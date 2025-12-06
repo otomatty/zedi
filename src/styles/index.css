@@ -1,0 +1,470 @@
+/* ============================================
+   Zedi Design System - TailwindCSS v4
+   "Zero-Friction Knowledge Network"
+   ============================================ */
+
+@import "tailwindcss";
+
+/* ============================================
+   Theme Configuration
+   ============================================ */
+
+@theme {
+  /* --- Color System --- */
+  
+  /* Primary Brand Colors - Cosmic Purple */
+  --color-primary-50: oklch(0.97 0.02 280);
+  --color-primary-100: oklch(0.94 0.04 280);
+  --color-primary-200: oklch(0.88 0.08 280);
+  --color-primary-300: oklch(0.78 0.12 280);
+  --color-primary-400: oklch(0.68 0.16 280);
+  --color-primary-500: oklch(0.58 0.20 280);
+  --color-primary-600: oklch(0.48 0.18 280);
+  --color-primary-700: oklch(0.40 0.15 280);
+  --color-primary-800: oklch(0.32 0.12 280);
+  --color-primary-900: oklch(0.25 0.09 280);
+  --color-primary-950: oklch(0.18 0.06 280);
+
+  /* Accent Colors - Nebula Teal */
+  --color-accent-50: oklch(0.97 0.02 180);
+  --color-accent-100: oklch(0.94 0.04 180);
+  --color-accent-200: oklch(0.88 0.08 180);
+  --color-accent-300: oklch(0.78 0.12 180);
+  --color-accent-400: oklch(0.68 0.14 180);
+  --color-accent-500: oklch(0.58 0.14 180);
+  --color-accent-600: oklch(0.48 0.12 180);
+  --color-accent-700: oklch(0.40 0.10 180);
+  --color-accent-800: oklch(0.32 0.08 180);
+  --color-accent-900: oklch(0.25 0.06 180);
+
+  /* Neutral Colors - Slate with slight warmth */
+  --color-neutral-50: oklch(0.98 0.004 270);
+  --color-neutral-100: oklch(0.96 0.006 270);
+  --color-neutral-200: oklch(0.92 0.008 270);
+  --color-neutral-300: oklch(0.86 0.010 270);
+  --color-neutral-400: oklch(0.70 0.012 270);
+  --color-neutral-500: oklch(0.55 0.012 270);
+  --color-neutral-600: oklch(0.45 0.012 270);
+  --color-neutral-700: oklch(0.35 0.012 270);
+  --color-neutral-800: oklch(0.25 0.012 270);
+  --color-neutral-850: oklch(0.20 0.012 270);
+  --color-neutral-900: oklch(0.16 0.012 270);
+  --color-neutral-950: oklch(0.12 0.010 270);
+
+  /* Semantic Colors */
+  --color-success-500: oklch(0.65 0.18 145);
+  --color-warning-500: oklch(0.75 0.16 85);
+  --color-error-500: oklch(0.60 0.20 25);
+  --color-info-500: oklch(0.60 0.16 240);
+
+  /* Surface Colors (for cards, backgrounds) */
+  --color-surface-light: oklch(0.99 0.002 270);
+  --color-surface-dark: oklch(0.18 0.012 270);
+  --color-surface-card-light: oklch(1.0 0 0);
+  --color-surface-card-dark: oklch(0.22 0.014 270);
+
+  /* --- Typography --- */
+  --font-sans: "Inter", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+
+  /* Font Sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  /* Line Heights */
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* --- Spacing --- */
+  --spacing-px: 1px;
+  --spacing-0: 0;
+  --spacing-0_5: 0.125rem;
+  --spacing-1: 0.25rem;
+  --spacing-1_5: 0.375rem;
+  --spacing-2: 0.5rem;
+  --spacing-2_5: 0.625rem;
+  --spacing-3: 0.75rem;
+  --spacing-3_5: 0.875rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-7: 1.75rem;
+  --spacing-8: 2rem;
+  --spacing-9: 2.25rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-14: 3.5rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+
+  /* --- Border Radius --- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* --- Shadows --- */
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.1), 0 2px 4px -2px oklch(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.25);
+  
+  /* Card-specific shadows */
+  --shadow-card: 0 2px 8px -2px oklch(0 0 0 / 0.08), 0 4px 16px -4px oklch(0 0 0 / 0.12);
+  --shadow-card-hover: 0 8px 24px -4px oklch(0 0 0 / 0.12), 0 12px 32px -8px oklch(0 0 0 / 0.16);
+  
+  /* Glow effects for focused elements */
+  --shadow-glow-primary: 0 0 20px oklch(0.58 0.20 280 / 0.3);
+  --shadow-glow-accent: 0 0 20px oklch(0.58 0.14 180 / 0.3);
+
+  /* --- Transitions --- */
+  --transition-fast: 100ms;
+  --transition-normal: 200ms;
+  --transition-slow: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* --- Z-Index --- */
+  --z-base: 0;
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-popover: 400;
+  --z-tooltip: 500;
+  --z-toast: 600;
+
+  /* --- Animation --- */
+  --animate-fade-in: fade-in 0.2s var(--ease-out);
+  --animate-slide-up: slide-up 0.2s var(--ease-out);
+  --animate-slide-down: slide-down 0.2s var(--ease-out);
+  --animate-scale-in: scale-in 0.2s var(--ease-spring);
+}
+
+/* ============================================
+   Keyframes
+   ============================================ */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { 
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from { 
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from { 
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-up-drawer {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+
+:root {
+  color-scheme: light dark;
+  
+  /* Default to light mode */
+  --bg-base: var(--color-surface-light);
+  --bg-card: var(--color-surface-card-light);
+  --text-primary: var(--color-neutral-900);
+  --text-secondary: var(--color-neutral-600);
+  --text-tertiary: var(--color-neutral-400);
+  --border-default: var(--color-neutral-200);
+  --border-subtle: var(--color-neutral-100);
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-base: var(--color-surface-dark);
+    --bg-card: var(--color-surface-card-dark);
+    --text-primary: var(--color-neutral-50);
+    --text-secondary: var(--color-neutral-400);
+    --text-tertiary: var(--color-neutral-500);
+    --border-default: var(--color-neutral-700);
+    --border-subtle: var(--color-neutral-800);
+  }
+}
+
+/* Manual dark mode class support */
+.dark {
+  --bg-base: var(--color-surface-dark);
+  --bg-card: var(--color-surface-card-dark);
+  --text-primary: var(--color-neutral-50);
+  --text-secondary: var(--color-neutral-400);
+  --text-tertiary: var(--color-neutral-500);
+  --border-default: var(--color-neutral-700);
+  --border-subtle: var(--color-neutral-800);
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background-color var(--transition-normal) var(--ease-out),
+              color var(--transition-normal) var(--ease-out);
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* Selection colors */
+::selection {
+  background-color: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::selection {
+    background-color: var(--color-primary-800);
+    color: var(--color-primary-100);
+  }
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-300);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-400);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-neutral-700);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-neutral-600);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+/* ============================================
+   Kobalte Component Styles
+   ============================================ */
+
+/* Button base styles */
+[data-kb-button] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  font-weight: 500;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast) var(--ease-out);
+  cursor: pointer;
+}
+
+[data-kb-button]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dialog/Modal styles */
+[data-kb-dialog-overlay] {
+  position: fixed;
+  inset: 0;
+  background-color: oklch(0 0 0 / 0.5);
+  backdrop-filter: blur(4px);
+  animation: var(--animate-fade-in);
+}
+
+[data-kb-dialog-content] {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-2xl);
+  animation: var(--animate-scale-in);
+}
+
+/* Popover styles */
+[data-kb-popover-content] {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  animation: var(--animate-slide-up);
+}
+
+/* Tooltip styles */
+[data-kb-tooltip-content] {
+  background-color: var(--color-neutral-900);
+  color: var(--color-neutral-50);
+  padding: var(--spacing-1_5) var(--spacing-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  animation: var(--animate-fade-in);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-kb-tooltip-content] {
+    background-color: var(--color-neutral-100);
+    color: var(--color-neutral-900);
+  }
+}
+
+/* ============================================
+   Utility Classes for Zedi
+   ============================================ */
+
+/* Card component base */
+.zedi-card {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-subtle);
+  transition: box-shadow var(--transition-normal) var(--ease-out),
+              transform var(--transition-normal) var(--ease-out);
+}
+
+.zedi-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+/* Ghost link styling */
+.zedi-ghost-link {
+  color: var(--color-primary-500);
+  border-bottom: 1px dashed var(--color-primary-300);
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--ease-out);
+}
+
+.zedi-ghost-link:hover {
+  color: var(--color-primary-600);
+  border-bottom-color: var(--color-primary-500);
+}
+
+/* Internal link styling */
+.zedi-link {
+  color: var(--color-primary-500);
+  text-decoration: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 60%,
+    var(--color-primary-200) 60%,
+    var(--color-primary-200) 100%
+  );
+  transition: all var(--transition-fast) var(--ease-out);
+}
+
+.zedi-link:hover {
+  color: var(--color-primary-600);
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 40%,
+    var(--color-primary-300) 40%,
+    var(--color-primary-300) 100%
+  );
+}
+
+/* Link suggestion highlight */
+.zedi-link-suggestion {
+  border-bottom: 2px dotted var(--color-accent-400);
+  cursor: pointer;
+}
+
+/* Glassmorphism effect */
+.zedi-glass {
+  background: oklch(1 0 0 / 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(1 0 0 / 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  .zedi-glass {
+    background: oklch(0.2 0.01 270 / 0.7);
+    border: 1px solid oklch(1 0 0 / 0.1);
+  }
+}
+
+/* Time Axis item animation */
+.zedi-time-axis-item {
+  animation: var(--animate-slide-up);
+}
