@@ -6,14 +6,20 @@ import App from "./App";
 import UILibrary from "./pages/UILibrary";
 import Home from "./pages/Home";
 import CardDetail from "./pages/CardDetail";
+import Login from "./pages/Login";
+import { AuthGuard } from "./components/auth/AuthGuard";
 
 render(
   () => (
     <Router>
-      <Route path="/" component={Home} />
-      <Route path="/card/:id" component={CardDetail} />
-      <Route path="/design-system" component={App} />
-      <Route path="/ui-library" component={UILibrary} />
+      {/* Public route */}
+      <Route path="/login" component={Login} />
+      
+      {/* Protected routes */}
+      <Route path="/" component={() => <AuthGuard><Home /></AuthGuard>} />
+      <Route path="/card/:id" component={() => <AuthGuard><CardDetail /></AuthGuard>} />
+      <Route path="/design-system" component={() => <AuthGuard><App /></AuthGuard>} />
+      <Route path="/ui-library" component={() => <AuthGuard><UILibrary /></AuthGuard>} />
     </Router>
   ),
   document.getElementById("root") as HTMLElement
