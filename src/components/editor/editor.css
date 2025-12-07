@@ -1,3 +1,17 @@
+/* Link Suggestion Styles */
+.suggested-link {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--color-primary, #7c3aed);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.suggested-link:hover {
+  background-color: var(--color-primary-light, rgba(124, 58, 237, 0.1));
+  border-radius: 2px;
+}
+
 /* CardEditor Styles */
 
 .card-editor-wrapper {

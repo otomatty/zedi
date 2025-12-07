@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { Button } from "./components/ui/Button";
 import { Card, CardHeader, CardContent, CardTitle } from "./components/ui/Card";
 import { Badge } from "./components/ui";
+import { SearchDialog } from "./components/search";
 
 function App() {
   const [darkMode, setDarkMode] = createSignal(false);
@@ -38,6 +39,9 @@ function App() {
 
   return (
     <div class={`min-h-screen transition-colors duration-300 ${darkMode() ? "dark" : ""}`}>
+      {/* Global Search Dialog */}
+      <SearchDialog onSelectCard={(cardId) => console.log("Selected card:", cardId)} />
+
       {/* Header */}
       <header class="sticky top-0 z-sticky bg-[var(--bg-base)]/80 backdrop-blur-xl border-b border-[var(--border-subtle)]">
         <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
