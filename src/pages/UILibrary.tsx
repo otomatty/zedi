@@ -41,6 +41,14 @@ import {
   CardHeader,
   CardContent,
   CardTitle,
+  // New components
+  Heading,
+  Text,
+  Code,
+  Divider,
+  Alert,
+  Progress,
+  Toast,
 } from "../components/ui";
 
 export default function UILibrary() {
@@ -561,6 +569,158 @@ export default function UILibrary() {
                   </Skeleton>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Typography Section */}
+        <section class="mb-12">
+          <h2 class="text-2xl font-bold text-[var(--text-primary)] mb-6 pb-2 border-b border-[var(--border-subtle)]">
+            タイポグラフィー
+          </h2>
+
+          <Card class="mb-6">
+            <CardHeader>
+              <CardTitle>Heading</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <div class="space-y-3">
+                <Heading as="h1">見出し H1</Heading>
+                <Heading as="h2">見出し H2</Heading>
+                <Heading as="h3">見出し H3</Heading>
+                <Heading as="h4">見出し H4</Heading>
+                <Heading as="h5">見出し H5</Heading>
+                <Heading as="h6">見出し H6</Heading>
+              </div>
+              <Divider label="グラデーション" />
+              <Heading as="h2" isGradient>グラデーションテキスト</Heading>
+              <Heading as="h3" color="primary">プライマリカラー</Heading>
+            </CardContent>
+          </Card>
+
+          <Card class="mb-6">
+            <CardHeader>
+              <CardTitle>Text</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <div class="space-y-2">
+                <Text size="lg" weight="bold">大きいテキスト（Bold）</Text>
+                <Text size="md">通常のテキスト。これは本文用のテキストコンポーネントです。</Text>
+                <Text size="sm" color="secondary">小さいセカンダリテキスト</Text>
+                <Text size="xs" color="tertiary">極小のターシャリテキスト</Text>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Code</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <Text>
+                インラインコード: <Code>const x = 42;</Code> のように使用できます。
+              </Text>
+              <Code variant="block">{`function hello() {
+  console.log("Hello, World!");
+}`}</Code>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Divider Section */}
+        <section class="mb-12">
+          <h2 class="text-2xl font-bold text-[var(--text-primary)] mb-6 pb-2 border-b border-[var(--border-subtle)]">
+            ディバイダー
+          </h2>
+          <Card>
+            <CardContent class="space-y-6">
+              <div>
+                <h4 class="font-medium text-[var(--text-primary)] mb-3">スタイル</h4>
+                <div class="space-y-4">
+                  <Divider variant="solid" />
+                  <Divider variant="dashed" />
+                  <Divider variant="dotted" />
+                </div>
+              </div>
+              <div>
+                <h4 class="font-medium text-[var(--text-primary)] mb-3">ラベル付き</h4>
+                <div class="space-y-4">
+                  <Divider label="中央" labelPosition="center" />
+                  <Divider label="左寄せ" labelPosition="start" />
+                  <Divider label="右寄せ" labelPosition="end" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Alert Section */}
+        <section class="mb-12">
+          <h2 class="text-2xl font-bold text-[var(--text-primary)] mb-6 pb-2 border-b border-[var(--border-subtle)]">
+            アラート
+          </h2>
+          <Card>
+            <CardContent class="space-y-4">
+              <Alert color="default" title="お知らせ">これはデフォルトのアラートです。</Alert>
+              <Alert color="primary" title="ヒント">これはプライマリカラーのアラートです。</Alert>
+              <Alert color="success" title="成功">処理が正常に完了しました。</Alert>
+              <Alert color="warning" title="警告">この操作は慎重に行ってください。</Alert>
+              <Alert color="danger" title="エラー" isClosable>問題が発生しました。</Alert>
+              <Divider label="バリエーション" />
+              <Alert variant="bordered" color="primary">ボーダースタイル</Alert>
+              <Alert variant="solid" color="success">ソリッドスタイル</Alert>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Progress Section */}
+        <section class="mb-12">
+          <h2 class="text-2xl font-bold text-[var(--text-primary)] mb-6 pb-2 border-b border-[var(--border-subtle)]">
+            プログレス
+          </h2>
+          <Card>
+            <CardContent class="space-y-6">
+              <div>
+                <h4 class="font-medium text-[var(--text-primary)] mb-3">基本</h4>
+                <div class="space-y-4">
+                  <Progress value={30} label="読み込み中" showValueLabel />
+                  <Progress value={60} color="success" label="アップロード" showValueLabel />
+                  <Progress value={90} color="warning" label="容量" showValueLabel />
+                </div>
+              </div>
+              <div>
+                <h4 class="font-medium text-[var(--text-primary)] mb-3">サイズ</h4>
+                <div class="space-y-4">
+                  <Progress value={50} size="sm" />
+                  <Progress value={50} size="md" />
+                  <Progress value={50} size="lg" />
+                </div>
+              </div>
+              <div>
+                <h4 class="font-medium text-[var(--text-primary)] mb-3">特殊効果</h4>
+                <div class="space-y-4">
+                  <Progress value={75} isStriped color="primary" />
+                  <Progress isIndeterminate color="secondary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Toast Section */}
+        <section class="mb-12">
+          <h2 class="text-2xl font-bold text-[var(--text-primary)] mb-6 pb-2 border-b border-[var(--border-subtle)]">
+            トースト
+          </h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Toast（静的プレビュー）</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <Toast color="default" title="お知らせ" description="新しいメッセージがあります。" />
+              <Toast color="success" title="保存完了" description="ファイルが保存されました。" variant="flat" />
+              <Toast color="warning" title="注意" description="ストレージ容量が残りわずかです。" variant="bordered" />
+              <Toast color="danger" title="エラー" description="接続に失敗しました。" variant="solid" />
             </CardContent>
           </Card>
         </section>

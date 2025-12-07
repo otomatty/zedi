@@ -82,7 +82,7 @@ export const Heading: ParentComponent<HeadingProps> = (props) => {
 export type TextSize = "xs" | "sm" | "md" | "lg";
 export type TextWeight = "normal" | "medium" | "semibold" | "bold";
 
-export interface TextProps extends JSX.HTMLAttributes<HTMLParagraphElement> {
+export interface TextProps {
   /** Text size */
   size?: TextSize;
   /** Font weight */
@@ -90,9 +90,13 @@ export interface TextProps extends JSX.HTMLAttributes<HTMLParagraphElement> {
   /** Color variant */
   color?: "default" | "secondary" | "tertiary" | "primary" | "success" | "warning" | "danger";
   /** Render as span instead of p */
-  as?: "p" | "span" | "div" | "label";
+  as?: "p" | "span" | "div";
   /** Truncate text with ellipsis */
   isTruncated?: boolean;
+  /** Additional CSS classes */
+  class?: string;
+  /** Children */
+  children?: JSX.Element;
 }
 
 const textSizeClasses: Record<TextSize, string> = {
@@ -120,7 +124,7 @@ const textColorClasses: Record<string, string> = {
 };
 
 export const Text: ParentComponent<TextProps> = (props) => {
-  const [local, others] = splitProps(props, [
+  const [local] = splitProps(props, [
     "size",
     "weight",
     "color",
@@ -137,25 +141,30 @@ export const Text: ParentComponent<TextProps> = (props) => {
 
   const truncateClass = local.isTruncated ? "truncate" : "";
 
-  return (
-    <Tag
-      class={`${textSizeClasses[size]} ${textWeightClasses[weight]} ${textColorClasses[color]} ${truncateClass} leading-relaxed ${local.class || ""}`}
-      {...others}
-    >
-      {local.children}
-    </Tag>
-  );
+  const classes = `${textSizeClasses[size]} ${textWeightClasses[weight]} ${textColorClasses[color]} ${truncateClass} leading-relaxed ${local.class || ""}`;
+
+  if (Tag === "span") {
+    return <span class={classes}>{local.children}</span>;
+  }
+  if (Tag === "div") {
+    return <div class={classes}>{local.children}</div>;
+  }
+  return <p class={classes}>{local.children}</p>;
 };
 
 // ============================================
 // Typography - Code
 // ============================================
 
-export interface CodeProps extends JSX.HTMLAttributes<HTMLElement> {
+export interface CodeProps {
   /** Inline or block display */
   variant?: "inline" | "block";
   /** Color/style variant */
   color?: "default" | "primary" | "success" | "warning" | "danger";
+  /** Additional CSS classes */
+  class?: string;
+  /** Children */
+  children?: JSX.Element;
 }
 
 const codeColorClasses: Record<string, string> = {
@@ -167,7 +176,7 @@ const codeColorClasses: Record<string, string> = {
 };
 
 export const Code: ParentComponent<CodeProps> = (props) => {
-  const [local, others] = splitProps(props, [
+  const [local] = splitProps(props, [
     "variant",
     "color",
     "class",
@@ -179,20 +188,14 @@ export const Code: ParentComponent<CodeProps> = (props) => {
 
   if (variant === "block") {
     return (
-      <pre
-        class={`${codeColorClasses[color]} font-mono text-sm p-4 rounded-xl overflow-x-auto ${local.class || ""}`}
-        {...others}
-      >
+      <pre class={`${codeColorClasses[color]} font-mono text-sm p-4 rounded-xl overflow-x-auto ${local.class || ""}`}>
         <code>{local.children}</code>
       </pre>
     );
   }
 
   return (
-    <code
-      class={`${codeColorClasses[color]} font-mono text-sm px-1.5 py-0.5 rounded-md ${local.class || ""}`}
-      {...others}
-    >
+    <code class={`${codeColorClasses[color]} font-mono text-sm px-1.5 py-0.5 rounded-md ${local.class || ""}`}>
       {local.children}
     </code>
   );
