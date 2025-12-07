@@ -1,0 +1,174 @@
+/* CardEditor Styles */
+
+.card-editor-wrapper {
+  /* Container for Tiptap editor - styles applied via ProseMirror */
+  position: relative;
+}
+
+.card-editor-content {
+  /* Tiptap editor content area */
+  min-height: 100px;
+  outline: none;
+}
+
+/* ProseMirror base styles */
+.ProseMirror {
+  outline: none;
+  min-height: 100px;
+}
+
+.ProseMirror > * + * {
+  margin-top: 0.75em;
+}
+
+/* Typography in editor */
+.ProseMirror h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror p {
+  color: var(--text-secondary);
+  line-height: 1.625;
+}
+
+/* Lists */
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+.ProseMirror li {
+  margin-top: 0.375em;
+}
+
+.ProseMirror li > p {
+  margin: 0;
+}
+
+/* Blockquote */
+.ProseMirror blockquote {
+  border-left: 4px solid var(--color-primary-300);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Code blocks */
+.ProseMirror pre {
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+
+.dark .ProseMirror pre {
+  background: var(--color-neutral-800);
+}
+
+.ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--color-neutral-100);
+  padding: 0.125em 0.25em;
+  border-radius: var(--radius-sm);
+}
+
+.dark .ProseMirror code {
+  background: var(--color-neutral-800);
+}
+
+.ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* Horizontal rule */
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border-default);
+  margin: 1.5rem 0;
+}
+
+/* Placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Focus styles */
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Internal links [[...]] */
+.ProseMirror .internal-link {
+  color: var(--color-primary-500);
+  text-decoration: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 60%,
+    var(--color-primary-200) 60%,
+    var(--color-primary-200) 100%
+  );
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--ease-out);
+}
+
+.ProseMirror .internal-link:hover {
+  color: var(--color-primary-600);
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 40%,
+    var(--color-primary-300) 40%,
+    var(--color-primary-300) 100%
+  );
+}
+
+/* Ghost links (unresolved) */
+.ProseMirror .ghost-link {
+  color: var(--color-primary-500);
+  border-bottom: 1px dashed var(--color-primary-300);
+  cursor: pointer;
+}
+
+.ProseMirror .ghost-link:hover {
+  color: var(--color-primary-600);
+  border-bottom-color: var(--color-primary-500);
+}
