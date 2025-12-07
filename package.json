@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.86.2",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-sql": "^2.3.1",
     "@tiptap/core": "^3.13.0",
     "@tiptap/pm": "^3.13.0",
     "@tiptap/starter-kit": "^3.13.0",

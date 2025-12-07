@@ -1,43 +1,14 @@
 // CardDetail page - Full card view with backlinks
-import { Show, For } from "solid-js";
+import { Show, For, createSignal, onMount, createEffect } from "solid-js";
 import { useParams, A } from "@solidjs/router";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
+import { cardStore } from "../stores/cardStore";
 import type { Card as CardData, Link } from "../types/card";
 
-// Demo data - will be replaced with actual API calls
-const demoCards: CardData[] = [
-  {
-    id: "1",
-    title: "👋 Zediへようこそ",
-    content: "<p>Zediは「書くストレス」と「整理する義務」からあなたを解放します。思いついたことを、ただ書く。それだけで知識のネットワークが生まれます。</p><p>詳しくは <span class='internal-link' data-type='internal-link' data-title='リンクの繋ぎ方' data-exists='true'>リンクの繋ぎ方</span> をご覧ください。</p>",
-    created_at: Math.floor(Date.now() / 1000) - 120,
-    updated_at: Math.floor(Date.now() / 1000) - 120,
-    is_deleted: false,
-  },
-  {
-    id: "2",
-    title: "🔗 リンクの繋ぎ方",
-    content: "<p>テキスト中に [[キーワード]] と入力するだけで、カード同士が繋がります。まだ存在しないカードへのリンク（Ghost Link）も作成できます。</p>",
-    created_at: Math.floor(Date.now() / 1000) - 300,
-    updated_at: Math.floor(Date.now() / 1000) - 300,
-    is_deleted: false,
-  },
-  {
-    id: "3",
-    title: "🤖 AIの使い方",
-    content: "<p>/wiki コマンドを使うと、AIが選択したキーワードについて解説と関連トピックへのリンクを含むカードを自動生成します。</p>",
-    created_at: Math.floor(Date.now() / 1000) - 600,
-    updated_at: Math.floor(Date.now() / 1000) - 600,
-    is_deleted: false,
-  },
-];
-
-// Demo links
-const demoLinks: Link[] = [
-  { source_id: "1", target_id: "2", created_at: Math.floor(Date.now() / 1000) },
-];
+// TODO: Links will be stored in database in future
+const demoLinks: Link[] = [];
 
 interface BacklinkItem {
   card: CardData;
@@ -46,21 +17,39 @@ interface BacklinkItem {
 
 export function CardDetail() {
   const params = useParams();
+  const [currentCard, setCurrentCard] = createSignal<CardData | null>(null);
   
-  // Find the current card
-  const card = () => demoCards.find(c => c.id === params.id);
+  // Initialize store and find card
+  onMount(async () => {
+    await cardStore.initialize();
+  });
+  
+  // Update current card when cards or params change
+  createEffect(() => {
+    const found = cardStore.cards().find(c => c.id === params.id);
+    if (found) {
+      setCurrentCard(found);
+    } else if (!cardStore.loading()) {
+      // Try to fetch from database if not in local state
+      if (params.id) {
+        cardStore.getCardById(params.id).then(card => {
+          setCurrentCard(card);
+        });
+      }
+    }
+  });
   
   // Find direct links (cards this card links to)
   const directLinks = (): CardData[] => {
     const links = demoLinks.filter(l => l.source_id === params.id);
-    return links.map(l => demoCards.find(c => c.id === l.target_id)).filter(Boolean) as CardData[];
+    return links.map(l => cardStore.cards().find(c => c.id === l.target_id)).filter(Boolean) as CardData[];
   };
   
   // Find backlinks (cards that link to this card)
   const backlinks = (): BacklinkItem[] => {
     const links = demoLinks.filter(l => l.target_id === params.id);
     return links.map(l => ({
-      card: demoCards.find(c => c.id === l.source_id)!,
+      card: cardStore.cards().find(c => c.id === l.source_id)!,
       context: "...このカードにリンクしています..."
     })).filter(item => item.card);
   };
@@ -69,7 +58,7 @@ export function CardDetail() {
   const twoHopLinks = (): CardData[] => {
     const directIds = directLinks().map(c => c.id);
     const secondaryLinks = demoLinks.filter(l => directIds.includes(l.source_id) && l.target_id !== params.id);
-    return secondaryLinks.map(l => demoCards.find(c => c.id === l.target_id)).filter(Boolean) as CardData[];
+    return secondaryLinks.map(l => cardStore.cards().find(c => c.id === l.target_id)).filter(Boolean) as CardData[];
   };
 
   const formatDate = (timestamp: number): string => {
@@ -106,7 +95,7 @@ export function CardDetail() {
       {/* Main Content */}
       <main class="max-w-4xl mx-auto px-6 py-8">
         <Show 
-          when={card()} 
+          when={currentCard()} 
           fallback={
             <div class="text-center py-16">
               <p class="text-[var(--text-secondary)]">カードが見つかりません</p>
@@ -118,24 +107,24 @@ export function CardDetail() {
             </div>
           }
         >
-          {(currentCard) => (
+          {(cardData) => (
             <>
               {/* Card Content */}
               <article class="zedi-card p-8">
                 <h1 class="text-3xl font-bold text-[var(--text-primary)] mb-4">
-                  {currentCard().title}
+                  {cardData().title}
                 </h1>
                 
                 <div class="flex items-center gap-4 text-sm text-[var(--text-tertiary)] mb-6">
-                  <span>作成: {formatDate(currentCard().created_at)}</span>
-                  <Show when={currentCard().updated_at !== currentCard().created_at}>
-                    <span>更新: {formatDate(currentCard().updated_at)}</span>
+                  <span>作成: {formatDate(cardData().created_at)}</span>
+                  <Show when={cardData().updated_at !== cardData().created_at}>
+                    <span>更新: {formatDate(cardData().updated_at)}</span>
                   </Show>
                 </div>
 
                 <div 
                   class="prose prose-lg dark:prose-invert max-w-none text-[var(--text-secondary)]"
-                  innerHTML={currentCard().content}
+                  innerHTML={cardData().content}
                 />
               </article>
 
