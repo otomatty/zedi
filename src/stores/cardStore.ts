@@ -2,34 +2,8 @@
 import { createSignal, createRoot } from "solid-js";
 import type { Card, CreateCardInput, UpdateCardInput } from "../types/card";
 import * as db from "../lib/database";
-
-// Demo data for browser mode
-const DEMO_CARDS: Card[] = [
-  {
-    id: "demo-1",
-    title: "👋 Zediへようこそ",
-    content: "<p>Zediは「書くストレス」と「整理する義務」からあなたを解放します。思いついたことを、ただ書く。それだけで知識のネットワークが生まれます。</p>",
-    created_at: Math.floor(Date.now() / 1000) - 120,
-    updated_at: Math.floor(Date.now() / 1000) - 120,
-    is_deleted: false,
-  },
-  {
-    id: "demo-2",
-    title: "🔗 リンクの繋ぎ方",
-    content: "<p>テキスト中に [[キーワード]] と入力するだけで、カード同士が繋がります。まだ存在しないカードへのリンク（Ghost Link）も作成できます。</p>",
-    created_at: Math.floor(Date.now() / 1000) - 300,
-    updated_at: Math.floor(Date.now() / 1000) - 300,
-    is_deleted: false,
-  },
-  {
-    id: "demo-3",
-    title: "🤖 AIの使い方",
-    content: "<p>/wiki コマンドを使うと、AIが選択したキーワードについて解説と関連トピックへのリンクを含むカードを自動生成します。</p>",
-    created_at: Math.floor(Date.now() / 1000) - 600,
-    updated_at: Math.floor(Date.now() / 1000) - 600,
-    is_deleted: false,
-  },
-];
+import * as sync from "../lib/syncService";
+import { SEED_CARDS } from "../data/seedCards";
 
 function createCardStore() {
   const [cards, setCards] = createSignal<Card[]>([]);
@@ -37,6 +11,29 @@ function createCardStore() {
   const [error, setError] = createSignal<string | null>(null);
   const [initialized, setInitialized] = createSignal(false);
   const [isUsingDatabase, setIsUsingDatabase] = createSignal(false);
+  const [syncStatus, setSyncStatus] = createSignal<{ syncing: boolean; lastSyncAt: number }>({ syncing: false, lastSyncAt: 0 });
+
+  /**
+   * Trigger background sync (non-blocking)
+   */
+  const triggerSync = () => {
+    if (!sync.isSyncAvailable()) return;
+    
+    setSyncStatus(prev => ({ ...prev, syncing: true }));
+    sync.syncAll()
+      .then(async ({ pulled }) => {
+        if (pulled > 0) {
+          // Refresh local state if we pulled changes
+          const dbCards = await db.getCards();
+          setCards(dbCards);
+        }
+        setSyncStatus({ syncing: false, lastSyncAt: Date.now() / 1000 });
+      })
+      .catch(err => {
+        console.error("Background sync failed:", err);
+        setSyncStatus(prev => ({ ...prev, syncing: false }));
+      });
+  };
 
   /**
    * Initialize the store and load cards
@@ -52,20 +49,50 @@ function createCardStore() {
       if (db.isTauriEnvironment()) {
         await db.initDatabase();
         setIsUsingDatabase(true);
-        const dbCards = await db.getCards();
+        let dbCards = await db.getCards();
+        
+        // Seeding: If database is empty, inject seed content
+        if (dbCards.length === 0) {
+          console.log("Empty database detected, seeding initial content...");
+          
+          // Insert seeds sequentially to respect order and avoid potential async issues in SQLite
+          for (const seed of SEED_CARDS) {
+            // Use db directly to avoid triggering unnecessary individual syncs
+            await db.createCard(seed);
+          }
+          
+          // Reload cards after seeding
+          dbCards = await db.getCards();
+          console.log(`Seeded ${dbCards.length} cards`);
+        }
+        
         setCards(dbCards);
         console.log("Loaded cards from database:", dbCards.length);
+        
+        // Initialize sync and trigger initial sync
+        // This will push the newly seeded cards to the server if online
+        await sync.initSync();
+        triggerSync();
       } else {
-        // Use demo data in browser
-        console.log("Not in Tauri environment, using demo data");
-        setCards(DEMO_CARDS);
+        // Use seed data as demo data in browser
+        console.log("Not in Tauri environment, using seed data as demo");
+        // Convert seed inputs to full card objects for display
+        const demoCards = SEED_CARDS.map((seed, index) => ({
+          id: `demo-${index}`,
+          title: seed.title || "無題",
+          content: seed.content || "",
+          created_at: Math.floor(Date.now() / 1000) - (index * 60),
+          updated_at: Math.floor(Date.now() / 1000) - (index * 60),
+          is_deleted: false
+        }));
+        setCards(demoCards);
       }
       setInitialized(true);
     } catch (err) {
       console.error("Failed to initialize card store:", err);
       setError(err instanceof Error ? err.message : "初期化に失敗しました");
-      // Fall back to demo data on error
-      setCards(DEMO_CARDS);
+      // Fall back to empty or safe state
+      setCards([]);
       setInitialized(true);
     } finally {
       setLoading(false);
@@ -100,6 +127,7 @@ function createCardStore() {
       if (isUsingDatabase()) {
         const newCard = await db.createCard(input);
         setCards(prev => [newCard, ...prev]);
+        triggerSync(); // Sync after create
         return newCard;
       } else {
         // Demo mode: create local card
@@ -152,6 +180,7 @@ function createCardStore() {
       if (isUsingDatabase()) {
         const updatedCard = await db.updateCard(input);
         setCards(prev => prev.map(c => c.id === input.id ? updatedCard : c));
+        triggerSync(); // Sync after update
         return updatedCard;
       } else {
         // Demo mode: update local card
@@ -185,6 +214,7 @@ function createCardStore() {
         await db.softDeleteCard(id);
       }
       setCards(prev => prev.filter(c => c.id !== id));
+      triggerSync(); // Sync after delete
     } catch (err) {
       console.error("Failed to delete card:", err);
       setError(err instanceof Error ? err.message : "カードの削除に失敗しました");
@@ -199,6 +229,7 @@ function createCardStore() {
     error,
     initialized,
     isUsingDatabase,
+    syncStatus,
     
     // Actions
     initialize,
@@ -207,6 +238,7 @@ function createCardStore() {
     getCardById,
     updateCard,
     deleteCard,
+    triggerSync,
   };
 }
 
