@@ -20,14 +20,14 @@ function App() {
       id: "2",
       title: "🔗 リンクの繋ぎ方",
       content:
-        "テキスト中に [[キーワード]] と入力するだけで、カード同士が繋がります。まだ存在しないカードへのリンク（Ghost Link）も作成できます。",
+        "テキスト中に [[キーワード]] と入力するだけで、ページ同士が繋がります。まだ存在しないページへのリンク（Ghost Link）も作成できます。",
       createdAt: "5分前",
     },
     {
       id: "3",
       title: "🤖 AIの使い方",
       content:
-        "/wiki コマンドを使うと、AIが選択したキーワードについて解説と関連トピックへのリンクを含むカードを自動生成します。",
+        "/wiki コマンドを使うと、AIが選択したキーワードについて解説と関連トピックへのリンクを含むページを自動生成します。",
       createdAt: "10分前",
     },
   ];
@@ -179,7 +179,7 @@ function App() {
               </p>
             </div>
             <Button variant="solid" color="primary" size="sm">
-              + 新規カード
+              + 新規ページ
             </Button>
           </div>
 
@@ -214,8 +214,8 @@ function App() {
           </h3>
           <p class="text-[var(--text-secondary)] leading-relaxed">
             これは通常のテキストです。
-            <a href="#" class="zedi-link">既存カードへのリンク</a> はハイライト表示され、
-            <span class="zedi-ghost-link">未作成のカード</span> は点線で表示されます。
+            <a href="#" class="zedi-link">既存ページへのリンク</a> はハイライト表示され、
+            <span class="zedi-ghost-link">未作成のページ</span> は点線で表示されます。
             また、入力中に検出された <span class="zedi-link-suggestion">リンク候補</span> は
             ドット線でハイライトされます。
           </p>

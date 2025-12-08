@@ -1,4 +1,4 @@
-// CardEditorModal - Modal for creating/editing cards
+// PageEditorModal - Modal for creating/editing pages
 import { createSignal } from "solid-js";
 import {
   Dialog,
@@ -10,41 +10,41 @@ import {
   DialogCloseButton,
 } from "../ui/Dialog";
 import { Button } from "../ui/Button";
-import { CardEditor } from "../editor";
-import type { Card } from "../../types/card";
+import { PageEditor } from "../editor";
+import type { Page } from "../../types/page";
 
-export interface CardEditorModalProps {
+export interface PageEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (title: string, content: string) => void;
-  card?: Card; // If provided, we're editing an existing card
+  page?: Page; // If provided, we're editing an existing page
   isSaving?: boolean;
 }
 
-export function CardEditorModal(props: CardEditorModalProps) {
-  const [title, setTitle] = createSignal(props.card?.title || "");
-  const [content, setContent] = createSignal(props.card?.content || "");
+export function PageEditorModal(props: PageEditorModalProps) {
+  const [title, setTitle] = createSignal(props.page?.title || "");
+  const [content, setContent] = createSignal(props.page?.content || "");
 
   const handleSave = () => {
     props.onSave(title(), content());
   };
 
-  const isEditing = () => !!props.card;
+  const isEditing = () => !!props.page;
 
   return (
     <Dialog open={props.isOpen} onOpenChange={(open) => !open && props.onClose()}>
       <DialogContent class="max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {isEditing() ? "カードを編集" : "新規カード"}
+            {isEditing() ? "ページを編集" : "新規ページ"}
           </DialogTitle>
           <DialogCloseButton />
         </DialogHeader>
         
         <DialogBody class="flex-1 overflow-y-auto p-0">
           <div class="p-6">
-            <CardEditor
-              initialContent={props.card?.content}
+            <PageEditor
+              initialContent={props.page?.content}
               autoFocus={true}
               onTitleChange={setTitle}
               onContentChange={setContent}
@@ -76,4 +76,8 @@ export function CardEditorModal(props: CardEditorModalProps) {
   );
 }
 
-export default CardEditorModal;
+// Backwards compatibility aliases
+export const CardEditorModal = PageEditorModal;
+export type CardEditorModalProps = PageEditorModalProps;
+
+export default PageEditorModal;

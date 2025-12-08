@@ -2,41 +2,43 @@
 import { createSignal, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { TimeAxis } from "../components/layout/TimeAxis";
-import { CardEditorModal } from "../components/layout/CardEditorModal";
-import { cardStore } from "../stores/cardStore";
-import type { Card } from "../types/card";
+import { PageEditorModal } from "../components/layout/PageEditorModal";
+import { Header } from "../components/layout/Header";
+import { pageStore } from "../stores/pageStore";
+import { authStore } from "../stores/authStore";
+import type { Page } from "../types/page";
 
 export function Home() {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [isSaving, setIsSaving] = createSignal(false);
-  const [selectedCard, setSelectedCard] = createSignal<Card | undefined>(undefined);
+  const [selectedPage, setSelectedPage] = createSignal<Page | undefined>(undefined);
   
-  // Initialize card store on mount
+  // Initialize page store on mount
   onMount(() => {
-    cardStore.initialize();
+    pageStore.initialize();
   });
 
-  const handleNewCard = () => {
-    setSelectedCard(undefined);
+  const handleNewPage = () => {
+    setSelectedPage(undefined);
     setIsModalOpen(true);
   };
 
-  const handleCardClick = (card: Card) => {
-    // Navigate to card detail page
-    navigate(`/card/${card.id}`);
+  const handlePageClick = (page: Page) => {
+    // Navigate to page detail
+    navigate(`/page/${page.id}`);
   };
 
-  const handleSaveCard = async (title: string, content: string) => {
+  const handleSavePage = async (title: string, content: string) => {
     setIsSaving(true);
     try {
-      await cardStore.createCard({
-        title: title || "無題のカード",
+      await pageStore.createPage({
+        title: title || "無題のページ",
         content,
       });
       setIsModalOpen(false);
     } catch (error) {
-      console.error("Failed to save card:", error);
+      console.error("Failed to save page:", error);
     } finally {
       setIsSaving(false);
     }
@@ -44,22 +46,29 @@ export function Home() {
 
   return (
     <div class="min-h-screen bg-[var(--bg-base)]">
+      {/* Header */}
+      <Header
+        isLoggedIn={authStore.isAuthenticated()}
+        userName={authStore.user()?.user_metadata?.full_name || authStore.user()?.email}
+        userAvatarUrl={authStore.user()?.user_metadata?.avatar_url}
+      />
+
       {/* Main Content */}
-      <main class="max-w-4xl mx-auto px-6 py-8">
+      <main class="max-w-6xl mx-auto px-6 py-8">
         <TimeAxis
-          cards={cardStore.cards()}
-          isLoading={cardStore.loading()}
-          onNewCard={handleNewCard}
-          onCardClick={handleCardClick}
+          cards={pageStore.pages()}
+          isLoading={pageStore.loading()}
+          onNewCard={handleNewPage}
+          onCardClick={handlePageClick}
         />
       </main>
 
-      {/* Card Editor Modal */}
-      <CardEditorModal
+      {/* Page Editor Modal */}
+      <PageEditorModal
         isOpen={isModalOpen()}
         onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveCard}
-        card={selectedCard()}
+        onSave={handleSavePage}
+        page={selectedPage()}
         isSaving={isSaving()}
       />
     </div>

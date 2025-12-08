@@ -1,14 +1,14 @@
 // Database initialization and migration
 use tauri_plugin_sql::{Migration, MigrationKind};
 
-/// Get migrations for the cards database
+/// Get migrations for the pages database
 pub fn get_migrations() -> Vec<Migration> {
     vec![
         Migration {
             version: 1,
-            description: "Create cards table",
+            description: "Create pages table",
             sql: r#"
-                CREATE TABLE IF NOT EXISTS cards (
+                CREATE TABLE IF NOT EXISTS pages (
                     id TEXT PRIMARY KEY NOT NULL,
                     title TEXT NOT NULL DEFAULT '',
                     content TEXT NOT NULL DEFAULT '',
@@ -16,8 +16,8 @@ pub fn get_migrations() -> Vec<Migration> {
                     updated_at INTEGER NOT NULL,
                     is_deleted INTEGER NOT NULL DEFAULT 0
                 );
-                CREATE INDEX IF NOT EXISTS idx_cards_created_at ON cards(created_at);
-                CREATE INDEX IF NOT EXISTS idx_cards_title ON cards(title);
+                CREATE INDEX IF NOT EXISTS idx_pages_created_at ON pages(created_at);
+                CREATE INDEX IF NOT EXISTS idx_pages_title ON pages(title);
             "#,
             kind: MigrationKind::Up,
         },
@@ -30,8 +30,8 @@ pub fn get_migrations() -> Vec<Migration> {
                     target_id TEXT NOT NULL,
                     created_at INTEGER NOT NULL,
                     PRIMARY KEY (source_id, target_id),
-                    FOREIGN KEY (source_id) REFERENCES cards(id),
-                    FOREIGN KEY (target_id) REFERENCES cards(id)
+                    FOREIGN KEY (source_id) REFERENCES pages(id),
+                    FOREIGN KEY (target_id) REFERENCES pages(id)
                 );
             "#,
             kind: MigrationKind::Up,
@@ -42,10 +42,10 @@ pub fn get_migrations() -> Vec<Migration> {
             sql: r#"
                 CREATE TABLE IF NOT EXISTS ghost_links (
                     link_text TEXT NOT NULL,
-                    source_card_id TEXT NOT NULL,
+                    source_page_id TEXT NOT NULL,
                     created_at INTEGER NOT NULL,
-                    PRIMARY KEY (link_text, source_card_id),
-                    FOREIGN KEY (source_card_id) REFERENCES cards(id)
+                    PRIMARY KEY (link_text, source_page_id),
+                    FOREIGN KEY (source_page_id) REFERENCES pages(id)
                 );
             "#,
             kind: MigrationKind::Up,

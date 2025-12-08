@@ -1,6 +1,6 @@
 // Type definitions for Zedi data models
 
-export interface Card {
+export interface Page {
   id: string;
   title: string;
   content: string;
@@ -9,12 +9,12 @@ export interface Card {
   is_deleted: boolean;
 }
 
-export interface CreateCardInput {
+export interface CreatePageInput {
   title: string;
   content: string;
 }
 
-export interface UpdateCardInput {
+export interface UpdatePageInput {
   id: string;
   title: string;
   content: string;
@@ -28,6 +28,11 @@ export interface Link {
 
 export interface GhostLink {
   link_text: string;
-  source_card_id: string;
+  source_page_id: string;
   created_at: number;
 }
+
+// Backwards compatibility aliases (can be removed later)
+export type Card = Page;
+export type CreateCardInput = CreatePageInput;
+export type UpdateCardInput = UpdatePageInput;

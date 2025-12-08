@@ -1,64 +1,64 @@
-// CardDetail page - Full card view with backlinks
+// PageDetail page - Full page view with backlinks
 import { Show, For, createSignal, onMount, createEffect } from "solid-js";
 import { useParams, A } from "@solidjs/router";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
-import { cardStore } from "../stores/cardStore";
-import type { Card as CardData, Link } from "../types/card";
+import { pageStore } from "../stores/pageStore";
+import type { Page, Link } from "../types/page";
 
 // TODO: Links will be stored in database in future
 const demoLinks: Link[] = [];
 
 interface BacklinkItem {
-  card: CardData;
+  page: Page;
   context?: string; // Snippet showing the link context
 }
 
-export function CardDetail() {
+export function PageDetail() {
   const params = useParams();
-  const [currentCard, setCurrentCard] = createSignal<CardData | null>(null);
+  const [currentPage, setCurrentPage] = createSignal<Page | null>(null);
   
-  // Initialize store and find card
+  // Initialize store and find page
   onMount(async () => {
-    await cardStore.initialize();
+    await pageStore.initialize();
   });
   
-  // Update current card when cards or params change
+  // Update current page when pages or params change
   createEffect(() => {
-    const found = cardStore.cards().find(c => c.id === params.id);
+    const found = pageStore.pages().find(p => p.id === params.id);
     if (found) {
-      setCurrentCard(found);
-    } else if (!cardStore.loading()) {
+      setCurrentPage(found);
+    } else if (!pageStore.loading()) {
       // Try to fetch from database if not in local state
       if (params.id) {
-        cardStore.getCardById(params.id).then(card => {
-          setCurrentCard(card);
+        pageStore.getPageById(params.id).then(page => {
+          setCurrentPage(page);
         });
       }
     }
   });
   
-  // Find direct links (cards this card links to)
-  const directLinks = (): CardData[] => {
+  // Find direct links (pages this page links to)
+  const directLinks = (): Page[] => {
     const links = demoLinks.filter(l => l.source_id === params.id);
-    return links.map(l => cardStore.cards().find(c => c.id === l.target_id)).filter(Boolean) as CardData[];
+    return links.map(l => pageStore.pages().find(p => p.id === l.target_id)).filter(Boolean) as Page[];
   };
   
-  // Find backlinks (cards that link to this card)
+  // Find backlinks (pages that link to this page)
   const backlinks = (): BacklinkItem[] => {
     const links = demoLinks.filter(l => l.target_id === params.id);
     return links.map(l => ({
-      card: cardStore.cards().find(c => c.id === l.source_id)!,
-      context: "...このカードにリンクしています..."
-    })).filter(item => item.card);
+      page: pageStore.pages().find(p => p.id === l.source_id)!,
+      context: "...このページにリンクしています..."
+    })).filter(item => item.page);
   };
   
   // Find 2-hop links (what the direct links link to)
-  const twoHopLinks = (): CardData[] => {
-    const directIds = directLinks().map(c => c.id);
+  const twoHopLinks = (): Page[] => {
+    const directIds = directLinks().map(p => p.id);
     const secondaryLinks = demoLinks.filter(l => directIds.includes(l.source_id) && l.target_id !== params.id);
-    return secondaryLinks.map(l => cardStore.cards().find(c => c.id === l.target_id)).filter(Boolean) as CardData[];
+    return secondaryLinks.map(l => pageStore.pages().find(p => p.id === l.target_id)).filter(Boolean) as Page[];
   };
 
   const formatDate = (timestamp: number): string => {
@@ -95,10 +95,10 @@ export function CardDetail() {
       {/* Main Content */}
       <main class="max-w-4xl mx-auto px-6 py-8">
         <Show 
-          when={currentCard()} 
+          when={currentPage()} 
           fallback={
             <div class="text-center py-16">
-              <p class="text-[var(--text-secondary)]">カードが見つかりません</p>
+              <p class="text-[var(--text-secondary)]">ページが見つかりません</p>
               <A href="/">
                 <Button variant="flat" color="primary" class="mt-4">
                   ホームに戻る
@@ -107,24 +107,24 @@ export function CardDetail() {
             </div>
           }
         >
-          {(cardData) => (
+          {(pageData) => (
             <>
-              {/* Card Content */}
+              {/* Page Content */}
               <article class="zedi-card p-8">
                 <h1 class="text-3xl font-bold text-[var(--text-primary)] mb-4">
-                  {cardData().title}
+                  {pageData().title}
                 </h1>
                 
                 <div class="flex items-center gap-4 text-sm text-[var(--text-tertiary)] mb-6">
-                  <span>作成: {formatDate(cardData().created_at)}</span>
-                  <Show when={cardData().updated_at !== cardData().created_at}>
-                    <span>更新: {formatDate(cardData().updated_at)}</span>
+                  <span>作成: {formatDate(pageData().created_at)}</span>
+                  <Show when={pageData().updated_at !== pageData().created_at}>
+                    <span>更新: {formatDate(pageData().updated_at)}</span>
                   </Show>
                 </div>
 
                 <div 
                   class="prose prose-lg dark:prose-invert max-w-none text-[var(--text-secondary)]"
-                  innerHTML={cardData().content}
+                  innerHTML={pageData().content}
                 />
               </article>
 
@@ -142,17 +142,17 @@ export function CardDetail() {
                   <div class="mb-6">
                     <h3 class="text-sm font-medium text-[var(--text-tertiary)] mb-3 flex items-center gap-2">
                       リンク先
-                      <span class="text-xs">（このカードからのリンク）</span>
+                      <span class="text-xs">（このページからのリンク）</span>
                     </h3>
                     <div class="space-y-2">
                       <For each={directLinks()}>
-                        {(linkedCard) => (
-                          <A href={`/card/${linkedCard.id}`}>
+                        {(linkedPage) => (
+                          <A href={`/page/${linkedPage.id}`}>
                             <Card isPressable isHoverable class="p-3">
                               <div class="flex items-center gap-3">
                                 <span class="w-2 h-2 rounded-full bg-success-500" />
                                 <span class="text-sm font-medium text-[var(--text-primary)]">
-                                  {linkedCard.title}
+                                  {linkedPage.title}
                                 </span>
                               </div>
                             </Card>
@@ -168,18 +168,18 @@ export function CardDetail() {
                   <div class="mb-6">
                     <h3 class="text-sm font-medium text-[var(--text-tertiary)] mb-3 flex items-center gap-2">
                       バックリンク
-                      <span class="text-xs">（このカードへのリンク）</span>
+                      <span class="text-xs">（このページへのリンク）</span>
                     </h3>
                     <div class="space-y-2">
                       <For each={backlinks()}>
                         {(item) => (
-                          <A href={`/card/${item.card.id}`}>
+                          <A href={`/page/${item.page.id}`}>
                             <Card isPressable isHoverable class="p-3">
                               <div class="flex items-center gap-3">
                                 <span class="w-2 h-2 rounded-full bg-primary-500" />
                                 <div>
                                   <span class="text-sm font-medium text-[var(--text-primary)]">
-                                    {item.card.title}
+                                    {item.page.title}
                                   </span>
                                   <Show when={item.context}>
                                     <p class="text-xs text-[var(--text-tertiary)] mt-1">
@@ -201,17 +201,17 @@ export function CardDetail() {
                   <div>
                     <h3 class="text-sm font-medium text-[var(--text-tertiary)] mb-3 flex items-center gap-2">
                       2ホップリンク
-                      <span class="text-xs">（リンク先のカードからのリンク）</span>
+                      <span class="text-xs">（リンク先のページからのリンク）</span>
                     </h3>
                     <div class="space-y-2">
                       <For each={twoHopLinks()}>
-                        {(linkedCard) => (
-                          <A href={`/card/${linkedCard.id}`}>
+                        {(linkedPage) => (
+                          <A href={`/page/${linkedPage.id}`}>
                             <Card isPressable isHoverable class="p-3">
                               <div class="flex items-center gap-3">
                                 <span class="w-2 h-2 rounded-full bg-accent-500" />
                                 <span class="text-sm font-medium text-[var(--text-primary)]">
-                                  {linkedCard.title}
+                                  {linkedPage.title}
                                 </span>
                               </div>
                             </Card>
@@ -229,7 +229,7 @@ export function CardDetail() {
                       まだリンクがありません
                     </p>
                     <p class="text-sm text-[var(--text-tertiary)] mt-1">
-                      <code class="px-1 py-0.5 bg-[var(--bg-card)] rounded">[[キーワード]]</code> で他のカードとリンクできます
+                      <code class="px-1 py-0.5 bg-[var(--bg-card)] rounded">[[キーワード]]</code> で他のページとリンクできます
                     </p>
                   </div>
                 </Show>
@@ -242,4 +242,7 @@ export function CardDetail() {
   );
 }
 
-export default CardDetail;
+// Backwards compatibility alias
+export const CardDetail = PageDetail;
+
+export default PageDetail;

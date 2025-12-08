@@ -63,7 +63,7 @@ export function LinkSuggestionMenu(props: LinkSuggestionMenuProps) {
                   "{props.inputValue}" を新規作成
                 </p>
                 <p class="text-xs text-[var(--text-tertiary)] mt-1">
-                  Enterで新しいカードへのリンクを作成
+                  Enterで新しいページへのリンクを作成
                 </p>
               </div>
             }

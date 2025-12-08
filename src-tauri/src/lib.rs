@@ -1,4 +1,4 @@
-// Card CRUD operations using Tauri commands
+// Page CRUD operations using Tauri commands
 mod database;
 mod link_detector;
 mod models;
@@ -22,11 +22,11 @@ fn get_link_detector() -> &'static LinkDetector {
     LINK_DETECTOR.get().expect("Link detector not initialized")
 }
 
-/// Create a new card
+/// Create a new page
 #[tauri::command]
-async fn create_card(input: models::CreateCardInput) -> Result<models::Card, String> {
+async fn create_page(input: models::CreatePageInput) -> Result<models::Page, String> {
     let now = chrono::Utc::now().timestamp();
-    let card = models::Card {
+    let page = models::Page {
         id: uuid::Uuid::new_v4().to_string(),
         title: input.title.clone(),
         content: input.content.clone(),
@@ -35,38 +35,38 @@ async fn create_card(input: models::CreateCardInput) -> Result<models::Card, Str
         is_deleted: false,
     };
 
-    // Index the new card
-    get_search_engine().index_card(&card.id, &card.title, &card.content)?;
+    // Index the new page
+    get_search_engine().index_card(&page.id, &page.title, &page.content)?;
 
     // Add title to link detector
-    if !card.title.is_empty() {
-        get_link_detector().add_pattern(card.title.clone())?;
+    if !page.title.is_empty() {
+        get_link_detector().add_pattern(page.title.clone())?;
     }
 
-    Ok(card)
+    Ok(page)
 }
 
-/// Get all cards (non-deleted) ordered by created_at desc
+/// Get all pages (non-deleted) ordered by created_at desc
 #[tauri::command]
-async fn get_cards(_limit: Option<u32>, _offset: Option<u32>) -> Result<Vec<models::Card>, String> {
+async fn get_pages(_limit: Option<u32>, _offset: Option<u32>) -> Result<Vec<models::Page>, String> {
     // TODO: Implement actual database query
     // For now, return empty vector
     Ok(vec![])
 }
 
-/// Get a single card by ID
+/// Get a single page by ID
 #[tauri::command]
-async fn get_card_by_id(_id: String) -> Result<Option<models::Card>, String> {
+async fn get_page_by_id(_id: String) -> Result<Option<models::Page>, String> {
     // TODO: Implement actual database query
     Ok(None)
 }
 
-/// Update an existing card
+/// Update an existing page
 #[tauri::command]
-async fn update_card(input: models::UpdateCardInput) -> Result<models::Card, String> {
+async fn update_page(input: models::UpdatePageInput) -> Result<models::Page, String> {
     let now = chrono::Utc::now().timestamp();
     // TODO: Implement actual database update
-    let card = models::Card {
+    let page = models::Page {
         id: input.id.clone(),
         title: input.title.clone(),
         content: input.content.clone(),
@@ -75,21 +75,21 @@ async fn update_card(input: models::UpdateCardInput) -> Result<models::Card, Str
         is_deleted: false,
     };
 
-    // Re-index the updated card
-    get_search_engine().index_card(&card.id, &card.title, &card.content)?;
+    // Re-index the updated page
+    get_search_engine().index_card(&page.id, &page.title, &page.content)?;
 
     // Update link detector patterns
     // Note: In production, we'd need to track the old title to remove it
-    if !card.title.is_empty() {
-        get_link_detector().add_pattern(card.title.clone())?;
+    if !page.title.is_empty() {
+        get_link_detector().add_pattern(page.title.clone())?;
     }
 
-    Ok(card)
+    Ok(page)
 }
 
-/// Soft delete a card
+/// Soft delete a page
 #[tauri::command]
-async fn soft_delete_card(id: String) -> Result<(), String> {
+async fn soft_delete_page(id: String) -> Result<(), String> {
     // TODO: Implement actual database soft delete
 
     // Remove from search index
@@ -98,9 +98,9 @@ async fn soft_delete_card(id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Search cards by query string
+/// Search pages by query string
 #[tauri::command]
-async fn search_cards(query: String, limit: Option<usize>) -> Result<Vec<search::SearchResult>, String> {
+async fn search_pages(query: String, limit: Option<usize>) -> Result<Vec<search::SearchResult>, String> {
     let limit = limit.unwrap_or(20);
     get_search_engine().search(&query, limit)
 }
@@ -111,7 +111,7 @@ async fn get_link_suggestions(text: String) -> Result<Vec<link_detector::LinkSug
     get_link_detector().find_matches(&text)
 }
 
-/// Update link detector patterns with all card titles
+/// Update link detector patterns with all page titles
 #[tauri::command]
 async fn update_link_patterns(titles: Vec<String>) -> Result<(), String> {
     get_link_detector().update_patterns(titles)
@@ -141,16 +141,15 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            create_card,
-            get_cards,
-            get_card_by_id,
-            update_card,
-            soft_delete_card,
-            search_cards,
+            create_page,
+            get_pages,
+            get_page_by_id,
+            update_page,
+            soft_delete_page,
+            search_pages,
             get_link_suggestions,
             update_link_patterns,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

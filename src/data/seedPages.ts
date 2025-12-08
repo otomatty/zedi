@@ -1,6 +1,6 @@
-import type { CreateCardInput } from "../types/card";
+import type { CreatePageInput } from "../types/page";
 
-export const SEED_CARDS: CreateCardInput[] = [
+export const SEED_PAGES: CreatePageInput[] = [
   {
     title: "👋 Zediへようこそ",
     content: `
@@ -22,17 +22,17 @@ export const SEED_CARDS: CreateCardInput[] = [
   {
     title: "🔗 リンクの繋ぎ方",
     content: `
-      <p>Zediの最も強力な機能は、カード同士を有機的に繋げることです。</p>
+      <p>Zediの最も強力な機能は、ページ同士を有機的に繋げることです。</p>
 
       <h3>使い方</h3>
       <p>テキストを入力中に <code>[[</code> とタイプするだけで、リンク補完メニューが開きます。</p>
       
       <ul>
-        <li>既存のカードを選択してリンク</li>
-        <li>新しい言葉を入力して<strong>Ghost Link</strong>（未作成カードへのリンク）を作成</li>
+        <li>既存のページを選択してリンク</li>
+        <li>新しい言葉を入力して<strong>Ghost Link</strong>（未作成ページへのリンク）を作成</li>
       </ul>
 
-      <p>例えば、[[Zediの哲学]] や [[AI機能]] のように、まだ存在しない概念にもリンクを晴れます。これらは将来、カードとして実体化されるのを待っています。</p>
+      <p>例えば、[[Zediの哲学]] や [[AI機能]] のように、まだ存在しない概念にもリンクを晴れます。これらは将来、ページとして実体化されるのを待っています。</p>
     `
   },
   {
@@ -50,3 +50,6 @@ export const SEED_CARDS: CreateCardInput[] = [
     `
   }
 ];
+
+// Backwards compatibility alias
+export const SEED_CARDS = SEED_PAGES;

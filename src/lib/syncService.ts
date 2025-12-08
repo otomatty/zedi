@@ -4,7 +4,7 @@
 import { supabase, hasValidCredentials } from "./supabase";
 import * as db from "./database";
 import { authStore } from "../stores/authStore";
-import type { Card } from "../types/card";
+import type { Page } from "../types/page";
 
 // Generate a unique device ID (persisted in localStorage)
 function getDeviceId(): string {
@@ -59,7 +59,7 @@ export async function initSync(): Promise<void> {
 }
 
 /**
- * Sync all cards between local and remote
+ * Sync all pages between local and remote
  */
 export async function syncAll(): Promise<{ pushed: number; pulled: number }> {
   if (!hasValidCredentials || !supabase) {
@@ -102,33 +102,33 @@ export async function syncAll(): Promise<{ pushed: number; pulled: number }> {
 async function pushChanges(userId: string): Promise<number> {
   if (!supabase) return 0;
 
-  // Get all local cards that were updated after last sync
-  const localCards = await db.getCards(1000, 0);
-  const cardsToSync = localCards.filter(
-    (card) => card.updated_at > lastSyncAt
+  // Get all local pages that were updated after last sync
+  const localPages = await db.getPages(1000, 0);
+  const pagesToSync = localPages.filter(
+    (page) => page.updated_at > lastSyncAt
   );
 
-  if (cardsToSync.length === 0) {
+  if (pagesToSync.length === 0) {
     return 0;
   }
 
-  // Upsert cards to Supabase (LWW - remote will keep newer version)
-  const cardsWithUserId = cardsToSync.map((card) => ({
-    ...card,
+  // Upsert pages to Supabase (LWW - remote will keep newer version)
+  const pagesWithUserId = pagesToSync.map((page) => ({
+    ...page,
     user_id: userId,
   }));
 
-  const { error } = await supabase.from("cards").upsert(cardsWithUserId, {
+  const { error } = await supabase.from("pages").upsert(pagesWithUserId, {
     onConflict: "id",
     ignoreDuplicates: false,
   });
 
   if (error) {
-    console.error("Failed to push cards:", error);
+    console.error("Failed to push pages:", error);
     throw error;
   }
 
-  return cardsToSync.length;
+  return pagesToSync.length;
 }
 
 /**
@@ -137,30 +137,30 @@ async function pushChanges(userId: string): Promise<number> {
 async function pullChanges(userId: string): Promise<number> {
   if (!supabase) return 0;
 
-  // Get remote cards updated after last sync
-  const { data: remoteCards, error } = await supabase
-    .from("cards")
+  // Get remote pages updated after last sync
+  const { data: remotePages, error } = await supabase
+    .from("pages")
     .select("*")
     .eq("user_id", userId)
     .gt("updated_at", lastSyncAt);
 
   if (error) {
-    console.error("Failed to pull cards:", error);
+    console.error("Failed to pull pages:", error);
     throw error;
   }
 
-  if (!remoteCards || remoteCards.length === 0) {
+  if (!remotePages || remotePages.length === 0) {
     return 0;
   }
 
   // Apply remote changes to local database (LWW resolution)
   let applied = 0;
-  for (const remoteCard of remoteCards) {
-    const localCard = await db.getCardById(remoteCard.id);
+  for (const remotePage of remotePages) {
+    const localPage = await db.getPageById(remotePage.id);
 
     // LWW: Apply remote if it's newer or doesn't exist locally
-    if (!localCard || remoteCard.updated_at > localCard.updated_at) {
-      await applyRemoteCard(remoteCard);
+    if (!localPage || remotePage.updated_at > localPage.updated_at) {
+      await applyRemotePage(remotePage);
       applied++;
     }
   }
@@ -169,42 +169,42 @@ async function pullChanges(userId: string): Promise<number> {
 }
 
 /**
- * Apply a remote card to local database
+ * Apply a remote page to local database
  */
-async function applyRemoteCard(
-  remoteCard: Card & { user_id: string }
+async function applyRemotePage(
+  remotePage: Page & { user_id: string }
 ): Promise<void> {
   const database = db.getDatabase();
 
-  // Check if card exists locally
-  const existing = await db.getCardById(remoteCard.id);
+  // Check if page exists locally
+  const existing = await db.getPageById(remotePage.id);
 
   if (existing) {
-    // Update existing card
+    // Update existing page
     await database.execute(
-      `UPDATE cards 
+      `UPDATE pages 
        SET title = $1, content = $2, updated_at = $3, is_deleted = $4 
        WHERE id = $5`,
       [
-        remoteCard.title,
-        remoteCard.content,
-        remoteCard.updated_at,
-        remoteCard.is_deleted ? 1 : 0,
-        remoteCard.id,
+        remotePage.title,
+        remotePage.content,
+        remotePage.updated_at,
+        remotePage.is_deleted ? 1 : 0,
+        remotePage.id,
       ]
     );
   } else {
-    // Insert new card
+    // Insert new page
     await database.execute(
-      `INSERT INTO cards (id, title, content, created_at, updated_at, is_deleted) 
+      `INSERT INTO pages (id, title, content, created_at, updated_at, is_deleted) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
-        remoteCard.id,
-        remoteCard.title,
-        remoteCard.content,
-        remoteCard.created_at,
-        remoteCard.updated_at,
-        remoteCard.is_deleted ? 1 : 0,
+        remotePage.id,
+        remotePage.title,
+        remotePage.content,
+        remotePage.created_at,
+        remotePage.updated_at,
+        remotePage.is_deleted ? 1 : 0,
       ]
     );
   }

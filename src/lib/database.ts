@@ -1,6 +1,6 @@
 // Database service layer using @tauri-apps/plugin-sql
 import Database from "@tauri-apps/plugin-sql";
-import type { Card, CreateCardInput, UpdateCardInput } from "../types/card";
+import type { Page, CreatePageInput, UpdatePageInput } from "../types/page";
 
 // Singleton database instance
 let db: Database | null = null;
@@ -52,15 +52,15 @@ function getCurrentTimestamp(): number {
 }
 
 /**
- * Create a new card
+ * Create a new page
  */
-export async function createCard(input: CreateCardInput): Promise<Card> {
+export async function createPage(input: CreatePageInput): Promise<Page> {
   const database = getDatabase();
   const id = generateUUID();
   const now = getCurrentTimestamp();
   
   await database.execute(
-    `INSERT INTO cards (id, title, content, created_at, updated_at, is_deleted) 
+    `INSERT INTO pages (id, title, content, created_at, updated_at, is_deleted) 
      VALUES ($1, $2, $3, $4, $5, 0)`,
     [id, input.title || "", input.content || "", now, now]
   );
@@ -76,14 +76,14 @@ export async function createCard(input: CreateCardInput): Promise<Card> {
 }
 
 /**
- * Get all cards (non-deleted) ordered by created_at desc
+ * Get all pages (non-deleted) ordered by created_at desc
  */
-export async function getCards(limit = 100, offset = 0): Promise<Card[]> {
+export async function getPages(limit = 100, offset = 0): Promise<Page[]> {
   const database = getDatabase();
   
-  const result = await database.select<Card[]>(
+  const result = await database.select<Page[]>(
     `SELECT id, title, content, created_at, updated_at, is_deleted 
-     FROM cards 
+     FROM pages 
      WHERE is_deleted = 0 
      ORDER BY created_at DESC 
      LIMIT $1 OFFSET $2`,
@@ -97,14 +97,14 @@ export async function getCards(limit = 100, offset = 0): Promise<Card[]> {
 }
 
 /**
- * Get a single card by ID
+ * Get a single page by ID
  */
-export async function getCardById(id: string): Promise<Card | null> {
+export async function getPageById(id: string): Promise<Page | null> {
   const database = getDatabase();
   
-  const result = await database.select<Card[]>(
+  const result = await database.select<Page[]>(
     `SELECT id, title, content, created_at, updated_at, is_deleted 
-     FROM cards 
+     FROM pages 
      WHERE id = $1`,
     [id]
   );
@@ -118,36 +118,36 @@ export async function getCardById(id: string): Promise<Card | null> {
 }
 
 /**
- * Update an existing card
+ * Update an existing page
  */
-export async function updateCard(input: UpdateCardInput): Promise<Card> {
+export async function updatePage(input: UpdatePageInput): Promise<Page> {
   const database = getDatabase();
   const now = getCurrentTimestamp();
   
   await database.execute(
-    `UPDATE cards 
+    `UPDATE pages 
      SET title = $1, content = $2, updated_at = $3 
      WHERE id = $4`,
     [input.title, input.content, now, input.id]
   );
   
-  const updated = await getCardById(input.id);
+  const updated = await getPageById(input.id);
   if (!updated) {
-    throw new Error(`Card not found: ${input.id}`);
+    throw new Error(`Page not found: ${input.id}`);
   }
   
   return updated;
 }
 
 /**
- * Soft delete a card
+ * Soft delete a page
  */
-export async function softDeleteCard(id: string): Promise<void> {
+export async function softDeletePage(id: string): Promise<void> {
   const database = getDatabase();
   const now = getCurrentTimestamp();
   
   await database.execute(
-    `UPDATE cards 
+    `UPDATE pages 
      SET is_deleted = 1, updated_at = $1 
      WHERE id = $2`,
     [now, id]
@@ -155,14 +155,22 @@ export async function softDeleteCard(id: string): Promise<void> {
 }
 
 /**
- * Get card count
+ * Get page count
  */
-export async function getCardCount(): Promise<number> {
+export async function getPageCount(): Promise<number> {
   const database = getDatabase();
   
   const result = await database.select<{ count: number }[]>(
-    `SELECT COUNT(*) as count FROM cards WHERE is_deleted = 0`
+    `SELECT COUNT(*) as count FROM pages WHERE is_deleted = 0`
   );
   
   return result[0]?.count ?? 0;
 }
+
+// Backwards compatibility aliases
+export const createCard = createPage;
+export const getCards = getPages;
+export const getCardById = getPageById;
+export const updateCard = updatePage;
+export const softDeleteCard = softDeletePage;
+export const getCardCount = getPageCount;

@@ -1,8 +1,8 @@
-// Card model representing a single knowledge card
+// Page model representing a single knowledge page
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Card {
+pub struct Page {
     pub id: String,
     pub title: String,
     pub content: String,
@@ -12,19 +12,19 @@ pub struct Card {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CreateCardInput {
+pub struct CreatePageInput {
     pub title: String,
     pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct UpdateCardInput {
+pub struct UpdatePageInput {
     pub id: String,
     pub title: String,
     pub content: String,
 }
 
-// Link model representing connections between cards
+// Link model representing connections between pages
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Link {
     pub source_id: String,
@@ -36,6 +36,11 @@ pub struct Link {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GhostLink {
     pub link_text: String,
-    pub source_card_id: String,
+    pub source_page_id: String,
     pub created_at: i64,
 }
+
+// Backwards compatibility type aliases
+pub type Card = Page;
+pub type CreateCardInput = CreatePageInput;
+pub type UpdateCardInput = UpdatePageInput;

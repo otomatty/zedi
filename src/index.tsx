@@ -5,7 +5,7 @@ import "./styles/index.css";
 import App from "./App";
 import UILibrary from "./pages/UILibrary";
 import Home from "./pages/Home";
-import CardDetail from "./pages/CardDetail";
+import PageDetail from "./pages/PageDetail";
 import Login from "./pages/Login";
 import { AuthGuard } from "./components/auth/AuthGuard";
 
@@ -17,10 +17,11 @@ render(
       
       {/* Protected routes */}
       <Route path="/" component={() => <AuthGuard><Home /></AuthGuard>} />
-      <Route path="/card/:id" component={() => <AuthGuard><CardDetail /></AuthGuard>} />
+      <Route path="/page/:id" component={() => <AuthGuard><PageDetail /></AuthGuard>} />
       <Route path="/design-system" component={() => <AuthGuard><App /></AuthGuard>} />
       <Route path="/ui-library" component={() => <AuthGuard><UILibrary /></AuthGuard>} />
     </Router>
   ),
   document.getElementById("root") as HTMLElement
 );
+

@@ -75,7 +75,7 @@ export function TimeAxis(props: TimeAxisProps) {
           </p>
         </div>
         <Button variant="solid" color="primary" size="sm" onClick={props.onNewCard}>
-          + 新規カード
+          + 新規ページ
         </Button>
       </div>
 
@@ -93,13 +93,13 @@ export function TimeAxis(props: TimeAxisProps) {
             <span class="text-3xl">📝</span>
           </div>
           <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-2">
-            まだカードがありません
+            まだページがありません
           </h3>
           <p class="text-[var(--text-secondary)] mb-6 max-w-sm">
             思いついたことを書き留めて、知識のネットワークを作り始めましょう。
           </p>
           <Button variant="solid" color="primary" onClick={props.onNewCard}>
-            最初のカードを作成
+            最初のページを作成
           </Button>
         </div>
       </Show>
@@ -118,8 +118,8 @@ export function TimeAxis(props: TimeAxisProps) {
                   <div class="flex-1 h-px bg-[var(--border-subtle)]" />
                 </div>
 
-                {/* Cards */}
-                <div class="space-y-4">
+                {/* Cards Grid */}
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   <For each={cards}>
                     {(card) => (
                       <Card 
@@ -130,7 +130,7 @@ export function TimeAxis(props: TimeAxisProps) {
                       >
                         <CardHeader>
                           <div class="flex items-center justify-between">
-                            <CardTitle>{card.title || "無題のカード"}</CardTitle>
+                            <CardTitle class="text-sm truncate">{card.title || "無題のページ"}</CardTitle>
                             <span class="text-xs text-[var(--text-tertiary)]">
                               {formatRelativeTime(card.created_at)}
                             </span>

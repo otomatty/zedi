@@ -1,22 +1,22 @@
-// CardEditor component using Tiptap with Internal Link support
+// PageEditor component using Tiptap with Internal Link support
 import { createSignal, Show } from "solid-js";
 import { createTiptapEditor } from "solid-tiptap";
 import StarterKit from "@tiptap/starter-kit";
 import { InternalLink } from "./extensions/InternalLink";
 
-export interface CardEditorProps {
+export interface PageEditorProps {
   initialContent?: string;
   placeholder?: string;
   onContentChange?: (content: string) => void;
   onTitleChange?: (title: string) => void;
   onSave?: (title: string, content: string) => void;
   onLinkClick?: (title: string, exists: boolean) => void;
-  existingCardTitles?: string[];
+  existingPageTitles?: string[];
   autoFocus?: boolean;
   readOnly?: boolean;
 }
 
-export function CardEditor(props: CardEditorProps) {
+export function PageEditor(props: PageEditorProps) {
   let editorContainerRef: HTMLDivElement | undefined;
   const [title, setTitle] = createSignal("");
   const [isFocused, setIsFocused] = createSignal(false);
@@ -66,7 +66,7 @@ export function CardEditor(props: CardEditorProps) {
       }),
       InternalLink.configure({
         onLinkClick: handleLinkClick,
-        existingTitles: props.existingCardTitles || [],
+        existingTitles: props.existingPageTitles || [],
       }),
     ],
     content: props.initialContent || "",
@@ -74,7 +74,7 @@ export function CardEditor(props: CardEditorProps) {
     autofocus: props.autoFocus ? "end" : false,
     editorProps: {
       attributes: {
-        class: "card-editor-content prose prose-sm sm:prose dark:prose-invert focus:outline-none min-h-[100px] max-w-none",
+        class: "page-editor-content prose prose-sm sm:prose dark:prose-invert focus:outline-none min-h-[100px] max-w-none",
       },
     },
     onUpdate: ({ editor }) => {
@@ -165,7 +165,7 @@ export function CardEditor(props: CardEditorProps) {
       {/* Editor Container */}
       <div 
         ref={editorContainerRef}
-        class="card-editor-wrapper"
+        class="page-editor-wrapper"
       />
 
       {/* Link hint */}
@@ -188,7 +188,7 @@ export function CardEditor(props: CardEditorProps) {
           </Show>
           <Show when={charCount() > 800}>
             <span class="text-xs text-[var(--text-tertiary)]">
-              • カードを分割することを検討してください
+              • ページを分割することを検討してください
             </span>
           </Show>
         </div>
@@ -206,4 +206,8 @@ export function CardEditor(props: CardEditorProps) {
   );
 }
 
-export default CardEditor;
+// Backwards compatibility aliases
+export const CardEditor = PageEditor;
+export type CardEditorProps = PageEditorProps;
+
+export default PageEditor;
