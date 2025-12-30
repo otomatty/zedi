@@ -230,13 +230,31 @@
   /* Wiki link styling */
   .wiki-link {
     @apply text-link font-medium hover:underline cursor-pointer 
-           transition-colors duration-200;
+           transition-colors duration-200 rounded px-0.5 -mx-0.5;
+    background: hsl(var(--link-color) / 0.1);
+  }
+
+  .wiki-link:hover {
+    background: hsl(var(--link-color) / 0.2);
   }
 
   .wiki-link-ghost {
     @apply text-ghost-link font-medium cursor-pointer 
            border-b border-dashed border-ghost-link/50 
-           hover:border-ghost-link transition-colors duration-200;
+           hover:border-ghost-link transition-colors duration-200 
+           rounded px-0.5 -mx-0.5;
+    background: hsl(var(--link-ghost) / 0.1);
+  }
+
+  .wiki-link-ghost:hover {
+    background: hsl(var(--link-ghost) / 0.2);
+  }
+
+  /* Wiki link typing state */
+  .wiki-link-typing {
+    @apply text-primary;
+    background: hsl(var(--primary) / 0.15);
+    border-radius: 2px;
   }
 }
 
