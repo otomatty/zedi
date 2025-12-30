@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { useNavigate } from 'react-router-dom';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import { cn } from '@/lib/utils';
+import { WikiLink } from './extensions/WikiLinkExtension';
+import { WikiLinkSuggestionPlugin, wikiLinkSuggestionPluginKey, type WikiLinkSuggestionState } from './extensions/wikiLinkSuggestionPlugin';
+import { WikiLinkSuggestion, type SuggestionItem, type WikiLinkSuggestionHandle } from './extensions/WikiLinkSuggestion';
+import { usePageStore } from '@/stores/pageStore';
 
 interface TiptapEditorProps {
   content: string;
@@ -20,6 +25,17 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   className,
   autoFocus = false,
 }) => {
+  const navigate = useNavigate();
+  const { createPage, getPageByTitle } = usePageStore();
+  const [suggestionState, setSuggestionState] = useState<WikiLinkSuggestionState | null>(null);
+  const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number } | null>(null);
+  const suggestionRef = useRef<WikiLinkSuggestionHandle>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleStateChange = useCallback((state: WikiLinkSuggestionState) => {
+    setSuggestionState(state);
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -37,12 +53,55 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           class: 'internal-link',
         },
       }),
+      WikiLink.configure({
+        onLinkClick: (title, exists) => {
+          if (exists) {
+            const page = getPageByTitle(title);
+            if (page) {
+              navigate(`/page/${page.id}`);
+            }
+          } else {
+            // Create new page and navigate
+            const newPage = createPage(title);
+            navigate(`/page/${newPage.id}`);
+          }
+        },
+      }),
+      WikiLinkSuggestionPlugin.configure({
+        onStateChange: handleStateChange,
+      }),
     ],
     content: content ? JSON.parse(content) : undefined,
     autofocus: autoFocus ? 'end' : false,
     editorProps: {
       attributes: {
         class: 'tiptap-editor focus:outline-none',
+      },
+      handleClick: (view, pos, event) => {
+        const target = event.target as HTMLElement;
+        if (target.hasAttribute('data-wiki-link')) {
+          const title = target.getAttribute('data-title');
+          const exists = target.getAttribute('data-exists') === 'true';
+          if (title) {
+            if (exists) {
+              const page = getPageByTitle(title);
+              if (page) {
+                navigate(`/page/${page.id}`);
+              }
+            } else {
+              const newPage = createPage(title);
+              navigate(`/page/${newPage.id}`);
+            }
+          }
+          return true;
+        }
+        return false;
+      },
+      handleKeyDown: (view, event) => {
+        if (suggestionState?.active && suggestionRef.current) {
+          return suggestionRef.current.onKeyDown(event);
+        }
+        return false;
       },
     },
     onUpdate: ({ editor }) => {
@@ -51,9 +110,91 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     },
   });
 
+  // Update suggestion position
+  useEffect(() => {
+    if (!editor || !suggestionState?.active || !suggestionState.range) {
+      setSuggestionPos(null);
+      return;
+    }
+
+    const { from } = suggestionState.range;
+    const coords = editor.view.coordsAtPos(from);
+    const containerRect = editorContainerRef.current?.getBoundingClientRect();
+
+    if (containerRect) {
+      setSuggestionPos({
+        top: coords.bottom - containerRect.top + 4,
+        left: coords.left - containerRect.left,
+      });
+    }
+  }, [editor, suggestionState]);
+
+  const handleSuggestionSelect = useCallback(
+    (item: SuggestionItem) => {
+      if (!editor || !suggestionState?.range) return;
+
+      const { from, to } = suggestionState.range;
+
+      // Delete the [[ trigger text
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from, to })
+        .insertContent([
+          {
+            type: 'text',
+            marks: [
+              {
+                type: 'wikiLink',
+                attrs: {
+                  title: item.title,
+                  exists: item.exists,
+                },
+              },
+            ],
+            text: `[[${item.title}]]`,
+          },
+        ])
+        .run();
+
+      // Close suggestion
+      editor.view.dispatch(
+        editor.view.state.tr.setMeta(wikiLinkSuggestionPluginKey, { close: true })
+      );
+    },
+    [editor, suggestionState]
+  );
+
+  const handleSuggestionClose = useCallback(() => {
+    if (!editor) return;
+    editor.view.dispatch(
+      editor.view.state.tr.setMeta(wikiLinkSuggestionPluginKey, { close: true })
+    );
+  }, [editor]);
+
   return (
-    <div className={cn('relative', className)}>
+    <div ref={editorContainerRef} className={cn('relative', className)}>
       <EditorContent editor={editor} />
+      
+      {/* Wiki Link Suggestion Popup */}
+      {suggestionState?.active && suggestionPos && editor && (
+        <div
+          className="absolute z-50"
+          style={{
+            top: suggestionPos.top,
+            left: suggestionPos.left,
+          }}
+        >
+          <WikiLinkSuggestion
+            ref={suggestionRef}
+            editor={editor}
+            query={suggestionState.query}
+            range={suggestionState.range!}
+            onSelect={handleSuggestionSelect}
+            onClose={handleSuggestionClose}
+          />
+        </div>
+      )}
     </div>
   );
 };
