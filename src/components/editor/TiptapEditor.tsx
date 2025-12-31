@@ -7,6 +7,7 @@ import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
 import { cn } from "@/lib/utils";
 import { WikiLink } from "./extensions/WikiLinkExtension";
+import { Mermaid } from "./extensions/MermaidExtension";
 import {
   WikiLinkSuggestionPlugin,
   wikiLinkSuggestionPluginKey,
@@ -17,7 +18,10 @@ import {
   type SuggestionItem,
   type WikiLinkSuggestionHandle,
 } from "./extensions/WikiLinkSuggestion";
+import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 import { usePageByTitle, useCreatePage } from "@/hooks/usePageQueries";
+import { Button } from "@/components/ui/button";
+import { GitBranch } from "lucide-react";
 
 interface TiptapEditorProps {
   content: string;
@@ -47,6 +51,15 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   } | null>(null);
   const suggestionRef = useRef<WikiLinkSuggestionHandle>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  // Mermaid generator state
+  const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
+  const [selectedTextForMermaid, setSelectedTextForMermaid] = useState("");
+  const [selectionMenuPos, setSelectionMenuPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [showSelectionMenu, setShowSelectionMenu] = useState(false);
 
   // Pending link action
   const pendingLinkActionRef = useRef<{
@@ -104,9 +117,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         emptyEditorClass: "is-editor-empty",
       }),
       Link.configure({
-        openOnClick: false,
+        openOnClick: true,
         HTMLAttributes: {
-          class: "internal-link",
+          class: "external-link text-blue-600 hover:underline cursor-pointer",
+          target: "_blank",
+          rel: "noopener noreferrer",
         },
       }),
       WikiLink.configure({
@@ -115,6 +130,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       WikiLinkSuggestionPlugin.configure({
         onStateChange: handleStateChange,
       }),
+      Mermaid,
     ],
     content: content ? JSON.parse(content) : undefined,
     autofocus: autoFocus ? "end" : false,
@@ -144,6 +160,28 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     onUpdate: ({ editor }) => {
       const json = JSON.stringify(editor.getJSON());
       onChange(json);
+    },
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+      const hasSelection = from !== to;
+      const selectedText = editor.state.doc.textBetween(from, to, " ");
+
+      // 10文字以上の選択時にメニューを表示
+      if (hasSelection && selectedText.trim().length >= 10) {
+        const coords = editor.view.coordsAtPos(from);
+        const containerRect =
+          editorContainerRef.current?.getBoundingClientRect();
+
+        if (containerRect) {
+          setSelectionMenuPos({
+            top: coords.top - containerRect.top - 40,
+            left: coords.left - containerRect.left,
+          });
+          setShowSelectionMenu(true);
+        }
+      } else {
+        setShowSelectionMenu(false);
+      }
     },
   });
 
@@ -228,9 +266,50 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     );
   }, [editor]);
 
+  // Handle Mermaid generation
+  const handleOpenMermaidDialog = useCallback(() => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selectedText = editor.state.doc.textBetween(from, to, " ");
+    if (selectedText.trim()) {
+      setSelectedTextForMermaid(selectedText);
+      setMermaidDialogOpen(true);
+    }
+  }, [editor]);
+
+  const handleInsertMermaid = useCallback(
+    (code: string) => {
+      if (!editor) return;
+      // 選択テキストを削除してMermaidを挿入
+      editor.chain().focus().deleteSelection().insertMermaid(code).run();
+    },
+    [editor]
+  );
+
   return (
     <div ref={editorContainerRef} className={cn("relative", className)}>
       <EditorContent editor={editor} />
+
+      {/* Selection Menu - テキスト選択時に表示 */}
+      {showSelectionMenu && selectionMenuPos && (
+        <div
+          className="absolute z-50 flex items-center gap-1 bg-background border rounded-lg shadow-lg p-1"
+          style={{
+            top: selectionMenuPos.top,
+            left: selectionMenuPos.left,
+          }}
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleOpenMermaidDialog}
+            className="text-xs"
+          >
+            <GitBranch className="h-4 w-4 mr-1" />
+            ダイアグラム生成
+          </Button>
+        </div>
+      )}
 
       {/* Wiki Link Suggestion Popup */}
       {suggestionState?.active && suggestionPos && editor && (
@@ -251,6 +330,14 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           />
         </div>
       )}
+
+      {/* Mermaid Generator Dialog */}
+      <MermaidGeneratorDialog
+        open={mermaidDialogOpen}
+        onOpenChange={setMermaidDialogOpen}
+        selectedText={selectedTextForMermaid}
+        onInsert={handleInsertMermaid}
+      />
     </div>
   );
 };

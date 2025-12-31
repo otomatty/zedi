@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import TiptapEditor from "./TiptapEditor";
+import { WikiGeneratorButton } from "./WikiGeneratorButton";
+import Container from "@/components/layout/Container";
 import {
   usePage,
   useCreatePage,
@@ -152,6 +154,37 @@ const PageEditor: React.FC = () => {
     [content, saveChanges]
   );
 
+  // Wiki生成結果をエディタに反映
+  const handleWikiGenerated = useCallback(
+    (tiptapContent: string) => {
+      setContent(tiptapContent);
+      saveChanges(title, tiptapContent);
+    },
+    [title, saveChanges]
+  );
+
+  // コンテンツが空でないかチェック（Tiptap JSON形式）
+  const isContentNotEmpty = useCallback((contentJson: string): boolean => {
+    if (!contentJson) return false;
+    try {
+      const parsed = JSON.parse(contentJson);
+      // doc.contentが空または空の段落のみかチェック
+      if (!parsed.content || parsed.content.length === 0) return false;
+      // 空の段落のみの場合もfalse
+      const hasRealContent = parsed.content.some(
+        (node: { type: string; content?: unknown[] }) => {
+          if (node.type === "paragraph") {
+            return node.content && node.content.length > 0;
+          }
+          return true; // 段落以外のノード（見出しなど）があればtrue
+        }
+      );
+      return hasRealContent;
+    } catch {
+      return contentJson.trim().length > 0;
+    }
+  }, []);
+
   const handleDelete = useCallback(() => {
     if (currentPageId) {
       deletePageMutation.mutate(currentPageId, {
@@ -232,7 +265,7 @@ const PageEditor: React.FC = () => {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center gap-4">
+        <Container className="flex h-14 items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
@@ -252,6 +285,12 @@ const PageEditor: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Wiki Generator Button - タイトルがあり本文が空の場合のみ表示 */}
+            <WikiGeneratorButton
+              title={title}
+              hasContent={isContentNotEmpty(content)}
+              onGenerated={handleWikiGenerated}
+            />
             {lastSaved && (
               <span className="text-xs text-muted-foreground hidden sm:inline">
                 {formatTimeAgo(lastSaved)}に保存
@@ -284,19 +323,21 @@ const PageEditor: React.FC = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
+        </Container>
       </header>
 
       {/* Editor */}
-      <main className="flex-1 container py-6">
-        <div className="max-w-2xl mx-auto">
-          <TiptapEditor
-            content={content}
-            onChange={handleContentChange}
-            autoFocus={isNewPage}
-            className="min-h-[calc(100vh-200px)]"
-          />
-        </div>
+      <main className="flex-1 py-6">
+        <Container>
+          <div className="max-w-2xl mx-auto">
+            <TiptapEditor
+              content={content}
+              onChange={handleContentChange}
+              autoFocus={isNewPage}
+              className="min-h-[calc(100vh-200px)]"
+            />
+          </div>
+        </Container>
       </main>
     </div>
   );

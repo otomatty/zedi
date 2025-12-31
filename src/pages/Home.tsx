@@ -1,8 +1,9 @@
-import React from 'react';
-import Header from '@/components/layout/Header';
-import PageGrid from '@/components/page/PageGrid';
-import FloatingActionButton from '@/components/layout/FloatingActionButton';
-import { useSeedData } from '@/hooks/useSeedData';
+import React from "react";
+import Header from "@/components/layout/Header";
+import Container from "@/components/layout/Container";
+import PageGrid from "@/components/page/PageGrid";
+import FloatingActionButton from "@/components/layout/FloatingActionButton";
+import { useSeedData } from "@/hooks/useSeedData";
 
 const Home: React.FC = () => {
   // Seed tutorial pages on first run
@@ -11,9 +12,11 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
-      <main className="container py-6">
-        <PageGrid />
+
+      <main className="py-6">
+        <Container>
+          <PageGrid />
+        </Container>
       </main>
 
       <FloatingActionButton />
