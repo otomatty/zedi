@@ -91,8 +91,12 @@ const PageEditor: React.FC = () => {
   }, [pageId, deletePage, navigate, toast]);
 
   const handleBack = useCallback(() => {
+    // Delete page if it's new and has no title or content
+    if (isNew && pageId && !title.trim() && !content.trim()) {
+      deletePage(pageId);
+    }
     navigate('/');
-  }, [navigate]);
+  }, [navigate, isNew, pageId, title, content, deletePage]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
