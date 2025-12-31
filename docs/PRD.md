@@ -151,11 +151,30 @@ flowchart LR
 
 #### Editor Core (React-Tiptap)
 
-- **React + Tiptap (Prosemirror)** を採用し、Markdown 互換かつリッチな編集体験を提供。
+- **React + Tiptap (Prosemirror)** を採用し、Markdown 記法によるシームレスな編集体験を提供。
+- **Markdown ショートカット（入力即変換）:**
+  - `# ` → H1、`## ` → H2、`### ` → H3
+  - `- ` または `* ` → 箇条書きリスト
+  - `1. ` → 番号付きリスト
+  - `> ` → 引用（Blockquote）
+  - `` ` `` で囲む → インラインコード
+  - ` ``` ` → コードブロック
+  - `---` → 水平線
+  - `**text**` → **太字**
+  - `*text*` または `_text_` → _斜体_
+  - `~~text~~` → ~~取り消し線~~
+- **Typography 自動変換:**
+  - `--` → –（en-dash）
+  - `---` → —（em-dash）
+  - `"text"` → "スマートクォート"
+  - `'text'` → 'スマートクォート'
+  - `...` → …（省略記号）
+  - `(c)` → ©、`(r)` → ®、`(tm)` → ™
 - **サポート要素:**
   - テキスト: H1-H3, Quote, List (Bullet, Numbered, Toggle), Code Block
   - メディア埋め込み: 画像（Turso ストレージに保存・同期）
   - **※動画、音声、PDF、手書き描画は非対応（MVP 範囲外）**
+- **内部データ形式:** Tiptap JSON（Markdown 互換）。インポート/エクスポート時に Markdown テキストへ変換可能。
 
 #### Smart Splitting
 

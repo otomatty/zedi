@@ -1,102 +1,232 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, MoreHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Trash2,
+  MoreHorizontal,
+  Loader2,
+  Download,
+  Copy,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import TiptapEditor from './TiptapEditor';
-import { usePageStore } from '@/stores/pageStore';
-import { formatTimeAgo } from '@/lib/dateUtils';
-import { generateAutoTitle } from '@/lib/contentUtils';
-import { useToast } from '@/hooks/use-toast';
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import TiptapEditor from "./TiptapEditor";
+import {
+  usePage,
+  useCreatePage,
+  useUpdatePage,
+  useDeletePage,
+} from "@/hooks/usePageQueries";
+import { formatTimeAgo } from "@/lib/dateUtils";
+import { generateAutoTitle } from "@/lib/contentUtils";
+import {
+  downloadMarkdown,
+  copyMarkdownToClipboard,
+} from "@/lib/markdownExport";
+import { useToast } from "@/hooks/use-toast";
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const { getPage, updatePage, deletePage, createPage } = usePageStore();
-  
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [isNew, setIsNew] = useState(false);
-  const [pageId, setPageId] = useState<string | null>(null);
-  const [lastSaved, setLastSaved] = useState<number | null>(null);
 
-  // Load or create page
+  const isNewPage = id === "new";
+  const pageId = isNewPage ? "" : id || "";
+
+  // React Query hooks
+  const { data: page, isLoading, isError } = usePage(pageId);
+  const createPageMutation = useCreatePage();
+  const updatePageMutation = useUpdatePage();
+  const deletePageMutation = useDeletePage();
+
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<number | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Refs for debouncing
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Create new page
   useEffect(() => {
-    if (id === 'new') {
-      const newPage = createPage();
-      setPageId(newPage.id);
-      setTitle('');
-      setContent('');
-      setIsNew(true);
-      setLastSaved(newPage.updatedAt);
-    } else if (id) {
-      const page = getPage(id);
-      if (page) {
-        setPageId(id);
-        setTitle(page.title);
-        setContent(page.content);
-        setIsNew(false);
-        setLastSaved(page.updatedAt);
-      } else {
-        navigate('/');
-        toast({
-          title: 'ページが見つかりません',
-          variant: 'destructive',
-        });
-      }
+    if (isNewPage && !currentPageId && !createPageMutation.isPending) {
+      createPageMutation.mutate(
+        { title: "", content: "" },
+        {
+          onSuccess: (newPage) => {
+            setCurrentPageId(newPage.id);
+            setTitle("");
+            setContent("");
+            setLastSaved(newPage.updatedAt);
+            setIsInitialized(true);
+            // Update URL without navigation
+            window.history.replaceState(null, "", `/page/${newPage.id}`);
+          },
+          onError: () => {
+            toast({
+              title: "ページの作成に失敗しました",
+              variant: "destructive",
+            });
+            navigate("/");
+          },
+        }
+      );
     }
-  }, [id, getPage, createPage, navigate, toast]);
+  }, [isNewPage, currentPageId, createPageMutation, navigate, toast]);
+
+  // Load existing page
+  useEffect(() => {
+    if (!isNewPage && page && !isInitialized) {
+      setCurrentPageId(page.id);
+      setTitle(page.title);
+      setContent(page.content);
+      setLastSaved(page.updatedAt);
+      setIsInitialized(true);
+    }
+  }, [isNewPage, page, isInitialized]);
+
+  // Handle page not found
+  useEffect(() => {
+    if (!isNewPage && isError) {
+      navigate("/");
+      toast({
+        title: "ページが見つかりません",
+        variant: "destructive",
+      });
+    }
+  }, [isNewPage, isError, navigate, toast]);
+
+  // Debounced save function
+  const saveChanges = useCallback(
+    (newTitle: string, newContent: string) => {
+      if (!currentPageId) return;
+
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      saveTimeoutRef.current = setTimeout(() => {
+        updatePageMutation.mutate(
+          {
+            pageId: currentPageId,
+            updates: { title: newTitle, content: newContent },
+          },
+          {
+            onSuccess: () => {
+              setLastSaved(Date.now());
+            },
+          }
+        );
+      }, 500); // 500ms debounce
+    },
+    [currentPageId, updatePageMutation]
+  );
 
   // Auto-save on changes
-  const handleContentChange = useCallback((newContent: string) => {
-    setContent(newContent);
-    if (pageId) {
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      setContent(newContent);
       // Auto-generate title if empty
       const autoTitle = !title ? generateAutoTitle(newContent) : title;
-      updatePage(pageId, { 
-        content: newContent,
-        title: autoTitle,
-      });
-      setLastSaved(Date.now());
-      if (!title && autoTitle !== '無題のページ') {
+      if (!title && autoTitle !== "無題のページ") {
         setTitle(autoTitle);
       }
-    }
-  }, [pageId, title, updatePage]);
+      saveChanges(autoTitle || title, newContent);
+    },
+    [title, saveChanges]
+  );
 
-  const handleTitleChange = useCallback((newTitle: string) => {
-    setTitle(newTitle);
-    if (pageId) {
-      updatePage(pageId, { title: newTitle });
-      setLastSaved(Date.now());
-    }
-  }, [pageId, updatePage]);
+  const handleTitleChange = useCallback(
+    (newTitle: string) => {
+      setTitle(newTitle);
+      saveChanges(newTitle, content);
+    },
+    [content, saveChanges]
+  );
 
   const handleDelete = useCallback(() => {
-    if (pageId) {
-      deletePage(pageId);
-      toast({
-        title: 'ページを削除しました',
+    if (currentPageId) {
+      deletePageMutation.mutate(currentPageId, {
+        onSuccess: () => {
+          toast({
+            title: "ページを削除しました",
+          });
+          navigate("/");
+        },
+        onError: () => {
+          toast({
+            title: "削除に失敗しました",
+            variant: "destructive",
+          });
+        },
       });
-      navigate('/');
     }
-  }, [pageId, deletePage, navigate, toast]);
+  }, [currentPageId, deletePageMutation, navigate, toast]);
 
   const handleBack = useCallback(() => {
     // Delete page if it's new and has no title or content
-    if (isNew && pageId && !title.trim() && !content.trim()) {
-      deletePage(pageId);
+    if (isNewPage && currentPageId && !title.trim() && !content.trim()) {
+      deletePageMutation.mutate(currentPageId);
     }
-    navigate('/');
-  }, [navigate, isNew, pageId, title, content, deletePage]);
+    navigate("/");
+  }, [navigate, isNewPage, currentPageId, title, content, deletePageMutation]);
+
+  // Export handlers
+  const handleExportMarkdown = useCallback(() => {
+    downloadMarkdown(title, content);
+    toast({
+      title: "Markdownファイルをダウンロードしました",
+    });
+  }, [title, content, toast]);
+
+  const handleCopyMarkdown = useCallback(async () => {
+    try {
+      await copyMarkdownToClipboard(title, content);
+      toast({
+        title: "Markdownをクリップボードにコピーしました",
+      });
+    } catch (error) {
+      toast({
+        title: "コピーに失敗しました",
+        variant: "destructive",
+      });
+    }
+  }, [title, content, toast]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Show loading state
+  if (!isNewPage && isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Show loading for new page creation
+  if (isNewPage && !isInitialized) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -111,7 +241,7 @@ const PageEditor: React.FC = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          
+
           <div className="flex-1 min-w-0">
             <Input
               value={title}
@@ -127,7 +257,7 @@ const PageEditor: React.FC = () => {
                 {formatTimeAgo(lastSaved)}に保存
               </span>
             )}
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -135,6 +265,15 @@ const PageEditor: React.FC = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportMarkdown}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Markdownでエクスポート
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCopyMarkdown}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Markdownをコピー
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleDelete}
                   className="text-destructive focus:text-destructive"
@@ -154,7 +293,7 @@ const PageEditor: React.FC = () => {
           <TiptapEditor
             content={content}
             onChange={handleContentChange}
-            autoFocus={isNew}
+            autoFocus={isNewPage}
             className="min-h-[calc(100vh-200px)]"
           />
         </div>

@@ -1,15 +1,25 @@
-import React, { useMemo } from 'react';
-import { usePageStore } from '@/stores/pageStore';
-import { groupPagesByDate } from '@/lib/dateUtils';
-import DateSection from './DateSection';
-import EmptyState from './EmptyState';
+import React, { useMemo } from "react";
+import { usePages } from "@/hooks/usePageQueries";
+import { groupPagesByDate } from "@/lib/dateUtils";
+import DateSection from "./DateSection";
+import EmptyState from "./EmptyState";
 
 const PageGrid: React.FC = () => {
-  const { pages } = usePageStore();
-  
+  // Use SQLite (local or Turso depending on auth state)
+  const { data: pages = [], isLoading } = usePages();
+
   const dateGroups = useMemo(() => {
     return groupPagesByDate(pages);
   }, [pages]);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   if (dateGroups.length === 0) {
     return <EmptyState />;
@@ -22,13 +32,9 @@ const PageGrid: React.FC = () => {
       {dateGroups.map((group) => {
         const startIndex = runningIndex;
         runningIndex += group.pages.length;
-        
+
         return (
-          <DateSection
-            key={group.date}
-            group={group}
-            startIndex={startIndex}
-          />
+          <DateSection key={group.date} group={group} startIndex={startIndex} />
         );
       })}
     </div>
