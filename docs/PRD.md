@@ -37,7 +37,7 @@ Web App で以下の機能が安定したタイミングで Tauri 2.0 への移�
 - ✅ Date Grid UI
 - ✅ WikiLink 機能
 - ⏳ AI 機能（Wiki Generator、API キー設定）
-- ⏳ Web Clipping 機能
+- ✅ Web Clipping 機能
 - ⏳ Global Search
 
 移行時の作業：
@@ -518,15 +518,15 @@ CREATE INDEX idx_ghost_links_text ON ghost_links(link_text);
 
 ---
 
-### Phase 2: AI & Knowledge Generation 🔄 **現在のフェーズ**
+### Phase 2: AI & Knowledge Generation ✅ **完了**
 
 **目標:** AI を活用した知識生成機能を実装し、「足場としての AI」のコンセプトを実現する。
 
 | 状態 | 優先度  | 実装項目                                                 |
 | :--- | :------ | :------------------------------------------------------- |
-| ⏳   | 🔴 必須 | **LLM API 設定画面**（OpenAI / Anthropic / Gemini キー） |
-| ⏳   | 🔴 必須 | **Wiki Generator**（タイトルから Wikipedia 風情報生成）  |
-| ⏳   | 🔴 必須 | AI 生成時の関連リンク `[[Topic]]` 自動挿入               |
+| ✅   | 🔴 必須 | **LLM API 設定画面**（OpenAI / Anthropic / Gemini キー） |
+| ✅   | 🔴 必須 | **Wiki Generator**（タイトルから Wikipedia 風情報生成）  |
+| ✅   | 🔴 必須 | AI 生成時の関連リンク `[[Topic]]` 自動挿入               |
 | ⏳   | 🟡 推奨 | AI Titling（Split 時の自動タイトル生成）                 |
 | ⏳   | 🟢 任意 | ローカル LLM 対応（Ollama 等）                           |
 
@@ -536,20 +536,20 @@ CREATE INDEX idx_ghost_links_text ON ghost_links(link_text);
 - **出力:** タイトルに関する簡潔な解説（200〜500 字）＋関連キーワードへの WikiLink
 - **例:** タイトル「機械学習」→ AI が解説を生成し、`[[ニューラルネットワーク]]`、`[[教師あり学習]]` 等のリンクを含める
 
-**完了基準:** ページタイトルから AI が Wikipedia 風の解説を生成し、関連リンクが自動挿入される。
+**完了基準:** ✅ ページタイトルから AI が Wikipedia 風の解説を生成し、関連リンクが自動挿入される。
 
 ---
 
-### Phase 3: Web Clipping & Information Capture
+### Phase 3: Web Clipping & Information Capture ✅ **完了**
 
 **目標:** Web からの情報取り込みを実現し、外部情報をナレッジネットワークに統合する。
 
 | 状態 | 優先度  | 実装項目                                                |
 | :--- | :------ | :------------------------------------------------------ |
-| ⏳   | 🔴 必須 | **URL 入力による Web ページ取り込み**（アプリ内機能）   |
-| ⏳   | 🔴 必須 | Reader Mode 変換（本文抽出、Readability.js 等）         |
-| ⏳   | 🔴 必須 | 引用元 URL の自動付与（source_url フィールド）          |
-| ⏳   | 🟡 推奨 | OGP 情報取得（タイトル、サムネイル）                    |
+| ✅   | 🔴 必須 | **URL 入力による Web ページ取り込み**（アプリ内機能）   |
+| ✅   | 🔴 必須 | Reader Mode 変換（本文抽出、Readability.js 等）         |
+| ✅   | 🔴 必須 | 引用元 URL の自動付与（source_url フィールド）          |
+| ✅   | 🟡 推奨 | OGP 情報取得（タイトル、サムネイル）                    |
 | ⏳   | 🟢 任意 | ブラウザ拡張機能 (Web Clipper) の実装（Chrome/Firefox） |
 | ⏳   | 🟢 任意 | 選択テキストのみクリップ機能                            |
 
@@ -559,11 +559,11 @@ CREATE INDEX idx_ghost_links_text ON ghost_links(link_text);
 - **処理:** URL から本文を抽出し、ページコンテンツとして保存。元 URL は source_url に記録
 - **表示:** Date Grid でクリップしたページには 🔗 アイコン等で区別表示
 
-**完了基準:** URL を入力すると Web ページの本文が自動抽出され、編集可能なページとして保存される。
+**完了基準:** ✅ URL を入力すると Web ページの本文が自動抽出され、編集可能なページとして保存される。
 
 ---
 
-### Phase 4: Search & Discovery
+### Phase 4: Search & Discovery 🔄 **現在のフェーズ**
 
 **目標:** 大量のページから目的の情報を素早く発見できるようにする。
 

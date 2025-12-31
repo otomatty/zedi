@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { Link2 } from "lucide-react";
 import type { Page } from "@/types/page";
 import { getContentPreview, extractFirstImage } from "@/lib/contentUtils";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const navigate = useNavigate();
   const preview = getContentPreview(page.content, 120);
   const thumbnail = page.thumbnailUrl || extractFirstImage(page.content);
+  const isClipped = !!page.sourceUrl;
 
   const handleClick = () => {
     navigate(`/page/${page.id}`);
@@ -36,9 +38,14 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     >
       {/* Title - Top */}
       <div className="p-3 pb-2 flex-shrink-0">
-        <h3 className="font-medium text-sm text-foreground line-clamp-2">
-          {page.title || "無題のページ"}
-        </h3>
+        <div className="flex items-start gap-1.5">
+          {isClipped && (
+            <Link2 className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+          )}
+          <h3 className="font-medium text-sm text-foreground line-clamp-2">
+            {page.title || "無題のページ"}
+          </h3>
+        </div>
       </div>
 
       {/* Thumbnail or Preview - Bottom */}

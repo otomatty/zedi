@@ -7,6 +7,7 @@ import {
   Loader2,
   Download,
   Copy,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import TiptapEditor from "./TiptapEditor";
 import { WikiGeneratorButton } from "./WikiGeneratorButton";
+import { WebClipperDialog } from "./WebClipperDialog";
+import { SourceUrlBadge } from "./SourceUrlBadge";
 import Container from "@/components/layout/Container";
 import {
   usePage,
@@ -33,6 +36,11 @@ import {
   copyMarkdownToClipboard,
 } from "@/lib/markdownExport";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,9 +58,11 @@ const PageEditor: React.FC = () => {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [sourceUrl, setSourceUrl] = useState<string | undefined>(undefined);
   const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [webClipperOpen, setWebClipperOpen] = useState(false);
 
   // Refs for debouncing
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -90,6 +100,7 @@ const PageEditor: React.FC = () => {
       setCurrentPageId(page.id);
       setTitle(page.title);
       setContent(page.content);
+      setSourceUrl(page.sourceUrl);
       setLastSaved(page.updatedAt);
       setIsInitialized(true);
     }
@@ -161,6 +172,43 @@ const PageEditor: React.FC = () => {
       saveChanges(title, tiptapContent);
     },
     [title, saveChanges]
+  );
+
+  // Web Clipper結果をエディタに反映
+  const handleWebClipped = useCallback(
+    (
+      clippedTitle: string,
+      clippedContent: string,
+      clippedSourceUrl: string,
+      thumbnailUrl?: string | null
+    ) => {
+      setTitle(clippedTitle);
+      setContent(clippedContent);
+      setSourceUrl(clippedSourceUrl);
+
+      if (currentPageId) {
+        updatePageMutation.mutate(
+          {
+            pageId: currentPageId,
+            updates: {
+              title: clippedTitle,
+              content: clippedContent,
+              sourceUrl: clippedSourceUrl,
+              thumbnailUrl: thumbnailUrl || undefined,
+            },
+          },
+          {
+            onSuccess: () => {
+              setLastSaved(Date.now());
+              toast({
+                title: "Webページを取り込みました",
+              });
+            },
+          }
+        );
+      }
+    },
+    [currentPageId, updatePageMutation, toast]
   );
 
   // コンテンツが空でないかチェック（Tiptap JSON形式）
@@ -291,6 +339,21 @@ const PageEditor: React.FC = () => {
               hasContent={isContentNotEmpty(content)}
               onGenerated={handleWikiGenerated}
             />
+            {/* Web Clipper Button - 本文が空の場合のみ表示 */}
+            {!isContentNotEmpty(content) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setWebClipperOpen(true)}
+                  >
+                    <Link2 className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>URLから取り込み</TooltipContent>
+              </Tooltip>
+            )}
             {lastSaved && (
               <span className="text-xs text-muted-foreground hidden sm:inline">
                 {formatTimeAgo(lastSaved)}に保存
@@ -304,6 +367,11 @@ const PageEditor: React.FC = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setWebClipperOpen(true)}>
+                  <Link2 className="mr-2 h-4 w-4" />
+                  URLから取り込み
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleExportMarkdown}>
                   <Download className="mr-2 h-4 w-4" />
                   Markdownでエクスポート
@@ -329,7 +397,10 @@ const PageEditor: React.FC = () => {
       {/* Editor */}
       <main className="flex-1 py-6">
         <Container>
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {/* Source URL Badge - クリップしたページの場合に表示 */}
+            {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
+
             <TiptapEditor
               content={content}
               onChange={handleContentChange}
@@ -339,6 +410,13 @@ const PageEditor: React.FC = () => {
           </div>
         </Container>
       </main>
+
+      {/* Web Clipper Dialog */}
+      <WebClipperDialog
+        open={webClipperOpen}
+        onOpenChange={setWebClipperOpen}
+        onClipped={handleWebClipped}
+      />
     </div>
   );
 };
