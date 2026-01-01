@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useEffect, useState } from "react";
-import { createAuthenticatedTursoClient } from "@/lib/turso";
+import {
+  createAuthenticatedTursoClient,
+  getLocalClient,
+  saveLocalDatabase,
+} from "@/lib/turso";
 import { PageRepository } from "@/lib/pageRepository";
-import { LocalPageRepository } from "@/lib/localPageRepository";
-import { initLocalDatabase } from "@/lib/localDatabase";
 import type { Page } from "@/types/page";
-import type { Database } from "sql.js";
 
 // Local user ID for unauthenticated users
 const LOCAL_USER_ID = "local-user";
@@ -23,22 +24,18 @@ export const pageKeys = {
     [...pageKeys.all, "search", userId, query] as const,
 };
 
-// Repository type
-type RepositoryType = PageRepository | LocalPageRepository;
-
 /**
  * Hook to get the appropriate repository based on auth state
+ * Now uses PageRepository for both local and remote (unified libsql API)
  */
 export function useRepository() {
   const { getToken, isSignedIn, userId, isLoaded } = useAuth();
-  const [localDb, setLocalDb] = useState<Database | null>(null);
   const [isLocalDbReady, setIsLocalDbReady] = useState(false);
 
   // Initialize local database
   useEffect(() => {
-    initLocalDatabase()
-      .then((db) => {
-        setLocalDb(db);
+    getLocalClient()
+      .then(() => {
         setIsLocalDbReady(true);
       })
       .catch((error) => {
@@ -47,7 +44,7 @@ export function useRepository() {
       });
   }, []);
 
-  const getRepository = useCallback(async (): Promise<RepositoryType> => {
+  const getRepository = useCallback(async (): Promise<PageRepository> => {
     if (isSignedIn && userId) {
       // Try to use Turso for authenticated users
       try {
@@ -58,17 +55,17 @@ export function useRepository() {
         }
       } catch (error) {
         // JWT Template may not be configured yet, fall back to local
-        console.warn("Failed to get Turso token, using local database:", error);
+        console.warn(
+          "Failed to get Turso token, using local database:",
+          error
+        );
       }
     }
 
-    // Use local SQLite for unauthenticated users or when Turso token fails
-    if (!localDb) {
-      const db = await initLocalDatabase();
-      return new LocalPageRepository(db);
-    }
-    return new LocalPageRepository(localDb);
-  }, [getToken, isSignedIn, userId, localDb]);
+    // Use local libsql for unauthenticated users or when Turso token fails
+    const client = await getLocalClient();
+    return new PageRepository(client, { onMutate: saveLocalDatabase });
+  }, [getToken, isSignedIn, userId]);
 
   const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
 
@@ -398,7 +395,6 @@ export function usePromoteGhostLink() {
  */
 export function useSyncWikiLinks() {
   const { getRepository, userId } = useRepository();
-  const queryClient = useQueryClient();
 
   const syncLinks = useCallback(
     async (

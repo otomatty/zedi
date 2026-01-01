@@ -1,6 +1,6 @@
 import { vi } from "vitest";
-import type { Database } from "sql.js";
-import { LocalPageRepository } from "@/lib/localPageRepository";
+import type { Client } from "@libsql/client/web";
+import { PageRepository } from "@/lib/pageRepository";
 
 /**
  * Mock the useAuth hook from Clerk
@@ -21,8 +21,8 @@ export function mockClerkAuth(options?: { isSignedIn?: boolean }) {
 /**
  * Create a mock repository provider for testing
  */
-export function createMockRepositoryHook(db: Database) {
-  const repository = new LocalPageRepository(db);
+export function createMockRepositoryHook(client: Client) {
+  const repository = new PageRepository(client);
 
   return {
     getRepository: vi.fn().mockResolvedValue(repository),

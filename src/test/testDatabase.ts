@@ -1,80 +1,77 @@
-import initSqlJs, { Database } from "sql.js";
-import { LocalPageRepository } from "@/lib/localPageRepository";
-
-let SQL: initSqlJs.SqlJsStatic | null = null;
+import { createClient, type Client } from "@libsql/client/web";
+import { PageRepository } from "@/lib/pageRepository";
 
 /**
- * Initialize sql.js for testing
+ * Schema SQL for test database
  */
-async function initSqlJsForTest(): Promise<initSqlJs.SqlJsStatic> {
-  if (!SQL) {
-    SQL = await initSqlJs();
-  }
-  return SQL;
-}
+const SCHEMA_SQL = `
+  -- Pages table
+  CREATE TABLE IF NOT EXISTS pages (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT,
+    content TEXT,
+    thumbnail_url TEXT,
+    source_url TEXT,
+    vector_embedding BLOB,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_pages_title ON pages(title);
+  CREATE INDEX IF NOT EXISTS idx_pages_created_at ON pages(created_at);
+  CREATE INDEX IF NOT EXISTS idx_pages_user_id ON pages(user_id);
+
+  -- Links table
+  CREATE TABLE IF NOT EXISTS links (
+    source_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (source_id, target_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
+  CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
+
+  -- Ghost Links table
+  CREATE TABLE IF NOT EXISTS ghost_links (
+    link_text TEXT NOT NULL,
+    source_page_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (link_text, source_page_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ghost_links_text ON ghost_links(link_text);
+`;
 
 /**
- * Create an in-memory database for testing
+ * Create an in-memory database client for testing
  */
-export async function createTestDatabase(): Promise<Database> {
-  const sqlJs = await initSqlJsForTest();
-  const db = new sqlJs.Database();
+export async function createTestClient(): Promise<Client> {
+  const client = createClient({
+    url: ":memory:",
+  });
 
   // Initialize schema
-  db.run(`
-    -- Pages table
-    CREATE TABLE IF NOT EXISTS pages (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      title TEXT,
-      content TEXT,
-      thumbnail_url TEXT,
-      source_url TEXT,
-      vector_embedding BLOB,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      is_deleted INTEGER DEFAULT 0
-    );
+  const statements = SCHEMA_SQL.split(";").filter((s) => s.trim());
+  for (const stmt of statements) {
+    await client.execute(stmt);
+  }
 
-    CREATE INDEX IF NOT EXISTS idx_pages_title ON pages(title);
-    CREATE INDEX IF NOT EXISTS idx_pages_created_at ON pages(created_at);
-    CREATE INDEX IF NOT EXISTS idx_pages_user_id ON pages(user_id);
-
-    -- Links table
-    CREATE TABLE IF NOT EXISTS links (
-      source_id TEXT NOT NULL,
-      target_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (source_id, target_id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
-    CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
-
-    -- Ghost Links table
-    CREATE TABLE IF NOT EXISTS ghost_links (
-      link_text TEXT NOT NULL,
-      source_page_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (link_text, source_page_id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_ghost_links_text ON ghost_links(link_text);
-  `);
-
-  return db;
+  return client;
 }
 
 /**
  * Create a test repository with an in-memory database
  */
 export async function createTestRepository(): Promise<{
-  db: Database;
-  repository: LocalPageRepository;
+  client: Client;
+  repository: PageRepository;
 }> {
-  const db = await createTestDatabase();
-  const repository = new LocalPageRepository(db);
-  return { db, repository };
+  const client = await createTestClient();
+  const repository = new PageRepository(client);
+  return { client, repository };
 }
 
 /**
@@ -143,12 +140,15 @@ export interface TestPageData {
 /**
  * Insert test page directly into database
  */
-export function insertTestPage(db: Database, page: TestPageData): void {
+export async function insertTestPage(
+  client: Client,
+  page: TestPageData
+): Promise<void> {
   const now = Date.now();
-  db.run(
-    `INSERT INTO pages (id, user_id, title, content, source_url, created_at, updated_at, is_deleted)
+  await client.execute({
+    sql: `INSERT INTO pages (id, user_id, title, content, source_url, created_at, updated_at, is_deleted)
      VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-    [
+    args: [
       page.id,
       page.userId,
       page.title,
@@ -156,43 +156,43 @@ export function insertTestPage(db: Database, page: TestPageData): void {
       page.sourceUrl || null,
       page.createdAt || now,
       page.updatedAt || now,
-    ]
-  );
+    ],
+  });
 }
 
 /**
  * Insert test link directly into database
  */
-export function insertTestLink(
-  db: Database,
+export async function insertTestLink(
+  client: Client,
   sourceId: string,
   targetId: string
-): void {
-  db.run(
-    `INSERT INTO links (source_id, target_id, created_at) VALUES (?, ?, ?)`,
-    [sourceId, targetId, Date.now()]
-  );
+): Promise<void> {
+  await client.execute({
+    sql: `INSERT INTO links (source_id, target_id, created_at) VALUES (?, ?, ?)`,
+    args: [sourceId, targetId, Date.now()],
+  });
 }
 
 /**
  * Insert test ghost link directly into database
  */
-export function insertTestGhostLink(
-  db: Database,
+export async function insertTestGhostLink(
+  client: Client,
   linkText: string,
   sourcePageId: string
-): void {
-  db.run(
-    `INSERT INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
-    [linkText, sourcePageId, Date.now()]
-  );
+): Promise<void> {
+  await client.execute({
+    sql: `INSERT INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
+    args: [linkText, sourcePageId, Date.now()],
+  });
 }
 
 /**
  * Clear all data from tables
  */
-export function clearTestDatabase(db: Database): void {
-  db.run("DELETE FROM pages");
-  db.run("DELETE FROM links");
-  db.run("DELETE FROM ghost_links");
+export async function clearTestDatabase(client: Client): Promise<void> {
+  await client.execute("DELETE FROM pages");
+  await client.execute("DELETE FROM links");
+  await client.execute("DELETE FROM ghost_links");
 }

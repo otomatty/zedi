@@ -3,10 +3,35 @@ import type { Page, Link, GhostLink } from "@/types/page";
 import { nanoid } from "nanoid";
 
 /**
- * Page repository for Turso database operations
+ * Options for PageRepository
+ */
+export interface PageRepositoryOptions {
+  /**
+   * Callback to call after any mutation (create, update, delete)
+   * Used for local database persistence
+   */
+  onMutate?: () => void | Promise<void>;
+}
+
+/**
+ * Page repository for database operations
+ * Works with both Turso (remote) and libsql (local) clients
  */
 export class PageRepository {
-  constructor(private client: Client) {}
+  private onMutate?: () => void | Promise<void>;
+
+  constructor(private client: Client, options?: PageRepositoryOptions) {
+    this.onMutate = options?.onMutate;
+  }
+
+  /**
+   * Call onMutate callback if provided
+   */
+  private async notifyMutation(): Promise<void> {
+    if (this.onMutate) {
+      await this.onMutate();
+    }
+  }
 
   /**
    * Create a new page
@@ -26,6 +51,8 @@ export class PageRepository {
       `,
       args: [id, userId, title, content, now, now],
     });
+
+    await this.notifyMutation();
 
     return {
       id,
@@ -171,6 +198,8 @@ export class PageRepository {
       `,
       args,
     });
+
+    await this.notifyMutation();
   }
 
   /**
@@ -191,6 +220,8 @@ export class PageRepository {
       sql: `DELETE FROM links WHERE source_id = ? OR target_id = ?`,
       args: [pageId, pageId],
     });
+
+    await this.notifyMutation();
   }
 
   /**
@@ -227,6 +258,7 @@ export class PageRepository {
         `,
         args: [sourceId, targetId, Date.now()],
       });
+      await this.notifyMutation();
     } catch (error) {
       // Ignore duplicate key errors
       console.error("Error adding link:", error);
@@ -241,6 +273,7 @@ export class PageRepository {
       sql: `DELETE FROM links WHERE source_id = ? AND target_id = ?`,
       args: [sourceId, targetId],
     });
+    await this.notifyMutation();
   }
 
   /**
@@ -302,6 +335,7 @@ export class PageRepository {
         `,
         args: [linkText, sourcePageId, Date.now()],
       });
+      await this.notifyMutation();
     } catch (error) {
       console.error("Error adding ghost link:", error);
     }
@@ -315,6 +349,7 @@ export class PageRepository {
       sql: `DELETE FROM ghost_links WHERE link_text = ? AND source_page_id = ?`,
       args: [linkText, sourcePageId],
     });
+    await this.notifyMutation();
   }
 
   /**
@@ -373,6 +408,8 @@ export class PageRepository {
         sql: `DELETE FROM ghost_links WHERE link_text = ?`,
         args: [linkText],
       });
+
+      await this.notifyMutation();
 
       return newPage;
     }
