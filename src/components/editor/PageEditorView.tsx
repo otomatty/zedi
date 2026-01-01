@@ -189,7 +189,7 @@ const PageEditor: React.FC = () => {
       setIsInitialized(true);
       window.history.replaceState(null, "", `/page/${existingPageId}`);
     }
-  });
+  }, [isNewPage, currentPageId, isInitialized, id]);
 
   // Load existing page
   useEffect(() => {
