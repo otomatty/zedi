@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>;
@@ -97,5 +98,41 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
     return {
       "Mod-[": () => false, // Prevent default
     };
+  },
+
+  addProseMirrorPlugins() {
+    const { onLinkClick } = this.options;
+
+    return [
+      new Plugin({
+        key: new PluginKey("wikiLinkClick"),
+        props: {
+          handleClick: (view, pos, event) => {
+            if (!onLinkClick) return false;
+
+            const target = event.target as HTMLElement;
+
+            // Check if clicked on a wiki-link element
+            const wikiLinkElement = target.closest(
+              "[data-wiki-link]"
+            ) as HTMLElement | null;
+            if (!wikiLinkElement) return false;
+
+            const title = wikiLinkElement.getAttribute("data-title");
+            const exists =
+              wikiLinkElement.getAttribute("data-exists") === "true";
+
+            if (title) {
+              event.preventDefault();
+              event.stopPropagation();
+              onLinkClick(title, exists);
+              return true;
+            }
+
+            return false;
+          },
+        },
+      }),
+    ];
   },
 });

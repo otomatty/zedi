@@ -389,3 +389,113 @@ export function usePromoteGhostLink() {
     },
   });
 }
+
+/**
+ * Hook to sync WikiLinks when saving a page
+ * - Updates links table for existing pages
+ * - Updates ghost_links table for non-existing pages
+ * - Promotes ghost links if referenced from 2+ pages
+ */
+export function useSyncWikiLinks() {
+  const { getRepository, userId } = useRepository();
+  const queryClient = useQueryClient();
+
+  const syncLinks = useCallback(
+    async (
+      sourcePageId: string,
+      wikiLinks: Array<{ title: string; exists: boolean }>
+    ): Promise<void> => {
+      const repo = await getRepository();
+
+      // Get all existing pages to check which links are valid
+      const pages = await repo.getPages(userId);
+      const pageTitleToId = new Map(
+        pages.map((p) => [p.title.toLowerCase().trim(), p.id])
+      );
+
+      // Process each WikiLink
+      for (const link of wikiLinks) {
+        const normalizedTitle = link.title.toLowerCase().trim();
+        const targetPageId = pageTitleToId.get(normalizedTitle);
+
+        if (targetPageId && targetPageId !== sourcePageId) {
+          // Existing page - add to links table
+          await repo.addLink(sourcePageId, targetPageId);
+          // Remove from ghost_links if it was there
+          await repo.removeGhostLink(link.title, sourcePageId);
+        } else if (!targetPageId) {
+          // Non-existing page - add to ghost_links
+          await repo.addGhostLink(link.title, sourcePageId);
+        }
+      }
+
+      // Note: Ghost links referenced from multiple pages will have their
+      // "referenced" attribute set to true for styling purposes, but
+      // pages are NOT automatically created. Users must explicitly create
+      // pages by clicking on the link.
+    },
+    [getRepository, userId]
+  );
+
+  return { syncLinks };
+}
+
+/**
+ * Hook to get data needed to update WikiLink exists status
+ * Returns a function that checks if pages exist by their titles
+ */
+export function useWikiLinkExistsChecker() {
+  const { getRepository, userId, isLoaded } = useRepository();
+
+  const checkExistence = useCallback(
+    async (
+      titles: string[],
+      currentPageId?: string
+    ): Promise<{
+      pageTitles: Set<string>;
+      referencedTitles: Set<string>;
+    }> => {
+      if (!isLoaded || titles.length === 0) {
+        return { pageTitles: new Set(), referencedTitles: new Set() };
+      }
+
+      const repo = await getRepository();
+
+      // Get all pages to check existence
+      const pages = await repo.getPages(userId);
+      const pageTitles = new Set(
+        pages.map((p) => p.title.toLowerCase().trim())
+      );
+
+      // Get ghost links to check referenced status
+      const ghostLinks = await repo.getGhostLinks(userId);
+      const referencedTitles = new Set<string>();
+
+      // Group ghost links by link_text
+      const ghostLinksByText = new Map<string, string[]>();
+      for (const gl of ghostLinks) {
+        const normalized = gl.linkText.toLowerCase().trim();
+        const sources = ghostLinksByText.get(normalized) || [];
+        sources.push(gl.sourcePageId);
+        ghostLinksByText.set(normalized, sources);
+      }
+
+      // A title is "referenced" if it appears in ghost_links from OTHER pages
+      for (const title of titles) {
+        const normalized = title.toLowerCase().trim();
+        const sources = ghostLinksByText.get(normalized) || [];
+        const otherSources = currentPageId
+          ? sources.filter((id) => id !== currentPageId)
+          : sources;
+        if (otherSources.length > 0) {
+          referencedTitles.add(normalized);
+        }
+      }
+
+      return { pageTitles, referencedTitles };
+    },
+    [getRepository, userId, isLoaded]
+  );
+
+  return { checkExistence, isLoaded };
+}

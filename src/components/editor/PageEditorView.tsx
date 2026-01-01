@@ -31,10 +31,12 @@ import {
   useCreatePage,
   useUpdatePage,
   useDeletePage,
+  useSyncWikiLinks,
 } from "@/hooks/usePageQueries";
 import { useTitleValidation } from "@/hooks/useTitleValidation";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import { generateAutoTitle } from "@/lib/contentUtils";
+import { extractWikiLinksFromContent } from "@/lib/wikiLinkUtils";
 import {
   downloadMarkdown,
   copyMarkdownToClipboard,
@@ -73,6 +75,7 @@ const PageEditor: React.FC = () => {
   const createPageMutation = useCreatePage();
   const updatePageMutation = useUpdatePage();
   const deletePageMutation = useDeletePage();
+  const { syncLinks } = useSyncWikiLinks();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -95,6 +98,20 @@ const PageEditor: React.FC = () => {
       // Strict Modeの再マウント時に重複作成を防ぐため
     };
   }, [id]);
+
+  // ページIDが変わった時に状態をリセット
+  useEffect(() => {
+    // 別のページに遷移した場合、状態をリセットして再読み込みを促す
+    if (currentPageId && currentPageId !== pageId && !isNewPage) {
+      setIsInitialized(false);
+      setCurrentPageId(null);
+      setTitle("");
+      setContent("");
+      setSourceUrl(undefined);
+      setLastSaved(null);
+      setOriginalTitle("");
+    }
+  }, [pageId, currentPageId, isNewPage]);
 
   // タイトル重複チェック
   const {
@@ -222,6 +239,14 @@ const PageEditor: React.FC = () => {
     (newTitle: string, newContent: string, forceBlockTitle = false) => {
       if (!currentPageId) return;
 
+      // WikiLinkを抽出して同期する関数
+      const syncWikiLinksFromContent = async (contentToSync: string) => {
+        const wikiLinks = extractWikiLinksFromContent(contentToSync);
+        if (wikiLinks.length > 0) {
+          await syncLinks(currentPageId, wikiLinks);
+        }
+      };
+
       // タイトル重複時は保存をブロック
       if (forceBlockTitle || shouldBlockSave) {
         // コンテンツのみ保存（タイトルは元のまま）
@@ -237,6 +262,8 @@ const PageEditor: React.FC = () => {
             {
               onSuccess: () => {
                 setLastSaved(Date.now());
+                // WikiLink同期
+                syncWikiLinksFromContent(newContent);
               },
             }
           );
@@ -257,12 +284,14 @@ const PageEditor: React.FC = () => {
           {
             onSuccess: () => {
               setLastSaved(Date.now());
+              // WikiLink同期
+              syncWikiLinksFromContent(newContent);
             },
           }
         );
       }, 500); // 500ms debounce
     },
-    [currentPageId, updatePageMutation, shouldBlockSave]
+    [currentPageId, updatePageMutation, shouldBlockSave, syncLinks]
   );
 
   // Auto-save on changes
@@ -655,6 +684,7 @@ const PageEditor: React.FC = () => {
               onChange={handleContentChange}
               autoFocus={isNewPage}
               className="min-h-[calc(100vh-200px)]"
+              pageId={currentPageId || pageId || undefined}
             />
           </div>
         </Container>
