@@ -82,15 +82,53 @@ export class LocalPageRepository {
   }
 
   /**
-   * Get a page by title
+   * Get a page by title (case-sensitive, trimmed)
    */
   async getPageByTitle(userId: string, title: string): Promise<Page | null> {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return null;
+
     const stmt = this.db.prepare(
       `SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
        FROM pages
-       WHERE user_id = ? AND LOWER(title) = LOWER(?) AND is_deleted = 0`
+       WHERE user_id = ? AND TRIM(title) = ? AND is_deleted = 0`
     );
-    stmt.bind([userId, title.trim()]);
+    stmt.bind([userId, trimmedTitle]);
+
+    if (stmt.step()) {
+      const row = stmt.getAsObject();
+      stmt.free();
+      return this.rowToPage(row);
+    }
+
+    stmt.free();
+    return null;
+  }
+
+  /**
+   * Check if a page with the same title exists (excluding a specific page)
+   * Used for duplicate title validation
+   */
+  async checkDuplicateTitle(
+    userId: string,
+    title: string,
+    excludePageId?: string
+  ): Promise<Page | null> {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return null;
+
+    let sql = `SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+       FROM pages
+       WHERE user_id = ? AND TRIM(title) = ? AND is_deleted = 0`;
+    const args: (string | number | null)[] = [userId, trimmedTitle];
+
+    if (excludePageId) {
+      sql += ` AND id != ?`;
+      args.push(excludePageId);
+    }
+
+    const stmt = this.db.prepare(sql);
+    stmt.bind(args);
 
     if (stmt.step()) {
       const row = stmt.getAsObject();

@@ -79,14 +79,30 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   }, []);
 
   // Handle link click - navigate to page or create new
+  // WikiLinkクリック時は常に既存ページの存在をチェック
   const handleLinkClick = useCallback(
-    async (title: string, exists: boolean) => {
-      if (exists) {
-        // Store the title to find and let useEffect handle navigation
-        pendingLinkActionRef.current = { title, exists };
-        setLinkTitleToFind(title);
-      } else {
-        // Create new page and navigate
+    async (title: string, _exists: boolean) => {
+      // まず既存ページを検索（タイトルの完全一致）
+      pendingLinkActionRef.current = { title, exists: true };
+      setLinkTitleToFind(title);
+    },
+    []
+  );
+
+  // Navigate when found page changes
+  useEffect(() => {
+    const handleNavigation = async () => {
+      if (!pendingLinkActionRef.current) return;
+
+      const { title } = pendingLinkActionRef.current;
+
+      if (foundPage) {
+        // 既存ページが見つかった場合はそのページに移動
+        navigate(`/page/${foundPage.id}`);
+        pendingLinkActionRef.current = null;
+        setLinkTitleToFind(null);
+      } else if (linkTitleToFind && linkTitleToFind === title) {
+        // ページが見つからなかった場合は新規作成
         try {
           const newPage = await createPageMutation.mutateAsync({
             title,
@@ -96,19 +112,13 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         } catch (error) {
           console.error("Failed to create page:", error);
         }
+        pendingLinkActionRef.current = null;
+        setLinkTitleToFind(null);
       }
-    },
-    [createPageMutation, navigate]
-  );
+    };
 
-  // Navigate when found page changes
-  useEffect(() => {
-    if (foundPage && pendingLinkActionRef.current?.exists) {
-      navigate(`/page/${foundPage.id}`);
-      pendingLinkActionRef.current = null;
-      setLinkTitleToFind(null);
-    }
-  }, [foundPage, navigate]);
+    handleNavigation();
+  }, [foundPage, linkTitleToFind, navigate, createPageMutation]);
 
   const editor = useEditor({
     extensions: [

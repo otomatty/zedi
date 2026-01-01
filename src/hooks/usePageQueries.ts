@@ -325,6 +325,29 @@ export function useCheckGhostLinkReferenced() {
 }
 
 /**
+ * Hook to check for duplicate page titles
+ */
+export function useCheckDuplicateTitle() {
+  const { getRepository, userId, isLoaded } = useRepository();
+
+  const checkDuplicate = useCallback(
+    async (title: string, excludePageId?: string): Promise<Page | null> => {
+      if (!isLoaded || !title.trim()) return null;
+      try {
+        const repo = await getRepository();
+        return await repo.checkDuplicateTitle(userId, title, excludePageId);
+      } catch (error) {
+        console.error("Error checking duplicate title:", error);
+        return null;
+      }
+    },
+    [getRepository, userId, isLoaded]
+  );
+
+  return { checkDuplicate, isLoaded };
+}
+
+/**
  * Hook to add a ghost link
  */
 export function useAddGhostLink() {

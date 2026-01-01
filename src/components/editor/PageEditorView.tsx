@@ -8,6 +8,8 @@ import {
   Download,
   Copy,
   Link2,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import TiptapEditor from "./TiptapEditor";
 import { WikiGeneratorButton } from "./WikiGeneratorButton";
 import { WebClipperDialog } from "./WebClipperDialog";
@@ -29,6 +32,7 @@ import {
   useUpdatePage,
   useDeletePage,
 } from "@/hooks/usePageQueries";
+import { useTitleValidation } from "@/hooks/useTitleValidation";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import { generateAutoTitle } from "@/lib/contentUtils";
 import {
@@ -41,6 +45,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -63,13 +77,36 @@ const PageEditor: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [webClipperOpen, setWebClipperOpen] = useState(false);
+  const [originalTitle, setOriginalTitle] = useState<string>("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState<string>("");
 
   // Refs for debouncing
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // タイトル重複チェック
+  const {
+    duplicatePage,
+    isValidating,
+    isEmpty: isTitleEmpty,
+    errorMessage,
+    validateTitle,
+    initializeWithTitle,
+    shouldBlockSave,
+  } = useTitleValidation({
+    currentPageId: currentPageId || undefined,
+    isNewPage,
+    debounceMs: 300,
+  });
+
   // Create new page
   useEffect(() => {
-    if (isNewPage && !currentPageId && !createPageMutation.isPending) {
+    if (
+      isNewPage &&
+      !currentPageId &&
+      !isInitialized &&
+      !createPageMutation.isPending
+    ) {
       createPageMutation.mutate(
         { title: "", content: "" },
         {
@@ -92,19 +129,29 @@ const PageEditor: React.FC = () => {
         }
       );
     }
-  }, [isNewPage, currentPageId, createPageMutation, navigate, toast]);
+  }, [
+    isNewPage,
+    currentPageId,
+    isInitialized,
+    createPageMutation,
+    navigate,
+    toast,
+  ]);
 
   // Load existing page
   useEffect(() => {
     if (!isNewPage && page && !isInitialized) {
       setCurrentPageId(page.id);
       setTitle(page.title);
+      setOriginalTitle(page.title);
       setContent(page.content);
       setSourceUrl(page.sourceUrl);
       setLastSaved(page.updatedAt);
       setIsInitialized(true);
+      // 既存ページのタイトルで状態を初期化（重複チェックは行わない）
+      initializeWithTitle(page.title);
     }
-  }, [isNewPage, page, isInitialized]);
+  }, [isNewPage, page, isInitialized, initializeWithTitle]);
 
   // Handle page not found
   useEffect(() => {
@@ -117,10 +164,32 @@ const PageEditor: React.FC = () => {
     }
   }, [isNewPage, isError, navigate, toast]);
 
-  // Debounced save function
+  // Debounced save function (タイトル重複時は保存をブロック)
   const saveChanges = useCallback(
-    (newTitle: string, newContent: string) => {
+    (newTitle: string, newContent: string, forceBlockTitle = false) => {
       if (!currentPageId) return;
+
+      // タイトル重複時は保存をブロック
+      if (forceBlockTitle || shouldBlockSave) {
+        // コンテンツのみ保存（タイトルは元のまま）
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        saveTimeoutRef.current = setTimeout(() => {
+          updatePageMutation.mutate(
+            {
+              pageId: currentPageId,
+              updates: { content: newContent },
+            },
+            {
+              onSuccess: () => {
+                setLastSaved(Date.now());
+              },
+            }
+          );
+        }, 500);
+        return;
+      }
 
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -140,7 +209,7 @@ const PageEditor: React.FC = () => {
         );
       }, 500); // 500ms debounce
     },
-    [currentPageId, updatePageMutation]
+    [currentPageId, updatePageMutation, shouldBlockSave]
   );
 
   // Auto-save on changes
@@ -151,19 +220,30 @@ const PageEditor: React.FC = () => {
       const autoTitle = !title ? generateAutoTitle(newContent) : title;
       if (!title && autoTitle !== "無題のページ") {
         setTitle(autoTitle);
+        validateTitle(autoTitle);
       }
       saveChanges(autoTitle || title, newContent);
     },
-    [title, saveChanges]
+    [title, saveChanges, validateTitle]
   );
 
   const handleTitleChange = useCallback(
     (newTitle: string) => {
       setTitle(newTitle);
+      validateTitle(newTitle);
+      // タイトル重複チェックは非同期なので、保存はvalidateTitleの結果を待たずに行う
+      // shouldBlockSaveがtrueの場合はsaveChanges内でコンテンツのみ保存される
       saveChanges(newTitle, content);
     },
-    [content, saveChanges]
+    [content, saveChanges, validateTitle]
   );
+
+  // 既存ページを開くハンドラー
+  const handleOpenDuplicatePage = useCallback(() => {
+    if (duplicatePage) {
+      navigate(`/page/${duplicatePage.id}`);
+    }
+  }, [duplicatePage, navigate]);
 
   // Wiki生成結果をエディタに反映
   const handleWikiGenerated = useCallback(
@@ -253,12 +333,83 @@ const PageEditor: React.FC = () => {
   }, [currentPageId, deletePageMutation, navigate, toast]);
 
   const handleBack = useCallback(() => {
-    // Delete page if it's new and has no title or content
-    if (isNewPage && currentPageId && !title.trim() && !content.trim()) {
+    const hasContent = isContentNotEmpty(content);
+    const isTitleEmptyOrUntitled = !title.trim();
+
+    // 削除が必要なケースを判定
+    // 1. タイトル重複警告がある場合
+    // 2. タイトルが空（無題）の場合
+    const shouldDeleteForDuplicate = currentPageId && shouldBlockSave;
+    const shouldDeleteForEmptyTitle = currentPageId && isTitleEmptyOrUntitled;
+
+    if (shouldDeleteForDuplicate || shouldDeleteForEmptyTitle) {
+      // コンテンツがある場合は確認ダイアログを表示
+      if (hasContent) {
+        if (shouldDeleteForDuplicate) {
+          setDeleteReason("重複するタイトルのページ");
+        } else {
+          setDeleteReason("タイトルが未入力のページ");
+        }
+        setDeleteConfirmOpen(true);
+        return;
+      }
+
+      // コンテンツがない場合はそのまま削除
       deletePageMutation.mutate(currentPageId);
+      if (shouldDeleteForDuplicate) {
+        toast({
+          title: "重複するタイトルのため、ページを削除しました",
+        });
+      } else {
+        toast({
+          title: "タイトルが未入力のため、ページを削除しました",
+        });
+      }
     }
     navigate("/");
-  }, [navigate, isNewPage, currentPageId, title, content, deletePageMutation]);
+  }, [
+    navigate,
+    currentPageId,
+    title,
+    content,
+    deletePageMutation,
+    shouldBlockSave,
+    toast,
+    isContentNotEmpty,
+  ]);
+
+  // 削除確認ダイアログで「削除」を選択した場合
+  const handleConfirmDelete = useCallback(() => {
+    if (currentPageId) {
+      deletePageMutation.mutate(currentPageId);
+      toast({
+        title: `${deleteReason}を削除しました`,
+      });
+    }
+    setDeleteConfirmOpen(false);
+    navigate("/");
+  }, [currentPageId, deletePageMutation, deleteReason, navigate, toast]);
+
+  // 削除確認ダイアログで「キャンセル」を選択した場合
+  const handleCancelDelete = useCallback(() => {
+    setDeleteConfirmOpen(false);
+  }, []);
+
+  // Cmd+H ショートカットをインターセプトしてhandleBackを呼び出す
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+H / Ctrl+H - ホームに戻る（handleBackを通す）
+      if ((e.metaKey || e.ctrlKey) && e.key === "h") {
+        e.preventDefault();
+        e.stopPropagation();
+        handleBack();
+      }
+    };
+
+    // captureフェーズでイベントをキャッチ（GlobalShortcutsProviderより先に処理）
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [handleBack]);
 
   // Export handlers
   const handleExportMarkdown = useCallback(() => {
@@ -328,7 +479,11 @@ const PageEditor: React.FC = () => {
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="ページタイトル"
-              className="border-0 bg-transparent text-lg font-medium focus-visible:ring-0 px-0 h-auto py-1"
+              className={`border-0 bg-transparent text-lg font-medium focus-visible:ring-0 px-0 h-auto py-1 ${
+                errorMessage || (!isNewPage && isTitleEmpty && title === "")
+                  ? "text-destructive"
+                  : ""
+              }`}
             />
           </div>
 
@@ -394,6 +549,47 @@ const PageEditor: React.FC = () => {
         </Container>
       </header>
 
+      {/* タイトル警告エリア */}
+      {(duplicatePage || (!isNewPage && isTitleEmpty && title === "")) && (
+        <div className="border-b border-border bg-destructive/10">
+          <Container>
+            {/* タイトル重複警告 */}
+            {duplicatePage && (
+              <Alert
+                variant="destructive"
+                className="border-0 bg-transparent py-3"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between gap-2">
+                  <span className="text-sm">{errorMessage}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenDuplicatePage}
+                    className="shrink-0"
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    開く
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            {/* 既存ページで空タイトル警告 */}
+            {!isNewPage && isTitleEmpty && title === "" && !duplicatePage && (
+              <Alert
+                variant="destructive"
+                className="border-0 bg-transparent py-3"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  タイトルを入力してください
+                </AlertDescription>
+              </Alert>
+            )}
+          </Container>
+        </div>
+      )}
+
       {/* Editor */}
       <main className="flex-1 py-6">
         <Container>
@@ -417,6 +613,30 @@ const PageEditor: React.FC = () => {
         onOpenChange={setWebClipperOpen}
         onClipped={handleWebClipped}
       />
+
+      {/* 削除確認ダイアログ */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ページを削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteReason}
+              は保存できません。このページにはコンテンツが含まれています。削除してもよろしいですか？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDelete}>
+              キャンセル
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              削除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
