@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/zedi-logo.svg" alt="Zedi Logo" width="120" height="120" />
+  <img src="public/favicon.svg" alt="Zedi Logo" width="120" height="120" />
 </p>
 
 <h1 align="center">Zedi</h1>
