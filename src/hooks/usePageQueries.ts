@@ -298,6 +298,33 @@ export function useRemoveLink() {
 // --- Ghost Link hooks ---
 
 /**
+ * Hook to check if a link text is referenced in ghost_links table from OTHER pages
+ */
+export function useCheckGhostLinkReferenced() {
+  const { getRepository } = useRepository();
+
+  const checkReferenced = useCallback(
+    async (linkText: string, currentPageId?: string): Promise<boolean> => {
+      try {
+        const repo = await getRepository();
+        const sources = await repo.getGhostLinkSources(linkText);
+        // Referenced if at least one OTHER page has this ghost link
+        const otherSources = currentPageId
+          ? sources.filter((id) => id !== currentPageId)
+          : sources;
+        return otherSources.length > 0;
+      } catch (error) {
+        console.error("Error checking ghost link:", error);
+        return false;
+      }
+    },
+    [getRepository]
+  );
+
+  return { checkReferenced };
+}
+
+/**
  * Hook to add a ghost link
  */
 export function useAddGhostLink() {

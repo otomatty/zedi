@@ -19,7 +19,11 @@ import {
   type WikiLinkSuggestionHandle,
 } from "./extensions/WikiLinkSuggestion";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
-import { usePageByTitle, useCreatePage } from "@/hooks/usePageQueries";
+import {
+  usePageByTitle,
+  useCreatePage,
+  useCheckGhostLinkReferenced,
+} from "@/hooks/usePageQueries";
 import { Button } from "@/components/ui/button";
 import { GitBranch } from "lucide-react";
 
@@ -29,6 +33,7 @@ interface TiptapEditorProps {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  pageId?: string;
 }
 
 const TiptapEditor: React.FC<TiptapEditorProps> = ({
@@ -37,9 +42,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   placeholder = "思考を書き始める...",
   className,
   autoFocus = false,
+  pageId,
 }) => {
   const navigate = useNavigate();
   const createPageMutation = useCreatePage();
+  const { checkReferenced } = useCheckGhostLinkReferenced();
   const [linkTitleToFind, setLinkTitleToFind] = useState<string | null>(null);
   const { data: foundPage } = usePageByTitle(linkTitleToFind || "");
 
@@ -202,6 +209,47 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     }
   }, [editor, content]);
 
+  // Update WikiLink referenced status when page loads
+  useEffect(() => {
+    if (!editor || !content) return;
+
+    const updateWikiLinkReferencedStatus = async () => {
+      const { doc, tr } = editor.state;
+      let hasChanges = false;
+
+      // Find all wikiLink marks in the document
+      doc.descendants((node, pos) => {
+        if (node.isText && node.marks.length > 0) {
+          node.marks.forEach((mark) => {
+            if (mark.type.name === "wikiLink" && !mark.attrs.exists) {
+              // Check if this ghost link is referenced elsewhere
+              checkReferenced(mark.attrs.title, pageId).then((isReferenced) => {
+                if (isReferenced !== mark.attrs.referenced) {
+                  // Update the mark with new referenced status
+                  const from = pos;
+                  const to = pos + node.nodeSize;
+
+                  editor
+                    .chain()
+                    .setTextSelection({ from, to })
+                    .extendMarkRange("wikiLink")
+                    .updateAttributes("wikiLink", { referenced: isReferenced })
+                    .run();
+
+                  hasChanges = true;
+                }
+              });
+            }
+          });
+        }
+      });
+    };
+
+    // Run after a short delay to ensure content is loaded
+    const timer = setTimeout(updateWikiLinkReferencedStatus, 100);
+    return () => clearTimeout(timer);
+  }, [editor, content, checkReferenced, pageId]);
+
   // Update suggestion position
   useEffect(() => {
     if (!editor || !suggestionState?.active || !suggestionState.range) {
@@ -222,10 +270,16 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   }, [editor, suggestionState]);
 
   const handleSuggestionSelect = useCallback(
-    (item: SuggestionItem) => {
+    async (item: SuggestionItem) => {
       if (!editor || !suggestionState?.range) return;
 
       const { from, to } = suggestionState.range;
+
+      // Check if this link text is referenced in other pages (ghost_links)
+      let referenced = false;
+      if (!item.exists) {
+        referenced = await checkReferenced(item.title, pageId);
+      }
 
       // Delete the [[ trigger text
       editor
@@ -241,6 +295,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
                 attrs: {
                   title: item.title,
                   exists: item.exists,
+                  referenced: referenced,
                 },
               },
             ],
@@ -256,7 +311,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         })
       );
     },
-    [editor, suggestionState]
+    [editor, suggestionState, checkReferenced, pageId]
   );
 
   const handleSuggestionClose = useCallback(() => {

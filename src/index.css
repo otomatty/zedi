@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -43,8 +43,9 @@
     --surface-elevated: 220 18% 14%;
     --text-subtle: 220 10% 50%;
     --link-color: 175 50% 60%;
+    --link-referenced: 200 70% 60%;
     --link-ghost: 35 80% 60%;
-    
+
     /* Shadows */
     --shadow-subtle: 0 2px 8px -2px hsl(220 30% 5% / 0.6);
     --shadow-elevated: 0 8px 24px -4px hsl(220 30% 5% / 0.8);
@@ -83,8 +84,9 @@
     --surface-elevated: 0 0% 100%;
     --text-subtle: 220 10% 55%;
     --link-color: 175 60% 40%;
+    --link-referenced: 200 65% 50%;
     --link-ghost: 35 70% 50%;
-    
+
     --shadow-subtle: 0 2px 8px -2px hsl(220 20% 10% / 0.08);
     --shadow-elevated: 0 8px 24px -4px hsl(220 20% 10% / 0.12);
     --shadow-glow: 0 0 20px -4px hsl(var(--primary) / 0.15);
@@ -151,7 +153,8 @@
   }
 
   @keyframes fab-pulse {
-    0%, 100% {
+    0%,
+    100% {
       box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
     }
     50% {
@@ -190,7 +193,8 @@
     @apply text-lg font-medium mb-2 mt-4 first:mt-0;
   }
 
-  .tiptap-editor ul, .tiptap-editor ol {
+  .tiptap-editor ul,
+  .tiptap-editor ol {
     @apply mb-3 pl-6;
   }
 
@@ -238,6 +242,20 @@
     background: hsl(var(--link-color) / 0.2);
   }
 
+  /* Referenced link - exists in other pages but no page created yet */
+  .wiki-link-referenced {
+    @apply text-link-referenced font-medium cursor-pointer 
+           border-b border-dashed border-current
+           hover:border-solid transition-colors duration-200 
+           rounded px-0.5 -mx-0.5;
+    background: hsl(var(--link-referenced) / 0.1);
+  }
+
+  .wiki-link-referenced:hover {
+    background: hsl(var(--link-referenced) / 0.2);
+  }
+
+  /* Ghost link - new link, not referenced elsewhere */
   .wiki-link-ghost {
     @apply text-ghost-link font-medium cursor-pointer 
            border-b border-dashed border-ghost-link/50 
@@ -261,6 +279,10 @@
 @layer utilities {
   .text-link {
     color: hsl(var(--link-color));
+  }
+
+  .text-link-referenced {
+    color: hsl(var(--link-referenced));
   }
 
   .text-ghost-link {
@@ -304,9 +326,19 @@
   }
 
   /* Stagger animation */
-  .stagger-1 { animation-delay: 0.05s; }
-  .stagger-2 { animation-delay: 0.1s; }
-  .stagger-3 { animation-delay: 0.15s; }
-  .stagger-4 { animation-delay: 0.2s; }
-  .stagger-5 { animation-delay: 0.25s; }
+  .stagger-1 {
+    animation-delay: 0.05s;
+  }
+  .stagger-2 {
+    animation-delay: 0.1s;
+  }
+  .stagger-3 {
+    animation-delay: 0.15s;
+  }
+  .stagger-4 {
+    animation-delay: 0.2s;
+  }
+  .stagger-5 {
+    animation-delay: 0.25s;
+  }
 }

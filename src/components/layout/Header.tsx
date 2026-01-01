@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Settings, LogOut } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  LogOut,
+  Keyboard,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,10 +16,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { format, addMonths, subMonths, startOfMonth } from "date-fns";
 import { ja } from "date-fns/locale";
-import SearchBar from "@/components/search/SearchBar";
 import Container from "@/components/layout/Container";
+import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
 import { cn } from "@/lib/utils";
 import {
   SignedIn,
@@ -25,12 +36,35 @@ import {
 
 interface HeaderProps {
   className?: string;
+  onShowShortcuts?: () => void;
+  shortcutsOpen?: boolean;
+  onShortcutsOpenChange?: (open: boolean) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ className }) => {
+const Header: React.FC<HeaderProps> = ({
+  className,
+  onShowShortcuts,
+  shortcutsOpen = false,
+  onShortcutsOpenChange,
+}) => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useClerk();
+
+  // Local state for shortcuts dialog if not controlled externally
+  const [localShortcutsOpen, setLocalShortcutsOpen] = useState(false);
+  const isShortcutsOpen = onShortcutsOpenChange
+    ? shortcutsOpen
+    : localShortcutsOpen;
+  const setShortcutsOpen = onShortcutsOpenChange ?? setLocalShortcutsOpen;
+
+  const handleShowShortcuts = () => {
+    if (onShowShortcuts) {
+      onShowShortcuts();
+    } else {
+      setShortcutsOpen(true);
+    }
+  };
 
   const [currentMonth, setCurrentMonth] = useState(() =>
     startOfMonth(new Date())
@@ -86,9 +120,29 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           </div>
         </div>
 
-        {/* Search & Auth */}
-        <div className="flex items-center gap-4">
-          <SearchBar className="w-full max-w-xs sm:max-w-sm" />
+        {/* Shortcuts & Auth */}
+        <div className="flex items-center gap-2">
+          {/* Keyboard Shortcuts Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleShowShortcuts}
+              >
+                <Keyboard className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                ショートカット一覧{" "}
+                <kbd className="ml-1 px-1 py-0.5 text-xs bg-muted rounded">
+                  ⌘/
+                </kbd>
+              </p>
+            </TooltipContent>
+          </Tooltip>
 
           {/* Authentication */}
           <SignedOut>
@@ -147,6 +201,14 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           </SignedIn>
         </div>
       </Container>
+
+      {/* Keyboard Shortcuts Dialog (only if not controlled externally) */}
+      {!onShortcutsOpenChange && (
+        <KeyboardShortcutsDialog
+          open={localShortcutsOpen}
+          onOpenChange={setLocalShortcutsOpen}
+        />
+      )}
     </header>
   );
 };

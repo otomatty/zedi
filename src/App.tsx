@@ -8,6 +8,8 @@ import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
 import AISettings from "./pages/AISettings";
 import NotFound from "./pages/NotFound";
+import { GlobalSearch } from "./components/search/GlobalSearch";
+import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 
 const queryClient = new QueryClient();
 
@@ -17,14 +19,17 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/page/:id" element={<PageEditorPage />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/settings/ai" element={<AISettings />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <GlobalShortcutsProvider>
+          <GlobalSearch />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/page/:id" element={<PageEditorPage />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/ai" element={<AISettings />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </GlobalShortcutsProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

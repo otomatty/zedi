@@ -36,9 +36,10 @@ Web App で以下の機能が安定したタイミングで Tauri 2.0 への移�
 - ✅ ページの CRUD 操作
 - ✅ Date Grid UI
 - ✅ WikiLink 機能
-- ⏳ AI 機能（Wiki Generator、API キー設定）
+- ✅ AI 機能（Wiki Generator、API キー設定）
 - ✅ Web Clipping 機能
-- ⏳ Global Search
+- ✅ Global Search
+- ✅ キーボードショートカット
 
 移行時の作業：
 
@@ -563,23 +564,24 @@ CREATE INDEX idx_ghost_links_text ON ghost_links(link_text);
 
 ---
 
-### Phase 4: Search & Discovery 🔄 **現在のフェーズ**
+### Phase 4: Search & Discovery ✅ **完了**
 
 **目標:** 大量のページから目的の情報を素早く発見できるようにする。
 
-| 状態 | 優先度  | 実装項目                                    |
-| :--- | :------ | :------------------------------------------ |
-| ⏳   | 🔴 必須 | Global Search UI（`Cmd+K` / `Ctrl+K`）      |
-| ⏳   | 🔴 必須 | ページタイトル・本文の全文検索              |
-| ⏳   | 🟡 推奨 | Smart Snippet（文脈考慮型スニペット）の実装 |
-| ⏳   | 🟡 推奨 | Backlinks / 2-hop Links の表示              |
-| ⏳   | 🟢 任意 | Semantic Search（ベクトル検索）             |
+| 状態 | 優先度  | 実装項目                                              |
+| :--- | :------ | :---------------------------------------------------- |
+| ✅   | 🔴 必須 | Global Search UI（`Cmd+K` / `Ctrl+K`）                |
+| ✅   | 🔴 必須 | ページタイトル・本文の全文検索                        |
+| ✅   | 🔴 必須 | キーボードショートカット（`Cmd+N`, `Cmd+H`, `Cmd+/`） |
+| ✅   | 🟡 推奨 | Smart Snippet（文脈考慮型スニペット）の実装           |
+| ⏳   | 🟡 推奨 | Backlinks / 2-hop Links の表示                        |
+| ⏳   | 🟢 任意 | Semantic Search（ベクトル検索）                       |
 
-**完了基準:** `Cmd+K` で全文検索が起動し、キーワードを含むページが即座に表示される。
+**完了基準:** ✅ `Cmd+K` で全文検索が起動し、キーワードを含むページが即座に表示される。
 
 ---
 
-### Phase 5: Sync & Multi-Device
+### Phase 5: Sync & Multi-Device 🔄 **現在のフェーズ**
 
 **目標:** データがデバイス間で矛盾なく同期する。
 
