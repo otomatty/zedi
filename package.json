@@ -1,8 +1,23 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "zedi",
+  "version": "0.1.0",
+  "description": "Zero-Friction Knowledge Network - AIネイティブなナレッジアプリ",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "author": "Zedi Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/zedi.git"
+  },
+  "keywords": [
+    "knowledge-management",
+    "note-taking",
+    "wiki",
+    "ai",
+    "react",
+    "typescript"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
