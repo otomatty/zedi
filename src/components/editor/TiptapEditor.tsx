@@ -48,7 +48,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const createPageMutation = useCreatePage();
   const { checkReferenced } = useCheckGhostLinkReferenced();
   const [linkTitleToFind, setLinkTitleToFind] = useState<string | null>(null);
-  const { data: foundPage } = usePageByTitle(linkTitleToFind || "");
+  const { data: foundPage, isFetched } = usePageByTitle(linkTitleToFind || "");
 
   const [suggestionState, setSuggestionState] =
     useState<WikiLinkSuggestionState | null>(null);
@@ -92,16 +92,23 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   // Navigate when found page changes
   useEffect(() => {
     const handleNavigation = async () => {
-      if (!pendingLinkActionRef.current) return;
+      // linkTitleToFindが設定されていない場合は何もしない
+      if (!linkTitleToFind || !pendingLinkActionRef.current) return;
 
       const { title } = pendingLinkActionRef.current;
+
+      // タイトルが一致しない場合は何もしない
+      if (linkTitleToFind !== title) return;
+
+      // クエリがまだ完了していない場合は待機
+      if (!isFetched) return;
 
       if (foundPage) {
         // 既存ページが見つかった場合はそのページに移動
         navigate(`/page/${foundPage.id}`);
         pendingLinkActionRef.current = null;
         setLinkTitleToFind(null);
-      } else if (linkTitleToFind && linkTitleToFind === title) {
+      } else {
         // ページが見つからなかった場合は新規作成
         try {
           const newPage = await createPageMutation.mutateAsync({
@@ -118,7 +125,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     };
 
     handleNavigation();
-  }, [foundPage, linkTitleToFind, navigate, createPageMutation]);
+  }, [foundPage, isFetched, linkTitleToFind, navigate, createPageMutation]);
 
   const editor = useEditor({
     extensions: [

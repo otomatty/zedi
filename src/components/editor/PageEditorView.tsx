@@ -56,6 +56,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// モジュールスコープで作成済みのページIDを追跡（Strict Mode対策）
+// key: createKey (id || "new-page"), value: 作成されたページID
+const createdPageMap = new Map<string, string>();
+
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -84,6 +88,14 @@ const PageEditor: React.FC = () => {
   // Refs for debouncing
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ページIDが変わった時にモジュールスコープの追跡をクリーンアップ
+  useEffect(() => {
+    return () => {
+      // コンポーネントのアンマウント時にcreatingPageIdsをクリーンアップしない
+      // Strict Modeの再マウント時に重複作成を防ぐため
+    };
+  }, [id]);
+
   // タイトル重複チェック
   const {
     duplicatePage,
@@ -101,16 +113,35 @@ const PageEditor: React.FC = () => {
 
   // Create new page
   useEffect(() => {
-    if (
-      isNewPage &&
-      !currentPageId &&
-      !isInitialized &&
-      !createPageMutation.isPending
-    ) {
+    if (!isNewPage || currentPageId || isInitialized) {
+      return;
+    }
+
+    // モジュールスコープのMapを使って一度だけ実行されるようにする（Strict Modeの二重レンダリング対策）
+    const createKey = id || "new-page";
+
+    // 既に作成済みのページがある場合は、その状態を復元
+    const existingPageId = createdPageMap.get(createKey);
+    if (existingPageId && existingPageId !== "pending") {
+      // 実際のページIDがある場合は復元
+      setCurrentPageId(existingPageId);
+      setTitle("");
+      setContent("");
+      setIsInitialized(true);
+      window.history.replaceState(null, "", `/page/${existingPageId}`);
+      return;
+    }
+
+    // まだ作成処理が開始されていない場合のみ作成
+    if (!createdPageMap.has(createKey)) {
+      // 作成開始をマーク
+      createdPageMap.set(createKey, "pending");
       createPageMutation.mutate(
         { title: "", content: "" },
         {
           onSuccess: (newPage) => {
+            // 作成されたページIDを保存
+            createdPageMap.set(createKey, newPage.id);
             setCurrentPageId(newPage.id);
             setTitle("");
             setContent("");
@@ -120,6 +151,7 @@ const PageEditor: React.FC = () => {
             window.history.replaceState(null, "", `/page/${newPage.id}`);
           },
           onError: () => {
+            createdPageMap.delete(createKey); // エラー時はリトライ可能に
             toast({
               title: "ページの作成に失敗しました",
               variant: "destructive",
@@ -129,6 +161,7 @@ const PageEditor: React.FC = () => {
         }
       );
     }
+    // 作成中（pending）の場合は何もしない - onSuccessが呼ばれるのを待つ
   }, [
     isNewPage,
     currentPageId,
@@ -136,7 +169,27 @@ const PageEditor: React.FC = () => {
     createPageMutation,
     navigate,
     toast,
+    id,
   ]);
+
+  // Strict Mode対策: pending状態のページが作成完了したら状態を復元
+  useEffect(() => {
+    if (!isNewPage || currentPageId || isInitialized) {
+      return;
+    }
+
+    const createKey = id || "new-page";
+    const existingPageId = createdPageMap.get(createKey);
+
+    // pendingではない実際のページIDがある場合は復元
+    if (existingPageId && existingPageId !== "pending") {
+      setCurrentPageId(existingPageId);
+      setTitle("");
+      setContent("");
+      setIsInitialized(true);
+      window.history.replaceState(null, "", `/page/${existingPageId}`);
+    }
+  });
 
   // Load existing page
   useEffect(() => {

@@ -145,10 +145,15 @@ export function useCreatePage() {
       title?: string;
       content?: string;
     }) => {
+      // デバッグ: スタックトレースを出力
+      console.log("=== createPage called ===");
+      console.log("title:", title);
+      console.log("Stack trace:", new Error().stack);
       const repo = await getRepository();
       return repo.createPage(userId, title, content);
     },
     onSuccess: (newPage) => {
+      console.log("=== createPage success ===", newPage.id);
       // Invalidate and refetch pages list
       queryClient.invalidateQueries({ queryKey: pageKeys.lists() });
 
