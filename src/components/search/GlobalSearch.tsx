@@ -8,11 +8,12 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandShortcut,
 } from "@/components/ui/command";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
 import { formatTimeAgo } from "@/lib/dateUtils";
+import { MatchTypeBadge } from "./MatchTypeBadge";
+import { HighlightedSnippet } from "./HighlightedSnippet";
 
 export function GlobalSearch() {
   const navigate = useNavigate();
@@ -76,7 +77,7 @@ export function GlobalSearch() {
         {/* Search Results */}
         {hasQuery && searchResults.length > 0 && (
           <CommandGroup heading={`検索結果 (${searchResults.length}件)`}>
-            {searchResults.map(({ page, matchedText }) => (
+            {searchResults.map(({ page, highlightedText, matchType }) => (
               <CommandItem
                 key={page.id}
                 value={`search-${page.id}-${page.title}`}
@@ -92,13 +93,11 @@ export function GlobalSearch() {
                   <span className="font-medium truncate flex-1">
                     {page.title || "無題のページ"}
                   </span>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {formatTimeAgo(page.updatedAt)}
-                  </span>
+                  <MatchTypeBadge type={matchType} />
                 </div>
-                <span className="text-xs text-muted-foreground line-clamp-1 pl-6 w-full">
-                  {matchedText}
-                </span>
+                <div className="pl-6 w-full">
+                  <HighlightedSnippet text={highlightedText} />
+                </div>
               </CommandItem>
             ))}
           </CommandGroup>
