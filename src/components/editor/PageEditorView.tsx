@@ -25,6 +25,7 @@ import TiptapEditor from "./TiptapEditor";
 import { WikiGeneratorButton } from "./WikiGeneratorButton";
 import { WebClipperDialog } from "./WebClipperDialog";
 import { SourceUrlBadge } from "./SourceUrlBadge";
+import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
 import Container from "@/components/layout/Container";
 import {
   usePage,
@@ -642,6 +643,9 @@ const PageEditor: React.FC = () => {
               className="min-h-[calc(100vh-200px)]"
               pageId={currentPageId || pageId || undefined}
             />
+
+            {/* Linked Pages Section */}
+            {currentPageId && <LinkedPagesSection pageId={currentPageId} />}
           </div>
         </Container>
       </main>

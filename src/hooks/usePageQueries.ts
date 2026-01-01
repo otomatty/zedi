@@ -29,7 +29,7 @@ type RepositoryType = PageRepository | LocalPageRepository;
 /**
  * Hook to get the appropriate repository based on auth state
  */
-function useRepository() {
+export function useRepository() {
   const { getToken, isSignedIn, userId, isLoaded } = useAuth();
   const [localDb, setLocalDb] = useState<Database | null>(null);
   const [isLocalDbReady, setIsLocalDbReady] = useState(false);
