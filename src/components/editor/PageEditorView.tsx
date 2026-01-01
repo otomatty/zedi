@@ -58,9 +58,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// モジュールスコープで作成済みのページIDを追跡（Strict Mode対策）
-// key: createKey (id || "new-page"), value: 作成されたページID
-const createdPageMap = new Map<string, string>();
+// モジュールスコープで作成中のフラグを追跡（Strict Mode対策）
+let isCreatingPage = false;
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -130,83 +129,40 @@ const PageEditor: React.FC = () => {
 
   // Create new page
   useEffect(() => {
-    if (!isNewPage || currentPageId || isInitialized) {
+    if (!isNewPage || isInitialized) {
       return;
     }
 
-    // モジュールスコープのMapを使って一度だけ実行されるようにする（Strict Modeの二重レンダリング対策）
-    const createKey = id || "new-page";
-
-    // 既に作成済みのページがある場合は、その状態を復元
-    const existingPageId = createdPageMap.get(createKey);
-    if (existingPageId && existingPageId !== "pending") {
-      // 実際のページIDがある場合は復元
-      setCurrentPageId(existingPageId);
-      setTitle("");
-      setContent("");
-      setIsInitialized(true);
-      window.history.replaceState(null, "", `/page/${existingPageId}`);
+    // Strict Modeの二重レンダリング対策
+    if (isCreatingPage) {
       return;
     }
 
-    // まだ作成処理が開始されていない場合のみ作成
-    if (!createdPageMap.has(createKey)) {
-      // 作成開始をマーク
-      createdPageMap.set(createKey, "pending");
-      createPageMutation.mutate(
-        { title: "", content: "" },
-        {
-          onSuccess: (newPage) => {
-            // 作成されたページIDを保存
-            createdPageMap.set(createKey, newPage.id);
-            setCurrentPageId(newPage.id);
-            setTitle("");
-            setContent("");
-            setLastSaved(newPage.updatedAt);
-            setIsInitialized(true);
-            // Update URL without navigation
-            window.history.replaceState(null, "", `/page/${newPage.id}`);
-          },
-          onError: () => {
-            createdPageMap.delete(createKey); // エラー時はリトライ可能に
-            toast({
-              title: "ページの作成に失敗しました",
-              variant: "destructive",
-            });
-            navigate("/");
-          },
-        }
-      );
-    }
-    // 作成中（pending）の場合は何もしない - onSuccessが呼ばれるのを待つ
-  }, [
-    isNewPage,
-    currentPageId,
-    isInitialized,
-    createPageMutation,
-    navigate,
-    toast,
-    id,
-  ]);
+    isCreatingPage = true;
 
-  // Strict Mode対策: pending状態のページが作成完了したら状態を復元
-  useEffect(() => {
-    if (!isNewPage || currentPageId || isInitialized) {
-      return;
-    }
+    // mutateAsyncを使って直接async処理
+    const createNewPage = async () => {
+      try {
+        const newPage = await createPageMutation.mutateAsync({
+          title: "",
+          content: "",
+        });
+        console.log("=== Page created, navigating to ===", newPage.id);
+        isCreatingPage = false;
+        navigate(`/page/${newPage.id}`, { replace: true });
+      } catch (error) {
+        console.error("=== Page creation failed ===", error);
+        isCreatingPage = false;
+        toast({
+          title: "ページの作成に失敗しました",
+          variant: "destructive",
+        });
+        navigate("/");
+      }
+    };
 
-    const createKey = id || "new-page";
-    const existingPageId = createdPageMap.get(createKey);
-
-    // pendingではない実際のページIDがある場合は復元
-    if (existingPageId && existingPageId !== "pending") {
-      setCurrentPageId(existingPageId);
-      setTitle("");
-      setContent("");
-      setIsInitialized(true);
-      window.history.replaceState(null, "", `/page/${existingPageId}`);
-    }
-  }, [isNewPage, currentPageId, isInitialized, id]);
+    createNewPage();
+  }, [isNewPage, isInitialized, createPageMutation, navigate, toast]);
 
   // Load existing page
   useEffect(() => {
