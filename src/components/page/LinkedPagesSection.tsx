@@ -1,12 +1,8 @@
 import { useNavigate } from "react-router-dom";
-import { Link2, ArrowLeft, Globe, ChevronDown, FilePlus } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Link2, FilePlus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LinkSection } from "./LinkSection";
+import { LinkGroupRow } from "./LinkGroupRow";
 import { GhostLinkCard } from "./GhostLinkCard";
 import { useLinkedPages } from "@/hooks/useLinkedPages";
 import { useCreatePage } from "@/hooks/usePageQueries";
@@ -22,8 +18,8 @@ function LinkedPagesSkeleton() {
         <Skeleton className="h-4 w-4" />
         <Skeleton className="h-4 w-24" />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {[1, 2, 3, 4, 5].map((i) => (
           <Skeleton key={i} className="h-24 w-full" />
         ))}
       </div>
@@ -42,11 +38,15 @@ export function LinkedPagesSection({ pageId }: LinkedPagesSectionProps) {
 
   if (!data) return null;
 
-  const { outgoingLinks, backlinks, twoHopLinks, ghostLinks } = data;
+  const { outgoingLinks, outgoingLinksWithChildren, backlinks, ghostLinks } =
+    data;
+
+  // Combine outgoing links (without children) and backlinks into "リンク" section
+  const allLinks = [...outgoingLinks, ...backlinks];
+
   const hasAnyLinks =
-    outgoingLinks.length > 0 ||
-    backlinks.length > 0 ||
-    twoHopLinks.length > 0 ||
+    allLinks.length > 0 ||
+    outgoingLinksWithChildren.length > 0 ||
     ghostLinks.length > 0;
 
   if (!hasAnyLinks) return null;
@@ -67,24 +67,37 @@ export function LinkedPagesSection({ pageId }: LinkedPagesSectionProps) {
 
   return (
     <div className="border-t pt-6 mt-6 space-y-6">
-      {/* Outgoing Links */}
-      {outgoingLinks.length > 0 && (
+      {/* Links with 2-hop children (horizontal layout) */}
+      {outgoingLinksWithChildren.length > 0 && (
+        <div className="space-y-4">
+          {outgoingLinksWithChildren.map((linkGroup) => (
+            <LinkGroupRow
+              key={linkGroup.source.id}
+              linkGroup={linkGroup}
+              onPageClick={handlePageClick}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Combined Links section (outgoing without children + backlinks) */}
+      {allLinks.length > 0 && (
         <LinkSection
-          title="リンク先"
+          title="リンク"
           icon={<Link2 className="h-4 w-4" />}
-          pages={outgoingLinks}
+          pages={allLinks}
           onPageClick={handlePageClick}
         />
       )}
 
-      {/* Ghost Links */}
+      {/* Ghost Links (renamed to 新しいリンク) */}
       {ghostLinks.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <FilePlus className="h-4 w-4" />
-            <span>未作成のリンク ({ghostLinks.length})</span>
+            <span>新しいリンク ({ghostLinks.length})</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {ghostLinks.map((title) => (
               <GhostLinkCard
                 key={title}
@@ -94,30 +107,6 @@ export function LinkedPagesSection({ pageId }: LinkedPagesSectionProps) {
             ))}
           </div>
         </div>
-      )}
-
-      {/* Backlinks */}
-      {backlinks.length > 0 && (
-        <LinkSection
-          title="被リンク"
-          icon={<ArrowLeft className="h-4 w-4" />}
-          pages={backlinks}
-          onPageClick={handlePageClick}
-        />
-      )}
-
-      {/* 2-hop Links */}
-      {twoHopLinks.length > 0 && (
-        <Collapsible>
-          <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            <Globe className="h-4 w-4" />
-            <span>2階層先 ({twoHopLinks.length})</span>
-            <ChevronDown className="h-4 w-4" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-3">
-            <LinkSection pages={twoHopLinks} onPageClick={handlePageClick} />
-          </CollapsibleContent>
-        </Collapsible>
       )}
     </div>
   );

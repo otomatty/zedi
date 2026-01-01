@@ -82,6 +82,7 @@ describe("calculateLinkedPages", () => {
         createWikiLinkContent(["Page A", "Page B"])
       );
 
+      // Pages without children go to outgoingLinks
       const pageA = createTestPage(
         "page-a",
         "Page A",
@@ -100,9 +101,11 @@ describe("calculateLinkedPages", () => {
         backlinkIds: [],
       });
 
+      // Both pages have no children, so they go to outgoingLinks
       expect(result.outgoingLinks).toHaveLength(2);
       expect(result.outgoingLinks.map((l) => l.id)).toContain("page-a");
       expect(result.outgoingLinks.map((l) => l.id)).toContain("page-b");
+      expect(result.outgoingLinksWithChildren).toHaveLength(0);
     });
 
     it("should exclude self-links", () => {
@@ -157,7 +160,7 @@ describe("calculateLinkedPages", () => {
       expect(result.outgoingLinks).toHaveLength(2);
     });
 
-    it("should limit outgoing links to 10", () => {
+    it("should limit outgoing links without children to 10", () => {
       const links = Array.from({ length: 15 }, (_, i) => `Page ${i}`);
       const currentPage = createTestPage(
         "current",
@@ -311,8 +314,8 @@ describe("calculateLinkedPages", () => {
     });
   });
 
-  describe("2-hop Links", () => {
-    it("should find 2-hop links through outgoing pages", () => {
+  describe("2-hop Links and outgoingLinksWithChildren", () => {
+    it("should group outgoing links with their children", () => {
       // Current -> Page A -> Page B (2-hop)
       const currentPage = createTestPage(
         "current",
@@ -339,8 +342,14 @@ describe("calculateLinkedPages", () => {
         backlinkIds: [],
       });
 
-      expect(result.outgoingLinks).toHaveLength(1);
-      expect(result.outgoingLinks[0].id).toBe("page-a");
+      // Page A has children, so it goes to outgoingLinksWithChildren
+      expect(result.outgoingLinks).toHaveLength(0);
+      expect(result.outgoingLinksWithChildren).toHaveLength(1);
+      expect(result.outgoingLinksWithChildren[0].source.id).toBe("page-a");
+      expect(result.outgoingLinksWithChildren[0].children).toHaveLength(1);
+      expect(result.outgoingLinksWithChildren[0].children[0].id).toBe("page-b");
+
+      // twoHopLinks still maintained for backward compatibility
       expect(result.twoHopLinks).toHaveLength(1);
       expect(result.twoHopLinks[0].id).toBe("page-b");
     });
@@ -366,6 +375,9 @@ describe("calculateLinkedPages", () => {
         backlinkIds: [],
       });
 
+      // Page A has no valid children (only links to current), so goes to outgoingLinks
+      expect(result.outgoingLinks).toHaveLength(1);
+      expect(result.outgoingLinksWithChildren).toHaveLength(0);
       expect(result.twoHopLinks).toHaveLength(0);
     });
 
@@ -397,14 +409,17 @@ describe("calculateLinkedPages", () => {
         backlinkIds: [],
       });
 
+      // Page A links to Page B which is already an outgoing link, so no children
+      // Page B has no children
       expect(result.outgoingLinks).toHaveLength(2);
+      expect(result.outgoingLinksWithChildren).toHaveLength(0);
       expect(result.twoHopLinks).toHaveLength(0);
     });
 
-    it("should deduplicate 2-hop links", () => {
+    it("should deduplicate 2-hop links across sources", () => {
       // Current -> Page A, Page B
       // Page A -> Page C
-      // Page B -> Page C (Page C should appear only once in 2-hop)
+      // Page B -> Page C (Page C should appear in both sources' children but once in twoHopLinks)
       const currentPage = createTestPage(
         "current",
         "Current Page",
@@ -436,8 +451,43 @@ describe("calculateLinkedPages", () => {
         backlinkIds: [],
       });
 
+      // Both Page A and Page B have children
+      expect(result.outgoingLinksWithChildren).toHaveLength(2);
+      expect(result.outgoingLinksWithChildren[0].children[0].id).toBe("page-c");
+      expect(result.outgoingLinksWithChildren[1].children[0].id).toBe("page-c");
+
+      // Global twoHopLinks should be deduplicated
       expect(result.twoHopLinks).toHaveLength(1);
       expect(result.twoHopLinks[0].id).toBe("page-c");
+    });
+
+    it("should limit children per source to 5", () => {
+      const currentPage = createTestPage(
+        "current",
+        "Current Page",
+        createWikiLinkContent(["Page A"])
+      );
+
+      const childTitles = Array.from({ length: 10 }, (_, i) => `Child ${i}`);
+      const pageA = createTestPage(
+        "page-a",
+        "Page A",
+        createWikiLinkContent(childTitles)
+      );
+
+      const childPages = childTitles.map((title, i) =>
+        createTestPage(`child-${i}`, title, createPlainTextContent(`Content ${i}`))
+      );
+
+      const result = calculateLinkedPages({
+        currentPage,
+        pageId: "current",
+        allPages: [currentPage, pageA, ...childPages],
+        backlinkIds: [],
+      });
+
+      expect(result.outgoingLinksWithChildren).toHaveLength(1);
+      expect(result.outgoingLinksWithChildren[0].children).toHaveLength(5);
     });
 
     it("should limit 2-hop links to 10", () => {
@@ -485,6 +535,7 @@ describe("calculateLinkedPages", () => {
       });
 
       expect(result.outgoingLinks).toHaveLength(0);
+      expect(result.outgoingLinksWithChildren).toHaveLength(0);
       expect(result.backlinks).toHaveLength(0);
       expect(result.twoHopLinks).toHaveLength(0);
       expect(result.ghostLinks).toHaveLength(0);
@@ -501,6 +552,7 @@ describe("calculateLinkedPages", () => {
       });
 
       expect(result.outgoingLinks).toHaveLength(0);
+      expect(result.outgoingLinksWithChildren).toHaveLength(0);
       expect(result.ghostLinks).toHaveLength(0);
     });
 
@@ -531,7 +583,11 @@ describe("calculateLinkedPages", () => {
         backlinkIds: [],
       });
 
-      expect(result.outgoingLinks).toHaveLength(1);
+      // Page A has Page B as child
+      expect(result.outgoingLinksWithChildren).toHaveLength(1);
+      expect(result.outgoingLinksWithChildren[0].source.id).toBe("page-a");
+      expect(result.outgoingLinksWithChildren[0].children[0].id).toBe("page-b");
+
       expect(result.twoHopLinks).toHaveLength(1);
       expect(result.twoHopLinks[0].id).toBe("page-b");
       // Current page should not appear in 2-hop (Page B -> Current is excluded)

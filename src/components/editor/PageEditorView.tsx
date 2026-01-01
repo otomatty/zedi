@@ -632,7 +632,7 @@ const PageEditor: React.FC = () => {
       {/* Editor */}
       <main className="flex-1 py-6">
         <Container>
-          <div className="max-w-2xl mx-auto space-y-4">
+          <div className="max-w-4xl mx-auto space-y-4">
             {/* Source URL Badge - クリップしたページの場合に表示 */}
             {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
 

@@ -10,6 +10,7 @@ const mockNavigate = vi.fn();
 const mockCreatePage = vi.fn();
 const mockLinkedPagesData: LinkedPagesData = {
   outgoingLinks: [],
+  outgoingLinksWithChildren: [],
   backlinks: [],
   twoHopLinks: [],
   ghostLinks: [],
@@ -41,6 +42,7 @@ describe("LinkedPagesSection", () => {
     vi.clearAllMocks();
     // Reset mock data
     mockLinkedPagesData.outgoingLinks = [];
+    mockLinkedPagesData.outgoingLinksWithChildren = [];
     mockLinkedPagesData.backlinks = [];
     mockLinkedPagesData.twoHopLinks = [];
     mockLinkedPagesData.ghostLinks = [];
@@ -60,7 +62,7 @@ describe("LinkedPagesSection", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("should render outgoing links section", () => {
+  it("should render combined links section with outgoing and backlinks", () => {
     mockLinkedPagesData.outgoingLinks = [
       {
         id: "page-1",
@@ -69,14 +71,6 @@ describe("LinkedPagesSection", () => {
         updatedAt: Date.now(),
       },
     ];
-
-    renderComponent();
-
-    expect(screen.getByText("リンク先 (1)")).toBeInTheDocument();
-    expect(screen.getByText("Outgoing Page")).toBeInTheDocument();
-  });
-
-  it("should render backlinks section", () => {
     mockLinkedPagesData.backlinks = [
       {
         id: "backlink-1",
@@ -88,35 +82,55 @@ describe("LinkedPagesSection", () => {
 
     renderComponent();
 
-    expect(screen.getByText("被リンク (1)")).toBeInTheDocument();
+    // Should show combined "リンク" section with count 2
+    expect(screen.getByText("リンク (2)")).toBeInTheDocument();
+    expect(screen.getByText("Outgoing Page")).toBeInTheDocument();
     expect(screen.getByText("Backlink Page")).toBeInTheDocument();
   });
 
-  it("should render ghost links section", () => {
+  it("should render ghost links section with new label", () => {
     mockLinkedPagesData.ghostLinks = ["Non Existing Page"];
 
     renderComponent();
 
-    expect(screen.getByText("未作成のリンク (1)")).toBeInTheDocument();
+    expect(screen.getByText("新しいリンク (1)")).toBeInTheDocument();
     expect(screen.getByText("Non Existing Page")).toBeInTheDocument();
   });
 
-  it("should render 2-hop links in collapsible section", () => {
-    mockLinkedPagesData.twoHopLinks = [
+  it("should render outgoing links with children in horizontal layout", () => {
+    mockLinkedPagesData.outgoingLinksWithChildren = [
       {
-        id: "twohop-1",
-        title: "Two Hop Page",
-        preview: "Two hop preview",
-        updatedAt: Date.now(),
+        source: {
+          id: "source-page",
+          title: "Source Page",
+          preview: "Source preview",
+          updatedAt: Date.now(),
+        },
+        children: [
+          {
+            id: "child-1",
+            title: "Child Page 1",
+            preview: "Child preview",
+            updatedAt: Date.now(),
+          },
+          {
+            id: "child-2",
+            title: "Child Page 2",
+            preview: "Child preview 2",
+            updatedAt: Date.now(),
+          },
+        ],
       },
     ];
 
     renderComponent();
 
-    expect(screen.getByText("2階層先 (1)")).toBeInTheDocument();
+    expect(screen.getByText("Source Page")).toBeInTheDocument();
+    expect(screen.getByText("Child Page 1")).toBeInTheDocument();
+    expect(screen.getByText("Child Page 2")).toBeInTheDocument();
   });
 
-  it("should navigate to page when outgoing link is clicked", async () => {
+  it("should navigate to page when link is clicked", async () => {
     const user = userEvent.setup();
     mockLinkedPagesData.outgoingLinks = [
       {
@@ -134,14 +148,24 @@ describe("LinkedPagesSection", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/page/target-page");
   });
 
-  it("should navigate to page when backlink is clicked", async () => {
+  it("should navigate to source page when link group source is clicked", async () => {
     const user = userEvent.setup();
-    mockLinkedPagesData.backlinks = [
+    mockLinkedPagesData.outgoingLinksWithChildren = [
       {
-        id: "source-page",
-        title: "Source Page",
-        preview: "Preview",
-        updatedAt: Date.now(),
+        source: {
+          id: "source-page",
+          title: "Source Page",
+          preview: "Source preview",
+          updatedAt: Date.now(),
+        },
+        children: [
+          {
+            id: "child-1",
+            title: "Child Page",
+            preview: "Child preview",
+            updatedAt: Date.now(),
+          },
+        ],
       },
     ];
 
@@ -150,6 +174,34 @@ describe("LinkedPagesSection", () => {
     await user.click(screen.getByText("Source Page"));
 
     expect(mockNavigate).toHaveBeenCalledWith("/page/source-page");
+  });
+
+  it("should navigate to child page when child card is clicked", async () => {
+    const user = userEvent.setup();
+    mockLinkedPagesData.outgoingLinksWithChildren = [
+      {
+        source: {
+          id: "source-page",
+          title: "Source Page",
+          preview: "Source preview",
+          updatedAt: Date.now(),
+        },
+        children: [
+          {
+            id: "child-page",
+            title: "Child Page",
+            preview: "Child preview",
+            updatedAt: Date.now(),
+          },
+        ],
+      },
+    ];
+
+    renderComponent();
+
+    await user.click(screen.getByText("Child Page"));
+
+    expect(mockNavigate).toHaveBeenCalledWith("/page/child-page");
   });
 
   it("should create page and navigate when ghost link is clicked", async () => {
@@ -170,46 +222,41 @@ describe("LinkedPagesSection", () => {
     });
   });
 
-  it("should render multiple sections when all link types exist", () => {
+  it("should render all sections when all link types exist", () => {
     mockLinkedPagesData.outgoingLinks = [
       { id: "out-1", title: "Outgoing", preview: "", updatedAt: Date.now() },
     ];
     mockLinkedPagesData.backlinks = [
       { id: "back-1", title: "Backlink", preview: "", updatedAt: Date.now() },
     ];
-    mockLinkedPagesData.ghostLinks = ["Ghost"];
-    mockLinkedPagesData.twoHopLinks = [
-      { id: "hop-1", title: "TwoHop", preview: "", updatedAt: Date.now() },
-    ];
-
-    renderComponent();
-
-    expect(screen.getByText("リンク先 (1)")).toBeInTheDocument();
-    expect(screen.getByText("被リンク (1)")).toBeInTheDocument();
-    expect(screen.getByText("未作成のリンク (1)")).toBeInTheDocument();
-    expect(screen.getByText("2階層先 (1)")).toBeInTheDocument();
-  });
-
-  it("should expand 2-hop links when collapsible is clicked", async () => {
-    const user = userEvent.setup();
-    mockLinkedPagesData.twoHopLinks = [
+    mockLinkedPagesData.outgoingLinksWithChildren = [
       {
-        id: "twohop-1",
-        title: "Hidden Two Hop",
-        preview: "Hidden content",
-        updatedAt: Date.now(),
+        source: {
+          id: "source-1",
+          title: "SourceWithChildren",
+          preview: "",
+          updatedAt: Date.now(),
+        },
+        children: [
+          {
+            id: "child-1",
+            title: "ChildPage",
+            preview: "",
+            updatedAt: Date.now(),
+          },
+        ],
       },
     ];
+    mockLinkedPagesData.ghostLinks = ["Ghost"];
 
     renderComponent();
 
-    // Initially the content might be hidden
-    const trigger = screen.getByText("2階層先 (1)");
-    await user.click(trigger);
-
-    // After clicking, the content should be visible
-    await waitFor(() => {
-      expect(screen.getByText("Hidden Two Hop")).toBeInTheDocument();
-    });
+    // Combined links section
+    expect(screen.getByText("リンク (2)")).toBeInTheDocument();
+    // Link group row
+    expect(screen.getByText("SourceWithChildren")).toBeInTheDocument();
+    expect(screen.getByText("ChildPage")).toBeInTheDocument();
+    // Ghost links renamed
+    expect(screen.getByText("新しいリンク (1)")).toBeInTheDocument();
   });
 });

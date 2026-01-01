@@ -19,12 +19,21 @@ export interface PageCard {
 }
 
 /**
+ * Outgoing link with its 2-hop children
+ */
+export interface OutgoingLinkWithChildren {
+  source: PageCard; // The outgoing link page
+  children: PageCard[]; // Pages linked from the source (2-hop)
+}
+
+/**
  * Data structure for linked pages
  */
 export interface LinkedPagesData {
-  outgoingLinks: PageCard[]; // Pages linked from this page
+  outgoingLinks: PageCard[]; // Pages linked from this page (without 2-hop)
+  outgoingLinksWithChildren: OutgoingLinkWithChildren[]; // Outgoing links that have their own outgoing links
   backlinks: PageCard[]; // Pages linking to this page
-  twoHopLinks: PageCard[]; // 2-hop links (links from linked pages)
+  twoHopLinks: PageCard[]; // 2-hop links (links from linked pages) - kept for backward compatibility
   ghostLinks: string[]; // Non-existing link targets
 }
 
@@ -71,13 +80,13 @@ export function calculateLinkedPages(
   const pageById = new Map(allPages.map((p) => [p.id, p]));
 
   // 3. Outgoing Links (existing pages only)
-  const outgoingLinks: PageCard[] = [];
+  const allOutgoingLinks: PageCard[] = [];
   const ghostLinks: string[] = [];
 
   for (const title of linkTitles) {
     const targetPage = pageByTitle.get(title.toLowerCase().trim());
     if (targetPage && targetPage.id !== pageId) {
-      outgoingLinks.push(pageToCard(targetPage));
+      allOutgoingLinks.push(pageToCard(targetPage));
     } else if (!targetPage) {
       ghostLinks.push(title);
     }
@@ -89,32 +98,57 @@ export function calculateLinkedPages(
     .filter((p): p is Page => p !== undefined && !p.isDeleted)
     .map(pageToCard);
 
-  // 5. 2-hop Links (outgoing links from linked pages)
+  // 5. 2-hop Links (outgoing links from linked pages) - grouped by source
   const twoHopSet = new Set<string>();
   const twoHopLinks: PageCard[] = [];
-  const outgoingIds = new Set(outgoingLinks.map((o) => o.id));
+  const outgoingIds = new Set(allOutgoingLinks.map((o) => o.id));
+  const outgoingLinksWithChildren: OutgoingLinkWithChildren[] = [];
+  const outgoingLinksWithoutChildren: PageCard[] = [];
 
-  for (const outgoing of outgoingLinks) {
+  for (const outgoing of allOutgoingLinks) {
     const outgoingPage = pageById.get(outgoing.id);
-    if (!outgoingPage) continue;
+    if (!outgoingPage) {
+      outgoingLinksWithoutChildren.push(outgoing);
+      continue;
+    }
 
     const secondaryLinks = extractWikiLinksFromContent(outgoingPage.content);
+    const children: PageCard[] = [];
+
     for (const link of secondaryLinks) {
       const targetPage = pageByTitle.get(link.title.toLowerCase().trim());
       if (
         targetPage &&
         targetPage.id !== pageId &&
-        !twoHopSet.has(targetPage.id) &&
         !outgoingIds.has(targetPage.id)
       ) {
-        twoHopSet.add(targetPage.id);
-        twoHopLinks.push(pageToCard(targetPage));
+        // Add to children for this source
+        const alreadyInChildren = children.some((c) => c.id === targetPage.id);
+        if (!alreadyInChildren) {
+          children.push(pageToCard(targetPage));
+        }
+
+        // Also track globally for backward compatibility
+        if (!twoHopSet.has(targetPage.id)) {
+          twoHopSet.add(targetPage.id);
+          twoHopLinks.push(pageToCard(targetPage));
+        }
       }
+    }
+
+    if (children.length > 0) {
+      outgoingLinksWithChildren.push({
+        source: outgoing,
+        children: children.slice(0, 5), // Limit children per source
+      });
+    } else {
+      outgoingLinksWithoutChildren.push(outgoing);
     }
   }
 
   return {
-    outgoingLinks: outgoingLinks.slice(0, 10),
+    outgoingLinks: outgoingLinksWithoutChildren.slice(0, 10),
+    outgoingLinksWithChildren: outgoingLinksWithChildren.slice(0, 5),
     backlinks: backlinks.slice(0, 10),
     twoHopLinks: twoHopLinks.slice(0, 10),
     ghostLinks: ghostLinks.slice(0, 5),
@@ -134,6 +168,7 @@ export function useLinkedPages(pageId: string) {
       if (!currentPage) {
         return {
           outgoingLinks: [],
+          outgoingLinksWithChildren: [],
           backlinks: [],
           twoHopLinks: [],
           ghostLinks: [],
