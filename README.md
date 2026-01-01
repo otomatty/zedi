@@ -59,6 +59,12 @@ URL を入力するだけで Web ページの本文を自動抽出。あとか�
 ### 🔍 Global Search
 `Cmd+K` / `Ctrl+K` で全文検索を起動。キーワードを含むページを瞬時に発見。
 
+### 🔀 Linked Pages
+ページ下部に関連ページを自動表示：
+- **Outgoing Links** — このページからリンクしている先
+- **Backlinks** — このページにリンクしている元
+- **2-hop Links** — リンク先のリンク先まで辿れる
+
 ### ⌨️ Keyboard Shortcuts
 - `Cmd/Ctrl + K` — グローバル検索
 - `Cmd/Ctrl + N` — 新規ページ作成
@@ -136,7 +142,7 @@ VITE_TURSO_AUTH_TOKEN=your_turso_token
 | **Styling** | Tailwind CSS + shadcn/ui |
 | **State** | Zustand + TanStack Query |
 | **Auth** | Clerk |
-| **Database** | SQLite (sql.js) / Turso |
+| **Database** | libsql (in-memory + IndexedDB) / Turso |
 | **AI** | OpenAI / Anthropic / Google Gemini |
 | **Testing** | Vitest + Playwright |
 
@@ -156,11 +162,12 @@ VITE_TURSO_AUTH_TOKEN=your_turso_token
 - [x] キーボードショートカット
 - [x] Clerk 認証連携
 - [x] Markdown エクスポート
+- [x] Backlinks / 2-hop Links 表示
+- [x] Linked Pages カード表示
 
 ### 🔄 開発中
 
 - [ ] Turso リアルタイム同期
-- [ ] Backlinks / 2-hop Links 表示
 
 ### 📋 予定
 

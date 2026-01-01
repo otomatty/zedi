@@ -5,7 +5,7 @@ import {
   getUniqueWikiLinkTitles,
 } from "@/lib/wikiLinkUtils";
 import { getContentPreview } from "@/lib/contentUtils";
-import type { Page } from "@/types/page";
+import type { Page, PageSummary } from "@/types/page";
 
 /**
  * Card data for linked pages display
@@ -38,12 +38,24 @@ export interface LinkedPagesData {
 }
 
 /**
- * Input data for calculating linked pages
+ * Input data for calculating linked pages (legacy, uses full Page objects)
  */
 export interface CalculateLinkedPagesInput {
   currentPage: Page;
   pageId: string;
   allPages: Page[];
+  backlinkIds: string[];
+}
+
+/**
+ * Input data for optimized linked pages calculation
+ */
+export interface CalculateLinkedPagesOptimizedInput {
+  currentPage: Page;
+  pageId: string;
+  allPagesSummary: PageSummary[];
+  outgoingPages: Page[]; // Pages with content for 2-hop calculation
+  backlinkPages: Page[]; // Backlink pages with content for preview
   backlinkIds: string[];
 }
 
@@ -57,6 +69,19 @@ export function pageToCard(page: Page): PageCard {
     preview: getContentPreview(page.content, 50),
     updatedAt: page.updatedAt,
     sourceUrl: page.sourceUrl,
+  };
+}
+
+/**
+ * Convert PageSummary to PageCard (without preview since no content)
+ */
+export function summaryToCard(summary: PageSummary): PageCard {
+  return {
+    id: summary.id,
+    title: summary.title,
+    preview: "", // No content available in summary
+    updatedAt: summary.updatedAt,
+    sourceUrl: summary.sourceUrl,
   };
 }
 
@@ -156,7 +181,151 @@ export function calculateLinkedPages(
 }
 
 /**
+ * Optimized function to calculate linked pages data
+ * Uses summary for title matching and fetches content only for necessary pages
+ */
+export function calculateLinkedPagesOptimized(
+  input: CalculateLinkedPagesOptimizedInput
+): LinkedPagesData {
+  const {
+    currentPage,
+    pageId,
+    allPagesSummary,
+    outgoingPages,
+    backlinkPages,
+    backlinkIds,
+  } = input;
+
+  // 1. Extract WikiLinks from current page content
+  const wikiLinks = extractWikiLinksFromContent(currentPage.content);
+  const linkTitles = getUniqueWikiLinkTitles(wikiLinks);
+
+  // 2. Create mappings
+  const summaryByTitle = new Map(
+    allPagesSummary.map((p) => [p.title.toLowerCase().trim(), p])
+  );
+  const summaryById = new Map(allPagesSummary.map((p) => [p.id, p]));
+  const pageById = new Map(outgoingPages.map((p) => [p.id, p]));
+  const backlinkPageById = new Map(backlinkPages.map((p) => [p.id, p]));
+
+  // 3. Outgoing Links (existing pages only)
+  const allOutgoingLinks: PageCard[] = [];
+  const ghostLinks: string[] = [];
+
+  for (const title of linkTitles) {
+    const targetSummary = summaryByTitle.get(title.toLowerCase().trim());
+    if (targetSummary && targetSummary.id !== pageId) {
+      const fullPage = pageById.get(targetSummary.id);
+      if (fullPage) {
+        allOutgoingLinks.push(pageToCard(fullPage));
+      } else {
+        // Fallback to summary (no preview)
+        allOutgoingLinks.push(summaryToCard(targetSummary));
+      }
+    } else if (!targetSummary) {
+      ghostLinks.push(title);
+    }
+  }
+
+  // 4. Backlinks (from links table)
+  const backlinks: PageCard[] = backlinkIds
+    .map((id) => {
+      const fullPage = backlinkPageById.get(id);
+      if (fullPage && !fullPage.isDeleted) {
+        return pageToCard(fullPage);
+      }
+      const summary = summaryById.get(id);
+      if (summary && !summary.isDeleted) {
+        return summaryToCard(summary);
+      }
+      return null;
+    })
+    .filter((p): p is PageCard => p !== null);
+
+  // 5. 2-hop Links (outgoing links from linked pages) - grouped by source
+  const twoHopSet = new Set<string>();
+  const twoHopLinks: PageCard[] = [];
+  const outgoingIds = new Set(allOutgoingLinks.map((o) => o.id));
+  const outgoingLinksWithChildren: OutgoingLinkWithChildren[] = [];
+  const outgoingLinksWithoutChildren: PageCard[] = [];
+
+  for (const outgoing of allOutgoingLinks) {
+    const outgoingPage = pageById.get(outgoing.id);
+    if (!outgoingPage) {
+      outgoingLinksWithoutChildren.push(outgoing);
+      continue;
+    }
+
+    const secondaryLinks = extractWikiLinksFromContent(outgoingPage.content);
+    const children: PageCard[] = [];
+
+    for (const link of secondaryLinks) {
+      const targetSummary = summaryByTitle.get(link.title.toLowerCase().trim());
+      if (
+        targetSummary &&
+        targetSummary.id !== pageId &&
+        !outgoingIds.has(targetSummary.id)
+      ) {
+        // Add to children for this source
+        const alreadyInChildren = children.some(
+          (c) => c.id === targetSummary.id
+        );
+        if (!alreadyInChildren) {
+          const fullPage = pageById.get(targetSummary.id);
+          if (fullPage) {
+            children.push(pageToCard(fullPage));
+          } else {
+            children.push(summaryToCard(targetSummary));
+          }
+        }
+
+        // Also track globally for backward compatibility
+        if (!twoHopSet.has(targetSummary.id)) {
+          twoHopSet.add(targetSummary.id);
+          const fullPage = pageById.get(targetSummary.id);
+          if (fullPage) {
+            twoHopLinks.push(pageToCard(fullPage));
+          } else {
+            twoHopLinks.push(summaryToCard(targetSummary));
+          }
+        }
+      }
+    }
+
+    if (children.length > 0) {
+      outgoingLinksWithChildren.push({
+        source: outgoing,
+        children: children.slice(0, 5), // Limit children per source
+      });
+    } else {
+      outgoingLinksWithoutChildren.push(outgoing);
+    }
+  }
+
+  return {
+    outgoingLinks: outgoingLinksWithoutChildren.slice(0, 10),
+    outgoingLinksWithChildren: outgoingLinksWithChildren.slice(0, 5),
+    backlinks: backlinks.slice(0, 10),
+    twoHopLinks: twoHopLinks.slice(0, 10),
+    ghostLinks: ghostLinks.slice(0, 5),
+  };
+}
+
+const emptyLinkedPagesData: LinkedPagesData = {
+  outgoingLinks: [],
+  outgoingLinksWithChildren: [],
+  backlinks: [],
+  twoHopLinks: [],
+  ghostLinks: [],
+};
+
+/**
  * Hook to fetch linked pages data for a given page
+ *
+ * OPTIMIZED:
+ * - Uses getPagesSummary() for title matching (no content, reduces Rows Read by ~95%)
+ * - Only fetches content for outgoing link pages (needed for 2-hop calculation)
+ * - Only fetches content for backlink pages (needed for preview)
  */
 export function useLinkedPages(pageId: string) {
   const { getRepository, userId, isLoaded } = useRepository();
@@ -166,23 +335,45 @@ export function useLinkedPages(pageId: string) {
     queryKey: [...pageKeys.all, "linkedPages", userId, pageId],
     queryFn: async (): Promise<LinkedPagesData> => {
       if (!currentPage) {
-        return {
-          outgoingLinks: [],
-          outgoingLinksWithChildren: [],
-          backlinks: [],
-          twoHopLinks: [],
-          ghostLinks: [],
-        };
+        return emptyLinkedPagesData;
       }
 
       const repo = await getRepository();
-      const allPages = await repo.getPages(userId);
+
+      // OPTIMIZED: Get summaries for title matching (no content)
+      const allPagesSummary = await repo.getPagesSummary(userId);
       const backlinkIds = await repo.getBacklinks(pageId);
 
-      return calculateLinkedPages({
+      // Extract WikiLinks to identify which pages need full content
+      const wikiLinks = extractWikiLinksFromContent(currentPage.content);
+      const linkTitles = getUniqueWikiLinkTitles(wikiLinks);
+
+      // Map titles to page IDs
+      const summaryByTitle = new Map(
+        allPagesSummary.map((p) => [p.title.toLowerCase().trim(), p])
+      );
+
+      // Identify outgoing page IDs (need content for 2-hop calculation)
+      const outgoingPageIds: string[] = [];
+      for (const title of linkTitles) {
+        const summary = summaryByTitle.get(title.toLowerCase().trim());
+        if (summary && summary.id !== pageId) {
+          outgoingPageIds.push(summary.id);
+        }
+      }
+
+      // OPTIMIZED: Only fetch content for necessary pages
+      const [outgoingPages, backlinkPages] = await Promise.all([
+        repo.getPagesByIds(userId, outgoingPageIds),
+        repo.getPagesByIds(userId, backlinkIds),
+      ]);
+
+      return calculateLinkedPagesOptimized({
         currentPage,
         pageId,
-        allPages,
+        allPagesSummary,
+        outgoingPages,
+        backlinkPages,
         backlinkIds,
       });
     },

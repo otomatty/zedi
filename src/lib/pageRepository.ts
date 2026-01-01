@@ -1,5 +1,5 @@
 import type { Client } from "@libsql/client";
-import type { Page, Link, GhostLink } from "@/types/page";
+import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
 import { nanoid } from "nanoid";
 
 /**
@@ -87,6 +87,7 @@ export class PageRepository {
 
   /**
    * Get all pages for a user (not deleted)
+   * WARNING: This fetches content for all pages - use getPagesSummary() for list views
    */
   async getPages(userId: string): Promise<Page[]> {
     const result = await this.client.execute({
@@ -97,6 +98,44 @@ export class PageRepository {
         ORDER BY created_at DESC
       `,
       args: [userId],
+    });
+
+    return result.rows.map((row) => this.rowToPage(row));
+  }
+
+  /**
+   * Get all page summaries for a user (without content)
+   * Use this for list views to minimize data transfer and reduce Turso Rows Read
+   */
+  async getPagesSummary(userId: string): Promise<PageSummary[]> {
+    const result = await this.client.execute({
+      sql: `
+        SELECT id, title, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        FROM pages
+        WHERE user_id = ? AND is_deleted = 0
+        ORDER BY created_at DESC
+      `,
+      args: [userId],
+    });
+
+    return result.rows.map((row) => this.rowToPageSummary(row));
+  }
+
+  /**
+   * Get multiple pages by IDs (with content)
+   * Use when you need content for specific pages only
+   */
+  async getPagesByIds(userId: string, pageIds: string[]): Promise<Page[]> {
+    if (pageIds.length === 0) return [];
+
+    const placeholders = pageIds.map(() => "?").join(",");
+    const result = await this.client.execute({
+      sql: `
+        SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        FROM pages
+        WHERE user_id = ? AND id IN (${placeholders}) AND is_deleted = 0
+      `,
+      args: [userId, ...pageIds],
     });
 
     return result.rows.map((row) => this.rowToPage(row));
@@ -424,6 +463,18 @@ export class PageRepository {
       id: row.id as string,
       title: (row.title as string) || "",
       content: (row.content as string) || "",
+      thumbnailUrl: row.thumbnail_url as string | undefined,
+      sourceUrl: row.source_url as string | undefined,
+      createdAt: row.created_at as number,
+      updatedAt: row.updated_at as number,
+      isDeleted: Boolean(row.is_deleted),
+    };
+  }
+
+  private rowToPageSummary(row: Record<string, unknown>): PageSummary {
+    return {
+      id: row.id as string,
+      title: (row.title as string) || "",
       thumbnailUrl: row.thumbnail_url as string | undefined,
       sourceUrl: row.source_url as string | undefined,
       createdAt: row.created_at as number,

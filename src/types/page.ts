@@ -9,6 +9,20 @@ export interface Page {
   isDeleted: boolean;
 }
 
+/**
+ * Lightweight page summary without content
+ * Use for list views to minimize data transfer and reduce Turso Rows Read
+ */
+export interface PageSummary {
+  id: string;
+  title: string;
+  thumbnailUrl?: string;
+  sourceUrl?: string;
+  createdAt: number;
+  updatedAt: number;
+  isDeleted: boolean;
+}
+
 export interface Link {
   sourceId: string;
   targetId: string;

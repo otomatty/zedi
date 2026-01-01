@@ -25,6 +25,7 @@ import { format, addMonths, subMonths, startOfMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import Container from "@/components/layout/Container";
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
+import { SyncIndicator } from "@/components/layout/SyncIndicator";
 import { cn } from "@/lib/utils";
 import {
   SignedIn,
@@ -120,8 +121,11 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Shortcuts & Auth */}
+        {/* Sync, Shortcuts & Auth */}
         <div className="flex items-center gap-2">
+          {/* Sync Status Indicator */}
+          <SyncIndicator />
+
           {/* Keyboard Shortcuts Button */}
           <Tooltip>
             <TooltipTrigger asChild>

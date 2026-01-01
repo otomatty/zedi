@@ -1,13 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import {
-  createAuthenticatedTursoClient,
   getLocalClient,
   saveLocalDatabase,
+  syncWithRemote,
+  triggerSync,
+  getSyncStatus,
+  subscribeSyncStatus,
+  type SyncStatus,
 } from "@/lib/turso";
 import { PageRepository } from "@/lib/pageRepository";
-import type { Page } from "@/types/page";
+import type { Page, PageSummary } from "@/types/page";
 
 // Local user ID for unauthenticated users
 const LOCAL_USER_ID = "local-user";
@@ -17,6 +21,8 @@ export const pageKeys = {
   all: ["pages"] as const,
   lists: () => [...pageKeys.all, "list"] as const,
   list: (userId: string) => [...pageKeys.lists(), userId] as const,
+  summaries: () => [...pageKeys.all, "summary"] as const,
+  summary: (userId: string) => [...pageKeys.summaries(), userId] as const,
   details: () => [...pageKeys.all, "detail"] as const,
   detail: (userId: string, pageId: string) =>
     [...pageKeys.details(), userId, pageId] as const,
@@ -25,16 +31,67 @@ export const pageKeys = {
 };
 
 /**
+ * Hook to get sync status for UI display
+ */
+export function useSyncStatus(): SyncStatus {
+  const [status, setStatus] = useState<SyncStatus>(getSyncStatus());
+
+  useEffect(() => {
+    const unsubscribe = subscribeSyncStatus(setStatus);
+    return unsubscribe;
+  }, []);
+
+  return status;
+}
+
+/**
+ * Hook to manually trigger sync (Delta sync - only changes since last sync)
+ */
+export function useSync() {
+  const { getToken, userId, isSignedIn } = useAuth();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const sync = useCallback(async () => {
+    if (!isSignedIn || !userId) return;
+
+    setIsSyncing(true);
+    try {
+      const token = await getToken({ template: "turso" });
+      if (token) {
+        await triggerSync(token, userId);
+        // Invalidate queries to refetch with updated local data
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      }
+    } catch (error) {
+      console.error("Sync failed:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [getToken, userId, isSignedIn, queryClient]);
+
+  return { sync, isSyncing };
+}
+
+/**
  * Hook to get the appropriate repository based on auth state
- * Now uses PageRepository for both local and remote (unified libsql API)
+ *
+ * LOCAL-FIRST ARCHITECTURE:
+ * - All reads/writes go to local WASM database (Rows Read = 0)
+ * - Sync only on: 1) Initial page load, 2) Manual sync button
+ * - Delta sync: Only fetches changes since last sync time
+ * - Data persisted to IndexedDB for offline support
  */
 export function useRepository() {
   const { getToken, isSignedIn, userId, isLoaded } = useAuth();
   const [isLocalDbReady, setIsLocalDbReady] = useState(false);
+  const initialSyncDone = useRef(false);
+
+  const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
 
   // Initialize local database
   useEffect(() => {
-    getLocalClient()
+    getLocalClient(effectiveUserId)
       .then(() => {
         setIsLocalDbReady(true);
       })
@@ -42,32 +99,32 @@ export function useRepository() {
         console.error("Failed to initialize local database:", error);
         setIsLocalDbReady(true); // Still mark as ready to avoid blocking
       });
-  }, []);
+  }, [effectiveUserId]);
+
+  // Initial sync on page load for authenticated users (once per session)
+  useEffect(() => {
+    if (isSignedIn && userId && isLocalDbReady && !initialSyncDone.current) {
+      initialSyncDone.current = true;
+
+      // Trigger delta sync on initial page load
+      (async () => {
+        try {
+          const token = await getToken({ template: "turso" });
+          if (token) {
+            await syncWithRemote(token, userId);
+          }
+        } catch (error) {
+          console.error("Initial sync failed:", error);
+        }
+      })();
+    }
+  }, [isSignedIn, userId, isLocalDbReady, getToken]);
 
   const getRepository = useCallback(async (): Promise<PageRepository> => {
-    if (isSignedIn && userId) {
-      // Try to use Turso for authenticated users
-      try {
-        const token = await getToken({ template: "turso" });
-        if (token) {
-          const client = createAuthenticatedTursoClient(token);
-          return new PageRepository(client);
-        }
-      } catch (error) {
-        // JWT Template may not be configured yet, fall back to local
-        console.warn(
-          "Failed to get Turso token, using local database:",
-          error
-        );
-      }
-    }
-
-    // Use local libsql for unauthenticated users or when Turso token fails
-    const client = await getLocalClient();
+    // Always use local database (Local-First)
+    const client = await getLocalClient(effectiveUserId);
     return new PageRepository(client, { onMutate: saveLocalDatabase });
-  }, [getToken, isSignedIn, userId]);
-
-  const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
+  }, [effectiveUserId]);
 
   return {
     getRepository,
@@ -79,6 +136,7 @@ export function useRepository() {
 
 /**
  * Hook to fetch all pages for the current user
+ * WARNING: This fetches content for all pages - use usePagesSummary() for list views
  */
 export function usePages() {
   const { getRepository, userId, isLoaded } = useRepository();
@@ -88,6 +146,24 @@ export function usePages() {
     queryFn: async () => {
       const repo = await getRepository();
       return repo.getPages(userId);
+    },
+    enabled: isLoaded,
+    staleTime: 1000 * 60, // 1 minute
+  });
+}
+
+/**
+ * Hook to fetch page summaries for the current user (without content)
+ * Use this for list views to minimize data transfer and reduce Turso Rows Read
+ */
+export function usePagesSummary() {
+  const { getRepository, userId, isLoaded } = useRepository();
+
+  return useQuery({
+    queryKey: pageKeys.summary(userId),
+    queryFn: async () => {
+      const repo = await getRepository();
+      return repo.getPagesSummary(userId);
     },
     enabled: isLoaded,
     staleTime: 1000 * 60, // 1 minute
@@ -153,12 +229,28 @@ export function useCreatePage() {
       console.log("=== createPage success ===", newPage.id);
       // Invalidate and refetch pages list
       queryClient.invalidateQueries({ queryKey: pageKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: pageKeys.summaries() });
 
       // Optimistically update the cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [
         newPage,
         ...old,
       ]);
+
+      // Also update summary cache
+      const newSummary: PageSummary = {
+        id: newPage.id,
+        title: newPage.title,
+        thumbnailUrl: newPage.thumbnailUrl,
+        sourceUrl: newPage.sourceUrl,
+        createdAt: newPage.createdAt,
+        updatedAt: newPage.updatedAt,
+        isDeleted: newPage.isDeleted,
+      };
+      queryClient.setQueryData<PageSummary[]>(
+        pageKeys.summary(userId),
+        (old = []) => [newSummary, ...old]
+      );
     },
   });
 }
@@ -185,19 +277,35 @@ export function useUpdatePage() {
       return { pageId, updates };
     },
     onSuccess: ({ pageId, updates }) => {
+      const now = Date.now();
+
       // Update the specific page in cache
       queryClient.setQueryData<Page | null>(
         pageKeys.detail(userId, pageId),
-        (old) => (old ? { ...old, ...updates, updatedAt: Date.now() } : null)
+        (old) => (old ? { ...old, ...updates, updatedAt: now } : null)
       );
 
       // Update the page in the list cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) =>
         old.map((page) =>
-          page.id === pageId
-            ? { ...page, ...updates, updatedAt: Date.now() }
-            : page
+          page.id === pageId ? { ...page, ...updates, updatedAt: now } : page
         )
+      );
+
+      // Update the page in the summary cache (only title, thumbnailUrl, sourceUrl)
+      const summaryUpdates: Partial<PageSummary> = { updatedAt: now };
+      if (updates.title !== undefined) summaryUpdates.title = updates.title;
+      if (updates.thumbnailUrl !== undefined)
+        summaryUpdates.thumbnailUrl = updates.thumbnailUrl;
+      if (updates.sourceUrl !== undefined)
+        summaryUpdates.sourceUrl = updates.sourceUrl;
+
+      queryClient.setQueryData<PageSummary[]>(
+        pageKeys.summary(userId),
+        (old = []) =>
+          old.map((page) =>
+            page.id === pageId ? { ...page, ...summaryUpdates } : page
+          )
       );
     },
   });
@@ -220,6 +328,12 @@ export function useDeletePage() {
       // Remove from list cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) =>
         old.filter((page) => page.id !== pageId)
+      );
+
+      // Remove from summary cache
+      queryClient.setQueryData<PageSummary[]>(
+        pageKeys.summary(userId),
+        (old = []) => old.filter((page) => page.id !== pageId)
       );
 
       // Invalidate detail query
@@ -392,6 +506,8 @@ export function usePromoteGhostLink() {
  * - Updates links table for existing pages
  * - Updates ghost_links table for non-existing pages
  * - Promotes ghost links if referenced from 2+ pages
+ *
+ * OPTIMIZED: Uses getPagesSummary() instead of getPages() to reduce Rows Read
  */
 export function useSyncWikiLinks() {
   const { getRepository, userId } = useRepository();
@@ -403,8 +519,8 @@ export function useSyncWikiLinks() {
     ): Promise<void> => {
       const repo = await getRepository();
 
-      // Get all existing pages to check which links are valid
-      const pages = await repo.getPages(userId);
+      // OPTIMIZED: Use summary (no content) to check which links are valid
+      const pages = await repo.getPagesSummary(userId);
       const pageTitleToId = new Map(
         pages.map((p) => [p.title.toLowerCase().trim(), p.id])
       );
@@ -439,6 +555,8 @@ export function useSyncWikiLinks() {
 /**
  * Hook to get data needed to update WikiLink exists status
  * Returns a function that checks if pages exist by their titles
+ *
+ * OPTIMIZED: Uses getPagesSummary() instead of getPages() to reduce Rows Read
  */
 export function useWikiLinkExistsChecker() {
   const { getRepository, userId, isLoaded } = useRepository();
@@ -457,8 +575,8 @@ export function useWikiLinkExistsChecker() {
 
       const repo = await getRepository();
 
-      // Get all pages to check existence
-      const pages = await repo.getPages(userId);
+      // OPTIMIZED: Use summary (no content) to check existence
+      const pages = await repo.getPagesSummary(userId);
       const pageTitles = new Set(
         pages.map((p) => p.title.toLowerCase().trim())
       );
