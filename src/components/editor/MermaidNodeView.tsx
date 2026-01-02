@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NodeViewWrapper, NodeViewProps } from "@tiptap/react";
-import mermaid from "mermaid";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, Check, X, Maximize2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,13 +10,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// Mermaid初期化
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "default",
-  securityLevel: "loose",
-  fontFamily: "inherit",
-});
+// Dynamic import for mermaid to avoid initialization issues
+let mermaidInstance: typeof import("mermaid").default | null = null;
+let mermaidInitialized = false;
+
+async function getMermaid() {
+  if (!mermaidInstance) {
+    const { default: mermaid } = await import("mermaid");
+    mermaidInstance = mermaid;
+    if (!mermaidInitialized) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "default",
+        securityLevel: "loose",
+        fontFamily: "inherit",
+      });
+      mermaidInitialized = true;
+    }
+  }
+  return mermaidInstance;
+}
 
 export const MermaidNodeView: React.FC<NodeViewProps> = ({
   node,
@@ -43,6 +55,8 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
       }
 
       try {
+        const mermaid = await getMermaid();
+        
         // コードを検証
         await mermaid.parse(code);
         setError(null);

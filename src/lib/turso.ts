@@ -1,4 +1,4 @@
-import { createClient, Client, InValue } from "@libsql/client/web";
+import type { Client, InValue } from "@libsql/client/web";
 import type { Database as SqlJsDatabase } from "sql.js";
 import { get, set } from "idb-keyval";
 
@@ -54,12 +54,19 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_ghost_links_text ON ghost_links(link_text);
 `;
 
+// Dynamic import for @libsql/client/web to avoid initialization errors
+async function getLibsqlClient() {
+  const { createClient } = await import("@libsql/client/web");
+  return createClient;
+}
+
 // Create an authenticated Turso client using Clerk JWT (for remote sync only)
-export function createAuthenticatedTursoClient(jwtToken: string): Client {
+export async function createAuthenticatedTursoClient(jwtToken: string): Promise<Client> {
   if (!TURSO_DATABASE_URL) {
     throw new Error("Missing Turso Database URL");
   }
 
+  const createClient = await getLibsqlClient();
   return createClient({
     url: TURSO_DATABASE_URL,
     authToken: jwtToken,
@@ -67,11 +74,12 @@ export function createAuthenticatedTursoClient(jwtToken: string): Client {
 }
 
 // Get a Turso client (for unauthenticated access - throws error if no URL configured)
-export function getTursoClient(): Client {
+export async function getTursoClient(): Promise<Client> {
   if (!TURSO_DATABASE_URL) {
     throw new Error("Missing Turso Database URL - user must be signed in");
   }
 
+  const createClient = await getLibsqlClient();
   return createClient({
     url: TURSO_DATABASE_URL,
   });
@@ -315,7 +323,7 @@ export async function syncWithRemote(
     setSyncStatus("syncing");
 
     const local = await getLocalClient(userId);
-    const remote = createAuthenticatedTursoClient(jwtToken);
+    const remote = await createAuthenticatedTursoClient(jwtToken);
 
     // Get sync timestamp (use 0 for initial sync to get all data)
     const syncSince = lastSyncTime ?? 0;

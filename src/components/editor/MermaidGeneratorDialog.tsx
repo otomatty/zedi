@@ -14,7 +14,12 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Settings, AlertCircle } from "lucide-react";
 import { useMermaidGenerator } from "@/hooks/useMermaidGenerator";
 import { DIAGRAM_TYPES, MermaidDiagramType } from "@/lib/mermaidGenerator";
-import mermaid from "mermaid";
+
+// Dynamic import for mermaid
+async function getMermaid() {
+  const { default: mermaid } = await import("mermaid");
+  return mermaid;
+}
 
 interface MermaidGeneratorDialogProps {
   open: boolean;
@@ -61,6 +66,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     const renderPreview = async () => {
       if (result?.code) {
         try {
+          const mermaid = await getMermaid();
           await mermaid.parse(result.code);
           const id = `preview-${Math.random().toString(36).substr(2, 9)}`;
           const { svg } = await mermaid.render(id, result.code);

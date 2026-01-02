@@ -31,12 +31,12 @@ export function useTurso() {
       const token = await getToken({ template: "turso" });
 
       if (token) {
-        return createAuthenticatedTursoClient(token);
+        return await createAuthenticatedTursoClient(token);
       }
     }
 
     // Fallback to unauthenticated client
-    return getTursoClient();
+    return await getTursoClient();
   }, [getToken, isSignedIn]);
 
   return {
