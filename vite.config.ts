@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
-  // Enable top-level await for @libsql/client-wasm
+  // Enable top-level await for sql.js
   build: {
     target: "esnext",
   },
@@ -20,8 +20,6 @@ export default defineConfig(({ mode }) => ({
     esbuildOptions: {
       target: "esnext",
     },
-    // Exclude libsql-wasm from optimization (it's WASM)
-    exclude: ["@libsql/client-wasm"],
   },
   plugins: [
     wasm(),

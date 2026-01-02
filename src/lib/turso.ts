@@ -66,6 +66,17 @@ export function createAuthenticatedTursoClient(jwtToken: string): Client {
   });
 }
 
+// Get a Turso client (for unauthenticated access - throws error if no URL configured)
+export function getTursoClient(): Client {
+  if (!TURSO_DATABASE_URL) {
+    throw new Error("Missing Turso Database URL - user must be signed in");
+  }
+
+  return createClient({
+    url: TURSO_DATABASE_URL,
+  });
+}
+
 // ============================================================================
 // Local-First Architecture with sql.js
 // ============================================================================
