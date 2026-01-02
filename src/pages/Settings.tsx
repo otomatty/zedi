@@ -1,16 +1,14 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Bot, Settings as SettingsIcon, User } from "lucide-react";
+import { ArrowLeft, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import Container from "@/components/layout/Container";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 
 interface SettingsItemProps {
   icon: React.ReactNode;
@@ -51,7 +49,7 @@ const Settings: React.FC = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Container className="flex h-16 items-center gap-4">
-          <Link to="/">
+          <Link to="/home">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -63,39 +61,24 @@ const Settings: React.FC = () => {
       {/* Content */}
       <main className="py-6">
         <Container>
-          <SignedIn>
-            <div className="space-y-4 max-w-2xl mx-auto">
-              <SettingsItem
-                icon={<Bot className="h-5 w-5" />}
-                title="AI 設定"
-                description="LLM APIキーの設定、プロバイダーの選択"
-                to="/settings/ai"
-              />
+          <div className="space-y-4 max-w-2xl mx-auto">
+            <SettingsItem
+              icon={<Bot className="h-5 w-5" />}
+              title="AI 設定"
+              description="LLM APIキーの設定、プロバイダーの選択"
+              to="/settings/ai"
+            />
 
-              {/* 将来的な設定項目のプレースホルダー */}
-              {/* 
-              <SettingsItem
-                icon={<User className="h-5 w-5" />}
-                title="アカウント"
-                description="プロフィール、同期設定"
-                to="/settings/account"
-              />
-              */}
-            </div>
-          </SignedIn>
-
-          <SignedOut>
-            <Card className="max-w-md mx-auto">
-              <CardContent className="flex flex-col items-center gap-4 py-10">
-                <p className="text-muted-foreground">
-                  設定を変更するにはサインインしてください
-                </p>
-                <SignInButton mode="modal">
-                  <Button>サインイン</Button>
-                </SignInButton>
-              </CardContent>
-            </Card>
-          </SignedOut>
+            {/* 将来的な設定項目のプレースホルダー */}
+            {/* 
+            <SettingsItem
+              icon={<User className="h-5 w-5" />}
+              title="アカウント"
+              description="プロフィール、同期設定"
+              to="/settings/account"
+            />
+            */}
+          </div>
         </Container>
       </main>
     </div>

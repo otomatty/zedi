@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,7 +32,6 @@ import { cn } from "@/lib/utils";
 import {
   SignedIn,
   SignedOut,
-  SignInButton,
   useUser,
   useClerk,
 } from "@clerk/clerk-react";
@@ -96,9 +95,11 @@ const Header: React.FC<HeaderProps> = ({
       <Container className="flex h-16 items-center justify-between gap-4">
         {/* Logo & Month Navigation */}
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Zedi
-          </h1>
+          <Link to="/home">
+            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent hover:opacity-80 transition-opacity">
+              Zedi
+            </h1>
+          </Link>
 
           <div className="hidden sm:flex items-center gap-1">
             <Button
@@ -152,11 +153,11 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Authentication */}
           <SignedOut>
-            <SignInButton mode="modal">
+            <Link to="/sign-in">
               <Button variant="outline" size="sm">
                 サインイン
               </Button>
-            </SignInButton>
+            </Link>
           </SignedOut>
           <SignedIn>
             <DropdownMenu>

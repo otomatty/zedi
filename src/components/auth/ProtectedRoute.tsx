@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 
 /**
  * A wrapper component that protects routes requiring authentication.
- * Redirects to the home page if the user is not signed in.
+ * Redirects to the sign-in page if the user is not signed in.
  */
 export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
   const { isSignedIn, isLoaded } = useAuth();
@@ -26,9 +26,9 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
     );
   }
 
-  // Redirect to home if not signed in
+  // Redirect to sign-in page if not signed in
   if (!isSignedIn) {
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/sign-in" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

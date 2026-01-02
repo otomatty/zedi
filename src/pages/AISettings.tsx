@@ -4,8 +4,6 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AISettingsForm } from "@/components/settings/AISettingsForm";
 import Container from "@/components/layout/Container";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
-import { Card, CardContent } from "@/components/ui/card";
 
 const AISettings: React.FC = () => {
   return (
@@ -25,24 +23,9 @@ const AISettings: React.FC = () => {
       {/* Content */}
       <main className="py-6">
         <Container>
-          <SignedIn>
-            <div className="max-w-2xl mx-auto">
-              <AISettingsForm />
-            </div>
-          </SignedIn>
-
-          <SignedOut>
-            <Card className="max-w-md mx-auto">
-              <CardContent className="flex flex-col items-center gap-4 py-10">
-                <p className="text-muted-foreground">
-                  AI設定を変更するにはサインインしてください
-                </p>
-                <SignInButton mode="modal">
-                  <Button>サインイン</Button>
-                </SignInButton>
-              </CardContent>
-            </Card>
-          </SignedOut>
+          <div className="max-w-2xl mx-auto">
+            <AISettingsForm />
+          </div>
         </Container>
       </main>
     </div>

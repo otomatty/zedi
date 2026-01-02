@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { cn } from "@/lib/utils";
 
 interface PlanFeature {
@@ -140,7 +139,7 @@ const Pricing: React.FC = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Container className="flex h-16 items-center gap-4">
-          <Link to="/">
+          <Link to="/home">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -152,9 +151,8 @@ const Pricing: React.FC = () => {
       {/* Content */}
       <main className="py-8">
         <Container>
-          <SignedIn>
-            {/* トライアル通知 */}
-            {trialActive && (
+          {/* トライアル通知 */}
+          {trialActive && (
               <div className="mb-8 p-4 rounded-lg bg-primary/10 border border-primary/20 text-center">
                 <p className="text-sm font-medium">
                   🎉 無料トライアル中 - 残り{trialDaysLeft}日
@@ -325,20 +323,6 @@ const Pricing: React.FC = () => {
                 ※ 為替レート 1ドル = 150円 で計算
               </p>
             </div>
-          </SignedIn>
-
-          <SignedOut>
-            <Card className="max-w-md mx-auto">
-              <CardContent className="flex flex-col items-center gap-4 py-10">
-                <p className="text-muted-foreground text-center">
-                  プランを確認・購入するにはサインインしてください
-                </p>
-                <SignInButton mode="modal">
-                  <Button>サインイン</Button>
-                </SignInButton>
-              </CardContent>
-            </Card>
-          </SignedOut>
         </Container>
       </main>
     </div>
