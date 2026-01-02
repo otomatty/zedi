@@ -1,6 +1,6 @@
 // Wiki Generator フック - ストリーミング生成を管理
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   generateWikiContentStream,
   WikiGeneratorResult,
@@ -23,15 +23,37 @@ export interface UseWikiGeneratorReturn {
   cancel: () => void;
   reset: () => void;
   getTiptapContent: () => string | null;
+  /** スロットリングされたTiptapコンテンツ（エディター直接更新用） */
+  throttledTiptapContent: string | null;
 }
+
+/** スロットリング間隔（ミリ秒） */
+const THROTTLE_INTERVAL_MS = 150;
 
 export function useWikiGenerator(): UseWikiGeneratorReturn {
   const [status, setStatus] = useState<WikiGeneratorStatus>("idle");
   const [streamedContent, setStreamedContent] = useState("");
   const [result, setResult] = useState<WikiGeneratorResult | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [throttledTiptapContent, setThrottledTiptapContent] = useState<
+    string | null
+  >(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // スロットリング: streamedContentの変更を一定間隔でTiptap形式に変換
+  useEffect(() => {
+    if (status !== "generating" || !streamedContent) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const tiptapContent = convertMarkdownToTiptapContent(streamedContent);
+      setThrottledTiptapContent(tiptapContent);
+    }, THROTTLE_INTERVAL_MS);
+
+    return () => clearTimeout(timer);
+  }, [streamedContent, status]);
 
   const generate = useCallback((title: string) => {
     // 既存の生成をキャンセル
@@ -90,6 +112,7 @@ export function useWikiGenerator(): UseWikiGeneratorReturn {
     setStreamedContent("");
     setResult(null);
     setError(null);
+    setThrottledTiptapContent(null);
   }, []);
 
   const getTiptapContent = useCallback((): string | null => {
@@ -111,5 +134,6 @@ export function useWikiGenerator(): UseWikiGeneratorReturn {
     cancel,
     reset,
     getTiptapContent,
+    throttledTiptapContent,
   };
 }

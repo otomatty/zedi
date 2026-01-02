@@ -6,6 +6,8 @@ import {
   Settings,
   LogOut,
   Keyboard,
+  CreditCard,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -191,6 +193,14 @@ const Header: React.FC<HeaderProps> = ({
                 <DropdownMenuItem onClick={() => navigate("/settings")}>
                   <Settings className="mr-2 h-4 w-4" />
                   設定
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/pricing")}>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  プラン
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/donate")}>
+                  <Heart className="mr-2 h-4 w-4" />
+                  サポート
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

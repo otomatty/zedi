@@ -49,6 +49,8 @@ interface TiptapEditorProps {
   className?: string;
   autoFocus?: boolean;
   pageId?: string;
+  /** 読み取り専用モード（生成中など） */
+  isReadOnly?: boolean;
 }
 
 const TiptapEditor: React.FC<TiptapEditorProps> = ({
@@ -58,6 +60,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   className,
   autoFocus = false,
   pageId,
+  isReadOnly = false,
 }) => {
   const navigate = useNavigate();
   const createPageMutation = useCreatePage();
@@ -199,6 +202,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     ],
     content: content ? JSON.parse(content) : undefined,
     autofocus: autoFocus ? "end" : false,
+    editable: !isReadOnly,
     // Prevent SSR hydration issues
     immediatelyRender: false,
     editorProps: {
@@ -239,6 +243,13 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       }
     },
   });
+
+  // isReadOnlyの変更を検知してエディターの編集可能状態を更新
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!isReadOnly);
+    }
+  }, [editor, isReadOnly]);
 
   // Update editor content when prop changes (e.g., when page data is loaded)
   useEffect(() => {

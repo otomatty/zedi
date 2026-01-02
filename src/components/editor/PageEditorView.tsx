@@ -10,6 +10,8 @@ import {
   Link2,
   AlertTriangle,
   ExternalLink,
+  X,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,6 +60,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 
 // モジュールスコープで作成中のフラグを追跡（Strict Mode対策）
 let isCreatingPage = false;
@@ -90,6 +101,19 @@ const PageEditor: React.FC = () => {
 
   // Refs for debouncing
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Wiki Generator
+  const {
+    status: wikiStatus,
+    error: wikiError,
+    generate: generateWiki,
+    cancel: cancelWiki,
+    reset: resetWiki,
+    throttledTiptapContent,
+    getTiptapContent,
+  } = useWikiGenerator();
+
+  const isWikiGenerating = wikiStatus === "generating";
 
   // ページIDが変わった時にモジュールスコープの追跡をクリーンアップ
   useEffect(() => {
@@ -251,6 +275,28 @@ const PageEditor: React.FC = () => {
     [currentPageId, updatePageMutation, shouldBlockSave, syncLinks]
   );
 
+  // Wiki生成中のコンテンツをエディターに反映
+  useEffect(() => {
+    if (isWikiGenerating && throttledTiptapContent) {
+      setContent(throttledTiptapContent);
+    }
+  }, [isWikiGenerating, throttledTiptapContent]);
+
+  // Wiki生成完了時に保存
+  useEffect(() => {
+    if (wikiStatus === "completed") {
+      const tiptapContent = getTiptapContent();
+      if (tiptapContent) {
+        setContent(tiptapContent);
+        saveChanges(title, tiptapContent);
+        toast({
+          title: "Wiki記事を生成しました",
+        });
+      }
+      resetWiki();
+    }
+  }, [wikiStatus, getTiptapContent, title, saveChanges, resetWiki, toast]);
+
   // Auto-save on changes
   const handleContentChange = useCallback(
     (newContent: string) => {
@@ -284,14 +330,16 @@ const PageEditor: React.FC = () => {
     }
   }, [duplicatePage, navigate]);
 
-  // Wiki生成結果をエディタに反映
-  const handleWikiGenerated = useCallback(
-    (tiptapContent: string) => {
-      setContent(tiptapContent);
-      saveChanges(title, tiptapContent);
-    },
-    [title, saveChanges]
-  );
+  // Wiki生成を開始
+  const handleGenerateWiki = useCallback(() => {
+    generateWiki(title);
+  }, [generateWiki, title]);
+
+  // Wiki生成エラーダイアログを閉じてAI設定へ遷移
+  const handleGoToAISettings = useCallback(() => {
+    resetWiki();
+    navigate("/settings/ai");
+  }, [resetWiki, navigate]);
 
   // Web Clipper結果をエディタに反映
   const handleWebClipped = useCallback(
@@ -531,7 +579,8 @@ const PageEditor: React.FC = () => {
             <WikiGeneratorButton
               title={title}
               hasContent={isContentNotEmpty(content)}
-              onGenerated={handleWikiGenerated}
+              onGenerate={handleGenerateWiki}
+              status={wikiStatus}
             />
             {/* Web Clipper Button - 本文が空の場合のみ表示 */}
             {!isContentNotEmpty(content) && (
@@ -629,6 +678,31 @@ const PageEditor: React.FC = () => {
         </div>
       )}
 
+      {/* Wiki生成中バナー */}
+      {isWikiGenerating && (
+        <div className="border-b border-border bg-primary/5">
+          <Container>
+            <div className="flex items-center justify-between py-3">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-sm">
+                  「{title}」について解説を生成しています...
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cancelWiki}
+                className="gap-1.5"
+              >
+                <X className="h-4 w-4" />
+                キャンセル
+              </Button>
+            </div>
+          </Container>
+        </div>
+      )}
+
       {/* Editor */}
       <main className="flex-1 py-6">
         <Container>
@@ -636,13 +710,20 @@ const PageEditor: React.FC = () => {
             {/* Source URL Badge - クリップしたページの場合に表示 */}
             {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
 
-            <TiptapEditor
-              content={content}
-              onChange={handleContentChange}
-              autoFocus={isNewPage}
-              className="min-h-[calc(100vh-200px)]"
-              pageId={currentPageId || pageId || undefined}
-            />
+            {/* エディター（生成中はオーバーレイを表示） */}
+            <div className="relative">
+              {isWikiGenerating && (
+                <div className="absolute inset-0 bg-background/30 pointer-events-none z-10 rounded-md" />
+              )}
+              <TiptapEditor
+                content={content}
+                onChange={handleContentChange}
+                autoFocus={isNewPage}
+                className="min-h-[calc(100vh-200px)]"
+                pageId={currentPageId || pageId || undefined}
+                isReadOnly={isWikiGenerating}
+              />
+            </div>
 
             {/* Linked Pages Section */}
             {currentPageId && <LinkedPagesSection pageId={currentPageId} />}
@@ -680,6 +761,32 @@ const PageEditor: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Wiki生成エラーダイアログ */}
+      <Dialog open={wikiStatus === "error"} onOpenChange={() => resetWiki()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              生成エラー
+            </DialogTitle>
+            <DialogDescription>
+              {wikiError?.message === "AI_NOT_CONFIGURED"
+                ? "AI設定が必要です。設定画面でAPIキーを入力してください。"
+                : wikiError?.message || "生成中にエラーが発生しました。"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            {wikiError?.message === "AI_NOT_CONFIGURED" ? (
+              <Button onClick={handleGoToAISettings}>設定画面へ</Button>
+            ) : (
+              <Button variant="outline" onClick={() => resetWiki()}>
+                閉じる
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
