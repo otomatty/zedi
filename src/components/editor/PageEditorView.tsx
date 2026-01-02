@@ -1,73 +1,25 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Trash2,
-  MoreHorizontal,
-  Loader2,
-  Download,
-  Copy,
-  Link2,
-  AlertTriangle,
-  ExternalLink,
-  X,
-  AlertCircle,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import TiptapEditor from "./TiptapEditor";
-import { WikiGeneratorButton } from "./WikiGeneratorButton";
-import { WebClipperDialog } from "./WebClipperDialog";
-import { SourceUrlBadge } from "./SourceUrlBadge";
-import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
-import Container from "@/components/layout/Container";
+import { Loader2 } from "lucide-react";
+import type { ContentError } from "./TiptapEditor/useContentSanitizer";
+import { usePageEditorState } from "./PageEditor/usePageEditorState";
+import { useEditorAutoSave } from "./PageEditor/useEditorAutoSave";
+import { usePageDeletion } from "./PageEditor/usePageDeletion";
+import { useMarkdownExport } from "./PageEditor/useMarkdownExport";
+import { usePageEditorKeyboard } from "./PageEditor/usePageEditorKeyboard";
+import { PageEditorHeader } from "./PageEditor/PageEditorHeader";
+import { PageEditorAlerts } from "./PageEditor/PageEditorAlerts";
+import { PageEditorContent } from "./PageEditor/PageEditorContent";
+import { PageEditorDialogs } from "./PageEditor/PageEditorDialogs";
 import {
   usePage,
   useCreatePage,
   useUpdatePage,
-  useDeletePage,
   useSyncWikiLinks,
 } from "@/hooks/usePageQueries";
 import { useTitleValidation } from "@/hooks/useTitleValidation";
-import { formatTimeAgo } from "@/lib/dateUtils";
-import { generateAutoTitle } from "@/lib/contentUtils";
-import { extractWikiLinksFromContent } from "@/lib/wikiLinkUtils";
-import {
-  downloadMarkdown,
-  copyMarkdownToClipboard,
-} from "@/lib/markdownExport";
+import { generateAutoTitle, isContentNotEmpty } from "@/lib/contentUtils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 
 // モジュールスコープで作成中のフラグを追跡（Strict Mode対策）
@@ -85,57 +37,35 @@ const PageEditor: React.FC = () => {
   const { data: page, isLoading, isError } = usePage(pageId);
   const createPageMutation = useCreatePage();
   const updatePageMutation = useUpdatePage();
-  const deletePageMutation = useDeletePage();
   const { syncLinks } = useSyncWikiLinks();
 
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [sourceUrl, setSourceUrl] = useState<string | undefined>(undefined);
-  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
-  const [lastSaved, setLastSaved] = useState<number | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [webClipperOpen, setWebClipperOpen] = useState(false);
-  const [originalTitle, setOriginalTitle] = useState<string>("");
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteReason, setDeleteReason] = useState<string>("");
 
-  // Refs for debouncing
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Wiki Generator
+  // Page editor state hook
   const {
-    status: wikiStatus,
-    error: wikiError,
-    generate: generateWiki,
-    cancel: cancelWiki,
-    reset: resetWiki,
-    throttledTiptapContent,
-    getTiptapContent,
-  } = useWikiGenerator();
-
-  const isWikiGenerating = wikiStatus === "generating";
-
-  // ページIDが変わった時にモジュールスコープの追跡をクリーンアップ
-  useEffect(() => {
-    return () => {
-      // コンポーネントのアンマウント時にcreatingPageIdsをクリーンアップしない
-      // Strict Modeの再マウント時に重複作成を防ぐため
-    };
-  }, [id]);
-
-  // ページIDが変わった時に状態をリセット
-  useEffect(() => {
-    // 別のページに遷移した場合、状態をリセットして再読み込みを促す
-    if (currentPageId && currentPageId !== pageId && !isNewPage) {
-      setIsInitialized(false);
-      setCurrentPageId(null);
-      setTitle("");
-      setContent("");
-      setSourceUrl(undefined);
-      setLastSaved(null);
-      setOriginalTitle("");
-    }
-  }, [pageId, currentPageId, isNewPage]);
+    title,
+    content,
+    sourceUrl,
+    currentPageId,
+    lastSaved,
+    isInitialized,
+    originalTitle,
+    contentError,
+    setTitle,
+    setContent,
+    setSourceUrl,
+    setContentError,
+    initialize,
+    reset,
+    updateLastSaved,
+  } = usePageEditorState({
+    pageId,
+    isNewPage,
+    onInitialized: (page) => {
+      // 既存ページのタイトルで状態を初期化（重複チェックは行わない）
+      initializeWithTitle(page.title);
+    },
+  });
 
   // タイトル重複チェック
   const {
@@ -152,6 +82,82 @@ const PageEditor: React.FC = () => {
     debounceMs: 300,
   });
 
+  // Wiki Generator
+  const {
+    status: wikiStatus,
+    error: wikiError,
+    generate: generateWiki,
+    cancel: cancelWiki,
+    reset: resetWiki,
+    throttledTiptapContent,
+    getTiptapContent,
+  } = useWikiGenerator();
+
+  const isWikiGenerating = wikiStatus === "generating";
+
+  // Page deletion hook
+  const {
+    deleteConfirmOpen,
+    deleteReason,
+    setDeleteConfirmOpen,
+    handleDelete,
+    handleBack,
+    handleConfirmDelete,
+    handleCancelDelete,
+  } = usePageDeletion({
+    currentPageId,
+    title,
+    content,
+    shouldBlockSave,
+  });
+
+  // Markdown export hook
+  const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(
+    title,
+    content
+  );
+
+  // Keyboard shortcuts hook
+  usePageEditorKeyboard({ onBack: handleBack });
+
+  // Auto-save hook
+  const { saveChanges, lastSaved: autoSaveLastSaved } = useEditorAutoSave({
+    pageId: currentPageId,
+    debounceMs: 500,
+    shouldBlockSave,
+    onSave: (updates) => {
+      if (currentPageId) {
+        updatePageMutation.mutate({
+          pageId: currentPageId,
+          updates,
+        });
+      }
+    },
+    onSaveContentOnly: (content) => {
+      if (currentPageId) {
+        updatePageMutation.mutate({
+          pageId: currentPageId,
+          updates: { content },
+        });
+      }
+    },
+    syncWikiLinks: syncLinks,
+    onSaveSuccess: () => {
+      updateLastSaved(Date.now());
+    },
+  });
+
+  // Use auto-save's lastSaved if available, otherwise use state's lastSaved
+  const displayLastSaved = autoSaveLastSaved ?? lastSaved;
+
+  // ページIDが変わった時にモジュールスコープの追跡をクリーンアップ
+  useEffect(() => {
+    return () => {
+      // コンポーネントのアンマウント時にcreatingPageIdsをクリーンアップしない
+      // Strict Modeの再マウント時に重複作成を防ぐため
+    };
+  }, [id]);
+
   // Create new page
   useEffect(() => {
     if (!isNewPage || isInitialized) {
@@ -165,7 +171,6 @@ const PageEditor: React.FC = () => {
 
     isCreatingPage = true;
 
-    // mutateAsyncを使って直接async処理
     const createNewPage = async () => {
       try {
         const newPage = await createPageMutation.mutateAsync({
@@ -192,17 +197,9 @@ const PageEditor: React.FC = () => {
   // Load existing page
   useEffect(() => {
     if (!isNewPage && page && !isInitialized) {
-      setCurrentPageId(page.id);
-      setTitle(page.title);
-      setOriginalTitle(page.title);
-      setContent(page.content);
-      setSourceUrl(page.sourceUrl);
-      setLastSaved(page.updatedAt);
-      setIsInitialized(true);
-      // 既存ページのタイトルで状態を初期化（重複チェックは行わない）
-      initializeWithTitle(page.title);
+      initialize(page);
     }
-  }, [isNewPage, page, isInitialized, initializeWithTitle]);
+  }, [isNewPage, page, isInitialized, initialize]);
 
   // Handle page not found
   useEffect(() => {
@@ -215,72 +212,12 @@ const PageEditor: React.FC = () => {
     }
   }, [isNewPage, isError, navigate, toast]);
 
-  // Debounced save function (タイトル重複時は保存をブロック)
-  const saveChanges = useCallback(
-    (newTitle: string, newContent: string, forceBlockTitle = false) => {
-      if (!currentPageId) return;
-
-      // WikiLinkを抽出して同期する関数
-      const syncWikiLinksFromContent = async (contentToSync: string) => {
-        const wikiLinks = extractWikiLinksFromContent(contentToSync);
-        if (wikiLinks.length > 0) {
-          await syncLinks(currentPageId, wikiLinks);
-        }
-      };
-
-      // タイトル重複時は保存をブロック
-      if (forceBlockTitle || shouldBlockSave) {
-        // コンテンツのみ保存（タイトルは元のまま）
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-        saveTimeoutRef.current = setTimeout(() => {
-          updatePageMutation.mutate(
-            {
-              pageId: currentPageId,
-              updates: { content: newContent },
-            },
-            {
-              onSuccess: () => {
-                setLastSaved(Date.now());
-                // WikiLink同期
-                syncWikiLinksFromContent(newContent);
-              },
-            }
-          );
-        }, 500);
-        return;
-      }
-
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      saveTimeoutRef.current = setTimeout(() => {
-        updatePageMutation.mutate(
-          {
-            pageId: currentPageId,
-            updates: { title: newTitle, content: newContent },
-          },
-          {
-            onSuccess: () => {
-              setLastSaved(Date.now());
-              // WikiLink同期
-              syncWikiLinksFromContent(newContent);
-            },
-          }
-        );
-      }, 500); // 500ms debounce
-    },
-    [currentPageId, updatePageMutation, shouldBlockSave, syncLinks]
-  );
-
   // Wiki生成中のコンテンツをエディターに反映
   useEffect(() => {
     if (isWikiGenerating && throttledTiptapContent) {
       setContent(throttledTiptapContent);
     }
-  }, [isWikiGenerating, throttledTiptapContent]);
+  }, [isWikiGenerating, throttledTiptapContent, setContent]);
 
   // Wiki生成完了時に保存
   useEffect(() => {
@@ -295,7 +232,7 @@ const PageEditor: React.FC = () => {
       }
       resetWiki();
     }
-  }, [wikiStatus, getTiptapContent, title, saveChanges, resetWiki, toast]);
+  }, [wikiStatus, getTiptapContent, title, saveChanges, resetWiki, toast, setContent]);
 
   // Auto-save on changes
   const handleContentChange = useCallback(
@@ -309,18 +246,24 @@ const PageEditor: React.FC = () => {
       }
       saveChanges(autoTitle || title, newContent);
     },
-    [title, saveChanges, validateTitle]
+    [title, saveChanges, validateTitle, setContent, setTitle]
   );
 
   const handleTitleChange = useCallback(
     (newTitle: string) => {
       setTitle(newTitle);
       validateTitle(newTitle);
-      // タイトル重複チェックは非同期なので、保存はvalidateTitleの結果を待たずに行う
-      // shouldBlockSaveがtrueの場合はsaveChanges内でコンテンツのみ保存される
       saveChanges(newTitle, content);
     },
-    [content, saveChanges, validateTitle]
+    [content, saveChanges, validateTitle, setTitle]
+  );
+
+  // コンテンツエラーのコールバック
+  const handleContentError = useCallback(
+    (error: ContentError | null) => {
+      setContentError(error);
+    },
+    [setContentError]
   );
 
   // 既存ページを開くハンドラー
@@ -366,7 +309,7 @@ const PageEditor: React.FC = () => {
           },
           {
             onSuccess: () => {
-              setLastSaved(Date.now());
+              updateLastSaved(Date.now());
               toast({
                 title: "Webページを取り込みました",
               });
@@ -375,159 +318,8 @@ const PageEditor: React.FC = () => {
         );
       }
     },
-    [currentPageId, updatePageMutation, toast]
+    [currentPageId, updatePageMutation, toast, setTitle, setContent, setSourceUrl, updateLastSaved]
   );
-
-  // コンテンツが空でないかチェック（Tiptap JSON形式）
-  const isContentNotEmpty = useCallback((contentJson: string): boolean => {
-    if (!contentJson) return false;
-    try {
-      const parsed = JSON.parse(contentJson);
-      // doc.contentが空または空の段落のみかチェック
-      if (!parsed.content || parsed.content.length === 0) return false;
-      // 空の段落のみの場合もfalse
-      const hasRealContent = parsed.content.some(
-        (node: { type: string; content?: unknown[] }) => {
-          if (node.type === "paragraph") {
-            return node.content && node.content.length > 0;
-          }
-          return true; // 段落以外のノード（見出しなど）があればtrue
-        }
-      );
-      return hasRealContent;
-    } catch {
-      return contentJson.trim().length > 0;
-    }
-  }, []);
-
-  const handleDelete = useCallback(() => {
-    if (currentPageId) {
-      deletePageMutation.mutate(currentPageId, {
-        onSuccess: () => {
-          toast({
-            title: "ページを削除しました",
-          });
-          navigate("/");
-        },
-        onError: () => {
-          toast({
-            title: "削除に失敗しました",
-            variant: "destructive",
-          });
-        },
-      });
-    }
-  }, [currentPageId, deletePageMutation, navigate, toast]);
-
-  const handleBack = useCallback(() => {
-    const hasContent = isContentNotEmpty(content);
-    const isTitleEmptyOrUntitled = !title.trim();
-
-    // 削除が必要なケースを判定
-    // 1. タイトル重複警告がある場合
-    // 2. タイトルが空（無題）の場合
-    const shouldDeleteForDuplicate = currentPageId && shouldBlockSave;
-    const shouldDeleteForEmptyTitle = currentPageId && isTitleEmptyOrUntitled;
-
-    if (shouldDeleteForDuplicate || shouldDeleteForEmptyTitle) {
-      // コンテンツがある場合は確認ダイアログを表示
-      if (hasContent) {
-        if (shouldDeleteForDuplicate) {
-          setDeleteReason("重複するタイトルのページ");
-        } else {
-          setDeleteReason("タイトルが未入力のページ");
-        }
-        setDeleteConfirmOpen(true);
-        return;
-      }
-
-      // コンテンツがない場合はそのまま削除
-      deletePageMutation.mutate(currentPageId);
-      if (shouldDeleteForDuplicate) {
-        toast({
-          title: "重複するタイトルのため、ページを削除しました",
-        });
-      } else {
-        toast({
-          title: "タイトルが未入力のため、ページを削除しました",
-        });
-      }
-    }
-    navigate("/");
-  }, [
-    navigate,
-    currentPageId,
-    title,
-    content,
-    deletePageMutation,
-    shouldBlockSave,
-    toast,
-    isContentNotEmpty,
-  ]);
-
-  // 削除確認ダイアログで「削除」を選択した場合
-  const handleConfirmDelete = useCallback(() => {
-    if (currentPageId) {
-      deletePageMutation.mutate(currentPageId);
-      toast({
-        title: `${deleteReason}を削除しました`,
-      });
-    }
-    setDeleteConfirmOpen(false);
-    navigate("/");
-  }, [currentPageId, deletePageMutation, deleteReason, navigate, toast]);
-
-  // 削除確認ダイアログで「キャンセル」を選択した場合
-  const handleCancelDelete = useCallback(() => {
-    setDeleteConfirmOpen(false);
-  }, []);
-
-  // Cmd+H ショートカットをインターセプトしてhandleBackを呼び出す
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+H / Ctrl+H - ホームに戻る（handleBackを通す）
-      if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        e.preventDefault();
-        e.stopPropagation();
-        handleBack();
-      }
-    };
-
-    // captureフェーズでイベントをキャッチ（GlobalShortcutsProviderより先に処理）
-    document.addEventListener("keydown", handleKeyDown, true);
-    return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [handleBack]);
-
-  // Export handlers
-  const handleExportMarkdown = useCallback(() => {
-    downloadMarkdown(title, content);
-    toast({
-      title: "Markdownファイルをダウンロードしました",
-    });
-  }, [title, content, toast]);
-
-  const handleCopyMarkdown = useCallback(async () => {
-    try {
-      await copyMarkdownToClipboard(title, content);
-      toast({
-        title: "Markdownをクリップボードにコピーしました",
-      });
-    } catch (error) {
-      toast({
-        title: "コピーに失敗しました",
-        variant: "destructive",
-      });
-    }
-  }, [title, content, toast]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Show loading state
   if (!isNewPage && isLoading) {
@@ -549,244 +341,60 @@ const PageEditor: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <Container className="flex h-14 items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleBack}
-            className="shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-
-          <div className="flex-1 min-w-0">
-            <Input
-              value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              placeholder="ページタイトル"
-              className={`border-0 bg-transparent text-lg font-medium focus-visible:ring-0 px-0 h-auto py-1 ${
-                errorMessage || (!isNewPage && isTitleEmpty && title === "")
-                  ? "text-destructive"
-                  : ""
-              }`}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Wiki Generator Button - タイトルがあり本文が空の場合のみ表示 */}
-            <WikiGeneratorButton
-              title={title}
-              hasContent={isContentNotEmpty(content)}
-              onGenerate={handleGenerateWiki}
-              status={wikiStatus}
-            />
-            {/* Web Clipper Button - 本文が空の場合のみ表示 */}
-            {!isContentNotEmpty(content) && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setWebClipperOpen(true)}
-                  >
-                    <Link2 className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>URLから取り込み</TooltipContent>
-              </Tooltip>
-            )}
-            {lastSaved && (
-              <span className="text-xs text-muted-foreground hidden sm:inline">
-                {formatTimeAgo(lastSaved)}に保存
-              </span>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setWebClipperOpen(true)}>
-                  <Link2 className="mr-2 h-4 w-4" />
-                  URLから取り込み
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleExportMarkdown}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Markdownでエクスポート
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleCopyMarkdown}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Markdownをコピー
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  削除
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </Container>
-      </header>
-
-      {/* タイトル警告エリア */}
-      {(duplicatePage || (!isNewPage && isTitleEmpty && title === "")) && (
-        <div className="border-b border-border bg-destructive/10">
-          <Container>
-            {/* タイトル重複警告 */}
-            {duplicatePage && (
-              <Alert
-                variant="destructive"
-                className="border-0 bg-transparent py-3"
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between gap-2">
-                  <span className="text-sm">{errorMessage}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenDuplicatePage}
-                    className="shrink-0"
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    開く
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-            {/* 既存ページで空タイトル警告 */}
-            {!isNewPage && isTitleEmpty && title === "" && !duplicatePage && (
-              <Alert
-                variant="destructive"
-                className="border-0 bg-transparent py-3"
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  タイトルを入力してください
-                </AlertDescription>
-              </Alert>
-            )}
-          </Container>
-        </div>
-      )}
-
-      {/* Wiki生成中バナー */}
-      {isWikiGenerating && (
-        <div className="border-b border-border bg-primary/5">
-          <Container>
-            <div className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="text-sm">
-                  「{title}」について解説を生成しています...
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={cancelWiki}
-                className="gap-1.5"
-              >
-                <X className="h-4 w-4" />
-                キャンセル
-              </Button>
-            </div>
-          </Container>
-        </div>
-      )}
-
-      {/* Editor */}
-      <main className="flex-1 py-6">
-        <Container>
-          <div className="max-w-4xl mx-auto space-y-4">
-            {/* Source URL Badge - クリップしたページの場合に表示 */}
-            {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
-
-            {/* エディター（生成中はオーバーレイを表示） */}
-            <div className="relative">
-              {isWikiGenerating && (
-                <div className="absolute inset-0 bg-background/30 pointer-events-none z-10 rounded-md" />
-              )}
-              <TiptapEditor
-                content={content}
-                onChange={handleContentChange}
-                autoFocus={isNewPage}
-                className="min-h-[calc(100vh-200px)]"
-                pageId={currentPageId || pageId || undefined}
-                isReadOnly={isWikiGenerating}
-              />
-            </div>
-
-            {/* Linked Pages Section */}
-            {currentPageId && <LinkedPagesSection pageId={currentPageId} />}
-          </div>
-        </Container>
-      </main>
-
-      {/* Web Clipper Dialog */}
-      <WebClipperDialog
-        open={webClipperOpen}
-        onOpenChange={setWebClipperOpen}
-        onClipped={handleWebClipped}
+      <PageEditorHeader
+        title={title}
+        onTitleChange={handleTitleChange}
+        lastSaved={displayLastSaved}
+        hasContent={isContentNotEmpty(content)}
+        wikiStatus={wikiStatus}
+        errorMessage={errorMessage}
+        isTitleEmpty={isTitleEmpty}
+        isNewPage={isNewPage}
+        onBack={handleBack}
+        onDelete={handleDelete}
+        onExportMarkdown={handleExportMarkdown}
+        onCopyMarkdown={handleCopyMarkdown}
+        onWebClipper={() => setWebClipperOpen(true)}
+        onGenerateWiki={handleGenerateWiki}
       />
 
-      {/* 削除確認ダイアログ */}
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ページを削除しますか？</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteReason}
-              は保存できません。このページにはコンテンツが含まれています。削除してもよろしいですか？
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelDelete}>
-              キャンセル
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              削除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PageEditorAlerts
+        duplicatePage={duplicatePage}
+        errorMessage={errorMessage}
+        isTitleEmpty={isTitleEmpty}
+        title={title}
+        isNewPage={isNewPage}
+        onOpenDuplicatePage={handleOpenDuplicatePage}
+        isWikiGenerating={isWikiGenerating}
+        onCancelWiki={cancelWiki}
+        contentError={contentError}
+      />
 
-      {/* Wiki生成エラーダイアログ */}
-      <Dialog open={wikiStatus === "error"} onOpenChange={() => resetWiki()}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              生成エラー
-            </DialogTitle>
-            <DialogDescription>
-              {wikiError?.message === "AI_NOT_CONFIGURED"
-                ? "AI設定が必要です。設定画面でAPIキーを入力してください。"
-                : wikiError?.message || "生成中にエラーが発生しました。"}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            {wikiError?.message === "AI_NOT_CONFIGURED" ? (
-              <Button onClick={handleGoToAISettings}>設定画面へ</Button>
-            ) : (
-              <Button variant="outline" onClick={() => resetWiki()}>
-                閉じる
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PageEditorContent
+        content={content}
+        sourceUrl={sourceUrl}
+        currentPageId={currentPageId}
+        pageId={pageId}
+        isNewPage={isNewPage}
+        isWikiGenerating={isWikiGenerating}
+        onContentChange={handleContentChange}
+        onContentError={handleContentError}
+      />
+
+      <PageEditorDialogs
+        deleteConfirmOpen={deleteConfirmOpen}
+        deleteReason={deleteReason}
+        onDeleteConfirmOpenChange={setDeleteConfirmOpen}
+        onConfirmDelete={handleConfirmDelete}
+        onCancelDelete={handleCancelDelete}
+        wikiStatus={wikiStatus}
+        wikiErrorMessage={wikiError?.message || null}
+        onResetWiki={resetWiki}
+        onGoToAISettings={handleGoToAISettings}
+        webClipperOpen={webClipperOpen}
+        onWebClipperOpenChange={setWebClipperOpen}
+        onWebClipped={handleWebClipped}
+      />
     </div>
   );
 };

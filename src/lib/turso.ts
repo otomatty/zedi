@@ -1,4 +1,4 @@
-import type { Client, InValue } from "@libsql/client/web";
+import type { Client, InValue, InStatement, InArgs, ResultSet, Row, TransactionMode, Transaction, Replicated } from "@libsql/client/web";
 import type { Database as SqlJsDatabase } from "sql.js";
 import { get, set } from "idb-keyval";
 
@@ -125,61 +125,199 @@ export function getLastSyncTime(): number | null {
 // sql.js Client Wrapper (compatible with libsql Client interface)
 // ============================================================================
 
-interface SqlJsRow {
-  [key: string]: unknown;
-}
-
-interface SqlJsResult {
-  columns: string[];
-  values: unknown[][];
+/**
+ * Create a Row object that satisfies the @libsql/client Row interface
+ */
+function createRow(obj: Record<string, unknown>, columns: string[]): Row {
+  const row = Object.create(null) as Row;
+  
+  // Set length property
+  Object.defineProperty(row, 'length', {
+    value: columns.length,
+    writable: false,
+    enumerable: false,
+  });
+  
+  // Add indexed access and named access
+  columns.forEach((col, index) => {
+    const value = obj[col] as Row[number];
+    row[index] = value;
+    row[col] = value;
+  });
+  
+  return row;
 }
 
 /**
- * Wrapper around sql.js Database that mimics libsql Client interface
+ * Create a ResultSet object that satisfies the @libsql/client ResultSet interface
  */
-class SqlJsClientWrapper {
+function createResultSet(
+  rows: Row[],
+  columns: string[],
+  rowsAffected: number = 0,
+  lastInsertRowid?: bigint
+): ResultSet {
+  return {
+    columns,
+    columnTypes: columns.map(() => ""), // sql.js doesn't provide column types
+    rows,
+    rowsAffected,
+    lastInsertRowid,
+    toJSON() {
+      return {
+        columns: this.columns,
+        columnTypes: this.columnTypes,
+        rows: this.rows,
+        rowsAffected: this.rowsAffected,
+        lastInsertRowid: this.lastInsertRowid?.toString(),
+      };
+    },
+  };
+}
+
+/**
+ * Wrapper around sql.js Database that implements the @libsql/client Client interface
+ */
+class SqlJsClientWrapper implements Client {
   private db: SqlJsDatabase;
+  private _closed: boolean = false;
 
   constructor(db: SqlJsDatabase) {
     this.db = db;
   }
 
+  get closed(): boolean {
+    return this._closed;
+  }
+
+  get protocol(): string {
+    return "file";
+  }
+
+  async execute(stmtOrSql: InStatement): Promise<ResultSet>;
+  async execute(sql: string, args?: InArgs): Promise<ResultSet>;
   async execute(
-    stmtOrSql: string | { sql: string; args?: unknown[] }
-  ): Promise<{ rows: SqlJsRow[]; columns: string[] }> {
+    stmtOrSql: InStatement | string,
+    args?: InArgs
+  ): Promise<ResultSet> {
     const sql = typeof stmtOrSql === "string" ? stmtOrSql : stmtOrSql.sql;
-    const args =
-      typeof stmtOrSql === "string" ? [] : (stmtOrSql.args ?? []);
+    const stmtArgs = typeof stmtOrSql === "string" 
+      ? args 
+      : (stmtOrSql as { sql: string; args?: InArgs }).args;
+    
+    // Convert args to array format
+    const argsArray: (string | number | null | Uint8Array)[] = [];
+    if (stmtArgs) {
+      if (Array.isArray(stmtArgs)) {
+        for (const arg of stmtArgs) {
+          argsArray.push(this.convertArg(arg));
+        }
+      } else {
+        // Named parameters - need to extract in order they appear in SQL
+        const paramNames = sql.match(/[?$:@][a-zA-Z0-9_]+/g) || [];
+        for (const param of paramNames) {
+          const key = param.slice(1); // Remove prefix
+          const value = (stmtArgs as Record<string, InValue>)[key];
+          argsArray.push(this.convertArg(value));
+        }
+      }
+    }
 
     try {
       const stmt = this.db.prepare(sql);
-      if (args.length > 0) {
-        stmt.bind(args as (string | number | null | Uint8Array)[]);
+      if (argsArray.length > 0) {
+        stmt.bind(argsArray);
       }
 
-      const rows: SqlJsRow[] = [];
+      const rows: Row[] = [];
       const columns: string[] = stmt.getColumnNames();
 
       while (stmt.step()) {
-        const row = stmt.getAsObject() as SqlJsRow;
-        rows.push(row);
+        const obj = stmt.getAsObject() as Record<string, unknown>;
+        rows.push(createRow(obj, columns));
       }
 
       stmt.free();
-      return { rows, columns };
+      return createResultSet(rows, columns);
     } catch (error) {
       // For INSERT/UPDATE/DELETE statements that don't return rows
+      const upperSql = sql.trim().toUpperCase();
       if (
-        sql.trim().toUpperCase().startsWith("INSERT") ||
-        sql.trim().toUpperCase().startsWith("UPDATE") ||
-        sql.trim().toUpperCase().startsWith("DELETE") ||
-        sql.trim().toUpperCase().startsWith("CREATE") ||
-        sql.trim().toUpperCase().startsWith("DROP")
+        upperSql.startsWith("INSERT") ||
+        upperSql.startsWith("UPDATE") ||
+        upperSql.startsWith("DELETE") ||
+        upperSql.startsWith("CREATE") ||
+        upperSql.startsWith("DROP")
       ) {
-        this.db.run(sql, args as (string | number | null | Uint8Array)[]);
-        return { rows: [], columns: [] };
+        this.db.run(sql, argsArray);
+        return createResultSet([], []);
       }
       throw error;
+    }
+  }
+
+  private convertArg(arg: InValue | undefined): string | number | null | Uint8Array {
+    if (arg === undefined || arg === null) return null;
+    if (typeof arg === "boolean") return arg ? 1 : 0;
+    if (arg instanceof Date) return arg.getTime();
+    if (arg instanceof Uint8Array) return arg;
+    if (arg instanceof ArrayBuffer) return new Uint8Array(arg);
+    if (typeof arg === "bigint") return Number(arg);
+    return arg as string | number;
+  }
+
+  async batch(
+    stmts: Array<InStatement | [string, InArgs?]>,
+    _mode?: TransactionMode
+  ): Promise<Array<ResultSet>> {
+    const results: ResultSet[] = [];
+    for (const stmt of stmts) {
+      if (Array.isArray(stmt)) {
+        results.push(await this.execute(stmt[0], stmt[1]));
+      } else {
+        results.push(await this.execute(stmt));
+      }
+    }
+    return results;
+  }
+
+  async migrate(stmts: Array<InStatement>): Promise<Array<ResultSet>> {
+    // Execute PRAGMA foreign_keys=off before and on after
+    await this.execute("PRAGMA foreign_keys=OFF");
+    try {
+      const results = await this.batch(stmts);
+      await this.execute("PRAGMA foreign_keys=ON");
+      return results;
+    } catch (error) {
+      await this.execute("PRAGMA foreign_keys=ON");
+      throw error;
+    }
+  }
+
+  async transaction(_mode?: TransactionMode): Promise<Transaction> {
+    throw new Error("transaction() is not supported in sql.js wrapper. Use batch() instead.");
+  }
+
+  async executeMultiple(sql: string): Promise<void> {
+    const statements = sql.split(";").filter((s) => s.trim());
+    for (const stmt of statements) {
+      await this.execute(stmt);
+    }
+  }
+
+  async sync(): Promise<Replicated> {
+    // Local database doesn't need sync
+    return undefined;
+  }
+
+  reconnect(): void {
+    // No-op for local database
+  }
+
+  close(): void {
+    if (!this._closed) {
+      this.db.close();
+      this._closed = true;
     }
   }
 
@@ -189,21 +327,16 @@ class SqlJsClientWrapper {
   export(): Uint8Array {
     return this.db.export();
   }
-
-  /**
-   * Close the database
-   */
-  close(): void {
-    this.db.close();
-  }
 }
 
-// Local sql.js client
+// Local sql.js client (implements Client interface)
 let localSqlJsClient: SqlJsClientWrapper | null = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sqlJs: any = null;
 let isLocalDbInitialized = false;
 let currentUserId: string | null = null;
+// Initialization lock to prevent race conditions
+let initializationPromise: Promise<Client> | null = null;
 
 /**
  * Initialize sql.js (load WASM) using dynamic import
@@ -226,11 +359,18 @@ async function initializeSqlJs(): Promise<{ Database: new (data?: ArrayLike<numb
 /**
  * Get or create local sql.js database
  * This is the primary database for all read/write operations
+ * 
+ * Uses a lock to prevent race conditions during initialization
  */
-export async function getLocalClient(userId: string): Promise<SqlJsClientWrapper> {
+export async function getLocalClient(userId: string): Promise<Client> {
   // Return existing client if already initialized for this user
   if (localSqlJsClient && isLocalDbInitialized && currentUserId === userId) {
     return localSqlJsClient;
+  }
+
+  // If initialization is in progress for the same user, wait for it
+  if (initializationPromise && currentUserId === userId) {
+    return initializationPromise;
   }
 
   // Reset if user changed
@@ -240,45 +380,65 @@ export async function getLocalClient(userId: string): Promise<SqlJsClientWrapper
     }
     localSqlJsClient = null;
     isLocalDbInitialized = false;
+    initializationPromise = null;
   }
 
-  try {
-    const SQL = await initializeSqlJs();
+  // Create initialization promise to prevent concurrent initializations
+  initializationPromise = (async () => {
+    try {
+      console.log(`[LocalDB] Initializing for user: ${userId}`);
+      const SQL = await initializeSqlJs();
 
-    // Try to restore from IndexedDB
-    const dbKey = `${LOCAL_DB_KEY}-${userId}`;
-    const savedData = await get<Uint8Array>(dbKey);
+      // Try to restore from IndexedDB
+      const dbKey = `${LOCAL_DB_KEY}-${userId}`;
+      const savedData = await get<Uint8Array>(dbKey);
 
-    let db: SqlJsDatabase;
-    if (savedData) {
-      try {
-        db = new SQL.Database(savedData);
-        console.log("[LocalDB] Restored from IndexedDB");
-      } catch (error) {
-        console.error("[LocalDB] Failed to restore from IndexedDB:", error);
+      let db: SqlJsDatabase;
+      if (savedData) {
+        try {
+          db = new SQL.Database(savedData);
+          console.log("[LocalDB] Restored from IndexedDB");
+          
+          // Debug: Check page count in restored DB
+          const wrapper = new SqlJsClientWrapper(db);
+          const countResult = await wrapper.execute({
+            sql: `SELECT COUNT(*) as count FROM pages WHERE user_id = ?`,
+            args: [userId],
+          });
+          console.log(`[LocalDB] Restored DB has ${countResult.rows[0]?.count ?? 0} pages`);
+        } catch (error) {
+          console.error("[LocalDB] Failed to restore from IndexedDB:", error);
+          db = new SQL.Database();
+          initializeSchema(db);
+        }
+      } else {
+        console.log("[LocalDB] No saved data found, creating new database");
         db = new SQL.Database();
         initializeSchema(db);
       }
-    } else {
-      db = new SQL.Database();
-      initializeSchema(db);
+
+      localSqlJsClient = new SqlJsClientWrapper(db);
+      isLocalDbInitialized = true;
+      currentUserId = userId;
+
+      // Restore last sync time
+      const savedSyncTime = await get<number>(`${LAST_SYNC_KEY}-${userId}`);
+      if (savedSyncTime) {
+        lastSyncTime = savedSyncTime;
+        console.log(`[LocalDB] Last sync time: ${new Date(savedSyncTime).toISOString()}`);
+      } else {
+        console.log("[LocalDB] No previous sync time found");
+      }
+
+      return localSqlJsClient;
+    } catch (error) {
+      console.error("[LocalDB] Failed to create sql.js client:", error);
+      initializationPromise = null;
+      throw error;
     }
+  })();
 
-    localSqlJsClient = new SqlJsClientWrapper(db);
-    isLocalDbInitialized = true;
-    currentUserId = userId;
-
-    // Restore last sync time
-    const savedSyncTime = await get<number>(`${LAST_SYNC_KEY}-${userId}`);
-    if (savedSyncTime) {
-      lastSyncTime = savedSyncTime;
-    }
-
-    return localSqlJsClient;
-  } catch (error) {
-    console.error("[LocalDB] Failed to create sql.js client:", error);
-    throw error;
-  }
+  return initializationPromise;
 }
 
 /**
@@ -307,10 +467,51 @@ export async function saveLocalDatabase(): Promise<void> {
   }
 }
 
+// ============================================================================
+// Sync Configuration
+// ============================================================================
+
+/** Batch size for pagination when fetching from remote */
+const SYNC_PAGE_SIZE = 500;
+
+/** Batch size for IN clause queries */
+const BATCH_IN_SIZE = 100;
+
 /**
- * Sync local database with remote Turso (Delta Sync)
- * - Only fetches/pushes changes since lastSyncTime
- * - Reduces Rows Read significantly
+ * Row type from remote database
+ */
+interface RemotePageRow {
+  id: string;
+  user_id: string;
+  title: string | null;
+  content: string | null;
+  thumbnail_url: string | null;
+  source_url: string | null;
+  vector_embedding: Uint8Array | null;
+  created_at: number;
+  updated_at: number;
+  is_deleted: number;
+}
+
+interface RemoteLinkRow {
+  source_id: string;
+  target_id: string;
+  created_at: number;
+}
+
+interface RemoteGhostLinkRow {
+  link_text: string;
+  source_page_id: string;
+  created_at: number;
+}
+
+/**
+ * Sync local database with remote Turso (Delta Sync - Optimized)
+ * 
+ * Improvements:
+ * - Pagination for initial sync (reduces memory usage)
+ * - Batch IN queries for links (eliminates N+1)
+ * - Progress logging
  */
 export async function syncWithRemote(
   jwtToken: string,
@@ -333,101 +534,15 @@ export async function syncWithRemote(
       `[Sync] Starting ${isInitialSync ? "initial" : "delta"} sync (since: ${new Date(syncSince).toISOString()})`
     );
 
-    // --- PULL: Fetch changes from remote since lastSyncTime ---
-    const remoteChanges = await remote.execute({
-      sql: `SELECT * FROM pages WHERE user_id = ? AND updated_at > ?`,
-      args: [userId, syncSince],
-    });
+    // --- PULL: Fetch changes from remote with pagination ---
+    const pulledCount = await pullFromRemote(local, remote, userId, syncSince);
 
-    console.log(`[Sync] Pulled ${remoteChanges.rows.length} changes from remote`);
+    // --- PUSH: Send local changes to remote ---
+    const pushedCount = await pushToRemote(local, remote, userId, syncSince);
 
-    // Get local pages for comparison
-    const localPages = await local.execute({
-      sql: `SELECT id, updated_at FROM pages WHERE user_id = ?`,
-      args: [userId],
-    });
-    const localPageMap = new Map(
-      localPages.rows.map((r) => [r.id as string, r.updated_at as number])
-    );
-
-    // Merge remote changes into local (remote wins if newer)
-    let pulledCount = 0;
-    for (const row of remoteChanges.rows) {
-      const localUpdatedAt = localPageMap.get(row.id as string);
-      const remoteUpdatedAt = row.updated_at as number;
-
-      if (!localUpdatedAt || remoteUpdatedAt > localUpdatedAt) {
-        await local.execute({
-          sql: `INSERT OR REPLACE INTO pages 
-                (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [
-            row.id,
-            row.user_id,
-            row.title,
-            row.content,
-            row.thumbnail_url,
-            row.source_url,
-            row.vector_embedding,
-            row.created_at,
-            row.updated_at,
-            row.is_deleted,
-          ],
-        });
-        pulledCount++;
-      }
-    }
-
-    // --- PUSH: Send local changes since lastSyncTime to remote ---
-    const localChanges = await local.execute({
-      sql: `SELECT * FROM pages WHERE user_id = ? AND updated_at > ?`,
-      args: [userId, syncSince],
-    });
-
-    console.log(`[Sync] Pushing ${localChanges.rows.length} local changes to remote`);
-
-    // Get remote page updated_at for comparison
-    const remotePageIds = await remote.execute({
-      sql: `SELECT id, updated_at FROM pages WHERE user_id = ?`,
-      args: [userId],
-    });
-    const remotePageMap = new Map(
-      remotePageIds.rows.map((r) => [r.id as string, r.updated_at as number])
-    );
-
-    let pushedCount = 0;
-    for (const p of localChanges.rows) {
-      const remoteUpdatedAt = remotePageMap.get(p.id as string);
-      const localUpdatedAt = p.updated_at as number;
-
-      // Push if local is newer or doesn't exist in remote
-      if (!remoteUpdatedAt || localUpdatedAt > remoteUpdatedAt) {
-        await remote.execute({
-          sql: `INSERT OR REPLACE INTO pages 
-                (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [
-            p.id,
-            p.user_id,
-            p.title,
-            p.content,
-            p.thumbnail_url,
-            p.source_url,
-            p.vector_embedding,
-            p.created_at,
-            p.updated_at,
-            p.is_deleted,
-          ] as InValue[],
-        });
-        pushedCount++;
-      }
-    }
-
-    // Sync links (delta)
-    await syncLinksDelta(local, remote, userId, syncSince);
-
-    // Sync ghost links (delta)
-    await syncGhostLinksDelta(local, remote, userId, syncSince);
+    // --- Sync links and ghost links (optimized batch queries) ---
+    await syncLinksDeltaOptimized(local, remote, userId, syncSince);
+    await syncGhostLinksDeltaOptimized(local, remote, userId, syncSince);
 
     // Save to IndexedDB
     await saveLocalDatabase();
@@ -450,23 +565,178 @@ export async function syncWithRemote(
 }
 
 /**
- * Sync links between local and remote (Delta)
- * Only syncs links for pages that have been updated since lastSyncTime
+ * Pull changes from remote to local with pagination
  */
-async function syncLinksDelta(
-  local: SqlJsClientWrapper,
+async function pullFromRemote(
+  local: Client,
+  remote: Client,
+  userId: string,
+  syncSince: number
+): Promise<number> {
+  // Get local pages for comparison (only id and updated_at)
+  const localPages = await local.execute({
+    sql: `SELECT id, updated_at FROM pages WHERE user_id = ?`,
+    args: [userId],
+  });
+  const localPageMap = new Map(
+    localPages.rows.map((r) => [r.id as string, r.updated_at as number])
+  );
+
+  let offset = 0;
+  let totalPulled = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    // Fetch a batch of pages from remote
+    const result = await remote.execute({
+      sql: `SELECT * FROM pages 
+            WHERE user_id = ? AND updated_at > ? 
+            ORDER BY updated_at ASC 
+            LIMIT ? OFFSET ?`,
+      args: [userId, syncSince, SYNC_PAGE_SIZE, offset],
+    });
+
+    const rows = result.rows as unknown as RemotePageRow[];
+    
+    if (rows.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    // Filter rows that need to be updated
+    const rowsToInsert = rows.filter((row) => {
+      const localUpdatedAt = localPageMap.get(row.id);
+      return !localUpdatedAt || row.updated_at > localUpdatedAt;
+    });
+
+    // Batch insert into local database
+    for (const row of rowsToInsert) {
+      await local.execute({
+        sql: `INSERT OR REPLACE INTO pages 
+              (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          row.id,
+          row.user_id,
+          row.title,
+          row.content,
+          row.thumbnail_url,
+          row.source_url,
+          row.vector_embedding,
+          row.created_at,
+          row.updated_at,
+          row.is_deleted,
+        ],
+      });
+    }
+
+    totalPulled += rowsToInsert.length;
+    offset += SYNC_PAGE_SIZE;
+
+    if (rows.length < SYNC_PAGE_SIZE) {
+      hasMore = false;
+    }
+
+    if (rows.length > 0) {
+      console.log(`[Sync] Pulled ${totalPulled} pages so far...`);
+    }
+  }
+
+  console.log(`[Sync] Total pulled: ${totalPulled} pages`);
+  return totalPulled;
+}
+
+/**
+ * Push local changes to remote
+ */
+async function pushToRemote(
+  local: Client,
+  remote: Client,
+  userId: string,
+  syncSince: number
+): Promise<number> {
+  // Get local changes
+  const localChanges = await local.execute({
+    sql: `SELECT * FROM pages WHERE user_id = ? AND updated_at > ?`,
+    args: [userId, syncSince],
+  });
+
+  if (localChanges.rows.length === 0) {
+    console.log("[Sync] No local changes to push");
+    return 0;
+  }
+
+  console.log(`[Sync] Pushing ${localChanges.rows.length} local changes to remote`);
+
+  // Get remote page updated_at for comparison (only changed pages)
+  const localIds = localChanges.rows.map((r) => r.id as string);
+  const remotePageMap = new Map<string, number>();
+
+  // Batch fetch remote pages in chunks
+  for (let i = 0; i < localIds.length; i += BATCH_IN_SIZE) {
+    const batchIds = localIds.slice(i, i + BATCH_IN_SIZE);
+    const placeholders = batchIds.map(() => "?").join(",");
+    
+    const result = await remote.execute({
+      sql: `SELECT id, updated_at FROM pages WHERE id IN (${placeholders})`,
+      args: batchIds as InValue[],
+    });
+
+    for (const row of result.rows) {
+      remotePageMap.set(row.id as string, row.updated_at as number);
+    }
+  }
+
+  let pushedCount = 0;
+  for (const p of localChanges.rows) {
+    const remoteUpdatedAt = remotePageMap.get(p.id as string);
+    const localUpdatedAt = p.updated_at as number;
+
+    // Push if local is newer or doesn't exist in remote
+    if (!remoteUpdatedAt || localUpdatedAt > remoteUpdatedAt) {
+      await remote.execute({
+        sql: `INSERT OR REPLACE INTO pages 
+              (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          p.id,
+          p.user_id,
+          p.title,
+          p.content,
+          p.thumbnail_url,
+          p.source_url,
+          p.vector_embedding,
+          p.created_at,
+          p.updated_at,
+          p.is_deleted,
+        ] as InValue[],
+      });
+      pushedCount++;
+    }
+  }
+
+  console.log(`[Sync] Pushed ${pushedCount} pages`);
+  return pushedCount;
+}
+
+/**
+ * Sync links between local and remote (Delta) - Optimized with batch queries
+ * Uses IN clause instead of N+1 queries
+ */
+async function syncLinksDeltaOptimized(
+  local: Client,
   remote: Client,
   userId: string,
   syncSince: number
 ): Promise<void> {
-  // Get page IDs that were updated since syncSince
+  // Get page IDs that were updated since syncSince (local)
   const updatedPages = await local.execute({
     sql: `SELECT id FROM pages WHERE user_id = ? AND updated_at > ?`,
     args: [userId, syncSince],
   });
-  const updatedIds = updatedPages.rows.map((r) => r.id as string);
+  const localUpdatedIds = updatedPages.rows.map((r) => r.id as string);
 
-  // Also check for remote updated pages
+  // Get page IDs that were updated since syncSince (remote)
   const remoteUpdatedPages = await remote.execute({
     sql: `SELECT id FROM pages WHERE user_id = ? AND updated_at > ?`,
     args: [userId, syncSince],
@@ -474,64 +744,100 @@ async function syncLinksDelta(
   const remoteUpdatedIds = remoteUpdatedPages.rows.map((r) => r.id as string);
 
   // Combine both sets
-  const allUpdatedIds = new Set([...updatedIds, ...remoteUpdatedIds]);
-  if (allUpdatedIds.size === 0) return;
+  const allUpdatedIds = [...new Set([...localUpdatedIds, ...remoteUpdatedIds])];
+  if (allUpdatedIds.length === 0) return;
 
-  // Pull links for updated pages from remote
-  for (const pageId of allUpdatedIds) {
-    const remoteLinks = await remote.execute({
-      sql: `SELECT * FROM links WHERE source_id = ?`,
-      args: [pageId],
+  console.log(`[Sync] Syncing links for ${allUpdatedIds.length} updated pages...`);
+
+  // --- PULL: Batch fetch remote links using IN clause ---
+  const allRemoteLinks: RemoteLinkRow[] = [];
+  
+  for (let i = 0; i < allUpdatedIds.length; i += BATCH_IN_SIZE) {
+    const batchIds = allUpdatedIds.slice(i, i + BATCH_IN_SIZE);
+    const placeholders = batchIds.map(() => "?").join(",");
+    
+    const result = await remote.execute({
+      sql: `SELECT * FROM links WHERE source_id IN (${placeholders})`,
+      args: batchIds as InValue[],
     });
+    
+    for (const row of result.rows) {
+      allRemoteLinks.push({
+        source_id: row.source_id as string,
+        target_id: row.target_id as string,
+        created_at: row.created_at as number,
+      });
+    }
+  }
 
-    // Replace local links for this page
+  // Delete old links for updated pages and insert new ones
+  for (const pageId of allUpdatedIds) {
     await local.execute({
       sql: `DELETE FROM links WHERE source_id = ?`,
       args: [pageId],
     });
-
-    for (const row of remoteLinks.rows) {
-      await local.execute({
-        sql: `INSERT OR REPLACE INTO links (source_id, target_id, created_at) VALUES (?, ?, ?)`,
-        args: [row.source_id, row.target_id, row.created_at],
-      });
-    }
   }
 
-  // Push local links for updated pages to remote
-  for (const pageId of updatedIds) {
-    const localLinks = await local.execute({
-      sql: `SELECT * FROM links WHERE source_id = ?`,
-      args: [pageId],
+  // Insert remote links
+  for (const link of allRemoteLinks) {
+    await local.execute({
+      sql: `INSERT OR REPLACE INTO links (source_id, target_id, created_at) VALUES (?, ?, ?)`,
+      args: [link.source_id, link.target_id, link.created_at],
     });
+  }
 
-    for (const row of localLinks.rows) {
+  // --- PUSH: Batch fetch local links and push to remote ---
+  if (localUpdatedIds.length > 0) {
+    const allLocalLinks: RemoteLinkRow[] = [];
+    
+    for (let i = 0; i < localUpdatedIds.length; i += BATCH_IN_SIZE) {
+      const batchIds = localUpdatedIds.slice(i, i + BATCH_IN_SIZE);
+      const placeholders = batchIds.map(() => "?").join(",");
+      
+      const result = await local.execute({
+        sql: `SELECT * FROM links WHERE source_id IN (${placeholders})`,
+        args: batchIds,
+      });
+      
+      for (const row of result.rows) {
+        allLocalLinks.push({
+          source_id: row.source_id as string,
+          target_id: row.target_id as string,
+          created_at: row.created_at as number,
+        });
+      }
+    }
+
+    // Push to remote
+    for (const link of allLocalLinks) {
       await remote.execute({
         sql: `INSERT OR REPLACE INTO links (source_id, target_id, created_at) VALUES (?, ?, ?)`,
-        args: [row.source_id, row.target_id, row.created_at] as InValue[],
+        args: [link.source_id, link.target_id, link.created_at] as InValue[],
       });
     }
+
+    console.log(`[Sync] Synced ${allLocalLinks.length} links`);
   }
 }
 
 /**
- * Sync ghost links between local and remote (Delta)
- * Only syncs ghost links for pages that have been updated since lastSyncTime
+ * Sync ghost links between local and remote (Delta) - Optimized with batch queries
+ * Uses IN clause instead of N+1 queries
  */
-async function syncGhostLinksDelta(
-  local: SqlJsClientWrapper,
+async function syncGhostLinksDeltaOptimized(
+  local: Client,
   remote: Client,
   userId: string,
   syncSince: number
 ): Promise<void> {
-  // Get page IDs that were updated since syncSince
+  // Get page IDs that were updated since syncSince (local)
   const updatedPages = await local.execute({
     sql: `SELECT id FROM pages WHERE user_id = ? AND updated_at > ?`,
     args: [userId, syncSince],
   });
-  const updatedIds = updatedPages.rows.map((r) => r.id as string);
+  const localUpdatedIds = updatedPages.rows.map((r) => r.id as string);
 
-  // Also check for remote updated pages
+  // Get page IDs that were updated since syncSince (remote)
   const remoteUpdatedPages = await remote.execute({
     sql: `SELECT id FROM pages WHERE user_id = ? AND updated_at > ?`,
     args: [userId, syncSince],
@@ -539,43 +845,79 @@ async function syncGhostLinksDelta(
   const remoteUpdatedIds = remoteUpdatedPages.rows.map((r) => r.id as string);
 
   // Combine both sets
-  const allUpdatedIds = new Set([...updatedIds, ...remoteUpdatedIds]);
-  if (allUpdatedIds.size === 0) return;
+  const allUpdatedIds = [...new Set([...localUpdatedIds, ...remoteUpdatedIds])];
+  if (allUpdatedIds.length === 0) return;
 
-  // Pull ghost links for updated pages from remote
-  for (const pageId of allUpdatedIds) {
-    const remoteGhostLinks = await remote.execute({
-      sql: `SELECT * FROM ghost_links WHERE source_page_id = ?`,
-      args: [pageId],
+  console.log(`[Sync] Syncing ghost links for ${allUpdatedIds.length} updated pages...`);
+
+  // --- PULL: Batch fetch remote ghost links using IN clause ---
+  const allRemoteGhostLinks: RemoteGhostLinkRow[] = [];
+  
+  for (let i = 0; i < allUpdatedIds.length; i += BATCH_IN_SIZE) {
+    const batchIds = allUpdatedIds.slice(i, i + BATCH_IN_SIZE);
+    const placeholders = batchIds.map(() => "?").join(",");
+    
+    const result = await remote.execute({
+      sql: `SELECT * FROM ghost_links WHERE source_page_id IN (${placeholders})`,
+      args: batchIds as InValue[],
     });
-
-    // Replace local ghost links for this page
-    await local.execute({
-      sql: `DELETE FROM ghost_links WHERE source_page_id = ?`,
-      args: [pageId],
-    });
-
-    for (const row of remoteGhostLinks.rows) {
-      await local.execute({
-        sql: `INSERT OR REPLACE INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
-        args: [row.link_text, row.source_page_id, row.created_at],
+    
+    for (const row of result.rows) {
+      allRemoteGhostLinks.push({
+        link_text: row.link_text as string,
+        source_page_id: row.source_page_id as string,
+        created_at: row.created_at as number,
       });
     }
   }
 
-  // Push local ghost links for updated pages to remote
-  for (const pageId of updatedIds) {
-    const localGhostLinks = await local.execute({
-      sql: `SELECT * FROM ghost_links WHERE source_page_id = ?`,
+  // Delete old ghost links for updated pages and insert new ones
+  for (const pageId of allUpdatedIds) {
+    await local.execute({
+      sql: `DELETE FROM ghost_links WHERE source_page_id = ?`,
       args: [pageId],
     });
+  }
 
-    for (const row of localGhostLinks.rows) {
+  // Insert remote ghost links
+  for (const link of allRemoteGhostLinks) {
+    await local.execute({
+      sql: `INSERT OR REPLACE INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
+      args: [link.link_text, link.source_page_id, link.created_at],
+    });
+  }
+
+  // --- PUSH: Batch fetch local ghost links and push to remote ---
+  if (localUpdatedIds.length > 0) {
+    const allLocalGhostLinks: RemoteGhostLinkRow[] = [];
+    
+    for (let i = 0; i < localUpdatedIds.length; i += BATCH_IN_SIZE) {
+      const batchIds = localUpdatedIds.slice(i, i + BATCH_IN_SIZE);
+      const placeholders = batchIds.map(() => "?").join(",");
+      
+      const result = await local.execute({
+        sql: `SELECT * FROM ghost_links WHERE source_page_id IN (${placeholders})`,
+        args: batchIds,
+      });
+      
+      for (const row of result.rows) {
+        allLocalGhostLinks.push({
+          link_text: row.link_text as string,
+          source_page_id: row.source_page_id as string,
+          created_at: row.created_at as number,
+        });
+      }
+    }
+
+    // Push to remote
+    for (const link of allLocalGhostLinks) {
       await remote.execute({
         sql: `INSERT OR REPLACE INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
-        args: [row.link_text, row.source_page_id, row.created_at] as InValue[],
+        args: [link.link_text, link.source_page_id, link.created_at] as InValue[],
       });
     }
+
+    console.log(`[Sync] Synced ${allLocalGhostLinks.length} ghost links`);
   }
 }
 
@@ -604,6 +946,7 @@ export function closeLocalClient(): void {
   isLocalDbInitialized = false;
   currentUserId = null;
   lastSyncTime = null;
+  initializationPromise = null;
   setSyncStatus("idle");
 }
 
@@ -621,5 +964,5 @@ export async function triggerSync(
 // Type exports for compatibility with existing code
 // ============================================================================
 
-// Export the wrapper type as the local client type
-export type LocalClient = SqlJsClientWrapper;
+// Re-export Client type for convenience
+export type { Client } from "@libsql/client/web";
