@@ -1,5 +1,5 @@
 import { createClient, Client, InValue } from "@libsql/client/web";
-import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
+import type { Database as SqlJsDatabase } from "sql.js";
 import { get, set } from "idb-keyval";
 
 // Turso database configuration
@@ -181,16 +181,20 @@ class SqlJsClientWrapper {
 
 // Local sql.js client
 let localSqlJsClient: SqlJsClientWrapper | null = null;
-let sqlJs: Awaited<ReturnType<typeof initSqlJs>> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let sqlJs: any = null;
 let isLocalDbInitialized = false;
 let currentUserId: string | null = null;
 
 /**
- * Initialize sql.js (load WASM)
+ * Initialize sql.js (load WASM) using dynamic import
  */
-async function initializeSqlJs(): Promise<Awaited<ReturnType<typeof initSqlJs>>> {
+async function initializeSqlJs(): Promise<{ Database: new (data?: ArrayLike<number> | Buffer | null) => SqlJsDatabase }> {
   if (sqlJs) return sqlJs;
 
+  // Dynamic import to avoid issues with static analysis
+  const initSqlJs = (await import("sql.js")).default;
+  
   sqlJs = await initSqlJs({
     // Load WASM from CDN for reliability
     locateFile: (file: string) =>
