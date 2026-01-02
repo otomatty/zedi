@@ -1,5 +1,5 @@
-import { createClient, Client } from "@libsql/client/web";
-import { createClient as createWasmClient } from "@libsql/client-wasm";
+import { createClient, Client, InValue } from "@libsql/client/web";
+import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
 import { get, set } from "idb-keyval";
 
 // Turso database configuration
@@ -67,7 +67,7 @@ export function createAuthenticatedTursoClient(jwtToken: string): Client {
 }
 
 // ============================================================================
-// Local-First Architecture with WASM Client
+// Local-First Architecture with sql.js
 // ============================================================================
 
 /**
@@ -102,54 +102,146 @@ export function getLastSyncTime(): number | null {
   return lastSyncTime;
 }
 
-// Local WASM client (works in browser with in-memory + IndexedDB persistence)
-let localWasmClient: Client | null = null;
+// ============================================================================
+// sql.js Client Wrapper (compatible with libsql Client interface)
+// ============================================================================
+
+interface SqlJsRow {
+  [key: string]: unknown;
+}
+
+interface SqlJsResult {
+  columns: string[];
+  values: unknown[][];
+}
+
+/**
+ * Wrapper around sql.js Database that mimics libsql Client interface
+ */
+class SqlJsClientWrapper {
+  private db: SqlJsDatabase;
+
+  constructor(db: SqlJsDatabase) {
+    this.db = db;
+  }
+
+  async execute(
+    stmtOrSql: string | { sql: string; args?: unknown[] }
+  ): Promise<{ rows: SqlJsRow[]; columns: string[] }> {
+    const sql = typeof stmtOrSql === "string" ? stmtOrSql : stmtOrSql.sql;
+    const args =
+      typeof stmtOrSql === "string" ? [] : (stmtOrSql.args ?? []);
+
+    try {
+      const stmt = this.db.prepare(sql);
+      if (args.length > 0) {
+        stmt.bind(args as (string | number | null | Uint8Array)[]);
+      }
+
+      const rows: SqlJsRow[] = [];
+      const columns: string[] = stmt.getColumnNames();
+
+      while (stmt.step()) {
+        const row = stmt.getAsObject() as SqlJsRow;
+        rows.push(row);
+      }
+
+      stmt.free();
+      return { rows, columns };
+    } catch (error) {
+      // For INSERT/UPDATE/DELETE statements that don't return rows
+      if (
+        sql.trim().toUpperCase().startsWith("INSERT") ||
+        sql.trim().toUpperCase().startsWith("UPDATE") ||
+        sql.trim().toUpperCase().startsWith("DELETE") ||
+        sql.trim().toUpperCase().startsWith("CREATE") ||
+        sql.trim().toUpperCase().startsWith("DROP")
+      ) {
+        this.db.run(sql, args as (string | number | null | Uint8Array)[]);
+        return { rows: [], columns: [] };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Export the database to a Uint8Array for persistence
+   */
+  export(): Uint8Array {
+    return this.db.export();
+  }
+
+  /**
+   * Close the database
+   */
+  close(): void {
+    this.db.close();
+  }
+}
+
+// Local sql.js client
+let localSqlJsClient: SqlJsClientWrapper | null = null;
+let sqlJs: Awaited<ReturnType<typeof initSqlJs>> | null = null;
 let isLocalDbInitialized = false;
 let currentUserId: string | null = null;
 
 /**
- * Get or create local WASM database
+ * Initialize sql.js (load WASM)
+ */
+async function initializeSqlJs(): Promise<Awaited<ReturnType<typeof initSqlJs>>> {
+  if (sqlJs) return sqlJs;
+
+  sqlJs = await initSqlJs({
+    // Load WASM from CDN for reliability
+    locateFile: (file: string) =>
+      `https://sql.js.org/dist/${file}`,
+  });
+
+  return sqlJs;
+}
+
+/**
+ * Get or create local sql.js database
  * This is the primary database for all read/write operations
  */
-export async function getLocalClient(userId: string): Promise<Client> {
+export async function getLocalClient(userId: string): Promise<SqlJsClientWrapper> {
   // Return existing client if already initialized for this user
-  if (localWasmClient && isLocalDbInitialized && currentUserId === userId) {
-    return localWasmClient;
+  if (localSqlJsClient && isLocalDbInitialized && currentUserId === userId) {
+    return localSqlJsClient;
   }
 
   // Reset if user changed
   if (currentUserId !== userId) {
-    localWasmClient = null;
+    if (localSqlJsClient) {
+      localSqlJsClient.close();
+    }
+    localSqlJsClient = null;
     isLocalDbInitialized = false;
   }
 
   try {
-    // Create WASM client (in-memory, browser-compatible)
-    localWasmClient = createWasmClient({
-      url: ":memory:",
-    });
+    const SQL = await initializeSqlJs();
 
     // Try to restore from IndexedDB
     const dbKey = `${LOCAL_DB_KEY}-${userId}`;
-    const savedData = await get<string>(dbKey);
+    const savedData = await get<Uint8Array>(dbKey);
 
+    let db: SqlJsDatabase;
     if (savedData) {
       try {
-        const statements = parseSqlDump(savedData);
-        for (const stmt of statements) {
-          if (stmt.trim()) {
-            await localWasmClient.execute(stmt);
-          }
-        }
+        db = new SQL.Database(savedData);
         console.log("[LocalDB] Restored from IndexedDB");
       } catch (error) {
         console.error("[LocalDB] Failed to restore from IndexedDB:", error);
-        await initializeSchema(localWasmClient);
+        db = new SQL.Database();
+        initializeSchema(db);
       }
     } else {
-      await initializeSchema(localWasmClient);
+      db = new SQL.Database();
+      initializeSchema(db);
     }
 
+    localSqlJsClient = new SqlJsClientWrapper(db);
     isLocalDbInitialized = true;
     currentUserId = userId;
 
@@ -159,9 +251,9 @@ export async function getLocalClient(userId: string): Promise<Client> {
       lastSyncTime = savedSyncTime;
     }
 
-    return localWasmClient;
+    return localSqlJsClient;
   } catch (error) {
-    console.error("[LocalDB] Failed to create WASM client:", error);
+    console.error("[LocalDB] Failed to create sql.js client:", error);
     throw error;
   }
 }
@@ -169,10 +261,10 @@ export async function getLocalClient(userId: string): Promise<Client> {
 /**
  * Initialize database schema
  */
-async function initializeSchema(client: Client): Promise<void> {
+function initializeSchema(db: SqlJsDatabase): void {
   const statements = SCHEMA_SQL.split(";").filter((s) => s.trim());
   for (const stmt of statements) {
-    await client.execute(stmt);
+    db.run(stmt);
   }
   console.log("[LocalDB] Schema initialized");
 }
@@ -181,11 +273,12 @@ async function initializeSchema(client: Client): Promise<void> {
  * Save local database to IndexedDB
  */
 export async function saveLocalDatabase(): Promise<void> {
-  if (!localWasmClient || !currentUserId) return;
+  if (!localSqlJsClient || !currentUserId) return;
 
   try {
-    const dump = await createSqlDump(localWasmClient);
-    await set(`${LOCAL_DB_KEY}-${currentUserId}`, dump);
+    const data = localSqlJsClient.export();
+    await set(`${LOCAL_DB_KEY}-${currentUserId}`, data);
+    console.log("[LocalDB] Saved to IndexedDB");
   } catch (error) {
     console.error("[LocalDB] Failed to save to IndexedDB:", error);
   }
@@ -301,7 +394,7 @@ export async function syncWithRemote(
             p.created_at,
             p.updated_at,
             p.is_deleted,
-          ],
+          ] as InValue[],
         });
         pushedCount++;
       }
@@ -338,7 +431,7 @@ export async function syncWithRemote(
  * Only syncs links for pages that have been updated since lastSyncTime
  */
 async function syncLinksDelta(
-  local: Client,
+  local: SqlJsClientWrapper,
   remote: Client,
   userId: string,
   syncSince: number
@@ -392,7 +485,7 @@ async function syncLinksDelta(
     for (const row of localLinks.rows) {
       await remote.execute({
         sql: `INSERT OR REPLACE INTO links (source_id, target_id, created_at) VALUES (?, ?, ?)`,
-        args: [row.source_id, row.target_id, row.created_at],
+        args: [row.source_id, row.target_id, row.created_at] as InValue[],
       });
     }
   }
@@ -403,7 +496,7 @@ async function syncLinksDelta(
  * Only syncs ghost links for pages that have been updated since lastSyncTime
  */
 async function syncGhostLinksDelta(
-  local: Client,
+  local: SqlJsClientWrapper,
   remote: Client,
   userId: string,
   syncSince: number
@@ -457,7 +550,7 @@ async function syncGhostLinksDelta(
     for (const row of localGhostLinks.rows) {
       await remote.execute({
         sql: `INSERT OR REPLACE INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
-        args: [row.link_text, row.source_page_id, row.created_at],
+        args: [row.link_text, row.source_page_id, row.created_at] as InValue[],
       });
     }
   }
@@ -474,14 +567,17 @@ export function hasNeverSynced(): boolean {
  * Check if local database is ready
  */
 export function isLocalClientReady(): boolean {
-  return localWasmClient !== null && isLocalDbInitialized;
+  return localSqlJsClient !== null && isLocalDbInitialized;
 }
 
 /**
  * Close local database
  */
 export function closeLocalClient(): void {
-  localWasmClient = null;
+  if (localSqlJsClient) {
+    localSqlJsClient.close();
+  }
+  localSqlJsClient = null;
   isLocalDbInitialized = false;
   currentUserId = null;
   lastSyncTime = null;
@@ -499,83 +595,8 @@ export async function triggerSync(
 }
 
 // ============================================================================
-// SQL Dump Utilities for IndexedDB Persistence
+// Type exports for compatibility with existing code
 // ============================================================================
 
-/**
- * Create a SQL dump of the database for persistence
- */
-async function createSqlDump(client: Client): Promise<string> {
-  const statements: string[] = [];
-
-  // Add schema
-  statements.push(SCHEMA_SQL);
-
-  // Dump pages table
-  const pages = await client.execute("SELECT * FROM pages");
-  for (const row of pages.rows) {
-    const values = [
-      sqlValue(row.id),
-      sqlValue(row.user_id),
-      sqlValue(row.title),
-      sqlValue(row.content),
-      sqlValue(row.thumbnail_url),
-      sqlValue(row.source_url),
-      sqlValue(row.vector_embedding),
-      row.created_at,
-      row.updated_at,
-      row.is_deleted,
-    ].join(", ");
-    statements.push(
-      `INSERT OR REPLACE INTO pages (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted) VALUES (${values})`
-    );
-  }
-
-  // Dump links table
-  const links = await client.execute("SELECT * FROM links");
-  for (const row of links.rows) {
-    statements.push(
-      `INSERT OR REPLACE INTO links (source_id, target_id, created_at) VALUES (${sqlValue(row.source_id)}, ${sqlValue(row.target_id)}, ${row.created_at})`
-    );
-  }
-
-  // Dump ghost_links table
-  const ghostLinks = await client.execute("SELECT * FROM ghost_links");
-  for (const row of ghostLinks.rows) {
-    statements.push(
-      `INSERT OR REPLACE INTO ghost_links (link_text, source_page_id, created_at) VALUES (${sqlValue(row.link_text)}, ${sqlValue(row.source_page_id)}, ${row.created_at})`
-    );
-  }
-
-  return statements.join(";\n");
-}
-
-/**
- * Parse SQL dump back into statements
- */
-function parseSqlDump(dump: string): string[] {
-  return dump.split(";\n").filter((s) => s.trim());
-}
-
-/**
- * Escape and quote a value for SQL
- */
-function sqlValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "NULL";
-  }
-  if (typeof value === "number") {
-    return String(value);
-  }
-  if (typeof value === "string") {
-    // Escape single quotes
-    return `'${value.replace(/'/g, "''")}'`;
-  }
-  if (value instanceof Uint8Array) {
-    // Convert blob to hex
-    return `X'${Array.from(value)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")}'`;
-  }
-  return `'${String(value).replace(/'/g, "''")}'`;
-}
+// Export the wrapper type as the local client type
+export type LocalClient = SqlJsClientWrapper;
