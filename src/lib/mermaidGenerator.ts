@@ -2,7 +2,7 @@
 
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { AISettings } from "@/types/ai";
 import { loadAISettings } from "./aiSettings";
 
@@ -185,7 +185,6 @@ async function generateWithAnthropic(
 ): Promise<void> {
   const client = new Anthropic({
     apiKey: settings.apiKey,
-    dangerouslyAllowBrowser: true,
   });
 
   const diagramTypesInfo = diagramTypes
@@ -234,8 +233,7 @@ async function generateWithGoogle(
   diagramTypes: MermaidDiagramType[],
   callbacks: MermaidGeneratorCallbacks
 ): Promise<void> {
-  const client = new GoogleGenerativeAI(settings.apiKey);
-  const model = client.getGenerativeModel({ model: settings.model });
+  const client = new GoogleGenAI({ apiKey: settings.apiKey });
 
   const diagramTypesInfo = diagramTypes
     .map((type) => {
@@ -251,9 +249,15 @@ async function generateWithGoogle(
   ).replace("{{text}}", text);
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const code = response.text().trim();
+    const response = await client.models.generateContent({
+      model: settings.model,
+      contents: prompt,
+      config: {
+        temperature: 0.3,
+      },
+    });
+
+    const code = response.text.trim();
 
     const detectedType = detectDiagramType(code, diagramTypes);
 

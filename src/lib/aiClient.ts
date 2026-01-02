@@ -2,7 +2,7 @@
 
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import {
   AISettings,
   AIProviderType,
@@ -10,7 +10,7 @@ import {
   getDefaultModels,
 } from "@/types/ai";
 
-export type AIClient = OpenAI | Anthropic | GoogleGenerativeAI;
+export type AIClient = OpenAI | Anthropic | GoogleGenAI;
 
 // モデルキャッシュのストレージキー
 const MODELS_CACHE_KEY = "zedi-ai-models-cache";
@@ -32,7 +32,7 @@ export function createAIClient(settings: AISettings): AIClient {
         apiKey: settings.apiKey,
       });
     case "google":
-      return new GoogleGenerativeAI(settings.apiKey);
+      return new GoogleGenAI({ apiKey: settings.apiKey });
     default:
       throw new Error(`Unknown provider: ${settings.provider}`);
   }

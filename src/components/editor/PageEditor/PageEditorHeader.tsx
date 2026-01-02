@@ -81,7 +81,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="ページタイトル"
-            className={`border-0 bg-transparent text-lg font-medium focus-visible:ring-0 px-0 h-auto py-1 ${
+            className={`border-0 bg-transparent text-xl font-medium focus-visible:ring-0 px-0 h-auto py-1 ${
               errorMessage || (!isNewPage && isTitleEmpty && title === "")
                 ? "text-destructive"
                 : ""

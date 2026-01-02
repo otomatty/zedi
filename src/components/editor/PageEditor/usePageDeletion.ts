@@ -45,7 +45,7 @@ export function usePageDeletion({
           toast({
             title: "ページを削除しました",
           });
-          navigate("/");
+          navigate("/home");
         },
         onError: () => {
           toast({
@@ -91,7 +91,7 @@ export function usePageDeletion({
         });
       }
     }
-    navigate("/");
+    navigate("/home");
   }, [
     navigate,
     currentPageId,
@@ -110,7 +110,7 @@ export function usePageDeletion({
       });
     }
     setDeleteConfirmOpen(false);
-    navigate("/");
+    navigate("/home");
   }, [currentPageId, deletePageMutation, deleteReason, navigate, toast]);
 
   const handleCancelDelete = useCallback(() => {
