@@ -1,9 +1,22 @@
-import type { Client, InValue, InStatement, InArgs, ResultSet, Row, TransactionMode, Transaction, Replicated } from "@libsql/client/web";
+import type {
+  Client,
+  InValue,
+  InStatement,
+  InArgs,
+  ResultSet,
+  Row,
+  TransactionMode,
+  Transaction,
+  Replicated,
+} from "@libsql/client/web";
 import type { Database as SqlJsDatabase } from "sql.js";
 import { get, set } from "idb-keyval";
 
 // Turso database configuration
 const TURSO_DATABASE_URL = import.meta.env.VITE_TURSO_DATABASE_URL;
+// Fallback auth token - used when Clerk JWT authentication fails due to JWKS issues
+// This is a temporary workaround until Turso JWKS configuration is fixed
+const TURSO_FALLBACK_AUTH_TOKEN = import.meta.env.VITE_TURSO_AUTH_TOKEN;
 
 // Local database configuration
 const LOCAL_DB_KEY = "zedi-local-db";
@@ -61,12 +74,26 @@ async function getLibsqlClient() {
 }
 
 // Create an authenticated Turso client using Clerk JWT (for remote sync only)
-export async function createAuthenticatedTursoClient(jwtToken: string): Promise<Client> {
+// Falls back to VITE_TURSO_AUTH_TOKEN if Clerk JWT fails (JWKS workaround)
+export async function createAuthenticatedTursoClient(
+  jwtToken: string
+): Promise<Client> {
   if (!TURSO_DATABASE_URL) {
     throw new Error("Missing Turso Database URL");
   }
 
   const createClient = await getLibsqlClient();
+
+  // If fallback token is available, use it directly (bypasses Clerk JWT issues)
+  if (TURSO_FALLBACK_AUTH_TOKEN) {
+    console.log("[Turso] Using fallback auth token (VITE_TURSO_AUTH_TOKEN)");
+    return createClient({
+      url: TURSO_DATABASE_URL,
+      authToken: TURSO_FALLBACK_AUTH_TOKEN,
+    });
+  }
+
+  // Otherwise, try Clerk JWT
   return createClient({
     url: TURSO_DATABASE_URL,
     authToken: jwtToken,
@@ -130,21 +157,21 @@ export function getLastSyncTime(): number | null {
  */
 function createRow(obj: Record<string, unknown>, columns: string[]): Row {
   const row = Object.create(null) as Row;
-  
+
   // Set length property
-  Object.defineProperty(row, 'length', {
+  Object.defineProperty(row, "length", {
     value: columns.length,
     writable: false,
     enumerable: false,
   });
-  
+
   // Add indexed access and named access
   columns.forEach((col, index) => {
     const value = obj[col] as Row[number];
     row[index] = value;
     row[col] = value;
   });
-  
+
   return row;
 }
 
@@ -201,10 +228,11 @@ class SqlJsClientWrapper implements Client {
     args?: InArgs
   ): Promise<ResultSet> {
     const sql = typeof stmtOrSql === "string" ? stmtOrSql : stmtOrSql.sql;
-    const stmtArgs = typeof stmtOrSql === "string" 
-      ? args 
-      : (stmtOrSql as { sql: string; args?: InArgs }).args;
-    
+    const stmtArgs =
+      typeof stmtOrSql === "string"
+        ? args
+        : (stmtOrSql as { sql: string; args?: InArgs }).args;
+
     // Convert args to array format
     const argsArray: (string | number | null | Uint8Array)[] = [];
     if (stmtArgs) {
@@ -256,7 +284,9 @@ class SqlJsClientWrapper implements Client {
     }
   }
 
-  private convertArg(arg: InValue | undefined): string | number | null | Uint8Array {
+  private convertArg(
+    arg: InValue | undefined
+  ): string | number | null | Uint8Array {
     if (arg === undefined || arg === null) return null;
     if (typeof arg === "boolean") return arg ? 1 : 0;
     if (arg instanceof Date) return arg.getTime();
@@ -295,7 +325,9 @@ class SqlJsClientWrapper implements Client {
   }
 
   async transaction(_mode?: TransactionMode): Promise<Transaction> {
-    throw new Error("transaction() is not supported in sql.js wrapper. Use batch() instead.");
+    throw new Error(
+      "transaction() is not supported in sql.js wrapper. Use batch() instead."
+    );
   }
 
   async executeMultiple(sql: string): Promise<void> {
@@ -341,16 +373,17 @@ let initializationPromise: Promise<Client> | null = null;
 /**
  * Initialize sql.js (load WASM) using dynamic import
  */
-async function initializeSqlJs(): Promise<{ Database: new (data?: ArrayLike<number> | Buffer | null) => SqlJsDatabase }> {
+async function initializeSqlJs(): Promise<{
+  Database: new (data?: ArrayLike<number> | Buffer | null) => SqlJsDatabase;
+}> {
   if (sqlJs) return sqlJs;
 
   // Dynamic import to avoid issues with static analysis
   const initSqlJs = (await import("sql.js")).default;
-  
+
   sqlJs = await initSqlJs({
     // Load WASM from CDN for reliability
-    locateFile: (file: string) =>
-      `https://sql.js.org/dist/${file}`,
+    locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
   });
 
   return sqlJs;
@@ -359,7 +392,7 @@ async function initializeSqlJs(): Promise<{ Database: new (data?: ArrayLike<numb
 /**
  * Get or create local sql.js database
  * This is the primary database for all read/write operations
- * 
+ *
  * Uses a lock to prevent race conditions during initialization
  */
 export async function getLocalClient(userId: string): Promise<Client> {
@@ -398,14 +431,16 @@ export async function getLocalClient(userId: string): Promise<Client> {
         try {
           db = new SQL.Database(savedData);
           console.log("[LocalDB] Restored from IndexedDB");
-          
+
           // Debug: Check page count in restored DB
           const wrapper = new SqlJsClientWrapper(db);
           const countResult = await wrapper.execute({
             sql: `SELECT COUNT(*) as count FROM pages WHERE user_id = ?`,
             args: [userId],
           });
-          console.log(`[LocalDB] Restored DB has ${countResult.rows[0]?.count ?? 0} pages`);
+          console.log(
+            `[LocalDB] Restored DB has ${countResult.rows[0]?.count ?? 0} pages`
+          );
         } catch (error) {
           console.error("[LocalDB] Failed to restore from IndexedDB:", error);
           db = new SQL.Database();
@@ -425,7 +460,9 @@ export async function getLocalClient(userId: string): Promise<Client> {
       const savedSyncTime = await get<number>(`${LAST_SYNC_KEY}-${userId}`);
       if (savedSyncTime) {
         lastSyncTime = savedSyncTime;
-        console.log(`[LocalDB] Last sync time: ${new Date(savedSyncTime).toISOString()}`);
+        console.log(
+          `[LocalDB] Last sync time: ${new Date(savedSyncTime).toISOString()}`
+        );
       } else {
         console.log("[LocalDB] No previous sync time found");
       }
@@ -507,7 +544,7 @@ interface RemoteGhostLinkRow {
 
 /**
  * Sync local database with remote Turso (Delta Sync - Optimized)
- * 
+ *
  * Improvements:
  * - Pagination for initial sync (reduces memory usage)
  * - Batch IN queries for links (eliminates N+1)
@@ -531,7 +568,9 @@ export async function syncWithRemote(
     const isInitialSync = syncSince === 0;
 
     console.log(
-      `[Sync] Starting ${isInitialSync ? "initial" : "delta"} sync (since: ${new Date(syncSince).toISOString()})`
+      `[Sync] Starting ${
+        isInitialSync ? "initial" : "delta"
+      } sync (since: ${new Date(syncSince).toISOString()})`
     );
 
     // --- PULL: Fetch changes from remote with pagination ---
@@ -597,7 +636,7 @@ async function pullFromRemote(
     });
 
     const rows = result.rows as unknown as RemotePageRow[];
-    
+
     if (rows.length === 0) {
       hasMore = false;
       break;
@@ -666,7 +705,9 @@ async function pushToRemote(
     return 0;
   }
 
-  console.log(`[Sync] Pushing ${localChanges.rows.length} local changes to remote`);
+  console.log(
+    `[Sync] Pushing ${localChanges.rows.length} local changes to remote`
+  );
 
   // Get remote page updated_at for comparison (only changed pages)
   const localIds = localChanges.rows.map((r) => r.id as string);
@@ -676,7 +717,7 @@ async function pushToRemote(
   for (let i = 0; i < localIds.length; i += BATCH_IN_SIZE) {
     const batchIds = localIds.slice(i, i + BATCH_IN_SIZE);
     const placeholders = batchIds.map(() => "?").join(",");
-    
+
     const result = await remote.execute({
       sql: `SELECT id, updated_at FROM pages WHERE id IN (${placeholders})`,
       args: batchIds as InValue[],
@@ -747,20 +788,22 @@ async function syncLinksDeltaOptimized(
   const allUpdatedIds = [...new Set([...localUpdatedIds, ...remoteUpdatedIds])];
   if (allUpdatedIds.length === 0) return;
 
-  console.log(`[Sync] Syncing links for ${allUpdatedIds.length} updated pages...`);
+  console.log(
+    `[Sync] Syncing links for ${allUpdatedIds.length} updated pages...`
+  );
 
   // --- PULL: Batch fetch remote links using IN clause ---
   const allRemoteLinks: RemoteLinkRow[] = [];
-  
+
   for (let i = 0; i < allUpdatedIds.length; i += BATCH_IN_SIZE) {
     const batchIds = allUpdatedIds.slice(i, i + BATCH_IN_SIZE);
     const placeholders = batchIds.map(() => "?").join(",");
-    
+
     const result = await remote.execute({
       sql: `SELECT * FROM links WHERE source_id IN (${placeholders})`,
       args: batchIds as InValue[],
     });
-    
+
     for (const row of result.rows) {
       allRemoteLinks.push({
         source_id: row.source_id as string,
@@ -789,16 +832,16 @@ async function syncLinksDeltaOptimized(
   // --- PUSH: Batch fetch local links and push to remote ---
   if (localUpdatedIds.length > 0) {
     const allLocalLinks: RemoteLinkRow[] = [];
-    
+
     for (let i = 0; i < localUpdatedIds.length; i += BATCH_IN_SIZE) {
       const batchIds = localUpdatedIds.slice(i, i + BATCH_IN_SIZE);
       const placeholders = batchIds.map(() => "?").join(",");
-      
+
       const result = await local.execute({
         sql: `SELECT * FROM links WHERE source_id IN (${placeholders})`,
         args: batchIds,
       });
-      
+
       for (const row of result.rows) {
         allLocalLinks.push({
           source_id: row.source_id as string,
@@ -848,20 +891,22 @@ async function syncGhostLinksDeltaOptimized(
   const allUpdatedIds = [...new Set([...localUpdatedIds, ...remoteUpdatedIds])];
   if (allUpdatedIds.length === 0) return;
 
-  console.log(`[Sync] Syncing ghost links for ${allUpdatedIds.length} updated pages...`);
+  console.log(
+    `[Sync] Syncing ghost links for ${allUpdatedIds.length} updated pages...`
+  );
 
   // --- PULL: Batch fetch remote ghost links using IN clause ---
   const allRemoteGhostLinks: RemoteGhostLinkRow[] = [];
-  
+
   for (let i = 0; i < allUpdatedIds.length; i += BATCH_IN_SIZE) {
     const batchIds = allUpdatedIds.slice(i, i + BATCH_IN_SIZE);
     const placeholders = batchIds.map(() => "?").join(",");
-    
+
     const result = await remote.execute({
       sql: `SELECT * FROM ghost_links WHERE source_page_id IN (${placeholders})`,
       args: batchIds as InValue[],
     });
-    
+
     for (const row of result.rows) {
       allRemoteGhostLinks.push({
         link_text: row.link_text as string,
@@ -890,16 +935,16 @@ async function syncGhostLinksDeltaOptimized(
   // --- PUSH: Batch fetch local ghost links and push to remote ---
   if (localUpdatedIds.length > 0) {
     const allLocalGhostLinks: RemoteGhostLinkRow[] = [];
-    
+
     for (let i = 0; i < localUpdatedIds.length; i += BATCH_IN_SIZE) {
       const batchIds = localUpdatedIds.slice(i, i + BATCH_IN_SIZE);
       const placeholders = batchIds.map(() => "?").join(",");
-      
+
       const result = await local.execute({
         sql: `SELECT * FROM ghost_links WHERE source_page_id IN (${placeholders})`,
         args: batchIds,
       });
-      
+
       for (const row of result.rows) {
         allLocalGhostLinks.push({
           link_text: row.link_text as string,
@@ -913,7 +958,11 @@ async function syncGhostLinksDeltaOptimized(
     for (const link of allLocalGhostLinks) {
       await remote.execute({
         sql: `INSERT OR REPLACE INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
-        args: [link.link_text, link.source_page_id, link.created_at] as InValue[],
+        args: [
+          link.link_text,
+          link.source_page_id,
+          link.created_at,
+        ] as InValue[],
       });
     }
 

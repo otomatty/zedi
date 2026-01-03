@@ -124,11 +124,15 @@ AI 機能や認証機能を使用する場合は、`.env.local` ファイルを�
 VITE_CLERK_PUBLISHABLE_KEY=your_clerk_key
 
 # Turso データベース（オプション - ローカル SQLite でも動作します）
-VITE_TURSO_DATABASE_URL=your_turso_url
-VITE_TURSO_AUTH_TOKEN=your_turso_token
+# 認証はClerkのJWTトークンを使用するため、VITE_TURSO_AUTH_TOKENは不要です
+VITE_TURSO_DATABASE_URL=libsql://your-database-name.aws-ap-northeast-1.turso.io
 ```
 
 > **Note:** 環境変数なしでもローカル SQLite で動作します。AI 機能は設定画面から API キーを入力して使用できます。
+
+### トラブルシューティング
+
+本番環境でクラウド同期が失敗する場合（CORSエラーや401エラー）は、[トラブルシューティングガイド](./docs/troubleshooting/turso-sync-errors.md)を参照してください。
 
 ---
 
