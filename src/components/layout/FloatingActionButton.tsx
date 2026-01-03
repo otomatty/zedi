@@ -1,15 +1,16 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import React from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useCreateNewPage } from "@/hooks/useCreateNewPage";
 
 const FloatingActionButton: React.FC = () => {
-  const navigate = useNavigate();
+  const { createNewPage, isCreating } = useCreateNewPage();
 
   return (
     <Button
-      onClick={() => navigate('/page/new')}
+      onClick={createNewPage}
+      disabled={isCreating}
       size="icon"
       className={cn(
         "fixed bottom-6 right-6 h-14 w-14 rounded-full",

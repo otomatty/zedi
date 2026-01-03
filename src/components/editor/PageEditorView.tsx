@@ -13,7 +13,6 @@ import { PageEditorContent } from "./PageEditor/PageEditorContent";
 import { PageEditorDialogs } from "./PageEditor/PageEditorDialogs";
 import {
   usePage,
-  useCreatePage,
   useUpdatePage,
   useSyncWikiLinks,
 } from "@/hooks/usePageQueries";
@@ -21,9 +20,6 @@ import { useTitleValidation } from "@/hooks/useTitleValidation";
 import { generateAutoTitle, isContentNotEmpty } from "@/lib/contentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
-
-// モジュールスコープで作成中のフラグを追跡（Strict Mode対策）
-let isCreatingPage = false;
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,9 +29,16 @@ const PageEditor: React.FC = () => {
   const isNewPage = id === "new";
   const pageId = isNewPage ? "" : id || "";
 
+  // /page/new への直接アクセスはホームへリダイレクト
+  // （ページ作成はuseCreateNewPageフック経由で行う）
+  useEffect(() => {
+    if (isNewPage) {
+      navigate("/", { replace: true });
+    }
+  }, [isNewPage, navigate]);
+
   // React Query hooks
   const { data: page, isLoading, isError } = usePage(pageId);
-  const createPageMutation = useCreatePage();
   const updatePageMutation = useUpdatePage();
   const { syncLinks } = useSyncWikiLinks();
 
@@ -150,50 +153,6 @@ const PageEditor: React.FC = () => {
   // Use auto-save's lastSaved if available, otherwise use state's lastSaved
   const displayLastSaved = autoSaveLastSaved ?? lastSaved;
 
-  // ページIDが変わった時にモジュールスコープの追跡をクリーンアップ
-  useEffect(() => {
-    return () => {
-      // コンポーネントのアンマウント時にcreatingPageIdsをクリーンアップしない
-      // Strict Modeの再マウント時に重複作成を防ぐため
-    };
-  }, [id]);
-
-  // Create new page
-  useEffect(() => {
-    if (!isNewPage || isInitialized) {
-      return;
-    }
-
-    // Strict Modeの二重レンダリング対策
-    if (isCreatingPage) {
-      return;
-    }
-
-    isCreatingPage = true;
-
-    const createNewPage = async () => {
-      try {
-        const newPage = await createPageMutation.mutateAsync({
-          title: "",
-          content: "",
-        });
-        console.log("=== Page created, navigating to ===", newPage.id);
-        isCreatingPage = false;
-        navigate(`/page/${newPage.id}`, { replace: true });
-      } catch (error) {
-        console.error("=== Page creation failed ===", error);
-        isCreatingPage = false;
-        toast({
-          title: "ページの作成に失敗しました",
-          variant: "destructive",
-        });
-        navigate("/");
-      }
-    };
-
-    createNewPage();
-  }, [isNewPage, isInitialized, createPageMutation, navigate, toast]);
-
   // Load existing page
   useEffect(() => {
     if (!isNewPage && page && !isInitialized) {
@@ -232,7 +191,15 @@ const PageEditor: React.FC = () => {
       }
       resetWiki();
     }
-  }, [wikiStatus, getTiptapContent, title, saveChanges, resetWiki, toast, setContent]);
+  }, [
+    wikiStatus,
+    getTiptapContent,
+    title,
+    saveChanges,
+    resetWiki,
+    toast,
+    setContent,
+  ]);
 
   // Auto-save on changes
   const handleContentChange = useCallback(
@@ -318,7 +285,15 @@ const PageEditor: React.FC = () => {
         );
       }
     },
-    [currentPageId, updatePageMutation, toast, setTitle, setContent, setSourceUrl, updateLastSaved]
+    [
+      currentPageId,
+      updatePageMutation,
+      toast,
+      setTitle,
+      setContent,
+      setSourceUrl,
+      updateLastSaved,
+    ]
   );
 
   // Show loading state

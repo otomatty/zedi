@@ -1,5 +1,6 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useCreateNewPage } from "./useCreateNewPage";
 
 interface KeyboardShortcutsOptions {
   onShowShortcuts?: () => void;
@@ -12,6 +13,9 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { onShowShortcuts } = options;
+  const { createNewPage, isCreating } = useCreateNewPage();
+  const isCreatingRef = useRef(isCreating);
+  isCreatingRef.current = isCreating;
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -25,7 +29,9 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
       // Cmd+N / Ctrl+N - New page (always works)
       if ((e.metaKey || e.ctrlKey) && e.key === "n") {
         e.preventDefault();
-        navigate("/page/new");
+        if (!isCreatingRef.current) {
+          createNewPage();
+        }
         return;
       }
 
