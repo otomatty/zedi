@@ -342,3 +342,25 @@
     animation-delay: 0.25s;
   }
 }
+
+/* Clerk GitHub button icon - force white color */
+.cl-socialButtonsProviderIcon__github,
+.cl-socialButtonsProviderIcon__github img {
+  filter: brightness(0) invert(1) !important;
+}
+
+.cl-socialButtonsBlockButton__github svg,
+.cl-socialButtonsBlockButton__github svg path,
+.cl-socialButtonsBlockButton__github svg g,
+.cl-socialButtonsBlockButton__github svg circle,
+.cl-socialButtonsBlockButton__github svg rect {
+  fill: white !important;
+  color: white !important;
+}
+
+.cl-socialButtonsBlockButtonIcon svg,
+.cl-socialButtonsBlockButtonIcon svg path,
+.cl-socialButtonsBlockButtonIcon svg g {
+  fill: white !important;
+  color: white !important;
+}
