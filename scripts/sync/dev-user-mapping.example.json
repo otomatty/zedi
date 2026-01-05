@@ -1,0 +1,17 @@
+{
+  "$schema": "./dev-user-mapping.schema.json",
+  "$comment": "Copy this file to dev-user-mapping.json and fill in your user IDs",
+  "developers": [
+    {
+      "email": "developer@example.com",
+      "productionUserId": "user_prod_xxxxxxxxxxxx",
+      "developmentUserId": "user_dev_xxxxxxxxxxxx",
+      "description": "Main developer account"
+    }
+  ],
+  "syncOptions": {
+    "direction": "bidirectional",
+    "conflictResolution": "latest-wins",
+    "syncDeleted": true
+  }
+}

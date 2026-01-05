@@ -30,7 +30,12 @@
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "sync:dev": "bun run scripts/sync/sync-dev-data.ts",
+    "sync:dev:dry": "bun run scripts/sync/sync-dev-data.ts --dry-run",
+    "sync:dev:verbose": "bun run scripts/sync/sync-dev-data.ts --verbose",
+    "sync:prod-to-dev": "bun run scripts/sync/sync-dev-data.ts --direction prod-to-dev",
+    "sync:dev-to-prod": "bun run scripts/sync/sync-dev-data.ts --direction dev-to-prod"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

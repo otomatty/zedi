@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Developer User Mapping Configuration",
+  "description": "Maps user IDs between production and development Clerk instances for data synchronization",
+  "type": "object",
+  "required": ["developers"],
+  "properties": {
+    "developers": {
+      "type": "array",
+      "description": "List of developer accounts to sync between environments",
+      "items": {
+        "type": "object",
+        "required": ["productionUserId", "developmentUserId"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Developer's email address (for reference only)"
+          },
+          "productionUserId": {
+            "type": "string",
+            "description": "User ID from production Clerk instance (starts with 'user_')",
+            "pattern": "^user_"
+          },
+          "developmentUserId": {
+            "type": "string",
+            "description": "User ID from development Clerk instance (starts with 'user_')",
+            "pattern": "^user_"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional description for this developer account"
+          }
+        }
+      }
+    },
+    "syncOptions": {
+      "type": "object",
+      "description": "Configuration options for synchronization behavior",
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": ["bidirectional", "prod-to-dev", "dev-to-prod"],
+          "default": "bidirectional",
+          "description": "Direction of data synchronization"
+        },
+        "conflictResolution": {
+          "type": "string",
+          "enum": ["latest-wins", "production-wins", "development-wins"],
+          "default": "latest-wins",
+          "description": "How to resolve conflicts when same page is modified in both environments"
+        },
+        "syncDeleted": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to sync deleted pages between environments"
+        }
+      }
+    }
+  }
+}

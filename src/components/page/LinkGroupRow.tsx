@@ -17,7 +17,7 @@ export function LinkGroupRow({ linkGroup, onPageClick }: LinkGroupRowProps) {
   return (
     <div className="space-y-3">
       {/* Grid with source card and child pages */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {/* Source link card (distinguished style) */}
         <Card
           className="cursor-pointer hover:bg-accent transition-colors bg-primary/5 border-primary/20 aspect-square flex flex-col"

@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Environment files (sensitive data)
+.env.development
+.env.production
+.env
+
+# Developer sync configuration (contains user ID mappings)
+scripts/sync/dev-user-mapping.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
