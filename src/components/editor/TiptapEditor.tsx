@@ -20,7 +20,9 @@ import { createEditorExtensions, defaultEditorProps } from "./TiptapEditor/edito
 import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";
 import { Button } from "@/components/ui/button";
-import { GitBranch } from "lucide-react";
+import { GitBranch, Image as ImageIcon, Loader2 } from "lucide-react";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { useToast } from "@/hooks/use-toast";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -74,6 +76,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       setMermaidDialogOpen(true);
     },
   });
+
+  // Image upload hook
+  const { uploadImage, isUploading, isConfigured: isStorageConfigured } = useImageUpload();
+  const { toast } = useToast();
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Flag to track if editor has been initialized with content
   // Prevents onUpdate from overwriting content before page data is loaded
@@ -260,9 +268,152 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     [editor]
   );
 
+  // Image upload handler
+  const handleImageUpload = useCallback(
+    async (files: FileList | File[]) => {
+      if (!editor) return;
+
+      const imageFiles = Array.from(files).filter((file) =>
+        file.type.startsWith("image/")
+      );
+
+      if (imageFiles.length === 0) return;
+
+      // Check if storage is configured
+      if (!isStorageConfigured) {
+        toast({
+          title: "ストレージ未設定",
+          description: "設定画面で画像ストレージを設定してください",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      for (const file of imageFiles) {
+        try {
+          const url = await uploadImage(file);
+          editor
+            .chain()
+            .focus()
+            .setImage({ src: url, alt: file.name })
+            .run();
+        } catch (error) {
+          toast({
+            title: "アップロード失敗",
+            description:
+              error instanceof Error ? error.message : "画像のアップロードに失敗しました",
+            variant: "destructive",
+          });
+        }
+      }
+    },
+    [editor, uploadImage, isStorageConfigured, toast]
+  );
+
+  // Handle file input change
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleImageUpload(e.target.files);
+        // Reset input value to allow selecting the same file again
+        e.target.value = "";
+      }
+    },
+    [handleImageUpload]
+  );
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingOver(false);
+
+      if (e.dataTransfer?.files?.length) {
+        handleImageUpload(e.dataTransfer.files);
+      }
+    },
+    [handleImageUpload]
+  );
+
+  // Handle paste events for images
+  useEffect(() => {
+    if (!editor) return;
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      const imageItems = Array.from(items).filter((item) =>
+        item.type.startsWith("image/")
+      );
+
+      if (imageItems.length > 0) {
+        event.preventDefault();
+        const files = imageItems
+          .map((item) => item.getAsFile())
+          .filter((file): file is File => file !== null);
+        handleImageUpload(files);
+      }
+    };
+
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener("paste", handlePaste);
+
+    return () => {
+      editorElement.removeEventListener("paste", handlePaste);
+    };
+  }, [editor, handleImageUpload]);
+
   return (
-    <div ref={editorContainerRef} className={cn("relative", className)}>
+    <div
+      ref={editorContainerRef}
+      className={cn("relative", className, isDraggingOver && "ring-2 ring-primary ring-dashed")}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+
       <EditorContent editor={editor} />
+
+      {/* Drag overlay */}
+      {isDraggingOver && (
+        <div className="absolute inset-0 bg-primary/10 flex items-center justify-center pointer-events-none z-40">
+          <div className="bg-background border-2 border-dashed border-primary rounded-lg p-4 text-center">
+            <ImageIcon className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <p className="text-sm text-muted-foreground">画像をドロップしてアップロード</p>
+          </div>
+        </div>
+      )}
+
+      {/* Upload progress indicator */}
+      {isUploading && (
+        <div className="absolute top-2 right-2 bg-background border rounded-lg shadow-lg p-2 flex items-center gap-2 z-50">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="text-sm">アップロード中...</span>
+        </div>
+      )}
 
       {/* Selection Menu - テキスト選択時に表示 */}
       {showSelectionMenu && selectionMenuPos && (
@@ -281,6 +432,16 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           >
             <GitBranch className="h-4 w-4 mr-1" />
             ダイアグラム生成
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-xs"
+            disabled={isUploading}
+          >
+            <ImageIcon className="h-4 w-4 mr-1" />
+            画像を挿入
           </Button>
         </div>
       )}

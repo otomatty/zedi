@@ -1,8 +1,8 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import {
   FileText,
   Link as LinkIcon,
@@ -35,6 +35,22 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
 );
 
 const Landing: React.FC = () => {
+  const { isSignedIn, isLoaded } = useAuth();
+
+  // Show loading state while Clerk is initializing
+  if (!isLoaded) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  // Redirect to /home if user is signed in
+  if (isSignedIn) {
+    return <Navigate to="/home" replace />;
+  }
+
   const features = [
     {
       icon: <FileText className="h-6 w-6" />,

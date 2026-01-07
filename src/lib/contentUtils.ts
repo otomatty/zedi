@@ -12,6 +12,7 @@ const SUPPORTED_NODE_TYPES = new Set([
   'horizontalRule',
   'hardBreak',
   'mermaid',
+  'image', // 画像挿入機能のサポート
 ]);
 
 // Supported mark types in zedi's Tiptap schema

@@ -2,6 +2,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
+import Image from "@tiptap/extension-image";
 import { WikiLink } from "../extensions/WikiLinkExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import {
@@ -50,6 +51,14 @@ export function createEditorExtensions(
     }),
     WikiLinkSuggestionPlugin.configure({
       onStateChange: options.onStateChange,
+    }),
+    // Image extension for image insertion
+    Image.configure({
+      inline: false, // ブロックレベルで表示
+      allowBase64: false, // 外部ストレージを使用するためBase64は無効化
+      HTMLAttributes: {
+        class: "tiptap-image max-w-full h-auto rounded-lg my-4",
+      },
     }),
     Mermaid,
   ] as Extension[];

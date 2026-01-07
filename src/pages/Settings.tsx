@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Bot } from "lucide-react";
+import { ArrowLeft, Bot, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -67,6 +67,13 @@ const Settings: React.FC = () => {
               title="AI 設定"
               description="LLM APIキーの設定、プロバイダーの選択"
               to="/settings/ai"
+            />
+
+            <SettingsItem
+              icon={<ImageIcon className="h-5 w-5" />}
+              title="画像ストレージ設定"
+              description="画像アップロード先のストレージ設定"
+              to="/settings/storage"
             />
 
             {/* 将来的な設定項目のプレースホルダー */}

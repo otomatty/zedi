@@ -59,10 +59,34 @@ turso db tokens create zedi-dev
 
 ## 3. 環境変数ファイルの設定
 
-> **重要**: `.env.local` ファイルが存在する場合、Viteはそれを最優先で読み込みます。
-> 環境を正しく分離するには、`.env.local` を削除または名前変更してください：
+### Viteの環境変数優先順位
+
+Viteは以下の順序で環境変数ファイルを読み込みます（上から優先度が高い順）：
+
+1. **`.env.[mode].local`** - 最優先（例: `.env.development.local`）
+2. **`.env.local`** - 全環境共通のローカル設定
+3. **`.env.[mode]`** - モード固有（例: `.env.development`, `.env.production`）
+4. **`.env`** - デフォルト
+
+> **重要**: `.env.local` と `.env.development` が両方存在する場合、**`.env.local` の方が優先されます**。
+> 
+> 環境を正しく分離するには、以下のいずれかの方法を取ってください：
+> 
+> **方法1: `.env.local` を削除**
+> ```bash
+> rm .env.local
+> ```
+> 
+> **方法2: `.env.local` をバックアップ**
 > ```bash
 > mv .env.local .env.local.backup
+> ```
+> 
+> **方法3: モード固有のローカルファイルを使用（推奨）**
+> ```bash
+> # .env.local を削除し、代わりに以下を使用
+> # .env.development.local  (開発環境用)
+> # .env.production.local   (本番環境用)
 > ```
 
 ### `.env.development`

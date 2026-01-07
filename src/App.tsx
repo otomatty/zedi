@@ -9,6 +9,7 @@ import SignIn from "./pages/SignIn";
 import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
 import AISettings from "./pages/AISettings";
+import StorageSettings from "./pages/StorageSettings";
 import Pricing from "./pages/Pricing";
 import Donate from "./pages/Donate";
 import NotFound from "./pages/NotFound";
@@ -63,6 +64,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AISettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/storage"
+              element={
+                <ProtectedRoute>
+                  <StorageSettings />
                 </ProtectedRoute>
               }
             />
