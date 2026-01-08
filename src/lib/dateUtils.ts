@@ -19,13 +19,13 @@ export function getDateKey(timestamp: number): string {
 export function groupPagesByDate(pages: Page[]): DateGroup[] {
   const groups: Map<string, Page[]> = new Map();
   
-  // Sort pages by createdAt descending
+  // Sort pages by updatedAt descending
   const sortedPages = [...pages]
     .filter(p => !p.isDeleted)
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => b.updatedAt - a.updatedAt);
   
   sortedPages.forEach((page) => {
-    const dateKey = getDateKey(page.createdAt);
+    const dateKey = getDateKey(page.updatedAt);
     const existing = groups.get(dateKey) || [];
     groups.set(dateKey, [...existing, page]);
   });
