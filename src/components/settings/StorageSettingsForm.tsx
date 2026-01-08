@@ -164,10 +164,10 @@ export const StorageSettingsForm: React.FC = () => {
         </div>
 
         {/* Provider-specific settings */}
-        {settings.provider === "imgur" && (
-          <ImgurSettings
-            clientId={settings.config.imgurClientId || ""}
-            onChange={(value) => updateConfig({ imgurClientId: value })}
+        {settings.provider === "gyazo" && (
+          <GyazoSettings
+            accessToken={settings.config.gyazoAccessToken || ""}
+            onChange={(value) => updateConfig({ gyazoAccessToken: value })}
             showSecrets={showSecrets}
             setShowSecrets={setShowSecrets}
             disabled={isSaving || isTesting}
@@ -298,31 +298,31 @@ export const StorageSettingsForm: React.FC = () => {
   );
 };
 
-// Imgur Settings Component
-interface ImgurSettingsProps {
-  clientId: string;
+// Gyazo Settings Component
+interface GyazoSettingsProps {
+  accessToken: string;
   onChange: (value: string) => void;
   showSecrets: boolean;
   setShowSecrets: (show: boolean) => void;
   disabled: boolean;
 }
 
-const ImgurSettings: React.FC<ImgurSettingsProps> = ({
-  clientId,
+const GyazoSettings: React.FC<GyazoSettingsProps> = ({
+  accessToken,
   onChange,
   showSecrets,
   setShowSecrets,
   disabled,
 }) => (
   <div className="space-y-2">
-    <Label htmlFor="imgurClientId">Client ID</Label>
+    <Label htmlFor="gyazoAccessToken">Access Token</Label>
     <div className="relative">
       <Input
-        id="imgurClientId"
+        id="gyazoAccessToken"
         type={showSecrets ? "text" : "password"}
-        value={clientId}
+        value={accessToken}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Imgur Client ID"
+        placeholder="Gyazo Access Token"
         disabled={disabled}
         className="pr-10"
       />
@@ -342,14 +342,14 @@ const ImgurSettings: React.FC<ImgurSettingsProps> = ({
     </div>
     <p className="text-xs text-muted-foreground">
       <a
-        href="https://api.imgur.com/oauth2/addclient"
+        href="https://gyazo.com/oauth/applications"
         target="_blank"
         rel="noopener noreferrer"
         className="text-primary hover:underline"
       >
-        Imgur App登録ページ
+        Gyazo OAuth Applications
       </a>
-      でClient IDを取得してください
+      でAccess Tokenを取得してください
     </p>
   </div>
 );

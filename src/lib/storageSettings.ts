@@ -12,7 +12,7 @@ const SENSITIVE_FIELDS = [
   "googleDriveClientSecret",
   "googleDriveAccessToken",
   "googleDriveRefreshToken",
-  "imgurClientId",
+  "gyazoAccessToken",
   "r2AccessKeyId",
   "r2SecretAccessKey",
   "githubToken",

@@ -2,7 +2,7 @@
 
 import { StorageSettings, StorageProviderType } from "@/types/storage";
 import { StorageProviderInterface } from "./types";
-import { ImgurProvider } from "./providers/ImgurProvider";
+import { GyazoProvider } from "./providers/GyazoProvider";
 import { CloudflareR2Provider } from "./providers/CloudflareR2Provider";
 import { GitHubProvider } from "./providers/GitHubProvider";
 import { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
@@ -16,11 +16,11 @@ export function getStorageProvider(
   const { provider, config } = settings;
 
   switch (provider) {
-    case "imgur":
-      if (!config.imgurClientId) {
-        throw new Error("Imgur Client ID が設定されていません");
+    case "gyazo":
+      if (!config.gyazoAccessToken) {
+        throw new Error("Gyazo Access Token が設定されていません");
       }
-      return new ImgurProvider(config.imgurClientId);
+      return new GyazoProvider(config.gyazoAccessToken);
 
     case "cloudflare-r2":
       if (
@@ -78,8 +78,8 @@ export function isProviderConfigured(
   config: StorageSettings["config"]
 ): boolean {
   switch (provider) {
-    case "imgur":
-      return !!config.imgurClientId;
+    case "gyazo":
+      return !!config.gyazoAccessToken;
 
     case "cloudflare-r2":
       return !!(
@@ -105,7 +105,7 @@ export function isProviderConfigured(
 
 // Re-export types
 export * from "./types";
-export { ImgurProvider } from "./providers/ImgurProvider";
+export { GyazoProvider } from "./providers/GyazoProvider";
 export { CloudflareR2Provider } from "./providers/CloudflareR2Provider";
 export { GitHubProvider } from "./providers/GitHubProvider";
 export { GoogleDriveProvider } from "./providers/GoogleDriveProvider";

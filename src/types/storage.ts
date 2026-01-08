@@ -4,7 +4,7 @@
  * サポートするストレージプロバイダーのタイプ
  */
 export type StorageProviderType =
-  | "imgur"
+  | "gyazo"
   | "cloudflare-r2"
   | "github"
   | "google-drive";
@@ -20,8 +20,8 @@ export interface StorageProviderConfig {
   googleDriveRefreshToken?: string;
   googleDriveFolderId?: string; // 保存先フォルダID（オプション）
 
-  // Imgur（最も簡単：Client IDのみ）
-  imgurClientId?: string;
+  // Gyazo（Access Tokenのみ）
+  gyazoAccessToken?: string;
 
   // Cloudflare R2（S3互換）
   r2Bucket?: string;
@@ -65,12 +65,12 @@ export interface StorageProviderInfo {
  */
 export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
   {
-    id: "imgur",
-    name: "Imgur",
-    description: "Client IDのみで簡単セットアップ",
-    helpUrl: "https://api.imgur.com/oauth2/addclient",
+    id: "gyazo",
+    name: "Gyazo",
+    description: "Access Tokenで簡単セットアップ",
+    helpUrl: "https://gyazo.com/oauth/applications",
     setupDifficulty: "easy",
-    freeTier: "無料（匿名アップロード）",
+    freeTier: "無料プランあり",
   },
   {
     id: "cloudflare-r2",
@@ -102,7 +102,7 @@ export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
  * デフォルトのストレージ設定
  */
 export const DEFAULT_STORAGE_SETTINGS: StorageSettings = {
-  provider: "imgur",
+  provider: "gyazo",
   config: {},
   isConfigured: false,
 };
