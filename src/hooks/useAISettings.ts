@@ -1,7 +1,12 @@
 // AI設定を管理するカスタムフック
 
 import { useState, useEffect, useCallback } from "react";
-import { AISettings, getDefaultModel, getDefaultModels } from "@/types/ai";
+import {
+  AISettings,
+  getDefaultModel,
+  getDefaultModels,
+  getProviderById,
+} from "@/types/ai";
 import {
   loadAISettings,
   saveAISettings,
@@ -35,7 +40,7 @@ export function useAISettings(): UseAISettingsReturn {
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(
-    null
+    null,
   );
 
   // 初期読み込み
@@ -48,12 +53,16 @@ export function useAISettings(): UseAISettingsReturn {
           // キャッシュからモデル一覧を取得
           setAvailableModels(getAvailableModels(loaded.provider));
         } else {
-          // デフォルトプロバイダーのモデル一覧
-          setAvailableModels(getDefaultModels("openai"));
+          // デフォルトプロバイダー（Ollama）のモデル一覧
+          const defaultSettings = getDefaultAISettings();
+          setSettings(defaultSettings);
+          setAvailableModels(getDefaultModels(defaultSettings.provider));
         }
       } catch (error) {
         console.error("Failed to load AI settings:", error);
-        setAvailableModels(getDefaultModels("openai"));
+        const defaultSettings = getDefaultAISettings();
+        setSettings(defaultSettings);
+        setAvailableModels(getDefaultModels(defaultSettings.provider));
       } finally {
         setIsLoading(false);
       }
@@ -71,6 +80,18 @@ export function useAISettings(): UseAISettingsReturn {
         const models = getAvailableModels(updates.provider);
         setAvailableModels(models);
         newSettings.model = models[0] || getDefaultModel(updates.provider);
+
+        // Ollamaの場合はデフォルトエンドポイントを設定
+        if (updates.provider === "ollama" && !newSettings.ollamaEndpoint) {
+          newSettings.ollamaEndpoint = "http://localhost:11434";
+        }
+
+        // APIキーが必要かどうかを確認
+        const provider = getProviderById(updates.provider);
+        if (provider && !provider.requiresApiKey) {
+          // APIキー不要のプロバイダーの場合、キーをクリア
+          newSettings.apiKey = "";
+        }
       }
 
       return newSettings;
@@ -83,9 +104,14 @@ export function useAISettings(): UseAISettingsReturn {
   const save = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     try {
+      const provider = getProviderById(settings.provider);
+      const isConfigured = provider?.requiresApiKey
+        ? settings.apiKey.trim() !== ""
+        : true; // Ollamaの場合はAPIキー不要なので常にtrue
+
       const settingsToSave = {
         ...settings,
-        isConfigured: settings.apiKey.trim() !== "",
+        isConfigured,
       };
       await saveAISettings(settingsToSave);
       setSettings(settingsToSave);
@@ -103,7 +129,11 @@ export function useAISettings(): UseAISettingsReturn {
     setIsTesting(true);
     setTestResult(null);
     try {
-      const result = await testConnection(settings.provider, settings.apiKey);
+      const result = await testConnection(
+        settings.provider,
+        settings.apiKey,
+        settings.ollamaEndpoint,
+      );
       setTestResult(result);
 
       // テスト成功時、取得したモデル一覧で更新
@@ -127,14 +157,20 @@ export function useAISettings(): UseAISettingsReturn {
     } finally {
       setIsTesting(false);
     }
-  }, [settings.provider, settings.apiKey, settings.model]);
+  }, [
+    settings.provider,
+    settings.apiKey,
+    settings.ollamaEndpoint,
+    settings.model,
+  ]);
 
   // 設定をリセットする
   const reset = useCallback(() => {
     clearAISettings();
     clearModelsCache();
-    setSettings(getDefaultAISettings());
-    setAvailableModels(getDefaultModels("openai"));
+    const defaultSettings = getDefaultAISettings();
+    setSettings(defaultSettings);
+    setAvailableModels(getDefaultModels(defaultSettings.provider));
     setTestResult(null);
   }, []);
 
