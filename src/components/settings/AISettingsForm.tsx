@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -75,6 +76,8 @@ export const AISettingsForm: React.FC = () => {
     reset,
   } = useAISettings();
 
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showApiKey, setShowApiKey] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{
@@ -98,6 +101,13 @@ export const AISettingsForm: React.FC = () => {
     }
   }, [isOllama, settings.ollamaEndpoint, updateSettings]);
 
+  const getSafeReturnTo = (): string | null => {
+    const returnTo = searchParams.get("returnTo");
+    if (!returnTo) return null;
+    if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
+    return returnTo;
+  };
+
   const handleSave = async () => {
     const success = await save();
     if (success) {
@@ -105,6 +115,10 @@ export const AISettingsForm: React.FC = () => {
         title: "保存しました",
         description: "AI設定が正常に保存されました",
       });
+      const returnTo = getSafeReturnTo();
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
+      }
     } else {
       toast({
         title: "エラー",

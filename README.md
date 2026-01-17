@@ -113,7 +113,52 @@ bun install
 bun run dev
 ```
 
-ブラウザで http://localhost:5173 を開いてください。
+ブラウザで http://localhost:30000 を開いてください（デフォルトポート）。
+
+### ポート設定
+
+複数のアプリを並列で開発する場合、ポートを変更できます：
+
+```bash
+# 方法1: 環境変数で指定
+VITE_PORT=30001 bun run dev
+
+# 方法2: .env.local ファイルを作成
+echo "VITE_PORT=30001" > .env.local
+bun run dev
+```
+
+ポートが使用中の場合は、自動的に次の利用可能なポートが使用されます。
+
+### Dockerを使った並列開発（オプション）
+
+複数のアプリケーションインスタンスを並列で開発する場合、Dockerを使用できます：
+
+```bash
+# Dockerイメージをビルド
+bun run docker:build
+
+# すべてのインスタンスを起動（3つ同時に起動）
+bun run docker:up
+
+# バックグラウンドで起動
+bun run docker:up:d
+
+# 停止
+bun run docker:down
+
+# ログを確認
+bun run docker:logs
+```
+
+起動後、以下のURLでアクセスできます：
+- インスタンス1: http://localhost:30000
+- インスタンス2: http://localhost:30001
+- インスタンス3: http://localhost:30002
+
+詳細は [Docker並列開発ガイド](./docs/guides/docker-parallel-development.md) を参照してください。
+
+> **Note:** Dockerを使う場合、最低8GBのRAM（推奨: 16GB以上）が必要です。軽量な並列開発が必要な場合は、環境変数によるポート設定の方が適しています。
 
 ### 環境変数の設定（オプション）
 

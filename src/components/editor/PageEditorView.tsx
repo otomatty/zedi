@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import type { ContentError } from "./TiptapEditor/useContentSanitizer";
 import { usePageEditorState } from "./PageEditor/usePageEditorState";
@@ -24,6 +24,7 @@ import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
   const isNewPage = id === "new";
@@ -248,8 +249,10 @@ const PageEditor: React.FC = () => {
   // Wiki生成エラーダイアログを閉じてAI設定へ遷移
   const handleGoToAISettings = useCallback(() => {
     resetWiki();
-    navigate("/settings/ai");
-  }, [resetWiki, navigate]);
+    const returnTo = `${location.pathname}${location.search}`;
+    const search = new URLSearchParams({ returnTo }).toString();
+    navigate(`/settings/ai?${search}`);
+  }, [resetWiki, navigate, location.pathname, location.search]);
 
   // Web Clipper結果をエディタに反映
   const handleWebClipped = useCallback(

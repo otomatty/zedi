@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
   disabled = false,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showNotConfiguredDialog, setShowNotConfiguredDialog] =
     React.useState(false);
 
@@ -57,7 +58,9 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
 
   const handleGoToSettings = () => {
     setShowNotConfiguredDialog(false);
-    navigate("/settings/ai");
+    const returnTo = `${location.pathname}${location.search}`;
+    const search = new URLSearchParams({ returnTo }).toString();
+    navigate(`/settings/ai?${search}`);
   };
 
   if (!shouldShowButton) {

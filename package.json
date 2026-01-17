@@ -35,7 +35,13 @@
     "sync:dev:dry": "bun run scripts/sync/sync-dev-data.ts --dry-run",
     "sync:dev:verbose": "bun run scripts/sync/sync-dev-data.ts --verbose",
     "sync:prod-to-dev": "bun run scripts/sync/sync-dev-data.ts --direction prod-to-dev",
-    "sync:dev-to-prod": "bun run scripts/sync/sync-dev-data.ts --direction dev-to-prod"
+    "sync:dev-to-prod": "bun run scripts/sync/sync-dev-data.ts --direction dev-to-prod",
+    "docker:build": "docker-compose -f docker-compose.dev.yml build",
+    "docker:up": "docker-compose -f docker-compose.dev.yml up",
+    "docker:up:d": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:down": "docker-compose -f docker-compose.dev.yml down",
+    "docker:logs": "docker-compose -f docker-compose.dev.yml logs -f",
+    "docker:clean": "docker-compose -f docker-compose.dev.yml down -v && docker image prune -f"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

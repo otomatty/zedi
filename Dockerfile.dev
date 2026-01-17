@@ -1,0 +1,17 @@
+# 開発環境用Dockerfile
+FROM oven/bun:1 AS base
+
+WORKDIR /app
+
+# 依存関係をインストール
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+# アプリケーションコードをコピー
+COPY . .
+
+# 開発サーバーを起動（ポートは環境変数で指定可能）
+EXPOSE 30000
+
+# Viteの開発サーバーを起動（vite.config.tsでhost: "::"が設定されているため、コンテナ外からアクセス可能）
+CMD ["bun", "run", "dev"]

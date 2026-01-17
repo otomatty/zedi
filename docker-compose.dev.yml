@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # インスタンス1: デフォルトポート30000
+  zedi-dev-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zedi-dev-1
+    ports:
+      - "30000:30000"
+    environment:
+      - VITE_PORT=30000
+      - NODE_ENV=development
+      # 環境変数は .env.local から読み込むか、ここで指定
+      # - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
+      # - VITE_TURSO_DATABASE_URL=${VITE_TURSO_DATABASE_URL}
+    volumes:
+      # ホットリロードのためにソースコードをマウント
+      - .:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    networks:
+      - zedi-dev-network
+
+  # インスタンス2: ポート30001
+  zedi-dev-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zedi-dev-2
+    ports:
+      - "30001:30000"
+    environment:
+      - VITE_PORT=30000
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    networks:
+      - zedi-dev-network
+
+  # インスタンス3: ポート30002
+  zedi-dev-3:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zedi-dev-3
+    ports:
+      - "30002:30000"
+    environment:
+      - VITE_PORT=30000
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+    networks:
+      - zedi-dev-network
+
+networks:
+  zedi-dev-network:
+    driver: bridge
