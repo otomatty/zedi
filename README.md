@@ -270,12 +270,12 @@ src/
 コントリビューションを歓迎します！
 
 1. このリポジトリをフォーク
-2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+2. `develop`ブランチから機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'feat: add amazing feature'`)
 4. ブランチをプッシュ (`git push origin feature/amazing-feature`)
-5. Pull Request を作成
+5. `develop`ブランチに対して Pull Request を作成
 
-詳細は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+詳細は [CONTRIBUTING.md](CONTRIBUTING.md) と [ブランチ戦略ガイド](docs/guides/branch-strategy.md) を参照してください。
 
 ---
 
