@@ -1,5 +1,6 @@
 import Image, { type ImageOptions } from "@tiptap/extension-image";
 import { ReactNodeViewRenderer } from "@tiptap/react";
+import { InputRule } from "@tiptap/core";
 import { ImageNodeView } from "../ImageNodeView.tsx";
 
 export interface StorageImageOptions extends ImageOptions {
@@ -36,6 +37,27 @@ export const StorageImage = Image.extend<StorageImageOptions>({
             : {},
       },
     };
+  },
+
+  addInputRules() {
+    return [
+      new InputRule({
+        find: /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s]*)?)$/i,
+        handler: ({ state, range, match }) => {
+          const imageUrl = match[1];
+          const { tr } = state;
+          tr.replaceWith(
+            range.from,
+            range.to,
+            this.type.create({
+              src: imageUrl,
+              alt: imageUrl.split("/").pop() || "image",
+              title: imageUrl,
+            })
+          );
+        },
+      }),
+    ];
   },
 
   addNodeView() {

@@ -391,6 +391,17 @@ const GyazoSettings: React.FC<GyazoSettingsProps> = ({
       </a>
       でAccess Tokenを取得してください
     </p>
+    <div className="rounded-lg border border-border bg-muted/50 p-3 mt-2">
+      <p className="text-xs font-medium mb-1">💡 Callback URLの設定について</p>
+      <p className="text-xs text-muted-foreground">
+        OAuthアプリケーション作成時にCallback URLが求められる場合、以下のいずれかを入力してください（実際には使用されません）:
+      </p>
+      <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc space-y-0.5">
+        <li><code className="bg-muted px-1 rounded">http://localhost:5173/callback</code></li>
+        <li><code className="bg-muted px-1 rounded">urn:ietf:wg:oauth:2.0:oob</code></li>
+        <li><code className="bg-muted px-1 rounded">zedi://oauth/callback</code></li>
+      </ul>
+    </div>
   </div>
 );
 
