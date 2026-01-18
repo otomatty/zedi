@@ -170,14 +170,14 @@ export const StorageSettingsForm: React.FC = () => {
             <SelectContent>
               {STORAGE_PROVIDERS.map((provider) => (
                 <SelectItem key={provider.id} value={provider.id}>
-                  <div className="flex w-full items-start justify-between gap-2">
+                  <div className="flex w-full items-center justify-between gap-2">
                     <div className="flex flex-col items-start">
                       <span>{provider.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {provider.description}
                       </span>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex items-center gap-1">
                       <Badge variant="outline" className="text-[10px]">
                         難易度: {difficultyLabels[provider.setupDifficulty]}
                       </Badge>

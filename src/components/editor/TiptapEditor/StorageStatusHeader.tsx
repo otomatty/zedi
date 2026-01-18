@@ -11,6 +11,7 @@ interface StorageStatusHeaderProps {
   isStorageConfigured: boolean;
   isStorageLoading: boolean;
   onGoToStorageSettings: () => void;
+  className?: string;
 }
 
 export const StorageStatusHeader: React.FC<StorageStatusHeaderProps> = ({
@@ -18,6 +19,7 @@ export const StorageStatusHeader: React.FC<StorageStatusHeaderProps> = ({
   isStorageConfigured,
   isStorageLoading,
   onGoToStorageSettings,
+  className,
 }) => {
   const storageProviderLabel = currentStorageProvider?.name ?? "未設定";
   const storageStatusLabel = isStorageConfigured ? "接続済み" : "未設定";
@@ -48,8 +50,9 @@ export const StorageStatusHeader: React.FC<StorageStatusHeaderProps> = ({
       <HoverCardTrigger asChild>
         <div
           className={cn(
-            "mb-2 inline-flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs",
-            !isStorageConfigured && !isStorageLoading && "cursor-pointer"
+            "inline-flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs",
+            !isStorageConfigured && !isStorageLoading && "cursor-pointer",
+            className
           )}
           onClick={handleStorageHeaderClick}
           onKeyDown={handleStorageHeaderKeyDown}

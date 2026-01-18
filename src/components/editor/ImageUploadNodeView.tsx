@@ -83,7 +83,7 @@ export const ImageUploadNodeView: React.FC<NodeViewProps> = ({
             <img
               src={previewUrl}
               alt={fileName || "upload preview"}
-              className="max-w-full h-auto rounded-md border bg-background"
+              className="w-full max-w-[480px] h-auto rounded-md border bg-background"
             />
           ) : (
             <div className="flex items-center justify-center h-32 rounded-md border border-dashed bg-background">

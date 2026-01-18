@@ -7,6 +7,7 @@ import Container from "@/components/layout/Container";
 
 interface PageEditorContentProps {
   content: string;
+  title: string;
   sourceUrl?: string;
   currentPageId: string | null;
   pageId: string;
@@ -22,6 +23,7 @@ interface PageEditorContentProps {
  */
 export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   content,
+  title,
   sourceUrl,
   currentPageId,
   pageId,
@@ -31,7 +33,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   onContentError,
 }) => {
   return (
-    <main className="flex-1 py-6">
+    <main className="flex-1 pt-6 pb-32">
       <Container>
         <div className="max-w-4xl mx-auto space-y-4">
           {/* Source URL Badge - クリップしたページの場合に表示 */}
@@ -48,6 +50,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
               autoFocus={isNewPage}
               className="min-h-[calc(100vh-200px)]"
               pageId={currentPageId || pageId || undefined}
+              pageTitle={title}
               isReadOnly={isWikiGenerating}
               onContentError={onContentError}
             />

@@ -21,6 +21,7 @@ interface UseImageUploadManagerParams {
   storageSettings: StorageSettings;
   toast: ToastFn;
   onRequestStorageSetup: () => void;
+  lastSelectionRef?: MutableRefObject<{ from: number; to: number } | null>;
 }
 
 export function useImageUploadManager({
@@ -32,6 +33,7 @@ export function useImageUploadManager({
   storageSettings,
   toast,
   onRequestStorageSetup,
+  lastSelectionRef,
 }: UseImageUploadManagerParams) {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [pendingRetryUploadId, setPendingRetryUploadId] = useState<string | null>(
@@ -263,6 +265,68 @@ export function useImageUploadManager({
     return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }, []);
 
+  const restoreSelectionIfNeeded = useCallback(() => {
+    const activeEditor = editorRef.current;
+    if (!activeEditor) return;
+    if (activeEditor.isFocused) return;
+    const lastSelection = lastSelectionRef?.current;
+    if (lastSelection) {
+      activeEditor.commands.setTextSelection(lastSelection);
+    }
+  }, [editorRef, lastSelectionRef]);
+
+  const createUploadItems = useCallback(
+    (files: File[]) =>
+      files.map((file) => {
+        const uploadId = createUploadId();
+        const previewUrl = URL.createObjectURL(file);
+        uploadFilesRef.current.set(uploadId, file);
+        uploadPreviewUrlsRef.current.set(uploadId, previewUrl);
+        return {
+          uploadId,
+          file,
+          attrs: {
+            uploadId,
+            status: "uploading",
+            progress: 0,
+            previewUrl,
+            fileName: file.name,
+            providerId: storageSettings.provider,
+          },
+        };
+      }),
+    [createUploadId, storageSettings.provider]
+  );
+
+  const insertUploadItems = useCallback(
+    (uploadItems: Array<{ uploadId: string; file: File; attrs: Record<string, unknown> }>, insertAtStart: boolean) => {
+      const activeEditor = editorRef.current;
+      if (!activeEditor) return;
+      const content = uploadItems.map((item) => ({
+        type: "imageUpload",
+        attrs: item.attrs,
+      }));
+
+      const chain = activeEditor.chain().focus();
+      if (insertAtStart) {
+        chain.insertContentAt(0, content);
+      } else {
+        chain.insertContent(content);
+      }
+      chain.run();
+    },
+    [editorRef]
+  );
+
+  const startUploads = useCallback(
+    (uploadItems: Array<{ uploadId: string; file: File }>) => {
+      uploadItems.forEach((item) => {
+        void startUpload(item.uploadId, item.file);
+      });
+    },
+    [startUpload]
+  );
+
   const handleImageUpload = useCallback(
     (files: FileList | File[]) => {
       const activeEditor = editorRef.current;
@@ -298,50 +362,76 @@ export function useImageUploadManager({
         return;
       }
 
-      const uploadItems = imageFiles.map((file) => {
-        const uploadId = createUploadId();
-        const previewUrl = URL.createObjectURL(file);
-        uploadFilesRef.current.set(uploadId, file);
-        uploadPreviewUrlsRef.current.set(uploadId, previewUrl);
-        return {
-          uploadId,
-          file,
-          attrs: {
-            uploadId,
-            status: "uploading",
-            progress: 0,
-            previewUrl,
-            fileName: file.name,
-            providerId: storageSettings.provider,
-          },
-        };
-      });
+      restoreSelectionIfNeeded();
 
-      activeEditor
-        .chain()
-        .focus()
-        .insertContent(
-          uploadItems.map((item) => ({
-            type: "imageUpload",
-            attrs: item.attrs,
-          }))
-        )
-        .run();
-
-      uploadItems.forEach((item) => {
-        void startUpload(item.uploadId, item.file);
-      });
+      const uploadItems = createUploadItems(imageFiles);
+      insertUploadItems(uploadItems, false);
+      startUploads(uploadItems);
     },
     [
-      createUploadId,
+      createUploadItems,
       editorRef,
+      isReadOnly,
+      isStorageConfigured,
+      isStorageLoading,
+      insertUploadItems,
+      onRequestStorageSetup,
+      pendingRetryUploadId,
+      restoreSelectionIfNeeded,
+      startUploads,
+      toast,
+    ]
+  );
+
+  const handleImageUploadAtStart = useCallback(
+    (files: FileList | File[]) => {
+      const activeEditor = editorRef.current;
+      if (!activeEditor) return;
+      if (isReadOnly) return;
+      if (pendingRetryUploadId) {
+        setPendingRetryUploadId(null);
+      }
+
+      if (isStorageLoading) {
+        toast({
+          title: "読み込み中",
+          description: "ストレージ設定を読み込み中です",
+        });
+        return;
+      }
+
+      const imageFiles = Array.from(files).filter((file) =>
+        file.type.startsWith("image/")
+      );
+
+      if (imageFiles.length === 0) {
+        toast({
+          title: "画像ファイルのみ対応",
+          description: "画像ファイルを選択してください",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!isStorageConfigured) {
+        onRequestStorageSetup();
+        return;
+      }
+
+      const uploadItems = createUploadItems(imageFiles);
+      insertUploadItems(uploadItems, true);
+      startUploads(uploadItems);
+    },
+    [
+      createUploadItems,
+      editorRef,
+      insertUploadItems,
       isReadOnly,
       isStorageConfigured,
       isStorageLoading,
       onRequestStorageSetup,
       pendingRetryUploadId,
-      startUpload,
-      storageSettings.provider,
+      startUploads,
       toast,
     ]
   );
@@ -456,5 +546,6 @@ export function useImageUploadManager({
     handleRetryUpload,
     handleRemoveUpload,
     handleImageUpload,
+    handleImageUploadAtStart,
   };
 }

@@ -122,7 +122,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
             src={src}
             alt={alt || "image"}
             title={title}
-            className="max-w-full h-auto rounded-lg border bg-background"
+            className="w-full max-w-[480px] h-auto rounded-lg border bg-background"
             onError={() => setHasLoadError(true)}
           />
         )}

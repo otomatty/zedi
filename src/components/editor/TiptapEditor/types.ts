@@ -10,6 +10,7 @@ export interface TiptapEditorProps {
   className?: string;
   autoFocus?: boolean;
   pageId?: string;
+  pageTitle?: string;
   /** 読み取り専用モード（生成中など） */
   isReadOnly?: boolean;
   /** コンテンツエラーのコールバック */

@@ -20,12 +20,20 @@ import { useTitleValidation } from "@/hooks/useTitleValidation";
 import { generateAutoTitle, isContentNotEmpty } from "@/lib/contentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
+import { useStorageSettings } from "@/hooks/useStorageSettings";
+import { getStorageProviderById } from "@/types/storage";
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const {
+    settings: storageSettings,
+    isLoading: isStorageLoading,
+  } = useStorageSettings();
+  const isStorageConfigured = !isStorageLoading && storageSettings.isConfigured;
+  const currentStorageProvider = getStorageProviderById(storageSettings.provider);
 
   const isNewPage = id === "new";
   const pageId = isNewPage ? "" : id || "";
@@ -254,6 +262,12 @@ const PageEditor: React.FC = () => {
     navigate(`/settings/ai?${search}`);
   }, [resetWiki, navigate, location.pathname, location.search]);
 
+  const handleGoToStorageSettings = useCallback(() => {
+    const returnTo = `${location.pathname}${location.search}`;
+    const search = new URLSearchParams({ returnTo }).toString();
+    navigate(`/settings/storage?${search}`);
+  }, [navigate, location.pathname, location.search]);
+
   // Web Clipper結果をエディタに反映
   const handleWebClipped = useCallback(
     (
@@ -328,6 +342,10 @@ const PageEditor: React.FC = () => {
         errorMessage={errorMessage}
         isTitleEmpty={isTitleEmpty}
         isNewPage={isNewPage}
+        currentStorageProvider={currentStorageProvider}
+        isStorageConfigured={isStorageConfigured}
+        isStorageLoading={isStorageLoading}
+        onGoToStorageSettings={handleGoToStorageSettings}
         onBack={handleBack}
         onDelete={handleDelete}
         onExportMarkdown={handleExportMarkdown}
@@ -350,6 +368,7 @@ const PageEditor: React.FC = () => {
 
       <PageEditorContent
         content={content}
+        title={title}
         sourceUrl={sourceUrl}
         currentPageId={currentPageId}
         pageId={pageId}
