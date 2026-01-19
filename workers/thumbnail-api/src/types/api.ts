@@ -25,3 +25,13 @@ export interface ThumbnailCommitResponse {
   permalinkUrl?: string;
   provider: "gyazo";
 }
+
+export interface ImageGenerateRequest {
+  prompt: string;
+  aspectRatio?: string;
+}
+
+export interface ImageGenerateResponse {
+  imageUrl: string; // base64データURI
+  mimeType: string;
+}

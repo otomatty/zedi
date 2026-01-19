@@ -4,6 +4,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Sparkles,
+  Wand2,
 } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ interface EditorRecommendationBarProps {
   ) => void;
 }
 
-type RecommendationMode = "actions" | "thumbnails";
+type RecommendationMode = "actions" | "thumbnails" | "generating";
 
 export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = ({
   pageTitle,
@@ -139,7 +140,61 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
     void loadCandidates(nextCursor);
   }, [isLoading, loadCandidates, nextCursor]);
 
+  const handleGenerateImage = useCallback(async () => {
+    if (!trimmedTitle) {
+      setErrorMessage("タイトルを入力してください");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    setMode("generating");
+
+    try {
+      const response = await fetch(
+        `${THUMBNAIL_API_BASE_URL}/api/image-generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: trimmedTitle,
+            aspectRatio: "16:9",
+            imageSize: "2K",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `画像生成に失敗しました: ${response.status}`
+        );
+      }
+
+      const data = (await response.json()) as {
+        imageUrl: string;
+        mimeType: string;
+      };
+
+      // base64データURIをそのまま使用
+      onSelectThumbnail(data.imageUrl, trimmedTitle, data.imageUrl);
+      setMode("actions");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "画像の生成に失敗しました"
+      );
+      setMode("actions");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [trimmedTitle, onSelectThumbnail]);
+
   const headerLabel = useMemo(() => {
+    if (mode === "generating") return "画像を生成中";
     return mode === "actions" ? "おすすめ" : "サムネイル候補";
   }, [mode]);
 
@@ -179,13 +234,55 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
 
         {mode === "actions" && (
           <div className="flex items-center gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={handleOpenThumbnailPicker}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleOpenThumbnailPicker}
+            >
               <ImageIcon className="h-4 w-4 mr-1" />
-              サムネイルを設定
+              画像を検索
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateImage}
+              disabled={isLoading}
+            >
+              <Wand2 className="h-4 w-4 mr-1" />
+              AIで生成
             </Button>
             <span className="text-xs text-muted-foreground">
-              タイトルからWeb画像を探します
+              タイトルから画像を検索または生成します
             </span>
+          </div>
+        )}
+
+        {mode === "generating" && (
+          <div className="space-y-2">
+            {isLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                画像を生成中...
+              </div>
+            )}
+            {errorMessage && (
+              <div className="text-xs text-destructive">{errorMessage}</div>
+            )}
+            {!isLoading && !errorMessage && (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleBackToActions}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  戻る
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

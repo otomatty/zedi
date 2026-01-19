@@ -1,15 +1,16 @@
 import React, { useMemo } from "react";
 import { usePages } from "@/hooks/usePageQueries";
-import { groupPagesByDate } from "@/lib/dateUtils";
-import DateSection from "./DateSection";
+import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
 
 const PageGrid: React.FC = () => {
   // Use SQLite (local or Turso depending on auth state)
   const { data: pages = [], isLoading } = usePages();
 
-  const dateGroups = useMemo(() => {
-    return groupPagesByDate(pages);
+  const sortedPages = useMemo(() => {
+    return [...pages]
+      .filter((p) => !p.isDeleted)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [pages]);
 
   // Show loading state
@@ -21,22 +22,17 @@ const PageGrid: React.FC = () => {
     );
   }
 
-  if (dateGroups.length === 0) {
+  if (sortedPages.length === 0) {
     return <EmptyState />;
   }
 
-  let runningIndex = 0;
-
   return (
     <div className="pb-24">
-      {dateGroups.map((group) => {
-        const startIndex = runningIndex;
-        runningIndex += group.pages.length;
-
-        return (
-          <DateSection key={group.date} group={group} startIndex={startIndex} />
-        );
-      })}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+        {sortedPages.map((page, index) => (
+          <PageCard key={page.id} page={page} index={index} />
+        ))}
+      </div>
     </div>
   );
 };

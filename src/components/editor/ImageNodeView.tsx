@@ -89,9 +89,9 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
   };
 
   return (
-    <NodeViewWrapper className="my-4">
+    <NodeViewWrapper className="my-4 max-w-full">
       <div
-        className={`relative group ${
+        className={`relative group inline-block max-w-full ${
           selected ? "ring-2 ring-primary rounded-lg" : ""
         }`}
       >
@@ -122,7 +122,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
             src={src}
             alt={alt || "image"}
             title={title}
-            className="w-full max-w-[480px] h-auto rounded-lg border bg-background"
+            className="block h-auto w-auto max-w-full rounded-lg border bg-background"
             onError={() => setHasLoadError(true)}
           />
         )}

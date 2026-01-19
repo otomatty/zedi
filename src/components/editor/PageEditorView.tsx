@@ -17,7 +17,7 @@ import {
   useSyncWikiLinks,
 } from "@/hooks/usePageQueries";
 import { useTitleValidation } from "@/hooks/useTitleValidation";
-import { generateAutoTitle, isContentNotEmpty } from "@/lib/contentUtils";
+import { generateAutoTitle, isContentNotEmpty, extractFirstImage } from "@/lib/contentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
@@ -139,17 +139,29 @@ const PageEditor: React.FC = () => {
     shouldBlockSave,
     onSave: (updates) => {
       if (currentPageId) {
+        // コンテンツから先頭画像を抽出してサムネイルとして設定
+        const thumbnailUrl = extractFirstImage(updates.content) || undefined;
+        
         updatePageMutation.mutate({
           pageId: currentPageId,
-          updates,
+          updates: {
+            ...updates,
+            thumbnailUrl,
+          },
         });
       }
     },
     onSaveContentOnly: (content) => {
       if (currentPageId) {
+        // コンテンツから先頭画像を抽出してサムネイルとして設定
+        const thumbnailUrl = extractFirstImage(content) || undefined;
+        
         updatePageMutation.mutate({
           pageId: currentPageId,
-          updates: { content },
+          updates: {
+            content,
+            thumbnailUrl,
+          },
         });
       }
     },

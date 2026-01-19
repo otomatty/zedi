@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "./types/env";
 import imageSearchRoute from "./routes/image-search";
+import imageGenerateRoute from "./routes/image-generate";
 import thumbnailCommitRoute from "./routes/thumbnail-commit";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -23,6 +24,7 @@ app.use(
 
 app.get("/", (c) => c.text("zedi thumbnail api"));
 app.route("/api", imageSearchRoute);
+app.route("/api", imageGenerateRoute);
 app.route("/api", thumbnailCommitRoute);
 
 export default app;
