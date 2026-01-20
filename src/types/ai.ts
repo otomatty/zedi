@@ -2,9 +2,12 @@
 
 export type AIProviderType = "openai" | "anthropic" | "google" | "ollama";
 
+export type APIMode = "user_api_key" | "api_server";
+
 export interface AISettings {
   provider: AIProviderType;
-  apiKey: string;
+  apiKey: string; // ユーザーAPIキーモード時のみ使用
+  apiMode?: APIMode; // API利用モード（後方互換性のためオプショナル）
   model: string;
   isConfigured: boolean;
   // Ollama用の追加設定
@@ -234,6 +237,7 @@ export const AI_PROVIDERS: AIProvider[] = [
 export const DEFAULT_AI_SETTINGS: AISettings = {
   provider: "ollama",
   apiKey: "",
+  apiMode: "api_server", // デフォルトはAPIサーバー経由
   model: "qwen2.5:7b", // 日本語対応が良いデフォルト
   isConfigured: false,
   ollamaEndpoint: "http://localhost:11434",

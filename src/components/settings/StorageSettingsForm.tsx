@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -12,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -43,6 +45,7 @@ import { useStorageSettings } from "@/hooks/useStorageSettings";
 import {
   STORAGE_PROVIDERS,
   StorageProviderType,
+  StorageProviderInfo,
   getStorageProviderById,
 } from "@/types/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -63,8 +66,25 @@ export const StorageSettingsForm: React.FC = () => {
 
   const [showSecrets, setShowSecrets] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const currentProvider = getStorageProviderById(settings.provider);
+  const difficultyLabels: Record<
+    StorageProviderInfo["setupDifficulty"],
+    string
+  > = {
+    easy: "簡単",
+    medium: "普通",
+    hard: "上級",
+  };
+
+  const getSafeReturnTo = (): string | null => {
+    const returnTo = searchParams.get("returnTo");
+    if (!returnTo) return null;
+    if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
+    return returnTo;
+  };
 
   const handleSave = async () => {
     const success = await save();
@@ -73,6 +93,10 @@ export const StorageSettingsForm: React.FC = () => {
         title: "保存しました",
         description: "ストレージ設定が正常に保存されました",
       });
+      const returnTo = getSafeReturnTo();
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
+      }
     } else {
       toast({
         title: "エラー",
@@ -146,20 +170,36 @@ export const StorageSettingsForm: React.FC = () => {
             <SelectContent>
               {STORAGE_PROVIDERS.map((provider) => (
                 <SelectItem key={provider.id} value={provider.id}>
-                  <div className="flex flex-col items-start">
-                    <span>{provider.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {provider.freeTier}
-                    </span>
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <div className="flex flex-col items-start">
+                      <span>{provider.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {provider.description}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className="text-[10px]">
+                        難易度: {difficultyLabels[provider.setupDifficulty]}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {provider.freeTier}
+                      </Badge>
+                    </div>
                   </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           {currentProvider && (
-            <p className="text-xs text-muted-foreground">
-              {currentProvider.description}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-[10px]">
+                難易度: {difficultyLabels[currentProvider.setupDifficulty]}
+              </Badge>
+              <Badge variant="secondary" className="text-[10px]">
+                {currentProvider.freeTier}
+              </Badge>
+              <span>{currentProvider.description}</span>
+            </div>
           )}
         </div>
 
@@ -351,6 +391,17 @@ const GyazoSettings: React.FC<GyazoSettingsProps> = ({
       </a>
       でAccess Tokenを取得してください
     </p>
+    <div className="rounded-lg border border-border bg-muted/50 p-3 mt-2">
+      <p className="text-xs font-medium mb-1">💡 Callback URLの設定について</p>
+      <p className="text-xs text-muted-foreground">
+        OAuthアプリケーション作成時にCallback URLが求められる場合、以下のいずれかを入力してください（実際には使用されません）:
+      </p>
+      <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc space-y-0.5">
+        <li><code className="bg-muted px-1 rounded">http://localhost:5173/callback</code></li>
+        <li><code className="bg-muted px-1 rounded">urn:ietf:wg:oauth:2.0:oob</code></li>
+        <li><code className="bg-muted px-1 rounded">zedi://oauth/callback</code></li>
+      </ul>
+    </div>
   </div>
 );
 

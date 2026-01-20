@@ -1,0 +1,6 @@
+name = "zedi-ai-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-20"
+
+[vars]
+CORS_ORIGIN = "http://localhost:30000"

@@ -17,15 +17,23 @@ import {
   useSyncWikiLinks,
 } from "@/hooks/usePageQueries";
 import { useTitleValidation } from "@/hooks/useTitleValidation";
-import { generateAutoTitle, isContentNotEmpty } from "@/lib/contentUtils";
+import { generateAutoTitle, isContentNotEmpty, extractFirstImage } from "@/lib/contentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
+import { useStorageSettings } from "@/hooks/useStorageSettings";
+import { getStorageProviderById } from "@/types/storage";
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const {
+    settings: storageSettings,
+    isLoading: isStorageLoading,
+  } = useStorageSettings();
+  const isStorageConfigured = !isStorageLoading && storageSettings.isConfigured;
+  const currentStorageProvider = getStorageProviderById(storageSettings.provider);
 
   const isNewPage = id === "new";
   const pageId = isNewPage ? "" : id || "";
@@ -131,17 +139,29 @@ const PageEditor: React.FC = () => {
     shouldBlockSave,
     onSave: (updates) => {
       if (currentPageId) {
+        // コンテンツから先頭画像を抽出してサムネイルとして設定
+        const thumbnailUrl = extractFirstImage(updates.content) || undefined;
+        
         updatePageMutation.mutate({
           pageId: currentPageId,
-          updates,
+          updates: {
+            ...updates,
+            thumbnailUrl,
+          },
         });
       }
     },
     onSaveContentOnly: (content) => {
       if (currentPageId) {
+        // コンテンツから先頭画像を抽出してサムネイルとして設定
+        const thumbnailUrl = extractFirstImage(content) || undefined;
+        
         updatePageMutation.mutate({
           pageId: currentPageId,
-          updates: { content },
+          updates: {
+            content,
+            thumbnailUrl,
+          },
         });
       }
     },
@@ -160,6 +180,33 @@ const PageEditor: React.FC = () => {
       initialize(page);
     }
   }, [isNewPage, page, isInitialized, initialize]);
+
+  // Handle navigation state (from FAB URL creation)
+  useEffect(() => {
+    const state = location.state as {
+      sourceUrl?: string;
+      thumbnailUrl?: string | null;
+    } | null;
+
+    if (state && currentPageId && isInitialized) {
+      const { sourceUrl: stateSourceUrl, thumbnailUrl: stateThumbnailUrl } = state;
+
+      if (stateSourceUrl || stateThumbnailUrl) {
+        // Update page with sourceUrl and thumbnailUrl from navigation state
+        setSourceUrl(stateSourceUrl || "");
+        updatePageMutation.mutate({
+          pageId: currentPageId,
+          updates: {
+            sourceUrl: stateSourceUrl || undefined,
+            thumbnailUrl: stateThumbnailUrl || undefined,
+          },
+        });
+
+        // Clear the state to prevent re-processing
+        navigate(location.pathname, { replace: true, state: null });
+      }
+    }
+  }, [location.state, currentPageId, isInitialized, setSourceUrl, updatePageMutation, navigate, location.pathname]);
 
   // Handle page not found
   useEffect(() => {
@@ -254,6 +301,12 @@ const PageEditor: React.FC = () => {
     navigate(`/settings/ai?${search}`);
   }, [resetWiki, navigate, location.pathname, location.search]);
 
+  const handleGoToStorageSettings = useCallback(() => {
+    const returnTo = `${location.pathname}${location.search}`;
+    const search = new URLSearchParams({ returnTo }).toString();
+    navigate(`/settings/storage?${search}`);
+  }, [navigate, location.pathname, location.search]);
+
   // Web Clipper結果をエディタに反映
   const handleWebClipped = useCallback(
     (
@@ -328,6 +381,10 @@ const PageEditor: React.FC = () => {
         errorMessage={errorMessage}
         isTitleEmpty={isTitleEmpty}
         isNewPage={isNewPage}
+        currentStorageProvider={currentStorageProvider}
+        isStorageConfigured={isStorageConfigured}
+        isStorageLoading={isStorageLoading}
+        onGoToStorageSettings={handleGoToStorageSettings}
         onBack={handleBack}
         onDelete={handleDelete}
         onExportMarkdown={handleExportMarkdown}
@@ -350,6 +407,7 @@ const PageEditor: React.FC = () => {
 
       <PageEditorContent
         content={content}
+        title={title}
         sourceUrl={sourceUrl}
         currentPageId={currentPageId}
         pageId={pageId}

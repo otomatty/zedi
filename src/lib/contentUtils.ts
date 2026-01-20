@@ -13,6 +13,7 @@ const SUPPORTED_NODE_TYPES = new Set([
   'hardBreak',
   'mermaid',
   'image', // 画像挿入機能のサポート
+  'imageUpload', // 画像アップロード中のプレースホルダー
 ]);
 
 // Supported mark types in zedi's Tiptap schema
@@ -230,18 +231,24 @@ export function extractPlainText(content: string): string {
   }
 }
 
-function extractTextFromNode(node: any): string {
-  if (!node) return '';
-  
-  if (node.type === 'text') {
-    return node.text || '';
+function extractTextFromNode(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+
+  const typedNode = node as {
+    type?: string;
+    text?: string;
+    content?: unknown[];
+  };
+
+  if (typedNode.type === "text") {
+    return typeof typedNode.text === "string" ? typedNode.text : "";
   }
-  
-  if (node.content && Array.isArray(node.content)) {
-    return node.content.map(extractTextFromNode).join(' ');
+
+  if (Array.isArray(typedNode.content)) {
+    return typedNode.content.map(extractTextFromNode).join(" ");
   }
-  
-  return '';
+
+  return "";
 }
 
 // Get a preview snippet of the content
@@ -268,20 +275,26 @@ export function extractFirstImage(content: string): string | null {
   }
 }
 
-function findFirstImage(node: any): string | null {
-  if (!node) return null;
-  
-  if (node.type === 'image' && node.attrs?.src) {
-    return node.attrs.src;
+function findFirstImage(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+
+  const typedNode = node as {
+    type?: string;
+    attrs?: { src?: string };
+    content?: unknown[];
+  };
+
+  if (typedNode.type === "image" && typedNode.attrs?.src) {
+    return typedNode.attrs.src;
   }
-  
-  if (node.content && Array.isArray(node.content)) {
-    for (const child of node.content) {
+
+  if (Array.isArray(typedNode.content)) {
+    for (const child of typedNode.content) {
       const found = findFirstImage(child);
       if (found) return found;
     }
   }
-  
+
   return null;
 }
 

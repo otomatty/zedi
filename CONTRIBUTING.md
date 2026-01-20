@@ -92,11 +92,13 @@ git remote add upstream https://github.com/original-owner/zedi.git
 
 ### 開発フロー
 
-1. **upstream から最新を取得**
+> 📖 **詳細なブランチ戦略**: [ブランチ戦略ガイド](../docs/guides/branch-strategy.md) を参照してください。
+
+1. **develop ブランチから最新を取得**
    ```bash
-   git fetch upstream
-   git checkout main
-   git merge upstream/main
+   git fetch origin
+   git checkout develop
+   git pull origin develop
    ```
 
 2. **機能ブランチを作成**
@@ -127,6 +129,10 @@ git remote add upstream https://github.com/original-owner/zedi.git
    git commit -m "feat: add backlinks feature"
    git push origin feature/your-feature
    ```
+
+6. **Pull Request を作成**
+   - ベースブランチ: `develop`
+   - CIが自動的に実行され、すべてのチェックが通ることを確認
 
 ---
 

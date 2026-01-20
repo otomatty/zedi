@@ -1,28 +1,39 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { useLocation, useNavigate } from "react-router-dom";
+import type { Editor } from "@tiptap/core";
 import { cn } from "@/lib/utils";
 import {
   wikiLinkSuggestionPluginKey,
   type WikiLinkSuggestionState,
 } from "./extensions/wikiLinkSuggestionPlugin";
 import {
-  WikiLinkSuggestion,
-  type SuggestionItem,
   type WikiLinkSuggestionHandle,
+  type SuggestionItem,
 } from "./extensions/WikiLinkSuggestion";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 import { useCheckGhostLinkReferenced } from "@/hooks/usePageQueries";
 import { useContentSanitizer, type ContentError } from "./TiptapEditor/useContentSanitizer";
 import { useWikiLinkNavigation } from "./TiptapEditor/useWikiLinkNavigation";
 import { useWikiLinkStatusSync } from "./TiptapEditor/useWikiLinkStatusSync";
-import { useEditorSelectionMenu } from "./TiptapEditor/useEditorSelectionMenu";
 import { createEditorExtensions, defaultEditorProps } from "./TiptapEditor/editorConfig";
 import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";
-import { Button } from "@/components/ui/button";
-import { GitBranch, Image as ImageIcon, Loader2 } from "lucide-react";
-import { useImageUpload } from "@/hooks/useImageUpload";
+import { getStorageProviderById } from "@/types/storage";
+import { useStorageSettings } from "@/hooks/useStorageSettings";
 import { useToast } from "@/hooks/use-toast";
+import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
+import { DragOverlay } from "./TiptapEditor/DragOverlay";
+import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
+import { useImageUploadManager } from "./TiptapEditor/useImageUploadManager";
+import { usePasteImageHandler } from "./TiptapEditor/usePasteImageHandler";
+import { useStorageActions } from "./TiptapEditor/useStorageActions";
+import { EditorBottomToolbar } from "@/components/editor/TiptapEditor/EditorBottomToolbar";
+import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
+import { extractFirstImage } from "@/lib/contentUtils";
+
+const THUMBNAIL_API_BASE_URL =
+  import.meta.env.VITE_THUMBNAIL_API_BASE_URL || "";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -35,6 +46,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   className,
   autoFocus = false,
   pageId,
+  pageTitle = "",
   isReadOnly = false,
   onContentError,
 }) => {
@@ -57,31 +69,27 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   } | null>(null);
   const suggestionRef = useRef<WikiLinkSuggestionHandle>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   // Mermaid generator state
   const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
   const [selectedTextForMermaid, setSelectedTextForMermaid] = useState("");
+  const [selectedText, setSelectedText] = useState("");
+  const hasThumbnail = useMemo(
+    () => Boolean(extractFirstImage(content)),
+    [content]
+  );
 
-  // Selection menu hook
-  const {
-    showMenu: showSelectionMenu,
-    menuPosition: selectionMenuPos,
-    selectedText,
-    handleOpenMermaidDialog: handleOpenMermaidDialogFromHook,
-    handleSelectionUpdate,
-  } = useEditorSelectionMenu({
-    containerRef: editorContainerRef,
-    onOpenMermaidDialog: (text) => {
-      setSelectedTextForMermaid(text);
-      setMermaidDialogOpen(true);
-    },
-  });
-
-  // Image upload hook
-  const { uploadImage, isUploading, isConfigured: isStorageConfigured } = useImageUpload();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    settings: storageSettings,
+    isLoading: isStorageLoading,
+  } = useStorageSettings();
+  const isStorageConfigured = !isStorageLoading && storageSettings.isConfigured;
+  const currentStorageProvider = getStorageProviderById(storageSettings.provider);
+  const [storageSetupDialogOpen, setStorageSetupDialogOpen] = useState(false);
 
   // Flag to track if editor has been initialized with content
   // Prevents onUpdate from overwriting content before page data is loaded
@@ -112,11 +120,62 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     }
   }
 
+  const editorRef = useRef<Editor | null>(null);
+  const openStorageSetupDialog = useCallback(() => {
+    setStorageSetupDialogOpen(true);
+  }, []);
+
+  const {
+    getProviderLabel,
+    handleCopyImageUrl,
+    canDeleteFromStorage,
+    handleDeleteFromStorage,
+  } = useStorageActions({
+    storageSettings,
+    isStorageConfigured,
+    currentStorageProvider,
+    toast,
+  });
+
+  const {
+    fileInputRef,
+    isDraggingOver,
+    handleFileInputChange,
+    handleInsertImageClick,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleRetryUpload,
+    handleRemoveUpload,
+    handleImageUpload,
+  } = useImageUploadManager({
+    editorRef,
+    onChange,
+    isReadOnly,
+    isStorageConfigured,
+    isStorageLoading,
+    storageSettings,
+    toast,
+    onRequestStorageSetup: openStorageSetupDialog,
+    lastSelectionRef,
+  });
+
   const editor = useEditor({
     extensions: createEditorExtensions({
       placeholder,
       onLinkClick: handleLinkClick,
       onStateChange: handleStateChange,
+      imageUploadOptions: {
+        onRetry: handleRetryUpload,
+        onRemove: handleRemoveUpload,
+        getProviderLabel,
+      },
+      imageOptions: {
+        getProviderLabel,
+        canDeleteFromStorage,
+        onDeleteFromStorage: handleDeleteFromStorage,
+        onCopyUrl: handleCopyImageUrl,
+      },
     }),
     content: initialParsedContent,
     autofocus: autoFocus ? "end" : false,
@@ -155,8 +214,19 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         isEditorInitializedRef.current = true;
       }
     },
-    onSelectionUpdate: handleSelectionUpdate,
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+      const text = editor.state.doc.textBetween(from, to, " ");
+      lastSelectionRef.current = { from, to };
+      setSelectedText(text.trim());
+    },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  usePasteImageHandler({ editor, handleImageUpload });
 
   // isReadOnlyの変更を検知してエディターの編集可能状態を更新
   useEffect(() => {
@@ -256,8 +326,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     );
   }, [editor]);
 
-  // Handle Mermaid generation (use hook's handler)
-  const handleOpenMermaidDialog = handleOpenMermaidDialogFromHook;
+  const handleOpenMermaidDialog = useCallback(() => {
+    if (!selectedText) return;
+    setSelectedTextForMermaid(selectedText);
+    setMermaidDialogOpen(true);
+  }, [selectedText]);
 
   const handleInsertMermaid = useCallback(
     (code: string) => {
@@ -268,114 +341,118 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     [editor]
   );
 
-  // Image upload handler
-  const handleImageUpload = useCallback(
-    async (files: FileList | File[]) => {
+  const handleInsertThumbnailImage = useCallback(
+    async (imageUrl: string, alt: string, previewUrl?: string) => {
       if (!editor) return;
-
-      const imageFiles = Array.from(files).filter((file) =>
-        file.type.startsWith("image/")
-      );
-
-      if (imageFiles.length === 0) return;
-
-      // Check if storage is configured
-      if (!isStorageConfigured) {
+      if (isStorageLoading) {
         toast({
-          title: "ストレージ未設定",
-          description: "設定画面で画像ストレージを設定してください",
+          title: "読み込み中",
+          description: "ストレージ設定を読み込み中です",
+        });
+        return;
+      }
+      if (!isStorageConfigured) {
+        openStorageSetupDialog();
+        return;
+      }
+      if (storageSettings.provider !== "gyazo") {
+        toast({
+          title: "Gyazoが必要です",
+          description: "サムネイル検索画像の保存はGyazoのみ対応しています",
           variant: "destructive",
         });
         return;
       }
 
-      for (const file of imageFiles) {
-        try {
-          const url = await uploadImage(file);
-          editor
-            .chain()
-            .focus()
-            .setImage({ src: url, alt: file.name })
-            .run();
-        } catch (error) {
-          toast({
-            title: "アップロード失敗",
-            description:
-              error instanceof Error ? error.message : "画像のアップロードに失敗しました",
-            variant: "destructive",
-          });
+      const accessToken = storageSettings.config.gyazoAccessToken;
+      if (!accessToken) {
+        toast({
+          title: "Gyazoトークンが必要です",
+          description: "Gyazo Access Tokenを設定してください",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const altText = alt || pageTitle || "thumbnail";
+
+      try {
+        const response = await fetch(
+          `${THUMBNAIL_API_BASE_URL}/api/thumbnail/commit`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Gyazo-Access-Token": accessToken,
+            },
+            body: JSON.stringify({
+              sourceUrl: imageUrl,
+              fallbackUrl: previewUrl,
+              title: altText,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          let message = `画像の保存に失敗しました: ${response.status}`;
+          try {
+            const data = (await response.json()) as { error?: string };
+            if (data?.error) {
+              message = data.error;
+            }
+          } catch {
+            // ignore parse errors
+          }
+          throw new Error(message);
         }
+
+        const data = (await response.json()) as {
+          imageUrl?: string;
+        };
+
+        if (!data.imageUrl) {
+          throw new Error("GyazoのURLが取得できませんでした");
+        }
+
+        editor
+          .chain()
+          .focus()
+          .insertContentAt(0, {
+            type: "image",
+            attrs: {
+              src: data.imageUrl,
+              alt: altText,
+              title: altText,
+              storageProviderId: "gyazo",
+            },
+          })
+          .run();
+      } catch (error) {
+        toast({
+          title: "画像の保存に失敗しました",
+          description:
+            error instanceof Error ? error.message : "画像の保存に失敗しました",
+          variant: "destructive",
+        });
       }
     },
-    [editor, uploadImage, isStorageConfigured, toast]
+    [
+      editor,
+      isStorageConfigured,
+      isStorageLoading,
+      openStorageSetupDialog,
+      pageTitle,
+      storageSettings.provider,
+      storageSettings.config.gyazoAccessToken,
+      toast,
+    ]
   );
 
-  // Handle file input change
-  const handleFileInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-        handleImageUpload(e.target.files);
-        // Reset input value to allow selecting the same file again
-        e.target.value = "";
-      }
-    },
-    [handleImageUpload]
-  );
-
-  // Drag and drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOver(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDraggingOver(false);
-
-      if (e.dataTransfer?.files?.length) {
-        handleImageUpload(e.dataTransfer.files);
-      }
-    },
-    [handleImageUpload]
-  );
-
-  // Handle paste events for images
-  useEffect(() => {
-    if (!editor) return;
-
-    const handlePaste = (event: ClipboardEvent) => {
-      const items = event.clipboardData?.items;
-      if (!items) return;
-
-      const imageItems = Array.from(items).filter((item) =>
-        item.type.startsWith("image/")
-      );
-
-      if (imageItems.length > 0) {
-        event.preventDefault();
-        const files = imageItems
-          .map((item) => item.getAsFile())
-          .filter((file): file is File => file !== null);
-        handleImageUpload(files);
-      }
-    };
-
-    const editorElement = editor.view.dom;
-    editorElement.addEventListener("paste", handlePaste);
-
-    return () => {
-      editorElement.removeEventListener("paste", handlePaste);
-    };
-  }, [editor, handleImageUpload]);
+  const handleGoToStorageSettings = useCallback(() => {
+    const returnTo = `${location.pathname}${location.search}`;
+    const search = new URLSearchParams({ returnTo }).toString();
+    navigate(`/settings/storage?${search}`);
+  }, [navigate, location.pathname, location.search]);
 
   return (
     <div
@@ -398,73 +475,17 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       <EditorContent editor={editor} />
 
       {/* Drag overlay */}
-      {isDraggingOver && (
-        <div className="absolute inset-0 bg-primary/10 flex items-center justify-center pointer-events-none z-40">
-          <div className="bg-background border-2 border-dashed border-primary rounded-lg p-4 text-center">
-            <ImageIcon className="h-8 w-8 mx-auto mb-2 text-primary" />
-            <p className="text-sm text-muted-foreground">画像をドロップしてアップロード</p>
-          </div>
-        </div>
-      )}
-
-      {/* Upload progress indicator */}
-      {isUploading && (
-        <div className="absolute top-2 right-2 bg-background border rounded-lg shadow-lg p-2 flex items-center gap-2 z-50">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          <span className="text-sm">アップロード中...</span>
-        </div>
-      )}
-
-      {/* Selection Menu - テキスト選択時に表示 */}
-      {showSelectionMenu && selectionMenuPos && (
-        <div
-          className="absolute z-50 flex items-center gap-1 bg-background border rounded-lg shadow-lg p-1"
-          style={{
-            top: selectionMenuPos.top,
-            left: selectionMenuPos.left,
-          }}
-        >
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleOpenMermaidDialog}
-            className="text-xs"
-          >
-            <GitBranch className="h-4 w-4 mr-1" />
-            ダイアグラム生成
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-xs"
-            disabled={isUploading}
-          >
-            <ImageIcon className="h-4 w-4 mr-1" />
-            画像を挿入
-          </Button>
-        </div>
-      )}
+      <DragOverlay isVisible={isDraggingOver} />
 
       {/* Wiki Link Suggestion Popup */}
-      {suggestionState?.active && suggestionPos && editor && (
-        <div
-          className="absolute z-50"
-          style={{
-            top: suggestionPos.top,
-            left: suggestionPos.left,
-          }}
-        >
-          <WikiLinkSuggestion
-            ref={suggestionRef}
-            editor={editor}
-            query={suggestionState.query}
-            range={suggestionState.range!}
-            onSelect={handleSuggestionSelect}
-            onClose={handleSuggestionClose}
-          />
-        </div>
-      )}
+      <WikiLinkSuggestionLayer
+        editor={editor}
+        suggestionState={suggestionState}
+        position={suggestionPos}
+        suggestionRef={suggestionRef}
+        onSelect={handleSuggestionSelect}
+        onClose={handleSuggestionClose}
+      />
 
       {/* Mermaid Generator Dialog */}
       <MermaidGeneratorDialog
@@ -480,6 +501,26 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         pageTitle={pendingCreatePageTitle}
         onConfirm={handleConfirmCreate}
         onCancel={handleCancelCreate}
+      />
+
+      <EditorRecommendationBar
+        pageTitle={pageTitle}
+        isReadOnly={isReadOnly}
+        hasThumbnail={hasThumbnail}
+        onSelectThumbnail={handleInsertThumbnailImage}
+      />
+
+      <EditorBottomToolbar
+        isReadOnly={isReadOnly}
+        showDiagramAction={selectedText.length > 0}
+        onInsertImage={handleInsertImageClick}
+        onGenerateDiagram={handleOpenMermaidDialog}
+      />
+
+      <StorageSetupDialog
+        open={storageSetupDialogOpen}
+        onOpenChange={setStorageSetupDialogOpen}
+        onConfirm={handleGoToStorageSettings}
       />
     </div>
   );

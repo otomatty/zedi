@@ -1,0 +1,17 @@
+{
+  "name": "zedi-thumbnail-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.11.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260118.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^3.114.17"
+  }
+}

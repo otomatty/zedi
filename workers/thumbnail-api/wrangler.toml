@@ -1,0 +1,6 @@
+name = "zedi-thumbnail-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-18"
+
+[vars]
+CORS_ORIGIN = "http://localhost:30000"
