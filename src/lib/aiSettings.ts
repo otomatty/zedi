@@ -26,6 +26,7 @@ export async function saveAISettings(settings: AISettings): Promise<void> {
 /**
  * AI設定を読み込む
  * 暗号化されたAPIキーを復号化して返す
+ * 後方互換性: apiModeがない場合は自動判定
  */
 export async function loadAISettings(): Promise<AISettings | null> {
   try {
@@ -34,9 +35,15 @@ export async function loadAISettings(): Promise<AISettings | null> {
 
     const parsed = JSON.parse(stored) as AISettings;
 
-    // APIキーを復号化
+    // APIキーを復号化（後方互換性判定の前に復号化）
     if (parsed.apiKey) {
       parsed.apiKey = await decrypt(parsed.apiKey);
+    }
+
+    // 後方互換性: apiModeがない場合は自動判定（復号化後）
+    if (!parsed.apiMode) {
+      // apiKeyが設定されている場合はuser_api_key、そうでなければapi_server
+      parsed.apiMode = parsed.apiKey.trim() !== "" ? "user_api_key" : "api_server";
     }
 
     return parsed;

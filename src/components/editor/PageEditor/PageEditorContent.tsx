@@ -35,7 +35,6 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   return (
     <main className="flex-1 pt-6 pb-32">
       <Container>
-        <div className="max-w-4xl mx-auto space-y-4">
           {/* Source URL Badge - クリップしたページの場合に表示 */}
           {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
 
@@ -58,7 +57,6 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
 
           {/* Linked Pages Section */}
           {currentPageId && <LinkedPagesSection pageId={currentPageId} />}
-        </div>
       </Container>
     </main>
   );
