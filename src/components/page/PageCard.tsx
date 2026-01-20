@@ -122,11 +122,11 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
             {/* Thumbnail or Preview - Bottom */}
             <div className="flex-1 min-h-0 overflow-hidden">
               {thumbnail ? (
-                <div className="h-full w-full overflow-hidden bg-muted">
+                <div className="h-full w-full px-3 pb-3 pt-0 flex items-center justify-center">
                   <img
                     src={thumbnail}
                     alt=""
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"
                   />
                 </div>

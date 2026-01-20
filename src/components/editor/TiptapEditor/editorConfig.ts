@@ -2,7 +2,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
-import Image from "@tiptap/extension-image";
+import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
+import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import {
@@ -18,6 +19,8 @@ export interface EditorExtensionsOptions {
   placeholder: string;
   onLinkClick: (title: string, exists: boolean) => void;
   onStateChange: (state: WikiLinkSuggestionState) => void;
+  imageUploadOptions: Partial<ImageUploadOptions>;
+  imageOptions: Partial<StorageImageOptions>;
 }
 
 /**
@@ -52,13 +55,17 @@ export function createEditorExtensions(
     WikiLinkSuggestionPlugin.configure({
       onStateChange: options.onStateChange,
     }),
-    // Image extension for image insertion
-    Image.configure({
-      inline: false, // ブロックレベルで表示
-      allowBase64: false, // 外部ストレージを使用するためBase64は無効化
+    ImageUpload.configure({
+      HTMLAttributes: {},
+      ...options.imageUploadOptions,
+    }),
+    StorageImage.configure({
+      inline: false,
+      allowBase64: false,
       HTMLAttributes: {
         class: "tiptap-image max-w-full h-auto rounded-lg my-4",
       },
+      ...options.imageOptions,
     }),
     Mermaid,
   ] as Extension[];

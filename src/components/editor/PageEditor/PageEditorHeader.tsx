@@ -25,7 +25,8 @@ import Container from "@/components/layout/Container";
 import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import type { WikiGeneratorStatus } from "./types";
-import type { Page } from "@/types/page";
+import type { StorageProviderInfo } from "@/types/storage";
+import { StorageStatusHeader } from "../TiptapEditor/StorageStatusHeader";
 
 interface PageEditorHeaderProps {
   title: string;
@@ -36,6 +37,10 @@ interface PageEditorHeaderProps {
   errorMessage: string | null;
   isTitleEmpty: boolean;
   isNewPage: boolean;
+  currentStorageProvider?: StorageProviderInfo;
+  isStorageConfigured: boolean;
+  isStorageLoading: boolean;
+  onGoToStorageSettings: () => void;
   onBack: () => void;
   onDelete: () => void;
   onExportMarkdown: () => void;
@@ -57,6 +62,10 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   errorMessage,
   isTitleEmpty,
   isNewPage,
+  currentStorageProvider,
+  isStorageConfigured,
+  isStorageLoading,
+  onGoToStorageSettings,
   onBack,
   onDelete,
   onExportMarkdown,
@@ -112,6 +121,13 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
               <TooltipContent>URLから取り込み</TooltipContent>
             </Tooltip>
           )}
+          <StorageStatusHeader
+            currentStorageProvider={currentStorageProvider}
+            isStorageConfigured={isStorageConfigured}
+            isStorageLoading={isStorageLoading}
+            onGoToStorageSettings={onGoToStorageSettings}
+            className="shrink-0"
+          />
           {lastSaved && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
               {formatTimeAgo(lastSaved)}に保存

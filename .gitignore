@@ -34,3 +34,7 @@ scripts/sync/dev-user-mapping.json
 # Playwright
 playwright-report/
 test-results/
+
+# Cloudflare Workers
+.wrangler/
+.dev.vars
