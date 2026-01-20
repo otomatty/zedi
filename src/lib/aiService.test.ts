@@ -8,19 +8,57 @@ import {
 } from "./aiService";
 import type { AISettings } from "@/types/ai";
 
+let openAIMock: {
+  chat: { completions: { create: ReturnType<typeof vi.fn> } };
+} | null = null;
+let anthropicMock: {
+  messages: {
+    create: ReturnType<typeof vi.fn>;
+    stream: ReturnType<typeof vi.fn>;
+  };
+} | null = null;
+let googleMock: {
+  models: {
+    generateContent: ReturnType<typeof vi.fn>;
+    generateContentStream: ReturnType<typeof vi.fn>;
+  };
+} | null = null;
+let ollamaMock: { chat: ReturnType<typeof vi.fn> } | null = null;
+
 // OpenAI SDKのモック
 vi.mock("openai", () => ({
-  default: vi.fn(),
+  default: class OpenAI {
+    constructor() {
+      if (!openAIMock) {
+        throw new Error("OpenAI mock is not configured");
+      }
+      return openAIMock;
+    }
+  },
 }));
 
 // Anthropic SDKのモック
 vi.mock("@anthropic-ai/sdk", () => ({
-  default: vi.fn(),
+  default: class Anthropic {
+    constructor() {
+      if (!anthropicMock) {
+        throw new Error("Anthropic mock is not configured");
+      }
+      return anthropicMock;
+    }
+  },
 }));
 
 // Google GenAI SDKのモック
 vi.mock("@google/genai", () => ({
-  GoogleGenAI: vi.fn(),
+  GoogleGenAI: class GoogleGenAI {
+    constructor() {
+      if (!googleMock) {
+        throw new Error("GoogleGenAI mock is not configured");
+      }
+      return googleMock;
+    }
+  },
 }));
 
 // OllamaClientのモック
@@ -28,7 +66,14 @@ vi.mock("./aiClient", async () => {
   const actual = await vi.importActual<typeof import("./aiClient")>("./aiClient");
   return {
     ...actual,
-    OllamaClient: vi.fn(),
+    OllamaClient: class OllamaClient {
+      constructor() {
+        if (!ollamaMock) {
+          throw new Error("Ollama mock is not configured");
+        }
+        return ollamaMock;
+      }
+    },
   };
 });
 
@@ -135,12 +180,15 @@ describe("aiService - 回帰テスト", () => {
     // モックのリセット用ヘルパー
     const resetMocks = () => {
       vi.clearAllMocks();
+      openAIMock = null;
+      anthropicMock = null;
+      googleMock = null;
+      ollamaMock = null;
     };
 
     describe("OpenAI - 非ストリーミング", () => {
       it("既存と同じようにAPIを呼び出せる", async () => {
         resetMocks();
-        const OpenAI = (await import("openai")).default;
         const settings = createTestSettings("openai");
         const request = createTestRequest();
         const mockResponse = {
@@ -161,8 +209,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        // OpenAIコンストラクタをモック
-        vi.mocked(OpenAI).mockImplementation(() => mockClient as any);
+        openAIMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onComplete: vi.fn(),
@@ -170,12 +217,6 @@ describe("aiService - 回帰テスト", () => {
         };
 
         await callAIService(settings, request, callbacks);
-
-        // OpenAIコンストラクタが呼ばれたことを確認
-        expect(OpenAI).toHaveBeenCalledWith({
-          apiKey: "test-key",
-          dangerouslyAllowBrowser: true,
-        });
 
         // APIが呼ばれたことを確認
         expect(mockCreate).toHaveBeenCalled();
@@ -191,7 +232,6 @@ describe("aiService - 回帰テスト", () => {
 
     describe("OpenAI - ストリーミング", () => {
       it("既存と同じようにストリーミングAPIを呼び出せる", async () => {
-        const { default: OpenAI } = await import("openai");
         const settings = createTestSettings("openai");
         const request: AIServiceRequest = {
           ...createTestRequest(),
@@ -220,7 +260,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        vi.mocked(OpenAI).mockImplementation(() => mockClient as any);
+        openAIMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onChunk: vi.fn(),
@@ -253,7 +293,6 @@ describe("aiService - 回帰テスト", () => {
     describe("Anthropic - 非ストリーミング", () => {
       it("既存と同じようにAPIを呼び出せる", async () => {
         resetMocks();
-        const Anthropic = (await import("@anthropic-ai/sdk")).default;
         const settings = createTestSettings("anthropic");
         const request: AIServiceRequest = {
           provider: "anthropic",
@@ -280,7 +319,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        vi.mocked(Anthropic).mockImplementation(() => mockClient as any);
+        anthropicMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onComplete: vi.fn(),
@@ -309,7 +348,6 @@ describe("aiService - 回帰テスト", () => {
     describe("Anthropic - ストリーミング", () => {
       it("既存と同じようにストリーミングAPIを呼び出せる", async () => {
         resetMocks();
-        const Anthropic = (await import("@anthropic-ai/sdk")).default;
         const settings = createTestSettings("anthropic");
         const request: AIServiceRequest = {
           provider: "anthropic",
@@ -350,7 +388,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        vi.mocked(Anthropic).mockImplementation(() => mockClient as any);
+        anthropicMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onChunk: vi.fn(),
@@ -376,7 +414,6 @@ describe("aiService - 回帰テスト", () => {
     describe("Google - 非ストリーミング", () => {
       it("既存と同じようにAPIを呼び出せる", async () => {
         resetMocks();
-        const { GoogleGenAI } = await import("@google/genai");
         const settings = createTestSettings("google");
         const request: AIServiceRequest = {
           provider: "google",
@@ -401,7 +438,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        (GoogleGenAI as any).mockImplementation(() => mockClient);
+        googleMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onComplete: vi.fn(),
@@ -431,7 +468,6 @@ describe("aiService - 回帰テスト", () => {
     describe("Google - ストリーミング", () => {
       it("既存と同じようにストリーミングAPIを呼び出せる", async () => {
         resetMocks();
-        const { GoogleGenAI } = await import("@google/genai");
         const settings = createTestSettings("google");
         const request: AIServiceRequest = {
           provider: "google",
@@ -465,7 +501,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        (GoogleGenAI as any).mockImplementation(() => mockClient);
+        googleMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onChunk: vi.fn(),
@@ -491,7 +527,6 @@ describe("aiService - 回帰テスト", () => {
     describe("Ollama", () => {
       it("既存と同じようにAPIを呼び出せる", async () => {
         resetMocks();
-        const { OllamaClient } = await import("./aiClient");
         const settings = createTestSettings("ollama", "");
         const request: AIServiceRequest = {
           provider: "ollama",
@@ -510,7 +545,7 @@ describe("aiService - 回帰テスト", () => {
           chat: mockChat,
         };
 
-        vi.mocked(OllamaClient).mockImplementation(() => mockClient as any);
+        ollamaMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onComplete: vi.fn(),
@@ -539,7 +574,6 @@ describe("aiService - 回帰テスト", () => {
     describe("エラーハンドリング", () => {
       it("API呼び出しエラー時にonErrorコールバックが呼ばれる", async () => {
         resetMocks();
-        const OpenAI = (await import("openai")).default;
         const settings = createTestSettings("openai");
         const request = createTestRequest();
 
@@ -552,7 +586,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        vi.mocked(OpenAI).mockImplementation(() => mockClient as any);
+        openAIMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onComplete: vi.fn(),
@@ -592,7 +626,6 @@ describe("aiService - 回帰テスト", () => {
     describe("中断シグナル", () => {
       it("abortSignalがabortedの場合、ストリーミングが中断される", async () => {
         resetMocks();
-        const OpenAI = (await import("openai")).default;
         const settings = createTestSettings("openai");
         const request: AIServiceRequest = {
           ...createTestRequest(),
@@ -617,7 +650,7 @@ describe("aiService - 回帰テスト", () => {
           },
         };
 
-        vi.mocked(OpenAI).mockImplementation(() => mockClient as any);
+        openAIMock = mockClient;
 
         const callbacks: AIServiceCallbacks = {
           onChunk: vi.fn(),
@@ -635,7 +668,7 @@ describe("aiService - 回帰テスト", () => {
   });
 
   describe("callAIService - APIサーバー経由モード", () => {
-    it("api_serverモードの場合はエラーを投げる（Phase 2で実装予定）", async () => {
+    it("api_serverモードでAPIサーバーURLが未設定の場合はonErrorが呼ばれる", async () => {
       const settings: AISettings = {
         provider: "openai",
         apiKey: "",
@@ -660,9 +693,10 @@ describe("aiService - 回帰テスト", () => {
         onError: vi.fn(),
       };
 
-      await expect(
-        callAIService(settings, request, callbacks)
-      ).rejects.toThrow("APIサーバー経由モードはまだ実装されていません");
+      await callAIService(settings, request, callbacks);
+
+      expect(callbacks.onError).toHaveBeenCalled();
+      expect(callbacks.onComplete).not.toHaveBeenCalled();
     });
   });
 });

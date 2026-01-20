@@ -7,6 +7,8 @@ import { GoogleGenAI } from "@google/genai";
 import { AISettings, AIProviderType, APIMode } from "@/types/ai";
 import { createAIClient, OllamaClient } from "./aiClient";
 
+const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
+
 export interface AIServiceRequest {
   provider: AIProviderType;
   model: string;
@@ -68,12 +70,10 @@ export async function callAIService(
   if (apiMode === "user_api_key") {
     // 既存の実装を使用（直接API呼び出し）
     return await callAIWithUserKey(settings, request, callbacks, abortSignal);
-  } else {
-    // APIサーバー経由（Phase 2で実装）
-    throw new Error(
-      "APIサーバー経由モードはまだ実装されていません。Phase 2で実装予定です。"
-    );
   }
+
+  // APIサーバー経由
+  return await callAIWithServer(request, callbacks, abortSignal);
 }
 
 /**
@@ -102,6 +102,137 @@ async function callAIWithUserKey(
       default:
         throw new Error(`Unknown provider: ${settings.provider}`);
     }
+  } catch (error) {
+    callbacks.onError?.(
+      error instanceof Error ? error : new Error("AI API呼び出しエラー")
+    );
+  }
+}
+
+async function getClerkToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const clerk = (window as Window & {
+    Clerk?: { session?: { getToken?: (options?: { template?: string }) => Promise<string | null> } };
+  }).Clerk;
+  if (!clerk?.session?.getToken) return null;
+  return await clerk.session.getToken({ template: "turso" });
+}
+
+/**
+ * APIサーバー経由で呼び出し
+ */
+async function callAIWithServer(
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal
+): Promise<void> {
+  try {
+    const apiBaseUrl = getAIAPIBaseUrl();
+    if (!apiBaseUrl) {
+      throw new Error("AI APIサーバーのURLが設定されていません");
+    }
+
+    if (request.provider === "ollama") {
+      throw new Error("OllamaはAPIサーバー経由モードでは利用できません");
+    }
+
+    const token = await getClerkToken();
+    if (!token) {
+      throw new Error("AUTH_REQUIRED");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        provider: request.provider,
+        model: request.model,
+        messages: request.messages,
+        options: request.options,
+      }),
+      signal: abortSignal,
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+      const message =
+        errorBody?.error || response.statusText || "AI API呼び出しエラー";
+      throw new Error(message);
+    }
+
+    if (request.options?.stream) {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("ストリーミングレスポンスが取得できません");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullContent = "";
+      let finishReason: string | undefined;
+
+      while (true) {
+        if (abortSignal?.aborted) {
+          throw new Error("ABORTED");
+        }
+
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (line.startsWith("data:")) {
+            const payload = line.slice(5).trim();
+            if (!payload) {
+              newlineIndex = buffer.indexOf("\n");
+              continue;
+            }
+
+            const data = JSON.parse(payload) as {
+              content?: string;
+              done?: boolean;
+              finishReason?: string;
+              error?: string;
+            };
+
+            if (data.error) {
+              throw new Error(data.error);
+            }
+
+            if (data.content) {
+              fullContent += data.content;
+              callbacks.onChunk?.(data.content);
+            }
+
+            if (data.done) {
+              finishReason = data.finishReason;
+              callbacks.onComplete?.({ content: fullContent, finishReason });
+              return;
+            }
+          }
+
+          newlineIndex = buffer.indexOf("\n");
+        }
+      }
+
+      if (fullContent) {
+        callbacks.onComplete?.({ content: fullContent, finishReason });
+      }
+      return;
+    }
+
+    const data = (await response.json()) as AIServiceResponse;
+    callbacks.onComplete?.({
+      content: data.content ?? "",
+      finishReason: data.finishReason,
+    });
   } catch (error) {
     callbacks.onError?.(
       error instanceof Error ? error : new Error("AI API呼び出しエラー")
