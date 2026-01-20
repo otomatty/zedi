@@ -181,6 +181,33 @@ const PageEditor: React.FC = () => {
     }
   }, [isNewPage, page, isInitialized, initialize]);
 
+  // Handle navigation state (from FAB URL creation)
+  useEffect(() => {
+    const state = location.state as {
+      sourceUrl?: string;
+      thumbnailUrl?: string | null;
+    } | null;
+
+    if (state && currentPageId && isInitialized) {
+      const { sourceUrl: stateSourceUrl, thumbnailUrl: stateThumbnailUrl } = state;
+
+      if (stateSourceUrl || stateThumbnailUrl) {
+        // Update page with sourceUrl and thumbnailUrl from navigation state
+        setSourceUrl(stateSourceUrl || "");
+        updatePageMutation.mutate({
+          pageId: currentPageId,
+          updates: {
+            sourceUrl: stateSourceUrl || undefined,
+            thumbnailUrl: stateThumbnailUrl || undefined,
+          },
+        });
+
+        // Clear the state to prevent re-processing
+        navigate(location.pathname, { replace: true, state: null });
+      }
+    }
+  }, [location.state, currentPageId, isInitialized, setSourceUrl, updatePageMutation, navigate, location.pathname]);
+
   // Handle page not found
   useEffect(() => {
     if (!isNewPage && isError) {
