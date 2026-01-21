@@ -1,6 +1,12 @@
-name = "zedi-ai-api"
+name = "zedi-ai-api-dev"
 main = "src/index.ts"
 compatibility_date = "2026-01-20"
 
 [vars]
 CORS_ORIGIN = "http://localhost:30000"
+
+[env.production]
+name = "zedi-ai-api"
+
+[env.production.vars]
+CORS_ORIGIN = "https://zedi-note.app/"

@@ -303,11 +303,70 @@ export function useUpdatePage() {
         Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">
       >;
     }) => {
+      const getCachedPage = (
+        targetPageId: string
+      ): Page | PageSummary | null => {
+        const detail = queryClient.getQueryData<Page | null>(
+          pageKeys.detail(userId, targetPageId)
+        );
+        if (detail) return detail;
+
+        const list = queryClient.getQueryData<Page[]>(pageKeys.list(userId));
+        if (list) {
+          const found = list.find((page) => page.id === targetPageId);
+          if (found) return found;
+        }
+
+        const summaries = queryClient.getQueryData<PageSummary[]>(
+          pageKeys.summary(userId)
+        );
+        if (summaries) {
+          const found = summaries.find((page) => page.id === targetPageId);
+          if (found) return found;
+        }
+
+        return null;
+      };
+
+      const existing = getCachedPage(pageId);
+      const existingContent =
+        existing && "content" in existing ? existing.content : undefined;
+
+      const actualUpdates: Partial<
+        Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">
+      > = {};
+
+      if (updates.title !== undefined) {
+        if (!existing || existing.title !== updates.title) {
+          actualUpdates.title = updates.title;
+        }
+      }
+      if (updates.content !== undefined) {
+        if (existingContent === undefined || existingContent !== updates.content) {
+          actualUpdates.content = updates.content;
+        }
+      }
+      if (updates.thumbnailUrl !== undefined) {
+        if (!existing || existing.thumbnailUrl !== updates.thumbnailUrl) {
+          actualUpdates.thumbnailUrl = updates.thumbnailUrl;
+        }
+      }
+      if (updates.sourceUrl !== undefined) {
+        if (!existing || existing.sourceUrl !== updates.sourceUrl) {
+          actualUpdates.sourceUrl = updates.sourceUrl;
+        }
+      }
+
+      if (Object.keys(actualUpdates).length === 0) {
+        return { pageId, updates: actualUpdates, skipped: true };
+      }
+
       const repo = await getRepository();
-      await repo.updatePage(userId, pageId, updates);
-      return { pageId, updates };
+      await repo.updatePage(userId, pageId, actualUpdates);
+      return { pageId, updates: actualUpdates, skipped: false };
     },
-    onSuccess: ({ pageId, updates }) => {
+    onSuccess: ({ pageId, updates, skipped }) => {
+      if (skipped) return;
       const now = Date.now();
       const contentPreview =
         updates.content !== undefined

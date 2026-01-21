@@ -5,8 +5,8 @@ interface UseEditorAutoSaveOptions {
   pageId: string | null;
   debounceMs?: number;
   shouldBlockSave?: boolean;
-  onSave: (updates: { title?: string; content: string }) => void;
-  onSaveContentOnly: (content: string) => void;
+  onSave: (updates: { title?: string; content: string }) => boolean | Promise<boolean>;
+  onSaveContentOnly: (content: string) => boolean | Promise<boolean>;
   syncWikiLinks: (pageId: string, wikiLinks: Array<{ title: string }>) => Promise<void>;
   onSaveSuccess?: () => void;
 }
@@ -54,6 +54,24 @@ export function useEditorAutoSave({
         }
       };
 
+      const runSave = async (saveAction: () => boolean | Promise<boolean>) => {
+        setIsSaving(true);
+        try {
+          const didSave = await saveAction();
+          if (didSave) {
+            setLastSaved(Date.now());
+            onSaveSuccess?.();
+          }
+        } catch (error) {
+          console.error("Auto-save failed:", error);
+        }
+        try {
+          await syncWikiLinksFromContent(newContent);
+        } finally {
+          setIsSaving(false);
+        }
+      };
+
       // タイトル重複時は保存をブロック
       if (forceBlockTitle || shouldBlockSave) {
         // コンテンツのみ保存（タイトルは元のまま）
@@ -61,14 +79,7 @@ export function useEditorAutoSave({
           clearTimeout(saveTimeoutRef.current);
         }
         saveTimeoutRef.current = setTimeout(() => {
-          setIsSaving(true);
-          onSaveContentOnly(newContent);
-          setLastSaved(Date.now());
-          onSaveSuccess?.();
-          // WikiLink同期（非同期だがawaitしない）
-          syncWikiLinksFromContent(newContent).finally(() => {
-            setIsSaving(false);
-          });
+          void runSave(() => onSaveContentOnly(newContent));
         }, debounceMs);
         return;
       }
@@ -78,14 +89,7 @@ export function useEditorAutoSave({
       }
 
       saveTimeoutRef.current = setTimeout(() => {
-        setIsSaving(true);
-        onSave({ title: newTitle, content: newContent });
-        setLastSaved(Date.now());
-        onSaveSuccess?.();
-        // WikiLink同期（非同期だがawaitしない）
-        syncWikiLinksFromContent(newContent).finally(() => {
-          setIsSaving(false);
-        });
+        void runSave(() => onSave({ title: newTitle, content: newContent }));
       }, debounceMs);
     },
     [pageId, debounceMs, shouldBlockSave, onSave, onSaveContentOnly, syncWikiLinks, onSaveSuccess]
