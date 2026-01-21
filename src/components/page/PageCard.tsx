@@ -134,6 +134,8 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
                     src={thumbnail}
                     alt=""
                     className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                    decoding="async"
+                    fetchPriority="low"
                     loading="lazy"
                   />
                 </div>
