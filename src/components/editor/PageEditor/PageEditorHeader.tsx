@@ -5,7 +5,6 @@ import {
   MoreHorizontal,
   Download,
   Copy,
-  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,11 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import Container from "@/components/layout/Container";
 import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { formatTimeAgo } from "@/lib/dateUtils";
@@ -45,7 +39,6 @@ interface PageEditorHeaderProps {
   onDelete: () => void;
   onExportMarkdown: () => void;
   onCopyMarkdown: () => void;
-  onWebClipper: () => void;
   onGenerateWiki: () => void;
 }
 
@@ -70,7 +63,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   onDelete,
   onExportMarkdown,
   onCopyMarkdown,
-  onWebClipper,
   onGenerateWiki,
 }) => {
   return (
@@ -106,21 +98,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
             onGenerate={onGenerateWiki}
             status={wikiStatus}
           />
-          {/* Web Clipper Button - 本文が空の場合のみ表示 */}
-          {!hasContent && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onWebClipper}
-                >
-                  <Link2 className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>URLから取り込み</TooltipContent>
-            </Tooltip>
-          )}
           <StorageStatusHeader
             currentStorageProvider={currentStorageProvider}
             isStorageConfigured={isStorageConfigured}
@@ -141,11 +118,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onWebClipper}>
-                <Link2 className="mr-2 h-4 w-4" />
-                URLから取り込み
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onExportMarkdown}>
                 <Download className="mr-2 h-4 w-4" />
                 Markdownでエクスポート

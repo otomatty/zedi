@@ -50,7 +50,7 @@ export const StorageStatusHeader: React.FC<StorageStatusHeaderProps> = ({
       <HoverCardTrigger asChild>
         <div
           className={cn(
-            "inline-flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs",
+            "inline-flex items-center gap-1 rounded-md border bg-muted/30 px-2 py-1 text-xs sm:gap-2 sm:px-3 sm:py-2",
             !isStorageConfigured && !isStorageLoading && "cursor-pointer",
             className
           )}
@@ -59,8 +59,18 @@ export const StorageStatusHeader: React.FC<StorageStatusHeaderProps> = ({
           role={!isStorageConfigured && !isStorageLoading ? "button" : undefined}
           tabIndex={!isStorageConfigured && !isStorageLoading ? 0 : undefined}
         >
-          <Badge variant="outline">{storageProviderLabel}</Badge>
-          <Badge variant={storageStatusVariant}>{storageStatusLabel}</Badge>
+          <Badge
+            variant={storageStatusVariant}
+            className="sm:hidden max-w-[120px] truncate"
+          >
+            {storageProviderLabel}
+          </Badge>
+          <Badge variant="outline" className="hidden sm:inline-flex">
+            {storageProviderLabel}
+          </Badge>
+          <Badge variant={storageStatusVariant} className="hidden sm:inline-flex">
+            {storageStatusLabel}
+          </Badge>
         </div>
       </HoverCardTrigger>
       <HoverCardContent className="space-y-2">
