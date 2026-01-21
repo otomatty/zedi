@@ -141,6 +141,7 @@ export function subscribeSyncStatus(
 
 function setSyncStatus(status: SyncStatus): void {
   currentSyncStatus = status;
+  console.log(`[Sync] Status -> ${status}`);
   syncStatusListeners.forEach((listener) => listener(status));
 }
 
@@ -554,7 +555,10 @@ export async function syncWithRemote(
   jwtToken: string,
   userId: string
 ): Promise<void> {
-  if (isSyncing) return;
+  if (isSyncing) {
+    console.log("[Sync] Skipped: sync already in progress");
+    return;
+  }
 
   try {
     isSyncing = true;
@@ -571,6 +575,9 @@ export async function syncWithRemote(
       `[Sync] Starting ${
         isInitialSync ? "initial" : "delta"
       } sync (since: ${new Date(syncSince).toISOString()})`
+    );
+    console.log(
+      `[Sync] userId=${userId}, lastSyncTime=${lastSyncTime ?? "none"}`
     );
 
     // --- PULL: Fetch changes from remote with pagination ---
@@ -594,6 +601,7 @@ export async function syncWithRemote(
     console.log(
       `[Sync] Completed: pulled ${pulledCount}, pushed ${pushedCount}`
     );
+    console.log(`[Sync] New lastSyncTime=${lastSyncTime}`);
   } catch (error) {
     console.error("[Sync] Failed:", error);
     setSyncStatus("error");
