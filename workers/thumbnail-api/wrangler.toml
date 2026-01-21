@@ -1,6 +1,12 @@
-name = "zedi-thumbnail-api"
+name = "zedi-thumbnail-api-dev"
 main = "src/index.ts"
 compatibility_date = "2026-01-18"
 
 [vars]
 CORS_ORIGIN = "http://localhost:30000"
+
+[env.production]
+name = "zedi-thumbnail-api"
+
+[env.production.vars]
+CORS_ORIGIN = "https://zedi-note.app/"
