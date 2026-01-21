@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS pages (
     user_id TEXT NOT NULL,
     title TEXT,
     content TEXT,                -- Tiptap JSON
+    content_preview TEXT,        -- Page list preview (derived from content)
     thumbnail_url TEXT,          -- Date Gridで表示するサムネイル画像URL（contentの先頭画像から自動抽出）
     source_url TEXT,             -- Webクリッピング時の元URL（引用元）
     vector_embedding BLOB,       -- ベクトル埋め込み（Tursoのベクトル検索機能で使用）

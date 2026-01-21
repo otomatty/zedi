@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
-import { usePages } from "@/hooks/usePageQueries";
+import { useAuth } from "@clerk/clerk-react";
+import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
+import { hasNeverSynced } from "@/lib/turso";
 
 const skeletonItems = Array.from({ length: 20 }, (_, index) => index);
 
@@ -34,9 +36,15 @@ const PageGridSkeleton: React.FC = () => {
   );
 };
 
-const PageGrid: React.FC = () => {
-  // Use SQLite (local or Turso depending on auth state)
-  const { data: pages = [], isLoading } = usePages();
+interface PageGridProps {
+  isSeeding?: boolean;
+}
+
+const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false }) => {
+  // Use summary for list view (no content, reduced transfer)
+  const { data: pages = [], isLoading } = usePagesSummary();
+  const syncStatus = useSyncStatus();
+  const { isSignedIn } = useAuth();
 
   const sortedPages = useMemo(() => {
     return [...pages]
@@ -44,8 +52,15 @@ const PageGrid: React.FC = () => {
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [pages]);
 
+  const isInitialSyncPending =
+    isSignedIn && hasNeverSynced() && syncStatus !== "error";
+  const hasPages = sortedPages.length > 0;
+  const shouldShowSkeleton =
+    !hasPages &&
+    (isLoading || syncStatus === "syncing" || isInitialSyncPending || isSeeding);
+
   // Show loading state
-  if (isLoading) {
+  if (shouldShowSkeleton) {
     return <PageGridSkeleton />;
   }
 

@@ -11,6 +11,7 @@ const SCHEMA_SQL = `
     user_id TEXT NOT NULL,
     title TEXT,
     content TEXT,
+    content_preview TEXT,
     thumbnail_url TEXT,
     source_url TEXT,
     vector_embedding BLOB,

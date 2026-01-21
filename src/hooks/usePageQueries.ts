@@ -11,6 +11,7 @@ import {
   type SyncStatus,
 } from "@/lib/turso";
 import { PageRepository } from "@/lib/pageRepository";
+import { getPageListPreview } from "@/lib/contentUtils";
 import type { Page, PageSummary } from "@/types/page";
 
 // Local user ID for unauthenticated users
@@ -147,7 +148,7 @@ export function useRepository() {
 export function usePages() {
   const { getRepository, userId, isLoaded } = useRepository();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: pageKeys.list(userId),
     queryFn: async () => {
       const repo = await getRepository();
@@ -156,6 +157,12 @@ export function usePages() {
     enabled: isLoaded,
     staleTime: 1000 * 60, // 1 minute
   });
+
+  return {
+    ...query,
+    isLoading: query.isLoading || !isLoaded,
+    isRepositoryReady: isLoaded,
+  };
 }
 
 /**
@@ -165,7 +172,7 @@ export function usePages() {
 export function usePagesSummary() {
   const { getRepository, userId, isLoaded } = useRepository();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: pageKeys.summary(userId),
     queryFn: async () => {
       const repo = await getRepository();
@@ -174,22 +181,39 @@ export function usePagesSummary() {
     enabled: isLoaded,
     staleTime: 1000 * 60, // 1 minute
   });
+
+  return {
+    ...query,
+    isLoading: query.isLoading || !isLoaded,
+    isRepositoryReady: isLoaded,
+  };
 }
 
 /**
  * Hook to fetch a single page by ID
  */
-export function usePage(pageId: string) {
-  const { getRepository, userId, isLoaded } = useRepository();
+type UsePageOptions = {
+  enabled?: boolean;
+};
 
-  return useQuery({
+export function usePage(pageId: string, options?: UsePageOptions) {
+  const { getRepository, userId, isLoaded } = useRepository();
+  const isEnabled = (options?.enabled ?? true) && isLoaded && !!pageId;
+
+  const query = useQuery({
     queryKey: pageKeys.detail(userId, pageId),
     queryFn: async () => {
       const repo = await getRepository();
       return repo.getPage(userId, pageId);
     },
-    enabled: isLoaded && !!pageId,
+    enabled: isEnabled,
   });
+
+  return {
+    ...query,
+    isLoading: (options?.enabled ?? true) && (query.isLoading || !isLoaded),
+    isRepositoryReady: isLoaded,
+  };
 }
 
 /**
@@ -247,6 +271,7 @@ export function useCreatePage() {
       const newSummary: PageSummary = {
         id: newPage.id,
         title: newPage.title,
+        contentPreview: newPage.contentPreview,
         thumbnailUrl: newPage.thumbnailUrl,
         sourceUrl: newPage.sourceUrl,
         createdAt: newPage.createdAt,
@@ -284,17 +309,36 @@ export function useUpdatePage() {
     },
     onSuccess: ({ pageId, updates }) => {
       const now = Date.now();
+      const contentPreview =
+        updates.content !== undefined
+          ? getPageListPreview(updates.content)
+          : undefined;
 
       // Update the specific page in cache
       queryClient.setQueryData<Page | null>(
         pageKeys.detail(userId, pageId),
-        (old) => (old ? { ...old, ...updates, updatedAt: now } : null)
+        (old) =>
+          old
+            ? {
+                ...old,
+                ...updates,
+                ...(contentPreview !== undefined ? { contentPreview } : {}),
+                updatedAt: now,
+              }
+            : null
       );
 
       // Update the page in the list cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) =>
         old.map((page) =>
-          page.id === pageId ? { ...page, ...updates, updatedAt: now } : page
+          page.id === pageId
+            ? {
+                ...page,
+                ...updates,
+                ...(contentPreview !== undefined ? { contentPreview } : {}),
+                updatedAt: now,
+              }
+            : page
         )
       );
 
@@ -305,6 +349,8 @@ export function useUpdatePage() {
         summaryUpdates.thumbnailUrl = updates.thumbnailUrl;
       if (updates.sourceUrl !== undefined)
         summaryUpdates.sourceUrl = updates.sourceUrl;
+      if (contentPreview !== undefined)
+        summaryUpdates.contentPreview = contentPreview;
 
       queryClient.setQueryData<PageSummary[]>(
         pageKeys.summary(userId),

@@ -2,6 +2,7 @@ export interface Page {
   id: string;
   title: string;
   content: string; // Tiptap JSON stringified
+  contentPreview?: string;
   thumbnailUrl?: string;
   sourceUrl?: string;
   createdAt: number;
@@ -16,6 +17,7 @@ export interface Page {
 export interface PageSummary {
   id: string;
   title: string;
+  contentPreview?: string;
   thumbnailUrl?: string;
   sourceUrl?: string;
   createdAt: number;

@@ -251,6 +251,8 @@ function extractTextFromNode(node: unknown): string {
   return "";
 }
 
+export const PAGE_LIST_PREVIEW_LENGTH = 120;
+
 // Get a preview snippet of the content
 export function getContentPreview(content: string, maxLength: number = 100): string {
   const plainText = extractPlainText(content);
@@ -259,6 +261,11 @@ export function getContentPreview(content: string, maxLength: number = 100): str
   if (trimmed.length <= maxLength) return trimmed;
   
   return trimmed.slice(0, maxLength).trim() + '...';
+}
+
+// Standard preview for page list UI
+export function getPageListPreview(content: string): string {
+  return getContentPreview(content, PAGE_LIST_PREVIEW_LENGTH);
 }
 
 // Extract first image URL from Tiptap content
