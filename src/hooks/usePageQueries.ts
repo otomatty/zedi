@@ -57,11 +57,14 @@ export function useSync() {
 
     setIsSyncing(true);
     try {
+      console.log("[Sync] Manual sync requested", { userId });
       const token = await getToken({ template: "turso" });
       if (token) {
         await triggerSync(token, userId);
         // Invalidate queries to refetch with updated local data
         queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      } else {
+        console.warn("[Sync] Manual sync skipped: missing token");
       }
     } catch (error) {
       console.error("Sync failed:", error);
@@ -109,9 +112,12 @@ export function useRepository() {
       // Trigger delta sync on initial page load
       (async () => {
         try {
+          console.log("[Sync] Initial sync requested", { userId });
           const token = await getToken({ template: "turso" });
           if (token) {
             await syncWithRemote(token, userId);
+          } else {
+            console.warn("[Sync] Initial sync skipped: missing token");
           }
         } catch (error) {
           console.error("Initial sync failed:", error);

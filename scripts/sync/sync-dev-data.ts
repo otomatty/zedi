@@ -13,6 +13,7 @@
  *   --direction <dir>  Sync direction: bidirectional, prod-to-dev, dev-to-prod
  *   --dry-run          Show what would be synced without making changes
  *   --verbose          Show detailed logging
+ *   --touch-updated-at Set updated_at to now on target rows
  */
 
 import { createClient, type Client, type InValue } from "@libsql/client";
@@ -74,6 +75,8 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const verbose = args.includes("--verbose");
 const directionArg = args.find((_, i) => args[i - 1] === "--direction");
+const touchUpdatedAt = args.includes("--touch-updated-at");
+const BATCH_IN_SIZE = 500;
 
 function log(message: string, level: "info" | "verbose" | "error" = "info") {
   if (level === "verbose" && !verbose) return;
@@ -274,17 +277,26 @@ async function fetchPages(
 async function fetchLinks(client: Client, pageIds: string[]): Promise<LinkRow[]> {
   if (pageIds.length === 0) return [];
 
-  const placeholders = pageIds.map(() => "?").join(",");
-  const result = await client.execute({
-    sql: `SELECT * FROM links WHERE source_id IN (${placeholders})`,
-    args: pageIds as InValue[],
-  });
+  const links: LinkRow[] = [];
 
-  return result.rows.map((row) => ({
-    source_id: row.source_id as string,
-    target_id: row.target_id as string,
-    created_at: row.created_at as number,
-  }));
+  for (let i = 0; i < pageIds.length; i += BATCH_IN_SIZE) {
+    const batchIds = pageIds.slice(i, i + BATCH_IN_SIZE);
+    const placeholders = batchIds.map(() => "?").join(",");
+    const result = await client.execute({
+      sql: `SELECT * FROM links WHERE source_id IN (${placeholders})`,
+      args: batchIds as InValue[],
+    });
+
+    for (const row of result.rows) {
+      links.push({
+        source_id: row.source_id as string,
+        target_id: row.target_id as string,
+        created_at: row.created_at as number,
+      });
+    }
+  }
+
+  return links;
 }
 
 async function fetchGhostLinks(
@@ -293,17 +305,26 @@ async function fetchGhostLinks(
 ): Promise<GhostLinkRow[]> {
   if (pageIds.length === 0) return [];
 
-  const placeholders = pageIds.map(() => "?").join(",");
-  const result = await client.execute({
-    sql: `SELECT * FROM ghost_links WHERE source_page_id IN (${placeholders})`,
-    args: pageIds as InValue[],
-  });
+  const ghostLinks: GhostLinkRow[] = [];
 
-  return result.rows.map((row) => ({
-    link_text: row.link_text as string,
-    source_page_id: row.source_page_id as string,
-    created_at: row.created_at as number,
-  }));
+  for (let i = 0; i < pageIds.length; i += BATCH_IN_SIZE) {
+    const batchIds = pageIds.slice(i, i + BATCH_IN_SIZE);
+    const placeholders = batchIds.map(() => "?").join(",");
+    const result = await client.execute({
+      sql: `SELECT * FROM ghost_links WHERE source_page_id IN (${placeholders})`,
+      args: batchIds as InValue[],
+    });
+
+    for (const row of result.rows) {
+      ghostLinks.push({
+        link_text: row.link_text as string,
+        source_page_id: row.source_page_id as string,
+        created_at: row.created_at as number,
+      });
+    }
+  }
+
+  return ghostLinks;
 }
 
 async function syncPages(
@@ -313,7 +334,8 @@ async function syncPages(
   targetUserId: string,
   direction: string,
   conflictResolution: string,
-  syncDeleted: boolean
+  syncDeleted: boolean,
+  touchUpdatedAt: boolean
 ): Promise<{ synced: number; skipped: number }> {
   log(`  Fetching pages from source...`, "verbose");
   const sourcePages = await fetchPages(sourceClient, sourceUserId);
@@ -353,6 +375,7 @@ async function syncPages(
 
     if (shouldSync) {
       if (!dryRun) {
+        const updatedAt = touchUpdatedAt ? Date.now() : page.updated_at;
         await targetClient.execute({
           sql: `INSERT OR REPLACE INTO pages 
                 (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)
@@ -366,7 +389,7 @@ async function syncPages(
             page.source_url,
             page.vector_embedding,
             page.created_at,
-            page.updated_at,
+            updatedAt,
             page.is_deleted,
           ] as InValue[],
         });
@@ -388,17 +411,29 @@ async function syncLinks(
   sourceClient: Client,
   targetClient: Client,
   sourceUserId: string,
-  _targetUserId: string
+  _targetUserId: string,
+  syncDeleted: boolean
 ): Promise<number> {
   // Get page IDs for this user
   const sourcePages = await fetchPages(sourceClient, sourceUserId);
-  const pageIds = sourcePages.map((p) => p.id);
+  const pageIds = sourcePages
+    .filter((p) => syncDeleted || p.is_deleted === 0)
+    .map((p) => p.id);
 
   if (pageIds.length === 0) return 0;
 
   const links = await fetchLinks(sourceClient, pageIds);
 
   if (!dryRun) {
+    for (let i = 0; i < pageIds.length; i += BATCH_IN_SIZE) {
+      const batchIds = pageIds.slice(i, i + BATCH_IN_SIZE);
+      const placeholders = batchIds.map(() => "?").join(",");
+      await targetClient.execute({
+        sql: `DELETE FROM links WHERE source_id IN (${placeholders})`,
+        args: batchIds as InValue[],
+      });
+    }
+
     for (const link of links) {
       await targetClient.execute({
         sql: `INSERT OR REPLACE INTO links (source_id, target_id, created_at) VALUES (?, ?, ?)`,
@@ -414,17 +449,29 @@ async function syncGhostLinks(
   sourceClient: Client,
   targetClient: Client,
   sourceUserId: string,
-  _targetUserId: string
+  _targetUserId: string,
+  syncDeleted: boolean
 ): Promise<number> {
   // Get page IDs for this user
   const sourcePages = await fetchPages(sourceClient, sourceUserId);
-  const pageIds = sourcePages.map((p) => p.id);
+  const pageIds = sourcePages
+    .filter((p) => syncDeleted || p.is_deleted === 0)
+    .map((p) => p.id);
 
   if (pageIds.length === 0) return 0;
 
   const ghostLinks = await fetchGhostLinks(sourceClient, pageIds);
 
   if (!dryRun) {
+    for (let i = 0; i < pageIds.length; i += BATCH_IN_SIZE) {
+      const batchIds = pageIds.slice(i, i + BATCH_IN_SIZE);
+      const placeholders = batchIds.map(() => "?").join(",");
+      await targetClient.execute({
+        sql: `DELETE FROM ghost_links WHERE source_page_id IN (${placeholders})`,
+        args: batchIds as InValue[],
+      });
+    }
+
     for (const link of ghostLinks) {
       await targetClient.execute({
         sql: `INSERT OR REPLACE INTO ghost_links (link_text, source_page_id, created_at) VALUES (?, ?, ?)`,
@@ -459,10 +506,23 @@ async function syncDeveloper(
       developmentUserId,
       "prod-to-dev",
       conflictResolution,
+      syncDeleted,
+      touchUpdatedAt
+    );
+    const linksCount = await syncLinks(
+      prodClient,
+      devClient,
+      productionUserId,
+      developmentUserId,
       syncDeleted
     );
-    const linksCount = await syncLinks(prodClient, devClient, productionUserId, developmentUserId);
-    const ghostLinksCount = await syncGhostLinks(prodClient, devClient, productionUserId, developmentUserId);
+    const ghostLinksCount = await syncGhostLinks(
+      prodClient,
+      devClient,
+      productionUserId,
+      developmentUserId,
+      syncDeleted
+    );
     
     log(`     Pages: ${synced} synced, ${skipped} skipped`);
     log(`     Links: ${linksCount}, Ghost Links: ${ghostLinksCount}`, "verbose");
@@ -477,10 +537,23 @@ async function syncDeveloper(
       productionUserId,
       "dev-to-prod",
       conflictResolution,
+      syncDeleted,
+      touchUpdatedAt
+    );
+    const linksCount = await syncLinks(
+      devClient,
+      prodClient,
+      developmentUserId,
+      productionUserId,
       syncDeleted
     );
-    const linksCount = await syncLinks(devClient, prodClient, developmentUserId, productionUserId);
-    const ghostLinksCount = await syncGhostLinks(devClient, prodClient, developmentUserId, productionUserId);
+    const ghostLinksCount = await syncGhostLinks(
+      devClient,
+      prodClient,
+      developmentUserId,
+      productionUserId,
+      syncDeleted
+    );
     
     log(`     Pages: ${synced} synced, ${skipped} skipped`);
     log(`     Links: ${linksCount}, Ghost Links: ${ghostLinksCount}`, "verbose");
@@ -516,6 +589,7 @@ async function main(): Promise<void> {
   log(`   Direction: ${syncOptions.direction}`);
   log(`   Conflict Resolution: ${syncOptions.conflictResolution}`);
   log(`   Sync Deleted: ${syncOptions.syncDeleted}`);
+  log(`   Touch updated_at: ${touchUpdatedAt}`);
   log(`   Developers: ${config.developers.length}`);
 
   if (config.developers.length === 0) {
