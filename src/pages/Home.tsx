@@ -7,7 +7,7 @@ import { useSeedData } from "@/hooks/useSeedData";
 
 const Home: React.FC = () => {
   // Seed tutorial pages on first run
-  useSeedData();
+  const { isSeeding } = useSeedData();
 
   return (
     <div className="min-h-screen bg-background">
@@ -15,7 +15,7 @@ const Home: React.FC = () => {
 
       <main className="py-6">
         <Container>
-          <PageGrid />
+          <PageGrid isSeeding={isSeeding} />
         </Container>
       </main>
 

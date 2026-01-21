@@ -11,6 +11,7 @@ import type {
 } from "@libsql/client/web";
 import type { Database as SqlJsDatabase } from "sql.js";
 import { get, set } from "idb-keyval";
+import { getPageListPreview } from "@/lib/contentUtils";
 
 // Turso database configuration
 const TURSO_DATABASE_URL = import.meta.env.VITE_TURSO_DATABASE_URL;
@@ -32,6 +33,7 @@ const SCHEMA_SQL = `
     user_id TEXT NOT NULL,
     title TEXT,
     content TEXT,
+    content_preview TEXT,
     thumbnail_url TEXT,
     source_url TEXT,
     vector_embedding BLOB,
@@ -66,6 +68,40 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_ghost_links_text ON ghost_links(link_text);
 `;
+
+async function hasColumn(
+  client: Client,
+  tableName: string,
+  columnName: string
+): Promise<boolean> {
+  const result = await client.execute({
+    sql: `PRAGMA table_info(${tableName})`,
+  });
+
+  return result.rows.some((row) => row.name === columnName);
+}
+
+async function ensureContentPreviewColumn(client: Client): Promise<void> {
+  const exists = await hasColumn(client, "pages", "content_preview");
+  if (exists) return;
+
+  await client.execute({
+    sql: `ALTER TABLE pages ADD COLUMN content_preview TEXT`,
+  });
+
+  const pages = await client.execute({
+    sql: `SELECT id, content FROM pages`,
+  });
+
+  for (const row of pages.rows) {
+    const content = (row.content as string) || "";
+    const contentPreview = getPageListPreview(content);
+    await client.execute({
+      sql: `UPDATE pages SET content_preview = ? WHERE id = ?`,
+      args: [contentPreview, row.id as string],
+    });
+  }
+}
 
 // Dynamic import for @libsql/client/web to avoid initialization errors
 async function getLibsqlClient() {
@@ -454,6 +490,7 @@ export async function getLocalClient(userId: string): Promise<Client> {
       }
 
       localSqlJsClient = new SqlJsClientWrapper(db);
+      await ensureContentPreviewColumn(localSqlJsClient);
       isLocalDbInitialized = true;
       currentUserId = userId;
 
@@ -523,6 +560,7 @@ interface RemotePageRow {
   user_id: string;
   title: string | null;
   content: string | null;
+  content_preview?: string | null;
   thumbnail_url: string | null;
   source_url: string | null;
   vector_embedding: Uint8Array | null;
@@ -566,6 +604,10 @@ export async function syncWithRemote(
 
     const local = await getLocalClient(userId);
     const remote = await createAuthenticatedTursoClient(jwtToken);
+    const [localHasPreview, remoteHasPreview] = await Promise.all([
+      hasColumn(local, "pages", "content_preview"),
+      hasColumn(remote, "pages", "content_preview"),
+    ]);
 
     // Get sync timestamp (use 0 for initial sync to get all data)
     const syncSince = lastSyncTime ?? 0;
@@ -581,10 +623,28 @@ export async function syncWithRemote(
     );
 
     // --- PULL: Fetch changes from remote with pagination ---
-    const pulledCount = await pullFromRemote(local, remote, userId, syncSince);
+    const pulledCount = await pullFromRemote(
+      local,
+      remote,
+      userId,
+      syncSince,
+      {
+        localHasPreview,
+        remoteHasPreview,
+      }
+    );
 
     // --- PUSH: Send local changes to remote ---
-    const pushedCount = await pushToRemote(local, remote, userId, syncSince);
+    const pushedCount = await pushToRemote(
+      local,
+      remote,
+      userId,
+      syncSince,
+      {
+        localHasPreview,
+        remoteHasPreview,
+      }
+    );
 
     // --- Sync links and ghost links (optimized batch queries) ---
     await syncLinksDeltaOptimized(local, remote, userId, syncSince);
@@ -614,11 +674,17 @@ export async function syncWithRemote(
 /**
  * Pull changes from remote to local with pagination
  */
+type ContentPreviewSupport = {
+  localHasPreview: boolean;
+  remoteHasPreview: boolean;
+};
+
 async function pullFromRemote(
   local: Client,
   remote: Client,
   userId: string,
-  syncSince: number
+  syncSince: number,
+  previewSupport: ContentPreviewSupport
 ): Promise<number> {
   // Get local pages for comparison (only id and updated_at)
   const localPages = await local.execute({
@@ -658,22 +724,49 @@ async function pullFromRemote(
 
     // Batch insert into local database
     for (const row of rowsToInsert) {
+      const contentPreview =
+        previewSupport.remoteHasPreview &&
+        row.content_preview !== undefined &&
+        row.content_preview !== null
+          ? row.content_preview
+          : getPageListPreview(row.content || "");
+
+      const insertColumns = previewSupport.localHasPreview
+        ? `(id, user_id, title, content, content_preview, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)`
+        : `(id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)`;
+
+      const insertArgs = previewSupport.localHasPreview
+        ? [
+            row.id,
+            row.user_id,
+            row.title,
+            row.content,
+            contentPreview,
+            row.thumbnail_url,
+            row.source_url,
+            row.vector_embedding,
+            row.created_at,
+            row.updated_at,
+            row.is_deleted,
+          ]
+        : [
+            row.id,
+            row.user_id,
+            row.title,
+            row.content,
+            row.thumbnail_url,
+            row.source_url,
+            row.vector_embedding,
+            row.created_at,
+            row.updated_at,
+            row.is_deleted,
+          ];
+
       await local.execute({
-        sql: `INSERT OR REPLACE INTO pages 
-              (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          row.id,
-          row.user_id,
-          row.title,
-          row.content,
-          row.thumbnail_url,
-          row.source_url,
-          row.vector_embedding,
-          row.created_at,
-          row.updated_at,
-          row.is_deleted,
-        ],
+        sql: `INSERT OR REPLACE INTO pages ${insertColumns} VALUES (${insertArgs
+          .map(() => "?")
+          .join(", ")})`,
+        args: insertArgs,
       });
     }
 
@@ -700,7 +793,8 @@ async function pushToRemote(
   local: Client,
   remote: Client,
   userId: string,
-  syncSince: number
+  syncSince: number,
+  previewSupport: ContentPreviewSupport
 ): Promise<number> {
   // Get local changes
   const localChanges = await local.execute({
@@ -743,22 +837,48 @@ async function pushToRemote(
 
     // Push if local is newer or doesn't exist in remote
     if (!remoteUpdatedAt || localUpdatedAt > remoteUpdatedAt) {
+      const localPreview = previewSupport.localHasPreview
+        ? (p.content_preview as string | null)
+        : null;
+      const contentPreview =
+        localPreview ?? getPageListPreview((p.content as string) || "");
+
+      const insertColumns = previewSupport.remoteHasPreview
+        ? `(id, user_id, title, content, content_preview, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)`
+        : `(id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)`;
+
+      const insertArgs = previewSupport.remoteHasPreview
+        ? [
+            p.id,
+            p.user_id,
+            p.title,
+            p.content,
+            contentPreview,
+            p.thumbnail_url,
+            p.source_url,
+            p.vector_embedding,
+            p.created_at,
+            p.updated_at,
+            p.is_deleted,
+          ]
+        : [
+            p.id,
+            p.user_id,
+            p.title,
+            p.content,
+            p.thumbnail_url,
+            p.source_url,
+            p.vector_embedding,
+            p.created_at,
+            p.updated_at,
+            p.is_deleted,
+          ];
+
       await remote.execute({
-        sql: `INSERT OR REPLACE INTO pages 
-              (id, user_id, title, content, thumbnail_url, source_url, vector_embedding, created_at, updated_at, is_deleted)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          p.id,
-          p.user_id,
-          p.title,
-          p.content,
-          p.thumbnail_url,
-          p.source_url,
-          p.vector_embedding,
-          p.created_at,
-          p.updated_at,
-          p.is_deleted,
-        ] as InValue[],
+        sql: `INSERT OR REPLACE INTO pages ${insertColumns} VALUES (${insertArgs
+          .map(() => "?")
+          .join(", ")})`,
+        args: insertArgs as InValue[],
       });
       pushedCount++;
     }

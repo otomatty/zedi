@@ -1,5 +1,6 @@
 import type { Client } from "@libsql/client";
 import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
+import { getPageListPreview } from "@/lib/contentUtils";
 import { nanoid } from "nanoid";
 
 /**
@@ -43,13 +44,14 @@ export class PageRepository {
   ): Promise<Page> {
     const id = nanoid();
     const now = Date.now();
+    const contentPreview = getPageListPreview(content);
 
     await this.client.execute({
       sql: `
-        INSERT INTO pages (id, user_id, title, content, created_at, updated_at, is_deleted)
-        VALUES (?, ?, ?, ?, ?, ?, 0)
+        INSERT INTO pages (id, user_id, title, content, content_preview, created_at, updated_at, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
       `,
-      args: [id, userId, title, content, now, now],
+      args: [id, userId, title, content, contentPreview, now, now],
     });
 
     await this.notifyMutation();
@@ -58,6 +60,7 @@ export class PageRepository {
       id,
       title,
       content,
+      contentPreview,
       createdAt: now,
       updatedAt: now,
       isDeleted: false,
@@ -70,7 +73,7 @@ export class PageRepository {
   async getPage(userId: string, pageId: string): Promise<Page | null> {
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE id = ? AND user_id = ? AND is_deleted = 0
       `,
@@ -92,7 +95,7 @@ export class PageRepository {
   async getPages(userId: string): Promise<Page[]> {
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND is_deleted = 0
         ORDER BY created_at DESC
@@ -110,7 +113,7 @@ export class PageRepository {
   async getPagesSummary(userId: string): Promise<PageSummary[]> {
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, title, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND is_deleted = 0
         ORDER BY created_at DESC
@@ -131,7 +134,7 @@ export class PageRepository {
     const placeholders = pageIds.map(() => "?").join(",");
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND id IN (${placeholders}) AND is_deleted = 0
       `,
@@ -150,7 +153,7 @@ export class PageRepository {
 
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND TRIM(title) = ? AND is_deleted = 0
       `,
@@ -177,7 +180,7 @@ export class PageRepository {
     if (!trimmedTitle) return null;
 
     let sql = `
-      SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+      SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
       FROM pages
       WHERE user_id = ? AND TRIM(title) = ? AND is_deleted = 0
     `;
@@ -217,6 +220,8 @@ export class PageRepository {
     if (updates.content !== undefined) {
       setClauses.push("content = ?");
       args.push(updates.content);
+      setClauses.push("content_preview = ?");
+      args.push(getPageListPreview(updates.content));
     }
     if (updates.thumbnailUrl !== undefined) {
       setClauses.push("thumbnail_url = ?");
@@ -271,7 +276,7 @@ export class PageRepository {
 
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND is_deleted = 0
           AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)
@@ -463,6 +468,7 @@ export class PageRepository {
       id: row.id as string,
       title: (row.title as string) || "",
       content: (row.content as string) || "",
+      contentPreview: row.content_preview as string | undefined,
       thumbnailUrl: row.thumbnail_url as string | undefined,
       sourceUrl: row.source_url as string | undefined,
       createdAt: row.created_at as number,
@@ -475,6 +481,7 @@ export class PageRepository {
     return {
       id: row.id as string,
       title: (row.title as string) || "",
+      contentPreview: row.content_preview as string | undefined,
       thumbnailUrl: row.thumbnail_url as string | undefined,
       sourceUrl: row.source_url as string | undefined,
       createdAt: row.created_at as number,
