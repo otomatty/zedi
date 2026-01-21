@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -50,8 +50,6 @@ const PageEditor: React.FC = () => {
   const { data: page, isLoading, isError } = usePage(pageId);
   const updatePageMutation = useUpdatePage();
   const { syncLinks } = useSyncWikiLinks();
-
-  const [webClipperOpen, setWebClipperOpen] = useState(false);
 
   // Page editor state hook
   const {
@@ -307,51 +305,6 @@ const PageEditor: React.FC = () => {
     navigate(`/settings/storage?${search}`);
   }, [navigate, location.pathname, location.search]);
 
-  // Web Clipper結果をエディタに反映
-  const handleWebClipped = useCallback(
-    (
-      clippedTitle: string,
-      clippedContent: string,
-      clippedSourceUrl: string,
-      thumbnailUrl?: string | null
-    ) => {
-      setTitle(clippedTitle);
-      setContent(clippedContent);
-      setSourceUrl(clippedSourceUrl);
-
-      if (currentPageId) {
-        updatePageMutation.mutate(
-          {
-            pageId: currentPageId,
-            updates: {
-              title: clippedTitle,
-              content: clippedContent,
-              sourceUrl: clippedSourceUrl,
-              thumbnailUrl: thumbnailUrl || undefined,
-            },
-          },
-          {
-            onSuccess: () => {
-              updateLastSaved(Date.now());
-              toast({
-                title: "Webページを取り込みました",
-              });
-            },
-          }
-        );
-      }
-    },
-    [
-      currentPageId,
-      updatePageMutation,
-      toast,
-      setTitle,
-      setContent,
-      setSourceUrl,
-      updateLastSaved,
-    ]
-  );
-
   // Show loading state
   if (!isNewPage && isLoading) {
     return (
@@ -389,7 +342,6 @@ const PageEditor: React.FC = () => {
         onDelete={handleDelete}
         onExportMarkdown={handleExportMarkdown}
         onCopyMarkdown={handleCopyMarkdown}
-        onWebClipper={() => setWebClipperOpen(true)}
         onGenerateWiki={handleGenerateWiki}
       />
 
@@ -427,9 +379,6 @@ const PageEditor: React.FC = () => {
         wikiErrorMessage={wikiError?.message || null}
         onResetWiki={resetWiki}
         onGoToAISettings={handleGoToAISettings}
-        webClipperOpen={webClipperOpen}
-        onWebClipperOpenChange={setWebClipperOpen}
-        onWebClipped={handleWebClipped}
       />
     </div>
   );

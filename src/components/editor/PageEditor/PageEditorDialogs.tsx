@@ -19,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { WebClipperDialog } from "../WebClipperDialog";
 
 interface PageEditorDialogsProps {
   // Delete confirmation dialog
@@ -35,15 +34,6 @@ interface PageEditorDialogsProps {
   onResetWiki: () => void;
   onGoToAISettings: () => void;
 
-  // Web clipper dialog
-  webClipperOpen: boolean;
-  onWebClipperOpenChange: (open: boolean) => void;
-  onWebClipped: (
-    title: string,
-    content: string,
-    sourceUrl: string,
-    thumbnailUrl?: string | null
-  ) => void;
 }
 
 /**
@@ -62,19 +52,9 @@ export const PageEditorDialogs: React.FC<PageEditorDialogsProps> = ({
   wikiErrorMessage,
   onResetWiki,
   onGoToAISettings,
-  webClipperOpen,
-  onWebClipperOpenChange,
-  onWebClipped,
 }) => {
   return (
     <>
-      {/* Web Clipper Dialog */}
-      <WebClipperDialog
-        open={webClipperOpen}
-        onOpenChange={onWebClipperOpenChange}
-        onClipped={onWebClipped}
-      />
-
       {/* 削除確認ダイアログ */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={onDeleteConfirmOpenChange}>
         <AlertDialogContent>
