@@ -48,6 +48,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   pageId,
   pageTitle = "",
   isReadOnly = false,
+  showToolbar = true,
   onContentError,
 }) => {
   const { checkReferenced } = useCheckGhostLinkReferenced();
@@ -503,19 +504,23 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         onCancel={handleCancelCreate}
       />
 
-      <EditorRecommendationBar
-        pageTitle={pageTitle}
-        isReadOnly={isReadOnly}
-        hasThumbnail={hasThumbnail}
-        onSelectThumbnail={handleInsertThumbnailImage}
-      />
+      {showToolbar && (
+        <EditorRecommendationBar
+          pageTitle={pageTitle}
+          isReadOnly={isReadOnly}
+          hasThumbnail={hasThumbnail}
+          onSelectThumbnail={handleInsertThumbnailImage}
+        />
+      )}
 
-      <EditorBottomToolbar
-        isReadOnly={isReadOnly}
-        showDiagramAction={selectedText.length > 0}
-        onInsertImage={handleInsertImageClick}
-        onGenerateDiagram={handleOpenMermaidDialog}
-      />
+      {showToolbar && (
+        <EditorBottomToolbar
+          isReadOnly={isReadOnly}
+          showDiagramAction={selectedText.length > 0}
+          onInsertImage={handleInsertImageClick}
+          onGenerateDiagram={handleOpenMermaidDialog}
+        />
+      )}
 
       <StorageSetupDialog
         open={storageSetupDialogOpen}

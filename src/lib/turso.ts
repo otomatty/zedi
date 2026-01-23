@@ -67,6 +67,49 @@ const SCHEMA_SQL = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_ghost_links_text ON ghost_links(link_text);
+
+  -- 4. ノート（公開ノートのコンテナ）
+  CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    owner_user_id TEXT NOT NULL,
+    title TEXT,
+    visibility TEXT NOT NULL DEFAULT 'private',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_notes_owner_id ON notes(owner_user_id);
+  CREATE INDEX IF NOT EXISTS idx_notes_visibility ON notes(visibility);
+
+  -- 5. ノートとページの紐付け
+  CREATE TABLE IF NOT EXISTS note_pages (
+    note_id TEXT NOT NULL,
+    page_id TEXT NOT NULL,
+    added_by_user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    PRIMARY KEY (note_id, page_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_note_pages_note_id ON note_pages(note_id);
+  CREATE INDEX IF NOT EXISTS idx_note_pages_page_id ON note_pages(page_id);
+
+  -- 6. ノートメンバー（招待）
+  CREATE TABLE IF NOT EXISTS note_members (
+    note_id TEXT NOT NULL,
+    member_email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'viewer',
+    invited_by_user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    PRIMARY KEY (note_id, member_email)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_note_members_note_id ON note_members(note_id);
+  CREATE INDEX IF NOT EXISTS idx_note_members_email ON note_members(member_email);
 `;
 
 async function hasColumn(
@@ -101,6 +144,70 @@ async function ensureContentPreviewColumn(client: Client): Promise<void> {
       args: [contentPreview, row.id as string],
     });
   }
+}
+
+async function ensureNoteSchema(client: Client): Promise<void> {
+  await client.execute({
+    sql: `
+      CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY,
+        owner_user_id TEXT NOT NULL,
+        title TEXT,
+        visibility TEXT NOT NULL DEFAULT 'private',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        is_deleted INTEGER DEFAULT 0
+      )
+    `,
+  });
+
+  await client.execute({
+    sql: `CREATE INDEX IF NOT EXISTS idx_notes_owner_id ON notes(owner_user_id)`,
+  });
+  await client.execute({
+    sql: `CREATE INDEX IF NOT EXISTS idx_notes_visibility ON notes(visibility)`,
+  });
+
+  await client.execute({
+    sql: `
+      CREATE TABLE IF NOT EXISTS note_pages (
+        note_id TEXT NOT NULL,
+        page_id TEXT NOT NULL,
+        added_by_user_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        is_deleted INTEGER DEFAULT 0,
+        PRIMARY KEY (note_id, page_id)
+      )
+    `,
+  });
+  await client.execute({
+    sql: `CREATE INDEX IF NOT EXISTS idx_note_pages_note_id ON note_pages(note_id)`,
+  });
+  await client.execute({
+    sql: `CREATE INDEX IF NOT EXISTS idx_note_pages_page_id ON note_pages(page_id)`,
+  });
+
+  await client.execute({
+    sql: `
+      CREATE TABLE IF NOT EXISTS note_members (
+        note_id TEXT NOT NULL,
+        member_email TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'viewer',
+        invited_by_user_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        is_deleted INTEGER DEFAULT 0,
+        PRIMARY KEY (note_id, member_email)
+      )
+    `,
+  });
+  await client.execute({
+    sql: `CREATE INDEX IF NOT EXISTS idx_note_members_note_id ON note_members(note_id)`,
+  });
+  await client.execute({
+    sql: `CREATE INDEX IF NOT EXISTS idx_note_members_email ON note_members(member_email)`,
+  });
 }
 
 // Dynamic import for @libsql/client/web to avoid initialization errors
@@ -491,6 +598,7 @@ export async function getLocalClient(userId: string): Promise<Client> {
 
       localSqlJsClient = new SqlJsClientWrapper(db);
       await ensureContentPreviewColumn(localSqlJsClient);
+      await ensureNoteSchema(localSqlJsClient);
       isLocalDbInitialized = true;
       currentUserId = userId;
 
@@ -581,6 +689,35 @@ interface RemoteGhostLinkRow {
   created_at: number;
 }
 
+interface RemoteNoteRow {
+  id: string;
+  owner_user_id: string;
+  title: string | null;
+  visibility: string;
+  created_at: number;
+  updated_at: number;
+  is_deleted: number;
+}
+
+interface RemoteNotePageRow {
+  note_id: string;
+  page_id: string;
+  added_by_user_id: string;
+  created_at: number;
+  updated_at: number;
+  is_deleted: number;
+}
+
+interface RemoteNoteMemberRow {
+  note_id: string;
+  member_email: string;
+  role: string;
+  invited_by_user_id: string;
+  created_at: number;
+  updated_at: number;
+  is_deleted: number;
+}
+
 /**
  * Sync local database with remote Turso (Delta Sync - Optimized)
  *
@@ -646,6 +783,21 @@ export async function syncWithRemote(
       }
     );
 
+    const pulledNotesCount = await pullNotesFromRemote(
+      local,
+      remote,
+      userId,
+      syncSince
+    );
+    const pushedNotesCount = await pushNotesToRemote(
+      local,
+      remote,
+      userId,
+      syncSince
+    );
+
+    await syncNoteRelationsDeltaOptimized(local, remote, userId, syncSince);
+
     // --- Sync links and ghost links (optimized batch queries) ---
     await syncLinksDeltaOptimized(local, remote, userId, syncSince);
     await syncGhostLinksDeltaOptimized(local, remote, userId, syncSince);
@@ -659,7 +811,10 @@ export async function syncWithRemote(
 
     setSyncStatus("synced");
     console.log(
-      `[Sync] Completed: pulled ${pulledCount}, pushed ${pushedCount}`
+      `[Sync] Completed: pulled ${pulledCount} pages, pushed ${pushedCount} pages`
+    );
+    console.log(
+      `[Sync] Notes: pulled ${pulledNotesCount}, pushed ${pushedNotesCount}`
     );
     console.log(`[Sync] New lastSyncTime=${lastSyncTime}`);
   } catch (error) {
@@ -886,6 +1041,330 @@ async function pushToRemote(
 
   console.log(`[Sync] Pushed ${pushedCount} pages`);
   return pushedCount;
+}
+
+/**
+ * Pull notes changes from remote to local with pagination
+ */
+async function pullNotesFromRemote(
+  local: Client,
+  remote: Client,
+  userId: string,
+  syncSince: number
+): Promise<number> {
+  const localNotes = await local.execute({
+    sql: `SELECT id, updated_at FROM notes WHERE owner_user_id = ?`,
+    args: [userId],
+  });
+  const localNoteMap = new Map(
+    localNotes.rows.map((r) => [r.id as string, r.updated_at as number])
+  );
+
+  let offset = 0;
+  let totalPulled = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const result = await remote.execute({
+      sql: `SELECT * FROM notes
+            WHERE owner_user_id = ? AND updated_at > ?
+            ORDER BY updated_at ASC
+            LIMIT ? OFFSET ?`,
+      args: [userId, syncSince, SYNC_PAGE_SIZE, offset],
+    });
+
+    const rows = result.rows as unknown as RemoteNoteRow[];
+    if (rows.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    const rowsToInsert = rows.filter((row) => {
+      const localUpdatedAt = localNoteMap.get(row.id);
+      return !localUpdatedAt || row.updated_at > localUpdatedAt;
+    });
+
+    for (const row of rowsToInsert) {
+      await local.execute({
+        sql: `
+          INSERT OR REPLACE INTO notes
+          (id, owner_user_id, title, visibility, created_at, updated_at, is_deleted)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          row.id,
+          row.owner_user_id,
+          row.title,
+          row.visibility,
+          row.created_at,
+          row.updated_at,
+          row.is_deleted,
+        ],
+      });
+    }
+
+    totalPulled += rowsToInsert.length;
+    offset += SYNC_PAGE_SIZE;
+
+    if (rows.length < SYNC_PAGE_SIZE) {
+      hasMore = false;
+    }
+  }
+
+  return totalPulled;
+}
+
+/**
+ * Push notes changes from local to remote
+ */
+async function pushNotesToRemote(
+  local: Client,
+  remote: Client,
+  userId: string,
+  syncSince: number
+): Promise<number> {
+  const localChanges = await local.execute({
+    sql: `SELECT * FROM notes WHERE owner_user_id = ? AND updated_at > ?`,
+    args: [userId, syncSince],
+  });
+
+  if (localChanges.rows.length === 0) {
+    return 0;
+  }
+
+  const localIds = localChanges.rows.map((r) => r.id as string);
+  const remoteNoteMap = new Map<string, number>();
+
+  for (let i = 0; i < localIds.length; i += BATCH_IN_SIZE) {
+    const batchIds = localIds.slice(i, i + BATCH_IN_SIZE);
+    const placeholders = batchIds.map(() => "?").join(",");
+    const result = await remote.execute({
+      sql: `SELECT id, updated_at FROM notes WHERE id IN (${placeholders})`,
+      args: batchIds as InValue[],
+    });
+
+    for (const row of result.rows) {
+      remoteNoteMap.set(row.id as string, row.updated_at as number);
+    }
+  }
+
+  let pushedCount = 0;
+  for (const n of localChanges.rows) {
+    const remoteUpdatedAt = remoteNoteMap.get(n.id as string);
+    const localUpdatedAt = n.updated_at as number;
+
+    if (!remoteUpdatedAt || localUpdatedAt > remoteUpdatedAt) {
+      await remote.execute({
+        sql: `
+          INSERT OR REPLACE INTO notes
+          (id, owner_user_id, title, visibility, created_at, updated_at, is_deleted)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          n.id,
+          n.owner_user_id,
+          n.title,
+          n.visibility,
+          n.created_at,
+          n.updated_at,
+          n.is_deleted,
+        ] as InValue[],
+      });
+      pushedCount++;
+    }
+  }
+
+  return pushedCount;
+}
+
+/**
+ * Sync note pages and members (Delta)
+ */
+async function syncNoteRelationsDeltaOptimized(
+  local: Client,
+  remote: Client,
+  userId: string,
+  syncSince: number
+): Promise<void> {
+  const localUpdatedNotes = await local.execute({
+    sql: `SELECT id FROM notes WHERE owner_user_id = ? AND updated_at > ?`,
+    args: [userId, syncSince],
+  });
+  const localUpdatedIds = localUpdatedNotes.rows.map((r) => r.id as string);
+
+  const remoteUpdatedNotes = await remote.execute({
+    sql: `SELECT id FROM notes WHERE owner_user_id = ? AND updated_at > ?`,
+    args: [userId, syncSince],
+  });
+  const remoteUpdatedIds = remoteUpdatedNotes.rows.map((r) => r.id as string);
+
+  const allUpdatedIds = [...new Set([...localUpdatedIds, ...remoteUpdatedIds])];
+  if (allUpdatedIds.length === 0) return;
+
+  const allRemoteNotePages: RemoteNotePageRow[] = [];
+  const allRemoteMembers: RemoteNoteMemberRow[] = [];
+
+  for (let i = 0; i < allUpdatedIds.length; i += BATCH_IN_SIZE) {
+    const batchIds = allUpdatedIds.slice(i, i + BATCH_IN_SIZE);
+    const placeholders = batchIds.map(() => "?").join(",");
+
+    const notePagesResult = await remote.execute({
+      sql: `SELECT * FROM note_pages WHERE note_id IN (${placeholders})`,
+      args: batchIds as InValue[],
+    });
+    for (const row of notePagesResult.rows) {
+      allRemoteNotePages.push({
+        note_id: row.note_id as string,
+        page_id: row.page_id as string,
+        added_by_user_id: row.added_by_user_id as string,
+        created_at: row.created_at as number,
+        updated_at: row.updated_at as number,
+        is_deleted: row.is_deleted as number,
+      });
+    }
+
+    const membersResult = await remote.execute({
+      sql: `SELECT * FROM note_members WHERE note_id IN (${placeholders})`,
+      args: batchIds as InValue[],
+    });
+    for (const row of membersResult.rows) {
+      allRemoteMembers.push({
+        note_id: row.note_id as string,
+        member_email: row.member_email as string,
+        role: row.role as string,
+        invited_by_user_id: row.invited_by_user_id as string,
+        created_at: row.created_at as number,
+        updated_at: row.updated_at as number,
+        is_deleted: row.is_deleted as number,
+      });
+    }
+  }
+
+  for (const noteId of allUpdatedIds) {
+    await local.execute({
+      sql: `DELETE FROM note_pages WHERE note_id = ?`,
+      args: [noteId],
+    });
+    await local.execute({
+      sql: `DELETE FROM note_members WHERE note_id = ?`,
+      args: [noteId],
+    });
+  }
+
+  for (const row of allRemoteNotePages) {
+    await local.execute({
+      sql: `
+        INSERT OR REPLACE INTO note_pages
+        (note_id, page_id, added_by_user_id, created_at, updated_at, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      args: [
+        row.note_id,
+        row.page_id,
+        row.added_by_user_id,
+        row.created_at,
+        row.updated_at,
+        row.is_deleted,
+      ],
+    });
+  }
+
+  for (const row of allRemoteMembers) {
+    await local.execute({
+      sql: `
+        INSERT OR REPLACE INTO note_members
+        (note_id, member_email, role, invited_by_user_id, created_at, updated_at, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [
+        row.note_id,
+        row.member_email,
+        row.role,
+        row.invited_by_user_id,
+        row.created_at,
+        row.updated_at,
+        row.is_deleted,
+      ],
+    });
+  }
+
+  if (localUpdatedIds.length > 0) {
+    const allLocalNotePages: RemoteNotePageRow[] = [];
+    const allLocalMembers: RemoteNoteMemberRow[] = [];
+
+    for (let i = 0; i < localUpdatedIds.length; i += BATCH_IN_SIZE) {
+      const batchIds = localUpdatedIds.slice(i, i + BATCH_IN_SIZE);
+      const placeholders = batchIds.map(() => "?").join(",");
+
+      const notePagesResult = await local.execute({
+        sql: `SELECT * FROM note_pages WHERE note_id IN (${placeholders})`,
+        args: batchIds,
+      });
+      for (const row of notePagesResult.rows) {
+        allLocalNotePages.push({
+          note_id: row.note_id as string,
+          page_id: row.page_id as string,
+          added_by_user_id: row.added_by_user_id as string,
+          created_at: row.created_at as number,
+          updated_at: row.updated_at as number,
+          is_deleted: row.is_deleted as number,
+        });
+      }
+
+      const membersResult = await local.execute({
+        sql: `SELECT * FROM note_members WHERE note_id IN (${placeholders})`,
+        args: batchIds,
+      });
+      for (const row of membersResult.rows) {
+        allLocalMembers.push({
+          note_id: row.note_id as string,
+          member_email: row.member_email as string,
+          role: row.role as string,
+          invited_by_user_id: row.invited_by_user_id as string,
+          created_at: row.created_at as number,
+          updated_at: row.updated_at as number,
+          is_deleted: row.is_deleted as number,
+        });
+      }
+    }
+
+    for (const row of allLocalNotePages) {
+      await remote.execute({
+        sql: `
+          INSERT OR REPLACE INTO note_pages
+          (note_id, page_id, added_by_user_id, created_at, updated_at, is_deleted)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          row.note_id,
+          row.page_id,
+          row.added_by_user_id,
+          row.created_at,
+          row.updated_at,
+          row.is_deleted,
+        ] as InValue[],
+      });
+    }
+
+    for (const row of allLocalMembers) {
+      await remote.execute({
+        sql: `
+          INSERT OR REPLACE INTO note_members
+          (note_id, member_email, role, invited_by_user_id, created_at, updated_at, is_deleted)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          row.note_id,
+          row.member_email,
+          row.role,
+          row.invited_by_user_id,
+          row.created_at,
+          row.updated_at,
+          row.is_deleted,
+        ] as InValue[],
+      });
+    }
+  }
 }
 
 /**

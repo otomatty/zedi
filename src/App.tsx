@@ -13,6 +13,10 @@ import StorageSettings from "./pages/StorageSettings";
 import Pricing from "./pages/Pricing";
 import Donate from "./pages/Donate";
 import NotFound from "./pages/NotFound";
+import NoteView from "./pages/NoteView";
+import NotePageView from "./pages/NotePageView";
+import NoteSettings from "./pages/NoteSettings.tsx";
+import NoteMembers from "./pages/NoteMembers.tsx";
 import { GlobalSearch } from "./components/search/GlobalSearch";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -33,6 +37,10 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/sign-in/*" element={<SignIn />} />
+            <Route path="/note/:noteId" element={<NoteView />} />
+            <Route path="/note/:noteId/settings" element={<NoteSettings />} />
+            <Route path="/note/:noteId/members" element={<NoteMembers />} />
+            <Route path="/note/:noteId/page/:pageId" element={<NotePageView />} />
 
             {/* Protected routes - require authentication */}
             <Route
