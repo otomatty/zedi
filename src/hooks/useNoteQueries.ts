@@ -263,7 +263,7 @@ export function useCreateNote() {
 }
 
 export function useUpdateNote() {
-  const { getRepository, userId } = useNoteRepository();
+  const { getRepository, userId, userEmail } = useNoteRepository();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -275,11 +275,14 @@ export function useUpdateNote() {
       updates: Partial<Pick<Note, "title" | "visibility">>;
     }) => {
       const repo = await getRepository();
-      await repo.updateNote(userId, noteId, updates);
+      await repo.updateNote(userId, noteId, updates, userEmail);
       return { noteId, updates };
     },
-    onSuccess: () => {
+    onSuccess: ({ noteId, updates }) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.all });
+      if (updates.visibility === "private") {
+        queryClient.invalidateQueries({ queryKey: noteKeys.memberList(noteId) });
+      }
     },
   });
 }

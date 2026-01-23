@@ -226,7 +226,8 @@ export class NoteRepository {
   async updateNote(
     ownerUserId: string,
     noteId: string,
-    updates: Partial<Pick<Note, "title" | "visibility">>
+    updates: Partial<Pick<Note, "title" | "visibility">>,
+    ownerEmail?: string
   ): Promise<void> {
     const setClauses: string[] = ["updated_at = ?"];
     const args: (string | number)[] = [Date.now()];
@@ -250,6 +251,33 @@ export class NoteRepository {
       `,
       args,
     });
+
+    if (updates.visibility === "private") {
+      if (ownerEmail) {
+        await this.client.execute({
+          sql: `
+            DELETE FROM note_members
+            WHERE note_id = ? AND member_email != ?
+          `,
+          args: [noteId, ownerEmail],
+        });
+
+        const now = Date.now();
+        await this.client.execute({
+          sql: `
+            INSERT OR REPLACE INTO note_members
+            (note_id, member_email, role, invited_by_user_id, created_at, updated_at, is_deleted)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+          `,
+          args: [noteId, ownerEmail, "editor", ownerUserId, now, now],
+        });
+      } else {
+        await this.client.execute({
+          sql: `DELETE FROM note_members WHERE note_id = ?`,
+          args: [noteId],
+        });
+      }
+    }
 
     await this.notifyMutation();
   }
