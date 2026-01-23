@@ -73,7 +73,7 @@ export class PageRepository {
   async getPage(userId: string, pageId: string): Promise<Page | null> {
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, user_id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE id = ? AND user_id = ? AND is_deleted = 0
       `,
@@ -95,7 +95,7 @@ export class PageRepository {
   async getPages(userId: string): Promise<Page[]> {
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, user_id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND is_deleted = 0
         ORDER BY created_at DESC
@@ -113,7 +113,7 @@ export class PageRepository {
   async getPagesSummary(userId: string): Promise<PageSummary[]> {
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, user_id, title, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND is_deleted = 0
         ORDER BY created_at DESC
@@ -134,7 +134,7 @@ export class PageRepository {
     const placeholders = pageIds.map(() => "?").join(",");
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, user_id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND id IN (${placeholders}) AND is_deleted = 0
       `,
@@ -153,7 +153,7 @@ export class PageRepository {
 
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, user_id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND TRIM(title) = ? AND is_deleted = 0
       `,
@@ -180,7 +180,7 @@ export class PageRepository {
     if (!trimmedTitle) return null;
 
     let sql = `
-      SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
+      SELECT id, user_id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
       FROM pages
       WHERE user_id = ? AND TRIM(title) = ? AND is_deleted = 0
     `;
@@ -276,7 +276,7 @@ export class PageRepository {
 
     const result = await this.client.execute({
       sql: `
-        SELECT id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
+        SELECT id, user_id, title, content, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted
         FROM pages
         WHERE user_id = ? AND is_deleted = 0
           AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)
@@ -466,6 +466,7 @@ export class PageRepository {
   private rowToPage(row: Record<string, unknown>): Page {
     return {
       id: row.id as string,
+      ownerUserId: row.user_id as string | undefined,
       title: (row.title as string) || "",
       content: (row.content as string) || "",
       contentPreview: row.content_preview as string | undefined,
@@ -480,6 +481,7 @@ export class PageRepository {
   private rowToPageSummary(row: Record<string, unknown>): PageSummary {
     return {
       id: row.id as string,
+      ownerUserId: row.user_id as string | undefined,
       title: (row.title as string) || "",
       contentPreview: row.content_preview as string | undefined,
       thumbnailUrl: row.thumbnail_url as string | undefined,

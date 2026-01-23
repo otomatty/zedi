@@ -13,6 +13,8 @@ export interface TiptapEditorProps {
   pageTitle?: string;
   /** 読み取り専用モード（生成中など） */
   isReadOnly?: boolean;
+  /** ツールバーを表示するか */
+  showToolbar?: boolean;
   /** コンテンツエラーのコールバック */
   onContentError?: (error: ContentError | null) => void;
 }
