@@ -1,6 +1,6 @@
 import { Cloud, CloudOff, Loader2, Check } from "lucide-react";
 import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Tooltip,
   TooltipContent,

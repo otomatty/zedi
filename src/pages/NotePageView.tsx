@@ -6,7 +6,7 @@ import Container from "@/components/layout/Container";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@/components/ui/button";
 import { useNote, useNotePage } from "@/hooks/useNoteQueries";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();

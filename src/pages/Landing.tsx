@@ -2,7 +2,7 @@ import React from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
+import { useAuth, SignedIn, SignedOut } from "@/hooks/useAuth";
 import {
   FileText,
   Link as LinkIcon,

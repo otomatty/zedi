@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@/hooks/useAuth";
 import { useCallback, useEffect, useState } from "react";
 import { getLocalClient, saveLocalDatabase } from "@/lib/turso";
 import { NoteRepository } from "@/lib/noteRepository";
@@ -124,7 +124,7 @@ export function useNote(noteId: string, options?: UseNoteOptions) {
   });
 
   const noteWithAccess = localQuery.data ?? remoteQuery.data ?? null;
-  const source = localQuery.data ? "local" : remoteQuery.data ? "remote" : "local";
+  const source: "local" | "remote" = localQuery.data ? "local" : remoteQuery.data ? "remote" : "local";
 
   useEffect(() => {
     if (!noteId || source !== "local" || !noteWithAccess) return;

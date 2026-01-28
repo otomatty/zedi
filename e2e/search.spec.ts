@@ -1,12 +1,10 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./auth-mock";
 
 test.describe("Global Search - UI Tests", () => {
   test.setTimeout(30000);
 
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(500);
+  test.beforeEach(async ({ page, helpers }) => {
+    await helpers.goToHome(page);
   });
 
   test("should open search dialog with keyboard shortcut Cmd+K", async ({
@@ -80,17 +78,14 @@ test.describe("Global Search - UI Tests", () => {
 test.describe("Global Search - Data Tests", () => {
   test.setTimeout(60000);
 
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
+  test.beforeEach(async ({ page, helpers }) => {
+    await helpers.goToHome(page);
   });
 
-  test("should show recent pages section", async ({ page }) => {
+  test("should show recent pages section", async ({ page, helpers }) => {
     // Create a page first
-    await page.goto("/page/new");
-    await page.waitForURL(/\/page\/(?!new).+/, { timeout: 10000 });
-    await page.getByPlaceholder("ページタイトル").fill("Recent Page Test");
+    await helpers.createNewPage(page);
+    await page.getByPlaceholder("タイトルを入力").fill("Recent Page Test");
     await page.waitForTimeout(2000);
 
     // Open search on the same page
