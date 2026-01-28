@@ -1,6 +1,6 @@
 export interface Page {
   id: string;
-  ownerUserId?: string;
+  ownerUserId: string;
   title: string;
   content: string; // Tiptap JSON stringified
   contentPreview?: string;
@@ -17,7 +17,7 @@ export interface Page {
  */
 export interface PageSummary {
   id: string;
-  ownerUserId?: string;
+  ownerUserId: string;
   title: string;
   contentPreview?: string;
   thumbnailUrl?: string;

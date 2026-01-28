@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS note_pages (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE,
+    FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE,
     PRIMARY KEY (note_id, page_id)
 );
 
@@ -39,6 +41,7 @@ CREATE TABLE IF NOT EXISTS note_members (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE,
     PRIMARY KEY (note_id, member_email)
 );
 
