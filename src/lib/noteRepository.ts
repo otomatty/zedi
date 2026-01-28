@@ -55,7 +55,7 @@ export class NoteRepository {
   private rowToPage(row: Record<string, unknown>): Page {
     return {
       id: row.id as string,
-      ownerUserId: row.user_id as string | undefined,
+      ownerUserId: row.user_id as string,
       title: (row.title as string) || "",
       content: (row.content as string) || "",
       contentPreview: row.content_preview as string | undefined,
@@ -70,7 +70,7 @@ export class NoteRepository {
   private rowToPageSummary(row: Record<string, unknown>): PageSummary {
     return {
       id: row.id as string,
-      ownerUserId: row.user_id as string | undefined,
+      ownerUserId: row.user_id as string,
       title: (row.title as string) || "",
       contentPreview: row.content_preview as string | undefined,
       thumbnailUrl: row.thumbnail_url as string | undefined,
