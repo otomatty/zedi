@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useMemo } from "react";
 import { createAuthenticatedTursoClient, getTursoClient } from "@/lib/turso";
 import type { Client } from "@libsql/client";

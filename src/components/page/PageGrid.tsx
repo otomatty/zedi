@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
 import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";

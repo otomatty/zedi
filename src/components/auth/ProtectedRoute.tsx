@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
 import { Navigate, useLocation } from "react-router-dom";
 import { ReactNode } from "react";
 
@@ -10,6 +10,8 @@ interface ProtectedRouteProps {
 /**
  * A wrapper component that protects routes requiring authentication.
  * Redirects to the sign-in page if the user is not signed in.
+ * 
+ * Note: E2E test mode is handled at the useAuth hook level via VITE_E2E_TEST.
  */
 export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
   const { isSignedIn, isLoaded } = useAuth();

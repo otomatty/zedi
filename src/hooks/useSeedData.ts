@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
 import { usePagesSummary, useCreatePage } from "./usePageQueries";
 
 // Tutorial pages to seed the app on first run
