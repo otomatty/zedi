@@ -24,7 +24,8 @@ describe("StorageStatusHeader", () => {
       />
     );
 
-    expect(screen.getByText("Gyazo")).toBeInTheDocument();
+    // レスポンシブデザインにより複数の"Gyazo"テキストがレンダリングされる
+    expect(screen.getAllByText("Gyazo").length).toBeGreaterThan(0);
     expect(screen.getByText("接続済み")).toBeInTheDocument();
   });
 
@@ -56,7 +57,9 @@ describe("StorageStatusHeader", () => {
       />
     );
 
-    const wrapper = screen.getByText("Gyazo").parentElement?.parentElement as HTMLElement;
+    // レスポンシブデザインにより複数の"Gyazo"テキストがレンダリングされる
+    const gyazoElements = screen.getAllByText("Gyazo");
+    const wrapper = gyazoElements[0].parentElement?.parentElement as HTMLElement;
     fireEvent.keyDown(wrapper, { key: "Enter" });
     expect(onGoToStorageSettings).not.toHaveBeenCalled();
   });
