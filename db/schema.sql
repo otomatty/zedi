@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS pages (
     user_id TEXT NOT NULL,
     title TEXT,
     content TEXT,                -- Tiptap JSON
+    content_preview TEXT,        -- Page list preview (derived from content)
     thumbnail_url TEXT,          -- Date Gridで表示するサムネイル画像URL（contentの先頭画像から自動抽出）
     source_url TEXT,             -- Webクリッピング時の元URL（引用元）
     vector_embedding BLOB,       -- ベクトル埋め込み（Tursoのベクトル検索機能で使用）
@@ -43,3 +44,49 @@ CREATE TABLE IF NOT EXISTS ghost_links (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ghost_links_text ON ghost_links(link_text);
+
+-- 4. ノート（公開ノートのコンテナ）
+CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    owner_user_id TEXT NOT NULL,
+    title TEXT,
+    visibility TEXT NOT NULL DEFAULT 'private',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    is_deleted INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_owner_id ON notes(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_visibility ON notes(visibility);
+
+-- 5. ノートとページの紐付け
+CREATE TABLE IF NOT EXISTS note_pages (
+    note_id TEXT NOT NULL,
+    page_id TEXT NOT NULL,
+    added_by_user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE,
+    FOREIGN KEY(page_id) REFERENCES pages(id) ON DELETE CASCADE,
+    PRIMARY KEY (note_id, page_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_note_pages_note_id ON note_pages(note_id);
+CREATE INDEX IF NOT EXISTS idx_note_pages_page_id ON note_pages(page_id);
+
+-- 6. ノートメンバー（招待）
+CREATE TABLE IF NOT EXISTS note_members (
+    note_id TEXT NOT NULL,
+    member_email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'viewer',
+    invited_by_user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    is_deleted INTEGER DEFAULT 0,
+    FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE,
+    PRIMARY KEY (note_id, member_email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_note_members_note_id ON note_members(note_id);
+CREATE INDEX IF NOT EXISTS idx_note_members_email ON note_members(member_email);

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
-import { usePages, useCreatePage } from "./usePageQueries";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { usePagesSummary, useCreatePage } from "./usePageQueries";
 
 // Tutorial pages to seed the app on first run
 const TUTORIAL_PAGES = [
@@ -221,11 +222,14 @@ const TUTORIAL_PAGES = [
 const SEED_KEY = "zedi-seeded";
 
 export function useSeedData() {
-  const { data: pages, isLoading, isSuccess } = usePages();
+  const { isSignedIn } = useAuth();
+  const { data: pages, isLoading, isSuccess } = usePagesSummary();
   const createPageMutation = useCreatePage();
   const hasSeededRef = useRef(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
+    if (isSignedIn) return;
     // Wait for pages to load successfully
     if (isLoading || !isSuccess) return;
 
@@ -239,6 +243,7 @@ export function useSeedData() {
     // Only seed if no pages exist (pages is guaranteed to be defined when isSuccess is true)
     if (pages.length === 0) {
       hasSeededRef.current = true;
+      setIsSeeding(true);
       console.log("Seeding tutorial pages...");
 
       // Create tutorial pages sequentially
@@ -260,7 +265,9 @@ export function useSeedData() {
         console.log("Tutorial pages seeded successfully");
       };
 
-      seedPages();
+      seedPages().finally(() => setIsSeeding(false));
     }
-  }, [pages, isLoading, isSuccess, createPageMutation]);
+  }, [isSignedIn, pages, isLoading, isSuccess, createPageMutation]);
+
+  return { isSeeding };
 }

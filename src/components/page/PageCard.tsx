@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link2, Copy, Trash2 } from "lucide-react";
-import type { Page } from "@/types/page";
-import { getContentPreview, extractFirstImage } from "@/lib/contentUtils";
+import type { PageSummary } from "@/types/page";
 import { cn } from "@/lib/utils";
-import { useCreatePage, useDeletePage } from "@/hooks/usePageQueries";
+import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
 import { useToast } from "@/hooks/use-toast";
 import {
   ContextMenu,
@@ -25,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface PageCardProps {
-  page: Page;
+  page: PageSummary;
   index?: number;
 }
 
@@ -34,38 +33,46 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const { toast } = useToast();
   const createPageMutation = useCreatePage();
   const deletePageMutation = useDeletePage();
+  const pageDetailQuery = usePage(page.id, { enabled: false });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const preview = getContentPreview(page.content, 120);
-  const thumbnail = page.thumbnailUrl || extractFirstImage(page.content);
+  const preview = page.contentPreview ?? "";
+  const thumbnail = page.thumbnailUrl;
   const isClipped = !!page.sourceUrl;
 
   const handleClick = () => {
     navigate(`/page/${page.id}`);
   };
 
-  const handleDuplicate = (e: React.MouseEvent) => {
+  const handleDuplicate = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newTitle = `${page.title || "無題のページ"}のコピー`;
-    createPageMutation.mutate(
-      { title: newTitle, content: page.content },
-      {
-        onSuccess: (newPage) => {
-          toast({
-            title: "複製しました",
-            description: `「${newTitle}」を作成しました`,
-          });
-          navigate(`/page/${newPage.id}`);
-        },
-        onError: () => {
-          toast({
-            title: "エラー",
-            description: "ページの複製に失敗しました",
-            variant: "destructive",
-          });
-        },
+    if (createPageMutation.isPending) return;
+
+    try {
+      const { data: fullPage } = await pageDetailQuery.refetch();
+      if (!fullPage) {
+        throw new Error("Page not found");
       }
-    );
+
+      const newTitle = `${page.title || "無題のページ"}のコピー`;
+      const newPage = await createPageMutation.mutateAsync({
+        title: newTitle,
+        content: fullPage.content,
+      });
+
+      toast({
+        title: "複製しました",
+        description: `「${newTitle}」を作成しました`,
+      });
+      navigate(`/page/${newPage.id}`);
+    } catch (error) {
+      console.error("Failed to duplicate page:", error);
+      toast({
+        title: "エラー",
+        description: "ページの複製に失敗しました",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDelete = () => {
@@ -127,6 +134,8 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
                     src={thumbnail}
                     alt=""
                     className="max-w-full max-h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                    decoding="async"
+                    fetchPriority="low"
                     loading="lazy"
                   />
                 </div>

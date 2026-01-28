@@ -13,6 +13,9 @@ interface PageEditorContentProps {
   pageId: string;
   isNewPage: boolean;
   isWikiGenerating: boolean;
+  isReadOnly?: boolean;
+  showLinkedPages?: boolean;
+  showToolbar?: boolean;
   onContentChange: (content: string) => void;
   onContentError: (error: ContentError | null) => void;
 }
@@ -29,9 +32,14 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   pageId,
   isNewPage,
   isWikiGenerating,
+  isReadOnly,
+  showLinkedPages = true,
+  showToolbar = true,
   onContentChange,
   onContentError,
 }) => {
+  const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
+
   return (
     <main className="flex-1 pt-6 pb-32">
       <Container>
@@ -50,13 +58,16 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
               className="min-h-[calc(100vh-200px)]"
               pageId={currentPageId || pageId || undefined}
               pageTitle={title}
-              isReadOnly={isWikiGenerating}
+              isReadOnly={isEditorReadOnly}
+              showToolbar={showToolbar}
               onContentError={onContentError}
             />
           </div>
 
           {/* Linked Pages Section */}
-          {currentPageId && <LinkedPagesSection pageId={currentPageId} />}
+          {showLinkedPages && currentPageId && (
+            <LinkedPagesSection pageId={currentPageId} />
+          )}
       </Container>
     </main>
   );
