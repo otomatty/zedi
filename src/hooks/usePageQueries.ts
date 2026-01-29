@@ -270,6 +270,7 @@ export function useCreatePage() {
       // Also update summary cache
       const newSummary: PageSummary = {
         id: newPage.id,
+        ownerUserId: newPage.ownerUserId,
         title: newPage.title,
         contentPreview: newPage.contentPreview,
         thumbnailUrl: newPage.thumbnailUrl,
