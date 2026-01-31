@@ -65,26 +65,6 @@ test.describe("Page Editor", () => {
       });
     });
 
-    test("should show empty title warning for existing pages", async ({
-      page,
-      helpers,
-    }) => {
-      await helpers.createNewPage(page);
-
-      // Enter title first
-      const titleInput = page.getByPlaceholder("タイトルを入力");
-      await titleInput.fill("Temporary Title");
-      await page.waitForTimeout(1500);
-
-      // Clear title
-      await titleInput.fill("");
-      await page.waitForTimeout(1500);
-
-      // Should show empty title warning
-      await expect(page.getByText(/タイトルを入力してください/)).toBeVisible({
-        timeout: 5000,
-      });
-    });
   });
 
   test.describe("Content Editing", () => {

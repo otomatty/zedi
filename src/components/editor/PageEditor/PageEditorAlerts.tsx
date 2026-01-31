@@ -16,9 +16,7 @@ interface PageEditorAlertsProps {
   // Title validation
   duplicatePage: Page | null;
   errorMessage: string | null;
-  isTitleEmpty: boolean;
   title: string;
-  isNewPage: boolean;
   onOpenDuplicatePage: () => void;
   
   // Wiki generating
@@ -36,15 +34,13 @@ interface PageEditorAlertsProps {
 export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
   duplicatePage,
   errorMessage,
-  isTitleEmpty,
   title,
-  isNewPage,
   onOpenDuplicatePage,
   isWikiGenerating,
   onCancelWiki,
   contentError,
 }) => {
-  const showTitleAlerts = duplicatePage || (!isNewPage && isTitleEmpty && title === "");
+  const showTitleAlerts = !!duplicatePage;
 
   return (
     <>
@@ -70,18 +66,6 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
                     <ExternalLink className="h-3 w-3 mr-1" />
                     開く
                   </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-            {/* 既存ページで空タイトル警告 */}
-            {!isNewPage && isTitleEmpty && title === "" && !duplicatePage && (
-              <Alert
-                variant="destructive"
-                className="border-0 bg-transparent py-3"
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  タイトルを入力してください
                 </AlertDescription>
               </Alert>
             )}
