@@ -53,7 +53,7 @@ export function useAISettings(): UseAISettingsReturn {
           // キャッシュからモデル一覧を取得
           setAvailableModels(getAvailableModels(loaded.provider));
         } else {
-          // デフォルトプロバイダー（Ollama）のモデル一覧
+          // デフォルトプロバイダー（Google）のモデル一覧
           const defaultSettings = getDefaultAISettings();
           setSettings(defaultSettings);
           setAvailableModels(getDefaultModels(defaultSettings.provider));
@@ -81,11 +81,6 @@ export function useAISettings(): UseAISettingsReturn {
         setAvailableModels(models);
         newSettings.model = models[0] || getDefaultModel(updates.provider);
 
-        // Ollamaの場合はデフォルトエンドポイントを設定
-        if (updates.provider === "ollama" && !newSettings.ollamaEndpoint) {
-          newSettings.ollamaEndpoint = "http://localhost:11434";
-        }
-
         // APIキーが必要かどうかを確認
         const provider = getProviderById(updates.provider);
         if (provider && !provider.requiresApiKey) {
@@ -107,7 +102,7 @@ export function useAISettings(): UseAISettingsReturn {
       const provider = getProviderById(settings.provider);
       const isConfigured = provider?.requiresApiKey
         ? settings.apiKey.trim() !== ""
-        : true; // Ollamaの場合はAPIキー不要なので常にtrue
+        : true;
 
       const settingsToSave = {
         ...settings,
@@ -132,7 +127,6 @@ export function useAISettings(): UseAISettingsReturn {
       const result = await testConnection(
         settings.provider,
         settings.apiKey,
-        settings.ollamaEndpoint,
       );
       setTestResult(result);
 
@@ -160,7 +154,6 @@ export function useAISettings(): UseAISettingsReturn {
   }, [
     settings.provider,
     settings.apiKey,
-    settings.ollamaEndpoint,
     settings.model,
   ]);
 

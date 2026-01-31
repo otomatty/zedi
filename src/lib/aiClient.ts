@@ -8,151 +8,9 @@ import {
   AIProviderType,
   CachedModels,
   getDefaultModels,
-  OLLAMA_MODELS,
 } from "@/types/ai";
 
-export type AIClient = OpenAI | Anthropic | GoogleGenAI | OllamaClient;
-
-// Ollamaクライアントクラス
-export class OllamaClient {
-  private endpoint: string;
-
-  constructor(endpoint: string = "http://localhost:11434") {
-    this.endpoint = endpoint.replace(/\/$/, ""); // 末尾のスラッシュを除去
-  }
-
-  async chat(
-    model: string,
-    messages: { role: "user" | "assistant" | "system"; content: string }[],
-    options?: {
-      temperature?: number;
-      maxTokens?: number;
-    },
-  ): Promise<string> {
-    const response = await fetch(`${this.endpoint}/api/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        options: {
-          temperature: options?.temperature ?? 0.7,
-          num_predict: options?.maxTokens ?? 2048,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Ollama API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json();
-    return data.message?.content ?? "";
-  }
-
-  async generate(
-    model: string,
-    prompt: string,
-    options?: {
-      temperature?: number;
-      maxTokens?: number;
-    },
-  ): Promise<string> {
-    const response = await fetch(`${this.endpoint}/api/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        prompt,
-        stream: false,
-        options: {
-          temperature: options?.temperature ?? 0.7,
-          num_predict: options?.maxTokens ?? 2048,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Ollama API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json();
-    return data.response ?? "";
-  }
-
-  async listModels(): Promise<string[]> {
-    const response = await fetch(`${this.endpoint}/api/tags`);
-
-    if (!response.ok) {
-      throw new Error(`Failed to list models: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return (data.models || []).map(
-      (m: { name: string }) =>
-        m.name.split(":")[0] + ":" + (m.name.split(":")[1] || "latest"),
-    );
-  }
-
-  async pullModel(
-    model: string,
-    onProgress?: (status: string, completed?: number, total?: number) => void,
-  ): Promise<void> {
-    const response = await fetch(`${this.endpoint}/api/pull`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name: model, stream: true }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to pull model: ${response.status}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) return;
-
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const lines = decoder.decode(value).split("\n").filter(Boolean);
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
-          if (onProgress) {
-            onProgress(data.status, data.completed, data.total);
-          }
-        } catch {
-          // JSONパースエラーは無視
-        }
-      }
-    }
-  }
-
-  async isModelAvailable(model: string): Promise<boolean> {
-    try {
-      const models = await this.listModels();
-      const modelBase = model.split(":")[0];
-      return models.some((m) => m.startsWith(modelBase));
-    } catch {
-      return false;
-    }
-  }
-
-  getEndpoint(): string {
-    return this.endpoint;
-  }
-}
+export type AIClient = OpenAI | Anthropic | GoogleGenAI;
 
 // モデルキャッシュのストレージキー
 const MODELS_CACHE_KEY = "zedi-ai-models-cache";
@@ -175,8 +33,6 @@ export function createAIClient(settings: AISettings): AIClient {
       });
     case "google":
       return new GoogleGenAI({ apiKey: settings.apiKey });
-    case "ollama":
-      return new OllamaClient(settings.ollamaEndpoint);
     default:
       throw new Error(`Unknown provider: ${settings.provider}`);
   }
@@ -320,32 +176,18 @@ async function fetchGoogleModels(apiKey: string): Promise<string[]> {
     })
     .map((m: { name: string }) => m.name.replace("models/", ""))
     .sort((a: string, b: string) => {
-      // gemini-2.0系を優先、その後1.5 pro、最後に1.5 flash
+      // gemini-2.5系を優先、その後2.0、最後に1.5
       const order = (id: string) => {
-        if (id.includes("2.0")) return 0;
-        if (id.includes("1.5-pro")) return 1;
-        if (id.includes("1.5-flash")) return 2;
-        return 3;
+        if (id.includes("2.5")) return 0;
+        if (id.includes("2.0")) return 1;
+        if (id.includes("1.5-pro")) return 2;
+        if (id.includes("1.5-flash")) return 3;
+        return 4;
       };
       return order(a) - order(b);
     });
 
   return geminiModels.length > 0 ? geminiModels : getDefaultModels("google");
-}
-
-/**
- * Ollamaからモデル一覧を取得
- */
-async function fetchOllamaModels(endpoint: string): Promise<string[]> {
-  const client = new OllamaClient(endpoint);
-  const installedModels = await client.listModels();
-
-  if (installedModels.length > 0) {
-    return installedModels;
-  }
-
-  // インストール済みモデルがない場合は推奨モデル一覧を返す
-  return OLLAMA_MODELS.map((m) => m.name);
 }
 
 /**
@@ -486,77 +328,14 @@ async function testGoogleConnection(
 }
 
 /**
- * Ollama接続テスト（ローカルモデル一覧も取得）
- */
-async function testOllamaConnection(
-  endpoint: string,
-): Promise<ConnectionTestResult> {
-  try {
-    const client = new OllamaClient(endpoint);
-
-    // まずバージョン確認でOllamaが起動しているかチェック
-    const versionResponse = await fetch(`${endpoint}/api/version`);
-    if (!versionResponse.ok) {
-      throw new Error("Ollama is not running");
-    }
-
-    // インストール済みモデルを取得
-    const models = await client.listModels();
-
-    // モデル取得成功時にキャッシュに保存
-    if (models.length > 0) {
-      saveCachedModels("ollama", models);
-    }
-
-    if (models.length === 0) {
-      return {
-        success: true,
-        message:
-          "Ollamaに接続しました。モデルがインストールされていません。設定画面からモデルをダウンロードしてください。",
-        models: OLLAMA_MODELS.map((m) => m.name), // 推奨モデル一覧を返す
-      };
-    }
-
-    return {
-      success: true,
-      message: `接続成功！ ${models.length}個のモデルがインストール済みです`,
-      models,
-    };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-
-    if (
-      errorMessage.includes("Failed to fetch") ||
-      errorMessage.includes("NetworkError") ||
-      errorMessage.includes("not running")
-    ) {
-      return {
-        success: false,
-        message:
-          "Ollamaに接続できません。Ollamaが起動しているか確認してください。",
-        error: `エンドポイント: ${endpoint}\n\nOllamaのインストール: https://ollama.ai/download\n起動コマンド: ollama serve`,
-      };
-    }
-
-    return {
-      success: false,
-      message: "接続に失敗しました",
-      error: errorMessage,
-    };
-  }
-}
-
-/**
  * 接続テストを実行する
  */
 export async function testConnection(
   provider: AIProviderType,
   apiKey: string,
-  ollamaEndpoint?: string,
 ): Promise<ConnectionTestResult> {
-  // Ollama以外はAPIキーが必要
-  if (provider !== "ollama" && (!apiKey || apiKey.trim() === "")) {
+  // APIキーが必要
+  if (!apiKey || apiKey.trim() === "") {
     return {
       success: false,
       message: "APIキーを入力してください",
@@ -570,28 +349,10 @@ export async function testConnection(
       return testAnthropicConnection(apiKey);
     case "google":
       return testGoogleConnection(apiKey);
-    case "ollama":
-      return testOllamaConnection(ollamaEndpoint || "http://localhost:11434");
     default:
       return {
         success: false,
         message: `不明なプロバイダー: ${provider}`,
       };
   }
-}
-
-/**
- * Ollamaモデルをダウンロード
- */
-export async function downloadOllamaModel(
-  modelName: string,
-  endpoint: string = "http://localhost:11434",
-  onProgress?: (status: string, completed?: number, total?: number) => void,
-): Promise<void> {
-  const client = new OllamaClient(endpoint);
-  await client.pullModel(modelName, onProgress);
-
-  // ダウンロード完了後、キャッシュを更新
-  const models = await client.listModels();
-  saveCachedModels("ollama", models);
 }
