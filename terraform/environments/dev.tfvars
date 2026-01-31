@@ -23,10 +23,14 @@ cognito_callback_urls = ["http://localhost:30000/callback", "http://localhost:30
 cognito_logout_urls   = ["http://localhost:30000"]
 
 # ECS (Fargate Spot)
-use_fargate_spot  = true   # ~70% cost savings
-ecs_task_cpu      = 256    # 0.25 vCPU
-ecs_task_memory   = 512    # 512 MB
-ecs_desired_count = 1      # Single instance for dev
+use_fargate_spot       = true   # ~70% cost savings
+ecs_task_cpu           = 256    # 0.25 vCPU
+ecs_task_memory        = 512    # 512 MB
+ecs_desired_count      = 1      # Single instance for dev
+enable_ecs_autoscaling = false  # No autoscaling for dev
+ecs_min_capacity       = 1
+ecs_max_capacity       = 4
+acm_certificate_arn    = ""     # No HTTPS for dev (uses HTTP)
 
 # Domain (optional)
 domain_name         = ""

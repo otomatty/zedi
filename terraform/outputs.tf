@@ -73,17 +73,32 @@ output "redis_connection_string" {
 }
 
 # =============================================================================
-# Realtime (ECS/ALB) - Uncomment when module is enabled
+# Realtime (ECS/ALB)
 # =============================================================================
-# output "alb_dns_name" {
-#   description = "ALB DNS name for WebSocket connections"
-#   value       = module.realtime.alb_dns_name
-# }
-#
-# output "websocket_url" {
-#   description = "WebSocket URL for Hocuspocus"
-#   value       = "wss://${module.realtime.alb_dns_name}"
-# }
+output "alb_dns_name" {
+  description = "ALB DNS name for WebSocket connections"
+  value       = module.realtime.alb_dns_name
+}
+
+output "websocket_url" {
+  description = "WebSocket URL for Hocuspocus"
+  value       = module.realtime.websocket_url
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for Hocuspocus image"
+  value       = module.realtime.ecr_repository_url
+}
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name"
+  value       = module.realtime.ecs_cluster_name
+}
+
+output "ecs_service_name" {
+  description = "ECS service name"
+  value       = module.realtime.ecs_service_name
+}
 
 # =============================================================================
 # CDN (CloudFront) - Uncomment when module is enabled

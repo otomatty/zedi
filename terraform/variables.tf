@@ -104,6 +104,30 @@ variable "ecs_desired_count" {
   default     = 1
 }
 
+variable "enable_ecs_autoscaling" {
+  description = "Enable ECS service auto scaling"
+  type        = bool
+  default     = false
+}
+
+variable "ecs_min_capacity" {
+  description = "Minimum number of ECS tasks (when autoscaling enabled)"
+  type        = number
+  default     = 1
+}
+
+variable "ecs_max_capacity" {
+  description = "Maximum number of ECS tasks (when autoscaling enabled)"
+  type        = number
+  default     = 4
+}
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN for HTTPS (optional, if empty uses HTTP)"
+  type        = string
+  default     = ""
+}
+
 # =============================================================================
 # Security (Cognito)
 # =============================================================================

@@ -116,15 +116,41 @@ module "cache" {
 # =============================================================================
 # Module: Realtime (ECS Fargate Spot, ALB, Hocuspocus)
 # =============================================================================
-# module "realtime" {
-#   source = "./modules/realtime"
-#
-#   environment        = var.environment
-#   vpc_id             = module.networking.vpc_id
-#   public_subnet_ids  = module.networking.public_subnet_ids
-#   private_subnet_ids = module.networking.private_subnet_ids
-#   tags               = local.common_tags
-# }
+module "realtime" {
+  source = "./modules/realtime"
+
+  environment        = var.environment
+  vpc_id             = module.networking.vpc_id
+  public_subnet_ids  = module.networking.public_subnet_ids
+  private_subnet_ids = module.networking.private_subnet_ids
+  tags               = local.common_tags
+
+  # ECS Configuration
+  task_cpu         = var.ecs_task_cpu
+  task_memory      = var.ecs_task_memory
+  desired_count    = var.ecs_desired_count
+  use_fargate_spot = var.use_fargate_spot
+
+  # IAM Roles
+  ecs_execution_role_arn = module.security.ecs_execution_role_arn
+  ecs_task_role_arn      = module.security.ecs_task_role_arn
+
+  # Dependencies
+  redis_connection_string   = module.cache.redis_connection_string
+  db_credentials_secret_arn = module.database.db_credentials_secret_arn
+  cognito_user_pool_id      = module.security.user_pool_id
+
+  # SSL/TLS (empty for dev, ACM ARN for prod)
+  acm_certificate_arn = var.acm_certificate_arn
+
+  # Auto Scaling
+  enable_autoscaling = var.enable_ecs_autoscaling
+  min_capacity       = var.ecs_min_capacity
+  max_capacity       = var.ecs_max_capacity
+
+  # Monitoring
+  enable_container_insights = var.enable_detailed_monitoring
+}
 
 # =============================================================================
 # Module: CDN (CloudFront, S3)
