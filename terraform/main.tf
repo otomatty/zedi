@@ -101,14 +101,17 @@ module "database" {
 # =============================================================================
 # Module: Cache (ElastiCache Redis)
 # =============================================================================
-# module "cache" {
-#   source = "./modules/cache"
-#
-#   environment        = var.environment
-#   vpc_id             = module.networking.vpc_id
-#   private_subnet_ids = module.networking.private_subnet_ids
-#   tags               = local.common_tags
-# }
+module "cache" {
+  source = "./modules/cache"
+
+  environment        = var.environment
+  vpc_id             = module.networking.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.networking.private_subnet_ids
+  node_type          = var.redis_node_type
+  num_cache_nodes    = var.redis_num_cache_nodes
+  tags               = local.common_tags
+}
 
 # =============================================================================
 # Module: Realtime (ECS Fargate Spot, ALB, Hocuspocus)
