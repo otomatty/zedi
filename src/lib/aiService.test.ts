@@ -23,7 +23,6 @@ let googleMock: {
     generateContentStream: ReturnType<typeof vi.fn>;
   };
 } | null = null;
-let ollamaMock: { chat: ReturnType<typeof vi.fn> } | null = null;
 
 // OpenAI SDKのモック
 vi.mock("openai", () => ({
@@ -61,21 +60,7 @@ vi.mock("@google/genai", () => ({
   },
 }));
 
-// OllamaClientのモック
-vi.mock("./aiClient", async () => {
-  const actual = await vi.importActual<typeof import("./aiClient")>("./aiClient");
-  return {
-    ...actual,
-    OllamaClient: class OllamaClient {
-      constructor() {
-        if (!ollamaMock) {
-          throw new Error("Ollama mock is not configured");
-        }
-        return ollamaMock;
-      }
-    },
-  };
-});
+
 
 describe("aiService - 回帰テスト", () => {
   beforeEach(() => {
@@ -161,9 +146,8 @@ describe("aiService - 回帰テスト", () => {
       provider,
       apiKey,
       apiMode: "user_api_key",
-      model: provider === "openai" ? "gpt-4o" : provider === "anthropic" ? "claude-3-5-sonnet-20241022" : provider === "google" ? "gemini-2.0-flash-exp" : "qwen2.5:7b",
+      model: provider === "openai" ? "gpt-4o" : provider === "anthropic" ? "claude-3-5-sonnet-20241022" : "gemini-2.5-flash",
       isConfigured: true,
-      ollamaEndpoint: provider === "ollama" ? "http://localhost:11434" : undefined,
     });
 
     const createTestRequest = (): AIServiceRequest => ({
@@ -183,7 +167,6 @@ describe("aiService - 回帰テスト", () => {
       openAIMock = null;
       anthropicMock = null;
       googleMock = null;
-      ollamaMock = null;
     };
 
     describe("OpenAI - 非ストリーミング", () => {
@@ -515,53 +498,6 @@ describe("aiService - 回帰テスト", () => {
         expect(callbacks.onChunk).toHaveBeenNthCalledWith(1, "Hello");
         expect(callbacks.onChunk).toHaveBeenNthCalledWith(2, ", ");
         expect(callbacks.onChunk).toHaveBeenNthCalledWith(3, "world!");
-
-        expect(callbacks.onComplete).toHaveBeenCalledWith({
-          content: "Hello, world!",
-          finishReason: "stop",
-        });
-        expect(callbacks.onError).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("Ollama", () => {
-      it("既存と同じようにAPIを呼び出せる", async () => {
-        resetMocks();
-        const settings = createTestSettings("ollama", "");
-        const request: AIServiceRequest = {
-          provider: "ollama",
-          model: "qwen2.5:7b",
-          messages: [{ role: "user", content: "Hello" }],
-          options: {
-            temperature: 0.7,
-            maxTokens: 100,
-          },
-        };
-
-        const mockResponse = "Hello, world!";
-
-        const mockChat = vi.fn().mockResolvedValue(mockResponse);
-        const mockClient = {
-          chat: mockChat,
-        };
-
-        ollamaMock = mockClient;
-
-        const callbacks: AIServiceCallbacks = {
-          onComplete: vi.fn(),
-          onError: vi.fn(),
-        };
-
-        await callAIService(settings, request, callbacks);
-
-        expect(mockChat).toHaveBeenCalledWith(
-          "qwen2.5:7b",
-          [{ role: "user", content: "Hello" }],
-          {
-            temperature: 0.7,
-            maxTokens: 100,
-          }
-        );
 
         expect(callbacks.onComplete).toHaveBeenCalledWith({
           content: "Hello, world!",

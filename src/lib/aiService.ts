@@ -5,7 +5,6 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { AISettings, AIProviderType, APIMode } from "@/types/ai";
-import { createAIClient, OllamaClient } from "./aiClient";
 
 const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
 
@@ -96,9 +95,6 @@ async function callAIWithUserKey(
       case "google":
         await callGoogle(settings, request, callbacks, abortSignal);
         break;
-      case "ollama":
-        await callOllama(settings, request, callbacks, abortSignal);
-        break;
       default:
         throw new Error(`Unknown provider: ${settings.provider}`);
     }
@@ -130,10 +126,6 @@ async function callAIWithServer(
     const apiBaseUrl = getAIAPIBaseUrl();
     if (!apiBaseUrl) {
       throw new Error("AI APIサーバーのURLが設定されていません");
-    }
-
-    if (request.provider === "ollama") {
-      throw new Error("OllamaはAPIサーバー経由モードでは利用できません");
     }
 
     const token = await getClerkToken();
@@ -477,32 +469,4 @@ async function callGoogle(
       finishReason: "stop",
     });
   }
-}
-
-/**
- * Ollama API呼び出し
- */
-async function callOllama(
-  settings: AISettings,
-  request: AIServiceRequest,
-  callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
-): Promise<void> {
-  const client = new OllamaClient(settings.ollamaEndpoint);
-
-  // Ollamaは常にストリーミング（stream: falseでも内部的にはストリーミング）
-  const response = await client.chat(
-    request.model,
-    request.messages,
-    {
-      temperature: request.options?.temperature ?? 0.7,
-      maxTokens: request.options?.maxTokens ?? 2048,
-    }
-  );
-
-  // Ollamaは非ストリーミングAPIなので、一度に結果を返す
-  callbacks.onComplete?.({
-    content: response,
-    finishReason: "stop",
-  });
 }

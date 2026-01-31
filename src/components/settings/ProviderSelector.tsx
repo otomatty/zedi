@@ -2,8 +2,6 @@ import React from "react";
 import { AI_PROVIDERS, AIProviderType } from "@/types/ai";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Shield } from "lucide-react";
 
 interface ProviderSelectorProps {
   value: AIProviderType;
@@ -26,7 +24,6 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         disabled={disabled}
       >
         {AI_PROVIDERS.map((provider) => {
-          const isOllama = provider.id === "ollama";
           const isSelected = value === provider.id;
 
           return (
@@ -36,7 +33,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                 isSelected
                   ? "border-primary bg-primary/5"
                   : "border-border hover:bg-muted/50"
-              } ${isOllama ? "ring-1 ring-green-500/30" : ""}`}
+              }`}
             >
               <RadioGroupItem
                 value={provider.id}
@@ -50,20 +47,6 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   className="cursor-pointer font-medium flex items-center gap-2"
                 >
                   {provider.name}
-                  {isOllama && (
-                    <Badge
-                      variant="outline"
-                      className="text-green-600 border-green-500/50 bg-green-500/10"
-                    >
-                      <Shield className="h-3 w-3 mr-1" />
-                      推奨
-                    </Badge>
-                  )}
-                  {!provider.requiresApiKey && (
-                    <Badge variant="secondary" className="text-xs">
-                      APIキー不要
-                    </Badge>
-                  )}
                 </Label>
                 {provider.description && (
                   <p className="text-xs text-muted-foreground mt-1">
