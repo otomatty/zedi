@@ -6,7 +6,7 @@ aws_region  = "ap-northeast-1"
 
 # Networking
 vpc_cidr             = "10.0.0.0/16"
-availability_zones   = ["ap-northeast-1a"]  # Single AZ for cost savings
+availability_zones   = ["ap-northeast-1a", "ap-northeast-1c"]  # Aurora requires 2 AZs minimum
 enable_vpc_endpoints = true                  # Replaces NAT Gateway ($32 → $14)
 
 # Database (Aurora Serverless v2)
@@ -17,6 +17,10 @@ aurora_database_name = "zedi"
 # Cache (ElastiCache Redis)
 redis_node_type       = "cache.t4g.micro"  # Graviton2, smallest instance
 redis_num_cache_nodes = 1
+
+# Security (Cognito)
+cognito_callback_urls = ["http://localhost:30000/callback", "http://localhost:30000/auth/callback"]
+cognito_logout_urls   = ["http://localhost:30000"]
 
 # ECS (Fargate Spot)
 use_fargate_spot  = true   # ~70% cost savings

@@ -73,24 +73,30 @@ module "networking" {
 # =============================================================================
 # Module: Security (Cognito, WAF, IAM)
 # =============================================================================
-# module "security" {
-#   source = "./modules/security"
-#
-#   environment = var.environment
-#   tags        = local.common_tags
-# }
+module "security" {
+  source = "./modules/security"
+
+  environment   = var.environment
+  callback_urls = var.cognito_callback_urls
+  logout_urls   = var.cognito_logout_urls
+  tags          = local.common_tags
+}
 
 # =============================================================================
 # Module: Database (Aurora Serverless v2)
 # =============================================================================
-# module "database" {
-#   source = "./modules/database"
-#
-#   environment        = var.environment
-#   vpc_id             = module.networking.vpc_id
-#   private_subnet_ids = module.networking.private_subnet_ids
-#   tags               = local.common_tags
-# }
+module "database" {
+  source = "./modules/database"
+
+  environment        = var.environment
+  vpc_id             = module.networking.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.networking.private_subnet_ids
+  database_name      = var.aurora_database_name
+  min_capacity       = var.aurora_min_capacity
+  max_capacity       = var.aurora_max_capacity
+  tags               = local.common_tags
+}
 
 # =============================================================================
 # Module: Cache (ElastiCache Redis)

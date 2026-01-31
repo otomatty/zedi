@@ -105,6 +105,21 @@ variable "ecs_desired_count" {
 }
 
 # =============================================================================
+# Security (Cognito)
+# =============================================================================
+variable "cognito_callback_urls" {
+  description = "List of allowed callback URLs for Cognito OAuth"
+  type        = list(string)
+  default     = ["http://localhost:30000/callback"]
+}
+
+variable "cognito_logout_urls" {
+  description = "List of allowed logout URLs for Cognito"
+  type        = list(string)
+  default     = ["http://localhost:30000"]
+}
+
+# =============================================================================
 # Domain (Optional)
 # =============================================================================
 variable "domain_name" {
