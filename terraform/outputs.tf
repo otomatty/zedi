@@ -37,17 +37,27 @@ output "private_subnet_ids" {
 }
 
 # =============================================================================
-# Database (Aurora) - Uncomment when module is enabled
+# Database (Aurora)
 # =============================================================================
-# output "aurora_cluster_endpoint" {
-#   description = "Aurora cluster endpoint"
-#   value       = module.database.cluster_endpoint
-# }
-#
-# output "aurora_reader_endpoint" {
-#   description = "Aurora reader endpoint"
-#   value       = module.database.reader_endpoint
-# }
+output "aurora_cluster_endpoint" {
+  description = "Aurora cluster endpoint (writer)"
+  value       = module.database.cluster_endpoint
+}
+
+output "aurora_reader_endpoint" {
+  description = "Aurora cluster reader endpoint"
+  value       = module.database.cluster_reader_endpoint
+}
+
+output "aurora_database_name" {
+  description = "Aurora database name"
+  value       = module.database.database_name
+}
+
+output "db_credentials_secret_arn" {
+  description = "ARN of Secrets Manager secret for DB credentials"
+  value       = module.database.db_credentials_secret_arn
+}
 
 # =============================================================================
 # Cache (Redis) - Uncomment when module is enabled
@@ -89,14 +99,34 @@ output "private_subnet_ids" {
 # }
 
 # =============================================================================
-# Cognito - Uncomment when module is enabled
+# Security (Cognito, IAM)
 # =============================================================================
-# output "cognito_user_pool_id" {
-#   description = "Cognito User Pool ID"
-#   value       = module.security.user_pool_id
-# }
-#
-# output "cognito_client_id" {
-#   description = "Cognito App Client ID"
-#   value       = module.security.client_id
-# }
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  value       = module.security.user_pool_id
+}
+
+output "cognito_user_pool_endpoint" {
+  description = "Cognito User Pool endpoint"
+  value       = module.security.user_pool_endpoint
+}
+
+output "cognito_client_id" {
+  description = "Cognito App Client ID"
+  value       = module.security.user_pool_client_id
+}
+
+output "cognito_hosted_ui_url" {
+  description = "Cognito Hosted UI URL"
+  value       = module.security.cognito_hosted_ui_url
+}
+
+output "ecs_execution_role_arn" {
+  description = "ECS Task Execution Role ARN"
+  value       = module.security.ecs_execution_role_arn
+}
+
+output "ecs_task_role_arn" {
+  description = "ECS Task Role ARN"
+  value       = module.security.ecs_task_role_arn
+}
