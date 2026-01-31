@@ -38,3 +38,19 @@ test-results/
 # Cloudflare Workers
 .wrangler/
 .dev.vars
+
+# Terraform
+terraform/.terraform/
+terraform/**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars.json
+
+# Terraform - DO NOT commit these if they contain secrets
+# terraform/environments/*.tfvars  # Uncomment if tfvars contain sensitive data
