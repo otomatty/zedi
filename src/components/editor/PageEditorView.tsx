@@ -336,8 +336,6 @@ const PageEditor: React.FC = () => {
         hasContent={isContentNotEmpty(content)}
         wikiStatus={wikiStatus}
         errorMessage={errorMessage}
-        isTitleEmpty={isTitleEmpty}
-        isNewPage={isNewPage}
         currentStorageProvider={currentStorageProvider}
         isStorageConfigured={isStorageConfigured}
         isStorageLoading={isStorageLoading}
@@ -352,9 +350,7 @@ const PageEditor: React.FC = () => {
       <PageEditorAlerts
         duplicatePage={duplicatePage}
         errorMessage={errorMessage}
-        isTitleEmpty={isTitleEmpty}
         title={title}
-        isNewPage={isNewPage}
         onOpenDuplicatePage={handleOpenDuplicatePage}
         isWikiGenerating={isWikiGenerating}
         onCancelWiki={cancelWiki}

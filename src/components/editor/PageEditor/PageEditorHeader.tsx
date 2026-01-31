@@ -29,8 +29,6 @@ interface PageEditorHeaderProps {
   hasContent: boolean;
   wikiStatus: WikiGeneratorStatus;
   errorMessage: string | null;
-  isTitleEmpty: boolean;
-  isNewPage: boolean;
   currentStorageProvider?: StorageProviderInfo;
   isStorageConfigured: boolean;
   isStorageLoading: boolean;
@@ -53,8 +51,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   hasContent,
   wikiStatus,
   errorMessage,
-  isTitleEmpty,
-  isNewPage,
   currentStorageProvider,
   isStorageConfigured,
   isStorageLoading,
@@ -83,9 +79,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="ページタイトル"
             className={`border-0 bg-transparent text-xl font-medium focus-visible:ring-0 px-0 h-auto py-1 ${
-              errorMessage || (!isNewPage && isTitleEmpty && title === "")
-                ? "text-destructive"
-                : ""
+              errorMessage ? "text-destructive" : ""
             }`}
           />
         </div>

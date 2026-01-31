@@ -61,9 +61,7 @@ export interface PageEditorHeaderProps {
  */
 export interface PageEditorAlertsProps {
   duplicatePage: Page | null;
-  isTitleEmpty: boolean;
   title: string;
-  isNewPage: boolean;
   contentError: ContentError | null;
   onDismissContentError: () => void;
   onNavigateToDuplicate: (pageId: string) => void;
