@@ -60,12 +60,17 @@ output "db_credentials_secret_arn" {
 }
 
 # =============================================================================
-# Cache (Redis) - Uncomment when module is enabled
+# Cache (Redis)
 # =============================================================================
-# output "redis_endpoint" {
-#   description = "ElastiCache Redis endpoint"
-#   value       = module.cache.redis_endpoint
-# }
+output "redis_endpoint" {
+  description = "ElastiCache Redis primary endpoint"
+  value       = module.cache.redis_endpoint
+}
+
+output "redis_connection_string" {
+  description = "Redis connection string (TLS enabled)"
+  value       = module.cache.redis_connection_string
+}
 
 # =============================================================================
 # Realtime (ECS/ALB) - Uncomment when module is enabled
