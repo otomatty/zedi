@@ -203,7 +203,7 @@ flowchart TB
         subgraph Editor["Tiptap Editor"]
             TE["📝 リッチテキストエディタ"]
             CE["Collaboration Extension"]
-            CCE["CollaborationCursor Extension"]
+            CCE["CollaborationCaret Extension"]
         end
         
         subgraph YDoc["Y.Doc (Single Source of Truth)"]
