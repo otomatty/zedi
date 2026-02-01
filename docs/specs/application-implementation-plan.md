@@ -665,7 +665,7 @@ import { useEffect, useMemo } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
-import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
@@ -722,7 +722,7 @@ export function CollaborativeEditor({
                 document: ydoc,
                 field: 'prosemirror',
               }),
-              CollaborationCursor.configure({
+              CollaborationCaret.configure({
                 provider: { awareness },
                 user: {
                   name: 'You', // TODO: ユーザー名を取得
@@ -792,7 +792,7 @@ export function CollaborativeEditor({
         )}
       </div>
 
-      {/* 他ユーザーのカーソル表示（CollaborationCursorが処理） */}
+      {/* 他ユーザーのカーソル表示（CollaborationCaretが処理） */}
     </div>
   );
 }
