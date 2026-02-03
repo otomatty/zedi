@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_TURSO_AUTH_TOKEN?: string;
   readonly VITE_AI_API_BASE_URL?: string;
   readonly VITE_THUMBNAIL_API_BASE_URL?: string;
+  readonly VITE_REALTIME_URL?: string;
+  readonly VITE_E2E_TEST?: string;
 }
 
 interface ImportMeta {

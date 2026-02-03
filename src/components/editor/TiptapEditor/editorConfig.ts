@@ -2,6 +2,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
@@ -11,6 +13,18 @@ import {
   type WikiLinkSuggestionState,
 } from "../extensions/wikiLinkSuggestionPlugin";
 import type { Extension } from "@tiptap/core";
+import type * as Y from "yjs";
+import type { Awareness } from "y-protocols/awareness";
+
+/**
+ * Collaboration options for real-time editing (Y.js + Hocuspocus)
+ */
+export interface CollaborationExtensionsOptions {
+  document: Y.Doc;
+  field: string;
+  awareness: Awareness;
+  user: { name: string; color: string };
+}
 
 /**
  * Options for creating editor extensions
@@ -21,6 +35,8 @@ export interface EditorExtensionsOptions {
   onStateChange: (state: WikiLinkSuggestionState) => void;
   imageUploadOptions: Partial<ImageUploadOptions>;
   imageOptions: Partial<StorageImageOptions>;
+  /** When set, enables Y.js collaboration and caret; StarterKit history is disabled */
+  collaboration?: CollaborationExtensionsOptions;
 }
 
 /**
@@ -29,11 +45,17 @@ export interface EditorExtensionsOptions {
 export function createEditorExtensions(
   options: EditorExtensionsOptions
 ): Extension[] {
+  const useCollaboration = Boolean(options.collaboration);
+
   return [
     StarterKit.configure({
       heading: {
         levels: [1, 2, 3],
       },
+      // Y.js が履歴を管理するためコラボ時は無効
+      undoRedo: useCollaboration ? false : undefined,
+      // 下で独自設定の Link を使うため StarterKit の link は無効
+      link: false,
     }),
     // Typography for smart quotes and dashes
     Typography,
@@ -68,6 +90,19 @@ export function createEditorExtensions(
       ...options.imageOptions,
     }),
     Mermaid,
+    // Y.js リアルタイムコラボレーション（オプション）
+    ...(options.collaboration
+      ? [
+          Collaboration.configure({
+            document: options.collaboration.document,
+            field: options.collaboration.field,
+          }),
+          CollaborationCaret.configure({
+            provider: { awareness: options.collaboration.awareness },
+            user: options.collaboration.user,
+          }),
+        ]
+      : []),
   ] as Extension[];
 }
 

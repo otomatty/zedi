@@ -513,6 +513,8 @@ let isLocalDbInitialized = false;
 let currentUserId: string | null = null;
 // Initialization lock to prevent race conditions
 let initializationPromise: Promise<Client> | null = null;
+/** userId を保持し、同一 userId の同時呼び出しで同じ promise を返す */
+let initializingUserId: string | null = null;
 
 /**
  * Initialize sql.js (load WASM) using dynamic import
@@ -546,20 +548,23 @@ export async function getLocalClient(userId: string): Promise<Client> {
   }
 
   // If initialization is in progress for the same user, wait for it
-  if (initializationPromise && currentUserId === userId) {
+  // (currentUserId は init 完了後にしか設定されないため、initializingUserId で判定)
+  if (initializationPromise && initializingUserId === userId) {
     return initializationPromise;
   }
 
   // Reset if user changed
-  if (currentUserId !== userId) {
+  if (currentUserId !== userId && currentUserId !== null) {
     if (localSqlJsClient) {
       localSqlJsClient.close();
     }
     localSqlJsClient = null;
     isLocalDbInitialized = false;
     initializationPromise = null;
+    initializingUserId = null;
   }
 
+  initializingUserId = userId;
   // Create initialization promise to prevent concurrent initializations
   initializationPromise = (async () => {
     try {
@@ -601,6 +606,7 @@ export async function getLocalClient(userId: string): Promise<Client> {
       await ensureNoteSchema(localSqlJsClient);
       isLocalDbInitialized = true;
       currentUserId = userId;
+      initializingUserId = null;
 
       // Restore last sync time
       const savedSyncTime = await get<number>(`${LAST_SYNC_KEY}-${userId}`);
@@ -617,6 +623,7 @@ export async function getLocalClient(userId: string): Promise<Client> {
     } catch (error) {
       console.error("[LocalDB] Failed to create sql.js client:", error);
       initializationPromise = null;
+      initializingUserId = null;
       throw error;
     }
   })();

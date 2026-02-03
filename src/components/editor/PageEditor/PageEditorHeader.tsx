@@ -21,6 +21,10 @@ import { formatTimeAgo } from "@/lib/dateUtils";
 import type { WikiGeneratorStatus } from "./types";
 import type { StorageProviderInfo } from "@/types/storage";
 import { StorageStatusHeader } from "../TiptapEditor/StorageStatusHeader";
+import { ConnectionIndicator } from "../ConnectionIndicator";
+import { UserAvatars } from "../UserAvatars";
+import type { ConnectionStatus } from "@/lib/collaboration/types";
+import type { UserPresence } from "@/lib/collaboration/types";
 
 interface PageEditorHeaderProps {
   title: string;
@@ -38,6 +42,13 @@ interface PageEditorHeaderProps {
   onExportMarkdown: () => void;
   onCopyMarkdown: () => void;
   onGenerateWiki: () => void;
+  /** リアルタイムコラボレーション状態（有効時のみ渡す） */
+  collaboration?: {
+    status: ConnectionStatus;
+    isSynced: boolean;
+    onlineUsers: UserPresence[];
+    onReconnect: () => void;
+  };
 }
 
 /**
@@ -60,6 +71,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   onExportMarkdown,
   onCopyMarkdown,
   onGenerateWiki,
+  collaboration,
 }) => {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -85,6 +97,18 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* リアルタイムコラボ: 接続状態・オンラインユーザー */}
+          {collaboration && (
+            <>
+              <ConnectionIndicator
+                status={collaboration.status}
+                isSynced={collaboration.isSynced}
+                onReconnect={collaboration.onReconnect}
+                className="shrink-0"
+              />
+              <UserAvatars users={collaboration.onlineUsers} className="shrink-0" />
+            </>
+          )}
           {/* Wiki Generator Button - タイトルがあり本文が空の場合のみ表示 */}
           <WikiGeneratorButton
             title={title}
