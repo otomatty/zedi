@@ -1,4 +1,18 @@
 import type { Editor } from "@tiptap/react";
+import type * as Y from "yjs";
+import type { Awareness } from "y-protocols/awareness";
+
+/**
+ * リアルタイムコラボレーション用の設定（useCollaboration の戻り値から渡す）
+ */
+export interface CollaborationConfig {
+  ydoc: Y.Doc;
+  xmlFragment: Y.XmlFragment;
+  awareness: Awareness;
+  user: { name: string; color: string };
+  updateCursor: (anchor: number, head: number) => void;
+  updateSelection: (from: number, to: number) => void;
+}
 
 /**
  * Props for TiptapEditor component
@@ -17,6 +31,8 @@ export interface TiptapEditorProps {
   showToolbar?: boolean;
   /** コンテンツエラーのコールバック */
   onContentError?: (error: ContentError | null) => void;
+  /** リアルタイムコラボレーション（Y.js）有効時のみ渡す。渡すと content は Y.Doc から取得 */
+  collaborationConfig?: CollaborationConfig;
 }
 
 /**

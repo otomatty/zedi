@@ -22,6 +22,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
 import { getStorageProviderById } from "@/types/storage";
+import { useCollaboration } from "@/hooks/useCollaboration";
+import { useAuth } from "@/hooks/useAuth";
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +39,7 @@ const PageEditor: React.FC = () => {
 
   const isNewPage = id === "new";
   const pageId = isNewPage ? "" : id || "";
+  const { isSignedIn } = useAuth();
 
   // /page/new への直接アクセスはホームへリダイレクト
   // （ページ作成はuseCreateNewPageフック経由で行う）
@@ -75,6 +78,13 @@ const PageEditor: React.FC = () => {
       // 既存ページのタイトルで状態を初期化（重複チェックは行わない）
       initializeWithTitle(page.title);
     },
+  });
+
+  // リアルタイムコラボレーション（既存ページ・サインイン時のみ有効）
+  const isCollaborationEnabled = Boolean(currentPageId && !isNewPage && isSignedIn);
+  const collaboration = useCollaboration({
+    pageId: currentPageId ?? "",
+    enabled: isCollaborationEnabled,
   });
 
   // タイトル重複チェック
@@ -345,6 +355,16 @@ const PageEditor: React.FC = () => {
         onExportMarkdown={handleExportMarkdown}
         onCopyMarkdown={handleCopyMarkdown}
         onGenerateWiki={handleGenerateWiki}
+        collaboration={
+          isCollaborationEnabled
+            ? {
+                status: collaboration.status,
+                isSynced: collaboration.isSynced,
+                onlineUsers: collaboration.onlineUsers,
+                onReconnect: collaboration.reconnect,
+              }
+            : undefined
+        }
       />
 
       <PageEditorAlerts
@@ -367,6 +387,9 @@ const PageEditor: React.FC = () => {
         isWikiGenerating={isWikiGenerating}
         onContentChange={handleContentChange}
         onContentError={handleContentError}
+        collaboration={
+          isCollaborationEnabled ? { ...collaboration } : undefined
+        }
       />
 
       <PageEditorDialogs

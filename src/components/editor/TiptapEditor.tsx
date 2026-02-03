@@ -50,6 +50,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   isReadOnly = false,
   showToolbar = true,
   onContentError,
+  collaborationConfig,
 }) => {
   const { checkReferenced } = useCheckGhostLinkReferenced();
 
@@ -161,6 +162,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     lastSelectionRef,
   });
 
+  const useCollaborationMode = Boolean(
+    collaborationConfig?.xmlFragment &&
+      collaborationConfig?.awareness &&
+      collaborationConfig?.user
+  );
+
   const editor = useEditor({
     extensions: createEditorExtensions({
       placeholder,
@@ -177,8 +184,16 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         onDeleteFromStorage: handleDeleteFromStorage,
         onCopyUrl: handleCopyImageUrl,
       },
+      collaboration: useCollaborationMode
+        ? {
+            document: collaborationConfig!.ydoc,
+            field: "prosemirror",
+            awareness: collaborationConfig!.awareness,
+            user: collaborationConfig!.user,
+          }
+        : undefined,
     }),
-    content: initialParsedContent,
+    content: useCollaborationMode ? undefined : initialParsedContent,
     autofocus: autoFocus ? "end" : false,
     editable: !isReadOnly,
     // Prevent SSR hydration issues
@@ -220,8 +235,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       const text = editor.state.doc.textBetween(from, to, " ");
       lastSelectionRef.current = { from, to };
       setSelectedText(text.trim());
+      if (useCollaborationMode && collaborationConfig) {
+        collaborationConfig.updateCursor(from, to);
+        collaborationConfig.updateSelection(from, to);
+      }
     },
-  });
+  }, [pageId, useCollaborationMode]);
 
   useEffect(() => {
     editorRef.current = editor;
