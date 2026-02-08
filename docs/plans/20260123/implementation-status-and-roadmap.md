@@ -10,9 +10,10 @@
 
 | 領域 | 状態 | 次のアクション |
 |------|------|----------------|
-| **リアルタイム編集（クライアント）** | 接続・同期まで動作確認済み | Cognito 化時に getToken 差し替え |
-| **リアルタイム編集（サーバー）** | AWS Hocuspocus 稼働・認証スキップのまま | Cognito JWT 検証、Redis/Aurora 永続化（将来） |
-| **AWS インフラ** | Phase 1–5 完了、Phase 6（CDN）以降は未着手 | アプリの DB/認証はまだ Turso + Clerk |
+| **認証（フロント）** | **Cognito OAuth（Google/GitHub）に移行済み** | Terraform に IdP の Client ID/Secret を設定しサインイン動作確認 |
+| **リアルタイム編集（クライアント）** | 接続・同期まで動作確認済み。getToken は Cognito ID Token に差し替え済み | 特になし |
+| **リアルタイム編集（サーバー）** | AWS Hocuspocus 稼働。**Cognito JWT 検証実装済み**（COGNITO_USER_POOL_ID 設定時）。未設定時は開発用に全許可 | Redis/Aurora 永続化（将来） |
+| **AWS インフラ** | Phase 1–5 完了、Phase 6（CDN）以降は未着手 | アプリの DB はまだ Turso。認証は Cognito 接続済み |
 
 **環境変数（接続確認に必要）**
 
@@ -20,9 +21,10 @@
 
 **主要ファイル**
 
+- 認証: `src/lib/auth/cognitoAuth.ts`, `src/components/auth/CognitoAuthProvider.tsx`, `src/hooks/useAuth.ts`, `src/pages/SignIn.tsx`, `src/pages/AuthCallback.tsx`
 - クライアント: `src/lib/collaboration/CollaborationManager.ts`, `src/hooks/useCollaboration.ts`, `src/components/editor/PageEditorView.tsx`, `src/components/editor/TiptapEditor/editorConfig.ts`
 - サーバー: `server/hocuspocus/src/index.ts`
-- 調査ログ: `docs/work-logs/20260202/realtime-4401-unauthorized-investigation.md`
+- 調査・移行計画: `docs/plans/20260203/clerk-to-cognito-migration-investigation.md`, `docs/work-logs/20260202/realtime-4401-unauthorized-investigation.md`
 
 **その他の修正（引き継ぎ用）**
 
@@ -51,7 +53,7 @@ Zedi の今後の実装は、次の2本柱で進められています。
 | 項目 | 現状 | 移行先（計画） |
 |------|------|----------------|
 | **DB** | **Turso**（`src/lib/turso.ts`）で運用中 | Aurora Serverless v2 (PostgreSQL) |
-| **認証** | **Clerk**（MockClerkProvider 等）で運用中 | Amazon Cognito |
+| **認証** | **Cognito OAuth（Google/GitHub）** にフロント移行済み。E2E 時は MockClerkProvider | Terraform で IdP 登録・本番動作確認 |
 | **API** | Turso 直接利用 / Workers 等 | Lambda + API Gateway（計画） |
 | **フロント配信** | 現行のまま | CloudFront + S3（Phase 6） |
 
@@ -159,24 +161,47 @@ Zedi の今後の実装は、次の2本柱で進められています。
 
 - **AWS 環境**  
   - インフラ（VPC, Cognito, Aurora, Redis, ECS, ALB）は **Terraform で構築済み**。  
-  - アプリは **まだ Turso + Clerk** のまま。**AWS 移行は「インフラ準備完了・アプリ未切り替え」**。
+  - 認証は **Cognito OAuth（Google/GitHub）にフロント移行済み**。DB は **まだ Turso** のまま。
 
 - **リアルタイム編集**  
   - **Hocuspocus は AWS 上で稼働済み**（認証・永続化は開発用のまま）。  
-  - クライアントは **HocuspocusProvider で接続・同期まで動作確認済み**（TiptapEditor 統合、PageEditor に接続UI 表示済み）。  
-  - **次のステップ**: 任意でコラボデバッグ無効化、将来は Cognito JWT 検証・Redis/Aurora 永続化。
+  - クライアントは **HocuspocusProvider で接続・同期まで動作確認済み**。getToken は Cognito ID Token に差し替え済み。  
+  - **残り**: Redis/Aurora 永続化（将来）。Cognito JWT 検証は実装済み。
 
 - **ドキュメントエディターの移行**  
-  - **Tiptap + Y.js + Hocuspocus によるリアルタイム編集** は、既存ページを開いた状態で接続・同期まで動作している。  
-  - 本番向けには Cognito 認証と Hocuspocus の永続化（Redis/Aurora）の実装が残っている。
+  - **Tiptap + Y.js + Hocuspocus** によるリアルタイム編集は接続・同期まで動作。本番向けには Hocuspocus 側の Cognito 検証・永続化が残っている。
 
 ---
 
-## 6. 関連ドキュメント一覧
+## 6. 次のステップ（やるべき作業）
+
+優先度の目安で並べています。上から順に進めるとよいです。
+
+| 順 | 作業 | 内容 | 参照 |
+|---|------|------|------|
+| 1 | **Cognito サインインの動作確認** | `.env` に `VITE_COGNITO_DOMAIN` / `VITE_COGNITO_CLIENT_ID` を設定し、ブラウザで `/sign-in` から Google または GitHub でサインインできるか確認する。IdP 未設定の場合は `dev.tfvars` に Google/GitHub の Client ID・Secret を追記して `terraform apply` し、Google/GitHub 側のリダイレクト URI に Cognito の `/oauth2/idpresponse` を登録する。 | `docs/guides/env-variables-guide.md`, `terraform/environments/dev.tfvars` |
+| 2 | **Google/GitHub IdP の有効化（未設定の場合）** | Terraform で IdP を追加する。`dev.tfvars` のコメントを外して `google_oauth_client_id` / `google_oauth_client_secret`（および GitHub 用）を設定し、`terraform apply`。シークレットは `TF_VAR_*` で渡すことを推奨。 | `terraform/environments/dev.tfvars` |
+| 3 | **既存ユーザー移行（Clerk → Cognito）** | 既存 Clerk ユーザーと Cognito ユーザー（`sub`）の対応表を作成し、Turso の `pages.user_id` / `notes.owner_user_id` 等を Cognito `sub` に一括更新する。移行スクリプト・手順書を用意し、メンテナンスウィンドウで実施する。 | `docs/plans/20260203/clerk-to-cognito-migration-investigation.md` §5.4 |
+| 4 | ~~**Hocuspocus の Cognito JWT 検証（任意）**~~ ✅ | 実装済み。`onAuthenticate` で `aws-jwt-verify` の `CognitoJwtVerifier` を使用。`COGNITO_USER_POOL_ID` 設定時のみ検証。 | — |
+| 5 | **パッケージ整理** | E2E は `MockClerkProvider` のみ使用しているため、`@clerk/clerk-react` を依存から削除してよい。削除後、`src/test/mocks.ts` の Clerk モックを必要に応じて調整する。 | — |
+| 6 | **本番デプロイ・運用** | 本番用 `.env`（または CI の環境変数）に `VITE_COGNITO_DOMAIN` / `VITE_COGNITO_CLIENT_ID` および本番のコールバック URL を設定。`prod.tfvars` で IdP とコールバック URL を設定済みであれば、本番 Terraform apply 後にアプリをデプロイする。 | `docs/guides/env-variables-guide.md` |
+
+**別ライン（インフラ・DB 移行）**
+
+- **Phase 6（CDN）**: CloudFront + S3 でフロント配信。
+- **DB 移行**: Turso → Aurora Serverless v2 への切り替え（アプリの接続先変更・データ移行）。
+- **API**: Lambda + API Gateway への載せ替え（計画）。
+
+---
+
+## 7. 関連ドキュメント一覧
 
 | 種類 | パス |
 |------|------|
-| **4401 調査・HocuspocusProvider 差し替え・Cognito メモ** | `docs/work-logs/20260202/realtime-4401-unauthorized-investigation.md` |
+| **次のステップ 作業計画書** | `docs/plans/20260208/next-steps-work-plan.md` |
+| **Clerk→Cognito 移行調査・タスク一覧** | `docs/plans/20260203/clerk-to-cognito-migration-investigation.md` |
+| **.env 設定ガイド** | `docs/guides/env-variables-guide.md` |
+| 4401 調査・HocuspocusProvider 差し替え・Cognito メモ | `docs/work-logs/20260202/realtime-4401-unauthorized-investigation.md` |
 | AWS インフラ作業ログ | `docs/work-logs/20260131/README.md` |
 | AWS 接続情報（VITE_REALTIME_URL 等） | `docs/work-logs/20260131/aws-connection-summary.md` |
 | Hocuspocus デプロイ | `docs/work-logs/20260201/hocuspocus-server-deployment.md` |

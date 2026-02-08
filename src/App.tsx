@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
+import AuthCallback from "./pages/AuthCallback";
 import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
 import AISettings from "./pages/AISettings";
@@ -37,6 +38,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/sign-in/*" element={<SignIn />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/note/:noteId" element={<NoteView />} />
             <Route path="/note/:noteId/settings" element={<NoteSettings />} />
             <Route path="/note/:noteId/members" element={<NoteMembers />} />

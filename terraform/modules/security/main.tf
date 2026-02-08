@@ -108,7 +108,7 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
   callback_urls                        = var.callback_urls
   logout_urls                          = var.logout_urls
-  supported_identity_providers         = ["COGNITO"]
+  supported_identity_providers         = distinct(concat(["COGNITO"], var.google_client_id != "" && var.google_client_secret != "" ? ["Google"] : [], var.enable_github_idp && var.github_client_id != "" && var.github_client_secret != "" ? ["GitHub"] : []))
 
   # セキュリティ設定
   prevent_user_existence_errors = "ENABLED"
@@ -116,6 +116,10 @@ resource "aws_cognito_user_pool_client" "web" {
 
   # SPA用（シークレット不要）
   generate_secret = false
+
+  # IdP 作成後に Client の supported_identity_providers を更新するため
+  depends_on = [aws_cognito_identity_provider.google, aws_cognito_identity_provider.github]
+  # enable_github_idp=false のときは GitHub IdP は作成されないが、depends_on は空リストで問題なし
 }
 
 ################################################################################
@@ -125,6 +129,61 @@ resource "aws_cognito_user_pool_client" "web" {
 resource "aws_cognito_user_pool_domain" "main" {
   domain       = "zedi-${var.environment}-${data.aws_caller_identity.current.account_id}"
   user_pool_id = aws_cognito_user_pool.main.id
+}
+
+################################################################################
+# Federated Identity Providers (Google, GitHub)
+################################################################################
+
+resource "aws_cognito_identity_provider" "google" {
+  count = var.google_client_id != "" && var.google_client_secret != "" ? 1 : 0
+
+  user_pool_id  = aws_cognito_user_pool.main.id
+  provider_name = "Google"
+  provider_type = "Google"
+
+  provider_details = {
+    authorize_scopes = "openid email profile"
+    client_id        = var.google_client_id
+    client_secret    = var.google_client_secret
+  }
+
+  attribute_mapping = {
+    email    = "email"
+    username = "sub"
+    name     = "name"
+    picture  = "picture"
+  }
+}
+
+# GitHub as OIDC. github_proxy_base_url にプロキシ API の URL を渡すと、
+# そのエンドポイントが well-known / token / user を提供し、Cognito が GitHub を IdP として利用可能になる。
+resource "aws_cognito_identity_provider" "github" {
+  # count は apply 前に決まる値のみ使用（github_proxy_base_url は proxy の output のため known after apply）
+  count = var.enable_github_idp && var.github_client_id != "" && var.github_client_secret != "" ? 1 : 0
+
+  user_pool_id  = aws_cognito_user_pool.main.id
+  provider_name = "GitHub"
+  provider_type = "OIDC"
+
+  provider_details = {
+    client_id                  = var.github_client_id
+    client_secret               = var.github_client_secret
+    authorize_scopes            = "openid user:email read:user"
+    authorize_url               = "https://github.com/login/oauth/authorize"
+    token_url                   = "${var.github_proxy_base_url}/token"
+    attributes_url              = "${var.github_proxy_base_url}/user"
+    attributes_request_method   = "GET"
+    oidc_issuer                 = var.github_proxy_base_url
+  }
+
+  # プロキシの /user が GitHub の id を sub として返すため、username に sub をマッピング可能
+  attribute_mapping = {
+    username = "sub"
+    email    = "email"
+    name     = "name"
+    picture  = "avatar_url"
+  }
 }
 
 ################################################################################

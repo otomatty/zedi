@@ -1,22 +1,47 @@
+import type { ReactNode } from "react";
 import { vi } from "vitest";
 import type { Client } from "@libsql/client/web";
 import { PageRepository } from "@/lib/pageRepository";
 
 /**
- * Mock the useAuth hook from Clerk
+ * Mock the useAuth hook (Cognito/auth layer). Use in unit tests that need auth.
  */
-export function mockClerkAuth(options?: { isSignedIn?: boolean }) {
+export function mockAuth(options?: { isSignedIn?: boolean }) {
   const isSignedIn = options?.isSignedIn ?? false;
 
-  vi.mock("@clerk/clerk-react", () => ({
+  vi.mock("@/hooks/useAuth", () => ({
     useAuth: () => ({
-      isSignedIn,
       isLoaded: true,
+      isSignedIn,
       userId: isSignedIn ? "test-user-id" : null,
       getToken: vi.fn().mockResolvedValue(null),
+      signOut: vi.fn(),
     }),
+    useUser: () => ({
+      isLoaded: true,
+      isSignedIn,
+      user: isSignedIn
+        ? {
+            id: "test-user-id",
+            primaryEmailAddress: { emailAddress: "test@example.com" },
+            fullName: "Test User",
+            firstName: "Test",
+            lastName: "User",
+            imageUrl: "",
+            profileImageUrl: "",
+            username: "test_user",
+          }
+        : null,
+    }),
+    SignedIn: ({ children }: { children: ReactNode }) =>
+      isSignedIn ? children : null,
+    SignedOut: ({ children }: { children: ReactNode }) =>
+      !isSignedIn ? children : null,
   }));
 }
+
+/** @deprecated Use mockAuth instead (Clerk removed). */
+export const mockClerkAuth = mockAuth;
 
 /**
  * Create a mock repository provider for testing

@@ -1,8 +1,8 @@
 /**
  * Zedi Hocuspocus Server - Minimal Implementation
- * 
+ *
  * 最小限のリアルタイム同期サーバー
- * - 認証: スキップ（開発用）
+ * - 認証: COGNITO_USER_POOL_ID が設定されていれば Cognito JWT 検証、未設定なら開発用に全許可
  * - 永続化: メモリのみ（開発用）
  * - Redis: オプション（環境変数で有効化）
  */
@@ -10,27 +10,57 @@
 import { Hocuspocus } from '@hocuspocus/server';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { WebSocketServer } from 'ws';
+import { CognitoJwtVerifier } from 'aws-jwt-verify';
 
 const PORT = parseInt(process.env.PORT || '1234', 10);
 const REDIS_URL = process.env.REDIS_URL;
+const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
+const COGNITO_REGION = process.env.COGNITO_REGION || process.env.AWS_REGION || 'ap-northeast-1';
+
+const cognitoVerifier =
+  COGNITO_USER_POOL_ID
+    ? CognitoJwtVerifier.create({
+        userPoolId: COGNITO_USER_POOL_ID,
+        tokenUse: 'id',
+        clientId: null, // 署名・有効期限のみ検証（clientId は未チェック）
+      })
+    : null;
 
 // Hocuspocusサーバー設定
 const hocuspocus = new Hocuspocus({
   name: 'zedi-hocuspocus',
-  
+
   // デバウンス設定（ドキュメント保存の頻度制御）
   debounce: 2000,
   maxDebounce: 10000,
-  
+
   // タイムアウト設定
   timeout: 30000,
-  
-  // 開発用: 認証をスキップ
+
   async onAuthenticate({ token, documentName }) {
     console.log(`[Auth] Document: ${documentName}, Token: ${token ? 'provided' : 'none'}`);
-    
-    // 開発環境では全てのリクエストを許可
-    // TODO: Cognito JWT検証を実装
+
+    if (cognitoVerifier) {
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      try {
+        const payload = await cognitoVerifier.verify(token);
+        const sub = payload.sub as string;
+        const name = (payload.name as string) || (payload['cognito:username'] as string) || sub;
+        return {
+          user: {
+            id: sub,
+            name,
+          },
+        };
+      } catch (err) {
+        console.warn('[Auth] Cognito JWT verification failed:', err);
+        throw new Error('Invalid token');
+      }
+    }
+
+    // 開発用: Cognito 未設定時は全許可
     return {
       user: {
         id: 'dev-user',
