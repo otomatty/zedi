@@ -18,9 +18,17 @@ aurora_database_name = "zedi"
 redis_node_type       = "cache.t4g.micro"  # Graviton2, smallest instance
 redis_num_cache_nodes = 1
 
-# Security (Cognito)
-cognito_callback_urls = ["http://localhost:30000/callback", "http://localhost:30000/auth/callback"]
+# Security (Cognito) - OAuth callback and logout URLs
+cognito_callback_urls = ["http://localhost:30000/auth/callback"]
 cognito_logout_urls   = ["http://localhost:30000"]
+
+# Federated IdP (Google / GitHub) - Client ID はここに記載。シークレットは環境変数で渡す（下記参照）
+# 設定手順: docs/guides/cognito-google-github-idp-setup.md
+google_oauth_client_id = "18191904440-asgu6seo9b9v68hs5mirklfv2msmir5d.apps.googleusercontent.com"
+github_oauth_client_id = "Ov23liz1wBIxySSlVUJU"
+# シークレットは dev.tfvars に書かず、terraform/environments/dev.secret.env で渡す（要作成。.gitignore 済み）
+# GitHub IdP を有効にする（プロキシ API を Terraform でデプロイする）
+enable_github_idp = true
 
 # ECS (Fargate Spot)
 use_fargate_spot       = true   # ~70% cost savings

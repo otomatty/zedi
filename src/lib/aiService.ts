@@ -105,13 +105,13 @@ async function callAIWithUserKey(
   }
 }
 
-async function getClerkToken(): Promise<string | null> {
+async function getAuthToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
-  const clerk = (window as Window & {
-    Clerk?: { session?: { getToken?: (options?: { template?: string }) => Promise<string | null> } };
-  }).Clerk;
-  if (!clerk?.session?.getToken) return null;
-  return await clerk.session.getToken({ template: "turso" });
+  if (import.meta.env.VITE_E2E_TEST === "true") {
+    return "mock_e2e_token_for_testing";
+  }
+  const { getIdToken } = await import("@/lib/auth");
+  return getIdToken();
 }
 
 /**
@@ -128,7 +128,7 @@ async function callAIWithServer(
       throw new Error("AI APIサーバーのURLが設定されていません");
     }
 
-    const token = await getClerkToken();
+    const token = await getAuthToken();
     if (!token) {
       throw new Error("AUTH_REQUIRED");
     }

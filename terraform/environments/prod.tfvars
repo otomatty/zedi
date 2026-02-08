@@ -18,15 +18,28 @@ aurora_database_name = "zedi"
 redis_node_type       = "cache.t4g.micro"  # Graviton2
 redis_num_cache_nodes = 1                   # Single node (upgrade to 2 for HA)
 
+# Security (Cognito) - OAuth callback and logout URLs (zedi-note.app + www)
+cognito_callback_urls = ["https://zedi-note.app/auth/callback", "https://www.zedi-note.app/auth/callback"]
+cognito_logout_urls   = ["https://zedi-note.app", "https://www.zedi-note.app"]
+
+# Federated IdP (本番) - Client ID のみ。シークレットは prod.secret.env で TF_VAR_* として渡す
+# 設定手順: docs/plans/20260208/prod-idp-google-github-work-plan.md
+google_oauth_client_id  = "18191904440-f37rv8s87inkdk9glhe3drhlstp1qfbq.apps.googleusercontent.com"  # GCP 本番用 OAuth クライアント ID（xxxxx.apps.googleusercontent.com）
+github_oauth_client_id  = "Ov23liF54sgTIvaXhVDV"  # GitHub 本番用 OAuth アプリの Client ID
+enable_github_idp       = true
+
 # ECS (Fargate Spot)
 use_fargate_spot  = true   # ~70% cost savings (with on-demand fallback)
 ecs_task_cpu      = 512    # 0.5 vCPU
 ecs_task_memory   = 1024   # 1 GB
 ecs_desired_count = 2      # 2 instances for availability
 
-# Domain (optional - set your domain)
-domain_name         = ""    # e.g., "zedi.example.com"
+# Domain (Cloudflare で管理。Route53 は使わない)
+domain_name         = "zedi-note.app"
 create_route53_zone = false
+route53_zone_id     = ""
+# Cloudflare で ACM 検証用 CNAME を追加し証明書が「発行済み」になったら true にする
+cdn_attach_custom_domain = true
 
 # Monitoring
 alarm_email                = ""     # Set email for alerts

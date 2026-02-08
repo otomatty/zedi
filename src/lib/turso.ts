@@ -13,7 +13,8 @@ import type { Database as SqlJsDatabase } from "sql.js";
 import { get, set } from "idb-keyval";
 import { getPageListPreview } from "@/lib/contentUtils";
 
-// Turso database configuration
+// Remote DB: Turso (libSQL). After AWS migration (Phase C3), connection will switch to Aurora Serverless v2 via API; this file's remote sync will be replaced.
+// See: docs/plans/20260208/next-steps-work-plan.md §5 Phase C, docs/plans/20260123/implementation-status-and-roadmap.md §2.
 const TURSO_DATABASE_URL = import.meta.env.VITE_TURSO_DATABASE_URL;
 // Fallback auth token - used when Clerk JWT authentication fails due to JWKS issues
 // This is a temporary workaround until Turso JWKS configuration is fixed
@@ -725,6 +726,11 @@ interface RemoteNoteMemberRow {
   is_deleted: number;
 }
 
+export type SyncWithRemoteOptions = {
+  /** When true and local has 0 pages, do a full pull (e.g. after account migration). Only used when sync is triggered manually by the user. */
+  forceFullSyncWhenLocalEmpty?: boolean;
+};
+
 /**
  * Sync local database with remote Turso (Delta Sync - Optimized)
  *
@@ -735,7 +741,8 @@ interface RemoteNoteMemberRow {
  */
 export async function syncWithRemote(
   jwtToken: string,
-  userId: string
+  userId: string,
+  options?: SyncWithRemoteOptions
 ): Promise<void> {
   if (isSyncing) {
     console.log("[Sync] Skipped: sync already in progress");
@@ -753,8 +760,18 @@ export async function syncWithRemote(
       hasColumn(remote, "pages", "content_preview"),
     ]);
 
-    // Get sync timestamp (use 0 for initial sync to get all data)
-    const syncSince = lastSyncTime ?? 0;
+    const localPageCountResult = await local.execute({
+      sql: `SELECT COUNT(*) as count FROM pages WHERE user_id = ?`,
+      args: [userId],
+    });
+    const localPageCount = Number((localPageCountResult.rows[0] as { count?: number })?.count ?? 0);
+
+    const storedSyncTime = lastSyncTime ?? 0;
+    // Only force full pull when user explicitly clicked sync and local has 0 pages (e.g. after Clerk→Cognito migration)
+    const syncSince =
+      options?.forceFullSyncWhenLocalEmpty && localPageCount === 0
+        ? 0
+        : storedSyncTime;
     const isInitialSync = syncSince === 0;
 
     console.log(
@@ -1614,13 +1631,16 @@ export function closeLocalClient(): void {
 }
 
 /**
- * Trigger manual sync
+ * Trigger manual sync (user clicked sync button).
+ * When local has 0 pages, forces a full pull so cloud data can be recovered (e.g. after account migration or new device).
  */
 export async function triggerSync(
   jwtToken: string,
   userId: string
 ): Promise<void> {
-  await syncWithRemote(jwtToken, userId);
+  await syncWithRemote(jwtToken, userId, {
+    forceFullSyncWhenLocalEmpty: true,
+  });
 }
 
 // ============================================================================

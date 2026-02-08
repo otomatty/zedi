@@ -143,6 +143,39 @@ variable "cognito_logout_urls" {
   default     = ["http://localhost:30000"]
 }
 
+variable "google_oauth_client_id" {
+  description = "Google OAuth Client ID for Cognito federated sign-in"
+  type        = string
+  default     = ""
+}
+
+variable "google_oauth_client_secret" {
+  description = "Google OAuth Client Secret"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_oauth_client_id" {
+  description = "GitHub OAuth App Client ID for Cognito"
+  type        = string
+  default     = ""
+}
+
+variable "github_oauth_client_secret" {
+  description = "GitHub OAuth App Client Secret"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# GitHub は OIDC discovery がないため、プロキシ API を用意するまで false 推奨
+variable "enable_github_idp" {
+  description = "Create GitHub as Cognito IdP (requires token/user proxy; default false)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # Domain (Optional)
 # =============================================================================
@@ -154,6 +187,18 @@ variable "domain_name" {
 
 variable "create_route53_zone" {
   description = "Create Route53 hosted zone for domain"
+  type        = bool
+  default     = false
+}
+
+variable "route53_zone_id" {
+  description = "Route53 hosted zone ID for frontend domain. Empty when DNS is managed elsewhere (e.g. Cloudflare)"
+  type        = string
+  default     = ""
+}
+
+variable "cdn_attach_custom_domain" {
+  description = "Attach custom domain and ACM cert to CloudFront. Set to true after ACM cert is validated (e.g. after adding CNAME in Cloudflare)"
   type        = bool
   default     = false
 }

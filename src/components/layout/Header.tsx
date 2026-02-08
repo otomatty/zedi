@@ -29,12 +29,7 @@ import Container from "@/components/layout/Container";
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
 import { SyncIndicator } from "@/components/layout/SyncIndicator";
 import { cn } from "@/lib/utils";
-import {
-  SignedIn,
-  SignedOut,
-  useUser,
-  useClerk,
-} from "@clerk/clerk-react";
+import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
 
 interface HeaderProps {
   className?: string;
@@ -51,7 +46,7 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
 
   // Local state for shortcuts dialog if not controlled externally
   const [localShortcutsOpen, setLocalShortcutsOpen] = useState(false);

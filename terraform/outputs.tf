@@ -101,22 +101,32 @@ output "ecs_service_name" {
 }
 
 # =============================================================================
-# CDN (CloudFront) - Uncomment when module is enabled
+# CDN (CloudFront, S3)
 # =============================================================================
-# output "cloudfront_distribution_id" {
-#   description = "CloudFront distribution ID"
-#   value       = module.cdn.distribution_id
-# }
-#
-# output "cloudfront_domain_name" {
-#   description = "CloudFront domain name"
-#   value       = module.cdn.domain_name
-# }
-#
-# output "frontend_url" {
-#   description = "Frontend URL"
-#   value       = var.domain_name != "" ? "https://${var.domain_name}" : "https://${module.cdn.domain_name}"
-# }
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (for cache invalidation)"
+  value       = module.cdn.distribution_id
+}
+
+output "cloudfront_domain_name" {
+  description = "CloudFront distribution domain name (xxx.cloudfront.net)"
+  value       = module.cdn.distribution_domain_name
+}
+
+output "frontend_url" {
+  description = "Frontend URL"
+  value       = module.cdn.frontend_url
+}
+
+output "frontend_s3_bucket" {
+  description = "S3 bucket name for frontend deploy (aws s3 sync dist/ s3://<this>)"
+  value       = module.cdn.bucket_id
+}
+
+output "acm_certificate_domain_validation_options" {
+  description = "CNAME records for ACM DNS validation - add these in Cloudflare to issue the certificate (us-east-1)"
+  value       = module.cdn.acm_certificate_domain_validation_options
+}
 
 # =============================================================================
 # Security (Cognito, IAM)

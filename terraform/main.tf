@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -71,6 +75,21 @@ module "networking" {
 }
 
 # =============================================================================
+# Module: Cognito GitHub OAuth Proxy (Lambda + API Gateway)
+# GitHub は OIDC discovery を提供しないため、プロキシで well-known / token / user を提供する。
+# enable_github_idp=true のときのみ作成する。
+# =============================================================================
+module "cognito_github_proxy" {
+  count  = var.enable_github_idp ? 1 : 0
+  source = "./modules/cognito-github-proxy"
+
+  environment         = var.environment
+  github_client_id     = var.github_oauth_client_id
+  github_client_secret = var.github_oauth_client_secret
+  tags                 = local.common_tags
+}
+
+# =============================================================================
 # Module: Security (Cognito, WAF, IAM)
 # =============================================================================
 module "security" {
@@ -80,6 +99,17 @@ module "security" {
   callback_urls = var.cognito_callback_urls
   logout_urls   = var.cognito_logout_urls
   tags          = local.common_tags
+
+  # Federated IdP (optional; set in .tfvars or TF_VAR_* to enable)
+  google_client_id       = var.google_oauth_client_id
+  google_client_secret   = var.google_oauth_client_secret
+  github_client_id       = var.github_oauth_client_id
+  github_client_secret   = var.github_oauth_client_secret
+  enable_github_idp      = var.enable_github_idp
+  github_proxy_base_url  = var.enable_github_idp ? module.cognito_github_proxy[0].invoke_url : ""
+
+  # GitHub IdP 作成前にプロキシの Lambda/API が完全にデプロイ済みである必要がある
+  depends_on = [module.cognito_github_proxy]
 }
 
 # =============================================================================
@@ -155,16 +185,20 @@ module "realtime" {
 # =============================================================================
 # Module: CDN (CloudFront, S3)
 # =============================================================================
-# module "cdn" {
-#   source = "./modules/cdn"
-#
-#   environment = var.environment
-#   tags        = local.common_tags
-#
-#   providers = {
-#     aws.us_east_1 = aws.us_east_1
-#   }
-# }
+module "cdn" {
+  source = "./modules/cdn"
+
+  environment           = var.environment
+  domain_name           = var.domain_name
+  route53_zone_id       = var.route53_zone_id
+  create_route53_zone   = var.create_route53_zone
+  attach_custom_domain  = var.cdn_attach_custom_domain
+  tags                  = local.common_tags
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+}
 
 # =============================================================================
 # Module: Monitoring (CloudWatch)

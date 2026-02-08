@@ -17,6 +17,14 @@ import type { Page, PageSummary } from "@/types/page";
 // Local user ID for unauthenticated users
 const LOCAL_USER_ID = "local-user";
 
+/**
+ * Track which userIds have already requested initial sync this session.
+ * useRepository() is used by many components (PageGrid, FAB, GlobalSearch, etc.);
+ * each hook instance has its own ref, so without this we'd trigger N sync
+ * requests and N "[Sync] Initial sync requested" logs (and 2N under Strict Mode).
+ */
+const initialSyncRequestedForUser = new Set<string>();
+
 // Query keys
 export const pageKeys = {
   all: ["pages"] as const,
@@ -105,26 +113,35 @@ export function useRepository() {
       });
   }, [effectiveUserId]);
 
-  // Initial sync on page load for authenticated users (once per session)
+  // Clear initial-sync flags when user signs out so next sign-in triggers sync again
   useEffect(() => {
-    if (isSignedIn && userId && isLocalDbReady && !initialSyncDone.current) {
-      initialSyncDone.current = true;
-
-      // Trigger delta sync on initial page load
-      (async () => {
-        try {
-          console.log("[Sync] Initial sync requested", { userId });
-          const token = await getToken({ template: "turso" });
-          if (token) {
-            await syncWithRemote(token, userId);
-          } else {
-            console.warn("[Sync] Initial sync skipped: missing token");
-          }
-        } catch (error) {
-          console.error("Initial sync failed:", error);
-        }
-      })();
+    if (!isSignedIn) {
+      initialSyncRequestedForUser.clear();
     }
+  }, [isSignedIn]);
+
+  // Initial sync on page load for authenticated users (once per userId per session)
+  // Use module-level set so we run only once no matter how many useRepository() instances exist
+  useEffect(() => {
+    if (!isSignedIn || !userId || !isLocalDbReady) return;
+    if (initialSyncRequestedForUser.has(userId)) return;
+    initialSyncRequestedForUser.add(userId);
+    initialSyncDone.current = true;
+
+    (async () => {
+      try {
+        console.log("[Sync] Initial sync requested", { userId });
+        const token = await getToken({ template: "turso" });
+        if (token) {
+          await syncWithRemote(token, userId);
+        } else {
+          console.warn("[Sync] Initial sync skipped: missing token");
+        }
+      } catch (error) {
+        console.error("Initial sync failed:", error);
+        initialSyncRequestedForUser.delete(userId);
+      }
+    })();
   }, [isSignedIn, userId, isLocalDbReady, getToken]);
 
   const getRepository = useCallback(async (): Promise<PageRepository> => {

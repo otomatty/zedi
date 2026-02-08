@@ -54,3 +54,7 @@ override.tf.json
 
 # Terraform - DO NOT commit these if they contain secrets
 # terraform/environments/*.tfvars  # Uncomment if tfvars contain sensitive data
+terraform/environments/dev.secret.env
+terraform/environments/prod.secret.env
+# Terraform module build artifact (cognito-github-proxy Lambda zip)
+terraform/modules/cognito-github-proxy/lambda.zip

@@ -165,11 +165,12 @@ bun run docker:logs
 AI 機能や認証機能を使用する場合は、`.env.local` ファイルを作成してください：
 
 ```bash
-# Clerk 認証（オプション）
-VITE_CLERK_PUBLISHABLE_KEY=your_clerk_key
+# Cognito 認証（Google/GitHub OAuth）
+VITE_COGNITO_DOMAIN=your-user-pool-domain.auth.region.amazoncognito.com
+VITE_COGNITO_CLIENT_ID=your-app-client-id
 
 # Turso データベース（オプション - ローカル SQLite でも動作します）
-# 認証はClerkのJWTトークンを使用するため、VITE_TURSO_AUTH_TOKENは不要です
+# 認証は Cognito の JWT トークンを使用するため、VITE_TURSO_AUTH_TOKEN は不要です
 VITE_TURSO_DATABASE_URL=libsql://your-database-name.aws-ap-northeast-1.turso.io
 ```
 
@@ -289,7 +290,7 @@ src/
 
 - [Tiptap](https://tiptap.dev/) — 素晴らしいエディタフレームワーク
 - [shadcn/ui](https://ui.shadcn.com/) — 美しい UI コンポーネント
-- [Clerk](https://clerk.com/) — シームレスな認証
+- [Amazon Cognito](https://aws.amazon.com/cognito/) — 認証（Google/GitHub OAuth）
 - [Turso](https://turso.tech/) — エッジ対応データベース
 
 ---
