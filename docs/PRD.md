@@ -446,11 +446,14 @@ CREATE INDEX idx_links_source ON links(source_id);
 CREATE INDEX idx_links_target ON links(target_id);
 
 -- 3. Ghost Links（未作成リンクのトラッキング）
+-- 拡張: original_* は共有ノートからコピーしたページ内のゴースト用。詳細は docs/specs/zedi-data-structure-spec.md §2.7, §3.4
 CREATE TABLE ghost_links (
-    link_text TEXT NOT NULL,         -- リンクテキスト（例: "Concept X"）
-    source_Page_id TEXT NOT NULL,    -- 使用しているページID
+    link_text TEXT NOT NULL,                  -- リンクテキスト（例: "Concept X"）
+    source_page_id TEXT NOT NULL,             -- 使用しているページID（新設計では UUID）
     created_at INTEGER,
-    PRIMARY KEY (link_text, source_Page_id)
+    original_target_page_id TEXT NULL,        -- 共有ノート由来のゴーストのみ。元のリンク先ページID
+    original_note_id TEXT NULL,               -- 共有ノート由来のゴーストのみ。元のノートID
+    PRIMARY KEY (link_text, source_page_id)
 );
 CREATE INDEX idx_ghost_links_text ON ghost_links(link_text);
 ```

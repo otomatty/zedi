@@ -45,16 +45,21 @@ CREATE TABLE links (
 
 ### ghost_links テーブル
 
-まだ存在しないページへのリンクを追跡します。
+まだ存在しないページへのリンクを追跡します。共有ノートからコピーしたページ内で「元のノート内の他ページ」へのリンクをゴースト化した場合、元参照先を保持する拡張カラムを持ちます（新設計では UUID に統一。詳細は `docs/specs/zedi-data-structure-spec.md` §2.7, §3.4）。
 
 ```sql
 CREATE TABLE ghost_links (
-    link_text TEXT NOT NULL,         -- リンクテキスト（例: "Concept X"）
-    source_page_id TEXT NOT NULL,    -- 使用しているページID
+    link_text TEXT NOT NULL,                  -- リンクテキスト（例: "Concept X"）
+    source_page_id TEXT NOT NULL,             -- 使用しているページID（新設計では UUID）
     created_at INTEGER NOT NULL,
+    original_target_page_id TEXT NULL,        -- 【拡張】共有ノート由来のゴーストのみ。元のリンク先ページID（新設計では UUID）
+    original_note_id TEXT NULL,               -- 【拡張】共有ノート由来のゴーストのみ。元のノートID（新設計では UUID）
     PRIMARY KEY (link_text, source_page_id)
 );
 ```
+
+- 通常のゴースト（手書きの未解決リンク）では `original_target_page_id` と `original_note_id` は NULL。
+- 両方が非 NULL のとき、クリック時に「新規作成」か「元の共有ノートのページをコピー」を選択する UX で利用する。
 
 ## リンクの作成
 

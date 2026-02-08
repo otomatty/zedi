@@ -386,6 +386,8 @@ CREATE INDEX idx_links_source ON links(source_id);
 CREATE INDEX idx_links_target ON links(target_id);
 
 -- ゴーストリンク (未作成ページへのリンク)
+-- 注: 本仕様は documents スキーマ用。アプリの pages/notes 設計では docs/specs/zedi-data-structure-spec.md を参照。
+-- 同仕様では ghost_links に original_target_page_id, original_note_id（NULL 許容）を追加し、共有ノート由来のゴーストの元参照先を保持する。
 CREATE TABLE ghost_links (
     link_text TEXT NOT NULL,
     source_document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
