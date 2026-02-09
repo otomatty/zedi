@@ -17,7 +17,8 @@
 | **C1-5** | ページ・コンテンツ API | 完了 | #20 | 3b2c3d5 |
 | **C1-6** | ノート API | 完了 | #21 | 0dfd45e |
 | **C1-7** | 検索 API | 完了 | #22 | 37c998f |
-| **C1-8** | メディア API | 完了 | - | 本作業 |
+| **C1-8** | メディア API | 完了 | #23 | 9abb48d |
+| **C1-9** | API テスト・デプロイ | 完了 | - | 本作業 |
 
 ---
 
@@ -115,7 +116,15 @@
   - **ルーター:** POST /api/media/upload, POST /api/media/confirm を `router.mjs` に追加。
   - **依存:** Lambda package.json に @aws-sdk/client-s3, @aws-sdk/s3-request-presigner を追加。
 
-### 2.9 デプロイ（prod）
+### 2.9 C1-9: API テスト・デプロイ
+
+- **成果物**
+  - **統合テスト:** `terraform/modules/api/lambda/test-api.mjs`  
+    Lambda ハンドラーをモックイベントで実行し、期待する status / body を検証。GET /api/health（200）, GET /api/me（200）, 認証なしで 401, scope 未指定で 400, 未知パスで 404, OPTIONS で 204 など 7 ケース。DB/S3 未設定でも実行可能。`node test-api.mjs` で実行、成功時 exit 0。
+  - **dev デプロイ手順・テスト手順:** `terraform/modules/api/README.md` に「dev 環境のみデプロイ」「prod 環境」「テスト（C1-9）」を追記。環境変数はルートの module.database 出力を参照する旨を明記。
+- **環境変数・Secrets:** Lambda の AURORA_* / DB_CREDENTIALS_SECRET はルートの `module.database` から渡す。dev デプロイ前に database モジュールの適用が必要。
+
+### 2.10 デプロイ（prod）
 
 - **環境:** prod（`terraform apply -var-file=environments/prod.tfvars -target=module.api`）
 - **対応した事象**
@@ -123,6 +132,21 @@
   - 上記シークレットを `terraform import module.database.aws_secretsmanager_secret.db_credentials zedi-prod-db-credentials` で state に取り込み
 - **結果**  
   Lambda（zedi-prod-api）、API Gateway、JWT Authorizer、ルート、IAM が作成され、`GET /api/health` で 200 を確認済み。
+
+### 2.11 dev デプロイ試行と prod API 再デプロイ（2026-02-09 セッション）
+
+- **経緯**  
+  「dev で terraform apply して API をデプロイ」の依頼に対し、`-var-file=environments/dev.tfvars -target=module.api` を実行。しかし **Terraform state が prod リソースを追跡している** ため、dev.tfvars にすると環境切り替え（prod 破棄・dev 作成）が計画に含まれ、Aurora 削除保護・Cognito ドメイン削除要件・シークレット重複などで失敗した。
+- **対応**  
+  dev と prod を同一 state で切り替えることは行わず、**prod の API を更新**する形で実施。
+  1. `aws secretsmanager restore-secret --secret-id zedi-prod-db-credentials` でシークレット復元（前回失敗時に削除予定になっていたため）
+  2. `terraform import 'module.database.aws_secretsmanager_secret.db_credentials' zedi-prod-db-credentials` で state に取り込み
+  3. `terraform apply -var-file=environments/prod.tfvars -target=module.api -auto-approve` で API モジュールを適用
+- **結果**
+  - Lambda（zedi-prod-api）作成、API Gateway 統合・IAM（lambda_db, lambda_s3_media）作成、メディア用 S3（zedi-prod-media-590183877893）作成
+  - `GET /api/health` で 200 を再確認
+- **補足**  
+  dev 専用で API をデプロイする場合は、Terraform workspace で dev を作成するか、dev 用 state/ディレクトリを分けて `terraform apply -var-file=environments/dev.tfvars` を実行する必要がある。
 
 ---
 
@@ -147,6 +171,7 @@
 | Lambda 検索 | `terraform/modules/api/lambda/handlers/search.mjs` | GET /api/search scope=shared |
 | Lambda メディア | `terraform/modules/api/lambda/handlers/media.mjs` | POST /api/media/upload, confirm |
 | S3 メディア | `terraform/modules/api/s3.tf` | メディア用バケット・Lambda IAM |
+| API 統合テスト | `terraform/modules/api/lambda/test-api.mjs` | C1-9。モックイベントで status/body 検証 |
 | Lambda ローカル確認 | `terraform/modules/api/lambda/run-local.mjs` | モックイベントでルーティング確認 |
 | API モジュール説明 | `terraform/modules/api/README.md` | ルート・デプロイ・環境変数 |
 
@@ -155,8 +180,13 @@
 ## 4. デプロイ結果（参照用）
 
 - **prod API ベース URL:** `https://gf2b3exazg.execute-api.ap-northeast-1.amazonaws.com/`
-- **確認済み:** `GET /api/health` → 200
-- **利用可能エンドポイント（要 JWT）:** 上記に加え `GET /api/search?q=&scope=shared`, `POST /api/media/upload`, `POST /api/media/confirm`
+- **確認済み:** `GET /api/health` → 200（最終確認: 2026-02-09 セッション）
+- **利用可能エンドポイント（要 JWT）:**  
+  `GET /api/me`, `POST /api/users/upsert`, `GET /api/users/:id`,  
+  `GET/POST /api/sync/pages`, `GET/PUT /api/pages/:id/content`, `POST /api/pages`, `DELETE /api/pages/:id`,  
+  `GET/POST/PUT/DELETE /api/notes`, `GET/POST/DELETE /api/notes/:id/pages`, `GET/POST/DELETE /api/notes/:id/members`,  
+  `GET /api/search?q=&scope=shared`, `POST /api/media/upload`, `POST /api/media/confirm`
+- **prod リソース:** Lambda（zedi-prod-api）、メディア用 S3（zedi-prod-media-590183877893）、API Gateway（gf2b3exazg）
 
 ---
 
@@ -164,9 +194,7 @@
 
 ### 5.1 Phase C1 の残り
 
-| # | タスク | 内容 | 依存 |
-|---|--------|------|------|
-| C1-9 | API テスト・デプロイ | 統合テスト、dev デプロイ、環境変数・Secrets 整備 | C1-3〜C1-8 |
+- C1-1〜C1-9 はすべて完了。残タスクなし。
 
 ### 5.2 Phase C2: データ移行
 
@@ -204,7 +232,12 @@
 | 37952d8 | feat: add initial Aurora PostgreSQL schema and application scripts | #16 [C1-1] |
 | 5c7b0d9 | feat(api): add REST API module with Lambda, API Gateway, and Cognito integration | #17 [C1-2] |
 | 91c14e3 | feat(api): enhance Lambda module with user management and automatic npm installation | #18 [C1-3] |
+| 3b2c3d5 | ページ・コンテンツ API（GET/PUT content, POST/DELETE pages） | #20 [C1-5] |
+| 0dfd45e | ノート API（notes CRUD, pages, members） | #21 [C1-6] |
+| 37c998f | 検索 API（GET /api/search?q=&scope=shared） | #22 [C1-7] |
+| 9abb48d | メディア API（Presigned URL, confirm）+ S3 バケット | #23 [C1-8] |
+| （未コミット） | C1-9: test-api.mjs, README デプロイ・テスト手順 | - |
 
 ---
 
-**以上、Phase C1 の C1-1〜C1-8 までの作業ログとする。次は C1-9（API テスト・デプロイ）に進む。**
+**以上、Phase C1 の C1-1〜C1-9 までの作業ログとする。Phase C1 は完了。prod への API 再デプロイ（Lambda・S3 メディア・health 確認）まで実施済み。次は Phase C2（データ移行）または dev 環境の別 state/workspace でのデプロイ。**

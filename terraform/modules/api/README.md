@@ -41,8 +41,35 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 
 ルートで `terraform apply` を実行すると、api モジュール内で **`npm ci` が自動実行**され（`package.json` / `package-lock.json` 変更時）、そのあと `lambda/` が ZIP されて Lambda にデプロイされます。手動で `npm install` する必要はありません。
 
+### dev 環境のみデプロイ
+
+```bash
+# ルート (terraform/) で実行。事前に database モジュールで Aurora + Secrets が作成済みであること
+terraform apply -var-file=environments/dev.tfvars -target=module.api
+```
+
+デプロイ後、`terraform output api_invoke_url`（または `module.api.outputs.invoke_url`）で API のベース URL を確認できます。
+
+### prod 環境
+
+```bash
+terraform apply -var-file=environments/prod.tfvars -target=module.api
+```
+
+## テスト（C1-9）
+
+Lambda ハンドラーをモックイベントで実行し、ルーティング・認証・エラーレスポンスを検証します。
+
+```bash
+cd lambda && node test-api.mjs
+```
+
+成功時は `7/7 tests passed.`、失敗時は exit code 1。DB や S3 は使用しないため、未設定の環境でも実行可能です。ルーティング確認のみの場合は `node run-local.mjs` も利用できます。
+
 ## 環境変数（Lambda）
 
+Terraform で Lambda に渡される変数（ルートの `module.api` に渡す値は `module.database` / `module.security` の出力を参照）:
+
 - `ENVIRONMENT`: dev / prod
-- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（users / sync/pages 等で使用）
-- `MEDIA_BUCKET`: メディアアップロード用 S3 バケット名（C1-8。API モジュール内でバケット作成）
+- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（`module.database` の出力。users / sync/pages / notes / search / media confirm で使用）
+- `MEDIA_BUCKET`: メディアアップロード用 S3 バケット名（API モジュール内で作成したバケットの id）
