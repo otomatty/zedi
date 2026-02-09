@@ -31,8 +31,12 @@ export function GlobalSearch() {
   // Register keyboard shortcut
   useGlobalSearchShortcut(open);
 
-  const handleSelect = (pageId: string) => {
-    navigate(`/page/${pageId}`);
+  const handleSelect = (pageId: string, noteId?: string) => {
+    if (noteId) {
+      navigate(`/note/${noteId}/page/${pageId}`);
+    } else {
+      navigate(`/page/${pageId}`);
+    }
     close();
   };
 
@@ -74,24 +78,24 @@ export function GlobalSearch() {
           </CommandGroup>
         )}
 
-        {/* Search Results */}
+        {/* Search Results (personal + shared merged, C3-8) */}
         {hasQuery && searchResults.length > 0 && (
           <CommandGroup heading={`検索結果 (${searchResults.length}件)`}>
-            {searchResults.map(({ page, highlightedText, matchType }) => (
+            {searchResults.map(({ pageId, noteId, title, highlightedText, matchType, sourceUrl }) => (
               <CommandItem
-                key={page.id}
-                value={`search-${page.id}-${page.title}`}
-                onSelect={() => handleSelect(page.id)}
+                key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`}
+                value={`search-${pageId}-${title}`}
+                onSelect={() => handleSelect(pageId, noteId)}
                 className="flex flex-col items-start gap-1 py-3"
               >
                 <div className="flex items-center gap-2 w-full">
-                  {page.sourceUrl ? (
+                  {sourceUrl ? (
                     <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   ) : (
                     <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                   )}
                   <span className="font-medium truncate flex-1">
-                    {page.title || "無題のページ"}
+                    {title}
                   </span>
                   <MatchTypeBadge type={matchType} />
                 </div>

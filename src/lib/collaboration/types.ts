@@ -49,6 +49,13 @@ export interface CollaborationState {
 }
 
 /**
+ * コラボレーションモード（C3-5）
+ * - local: 個人ページ。Y.Doc + y-indexeddb のみ。WebSocket 接続なし。
+ * - collaborative: 共有ノート内ページ。Hocuspocus でリアルタイム共同編集。
+ */
+export type CollaborationMode = 'local' | 'collaborative';
+
+/**
  * useCollaborationフックのオプション
  */
 export interface UseCollaborationOptions {
@@ -56,6 +63,8 @@ export interface UseCollaborationOptions {
   pageId: string;
   /** コラボレーション機能を有効にするか */
   enabled?: boolean;
+  /** local = 個人ページ（y-indexeddb のみ）。collaborative = 共有ノート（Hocuspocus）。省略時は local。 */
+  mode?: CollaborationMode;
 }
 
 /**

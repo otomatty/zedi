@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_AI_API_BASE_URL?: string;
   readonly VITE_THUMBNAIL_API_BASE_URL?: string;
   readonly VITE_REALTIME_URL?: string;
+  readonly VITE_ZEDI_API_BASE_URL?: string;
   readonly VITE_E2E_TEST?: string;
 }
 

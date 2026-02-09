@@ -2,15 +2,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useEffect, useState, useRef } from "react";
 import {
-  getLocalClient,
-  saveLocalDatabase,
-  syncWithRemote,
-  triggerSync,
+  runAuroraSync,
   getSyncStatus,
   subscribeSyncStatus,
   type SyncStatus,
-} from "@/lib/turso";
-import { PageRepository } from "@/lib/pageRepository";
+} from "@/lib/sync";
+import { createStorageAdapter } from "@/lib/storageAdapter";
+import { createApiClient } from "@/lib/api";
+import { StorageAdapterPageRepository } from "@/lib/pageRepository/StorageAdapterPageRepository";
+import type { IPageRepository } from "@/lib/pageRepository";
 import { getPageListPreview } from "@/lib/contentUtils";
 import type { Page, PageSummary } from "@/types/page";
 
@@ -37,6 +37,8 @@ export const pageKeys = {
     [...pageKeys.details(), userId, pageId] as const,
   search: (userId: string, query: string) =>
     [...pageKeys.all, "search", userId, query] as const,
+  searchShared: (query: string) =>
+    [...pageKeys.all, "searchShared", query] as const,
 };
 
 /**
@@ -54,7 +56,7 @@ export function useSyncStatus(): SyncStatus {
 }
 
 /**
- * Hook to manually trigger sync (Delta sync - only changes since last sync)
+ * Hook to manually trigger sync (C3-7: API + StorageAdapter)
  */
 export function useSync() {
   const { getToken, userId, isSignedIn } = useAuth();
@@ -67,14 +69,8 @@ export function useSync() {
     setIsSyncing(true);
     try {
       console.log("[Sync] Manual sync requested", { userId });
-      const token = await getToken({ template: "turso" });
-      if (token) {
-        await triggerSync(token, userId);
-        // Invalidate queries to refetch with updated local data
-        queryClient.invalidateQueries({ queryKey: pageKeys.all });
-      } else {
-        console.warn("[Sync] Manual sync skipped: missing token");
-      }
+      await runAuroraSync(userId, getToken);
+      queryClient.invalidateQueries({ queryKey: pageKeys.all });
     } catch (error) {
       console.error("Sync failed:", error);
     } finally {
@@ -86,75 +82,76 @@ export function useSync() {
 }
 
 /**
- * Hook to get the appropriate repository based on auth state
+ * Hook to get the appropriate repository based on auth state (C3-7: StorageAdapter + API)
  *
- * LOCAL-FIRST ARCHITECTURE:
- * - All reads/writes go to local WASM database (Rows Read = 0)
- * - Sync only on: 1) Initial page load, 2) Manual sync button
- * - Delta sync: Only fetches changes since last sync time
- * - Data persisted to IndexedDB for offline support
+ * LOCAL-FIRST:
+ * - Reads/writes go to StorageAdapter (IndexedDB). Sync via runAuroraSync (GET/POST /api/sync/pages).
+ * - Initial sync on load; manual sync via useSync().
  */
 export function useRepository() {
   const { getToken, isSignedIn, userId, isLoaded } = useAuth();
-  const [isLocalDbReady, setIsLocalDbReady] = useState(false);
-  const initialSyncDone = useRef(false);
+  const [isAdapterReady, setIsAdapterReady] = useState(false);
+  const adapterRef = useRef<ReturnType<typeof createStorageAdapter> | null>(null);
+  const apiRef = useRef<ReturnType<typeof createApiClient> | null>(null);
 
   const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
 
-  // Initialize local database
+  // Create adapter + api and initialize adapter for current user
   useEffect(() => {
-    getLocalClient(effectiveUserId)
-      .then(() => {
-        setIsLocalDbReady(true);
-      })
-      .catch((error) => {
-        console.error("Failed to initialize local database:", error);
-        setIsLocalDbReady(true); // Still mark as ready to avoid blocking
+    const adapter = createStorageAdapter();
+    const api = createApiClient({ getToken });
+    adapterRef.current = adapter;
+    apiRef.current = api;
+    adapter
+      .initialize(effectiveUserId)
+      .then(() => setIsAdapterReady(true))
+      .catch((err) => {
+        console.error("Failed to initialize storage adapter:", err);
+        setIsAdapterReady(true);
       });
-  }, [effectiveUserId]);
+    return () => {
+      adapter.close();
+      adapterRef.current = null;
+      apiRef.current = null;
+    };
+  }, [effectiveUserId, getToken]);
 
-  // Clear initial-sync flags when user signs out so next sign-in triggers sync again
+  // Clear initial-sync flags when user signs out
   useEffect(() => {
     if (!isSignedIn) {
       initialSyncRequestedForUser.clear();
     }
   }, [isSignedIn]);
 
-  // Initial sync on page load for authenticated users (once per userId per session)
-  // Use module-level set so we run only once no matter how many useRepository() instances exist
+  // Initial sync for authenticated users (once per userId per session)
   useEffect(() => {
-    if (!isSignedIn || !userId || !isLocalDbReady) return;
+    if (!isSignedIn || !userId || !isAdapterReady) return;
     if (initialSyncRequestedForUser.has(userId)) return;
     initialSyncRequestedForUser.add(userId);
-    initialSyncDone.current = true;
 
     (async () => {
       try {
         console.log("[Sync] Initial sync requested", { userId });
-        const token = await getToken({ template: "turso" });
-        if (token) {
-          await syncWithRemote(token, userId);
-        } else {
-          console.warn("[Sync] Initial sync skipped: missing token");
-        }
+        await runAuroraSync(userId, getToken);
       } catch (error) {
         console.error("Initial sync failed:", error);
         initialSyncRequestedForUser.delete(userId);
       }
     })();
-  }, [isSignedIn, userId, isLocalDbReady, getToken]);
+  }, [isSignedIn, userId, isAdapterReady, getToken]);
 
-  const getRepository = useCallback(async (): Promise<PageRepository> => {
-    // Always use local database (Local-First)
-    const client = await getLocalClient(effectiveUserId);
-    return new PageRepository(client, { onMutate: saveLocalDatabase });
+  const getRepository = useCallback(async (): Promise<IPageRepository> => {
+    const adapter = adapterRef.current;
+    const api = apiRef.current;
+    if (!adapter || !api) throw new Error("Repository not ready");
+    return new StorageAdapterPageRepository(adapter, api, effectiveUserId);
   }, [effectiveUserId]);
 
   return {
     getRepository,
     userId: effectiveUserId,
     isSignedIn: isSignedIn ?? false,
-    isLoaded: isLoaded && isLocalDbReady,
+    isLoaded: isLoaded && isAdapterReady,
   };
 }
 
@@ -234,7 +231,7 @@ export function usePage(pageId: string, options?: UsePageOptions) {
 }
 
 /**
- * Hook to search pages
+ * Hook to search pages (personal; StorageAdapter)
  */
 export function useSearchPages(query: string) {
   const { getRepository, userId, isLoaded } = useRepository();
@@ -247,6 +244,22 @@ export function useSearchPages(query: string) {
       return repo.searchPages(userId, query);
     },
     enabled: isLoaded && query.trim().length > 0,
+  });
+}
+
+/**
+ * Hook to search shared notes (API: GET /api/search?q=&scope=shared). C3-8.
+ */
+export function useSearchSharedNotes(query: string) {
+  const { getToken, isSignedIn } = useAuth();
+
+  return useQuery({
+    queryKey: pageKeys.searchShared(query),
+    queryFn: async () => {
+      const api = createApiClient({ getToken });
+      return api.searchSharedNotes(query);
+    },
+    enabled: isSignedIn && query.trim().length > 0,
   });
 }
 

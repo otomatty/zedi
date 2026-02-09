@@ -20,6 +20,11 @@ dist-ssr
 # Developer sync configuration (contains user ID mappings)
 scripts/sync/dev-user-mapping.json
 
+# Turso export output (C2-1; may contain sensitive data)
+scripts/migration/export-turso/output/
+# Aurora transform output (C2-2; contains UUID-mapped data)
+scripts/migration/transform-for-aurora/output/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

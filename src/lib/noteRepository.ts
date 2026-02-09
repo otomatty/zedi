@@ -1,5 +1,5 @@
 import type { Client } from "@libsql/client";
-import { nanoid } from "nanoid";
+import { v4 as uuidv4 } from "uuid";
 import type { Page, PageSummary } from "@/types/page";
 import type {
   Note,
@@ -150,7 +150,7 @@ export class NoteRepository {
     visibility: NoteVisibility,
     ownerEmail?: string
   ): Promise<Note> {
-    const id = nanoid();
+    const id = uuidv4();
     const now = Date.now();
 
     await this.client.execute({
