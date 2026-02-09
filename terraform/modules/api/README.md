@@ -33,6 +33,8 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 | `POST /api/notes/:id/members` | 必須 | メンバー招待（オーナーのみ）。body: `member_email`, `role?` |
 | `DELETE /api/notes/:id/members/:email` | 必須 | メンバー削除（オーナーのみ、論理削除） |
 | `GET /api/search?q=&scope=shared` | 必須 | 共有ノートの全文検索（自分がアクセス可能なノート内のページを title / content_text で LIKE 検索、pg_bigm） |
+| `POST /api/media/upload` | 必須 | Presigned URL 発行。body: `file_name?`, `content_type?`。返却: `upload_url`, `media_id`, `s3_key`, `expires_in`。クライアントは upload_url に PUT 後、confirm を呼ぶ。 |
+| `POST /api/media/confirm` | 必須 | アップロード完了確認。body: `media_id`, `s3_key`, `file_name?`, `content_type?`, `file_size?`, `page_id?`。media テーブルに登録。 |
 | その他 `/api/*` | 必須 | 404 |
 
 ## デプロイ
@@ -42,4 +44,5 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 ## 環境変数（Lambda）
 
 - `ENVIRONMENT`: dev / prod
-- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（users / sync/pages で使用）
+- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（users / sync/pages 等で使用）
+- `MEDIA_BUCKET`: メディアアップロード用 S3 バケット名（C1-8。API モジュール内でバケット作成）

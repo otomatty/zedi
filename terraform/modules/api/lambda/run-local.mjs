@@ -53,6 +53,17 @@ const events = [
       queryStringParameters: { q: "test" },
     },
   },
+  {
+    name: "POST /api/media/upload (no MEDIA_BUCKET -> 503)",
+    event: {
+      requestContext: {
+        http: { method: "POST" },
+        authorizer: { jwt: { claims: { sub: "test-sub" } } },
+      },
+      rawPath: "/api/media/upload",
+      body: JSON.stringify({ content_type: "image/png" }),
+    },
+  },
 ];
 
 async function main() {
