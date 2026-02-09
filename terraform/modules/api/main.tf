@@ -10,13 +10,25 @@ locals {
 }
 
 ################################################################################
-# Lambda
+# Lambda: npm install を apply 前に実行（node_modules を ZIP に含める）
 ################################################################################
+
+resource "null_resource" "lambda_npm" {
+  triggers = {
+    package_json    = filemd5("${path.module}/lambda/package.json")
+    package_lock    = fileexists("${path.module}/lambda/package-lock.json") ? filemd5("${path.module}/lambda/package-lock.json") : "no-lock"
+  }
+  provisioner "local-exec" {
+    command     = "npm ci"
+    working_dir = "${path.module}/lambda"
+  }
+}
 
 data "archive_file" "lambda" {
   type        = "zip"
   source_dir  = "${path.module}/lambda"
   output_path = "${path.module}/lambda.zip"
+  depends_on  = [null_resource.lambda_npm]
 }
 
 resource "aws_iam_role" "lambda" {
