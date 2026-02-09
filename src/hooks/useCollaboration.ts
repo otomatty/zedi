@@ -32,6 +32,7 @@ const initialState: CollaborationState = {
 export function useCollaboration({
   pageId,
   enabled = true,
+  mode = 'local',
 }: UseCollaborationOptions): UseCollaborationReturn {
   const { userId, getToken, isSignedIn } = useAuth();
   const { user } = useUser();
@@ -59,7 +60,8 @@ export function useCollaboration({
           console.error('[useCollaboration] Failed to get token:', error);
           return null;
         }
-      }
+      },
+      { mode }
     );
 
     managerRef.current = manager;
@@ -73,7 +75,7 @@ export function useCollaboration({
       manager.destroy();
       managerRef.current = null;
     };
-  }, [pageId, userId, enabled, getToken, isSignedIn, user?.fullName, user?.firstName]);
+  }, [pageId, userId, enabled, mode, getToken, isSignedIn, user?.fullName, user?.firstName]);
 
   // カーソル位置更新
   const updateCursor = useCallback((anchor: number, head: number) => {

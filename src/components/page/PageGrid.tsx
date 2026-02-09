@@ -4,7 +4,7 @@ import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import { hasNeverSynced } from "@/lib/turso";
+import { hasNeverSynced } from "@/lib/sync";
 
 const skeletonItems = Array.from({ length: 20 }, (_, index) => index);
 

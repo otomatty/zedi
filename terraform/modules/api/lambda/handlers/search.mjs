@@ -15,7 +15,7 @@ SELECT id, email FROM users WHERE cognito_sub = :cognito_sub
  * pg_bigm (GIN gin_bigm_ops) により LIKE 検索がインデックスで高速化される。
  */
 const SEARCH_SHARED_SQL = `
-SELECT DISTINCT p.id, p.owner_id, p.title, p.content_preview, p.thumbnail_url, p.source_url, p.updated_at
+SELECT DISTINCT p.id, p.owner_id, p.title, p.content_preview, p.thumbnail_url, p.source_url, p.updated_at, np.note_id
 FROM note_pages np
 JOIN notes n ON n.id = np.note_id AND n.is_deleted = FALSE
 LEFT JOIN note_members nm ON nm.note_id = n.id AND nm.member_email = :user_email AND nm.is_deleted = FALSE
@@ -82,6 +82,7 @@ export async function searchShared(claims, queryParams = {}) {
 
   const results = rows.map((row) => ({
     id: row.id,
+    note_id: row.note_id,
     owner_id: row.owner_id,
     title: row.title ?? null,
     content_preview: row.content_preview ?? null,

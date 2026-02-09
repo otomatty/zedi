@@ -1,7 +1,7 @@
 /**
  * CollaborationManager
- * Y.jsドキュメントの管理、WebSocket接続、IndexedDB永続化を担当
- * Hocuspocus サーバー用に HocuspocusProvider を使用（Auth メッセージ送信が必要）
+ * Y.jsドキュメントの管理、IndexedDB永続化を担当。
+ * mode='collaborative' のときのみ Hocuspocus に WebSocket 接続（C3-5）。
  */
 
 import * as Y from 'yjs';
@@ -11,6 +11,8 @@ import { Awareness } from 'y-protocols/awareness';
 import type { UserPresence, ConnectionStatus, CollaborationState } from './types';
 import { getUserColor } from './types';
 
+export type CollaborationManagerMode = 'local' | 'collaborative';
+
 export class CollaborationManager {
   private ydoc: Y.Doc;
   private wsProvider: HocuspocusProvider | null = null;
@@ -19,6 +21,7 @@ export class CollaborationManager {
   private pageId: string;
   private userId: string;
   private userName: string;
+  private readonly mode: CollaborationManagerMode;
   private listeners: Set<(state: CollaborationState) => void> = new Set();
   private state: CollaborationState;
 
@@ -26,11 +29,14 @@ export class CollaborationManager {
     pageId: string,
     userId: string,
     userName: string,
-    private getAuthToken: () => Promise<string | null>
+    private getAuthToken: () => Promise<string | null>,
+    options?: { mode?: CollaborationManagerMode }
   ) {
     this.pageId = pageId;
     this.userId = userId;
     this.userName = userName;
+    this.mode = options?.mode ?? 'local';
+
     this.ydoc = new Y.Doc();
 
     this.state = {
@@ -40,7 +46,7 @@ export class CollaborationManager {
       pendingChanges: 0,
     };
 
-    // Layer 2: IndexedDB永続化（常時有効）
+    // IndexedDB 永続化（常時有効）
     this.idbProvider = new IndexeddbPersistence(
       `zedi-doc-${pageId}`,
       this.ydoc
@@ -48,8 +54,12 @@ export class CollaborationManager {
 
     this.idbProvider.on('synced', () => {
       console.log('[Collab] IndexedDB synced');
-      // ローカル同期完了後にWebSocket接続
-      this.connectWebSocket();
+      if (this.mode === 'local') {
+        // 個人ページ: WebSocket 接続なし。Y.Doc + y-indexeddb のみ（C3-5）
+        this.updateState({ status: 'connected', isSynced: true });
+      } else {
+        this.connectWebSocket();
+      }
     });
   }
 

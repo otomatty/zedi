@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { nanoid } from 'nanoid';
+import { v4 as uuidv4 } from 'uuid';
 import type { Page, Link, GhostLink } from '@/types/page';
 
 interface PageStore {
@@ -41,7 +41,8 @@ export const usePageStore = create<PageStore>()(
       createPage: (title = '', content = '') => {
         const now = Date.now();
         const newPage: Page = {
-          id: nanoid(),
+          id: uuidv4(),
+          ownerUserId: 'local-user',
           title,
           content,
           createdAt: now,

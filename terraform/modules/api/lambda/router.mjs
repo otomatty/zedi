@@ -141,6 +141,10 @@ export async function route(rawPath, method, ctx) {
       const { removeNoteMember } = await import("./handlers/notes.mjs");
       return removeNoteMember(claims, noteId, subId);
     }
+    if (method === "PUT" && noteId && subResource === "members" && subId) {
+      const { updateNoteMember } = await import("./handlers/notes.mjs");
+      return updateNoteMember(claims, noteId, subId, ctx.body);
+    }
   }
 
   // GET /api/search?q=&scope=shared — 共有ノートの全文検索（pg_bigm）

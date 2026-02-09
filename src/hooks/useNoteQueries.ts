@@ -1,13 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth, useUser } from "@/hooks/useAuth";
-import { useCallback, useEffect, useState } from "react";
-import { getLocalClient, saveLocalDatabase } from "@/lib/turso";
-import { NoteRepository } from "@/lib/noteRepository";
+import { createApiClient } from "@/lib/api";
+import type { NoteListItem, GetNoteResponse, NoteMemberItem } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
-import { useTurso } from "@/hooks/useTurso";
-
-const LOCAL_USER_ID = "local-user";
 
 export const noteKeys = {
   all: ["notes"] as const,
@@ -23,65 +19,131 @@ export const noteKeys = {
     [...noteKeys.pages(), noteId, pageId] as const,
   members: () => [...noteKeys.all, "members"] as const,
   memberList: (noteId: string) => [...noteKeys.members(), noteId] as const,
-  remote: () => [...noteKeys.all, "remote"] as const,
-  remoteDetail: (noteId: string, userId?: string, userEmail?: string) =>
-    [...noteKeys.remote(), noteId, userId ?? "", userEmail ?? ""] as const,
-  remotePageList: (noteId: string) =>
-    [...noteKeys.remote(), "pages", noteId] as const,
-  remotePage: (noteId: string, pageId: string) =>
-    [...noteKeys.remote(), "pages", noteId, pageId] as const,
 };
 
 type NoteWithAccess = { note: Note; access: NoteAccess } | null;
 
-export function useNoteRepository() {
-  const { isSignedIn, userId, isLoaded } = useAuth();
-  const { user } = useUser();
-  const [isLocalDbReady, setIsLocalDbReady] = useState(false);
+function parseTs(iso: string): number {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? 0 : t;
+}
 
-  const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
+function apiNoteToNote(item: {
+  id: string;
+  owner_id: string;
+  title: string | null;
+  visibility: string;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+}): Note {
+  return {
+    id: item.id,
+    ownerUserId: item.owner_id,
+    title: item.title ?? "",
+    visibility: item.visibility as Note["visibility"],
+    createdAt: parseTs(item.created_at),
+    updatedAt: parseTs(item.updated_at),
+    isDeleted: item.is_deleted,
+  };
+}
+
+function apiNoteToNoteSummary(item: NoteListItem): import("@/types/note").NoteSummary {
+  const role =
+    item.role === "owner"
+      ? ("owner" as const)
+      : item.role === "editor"
+        ? ("editor" as const)
+        : ("viewer" as const);
+  return {
+    ...apiNoteToNote(item),
+    role,
+    pageCount: item.page_count ?? 0,
+    memberCount: item.member_count ?? 0,
+  };
+}
+
+function buildAccessFromApi(
+  note: Note,
+  currentUserRole: "owner" | "editor" | "viewer"
+): NoteAccess {
+  const role =
+    currentUserRole === "owner"
+      ? ("owner" as const)
+      : currentUserRole === "editor"
+        ? ("editor" as const)
+        : ("viewer" as const);
+  return {
+    role,
+    visibility: note.visibility,
+    canView: true,
+    canEdit: role === "owner" || role === "editor",
+    canManageMembers: role === "owner",
+  };
+}
+
+function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
+  return {
+    id: p.id,
+    ownerUserId: p.owner_id,
+    title: p.title ?? "",
+    contentPreview: p.content_preview ?? undefined,
+    thumbnailUrl: p.thumbnail_url ?? undefined,
+    sourceUrl: p.source_url ?? undefined,
+    createdAt: parseTs(p.created_at),
+    updatedAt: parseTs(p.updated_at),
+    isDeleted: p.is_deleted,
+  };
+}
+
+function apiPageToPage(p: GetNoteResponse["pages"][0]): Page {
+  return {
+    ...apiPageToPageSummary(p),
+    content: "",
+  };
+}
+
+function apiMemberToNoteMember(m: NoteMemberItem, noteId: string): NoteMember {
+  return {
+    noteId,
+    memberEmail: m.member_email,
+    role: (m.role === "editor" ? "editor" : "viewer") as NoteMemberRole,
+    invitedByUserId: m.invited_by_user_id,
+    createdAt: parseTs(m.created_at),
+    updatedAt: parseTs(m.updated_at),
+    isDeleted: false,
+  };
+}
+
+/**
+ * C3-9: Hook to get API client and auth for note queries (replaces useNoteRepository).
+ */
+export function useNoteApi() {
+  const { getToken, isSignedIn, userId, isLoaded } = useAuth();
+  const { user } = useUser();
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? undefined;
 
-  useEffect(() => {
-    let isMounted = true;
-    getLocalClient(effectiveUserId)
-      .then(() => {
-        if (isMounted) setIsLocalDbReady(true);
-      })
-      .catch((error) => {
-        console.error("Failed to initialize local database:", error);
-        if (isMounted) setIsLocalDbReady(true);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [effectiveUserId]);
-
-  const getRepository = useCallback(async (): Promise<NoteRepository> => {
-    const client = await getLocalClient(effectiveUserId);
-    return new NoteRepository(client, { onMutate: saveLocalDatabase });
-  }, [effectiveUserId]);
+  const api = createApiClient({ getToken });
 
   return {
-    getRepository,
-    userId: effectiveUserId,
+    api,
+    userId: userId ?? "",
     userEmail,
     isSignedIn: isSignedIn ?? false,
-    isLoaded: isLoaded && isLocalDbReady,
+    isLoaded: isLoaded ?? false,
   };
 }
 
 export function useNotes() {
-  const { getRepository, userId, userEmail, isLoaded } = useNoteRepository();
+  const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
   const query = useQuery({
     queryKey: noteKeys.list(userId, userEmail),
     queryFn: async () => {
-      const repo = await getRepository();
-      return repo.getNotesSummary(userId, userEmail);
+      const list = await api.getNotes();
+      return list.map(apiNoteToNoteSummary);
     },
-    enabled: isLoaded,
+    enabled: isLoaded && isSignedIn,
     staleTime: 1000 * 60,
   });
 
@@ -91,158 +153,81 @@ export function useNotes() {
   };
 }
 
-type UseNoteOptions = {
-  allowRemote?: boolean;
-};
+type UseNoteOptions = { allowRemote?: boolean };
 
-export function useNote(noteId: string, options?: UseNoteOptions) {
-  const { getRepository, userId, userEmail, isLoaded } = useNoteRepository();
-  const { getClient, isLoaded: isTursoLoaded } = useTurso();
-  const allowRemote = options?.allowRemote ?? true;
+export function useNote(noteId: string, _options?: UseNoteOptions) {
+  const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
   const queryClient = useQueryClient();
 
-  const localQuery = useQuery({
+  const query = useQuery({
     queryKey: noteKeys.detail(noteId, userId, userEmail),
     queryFn: async (): Promise<NoteWithAccess> => {
-      const repo = await getRepository();
-      return repo.getNoteWithAccess(noteId, userId, userEmail);
+      const res = await api.getNote(noteId);
+      const note = apiNoteToNote(res);
+      const access = buildAccessFromApi(note, res.current_user_role);
+      return { note, access };
     },
-    enabled: isLoaded && !!noteId,
+    enabled: isLoaded && isSignedIn && !!noteId,
   });
 
-  const shouldFetchRemote =
-    allowRemote && !!noteId && !localQuery.isLoading && !localQuery.data;
-
-  const remoteQuery = useQuery({
-    queryKey: noteKeys.remoteDetail(noteId, userId, userEmail),
-    queryFn: async (): Promise<NoteWithAccess> => {
-      const client = await getClient();
-      const repo = new NoteRepository(client);
-      return repo.getNoteWithAccess(noteId, userId, userEmail);
-    },
-    enabled: shouldFetchRemote && isTursoLoaded,
-  });
-
-  const noteWithAccess = localQuery.data ?? remoteQuery.data ?? null;
-  const source: "local" | "remote" = localQuery.data ? "local" : remoteQuery.data ? "remote" : "local";
-
-  useEffect(() => {
-    if (!noteId || source !== "local" || !noteWithAccess) return;
-    if (!userId || !userEmail) return;
-    if (noteWithAccess.note.ownerUserId !== userId) return;
-
-    let isCancelled = false;
-
-    const ensureOwnerMember = async () => {
-      const repo = await getRepository();
-      const updated = await repo.ensureOwnerMember(noteId, userId, userEmail);
-      if (updated && !isCancelled) {
-        queryClient.invalidateQueries({
-          queryKey: noteKeys.memberList(noteId),
-        });
-        queryClient.invalidateQueries({ queryKey: noteKeys.all });
-      }
-    };
-
-    ensureOwnerMember().catch((error) => {
-      console.error("Failed to ensure owner member:", error);
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [
-    noteId,
-    source,
-    noteWithAccess,
-    userId,
-    userEmail,
-    getRepository,
-    queryClient,
-  ]);
+  const noteWithAccess = query.data ?? null;
 
   return {
     note: noteWithAccess?.note ?? null,
     access: noteWithAccess?.access ?? null,
-    source,
-    isLoading:
-      localQuery.isLoading ||
-      (!localQuery.data && shouldFetchRemote && remoteQuery.isLoading),
-    error: localQuery.error ?? remoteQuery.error,
+    source: "local" as const,
+    isLoading: query.isLoading,
+    error: query.error,
   };
 }
 
-export function useNotePages(
-  noteId: string,
-  source: "local" | "remote" = "local",
-  enabled: boolean = true
-) {
-  const { getRepository, isLoaded } = useNoteRepository();
-  const { getClient, isLoaded: isTursoLoaded } = useTurso();
-
-  const isRemote = source === "remote";
-  const isEnabled = enabled && !!noteId && (isRemote ? isTursoLoaded : isLoaded);
+export function useNotePages(noteId: string, _source?: "local" | "remote", enabled: boolean = true) {
+  const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
-    queryKey: isRemote ? noteKeys.remotePageList(noteId) : noteKeys.pageList(noteId),
+    queryKey: noteKeys.pageList(noteId),
     queryFn: async (): Promise<PageSummary[]> => {
-      if (isRemote) {
-        const client = await getClient();
-        const repo = new NoteRepository(client);
-        return repo.getNotePagesSummary(noteId);
-      }
-      const repo = await getRepository();
-      return repo.getNotePagesSummary(noteId);
+      const res = await api.getNote(noteId);
+      return res.pages.map(apiPageToPageSummary);
     },
-    enabled: isEnabled,
+    enabled: enabled && isLoaded && isSignedIn && !!noteId,
   });
 }
 
 export function useNotePage(
   noteId: string,
   pageId: string,
-  source: "local" | "remote" = "local",
+  _source?: "local" | "remote",
   enabled: boolean = true
 ) {
-  const { getRepository, isLoaded } = useNoteRepository();
-  const { getClient, isLoaded: isTursoLoaded } = useTurso();
-  const isRemote = source === "remote";
-  const isEnabled =
-    enabled && !!noteId && !!pageId && (isRemote ? isTursoLoaded : isLoaded);
+  const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
-    queryKey: isRemote
-      ? noteKeys.remotePage(noteId, pageId)
-      : noteKeys.page(noteId, pageId),
+    queryKey: noteKeys.page(noteId, pageId),
     queryFn: async (): Promise<Page | null> => {
-      if (isRemote) {
-        const client = await getClient();
-        const repo = new NoteRepository(client);
-        return repo.getNotePage(noteId, pageId);
-      }
-      const repo = await getRepository();
-      return repo.getNotePage(noteId, pageId);
+      const res = await api.getNote(noteId);
+      const p = res.pages.find((x) => x.id === pageId);
+      return p ? apiPageToPage(p) : null;
     },
-    enabled: isEnabled,
+    enabled: enabled && isLoaded && isSignedIn && !!noteId && !!pageId,
   });
 }
 
 export function useNoteMembers(noteId: string, enabled: boolean = true) {
-  const { getRepository, isLoaded } = useNoteRepository();
-  const isEnabled = enabled && isLoaded && !!noteId;
+  const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.memberList(noteId),
     queryFn: async (): Promise<NoteMember[]> => {
-      const repo = await getRepository();
-      return repo.getNoteMembers(noteId);
+      const list = await api.getNoteMembers(noteId);
+      return list.map((m) => apiMemberToNoteMember(m, noteId));
     },
-    enabled: isEnabled,
+    enabled: enabled && isLoaded && isSignedIn && !!noteId,
   });
 }
 
 export function useCreateNote() {
-  const { getRepository, userId, userEmail } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -253,8 +238,8 @@ export function useCreateNote() {
       title: string;
       visibility: Note["visibility"];
     }) => {
-      const repo = await getRepository();
-      return repo.createNote(userId, title, visibility, userEmail);
+      const created = await api.createNote({ title, visibility });
+      return apiNoteToNote(created);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: noteKeys.all });
@@ -263,7 +248,7 @@ export function useCreateNote() {
 }
 
 export function useUpdateNote() {
-  const { getRepository, userId, userEmail } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -274,8 +259,10 @@ export function useUpdateNote() {
       noteId: string;
       updates: Partial<Pick<Note, "title" | "visibility">>;
     }) => {
-      const repo = await getRepository();
-      await repo.updateNote(userId, noteId, updates, userEmail);
+      await api.updateNote(noteId, {
+        title: updates.title,
+        visibility: updates.visibility,
+      });
       return { noteId, updates };
     },
     onSuccess: ({ noteId, updates }) => {
@@ -288,13 +275,12 @@ export function useUpdateNote() {
 }
 
 export function useDeleteNote() {
-  const { getRepository, userId } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (noteId: string) => {
-      const repo = await getRepository();
-      await repo.deleteNote(userId, noteId);
+      await api.deleteNote(noteId);
       return noteId;
     },
     onSuccess: () => {
@@ -304,13 +290,12 @@ export function useDeleteNote() {
 }
 
 export function useAddPageToNote() {
-  const { getRepository, userId } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ noteId, pageId }: { noteId: string; pageId: string }) => {
-      const repo = await getRepository();
-      await repo.addPageToNote(noteId, pageId, userId);
+      await api.addNotePage(noteId, { pageId });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
@@ -320,13 +305,12 @@ export function useAddPageToNote() {
 }
 
 export function useRemovePageFromNote() {
-  const { getRepository } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ noteId, pageId }: { noteId: string; pageId: string }) => {
-      const repo = await getRepository();
-      await repo.removePageFromNote(noteId, pageId);
+      await api.removeNotePage(noteId, pageId);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
@@ -336,7 +320,7 @@ export function useRemovePageFromNote() {
 }
 
 export function useAddNoteMember() {
-  const { getRepository, userId } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -349,8 +333,7 @@ export function useAddNoteMember() {
       memberEmail: string;
       role: NoteMemberRole;
     }) => {
-      const repo = await getRepository();
-      await repo.addNoteMember(noteId, memberEmail, role, userId);
+      await api.addNoteMember(noteId, { member_email: memberEmail, role });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.memberList(variables.noteId) });
@@ -360,7 +343,7 @@ export function useAddNoteMember() {
 }
 
 export function useUpdateNoteMemberRole() {
-  const { getRepository } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -373,8 +356,7 @@ export function useUpdateNoteMemberRole() {
       memberEmail: string;
       role: NoteMemberRole;
     }) => {
-      const repo = await getRepository();
-      await repo.updateNoteMemberRole(noteId, memberEmail, role);
+      await api.updateNoteMember(noteId, memberEmail, { role });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.memberList(variables.noteId) });
@@ -384,7 +366,7 @@ export function useUpdateNoteMemberRole() {
 }
 
 export function useRemoveNoteMember() {
-  const { getRepository } = useNoteRepository();
+  const { api } = useNoteApi();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -395,8 +377,7 @@ export function useRemoveNoteMember() {
       noteId: string;
       memberEmail: string;
     }) => {
-      const repo = await getRepository();
-      await repo.removeNoteMember(noteId, memberEmail);
+      await api.removeNoteMember(noteId, memberEmail);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.memberList(variables.noteId) });

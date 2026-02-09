@@ -1,7 +1,38 @@
 import type { Client } from "@libsql/client";
 import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
 import { getPageListPreview } from "@/lib/contentUtils";
-import { nanoid } from "nanoid";
+import { v4 as uuidv4 } from "uuid";
+
+/**
+ * C3-7: Common interface for page repository implementations.
+ * Implemented by PageRepository (Turso/sql.js) and StorageAdapterPageRepository (adapter + API).
+ */
+export interface IPageRepository {
+  createPage(userId: string, title?: string, content?: string): Promise<Page>;
+  getPage(userId: string, pageId: string): Promise<Page | null>;
+  getPages(userId: string): Promise<Page[]>;
+  getPagesSummary(userId: string): Promise<PageSummary[]>;
+  getPagesByIds(userId: string, pageIds: string[]): Promise<Page[]>;
+  getPageByTitle(userId: string, title: string): Promise<Page | null>;
+  checkDuplicateTitle(userId: string, title: string, excludePageId?: string): Promise<Page | null>;
+  updatePage(
+    userId: string,
+    pageId: string,
+    updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>
+  ): Promise<void>;
+  deletePage(userId: string, pageId: string): Promise<void>;
+  searchPages(userId: string, query: string): Promise<Page[]>;
+  addLink(sourceId: string, targetId: string): Promise<void>;
+  removeLink(sourceId: string, targetId: string): Promise<void>;
+  getOutgoingLinks(pageId: string): Promise<string[]>;
+  getBacklinks(pageId: string): Promise<string[]>;
+  getLinks(userId: string): Promise<Link[]>;
+  addGhostLink(linkText: string, sourcePageId: string): Promise<void>;
+  removeGhostLink(linkText: string, sourcePageId: string): Promise<void>;
+  getGhostLinkSources(linkText: string): Promise<string[]>;
+  getGhostLinks(userId: string): Promise<GhostLink[]>;
+  promoteGhostLink(userId: string, linkText: string): Promise<Page | null>;
+}
 
 /**
  * Options for PageRepository
@@ -42,7 +73,7 @@ export class PageRepository {
     title: string = "",
     content: string = ""
   ): Promise<Page> {
-    const id = nanoid();
+    const id = uuidv4();
     const now = Date.now();
     const contentPreview = getPageListPreview(content);
 
@@ -58,6 +89,7 @@ export class PageRepository {
 
     return {
       id,
+      ownerUserId: userId,
       title,
       content,
       contentPreview,

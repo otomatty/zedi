@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
-import { useNotes, useCreateNote, useNoteRepository } from "@/hooks/useNoteQueries";
+import { useNotes, useCreateNote, useNoteApi } from "@/hooks/useNoteQueries";
 import type { NoteVisibility } from "@/types/note";
 import { NoteCard } from "./NoteCard";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ const visibilityOptions: Array<{ value: NoteVisibility; label: string }> = [
 export const NotesSection: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isSignedIn } = useNoteRepository();
+  const { isSignedIn } = useNoteApi();
   const { data: notes = [], isLoading } = useNotes();
   const createNoteMutation = useCreateNote();
 

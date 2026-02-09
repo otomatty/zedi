@@ -1,5 +1,9 @@
 import { useState, useMemo, useCallback } from "react";
-import { usePagesSummary, useSearchPages } from "./usePageQueries";
+import {
+  usePagesSummary,
+  useSearchPages,
+  useSearchSharedNotes,
+} from "./usePageQueries";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { extractPlainText } from "@/lib/contentUtils";
 import {
@@ -18,6 +22,17 @@ export interface SearchResult {
   highlightedText: string;
   matchType: MatchType;
   score: number;
+}
+
+/** Unified item for global search (personal + shared). C3-8. */
+export interface GlobalSearchResultItem {
+  pageId: string;
+  /** Set for shared-note results; navigate to /note/:noteId/page/:pageId */
+  noteId?: string;
+  title: string;
+  highlightedText: string;
+  matchType: MatchType;
+  sourceUrl?: string;
 }
 
 /**
@@ -71,56 +86,76 @@ export function searchPages(pages: Page[], query: string): SearchResult[] {
 }
 
 /**
- * Hook for global search functionality
+ * Hook for global search functionality (C3-8: personal + shared merged).
  *
- * OPTIMIZED:
- * - Uses usePagesSummary() for recent pages display (no content, reduces Rows Read by ~95%)
- * - Uses useSearchPages() for server-side search (only fetches matching pages)
+ * - Personal: StorageAdapter.searchPages via useSearchPages().
+ * - Shared: apiClient.searchSharedNotes via useSearchSharedNotes().
+ * - Results are merged, sorted by score, and capped.
  */
 export function useGlobalSearch() {
-  // OPTIMIZED: Use summary for recent pages (no content needed)
   const { data: pageSummaries = [] } = usePagesSummary();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
-  // Debounce query for performance
   const debouncedQuery = useDebouncedValue(query, 150);
 
-  // OPTIMIZED: Use server-side search (only fetches matching pages with content)
   const { data: serverSearchResults = [] } = useSearchPages(debouncedQuery);
+  const { data: sharedResponse } = useSearchSharedNotes(debouncedQuery);
+  const sharedResults = sharedResponse?.results ?? [];
 
-  // Process server search results with enhanced scoring and snippets
-  const searchResults = useMemo(() => {
-    if (!debouncedQuery.trim() || serverSearchResults.length === 0) return [];
+  const keywords = useMemo(
+    () => parseSearchQuery(debouncedQuery),
+    [debouncedQuery]
+  );
 
-    const keywords = parseSearchQuery(debouncedQuery);
-    if (keywords.length === 0) return [];
+  const searchResults = useMemo((): GlobalSearchResultItem[] => {
+    if (!debouncedQuery.trim() || keywords.length === 0) return [];
 
-    return serverSearchResults
-      .filter((page) => !page.isDeleted)
-      .map((page) => {
-        const content = extractPlainText(page.content);
+    const personal: Array<GlobalSearchResultItem & { score: number }> =
+      serverSearchResults
+        .filter((page) => !page.isDeleted)
+        .map((page) => {
+          const content = extractPlainText(page.content);
+          const matchType = determineMatchType(
+            page.title,
+            content,
+            keywords,
+            debouncedQuery
+          );
+          const score = calculateEnhancedScore(page, keywords, matchType);
+          const matchedText = extractSmartSnippet(content, keywords);
+          const highlightedText = highlightKeywords(matchedText, keywords);
+          return {
+            pageId: page.id,
+            title: page.title || "無題のページ",
+            highlightedText,
+            matchType,
+            sourceUrl: page.sourceUrl,
+            score,
+          };
+        })
+        .sort((a, b) => b.score - a.score);
 
-        // マッチタイプを判定
-        const matchType = determineMatchType(
-          page.title,
-          content,
-          keywords,
-          debouncedQuery
-        );
+    const shared: Array<GlobalSearchResultItem & { score: number }> =
+      sharedResults.map((r) => {
+        const preview = r.content_preview ?? "";
+        const highlightedText = highlightKeywords(preview, keywords);
+        return {
+          pageId: r.id,
+          noteId: r.note_id,
+          title: r.title ?? "無題のページ",
+          highlightedText: highlightedText || "（共有ノート）",
+          matchType: "content" as MatchType,
+          sourceUrl: r.source_url ?? undefined,
+          score: 0,
+        };
+      });
 
-        // スコア計算
-        const score = calculateEnhancedScore(page, keywords, matchType);
-
-        // スマートスニペット生成
-        const matchedText = extractSmartSnippet(content, keywords);
-        const highlightedText = highlightKeywords(matchedText, keywords);
-
-        return { page, matchedText, highlightedText, matchType, score };
-      })
+    return [...personal, ...shared]
       .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
-  }, [serverSearchResults, debouncedQuery]);
+      .slice(0, 10)
+      .map(({ score: _s, ...item }) => item);
+  }, [serverSearchResults, sharedResults, debouncedQuery, keywords]);
 
   // OPTIMIZED: Recent pages from summary (no content, much less data)
   const recentPages = useMemo((): PageSummary[] => {

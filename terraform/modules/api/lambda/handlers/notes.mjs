@@ -11,7 +11,11 @@ SELECT id, email FROM users WHERE cognito_sub = :cognito_sub
 `;
 
 const LIST_NOTES_SQL = `
-SELECT DISTINCT n.id, n.owner_id, n.title, n.visibility, n.created_at, n.updated_at, n.is_deleted
+SELECT DISTINCT
+  n.id, n.owner_id, n.title, n.visibility, n.created_at, n.updated_at, n.is_deleted,
+  CASE WHEN n.owner_id = :owner_id THEN 'owner' ELSE COALESCE(nm.role, 'viewer') END AS member_role,
+  (SELECT COUNT(*)::int FROM note_pages np WHERE np.note_id = n.id AND np.is_deleted = FALSE) AS page_count,
+  (SELECT COUNT(*)::int FROM note_members nm2 WHERE nm2.note_id = n.id AND nm2.is_deleted = FALSE) AS member_count
 FROM notes n
 LEFT JOIN note_members nm ON nm.note_id = n.id AND nm.member_email = :user_email AND nm.is_deleted = FALSE
 WHERE n.is_deleted = FALSE AND (n.owner_id = :owner_id OR nm.note_id IS NOT NULL)
@@ -97,6 +101,13 @@ FROM note_members WHERE note_id = :note_id AND is_deleted = FALSE
 ORDER BY created_at ASC
 `;
 
+const GET_CURRENT_USER_ROLE_SQL = `
+SELECT CASE WHEN n.owner_id = :owner_id THEN 'owner' ELSE nm.role END AS role
+FROM notes n
+LEFT JOIN note_members nm ON nm.note_id = n.id AND nm.member_email = :user_email AND nm.is_deleted = FALSE
+WHERE n.id = :note_id AND n.is_deleted = FALSE AND (n.owner_id = :owner_id OR nm.note_id IS NOT NULL)
+`;
+
 const INSERT_NOTE_MEMBER_SQL = `
 INSERT INTO note_members (note_id, member_email, role, invited_by_user_id)
 VALUES (:note_id, :member_email, COALESCE(:role, 'viewer'), :invited_by_user_id)
@@ -108,6 +119,12 @@ const REMOVE_NOTE_MEMBER_SQL = `
 UPDATE note_members SET is_deleted = TRUE, updated_at = NOW()
 WHERE note_id = :note_id AND member_email = :member_email
 RETURNING note_id, member_email
+`;
+
+const UPDATE_NOTE_MEMBER_ROLE_SQL = `
+UPDATE note_members SET role = COALESCE(:role, role), updated_at = NOW()
+WHERE note_id = :note_id AND member_email = :member_email AND is_deleted = FALSE
+RETURNING note_id, member_email, role, invited_by_user_id, created_at, updated_at
 `;
 
 /**
@@ -197,8 +214,17 @@ function rowToMember(row) {
   };
 }
 
+function rowToNoteListItem(row) {
+  return {
+    ...rowToNote(row),
+    role: row.member_role === "owner" ? "owner" : row.member_role === "editor" ? "editor" : "viewer",
+    page_count: Number(row.page_count ?? 0),
+    member_count: Number(row.member_count ?? 0),
+  };
+}
+
 /**
- * GET /api/notes — 自分がアクセス可能なノート一覧
+ * GET /api/notes — 自分がアクセス可能なノート一覧（C3-9: role, page_count, member_count 含む）
  */
 export async function listNotes(claims) {
   const user = await getCurrentUser(claims);
@@ -208,11 +234,11 @@ export async function listNotes(claims) {
     owner_id: user.ownerId,
     user_email: user.email,
   });
-  return res.success(rows.map(rowToNote));
+  return res.success(rows.map(rowToNoteListItem));
 }
 
 /**
- * GET /api/notes/:id — ノート詳細 + ページ一覧
+ * GET /api/notes/:id — ノート詳細 + ページ一覧 + current_user_role（C3-9）
  */
 export async function getNote(claims, noteId) {
   const user = await getCurrentUser(claims);
@@ -227,8 +253,16 @@ export async function getNote(claims, noteId) {
   if (!note) return res.notFound("Note not found");
 
   const pageRows = await execute(GET_NOTE_PAGES_SQL, { note_id: noteId });
+  const roleRows = await execute(GET_CURRENT_USER_ROLE_SQL, {
+    note_id: noteId,
+    owner_id: user.ownerId,
+    user_email: user.email,
+  });
+  const current_user_role = roleRows[0]?.role ?? "viewer";
+
   return res.success({
     ...rowToNote(note),
+    current_user_role,
     pages: pageRows.map(rowToPage),
   });
 }
@@ -423,4 +457,26 @@ export async function removeNoteMember(claims, noteId, memberEmail) {
   const rows = await execute(REMOVE_NOTE_MEMBER_SQL, { note_id: noteId, member_email: email });
   if (rows.length === 0) return res.notFound("Member not found");
   return res.success({ note_id: noteId, member_email: email, removed: true });
+}
+
+/**
+ * PUT /api/notes/:id/members/:email — メンバーロール更新（オーナーのみ）。C3-9
+ */
+export async function updateNoteMember(claims, noteId, memberEmail, body = {}) {
+  const user = await getCurrentUser(claims);
+  if (!user) return res.unauthorized("User not found");
+  if (!noteId || !memberEmail) return res.badRequest("Note id and member email are required");
+
+  const isOwner = await isNoteOwner(noteId, user.ownerId);
+  if (!isOwner) return res.forbidden("Only the note owner can update member roles");
+
+  const role = body?.role === "editor" ? "editor" : "viewer";
+  const email = decodeURIComponent(String(memberEmail).trim()).toLowerCase();
+  const rows = await execute(UPDATE_NOTE_MEMBER_ROLE_SQL, {
+    note_id: noteId,
+    member_email: email,
+    role,
+  });
+  if (rows.length === 0) return res.notFound("Member not found");
+  return res.success(rowToMember(rows[0]));
 }

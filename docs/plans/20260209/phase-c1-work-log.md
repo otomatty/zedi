@@ -198,7 +198,7 @@
 
 ### 5.2 Phase C2: データ移行
 
-- C2-1 Turso エクスポート → C2-2 ID 変換・users 生成 → C2-3 Tiptap JSON → Y.Doc → C2-4 content_text → C2-5 Aurora インポート 等（タスク細分化 §2 参照）
+- Phase C2 の作業内容（C2-1〜C2-5）は [phase-c2-work-log.md](phase-c2-work-log.md) を参照。
 
 ### 5.3 Phase C3: クライアント移行（Web）
 
@@ -215,6 +215,7 @@
 | ドキュメント | 用途 |
 |-------------|------|
 | [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md) | タスク細分化・Phase C/D/E 一覧・推奨実施順序 |
+| [phase-c2-work-log.md](phase-c2-work-log.md) | Phase C2 データ移行（Turso エクスポート〜Aurora インポート）作業ログ |
 | [zedi-rearchitecture-spec.md](../specs/zedi-rearchitecture-spec.md) | リアーキテクチャ仕様の正本（§13 API、§14 サーバー、§16 移行計画） |
 | [zedi-data-structure-spec.md](../specs/zedi-data-structure-spec.md) | DB スキーマ・エンティティ定義（users, pages, notes 等） |
 | [turso-to-aurora-migration-decisions.md](20260208/turso-to-aurora-migration-decisions.md) | Turso → Aurora 移行の決定事項 |
@@ -236,8 +237,15 @@
 | 0dfd45e | ノート API（notes CRUD, pages, members） | #21 [C1-6] |
 | 37c998f | 検索 API（GET /api/search?q=&scope=shared） | #22 [C1-7] |
 | 9abb48d | メディア API（Presigned URL, confirm）+ S3 バケット | #23 [C1-8] |
-| （未コミット） | C1-9: test-api.mjs, README デプロイ・テスト手順 | - |
+| a819173 | C1-9: test-api.mjs, README デプロイ・テスト手順 | - |
 
 ---
 
-**以上、Phase C1 の C1-1〜C1-9 までの作業ログとする。Phase C1 は完了。prod への API 再デプロイ（Lambda・S3 メディア・health 確認）まで実施済み。次は Phase C2（データ移行）または dev 環境の別 state/workspace でのデプロイ。**
+**以上、Phase C1 の C1-1〜C1-9 までの作業ログとする。Phase C1 は完了。prod への API 再デプロイ（Lambda・S3 メディア・health 確認）まで実施済み。C1-9 は a819173 でコミット済み。**
+
+---
+
+## 8. 作業再開時の確認（2026-02-09）
+
+- **実装状況:** 上記成果物一覧のファイルはすべて存在し、`terraform/modules/api/lambda` で `node test-api.mjs` を実行すると 7/7 テストが成功することを確認済み。
+- **Phase C2:** データ移行（C2-1〜C2-5）の作業内容・実行結果は [phase-c2-work-log.md](phase-c2-work-log.md) に記載。次は C2-6 / C2-7 / C2-8 または Phase C3（クライアント移行）。
