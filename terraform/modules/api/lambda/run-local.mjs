@@ -42,6 +42,17 @@ const events = [
       rawPath: "/api/notes",
     },
   },
+  {
+    name: "GET /api/search (scope missing -> 400)",
+    event: {
+      requestContext: {
+        http: { method: "GET" },
+        authorizer: { jwt: { claims: { sub: "test-sub" } } },
+      },
+      rawPath: "/api/search",
+      queryStringParameters: { q: "test" },
+    },
+  },
 ];
 
 async function main() {

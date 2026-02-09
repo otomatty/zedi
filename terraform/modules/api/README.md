@@ -32,6 +32,7 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 | `GET /api/notes/:id/members` | 必須 | メンバー一覧 |
 | `POST /api/notes/:id/members` | 必須 | メンバー招待（オーナーのみ）。body: `member_email`, `role?` |
 | `DELETE /api/notes/:id/members/:email` | 必須 | メンバー削除（オーナーのみ、論理削除） |
+| `GET /api/search?q=&scope=shared` | 必須 | 共有ノートの全文検索（自分がアクセス可能なノート内のページを title / content_text で LIKE 検索、pg_bigm） |
 | その他 `/api/*` | 必須 | 404 |
 
 ## デプロイ

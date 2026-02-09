@@ -15,7 +15,8 @@
 | **C1-3** | ユーザー API | 完了 | #18 | 91c14e3 |
 | **C1-4** | ページ・同期 API（メタデータ） | 完了 | - | 既存実装 |
 | **C1-5** | ページ・コンテンツ API | 完了 | #20 | 3b2c3d5 |
-| **C1-6** | ノート API | 完了 | - | 本作業 |
+| **C1-6** | ノート API | 完了 | #21 | 0dfd45e |
+| **C1-7** | 検索 API | 完了 | - | 本作業 |
 
 ---
 
@@ -95,7 +96,14 @@
     - **DELETE /api/notes/:id/members/:email** メンバー削除（オーナーのみ、論理削除）。
   - **ルーター:** 上記を `router.mjs` に `/api/notes` 配下で追加。`run-local.mjs` に GET /api/notes を追加。
 
-### 2.7 デプロイ（prod）
+### 2.7 C1-7: 検索 API
+
+- **成果物**
+  - **ハンドラー:** `terraform/modules/api/lambda/handlers/search.mjs`
+    - **GET /api/search?q=&scope=shared** 自分がアクセス可能なノート（owner または member）に含まれるページを、`pages.title` および `page_contents.content_text` で LIKE 検索。pg_bigm（GIN gin_bigm_ops）によりインデックスで高速化。q 空または scope≠shared は 400/空配列。LIKE の % _ \ はエスケープ。最大 100 件。
+  - **ルーター:** `GET /api/search` を `router.mjs` に追加。
+
+### 2.8 デプロイ（prod）
 
 - **環境:** prod（`terraform apply -var-file=environments/prod.tfvars -target=module.api`）
 - **対応した事象**
@@ -124,6 +132,7 @@
 | Lambda 同期 | `terraform/modules/api/lambda/handlers/syncPages.mjs` | GET/POST /api/sync/pages |
 | Lambda ページ | `terraform/modules/api/lambda/handlers/pages.mjs` | content GET/PUT, pages POST/DELETE |
 | Lambda ノート | `terraform/modules/api/lambda/handlers/notes.mjs` | notes CRUD, pages, members |
+| Lambda 検索 | `terraform/modules/api/lambda/handlers/search.mjs` | GET /api/search scope=shared |
 | Lambda ローカル確認 | `terraform/modules/api/lambda/run-local.mjs` | モックイベントでルーティング確認 |
 | API モジュール説明 | `terraform/modules/api/README.md` | ルート・デプロイ・環境変数 |
 
@@ -133,7 +142,7 @@
 
 - **prod API ベース URL:** `https://gf2b3exazg.execute-api.ap-northeast-1.amazonaws.com/`
 - **確認済み:** `GET /api/health` → 200
-- **利用可能エンドポイント（要 JWT）:** `GET /api/me`, `POST /api/users/upsert`, `GET /api/users/:id`, `GET/POST /api/sync/pages`, `GET/PUT /api/pages/:id/content`, `POST /api/pages`, `DELETE /api/pages/:id`, `GET/POST/PUT/DELETE /api/notes`, `GET/POST/DELETE /api/notes/:id/pages`, `GET/POST/DELETE /api/notes/:id/members`
+- **利用可能エンドポイント（要 JWT）:** 上記に加え `GET /api/search?q=&scope=shared`
 
 ---
 
@@ -143,7 +152,6 @@
 
 | # | タスク | 内容 | 依存 |
 |---|--------|------|------|
-| C1-7 | 検索 API | GET /api/search?q=&scope=shared（pg_bigm） | C1-1 |
 | C1-8 | メディア API | POST /api/media/upload（Presigned URL）、POST /api/media/confirm | C1-1, C1-2 |
 | C1-9 | API テスト・デプロイ | 統合テスト、dev デプロイ、環境変数・Secrets 整備 | C1-3〜C1-8 |
 
@@ -186,4 +194,4 @@
 
 ---
 
-**以上、Phase C1 の C1-1〜C1-6 までの作業ログとする。次は C1-7（検索 API）に進む。**
+**以上、Phase C1 の C1-1〜C1-7 までの作業ログとする。次は C1-8（メディア API）に進む。**
