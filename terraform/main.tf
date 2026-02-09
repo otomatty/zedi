@@ -144,6 +144,24 @@ module "cache" {
 }
 
 # =============================================================================
+# Module: REST API (Lambda + API Gateway HTTP API + Cognito JWT)
+# C1-2: REST API 基盤
+# =============================================================================
+module "api" {
+  source = "./modules/api"
+
+  environment = var.environment
+  tags        = local.common_tags
+
+  cognito_user_pool_id        = module.security.user_pool_id
+  cognito_user_pool_client_id = module.security.user_pool_client_id
+
+  db_credentials_secret_arn = module.database.db_credentials_secret_arn
+  aurora_cluster_arn       = module.database.cluster_arn
+  aurora_database_name     = var.aurora_database_name
+}
+
+# =============================================================================
 # Module: Realtime (ECS Fargate Spot, ALB, Hocuspocus)
 # =============================================================================
 module "realtime" {

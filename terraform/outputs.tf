@@ -129,6 +129,14 @@ output "acm_certificate_domain_validation_options" {
 }
 
 # =============================================================================
+# REST API (Lambda + API Gateway)
+# =============================================================================
+output "api_invoke_url" {
+  description = "REST API invoke URL (use as base for /api/*)"
+  value       = module.api.invoke_url
+}
+
+# =============================================================================
 # Security (Cognito, IAM)
 # =============================================================================
 output "cognito_user_pool_id" {
