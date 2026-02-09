@@ -30,8 +30,21 @@ export async function handler(event, context) {
     const method = event.requestContext?.http?.method ?? "GET";
     const rawPath = event.rawPath ?? event.path ?? "/api";
     const claims = event.requestContext?.authorizer?.jwt?.claims;
+    let body = null;
+    if (event.body) {
+      try {
+        body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
+      } catch (_) {
+        body = null;
+      }
+    }
+    const pathParameters = event.pathParameters ?? {};
 
-    const response = await route(rawPath, method, { claims });
+    const response = await route(rawPath, method, {
+      claims,
+      body,
+      pathParameters,
+    });
     return response;
   } catch (err) {
     console.error("Lambda error:", err);

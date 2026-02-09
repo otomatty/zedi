@@ -6,9 +6,16 @@
 import * as res from "./responses.mjs";
 
 /**
+ * @typedef {Object} ApiContext
+ * @property {Record<string, string>|undefined} claims
+ * @property {Record<string, unknown>|null} [body]
+ * @property {Record<string, string>} [pathParameters]
+ */
+
+/**
  * @param {string} rawPath - e.g. "/api" or "/api/users/123"
  * @param {string} method
- * @param {import("./index.mjs").ApiContext} ctx
+ * @param {ApiContext} ctx
  * @returns {Promise<{ statusCode: number; headers: Record<string, string>; body: string }>}
  */
 export async function route(rawPath, method, ctx) {
@@ -30,7 +37,7 @@ export async function route(rawPath, method, ctx) {
     return res.unauthorized("Missing or invalid token");
   }
 
-  // GET /api/me — 現在ユーザー情報（C1-3 で users と連携）
+  // GET /api/me — 現在ユーザー情報（claims のみ；DB の users は GET /api/users/:id で取得）
   if (method === "GET" && (path === "me" || segments[0] === "me")) {
     return res.success({
       sub: claims.sub,
@@ -38,7 +45,18 @@ export async function route(rawPath, method, ctx) {
     });
   }
 
-  // TODO C1-3: POST /api/users/upsert, GET /api/users/:id
+  // POST /api/users/upsert — Cognito sub/email から users を upsert
+  if (method === "POST" && segments[0] === "users" && segments[1] === "upsert") {
+    const { upsert: upsertUser } = await import("./handlers/users.mjs");
+    return upsertUser(claims, ctx.body);
+  }
+
+  // GET /api/users/:id
+  if (method === "GET" && segments[0] === "users" && segments[1]) {
+    const { getById } = await import("./handlers/users.mjs");
+    return getById(segments[1]);
+  }
+
   // TODO C1-4: GET/POST /api/sync/pages
   // TODO C1-5: /api/pages/*
   // TODO C1-6: /api/notes/*

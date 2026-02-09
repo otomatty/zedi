@@ -14,13 +14,15 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 |------|------|------|
 | `GET /api/health` | 不要 | ヘルスチェック |
 | `GET /api/me` | 必須 | 現在ユーザー（JWT claims の sub, email） |
-| その他 `/api/*` | 必須 | 404（C1-3 以降で実装） |
+| `POST /api/users/upsert` | 必須 | Cognito sub/email から users を upsert（body: display_name?, avatar_url?） |
+| `GET /api/users/:id` | 必須 | ユーザー情報取得 |
+| その他 `/api/*` | 必須 | 404 |
 
 ## デプロイ
 
-ルートで `terraform apply` を実行すると、`modules/api/lambda` が ZIP され Lambda にデプロイされます。Lambda のソースを変更した場合は `terraform apply` で再デプロイされます。
+ルートで `terraform apply` を実行すると、api モジュール内で **`npm ci` が自動実行**され（`package.json` / `package-lock.json` 変更時）、そのあと `lambda/` が ZIP されて Lambda にデプロイされます。手動で `npm install` する必要はありません。
 
 ## 環境変数（Lambda）
 
 - `ENVIRONMENT`: dev / prod
-- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: C1-3 以降で RDS Data API 用
+- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（users API で使用）
