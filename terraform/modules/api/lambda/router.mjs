@@ -10,6 +10,7 @@ import * as res from "./responses.mjs";
  * @property {Record<string, string>|undefined} claims
  * @property {Record<string, unknown>|null} [body]
  * @property {Record<string, string>} [pathParameters]
+ * @property {Record<string, string>} [queryStringParameters]
  */
 
 /**
@@ -57,7 +58,19 @@ export async function route(rawPath, method, ctx) {
     return getById(segments[1]);
   }
 
-  // TODO C1-4: GET/POST /api/sync/pages
+  // GET /api/sync/pages?since= — 差分取得（自分のページメタデータ + links + ghost_links）
+  if (method === "GET" && segments[0] === "sync" && segments[1] === "pages") {
+    const { getSyncPages } = await import("./handlers/syncPages.mjs");
+    const query = ctx.queryStringParameters ?? {};
+    return getSyncPages(claims, query);
+  }
+
+  // POST /api/sync/pages — ローカル変更の一括送信（LWW、conflicts 返却）
+  if (method === "POST" && segments[0] === "sync" && segments[1] === "pages") {
+    const { postSyncPages } = await import("./handlers/syncPages.mjs");
+    return postSyncPages(claims, ctx.body);
+  }
+
   // TODO C1-5: /api/pages/*
   // TODO C1-6: /api/notes/*
   // TODO C1-7: GET /api/search

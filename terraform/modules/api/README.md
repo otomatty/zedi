@@ -16,6 +16,8 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 | `GET /api/me` | 必須 | 現在ユーザー（JWT claims の sub, email） |
 | `POST /api/users/upsert` | 必須 | Cognito sub/email から users を upsert（body: display_name?, avatar_url?） |
 | `GET /api/users/:id` | 必須 | ユーザー情報取得 |
+| `GET /api/sync/pages?since=` | 必須 | 自分のページのメタデータ差分（pages, links, ghost_links）。`since` は ISO8601（省略時は全件） |
+| `POST /api/sync/pages` | 必須 | ローカル変更の一括送信（LWW）。body: `pages`, `links?`, `ghost_links?`。競合は `conflicts` で返却 |
 | その他 `/api/*` | 必須 | 404 |
 
 ## デプロイ
@@ -25,4 +27,4 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 ## 環境変数（Lambda）
 
 - `ENVIRONMENT`: dev / prod
-- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（users API で使用）
+- `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（users / sync/pages で使用）

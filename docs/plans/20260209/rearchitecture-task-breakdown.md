@@ -246,6 +246,7 @@
 |-------------|------|
 | docs/specs/zedi-rearchitecture-spec.md | リアーキテクチャ仕様の正本 |
 | docs/specs/zedi-data-structure-spec.md | DB スキーマ・データ構造 |
+| docs/plans/20260209/phase-c1-work-log.md | **C1-1〜C1-3 作業ログ**（実施内容・成果物・今後の作業・関連ドキュメント） |
 | docs/plans/20260208/turso-to-aurora-migration-decisions.md | 移行で確定している方針 |
 | docs/plans/20260208/phase-c-work-breakdown.md | Phase C の概要 |
 | src/lib/turso.ts | 現行ローカル・同期・Turso 直結 |
