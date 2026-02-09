@@ -18,6 +18,10 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 | `GET /api/users/:id` | 必須 | ユーザー情報取得 |
 | `GET /api/sync/pages?since=` | 必須 | 自分のページのメタデータ差分（pages, links, ghost_links）。`since` は ISO8601（省略時は全件） |
 | `POST /api/sync/pages` | 必須 | ローカル変更の一括送信（LWW）。body: `pages`, `links?`, `ghost_links?`。競合は `conflicts` で返却 |
+| `GET /api/pages/:id/content` | 必須 | Y.Doc 状態の取得（base64 + version）。自分のページのみ |
+| `PUT /api/pages/:id/content` | 必須 | Y.Doc 状態の保存。body: `ydoc_state` (base64), `content_text?`, `version?`（楽観的ロック） |
+| `POST /api/pages` | 必須 | ページ作成。body: `id?`, `title?`, `content_preview?`, `source_page_id?`, `thumbnail_url?`, `source_url?` |
+| `DELETE /api/pages/:id` | 必須 | ページ論理削除（is_deleted = true） |
 | その他 `/api/*` | 必須 | 404 |
 
 ## デプロイ

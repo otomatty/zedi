@@ -71,7 +71,30 @@ export async function route(rawPath, method, ctx) {
     return postSyncPages(claims, ctx.body);
   }
 
-  // TODO C1-5: /api/pages/*
+  // GET /api/pages/:id/content
+  if (method === "GET" && segments[0] === "pages" && segments[1] && segments[2] === "content") {
+    const { getPageContent } = await import("./handlers/pages.mjs");
+    return getPageContent(claims, segments[1]);
+  }
+
+  // PUT /api/pages/:id/content
+  if (method === "PUT" && segments[0] === "pages" && segments[1] && segments[2] === "content") {
+    const { putPageContent } = await import("./handlers/pages.mjs");
+    return putPageContent(claims, segments[1], ctx.body);
+  }
+
+  // POST /api/pages
+  if (method === "POST" && segments[0] === "pages" && !segments[1]) {
+    const { createPage } = await import("./handlers/pages.mjs");
+    return createPage(claims, ctx.body);
+  }
+
+  // DELETE /api/pages/:id
+  if (method === "DELETE" && segments[0] === "pages" && segments[1] && !segments[2]) {
+    const { deletePage } = await import("./handlers/pages.mjs");
+    return deletePage(claims, segments[1]);
+  }
+
   // TODO C1-6: /api/notes/*
   // TODO C1-7: GET /api/search
   // TODO C1-8: /api/media/*

@@ -13,6 +13,8 @@
 | **C1-1** | Aurora DDL 作成・適用 | 完了 | #16 | 37952d8 |
 | **C1-2** | REST API 基盤 | 完了 | #17 | 5c7b0d9 |
 | **C1-3** | ユーザー API | 完了 | #18 | 91c14e3 |
+| **C1-4** | ページ・同期 API（メタデータ） | 完了 | - | 既存実装 |
+| **C1-5** | ページ・コンテンツ API | 完了 | - | 本作業 |
 
 ---
 
@@ -55,7 +57,28 @@
   - **依存:** `@aws-sdk/client-rds-data` を lambda の package.json に追加
   - **デプロイ時:** `null_resource.lambda_npm` で apply 前に `npm ci` を実行し、ZIP に node_modules を含める（`terraform/modules/api/main.tf`）
 
-### 2.4 デプロイ（prod）
+### 2.4 C1-4: ページ・同期 API（メタデータ）
+
+- **既存実装**（作業ログ作成時点でコード上は完了済み）
+  - **ハンドラー:** `terraform/modules/api/lambda/handlers/syncPages.mjs`
+  - **GET /api/sync/pages?since=** 自分のページの差分（pages, links, ghost_links）。since 省略時は全件。
+  - **POST /api/sync/pages** ローカル変更の一括送信（LWW）。body: pages, links?, ghost_links?。競合は conflicts で返却。
+  - **ルーター:** `router.mjs` に上記パスを登録済み。
+
+### 2.5 C1-5: ページ・コンテンツ API
+
+- **成果物**
+  - **ハンドラー:** `terraform/modules/api/lambda/handlers/pages.mjs`
+    - **GET /api/pages/:id/content** 自分のページの page_contents から ydoc_state（base64）, version を返す。未保存なら 404。
+    - **PUT /api/pages/:id/content** body: ydoc_state (base64), content_text?, version?。version 指定時は楽観的ロック（不一致で 409）。
+    - **POST /api/pages** ページ作成。body: id?, title?, content_preview?, source_page_id?, thumbnail_url?, source_url?。id 省略時は DB で UUID 生成。
+    - **DELETE /api/pages/:id** 論理削除（is_deleted = true）。自分のページのみ。
+  - **ルーター:** GET/PUT /api/pages/:id/content, POST /api/pages, DELETE /api/pages/:id を `router.mjs` に追加。
+  - **BYTEA 扱い:** ydoc_state は SQL の `encode(ydoc_state, 'base64')` / `decode(:ydoc_state_b64, 'base64')` で文字列パラメータのみ使用（db.mjs 変更なし）。
+- **動作確認**
+  - `lambda/run-local.mjs` を追加。`node run-local.mjs` で GET /api/health, GET /api/me, GET /api/pages/:id/content のルーティングをローカル確認（DB 未設定時は pages は 500）。
+
+### 2.6 デプロイ（prod）
 
 - **環境:** prod（`terraform apply -var-file=environments/prod.tfvars -target=module.api`）
 - **対応した事象**
@@ -81,6 +104,9 @@
 | Lambda ルート | `terraform/modules/api/lambda/router.mjs` | パス・メソッドでディスパッチ |
 | Lambda DB | `terraform/modules/api/lambda/lib/db.mjs` | RDS Data API 実行 |
 | Lambda ユーザー | `terraform/modules/api/lambda/handlers/users.mjs` | upsert / getById |
+| Lambda 同期 | `terraform/modules/api/lambda/handlers/syncPages.mjs` | GET/POST /api/sync/pages |
+| Lambda ページ | `terraform/modules/api/lambda/handlers/pages.mjs` | content GET/PUT, pages POST/DELETE |
+| Lambda ローカル確認 | `terraform/modules/api/lambda/run-local.mjs` | モックイベントでルーティング確認 |
 | API モジュール説明 | `terraform/modules/api/README.md` | ルート・デプロイ・環境変数 |
 
 ---
@@ -89,7 +115,7 @@
 
 - **prod API ベース URL:** `https://gf2b3exazg.execute-api.ap-northeast-1.amazonaws.com/`
 - **確認済み:** `GET /api/health` → 200
-- **利用可能エンドポイント（要 JWT）:** `GET /api/me`, `POST /api/users/upsert`, `GET /api/users/:id`
+- **利用可能エンドポイント（要 JWT）:** `GET /api/me`, `POST /api/users/upsert`, `GET /api/users/:id`, `GET/POST /api/sync/pages`, `GET/PUT /api/pages/:id/content`, `POST /api/pages`, `DELETE /api/pages/:id`
 
 ---
 
@@ -99,8 +125,6 @@
 
 | # | タスク | 内容 | 依存 |
 |---|--------|------|------|
-| C1-4 | ページ・同期 API（メタデータ） | GET/POST /api/sync/pages（差分同期 LWW）、自分のページのみ | C1-1, C1-2 |
-| C1-5 | ページ・コンテンツ API | GET/PUT /api/pages/:id/content（ydoc_state, version）、POST /api/pages、DELETE /api/pages/:id | C1-1, C1-2 |
 | C1-6 | ノート API | GET/POST/PUT/DELETE /api/notes、/api/notes/:id/pages、/api/notes/:id/members。ノート内新規ページは owner_id = notes.owner_id | C1-1, C1-2 |
 | C1-7 | 検索 API | GET /api/search?q=&scope=shared（pg_bigm） | C1-1 |
 | C1-8 | メディア API | POST /api/media/upload（Presigned URL）、POST /api/media/confirm | C1-1, C1-2 |
@@ -145,4 +169,4 @@
 
 ---
 
-**以上、Phase C1 の C1-1〜C1-3 までの作業ログとする。次は C1-4（ページ・同期 API）以降に進む。**
+**以上、Phase C1 の C1-1〜C1-5 までの作業ログとする。次は C1-6（ノート API）に進む。**
