@@ -143,10 +143,11 @@ resource "aws_rds_cluster" "main" {
 
   db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.main.name
 
-  # Serverless v2 設定
+  # Serverless v2 設定（min_capacity=0 のときは seconds_until_auto_pause 必須でスケールゼロ＋自動ポーズ）
   serverlessv2_scaling_configuration {
-    min_capacity = var.min_capacity
-    max_capacity = var.max_capacity
+    min_capacity            = var.min_capacity
+    max_capacity            = var.max_capacity
+    seconds_until_auto_pause = var.seconds_until_auto_pause
   }
 
   # バックアップ設定

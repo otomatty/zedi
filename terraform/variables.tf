@@ -56,6 +56,12 @@ variable "aurora_max_capacity" {
   default     = 4
 }
 
+variable "aurora_seconds_until_auto_pause" {
+  description = "Seconds of inactivity before auto-pause when aurora_min_capacity=0 (300-86400). Set only for dev; leave null for prod."
+  type        = number
+  default     = null
+}
+
 variable "aurora_database_name" {
   description = "Database name"
   type        = string
