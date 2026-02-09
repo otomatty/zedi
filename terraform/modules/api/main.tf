@@ -93,6 +93,7 @@ resource "aws_lambda_function" "main" {
       AURORA_DATABASE_NAME   = var.aurora_database_name
       DB_CREDENTIALS_SECRET  = var.db_credentials_secret_arn
       AURORA_CLUSTER_ARN     = var.aurora_cluster_arn
+      MEDIA_BUCKET           = aws_s3_bucket.media.id
     }
   }
   tags = var.tags

@@ -150,7 +150,17 @@ export async function route(rawPath, method, ctx) {
     return searchShared(claims, query);
   }
 
-  // TODO C1-8: /api/media/*
+  // POST /api/media/upload — Presigned URL 発行
+  if (method === "POST" && segments[0] === "media" && segments[1] === "upload") {
+    const { upload: mediaUpload } = await import("./handlers/media.mjs");
+    return mediaUpload(claims, ctx.body);
+  }
+
+  // POST /api/media/confirm — アップロード完了確認（media テーブル登録）
+  if (method === "POST" && segments[0] === "media" && segments[1] === "confirm") {
+    const { confirm: mediaConfirm } = await import("./handlers/media.mjs");
+    return mediaConfirm(claims, ctx.body);
+  }
 
   return res.notFound("Not found");
 }
