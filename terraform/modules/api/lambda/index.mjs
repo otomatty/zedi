@@ -39,11 +39,13 @@ export async function handler(event, context) {
       }
     }
     const pathParameters = event.pathParameters ?? {};
+    const queryStringParameters = event.queryStringParameters ?? {};
 
     const response = await route(rawPath, method, {
       claims,
       body,
       pathParameters,
+      queryStringParameters,
     });
     return response;
   } catch (err) {
