@@ -32,6 +32,16 @@ const events = [
       rawPath: "/api/pages/00000000-0000-0000-0000-000000000001/content",
     },
   },
+  {
+    name: "GET /api/notes (needs DB)",
+    event: {
+      requestContext: {
+        http: { method: "GET" },
+        authorizer: { jwt: { claims: { sub: "test-sub" } } },
+      },
+      rawPath: "/api/notes",
+    },
+  },
 ];
 
 async function main() {

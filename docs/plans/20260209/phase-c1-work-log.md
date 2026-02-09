@@ -14,7 +14,8 @@
 | **C1-2** | REST API 基盤 | 完了 | #17 | 5c7b0d9 |
 | **C1-3** | ユーザー API | 完了 | #18 | 91c14e3 |
 | **C1-4** | ページ・同期 API（メタデータ） | 完了 | - | 既存実装 |
-| **C1-5** | ページ・コンテンツ API | 完了 | - | 本作業 |
+| **C1-5** | ページ・コンテンツ API | 完了 | #20 | 3b2c3d5 |
+| **C1-6** | ノート API | 完了 | - | 本作業 |
 
 ---
 
@@ -78,7 +79,23 @@
 - **動作確認**
   - `lambda/run-local.mjs` を追加。`node run-local.mjs` で GET /api/health, GET /api/me, GET /api/pages/:id/content のルーティングをローカル確認（DB 未設定時は pages は 500）。
 
-### 2.6 デプロイ（prod）
+### 2.6 C1-6: ノート API
+
+- **成果物**
+  - **ハンドラー:** `terraform/modules/api/lambda/handlers/notes.mjs`
+    - **GET /api/notes** 自分がアクセス可能なノート一覧（owner または note_members で member_email = 現在ユーザー）。
+    - **GET /api/notes/:id** ノート詳細 + ページ一覧（note_pages JOIN pages、is_deleted 除外）。
+    - **POST /api/notes** ノート作成。body: id?, title?, visibility?。
+    - **PUT /api/notes/:id** ノート更新（オーナーのみ）。body: title?, visibility?。
+    - **DELETE /api/notes/:id** 論理削除（オーナーのみ）。
+    - **POST /api/notes/:id/pages** 既存ページ追加 `{ pageId }` または新規ページ作成 `{ title }`（owner_id = notes.owner_id）。オーナーまたは editor メンバーのみ。
+    - **DELETE /api/notes/:id/pages/:pageId** ノートからページを削除（論理削除）。オーナーまたは editor のみ。
+    - **GET /api/notes/:id/members** メンバー一覧。アクセス可能なユーザーのみ。
+    - **POST /api/notes/:id/members** メンバー招待（オーナーのみ）。body: member_email, role? (viewer|editor)。
+    - **DELETE /api/notes/:id/members/:email** メンバー削除（オーナーのみ、論理削除）。
+  - **ルーター:** 上記を `router.mjs` に `/api/notes` 配下で追加。`run-local.mjs` に GET /api/notes を追加。
+
+### 2.7 デプロイ（prod）
 
 - **環境:** prod（`terraform apply -var-file=environments/prod.tfvars -target=module.api`）
 - **対応した事象**
@@ -106,6 +123,7 @@
 | Lambda ユーザー | `terraform/modules/api/lambda/handlers/users.mjs` | upsert / getById |
 | Lambda 同期 | `terraform/modules/api/lambda/handlers/syncPages.mjs` | GET/POST /api/sync/pages |
 | Lambda ページ | `terraform/modules/api/lambda/handlers/pages.mjs` | content GET/PUT, pages POST/DELETE |
+| Lambda ノート | `terraform/modules/api/lambda/handlers/notes.mjs` | notes CRUD, pages, members |
 | Lambda ローカル確認 | `terraform/modules/api/lambda/run-local.mjs` | モックイベントでルーティング確認 |
 | API モジュール説明 | `terraform/modules/api/README.md` | ルート・デプロイ・環境変数 |
 
@@ -115,7 +133,7 @@
 
 - **prod API ベース URL:** `https://gf2b3exazg.execute-api.ap-northeast-1.amazonaws.com/`
 - **確認済み:** `GET /api/health` → 200
-- **利用可能エンドポイント（要 JWT）:** `GET /api/me`, `POST /api/users/upsert`, `GET /api/users/:id`, `GET/POST /api/sync/pages`, `GET/PUT /api/pages/:id/content`, `POST /api/pages`, `DELETE /api/pages/:id`
+- **利用可能エンドポイント（要 JWT）:** `GET /api/me`, `POST /api/users/upsert`, `GET /api/users/:id`, `GET/POST /api/sync/pages`, `GET/PUT /api/pages/:id/content`, `POST /api/pages`, `DELETE /api/pages/:id`, `GET/POST/PUT/DELETE /api/notes`, `GET/POST/DELETE /api/notes/:id/pages`, `GET/POST/DELETE /api/notes/:id/members`
 
 ---
 
@@ -125,7 +143,6 @@
 
 | # | タスク | 内容 | 依存 |
 |---|--------|------|------|
-| C1-6 | ノート API | GET/POST/PUT/DELETE /api/notes、/api/notes/:id/pages、/api/notes/:id/members。ノート内新規ページは owner_id = notes.owner_id | C1-1, C1-2 |
 | C1-7 | 検索 API | GET /api/search?q=&scope=shared（pg_bigm） | C1-1 |
 | C1-8 | メディア API | POST /api/media/upload（Presigned URL）、POST /api/media/confirm | C1-1, C1-2 |
 | C1-9 | API テスト・デプロイ | 統合テスト、dev デプロイ、環境変数・Secrets 整備 | C1-3〜C1-8 |
@@ -169,4 +186,4 @@
 
 ---
 
-**以上、Phase C1 の C1-1〜C1-5 までの作業ログとする。次は C1-6（ノート API）に進む。**
+**以上、Phase C1 の C1-1〜C1-6 までの作業ログとする。次は C1-7（検索 API）に進む。**
