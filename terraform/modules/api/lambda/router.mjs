@@ -143,7 +143,13 @@ export async function route(rawPath, method, ctx) {
     }
   }
 
-  // TODO C1-7: GET /api/search
+  // GET /api/search?q=&scope=shared — 共有ノートの全文検索（pg_bigm）
+  if (method === "GET" && segments[0] === "search") {
+    const { searchShared } = await import("./handlers/search.mjs");
+    const query = ctx.queryStringParameters ?? {};
+    return searchShared(claims, query);
+  }
+
   // TODO C1-8: /api/media/*
 
   return res.notFound("Not found");
