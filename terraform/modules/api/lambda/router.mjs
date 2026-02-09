@@ -95,7 +95,54 @@ export async function route(rawPath, method, ctx) {
     return deletePage(claims, segments[1]);
   }
 
-  // TODO C1-6: /api/notes/*
+  // --- /api/notes (C1-6) ---
+  if (segments[0] === "notes") {
+    const noteId = segments[1];
+    const subResource = segments[2]; // "pages" | "members"
+    const subId = segments[3];
+
+    if (method === "GET" && !noteId) {
+      const { listNotes } = await import("./handlers/notes.mjs");
+      return listNotes(claims);
+    }
+    if (method === "GET" && noteId && !subResource) {
+      const { getNote } = await import("./handlers/notes.mjs");
+      return getNote(claims, noteId);
+    }
+    if (method === "POST" && !noteId) {
+      const { createNote } = await import("./handlers/notes.mjs");
+      return createNote(claims, ctx.body);
+    }
+    if (method === "PUT" && noteId && !subResource) {
+      const { updateNote } = await import("./handlers/notes.mjs");
+      return updateNote(claims, noteId, ctx.body);
+    }
+    if (method === "DELETE" && noteId && !subResource) {
+      const { deleteNote } = await import("./handlers/notes.mjs");
+      return deleteNote(claims, noteId);
+    }
+    if (method === "POST" && noteId && subResource === "pages") {
+      const { addNotePage } = await import("./handlers/notes.mjs");
+      return addNotePage(claims, noteId, ctx.body);
+    }
+    if (method === "DELETE" && noteId && subResource === "pages" && subId) {
+      const { removeNotePage } = await import("./handlers/notes.mjs");
+      return removeNotePage(claims, noteId, subId);
+    }
+    if (method === "GET" && noteId && subResource === "members") {
+      const { listNoteMembers } = await import("./handlers/notes.mjs");
+      return listNoteMembers(claims, noteId);
+    }
+    if (method === "POST" && noteId && subResource === "members") {
+      const { addNoteMember } = await import("./handlers/notes.mjs");
+      return addNoteMember(claims, noteId, ctx.body);
+    }
+    if (method === "DELETE" && noteId && subResource === "members" && subId) {
+      const { removeNoteMember } = await import("./handlers/notes.mjs");
+      return removeNoteMember(claims, noteId, subId);
+    }
+  }
+
   // TODO C1-7: GET /api/search
   // TODO C1-8: /api/media/*
 
