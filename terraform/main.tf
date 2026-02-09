@@ -122,10 +122,11 @@ module "database" {
   vpc_id             = module.networking.vpc_id
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.networking.private_subnet_ids
-  database_name      = var.aurora_database_name
-  min_capacity       = var.aurora_min_capacity
-  max_capacity       = var.aurora_max_capacity
-  tags               = local.common_tags
+  database_name             = var.aurora_database_name
+  min_capacity              = var.aurora_min_capacity
+  max_capacity              = var.aurora_max_capacity
+  seconds_until_auto_pause  = var.aurora_seconds_until_auto_pause
+  tags                      = local.common_tags
 }
 
 # =============================================================================

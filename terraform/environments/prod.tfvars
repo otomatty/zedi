@@ -9,10 +9,11 @@ vpc_cidr             = "10.0.0.0/16"
 availability_zones   = ["ap-northeast-1a", "ap-northeast-1c"]  # 2 AZs for redundancy
 enable_vpc_endpoints = true                                     # Replaces NAT Gateway
 
-# Database (Aurora Serverless v2)
-aurora_min_capacity  = 0.5   # Minimum ACU
-aurora_max_capacity  = 8     # Higher max for production spikes
-aurora_database_name = "zedi"
+# Database (Aurora Serverless v2) - 現時点はほぼ稼働していないため自動ポーズでコスト削減
+aurora_min_capacity             = 0     # 0 = scale to zero with auto-pause
+aurora_max_capacity              = 8     # 負荷時は最大 8 ACU までスケール
+aurora_seconds_until_auto_pause  = 600   # 10 分アイドルで自動ポーズ (300-86400)
+aurora_database_name             = "zedi"
 
 # Cache (ElastiCache Redis)
 redis_node_type       = "cache.t4g.micro"  # Graviton2

@@ -57,24 +57,35 @@ variable "instance_count" {
 # =============================================================================
 
 variable "min_capacity" {
-  description = "Minimum ACU for Aurora Serverless v2 (0.5 to 128)"
+  description = "Minimum ACU for Aurora Serverless v2 (0 = scale-to-zero with auto-pause, 0.5 to 128)"
   type        = number
   default     = 0.5
 
   validation {
-    condition     = var.min_capacity >= 0.5 && var.min_capacity <= 128
-    error_message = "min_capacity must be between 0.5 and 128."
+    condition     = var.min_capacity >= 0 && var.min_capacity <= 128
+    error_message = "min_capacity must be between 0 and 128."
   }
 }
 
 variable "max_capacity" {
-  description = "Maximum ACU for Aurora Serverless v2 (0.5 to 128)"
+  description = "Maximum ACU for Aurora Serverless v2 (0.5 to 128, or 0 when min_capacity=0)"
   type        = number
   default     = 4
 
   validation {
-    condition     = var.max_capacity >= 0.5 && var.max_capacity <= 128
-    error_message = "max_capacity must be between 0.5 and 128."
+    condition     = var.max_capacity >= 0 && var.max_capacity <= 128
+    error_message = "max_capacity must be between 0 and 128."
+  }
+}
+
+variable "seconds_until_auto_pause" {
+  description = "Seconds of inactivity before auto-pause when min_capacity=0 (300-86400). Set only for dev/test; leave null for prod."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.seconds_until_auto_pause == null || (var.seconds_until_auto_pause >= 300 && var.seconds_until_auto_pause <= 86400)
+    error_message = "seconds_until_auto_pause must be between 300 and 86400 when set."
   }
 }
 
