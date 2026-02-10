@@ -81,7 +81,7 @@ const PageEditor: React.FC = () => {
   });
 
   // C-Collab-2: 個人ページ(/page/:id)は常に local モードで動作させる。
-  // これにより Hocuspocus WebSocket には接続しない。
+  // これにより Hocuspocus WebSocket には接続せず、Y.Doc + y-indexeddb のみ。
   const isLocalDocEnabled = Boolean(currentPageId && !isNewPage && isSignedIn);
   const collaboration = useCollaboration({
     pageId: currentPageId ?? "",

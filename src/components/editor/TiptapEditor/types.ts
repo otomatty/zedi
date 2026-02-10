@@ -8,7 +8,8 @@ import type { Awareness } from "y-protocols/awareness";
 export interface CollaborationConfig {
   ydoc: Y.Doc;
   xmlFragment: Y.XmlFragment;
-  awareness: Awareness;
+  /** Awareness instance. Required for collaborative mode; undefined in local mode (no WebSocket). */
+  awareness?: Awareness;
   user: { name: string; color: string };
   updateCursor: (anchor: number, head: number) => void;
   updateSelection: (from: number, to: number) => void;

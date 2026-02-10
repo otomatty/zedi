@@ -245,9 +245,31 @@ export async function syncWithApi(
       return;
     }
 
-    const pagesForPush = await adapter.getAllPages();
+    // Delta sync: only push pages that were modified locally since last sync.
+    // Pages just pulled from server don't need to be pushed back.
+    const pulledPageIds = new Set(res.pages.map((r) => r.id));
+    const allLocalPages = await adapter.getAllPages();
+    const pagesForPush = lastSync
+      ? allLocalPages.filter(
+          (p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id)
+        )
+      : allLocalPages; // Initial sync with existing local data: push all
+
+    // If no local changes need pushing, skip the expensive POST requests.
+    if (pagesForPush.length === 0) {
+      const newSyncTime = res.server_time ? new Date(res.server_time).getTime() : Date.now();
+      await adapter.setLastSyncTime(newSyncTime);
+      consecutiveFailures = 0;
+      setSyncStatus("synced");
+      console.log(
+        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, no local changes to push`
+      );
+      return;
+    }
+
     const pushPages: PostSyncPageItem[] = pagesForPush.map(metadataToSyncPage);
 
+    // Collect links/ghost_links only for pages being pushed (not all pages).
     const allLinks: Array<{ sourceId: string; targetId: string; createdAt: number }> = [];
     const allGhostLinks: Array<GhostLink> = [];
     for (const p of pagesForPush) {
