@@ -38,6 +38,12 @@ export class ApiError extends Error {
   }
 }
 
+type ApiEnvelope<T> = {
+  ok: boolean;
+  data?: T;
+  error?: { message?: string; code?: string };
+};
+
 function getDefaultBaseUrl(): string {
   return (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
 }
@@ -66,19 +72,54 @@ async function request<T>(
   if (options.body !== undefined) {
     init.body = JSON.stringify(options.body);
   }
-  const res = await fetch(url.toString(), init);
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), init);
+  } catch (networkError) {
+    // Network-level failures (CORS blocked, DNS failure, offline, etc.)
+    throw new ApiError(
+      `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
+      0,
+      "NETWORK_ERROR"
+    );
+  }
   const text = await res.text();
   let data: unknown;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
-    throw new ApiError(res.statusText || `HTTP ${res.status}`, res.status);
+    // Response was not valid JSON — log a snippet for debugging
+    const snippet = text.length > 200 ? text.slice(0, 200) + "…" : text;
+    throw new ApiError(
+      `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
+      res.status,
+      "INVALID_JSON"
+    );
   }
   if (!res.ok) {
-    const msg = (data as { message?: string })?.message ?? res.statusText;
-    const code = (data as { code?: string })?.code;
+    const envelope = data as ApiEnvelope<unknown> | null;
+    const legacy = data as { message?: string; code?: string } | null;
+    const msg =
+      envelope?.error?.message ??
+      legacy?.message ??
+      res.statusText;
+    const code = envelope?.error?.code ?? legacy?.code;
     throw new ApiError(msg, res.status, code);
   }
+
+  // Server success responses are wrapped as { ok: true, data: ... }.
+  const envelope = data as ApiEnvelope<T> | null;
+  if (
+    envelope &&
+    typeof envelope === "object" &&
+    "ok" in envelope &&
+    envelope.ok === true &&
+    "data" in envelope
+  ) {
+    return envelope.data as T;
+  }
+
+  // Backward compatibility: if server returns raw payload, keep accepting it.
   return data as T;
 }
 
