@@ -14,7 +14,7 @@ const GET_PAGES_SQL = `
 SELECT id, owner_id, source_page_id, title, content_preview, thumbnail_url, source_url,
        created_at, updated_at, is_deleted
 FROM pages
-WHERE owner_id = :owner_id AND updated_at > :since
+WHERE owner_id = :owner_id AND updated_at > CAST(:since AS timestamptz)
 ORDER BY updated_at ASC
 `;
 
@@ -57,7 +57,7 @@ const UPDATE_PAGE_SQL = `
 UPDATE pages
 SET source_page_id = :source_page_id, title = :title, content_preview = :content_preview,
     thumbnail_url = :thumbnail_url, source_url = :source_url, is_deleted = :is_deleted, updated_at = NOW()
-WHERE id = :id AND owner_id = :owner_id AND updated_at <= :client_updated_at
+WHERE id = :id AND owner_id = :owner_id AND updated_at <= CAST(:client_updated_at AS timestamptz)
 RETURNING id
 `;
 

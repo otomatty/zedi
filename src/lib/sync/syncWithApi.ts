@@ -52,6 +52,11 @@ interface PostSyncPageItem {
 
 let syncInProgress = false;
 let hasCompletedFirstSync = false;
+/** Number of consecutive sync failures (reset on success). */
+let consecutiveFailures = 0;
+/** Maximum consecutive failures before giving up automatic retries. */
+const MAX_CONSECUTIVE_FAILURES = 3;
+const PAGE_PUSH_CHUNK_SIZE = 100;
 export type SyncStatus = "idle" | "syncing" | "synced" | "error";
 let syncStatus: SyncStatus = "idle";
 const syncStatusListeners = new Set<(status: SyncStatus) => void>();
@@ -80,10 +85,67 @@ export function isSyncInProgress(): boolean {
   return syncInProgress;
 }
 
+/** True when consecutive failures have exceeded the automatic retry limit. */
+export function isSyncDisabledByErrors(): boolean {
+  return consecutiveFailures >= MAX_CONSECUTIVE_FAILURES;
+}
+
+/** Reset failure counter (e.g. when user manually triggers sync). */
+export function resetSyncFailures(): void {
+  consecutiveFailures = 0;
+}
+
 export type SyncWithApiOptions = {
   /** When true and local has 0 pages, do a full pull (since=omit). */
   forceFullSyncWhenLocalEmpty?: boolean;
 };
+
+function normalizeSyncResponse(raw: unknown): {
+  pages: SyncPageItem[];
+  links: SyncLinkItem[];
+  ghost_links: SyncGhostLinkItem[];
+  server_time?: string;
+} {
+  let candidate: unknown = raw;
+
+  // Be robust to accidentally wrapped envelopes: { ok, data }.
+  for (let i = 0; i < 3; i++) {
+    if (
+      candidate &&
+      typeof candidate === "object" &&
+      "ok" in candidate &&
+      "data" in candidate
+    ) {
+      candidate = (candidate as { data: unknown }).data;
+      continue;
+    }
+    break;
+  }
+
+  const obj =
+    candidate && typeof candidate === "object"
+      ? (candidate as Record<string, unknown>)
+      : null;
+
+  const pages = obj?.pages;
+  const links = obj?.links;
+  const ghostLinks = obj?.ghost_links;
+  const serverTime = obj?.server_time;
+
+  if (!Array.isArray(pages) || !Array.isArray(links) || !Array.isArray(ghostLinks)) {
+    const keys = obj ? Object.keys(obj).join(", ") : "non-object";
+    throw new TypeError(
+      `[Sync/API] Invalid sync payload shape. Expected arrays: pages/links/ghost_links, got keys: ${keys}`
+    );
+  }
+
+  return {
+    pages: pages as SyncPageItem[],
+    links: links as SyncLinkItem[],
+    ghost_links: ghostLinks as SyncGhostLinkItem[],
+    server_time: typeof serverTime === "string" ? serverTime : undefined,
+  };
+}
 
 /**
  * Sync with backend using GET/POST /api/sync/pages.
@@ -95,10 +157,17 @@ export async function syncWithApi(
   adapter: StorageAdapter,
   api: ApiClient,
   userId: string,
-  options?: SyncWithApiOptions
+  options?: SyncWithApiOptions & { /** Skip the consecutive-failure guard (for manual sync). */ force?: boolean }
 ): Promise<void> {
   if (syncInProgress) {
     console.log("[Sync/API] Skipped: sync already in progress");
+    return;
+  }
+
+  if (!options?.force && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    console.warn(
+      `[Sync/API] Skipped: ${consecutiveFailures} consecutive failures. Use manual sync to retry.`
+    );
     return;
   }
 
@@ -123,7 +192,7 @@ export async function syncWithApi(
     );
 
     // --- PULL ---
-    const res = await api.getSyncPages(since);
+    const res = normalizeSyncResponse(await api.getSyncPages(since));
     for (const row of res.pages) {
       const meta = syncPageToMetadata(row);
       await adapter.upsertPage(meta);
@@ -162,6 +231,20 @@ export async function syncWithApi(
     }
 
     // --- PUSH ---
+    // If local was empty before initial full pull, pushing pulled server data
+    // back immediately is redundant and can take a very long time.
+    if (isInitialSync && localPageCount === 0) {
+      console.log("[Sync/API] Skip push: local was empty before initial full pull");
+      const newSyncTime = res.server_time ? new Date(res.server_time).getTime() : Date.now();
+      await adapter.setLastSyncTime(newSyncTime);
+      consecutiveFailures = 0; // Reset on success
+      setSyncStatus("synced");
+      console.log(
+        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, pushed 0 pages`
+      );
+      return;
+    }
+
     const pagesForPush = await adapter.getAllPages();
     const pushPages: PostSyncPageItem[] = pagesForPush.map(metadataToSyncPage);
 
@@ -187,21 +270,43 @@ export async function syncWithApi(
       original_note_id: g.originalNoteId ?? null,
     }));
 
-    await api.postSyncPages({
-      pages: pushPages,
-      links: pushLinks,
-      ghost_links: pushGhostLinks,
-    });
+    // POST /api/sync/pages can time out with large page counts (Lambda 30s).
+    // Send pages in chunks, then send links/ghost_links once.
+    if (pushPages.length > PAGE_PUSH_CHUNK_SIZE) {
+      console.log(
+        `[Sync/API] Pushing ${pushPages.length} pages in chunks of ${PAGE_PUSH_CHUNK_SIZE}`
+      );
+      for (let i = 0; i < pushPages.length; i += PAGE_PUSH_CHUNK_SIZE) {
+        const chunk = pushPages.slice(i, i + PAGE_PUSH_CHUNK_SIZE);
+        await api.postSyncPages({ pages: chunk });
+      }
+      await api.postSyncPages({
+        pages: [],
+        links: pushLinks,
+        ghost_links: pushGhostLinks,
+      });
+    } else {
+      await api.postSyncPages({
+        pages: pushPages,
+        links: pushLinks,
+        ghost_links: pushGhostLinks,
+      });
+    }
 
     const newSyncTime = res.server_time ? new Date(res.server_time).getTime() : Date.now();
     await adapter.setLastSyncTime(newSyncTime);
 
+    consecutiveFailures = 0; // Reset on success
     setSyncStatus("synced");
     console.log(
       `[Sync/API] Completed: pulled ${res.pages.length} pages, pushed ${pushPages.length} pages`
     );
   } catch (error) {
-    console.error("[Sync/API] Failed:", error);
+    consecutiveFailures++;
+    console.error(
+      `[Sync/API] Failed (attempt ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`,
+      error
+    );
     setSyncStatus("error");
     throw error;
   } finally {
@@ -218,7 +323,7 @@ export async function syncWithApi(
 export async function runAuroraSync(
   userId: string,
   getToken: () => Promise<string | null>,
-  options?: SyncWithApiOptions
+  options?: SyncWithApiOptions & { force?: boolean }
 ): Promise<void> {
   const { createStorageAdapter } = await import("@/lib/storageAdapter");
   const { createApiClient } = await import("@/lib/api");

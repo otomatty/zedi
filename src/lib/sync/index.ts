@@ -2,6 +2,8 @@ export {
   syncWithApi,
   runAuroraSync,
   isSyncInProgress,
+  isSyncDisabledByErrors,
+  resetSyncFailures,
   getSyncStatus,
   subscribeSyncStatus,
   hasNeverSynced,

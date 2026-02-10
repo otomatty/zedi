@@ -5,6 +5,7 @@ import {
   runAuroraSync,
   getSyncStatus,
   subscribeSyncStatus,
+  resetSyncFailures,
   type SyncStatus,
 } from "@/lib/sync";
 import { createStorageAdapter } from "@/lib/storageAdapter";
@@ -69,7 +70,9 @@ export function useSync() {
     setIsSyncing(true);
     try {
       console.log("[Sync] Manual sync requested", { userId });
-      await runAuroraSync(userId, getToken);
+      // Manual sync: reset failure counter and force past the auto-retry guard
+      resetSyncFailures();
+      await runAuroraSync(userId, getToken, { force: true });
       queryClient.invalidateQueries({ queryKey: pageKeys.all });
     } catch (error) {
       console.error("Sync failed:", error);
@@ -98,6 +101,7 @@ export function useRepository() {
 
   // Create adapter + api and initialize adapter for current user
   useEffect(() => {
+    setIsAdapterReady(false);
     const adapter = createStorageAdapter();
     const api = createApiClient({ getToken });
     adapterRef.current = adapter;
@@ -110,7 +114,12 @@ export function useRepository() {
         setIsAdapterReady(true);
       });
     return () => {
-      adapter.close();
+      // NOTE:
+      // IndexedDBStorageAdapter currently keeps its DB handle at module scope.
+      // Closing it from each hook instance cleanup can tear down active sync
+      // running in another instance (e.g. StrictMode double-mount), causing:
+      // "IndexedDBStorageAdapter: not initialized".
+      // Keep the adapter alive and let initialize(userId) handle user switches.
       adapterRef.current = null;
       apiRef.current = null;
     };
@@ -123,7 +132,9 @@ export function useRepository() {
     }
   }, [isSignedIn]);
 
-  // Initial sync for authenticated users (once per userId per session)
+  // Initial sync for authenticated users (once per userId per session).
+  // On failure the guard is NOT removed — this prevents infinite retry loops.
+  // The user can manually retry via the SyncIndicator button.
   useEffect(() => {
     if (!isSignedIn || !userId || !isAdapterReady) return;
     if (initialSyncRequestedForUser.has(userId)) return;
@@ -135,7 +146,10 @@ export function useRepository() {
         await runAuroraSync(userId, getToken);
       } catch (error) {
         console.error("Initial sync failed:", error);
-        initialSyncRequestedForUser.delete(userId);
+        // NOTE: Do NOT delete from initialSyncRequestedForUser here.
+        // Removing the guard on failure previously caused infinite retry loops
+        // when the API was unreachable (CORS, network error, invalid JSON, etc.).
+        // Manual retry via useSync() or page reload will re-attempt.
       }
     })();
   }, [isSignedIn, userId, isAdapterReady, getToken]);
