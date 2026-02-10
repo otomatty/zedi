@@ -15,7 +15,8 @@ import { tmpdir } from "os";
 import { execSync } from "child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SCHEMA_PATH = join(__dirname, "001_schema.sql");
+const SCHEMA_FILE = process.env.SCHEMA_FILE || "001_schema.sql";
+const SCHEMA_PATH = join(__dirname, SCHEMA_FILE);
 
 const REGION = process.env.AWS_REGION || "ap-northeast-1";
 const CLUSTER_ARN =

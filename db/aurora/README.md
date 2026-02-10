@@ -37,6 +37,15 @@ node apply-data-api.mjs
 
 初回で 29 件の DDL が実行され、9 テーブル（users, pages, page_contents, notes, note_pages, note_members, links, ghost_links, media）が作成されます。他環境の場合は `CLUSTER_ARN` と `SECRET_ARN` を環境変数で指定してください。
 
+**AI プラットフォーム用マイグレーション（002）:**
+
+```bash
+# 002 を適用（subscriptions, ai_models, ai_usage_logs, ai_monthly_usage, ai_tier_budgets）
+SCHEMA_FILE=002_ai_platform.sql node apply-data-api.mjs
+```
+
+Aurora が auto-pause から復帰直後だと最初の文が失敗することがあります。その場合は `002_ai_platform_subscriptions_only.sql` で subscriptions のみ再適用し、`002_seed_ai_models.sql` で ai_models のシードを投入してください。
+
 ### 方法 B: psql（VPC 内などネットワーク接続がある場合）
 
 #### 1. 接続情報の取得

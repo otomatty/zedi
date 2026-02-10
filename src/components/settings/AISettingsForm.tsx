@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Eye,
@@ -8,6 +8,9 @@ import {
   XCircle,
   ExternalLink,
   Trash2,
+  Key,
+  Server,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,10 +42,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { ProviderSelector } from "./ProviderSelector";
 import { useAISettings } from "@/hooks/useAISettings";
-import { getProviderById } from "@/types/ai";
+import { getProviderById, type AIModel } from "@/types/ai";
 import { useToast } from "@/hooks/use-toast";
+import { fetchServerModels } from "@/lib/aiService";
 
 export const AISettingsForm: React.FC = () => {
   const {
@@ -61,7 +67,38 @@ export const AISettingsForm: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showApiKey, setShowApiKey] = useState(false);
+  const [useOwnKey, setUseOwnKey] = useState(false);
+  const [serverModels, setServerModels] = useState<AIModel[]>([]);
+  const [serverModelsLoading, setServerModelsLoading] = useState(false);
   const { toast } = useToast();
+
+  const isServerMode = settings.apiMode === "api_server" && !useOwnKey;
+
+  // Load server models when in server mode
+  const loadServerModels = useCallback(async () => {
+    setServerModelsLoading(true);
+    try {
+      const { models } = await fetchServerModels();
+      setServerModels(models);
+    } catch {
+      // Failed to load ? will show empty list
+    } finally {
+      setServerModelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isServerMode) {
+      loadServerModels();
+    }
+  }, [isServerMode, loadServerModels]);
+
+  // Initialize useOwnKey state from current settings
+  useEffect(() => {
+    if (!isLoading) {
+      setUseOwnKey(settings.apiMode === "user_api_key");
+    }
+  }, [isLoading, settings.apiMode]);
 
   const currentProvider = getProviderById(settings.provider);
 
@@ -72,12 +109,30 @@ export const AISettingsForm: React.FC = () => {
     return returnTo;
   };
 
+  const handleToggleOwnKey = (checked: boolean) => {
+    setUseOwnKey(checked);
+    updateSettings({
+      apiMode: checked ? "user_api_key" : "api_server",
+    });
+  };
+
+  const handleServerModelSelect = (modelId: string) => {
+    const model = serverModels.find((m) => m.id === modelId);
+    if (model) {
+      updateSettings({
+        provider: model.provider,
+        model: model.modelId,
+        modelId: model.id,
+      });
+    }
+  };
+
   const handleSave = async () => {
     const success = await save();
     if (success) {
       toast({
-        title: "保存しました",
-        description: "AI設定が正常に保存されました",
+        title: "??????",
+        description: "AI?????????????",
       });
       const returnTo = getSafeReturnTo();
       if (returnTo) {
@@ -85,8 +140,8 @@ export const AISettingsForm: React.FC = () => {
       }
     } else {
       toast({
-        title: "エラー",
-        description: "AI設定の保存に失敗しました",
+        title: "???",
+        description: "AI????????????",
         variant: "destructive",
       });
     }
@@ -95,13 +150,10 @@ export const AISettingsForm: React.FC = () => {
   const handleTest = async () => {
     const result = await test();
     if (result.success) {
-      toast({
-        title: "接続成功",
-        description: result.message,
-      });
+      toast({ title: "????", description: result.message });
     } else {
       toast({
-        title: "接続失敗",
+        title: "????",
         description: result.message,
         variant: "destructive",
       });
@@ -110,10 +162,8 @@ export const AISettingsForm: React.FC = () => {
 
   const handleReset = () => {
     reset();
-    toast({
-      title: "リセットしました",
-      description: "AI設定が初期化されました",
-    });
+    setUseOwnKey(false);
+    toast({ title: "????????", description: "AI??????????" });
   };
 
   if (isLoading) {
@@ -126,129 +176,225 @@ export const AISettingsForm: React.FC = () => {
     );
   }
 
+  const availableServerModels = serverModels.filter((m) => m.available);
+  const lockedServerModels = serverModels.filter((m) => !m.available);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">��� AI 設定</CardTitle>
+        <CardTitle className="flex items-center gap-2">AI ??</CardTitle>
         <CardDescription>
-          LLMプロバイダーを設定して、AI機能を有効化します
+          AI????????????????????Zedi?AI??????????
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Provider Selection */}
-        <ProviderSelector
-          value={settings.provider}
-          onChange={(provider) => updateSettings({ provider })}
-          disabled={isSaving || isTesting}
-        />
+        {/* ========== Server Mode (Default) ========== */}
+        {isServerMode && (
+          <>
+            {/* Server Model Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Server className="h-4 w-4 text-primary" />
+                <Label>AI???</Label>
+              </div>
 
-        {/* API Key Input */}
-        <div className="space-y-2">
-          <Label htmlFor="apiKey">API キー</Label>
-          <div className="relative">
-            <Input
-              id="apiKey"
-              type={showApiKey ? "text" : "password"}
-              value={settings.apiKey}
-              onChange={(e) => updateSettings({ apiKey: e.target.value })}
-              placeholder={currentProvider?.placeholder}
-              disabled={isSaving || isTesting}
-              className="pr-10"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-              onClick={() => setShowApiKey(!showApiKey)}
-            >
-              {showApiKey ? (
-                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              {serverModelsLoading ? (
+                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  ???????????...
+                </div>
               ) : (
-                <Eye className="h-4 w-4 text-muted-foreground" />
+                <Select
+                  value={settings.modelId || `${settings.provider}:${settings.model}`}
+                  onValueChange={handleServerModelSelect}
+                  disabled={isSaving}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="??????" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableServerModels.length > 0 && (
+                      <>
+                        {availableServerModels.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{model.displayName}</span>
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                                {model.provider}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {lockedServerModels.length > 0 && (
+                      <>
+                        {lockedServerModels.map((model) => (
+                          <SelectItem
+                            key={model.id}
+                            value={model.id}
+                            disabled
+                          >
+                            <div className="flex items-center gap-2">
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">
+                                {model.displayName}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                ??
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
               )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Model Selection */}
-        <div className="space-y-2">
-          <Label htmlFor="model">モデル</Label>
-          <Select
-            value={settings.model}
-            onValueChange={(model) => updateSettings({ model })}
-            disabled={isSaving || isTesting}
-          >
-            <SelectTrigger id="model">
-              <SelectValue placeholder="モデルを選択" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableModels.map((model) => (
-                <SelectItem key={model} value={model}>
-                  {model}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            ��� 接続テスト成功後、最新のモデル一覧が反映されます
-          </p>
-        </div>
-
-        {/* Test Result */}
-        {testResult && (
-          <Alert variant={testResult.success ? "default" : "destructive"}>
-            {testResult.success ? (
-              <CheckCircle2 className="h-4 w-4" />
-            ) : (
-              <XCircle className="h-4 w-4" />
-            )}
-            <AlertTitle>
-              {testResult.success ? "接続成功" : "接続失敗"}
-            </AlertTitle>
-            <AlertDescription className="whitespace-pre-wrap">
-              {testResult.message}
-            </AlertDescription>
-          </Alert>
+              <p className="text-xs text-muted-foreground">
+                Zedi AI????????????????????????????????????
+              </p>
+            </div>
+          </>
         )}
 
-        {/* API Key Help */}
-        <div className="rounded-lg border border-border bg-muted/50 p-4">
-          <h4 className="text-sm font-medium mb-2">��� APIキーの取得方法</h4>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                Google AI Studio <ExternalLink className="h-3 w-3" />
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                OpenAI <ExternalLink className="h-3 w-3" />
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://console.anthropic.com/settings/keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                Anthropic <ExternalLink className="h-3 w-3" />
-              </a>
-            </li>
-          </ul>
+        {/* ========== User API Key Mode Toggle ========== */}
+        <div className="flex items-center justify-between rounded-lg border p-4">
+          <div className="flex items-center gap-3">
+            <Key className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">???API???????</p>
+              <p className="text-xs text-muted-foreground">
+                ???API??????????????????????
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={useOwnKey}
+            onCheckedChange={handleToggleOwnKey}
+            disabled={isSaving || isTesting}
+          />
         </div>
+
+        {/* ========== User API Key Mode ========== */}
+        {useOwnKey && (
+          <>
+            {/* Provider Selection */}
+            <ProviderSelector
+              value={settings.provider}
+              onChange={(provider) => updateSettings({ provider })}
+              disabled={isSaving || isTesting}
+            />
+
+            {/* API Key Input */}
+            <div className="space-y-2">
+              <Label htmlFor="apiKey">API ??</Label>
+              <div className="relative">
+                <Input
+                  id="apiKey"
+                  type={showApiKey ? "text" : "password"}
+                  value={settings.apiKey}
+                  onChange={(e) => updateSettings({ apiKey: e.target.value })}
+                  placeholder={currentProvider?.placeholder}
+                  disabled={isSaving || isTesting}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Model Selection (user key mode) */}
+            <div className="space-y-2">
+              <Label htmlFor="model">???</Label>
+              <Select
+                value={settings.model}
+                onValueChange={(model) => updateSettings({ model })}
+                disabled={isSaving || isTesting}
+              >
+                <SelectTrigger id="model">
+                  <SelectValue placeholder="??????" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModels.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                ????????????????????????
+              </p>
+            </div>
+
+            {/* Test Result */}
+            {testResult && (
+              <Alert variant={testResult.success ? "default" : "destructive"}>
+                {testResult.success ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <XCircle className="h-4 w-4" />
+                )}
+                <AlertTitle>
+                  {testResult.success ? "????" : "????"}
+                </AlertTitle>
+                <AlertDescription className="whitespace-pre-wrap">
+                  {testResult.message}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* API Key Help */}
+            <div className="rounded-lg border border-border bg-muted/50 p-4">
+              <h4 className="text-sm font-medium mb-2">API???????</h4>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Google AI Studio <ExternalLink className="h-3 w-3" />
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://platform.openai.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    OpenAI <ExternalLink className="h-3 w-3" />
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Anthropic <ExternalLink className="h-3 w-3" />
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </>
+        )}
       </CardContent>
 
       <CardFooter className="flex justify-between">
@@ -260,37 +406,39 @@ export const AISettingsForm: React.FC = () => {
               disabled={isSaving || isTesting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              リセット
+              ????
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>設定をリセットしますか？</AlertDialogTitle>
+              <AlertDialogTitle>????????????</AlertDialogTitle>
               <AlertDialogDescription>
-                保存されているAPIキーとすべての設定が削除されます。この操作は取り消せません。
+                ???????API??????????????????????????????
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogCancel>?????</AlertDialogCancel>
               <AlertDialogAction onClick={handleReset}>
-                リセット
+                ????
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleTest}
-            disabled={isSaving || isTesting || !settings.apiKey}
-          >
-            {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            接続テスト
-          </Button>
+          {useOwnKey && (
+            <Button
+              variant="outline"
+              onClick={handleTest}
+              disabled={isSaving || isTesting || !settings.apiKey}
+            >
+              {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              ?????
+            </Button>
+          )}
           <Button onClick={handleSave} disabled={isSaving || isTesting}>
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            保存
+            ??
           </Button>
         </div>
       </CardFooter>

@@ -163,6 +163,24 @@ module "api" {
 }
 
 # =============================================================================
+# Module: AI API (Lambda Function URL + DynamoDB + Secrets Manager)
+# =============================================================================
+module "ai_api" {
+  source = "./modules/ai-api"
+
+  environment = var.environment
+  tags        = local.common_tags
+
+  cognito_user_pool_id = module.security.user_pool_id
+
+  db_credentials_secret_arn = module.database.db_credentials_secret_arn
+  aurora_cluster_arn        = module.database.cluster_arn
+  aurora_database_name      = var.aurora_database_name
+
+  cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
+}
+
+# =============================================================================
 # Module: Realtime (ECS Fargate Spot, ALB, Hocuspocus)
 # =============================================================================
 module "realtime" {
@@ -199,6 +217,22 @@ module "realtime" {
 
   # Monitoring
   enable_container_insights = var.enable_detailed_monitoring
+}
+
+# =============================================================================
+# Module: Subscription (LemonSqueezy Webhook)
+# =============================================================================
+module "subscription" {
+  source = "./modules/subscription"
+
+  environment = var.environment
+  tags        = local.common_tags
+
+  db_credentials_secret_arn = module.database.db_credentials_secret_arn
+  aurora_cluster_arn        = module.database.cluster_arn
+  aurora_database_name      = var.aurora_database_name
+
+  api_id = module.api.api_id
 }
 
 # =============================================================================

@@ -130,10 +130,25 @@ export interface WikiGeneratorCallbacks {
 
 /**
  * AI設定を取得し、設定されているか確認
+ * api_serverモードではシステムプロバイダーが利用可能なため常にOK
  */
 export async function getAISettingsOrThrow(): Promise<AISettings> {
   const settings = await loadAISettings();
-  if (!settings || !settings.isConfigured || !settings.apiKey) {
+
+  // 設定がない場合はデフォルト(api_server)を使用
+  if (!settings) {
+    const { DEFAULT_AI_SETTINGS } = await import("@/types/ai");
+    return { ...DEFAULT_AI_SETTINGS, isConfigured: true };
+  }
+
+  // api_serverモードならAPIキー不要
+  const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+  if (effectiveMode === "api_server") {
+    return { ...settings, isConfigured: true };
+  }
+
+  // user_api_keyモードではAPIキーが必要
+  if (!settings.isConfigured || !settings.apiKey) {
     throw new Error("AI_NOT_CONFIGURED");
   }
   return settings;
@@ -336,6 +351,8 @@ async function generateWithGoogle(
 
 /**
  * Wikiコンテンツをストリーミング生成
+ * api_serverモード: callAIService経由でサーバーに委譲
+ * user_api_keyモード: 直接SDKで呼び出し（既存動作）
  */
 export async function generateWikiContentStream(
   title: string,
@@ -344,7 +361,47 @@ export async function generateWikiContentStream(
 ): Promise<void> {
   try {
     const settings = await getAISettingsOrThrow();
+    const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
+    // api_serverモード: 統一されたcallAIService経由
+    if (effectiveMode === "api_server") {
+      const { callAIService } = await import("@/lib/aiService");
+      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
+
+      let fullContent = "";
+
+      await callAIService(
+        settings,
+        {
+          provider: settings.provider,
+          model: settings.model,
+          messages: [{ role: "user", content: prompt }],
+          options: {
+            maxTokens: 4000,
+            temperature: 0.7,
+            stream: true,
+            feature: "wiki_generation",
+          },
+        },
+        {
+          onChunk: (chunk) => {
+            fullContent += chunk;
+            callbacks.onChunk(chunk);
+          },
+          onComplete: () => {
+            const wikiLinks = extractWikiLinks(fullContent);
+            callbacks.onComplete({ content: fullContent, wikiLinks });
+          },
+          onError: (error) => {
+            callbacks.onError(error);
+          },
+        },
+        abortSignal
+      );
+      return;
+    }
+
+    // user_api_keyモード: 既存の直接SDK呼び出し
     switch (settings.provider) {
       case "openai":
         await generateWithOpenAI(settings, title, callbacks, abortSignal);
