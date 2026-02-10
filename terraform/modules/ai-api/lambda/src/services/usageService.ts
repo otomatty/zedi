@@ -97,7 +97,7 @@ async function getMonthlyUsage(
   const rows = await execute<MonthlyUsage>(
     `SELECT user_id, year_month, total_cost_units, request_count
      FROM ai_monthly_usage
-     WHERE user_id = :userId AND year_month = :yearMonth`,
+     WHERE user_id = CAST(:userId AS uuid) AND year_month = :yearMonth`,
     { userId, yearMonth },
     env
   );
@@ -171,7 +171,7 @@ export async function recordUsage(
   // Insert usage log
   await execute(
     `INSERT INTO ai_usage_logs (user_id, model_id, feature, input_tokens, output_tokens, cost_units, api_mode)
-     VALUES (:userId, :modelId, :feature, :inputTokens, :outputTokens, :costUnits, :apiMode)`,
+     VALUES (CAST(:userId AS uuid), :modelId, :feature, :inputTokens, :outputTokens, :costUnits, :apiMode)`,
     {
       userId: params.userId,
       modelId: params.modelId,
@@ -187,7 +187,7 @@ export async function recordUsage(
   // Upsert monthly aggregate
   await execute(
     `INSERT INTO ai_monthly_usage (user_id, year_month, total_cost_units, request_count, updated_at)
-     VALUES (:userId, :yearMonth, :costUnits, 1, NOW())
+     VALUES (CAST(:userId AS uuid), :yearMonth, :costUnits, 1, NOW())
      ON CONFLICT (user_id, year_month)
      DO UPDATE SET
        total_cost_units = ai_monthly_usage.total_cost_units + :costUnits,
@@ -221,7 +221,7 @@ export async function validateModelAccess(
   const subscription = await getSubscription(userId, env);
   const userTier = subscription?.plan ?? "free";
 
-  if (model.tier_required === "paid" && userTier !== "paid") {
+  if (model.tier_required === "pro" && userTier !== "pro") {
     throw new Error("MODEL_ACCESS_DENIED");
   }
 

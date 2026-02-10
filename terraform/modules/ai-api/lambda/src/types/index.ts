@@ -4,7 +4,7 @@
 
 export type AIProviderType = "openai" | "anthropic" | "google";
 export type AIMessageRole = "user" | "assistant" | "system";
-export type UserTier = "free" | "paid";
+export type UserTier = "free" | "pro";
 export type ApiMode = "system" | "user_key";
 
 export interface AIMessage {
@@ -63,6 +63,7 @@ export interface Subscription {
   status: "active" | "canceled" | "past_due" | "trialing";
   current_period_start: string | null;
   current_period_end: string | null;
+  billing_interval?: "monthly" | "yearly" | null;
 }
 
 export interface TierBudget {

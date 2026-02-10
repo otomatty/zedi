@@ -1,8 +1,13 @@
 # Zedi AI API Module - Outputs
 
-output "function_url" {
-  description = "Lambda Function URL for the AI API (streaming-enabled)"
-  value       = aws_lambda_function_url.ai_api.function_url
+output "websocket_url" {
+  description = "WebSocket API Gateway URL for streaming chat"
+  value       = "${aws_apigatewayv2_api.ws.api_endpoint}/${aws_apigatewayv2_stage.ws_default.name}"
+}
+
+output "websocket_api_id" {
+  description = "WebSocket API Gateway ID"
+  value       = aws_apigatewayv2_api.ws.id
 }
 
 output "lambda_function_name" {

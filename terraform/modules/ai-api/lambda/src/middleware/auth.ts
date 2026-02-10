@@ -41,6 +41,17 @@ export async function verifyToken(
     ? authHeader.slice(7)
     : authHeader;
 
+  return verifyTokenString(token, env);
+}
+
+/**
+ * Verify a raw JWT token string.
+ * Returns the Cognito `sub` claim (user ID).
+ */
+export async function verifyTokenString(
+  token: string,
+  env: EnvConfig
+): Promise<string> {
   if (!token) {
     throw new Error("UNAUTHORIZED");
   }

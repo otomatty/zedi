@@ -2,30 +2,98 @@
  * Subscription service — handles LemonSqueezy checkout and subscription state
  */
 
+export interface SubscriptionState {
+  plan: "free" | "pro";
+  status: string;
+  billingInterval: "monthly" | "yearly" | null;
+  currentPeriodEnd: string | null;
+  usage: {
+    consumedUnits: number;
+    budgetUnits: number;
+    usagePercent: number;
+  };
+}
+
+const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
+
 /**
- * Open a LemonSqueezy checkout for the AI Power subscription.
- * Passes the user's Cognito sub as custom_data so the webhook
- * can associate the subscription with the correct user.
+ * Fetch current subscription state from the AI API (requires auth).
  */
-export function openAISubscriptionCheckout(userId: string): void {
+export async function fetchSubscription(): Promise<SubscriptionState> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    return {
+      plan: "free",
+      status: "active",
+      billingInterval: null,
+      currentPeriodEnd: null,
+      usage: { consumedUnits: 0, budgetUnits: 1500, usagePercent: 0 },
+    };
+  }
+
+  const { getIdToken } = await import("@/lib/auth");
+  const token = await getIdToken();
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/subscription`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch subscription");
+  }
+
+  return (await response.json()) as SubscriptionState;
+}
+
+export type BillingInterval = "monthly" | "yearly";
+
+/**
+ * Open LemonSqueezy checkout for the Pro plan.
+ * Passes the user's Cognito sub and billing interval as custom_data for the webhook.
+ */
+export function openProCheckout(
+  userId: string,
+  billingInterval: BillingInterval
+): void {
   const storeId = import.meta.env.VITE_LEMONSQUEEZY_STORE_ID || "";
-  const productId = import.meta.env.VITE_LEMONSQUEEZY_AI_PRODUCT_ID || "";
+  const productId =
+    billingInterval === "yearly"
+      ? import.meta.env.VITE_LEMONSQUEEZY_AI_YEARLY_PRODUCT_ID
+      : import.meta.env.VITE_LEMONSQUEEZY_AI_MONTHLY_PRODUCT_ID ||
+        import.meta.env.VITE_LEMONSQUEEZY_AI_PRODUCT_ID ||
+        "";
 
   if (!storeId || !productId) {
     console.error("LemonSqueezy store/product IDs not configured");
     return;
   }
 
-  // Build LemonSqueezy checkout URL with custom data
   const checkoutUrl = new URL(
     `https://${storeId}.lemonsqueezy.com/buy/${productId}`
   );
-
-  // Pass user ID as custom data for webhook association
   checkoutUrl.searchParams.set("checkout[custom][user_id]", userId);
-
-  // Open in new tab
+  checkoutUrl.searchParams.set(
+    "checkout[custom][billing_interval]",
+    billingInterval
+  );
   window.open(checkoutUrl.toString(), "_blank");
+}
+
+/**
+ * @deprecated Use openProCheckout(userId, 'monthly') for new Pro plan.
+ * Open a LemonSqueezy checkout for the AI Power subscription.
+ * Passes the user's Cognito sub as custom_data so the webhook
+ * can associate the subscription with the correct user.
+ */
+export function openAISubscriptionCheckout(userId: string): void {
+  openProCheckout(userId, "monthly");
 }
 
 /**

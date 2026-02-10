@@ -138,9 +138,9 @@ variable "acm_certificate_arn" {
 # Security (Cognito)
 # =============================================================================
 variable "cognito_callback_urls" {
-  description = "List of allowed callback URLs for Cognito OAuth"
+  description = "List of allowed callback URLs for Cognito OAuth (must match app route, e.g. /auth/callback)"
   type        = list(string)
-  default     = ["http://localhost:30000/callback"]
+  default     = ["http://localhost:30000/auth/callback"]
 }
 
 variable "cognito_logout_urls" {

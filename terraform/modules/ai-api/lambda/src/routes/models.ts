@@ -33,7 +33,7 @@ export async function handleGetModels(
     modelId: m.model_id,
     displayName: m.display_name,
     tierRequired: m.tier_required,
-    available: m.tier_required === "free" || userTier === "paid",
+    available: m.tier_required === "free" || userTier === "pro",
   }));
 
   return { models: modelResponses, tier: userTier };

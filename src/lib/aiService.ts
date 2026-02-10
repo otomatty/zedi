@@ -4,9 +4,10 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { AISettings, AIProviderType, APIMode, AIResponseUsage } from "@/types/ai";
+import { AISettings, AIProviderType, APIMode, AIResponseUsage, UserTier } from "@/types/ai";
 
 const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
+const getAIWSUrl = () => import.meta.env.VITE_AI_WS_URL || "";
 
 export interface AIServiceRequest {
   provider: AIProviderType;
@@ -118,9 +119,150 @@ async function getAuthToken(): Promise<string | null> {
 }
 
 /**
- * APIサーバー経由で呼び出し
+ * APIサーバー経由で呼び出し（WebSocket API Gateway経由のストリーミング）
  */
 async function callAIWithServer(
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal
+): Promise<void> {
+  const wsUrl = getAIWSUrl();
+
+  // WebSocket URL が設定されている場合はWebSocket経由でストリーミング
+  if (wsUrl) {
+    return callAIWithServerWS(wsUrl, request, callbacks, abortSignal);
+  }
+
+  // フォールバック: HTTP API経由（非ストリーミング）
+  return callAIWithServerHTTP(request, callbacks, abortSignal);
+}
+
+/**
+ * WebSocket API Gateway経由のストリーミングチャット
+ */
+async function callAIWithServerWS(
+  wsUrl: string,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal
+): Promise<void> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    let fullContent = "";
+    let finishReason: string | undefined;
+    let lastUsage: AIResponseUsage | undefined;
+    let completed = false;
+
+    const complete = () => {
+      if (completed) return;
+      completed = true;
+      callbacks.onComplete?.({
+        content: fullContent,
+        finishReason,
+        usage: lastUsage,
+      });
+      resolve();
+    };
+
+    const fail = (err: Error) => {
+      if (completed) return;
+      completed = true;
+      callbacks.onError?.(err);
+      reject(err);
+    };
+
+    // Connect with token in query string for $connect auth
+    const url = `${wsUrl}?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(url);
+
+    if (abortSignal) {
+      const onAbort = () => {
+        ws.close();
+        fail(new Error("ABORTED"));
+      };
+      abortSignal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    ws.onopen = () => {
+      // Send chat request with token for userId extraction
+      ws.send(
+        JSON.stringify({
+          action: "chat",
+          token,
+          provider: request.provider,
+          model: request.model,
+          messages: request.messages,
+          options: { ...request.options, stream: true },
+        })
+      );
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string) as {
+          content?: string;
+          done?: boolean;
+          finishReason?: string;
+          error?: string;
+          usage?: AIResponseUsage;
+        };
+
+        if (data.error) {
+          fail(new Error(data.error));
+          ws.close();
+          return;
+        }
+
+        if (data.content) {
+          fullContent += data.content;
+          callbacks.onChunk?.(data.content);
+        }
+
+        if (data.usage) {
+          lastUsage = data.usage;
+          callbacks.onUsageUpdate?.(data.usage);
+        }
+
+        if (data.finishReason) {
+          finishReason = data.finishReason;
+        }
+
+        // Final done message with usage → complete
+        if (data.done && data.usage) {
+          complete();
+          ws.close();
+        }
+      } catch (err) {
+        fail(err instanceof Error ? err : new Error("Parse error"));
+        ws.close();
+      }
+    };
+
+    ws.onerror = () => {
+      fail(new Error("WebSocket接続エラー"));
+    };
+
+    ws.onclose = () => {
+      if (!completed) {
+        if (fullContent) {
+          // Connection closed after receiving content but before final done
+          complete();
+        } else {
+          fail(new Error("WebSocket接続が予期せず切断されました"));
+        }
+      }
+    };
+  });
+}
+
+/**
+ * HTTP API経由の呼び出し（フォールバック、非ストリーミング）
+ */
+async function callAIWithServerHTTP(
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
   abortSignal?: AbortSignal
@@ -549,7 +691,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
     throw new Error("Failed to fetch models");
   }
 
-  const data = (await response.json()) as { models: AIModel[]; tier: string };
+  const data = (await response.json()) as { models: AIModel[]; tier: UserTier };
 
   // Cache the result
   try {

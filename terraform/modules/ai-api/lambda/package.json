@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.750.0",
     "@aws-sdk/client-dynamodb": "^3.750.0",
     "@aws-sdk/client-rds-data": "^3.750.0",
     "@aws-sdk/client-secrets-manager": "^3.750.0",

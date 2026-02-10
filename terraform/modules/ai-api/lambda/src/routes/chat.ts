@@ -24,7 +24,6 @@ import {
   streamAnthropic,
   streamGoogle,
 } from "../services/aiProviders.js";
-import { writeSSE } from "../utils/sse.js";
 
 // =============================================================================
 // Validation
@@ -148,7 +147,8 @@ export async function handleChatStreaming(
   userId: string,
   body: unknown,
   env: EnvConfig,
-  stream: NodeJS.WritableStream
+  sendFn: (payload: SSEPayload) => void | Promise<void>,
+  onEnd?: () => void
 ): Promise<void> {
   try {
     const request = validateRequest(body);
@@ -160,28 +160,28 @@ export async function handleChatStreaming(
     // Check usage budget
     const usageCheck = await checkUsage(userId, env);
     if (!usageCheck.allowed) {
-      writeSSE(stream, { error: "Usage limit exceeded", done: true });
-      stream.end();
+      await sendFn({ error: "Usage limit exceeded", done: true });
+      onEnd?.();
       return;
     }
 
     // Get provider API key
     const apiKey = await getProviderKey(request.provider, env);
 
-    // Write function that forwards SSE to client
-    const writeFn = (payload: SSEPayload) => writeSSE(stream, payload);
+    // Provider streaming functions accept writeFn; stream param is unused
+    const dummyStream = null as unknown as NodeJS.WritableStream;
 
     // Call provider with streaming
     let tokenUsage: TokenUsage;
     switch (request.provider) {
       case "openai":
-        tokenUsage = await streamOpenAI(apiKey, request, stream, writeFn);
+        tokenUsage = await streamOpenAI(apiKey, request, dummyStream, sendFn);
         break;
       case "anthropic":
-        tokenUsage = await streamAnthropic(apiKey, request, stream, writeFn);
+        tokenUsage = await streamAnthropic(apiKey, request, dummyStream, sendFn);
         break;
       case "google":
-        tokenUsage = await streamGoogle(apiKey, request, stream, writeFn);
+        tokenUsage = await streamGoogle(apiKey, request, dummyStream, sendFn);
         break;
       default:
         throw new Error(`Unsupported provider: ${request.provider}`);
@@ -201,7 +201,7 @@ export async function handleChatStreaming(
     );
 
     // Send final usage info
-    writeSSE(stream, {
+    await sendFn({
       done: true,
       usage: {
         inputTokens: tokenUsage.inputTokens,
@@ -212,8 +212,8 @@ export async function handleChatStreaming(
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "AI API error";
-    writeSSE(stream, { error: message, done: true });
+    await sendFn({ error: message, done: true });
   } finally {
-    stream.end();
+    onEnd?.();
   }
 }

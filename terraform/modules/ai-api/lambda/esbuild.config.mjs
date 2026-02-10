@@ -10,6 +10,7 @@ await build({
   minify: true,
   sourcemap: true,
   external: [
+    "@aws-sdk/client-apigatewaymanagementapi",
     "@aws-sdk/client-dynamodb",
     "@aws-sdk/client-rds-data",
     "@aws-sdk/client-secrets-manager",

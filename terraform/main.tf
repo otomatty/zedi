@@ -163,7 +163,7 @@ module "api" {
 }
 
 # =============================================================================
-# Module: AI API (Lambda Function URL + DynamoDB + Secrets Manager)
+# Module: AI API (HTTP API GW + WebSocket API GW + Lambda + DynamoDB + Secrets)
 # =============================================================================
 module "ai_api" {
   source = "./modules/ai-api"
@@ -178,6 +178,9 @@ module "ai_api" {
   aurora_database_name      = var.aurora_database_name
 
   cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
+
+  # Share the HTTP API Gateway for GET /api/ai/* routes
+  api_id = module.api.api_id
 }
 
 # =============================================================================
