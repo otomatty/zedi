@@ -22,7 +22,8 @@ import type { Awareness } from "y-protocols/awareness";
 export interface CollaborationExtensionsOptions {
   document: Y.Doc;
   field: string;
-  awareness: Awareness;
+  /** Awareness instance. When undefined (local mode), CollaborationCaret is not added. */
+  awareness?: Awareness;
   user: { name: string; color: string };
 }
 
@@ -97,10 +98,15 @@ export function createEditorExtensions(
             document: options.collaboration.document,
             field: options.collaboration.field,
           }),
-          CollaborationCaret.configure({
-            provider: { awareness: options.collaboration.awareness },
-            user: options.collaboration.user,
-          }),
+          // CollaborationCaret は awareness がある場合（collaborative モード）のみ追加
+          ...(options.collaboration.awareness
+            ? [
+                CollaborationCaret.configure({
+                  provider: { awareness: options.collaboration.awareness },
+                  user: options.collaboration.user,
+                }),
+              ]
+            : []),
         ]
       : []),
   ] as Extension[];

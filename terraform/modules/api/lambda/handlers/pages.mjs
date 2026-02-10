@@ -50,6 +50,17 @@ WHERE page_id = :page_id
 RETURNING version
 `;
 
+/** Update pages.content_preview from content_text (first 200 chars) when saving content. */
+const UPDATE_PAGE_PREVIEW_SQL = `
+UPDATE pages
+SET content_preview = CASE
+  WHEN NULLIF(TRIM(:content_text), '') IS NOT NULL THEN LEFT(TRIM(:content_text), 200)
+  ELSE content_preview
+END,
+updated_at = NOW()
+WHERE id = :page_id AND owner_id = :owner_id
+`;
+
 const INSERT_PAGE_SQL = `
 INSERT INTO pages (id, owner_id, source_page_id, title, content_preview, thumbnail_url, source_url)
 VALUES (
@@ -138,26 +149,38 @@ export async function putPageContent(claims, pageId, body = {}) {
   const contentText = body?.content_text ?? null;
   const expectedVersion = body?.version;
 
+  const contentTextParam = contentText ?? "";
+
   if (expectedVersion != null && Number.isInteger(expectedVersion)) {
     const updated = await execute(UPSERT_CONTENT_OPTIMISTIC_SQL, {
       page_id: pageId,
       owner_id: ownerId,
       ydoc_state_b64: ydocStateB64.trim(),
-      content_text: contentText ?? "",
+      content_text: contentTextParam,
       expected_version: expectedVersion,
     });
     if (updated.length === 0) {
       return res.error("Version conflict", 409, "VERSION_CONFLICT");
     }
+    await execute(UPDATE_PAGE_PREVIEW_SQL, {
+      page_id: pageId,
+      owner_id: ownerId,
+      content_text: contentTextParam,
+    });
     return res.success({ version: updated[0].version });
   }
 
   const rows = await execute(UPSERT_CONTENT_SQL, {
     page_id: pageId,
     ydoc_state_b64: ydocStateB64.trim(),
-    content_text: contentText ?? "",
+    content_text: contentTextParam,
   });
   const version = rows[0]?.version ?? 1;
+  await execute(UPDATE_PAGE_PREVIEW_SQL, {
+    page_id: pageId,
+    owner_id: ownerId,
+    content_text: contentTextParam,
+  });
   return res.success({ version });
 }
 

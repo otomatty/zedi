@@ -162,9 +162,9 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     lastSelectionRef,
   });
 
+  // local モード（個人ページ）は awareness なしでも Y.Doc コラボレーション有効
   const useCollaborationMode = Boolean(
     collaborationConfig?.xmlFragment &&
-      collaborationConfig?.awareness &&
       collaborationConfig?.user
   );
 
@@ -187,8 +187,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       collaboration: useCollaborationMode
         ? {
             document: collaborationConfig!.ydoc,
-            field: "prosemirror",
-            awareness: collaborationConfig!.awareness,
+            field: "default",
+            awareness: collaborationConfig!.awareness, // undefined in local mode
             user: collaborationConfig!.user,
           }
         : undefined,
@@ -235,7 +235,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       const text = editor.state.doc.textBetween(from, to, " ");
       lastSelectionRef.current = { from, to };
       setSelectedText(text.trim());
-      if (useCollaborationMode && collaborationConfig) {
+      if (useCollaborationMode && collaborationConfig?.awareness) {
         collaborationConfig.updateCursor(from, to);
         collaborationConfig.updateSelection(from, to);
       }

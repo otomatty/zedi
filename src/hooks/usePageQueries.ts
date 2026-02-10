@@ -93,6 +93,7 @@ export function useSync() {
  */
 export function useRepository() {
   const { getToken, isSignedIn, userId, isLoaded } = useAuth();
+  const queryClient = useQueryClient();
   const [isAdapterReady, setIsAdapterReady] = useState(false);
   const adapterRef = useRef<ReturnType<typeof createStorageAdapter> | null>(null);
   const apiRef = useRef<ReturnType<typeof createApiClient> | null>(null);
@@ -144,15 +145,19 @@ export function useRepository() {
       try {
         console.log("[Sync] Initial sync requested", { userId });
         await runAuroraSync(userId, getToken);
+        // Refetch page list so UI shows data pulled into IndexedDB (avoids stuck loading/empty)
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
       } catch (error) {
         console.error("Initial sync failed:", error);
+        // Refetch so UI reflects current IndexedDB state (e.g. partial pull)
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
         // NOTE: Do NOT delete from initialSyncRequestedForUser here.
         // Removing the guard on failure previously caused infinite retry loops
         // when the API was unreachable (CORS, network error, invalid JSON, etc.).
         // Manual retry via useSync() or page reload will re-attempt.
       }
     })();
-  }, [isSignedIn, userId, isAdapterReady, getToken]);
+  }, [isSignedIn, userId, isAdapterReady, getToken, queryClient]);
 
   const getRepository = useCallback(async (): Promise<IPageRepository> => {
     const adapter = adapterRef.current;

@@ -45,15 +45,16 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
 
+  // local モード（個人ページ）は awareness 不要。collaborative モードのみ awareness 必須。
   const useCollaborationMode =
-    Boolean(collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.awareness && collaboration?.collaborationUser);
+    Boolean(collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.collaborationUser);
 
   const collaborationConfig =
     useCollaborationMode && collaboration
       ? {
           ydoc: collaboration.ydoc!,
           xmlFragment: collaboration.xmlFragment!,
-          awareness: collaboration.awareness!,
+          awareness: collaboration.awareness, // undefined in local mode
           user: collaboration.collaborationUser!,
           updateCursor: collaboration.updateCursor,
           updateSelection: collaboration.updateSelection,
