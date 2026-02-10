@@ -137,6 +137,19 @@ output "api_invoke_url" {
 }
 
 # =============================================================================
+# AI API (Lambda Function URL)
+# =============================================================================
+output "ai_api_function_url" {
+  description = "AI API Lambda Function URL (streaming-enabled)"
+  value       = module.ai_api.function_url
+}
+
+output "ai_api_secrets_arn" {
+  description = "ARN of the AI provider keys secret (populate via console or CLI)"
+  value       = module.ai_api.ai_secrets_arn
+}
+
+# =============================================================================
 # Security (Cognito, IAM)
 # =============================================================================
 output "cognito_user_pool_id" {

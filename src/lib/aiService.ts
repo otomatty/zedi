@@ -4,7 +4,7 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { AISettings, AIProviderType, APIMode } from "@/types/ai";
+import { AISettings, AIProviderType, APIMode, AIResponseUsage } from "@/types/ai";
 
 const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
 
@@ -16,6 +16,7 @@ export interface AIServiceRequest {
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;
+    feature?: string; // "wiki_generation" | "mermaid_generation" | "chat"
     // OpenAI固有のオプション
     webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
     // Anthropic固有のオプション
@@ -28,12 +29,14 @@ export interface AIServiceRequest {
 export interface AIServiceResponse {
   content: string;
   finishReason?: string;
+  usage?: AIResponseUsage; // サーバーモード時のみ
 }
 
 export interface AIServiceCallbacks {
   onChunk?: (chunk: string) => void;
   onComplete?: (response: AIServiceResponse) => void;
   onError?: (error: Error) => void;
+  onUsageUpdate?: (usage: AIResponseUsage) => void;
 }
 
 /**
@@ -165,6 +168,7 @@ async function callAIWithServer(
       let buffer = "";
       let fullContent = "";
       let finishReason: string | undefined;
+      let lastUsage: AIResponseUsage | undefined;
 
       while (true) {
         if (abortSignal?.aborted) {
@@ -192,6 +196,7 @@ async function callAIWithServer(
               done?: boolean;
               finishReason?: string;
               error?: string;
+              usage?: AIResponseUsage;
             };
 
             if (data.error) {
@@ -203,9 +208,19 @@ async function callAIWithServer(
               callbacks.onChunk?.(data.content);
             }
 
+            // Usage info from the server (sent with final chunk)
+            if (data.usage) {
+              lastUsage = data.usage;
+              callbacks.onUsageUpdate?.(data.usage);
+            }
+
             if (data.done) {
               finishReason = data.finishReason;
-              callbacks.onComplete?.({ content: fullContent, finishReason });
+              callbacks.onComplete?.({
+                content: fullContent,
+                finishReason,
+                usage: lastUsage,
+              });
               return;
             }
           }
@@ -215,15 +230,23 @@ async function callAIWithServer(
       }
 
       if (fullContent) {
-        callbacks.onComplete?.({ content: fullContent, finishReason });
+        callbacks.onComplete?.({
+          content: fullContent,
+          finishReason,
+          usage: lastUsage,
+        });
       }
       return;
     }
 
     const data = (await response.json()) as AIServiceResponse;
+    if (data.usage) {
+      callbacks.onUsageUpdate?.(data.usage);
+    }
     callbacks.onComplete?.({
       content: data.content ?? "",
       finishReason: data.finishReason,
+      usage: data.usage,
     });
   } catch (error) {
     callbacks.onError?.(
@@ -469,4 +492,114 @@ async function callGoogle(
       finishReason: "stop",
     });
   }
+}
+
+// =============================================================================
+// Server API functions (models, usage)
+// =============================================================================
+
+import type { AIModel, AIUsage, CachedServerModels } from "@/types/ai";
+
+const SERVER_MODELS_CACHE_KEY = "zedi-ai-server-models";
+const SERVER_MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * サーバーから利用可能なモデル一覧を取得（キャッシュあり）
+ */
+export async function fetchServerModels(forceRefresh = false): Promise<{
+  models: AIModel[];
+  tier: string;
+}> {
+  // Check cache first
+  if (!forceRefresh) {
+    try {
+      const cached = localStorage.getItem(SERVER_MODELS_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as CachedServerModels;
+        if (Date.now() - parsed.cachedAt < SERVER_MODELS_CACHE_TTL) {
+          return { models: parsed.models, tier: parsed.tier };
+        }
+      }
+    } catch {
+      // Cache read failed, continue to fetch
+    }
+  }
+
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    return { models: [], tier: "free" };
+  }
+
+  let headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    const token = await getAuthToken();
+    if (token) {
+      headers = { ...headers, Authorization: `Bearer ${token}` };
+    }
+  } catch {
+    // Unauthenticated — will return free-tier models only
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/models`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch models");
+  }
+
+  const data = (await response.json()) as { models: AIModel[]; tier: string };
+
+  // Cache the result
+  try {
+    localStorage.setItem(
+      SERVER_MODELS_CACHE_KEY,
+      JSON.stringify({
+        models: data.models,
+        tier: data.tier,
+        cachedAt: Date.now(),
+      } satisfies CachedServerModels)
+    );
+  } catch {
+    // localStorage write failed, ignore
+  }
+
+  return data;
+}
+
+/**
+ * サーバーから現在の使用量を取得
+ */
+export async function fetchUsage(): Promise<AIUsage> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    return {
+      usagePercent: 0,
+      consumedUnits: 0,
+      budgetUnits: 0,
+      remaining: 0,
+      tier: "free",
+      yearMonth: "",
+    };
+  }
+
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/usage`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch usage");
+  }
+
+  return (await response.json()) as AIUsage;
 }

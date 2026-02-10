@@ -99,13 +99,21 @@ export function useAISettings(): UseAISettingsReturn {
   const save = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     try {
+      // api_serverモードではAPIキー不要で常にconfigured
+      const isServerMode = settings.apiMode === "api_server";
       const provider = getProviderById(settings.provider);
-      const isConfigured = provider?.requiresApiKey
-        ? settings.apiKey.trim() !== ""
-        : true;
+      const isConfigured = isServerMode
+        ? true
+        : provider?.requiresApiKey
+          ? settings.apiKey.trim() !== ""
+          : true;
+
+      // modelIdが未設定の場合はprovider:modelから生成
+      const modelId = settings.modelId || `${settings.provider}:${settings.model}`;
 
       const settingsToSave = {
         ...settings,
+        modelId,
         isConfigured,
       };
       await saveAISettings(settingsToSave);

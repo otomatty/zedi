@@ -1,0 +1,9 @@
+{
+  "name": "zedi-subscription-webhook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-rds-data": "^3.750.0"
+  }
+}

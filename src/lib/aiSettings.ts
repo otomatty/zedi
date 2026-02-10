@@ -46,6 +46,11 @@ export async function loadAISettings(): Promise<AISettings | null> {
       parsed.apiMode = parsed.apiKey.trim() !== "" ? "user_api_key" : "api_server";
     }
 
+    // 後方互換性: modelIdがない場合はprovider:modelから生成
+    if (!parsed.modelId && parsed.model && parsed.provider) {
+      parsed.modelId = `${parsed.provider}:${parsed.model}`;
+    }
+
     return parsed;
   } catch (error) {
     console.error("Failed to load AI settings:", error);
@@ -64,10 +69,18 @@ export function clearAISettings(): void {
 
 /**
  * AI設定が有効かどうかを確認する
+ * api_serverモードではシステムプロバイダーが利用可能なため常にtrue
  */
 export async function isAIConfigured(): Promise<boolean> {
   const settings = await loadAISettings();
-  return settings?.isConfigured ?? false;
+  if (!settings) {
+    // 未設定の場合、デフォルトのapi_serverモードで利用可能
+    return true;
+  }
+  if (settings.apiMode === "api_server") {
+    return true;
+  }
+  return settings.isConfigured;
 }
 
 /**
