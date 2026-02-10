@@ -137,11 +137,11 @@ output "api_invoke_url" {
 }
 
 # =============================================================================
-# AI API (Lambda Function URL)
+# AI API (HTTP API GW + WebSocket API GW)
 # =============================================================================
-output "ai_api_function_url" {
-  description = "AI API Lambda Function URL (streaming-enabled)"
-  value       = module.ai_api.function_url
+output "ai_api_websocket_url" {
+  description = "AI API WebSocket URL for streaming chat"
+  value       = module.ai_api.websocket_url
 }
 
 output "ai_api_secrets_arn" {

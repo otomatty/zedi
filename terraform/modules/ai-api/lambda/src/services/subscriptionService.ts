@@ -20,9 +20,9 @@ export async function getSubscription(
   }
 
   const rows = await execute<Subscription>(
-    `SELECT id, user_id, plan, status, current_period_start, current_period_end
+    `SELECT id, user_id, plan, status, current_period_start, current_period_end, billing_interval
      FROM subscriptions
-     WHERE user_id = :userId AND status IN ('active', 'trialing')
+     WHERE user_id = CAST(:userId AS uuid) AND status IN ('active', 'trialing')
      LIMIT 1`,
     { userId },
     env

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Check, Sparkles, Cloud, Zap, Brain } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,7 +14,9 @@ import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
 import { UsageBar } from "@/components/ai/UsageBar";
-import { fetchUsage } from "@/lib/aiService";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useAuth } from "@/hooks/useAuth";
+import { openProCheckout, openCustomerPortal } from "@/lib/subscriptionService";
 import type { AIUsage } from "@/types/ai";
 
 interface PlanFeature {
@@ -121,40 +123,45 @@ const PlanCard: React.FC<PlanCardProps> = ({
   );
 };
 
-type PlanType = "free" | "pro";
+type BillingInterval = "monthly" | "yearly";
 
 const Pricing: React.FC = () => {
-  // TODO: 実際のライセンス状態を取得する
-  const [currentPlan] = useState<PlanType>("free");
-  const [hasSyncSubscription] = useState(false);
-  const [hasAISubscription] = useState(false);
-  const [usage, setUsage] = useState<AIUsage | null>(null);
+  const { userId, isSignedIn } = useAuth();
+  const {
+    plan: currentPlan,
+    isProUser,
+    usage,
+    isLoading,
+    refetch,
+  } = useSubscription();
 
-  useEffect(() => {
-    fetchUsage()
-      .then(setUsage)
-      .catch(() => {});
-  }, []);
+  const [billingInterval, setBillingInterval] =
+    useState<BillingInterval>("monthly");
+
+  const usageForBar: AIUsage | null = usage
+    ? {
+        usagePercent: usage.usagePercent,
+        consumedUnits: usage.consumedUnits,
+        budgetUnits: usage.budgetUnits,
+        remaining: Math.max(0, usage.budgetUnits - usage.consumedUnits),
+        tier: currentPlan,
+        yearMonth: new Date().toISOString().slice(0, 7),
+      }
+    : null;
 
   const handleSelectPro = () => {
-    // TODO: LemonSqueezy チェックアウトを開く
-    console.log("Pro プラン購入");
+    if (!userId) return;
+    openProCheckout(userId, billingInterval);
+    // User may return from checkout in same tab; refetch after a short delay
+    setTimeout(() => refetch(), 2000);
   };
 
-  const handleSelectSync = () => {
-    // TODO: LemonSqueezy Sync サブスク開始
-    console.log("Sync サブスク開始");
-  };
-
-  const handleSelectAI = () => {
-    // TODO: LemonSqueezy AI サブスク開始
-    // LemonSqueezy Checkout URL with custom_data.user_id
-    console.log("AI サブスク開始");
+  const handleManageSubscription = () => {
+    openCustomerPortal();
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Container className="flex h-16 items-center gap-4">
           <Link to="/home">
@@ -166,22 +173,34 @@ const Pricing: React.FC = () => {
         </Container>
       </header>
 
-      {/* Content */}
       <main className="py-8">
         <Container>
-          {/* 見出し */}
           <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold mb-2">
-              シンプルな料金プラン
-            </h2>
+            <h2 className="text-2xl font-bold mb-2">シンプルな料金プラン</h2>
             <p className="text-muted-foreground">
-              基本機能は無料。AI機能やクラウド同期は柔軟なプランで。
+              Free で基本機能とクラウド同期。Pro で無制限ページとフルAI機能。
             </p>
           </div>
 
-          {/* プランカード */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
-            {/* Free プラン */}
+          {/* Monthly / Yearly toggle for Pro */}
+          <div className="flex justify-center gap-2 mb-6">
+            <Button
+              variant={billingInterval === "monthly" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setBillingInterval("monthly")}
+            >
+              月額
+            </Button>
+            <Button
+              variant={billingInterval === "yearly" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setBillingInterval("yearly")}
+            >
+              年額（2ヶ月分お得）
+            </Button>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 max-w-4xl mx-auto">
             <PlanCard
               name="Free"
               description="基本機能を無料で"
@@ -189,87 +208,57 @@ const Pricing: React.FC = () => {
               icon={<Sparkles className="h-5 w-5" />}
               features={[
                 { text: "100ページまで", included: true },
-                { text: "ローカル保存", included: true },
+                { text: "クラウド同期", included: true },
                 { text: "Wiki リンク", included: true },
-                { text: "AI機能（制限付き）", included: true },
+                { text: "基本AIモデル（制限付き）", included: true },
                 { text: "無制限ページ", included: false },
-                { text: "クラウド同期", included: false },
+                { text: "高性能AIモデル", included: false },
               ]}
               buttonText="現在のプラン"
               buttonVariant="outline"
-              current={currentPlan === "free"}
+              current={!isProUser}
               extraContent={
-                usage && (
-                  <UsageBar usage={usage} autoRefresh={false} />
+                isSignedIn &&
+                usageForBar && (
+                  <UsageBar usage={usageForBar} autoRefresh={false} />
                 )
               }
             />
 
-            {/* Pro プラン */}
             <PlanCard
               name="Pro"
-              description="買い切りで永続利用"
-              price="¥4,980"
-              priceNote="買い切り"
+              description="無制限＋フルAI"
+              price={billingInterval === "yearly" ? "$100" : "$10"}
+              priceNote={billingInterval === "yearly" ? "/ 年" : "/ 月"}
               icon={<Zap className="h-5 w-5" />}
-              features={[
-                { text: "無制限ページ", included: true },
-                { text: "ローカル保存", included: true },
-                { text: "Wiki リンク", included: true },
-                { text: "AI機能（制限付き）", included: true },
-                { text: "現行バージョン永続利用", included: true },
-                { text: "クラウド同期（別途契約）", included: true },
-              ]}
-              buttonText="Pro を購入"
-              onSelect={handleSelectPro}
-              current={currentPlan === "pro"}
-            />
-
-            {/* AI パワーアップ */}
-            <PlanCard
-              name="AI Power"
-              description="AI機能を最大限に"
-              price="$10"
-              priceNote="/ 月"
-              icon={<Brain className="h-5 w-5" />}
               popular
               features={[
-                { text: "全AI機能を使用量拡大", included: true },
-                { text: "GPT-4o, Claude Sonnet 4", included: true },
-                { text: "Gemini 2.5 Pro", included: true },
-                { text: "最新プレビューモデル", included: true },
-                { text: "高性能モデルを使い放題", included: true },
+                { text: "無制限ページ", included: true },
+                { text: "クラウド同期", included: true },
+                { text: "Wiki リンク", included: true },
+                { text: "全AIモデル（GPT-4o, Claude, Gemini Pro等）", included: true },
+                { text: "月間AI使用量 拡大", included: true },
                 { text: "自分のAPIキーも使用可", included: true },
               ]}
-              buttonText={hasAISubscription ? "現在のプラン" : "AI Powerを契約"}
-              onSelect={handleSelectAI}
-              current={hasAISubscription}
-            />
-
-            {/* Sync アドオン */}
-            <PlanCard
-              name="Sync"
-              description="Proユーザー向けオプション"
-              price="¥2,980"
-              priceNote="/ 年"
-              icon={<Cloud className="h-5 w-5" />}
-              features={[
-                { text: "クラウド同期", included: true },
-                { text: "マルチデバイス対応", included: true },
-                { text: "自動バックアップ", included: true },
-                { text: "オフライン対応", included: true },
-                { text: "月額プラン: ¥400/月", included: true },
-                { text: "Pro購入が必要", included: true },
-              ]}
-              buttonText="Sync を契約"
-              buttonVariant="outline"
-              onSelect={handleSelectSync}
-              disabled={currentPlan !== "pro"}
-              current={hasSyncSubscription}
+              buttonText={
+                isProUser
+                  ? "サブスク管理"
+                  : billingInterval === "yearly"
+                    ? "Pro 年額で契約"
+                    : "Pro 月額で契約"
+              }
+              onSelect={isProUser ? handleManageSubscription : handleSelectPro}
+              current={isProUser}
+              disabled={!isSignedIn}
             />
           </div>
 
-          {/* AI使用量の説明 */}
+          {isLoading && (
+            <p className="text-center text-sm text-muted-foreground mt-4">
+              プラン情報を取得中...
+            </p>
+          )}
+
           <div className="mt-12 max-w-3xl mx-auto">
             <h3 className="text-lg font-semibold mb-4 text-center">
               AI機能について
@@ -278,32 +267,31 @@ const Pricing: React.FC = () => {
               <div className="p-4 rounded-lg border">
                 <h4 className="font-medium mb-2 flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  無料プラン
+                  Free プラン
                 </h4>
                 <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>- 基本モデル（GPT-4o Mini, Gemini Flash等）</li>
+                  <li>- 基本モデル（GPT-4o Mini, Gemini Flash 等）</li>
                   <li>- 月間使用量の制限あり</li>
                   <li>- Wiki生成、Mermaid図 生成</li>
                 </ul>
               </div>
               <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
                 <h4 className="font-medium mb-2 flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-primary" />
-                  AI Powerプラン
+                  <Zap className="h-4 w-4 text-primary" />
+                  Pro プラン
                 </h4>
                 <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>- 高性能モデル（GPT-4o, Claude Sonnet 4, Gemini Pro等）</li>
+                  <li>- 高性能モデル（GPT-4o, Claude Sonnet 4, Gemini Pro 等）</li>
                   <li>- 月間使用量が大幅に拡大</li>
                   <li>- 今後追加されるAI機能も利用可能</li>
                 </ul>
               </div>
             </div>
             <p className="text-xs text-muted-foreground text-center mt-4">
-              自分のAPIキーを設定することで、プラン制限なく全モデルを利用することもできます。
+              自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。
             </p>
           </div>
 
-          {/* 補足情報 */}
           <div className="mt-12 max-w-3xl mx-auto">
             <h3 className="text-lg font-semibold mb-4 text-center">
               よくある質問
@@ -311,21 +299,12 @@ const Pricing: React.FC = () => {
             <div className="space-y-4">
               <div className="p-4 rounded-lg border">
                 <h4 className="font-medium mb-1">
-                  メジャーアップデート時はどうなりますか？
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  現行バージョンは引き続き利用できます。新バージョンへのアップグレードは任意で、
-                  既存ユーザーは割引価格（¥3,480）でアップグレードできます。
-                </p>
-              </div>
-              <div className="p-4 rounded-lg border">
-                <h4 className="font-medium mb-1">
-                  AI Powerプランの使用量はどう計算されますか？
+                  Proプランの使用量はどう計算されますか？
                 </h4>
                 <p className="text-sm text-muted-foreground">
                   利用するモデルとトークン消費量に応じたコストユニットで計算されます。
-                  軽量モデル（GPT-4o Mini等）なら月に数百回の生成が可能です。
-                  設定画面で現在の使用率をリアルタイムに確認できます。
+                  軽量モデルなら月に数百回の生成が可能です。
+                  設定画面で現在の使用率を確認できます。
                 </p>
               </div>
               <div className="p-4 rounded-lg border">
@@ -333,65 +312,19 @@ const Pricing: React.FC = () => {
                   自分のAPIキーとサブスクの違いは？
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  サブスクではZedのAI基盤を通じて簡単にAI機能を使えます。
+                  サブスクではZediのAI基盤を通じて簡単にAI機能を使えます。
                   自分のAPIキーを設定すると使用量制限なく利用できますが、
                   各プロバイダーとの個別契約と料金が必要です。
                 </p>
               </div>
               <div className="p-4 rounded-lg border">
-                <h4 className="font-medium mb-1">
-                  返金ポリシーはありますか？
-                </h4>
+                <h4 className="font-medium mb-1">返金ポリシーはありますか？</h4>
                 <p className="text-sm text-muted-foreground">
                   購入後14日以内であれば全額返金いたします。
                   お問い合わせフォームからご連絡ください。
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* 価格比較 */}
-          <div className="mt-12 max-w-3xl mx-auto">
-            <h3 className="text-lg font-semibold mb-4 text-center">
-              他サービスとの比較（2年間利用時）
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">サービス</th>
-                    <th className="text-right py-3 px-4">1年目</th>
-                    <th className="text-right py-3 px-4">2年目</th>
-                    <th className="text-right py-3 px-4">合計</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b bg-primary/5">
-                    <td className="py-3 px-4 font-medium">Zedi Pro + AI + Sync</td>
-                    <td className="text-right py-3 px-4">¥25,960</td>
-                    <td className="text-right py-3 px-4">¥20,980</td>
-                    <td className="text-right py-3 px-4 font-bold text-primary">
-                      ¥46,940
-                    </td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-3 px-4">Notion AI Pro</td>
-                    <td className="text-right py-3 px-4">¥28,800</td>
-                    <td className="text-right py-3 px-4">¥28,800</td>
-                    <td className="text-right py-3 px-4">¥57,600</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-3 px-4">Obsidian + Sync</td>
-                    <td className="text-right py-3 px-4">¥14,400</td>
-                    <td className="text-right py-3 px-4">¥14,400</td>
-                    <td className="text-right py-3 px-4">¥28,800</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              ※ 為替レート 1ドル = 150円 で計算
-            </p>
           </div>
         </Container>
       </main>

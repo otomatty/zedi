@@ -148,6 +148,12 @@ resource "aws_iam_role_policy" "lambda_resources" {
         ]
         Resource = [aws_dynamodb_table.rate_limit.arn]
       },
+      # API Gateway Management API — WebSocket postToConnection
+      {
+        Effect = "Allow"
+        Action = ["execute-api:ManageConnections"]
+        Resource = ["${aws_apigatewayv2_api.ws.execution_arn}/*/*"]
+      },
     ]
   })
 }
@@ -160,7 +166,7 @@ resource "aws_lambda_function" "ai_api" {
   filename         = data.archive_file.lambda.output_path
   function_name    = "zedi-${var.environment}-ai-api"
   role             = aws_iam_role.lambda.arn
-  handler          = "index.streamHandler"
+  handler          = "index.handler"
   source_code_hash = data.archive_file.lambda.output_base64sha256
   runtime          = "nodejs20.x"
   timeout          = 90
@@ -185,21 +191,116 @@ resource "aws_lambda_function" "ai_api" {
 }
 
 ################################################################################
-# Lambda Function URL (Response Streaming)
+# HTTP API Gateway routes (added to shared API Gateway)
+# GET /api/ai/models — model listing (no auth, handled in Lambda)
+# GET /api/ai/usage  — usage info (no auth at GW level, Lambda verifies JWT)
 ################################################################################
 
-resource "aws_lambda_function_url" "ai_api" {
-  function_name      = aws_lambda_function.ai_api.function_name
-  authorization_type = "NONE" # Auth handled in Lambda code (Cognito JWT)
-  invoke_mode        = "RESPONSE_STREAM"
+resource "aws_apigatewayv2_integration" "ai_http" {
+  api_id                 = var.api_id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.ai_api.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
 
-  cors {
-    allow_origins     = [var.cors_origin]
-    allow_methods     = ["*"]
-    allow_headers     = ["Content-Type", "Authorization"]
-    max_age           = 86400
-    allow_credentials = false
-  }
+resource "aws_apigatewayv2_route" "ai_models" {
+  api_id    = var.api_id
+  route_key = "GET /api/ai/models"
+  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
+}
+
+resource "aws_apigatewayv2_route" "ai_models_options" {
+  api_id    = var.api_id
+  route_key = "OPTIONS /api/ai/models"
+  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
+}
+
+resource "aws_apigatewayv2_route" "ai_usage" {
+  api_id    = var.api_id
+  route_key = "GET /api/ai/usage"
+  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
+}
+
+resource "aws_apigatewayv2_route" "ai_usage_options" {
+  api_id    = var.api_id
+  route_key = "OPTIONS /api/ai/usage"
+  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
+}
+
+resource "aws_apigatewayv2_route" "ai_subscription" {
+  api_id    = var.api_id
+  route_key = "GET /api/ai/subscription"
+  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
+}
+
+resource "aws_apigatewayv2_route" "ai_subscription_options" {
+  api_id    = var.api_id
+  route_key = "OPTIONS /api/ai/subscription"
+  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
+}
+
+resource "aws_lambda_permission" "apigw_http" {
+  statement_id  = "AllowAPIGatewayInvokeAIAPI"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.ai_api.function_name
+  principal     = "apigateway.amazonaws.com"
+}
+
+################################################################################
+# WebSocket API Gateway (streaming chat)
+################################################################################
+
+resource "aws_apigatewayv2_api" "ws" {
+  name                       = "zedi-${var.environment}-ai-ws"
+  protocol_type              = "WEBSOCKET"
+  route_selection_expression = "$request.body.action"
+  description                = "Zedi AI Chat WebSocket API (streaming)"
+  tags                       = var.tags
+}
+
+resource "aws_apigatewayv2_integration" "ws_lambda" {
+  api_id                 = aws_apigatewayv2_api.ws.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.ai_api.invoke_arn
+  integration_method     = "POST"
+  content_handling_strategy = "CONVERT_TO_TEXT"
+}
+
+# $connect route
+resource "aws_apigatewayv2_route" "ws_connect" {
+  api_id    = aws_apigatewayv2_api.ws.id
+  route_key = "$connect"
+  target    = "integrations/${aws_apigatewayv2_integration.ws_lambda.id}"
+}
+
+# $disconnect route
+resource "aws_apigatewayv2_route" "ws_disconnect" {
+  api_id    = aws_apigatewayv2_api.ws.id
+  route_key = "$disconnect"
+  target    = "integrations/${aws_apigatewayv2_integration.ws_lambda.id}"
+}
+
+# chat route (matched by $request.body.action == "chat")
+resource "aws_apigatewayv2_route" "ws_chat" {
+  api_id    = aws_apigatewayv2_api.ws.id
+  route_key = "chat"
+  target    = "integrations/${aws_apigatewayv2_integration.ws_lambda.id}"
+}
+
+resource "aws_apigatewayv2_stage" "ws_default" {
+  api_id      = aws_apigatewayv2_api.ws.id
+  name        = "production"
+  auto_deploy = true
+  tags        = var.tags
+}
+
+resource "aws_lambda_permission" "apigw_ws" {
+  statement_id  = "AllowAPIGatewayWSInvokeAIAPI"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.ai_api.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.ws.execution_arn}/*/*"
 }
 
 ################################################################################

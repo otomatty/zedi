@@ -49,3 +49,12 @@ variable "cors_origin" {
   type        = string
   default     = "*"
 }
+
+# =============================================================================
+# API Gateway (HTTP API — shared with REST API module)
+# =============================================================================
+
+variable "api_id" {
+  description = "API Gateway HTTP API ID for adding AI GET routes"
+  type        = string
+}

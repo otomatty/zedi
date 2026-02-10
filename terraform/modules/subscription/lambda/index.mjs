@@ -118,6 +118,22 @@ function resolveUserId(webhookData) {
   return null;
 }
 
+/**
+ * Resolve billing interval from custom_data or LemonSqueezy attributes.
+ * Returns "monthly" | "yearly" | null.
+ */
+function resolveBillingInterval(webhookData) {
+  const customData = webhookData?.meta?.custom_data ?? webhookData?.data?.attributes?.custom_data;
+  if (customData?.billing_interval === "monthly" || customData?.billing_interval === "yearly") {
+    return customData.billing_interval;
+  }
+  const attrs = webhookData?.data?.attributes;
+  const interval = attrs?.interval ?? attrs?.variant_interval;
+  if (interval === "month" || interval === "monthly") return "monthly";
+  if (interval === "year" || interval === "yearly") return "yearly";
+  return null;
+}
+
 async function handleSubscriptionEvent(webhookData) {
   const attrs = webhookData?.data?.attributes;
   if (!attrs) {
@@ -136,19 +152,21 @@ async function handleSubscriptionEvent(webhookData) {
   const status = mapStatus(attrs.status);
   const periodStart = attrs.current_period_start || null;
   const periodEnd = attrs.current_period_end || null;
+  const billingInterval = resolveBillingInterval(webhookData);
 
   // Upsert subscription
   await execute(
-    `INSERT INTO subscriptions (user_id, plan, status, current_period_start, current_period_end, external_id, external_customer_id, updated_at)
-     VALUES (:userId, 'paid', :status, :periodStart, :periodEnd, :externalId, :externalCustomerId, NOW())
+    `INSERT INTO subscriptions (user_id, plan, status, current_period_start, current_period_end, external_id, external_customer_id, billing_interval, updated_at)
+     VALUES (:userId, 'pro', :status, :periodStart, :periodEnd, :externalId, :externalCustomerId, :billingInterval, NOW())
      ON CONFLICT (user_id)
      DO UPDATE SET
-       plan = CASE WHEN :status IN ('active', 'trialing') THEN 'paid' ELSE subscriptions.plan END,
+       plan = CASE WHEN :status IN ('active', 'trialing') THEN 'pro' ELSE subscriptions.plan END,
        status = :status,
        current_period_start = COALESCE(:periodStart, subscriptions.current_period_start),
        current_period_end = COALESCE(:periodEnd, subscriptions.current_period_end),
        external_id = :externalId,
        external_customer_id = :externalCustomerId,
+       billing_interval = COALESCE(:billingInterval, subscriptions.billing_interval),
        updated_at = NOW()`,
     {
       userId,
@@ -157,6 +175,7 @@ async function handleSubscriptionEvent(webhookData) {
       periodEnd,
       externalId,
       externalCustomerId,
+      billingInterval,
     }
   );
 

@@ -1,6 +1,37 @@
 # Cognito 認証のトラブルシューティング
 
-本番（zedi-note.app）での Google / GitHub サインインまわりのよくある事象と対処です。
+本番（zedi-note.app）および開発環境での Google / GitHub サインインまわりのよくある事象と対処です。
+
+---
+
+## 0. 開発環境で `redirect_mismatch`（Cognito のエラーページが表示される）
+
+**症状:** ログインしようとすると Cognito のエラーページが表示される。
+
+```
+GET https://zedi-dev-....auth.ap-northeast-1.amazoncognito.com/error?error=redirect_mismatch&client_id=... 400 (Bad Request)
+```
+
+**原因:** アプリが Cognito に送っている **redirect_uri**（例: `http://localhost:30000/auth/callback`）が、Cognito の「許可されたコールバック URL」に含まれていない。開発でポートを 30000 にしている場合、Cognito 側にも同じ URL が登録されている必要がある。
+
+**対処:**
+
+1. **Terraform で Cognito を正しい URL で再適用する**
+   - `terraform/variables.tf` のデフォルトは `http://localhost:30000/auth/callback`。`environments/dev.tfvars` でも `cognito_callback_urls = ["http://localhost:30000/auth/callback"]` になっているか確認する。
+   - 以下で plan を確認してから apply する（dev の場合）:
+   ```bash
+   cd terraform
+   terraform plan -var-file=environments/dev.tfvars
+   terraform apply -var-file=environments/dev.tfvars
+   ```
+   - apply 後、AWS コンソールの Cognito → ユーザープール → アプリの統合 → 当該クライアントで「許可されているコールバック URL」に `http://localhost:30000/auth/callback` が含まれているか確認する。
+
+2. **開いている URL を確認する**
+   - アプリは `window.location.origin + "/auth/callback"` を redirect_uri として送る。`http://127.0.0.1:30000` で開いていると、Cognito には `http://127.0.0.1:30000/auth/callback` が送られ、`localhost` だけ登録していると一致しない。
+   - **対応:** ブラウザでは **`http://localhost:30000`** で開く。または `dev.tfvars` の `cognito_callback_urls` に `http://127.0.0.1:30000/auth/callback` を追加してから `terraform apply` する。
+
+3. **環境変数で明示する（任意）**
+   - `.env` に `VITE_COGNITO_REDIRECT_URI=http://localhost:30000/auth/callback` を設定すると、常にこの URL が使われる。Cognito の許可リストと一致しているか確認する。
 
 ---
 
@@ -15,25 +46,34 @@
 
 **対処:**
 
-1. **prod.secret.env の中身を確認**
+1. **secret ファイルの中身を確認**
+   - **本番:** `terraform/environments/prod.secret.env`
+   - **開発:** `terraform/environments/dev.secret.env`（`dev.secret.env.example` をコピーして作成。このファイルは .gitignore 済み）
    - 次の 2 つが設定されているか確認する（値は伏せてよい）。
      - `TF_VAR_google_oauth_client_secret=GOCSPX-...`（GCP の OAuth クライアントの「クライアント シークレット」）
      - `TF_VAR_github_oauth_client_secret=...`（GitHub OAuth アプリの Client secret）
-   - 無ければ GCP / GitHub の画面からシークレットを再発行し、`terraform/environments/prod.secret.env` に上記の変数名で追記する。
+   - 無ければ GCP / GitHub の画面からシークレットを取得し、上記の変数名で追記する。
 
 2. **apply の直前に secret を読み込んでから実行**
    - **Bash / Git Bash:** 環境変数を子プロセス（terraform）に渡すため、`set -a` で export してから読み込む。
+   - **本番の例:**
    ```bash
    cd terraform
-   terraform workspace select prod
    set -a && . environments/prod.secret.env && set +a
    terraform apply -var-file=environments/prod.tfvars
    ```
-   - 一行で実行する場合: `set -a && . environments/prod.secret.env && set +a && terraform apply -var-file=environments/prod.tfvars`
+   - **開発の例:**
+   ```bash
+   cd terraform
+   set -a && . environments/dev.secret.env && set +a
+   terraform apply -var-file=environments/dev.tfvars
+   ```
    - 単に `source` しただけでは、シェルによっては terraform に変数が渡らず、plan に IdP の変更が出ないことがある。
    apply 後、Cognito の「アプリの統合」→ 当該クライアントで「Google」「GitHub」が有効になっているはず。
 
-3. **再度 Hosted UI でログイン**
+3. **開発で Google を使う場合:** GCP の「承認済みのリダイレクト URI」に **開発用 Cognito** の URL を 1 件追加する（本番と別クライアントなら別途追加）。例: `https://zedi-dev-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse`
+
+4. **再度 Hosted UI でログイン**
    - サインイン画面で Google / GitHub の選択肢が表示され、選択しても 401 にならないか確認する。
 
 ---
