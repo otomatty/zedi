@@ -4,7 +4,6 @@ import Container from "@/components/layout/Container";
 import PageGrid from "@/components/page/PageGrid";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { useSeedData } from "@/hooks/useSeedData";
-import { NotesSection } from "@/components/note/NotesSection";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { useOnboarding } from "@/hooks/useOnboarding";
 
@@ -21,7 +20,6 @@ const Home: React.FC = () => {
 
       <main className="py-6">
         <Container>
-          <NotesSection />
           <PageGrid isSeeding={isSeeding} />
         </Container>
       </main>
