@@ -117,8 +117,9 @@ resource "aws_db_parameter_group" "main" {
   description = "Aurora PostgreSQL instance parameter group for Zedi"
 
   parameter {
-    name  = "shared_preload_libraries"
-    value = "pg_stat_statements"
+    name         = "shared_preload_libraries"
+    value        = "pg_stat_statements"
+    apply_method = "pending-reboot"
   }
 
   tags = merge(var.tags, {
@@ -145,8 +146,8 @@ resource "aws_rds_cluster" "main" {
 
   # Serverless v2 設定（min_capacity=0 のときは seconds_until_auto_pause 必須でスケールゼロ＋自動ポーズ）
   serverlessv2_scaling_configuration {
-    min_capacity            = var.min_capacity
-    max_capacity            = var.max_capacity
+    min_capacity             = var.min_capacity
+    max_capacity             = var.max_capacity
     seconds_until_auto_pause = var.seconds_until_auto_pause
   }
 

@@ -39,10 +39,10 @@ resource "aws_cognito_user_pool" "main" {
 
   # ユーザー属性スキーマ
   schema {
-    name                     = "email"
-    attribute_data_type      = "String"
-    required                 = true
-    mutable                  = true
+    name                = "email"
+    attribute_data_type = "String"
+    required            = true
+    mutable             = true
     string_attribute_constraints {
       min_length = 0
       max_length = 256
@@ -50,10 +50,10 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   schema {
-    name                     = "display_name"
-    attribute_data_type      = "String"
-    required                 = false
-    mutable                  = true
+    name                = "display_name"
+    attribute_data_type = "String"
+    required            = false
+    mutable             = true
     string_attribute_constraints {
       min_length = 0
       max_length = 100
@@ -92,9 +92,9 @@ resource "aws_cognito_user_pool_client" "web" {
   ]
 
   # トークン有効期限
-  access_token_validity  = 1   # 1時間
-  id_token_validity      = 1   # 1時間
-  refresh_token_validity = 30  # 30日
+  access_token_validity  = 1  # 1時間
+  id_token_validity      = 1  # 1時間
+  refresh_token_validity = 30 # 30日
 
   token_validity_units {
     access_token  = "hours"
@@ -154,6 +154,17 @@ resource "aws_cognito_identity_provider" "google" {
     name     = "name"
     picture  = "picture"
   }
+
+  lifecycle {
+    ignore_changes = [
+      provider_details["attributes_url"],
+      provider_details["attributes_url_add_attributes"],
+      provider_details["authorize_url"],
+      provider_details["oidc_issuer"],
+      provider_details["token_request_method"],
+      provider_details["token_url"],
+    ]
+  }
 }
 
 # GitHub as OIDC. github_proxy_base_url にプロキシ API の URL を渡すと、
@@ -167,14 +178,14 @@ resource "aws_cognito_identity_provider" "github" {
   provider_type = "OIDC"
 
   provider_details = {
-    client_id                  = var.github_client_id
-    client_secret               = var.github_client_secret
-    authorize_scopes            = "openid user:email read:user"
-    authorize_url               = "https://github.com/login/oauth/authorize"
-    token_url                   = "${var.github_proxy_base_url}/token"
-    attributes_url              = "${var.github_proxy_base_url}/user"
-    attributes_request_method   = "GET"
-    oidc_issuer                 = var.github_proxy_base_url
+    client_id                 = var.github_client_id
+    client_secret             = var.github_client_secret
+    authorize_scopes          = "openid user:email read:user"
+    authorize_url             = "https://github.com/login/oauth/authorize"
+    token_url                 = "${var.github_proxy_base_url}/token"
+    attributes_url            = "${var.github_proxy_base_url}/user"
+    attributes_request_method = "GET"
+    oidc_issuer               = var.github_proxy_base_url
   }
 
   # プロキシの /user が GitHub の id を sub として返すため、username に sub をマッピング可能
@@ -183,6 +194,12 @@ resource "aws_cognito_identity_provider" "github" {
     email    = "email"
     name     = "name"
     picture  = "avatar_url"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      provider_details["attributes_url_add_attributes"],
+    ]
   }
 }
 
