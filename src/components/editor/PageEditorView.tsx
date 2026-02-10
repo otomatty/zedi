@@ -80,11 +80,13 @@ const PageEditor: React.FC = () => {
     },
   });
 
-  // リアルタイムコラボレーション（既存ページ・サインイン時のみ有効）
-  const isCollaborationEnabled = Boolean(currentPageId && !isNewPage && isSignedIn);
+  // C-Collab-2: 個人ページ(/page/:id)は常に local モードで動作させる。
+  // これにより Hocuspocus WebSocket には接続しない。
+  const isLocalDocEnabled = Boolean(currentPageId && !isNewPage && isSignedIn);
   const collaboration = useCollaboration({
     pageId: currentPageId ?? "",
-    enabled: isCollaborationEnabled,
+    enabled: isLocalDocEnabled,
+    mode: "local",
   });
 
   // タイトル重複チェック
@@ -355,16 +357,7 @@ const PageEditor: React.FC = () => {
         onExportMarkdown={handleExportMarkdown}
         onCopyMarkdown={handleCopyMarkdown}
         onGenerateWiki={handleGenerateWiki}
-        collaboration={
-          isCollaborationEnabled
-            ? {
-                status: collaboration.status,
-                isSynced: collaboration.isSynced,
-                onlineUsers: collaboration.onlineUsers,
-                onReconnect: collaboration.reconnect,
-              }
-            : undefined
-        }
+        collaboration={undefined}
       />
 
       <PageEditorAlerts
@@ -388,7 +381,7 @@ const PageEditor: React.FC = () => {
         onContentChange={handleContentChange}
         onContentError={handleContentError}
         collaboration={
-          isCollaborationEnabled ? { ...collaboration } : undefined
+          isLocalDocEnabled ? { ...collaboration } : undefined
         }
       />
 

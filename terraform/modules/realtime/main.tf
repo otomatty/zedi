@@ -31,9 +31,9 @@ resource "aws_ecr_lifecycle_policy" "hocuspocus" {
         rulePriority = 1
         description  = "Keep last 10 images"
         selection = {
-          tagStatus     = "any"
-          countType     = "imageCountMoreThan"
-          countNumber   = 10
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
         }
         action = {
           type = "expire"
@@ -156,7 +156,7 @@ resource "aws_lb_target_group" "hocuspocus" {
   # Enable stickiness for WebSocket connections
   stickiness {
     type            = "lb_cookie"
-    cookie_duration = 86400  # 24 hours
+    cookie_duration = 86400 # 24 hours
     enabled         = true
   }
 
@@ -335,8 +335,8 @@ resource "aws_ecs_task_definition" "hocuspocus" {
 
       secrets = [
         {
-          name      = "DATABASE_URL"
-          valueFrom = "${var.db_credentials_secret_arn}:host::"
+          name      = "DB_CREDENTIALS_JSON"
+          valueFrom = var.db_credentials_secret_arn
         }
       ]
 
