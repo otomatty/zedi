@@ -6,15 +6,14 @@
 const STORAGE_KEY = "zedi-onboarding";
 
 export interface OnboardingState {
-  hasSeenWelcome: boolean;
+  hasCompletedSetupWizard: boolean;
   hasCompletedTour: boolean;
   completedSteps: string[];
   dismissedHints: string[];
-  welcomeSeenAt?: number;
 }
 
 const DEFAULT_STATE: OnboardingState = {
-  hasSeenWelcome: false,
+  hasCompletedSetupWizard: false,
   hasCompletedTour: false,
   completedSteps: [],
   dismissedHints: [],
@@ -49,12 +48,11 @@ export function saveOnboardingState(state: Partial<OnboardingState>): void {
 }
 
 /**
- * Mark the welcome modal as seen
+ * Mark the setup wizard as completed
  */
-export function markWelcomeSeen(): void {
+export function markSetupWizardCompleted(): void {
   saveOnboardingState({
-    hasSeenWelcome: true,
-    welcomeSeenAt: Date.now(),
+    hasCompletedSetupWizard: true,
   });
 }
 

@@ -21,6 +21,7 @@ import NoteView from "./pages/NoteView";
 import NotePageView from "./pages/NotePageView";
 import NoteSettings from "./pages/NoteSettings.tsx";
 import NoteMembers from "./pages/NoteMembers.tsx";
+import Onboarding from "./pages/Onboarding";
 import { GlobalSearch } from "./components/search/GlobalSearch";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -49,6 +50,14 @@ const App = () => (
             <Route path="/note/:noteId/page/:pageId" element={<NotePageView />} />
 
             {/* Protected routes - require authentication */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <Onboarding />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/home"
               element={

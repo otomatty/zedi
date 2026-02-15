@@ -1,0 +1,27 @@
+{
+  "title": "初期設定",
+  "step": {
+    "profile": "プロフィール",
+    "language": "言語",
+    "tour": "ガイドツアー"
+  },
+  "profile": {
+    "heading": "あなたのプロフィール",
+    "description": "表示名とプロフィール画像を設定します（任意）"
+  },
+  "language": {
+    "heading": "使用言語",
+    "description": "UIの表示言語を選んでください"
+  },
+  "tour": {
+    "heading": "クイックツアー",
+    "description": "アプリの使い方を案内します。スキップしても後から設定で確認できます。",
+    "startTour": "クイックツアーを見る",
+    "skip": "スキップして始める"
+  },
+  "action": {
+    "next": "次へ",
+    "back": "戻る",
+    "complete": "設定を完了してホームへ"
+  }
+}

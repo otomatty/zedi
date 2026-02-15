@@ -1,18 +1,30 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import PageGrid from "@/components/page/PageGrid";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { useSeedData } from "@/hooks/useSeedData";
-import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { useOnboarding } from "@/hooks/useOnboarding";
 
 const Home: React.FC = () => {
-  // Seed tutorial pages on first run
+  const location = useLocation();
+  const navigate = useNavigate();
   const { isSeeding } = useSeedData();
+  const { needsSetupWizard, startTour } = useOnboarding();
 
-  // Onboarding state
-  const { showWelcome, dismissWelcome } = useOnboarding();
+  // When returning from onboarding with "start tour", trigger the tour
+  useEffect(() => {
+    const state = location.state as { startTour?: boolean } | null;
+    if (state?.startTour) {
+      startTour();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate, startTour]);
+
+  if (needsSetupWizard) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,9 +37,6 @@ const Home: React.FC = () => {
       </main>
 
       <FloatingActionButton />
-
-      {/* Welcome modal for first-time users */}
-      <WelcomeModal open={showWelcome} onClose={dismissWelcome} />
     </div>
   );
 };
