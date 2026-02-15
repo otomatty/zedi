@@ -14,6 +14,17 @@ const SUPPORTED_NODE_TYPES = new Set([
   'mermaid',
   'image', // 画像挿入機能のサポート
   'imageUpload', // 画像アップロード中のプレースホルダー
+  // Phase 1: タスクリスト
+  'taskList',
+  'taskItem',
+  // Phase 2: テーブル
+  'table',
+  'tableRow',
+  'tableCell',
+  'tableHeader',
+  // Phase 4: 数式
+  'math',
+  'mathBlock',
 ]);
 
 // Supported mark types in zedi's Tiptap schema
@@ -24,6 +35,11 @@ const SUPPORTED_MARK_TYPES = new Set([
   'code',
   'link',
   'wikiLink',
+  // Phase 1: ハイライト・下線
+  'highlight',
+  'underline',
+  // Phase 3: 文字色
+  'textStyle',
 ]);
 
 export interface SanitizeResult {

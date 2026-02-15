@@ -8,6 +8,10 @@ import {
   type WikiLinkSuggestionState,
 } from "./extensions/wikiLinkSuggestionPlugin";
 import {
+  slashSuggestionPluginKey,
+  type SlashSuggestionState,
+} from "./extensions/slashSuggestionPlugin";
+import {
   type WikiLinkSuggestionHandle,
   type SuggestionItem,
 } from "./extensions/WikiLinkSuggestion";
@@ -25,6 +29,12 @@ import { useToast } from "@/hooks/use-toast";
 import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
+import {
+  SlashSuggestionLayer,
+  type SlashSuggestionHandle,
+} from "./TiptapEditor/SlashSuggestionLayer";
+import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
+import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { useImageUploadManager } from "./TiptapEditor/useImageUploadManager";
 import { usePasteImageHandler } from "./TiptapEditor/usePasteImageHandler";
 import { useStorageActions } from "./TiptapEditor/useStorageActions";
@@ -73,6 +83,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     left: number;
   } | null>(null);
   const suggestionRef = useRef<WikiLinkSuggestionHandle>(null);
+
+  // Slash command state
+  const [slashState, setSlashState] = useState<SlashSuggestionState | null>(null);
+  const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null);
+  const slashRef = useRef<SlashSuggestionHandle>(null);
+
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
@@ -102,6 +118,10 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
 
   const handleStateChange = useCallback((state: WikiLinkSuggestionState) => {
     setSuggestionState(state);
+  }, []);
+
+  const handleSlashStateChange = useCallback((state: SlashSuggestionState) => {
+    setSlashState(state);
   }, []);
 
   // Parse initial content (sanitization will be done in useContentSanitizer hook)
@@ -176,6 +196,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       placeholder,
       onLinkClick: handleLinkClick,
       onStateChange: handleStateChange,
+      onSlashStateChange: handleSlashStateChange,
       imageUploadOptions: {
         onRetry: handleRetryUpload,
         onRemove: handleRemoveUpload,
@@ -218,6 +239,10 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     editorProps: {
       ...defaultEditorProps,
       handleKeyDown: (view, event) => {
+        // Slash suggestion takes priority when active
+        if (slashState?.active && slashRef.current) {
+          return slashRef.current.onKeyDown(event);
+        }
         if (suggestionState?.active && suggestionRef.current) {
           return suggestionRef.current.onKeyDown(event);
         }
@@ -310,6 +335,34 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       });
     }
   }, [editor, suggestionState]);
+
+  // Update slash suggestion position
+  useEffect(() => {
+    if (!editor || !slashState?.active || !slashState.range) {
+      setSlashPos(null);
+      return;
+    }
+
+    const { from } = slashState.range;
+    const coords = editor.view.coordsAtPos(from);
+    const containerRect = editorContainerRef.current?.getBoundingClientRect();
+
+    if (containerRect) {
+      setSlashPos({
+        top: coords.bottom - containerRect.top + 4,
+        left: coords.left - containerRect.left,
+      });
+    }
+  }, [editor, slashState]);
+
+  // Listen for image insert from slash command
+  useEffect(() => {
+    const handler = () => {
+      handleInsertImageClick();
+    };
+    window.addEventListener('slash-command-insert-image', handler);
+    return () => window.removeEventListener('slash-command-insert-image', handler);
+  }, [handleInsertImageClick]);
 
   const handleSuggestionSelect = useCallback(
     async (item: SuggestionItem) => {
@@ -468,6 +521,13 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     [editor, getToken, thumbnailApiBaseUrl, pageTitle, toast]
   );
 
+  const handleSlashClose = useCallback(() => {
+    if (!editor) return;
+    editor.view.dispatch(
+      editor.view.state.tr.setMeta(slashSuggestionPluginKey, { close: true })
+    );
+  }, [editor]);
+
   const handleGoToStorageSettings = useCallback(() => {
     const returnTo = `${location.pathname}${location.search}`;
     const search = new URLSearchParams({ returnTo }).toString();
@@ -494,6 +554,14 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
 
       <EditorContent editor={editor} />
 
+      {/* Bubble Menus */}
+      {editor && !isReadOnly && (
+        <>
+          <EditorBubbleMenu editor={editor} />
+          <TableBubbleMenu editor={editor} />
+        </>
+      )}
+
       {/* Drag overlay */}
       <DragOverlay isVisible={isDraggingOver} />
 
@@ -506,6 +574,17 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         onSelect={handleSuggestionSelect}
         onClose={handleSuggestionClose}
       />
+
+      {/* Slash Command Suggestion Popup */}
+      {!isReadOnly && (
+        <SlashSuggestionLayer
+          editor={editor}
+          suggestionState={slashState}
+          position={slashPos}
+          suggestionRef={slashRef}
+          onClose={handleSlashClose}
+        />
+      )}
 
       {/* Mermaid Generator Dialog */}
       <MermaidGeneratorDialog

@@ -202,6 +202,76 @@ describe("sanitizeTiptapContent", () => {
     expect(result.removedNodeTypes).toEqual([]);
   });
 
+  it("should support task list nodes", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "taskList",
+          content: [
+            {
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [{ type: "paragraph", content: [{ type: "text", text: "TODO" }] }],
+            },
+            {
+              type: "taskItem",
+              attrs: { checked: true },
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Done" }] }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+  });
+
+  it("should support table nodes", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                { type: "tableHeader", content: [{ type: "paragraph", content: [{ type: "text", text: "Header" }] }] },
+              ],
+            },
+            {
+              type: "tableRow",
+              content: [
+                { type: "tableCell", content: [{ type: "paragraph", content: [{ type: "text", text: "Cell" }] }] },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+  });
+
+  it("should support math nodes", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "math", attrs: { latex: "E = mc^2" } }] },
+        { type: "mathBlock", attrs: { latex: "\\sum_{i=1}^n x_i" } },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+  });
+
   it("should support all standard Tiptap marks", () => {
     const contentWithAllMarks = JSON.stringify({
       type: "doc",
@@ -221,6 +291,43 @@ describe("sanitizeTiptapContent", () => {
     });
 
     const result = sanitizeTiptapContent(contentWithAllMarks);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedMarkTypes).toEqual([]);
+  });
+
+  it("should support highlight and underline marks", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "highlighted", marks: [{ type: "highlight" }] },
+            { type: "text", text: "underlined", marks: [{ type: "underline" }] },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedMarkTypes).toEqual([]);
+  });
+
+  it("should support textStyle mark for text color", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "colored", marks: [{ type: "textStyle", attrs: { color: "#dc2626" } }] },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
     expect(result.hadErrors).toBe(false);
     expect(result.removedMarkTypes).toEqual([]);
   });

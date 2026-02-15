@@ -1,5 +1,11 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
+/* KaTeX for math rendering */
+@import "katex/dist/katex.min.css";
+
+/* highlight.js GitHub dark theme for code block syntax highlighting (default) */
+@import "highlight.js/styles/github-dark.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -224,6 +230,156 @@
 
   .tiptap-editor pre code {
     @apply bg-transparent p-0;
+  }
+
+  /* Task list styles */
+  .tiptap-editor ul[data-type="taskList"] {
+    @apply list-none pl-0 mb-3;
+  }
+
+  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] {
+    @apply flex items-start gap-2 mb-1;
+  }
+
+  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > label {
+    @apply flex items-center shrink-0 mt-1;
+  }
+
+  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > label input[type="checkbox"] {
+    @apply h-4 w-4 rounded border-border accent-primary cursor-pointer;
+  }
+
+  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > div {
+    @apply flex-1 min-w-0;
+  }
+
+  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div {
+    @apply text-muted-foreground line-through;
+  }
+
+  /* Nested task lists */
+  .tiptap-editor ul[data-type="taskList"] ul[data-type="taskList"] {
+    @apply ml-6 mt-1;
+  }
+
+  /* Highlight styles */
+  .tiptap-editor mark {
+    @apply bg-yellow-300/40 rounded-sm px-0.5;
+  }
+
+  /* Table styles */
+  .tiptap-editor .tableWrapper {
+    @apply overflow-x-auto mb-3;
+  }
+
+  .tiptap-editor table {
+    @apply w-full border-collapse;
+  }
+
+  .tiptap-editor th,
+  .tiptap-editor td {
+    @apply border border-border px-3 py-2 text-left align-top min-w-[80px];
+  }
+
+  .tiptap-editor th {
+    @apply bg-muted font-semibold;
+  }
+
+  .tiptap-editor td > p,
+  .tiptap-editor th > p {
+    @apply mb-0;
+  }
+
+  /* Table cell selection */
+  .tiptap-editor .selectedCell {
+    @apply bg-accent/40;
+  }
+
+  /* Code block syntax highlight - override hljs background to use our theme */
+  .tiptap-editor pre code.hljs {
+    background: transparent;
+    padding: 0;
+  }
+
+  .tiptap-editor pre {
+    position: relative;
+  }
+
+  /* Code block language label */
+  .tiptap-editor pre .code-block-language {
+    @apply absolute top-2 right-2 text-xs text-muted-foreground bg-muted/80 px-2 py-0.5 rounded;
+  }
+
+  /* Light mode: override hljs token colors for better readability */
+  .light .tiptap-editor pre code.hljs {
+    color: #24292e;
+  }
+  .light .tiptap-editor pre code .hljs-keyword,
+  .light .tiptap-editor pre code .hljs-selector-tag,
+  .light .tiptap-editor pre code .hljs-literal,
+  .light .tiptap-editor pre code .hljs-section,
+  .light .tiptap-editor pre code .hljs-link {
+    color: #d73a49;
+  }
+  .light .tiptap-editor pre code .hljs-string,
+  .light .tiptap-editor pre code .hljs-addition {
+    color: #032f62;
+  }
+  .light .tiptap-editor pre code .hljs-comment,
+  .light .tiptap-editor pre code .hljs-quote,
+  .light .tiptap-editor pre code .hljs-meta {
+    color: #6a737d;
+  }
+  .light .tiptap-editor pre code .hljs-name,
+  .light .tiptap-editor pre code .hljs-selector-id,
+  .light .tiptap-editor pre code .hljs-selector-class,
+  .light .tiptap-editor pre code .hljs-regexp,
+  .light .tiptap-editor pre code .hljs-deletion {
+    color: #22863a;
+  }
+  .light .tiptap-editor pre code .hljs-number,
+  .light .tiptap-editor pre code .hljs-built_in,
+  .light .tiptap-editor pre code .hljs-builtin-name,
+  .light .tiptap-editor pre code .hljs-type,
+  .light .tiptap-editor pre code .hljs-params {
+    color: #005cc5;
+  }
+  .light .tiptap-editor pre code .hljs-symbol,
+  .light .tiptap-editor pre code .hljs-bullet,
+  .light .tiptap-editor pre code .hljs-variable,
+  .light .tiptap-editor pre code .hljs-template-variable {
+    color: #e36209;
+  }
+  .light .tiptap-editor pre code .hljs-title,
+  .light .tiptap-editor pre code .hljs-attr {
+    color: #6f42c1;
+  }
+
+  /* Light mode: highlight mark */
+  .light .tiptap-editor mark {
+    @apply bg-yellow-200/60;
+  }
+
+  /* Mathematics (KaTeX) styles */
+  .tiptap-editor .Tiptap-mathematics-editor {
+    @apply font-mono text-sm bg-muted px-2 py-1 rounded border border-border;
+  }
+
+  .tiptap-editor .Tiptap-mathematics-render {
+    @apply cursor-pointer;
+  }
+
+  .tiptap-editor .Tiptap-mathematics-render--editable:hover {
+    @apply bg-accent/30 rounded;
+  }
+
+  .tiptap-editor .Tiptap-mathematics-editor--active {
+    @apply ring-2 ring-primary/50;
+  }
+
+  /* Slash command typing state */
+  .slash-command-typing {
+    @apply text-muted-foreground;
   }
 
   .tiptap-editor .is-editor-empty:first-child::before {
