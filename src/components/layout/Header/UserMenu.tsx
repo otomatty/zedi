@@ -11,18 +11,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { useTranslation } from "react-i18next";
 
 export const UserMenu: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useAuth();
+  const { displayName, avatarUrl } = useProfile();
+  const { t } = useTranslation();
 
   return (
     <>
       <SignedOut>
         <Link to="/sign-in">
           <Button variant="outline" size="sm">
-            サインイン
+            {t("nav.signIn")}
           </Button>
         </Link>
       </SignedOut>
@@ -35,11 +39,11 @@ export const UserMenu: React.FC = () => {
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage
-                  src={user?.imageUrl}
-                  alt={user?.fullName ?? "User"}
+                  src={avatarUrl || user?.imageUrl}
+                  alt={displayName || user?.fullName || "User"}
                 />
                 <AvatarFallback>
-                  {user?.firstName?.charAt(0) ?? "U"}
+                  {(displayName || user?.firstName)?.charAt(0) ?? "U"}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -47,8 +51,8 @@ export const UserMenu: React.FC = () => {
           <DropdownMenuContent align="end" className="w-56">
             <div className="flex items-center justify-start gap-2 p-2">
               <div className="flex flex-col space-y-1 leading-none">
-                {user?.fullName && (
-                  <p className="font-medium">{user.fullName}</p>
+                {(displayName || user?.fullName) && (
+                  <p className="font-medium">{displayName || user?.fullName}</p>
                 )}
                 {user?.primaryEmailAddress && (
                   <p className="text-xs text-muted-foreground">
@@ -60,15 +64,15 @@ export const UserMenu: React.FC = () => {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate("/settings")}>
               <Settings className="mr-2 h-4 w-4" />
-              設定
+              {t("nav.settings")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/pricing")}>
               <CreditCard className="mr-2 h-4 w-4" />
-              プラン
+              {t("nav.plan")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/donate")}>
               <Heart className="mr-2 h-4 w-4" />
-              サポート
+              {t("nav.support")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -76,7 +80,7 @@ export const UserMenu: React.FC = () => {
               className="text-destructive focus:text-destructive"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              サインアウト
+              {t("nav.signOut")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

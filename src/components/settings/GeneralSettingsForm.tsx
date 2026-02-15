@@ -1,0 +1,298 @@
+import React, { useRef, useCallback } from "react";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useGeneralSettings } from "@/hooks/useGeneralSettings";
+import { useProfile } from "@/hooks/useProfile";
+import {
+  THEME_OPTIONS,
+  FONT_SIZE_OPTIONS,
+  LOCALE_OPTIONS,
+  type ThemeMode,
+  type EditorFontSize,
+  type UILocale,
+} from "@/types/generalSettings";
+import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
+
+export const GeneralSettingsForm: React.FC = () => {
+  const {
+    settings,
+    isLoading: isGeneralLoading,
+    isSaving: isGeneralSaving,
+    updateTheme,
+    updateEditorFontSize,
+    updateLocale,
+    save: saveGeneral,
+  } = useGeneralSettings();
+
+  const {
+    profile,
+    isLoading: isProfileLoading,
+    isSaving: isProfileSaving,
+    updateProfile,
+    save: saveProfile,
+    displayName,
+    avatarUrl,
+  } = useProfile();
+
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isLoading = isGeneralLoading || isProfileLoading;
+  const isSaving = isGeneralSaving || isProfileSaving;
+
+  const handleSave = useCallback(async () => {
+    const [generalOk, profileOk] = await Promise.all([
+      saveGeneral(),
+      saveProfile(),
+    ]);
+
+    if (generalOk && profileOk) {
+      toast({
+        title: t("generalSettings.saved"),
+      });
+    } else {
+      toast({
+        title: t("generalSettings.saveFailed"),
+        variant: "destructive",
+      });
+    }
+  }, [saveGeneral, saveProfile, toast, t]);
+
+  const handleAvatarFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // ローカルプレビュー用に Object URL を使用
+      // 実際の運用ではストレージにアップロードして URL を取得する
+      const objectUrl = URL.createObjectURL(file);
+      updateProfile({ avatarUrl: objectUrl });
+    },
+    [updateProfile],
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* プロフィール設定（先頭） */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("generalSettings.profile.title")}</CardTitle>
+          <CardDescription>
+            {t("generalSettings.profile.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* アカウント名 */}
+          <div className="space-y-2">
+            <Label htmlFor="displayName">
+              {t("generalSettings.profile.displayName")}
+            </Label>
+            <Input
+              id="displayName"
+              value={profile.displayName}
+              onChange={(e) =>
+                updateProfile({ displayName: e.target.value })
+              }
+              placeholder={t("generalSettings.profile.displayNamePlaceholder")}
+              maxLength={100}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("generalSettings.profile.displayNameHelp")}
+            </p>
+          </div>
+
+          {/* サムネイル */}
+          <div className="space-y-3">
+            <Label>{t("generalSettings.profile.avatar")}</Label>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarImage
+                  src={profile.avatarUrl || avatarUrl}
+                  alt={displayName}
+                />
+                <AvatarFallback className="text-lg">
+                  {displayName?.charAt(0) ?? "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {t("generalSettings.profile.avatarUpload")}
+                </Button>
+                {profile.avatarUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => updateProfile({ avatarUrl: "" })}
+                  >
+                    {t("generalSettings.profile.avatarRemove")}
+                  </Button>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                className="hidden"
+              />
+            </div>
+
+            {/* URL 直接入力 */}
+            <div className="space-y-2">
+              <Label htmlFor="avatarUrl">
+                {t("generalSettings.profile.avatarUrl")}
+              </Label>
+              <Input
+                id="avatarUrl"
+                value={profile.avatarUrl}
+                onChange={(e) =>
+                  updateProfile({ avatarUrl: e.target.value })
+                }
+                placeholder={t(
+                  "generalSettings.profile.avatarUrlPlaceholder",
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("generalSettings.profile.avatarHelp")}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleSave} disabled={isSaving} className="w-full">
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t("common.saving")}
+              </>
+            ) : (
+              t("common.save")
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* 表示設定: テーマ + フォントサイズ */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("generalSettings.display.title")}</CardTitle>
+          <CardDescription>
+            {t("generalSettings.display.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* テーマ */}
+          <div className="space-y-2">
+            <Label htmlFor="theme">{t("generalSettings.theme.label")}</Label>
+            <Select
+              value={settings.theme}
+              onValueChange={(v) => updateTheme(v as ThemeMode)}
+            >
+              <SelectTrigger id="theme" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {THEME_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {t(`generalSettings.theme.${opt.value}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* フォントサイズ */}
+          <div className="space-y-2">
+            <Label htmlFor="fontSize">
+              {t("generalSettings.fontSize.label")}
+            </Label>
+            <Select
+              value={settings.editorFontSize}
+              onValueChange={(v) =>
+                updateEditorFontSize(v as EditorFontSize)
+              }
+            >
+              <SelectTrigger id="fontSize" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_SIZE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {t(`generalSettings.fontSize.${opt.value}`)} ({opt.px}px)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 言語設定 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("generalSettings.language.title")}</CardTitle>
+          <CardDescription>
+            {t("generalSettings.language.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="locale">
+              {t("generalSettings.language.label")}
+            </Label>
+            <Select
+              value={settings.locale}
+              onValueChange={(v) => updateLocale(v as UILocale)}
+            >
+              <SelectTrigger id="locale" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LOCALE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};

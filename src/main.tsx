@@ -4,6 +4,7 @@ import { CognitoAuthProvider } from "./components/auth/CognitoAuthProvider";
 import { MockClerkProvider } from "./components/auth/MockClerkProvider";
 import App from "./App.tsx";
 import "./index.css";
+import "./i18n"; // i18n 初期化
 
 const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 

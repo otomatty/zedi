@@ -181,6 +181,7 @@
   /* Tiptap editor styles */
   .tiptap-editor {
     @apply outline-none min-h-[200px];
+    font-size: var(--editor-font-size, 14px);
   }
 
   .tiptap-editor p {

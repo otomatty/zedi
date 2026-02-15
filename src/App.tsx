@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
@@ -12,6 +13,7 @@ import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
 import AISettings from "./pages/AISettings";
 import StorageSettings from "./pages/StorageSettings";
+import GeneralSettings from "./pages/GeneralSettings";
 import Pricing from "./pages/Pricing";
 import Donate from "./pages/Donate";
 import NotFound from "./pages/NotFound";
@@ -26,6 +28,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 const queryClient = new QueryClient();
 
 const App = () => (
+  <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -95,6 +98,14 @@ const App = () => (
               }
             />
             <Route
+              path="/settings/general"
+              element={
+                <ProtectedRoute>
+                  <GeneralSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/pricing"
               element={
                 <ProtectedRoute>
@@ -117,6 +128,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

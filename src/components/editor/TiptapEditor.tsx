@@ -43,6 +43,7 @@ import { EditorBottomToolbar } from "@/components/editor/TiptapEditor/EditorBott
 import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
 import { useAuth } from "@/hooks/useAuth";
 import { extractFirstImage } from "@/lib/contentUtils";
+import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 
 const getThumbnailApiBaseUrl = () =>
   import.meta.env.VITE_THUMBNAIL_API_BASE_URL ||
@@ -67,6 +68,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   collaborationConfig,
 }) => {
   const { checkReferenced } = useCheckGhostLinkReferenced();
+  const { editorFontSizePx } = useGeneralSettings();
 
   // WikiLink navigation hook
   const {
@@ -541,6 +543,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     <div
       ref={editorContainerRef}
       className={cn("relative", className, isDraggingOver && "ring-2 ring-primary ring-dashed")}
+      style={{ "--editor-font-size": `${editorFontSizePx}px` } as React.CSSProperties}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

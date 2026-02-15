@@ -1,0 +1,40 @@
+{
+  "display": {
+    "title": "Display",
+    "description": "Configure theme and font size"
+  },
+  "theme": {
+    "label": "Theme",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "fontSize": {
+    "label": "Editor Font Size",
+    "normal": "Normal",
+    "large": "Large",
+    "x-large": "Extra Large"
+  },
+  "language": {
+    "title": "Language",
+    "description": "Set the display language for the UI",
+    "label": "Display Language"
+  },
+  "profile": {
+    "title": "Profile",
+    "description": "Configure your display name and avatar",
+    "displayName": "Display Name",
+    "displayNamePlaceholder": "Enter your display name",
+    "displayNameHelp": "If left blank, your sign-in name will be used",
+    "avatar": "Avatar",
+    "avatarUrl": "Image URL",
+    "avatarUrlPlaceholder": "https://example.com/avatar.png",
+    "avatarUpload": "Upload Image",
+    "avatarRemove": "Remove Avatar",
+    "avatarHelp": "Enter a URL or upload an image"
+  },
+  "saved": "General settings saved",
+  "saveFailed": "Failed to save general settings",
+  "profileSaved": "Profile saved",
+  "profileSaveFailed": "Failed to save profile"
+}
