@@ -1,0 +1,14 @@
+{
+  "period": {
+    "all": "All time",
+    "selectMonth": "Select period"
+  },
+  "monthFilter": {
+    "empty": "No pages updated in this month.",
+    "showAll": "Show all"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next"
+  }
+}
