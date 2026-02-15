@@ -18,6 +18,7 @@
   "setupGuideLink": "How to set up {{name}}",
   "resetConfirmTitle": "Reset settings?",
   "resetConfirmDescription": "Your saved credentials and all settings will be deleted. This cannot be undone.",
+  "testConnection": "Test connection",
   "connectionSuccess": "Connection successful",
   "connectionFailed": "Connection failed",
   "savedToast": "Saved",

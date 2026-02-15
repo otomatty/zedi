@@ -18,6 +18,7 @@
   "setupGuideLink": "{{name}}の設定方法",
   "resetConfirmTitle": "設定をリセットしますか？",
   "resetConfirmDescription": "保存されている認証情報とすべての設定が削除されます。この操作は取り消せません。",
+  "testConnection": "接続テスト",
   "connectionSuccess": "接続成功",
   "connectionFailed": "接続失敗",
   "savedToast": "保存しました",

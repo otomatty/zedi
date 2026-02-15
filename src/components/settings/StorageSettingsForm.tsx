@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Eye,
@@ -48,7 +48,10 @@ import {
   StorageProviderType,
   getStorageProviderById,
 } from "@/types/storage";
+import type { StorageSettings } from "@/types/storage";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "@/components/ui/sonner";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { useTranslation } from "react-i18next";
 
 export const StorageSettingsForm: React.FC = () => {
@@ -59,8 +62,8 @@ export const StorageSettingsForm: React.FC = () => {
     isSaving,
     isTesting,
     testResult,
-    updateSettings,
-    updateConfig,
+    updateSettings: updateSettingsBase,
+    updateConfig: updateConfigBase,
     save,
     test,
     reset,
@@ -76,32 +79,42 @@ export const StorageSettingsForm: React.FC = () => {
     useExternalStorage ? settings.provider : "s3"
   );
 
-  const getSafeReturnTo = (): string | null => {
+  const getSafeReturnTo = useCallback((): string | null => {
     const returnTo = searchParams.get("returnTo");
     if (!returnTo) return null;
     if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
     return returnTo;
-  };
+  }, [searchParams]);
 
-  const handleSave = async () => {
+  const runSave = useCallback(async () => {
     const success = await save();
     if (success) {
-      toast({
-        title: t("storageSettings.savedToast"),
+      sonnerToast.success(t("storageSettings.savedToast"), {
         description: t("storageSettings.savedToastDescription"),
       });
       const returnTo = getSafeReturnTo();
-      if (returnTo) {
-        navigate(returnTo, { replace: true });
-      }
+      if (returnTo) navigate(returnTo, { replace: true });
     } else {
-      toast({
-        title: t("common.error"),
+      sonnerToast.error(t("common.error"), {
         description: t("storageSettings.saveFailedToastDescription"),
-        variant: "destructive",
       });
     }
-  };
+  }, [save, t, navigate, getSafeReturnTo]);
+  const scheduleSave = useDebouncedCallback(runSave, 800);
+  const updateSettings = useCallback(
+    (updates: Partial<StorageSettings>) => {
+      updateSettingsBase(updates);
+      scheduleSave();
+    },
+    [updateSettingsBase, scheduleSave],
+  );
+  const updateConfig = useCallback(
+    (updates: Partial<StorageSettings["config"]>) => {
+      updateConfigBase(updates);
+      scheduleSave();
+    },
+    [updateConfigBase, scheduleSave],
+  );
 
   const handleTest = async () => {
     const result = await test();
@@ -357,11 +370,7 @@ export const StorageSettingsForm: React.FC = () => {
             disabled={isSaving || isTesting}
           >
             {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {t("aiSettings.testConnection")}
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving || isTesting}>
-            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {t("common.save")}
+            {t("storageSettings.testConnection")}
           </Button>
         </div>
       </CardFooter>

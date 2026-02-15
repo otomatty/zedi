@@ -14,7 +14,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -29,8 +28,9 @@ import {
   type EditorFontSize,
   type UILocale,
 } from "@/types/generalSettings";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { useTranslation } from "react-i18next";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 
 export const GeneralSettingsForm: React.FC = () => {
   const {
@@ -53,30 +53,25 @@ export const GeneralSettingsForm: React.FC = () => {
     avatarUrl,
   } = useProfile();
 
-  const { toast } = useToast();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isLoading = isGeneralLoading || isProfileLoading;
-  const isSaving = isGeneralSaving || isProfileSaving;
 
-  const handleSave = useCallback(async () => {
-    const [generalOk, profileOk] = await Promise.all([
-      saveGeneral(),
-      saveProfile(),
-    ]);
+  const runProfileSave = useCallback(async () => {
+    const ok = await saveProfile();
+    if (ok) toast.success(t("generalSettings.saved"));
+    else toast.error(t("generalSettings.saveFailed"));
+  }, [saveProfile, t]);
+  const scheduleProfileSave = useDebouncedCallback(runProfileSave, 800);
 
-    if (generalOk && profileOk) {
-      toast({
-        title: t("generalSettings.saved"),
-      });
-    } else {
-      toast({
-        title: t("generalSettings.saveFailed"),
-        variant: "destructive",
-      });
-    }
-  }, [saveGeneral, saveProfile, toast, t]);
+  const updateProfileAndSave = useCallback(
+    (updates: Parameters<typeof updateProfile>[0]) => {
+      updateProfile(updates);
+      scheduleProfileSave();
+    },
+    [updateProfile, scheduleProfileSave],
+  );
 
   const handleAvatarFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,9 +81,9 @@ export const GeneralSettingsForm: React.FC = () => {
       // ローカルプレビュー用に Object URL を使用
       // 実際の運用ではストレージにアップロードして URL を取得する
       const objectUrl = URL.createObjectURL(file);
-      updateProfile({ avatarUrl: objectUrl });
+      updateProfileAndSave({ avatarUrl: objectUrl });
     },
-    [updateProfile],
+    [updateProfileAndSave],
   );
 
   if (isLoading) {
@@ -119,7 +114,7 @@ export const GeneralSettingsForm: React.FC = () => {
               id="displayName"
               value={profile.displayName}
               onChange={(e) =>
-                updateProfile({ displayName: e.target.value })
+                updateProfileAndSave({ displayName: e.target.value })
               }
               placeholder={t("generalSettings.profile.displayNamePlaceholder")}
               maxLength={100}
@@ -157,7 +152,7 @@ export const GeneralSettingsForm: React.FC = () => {
                     variant="ghost"
                     size="sm"
                     className="text-destructive"
-                    onClick={() => updateProfile({ avatarUrl: "" })}
+                    onClick={() => updateProfileAndSave({ avatarUrl: "" })}
                   >
                     {t("generalSettings.profile.avatarRemove")}
                   </Button>
@@ -171,40 +166,8 @@ export const GeneralSettingsForm: React.FC = () => {
                 className="hidden"
               />
             </div>
-
-            {/* URL 直接入力 */}
-            <div className="space-y-2">
-              <Label htmlFor="avatarUrl">
-                {t("generalSettings.profile.avatarUrl")}
-              </Label>
-              <Input
-                id="avatarUrl"
-                value={profile.avatarUrl}
-                onChange={(e) =>
-                  updateProfile({ avatarUrl: e.target.value })
-                }
-                placeholder={t(
-                  "generalSettings.profile.avatarUrlPlaceholder",
-                )}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("generalSettings.profile.avatarHelp")}
-              </p>
-            </div>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button onClick={handleSave} disabled={isSaving} className="w-full">
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t("common.saving")}
-              </>
-            ) : (
-              t("common.save")
-            )}
-          </Button>
-        </CardFooter>
       </Card>
 
       {/* 表示設定: テーマ + フォントサイズ */}

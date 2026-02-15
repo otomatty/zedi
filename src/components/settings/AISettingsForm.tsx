@@ -47,7 +47,10 @@ import { Badge } from "@/components/ui/badge";
 import { ProviderSelector } from "./ProviderSelector";
 import { useAISettings } from "@/hooks/useAISettings";
 import { getProviderById, type AIModel } from "@/types/ai";
+import type { AISettings } from "@/types/ai";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "@/components/ui/sonner";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { fetchServerModels } from "@/lib/aiService";
 import { useTranslation } from "react-i18next";
 
@@ -60,7 +63,7 @@ export const AISettingsForm: React.FC = () => {
     isSaving,
     isTesting,
     testResult,
-    updateSettings,
+    updateSettings: updateSettingsBase,
     save,
     test,
     reset,
@@ -104,12 +107,35 @@ export const AISettingsForm: React.FC = () => {
 
   const currentProvider = getProviderById(settings.provider);
 
-  const getSafeReturnTo = (): string | null => {
+  const getSafeReturnTo = useCallback((): string | null => {
     const returnTo = searchParams.get("returnTo");
     if (!returnTo) return null;
     if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
     return returnTo;
-  };
+  }, [searchParams]);
+
+  const runSave = useCallback(async () => {
+    const success = await save();
+    if (success) {
+      sonnerToast.success(t("aiSettings.savedToast"), {
+        description: t("aiSettings.savedToastDescription"),
+      });
+      const returnTo = getSafeReturnTo();
+      if (returnTo) navigate(returnTo, { replace: true });
+    } else {
+      sonnerToast.error(t("common.error"), {
+        description: t("aiSettings.saveFailedToastDescription"),
+      });
+    }
+  }, [save, t, navigate, getSafeReturnTo]);
+  const scheduleSave = useDebouncedCallback(runSave, 800);
+  const updateSettings = useCallback(
+    (updates: Partial<AISettings>) => {
+      updateSettingsBase(updates);
+      scheduleSave();
+    },
+    [updateSettingsBase, scheduleSave],
+  );
 
   const handleToggleOwnKey = (checked: boolean) => {
     setUseOwnKey(checked);
@@ -125,26 +151,6 @@ export const AISettingsForm: React.FC = () => {
         provider: model.provider,
         model: model.modelId,
         modelId: model.id,
-      });
-    }
-  };
-
-  const handleSave = async () => {
-    const success = await save();
-    if (success) {
-      toast({
-        title: t("aiSettings.savedToast"),
-        description: t("aiSettings.savedToastDescription"),
-      });
-      const returnTo = getSafeReturnTo();
-      if (returnTo) {
-        navigate(returnTo, { replace: true });
-      }
-    } else {
-      toast({
-        title: t("common.error"),
-        description: t("aiSettings.saveFailedToastDescription"),
-        variant: "destructive",
       });
     }
   };
@@ -438,10 +444,6 @@ export const AISettingsForm: React.FC = () => {
               {t("aiSettings.testConnection")}
             </Button>
           )}
-          <Button onClick={handleSave} disabled={isSaving || isTesting}>
-            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {t("common.save")}
-          </Button>
         </div>
       </CardFooter>
     </Card>

@@ -48,19 +48,31 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
 
   const updateTheme = useCallback(
     (theme: ThemeMode) => {
-      setSettings((prev) => ({ ...prev, theme }));
+      setSettings((prev) => {
+        const next = { ...prev, theme };
+        saveGeneralSettings(next);
+        return next;
+      });
       setTheme(theme);
     },
     [setTheme],
   );
 
   const updateEditorFontSize = useCallback((fontSize: EditorFontSize) => {
-    setSettings((prev) => ({ ...prev, editorFontSize: fontSize }));
+    setSettings((prev) => {
+      const next = { ...prev, editorFontSize: fontSize };
+      saveGeneralSettings(next);
+      return next;
+    });
   }, []);
 
   const updateLocale = useCallback(
     (locale: UILocale) => {
-      setSettings((prev) => ({ ...prev, locale }));
+      setSettings((prev) => {
+        const next = { ...prev, locale };
+        saveGeneralSettings(next);
+        return next;
+      });
       i18n.changeLanguage(locale);
     },
     [i18n],

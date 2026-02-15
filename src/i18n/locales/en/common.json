@@ -20,5 +20,10 @@
   "createNew": "New page",
   "comingSoon": "Coming soon",
   "voiceComingSoon": "Voice input coming soon",
-  "templateComingSoon": "Templates coming soon"
+  "templateComingSoon": "Templates coming soon",
+  "discard": "Discard",
+  "unsavedChangesMessage": "You have unsaved changes. Save them?",
+  "unsavedNavigationMessage": "Settings are not saved",
+  "saveAndLeave": "Save and leave",
+  "discardAndLeave": "Leave without saving"
 }

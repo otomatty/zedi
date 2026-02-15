@@ -20,5 +20,10 @@
   "createNew": "新規作成",
   "comingSoon": "準備中",
   "voiceComingSoon": "音声入力機能は近日公開予定です",
-  "templateComingSoon": "テンプレート機能は近日公開予定です"
+  "templateComingSoon": "テンプレート機能は近日公開予定です",
+  "discard": "破棄",
+  "unsavedChangesMessage": "設定が変更されています。保存しますか？",
+  "unsavedNavigationMessage": "設定が保存されていません",
+  "saveAndLeave": "保存して移動",
+  "discardAndLeave": "保存せずに移動"
 }
