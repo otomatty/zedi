@@ -30,6 +30,18 @@ resource "aws_s3_bucket_public_access_block" "media" {
   restrict_public_buckets = true
 }
 
+# ブラウザから Presigned URL へ PUT するために CORS を許可
+resource "aws_s3_bucket_cors_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "GET", "HEAD"]
+    allowed_origins = ["*"]
+    expose_headers  = ["ETag"]
+  }
+}
+
 # Lambda が Presigned URL を発行し、クライアントが PUT。Lambda は GetObject で確認用にも利用可能に。
 resource "aws_iam_role_policy" "lambda_s3_media" {
   name   = "zedi-${var.environment}-api-lambda-s3-media"

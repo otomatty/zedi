@@ -148,8 +148,7 @@ export const StorageSettingsForm: React.FC = () => {
           画像ストレージ設定
         </CardTitle>
         <CardDescription>
-          画像はあなた自身のストレージアカウントに保存されます。
-          Zediは画像を保存しません。
+          デフォルトでは画像は Zedi (S3) に保存されます。ここで「使用するストレージ」を変更すると、Gyazo や Cloudflare R2 など外部ストレージに保存することもできます。
         </CardDescription>
       </CardHeader>
 
@@ -204,6 +203,15 @@ export const StorageSettingsForm: React.FC = () => {
         </div>
 
         {/* Provider-specific settings */}
+        {settings.provider === "s3" && (
+          <Alert>
+            <AlertTitle>Zedi (S3) について</AlertTitle>
+            <AlertDescription>
+              ログインしていれば追加の設定は不要です。画像は Zedi の標準ストレージ（S3）に保存されます。他のストレージを使う場合は上で「使用するストレージ」を変更してください。
+            </AlertDescription>
+          </Alert>
+        )}
+
         {settings.provider === "gyazo" && (
           <GyazoSettings
             accessToken={settings.config.gyazoAccessToken || ""}
@@ -275,8 +283,8 @@ export const StorageSettingsForm: React.FC = () => {
           </Alert>
         )}
 
-        {/* Setup Guide Link */}
-        {currentProvider && (
+        {/* Setup Guide Link (外部ストレージのみ) */}
+        {currentProvider && currentProvider.helpUrl && (
           <div className="rounded-lg border border-border bg-muted/50 p-4">
             <h4 className="text-sm font-medium mb-2">💡 セットアップガイド</h4>
             <a

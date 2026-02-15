@@ -3,11 +3,13 @@
  * C1-8: S3 にクライアントが直接 PUT するための URL 発行と、media テーブルへの登録。
  */
 
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { S3Client } from "@aws-sdk/client-s3";
 import * as res from "../responses.mjs";
 import { execute } from "../lib/db.mjs";
+
+const PRESIGNED_GET_EXPIRES_IN = 3600; // 1 hour for image viewing
 
 const PRESIGNED_EXPIRES_IN = 900; // 15 min
 
@@ -126,4 +128,39 @@ export async function confirm(claims, body = {}) {
     file_size: row.file_size ?? null,
     created_at: row.created_at,
   });
+}
+
+const GET_MEDIA_BY_ID_SQL = `
+SELECT id, owner_id, s3_key, content_type FROM media WHERE id = :id
+`;
+
+/**
+ * GET /api/media/:id
+ * 認証済みユーザーが自分のメディアを取得。S3 の署名付き GET URL へ 302 リダイレクト。
+ */
+export async function getById(claims, mediaId) {
+  const ownerId = await getOwnerId(claims);
+  if (!ownerId) return res.unauthorized("User not found");
+
+  const bucket = process.env.MEDIA_BUCKET;
+  if (!bucket) return res.error("Media not configured", 503, "CONFIG");
+
+  if (!mediaId || !/^[0-9a-f-]{36}$/i.test(mediaId)) {
+    return res.badRequest("Invalid media id");
+  }
+
+  const rows = await execute(GET_MEDIA_BY_ID_SQL, { id: mediaId });
+  const row = rows[0];
+  if (!row) return res.notFound("Media not found");
+  if (row.owner_id !== ownerId) return res.forbidden("Access denied");
+
+  const client = getS3Client();
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: row.s3_key,
+  });
+  const signedUrl = await getSignedUrl(client, command, {
+    expiresIn: PRESIGNED_GET_EXPIRES_IN,
+  });
+  return res.redirect(signedUrl);
 }

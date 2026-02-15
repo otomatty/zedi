@@ -16,10 +16,10 @@ UPDATE ai_tier_budgets SET tier = 'pro' WHERE tier = 'paid';
 
 -- =============================================================================
 -- ai_models: tier_required 'paid' -> 'pro'
+-- (DROP first so UPDATE to 'pro' doesn't violate old check)
 -- =============================================================================
-UPDATE ai_models SET tier_required = 'pro' WHERE tier_required = 'paid';
-
 ALTER TABLE ai_models DROP CONSTRAINT IF EXISTS ai_models_tier_required_check;
+UPDATE ai_models SET tier_required = 'pro' WHERE tier_required = 'paid';
 ALTER TABLE ai_models ADD CONSTRAINT ai_models_tier_required_check CHECK (tier_required IN ('free', 'pro'));
 
 -- =============================================================================

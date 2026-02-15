@@ -154,6 +154,12 @@ export async function route(rawPath, method, ctx) {
     return searchShared(claims, query);
   }
 
+  // GET /api/media/:id — 自分のメディアを取得（302 → 署名付き S3 URL）
+  if (method === "GET" && segments[0] === "media" && segments[1] && segments.length === 2) {
+    const { getById: mediaGetById } = await import("./handlers/media.mjs");
+    return mediaGetById(claims, segments[1]);
+  }
+
   // POST /api/media/upload — Presigned URL 発行
   if (method === "POST" && segments[0] === "media" && segments[1] === "upload") {
     const { upload: mediaUpload } = await import("./handlers/media.mjs");

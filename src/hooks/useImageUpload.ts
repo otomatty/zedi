@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useStorageSettings } from "./useStorageSettings";
+import { useAuth } from "./useAuth";
 import { getStorageProvider, UploadProgress } from "@/lib/storage";
 
 interface ImageUploadState {
@@ -22,6 +23,7 @@ interface UseImageUploadReturn {
 
 export function useImageUpload(): UseImageUploadReturn {
   const { settings, isLoading } = useStorageSettings();
+  const { getToken } = useAuth();
   const [state, setState] = useState<ImageUploadState>({
     isUploading: false,
     progress: null,
@@ -55,8 +57,8 @@ export function useImageUpload(): UseImageUploadReturn {
       }));
 
       try {
-        // プロバイダーを取得
-        const provider = getStorageProvider(settings);
+        // プロバイダーを取得（S3 の場合は getToken を渡す）
+        const provider = getStorageProvider(settings, { getToken });
 
         // アップロード実行
         const url = await provider.uploadImage(file, {
@@ -83,7 +85,7 @@ export function useImageUpload(): UseImageUploadReturn {
         throw error;
       }
     },
-    [settings]
+    [settings, getToken]
   );
 
   /**

@@ -144,6 +144,15 @@ export function useRepository() {
     (async () => {
       try {
         console.log("[Sync] Initial sync requested", { userId });
+        // Ensure user row exists in Aurora (POST /api/users/upsert) before first sync
+        const api = apiRef.current;
+        if (api) {
+          try {
+            await api.upsertMe();
+          } catch (e) {
+            console.warn("[Sync] upsertMe failed (will still try sync):", e);
+          }
+        }
         await runAuroraSync(userId, getToken);
         // Refetch page list so UI shows data pulled into IndexedDB (avoids stuck loading/empty)
         queryClient.invalidateQueries({ queryKey: pageKeys.all });

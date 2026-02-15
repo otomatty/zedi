@@ -223,3 +223,21 @@ variable "enable_detailed_monitoring" {
   type        = bool
   default     = false
 }
+
+# =============================================================================
+# Secrets (optional — set via -var or .tfvars, do not commit values)
+# =============================================================================
+
+variable "thumbnail_google_custom_search_api_key" {
+  description = "Google Custom Search API key for thumbnail image search. Leave empty to create secret and set value later in AWS Console."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "thumbnail_google_custom_search_engine_id" {
+  description = "Google Custom Search Engine ID (cx) for thumbnail image search."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

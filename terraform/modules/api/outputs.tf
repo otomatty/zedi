@@ -5,6 +5,16 @@ output "api_id" {
   value       = aws_apigatewayv2_api.main.id
 }
 
+output "authorizer_id" {
+  description = "JWT authorizer ID for API Gateway routes"
+  value       = aws_apigatewayv2_authorizer.jwt.id
+}
+
+output "api_execution_arn" {
+  description = "API Gateway execution ARN for Lambda permissions"
+  value       = aws_apigatewayv2_api.main.execution_arn
+}
+
 output "invoke_url" {
   description = "API Gateway invoke URL (no trailing slash)"
   value       = aws_apigatewayv2_stage.default.invoke_url

@@ -24,7 +24,7 @@ const CLUSTER_ARN =
   "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
 const SECRET_ARN =
   process.env.SECRET_ARN ||
-  "arn:aws:secretsmanager:ap-northeast-1:590183877893:secret:zedi-dev-db-credentials-x1aCah";
+  "arn:aws:secretsmanager:ap-northeast-1:590183877893:secret:zedi-dev-db-credentials-QbCDfb";
 const DATABASE = process.env.DATABASE || "zedi";
 
 function extractStatements(content) {

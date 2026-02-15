@@ -48,7 +48,7 @@ bun run scripts/migration/transform-for-aurora/extract-content-text.ts
 bun run scripts/migration/transform-for-aurora/extract-content-text.ts path/to/page-contents-*.json
 ```
 
-出力: `output/page-contents-with-text-<timestamp>.json`（各 `page_contents` に `content_text` が追加された形式）。C2-5 の Aurora インポートではこのファイルの page_contents を使用します。
+出力: `output/page-contents-with-text-<timestamp>.json`（各 `page_contents` に `content_text` と **content_preview**（summary 用・先頭 300 文字）が追加された形式）。C2-5 の Aurora インポートではこのファイルの page_contents を使用し、`content_preview` が空のページには summary として `pages.content_preview` を更新します。
 
 ## C2-5: Aurora インポート
 
@@ -65,7 +65,7 @@ node scripts/migration/transform-for-aurora/import-to-aurora.mjs
 node scripts/migration/transform-for-aurora/import-to-aurora.mjs --transform=path/to/aurora-transform.json --page-contents=path/to/page-contents-with-text.json
 ```
 
-投入順: users → pages → notes → note_pages → note_members → links → ghost_links → page_contents。冪等のため INSERT ... ON CONFLICT DO NOTHING（page_contents は ON CONFLICT DO UPDATE）を使用。  
+投入順: users → pages → notes → note_pages → note_members → links → ghost_links → page_contents。続けて、`page-contents-with-text` の `content_preview` を使って **pages.content_preview（summary）** が空の行のみ UPDATE で補完する。冪等のため INSERT ... ON CONFLICT DO NOTHING（page_contents は ON CONFLICT DO UPDATE）を使用。  
 **注意:** page_contents の ydoc_state_base64 は長いため、環境によっては AWS CLI のコマンドライン長制限に達する場合があります。その場合は WSL や別環境での実行を検討してください。
 
 ## C2-7: 整合性検証（件数比較）

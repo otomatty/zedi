@@ -17,6 +17,7 @@ import {
   isProviderConfigured,
   ConnectionTestResult,
 } from "@/lib/storage";
+import { useAuth } from "./useAuth";
 
 interface UseStorageSettingsReturn {
   settings: StorageSettings;
@@ -34,6 +35,7 @@ interface UseStorageSettingsReturn {
 }
 
 export function useStorageSettings(): UseStorageSettingsReturn {
+  const { getToken } = useAuth();
   const [settings, setSettings] = useState<StorageSettings>(
     getDefaultStorageSettings()
   );
@@ -116,8 +118,8 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     setTestResult(null);
 
     try {
-      // 現在の設定でプロバイダーを作成
-      const provider = getStorageProvider(settings);
+      // 現在の設定でプロバイダーを作成（S3 の場合は getToken を渡す）
+      const provider = getStorageProvider(settings, { getToken });
       const result = await provider.testConnection();
       setTestResult(result);
       return result;
@@ -132,7 +134,7 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     } finally {
       setIsTesting(false);
     }
-  }, [settings]);
+  }, [settings, getToken]);
 
   // 設定をリセットする
   const reset = useCallback(() => {

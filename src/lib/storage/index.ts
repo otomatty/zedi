@@ -6,16 +6,33 @@ import { GyazoProvider } from "./providers/GyazoProvider";
 import { CloudflareR2Provider } from "./providers/CloudflareR2Provider";
 import { GitHubProvider } from "./providers/GitHubProvider";
 import { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
+import { S3Provider, type S3ProviderContext } from "./providers/S3Provider";
+
+/**
+ * S3 プロバイダー用のコンテキスト（getToken 必須。baseUrl は省略時は VITE_ZEDI_API_BASE_URL）
+ */
+export type StorageProviderContext = S3ProviderContext;
 
 /**
  * ストレージ設定からプロバイダーインスタンスを取得
+ * provider が "s3" のときは context.getToken が必須
  */
 export function getStorageProvider(
-  settings: StorageSettings
+  settings: StorageSettings,
+  context?: StorageProviderContext
 ): StorageProviderInterface {
   const { provider, config } = settings;
 
   switch (provider) {
+    case "s3":
+      if (!context?.getToken) {
+        throw new Error("Zedi (S3) を使うには getToken が必要です（ログインしてください）");
+      }
+      return new S3Provider(config as Record<string, unknown>, {
+        getToken: context.getToken,
+        baseUrl: context.baseUrl,
+      });
+
     case "gyazo":
       if (!config.gyazoAccessToken) {
         throw new Error("Gyazo Access Token が設定されていません");
@@ -98,6 +115,9 @@ export function isProviderConfigured(
         config.googleDriveAccessToken
       );
 
+    case "s3":
+      return true;
+
     default:
       return false;
   }
@@ -109,3 +129,4 @@ export { GyazoProvider } from "./providers/GyazoProvider";
 export { CloudflareR2Provider } from "./providers/CloudflareR2Provider";
 export { GitHubProvider } from "./providers/GitHubProvider";
 export { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
+export { S3Provider } from "./providers/S3Provider";

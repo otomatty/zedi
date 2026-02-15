@@ -8,6 +8,7 @@ import {
 import type { Editor } from "@tiptap/core";
 import { getStorageProvider } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type { StorageSettings } from "@/types/storage";
 
 type ToastFn = ReturnType<typeof useToast>["toast"];
@@ -35,6 +36,7 @@ export function useImageUploadManager({
   onRequestStorageSetup,
   lastSelectionRef,
 }: UseImageUploadManagerParams) {
+  const { getToken } = useAuth();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [pendingRetryUploadId, setPendingRetryUploadId] = useState<string | null>(
     null
@@ -157,7 +159,7 @@ export function useImageUploadManager({
 
       let provider: ReturnType<typeof getStorageProvider>;
       try {
-        provider = getStorageProvider(storageSettings);
+        provider = getStorageProvider(storageSettings, { getToken });
       } catch (error) {
         toast({
           title: "ストレージ設定エラー",
@@ -225,6 +227,7 @@ export function useImageUploadManager({
     },
     [
       isStorageConfigured,
+      getToken,
       storageSettings,
       toast,
       updateUploadNodeAttributes,

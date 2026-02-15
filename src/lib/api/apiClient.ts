@@ -134,6 +134,11 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
   ) => request<T>(method, path, getToken, baseUrl, opts);
 
   return {
+    /** POST /api/users/upsert — ensure current user exists in DB (Cognito sub/email from JWT). Call before first sync. */
+    async upsertMe(body?: { display_name?: string; avatar_url?: string }): Promise<unknown> {
+      return req("POST", "/api/users/upsert", { body: body ?? {} });
+    },
+
     /** GET /api/sync/pages?since= (ISO8601). Omit since for full pull. */
     async getSyncPages(since?: string): Promise<SyncPagesResponse> {
       const query: Record<string, string> = {};

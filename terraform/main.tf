@@ -239,6 +239,34 @@ module "subscription" {
 }
 
 # =============================================================================
+# Module: Thumbnail API (image search, AI generate, commit → S3 + CloudFront)
+# =============================================================================
+module "thumbnail_api" {
+  source = "./modules/thumbnail-api"
+
+  environment = var.environment
+  tags        = local.common_tags
+
+  cognito_user_pool_id = module.security.user_pool_id
+
+  db_credentials_secret_arn = module.database.db_credentials_secret_arn
+  aurora_cluster_arn        = module.database.cluster_arn
+  aurora_database_name      = var.aurora_database_name
+
+  api_id            = module.api.api_id
+  api_execution_arn = module.api.api_execution_arn
+  authorizer_id     = module.api.authorizer_id
+
+  rate_limit_table_name = module.ai_api.rate_limit_table_name
+  ai_secrets_arn        = module.ai_api.ai_secrets_arn
+
+  cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
+
+  google_custom_search_api_key    = var.thumbnail_google_custom_search_api_key
+  google_custom_search_engine_id  = var.thumbnail_google_custom_search_engine_id
+}
+
+# =============================================================================
 # Module: CDN (CloudFront, S3)
 # =============================================================================
 module "cdn" {

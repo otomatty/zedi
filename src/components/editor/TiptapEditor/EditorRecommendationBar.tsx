@@ -8,9 +8,13 @@ import {
 } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
-const THUMBNAIL_API_BASE_URL =
-  import.meta.env.VITE_THUMBNAIL_API_BASE_URL || "";
+// Same origin as REST API when using AWS thumbnail-api; fallback for legacy Worker
+const getThumbnailApiBaseUrl = () =>
+  import.meta.env.VITE_THUMBNAIL_API_BASE_URL ||
+  import.meta.env.VITE_ZEDI_API_BASE_URL ||
+  "";
 
 interface ThumbnailCandidate {
   id: string;
@@ -42,6 +46,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
   hasThumbnail,
   onSelectThumbnail,
 }) => {
+  const { getToken } = useAuth();
   const [mode, setMode] = useState<RecommendationMode>("actions");
   const [candidates, setCandidates] = useState<ThumbnailCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +55,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
   const lastQueryRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const thumbnailApiBaseUrl = getThumbnailApiBaseUrl();
   const trimmedTitle = pageTitle.trim();
   const canSearch = !isReadOnly && !hasThumbnail;
 
@@ -73,6 +79,11 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
     setErrorMessage(null);
 
     try {
+      const token = await getToken();
+      if (!token) {
+        setErrorMessage("ログインが必要です");
+        return;
+      }
       const params = new URLSearchParams({
         query,
         limit: "10",
@@ -81,7 +92,12 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
         params.set("cursor", cursor);
       }
       const response = await fetch(
-        `${THUMBNAIL_API_BASE_URL}/api/image-search?${params.toString()}`
+        `${thumbnailApiBaseUrl}/api/thumbnail/image-search?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
       if (!response.ok) {
@@ -105,9 +121,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
     } finally {
       setIsLoading(false);
     }
-  },
-    [trimmedTitle]
-  );
+  }, [getToken, thumbnailApiBaseUrl, trimmedTitle]);
 
   const handleOpenThumbnailPicker = useCallback(() => {
     if (!canSearch) return;
@@ -151,12 +165,19 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
     setMode("generating");
 
     try {
+      const token = await getToken();
+      if (!token) {
+        setErrorMessage("ログインが必要です");
+        setMode("actions");
+        return;
+      }
       const response = await fetch(
-        `${THUMBNAIL_API_BASE_URL}/api/image-generate`,
+        `${thumbnailApiBaseUrl}/api/thumbnail/image-generate`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             prompt: trimmedTitle,
@@ -191,7 +212,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
     } finally {
       setIsLoading(false);
     }
-  }, [trimmedTitle, onSelectThumbnail]);
+  }, [getToken, thumbnailApiBaseUrl, trimmedTitle, onSelectThumbnail]);
 
   const headerLabel = useMemo(() => {
     if (mode === "generating") return "画像を生成中";

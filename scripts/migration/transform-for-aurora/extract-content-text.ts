@@ -18,6 +18,9 @@ const outputDir = join(__dirname, "output");
 
 type ProseMirrorNode = { type: string; text?: string; content?: ProseMirrorNode[] };
 
+/** summary / content_preview 用の最大文字数 */
+const CONTENT_PREVIEW_MAX_LENGTH = 300;
+
 /** ProseMirror/Tiptap JSON からプレーンテキストを抽出（全文検索用） */
 function extractTextFromNode(node: ProseMirrorNode): string {
   if (node.type === "text" && typeof node.text === "string") {
@@ -35,6 +38,15 @@ function extractTextFromDoc(doc: ProseMirrorNode): string {
   return raw.replace(/\s+/g, " ").trim();
 }
 
+/** 本文から summary（content_preview）用の短いプレビューを生成 */
+function toContentPreview(contentText: string | null): string | null {
+  if (contentText == null || contentText === "") return null;
+  const trimmed = contentText.trim();
+  if (trimmed === "") return null;
+  if (trimmed.length <= CONTENT_PREVIEW_MAX_LENGTH) return trimmed;
+  return trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trim() + "…";
+}
+
 async function findLatestPageContents(): Promise<string | null> {
   let files: string[] = [];
   try {
@@ -43,7 +55,7 @@ async function findLatestPageContents(): Promise<string | null> {
     return null;
   }
   const jsonFiles = files
-    .filter((f) => f.startsWith("page-contents-") && f.endsWith(".json"))
+    .filter((f) => f.startsWith("page-contents-") && !f.includes("with-text") && f.endsWith(".json"))
     .sort()
     .reverse();
   return jsonFiles.length ? join(outputDir, jsonFiles[0]) : null;
@@ -71,6 +83,7 @@ async function main() {
     ydoc_state_base64: string;
     version: number;
     content_text: string | null;
+    content_preview: string | null;
   }> = [];
   let errors = 0;
 
@@ -87,6 +100,7 @@ async function main() {
         ydoc_state_base64: item.ydoc_state_base64,
         version: item.version,
         content_text: contentText,
+        content_preview: toContentPreview(contentText),
       });
     } catch (err) {
       errors++;
@@ -98,6 +112,7 @@ async function main() {
         ydoc_state_base64: item.ydoc_state_base64,
         version: item.version,
         content_text: null,
+        content_preview: null,
       });
     }
   }

@@ -78,3 +78,19 @@ export function corsPreflight() {
     body: "",
   };
 }
+
+/**
+ * 302 redirect (e.g. for GET /api/media/:id → presigned S3 URL)
+ * @param {string} location
+ * @returns {{ statusCode: number; headers: Record<string, string>; body: string }}
+ */
+export function redirect(location) {
+  return {
+    statusCode: 302,
+    headers: {
+      ...CORS_HEADERS,
+      Location: location,
+    },
+    body: "",
+  };
+}

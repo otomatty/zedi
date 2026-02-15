@@ -46,6 +46,14 @@ SCHEMA_FILE=002_ai_platform.sql node apply-data-api.mjs
 
 Aurora が auto-pause から復帰直後だと最初の文が失敗することがあります。その場合は `002_ai_platform_subscriptions_only.sql` で subscriptions のみ再適用し、`002_seed_ai_models.sql` で ai_models のシードを投入してください。
 
+**プラン名・billing_interval 用マイグレーション（004）:**
+
+```bash
+# 004 を適用（plan: paid→pro、subscriptions.billing_interval 追加）
+# ※ AI API（モデル一覧・利用状況・Wiki生成など）は subscription を参照するため、未適用だと "column billing_interval does not exist" が発生します。
+SCHEMA_FILE=004_plan_rename.sql node apply-data-api.mjs
+```
+
 ### 方法 B: psql（VPC 内などネットワーク接続がある場合）
 
 #### 1. 接続情報の取得

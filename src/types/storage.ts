@@ -5,6 +5,7 @@
  */
 export type StorageProviderType =
   | "gyazo"
+  | "s3" // Zedi standard storage (AWS thumbnail-api commit)
   | "cloudflare-r2"
   | "github"
   | "google-drive";
@@ -65,6 +66,14 @@ export interface StorageProviderInfo {
  */
 export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
   {
+    id: "s3",
+    name: "Zedi (S3)",
+    description: "標準ストレージ（ログインで利用）",
+    helpUrl: "",
+    setupDifficulty: "easy",
+    freeTier: "無料枠あり",
+  },
+  {
     id: "gyazo",
     name: "Gyazo",
     description: "Access Tokenで簡単セットアップ",
@@ -102,9 +111,9 @@ export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
  * デフォルトのストレージ設定
  */
 export const DEFAULT_STORAGE_SETTINGS: StorageSettings = {
-  provider: "gyazo",
+  provider: "s3",
   config: {},
-  isConfigured: false,
+  isConfigured: true, // S3 はログインのみで利用可能
 };
 
 /**

@@ -54,6 +54,30 @@ async function runStatement(sql, parameters = []) {
   }
 }
 
+/** Run SELECT and return first row's first column value, or null. */
+async function runQueryOne(sql, parameters = []) {
+  try {
+    const response = await rdsClient.send(
+      new ExecuteStatementCommand({
+        resourceArn: CLUSTER_ARN,
+        secretArn: SECRET_ARN,
+        database: DATABASE,
+        sql,
+        ...(parameters.length ? { parameters } : {}),
+      })
+    );
+    const records = response.records ?? [];
+    if (records.length === 0) return null;
+    const col = records[0][0];
+    if (col?.stringValue !== undefined) return col.stringValue;
+    if (col?.longValue !== undefined) return String(col.longValue);
+    return null;
+  } catch (e) {
+    if (e.message) process.stderr.write(String(e.message) + "\n");
+    return null;
+  }
+}
+
 async function findLatest(pattern, desc) {
   let files = [];
   try {
@@ -112,11 +136,11 @@ async function main() {
   let ok = 0;
   let fail = 0;
 
-  // 1. users (ON CONFLICT DO NOTHING). UUID は CAST で明示
+  // 1. users (ON CONFLICT (cognito_sub) DO NOTHING — 既存 Cognito ユーザーはスキップ)
   for (const row of users) {
     const sql = `INSERT INTO users (id, cognito_sub, email, display_name, avatar_url, created_at, updated_at)
       VALUES (CAST(:id AS uuid), :cognito_sub, :email, :display_name, :avatar_url, CAST(:created_at AS timestamptz), CAST(:updated_at AS timestamptz))
-      ON CONFLICT (id) DO NOTHING`;
+      ON CONFLICT (cognito_sub) DO NOTHING`;
     const params = [
       param("id", row.id),
       param("cognito_sub", row.cognito_sub),
@@ -131,18 +155,29 @@ async function main() {
   }
   console.log("users:", ok, "ok", fail, "fail");
 
-  // 2. pages
+  // transform の user id → Aurora の user id（既存ユーザーは SELECT で取得）
+  const ownerIdMap = new Map();
+  for (const row of users) {
+    const auroraId = await runQueryOne(
+      `SELECT id FROM users WHERE cognito_sub = :cognito_sub`,
+      [param("cognito_sub", row.cognito_sub)]
+    );
+    if (auroraId) ownerIdMap.set(row.id, auroraId);
+  }
+
+  // 2. pages（owner_id は既存 Aurora ユーザー ID にマッピング）
   ok = 0;
   fail = 0;
   for (let i = 0; i < pages.length; i++) {
     const row = pages[i];
     if (i > 0 && i % 200 === 0) console.log("  pages progress:", i, "/", pages.length);
+    const ownerId = ownerIdMap.get(row.owner_id) ?? row.owner_id;
     const sql = `INSERT INTO pages (id, owner_id, source_page_id, title, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted)
       VALUES (CAST(:id AS uuid), CAST(:owner_id AS uuid), CAST(:source_page_id AS uuid), :title, :content_preview, :thumbnail_url, :source_url, CAST(:created_at AS timestamptz), CAST(:updated_at AS timestamptz), :is_deleted)
       ON CONFLICT (id) DO NOTHING`;
     const params = [
       param("id", row.id),
-      param("owner_id", row.owner_id),
+      param("owner_id", ownerId),
       param("source_page_id", row.source_page_id),
       param("title", row.title),
       param("content_preview", row.content_preview),
@@ -157,16 +192,17 @@ async function main() {
   }
   console.log("pages:", ok, "ok", fail, "fail");
 
-  // 3. notes
+  // 3. notes（owner_id をマッピング）
   ok = 0;
   fail = 0;
   for (const row of notes) {
+    const ownerId = ownerIdMap.get(row.owner_id) ?? row.owner_id;
     const sql = `INSERT INTO notes (id, owner_id, title, visibility, created_at, updated_at, is_deleted)
       VALUES (CAST(:id AS uuid), CAST(:owner_id AS uuid), :title, :visibility, CAST(:created_at AS timestamptz), CAST(:updated_at AS timestamptz), :is_deleted)
       ON CONFLICT (id) DO NOTHING`;
     const params = [
       param("id", row.id),
-      param("owner_id", row.owner_id),
+      param("owner_id", ownerId),
       param("title", row.title),
       param("visibility", row.visibility),
       param("created_at", row.created_at),
@@ -178,17 +214,18 @@ async function main() {
   }
   console.log("notes:", ok, "ok", fail, "fail");
 
-  // 4. note_pages
+  // 4. note_pages（added_by_user_id をマッピング）
   ok = 0;
   fail = 0;
   for (const row of note_pages) {
+    const addedBy = ownerIdMap.get(row.added_by_user_id) ?? row.added_by_user_id;
     const sql = `INSERT INTO note_pages (note_id, page_id, added_by_user_id, sort_order, created_at, updated_at, is_deleted)
       VALUES (CAST(:note_id AS uuid), CAST(:page_id AS uuid), CAST(:added_by_user_id AS uuid), :sort_order, CAST(:created_at AS timestamptz), CAST(:updated_at AS timestamptz), :is_deleted)
       ON CONFLICT (note_id, page_id) DO NOTHING`;
     const params = [
       param("note_id", row.note_id),
       param("page_id", row.page_id),
-      param("added_by_user_id", row.added_by_user_id),
+      param("added_by_user_id", addedBy),
       param("sort_order", row.sort_order),
       param("created_at", row.created_at),
       param("updated_at", row.updated_at),
@@ -199,10 +236,11 @@ async function main() {
   }
   console.log("note_pages:", ok, "ok", fail, "fail");
 
-  // 5. note_members
+  // 5. note_members（invited_by_user_id をマッピング）
   ok = 0;
   fail = 0;
   for (const row of note_members) {
+    const invitedBy = ownerIdMap.get(row.invited_by_user_id) ?? row.invited_by_user_id;
     const sql = `INSERT INTO note_members (note_id, member_email, role, invited_by_user_id, created_at, updated_at, is_deleted)
       VALUES (CAST(:note_id AS uuid), :member_email, :role, CAST(:invited_by_user_id AS uuid), CAST(:created_at AS timestamptz), CAST(:updated_at AS timestamptz), :is_deleted)
       ON CONFLICT (note_id, member_email) DO NOTHING`;
@@ -210,7 +248,7 @@ async function main() {
       param("note_id", row.note_id),
       param("member_email", row.member_email),
       param("role", row.role),
-      param("invited_by_user_id", row.invited_by_user_id),
+      param("invited_by_user_id", invitedBy),
       param("created_at", row.created_at),
       param("updated_at", row.updated_at),
       param("is_deleted", row.is_deleted),
@@ -277,6 +315,21 @@ async function main() {
     else fail++;
   }
   console.log("page_contents:", ok, "ok", fail, "fail");
+
+  // 9. pages.content_preview（summary）を content_text から生成したプレビューで補完（空の場合のみ）
+  ok = 0;
+  fail = 0;
+  for (let i = 0; i < page_contents.length; i++) {
+    const row = page_contents[i];
+    const preview = row.content_preview ?? null;
+    if (preview == null || String(preview).trim() === "") continue;
+    if (i > 0 && i % 200 === 0) console.log("  content_preview progress:", i, "/", page_contents.length);
+    const sql = `UPDATE pages SET content_preview = COALESCE(NULLIF(TRIM(content_preview), ''), :content_preview) WHERE id = CAST(:page_id AS uuid) AND (content_preview IS NULL OR TRIM(content_preview) = '')`;
+    const params = [param("content_preview", preview), param("page_id", row.page_id)];
+    if (await runStatement(sql, params)) ok++;
+    else fail++;
+  }
+  console.log("pages.content_preview (summary) updated:", ok, "ok", fail, "fail");
 
   console.log("C2-5 import done.");
 }

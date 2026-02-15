@@ -30,10 +30,13 @@ import { usePasteImageHandler } from "./TiptapEditor/usePasteImageHandler";
 import { useStorageActions } from "./TiptapEditor/useStorageActions";
 import { EditorBottomToolbar } from "@/components/editor/TiptapEditor/EditorBottomToolbar";
 import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
+import { useAuth } from "@/hooks/useAuth";
 import { extractFirstImage } from "@/lib/contentUtils";
 
-const THUMBNAIL_API_BASE_URL =
-  import.meta.env.VITE_THUMBNAIL_API_BASE_URL || "";
+const getThumbnailApiBaseUrl = () =>
+  import.meta.env.VITE_THUMBNAIL_API_BASE_URL ||
+  import.meta.env.VITE_ZEDI_API_BASE_URL ||
+  "";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -361,34 +364,25 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     [editor]
   );
 
+  const { getToken } = useAuth();
+  const thumbnailApiBaseUrl = getThumbnailApiBaseUrl();
+
   const handleInsertThumbnailImage = useCallback(
     async (imageUrl: string, alt: string, previewUrl?: string) => {
       if (!editor) return;
-      if (isStorageLoading) {
+      const token = await getToken();
+      if (!token) {
         toast({
-          title: "読み込み中",
-          description: "ストレージ設定を読み込み中です",
-        });
-        return;
-      }
-      if (!isStorageConfigured) {
-        openStorageSetupDialog();
-        return;
-      }
-      if (storageSettings.provider !== "gyazo") {
-        toast({
-          title: "Gyazoが必要です",
-          description: "サムネイル検索画像の保存はGyazoのみ対応しています",
+          title: "ログインが必要です",
+          description: "画像の保存にはログインしてください",
           variant: "destructive",
         });
         return;
       }
-
-      const accessToken = storageSettings.config.gyazoAccessToken;
-      if (!accessToken) {
+      if (!thumbnailApiBaseUrl) {
         toast({
-          title: "Gyazoトークンが必要です",
-          description: "Gyazo Access Tokenを設定してください",
+          title: "設定エラー",
+          description: "APIのURLが設定されていません",
           variant: "destructive",
         });
         return;
@@ -398,12 +392,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
 
       try {
         const response = await fetch(
-          `${THUMBNAIL_API_BASE_URL}/api/thumbnail/commit`,
+          `${thumbnailApiBaseUrl}/api/thumbnail/commit`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "X-Gyazo-Access-Token": accessToken,
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               sourceUrl: imageUrl,
@@ -428,10 +422,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
 
         const data = (await response.json()) as {
           imageUrl?: string;
+          provider?: string;
         };
 
         if (!data.imageUrl) {
-          throw new Error("GyazoのURLが取得できませんでした");
+          throw new Error("画像のURLが取得できませんでした");
         }
 
         editor
@@ -443,7 +438,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
               src: data.imageUrl,
               alt: altText,
               title: altText,
-              storageProviderId: "gyazo",
+              storageProviderId: "s3",
             },
           })
           .run();
@@ -456,16 +451,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         });
       }
     },
-    [
-      editor,
-      isStorageConfigured,
-      isStorageLoading,
-      openStorageSetupDialog,
-      pageTitle,
-      storageSettings.provider,
-      storageSettings.config.gyazoAccessToken,
-      toast,
-    ]
+    [editor, getToken, thumbnailApiBaseUrl, pageTitle, toast]
   );
 
   const handleGoToStorageSettings = useCallback(() => {
