@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from "react";
-import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +55,12 @@ export const GeneralSettingsForm: React.FC = () => {
   } = useProfile();
 
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRunTourAgain = useCallback(() => {
+    navigate("/home", { state: { startTour: true } });
+  }, [navigate]);
 
   const isLoading = isGeneralLoading || isProfileLoading;
 
@@ -222,6 +228,24 @@ export const GeneralSettingsForm: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* クイックツアー */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Compass className="h-5 w-5" />
+            {t("generalSettings.tour.title")}
+          </CardTitle>
+          <CardDescription>
+            {t("generalSettings.tour.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={handleRunTourAgain}>
+            {t("generalSettings.tour.runAgain")}
+          </Button>
         </CardContent>
       </Card>
 

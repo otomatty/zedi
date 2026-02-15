@@ -18,6 +18,7 @@ import jaLanding from "./locales/ja/landing.json";
 import jaDonate from "./locales/ja/donate.json";
 import jaPricing from "./locales/ja/pricing.json";
 import jaOnboarding from "./locales/ja/onboarding.json";
+import jaTour from "./locales/ja/tour.json";
 import enCommon from "./locales/en/common.json";
 import enSettings from "./locales/en/settings.json";
 import enGeneralSettings from "./locales/en/generalSettings.json";
@@ -32,6 +33,7 @@ import enLanding from "./locales/en/landing.json";
 import enDonate from "./locales/en/donate.json";
 import enPricing from "./locales/en/pricing.json";
 import enOnboarding from "./locales/en/onboarding.json";
+import enTour from "./locales/en/tour.json";
 
 const ja = {
   common: jaCommon,
@@ -48,6 +50,7 @@ const ja = {
   donate: jaDonate,
   pricing: jaPricing,
   onboarding: jaOnboarding,
+  tour: jaTour,
 };
 
 const en = {
@@ -65,6 +68,7 @@ const en = {
   donate: enDonate,
   pricing: enPricing,
   onboarding: enOnboarding,
+  tour: enTour,
 };
 
 // localStorage の設定から初期言語を取得

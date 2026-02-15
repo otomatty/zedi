@@ -4,14 +4,18 @@ import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import PageGrid from "@/components/page/PageGrid";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
+import { QuickTour } from "@/components/tour/QuickTour";
 import { useSeedData } from "@/hooks/useSeedData";
 import { useOnboarding } from "@/hooks/useOnboarding";
+
+const HOME_PATH = "/home";
 
 const Home: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isSeeding } = useSeedData();
-  const { needsSetupWizard, startTour } = useOnboarding();
+  const { needsSetupWizard, isTourRunning, startTour, completeTour } =
+    useOnboarding();
 
   // When returning from onboarding with "start tour", trigger the tour
   useEffect(() => {
@@ -22,17 +26,28 @@ const Home: React.FC = () => {
     }
   }, [location.pathname, location.state, navigate, startTour]);
 
+  // End tour when user navigates away from home
+  useEffect(() => {
+    if (isTourRunning && location.pathname !== HOME_PATH) {
+      completeTour();
+    }
+  }, [isTourRunning, location.pathname, completeTour]);
+
   if (needsSetupWizard) {
     return <Navigate to="/onboarding" replace />;
   }
 
   return (
     <div className="min-h-screen bg-background">
+      <QuickTour run={isTourRunning} onComplete={completeTour} />
+
       <Header />
 
       <main className="py-6">
         <Container>
-          <PageGrid isSeeding={isSeeding} />
+          <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
+            <PageGrid isSeeding={isSeeding} />
+          </div>
         </Container>
       </main>
 

@@ -16,7 +16,12 @@ export const AppsMenu: React.FC = () => {
     <SignedIn>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            data-tour-id="tour-apps-menu"
+          >
             <LayoutGrid className="h-5 w-5" />
             <span className="sr-only">アプリメニュー</span>
           </Button>

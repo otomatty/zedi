@@ -1,4 +1,9 @@
 {
+  "tour": {
+    "title": "Quick tour",
+    "description": "A short guide to the app.",
+    "runAgain": "Watch quick tour again"
+  },
   "display": {
     "title": "Display",
     "description": "Configure theme and font size"

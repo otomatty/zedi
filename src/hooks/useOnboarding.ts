@@ -13,6 +13,7 @@ import {
 export function useOnboarding() {
   const { isSignedIn } = useAuth();
   const [state, setState] = useState<OnboardingState>(getOnboardingState);
+  const [isTourRunning, setIsTourRunning] = useState(false);
 
   /** True when signed-in user has not completed the setup wizard */
   const needsSetupWizard =
@@ -25,17 +26,19 @@ export function useOnboarding() {
 
   const completeTour = useCallback(() => {
     markTourCompleted();
+    setIsTourRunning(false);
     setState(getOnboardingState());
   }, []);
 
   const startTour = useCallback(() => {
-    // TODO: Trigger tour start
+    setIsTourRunning(true);
     setState(getOnboardingState());
   }, []);
 
   return {
     state,
     needsSetupWizard,
+    isTourRunning,
     completeSetupWizard,
     completeTour,
     startTour,

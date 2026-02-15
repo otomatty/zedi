@@ -134,6 +134,7 @@ const FloatingActionButton: React.FC = () => {
   // メインFABボタン
   const fabButton = (
     <Button
+      data-tour-id="tour-fab"
       onClick={() => setIsMenuOpen(!isMenuOpen)}
       disabled={isCreating}
       size="icon"

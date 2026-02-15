@@ -1,4 +1,9 @@
 {
+  "tour": {
+    "title": "クイックツアー",
+    "description": "アプリの使い方を短いガイドで案内します。",
+    "runAgain": "クイックツアーをもう一度見る"
+  },
   "display": {
     "title": "表示",
     "description": "テーマとフォントサイズを設定します"
