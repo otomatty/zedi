@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import {
   Copy,
@@ -50,6 +50,33 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
   const [reloadKey, setReloadKey] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  /** For /api/media/ URLs: resolved blob URL so img works after reload (auth required) */
+  const [authenticatedSrc, setAuthenticatedSrc] = useState<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  const isAuthRequiredUrl = src != null && src.includes("/api/media/");
+  const getAuthenticatedImageUrl = options.getAuthenticatedImageUrl;
+
+  useEffect(() => {
+    if (!isAuthRequiredUrl || !getAuthenticatedImageUrl || !src) return;
+    let cancelled = false;
+    getAuthenticatedImageUrl(src).then((blobUrl) => {
+      if (cancelled) return;
+      if (blobUrl) {
+        blobUrlRef.current = blobUrl;
+        setAuthenticatedSrc(blobUrl);
+      } else {
+        setHasLoadError(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [src, isAuthRequiredUrl, getAuthenticatedImageUrl, reloadKey]);
 
   const handleCopyUrl = () => {
     if (!src) return;
@@ -67,6 +94,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
 
   const handleReload = () => {
     setHasLoadError(false);
+    setAuthenticatedSrc(null);
     setReloadKey((prev) => prev + 1);
   };
 
@@ -116,10 +144,14 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
               </Button>
             </div>
           </div>
+        ) : isAuthRequiredUrl && !authenticatedSrc && getAuthenticatedImageUrl ? (
+          <div className="flex items-center justify-center min-h-[120px] rounded-lg border bg-muted/50 text-muted-foreground text-sm">
+            読み込み中…
+          </div>
         ) : (
           <img
             key={reloadKey}
-            src={src}
+            src={isAuthRequiredUrl && authenticatedSrc ? authenticatedSrc : src}
             alt={alt || "image"}
             title={title}
             className="block h-auto w-auto max-w-full rounded-lg border bg-background"

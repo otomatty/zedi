@@ -186,6 +186,20 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         canDeleteFromStorage,
         onDeleteFromStorage: handleDeleteFromStorage,
         onCopyUrl: handleCopyImageUrl,
+        getAuthenticatedImageUrl: async (url: string) => {
+          const token = await getToken();
+          if (!token) return null;
+          try {
+            const r = await fetch(url, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!r.ok) return null;
+            const blob = await r.blob();
+            return URL.createObjectURL(blob);
+          } catch {
+            return null;
+          }
+        },
       },
       collaboration: useCollaborationMode
         ? {
