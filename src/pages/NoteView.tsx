@@ -16,8 +16,10 @@ import {
   useRemovePageFromNote,
 } from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
+import { useTranslation } from "react-i18next";
 
 const NoteView: React.FC = () => {
+  const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
   const { toast } = useToast();
 
@@ -68,10 +70,10 @@ const NoteView: React.FC = () => {
     if (!noteId) return;
     try {
       await addPageMutation.mutateAsync({ noteId, pageId });
-      toast({ title: "ページを追加しました" });
+      toast({ title: t("notes.pageAdded") });
     } catch (error) {
       console.error("Failed to add page:", error);
-      toast({ title: "ページの追加に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.pageAddFailed"), variant: "destructive" });
     }
   };
 
@@ -79,10 +81,10 @@ const NoteView: React.FC = () => {
     if (!noteId) return;
     try {
       await removePageMutation.mutateAsync({ noteId, pageId });
-      toast({ title: "ページを削除しました" });
+      toast({ title: t("notes.pageRemoved") });
     } catch (error) {
       console.error("Failed to remove page:", error);
-      toast({ title: "ページの削除に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.pageRemoveFailed"), variant: "destructive" });
     }
   };
 
@@ -93,7 +95,7 @@ const NoteView: React.FC = () => {
         <Header />
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">読み込み中...</p>
+            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
           </Container>
         </main>
       </div>
@@ -107,7 +109,7 @@ const NoteView: React.FC = () => {
         <main className="py-10">
           <Container>
             <p className="text-sm text-muted-foreground">
-              ノートが見つからないか、閲覧権限がありません。
+              {t("notes.noteNotFoundOrNoAccess")}
             </p>
           </Container>
         </main>
@@ -124,22 +126,22 @@ const NoteView: React.FC = () => {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-semibold truncate">
-                  {note.title || "無題のノート"}
+                  {note.title || t("notes.untitledNote")}
                 </h1>
                 <NoteVisibilityBadge visibility={note.visibility} />
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {notePages.length} 件のページ
+                {t("notes.pagesCount", { count: notePages.length })}
               </p>
             </div>
             <div className="flex items-center gap-2">
               {canManageMembers && (
                 <>
                   <Button asChild variant="outline" size="sm">
-                    <Link to={`/note/${note.id}/members`}>メンバー</Link>
+                    <Link to={`/note/${note.id}/members`}>{t("notes.members")}</Link>
                   </Button>
                   <Button asChild variant="outline" size="sm">
-                    <Link to={`/note/${note.id}/settings`}>設定</Link>
+                    <Link to={`/note/${note.id}/settings`}>{t("notes.settings")}</Link>
                   </Button>
                 </>
               )}
@@ -148,23 +150,23 @@ const NoteView: React.FC = () => {
                   <DialogTrigger asChild>
                     <Button size="sm" variant="outline">
                       <Plus className="mr-2 h-4 w-4" />
-                      ページを追加
+                      {t("notes.addPage")}
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>ページを追加</DialogTitle>
+                      <DialogTitle>{t("notes.addPageDialogTitle")}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3">
                       <Input
                         value={pageFilter}
                         onChange={(event) => setPageFilter(event.target.value)}
-                        placeholder="タイトルで検索"
+                        placeholder={t("notes.searchByTitle")}
                       />
                       <div className="max-h-64 overflow-y-auto space-y-2">
                         {filteredPages.length === 0 ? (
                           <p className="text-sm text-muted-foreground">
-                            追加できるページがありません。
+                            {t("notes.noPagesToAdd")}
                           </p>
                         ) : (
                           filteredPages.map((page) => (
@@ -173,7 +175,7 @@ const NoteView: React.FC = () => {
                               onClick={() => handleAddPage(page.id)}
                               className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border"
                             >
-                              {page.title || "無題のページ"}
+                              {page.title || t("notes.untitledPage")}
                             </button>
                           ))
                         )}
@@ -184,7 +186,7 @@ const NoteView: React.FC = () => {
                         variant="outline"
                         onClick={() => setIsAddPageOpen(false)}
                       >
-                        閉じる
+                        {t("notes.close")}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -194,10 +196,10 @@ const NoteView: React.FC = () => {
           </div>
           <div className="mt-4">
             {isPagesLoading ? (
-              <p className="text-sm text-muted-foreground">読み込み中...</p>
+              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
             ) : notePages.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                まだページが登録されていません。
+                {t("notes.noPagesYet")}
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

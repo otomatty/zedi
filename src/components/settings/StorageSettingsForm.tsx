@@ -46,12 +46,13 @@ import { useStorageSettings } from "@/hooks/useStorageSettings";
 import {
   EXTERNAL_STORAGE_PROVIDERS,
   StorageProviderType,
-  StorageProviderInfo,
   getStorageProviderById,
 } from "@/types/storage";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 
 export const StorageSettingsForm: React.FC = () => {
+  const { t } = useTranslation();
   const {
     settings,
     isLoading,
@@ -74,14 +75,6 @@ export const StorageSettingsForm: React.FC = () => {
   const currentProvider = getStorageProviderById(
     useExternalStorage ? settings.provider : "s3"
   );
-  const difficultyLabels: Record<
-    StorageProviderInfo["setupDifficulty"],
-    string
-  > = {
-    easy: "簡単",
-    medium: "普通",
-    hard: "上級",
-  };
 
   const getSafeReturnTo = (): string | null => {
     const returnTo = searchParams.get("returnTo");
@@ -94,8 +87,8 @@ export const StorageSettingsForm: React.FC = () => {
     const success = await save();
     if (success) {
       toast({
-        title: "保存しました",
-        description: "ストレージ設定が正常に保存されました",
+        title: t("storageSettings.savedToast"),
+        description: t("storageSettings.savedToastDescription"),
       });
       const returnTo = getSafeReturnTo();
       if (returnTo) {
@@ -103,8 +96,8 @@ export const StorageSettingsForm: React.FC = () => {
       }
     } else {
       toast({
-        title: "エラー",
-        description: "ストレージ設定の保存に失敗しました",
+        title: t("common.error"),
+        description: t("storageSettings.saveFailedToastDescription"),
         variant: "destructive",
       });
     }
@@ -114,12 +107,12 @@ export const StorageSettingsForm: React.FC = () => {
     const result = await test();
     if (result.success) {
       toast({
-        title: "接続成功",
+        title: t("storageSettings.connectionSuccess"),
         description: result.message,
       });
     } else {
       toast({
-        title: "接続失敗",
+        title: t("storageSettings.connectionFailed"),
         description: result.message,
         variant: "destructive",
       });
@@ -129,8 +122,8 @@ export const StorageSettingsForm: React.FC = () => {
   const handleReset = () => {
     reset();
     toast({
-      title: "リセットしました",
-      description: "ストレージ設定が初期化されました",
+      title: t("storageSettings.resetToast"),
+      description: t("storageSettings.resetToastDescription"),
     });
   };
 
@@ -149,10 +142,10 @@ export const StorageSettingsForm: React.FC = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Image className="h-5 w-5" />
-          画像ストレージ設定
+          {t("storageSettings.title")}
         </CardTitle>
         <CardDescription>
-          デフォルトでは画像はデフォルトストレージに保存されます。トグルで外部ストレージに切り替え、Gyazo や Cloudflare R2 などに保存することもできます。
+          {t("storageSettings.description")}
         </CardDescription>
       </CardHeader>
 
@@ -161,12 +154,12 @@ export const StorageSettingsForm: React.FC = () => {
         <div className="flex items-center justify-between rounded-lg border border-border p-4">
           <div className="space-y-0.5">
             <Label htmlFor="prefer-default" className="text-base">
-              画像の保存先
+              {t("storageSettings.storageDestination")}
             </Label>
             <p className="text-sm text-muted-foreground">
               {useExternalStorage
-                ? "外部ストレージに保存します"
-                : "デフォルトストレージに保存します"}
+                ? t("storageSettings.saveToExternal")
+                : t("storageSettings.saveToDefault")}
             </p>
           </div>
           <Switch
@@ -181,9 +174,9 @@ export const StorageSettingsForm: React.FC = () => {
 
         {!useExternalStorage && (
           <Alert>
-            <AlertTitle>デフォルトストレージについて</AlertTitle>
+            <AlertTitle>{t("storageSettings.defaultStorageAlertTitle")}</AlertTitle>
             <AlertDescription>
-              ログインしていれば追加の設定は不要です。画像はデフォルトストレージに保存されます。
+              {t("storageSettings.defaultStorageAlertDescription")}
             </AlertDescription>
           </Alert>
         )}
@@ -192,7 +185,7 @@ export const StorageSettingsForm: React.FC = () => {
         {useExternalStorage && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="provider">使用する外部ストレージ</Label>
+              <Label htmlFor="provider">{t("storageSettings.externalStorageLabel")}</Label>
               <Select
                 value={settings.provider}
                 onValueChange={(value) =>
@@ -201,24 +194,24 @@ export const StorageSettingsForm: React.FC = () => {
                 disabled={isSaving || isTesting}
               >
                 <SelectTrigger id="provider">
-                  <SelectValue placeholder="ストレージを選択" />
+                  <SelectValue placeholder={t("storageSettings.selectStorage")} />
                 </SelectTrigger>
                 <SelectContent>
                   {EXTERNAL_STORAGE_PROVIDERS.map((provider) => (
                     <SelectItem key={provider.id} value={provider.id}>
                       <div className="flex w-full items-center justify-between gap-2">
                         <div className="flex flex-col items-start">
-                          <span>{provider.name}</span>
+                          <span>{t(`storageSettings.providers.${provider.id}.name`)}</span>
                           <span className="text-xs text-muted-foreground">
-                            {provider.description}
+                            {t(`storageSettings.providers.${provider.id}.description`)}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Badge variant="outline" className="text-[10px]">
-                            難易度: {difficultyLabels[provider.setupDifficulty]}
+                            {t("storageSettings.difficultyLabel")}: {t(`storageSettings.difficulty.${provider.setupDifficulty}`)}
                           </Badge>
                           <Badge variant="secondary" className="text-[10px]">
-                            {provider.freeTier}
+                            {t(`storageSettings.providers.${provider.id}.freeTier`)}
                           </Badge>
                         </div>
                       </div>
@@ -229,12 +222,12 @@ export const StorageSettingsForm: React.FC = () => {
               {currentProvider && (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="outline" className="text-[10px]">
-                    難易度: {difficultyLabels[currentProvider.setupDifficulty]}
+                    {t("storageSettings.difficultyLabel")}: {t(`storageSettings.difficulty.${currentProvider.setupDifficulty}`)}
                   </Badge>
                   <Badge variant="secondary" className="text-[10px]">
-                    {currentProvider.freeTier}
+                    {t(`storageSettings.providers.${currentProvider.id}.freeTier`)}
                   </Badge>
-                  <span>{currentProvider.description}</span>
+                  <span>{t(`storageSettings.providers.${currentProvider.id}.description`)}</span>
                 </div>
               )}
             </div>
@@ -302,7 +295,7 @@ export const StorageSettingsForm: React.FC = () => {
               <XCircle className="h-4 w-4" />
             )}
             <AlertTitle>
-              {testResult.success ? "接続成功" : "接続失敗"}
+              {testResult.success ? t("storageSettings.connectionSuccess") : t("storageSettings.connectionFailed")}
             </AlertTitle>
             <AlertDescription>
               {testResult.message}
@@ -316,14 +309,14 @@ export const StorageSettingsForm: React.FC = () => {
         {/* Setup Guide Link (外部ストレージのみ) */}
         {currentProvider && currentProvider.helpUrl && (
           <div className="rounded-lg border border-border bg-muted/50 p-4">
-            <h4 className="text-sm font-medium mb-2">💡 セットアップガイド</h4>
+            <h4 className="text-sm font-medium mb-2">{t("storageSettings.setupGuideTitle")}</h4>
             <a
               href={currentProvider.helpUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
-              {currentProvider.name}の設定方法 <ExternalLink className="h-3 w-3" />
+              {t("storageSettings.setupGuideLink", { name: t(`storageSettings.providers.${currentProvider.id}.name`) })} <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         )}
@@ -338,20 +331,20 @@ export const StorageSettingsForm: React.FC = () => {
               disabled={isSaving || isTesting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              リセット
+              {t("common.reset")}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>設定をリセットしますか？</AlertDialogTitle>
+              <AlertDialogTitle>{t("storageSettings.resetConfirmTitle")}</AlertDialogTitle>
               <AlertDialogDescription>
-                保存されている認証情報とすべての設定が削除されます。この操作は取り消せません。
+                {t("storageSettings.resetConfirmDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
               <AlertDialogAction onClick={handleReset}>
-                リセット
+                {t("common.reset")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -364,11 +357,11 @@ export const StorageSettingsForm: React.FC = () => {
             disabled={isSaving || isTesting}
           >
             {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            接続テスト
+            {t("aiSettings.testConnection")}
           </Button>
           <Button onClick={handleSave} disabled={isSaving || isTesting}>
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            保存
+            {t("common.save")}
           </Button>
         </div>
       </CardFooter>
@@ -391,57 +384,60 @@ const GyazoSettings: React.FC<GyazoSettingsProps> = ({
   showSecrets,
   setShowSecrets,
   disabled,
-}) => (
-  <div className="space-y-2">
-    <Label htmlFor="gyazoAccessToken">Access Token</Label>
-    <div className="relative">
-      <Input
-        id="gyazoAccessToken"
-        type={showSecrets ? "text" : "password"}
-        value={accessToken}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Gyazo Access Token"
-        disabled={disabled}
-        className="pr-10"
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-        onClick={() => setShowSecrets(!showSecrets)}
-      >
-        {showSecrets ? (
-          <EyeOff className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <Eye className="h-4 w-4 text-muted-foreground" />
-        )}
-      </Button>
-    </div>
-    <p className="text-xs text-muted-foreground">
-      <a
-        href="https://gyazo.com/oauth/applications"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary hover:underline"
-      >
-        Gyazo OAuth Applications
-      </a>
-      でAccess Tokenを取得してください
-    </p>
-    <div className="rounded-lg border border-border bg-muted/50 p-3 mt-2">
-      <p className="text-xs font-medium mb-1">💡 Callback URLの設定について</p>
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="gyazoAccessToken">{t("storageSettings.gyazo.accessTokenLabel")}</Label>
+      <div className="relative">
+        <Input
+          id="gyazoAccessToken"
+          type={showSecrets ? "text" : "password"}
+          value={accessToken}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={t("storageSettings.gyazo.accessTokenPlaceholder")}
+          disabled={disabled}
+          className="pr-10"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+          onClick={() => setShowSecrets(!showSecrets)}
+        >
+          {showSecrets ? (
+            <EyeOff className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          )}
+        </Button>
+      </div>
       <p className="text-xs text-muted-foreground">
-        OAuthアプリケーション作成時にCallback URLが求められる場合、以下のいずれかを入力してください（実際には使用されません）:
+        <a
+          href="https://gyazo.com/oauth/applications"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline"
+        >
+          Gyazo OAuth Applications
+        </a>
+        {t("storageSettings.gyazo.getTokenHelp")}
       </p>
-      <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc space-y-0.5">
-        <li><code className="bg-muted px-1 rounded">http://localhost:5173/callback</code></li>
-        <li><code className="bg-muted px-1 rounded">urn:ietf:wg:oauth:2.0:oob</code></li>
-        <li><code className="bg-muted px-1 rounded">zedi://oauth/callback</code></li>
-      </ul>
+      <div className="rounded-lg border border-border bg-muted/50 p-3 mt-2">
+        <p className="text-xs font-medium mb-1">{t("storageSettings.gyazo.callbackUrlTitle")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("storageSettings.gyazo.callbackUrlDescription")}
+        </p>
+        <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc space-y-0.5">
+          <li><code className="bg-muted px-1 rounded">http://localhost:5173/callback</code></li>
+          <li><code className="bg-muted px-1 rounded">urn:ietf:wg:oauth:2.0:oob</code></li>
+          <li><code className="bg-muted px-1 rounded">zedi://oauth/callback</code></li>
+        </ul>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // GitHub Settings Component
 interface GitHubSettingsProps {
@@ -464,77 +460,80 @@ const GitHubSettings: React.FC<GitHubSettingsProps> = ({
   showSecrets,
   setShowSecrets,
   disabled,
-}) => (
-  <div className="space-y-4">
-    <div className="space-y-2">
-      <Label htmlFor="githubRepository">リポジトリ</Label>
-      <Input
-        id="githubRepository"
-        type="text"
-        value={repository}
-        onChange={(e) => onChange({ githubRepository: e.target.value })}
-        placeholder="username/repo-name"
-        disabled={disabled}
-      />
-      <p className="text-xs text-muted-foreground">
-        画像保存用のリポジトリを "owner/repo" 形式で入力
-      </p>
-    </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="githubToken">Personal Access Token</Label>
-      <div className="relative">
-        <Input
-          id="githubToken"
-          type={showSecrets ? "text" : "password"}
-          value={token}
-          onChange={(e) => onChange({ githubToken: e.target.value })}
-          placeholder="ghp_..."
-          disabled={disabled}
-          className="pr-10"
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-          onClick={() => setShowSecrets(!showSecrets)}
-        >
-          {showSecrets ? (
-            <EyeOff className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          )}
-        </Button>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-2 gap-4">
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="githubBranch">ブランチ</Label>
+        <Label htmlFor="githubRepository">{t("storageSettings.github.repository")}</Label>
         <Input
-          id="githubBranch"
+          id="githubRepository"
           type="text"
-          value={branch}
-          onChange={(e) => onChange({ githubBranch: e.target.value })}
-          placeholder="main"
+          value={repository}
+          onChange={(e) => onChange({ githubRepository: e.target.value })}
+          placeholder={t("storageSettings.github.repositoryPlaceholder")}
           disabled={disabled}
         />
+        <p className="text-xs text-muted-foreground">
+          {t("storageSettings.github.repositoryHelp")}
+        </p>
       </div>
+
       <div className="space-y-2">
-        <Label htmlFor="githubPath">保存先パス</Label>
-        <Input
-          id="githubPath"
-          type="text"
-          value={path}
-          onChange={(e) => onChange({ githubPath: e.target.value })}
-          placeholder="images"
-          disabled={disabled}
-        />
+        <Label htmlFor="githubToken">{t("storageSettings.github.personalAccessToken")}</Label>
+        <div className="relative">
+          <Input
+            id="githubToken"
+            type={showSecrets ? "text" : "password"}
+            value={token}
+            onChange={(e) => onChange({ githubToken: e.target.value })}
+            placeholder={t("storageSettings.github.tokenPlaceholder")}
+            disabled={disabled}
+            className="pr-10"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setShowSecrets(!showSecrets)}
+          >
+            {showSecrets ? (
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="githubBranch">{t("storageSettings.github.branch")}</Label>
+          <Input
+            id="githubBranch"
+            type="text"
+            value={branch}
+            onChange={(e) => onChange({ githubBranch: e.target.value })}
+            placeholder={t("storageSettings.github.branchPlaceholder")}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="githubPath">{t("storageSettings.github.path")}</Label>
+          <Input
+            id="githubPath"
+            type="text"
+            value={path}
+            onChange={(e) => onChange({ githubPath: e.target.value })}
+            placeholder={t("storageSettings.github.pathPlaceholder")}
+            disabled={disabled}
+          />
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Cloudflare R2 Settings Component
 interface CloudflareR2SettingsProps {
@@ -559,89 +558,92 @@ const CloudflareR2Settings: React.FC<CloudflareR2SettingsProps> = ({
   showSecrets,
   setShowSecrets,
   disabled,
-}) => (
-  <div className="space-y-4">
-    <div className="grid grid-cols-2 gap-4">
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="r2Bucket">{t("storageSettings.r2.bucket")}</Label>
+          <Input
+            id="r2Bucket"
+            type="text"
+            value={bucket}
+            onChange={(e) => onChange({ r2Bucket: e.target.value })}
+            placeholder={t("storageSettings.r2.bucketPlaceholder")}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="r2AccountId">{t("storageSettings.r2.accountId")}</Label>
+          <Input
+            id="r2AccountId"
+            type="text"
+            value={accountId}
+            onChange={(e) => onChange({ r2AccountId: e.target.value })}
+            placeholder={t("storageSettings.r2.accountIdPlaceholder")}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+
       <div className="space-y-2">
-        <Label htmlFor="r2Bucket">バケット名</Label>
+        <Label htmlFor="r2AccessKeyId">{t("storageSettings.r2.accessKeyId")}</Label>
         <Input
-          id="r2Bucket"
+          id="r2AccessKeyId"
           type="text"
-          value={bucket}
-          onChange={(e) => onChange({ r2Bucket: e.target.value })}
-          placeholder="my-bucket"
+          value={accessKeyId}
+          onChange={(e) => onChange({ r2AccessKeyId: e.target.value })}
+          placeholder={t("storageSettings.r2.accessKeyIdPlaceholder")}
           disabled={disabled}
         />
       </div>
+
       <div className="space-y-2">
-        <Label htmlFor="r2AccountId">Account ID</Label>
+        <Label htmlFor="r2SecretAccessKey">{t("storageSettings.r2.secretAccessKey")}</Label>
+        <div className="relative">
+          <Input
+            id="r2SecretAccessKey"
+            type={showSecrets ? "text" : "password"}
+            value={secretAccessKey}
+            onChange={(e) => onChange({ r2SecretAccessKey: e.target.value })}
+            placeholder={t("storageSettings.r2.secretAccessKeyPlaceholder")}
+            disabled={disabled}
+            className="pr-10"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setShowSecrets(!showSecrets)}
+          >
+            {showSecrets ? (
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="r2PublicUrl">{t("storageSettings.r2.publicUrl")}</Label>
         <Input
-          id="r2AccountId"
+          id="r2PublicUrl"
           type="text"
-          value={accountId}
-          onChange={(e) => onChange({ r2AccountId: e.target.value })}
-          placeholder="Cloudflare Account ID"
+          value={publicUrl}
+          onChange={(e) => onChange({ r2PublicUrl: e.target.value })}
+          placeholder={t("storageSettings.r2.publicUrlPlaceholder")}
           disabled={disabled}
         />
+        <p className="text-xs text-muted-foreground">
+          {t("storageSettings.r2.publicUrlHelp")}
+        </p>
       </div>
     </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="r2AccessKeyId">Access Key ID</Label>
-      <Input
-        id="r2AccessKeyId"
-        type="text"
-        value={accessKeyId}
-        onChange={(e) => onChange({ r2AccessKeyId: e.target.value })}
-        placeholder="Access Key ID"
-        disabled={disabled}
-      />
-    </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="r2SecretAccessKey">Secret Access Key</Label>
-      <div className="relative">
-        <Input
-          id="r2SecretAccessKey"
-          type={showSecrets ? "text" : "password"}
-          value={secretAccessKey}
-          onChange={(e) => onChange({ r2SecretAccessKey: e.target.value })}
-          placeholder="Secret Access Key"
-          disabled={disabled}
-          className="pr-10"
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-          onClick={() => setShowSecrets(!showSecrets)}
-        >
-          {showSecrets ? (
-            <EyeOff className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          )}
-        </Button>
-      </div>
-    </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="r2PublicUrl">公開URL（オプション）</Label>
-      <Input
-        id="r2PublicUrl"
-        type="text"
-        value={publicUrl}
-        onChange={(e) => onChange({ r2PublicUrl: e.target.value })}
-        placeholder="https://your-domain.com"
-        disabled={disabled}
-      />
-      <p className="text-xs text-muted-foreground">
-        カスタムドメインを使用する場合に入力
-      </p>
-    </div>
-  </div>
-);
+  );
+};
 
 // Google Drive Settings Component
 interface GoogleDriveSettingsProps {
@@ -666,101 +668,104 @@ const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
   showSecrets,
   setShowSecrets,
   disabled,
-}) => (
-  <div className="space-y-4">
-    <Alert>
-      <AlertTitle>⚠️ OAuth2認証が必要です</AlertTitle>
-      <AlertDescription className="text-xs">
-        Google Driveを使用するには、OAuth2認証の設定が必要です。
-        <a
-          href="https://console.cloud.google.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline ml-1"
-        >
-          Google Cloud Console
-        </a>
-        でAPIを有効化し、認証情報を取得してください。
-      </AlertDescription>
-    </Alert>
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-4">
+      <Alert>
+        <AlertTitle>{t("storageSettings.googleDrive.oauthAlertTitle")}</AlertTitle>
+        <AlertDescription className="text-xs">
+          {t("storageSettings.googleDrive.oauthAlertDescription")}
+          <a
+            href="https://console.cloud.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline ml-1"
+          >
+            {t("storageSettings.googleDrive.oauthAlertLink")}
+          </a>
+          {t("storageSettings.googleDrive.oauthAlertSuffix")}
+        </AlertDescription>
+      </Alert>
 
-    <div className="space-y-2">
-      <Label htmlFor="googleDriveClientId">Client ID</Label>
-      <Input
-        id="googleDriveClientId"
-        type="text"
-        value={clientId}
-        onChange={(e) => onChange({ googleDriveClientId: e.target.value })}
-        placeholder="Client ID"
-        disabled={disabled}
-      />
-    </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="googleDriveClientSecret">Client Secret</Label>
-      <div className="relative">
+      <div className="space-y-2">
+        <Label htmlFor="googleDriveClientId">{t("storageSettings.googleDrive.clientId")}</Label>
         <Input
-          id="googleDriveClientSecret"
-          type={showSecrets ? "text" : "password"}
-          value={clientSecret}
-          onChange={(e) => onChange({ googleDriveClientSecret: e.target.value })}
-          placeholder="Client Secret"
+          id="googleDriveClientId"
+          type="text"
+          value={clientId}
+          onChange={(e) => onChange({ googleDriveClientId: e.target.value })}
+          placeholder={t("storageSettings.googleDrive.clientIdPlaceholder")}
           disabled={disabled}
-          className="pr-10"
         />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-          onClick={() => setShowSecrets(!showSecrets)}
-        >
-          {showSecrets ? (
-            <EyeOff className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          )}
-        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="googleDriveClientSecret">{t("storageSettings.googleDrive.clientSecret")}</Label>
+        <div className="relative">
+          <Input
+            id="googleDriveClientSecret"
+            type={showSecrets ? "text" : "password"}
+            value={clientSecret}
+            onChange={(e) => onChange({ googleDriveClientSecret: e.target.value })}
+            placeholder={t("storageSettings.googleDrive.clientSecretPlaceholder")}
+            disabled={disabled}
+            className="pr-10"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setShowSecrets(!showSecrets)}
+          >
+            {showSecrets ? (
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="googleDriveAccessToken">{t("storageSettings.googleDrive.accessToken")}</Label>
+        <Input
+          id="googleDriveAccessToken"
+          type={showSecrets ? "text" : "password"}
+          value={accessToken}
+          onChange={(e) => onChange({ googleDriveAccessToken: e.target.value })}
+          placeholder={t("storageSettings.googleDrive.accessTokenPlaceholder")}
+          disabled={disabled}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="googleDriveRefreshToken">{t("storageSettings.googleDrive.refreshToken")}</Label>
+        <Input
+          id="googleDriveRefreshToken"
+          type={showSecrets ? "text" : "password"}
+          value={refreshToken}
+          onChange={(e) => onChange({ googleDriveRefreshToken: e.target.value })}
+          placeholder={t("storageSettings.googleDrive.refreshTokenPlaceholder")}
+          disabled={disabled}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="googleDriveFolderId">{t("storageSettings.googleDrive.folderId")}</Label>
+        <Input
+          id="googleDriveFolderId"
+          type="text"
+          value={folderId}
+          onChange={(e) => onChange({ googleDriveFolderId: e.target.value })}
+          placeholder={t("storageSettings.googleDrive.folderIdPlaceholder")}
+          disabled={disabled}
+        />
+        <p className="text-xs text-muted-foreground">
+          {t("storageSettings.googleDrive.folderIdHelp")}
+        </p>
       </div>
     </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="googleDriveAccessToken">Access Token</Label>
-      <Input
-        id="googleDriveAccessToken"
-        type={showSecrets ? "text" : "password"}
-        value={accessToken}
-        onChange={(e) => onChange({ googleDriveAccessToken: e.target.value })}
-        placeholder="Access Token"
-        disabled={disabled}
-      />
-    </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="googleDriveRefreshToken">Refresh Token</Label>
-      <Input
-        id="googleDriveRefreshToken"
-        type={showSecrets ? "text" : "password"}
-        value={refreshToken}
-        onChange={(e) => onChange({ googleDriveRefreshToken: e.target.value })}
-        placeholder="Refresh Token"
-        disabled={disabled}
-      />
-    </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="googleDriveFolderId">フォルダID（オプション）</Label>
-      <Input
-        id="googleDriveFolderId"
-        type="text"
-        value={folderId}
-        onChange={(e) => onChange({ googleDriveFolderId: e.target.value })}
-        placeholder="保存先フォルダのID"
-        disabled={disabled}
-      />
-      <p className="text-xs text-muted-foreground">
-        特定のフォルダに保存する場合に入力
-      </p>
-    </div>
-  </div>
-);
+  );
+};

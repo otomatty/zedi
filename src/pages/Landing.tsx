@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth, SignedIn, SignedOut } from "@/hooks/useAuth";
@@ -35,6 +36,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
 );
 
 const Landing: React.FC = () => {
+  const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useAuth();
 
   // Show loading state while Clerk is initializing
@@ -52,36 +54,11 @@ const Landing: React.FC = () => {
   }
 
   const features = [
-    {
-      icon: <FileText className="h-6 w-6" />,
-      title: "シンプルなメモ",
-      description:
-        "マークダウン対応のリッチエディタで、思考をすばやく記録できます。",
-    },
-    {
-      icon: <LinkIcon className="h-6 w-6" />,
-      title: "双方向リンク",
-      description:
-        "[[ページ名]] で簡単にリンク。アイデアをつなげてナレッジグラフを構築。",
-    },
-    {
-      icon: <Search className="h-6 w-6" />,
-      title: "高速検索",
-      description:
-        "全文検索でどこからでも瞬時にメモを見つけ出せます。",
-    },
-    {
-      icon: <Cloud className="h-6 w-6" />,
-      title: "クラウド同期",
-      description:
-        "ローカルファースト設計。オフラインでも使え、自動でクラウドに同期。",
-    },
-    {
-      icon: <Sparkles className="h-6 w-6" />,
-      title: "AI支援",
-      description:
-        "AIがメモの整理や図表の生成をサポート。知識の活用を加速します。",
-    },
+    { icon: <FileText className="h-6 w-6" />, title: t("landing.feature1Title"), description: t("landing.feature1Description") },
+    { icon: <LinkIcon className="h-6 w-6" />, title: t("landing.feature2Title"), description: t("landing.feature2Description") },
+    { icon: <Search className="h-6 w-6" />, title: t("landing.feature3Title"), description: t("landing.feature3Description") },
+    { icon: <Cloud className="h-6 w-6" />, title: t("landing.feature4Title"), description: t("landing.feature4Description") },
+    { icon: <Sparkles className="h-6 w-6" />, title: t("landing.feature5Title"), description: t("landing.feature5Description") },
   ];
 
   return (
@@ -96,17 +73,17 @@ const Landing: React.FC = () => {
             <SignedOut>
               <Link to="/sign-in">
                 <Button variant="ghost" size="sm">
-                  サインイン
+                  {t("nav.signIn")}
                 </Button>
               </Link>
               <Link to="/sign-in">
-                <Button size="sm">無料で始める</Button>
+                <Button size="sm">{t("landing.startFree")}</Button>
               </Link>
             </SignedOut>
             <SignedIn>
               <Link to="/home">
                 <Button size="sm">
-                  アプリを開く
+                  {t("landing.openApp")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -120,21 +97,19 @@ const Landing: React.FC = () => {
         <div className="mx-auto max-w-3xl">
           <h2 className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
             <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-              思考を繋げる
+              {t("landing.heroTitle1")}
             </span>
             <br />
-            パーソナルナレッジベース
+            {t("landing.heroTitle2")}
           </h2>
           <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
-            Zediは、あなたのアイデアとメモを双方向リンクで結びつけ、
-            <br className="hidden sm:block" />
-            知識のネットワークを構築するためのツールです。
+            {t("landing.heroDescription")}
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <SignedOut>
               <Link to="/sign-in">
                 <Button size="lg" className="w-full sm:w-auto">
-                  無料で始める
+                  {t("landing.startFree")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -142,7 +117,7 @@ const Landing: React.FC = () => {
             <SignedIn>
               <Link to="/home">
                 <Button size="lg" className="w-full sm:w-auto">
-                  アプリを開く
+                  {t("landing.openApp")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -155,7 +130,7 @@ const Landing: React.FC = () => {
       <section className="container mx-auto px-4 py-16">
         <div className="mx-auto max-w-5xl">
           <h3 className="mb-12 text-center text-2xl font-bold sm:text-3xl">
-            主な機能
+            {t("landing.featuresHeading")}
           </h3>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature, index) => (
@@ -169,15 +144,15 @@ const Landing: React.FC = () => {
       <section className="container mx-auto px-4 py-16">
         <div className="mx-auto max-w-2xl rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 p-8 text-center sm:p-12">
           <h3 className="mb-4 text-2xl font-bold sm:text-3xl">
-            今すぐ始めましょう
+            {t("landing.ctaTitle")}
           </h3>
           <p className="mb-6 text-muted-foreground">
-            無料でアカウントを作成して、あなたのナレッジベースを構築しましょう。
+            {t("landing.ctaDescription")}
           </p>
           <SignedOut>
             <Link to="/sign-in">
               <Button size="lg">
-                無料で始める
+                {t("landing.startFree")}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
@@ -185,7 +160,7 @@ const Landing: React.FC = () => {
           <SignedIn>
             <Link to="/home">
               <Button size="lg">
-                アプリを開く
+                {t("landing.openApp")}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

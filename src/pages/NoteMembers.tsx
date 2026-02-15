@@ -21,13 +21,15 @@ import {
   useUpdateNoteMemberRole,
 } from "@/hooks/useNoteQueries";
 import type { NoteMemberRole } from "@/types/note";
+import { useTranslation } from "react-i18next";
 
-const memberRoleOptions: Array<{ value: NoteMemberRole; label: string }> = [
-  { value: "viewer", label: "閲覧のみ" },
-  { value: "editor", label: "編集可能" },
-];
+const memberRoleKeys: Record<NoteMemberRole, string> = {
+  viewer: "notes.roleViewer",
+  editor: "notes.roleEditor",
+};
 
 const NoteMembers: React.FC = () => {
+  const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
   const { toast } = useToast();
 
@@ -61,10 +63,10 @@ const NoteMembers: React.FC = () => {
       });
       setMemberEmail("");
       setMemberRole("viewer");
-      toast({ title: "メンバーを追加しました" });
+      toast({ title: t("notes.memberAdded") });
     } catch (error) {
       console.error("Failed to add member:", error);
-      toast({ title: "メンバー追加に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.memberAddFailed"), variant: "destructive" });
     }
   };
 
@@ -79,10 +81,10 @@ const NoteMembers: React.FC = () => {
         memberEmail: email,
         role,
       });
-      toast({ title: "権限を更新しました" });
+      toast({ title: t("notes.roleUpdated") });
     } catch (error) {
       console.error("Failed to update member role:", error);
-      toast({ title: "権限更新に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.roleUpdateFailed"), variant: "destructive" });
     }
   };
 
@@ -90,10 +92,10 @@ const NoteMembers: React.FC = () => {
     if (!noteId) return;
     try {
       await removeMemberMutation.mutateAsync({ noteId, memberEmail: email });
-      toast({ title: "メンバーを削除しました" });
+      toast({ title: t("notes.memberRemoved") });
     } catch (error) {
       console.error("Failed to remove member:", error);
-      toast({ title: "メンバー削除に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.memberRemoveFailed"), variant: "destructive" });
     }
   };
 
@@ -103,7 +105,7 @@ const NoteMembers: React.FC = () => {
         <Header />
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">読み込み中...</p>
+            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
           </Container>
         </main>
       </div>
@@ -117,7 +119,7 @@ const NoteMembers: React.FC = () => {
         <main className="py-10">
           <Container>
             <p className="text-sm text-muted-foreground">
-              ノートが見つからないか、閲覧権限がありません。
+              {t("notes.noteNotFoundOrNoAccess")}
             </p>
           </Container>
         </main>
@@ -132,28 +134,28 @@ const NoteMembers: React.FC = () => {
         <Container>
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold truncate">メンバー</h1>
+              <h1 className="text-xl font-semibold truncate">{t("notes.members")}</h1>
               <p className="mt-1 text-sm text-muted-foreground truncate">
-                {note.title || "無題のノート"}
+                {note.title || t("notes.untitledNote")}
               </p>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link to={`/note/${note.id}`}>ノートへ戻る</Link>
+              <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
             </Button>
           </div>
 
           {!canManageMembers ? (
             <p className="mt-6 text-sm text-muted-foreground">
-              メンバーを管理する権限がありません。
+              {t("notes.noPermissionToManageMembers")}
             </p>
           ) : (
             <section className="mt-6 rounded-lg border border-border/60 p-4">
-              <h2 className="text-sm font-semibold mb-4">招待メンバー</h2>
+              <h2 className="text-sm font-semibold mb-4">{t("notes.inviteMember")}</h2>
               <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
                 <Input
                   value={memberEmail}
                   onChange={(event) => setMemberEmail(event.target.value)}
-                  placeholder="招待するメールアドレス"
+                  placeholder={t("notes.emailPlaceholder")}
                 />
                 <Select
                   value={memberRole}
@@ -162,25 +164,25 @@ const NoteMembers: React.FC = () => {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="権限" />
+                    <SelectValue placeholder={t("notes.role")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {memberRoleOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                    {(Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {t(memberRoleKeys[value])}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button onClick={handleAddMember}>追加</Button>
+                <Button onClick={handleAddMember}>{t("notes.add")}</Button>
               </div>
 
               <div className="mt-4 space-y-3">
                 {isMembersLoading ? (
-                  <p className="text-sm text-muted-foreground">読み込み中...</p>
+                  <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
                 ) : members.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    まだ招待メンバーがいません。
+                    {t("notes.noMembersYet")}
                   </p>
                 ) : (
                   members.map((member) => (

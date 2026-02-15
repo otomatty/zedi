@@ -9,8 +9,10 @@ import { useToast } from "@/hooks/use-toast";
 import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
+import { useTranslation } from "react-i18next";
 
 const FloatingActionButton: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { createNewPage, isCreating } = useCreateNewPage();
   const createPageMutation = useCreatePage();
@@ -37,15 +39,15 @@ const FloatingActionButton: React.FC = () => {
       case "template":
         // TODO: テンプレート選択画面
         toast({
-          title: "準備中",
-          description: "テンプレート機能は近日公開予定です",
+          title: t("common.comingSoon"),
+          description: t("common.templateComingSoon"),
         });
         break;
       case "voice":
         // TODO: 音声録音画面
         toast({
-          title: "準備中",
-          description: "音声入力機能は近日公開予定です",
+          title: t("common.comingSoon"),
+          description: t("common.voiceComingSoon"),
         });
         break;
     }

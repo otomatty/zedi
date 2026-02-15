@@ -2,8 +2,10 @@ import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 const NotFound = () => {
+  const { t } = useTranslation();
   const location = useLocation();
 
   useEffect(() => {
@@ -19,14 +21,14 @@ const NotFound = () => {
         <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
           <span className="text-4xl font-bold text-muted-foreground">404</span>
         </div>
-        <h1 className="text-2xl font-bold mb-2">ページが見つかりません</h1>
+        <h1 className="text-2xl font-bold mb-2">{t("errors.notFoundTitle")}</h1>
         <p className="text-muted-foreground mb-8">
-          お探しのページは存在しないか、移動した可能性があります。
+          {t("errors.notFoundDescription")}
         </p>
         <Button asChild>
           <Link to="/" className="gap-2">
             <Home className="h-4 w-4" />
-            ホームに戻る
+            {t("errors.backToHome")}
           </Link>
         </Button>
       </div>

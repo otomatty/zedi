@@ -1,0 +1,81 @@
+{
+  "slashMenuAriaLabel": "Slash command menu",
+  "slashNoResults": "No matching commands",
+  "slash": {
+    "paragraph": {
+      "title": "Paragraph",
+      "description": "Body text",
+      "aliases": "paragraph,p,text"
+    },
+    "heading1": {
+      "title": "Heading 1",
+      "description": "Large heading",
+      "aliases": "heading1,h1,heading"
+    },
+    "heading2": {
+      "title": "Heading 2",
+      "description": "Medium heading",
+      "aliases": "heading2,h2,heading"
+    },
+    "heading3": {
+      "title": "Heading 3",
+      "description": "Small heading",
+      "aliases": "heading3,h3,heading"
+    },
+    "bulletList": {
+      "title": "Bullet list",
+      "description": "Bullet list",
+      "aliases": "ul,list,bullet"
+    },
+    "orderedList": {
+      "title": "Numbered list",
+      "description": "Ordered list",
+      "aliases": "ol,ordered,number"
+    },
+    "taskList": {
+      "title": "Task list",
+      "description": "List with checkboxes",
+      "aliases": "task,todo,checkbox"
+    },
+    "blockquote": {
+      "title": "Quote",
+      "description": "Quote block",
+      "aliases": "blockquote,quote"
+    },
+    "codeBlock": {
+      "title": "Code block",
+      "description": "Code with syntax highlighting",
+      "aliases": "code,pre"
+    },
+    "horizontalRule": {
+      "title": "Horizontal rule",
+      "description": "Divider line",
+      "aliases": "hr,divider,separator"
+    },
+    "table": {
+      "title": "Table",
+      "description": "Insert 3×3 table",
+      "aliases": "table"
+    },
+    "image": {
+      "title": "Image",
+      "description": "Upload image",
+      "aliases": "image,img"
+    },
+    "mermaid": {
+      "title": "Diagram",
+      "description": "Create flowcharts and diagrams with Mermaid",
+      "aliases": "mermaid,diagram,flowchart"
+    },
+    "mathInline": {
+      "title": "Math (inline)",
+      "description": "Insert inline math",
+      "aliases": "math,inline,latex"
+    },
+    "mathBlock": {
+      "title": "Math (block)",
+      "description": "Insert block math",
+      "aliases": "math block,block math,equation"
+    }
+  }
+}

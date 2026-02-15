@@ -6,5 +6,19 @@
   "back": "Back",
   "loading": "Loading...",
   "error": "Error",
-  "success": "Success"
+  "success": "Success",
+  "syncIdleLabel": "Cloud sync",
+  "syncIdleDescription": "Click to sync",
+  "syncSyncingLabel": "Syncing...",
+  "syncSyncingDescription": "Syncing data",
+  "syncSyncedLabel": "Synced",
+  "syncSyncedDescription": "All data is synced",
+  "syncErrorLabel": "Sync error",
+  "syncErrorDescription": "Sync failed. Click to retry",
+  "createFromImage": "Create from image",
+  "createFromUrl": "Create from URL",
+  "createNew": "New page",
+  "comingSoon": "Coming soon",
+  "voiceComingSoon": "Voice input coming soon",
+  "templateComingSoon": "Templates coming soon"
 }

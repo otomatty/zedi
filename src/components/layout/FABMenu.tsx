@@ -1,6 +1,7 @@
 import React from "react";
 import { FileText, Link2, Image } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 export type FABMenuOption =
   | "blank"
@@ -70,6 +71,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
   onSelect,
   trigger,
 }) => {
+  const { t } = useTranslation();
   const handleSelect = (option: FABMenuOption) => {
     onSelect(option);
     onOpenChange(false);
@@ -81,9 +83,9 @@ export const FABMenu: React.FC<FABMenuProps> = ({
     option: FABMenuOption;
     disabled?: boolean;
   }> = [
-    { icon: Image, label: "画像から作成", option: "image" },
-    { icon: Link2, label: "URLから作成", option: "url" },
-    { icon: FileText, label: "新規作成", option: "blank" },
+    { icon: Image, label: t("common.createFromImage"), option: "image" },
+    { icon: Link2, label: t("common.createFromUrl"), option: "url" },
+    { icon: FileText, label: t("common.createNew"), option: "blank" },
   ];
 
   return (

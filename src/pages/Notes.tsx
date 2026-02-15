@@ -25,15 +25,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 
-const visibilityOptions: Array<{ value: NoteVisibility; label: string }> = [
-  { value: "private", label: "非公開" },
-  { value: "public", label: "公開" },
-  { value: "unlisted", label: "限定公開(URL)" },
-  { value: "restricted", label: "限定公開(招待)" },
-];
+const visibilityKeys: Record<NoteVisibility, string> = {
+  private: "notes.visibilityPrivate",
+  public: "notes.visibilityPublic",
+  unlisted: "notes.visibilityUnlisted",
+  restricted: "notes.visibilityRestricted",
+};
 
 const Notes: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: notes = [], isLoading } = useNotes();
@@ -51,7 +53,7 @@ const Notes: React.FC = () => {
   const handleCreate = async () => {
     if (!title.trim()) {
       toast({
-        title: "タイトルを入力してください",
+        title: t("notes.titleRequired"),
         variant: "destructive",
       });
       return;
@@ -69,7 +71,7 @@ const Notes: React.FC = () => {
     } catch (error) {
       console.error("Failed to create note:", error);
       toast({
-        title: "ノートの作成に失敗しました",
+        title: t("notes.createFailed"),
         variant: "destructive",
       });
     }
@@ -83,41 +85,41 @@ const Notes: React.FC = () => {
         <Container>
           {/* Page title & New note */}
           <div className="flex items-center justify-between mb-8">
-            <h1 className="text-2xl font-semibold">ノート</h1>
+            <h1 className="text-2xl font-semibold">{t("notes.title")}</h1>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  新規ノート
+                  {t("notes.newNote")}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>新しいノート</DialogTitle>
+                  <DialogTitle>{t("notes.newNoteDialogTitle")}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
                   <div className="space-y-2">
-                    <Label htmlFor="note-title">タイトル</Label>
+                    <Label htmlFor="note-title">{t("notes.noteTitle")}</Label>
                     <Input
                       id="note-title"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      placeholder="例: チーム共有メモ"
+                      placeholder={t("notes.titlePlaceholder")}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>公開範囲</Label>
+                    <Label>{t("notes.visibility")}</Label>
                     <Select
                       value={visibility}
                       onValueChange={(v) => setVisibility(v as NoteVisibility)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="公開範囲を選択" />
+                        <SelectValue placeholder={t("notes.selectVisibility")} />
                       </SelectTrigger>
                       <SelectContent>
-                        {visibilityOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
+                        {(Object.keys(visibilityKeys) as NoteVisibility[]).map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {t(visibilityKeys[value])}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -130,7 +132,7 @@ const Notes: React.FC = () => {
                     onClick={handleCreate}
                     disabled={createNoteMutation.isPending}
                   >
-                    {createNoteMutation.isPending ? "作成中..." : "作成"}
+                    {createNoteMutation.isPending ? t("notes.creating") : t("notes.create")}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -140,13 +142,13 @@ const Notes: React.FC = () => {
           {/* 参加しているノート */}
           <section className="mb-10">
             <h2 className="text-lg font-medium text-foreground mb-4">
-              参加しているノート
+              {t("notes.sectionParticipating")}
             </h2>
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">読み込み中...</p>
+              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
             ) : sortedNotes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                参加しているノートはまだありません。
+                {t("notes.noNotesYet")}
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -160,13 +162,11 @@ const Notes: React.FC = () => {
           {/* みんなのノート（誰でも参加できるノート）— 仕様検討用プレースホルダー */}
           <section>
             <h2 className="text-lg font-medium text-foreground mb-4">
-              みんなのノート
+              {t("notes.sectionPublic")}
             </h2>
             <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                誰でも参加できるノートの一覧や、様々な情報に触れられるUIは
-                <br />
-                仕様検討後に実装予定です。
+                {t("notes.publicNotesPlaceholder")}
               </p>
             </div>
           </section>

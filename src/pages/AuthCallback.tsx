@@ -4,12 +4,14 @@
  * exchange the same code twice and trigger Cognito invalid_grant.
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { exchangeCodeForTokens, setTokens } from "@/lib/auth";
 
 const exchangedCodes = new Set<string>();
 const MAX_TRACKED_CODES = 20;
 
 export default function AuthCallback() {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function AuthCallback() {
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <p className="text-destructive mb-4">{error}</p>
         <a href="/sign-in" className="text-primary hover:underline">
-          サインインに戻る
+          {t("auth.backToSignIn")}
         </a>
       </div>
     );
@@ -71,7 +73,7 @@ export default function AuthCallback() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <p className="text-muted-foreground">サインイン中...</p>
+      <p className="text-muted-foreground">{t("auth.signingIn")}</p>
     </div>
   );
 }

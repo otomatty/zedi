@@ -49,8 +49,10 @@ import { useAISettings } from "@/hooks/useAISettings";
 import { getProviderById, type AIModel } from "@/types/ai";
 import { useToast } from "@/hooks/use-toast";
 import { fetchServerModels } from "@/lib/aiService";
+import { useTranslation } from "react-i18next";
 
 export const AISettingsForm: React.FC = () => {
+  const { t } = useTranslation();
   const {
     settings,
     availableModels,
@@ -131,8 +133,8 @@ export const AISettingsForm: React.FC = () => {
     const success = await save();
     if (success) {
       toast({
-        title: "保存しました",
-        description: "AI設定が正常に保存されました",
+        title: t("aiSettings.savedToast"),
+        description: t("aiSettings.savedToastDescription"),
       });
       const returnTo = getSafeReturnTo();
       if (returnTo) {
@@ -140,8 +142,8 @@ export const AISettingsForm: React.FC = () => {
       }
     } else {
       toast({
-        title: "エラー",
-        description: "AI設定の保存に失敗しました",
+        title: t("common.error"),
+        description: t("aiSettings.saveFailedToastDescription"),
         variant: "destructive",
       });
     }
@@ -150,10 +152,10 @@ export const AISettingsForm: React.FC = () => {
   const handleTest = async () => {
     const result = await test();
     if (result.success) {
-      toast({ title: "接続成功", description: result.message });
+      toast({ title: t("aiSettings.connectionSuccess"), description: result.message });
     } else {
       toast({
-        title: "接続失敗",
+        title: t("aiSettings.connectionFailed"),
         description: result.message,
         variant: "destructive",
       });
@@ -163,7 +165,7 @@ export const AISettingsForm: React.FC = () => {
   const handleReset = () => {
     reset();
     setUseOwnKey(false);
-    toast({ title: "リセットしました", description: "AI設定が初期化されました" });
+    toast({ title: t("aiSettings.resetToast"), description: t("aiSettings.resetToastDescription") });
   };
 
   if (isLoading) {
@@ -182,9 +184,9 @@ export const AISettingsForm: React.FC = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">AI 設定</CardTitle>
+        <CardTitle className="flex items-center gap-2">{t("aiSettings.title")}</CardTitle>
         <CardDescription>
-          AI機能で使用するモデルを設定します。ZediのAIサーバー経由で利用できます。
+          {t("aiSettings.description")}
         </CardDescription>
       </CardHeader>
 
@@ -196,13 +198,13 @@ export const AISettingsForm: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Server className="h-4 w-4 text-primary" />
-                <Label>AIモデル</Label>
+                <Label>{t("aiSettings.aiModel")}</Label>
               </div>
 
               {serverModelsLoading ? (
                 <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  モデルを読み込み中...
+                  {t("aiSettings.loadingModels")}
                 </div>
               ) : (
                 <Select
@@ -211,7 +213,7 @@ export const AISettingsForm: React.FC = () => {
                   disabled={isSaving}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="モデルを選択" />
+                    <SelectValue placeholder={t("aiSettings.selectModel")} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableServerModels.length > 0 && (
@@ -242,7 +244,7 @@ export const AISettingsForm: React.FC = () => {
                                 {model.displayName}
                               </span>
                               <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                有料
+                                {t("aiSettings.paid")}
                               </Badge>
                             </div>
                           </SelectItem>
@@ -253,7 +255,7 @@ export const AISettingsForm: React.FC = () => {
                 </Select>
               )}
               <p className="text-xs text-muted-foreground">
-                ZediのAIサーバー経由で利用します。無料プランでは一部モデルのみ利用可能です。
+                {t("aiSettings.serverModeHelp")}
               </p>
             </div>
           </>
@@ -264,9 +266,9 @@ export const AISettingsForm: React.FC = () => {
           <div className="flex items-center gap-3">
             <Key className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium">自分のAPIキーを使う</p>
+              <p className="text-sm font-medium">{t("aiSettings.useOwnKey")}</p>
               <p className="text-xs text-muted-foreground">
-                自分のAPIキーを設定すると、制限なくすべてのモデルを利用できます。
+                {t("aiSettings.useOwnKeyDescription")}
               </p>
             </div>
           </div>
@@ -289,7 +291,7 @@ export const AISettingsForm: React.FC = () => {
 
             {/* API Key Input */}
             <div className="space-y-2">
-              <Label htmlFor="apiKey">API キー</Label>
+              <Label htmlFor="apiKey">{t("aiSettings.apiKey")}</Label>
               <div className="relative">
                 <Input
                   id="apiKey"
@@ -318,14 +320,14 @@ export const AISettingsForm: React.FC = () => {
 
             {/* Model Selection (user key mode) */}
             <div className="space-y-2">
-              <Label htmlFor="model">モデル</Label>
+              <Label htmlFor="model">{t("aiSettings.model")}</Label>
               <Select
                 value={settings.model}
                 onValueChange={(model) => updateSettings({ model })}
                 disabled={isSaving || isTesting}
               >
                 <SelectTrigger id="model">
-                  <SelectValue placeholder="モデルを選択" />
+                  <SelectValue placeholder={t("aiSettings.selectModel")} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableModels.map((model) => (
@@ -336,7 +338,7 @@ export const AISettingsForm: React.FC = () => {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                接続テスト後に利用可能なモデルが表示されます
+                {t("aiSettings.modelsAvailableAfterTest")}
               </p>
             </div>
 
@@ -349,7 +351,7 @@ export const AISettingsForm: React.FC = () => {
                   <XCircle className="h-4 w-4" />
                 )}
                 <AlertTitle>
-                  {testResult.success ? "接続成功" : "接続失敗"}
+                  {testResult.success ? t("aiSettings.connectionSuccess") : t("aiSettings.connectionFailed")}
                 </AlertTitle>
                 <AlertDescription className="whitespace-pre-wrap">
                   {testResult.message}
@@ -359,7 +361,7 @@ export const AISettingsForm: React.FC = () => {
 
             {/* API Key Help */}
             <div className="rounded-lg border border-border bg-muted/50 p-4">
-              <h4 className="text-sm font-medium mb-2">APIキーの取得先</h4>
+              <h4 className="text-sm font-medium mb-2">{t("aiSettings.apiKeySources")}</h4>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li>
                   <a
@@ -406,20 +408,20 @@ export const AISettingsForm: React.FC = () => {
               disabled={isSaving || isTesting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              リセット
+              {t("common.reset")}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>設定をリセットしますか？</AlertDialogTitle>
+              <AlertDialogTitle>{t("aiSettings.resetConfirmTitle")}</AlertDialogTitle>
               <AlertDialogDescription>
-                保存されているAPIキーとすべての設定が削除されます。この操作は取り消せません。
+                {t("aiSettings.resetConfirmDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
               <AlertDialogAction onClick={handleReset}>
-                リセット
+                {t("common.reset")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -433,12 +435,12 @@ export const AISettingsForm: React.FC = () => {
               disabled={isSaving || isTesting || !settings.apiKey}
             >
               {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              接続テスト
+              {t("aiSettings.testConnection")}
             </Button>
           )}
           <Button onClick={handleSave} disabled={isSaving || isTesting}>
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            保存
+            {t("common.save")}
           </Button>
         </div>
       </CardFooter>

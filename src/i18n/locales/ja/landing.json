@@ -1,0 +1,20 @@
+{
+  "startFree": "無料で始める",
+  "openApp": "アプリを開く",
+  "heroTitle1": "思考を繋げる",
+  "heroTitle2": "パーソナルナレッジベース",
+  "heroDescription": "Zediは、あなたのアイデアとメモを双方向リンクで結びつけ、知識のネットワークを構築するためのツールです。",
+  "featuresHeading": "主な機能",
+  "feature1Title": "シンプルなメモ",
+  "feature1Description": "マークダウン対応のリッチエディタで、思考をすばやく記録できます。",
+  "feature2Title": "双方向リンク",
+  "feature2Description": "[[ページ名]] で簡単にリンク。アイデアをつなげてナレッジグラフを構築。",
+  "feature3Title": "高速検索",
+  "feature3Description": "全文検索でどこからでも瞬時にメモを見つけ出せます。",
+  "feature4Title": "クラウド同期",
+  "feature4Description": "ローカルファースト設計。オフラインでも使え、自動でクラウドに同期。",
+  "feature5Title": "AI支援",
+  "feature5Description": "AIがメモの整理や図表の生成をサポート。知識の活用を加速します。",
+  "ctaTitle": "今すぐ始めましょう",
+  "ctaDescription": "無料でアカウントを作成して、あなたのナレッジベースを構築しましょう。"
+}

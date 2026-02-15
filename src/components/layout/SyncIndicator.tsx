@@ -9,12 +9,14 @@ import {
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 /**
  * Sync status indicator for the header
  * Shows sync status for authenticated users using Embedded Replicas
  */
 export function SyncIndicator() {
+  const { t } = useTranslation();
   const { isSignedIn } = useAuth();
   const syncStatus = useSyncStatus();
   const { sync, isSyncing } = useSync();
@@ -27,26 +29,26 @@ export function SyncIndicator() {
   const statusConfig = {
     idle: {
       icon: Cloud,
-      label: "クラウド同期",
-      description: "クリックして同期",
+      label: t("common.syncIdleLabel"),
+      description: t("common.syncIdleDescription"),
       className: "text-muted-foreground",
     },
     syncing: {
       icon: Loader2,
-      label: "同期中...",
-      description: "データを同期しています",
+      label: t("common.syncSyncingLabel"),
+      description: t("common.syncSyncingDescription"),
       className: "text-blue-500 animate-spin",
     },
     synced: {
       icon: Check,
-      label: "同期完了",
-      description: "すべてのデータが同期されています",
+      label: t("common.syncSyncedLabel"),
+      description: t("common.syncSyncedDescription"),
       className: "text-green-500",
     },
     error: {
       icon: CloudOff,
-      label: "同期エラー",
-      description: "同期に失敗しました。クリックして再試行",
+      label: t("common.syncErrorLabel"),
+      description: t("common.syncErrorDescription"),
       className: "text-destructive",
     },
   };

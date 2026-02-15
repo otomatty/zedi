@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Check, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,6 +56,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
   current,
   extraContent,
 }) => {
+  const { t } = useTranslation();
   return (
     <Card
       className={cn(
@@ -64,7 +66,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
     >
       {popular && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-          おすすめ
+          {t("pricing.recommended")}
         </Badge>
       )}
       <CardHeader>

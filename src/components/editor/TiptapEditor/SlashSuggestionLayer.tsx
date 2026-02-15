@@ -14,6 +14,7 @@ import {
   type SlashCommandItem,
 } from "./slashCommandItems";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import {
   Pilcrow,
   Heading1,
@@ -72,10 +73,11 @@ const SlashSuggestionMenu = forwardRef<
     onClose: () => void;
   }
 >(({ editor, query, range, onClose }, ref) => {
+  const { t } = useTranslation();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const items = filterSlashCommandItems(slashCommandItems, query, editor);
+  const items = filterSlashCommandItems(slashCommandItems, query, editor, t);
 
   // Reset selection when query changes
   useEffect(() => {
@@ -137,7 +139,7 @@ const SlashSuggestionMenu = forwardRef<
     return (
       <div className="bg-popover border border-border rounded-lg shadow-elevated overflow-hidden min-w-[240px] animate-fade-in">
         <div className="px-3 py-2 text-sm text-muted-foreground">
-          一致する項目がありません
+          {t("editor.slashNoResults")}
         </div>
       </div>
     );
@@ -148,7 +150,7 @@ const SlashSuggestionMenu = forwardRef<
       ref={listRef}
       className="bg-popover border border-border rounded-lg shadow-elevated overflow-hidden min-w-[240px] max-w-[320px] max-h-[320px] overflow-y-auto animate-fade-in"
       role="listbox"
-      aria-label="スラッシュコマンドメニュー"
+      aria-label={t("editor.slashMenuAriaLabel")}
     >
       <div className="p-1">
         {items.map((item, index) => {
@@ -170,9 +172,9 @@ const SlashSuggestionMenu = forwardRef<
                 <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
               <div className="flex flex-col min-w-0">
-                <span className="font-medium truncate">{item.title}</span>
+                <span className="font-medium truncate">{t(`editor.slash.${item.id}.title`)}</span>
                 <span className="text-xs text-muted-foreground truncate">
-                  {item.description}
+                  {t(`editor.slash.${item.id}.description`)}
                 </span>
               </div>
             </button>

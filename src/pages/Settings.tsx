@@ -31,7 +31,7 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
       className="cursor-pointer transition-colors hover:bg-muted/50"
       onClick={() => navigate(to)}
     >
-      <CardHeader className="flex flex-row items-center gap-4 pb-2">
+      <CardHeader className="flex flex-row items-center gap-4 p-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
           {icon}
         </div>
@@ -64,7 +64,7 @@ const Settings: React.FC = () => {
       {/* Content */}
       <main className="py-6">
         <Container>
-          <div className="space-y-4 max-w-2xl mx-auto">
+          <div className="space-y-2 max-w-2xl mx-auto">
             <SettingsItem
               icon={<Settings2 className="h-5 w-5" />}
               title={t("settings.general.title")}

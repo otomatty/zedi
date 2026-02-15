@@ -86,7 +86,7 @@ export async function streamOpenAI(
   if (!body) throw new Error("OpenAI stream body is empty");
 
   let finishReason: string | undefined;
-  let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+  const tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
   await consumeProviderSSE(body, (raw) => {
     const payload = JSON.parse(raw);
@@ -100,10 +100,8 @@ export async function streamOpenAI(
     }
     // stream_options: { include_usage: true } gives usage in the final chunk
     if (payload?.usage) {
-      tokenUsage = {
-        inputTokens: payload.usage.prompt_tokens ?? 0,
-        outputTokens: payload.usage.completion_tokens ?? 0,
-      };
+      tokenUsage.inputTokens = payload.usage.prompt_tokens ?? 0;
+      tokenUsage.outputTokens = payload.usage.completion_tokens ?? 0;
     }
   });
 
@@ -207,7 +205,7 @@ export async function streamAnthropic(
   if (!body) throw new Error("Anthropic stream body is empty");
 
   let finishReason: string | undefined;
-  let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+  const tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
   await consumeProviderSSE(body, (raw) => {
     const payload = JSON.parse(raw);
@@ -323,7 +321,7 @@ export async function streamGoogle(
   const body = response.body;
   if (!body) throw new Error("Google stream body is empty");
 
-  let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+  const tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
   await consumeProviderSSE(body, (raw) => {
     const payload = JSON.parse(raw);
@@ -336,10 +334,8 @@ export async function streamGoogle(
       }
     }
     if (payload?.usageMetadata) {
-      tokenUsage = {
-        inputTokens: payload.usageMetadata.promptTokenCount ?? tokenUsage.inputTokens,
-        outputTokens: payload.usageMetadata.candidatesTokenCount ?? tokenUsage.outputTokens,
-      };
+      tokenUsage.inputTokens = payload.usageMetadata.promptTokenCount ?? tokenUsage.inputTokens;
+      tokenUsage.outputTokens = payload.usageMetadata.candidatesTokenCount ?? tokenUsage.outputTokens;
     }
   });
 
