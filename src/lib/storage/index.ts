@@ -26,7 +26,7 @@ export function getStorageProvider(
   switch (provider) {
     case "s3":
       if (!context?.getToken) {
-        throw new Error("Zedi (S3) を使うには getToken が必要です（ログインしてください）");
+        throw new Error("デフォルトストレージを使うには getToken が必要です（ログインしてください）");
       }
       return new S3Provider(config as Record<string, unknown>, {
         getToken: context.getToken,
@@ -121,6 +121,34 @@ export function isProviderConfigured(
     default:
       return false;
   }
+}
+
+/**
+ * アップロード時に使う実効的な設定を返す
+ * preferDefaultStorage が true のときはデフォルトストレージ(s3)用の設定を返す
+ */
+export function getSettingsForUpload(settings: StorageSettings): StorageSettings {
+  if (settings.preferDefaultStorage !== false) {
+    return {
+      ...settings,
+      provider: "s3",
+      config: {},
+      isConfigured: true,
+    };
+  }
+  return settings;
+}
+
+/**
+ * アップロード可能かどうか（設定が有効か）
+ * デフォルトストレージ優先のときは true、外部のときはそのプロバイダーが設定済みなら true
+ */
+export function isStorageConfiguredForUpload(settings: StorageSettings): boolean {
+  if (settings.preferDefaultStorage !== false) return true;
+  return (
+    settings.provider !== "s3" &&
+    isProviderConfigured(settings.provider, settings.config)
+  );
 }
 
 // Re-export types

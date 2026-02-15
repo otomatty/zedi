@@ -2,6 +2,7 @@
 
 import { encrypt, decrypt } from "./encryption";
 import { StorageSettings, DEFAULT_STORAGE_SETTINGS } from "@/types/storage";
+import { isStorageConfiguredForUpload } from "@/lib/storage";
 
 const STORAGE_KEY = "zedi-storage-settings";
 
@@ -75,9 +76,23 @@ export async function loadStorageSettings(): Promise<StorageSettings | null> {
       }
     }
 
+    const preferDefaultStorage = parsed.preferDefaultStorage !== false;
+    const provider =
+      !preferDefaultStorage && parsed.provider === "s3"
+        ? "gyazo"
+        : parsed.provider;
+
     return {
       ...parsed,
       config,
+      preferDefaultStorage,
+      provider,
+      isConfigured: isStorageConfiguredForUpload({
+        ...parsed,
+        config,
+        preferDefaultStorage,
+        provider,
+      }),
     };
   } catch (error) {
     console.error("Failed to load storage settings:", error);
@@ -95,11 +110,11 @@ export function clearStorageSettings(): void {
 }
 
 /**
- * ストレージ設定が有効かどうかを確認する
+ * ストレージ設定が有効かどうかを確認する（アップロード可能か）
  */
 export async function isStorageConfigured(): Promise<boolean> {
   const settings = await loadStorageSettings();
-  return settings?.isConfigured ?? false;
+  return settings ? isStorageConfiguredForUpload(settings) : false;
 }
 
 /**

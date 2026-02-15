@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { getStorageProvider } from "@/lib/storage";
+import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
 import {
   getStorageProviderById,
   type StorageSettings,
@@ -23,15 +23,17 @@ export function useStorageActions({
   currentStorageProvider,
   toast,
 }: UseStorageActionsParams) {
+  const effectiveProvider = getSettingsForUpload(storageSettings).provider;
+
   const getProviderLabel = useCallback(
     (providerId?: string | null) => {
       const provider =
-        providerId && providerId !== storageSettings.provider
+        providerId && providerId !== effectiveProvider
           ? getStorageProviderById(providerId as StorageProviderType)
           : currentStorageProvider;
       return provider?.name ?? "未設定";
     },
-    [currentStorageProvider, storageSettings.provider]
+    [currentStorageProvider, effectiveProvider]
   );
 
   const handleCopyImageUrl = useCallback(
@@ -52,15 +54,15 @@ export function useStorageActions({
   const canDeleteFromStorage = useCallback(
     (providerId?: string | null) => {
       if (!isStorageConfigured) return false;
-      if (providerId && providerId !== storageSettings.provider) return false;
+      if (providerId && providerId !== effectiveProvider) return false;
       try {
-        const provider = getStorageProvider(storageSettings);
+        const provider = getStorageProvider(getSettingsForUpload(storageSettings));
         return typeof provider.deleteImage === "function";
       } catch {
         return false;
       }
     },
-    [isStorageConfigured, storageSettings]
+    [isStorageConfigured, storageSettings, effectiveProvider]
   );
 
   const handleDeleteFromStorage = useCallback(
@@ -73,7 +75,7 @@ export function useStorageActions({
         });
         throw new Error("Storage not configured");
       }
-      if (providerId && providerId !== storageSettings.provider) {
+      if (providerId && providerId !== effectiveProvider) {
         toast({
           title: "保存先が一致しません",
           description: "画像の保存先設定を確認してください",
@@ -84,7 +86,7 @@ export function useStorageActions({
 
       let provider: ReturnType<typeof getStorageProvider>;
       try {
-        provider = getStorageProvider(storageSettings);
+        provider = getStorageProvider(getSettingsForUpload(storageSettings));
       } catch (error) {
         toast({
           title: "ストレージ設定エラー",

@@ -3,7 +3,12 @@
 import { useState, useCallback } from "react";
 import { useStorageSettings } from "./useStorageSettings";
 import { useAuth } from "./useAuth";
-import { getStorageProvider, UploadProgress } from "@/lib/storage";
+import {
+  getStorageProvider,
+  getSettingsForUpload,
+  isStorageConfiguredForUpload,
+  UploadProgress,
+} from "@/lib/storage";
 
 interface ImageUploadState {
   isUploading: boolean;
@@ -30,7 +35,8 @@ export function useImageUpload(): UseImageUploadReturn {
     error: null,
   });
 
-  const isConfigured = !isLoading && settings.isConfigured;
+  const isConfigured =
+    !isLoading && isStorageConfiguredForUpload(settings);
 
   /**
    * 単一の画像をアップロード
@@ -38,7 +44,7 @@ export function useImageUpload(): UseImageUploadReturn {
   const uploadImage = useCallback(
     async (file: File): Promise<string> => {
       // ストレージ設定の確認
-      if (!settings.isConfigured) {
+      if (!isStorageConfiguredForUpload(settings)) {
         throw new Error(
           "ストレージが設定されていません。設定画面でストレージを設定してください。"
         );
@@ -58,7 +64,9 @@ export function useImageUpload(): UseImageUploadReturn {
 
       try {
         // プロバイダーを取得（S3 の場合は getToken を渡す）
-        const provider = getStorageProvider(settings, { getToken });
+        const provider = getStorageProvider(getSettingsForUpload(settings), {
+          getToken,
+        });
 
         // アップロード実行
         const url = await provider.uploadImage(file, {

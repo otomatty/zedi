@@ -15,6 +15,7 @@ import {
 import {
   getStorageProvider,
   isProviderConfigured,
+  isStorageConfiguredForUpload,
   ConnectionTestResult,
 } from "@/lib/storage";
 import { useAuth } from "./useAuth";
@@ -68,8 +69,14 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     setSettings((prev) => {
       const newSettings = { ...prev, ...updates };
 
+      // 外部ストレージに切り替えたときに provider が s3 のままなら外部の先頭に合わせる
+      if (updates.preferDefaultStorage === false && prev.provider === "s3") {
+        newSettings.provider = "gyazo";
+        newSettings.config = {};
+        newSettings.isConfigured = false;
+      }
       // プロバイダーが変更された場合、設定をリセット
-      if (updates.provider && updates.provider !== prev.provider) {
+      else if (updates.provider && updates.provider !== prev.provider) {
         newSettings.config = {};
         newSettings.isConfigured = false;
       }
@@ -99,7 +106,7 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     try {
       const settingsToSave: StorageSettings = {
         ...settings,
-        isConfigured: isProviderConfigured(settings.provider, settings.config),
+        isConfigured: isStorageConfiguredForUpload(settings),
       };
       await saveStorageSettings(settingsToSave);
       setSettings(settingsToSave);
@@ -112,14 +119,17 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     }
   }, [settings]);
 
-  // 接続テストを実行する
+  // 接続テストを実行する（デフォルト優先のときはデフォルトストレージ、外部のときは選択中の外部プロバイダー）
   const test = useCallback(async (): Promise<ConnectionTestResult> => {
     setIsTesting(true);
     setTestResult(null);
 
     try {
-      // 現在の設定でプロバイダーを作成（S3 の場合は getToken を渡す）
-      const provider = getStorageProvider(settings, { getToken });
+      const settingsToTest =
+        settings.preferDefaultStorage !== false
+          ? { ...settings, provider: "s3" as const, config: {} }
+          : settings;
+      const provider = getStorageProvider(settingsToTest, { getToken });
       const result = await provider.testConnection();
       setTestResult(result);
       return result;

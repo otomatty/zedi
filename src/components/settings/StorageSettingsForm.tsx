@@ -29,6 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -43,7 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
 import {
-  STORAGE_PROVIDERS,
+  EXTERNAL_STORAGE_PROVIDERS,
   StorageProviderType,
   StorageProviderInfo,
   getStorageProviderById,
@@ -69,7 +70,10 @@ export const StorageSettingsForm: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const currentProvider = getStorageProviderById(settings.provider);
+  const useExternalStorage = settings.preferDefaultStorage === false;
+  const currentProvider = getStorageProviderById(
+    useExternalStorage ? settings.provider : "s3"
+  );
   const difficultyLabels: Record<
     StorageProviderInfo["setupDifficulty"],
     string
@@ -148,71 +152,97 @@ export const StorageSettingsForm: React.FC = () => {
           画像ストレージ設定
         </CardTitle>
         <CardDescription>
-          デフォルトでは画像は Zedi (S3) に保存されます。ここで「使用するストレージ」を変更すると、Gyazo や Cloudflare R2 など外部ストレージに保存することもできます。
+          デフォルトでは画像はデフォルトストレージに保存されます。トグルで外部ストレージに切り替え、Gyazo や Cloudflare R2 などに保存することもできます。
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Provider Selection */}
-        <div className="space-y-2">
-          <Label htmlFor="provider">使用するストレージ</Label>
-          <Select
-            value={settings.provider}
-            onValueChange={(value) =>
-              updateSettings({ provider: value as StorageProviderType })
+        {/* 保存先トグル: デフォルトストレージ / 外部ストレージ */}
+        <div className="flex items-center justify-between rounded-lg border border-border p-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="prefer-default" className="text-base">
+              画像の保存先
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              {useExternalStorage
+                ? "外部ストレージに保存します"
+                : "デフォルトストレージに保存します"}
+            </p>
+          </div>
+          <Switch
+            id="prefer-default"
+            checked={useExternalStorage}
+            onCheckedChange={(checked) =>
+              updateSettings({ preferDefaultStorage: !checked })
             }
             disabled={isSaving || isTesting}
-          >
-            <SelectTrigger id="provider">
-              <SelectValue placeholder="ストレージを選択" />
-            </SelectTrigger>
-            <SelectContent>
-              {STORAGE_PROVIDERS.map((provider) => (
-                <SelectItem key={provider.id} value={provider.id}>
-                  <div className="flex w-full items-center justify-between gap-2">
-                    <div className="flex flex-col items-start">
-                      <span>{provider.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {provider.description}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Badge variant="outline" className="text-[10px]">
-                        難易度: {difficultyLabels[provider.setupDifficulty]}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {provider.freeTier}
-                      </Badge>
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {currentProvider && (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline" className="text-[10px]">
-                難易度: {difficultyLabels[currentProvider.setupDifficulty]}
-              </Badge>
-              <Badge variant="secondary" className="text-[10px]">
-                {currentProvider.freeTier}
-              </Badge>
-              <span>{currentProvider.description}</span>
-            </div>
-          )}
+          />
         </div>
 
-        {/* Provider-specific settings */}
-        {settings.provider === "s3" && (
+        {!useExternalStorage && (
           <Alert>
-            <AlertTitle>Zedi (S3) について</AlertTitle>
+            <AlertTitle>デフォルトストレージについて</AlertTitle>
             <AlertDescription>
-              ログインしていれば追加の設定は不要です。画像は Zedi の標準ストレージ（S3）に保存されます。他のストレージを使う場合は上で「使用するストレージ」を変更してください。
+              ログインしていれば追加の設定は不要です。画像はデフォルトストレージに保存されます。
             </AlertDescription>
           </Alert>
         )}
 
-        {settings.provider === "gyazo" && (
+        {/* 外部ストレージ選択（外部を選んだときのみ表示） */}
+        {useExternalStorage && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="provider">使用する外部ストレージ</Label>
+              <Select
+                value={settings.provider}
+                onValueChange={(value) =>
+                  updateSettings({ provider: value as StorageProviderType })
+                }
+                disabled={isSaving || isTesting}
+              >
+                <SelectTrigger id="provider">
+                  <SelectValue placeholder="ストレージを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXTERNAL_STORAGE_PROVIDERS.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      <div className="flex w-full items-center justify-between gap-2">
+                        <div className="flex flex-col items-start">
+                          <span>{provider.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {provider.description}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline" className="text-[10px]">
+                            難易度: {difficultyLabels[provider.setupDifficulty]}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {provider.freeTier}
+                          </Badge>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {currentProvider && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="outline" className="text-[10px]">
+                    難易度: {difficultyLabels[currentProvider.setupDifficulty]}
+                  </Badge>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {currentProvider.freeTier}
+                  </Badge>
+                  <span>{currentProvider.description}</span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Provider-specific settings（外部ストレージのときのみ表示） */}
+        {useExternalStorage && settings.provider === "gyazo" && (
           <GyazoSettings
             accessToken={settings.config.gyazoAccessToken || ""}
             onChange={(value) => updateConfig({ gyazoAccessToken: value })}
@@ -222,7 +252,7 @@ export const StorageSettingsForm: React.FC = () => {
           />
         )}
 
-        {settings.provider === "github" && (
+        {useExternalStorage && settings.provider === "github" && (
           <GitHubSettings
             repository={settings.config.githubRepository || ""}
             token={settings.config.githubToken || ""}
@@ -235,7 +265,7 @@ export const StorageSettingsForm: React.FC = () => {
           />
         )}
 
-        {settings.provider === "cloudflare-r2" && (
+        {useExternalStorage && settings.provider === "cloudflare-r2" && (
           <CloudflareR2Settings
             bucket={settings.config.r2Bucket || ""}
             accountId={settings.config.r2AccountId || ""}
@@ -249,7 +279,7 @@ export const StorageSettingsForm: React.FC = () => {
           />
         )}
 
-        {settings.provider === "google-drive" && (
+        {useExternalStorage && settings.provider === "google-drive" && (
           <GoogleDriveSettings
             clientId={settings.config.googleDriveClientId || ""}
             clientSecret={settings.config.googleDriveClientSecret || ""}

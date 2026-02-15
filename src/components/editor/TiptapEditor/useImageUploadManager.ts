@@ -6,7 +6,7 @@ import {
   type MutableRefObject,
 } from "react";
 import type { Editor } from "@tiptap/core";
-import { getStorageProvider } from "@/lib/storage";
+import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { StorageSettings } from "@/types/storage";
@@ -157,9 +157,10 @@ export function useImageUploadManager({
         return;
       }
 
+      const uploadSettings = getSettingsForUpload(storageSettings);
       let provider: ReturnType<typeof getStorageProvider>;
       try {
-        provider = getStorageProvider(storageSettings, { getToken });
+        provider = getStorageProvider(uploadSettings, { getToken });
       } catch (error) {
         toast({
           title: "ストレージ設定エラー",
@@ -177,7 +178,7 @@ export function useImageUploadManager({
         progress: 0,
         errorMessage: null,
         fileName: file.name,
-        providerId: storageSettings.provider,
+        providerId: uploadSettings.provider,
       });
       uploadFilesRef.current.set(uploadId, file);
 
@@ -208,7 +209,7 @@ export function useImageUploadManager({
           src: url,
           alt: file.name,
           title: file.name,
-          storageProviderId: storageSettings.provider,
+          storageProviderId: uploadSettings.provider,
         });
       } catch (error) {
         const message =

@@ -27,7 +27,7 @@ function buildImageUrl(baseUrl: string, mediaId: string): string {
 }
 
 export class S3Provider implements StorageProviderInterface {
-  readonly name = "Zedi (S3)";
+  readonly name = "デフォルトストレージ";
   private readonly getToken: () => Promise<string | null>;
   private readonly baseUrl: string;
 
@@ -42,7 +42,7 @@ export class S3Provider implements StorageProviderInterface {
   async uploadImage(file: File, options?: UploadOptions): Promise<string> {
     const token = await this.getToken();
     if (!token) {
-      throw new Error("ログインしていません。Zedi (S3) を使うにはサインインしてください。");
+      throw new Error("ログインしていません。デフォルトストレージを使うにはサインインしてください。");
     }
 
     const base = this.baseUrl.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
@@ -123,7 +123,7 @@ export class S3Provider implements StorageProviderInterface {
       if (!token) {
         return {
           success: false,
-          message: "ログインしていません。Zedi (S3) を使うにはサインインしてください。",
+          message: "ログインしていません。デフォルトストレージを使うにはサインインしてください。",
           error: "Not authenticated",
         };
       }
@@ -132,12 +132,12 @@ export class S3Provider implements StorageProviderInterface {
       await this.uploadImage(testImage);
       return {
         success: true,
-        message: "Zedi (S3) に接続できました。テスト画像をアップロードしました。",
+        message: "デフォルトストレージに接続できました。テスト画像をアップロードしました。",
       };
     } catch (error) {
       return {
         success: false,
-        message: "Zedi (S3) への接続に失敗しました",
+        message: "デフォルトストレージへの接続に失敗しました",
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }

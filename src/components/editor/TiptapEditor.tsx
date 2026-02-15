@@ -25,6 +25,7 @@ import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";
 import { getStorageProviderById } from "@/types/storage";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
+import { isStorageConfiguredForUpload, getSettingsForUpload } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
@@ -108,8 +109,10 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     settings: storageSettings,
     isLoading: isStorageLoading,
   } = useStorageSettings();
-  const isStorageConfigured = !isStorageLoading && storageSettings.isConfigured;
-  const currentStorageProvider = getStorageProviderById(storageSettings.provider);
+  const isStorageConfigured =
+    !isStorageLoading && isStorageConfiguredForUpload(storageSettings);
+  const effectiveProvider = getSettingsForUpload(storageSettings).provider;
+  const currentStorageProvider = getStorageProviderById(effectiveProvider);
   const [storageSetupDialogOpen, setStorageSetupDialogOpen] = useState(false);
 
   // Flag to track if editor has been initialized with content

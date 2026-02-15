@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
 import { getStorageProviderById } from "@/types/storage";
+import { isStorageConfiguredForUpload, getSettingsForUpload } from "@/lib/storage";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -34,8 +35,10 @@ const PageEditor: React.FC = () => {
     settings: storageSettings,
     isLoading: isStorageLoading,
   } = useStorageSettings();
-  const isStorageConfigured = !isStorageLoading && storageSettings.isConfigured;
-  const currentStorageProvider = getStorageProviderById(storageSettings.provider);
+  const isStorageConfigured =
+    !isStorageLoading && isStorageConfiguredForUpload(storageSettings);
+  const effectiveProvider = getSettingsForUpload(storageSettings).provider;
+  const currentStorageProvider = getStorageProviderById(effectiveProvider);
 
   const isNewPage = id === "new";
   const pageId = isNewPage ? "" : id || "";

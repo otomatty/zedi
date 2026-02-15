@@ -43,6 +43,8 @@ export interface StorageProviderConfig {
  * ストレージ設定
  */
 export interface StorageSettings {
+  /** true: デフォルトストレージに保存, false: 外部ストレージに保存 */
+  preferDefaultStorage?: boolean;
   provider: StorageProviderType;
   config: StorageProviderConfig;
   isConfigured: boolean;
@@ -67,8 +69,8 @@ export interface StorageProviderInfo {
 export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
   {
     id: "s3",
-    name: "Zedi (S3)",
-    description: "標準ストレージ（ログインで利用）",
+    name: "デフォルトストレージ",
+    description: "ログインで利用可能",
     helpUrl: "",
     setupDifficulty: "easy",
     freeTier: "無料枠あり",
@@ -111,10 +113,16 @@ export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
  * デフォルトのストレージ設定
  */
 export const DEFAULT_STORAGE_SETTINGS: StorageSettings = {
+  preferDefaultStorage: true,
   provider: "s3",
   config: {},
-  isConfigured: true, // S3 はログインのみで利用可能
+  isConfigured: true,
 };
+
+/** 外部ストレージのみ（Select で使用） */
+export const EXTERNAL_STORAGE_PROVIDERS = STORAGE_PROVIDERS.filter(
+  (p) => p.id !== "s3"
+);
 
 /**
  * プロバイダーIDから情報を取得
