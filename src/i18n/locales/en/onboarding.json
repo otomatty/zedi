@@ -7,7 +7,8 @@
   },
   "profile": {
     "heading": "Your profile",
-    "description": "Set your display name and profile image (optional)"
+    "description": "Set your display name. Profile image is optional.",
+    "displayNameRequired": "Please enter your display name"
   },
   "language": {
     "heading": "Language",

@@ -69,9 +69,16 @@ export function useProfile(): UseProfileReturn {
         // upsert を body なしで呼ぶと現在のユーザー情報が返る想定
         const result = await api.upsertMe({}) as Record<string, unknown> | null;
         if (result && typeof result === "object") {
+          const rawDisplayName = (result.display_name as string) ?? "";
+          const rawAvatarUrl = (result.avatar_url as string) ?? "";
+          // バックエンドが空のときは IdP（Google/GitHub）の名前で初期化
+          const displayName =
+            rawDisplayName.trim() !== ""
+              ? rawDisplayName
+              : (user?.fullName ?? user?.username ?? "").trim();
           const fetched: ProfileData = {
-            displayName: (result.display_name as string) ?? "",
-            avatarUrl: (result.avatar_url as string) ?? "",
+            displayName,
+            avatarUrl: rawAvatarUrl,
           };
           setProfile(fetched);
           saveCachedProfile(fetched);
@@ -84,7 +91,7 @@ export function useProfile(): UseProfileReturn {
       }
     };
     fetchProfile();
-  }, [isSignedIn, getToken]);
+  }, [isSignedIn, getToken, user?.fullName, user?.username]);
 
   const updateProfile = useCallback((updates: Partial<ProfileData>) => {
     setProfile((prev) => ({ ...prev, ...updates }));

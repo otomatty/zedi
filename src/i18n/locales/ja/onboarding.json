@@ -7,7 +7,8 @@
   },
   "profile": {
     "heading": "あなたのプロフィール",
-    "description": "表示名とプロフィール画像を設定します（任意）"
+    "description": "表示名を設定します。プロフィール画像は任意です。",
+    "displayNameRequired": "表示名を入力してください"
   },
   "language": {
     "heading": "使用言語",

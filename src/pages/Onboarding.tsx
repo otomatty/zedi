@@ -81,6 +81,7 @@ const Onboarding: React.FC = () => {
   }, [completeSetupWizard, navigate]);
 
   const isLoading = isProfileLoading || isSettingsLoading;
+  const displayNameInvalid = profile.displayName.trim() === "";
 
   if (!needsSetupWizard) {
     return <Navigate to="/home" replace />;
@@ -137,10 +138,23 @@ const Onboarding: React.FC = () => {
                     }
                     placeholder={t("generalSettings.profile.displayNamePlaceholder")}
                     maxLength={100}
+                    aria-invalid={displayNameInvalid}
+                    aria-describedby={displayNameInvalid ? "onboarding-displayName-error" : undefined}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {t("generalSettings.profile.displayNameHelp")}
-                  </p>
+                  {displayNameInvalid && (
+                    <p
+                      id="onboarding-displayName-error"
+                      className="text-xs text-destructive"
+                      role="alert"
+                    >
+                      {t("onboarding.profile.displayNameRequired")}
+                    </p>
+                  )}
+                  {!displayNameInvalid && (
+                    <p className="text-xs text-muted-foreground">
+                      {t("generalSettings.profile.displayNameHelp")}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>{t("generalSettings.profile.avatar")}</Label>
@@ -268,7 +282,7 @@ const Onboarding: React.FC = () => {
               <Button
                 onClick={handleNext}
                 className={step === 1 ? "w-full" : "flex-1"}
-                disabled={step === 1 && isProfileSaving}
+                disabled={step === 1 && (displayNameInvalid || isProfileSaving)}
               >
                 {t("onboarding.action.next")}
               </Button>

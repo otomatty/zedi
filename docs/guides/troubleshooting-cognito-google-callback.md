@@ -4,6 +4,20 @@
 
 ---
 
+## 本番で「An error was encountered with the requested page」／Google・GitHub サインインができない
+
+**症状:** 本番の認証画面で「An error was encountered with the requested page」と表示され、Google や GitHub でサインインできない。
+
+**原因:** Terraform の apply 時に **Google / GitHub の OAuth Client Secret が渡っておらず**、Cognito に IdP（Google / GitHub）が登録されていない、または空のシークレットで登録されている。
+
+- シークレットは **`prod.secret.env`** に `TF_VAR_google_oauth_client_secret` と `TF_VAR_github_oauth_client_secret` で渡す必要がある。
+- apply の**前**にこのファイルを **読み込んでから** `terraform apply` しないと、Cognito に IdP が有効にならない。
+
+**対処:** 下記 **§A** の手順に従う（prod.secret.env の作成・確認 → 読み込んでから terraform apply）。  
+テンプレート: `terraform/environments/prod.secret.env.example` をコピーして `prod.secret.env` を作成し、GCP と GitHub から取得した Client Secret を記入する。
+
+---
+
 ## 0. 開発環境で `redirect_mismatch`（Cognito のエラーページが表示される）
 
 **症状:** ログインしようとすると Cognito のエラーページが表示される。
@@ -78,7 +92,35 @@ GET https://zedi-dev-....auth.ap-northeast-1.amazoncognito.com/error?error=redir
 
 ---
 
-## B. Google のアカウント選択が表示されずコールバックで止まる
+## B. 認証ページで `invalid_request`（client_id が古い）
+
+**症状:** 認証画面で `GET .../error?error=invalid_request&client_id=xxxxx` が 400 で返る。
+
+**原因:** デプロイ済みのフロントに埋め込まれている **Cognito Client ID** が、現在の Cognito の Client ID と一致していない。Terraform で destroy → apply したあとなど、Cognito が作り直されると **Client ID が変わります**。そのまま古い Client ID でビルドしたフロントが本番に出ているとこのエラーになる。
+
+**対処:**
+
+1. **現在の Client ID を確認**
+   ```bash
+   cd terraform && terraform workspace select prod && terraform output -raw cognito_client_id
+   ```
+   例: `1aoffob0l5avca6335tq6co7p`
+
+2. **`.env.production` を更新**
+   - `VITE_COGNITO_CLIENT_ID=` を上記の値に書き換える。
+   - あわせて `VITE_COGNITO_DOMAIN=` が `zedi-prod-590183877893.auth.ap-northeast-1.amazoncognito.com`（`https://` なし）になっているか確認する。
+
+3. **フロントを再ビルド・再デプロイ**
+   ```bash
+   bun run deploy:prod
+   ```
+   GitHub Actions でデプロイしている場合は、**Secrets** の `VITE_COGNITO_CLIENT_ID`（と必要なら `VITE_COGNITO_DOMAIN`）を上記の値に更新し、ワークフローを再実行する。
+
+4. ブラウザのキャッシュを消すかシークレットウィンドウで https://zedi-note.app にアクセスし直す。
+
+---
+
+## C. Google のアカウント選択が表示されずコールバックで止まる
 
 本番（zedi-note.app）で「Google でサインイン」を押したあと、Google のアカウント選択画面が出ずに `/auth/callback` で止まるときの確認ポイントです。
 

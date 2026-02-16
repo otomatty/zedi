@@ -5,6 +5,11 @@
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+# Normalize path for file()/fileexists() on Windows (avoid "inconsistent result")
+locals {
+  lambda_dist_dir = "${replace(path.module, "\\", "/")}/lambda/dist"
+}
+
 ################################################################################
 # Build Lambda (esbuild TypeScript → dist/index.mjs)
 ################################################################################
@@ -29,13 +34,13 @@ data "archive_file" "lambda" {
   output_path = "${path.module}/lambda.zip"
 
   source {
-    content  = file("${path.module}/lambda/dist/index.mjs")
+    content  = file("${local.lambda_dist_dir}/index.mjs")
     filename = "index.mjs"
   }
 
   # Include source map for debugging
   source {
-    content  = fileexists("${path.module}/lambda/dist/index.mjs.map") ? file("${path.module}/lambda/dist/index.mjs.map") : "{}"
+    content  = fileexists("${local.lambda_dist_dir}/index.mjs.map") ? file("${local.lambda_dist_dir}/index.mjs.map") : "{}"
     filename = "index.mjs.map"
   }
 
