@@ -1,7 +1,7 @@
 import { StrictMode, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { CognitoAuthProvider } from "./components/auth/CognitoAuthProvider";
-import { MockClerkProvider } from "./components/auth/MockClerkProvider";
+import { MockAuthProvider } from "./components/auth/MockAuthProvider";
 import App from "./App.tsx";
 import "./index.css";
 import "./i18n"; // i18n 初期化
@@ -10,7 +10,7 @@ const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 
 function AuthProvider({ children }: { children: ReactNode }) {
   if (isE2EMode) {
-    return <MockClerkProvider>{children}</MockClerkProvider>;
+    return <MockAuthProvider>{children}</MockAuthProvider>;
   }
   return <CognitoAuthProvider>{children}</CognitoAuthProvider>;
 }

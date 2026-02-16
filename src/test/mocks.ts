@@ -40,9 +40,6 @@ export function mockAuth(options?: { isSignedIn?: boolean }) {
   }));
 }
 
-/** @deprecated Use mockAuth instead (Clerk removed). */
-export const mockClerkAuth = mockAuth;
-
 /**
  * Create a mock repository provider for testing
  */

@@ -13,7 +13,7 @@ import {
   MOCK_USER_EMAIL,
   MockSignedIn,
   MockSignedOut,
-} from "@/components/auth/MockClerkProvider";
+} from "@/components/auth/MockAuthProvider";
 
 const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 

@@ -39,7 +39,7 @@ const Landing: React.FC = () => {
   const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useAuth();
 
-  // Show loading state while Clerk is initializing
+  // Show loading state while auth is initializing
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center">

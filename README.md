@@ -191,7 +191,7 @@ VITE_TURSO_DATABASE_URL=libsql://your-database-name.aws-ap-northeast-1.turso.io
 | **Editor** | Tiptap (ProseMirror) |
 | **Styling** | Tailwind CSS + shadcn/ui |
 | **State** | Zustand + TanStack Query |
-| **Auth** | Clerk |
+| **Auth** | Cognito (Google/GitHub OAuth) |
 | **Database** | libsql (in-memory + IndexedDB) / Turso |
 | **AI** | OpenAI / Anthropic / Google Gemini |
 | **Testing** | Vitest + Playwright |
@@ -210,7 +210,7 @@ VITE_TURSO_DATABASE_URL=libsql://your-database-name.aws-ap-northeast-1.turso.io
 - [x] Web Clipper
 - [x] Global Search
 - [x] キーボードショートカット
-- [x] Clerk 認証連携
+- [x] Cognito 認証連携（Google/GitHub OAuth）
 - [x] Markdown エクスポート
 - [x] Backlinks / 2-hop Links 表示
 - [x] Linked Pages カード表示
