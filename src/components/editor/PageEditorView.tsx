@@ -20,9 +20,6 @@ import { useTitleValidation } from "@/hooks/useTitleValidation";
 import { generateAutoTitle, isContentNotEmpty, extractFirstImage } from "@/lib/contentUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
-import { useStorageSettings } from "@/hooks/useStorageSettings";
-import { getStorageProviderById } from "@/types/storage";
-import { isStorageConfiguredForUpload, getSettingsForUpload } from "@/lib/storage";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -31,15 +28,6 @@ const PageEditor: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const {
-    settings: storageSettings,
-    isLoading: isStorageLoading,
-  } = useStorageSettings();
-  const isStorageConfigured =
-    !isStorageLoading && isStorageConfiguredForUpload(storageSettings);
-  const effectiveProvider = getSettingsForUpload(storageSettings).provider;
-  const currentStorageProvider = getStorageProviderById(effectiveProvider);
-
   const isNewPage = id === "new";
   const pageId = isNewPage ? "" : id || "";
   const { isSignedIn } = useAuth();
@@ -318,12 +306,6 @@ const PageEditor: React.FC = () => {
     navigate(`/settings/ai?${search}`);
   }, [resetWiki, navigate, location.pathname, location.search]);
 
-  const handleGoToStorageSettings = useCallback(() => {
-    const returnTo = `${location.pathname}${location.search}`;
-    const search = new URLSearchParams({ returnTo }).toString();
-    navigate(`/settings/storage?${search}`);
-  }, [navigate, location.pathname, location.search]);
-
   // Show loading state
   if (!isNewPage && isLoading) {
     return (
@@ -351,10 +333,6 @@ const PageEditor: React.FC = () => {
         hasContent={isContentNotEmpty(content)}
         wikiStatus={wikiStatus}
         errorMessage={errorMessage}
-        currentStorageProvider={currentStorageProvider}
-        isStorageConfigured={isStorageConfigured}
-        isStorageLoading={isStorageLoading}
-        onGoToStorageSettings={handleGoToStorageSettings}
         onBack={handleBack}
         onDelete={handleDelete}
         onExportMarkdown={handleExportMarkdown}

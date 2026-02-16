@@ -19,8 +19,6 @@ import Container from "@/components/layout/Container";
 import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import type { WikiGeneratorStatus } from "./types";
-import type { StorageProviderInfo } from "@/types/storage";
-import { StorageStatusHeader } from "../TiptapEditor/StorageStatusHeader";
 import { ConnectionIndicator } from "../ConnectionIndicator";
 import { UserAvatars } from "../UserAvatars";
 import type { ConnectionStatus } from "@/lib/collaboration/types";
@@ -33,10 +31,6 @@ interface PageEditorHeaderProps {
   hasContent: boolean;
   wikiStatus: WikiGeneratorStatus;
   errorMessage: string | null;
-  currentStorageProvider?: StorageProviderInfo;
-  isStorageConfigured: boolean;
-  isStorageLoading: boolean;
-  onGoToStorageSettings: () => void;
   onBack: () => void;
   onDelete: () => void;
   onExportMarkdown: () => void;
@@ -62,10 +56,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   hasContent,
   wikiStatus,
   errorMessage,
-  currentStorageProvider,
-  isStorageConfigured,
-  isStorageLoading,
-  onGoToStorageSettings,
   onBack,
   onDelete,
   onExportMarkdown,
@@ -115,13 +105,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
             hasContent={hasContent}
             onGenerate={onGenerateWiki}
             status={wikiStatus}
-          />
-          <StorageStatusHeader
-            currentStorageProvider={currentStorageProvider}
-            isStorageConfigured={isStorageConfigured}
-            isStorageLoading={isStorageLoading}
-            onGoToStorageSettings={onGoToStorageSettings}
-            className="shrink-0"
           />
           {lastSaved && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
