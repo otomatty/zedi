@@ -19,6 +19,7 @@ dist-ssr
 
 # Developer sync configuration (contains user ID mappings)
 scripts/sync/dev-user-mapping.json
+scripts/sync/dev-user-mapping-aurora.json
 
 # Turso export output (C2-1; may contain sensitive data)
 scripts/migration/export-turso/output/

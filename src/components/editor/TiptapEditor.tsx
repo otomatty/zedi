@@ -45,10 +45,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { extractFirstImage } from "@/lib/contentUtils";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 
-const getThumbnailApiBaseUrl = () =>
-  import.meta.env.VITE_THUMBNAIL_API_BASE_URL ||
-  import.meta.env.VITE_ZEDI_API_BASE_URL ||
-  "";
+/** Uses same base URL as REST API (VITE_ZEDI_API_BASE_URL). */
+const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";

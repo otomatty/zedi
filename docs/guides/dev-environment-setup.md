@@ -2,21 +2,23 @@
 
 本番環境と開発環境を分離し、開発者データを同期する方法について説明します。
 
+> **データベースについて:** 本番・開発ともに **Aurora (PostgreSQL)** に移行済みです。特定ユーザーのデータのみ本番↔開発で同期する方法は [Aurora 開発・本番同期の実装方針](../plans/aurora-dev-prod-sync-plan.md) を参照してください。以下「Turso」の記述は、Aurora 移行前の参照用に残しています。
+
 ## 概要
 
 ```
 ┌─────────────────┐                     ┌─────────────────┐
 │   Production    │                     │   Development   │
 ├─────────────────┤                     ├─────────────────┤
-│ Turso: zedi-prod│ ←── sync script ──→ │ Turso: zedi-dev │
-│ Clerk: pk_live_ │                     │ Clerk: pk_test_ │
+│ Aurora (RDS)    │ ←── sync script ──→ │ Aurora (RDS)    │
+│ Cognito (prod)  │     (要 Aurora 用)   │ Cognito (dev)   │
 │ 全ユーザーデータ │                     │ 開発者データのみ │
 └─────────────────┘                     └─────────────────┘
 ```
 
 - **本番環境**: 全ユーザーのデータを含む
 - **開発環境**: 開発者のデータのみ（テストデータで本番DBを圧迫しない）
-- **同期スクリプト**: 開発者のデータを両環境で同期
+- **同期スクリプト**: Aurora 用は `docs/plans/aurora-dev-prod-sync-plan.md` の方針に基づき実装予定。従来の Turso 用 `scripts/sync/sync-dev-data.ts` は Aurora 移行後は利用しない。
 
 ## 1. Turso 開発データベースの作成
 

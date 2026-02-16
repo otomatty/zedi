@@ -5,13 +5,15 @@ API Gateway HTTP API + Lambda + Cognito JWT Authorizer の基盤です。
 ## 構成
 
 - **API Gateway HTTP API**: `/api`, `/api/{proxy+}` を Lambda にルーティング
-- **Cognito JWT Authorizer**: `Authorization: Bearer <id_token>` を検証（`/api/health` は認証なし）
+- **Cognito JWT Authorizer**: `Authorization: Bearer <id_token>` を検証（`/api/health` と `OPTIONS` は認証なし）
+- **CORS**: `cors_origin` 変数でオリジンを制御（prod: `https://zedi-note.app`、dev: `*`）。OPTIONS プリフライトは JWT をバイパスする専用ルートで処理
 - **Lambda**: Node 20、ルーター + 共通エラーハンドリング（`lambda/` 配下）
 
 ## ルート
 
 | パス | 認証 | 説明 |
 |------|------|------|
+| `OPTIONS /api/*` | 不要 | CORS プリフライト（JWT バイパス） |
 | `GET /api/health` | 不要 | ヘルスチェック |
 | `GET /api/me` | 必須 | 現在ユーザー（JWT claims の sub, email） |
 | `POST /api/users/upsert` | 必須 | Cognito sub/email から users を upsert（body: display_name?, avatar_url?） |
@@ -71,5 +73,6 @@ cd lambda && node test-api.mjs
 Terraform で Lambda に渡される変数（ルートの `module.api` に渡す値は `module.database` / `module.security` の出力を参照）:
 
 - `ENVIRONMENT`: dev / prod
+- `CORS_ORIGIN`: 許可する CORS オリジン（prod: `https://zedi-note.app`、dev: `*`）。`responses.mjs` の `Access-Control-Allow-Origin` ヘッダーに使用
 - `AURORA_DATABASE_NAME`, `DB_CREDENTIALS_SECRET`, `AURORA_CLUSTER_ARN`: RDS Data API 用（`module.database` の出力。users / sync/pages / notes / search / media confirm で使用）
 - `MEDIA_BUCKET`: メディアアップロード用 S3 バケット名（API モジュール内で作成したバケットの id）

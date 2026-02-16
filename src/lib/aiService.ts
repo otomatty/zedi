@@ -6,8 +6,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { AISettings, AIProviderType, APIMode, AIResponseUsage, UserTier } from "@/types/ai";
 
-const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
-const getAIWSUrl = () => import.meta.env.VITE_AI_WS_URL || "";
+/** Uses same base URL as REST API (VITE_ZEDI_API_BASE_URL). */
+const getAIAPIBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+const getAIWSUrl = () => (import.meta.env.VITE_AI_WS_URL as string) ?? "";
 
 export interface AIServiceRequest {
   provider: AIProviderType;

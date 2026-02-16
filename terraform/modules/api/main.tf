@@ -94,6 +94,7 @@ resource "aws_lambda_function" "main" {
       DB_CREDENTIALS_SECRET  = var.db_credentials_secret_arn
       AURORA_CLUSTER_ARN     = var.aurora_cluster_arn
       MEDIA_BUCKET           = aws_s3_bucket.media.id
+      CORS_ORIGIN            = var.cors_origin
     }
   }
   tags = var.tags
@@ -110,7 +111,7 @@ resource "aws_apigatewayv2_api" "main" {
   tags          = var.tags
 
   cors_configuration {
-    allow_origins = ["*"]
+    allow_origins = [var.cors_origin]
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allow_headers = ["Content-Type", "Authorization"]
     max_age       = 86400
@@ -152,6 +153,19 @@ resource "aws_apigatewayv2_route" "api_root" {
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+}
+
+# OPTIONS preflight routes（認証なし — CORS プリフライトが JWT をバイパスするために必要）
+resource "aws_apigatewayv2_route" "api_proxy_options" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "OPTIONS /api/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "api_root_options" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "OPTIONS /api"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
 # ヘルスチェック用（認証なし・オプション）

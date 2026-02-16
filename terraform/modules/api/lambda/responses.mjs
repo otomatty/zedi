@@ -3,12 +3,14 @@
  * CORS ヘッダーと JSON ボディを統一
  */
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-  "Content-Type": "application/json; charset=utf-8",
-};
+function getCorsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "Content-Type": "application/json; charset=utf-8",
+  };
+}
 
 /**
  * @param {Record<string, unknown>} body
@@ -18,7 +20,7 @@ const CORS_HEADERS = {
 export function json(body, statusCode = 200) {
   return {
     statusCode,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(),
     body: JSON.stringify(body),
   };
 }
@@ -72,7 +74,7 @@ export function corsPreflight() {
   return {
     statusCode: 204,
     headers: {
-      ...CORS_HEADERS,
+      ...getCorsHeaders(),
       "Content-Length": "0",
     },
     body: "",
@@ -88,7 +90,7 @@ export function redirect(location) {
   return {
     statusCode: 302,
     headers: {
-      ...CORS_HEADERS,
+      ...getCorsHeaders(),
       Location: location,
     },
     body: "",

@@ -29,10 +29,19 @@ async function main(): Promise<void> {
 
   const bucket = process.env.PROD_FRONTEND_S3_BUCKET;
   const distributionId = process.env.PROD_CLOUDFRONT_DISTRIBUTION_ID;
+  const apiBaseUrl = process.env.VITE_ZEDI_API_BASE_URL?.trim();
 
   if (!bucket || !distributionId) {
     console.error(
       "[deploy] Missing PROD_FRONTEND_S3_BUCKET or PROD_CLOUDFRONT_DISTRIBUTION_ID. Set them in .env.production (see .env.production.example)."
+    );
+    process.exit(1);
+  }
+
+  if (!apiBaseUrl) {
+    console.error(
+      "[deploy] Missing VITE_ZEDI_API_BASE_URL. Set it in .env.production (e.g. terraform output -raw api_invoke_url). " +
+        "Without it, /api/* requests go to the frontend origin and return HTML, causing 'Invalid JSON response' on /home."
     );
     process.exit(1);
   }

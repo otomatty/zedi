@@ -14,7 +14,8 @@ export interface SubscriptionState {
   };
 }
 
-const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
+/** Uses same base URL as REST API (VITE_ZEDI_API_BASE_URL). */
+const getAIAPIBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
 
 /**
  * Fetch current subscription state from the AI API (requires auth).

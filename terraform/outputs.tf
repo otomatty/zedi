@@ -39,6 +39,11 @@ output "private_subnet_ids" {
 # =============================================================================
 # Database (Aurora)
 # =============================================================================
+output "aurora_cluster_arn" {
+  description = "Aurora cluster ARN (for RDS Data API)"
+  value       = module.database.cluster_arn
+}
+
 output "aurora_cluster_endpoint" {
   description = "Aurora cluster endpoint (writer)"
   value       = module.database.cluster_endpoint

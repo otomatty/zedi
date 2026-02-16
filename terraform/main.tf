@@ -157,6 +157,8 @@ module "api" {
   cognito_user_pool_id        = module.security.user_pool_id
   cognito_user_pool_client_id = module.security.user_pool_client_id
 
+  cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
+
   db_credentials_secret_arn = module.database.db_credentials_secret_arn
   aurora_cluster_arn       = module.database.cluster_arn
   aurora_database_name     = var.aurora_database_name
