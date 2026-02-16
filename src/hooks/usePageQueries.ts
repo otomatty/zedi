@@ -209,7 +209,7 @@ export function usePages() {
 
 /**
  * Hook to fetch page summaries for the current user (without content)
- * Use this for list views to minimize data transfer and reduce Turso Rows Read
+ * Use this for list views to minimize data transfer
  */
 export function usePagesSummary() {
   const { getRepository, userId, isLoaded } = useRepository();

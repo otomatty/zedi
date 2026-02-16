@@ -1,6 +1,6 @@
 /**
  * REST API client for Zedi backend (C1-4, C1-5, C1-6, C1-7).
- * Phase C3: Replaces direct Turso connection. All /api/* routes require Cognito JWT.
+ * All /api/* routes require Cognito JWT.
  */
 
 import type {

@@ -21,8 +21,9 @@ dist-ssr
 scripts/sync/dev-user-mapping.json
 scripts/sync/dev-user-mapping-aurora.json
 
-# Turso export output (C2-1; may contain sensitive data)
+# Migration export output (may contain sensitive data)
 scripts/migration/export-turso/output/
+
 # Aurora transform output (C2-2; contains UUID-mapped data)
 scripts/migration/transform-for-aurora/output/
 

@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 
 /**
  * C3-7: Common interface for page repository implementations.
- * Implemented by PageRepository (Turso/sql.js) and StorageAdapterPageRepository (adapter + API).
+ * Implemented by PageRepository (libsql local/test) and StorageAdapterPageRepository (adapter + API).
  */
 export interface IPageRepository {
   createPage(userId: string, title?: string, content?: string): Promise<Page>;
@@ -47,7 +47,7 @@ export interface PageRepositoryOptions {
 
 /**
  * Page repository for database operations
- * Works with both Turso (remote) and libsql (local) clients
+ * Works with libsql clients (in-memory for tests)
  */
 export class PageRepository {
   private onMutate?: () => void | Promise<void>;
@@ -140,7 +140,7 @@ export class PageRepository {
 
   /**
    * Get all page summaries for a user (without content)
-   * Use this for list views to minimize data transfer and reduce Turso Rows Read
+   * Use this for list views to minimize data transfer
    */
   async getPagesSummary(userId: string): Promise<PageSummary[]> {
     const result = await this.client.execute({

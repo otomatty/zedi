@@ -1,6 +1,6 @@
 /**
  * C3-7: Page repository backed by StorageAdapter + ApiClient.
- * Replaces Turso/sql.js for reads and writes. Page "content" is Y.Doc (returned as "").
+ * Uses StorageAdapter + API for reads and writes. Page "content" is Y.Doc (returned as "").
  */
 
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";

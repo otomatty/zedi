@@ -29,13 +29,6 @@
 | VITE_LEMONSQUEEZY_AI_YEARLY_PRODUCT_ID | ❌ | 同上。 |
 | VITE_LEMONSQUEEZY_PORTAL_URL | ❌ | 顧客ポータル（任意）。 |
 
-## .env.production にのみある項目
-
-| 変数 | 備考 |
-|------|------|
-| VITE_CLERK_PUBLISHABLE_KEY | .env.production.example にはなし。Clerk 利用時はそのままで可。 |
-| VITE_TURSO_DATABASE_URL / VITE_TURSO_AUTH_TOKEN | example では「AWS 移行済みなら未使用で可」。Aurora 移行後は削除してよい。 |
-
 ## 推奨アクション
 
 1. **VITE_AI_WS_URL**  
@@ -43,6 +36,3 @@
 
 2. **LemonSqueezy で Pro 課金を行う場合**  
    `VITE_LEMONSQUEEZY_STORE_ID`、`VITE_LEMONSQUEEZY_AI_MONTHLY_PRODUCT_ID`（または YEARLY）を追加。
-
-3. **Turso**  
-   Aurora 完全移行済みなら本番では `VITE_TURSO_*` を削除してよい。
