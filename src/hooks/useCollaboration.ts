@@ -1,6 +1,7 @@
 /**
  * useCollaboration hook
  * CollaborationManagerをReactで使用するためのカスタムフック
+ * 未ログイン時は local-user で IndexedDB のみ使用（Aurora 同期なし）。
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -11,6 +12,8 @@ import { useAuth, useUser } from '@/hooks/useAuth';
 import type * as Y from 'yjs';
 import type { Awareness } from 'y-protocols/awareness';
 
+const LOCAL_USER_ID = 'local-user';
+
 const initialState: CollaborationState = {
   status: 'connecting',
   isSynced: false,
@@ -20,7 +23,8 @@ const initialState: CollaborationState = {
 
 /**
  * リアルタイムコラボレーション機能を提供するフック
- * 
+ * 未ログイン時は effectiveUserId = local-user で Y.Doc + IndexedDB のみ使用。
+ *
  * @example
  * ```tsx
  * const { status, isSynced, onlineUsers, ydoc, xmlFragment, awareness } = useCollaboration({
@@ -39,18 +43,20 @@ export function useCollaboration({
   const [state, setState] = useState<CollaborationState>(initialState);
   const managerRef = useRef<CollaborationManager | null>(null);
 
-  // Manager初期化
+  const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
+
+  // Manager初期化（ゲスト時も local モードで IndexedDB のみ有効）
   useEffect(() => {
-    if (!enabled || !pageId || !userId || !isSignedIn) {
+    if (!enabled || !pageId) {
       setState(prev => ({ ...prev, status: 'disconnected' }));
       return;
     }
 
-    const userName = user?.fullName || user?.firstName || 'Anonymous';
+    const userName = (isSignedIn && user) ? (user.fullName || user.firstName || 'Anonymous') : 'Guest';
 
     const manager = new CollaborationManager(
       pageId,
-      userId,
+      effectiveUserId,
       userName,
       async () => {
         try {
@@ -75,7 +81,7 @@ export function useCollaboration({
       manager.destroy();
       managerRef.current = null;
     };
-  }, [pageId, userId, enabled, mode, getToken, isSignedIn, user?.fullName, user?.firstName]);
+  }, [pageId, effectiveUserId, enabled, mode, getToken, isSignedIn, user?.fullName, user?.firstName]);
 
   // カーソル位置更新
   const updateCursor = useCallback((anchor: number, head: number) => {
@@ -93,10 +99,10 @@ export function useCollaboration({
   }, []);
 
   const collaborationUser =
-    enabled && userId && user
+    enabled && effectiveUserId
       ? {
-          name: user.fullName || user.firstName || 'Anonymous',
-          color: getUserColor(userId),
+          name: (isSignedIn && user) ? (user.fullName || user.firstName || 'Anonymous') : 'Guest',
+          color: getUserColor(effectiveUserId),
         }
       : undefined;
 

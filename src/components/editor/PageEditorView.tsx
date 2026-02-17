@@ -21,7 +21,6 @@ import { generateAutoTitle, isContentNotEmpty, extractFirstImage } from "@/lib/c
 import { useToast } from "@/hooks/use-toast";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 import { useCollaboration } from "@/hooks/useCollaboration";
-import { useAuth } from "@/hooks/useAuth";
 
 const PageEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,13 +29,12 @@ const PageEditor: React.FC = () => {
   const { toast } = useToast();
   const isNewPage = id === "new";
   const pageId = isNewPage ? "" : id || "";
-  const { isSignedIn } = useAuth();
 
   // /page/new への直接アクセスはホームへリダイレクト
-  // （ページ作成はuseCreateNewPageフック経由で行う）
+  // （ページ作成は FAB の useCreateNewPage 経由で行う）
   useEffect(() => {
     if (isNewPage) {
-      navigate("/", { replace: true });
+      navigate("/home", { replace: true });
     }
   }, [isNewPage, navigate]);
 
@@ -72,8 +70,8 @@ const PageEditor: React.FC = () => {
   });
 
   // C-Collab-2: 個人ページ(/page/:id)は常に local モードで動作させる。
-  // これにより Hocuspocus WebSocket には接続せず、Y.Doc + y-indexeddb のみ。
-  const isLocalDocEnabled = Boolean(currentPageId && !isNewPage && isSignedIn);
+  // ログイン有無にかかわらず Y.Doc + y-indexeddb を使用（未ログイン時は Aurora 同期なし）。
+  const isLocalDocEnabled = Boolean(currentPageId && !isNewPage);
   const collaboration = useCollaboration({
     pageId: currentPageId ?? "",
     enabled: isLocalDocEnabled,

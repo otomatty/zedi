@@ -1,6 +1,7 @@
 /**
  * C3-7: Page repository backed by StorageAdapter + ApiClient.
  * Uses StorageAdapter + API for reads and writes. Page "content" is Y.Doc (returned as "").
+ * When userId is LOCAL_USER_ID (guest), create/delete use adapter only (no API).
  */
 
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
@@ -8,6 +9,8 @@ import type { PageMetadata } from "@/lib/storageAdapter/types";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
 import { getPageListPreview } from "@/lib/contentUtils";
+
+const LOCAL_USER_ID = "local-user";
 
 function metadataToPage(m: PageMetadata): Page {
   return {
@@ -51,6 +54,26 @@ export class StorageAdapterPageRepository {
     content: string = ""
   ): Promise<Page> {
     const contentPreview = getPageListPreview(content);
+    const now = Date.now();
+
+    if (userId === LOCAL_USER_ID) {
+      const id = crypto.randomUUID();
+      const meta: PageMetadata = {
+        id,
+        ownerId: userId,
+        sourcePageId: null,
+        title: title || null,
+        contentPreview: contentPreview || null,
+        thumbnailUrl: null,
+        sourceUrl: null,
+        createdAt: now,
+        updatedAt: now,
+        isDeleted: false,
+      };
+      await this.adapter.upsertPage(meta);
+      return metadataToPage(meta);
+    }
+
     const created = await this.api.createPage({
       title: title || undefined,
       content_preview: contentPreview || undefined,
@@ -147,7 +170,9 @@ export class StorageAdapterPageRepository {
 
   async deletePage(userId: string, pageId: string): Promise<void> {
     await this.adapter.deletePage(pageId);
-    await this.api.deletePage(pageId);
+    if (userId !== LOCAL_USER_ID) {
+      await this.api.deletePage(pageId);
+    }
   }
 
   async searchPages(userId: string, query: string): Promise<Page[]> {

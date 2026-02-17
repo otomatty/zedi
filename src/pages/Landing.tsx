@@ -72,12 +72,10 @@ const Landing: React.FC = () => {
           <div className="flex items-center gap-4">
             <SignedOut>
               <Link to="/sign-in">
-                <Button variant="ghost" size="sm">
-                  {t("nav.signIn")}
+                <Button size="sm">
+                  {t("common.startUsingApp")}
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
-              </Link>
-              <Link to="/sign-in">
-                <Button size="sm">{t("landing.startFree")}</Button>
               </Link>
             </SignedOut>
             <SignedIn>
@@ -109,7 +107,7 @@ const Landing: React.FC = () => {
             <SignedOut>
               <Link to="/sign-in">
                 <Button size="lg" className="w-full sm:w-auto">
-                  {t("landing.startFree")}
+                  {t("common.startUsingApp")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -152,7 +150,7 @@ const Landing: React.FC = () => {
           <SignedOut>
             <Link to="/sign-in">
               <Button size="lg">
-                {t("landing.startFree")}
+                {t("common.startUsingApp")}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

@@ -58,14 +58,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/home"
-              element={
-                <ProtectedRoute>
-                  <Home />
-                </ProtectedRoute>
-              }
-            />
+            {/* Home and PageEditor: available without login (local-only mode) */}
+            <Route path="/home" element={<Home />} />
             <Route
               path="/notes"
               element={
@@ -74,14 +68,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/page/:id"
-              element={
-                <ProtectedRoute>
-                  <PageEditorPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/page/:id" element={<PageEditorPage />} />
             <Route
               path="/settings"
               element={

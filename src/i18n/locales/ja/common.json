@@ -25,5 +25,8 @@
   "unsavedChangesMessage": "設定が変更されています。保存しますか？",
   "unsavedNavigationMessage": "設定が保存されていません",
   "saveAndLeave": "保存して移動",
-  "discardAndLeave": "保存せずに移動"
+  "discardAndLeave": "保存せずに移動",
+  "guestSyncPrompt": "ログインしてクラウドに同期",
+  "useWithoutSignIn": "ログインせずに使う",
+  "startUsingApp": "アプリを使い始める"
 }

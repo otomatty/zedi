@@ -82,15 +82,22 @@ Cognito と対応づけるためのユーザー情報。認証後、アプリ内
 
 共有のコンテナ。**ノート単位**で他ユーザーに共有する。
 
+**権限の2軸**: 「誰が見られるか」（閲覧権限）と「誰が編集・投稿できるか」（編集権限）を分離する。詳細は [note-permissions-design.md](./note-permissions-design.md) を参照。
+
 | カラム | 型 | 説明 |
 |--------|-----|------|
 | id | UUID | 主キー。 |
 | owner_id | UUID NOT NULL | ノートの所有者。users.id を参照。 |
 | title | TEXT | ノートのタイトル。 |
-| visibility | TEXT | 'private' \| 'public' \| 'unlisted' \| 'restricted'（現行と同様）。 |
+| visibility | TEXT | **閲覧権限**。'private' \| 'public' \| 'unlisted' \| 'restricted'。 |
+| edit_permission | TEXT | **編集権限**。'owner_only' \| 'members_editors' \| 'any_logged_in'。NOT NULL DEFAULT 'owner_only'。 |
+| is_official | BOOLEAN | 公式ノートなら true。運営のみ設定可。DEFAULT false。 |
+| view_count | INTEGER | ノート単位の閲覧数。人気順表示用。DEFAULT 0。 |
 | created_at | TIMESTAMPTZ | 作成日時。 |
 | updated_at | TIMESTAMPTZ | 更新日時。 |
 | is_deleted | BOOLEAN | 論理削除フラグ。 |
+
+公開ノート一覧・公式・人気の表示は [notes-list-and-discover.md](./notes-list-and-discover.md) を参照。
 
 ---
 
@@ -176,12 +183,16 @@ PRIMARY KEY: (link_text, source_page_id)
 | **共有されて見えるページ** | ある note の note_pages に含まれ、かつその note に対して自分がオーナーまたは note_members に含まれる | ノート単位で共有されているため、「ノート一覧」で見えるノートに含まれるページとして表示。権限に応じて閲覧・編集。 |
 | **コピーして自分のページ** | 新規 pages を生成し、owner_id = 自分、source_page_id = 元ページの id、本文をコピー（Y.Doc を複製または再構築） | 共有ノート内のページを「自分のページとしてコピー」したもの。以降は通常の「自分のページ」として扱う。 |
 
-### 3.2 ノートの見え方（現行と同様）
+### 3.2 ノートの見え方・編集の権限（閲覧権限と編集権限の分離）
+
+ノートのアクセスは **閲覧権限（visibility）** と **編集権限（edit_permission）** の2軸で決まる。メンバーは招待時に付与したロール（viewer / editor）で、閲覧・編集が決まる。詳細は [note-permissions-design.md](./note-permissions-design.md) を参照。
 
 - **オーナー:** ノートの作成・編集・削除・メンバー管理・ノート内ページの追加・削除が可能。
 - **メンバー (editor):** ノート内ページの追加・編集が可能（ノートの設定変更はオーナーのみの想定）。
 - **メンバー (viewer):** ノート内ページの閲覧のみ。
-- **visibility:** public / unlisted / restricted のとき、メンバーでなくてもリンク等でアクセスできる場合は「閲覧可能」とする（現行の canView ロジックに準拠）。
+- **非メンバー:** visibility が public / unlisted のときは閲覧可能（未ログインを許可するかは実装方針による）。edit_permission が any_logged_in のときは、ログイン済みならページの追加が可能（既存ページの編集・削除はオーナー・メンバー editor のみとすることを推奨）。
+
+ノート内ページの**削除**（ノートからページを外す）: オーナーは全ページを削除可能。メンバー(editor) は自分が追加したページ（note_pages.added_by_user_id = 自分）のみ削除可能。詳細は [note-permissions-design.md](./note-permissions-design.md) §10。
 
 ### 3.2.1 共有ノート内での新規ページ作成とオーナーシップ
 
