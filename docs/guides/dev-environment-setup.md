@@ -155,6 +155,27 @@ bun run build
 bun run build:dev
 ```
 
+## 5. Git フックの有効化（任意）
+
+コミット前に Terraform ファイルを自動でフォーマットし、CI の `terraform fmt -check` を通過させたい場合は、**1 回だけ** 以下を実行してください。
+
+```bash
+git config core.hooksPath .githooks
+```
+
+macOS / Linux では、初回に実行権を付与してください。
+
+```bash
+chmod +x .githooks/pre-commit
+```
+
+（Windows の Git Bash / WSL でも上記 `git config` で有効になります。）
+
+これにより、`git commit` の直前に `terraform fmt -recursive` が実行され、変更された `.tf` / `.tfvars` が自動でステージされます。エディタの設定を共有しなくても、リポジトリ側でフォーマット品質を揃えられます。
+
+- フックを実行したくない場合は `git commit --no-verify` でスキップできます。
+- Terraform が未インストールの場合はフックは何も行いません。
+
 ## トラブルシューティング
 
 ### 「Configuration file not found」エラー
