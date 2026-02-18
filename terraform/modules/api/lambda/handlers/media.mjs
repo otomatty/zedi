@@ -8,14 +8,11 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { S3Client } from "@aws-sdk/client-s3";
 import * as res from "../responses.mjs";
 import { execute } from "../lib/db.mjs";
+import { resolveUserId } from "zedi-auth-db";
 
 const PRESIGNED_GET_EXPIRES_IN = 3600; // 1 hour for image viewing
 
 const PRESIGNED_EXPIRES_IN = 900; // 15 min
-
-const GET_USER_ID_SQL = `
-SELECT id FROM users WHERE cognito_sub = :cognito_sub
-`;
 
 const INSERT_MEDIA_SQL = `
 INSERT INTO media (id, owner_id, page_id, s3_key, file_name, content_type, file_size)
@@ -27,18 +24,6 @@ function getS3Client() {
   const bucket = process.env.MEDIA_BUCKET;
   if (!bucket) throw new Error("MEDIA_BUCKET is not set");
   return new S3Client({});
-}
-
-/**
- * JWT claims から owner_id (users.id UUID) を取得する
- * @param {{ sub: string }} claims
- * @returns {Promise<string|null>}
- */
-async function getOwnerId(claims) {
-  const sub = claims?.sub;
-  if (!sub) return null;
-  const rows = await execute(GET_USER_ID_SQL, { cognito_sub: sub });
-  return rows[0]?.id ?? null;
 }
 
 /**
@@ -56,7 +41,7 @@ function randomUUID() {
  * クライアントは upload_url に PUT でファイルをアップロードし、完了後に POST /api/media/confirm を呼ぶ。
  */
 export async function upload(claims, body = {}) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   const bucket = process.env.MEDIA_BUCKET;
@@ -89,7 +74,7 @@ export async function upload(claims, body = {}) {
  * s3_key は media/{owner_id}/{media_id} 形式である必要がある。
  */
 export async function confirm(claims, body = {}) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   const mediaId = (body?.media_id ?? body?.mediaId ?? "").trim();
@@ -139,7 +124,7 @@ SELECT id, owner_id, s3_key, content_type FROM media WHERE id = :id
  * 認証済みユーザーが自分のメディアを取得。S3 の署名付き GET URL へ 302 リダイレクト。
  */
 export async function getById(claims, mediaId) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   const bucket = process.env.MEDIA_BUCKET;

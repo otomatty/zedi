@@ -17,9 +17,10 @@ resource "null_resource" "lambda_npm" {
   triggers = {
     package_json    = filemd5("${path.module}/lambda/package.json")
     package_lock    = fileexists("${path.module}/lambda/package-lock.json") ? filemd5("${path.module}/lambda/package-lock.json") : "no-lock"
+    zedi_auth_db    = fileexists("${path.root}/../packages/zedi-auth-db/dist/index.js") ? filemd5("${path.root}/../packages/zedi-auth-db/dist/index.js") : "no-pkg"
   }
   provisioner "local-exec" {
-    command     = "npm ci"
+    command     = "npm ci && node scripts/copy-zedi-auth-db.mjs"
     working_dir = "${path.module}/lambda"
   }
 }

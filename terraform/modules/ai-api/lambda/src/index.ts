@@ -20,8 +20,25 @@ import { handleGetModels } from "./routes/models.js";
 import { handleGetSubscription } from "./routes/subscription.js";
 import { handleGetUsage } from "./routes/usage.js";
 import { getEnvConfig } from "./lib/env.js";
+import { execute } from "./lib/db.js";
 import { writeSSE } from "./utils/sse.js";
+import { resolveUserId } from "zedi-auth-db";
 import type { EnvConfig, SSEPayload } from "./types/index.js";
+
+/** Resolve Cognito sub to users.id; throw if user not found in DB. */
+async function requireResolvedUserId(
+  cognitoSub: string,
+  env: EnvConfig
+): Promise<string> {
+  const userId = await resolveUserId(
+    cognitoSub,
+    (sql, params) => execute(sql, params, env)
+  );
+  if (!userId) {
+    throw new Error("UNAUTHORIZED");
+  }
+  return userId;
+}
 
 // ---------------------------------------------------------------------------
 // CORS helpers
@@ -82,7 +99,11 @@ async function handleHttpEvent(event: APIGatewayProxyEventV2) {
       // Optional auth — provides tier-filtered results if authenticated
       let userId: string | undefined;
       try {
-        userId = await verifyToken(event, env);
+        const sub = await verifyToken(event, env);
+        userId =
+          (await resolveUserId(sub, (sql, params) =>
+            execute(sql, params, env)
+          )) ?? undefined;
       } catch {
         // Anonymous access returns free-tier models only
       }
@@ -91,7 +112,8 @@ async function handleHttpEvent(event: APIGatewayProxyEventV2) {
     }
 
     // ----- Auth required for all other endpoints -----
-    const userId = await verifyToken(event, env);
+    const sub = await verifyToken(event, env);
+    const userId = await requireResolvedUserId(sub, env);
 
     // ----- Rate limit -----
     await checkRateLimit(userId, env);
@@ -200,7 +222,8 @@ export const streamHandler = awslambda.streamifyResponse(
     }
 
     try {
-      const userId = await verifyToken(event, env);
+      const sub = await verifyToken(event, env);
+      const userId = await requireResolvedUserId(sub, env);
       await checkRateLimit(userId, env);
 
       const body = event.body ? JSON.parse(event.body) : null;
@@ -311,7 +334,8 @@ async function handleWebSocketEvent(
           return { statusCode: 200, body: "" };
         }
 
-        const userId = await verifyTokenString(token, env);
+        const sub = await verifyTokenString(token, env);
+        const userId = await requireResolvedUserId(sub, env);
         await checkRateLimit(userId, env);
 
         // Build sendFn that posts each payload as a WebSocket message

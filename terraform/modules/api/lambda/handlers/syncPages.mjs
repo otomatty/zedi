@@ -5,10 +5,7 @@
 
 import * as res from "../responses.mjs";
 import { execute } from "../lib/db.mjs";
-
-const GET_USER_ID_SQL = `
-SELECT id FROM users WHERE cognito_sub = :cognito_sub
-`;
+import { resolveUserId } from "zedi-auth-db";
 
 const GET_PAGES_SQL = `
 SELECT id, owner_id, source_page_id, title, content_preview, thumbnail_url, source_url,
@@ -80,18 +77,6 @@ VALUES (:link_text, :source_page_id, :original_target_page_id, :original_note_id
 ON CONFLICT (link_text, source_page_id) DO NOTHING
 `;
 
-/**
- * JWT claims から owner_id (users.id UUID) を取得する
- * @param {{ sub: string }} claims
- * @returns {Promise<string|null>}
- */
-async function getOwnerId(claims) {
-  const sub = claims?.sub;
-  if (!sub) return null;
-  const rows = await execute(GET_USER_ID_SQL, { cognito_sub: sub });
-  return rows[0]?.id ?? null;
-}
-
 function rowToPage(row) {
   return {
     id: row.id,
@@ -132,7 +117,7 @@ function rowToGhostLink(row) {
  * @param {{ since?: string }} query
  */
 export async function getSyncPages(claims, query = {}) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   const since = query?.since?.trim();
@@ -177,7 +162,7 @@ export async function getSyncPages(claims, query = {}) {
  * @param {{ pages?: Array<Record<string, unknown>>; links?: Array<Record<string, unknown>>; ghost_links?: Array<Record<string, unknown>> }} body
  */
 export async function postSyncPages(claims, body = {}) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   const serverTime = new Date().toISOString();

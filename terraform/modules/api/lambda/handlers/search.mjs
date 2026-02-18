@@ -5,10 +5,7 @@
 
 import * as res from "../responses.mjs";
 import { execute } from "../lib/db.mjs";
-
-const GET_USER_SQL = `
-SELECT id, email FROM users WHERE cognito_sub = :cognito_sub
-`;
+import { resolveUser } from "zedi-auth-db";
 
 /**
  * 自分がアクセス可能なノートに含まれるページのうち、q が title または content_text に含まれるものを取得。
@@ -41,20 +38,6 @@ function escapeLike(s) {
 }
 
 /**
- * 現在ユーザーの owner_id と email を取得
- * @param {{ sub: string }} claims
- * @returns {Promise<{ ownerId: string; email: string }|null>}
- */
-async function getCurrentUser(claims) {
-  const sub = claims?.sub;
-  if (!sub) return null;
-  const rows = await execute(GET_USER_SQL, { cognito_sub: sub });
-  const r = rows[0];
-  if (!r?.id || !r?.email) return null;
-  return { ownerId: r.id, email: String(r.email).trim().toLowerCase() };
-}
-
-/**
  * GET /api/search?q={query}&scope=shared
  * scope=shared の場合、自分がアクセス可能なノート（owner または member）に含まれるページを
  * title および page_contents.content_text に対して q で LIKE 検索（pg_bigm インデックス利用）。
@@ -70,12 +53,12 @@ export async function searchShared(claims, queryParams = {}) {
     return res.success({ results: [] });
   }
 
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
 
   const qLike = "%" + escapeLike(q) + "%";
   const rows = await execute(SEARCH_SHARED_SQL, {
-    owner_id: user.ownerId,
+    owner_id: user.id,
     user_email: user.email,
     q_like: qLike,
   });

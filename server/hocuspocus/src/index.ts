@@ -92,6 +92,10 @@ function getPool(): Pool {
   return pgPool;
 }
 
+/**
+ * Resolve Cognito sub to users.id and email (pg driver).
+ * Same contract as packages/zedi-auth-db resolveUser: DB user identifier must be users.id.
+ */
 async function getCurrentUserBySub(client: PoolClient, cognitoSub: string): Promise<DbUser | null> {
   const result = await client.query<{ id: string; email: string }>(
     'SELECT id, email FROM users WHERE cognito_sub = $1 LIMIT 1',

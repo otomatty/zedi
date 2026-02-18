@@ -5,10 +5,7 @@
 
 import * as res from "../responses.mjs";
 import { execute } from "../lib/db.mjs";
-
-const GET_USER_ID_SQL = `
-SELECT id FROM users WHERE cognito_sub = :cognito_sub
-`;
+import { resolveUserId } from "zedi-auth-db";
 
 const GET_PAGE_OWNER_SQL = `
 SELECT id, owner_id FROM pages WHERE id = :id AND is_deleted = FALSE
@@ -82,18 +79,6 @@ RETURNING id
 `;
 
 /**
- * JWT claims から owner_id (users.id UUID) を取得する
- * @param {{ sub: string }} claims
- * @returns {Promise<string|null>}
- */
-async function getOwnerId(claims) {
-  const sub = claims?.sub;
-  if (!sub) return null;
-  const rows = await execute(GET_USER_ID_SQL, { cognito_sub: sub });
-  return rows[0]?.id ?? null;
-}
-
-/**
  * ページが現在ユーザー所有か確認する
  * @param {string} pageId
  * @param {string} ownerId
@@ -109,7 +94,7 @@ async function isPageOwnedBy(pageId, ownerId) {
  * 自分のページの Y.Doc 状態と version を返す。未保存なら 404。
  */
 export async function getPageContent(claims, pageId) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   if (!pageId) return res.badRequest("Page id is required");
@@ -133,7 +118,7 @@ export async function getPageContent(claims, pageId) {
  * version を送った場合は楽観的ロック（一致しないと 409）。
  */
 export async function putPageContent(claims, pageId, body = {}) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   if (!pageId) return res.badRequest("Page id is required");
@@ -189,7 +174,7 @@ export async function putPageContent(claims, pageId, body = {}) {
  * Body: { id?: string (UUID), title?, content_preview?, source_page_id?, thumbnail_url?, source_url? }
  */
 export async function createPage(claims, body = {}) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   const id = body?.id?.trim() || null;
@@ -219,7 +204,7 @@ export async function createPage(claims, body = {}) {
  * 論理削除（is_deleted = true）。
  */
 export async function deletePage(claims, pageId) {
-  const ownerId = await getOwnerId(claims);
+  const ownerId = await resolveUserId(claims?.sub, execute);
   if (!ownerId) return res.unauthorized("User not found");
 
   if (!pageId) return res.badRequest("Page id is required");

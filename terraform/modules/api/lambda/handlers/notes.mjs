@@ -5,10 +5,7 @@
 
 import * as res from "../responses.mjs";
 import { execute } from "../lib/db.mjs";
-
-const GET_USER_SQL = `
-SELECT id, email FROM users WHERE cognito_sub = :cognito_sub
-`;
+import { resolveUser } from "zedi-auth-db";
 
 const LIST_NOTES_SQL = `
 SELECT DISTINCT
@@ -220,20 +217,6 @@ RETURNING note_id, member_email, role, invited_by_user_id, created_at, updated_a
 `;
 
 /**
- * 現在ユーザーの owner_id と email を取得
- * @param {{ sub: string }} claims
- * @returns {Promise<{ ownerId: string; email: string }|null>}
- */
-async function getCurrentUser(claims) {
-  const sub = claims?.sub;
-  if (!sub) return null;
-  const rows = await execute(GET_USER_SQL, { cognito_sub: sub });
-  const r = rows[0];
-  if (!r?.id || !r?.email) return null;
-  return { ownerId: r.id, email: String(r.email).trim().toLowerCase() };
-}
-
-/**
  * ノートにアクセス可能か（owner または member）
  */
 async function canAccessNote(noteId, ownerId, userEmail) {
@@ -338,11 +321,11 @@ function rowToDiscoverItem(row) {
  * GET /api/notes — 自分がアクセス可能なノート一覧（C3-9: role, page_count, member_count 含む）
  */
 export async function listNotes(claims) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
 
   const rows = await execute(LIST_NOTES_SQL, {
-    owner_id: user.ownerId,
+    owner_id: user.id,
     user_email: user.email,
   });
   return res.success(rows.map(rowToNoteListItem));
@@ -354,7 +337,7 @@ export async function listNotes(claims) {
 export async function getNote(claims, noteId) {
   if (!noteId) return res.badRequest("Note id is required");
 
-  const user = claims?.sub ? await getCurrentUser(claims) : null;
+  const user = claims?.sub ? await resolveUser(claims?.sub, execute) : null;
   const noteRows = await execute(GET_NOTE_SQL, { id: noteId });
   const note = noteRows[0];
   if (!note) return res.notFound("Note not found");
@@ -363,11 +346,11 @@ export async function getNote(claims, noteId) {
   let current_user_role = "guest";
 
   if (user) {
-    canAccess = await canAccessNote(noteId, user.ownerId, user.email);
+    canAccess = await canAccessNote(noteId, user.id, user.email);
     if (canAccess) {
       const roleRows = await execute(GET_CURRENT_USER_ROLE_SQL, {
         note_id: noteId,
-        owner_id: user.ownerId,
+        owner_id: user.id,
         user_email: user.email,
       });
       current_user_role = roleRows[0]?.role ?? "viewer";
@@ -417,7 +400,7 @@ export async function getDiscover(claims, query = {}) {
  * POST /api/notes — ノート作成
  */
 export async function createNote(claims, body = {}) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
 
   const id = body?.id?.trim() || null;
@@ -431,7 +414,7 @@ export async function createNote(claims, body = {}) {
 
   const rows = await execute(INSERT_NOTE_SQL, {
     id: id || undefined,
-    owner_id: user.ownerId,
+    owner_id: user.id,
     title: title ?? "",
     visibility: vis,
     edit_permission: editPerm,
@@ -445,11 +428,11 @@ export async function createNote(claims, body = {}) {
  * PUT /api/notes/:id — ノート更新（オーナーのみ）
  */
 export async function updateNote(claims, noteId, body = {}) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId) return res.badRequest("Note id is required");
 
-  const isOwner = await isNoteOwner(noteId, user.ownerId);
+  const isOwner = await isNoteOwner(noteId, user.id);
   if (!isOwner) return res.forbidden("Only the note owner can update");
 
   const title = body?.title;
@@ -463,7 +446,7 @@ export async function updateNote(claims, noteId, body = {}) {
 
   const rows = await execute(UPDATE_NOTE_SQL, {
     id: noteId,
-    owner_id: user.ownerId,
+    owner_id: user.id,
     title: title !== undefined ? String(title) : undefined,
     visibility: vis,
     edit_permission: editPerm,
@@ -476,11 +459,11 @@ export async function updateNote(claims, noteId, body = {}) {
  * DELETE /api/notes/:id — ノート削除（論理削除、オーナーのみ）
  */
 export async function deleteNote(claims, noteId) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId) return res.badRequest("Note id is required");
 
-  const rows = await execute(DELETE_NOTE_SQL, { id: noteId, owner_id: user.ownerId });
+  const rows = await execute(DELETE_NOTE_SQL, { id: noteId, owner_id: user.id });
   if (rows.length === 0) return res.notFound("Note not found");
   return res.success({ id: noteId, deleted: true });
 }
@@ -501,18 +484,18 @@ async function canAddPage(noteId, ownerId, userEmail) {
  * POST /api/notes/:id/pages — 既存ページ追加 { pageId } または 新規ページ作成 { title }。any_logged_in のとき非メンバーは owner_id = 投稿者。
  */
 export async function addNotePage(claims, noteId, body = {}) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId) return res.badRequest("Note id is required");
 
-  const canAdd = await canAddPage(noteId, user.ownerId, user.email);
+  const canAdd = await canAddPage(noteId, user.id, user.email);
   if (!canAdd) return res.forbidden("You do not have permission to add pages to this note");
 
   const noteRows = await execute(GET_NOTE_SQL, { id: noteId });
   const note = noteRows[0];
   if (!note) return res.notFound("Note not found");
-  const isMemberOrEditor = await canEditNote(noteId, user.ownerId, user.email);
-  const pageOwnerId = isMemberOrEditor ? note.owner_id : user.ownerId;
+  const isMemberOrEditor = await canEditNote(noteId, user.id, user.email);
+  const pageOwnerId = isMemberOrEditor ? note.owner_id : user.id;
 
   const pageId = body?.pageId ?? body?.page_id;
   const title = body?.title;
@@ -523,7 +506,7 @@ export async function addNotePage(claims, noteId, body = {}) {
     const rows = await execute(INSERT_NOTE_PAGE_SQL, {
       note_id: noteId,
       page_id: pageId,
-      added_by_user_id: user.ownerId,
+      added_by_user_id: user.id,
       sort_order: sortOrder,
     });
     if (rows.length === 0) return res.badRequest("Page could not be added (invalid page or duplicate)");
@@ -542,14 +525,14 @@ export async function addNotePage(claims, noteId, body = {}) {
     await execute(INSERT_NOTE_PAGE_SQL, {
       note_id: noteId,
       page_id: newPage.id,
-      added_by_user_id: user.ownerId,
+      added_by_user_id: user.id,
       sort_order: sortOrder,
     });
     return res.success({
       page: rowToPage({
         ...newPage,
         sort_order: sortOrder,
-        added_by_user_id: user.ownerId,
+        added_by_user_id: user.id,
         added_at: newPage.created_at,
       }),
       created: true,
@@ -563,7 +546,7 @@ export async function addNotePage(claims, noteId, body = {}) {
  * DELETE /api/notes/:id/pages/:pageId — ノートからページを削除。オーナーは全削除可、editor は自分が追加したページのみ。
  */
 export async function removeNotePage(claims, noteId, pageId) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId || !pageId) return res.badRequest("Note id and page id are required");
 
@@ -574,9 +557,9 @@ export async function removeNotePage(claims, noteId, pageId) {
   const pageRow = pageRows[0];
   if (!pageRow) return res.notFound("Note page not found");
 
-  const isOwner = pageRow.owner_id === user.ownerId;
-  const isAddedByMe = pageRow.added_by_user_id === user.ownerId;
-  const canEdit = await canEditNote(noteId, user.ownerId, user.email);
+  const isOwner = pageRow.owner_id === user.id;
+  const isAddedByMe = pageRow.added_by_user_id === user.id;
+  const canEdit = await canEditNote(noteId, user.id, user.email);
   const canDelete = isOwner || (canEdit && isAddedByMe);
   if (!canDelete) return res.forbidden("You do not have permission to remove this page from the note");
 
@@ -589,11 +572,11 @@ export async function removeNotePage(claims, noteId, pageId) {
  * GET /api/notes/:id/members — メンバー一覧
  */
 export async function listNoteMembers(claims, noteId) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId) return res.badRequest("Note id is required");
 
-  const canAccess = await canAccessNote(noteId, user.ownerId, user.email);
+  const canAccess = await canAccessNote(noteId, user.id, user.email);
   if (!canAccess) return res.notFound("Note not found");
 
   const rows = await execute(GET_NOTE_MEMBERS_SQL, { note_id: noteId });
@@ -604,11 +587,11 @@ export async function listNoteMembers(claims, noteId) {
  * POST /api/notes/:id/members — メンバー招待（オーナーのみ）
  */
 export async function addNoteMember(claims, noteId, body = {}) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId) return res.badRequest("Note id is required");
 
-  const isOwner = await isNoteOwner(noteId, user.ownerId);
+  const isOwner = await isNoteOwner(noteId, user.id);
   if (!isOwner) return res.forbidden("Only the note owner can invite members");
 
   const memberEmail = (body?.member_email ?? body?.memberEmail ?? "").trim().toLowerCase();
@@ -619,7 +602,7 @@ export async function addNoteMember(claims, noteId, body = {}) {
     note_id: noteId,
     member_email: memberEmail,
     role,
-    invited_by_user_id: user.ownerId,
+    invited_by_user_id: user.id,
   });
   if (rows.length === 0) return res.error("Add member failed", 500, "DB_ERROR");
   return res.success(rowToMember(rows[0]));
@@ -629,11 +612,11 @@ export async function addNoteMember(claims, noteId, body = {}) {
  * DELETE /api/notes/:id/members/:email — メンバー削除（論理削除、オーナーのみ）
  */
 export async function removeNoteMember(claims, noteId, memberEmail) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId || !memberEmail) return res.badRequest("Note id and member email are required");
 
-  const isOwner = await isNoteOwner(noteId, user.ownerId);
+  const isOwner = await isNoteOwner(noteId, user.id);
   if (!isOwner) return res.forbidden("Only the note owner can remove members");
 
   const email = decodeURIComponent(String(memberEmail).trim()).toLowerCase();
@@ -646,11 +629,11 @@ export async function removeNoteMember(claims, noteId, memberEmail) {
  * PUT /api/notes/:id/members/:email — メンバーロール更新（オーナーのみ）。C3-9
  */
 export async function updateNoteMember(claims, noteId, memberEmail, body = {}) {
-  const user = await getCurrentUser(claims);
+  const user = await resolveUser(claims?.sub, execute);
   if (!user) return res.unauthorized("User not found");
   if (!noteId || !memberEmail) return res.badRequest("Note id and member email are required");
 
-  const isOwner = await isNoteOwner(noteId, user.ownerId);
+  const isOwner = await isNoteOwner(noteId, user.id);
   if (!isOwner) return res.forbidden("Only the note owner can update member roles");
 
   const role = body?.role === "editor" ? "editor" : "viewer";
