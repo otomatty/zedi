@@ -113,6 +113,9 @@ export interface NoteListItem {
   owner_id: string;
   title: string | null;
   visibility: string;
+  edit_permission?: string;
+  is_official?: boolean;
+  view_count?: number;
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
@@ -121,16 +124,39 @@ export interface NoteListItem {
   member_count?: number;
 }
 
+/** GET /api/notes/discover response. */
+export interface DiscoverResponse {
+  official: DiscoverNoteItem[];
+  notes: DiscoverNoteItem[];
+}
+
+export interface DiscoverNoteItem {
+  id: string;
+  owner_id: string;
+  title: string | null;
+  visibility: string;
+  edit_permission: string;
+  is_official: boolean;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+  owner_display_name?: string | null;
+  page_count: number;
+}
+
 /** GET /api/notes/:id response. */
 export interface GetNoteResponse {
   id: string;
   owner_id: string;
   title: string | null;
   visibility: string;
+  edit_permission?: string;
+  is_official?: boolean;
+  view_count?: number;
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
-  current_user_role: "owner" | "editor" | "viewer";
+  current_user_role: "owner" | "editor" | "viewer" | "guest";
   pages: Array<{
     id: string;
     owner_id: string;

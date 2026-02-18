@@ -32,9 +32,12 @@ export async function route(rawPath, method, ctx) {
     return res.success({ status: "ok", service: "zedi-api" });
   }
 
-  // 認証必須ルート（JWT 通過後のみ到達）
   const claims = ctx.claims;
-  if (!claims?.sub) {
+  // 認証オプションルート: GET /api/notes/discover, GET /api/notes/:id（ゲストでも閲覧可）
+  const optionalAuthRoutes =
+    (method === "GET" && segments[0] === "notes" && segments[1] === "discover" && !segments[2]) ||
+    (method === "GET" && segments[0] === "notes" && segments[1] && !segments[2]);
+  if (!optionalAuthRoutes && !claims?.sub) {
     return res.unauthorized("Missing or invalid token");
   }
 
@@ -104,6 +107,11 @@ export async function route(rawPath, method, ctx) {
     if (method === "GET" && !noteId) {
       const { listNotes } = await import("./handlers/notes.mjs");
       return listNotes(claims);
+    }
+    if (method === "GET" && noteId === "discover" && !subResource) {
+      const { getDiscover } = await import("./handlers/notes.mjs");
+      const query = ctx.queryStringParameters ?? {};
+      return getDiscover(claims, query);
     }
     if (method === "GET" && noteId && !subResource) {
       const { getNote } = await import("./handlers/notes.mjs");

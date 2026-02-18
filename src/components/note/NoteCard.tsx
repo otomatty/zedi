@@ -4,6 +4,8 @@ import { Users, FileText } from "lucide-react";
 import type { NoteSummary } from "@/types/note";
 import { cn } from "@/lib/utils";
 import { NoteVisibilityBadge } from "./NoteVisibilityBadge";
+import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
 
 interface NoteCardProps {
   note: NoteSummary;
@@ -20,6 +22,7 @@ const roleLabel: Record<NoteSummary["role"], string> = {
 
 export const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleClick = () => {
     navigate(`/note/${note.id}`);
@@ -48,7 +51,12 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
             {roleLabel[note.role]}
           </p>
         </div>
-        <NoteVisibilityBadge visibility={note.visibility} />
+        <div className="flex items-center gap-1.5 shrink-0">
+          {note.isOfficial && (
+            <Badge variant="secondary">{t("notes.officialBadge")}</Badge>
+          )}
+          <NoteVisibilityBadge visibility={note.visibility} />
+        </div>
       </div>
 
       <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">

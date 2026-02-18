@@ -116,7 +116,14 @@ async function canEditNotePage(client: PoolClient, pageId: string, user: DbUser)
        AND nm.is_deleted = FALSE
       WHERE np.page_id = $1
         AND np.is_deleted = FALSE
-        AND (n.owner_id = $2 OR nm.role = 'editor')
+        AND (
+          n.owner_id = $2
+          OR nm.role = 'editor'
+          OR (
+            COALESCE(n.edit_permission, 'owner_only') = 'any_logged_in'
+            AND n.visibility IN ('public', 'unlisted')
+          )
+        )
       LIMIT 1
     `,
     [pageId, user.id, user.email]

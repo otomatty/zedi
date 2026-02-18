@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
-import Header from "@/components/layout/Header";
-import Container from "@/components/layout/Container";
+import { NotesLayout } from "@/components/note/NotesLayout";
 import { useNotes, useCreateNote } from "@/hooks/useNoteQueries";
-import type { NoteVisibility } from "@/types/note";
+import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { NoteCard } from "@/components/note/NoteCard";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +33,19 @@ const visibilityKeys: Record<NoteVisibility, string> = {
   restricted: "notes.visibilityRestricted",
 };
 
+const editPermissionKeys: Record<NoteEditPermission, string> = {
+  owner_only: "notes.editPermissionOwnerOnly",
+  members_editors: "notes.editPermissionMembersEditors",
+  any_logged_in: "notes.editPermissionAnyLoggedIn",
+};
+
+const allowedEditPermissions: Record<NoteVisibility, NoteEditPermission[]> = {
+  private: ["owner_only"],
+  restricted: ["owner_only", "members_editors"],
+  unlisted: ["owner_only", "members_editors", "any_logged_in"],
+  public: ["owner_only", "members_editors", "any_logged_in"],
+};
+
 const Notes: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -44,6 +56,7 @@ const Notes: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<NoteVisibility>("private");
+  const [editPermission, setEditPermission] = useState<NoteEditPermission>("owner_only");
 
   const sortedNotes = useMemo(
     () => [...notes].sort((a, b) => b.updatedAt - a.updatedAt),
@@ -63,10 +76,12 @@ const Notes: React.FC = () => {
       const newNote = await createNoteMutation.mutateAsync({
         title: title.trim(),
         visibility,
+        editPermission,
       });
       setIsDialogOpen(false);
       setTitle("");
       setVisibility("private");
+      setEditPermission("owner_only");
       navigate(`/note/${newNote.id}`);
     } catch (error) {
       console.error("Failed to create note:", error);
@@ -78,13 +93,9 @@ const Notes: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-
-      <main className="py-6">
-        <Container>
-          {/* Page title & New note */}
-          <div className="flex items-center justify-between mb-8">
+    <NotesLayout>
+      {/* Page title & New note */}
+      <div className="flex items-center justify-between mb-8">
             <h1 className="text-2xl font-semibold">{t("notes.title")}</h1>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -111,7 +122,14 @@ const Notes: React.FC = () => {
                     <Label>{t("notes.visibility")}</Label>
                     <Select
                       value={visibility}
-                      onValueChange={(v) => setVisibility(v as NoteVisibility)}
+                      onValueChange={(v) => {
+                        const next = v as NoteVisibility;
+                        setVisibility(next);
+                        const allowed = allowedEditPermissions[next];
+                        if (!allowed.includes(editPermission)) {
+                          setEditPermission(allowed[0]);
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={t("notes.selectVisibility")} />
@@ -120,6 +138,24 @@ const Notes: React.FC = () => {
                         {(Object.keys(visibilityKeys) as NoteVisibility[]).map((value) => (
                           <SelectItem key={value} value={value}>
                             {t(visibilityKeys[value])}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("notes.editPermission")}</Label>
+                    <Select
+                      value={editPermission}
+                      onValueChange={(v) => setEditPermission(v as NoteEditPermission)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allowedEditPermissions[visibility].map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {t(editPermissionKeys[value])}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -158,21 +194,7 @@ const Notes: React.FC = () => {
               </div>
             )}
           </section>
-
-          {/* みんなのノート（誰でも参加できるノート）— 仕様検討用プレースホルダー */}
-          <section>
-            <h2 className="text-lg font-medium text-foreground mb-4">
-              {t("notes.sectionPublic")}
-            </h2>
-            <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                {t("notes.publicNotesPlaceholder")}
-              </p>
-            </div>
-          </section>
-        </Container>
-      </main>
-    </div>
+    </NotesLayout>
   );
 };
 

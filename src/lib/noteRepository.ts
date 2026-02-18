@@ -34,6 +34,9 @@ export class NoteRepository {
       ownerUserId: row.owner_user_id as string,
       title: (row.title as string) || "",
       visibility: row.visibility as NoteVisibility,
+      editPermission: (row.edit_permission as Note["editPermission"]) ?? "owner_only",
+      isOfficial: Boolean(row.is_official),
+      viewCount: Number(row.view_count ?? 0),
       createdAt: row.created_at as number,
       updatedAt: row.updated_at as number,
       isDeleted: Boolean(row.is_deleted),
@@ -128,12 +131,24 @@ export class NoteRepository {
       role = "guest";
     }
 
+    const canEdit = isOwner || memberRole === "editor";
+    const canAddPage =
+      canEdit ||
+      (note.editPermission === "any_logged_in" && canView && Boolean(userId));
+    const canDeletePage = (addedByUserId: string) => {
+      if (isOwner) return true;
+      if (memberRole === "editor" && userId && addedByUserId === userId) return true;
+      return false;
+    };
     return {
       role,
       visibility: note.visibility,
+      editPermission: note.editPermission,
       canView,
-      canEdit: isOwner || memberRole === "editor",
+      canEdit,
+      canAddPage,
       canManageMembers: isOwner,
+      canDeletePage,
     };
   }
 

@@ -1,9 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth, useUser } from "@/hooks/useAuth";
 import { createApiClient } from "@/lib/api";
-import type { NoteListItem, GetNoteResponse, NoteMemberItem } from "@/lib/api/types";
+import type {
+  NoteListItem,
+  GetNoteResponse,
+  NoteMemberItem,
+  DiscoverResponse,
+} from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
+
+/** Page in a note with who added it (for canDeletePage). */
+export type NotePageSummary = PageSummary & { addedByUserId: string };
 
 export const noteKeys = {
   all: ["notes"] as const,
@@ -13,6 +21,8 @@ export const noteKeys = {
   details: () => [...noteKeys.all, "detail"] as const,
   detail: (noteId: string, userId?: string, userEmail?: string) =>
     [...noteKeys.details(), noteId, userId ?? "", userEmail ?? ""] as const,
+  publicList: (sort: string, limit: number, offset: number) =>
+    [...noteKeys.all, "public", sort, limit, offset] as const,
   pages: () => [...noteKeys.all, "pages"] as const,
   pageList: (noteId: string) => [...noteKeys.pages(), noteId] as const,
   page: (noteId: string, pageId: string) =>
@@ -33,6 +43,9 @@ function apiNoteToNote(item: {
   owner_id: string;
   title: string | null;
   visibility: string;
+  edit_permission?: string;
+  is_official?: boolean;
+  view_count?: number;
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
@@ -42,6 +55,9 @@ function apiNoteToNote(item: {
     ownerUserId: item.owner_id,
     title: item.title ?? "",
     visibility: item.visibility as Note["visibility"],
+    editPermission: (item.edit_permission as Note["editPermission"]) ?? "owner_only",
+    isOfficial: item.is_official ?? false,
+    viewCount: item.view_count ?? 0,
     createdAt: parseTs(item.created_at),
     updatedAt: parseTs(item.updated_at),
     isDeleted: item.is_deleted,
@@ -63,22 +79,47 @@ function apiNoteToNoteSummary(item: NoteListItem): import("@/types/note").NoteSu
   };
 }
 
+/** Map Discover API item to NoteSummary for NoteCard. */
+export function mapDiscoverItemToNoteSummary(
+  item: DiscoverResponse["official"][0]
+): import("@/types/note").NoteSummary {
+  return {
+    ...apiNoteToNote({ ...item, is_deleted: false }),
+    role: "guest",
+    pageCount: item.page_count ?? 0,
+    memberCount: 0,
+  };
+}
+
 function buildAccessFromApi(
   note: Note,
-  currentUserRole: "owner" | "editor" | "viewer"
+  currentUserRole: "owner" | "editor" | "viewer" | "guest",
+  userId?: string
 ): NoteAccess {
-  const role =
-    currentUserRole === "owner"
-      ? ("owner" as const)
-      : currentUserRole === "editor"
-        ? ("editor" as const)
-        : ("viewer" as const);
+  const isOwner = currentUserRole === "owner";
+  const isEditor = currentUserRole === "editor";
+  const isViewer = currentUserRole === "viewer";
+  const isGuest = currentUserRole === "guest";
+  const canView = isOwner || isEditor || isViewer || isGuest;
+  const canEdit = isOwner || isEditor;
+  const canAddPage =
+    canEdit ||
+    (note.editPermission === "any_logged_in" && canView && Boolean(userId));
+  const canManageMembers = isOwner;
+  const canDeletePage = (addedByUserId: string) => {
+    if (isOwner) return true;
+    if (isEditor && userId && addedByUserId === userId) return true;
+    return false;
+  };
   return {
-    role,
+    role: currentUserRole as NoteAccess["role"],
     visibility: note.visibility,
-    canView: true,
-    canEdit: role === "owner" || role === "editor",
-    canManageMembers: role === "owner",
+    editPermission: note.editPermission,
+    canView,
+    canEdit,
+    canAddPage,
+    canManageMembers,
+    canDeletePage,
   };
 }
 
@@ -164,10 +205,10 @@ export function useNote(noteId: string, _options?: UseNoteOptions) {
     queryFn: async (): Promise<NoteWithAccess> => {
       const res = await api.getNote(noteId);
       const note = apiNoteToNote(res);
-      const access = buildAccessFromApi(note, res.current_user_role);
+      const access = buildAccessFromApi(note, res.current_user_role, userId);
       return { note, access };
     },
-    enabled: isLoaded && isSignedIn && !!noteId,
+    enabled: isLoaded && !!noteId,
   });
 
   const noteWithAccess = query.data ?? null;
@@ -175,22 +216,40 @@ export function useNote(noteId: string, _options?: UseNoteOptions) {
   return {
     note: noteWithAccess?.note ?? null,
     access: noteWithAccess?.access ?? null,
-    source: "local" as const,
+    source: isSignedIn ? ("local" as const) : ("remote" as const),
     isLoading: query.isLoading,
     error: query.error,
   };
 }
 
-export function useNotePages(noteId: string, _source?: "local" | "remote", enabled: boolean = true) {
-  const { api, isLoaded, isSignedIn } = useNoteApi();
+export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 20, offset = 0) {
+  const { api } = useNoteApi();
+  return useQuery({
+    queryKey: noteKeys.publicList(sort, limit, offset),
+    queryFn: async (): Promise<DiscoverResponse> => {
+      return api.getPublicNotes({ sort, limit, offset });
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
+export function useNotePages(
+  noteId: string,
+  _source?: "local" | "remote",
+  enabled: boolean = true
+) {
+  const { api, isLoaded, userId } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.pageList(noteId),
-    queryFn: async (): Promise<PageSummary[]> => {
+    queryFn: async (): Promise<NotePageSummary[]> => {
       const res = await api.getNote(noteId);
-      return res.pages.map(apiPageToPageSummary);
+      return res.pages.map((p) => ({
+        ...apiPageToPageSummary(p),
+        addedByUserId: p.added_by_user_id,
+      }));
     },
-    enabled: enabled && isLoaded && isSignedIn && !!noteId,
+    enabled: enabled && isLoaded && !!noteId,
   });
 }
 
@@ -234,11 +293,17 @@ export function useCreateNote() {
     mutationFn: async ({
       title,
       visibility,
+      editPermission,
     }: {
       title: string;
       visibility: Note["visibility"];
+      editPermission?: Note["editPermission"];
     }) => {
-      const created = await api.createNote({ title, visibility });
+      const created = await api.createNote({
+        title,
+        visibility,
+        edit_permission: editPermission,
+      });
       return apiNoteToNote(created);
     },
     onSuccess: () => {
@@ -257,11 +322,12 @@ export function useUpdateNote() {
       updates,
     }: {
       noteId: string;
-      updates: Partial<Pick<Note, "title" | "visibility">>;
+      updates: Partial<Pick<Note, "title" | "visibility" | "editPermission">>;
     }) => {
       await api.updateNote(noteId, {
         title: updates.title,
         visibility: updates.visibility,
+        edit_permission: updates.editPermission,
       });
       return { noteId, updates };
     },
@@ -294,8 +360,16 @@ export function useAddPageToNote() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ noteId, pageId }: { noteId: string; pageId: string }) => {
-      await api.addNotePage(noteId, { pageId });
+    mutationFn: async ({
+      noteId,
+      pageId,
+      title,
+    }: {
+      noteId: string;
+      pageId?: string;
+      title?: string;
+    }) => {
+      await api.addNotePage(noteId, { pageId, title });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });

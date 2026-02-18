@@ -58,10 +58,13 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 *.tfvars.json
+# Terraform plan output (environment-specific, may contain sensitive resource details)
+tfplan*
+*.tfplan
 
 # Terraform - DO NOT commit these if they contain secrets
 # terraform/environments/*.tfvars  # Uncomment if tfvars contain sensitive data
 terraform/environments/dev.secret.env
 terraform/environments/prod.secret.env
-# Terraform module build artifact (cognito-github-proxy Lambda zip)
-terraform/modules/cognito-github-proxy/lambda.zip
+# Terraform module build artifacts (Lambda zip)
+terraform/modules/*/lambda.zip

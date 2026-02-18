@@ -67,5 +67,21 @@
   "roleEditor": "編集可能",
   "add": "追加",
   "noPermissionToManageMembers": "メンバーを管理する権限がありません。",
-  "noMembersYet": "まだ招待メンバーがいません。"
+  "noMembersYet": "まだ招待メンバーがいません。",
+  "editPermission": "誰がこのノートに投稿できますか？",
+  "editPermissionOwnerOnly": "自分（オーナー）のみ",
+  "editPermissionMembersEditors": "自分と編集メンバー",
+  "editPermissionAnyLoggedIn": "ログインしている人なら誰でも",
+  "tabMyNotes": "参加中のノート",
+  "tabDiscover": "公開ノート",
+  "officialBadge": "公式",
+  "sortUpdated": "更新順",
+  "sortPopular": "人気順",
+  "sectionOfficial": "公式ノート",
+  "sectionPublicNotes": "公開ノート",
+  "loginToPost": "ログインして投稿",
+  "loginToViewMyNotes": "ログインしてノートを表示",
+  "addNewPageToNote": "新規ページを追加",
+  "newPageTitle": "ページタイトル",
+  "viewCount": "{{count}} 回閲覧"
 }

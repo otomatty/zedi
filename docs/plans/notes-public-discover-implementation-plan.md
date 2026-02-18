@@ -31,17 +31,31 @@
 ### Hocuspocus（リアルタイム共同編集サーバー）
 - `server/hocuspocus/src/index.ts` — `canEditNotePage` で owner or editor member を確認
 
-### フロントエンド
+### フロントエンド — 認証とローカルファースト
+
+**未ログインでもアプリが使える仕組みが実装済み**:
+
+- `/home` と `/page/:id` は **ProtectedRoute を解除済み**（未ログインでもアクセス可能）。
+- 未ログインユーザーは `LOCAL_USER_ID = "local-user"` で IndexedDB（`zedi-storage-local-user`）を使用。
+- ページの作成・編集・削除・検索はすべて**ローカルで完結**し、API を呼ばない。
+- 同期（`syncWithApi`）は `isSignedIn` のときのみ実行。
+- サインインページに「ログインせずに使う」ボタンがある（`/home` に遷移）。
+- ヘッダーに未ログイン時「ログインしてクラウド同期を有効にする」のメッセージを表示。
+
+### フロントエンド — ノート関連
+
 - 型: `src/types/note.ts` — NoteVisibility, NoteMemberRole, NoteAccessRole, Note, NoteAccess 等
 - Hooks: `src/hooks/useNoteQueries.ts` — useNote, useNotes, useNotePages 等。**isSignedIn のときのみ enabled**。
 - ページ:
-  - `src/pages/Notes.tsx` — ノート一覧（参加中のみ）。ProtectedRoute。
-  - `src/pages/NoteView.tsx` — ノート詳細。Public Route（ただし API が認証必須なので実質ログイン時のみ表示）。
+  - `src/pages/Notes.tsx` — ノート一覧（参加中のみ）。**ProtectedRoute（ログイン必須）**。
+  - `src/pages/NoteView.tsx` — ノート詳細。Public Route だが **API が認証必須なので実質ログイン時のみ表示可能**。
   - `src/pages/NoteSettings.tsx` — 設定。visibility の変更。
   - `src/pages/NoteMembers.tsx` — メンバー管理。
   - `src/pages/NotePageView.tsx` — ノート内ページ表示。
-- API クライアント: `src/lib/api/apiClient.ts` — すべて JWT 必須の `request()` 経由。
-- ルート: `src/App.tsx` — `/notes`（ProtectedRoute）、`/note/:noteId` 等（Public Route）。
+- API クライアント: `src/lib/api/apiClient.ts` — すべて JWT 必須の `request()` 経由。`getToken()` が null なら `ApiError(401)` をスロー。
+- ルート: `src/App.tsx`:
+  - Public: `/home`, `/page/:id`, `/note/:noteId`, `/note/:noteId/*`
+  - Protected: `/notes`, `/settings/*`, `/pricing`, `/donate`, `/onboarding`
 
 ---
 
@@ -114,9 +128,8 @@ export interface NoteAccess {
 
 変更:
 - 以下のルートは **認証をオプション** にする（JWT があれば使う、なければゲスト扱い）:
-  - `GET /api/notes/:id` — public/unlisted のノート閲覧（ゲスト可）
-  - `GET /api/notes/:id/pages` — 同上（使う場合）
   - `GET /api/notes/discover` — 公開ノート一覧（ゲスト可）
+  - `GET /api/notes/:id` — public/unlisted のノート閲覧（ゲスト可）
 
 実装方針: ルーターで特定パスの GET リクエストは `claims` が null でも handler に渡す。handler 側で public/unlisted チェックを行う。
 
@@ -133,6 +146,8 @@ if (!isOptionalAuth && !ctx.claims?.sub) {
   return res.unauthorized("Missing or invalid token");
 }
 ```
+
+**注意**: `GET /api/notes/discover` は `GET /api/notes/:id` よりも先にルーターでマッチさせる（"discover" がノート ID として解釈されないようにする）。
 
 #### 2-2. notes ハンドラの変更
 
@@ -196,7 +211,8 @@ WHERE np.note_id = :note_id AND np.page_id = :page_id AND np.is_deleted = FALSE 
 ##### (B) getNote の変更
 
 - `getCurrentUser(claims)` で user が null の場合（ゲスト）でも、visibility が public/unlisted なら閲覧を許可。
-- `current_user_role` は guest の場合 `'guest'` を返す。
+- ゲストの場合: `user_email` と `owner_id` をダミー値で `CAN_VIEW_NOTE_SQL` に渡し、`visibility IN ('public', 'unlisted')` の条件でヒットさせる。
+- `current_user_role` はゲストの場合 `'guest'` を返す。
 - 閲覧時に `view_count` をインクリメントする（public/unlisted のとき）。
 - レスポンスに `edit_permission`, `is_official`, `view_count` を含める。
 
@@ -254,37 +270,91 @@ WHERE np.note_id = :note_id AND np.page_id = :page_id AND np.is_deleted = FALSE 
 
 ---
 
-### フェーズ 3: フロント — 権限ロジック・ノート作成/設定の2軸化
+### フェーズ 3: フロント — API クライアント・権限ロジック・ノート作成/設定の2軸化
 
-**目的**: 既存画面にノートの閲覧権限＋編集権限の2軸を反映。
+**目的**: API クライアントに認証オプションモードを追加し、既存画面にノートの閲覧権限＋編集権限の2軸を反映。
 
 #### 3-1. API クライアントの更新
 
 **ファイル**: `src/lib/api/apiClient.ts`
 
-- `request()` に「認証オプション」モードを追加。JWT がない場合でも fetch を実行し、public/unlisted ノートのレスポンスを取得できるようにする。
-- 新規メソッド追加:
-  - `getPublicNotes(options?: { sort?: 'updated' | 'popular'; limit?: number; offset?: number })` — `GET /api/notes/discover`
+現行: `request()` は `getToken()` が null なら `ApiError(401)` をスロー。
+
+変更:
+- **認証オプションの `requestOptionalAuth()` を追加**。JWT がない場合でも `Authorization` ヘッダーなしで fetch を実行し、public/unlisted ノートのレスポンスを取得できるようにする。
+
+```ts
+async function requestOptionalAuth<T>(
+  method: string, path: string, baseUrl: string,
+  getToken: () => Promise<string | null>,
+  options?: { body?: unknown; query?: Record<string, string> }
+): Promise<T> {
+  const token = await getToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  // ... fetch と同じ処理
+}
+```
+
+- 新規メソッド:
+  - `getPublicNotes(options?)` — `GET /api/notes/discover`（認証オプション）
+  - `getNote` を認証オプションに変更（public/unlisted の場合ゲストでも取得可能に）
 
 ```ts
 /** GET /api/notes/discover — public note list (auth optional). */
 async getPublicNotes(options?: { sort?: string; limit?: number; offset?: number }) {
   return reqOptionalAuth<DiscoverResponse>("GET", "/api/notes/discover", {
-    query: { sort: options?.sort ?? "updated", limit: String(options?.limit ?? 20), offset: String(options?.offset ?? 0) },
+    query: {
+      sort: options?.sort ?? "updated",
+      limit: String(options?.limit ?? 20),
+      offset: String(options?.offset ?? 0),
+    },
   });
 },
 ```
-
-- `getNote` を認証オプションに変更（public/unlisted の場合ゲストでも取得可能に）。
 
 #### 3-2. useNoteQueries の更新
 
 **ファイル**: `src/hooks/useNoteQueries.ts`
 
-- `useNote`: `enabled` の条件から `isSignedIn` を外す（public/unlisted は未ログインでも取得を試みる）。ただし API が 401 を返した場合のエラーハンドリングを追加。
-- `buildAccessFromApi`: `edit_permission` と `current_user_role` を使って `canView`, `canEdit`, `canAddPage`, `canDeletePage` を算出する。
+- `useNote`: `enabled` の条件から `isSignedIn` を外す。未ログインでも public/unlisted のノート取得を試みる。API が 401 を返した場合は「ノートが見つからない」として処理。
+
+```ts
+// 変更前
+enabled: isLoaded && isSignedIn && !!noteId,
+
+// 変更後
+enabled: isLoaded && !!noteId,
+```
+
+- `buildAccessFromApi` を2軸対応に更新:
+
+```ts
+function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string): NoteAccess {
+  const isOwner = currentUserRole === "owner";
+  const isEditor = currentUserRole === "editor";
+  const isViewer = currentUserRole === "viewer";
+  const isGuest = currentUserRole === "guest";
+  const canView = isOwner || isEditor || isViewer || isGuest;
+  const canEdit = isOwner || isEditor;
+  const canAddPage = canEdit || (note.editPermission === "any_logged_in" && canView && !!userId);
+  const canManageMembers = isOwner;
+  const canDeletePage = (addedByUserId: string) => {
+    if (isOwner) return true;
+    if (isEditor && userId && addedByUserId === userId) return true;
+    return false;
+  };
+  return {
+    role: currentUserRole as NoteAccessRole,
+    visibility: note.visibility,
+    editPermission: note.editPermission,
+    canView, canEdit, canAddPage, canManageMembers, canDeletePage,
+  };
+}
+```
+
 - 新規フック:
-  - `usePublicNotes(sort, limit, offset)` — Discover 用の公開ノート一覧。
+  - `usePublicNotes(sort, limit, offset)` — Discover 用の公開ノート一覧。`isSignedIn` に関わらず常に有効。
 
 #### 3-3. ノート作成ダイアログの更新
 
@@ -295,7 +365,11 @@ async getPublicNotes(options?: { sort?: string; limit?: number; offset?: number 
 変更:
 - **「誰がこのノートを見られますか？」** — visibility の選択（private / restricted / unlisted / public）。
 - **「誰がこのノートに投稿できますか？」** — edit_permission の選択（owner_only / members_editors / any_logged_in）。
-- 組み合わせ制約: visibility = private のときは edit_permission = owner_only のみ。visibility = restricted のときは owner_only / members_editors のみ。UI でグレーアウトまたは非表示。
+- 組み合わせ制約:
+  - visibility = private → edit_permission = owner_only のみ。
+  - visibility = restricted → owner_only / members_editors のみ。
+  - visibility = unlisted / public → すべて選択可能。
+  - UI でグレーアウトまたは非表示。
 - `useCreateNote` の mutationFn に `editPermission` を追加。
 
 #### 3-4. ノート設定ページの更新
@@ -315,35 +389,13 @@ async getPublicNotes(options?: { sort?: string; limit?: number; offset?: number 
 
 変更:
 - 「ページを追加」ボタンの表示条件: `canEdit || canAddPage`。
+  - 未ログイン時は非表示（`canAddPage` は `!!userId` を条件に含むため false になる）。
 - 「ページを削除」ボタンの表示条件: `canDeletePage(page.addedByUserId)`。
-- **「このノートにページを追加」UI の追加**: 既存ページを選ぶ UI に加え、「タイトルで新規ページを追加」ができるフォームを追加（API `POST /api/notes/:id/pages` の `{ title }` を使用）。
+- **「このノートにページを追加」UI の追加**: 既存ページを選ぶ UI に加え、「タイトルで新規ページを追加」ができるフォームを追加（API `POST /api/notes/:id/pages` の `{ title }` を使用）。非メンバーの `any_logged_in` ユーザーは「タイトルで新規ページを追加」のみを使う形になる。
 - 公式バッジの表示（`note.isOfficial` のとき）。
+- 未ログイン時は「ログインして投稿」の案内を表示。
 
-#### 3-6. NoteAccess の算出ロジック更新
-
-**ファイル**: `src/hooks/useNoteQueries.ts` の `buildAccessFromApi`
-
-```ts
-function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string): NoteAccess {
-  const isOwner = currentUserRole === "owner";
-  const isEditor = currentUserRole === "editor";
-  const isViewer = currentUserRole === "viewer";
-  const isGuest = currentUserRole === "guest";
-  const canView = isOwner || isEditor || isViewer || isGuest;
-  const canEdit = isOwner || isEditor;
-  const canAddPage = canEdit || (note.editPermission === "any_logged_in" && canView && !!userId);
-  const canManageMembers = isOwner;
-  const canDeletePage = (addedByUserId: string) => {
-    if (isOwner) return true;
-    if (isEditor && userId && addedByUserId === userId) return true;
-    return false;
-  };
-  return { role: currentUserRole as NoteAccessRole, visibility: note.visibility,
-           editPermission: note.editPermission, canView, canEdit, canAddPage, canManageMembers, canDeletePage };
-}
-```
-
-**確認ポイント**: ノート作成・設定で2軸が正しく保存・表示されること。権限に応じたボタンの表示/非表示。
+**確認ポイント**: ノート作成・設定で2軸が正しく保存・表示されること。権限に応じたボタンの表示/非表示。未ログインで public/unlisted ノートが閲覧できること。
 
 ---
 
@@ -363,44 +415,51 @@ function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string
 <Route path="/notes" element={<ProtectedRoute><Notes /></ProtectedRoute>} />
 ```
 
-注意: `/notes/discover` は `/notes` よりも前に定義し、ProtectedRoute をかけない。
+注意: `/notes/discover` は `/notes` よりも前に定義し、`ProtectedRoute` をかけない（未ログインでも閲覧可能）。
 
-#### 4-2. Notes ページにタブを追加
+#### 4-2. 共通タブレイアウトの抽出
+
+**新規ファイル**: `src/components/note/NotesLayout.tsx`
+
+- Header + Container + タブヘッダー を共通化。
+- `Notes.tsx` と `NotesDiscover.tsx` の両方で使用。
+- タブ:
+  - **「参加中のノート」** → `/notes`（アクティブ: パスが `/notes` のとき）
+  - **「公開ノート」** → `/notes/discover`（アクティブ: パスが `/notes/discover` のとき）
+- タブの実装: `react-router-dom` の `Link` + パスに応じた active 状態。
+- **未ログインの場合**: 「参加中のノート」タブをクリックすると `/sign-in` に遷移（または「ログインが必要です」と案内）。
+
+#### 4-3. Notes ページにタブを追加
 
 **ファイル**: `src/pages/Notes.tsx`
 
-- ページ上部に2つのタブを追加:
-  - **「参加中のノート」** → `/notes`（アクティブ: パスが `/notes` のとき）
-  - **「公開ノート」** → `/notes/discover`（アクティブ: パスが `/notes/discover` のとき）
-- タブの実装: `react-router-dom` の `Link` + パスに応じた active 状態。または shadcn/ui の `Tabs` コンポーネント。
+- `NotesLayout` を使用してタブ付きレイアウトに変更。
 - 参加中のノート部分は現行のままキープ。
+- ノート作成ボタン・ダイアログはこのタブで表示。
 
-#### 4-3. NotesDiscover ページの新規作成
+#### 4-4. NotesDiscover ページの新規作成
 
 **新規ファイル**: `src/pages/NotesDiscover.tsx`
 
-- 同じタブヘッダーを持つ（Notes と共通レイアウト推奨 → `NotesLayout` コンポーネントを抽出するとよい）。
+- `NotesLayout` を使用してタブ付きレイアウト。
 - `usePublicNotes('updated')` でデータ取得。
 - **公式ノートセクション**: `official` 配列を `NoteCard` で表示。公式バッジ付き。
 - **公開ノートセクション**: `notes` 配列を表示。
   - 並び替え: 「更新順」「人気順」の切り替え（ミニタブまたはセグメントコントロール）。
   - 「人気順」選択時は `usePublicNotes('popular')` で再取得。
-- 未ログインでもアクセス可能。投稿系のアクションは非表示（または「ログインして投稿」の案内）。
+- **未ログインでもアクセス可能**。投稿系のアクションは非表示。
 
-#### 4-4. NoteCard に公式バッジを追加
+#### 4-5. NoteCard に公式バッジを追加
 
 **ファイル**: `src/components/note/NoteCard.tsx`
 
 - `note.isOfficial` が true のとき、公式バッジを表示（例: `<Badge variant="default">公式</Badge>`）。
 
-#### 4-5. 共通タブレイアウトの抽出
-
-**新規ファイル**: `src/components/note/NotesLayout.tsx`（推奨）
-
-- Header + Container + タブヘッダー を共通化。
-- `Notes.tsx` と `NotesDiscover.tsx` の両方で使用。
-
-**確認ポイント**: タブ切り替えが動作すること。公開ノート・公式ノートが正しいセクションに表示されること。未ログインで Discover にアクセスできること。
+**確認ポイント**: 
+- タブ切り替えが動作すること。
+- 公開ノート・公式ノートが正しいセクションに表示されること。
+- **未ログインで `/notes/discover` にアクセスでき、公開ノートが表示されること**。
+- 未ログインで「参加中のノート」タブに行くとログインが要求されること。
 
 ---
 
@@ -431,7 +490,7 @@ function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string
 
 #### 6-1. 翻訳キーの追加
 
-**ファイル**: `src/i18n/locales/en/notes.json`（＋日本語版）
+**ファイル**: `src/i18n/locales/en/notes.json`（＋日本語版 `ja/notes.json`）
 
 追加するキーの例:
 ```json
@@ -448,6 +507,7 @@ function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string
   "sectionOfficial": "Official Notes",
   "sectionPublicNotes": "Public Notes",
   "loginToPost": "Sign in to post",
+  "loginToViewMyNotes": "Sign in to view your notes",
   "addNewPageToNote": "Add new page",
   "newPageTitle": "Page title",
   "viewCount": "{{count}} views"
@@ -475,9 +535,9 @@ function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string
     ↓
 フェーズ 2: バックエンド API の変更
     ↓
-フェーズ 3: フロント — 権限ロジック・ノート作成/設定の2軸化
+フェーズ 3: フロント — API クライアント・権限ロジック・ノート作成/設定の2軸化
     ↓
-フェーズ 4: フロント — /notes タブ + Discover ページ
+フェーズ 4: フロント — /notes タブ + Discover ページ（/notes/discover は Public）
     ↓
 フェーズ 5: 閲覧数カウント
     ↓
@@ -499,8 +559,8 @@ function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string
 ### バックエンド
 | ファイル | 変更内容 |
 |----------|----------|
-| `terraform/modules/api/lambda/router.mjs` | 認証オプションルート追加 |
-| `terraform/modules/api/lambda/handlers/notes.mjs` | 権限チェック変更、Discover エンドポイント追加、閲覧数、レスポンスフィールド追加 |
+| `terraform/modules/api/lambda/router.mjs` | 認証オプションルート追加（`GET /api/notes/discover`, `GET /api/notes/:id`） |
+| `terraform/modules/api/lambda/handlers/notes.mjs` | 権限チェック変更、Discover エンドポイント追加、閲覧数、レスポンスフィールド追加、ページ追加の owner_id ルール、ページ削除の権限チェック |
 | `server/hocuspocus/src/index.ts` | `canEditNotePage` に any_logged_in 対応 |
 
 ### フロント — 型・API
@@ -508,27 +568,27 @@ function buildAccessFromApi(note: Note, currentUserRole: string, userId?: string
 |----------|----------|
 | `src/types/note.ts` | NoteEditPermission 追加、Note / NoteAccess 拡張 |
 | `src/lib/api/types.ts` | API レスポンス型に edit_permission 等追加 |
-| `src/lib/api/apiClient.ts` | 認証オプション request、getPublicNotes 追加 |
+| `src/lib/api/apiClient.ts` | `requestOptionalAuth()` 追加、`getPublicNotes` 追加、`getNote` を認証オプション化 |
 
 ### フロント — Hooks
 | ファイル | 変更内容 |
 |----------|----------|
-| `src/hooks/useNoteQueries.ts` | useNote の enabled 変更、buildAccessFromApi の2軸化、usePublicNotes 追加 |
+| `src/hooks/useNoteQueries.ts` | `useNote` の enabled 変更（isSignedIn 不要に）、`buildAccessFromApi` の2軸化、`usePublicNotes` 追加 |
 
 ### フロント — ページ
 | ファイル | 変更内容 |
 |----------|----------|
-| `src/App.tsx` | `/notes/discover` ルート追加 |
-| `src/pages/Notes.tsx` | タブ追加、ノート作成ダイアログに editPermission 追加 |
-| `src/pages/NotesDiscover.tsx` | **新規作成** — 公開ノート一覧（公式セクション + 通常セクション） |
-| `src/pages/NoteView.tsx` | canAddPage / canDeletePage 対応、新規ページ追加 UI、公式バッジ |
+| `src/App.tsx` | `/notes/discover` ルート追加（**Public Route**、`/notes` よりも前に定義） |
+| `src/pages/Notes.tsx` | `NotesLayout` 使用、ノート作成ダイアログに editPermission 追加 |
+| `src/pages/NotesDiscover.tsx` | **新規作成** — 公開ノート一覧（公式セクション + 通常セクション）。**未ログインでも閲覧可** |
+| `src/pages/NoteView.tsx` | canAddPage / canDeletePage 対応、新規ページ追加 UI、公式バッジ、未ログインへの案内 |
 | `src/pages/NoteSettings.tsx` | editPermission の変更 UI 追加 |
 | `src/pages/NotePageView.tsx` | canAddPage 対応（非メンバーの編集権限） |
 
 ### フロント — コンポーネント
 | ファイル | 変更内容 |
 |----------|----------|
-| `src/components/note/NotesLayout.tsx` | **新規作成** — タブ付き共通レイアウト |
+| `src/components/note/NotesLayout.tsx` | **新規作成** — タブ付き共通レイアウト（未ログインでも表示可能） |
 | `src/components/note/NoteCard.tsx` | 公式バッジ追加 |
 | `src/components/note/NoteVisibilityBadge.tsx` | i18n 化 |
 

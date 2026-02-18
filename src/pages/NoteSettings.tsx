@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteNote, useNote, useUpdateNote } from "@/hooks/useNoteQueries";
-import type { NoteVisibility } from "@/types/note";
+import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { useTranslation } from "react-i18next";
 
 const visibilityKeys: Record<NoteVisibility, string> = {
@@ -34,6 +34,19 @@ const visibilityKeys: Record<NoteVisibility, string> = {
   public: "notes.visibilityPublic",
   unlisted: "notes.visibilityUnlisted",
   restricted: "notes.visibilityRestricted",
+};
+
+const editPermissionKeys: Record<NoteEditPermission, string> = {
+  owner_only: "notes.editPermissionOwnerOnly",
+  members_editors: "notes.editPermissionMembersEditors",
+  any_logged_in: "notes.editPermissionAnyLoggedIn",
+};
+
+const allowedEditPermissions: Record<NoteVisibility, NoteEditPermission[]> = {
+  private: ["owner_only"],
+  restricted: ["owner_only", "members_editors"],
+  unlisted: ["owner_only", "members_editors", "any_logged_in"],
+  public: ["owner_only", "members_editors", "any_logged_in"],
 };
 
 const NoteSettings: React.FC = () => {
@@ -55,12 +68,14 @@ const NoteSettings: React.FC = () => {
 
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<NoteVisibility>("private");
+  const [editPermission, setEditPermission] = useState<NoteEditPermission>("owner_only");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (note) {
       setTitle(note.title);
       setVisibility(note.visibility);
+      setEditPermission(note.editPermission);
     }
   }, [note]);
 
@@ -84,7 +99,7 @@ const NoteSettings: React.FC = () => {
     try {
       await updateNoteMutation.mutateAsync({
         noteId,
-        updates: { title: title.trim(), visibility },
+        updates: { title: title.trim(), visibility, editPermission },
       });
       toast({ title: t("notes.noteUpdated") });
     } catch (error) {
@@ -192,9 +207,14 @@ const NoteSettings: React.FC = () => {
                     <Label>{t("notes.visibility")}</Label>
                     <Select
                       value={visibility}
-                      onValueChange={(value) =>
-                        setVisibility(value as NoteVisibility)
-                      }
+                      onValueChange={(value) => {
+                        const next = value as NoteVisibility;
+                        setVisibility(next);
+                        const allowed = allowedEditPermissions[next];
+                        if (!allowed.includes(editPermission)) {
+                          setEditPermission(allowed[0]);
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={t("notes.selectVisibility")} />
@@ -203,6 +223,24 @@ const NoteSettings: React.FC = () => {
                         {(Object.keys(visibilityKeys) as NoteVisibility[]).map((value) => (
                           <SelectItem key={value} value={value}>
                             {t(visibilityKeys[value])}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t("notes.editPermission")}</Label>
+                    <Select
+                      value={editPermission}
+                      onValueChange={(v) => setEditPermission(v as NoteEditPermission)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allowedEditPermissions[visibility].map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {t(editPermissionKeys[value])}
                           </SelectItem>
                         ))}
                       </SelectContent>

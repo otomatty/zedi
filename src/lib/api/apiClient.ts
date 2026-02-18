@@ -15,6 +15,7 @@ import type {
   NoteListItem,
   GetNoteResponse,
   NoteMemberItem,
+  DiscoverResponse,
 } from "./types";
 
 export type { NoteListItem };
@@ -123,6 +124,70 @@ async function request<T>(
   return data as T;
 }
 
+async function requestOptionalAuth<T>(
+  method: string,
+  path: string,
+  getToken: () => Promise<string | null>,
+  baseUrl: string,
+  options: { body?: unknown; query?: Record<string, string> } = {}
+): Promise<T> {
+  const base = baseUrl.replace(/\/$/, "");
+  const url = new URL(path.startsWith("/") ? path : `/${path}`, base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"));
+  if (options.query) {
+    Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
+  }
+  const token = await getToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const init: RequestInit = { method, headers };
+  if (options.body !== undefined) {
+    init.body = JSON.stringify(options.body);
+  }
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), init);
+  } catch (networkError) {
+    throw new ApiError(
+      `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
+      0,
+      "NETWORK_ERROR"
+    );
+  }
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    const snippet = text.length > 200 ? text.slice(0, 200) + "…" : text;
+    throw new ApiError(
+      `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
+      res.status,
+      "INVALID_JSON"
+    );
+  }
+  if (!res.ok) {
+    const envelope = data as ApiEnvelope<unknown> | null;
+    const legacy = data as { message?: string; code?: string } | null;
+    const msg =
+      envelope?.error?.message ??
+      legacy?.message ??
+      res.statusText;
+    const code = envelope?.error?.code ?? legacy?.code;
+    throw new ApiError(msg, res.status, code);
+  }
+  const envelope = data as ApiEnvelope<T> | null;
+  if (
+    envelope &&
+    typeof envelope === "object" &&
+    "ok" in envelope &&
+    envelope.ok === true &&
+    "data" in envelope
+  ) {
+    return envelope.data as T;
+  }
+  return data as T;
+}
+
 export function createApiClient(options?: Partial<ApiClientOptions>) {
   const getToken = options?.getToken ?? (() => Promise.resolve(null));
   const baseUrl = options?.baseUrl ?? getDefaultBaseUrl();
@@ -132,6 +197,12 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     path: string,
     opts: { body?: unknown; query?: Record<string, string> } = {}
   ) => request<T>(method, path, getToken, baseUrl, opts);
+
+  const reqOptionalAuth = <T>(
+    method: string,
+    path: string,
+    opts: { body?: unknown; query?: Record<string, string> } = {}
+  ) => requestOptionalAuth<T>(method, path, getToken, baseUrl, opts);
 
   return {
     /** POST /api/users/upsert — ensure current user exists in DB (Cognito sub/email from JWT). Call before first sync. */
@@ -186,9 +257,24 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<NoteListItem[]>("GET", "/api/notes");
     },
 
-    /** GET /api/notes/:id — note detail with pages and current_user_role. */
+    /** GET /api/notes/:id — note detail (auth optional; public/unlisted viewable by guests). */
     async getNote(noteId: string): Promise<GetNoteResponse> {
-      return req<GetNoteResponse>("GET", `/api/notes/${encodeURIComponent(noteId)}`);
+      return reqOptionalAuth<GetNoteResponse>("GET", `/api/notes/${encodeURIComponent(noteId)}`);
+    },
+
+    /** GET /api/notes/discover — public notes list (auth optional). */
+    async getPublicNotes(opts?: {
+      sort?: string;
+      limit?: number;
+      offset?: number;
+    }): Promise<DiscoverResponse> {
+      return reqOptionalAuth<DiscoverResponse>("GET", "/api/notes/discover", {
+        query: {
+          sort: opts?.sort ?? "updated",
+          limit: String(opts?.limit ?? 20),
+          offset: String(opts?.offset ?? 0),
+        },
+      });
     },
 
     /** GET /api/notes/:id/members — list members. */
@@ -197,14 +283,18 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     },
 
     /** POST /api/notes — create note. */
-    async createNote(body: { title?: string; visibility?: string } = {}): Promise<NoteListItem> {
+    async createNote(body: {
+      title?: string;
+      visibility?: string;
+      edit_permission?: string;
+    } = {}): Promise<NoteListItem> {
       return req<NoteListItem>("POST", "/api/notes", { body });
     },
 
     /** PUT /api/notes/:id — update note (owner only). */
     async updateNote(
       noteId: string,
-      body: { title?: string; visibility?: string }
+      body: { title?: string; visibility?: string; edit_permission?: string }
     ): Promise<NoteListItem> {
       return req<NoteListItem>("PUT", `/api/notes/${encodeURIComponent(noteId)}`, { body });
     },

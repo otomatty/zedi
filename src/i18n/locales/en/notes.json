@@ -67,5 +67,21 @@
   "roleEditor": "Can edit",
   "add": "Add",
   "noPermissionToManageMembers": "You don't have permission to manage members.",
-  "noMembersYet": "No members invited yet."
+  "noMembersYet": "No members invited yet.",
+  "editPermission": "Who can post to this note?",
+  "editPermissionOwnerOnly": "Only you (owner)",
+  "editPermissionMembersEditors": "You and editor members",
+  "editPermissionAnyLoggedIn": "Any logged-in user",
+  "tabMyNotes": "My Notes",
+  "tabDiscover": "Discover",
+  "officialBadge": "Official",
+  "sortUpdated": "Recently Updated",
+  "sortPopular": "Popular",
+  "sectionOfficial": "Official Notes",
+  "sectionPublicNotes": "Public Notes",
+  "loginToPost": "Sign in to post",
+  "loginToViewMyNotes": "Sign in to view your notes",
+  "addNewPageToNote": "Add new page",
+  "newPageTitle": "Page title",
+  "viewCount": "{{count}} views"
 }

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Notes from "./pages/Notes";
+import NotesDiscover from "./pages/NotesDiscover";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
 import PageEditorPage from "./pages/PageEditor";
@@ -60,6 +61,7 @@ const App = () => (
             />
             {/* Home and PageEditor: available without login (local-only mode) */}
             <Route path="/home" element={<Home />} />
+            <Route path="/notes/discover" element={<NotesDiscover />} />
             <Route
               path="/notes"
               element={

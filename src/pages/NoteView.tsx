@@ -15,14 +15,17 @@ import {
   useNotePages,
   useRemovePageFromNote,
 } from "@/hooks/useNoteQueries";
+import { useNoteApi } from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
+import { Badge } from "@/components/ui/badge";
 
 const NoteView: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
   const { toast } = useToast();
 
+  const { userId, isSignedIn } = useNoteApi();
   const {
     note,
     access,
@@ -31,7 +34,9 @@ const NoteView: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const noteSource = source === "remote" ? "remote" : "local";
-  const canManage = Boolean(access?.canEdit && noteSource === "local");
+  const canEdit = Boolean(access?.canEdit && noteSource === "local");
+  const canAddPage = Boolean(access?.canAddPage);
+  const canShowAddPage = canEdit || canAddPage;
   const canManageMembers = Boolean(access?.canManageMembers && noteSource === "local");
 
   const { data: notePages = [], isLoading: isPagesLoading } = useNotePages(
@@ -47,6 +52,7 @@ const NoteView: React.FC = () => {
 
   const [isAddPageOpen, setIsAddPageOpen] = useState(false);
   const [pageFilter, setPageFilter] = useState("");
+  const [newPageTitle, setNewPageTitle] = useState("");
 
   const notePageIds = useMemo(
     () => new Set(notePages.map((page) => page.id)),
@@ -88,6 +94,19 @@ const NoteView: React.FC = () => {
     }
   };
 
+  const handleAddNewPageByTitle = async () => {
+    if (!noteId || !newPageTitle.trim()) return;
+    try {
+      await addPageMutation.mutateAsync({ noteId, title: newPageTitle.trim() });
+      toast({ title: t("notes.pageAdded") });
+      setNewPageTitle("");
+      setIsAddPageOpen(false);
+    } catch (error) {
+      console.error("Failed to add page:", error);
+      toast({ title: t("notes.pageAddFailed"), variant: "destructive" });
+    }
+  };
+
 
   if (isNoteLoading) {
     return (
@@ -124,11 +143,14 @@ const NoteView: React.FC = () => {
         <Container>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-semibold truncate">
                   {note.title || t("notes.untitledNote")}
                 </h1>
                 <NoteVisibilityBadge visibility={note.visibility} />
+                {note.isOfficial && (
+                  <Badge variant="secondary">{t("notes.officialBadge")}</Badge>
+                )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {t("notes.pagesCount", { count: notePages.length })}
@@ -145,7 +167,12 @@ const NoteView: React.FC = () => {
                   </Button>
                 </>
               )}
-              {canManage && (
+              {!isSignedIn && access?.canView && (
+                <span className="text-sm text-muted-foreground">
+                  {t("notes.loginToPost")}
+                </span>
+              )}
+              {canShowAddPage && (
                 <Dialog open={isAddPageOpen} onOpenChange={setIsAddPageOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm" variant="outline">
@@ -157,29 +184,54 @@ const NoteView: React.FC = () => {
                     <DialogHeader>
                       <DialogTitle>{t("notes.addPageDialogTitle")}</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-3">
-                      <Input
-                        value={pageFilter}
-                        onChange={(event) => setPageFilter(event.target.value)}
-                        placeholder={t("notes.searchByTitle")}
-                      />
-                      <div className="max-h-64 overflow-y-auto space-y-2">
-                        {filteredPages.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            {t("notes.noPagesToAdd")}
-                          </p>
-                        ) : (
-                          filteredPages.map((page) => (
-                            <button
-                              key={page.id}
-                              onClick={() => handleAddPage(page.id)}
-                              className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border"
-                            >
-                              {page.title || t("notes.untitledPage")}
-                            </button>
-                          ))
-                        )}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">{t("notes.addNewPageToNote")}</label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={newPageTitle}
+                            onChange={(e) => setNewPageTitle(e.target.value)}
+                            placeholder={t("notes.newPageTitle")}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleAddNewPageByTitle}
+                            disabled={!newPageTitle.trim() || addPageMutation.isPending}
+                          >
+                            {t("notes.add")}
+                          </Button>
+                        </div>
                       </div>
+                      {canEdit && (
+                        <>
+                          <div className="border-t pt-3 space-y-2">
+                            <label className="text-sm font-medium">{t("notes.searchByTitle")}</label>
+                            <Input
+                              value={pageFilter}
+                              onChange={(event) => setPageFilter(event.target.value)}
+                              placeholder={t("notes.searchByTitle")}
+                            />
+                            <div className="max-h-64 overflow-y-auto space-y-2">
+                              {filteredPages.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                  {t("notes.noPagesToAdd")}
+                                </p>
+                              ) : (
+                                filteredPages.map((page) => (
+                                  <button
+                                    key={page.id}
+                                    onClick={() => handleAddPage(page.id)}
+                                    className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border"
+                                  >
+                                    {page.title || t("notes.untitledPage")}
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                     <DialogFooter>
                       <Button
@@ -206,7 +258,7 @@ const NoteView: React.FC = () => {
                 {notePages.map((page) => (
                   <div key={page.id} className="relative">
                     <NotePageCard noteId={note.id} page={page} />
-                    {canManage && (
+                    {access?.canDeletePage(page.addedByUserId) && (
                       <Button
                         type="button"
                         variant="secondary"
