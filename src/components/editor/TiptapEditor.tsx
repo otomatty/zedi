@@ -64,6 +64,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   showToolbar = true,
   onContentError,
   collaborationConfig,
+  focusContentRef,
 }) => {
   const { checkReferenced } = useCheckGhostLinkReferenced();
   const { editorFontSizePx } = useGeneralSettings();
@@ -290,6 +291,14 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   useEffect(() => {
     editorRef.current = editor;
   }, [editor]);
+
+  useEffect(() => {
+    if (!focusContentRef || !editor) return;
+    focusContentRef.current = () => editor.commands.focus();
+    return () => {
+      focusContentRef.current = null;
+    };
+  }, [editor, focusContentRef]);
 
   usePasteImageHandler({ editor, handleImageUpload });
 

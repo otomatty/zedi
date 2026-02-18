@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import TiptapEditor from "../TiptapEditor";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
@@ -7,7 +7,6 @@ import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
 import Container from "@/components/layout/Container";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import { PageTitleBlock } from "./PageTitleBlock";
-import { StickyTitleBar } from "./StickyTitleBar";
 
 interface PageEditorContentProps {
   content: string;
@@ -26,8 +25,6 @@ interface PageEditorContentProps {
   onTitleChange?: (value: string) => void;
   /** タイトルバリデーションエラー（例: 重複） */
   errorMessage?: string | null;
-  /** 省略可。StickyTitleBar と PageTitleBlock で使う ref */
-  titleRef?: React.RefObject<HTMLElement | null>;
   /** リアルタイムコラボレーション（有効時のみ渡す）。ydoc 準備前に表示するローディング用 */
   collaboration?: UseCollaborationReturn;
 }
@@ -51,37 +48,13 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   onContentError,
   onTitleChange,
   errorMessage = null,
-  titleRef: titleRefFromParent,
   collaboration,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
 
-  const titleBlockRef = useRef<HTMLElement | null>(null);
-  const [isTitleInView, setIsTitleInView] = useState(true);
-
-  const setTitleRef = useCallback(
-    (el: HTMLElement | null) => {
-      (titleBlockRef as React.MutableRefObject<HTMLElement | null>).current = el;
-      if (titleRefFromParent && "current" in titleRefFromParent) {
-        (titleRefFromParent as React.MutableRefObject<HTMLElement | null>).current = el;
-      }
-    },
-    [titleRefFromParent]
-  );
-
-  useEffect(() => {
-    const el = titleBlockRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setIsTitleInView(entry.isIntersecting),
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const scrollToTitle = useCallback(() => {
-    titleBlockRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const contentFocusRef = useRef<(() => void) | null>(null);
+  const focusContent = useCallback(() => {
+    contentFocusRef.current?.();
   }, []);
 
   // local モード（個人ページ）は awareness 不要。collaborative モードのみ awareness 必須。
@@ -102,11 +75,6 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
 
   return (
     <main className="flex-1 pt-6 pb-32">
-      <StickyTitleBar
-        visible={!isTitleInView}
-        title={title}
-        onClick={scrollToTitle}
-      />
       <Container>
           {/* ページタイトル（コンテンツ上部） */}
           <PageTitleBlock
@@ -114,7 +82,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
             onTitleChange={onTitleChange}
             isReadOnly={isEditorReadOnly}
             errorMessage={errorMessage}
-            titleRef={setTitleRef}
+            onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
           />
           {/* Source URL Badge - クリップしたページの場合に表示 */}
           {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
@@ -143,6 +111,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                   showToolbar={showToolbar}
                   onContentError={onContentError}
                   collaborationConfig={collaborationConfig}
+                  focusContentRef={contentFocusRef}
                 />
               </>
             )}

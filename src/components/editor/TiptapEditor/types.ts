@@ -1,3 +1,4 @@
+import type { MutableRefObject } from "react";
 import type { Editor } from "@tiptap/react";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
@@ -34,6 +35,8 @@ export interface TiptapEditorProps {
   onContentError?: (error: ContentError | null) => void;
   /** リアルタイムコラボレーション（Y.js）有効時のみ渡す。渡すと content は Y.Doc から取得 */
   collaborationConfig?: CollaborationConfig;
+  /** 親がコンテンツにフォーカスするためのコールバック。editor 準備後に ref.current に focus() を代入 */
+  focusContentRef?: MutableRefObject<(() => void) | null>;
 }
 
 /**

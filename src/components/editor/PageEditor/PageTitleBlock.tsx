@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 export interface PageTitleBlockProps {
@@ -14,6 +14,8 @@ export interface PageTitleBlockProps {
   placeholder?: string;
   /** IntersectionObserver 用。タイトルブロックのルート要素に ref を付与 */
   titleRef?: React.Ref<HTMLDivElement | null>;
+  /** Enter キー押下時（変換確定後）にコンテンツへフォーカスを移す場合に渡す */
+  onEnterMoveToContent?: () => void;
 }
 
 const DEFAULT_PLACEHOLDER = "タイトル";
@@ -29,26 +31,24 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
   errorMessage = null,
   placeholder = DEFAULT_PLACEHOLDER,
   titleRef,
+  onEnterMoveToContent,
 }) => {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const adjustHeight = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, []);
-
-  useEffect(() => {
-    if (!isReadOnly) adjustHeight();
-  }, [title, isReadOnly, adjustHeight]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== "Enter") return;
+      if (e.nativeEvent.isComposing) return;
+      e.preventDefault();
+      onEnterMoveToContent?.();
+    },
+    [onEnterMoveToContent]
+  );
 
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      onTitleChange?.(e.target.value);
-      adjustHeight();
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value.replace(/\n/g, "");
+      onTitleChange?.(value);
     },
-    [onTitleChange, adjustHeight]
+    [onTitleChange]
   );
 
   if (isReadOnly) {
@@ -63,16 +63,16 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
 
   return (
     <div ref={titleRef} className="pt-6 pb-2">
-      <textarea
-        ref={textareaRef}
+      <input
+        type="text"
         value={title}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        rows={1}
         className={cn(
-          "w-full resize-none border-0 bg-transparent text-2xl font-semibold",
+          "w-full border-0 bg-transparent text-2xl font-semibold",
           "placeholder:text-muted-foreground",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:rounded",
+          "focus:outline-none",
           "min-h-[2.5rem] py-0 leading-tight",
           errorMessage ? "text-destructive" : ""
         )}

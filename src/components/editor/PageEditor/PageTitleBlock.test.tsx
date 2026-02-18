@@ -31,8 +31,8 @@ describe("PageTitleBlock", () => {
           errorMessage="重複しています"
         />
       );
-      const textarea = container.querySelector("textarea");
-      expect(textarea).toHaveClass("text-destructive");
+      const input = container.querySelector("input");
+      expect(input).toHaveClass("text-destructive");
       expect(screen.getByRole("alert")).toHaveTextContent("重複しています");
     });
 
@@ -40,8 +40,24 @@ describe("PageTitleBlock", () => {
       const { container } = render(
         <PageTitleBlock title="タイトル" onTitleChange={vi.fn()} />
       );
-      const textarea = container.querySelector("textarea");
-      expect(textarea).not.toHaveClass("text-destructive");
+      const input = container.querySelector("input");
+      expect(input).not.toHaveClass("text-destructive");
+    });
+
+    it("Enter キー（変換確定後）で onEnterMoveToContent が呼ばれる", async () => {
+      const user = userEvent.setup();
+      const onEnterMoveToContent = vi.fn();
+      render(
+        <PageTitleBlock
+          title="タイトル"
+          onTitleChange={vi.fn()}
+          onEnterMoveToContent={onEnterMoveToContent}
+        />
+      );
+      const input = screen.getByPlaceholderText("タイトル");
+      await user.click(input);
+      await user.keyboard("{Enter}");
+      expect(onEnterMoveToContent).toHaveBeenCalledTimes(1);
     });
   });
 
