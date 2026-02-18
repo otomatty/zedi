@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/command";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
-import { formatTimeAgo } from "@/lib/dateUtils";
 import { MatchTypeBadge } from "./MatchTypeBadge";
 import { HighlightedSnippet } from "./HighlightedSnippet";
 
@@ -22,7 +21,6 @@ export function GlobalSearch() {
     open,
     close,
     searchResults,
-    recentPages,
     hasQuery,
     handleSelect,
   } = useGlobalSearchContext();
@@ -38,34 +36,6 @@ export function GlobalSearch() {
       />
       <CommandList>
         <CommandEmpty>ページが見つかりません</CommandEmpty>
-
-        {/* Recent Pages (shown when no query) */}
-        {!hasQuery && recentPages.length > 0 && (
-          <CommandGroup heading="最近のページ">
-            {recentPages.map((page) => (
-              <CommandItem
-                key={page.id}
-                value={`recent-${page.id}`}
-                onSelect={() => handleSelect(page.id, undefined)}
-                className="flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  {page.sourceUrl ? (
-                    <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="truncate">
-                    {page.title || "無題のページ"}
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                  {formatTimeAgo(page.updatedAt)}
-                </span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
 
         {/* Search Results (personal + shared merged, C3-8) */}
         {hasQuery && searchResults.length > 0 && (

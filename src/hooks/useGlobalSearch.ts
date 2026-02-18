@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
 import {
-  usePagesSummary,
   useSearchPages,
   useSearchSharedNotes,
 } from "./usePageQueries";
@@ -14,7 +13,7 @@ import {
   highlightKeywords,
   calculateEnhancedScore,
 } from "@/lib/searchUtils";
-import type { Page, PageSummary } from "@/types/page";
+import type { Page } from "@/types/page";
 
 export interface SearchResult {
   page: Page;
@@ -93,7 +92,6 @@ export function searchPages(pages: Page[], query: string): SearchResult[] {
  * - Results are merged, sorted by score, and capped.
  */
 export function useGlobalSearch() {
-  const { data: pageSummaries = [] } = usePagesSummary();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
@@ -109,7 +107,7 @@ export function useGlobalSearch() {
   );
 
   const searchResults = useMemo((): GlobalSearchResultItem[] => {
-    if (!debouncedQuery.trim() || keywords.length === 0) return [];
+    if (debouncedQuery.trim().length < 3 || keywords.length === 0) return [];
 
     const personal: Array<GlobalSearchResultItem & { score: number }> =
       serverSearchResults
@@ -157,14 +155,6 @@ export function useGlobalSearch() {
       .map(({ score: _s, ...item }) => item);
   }, [serverSearchResults, sharedResults, debouncedQuery, keywords]);
 
-  // OPTIMIZED: Recent pages from summary (no content, much less data)
-  const recentPages = useMemo((): PageSummary[] => {
-    return pageSummaries
-      .filter((p) => !p.isDeleted)
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 5);
-  }, [pageSummaries]);
-
   const open = useCallback(() => setIsOpen(true), []);
 
   const close = useCallback(() => {
@@ -188,7 +178,6 @@ export function useGlobalSearch() {
     close,
     toggle,
     searchResults,
-    recentPages,
-    hasQuery: query.trim().length > 0,
+    hasQuery: query.trim().length >= 3,
   };
 }

@@ -20,21 +20,21 @@ JOIN pages p ON p.id = np.page_id AND p.is_deleted = FALSE
 LEFT JOIN page_contents pc ON pc.page_id = p.id
 WHERE np.is_deleted = FALSE
   AND (n.owner_id = :owner_id OR nm.note_id IS NOT NULL)
-  AND (p.title LIKE :q_like ESCAPE '\\' OR pc.content_text LIKE :q_like ESCAPE '\\')
+  AND (p.title LIKE :q_like_title ESCAPE '!' OR pc.content_text LIKE :q_like_content ESCAPE '!')
 ORDER BY p.updated_at DESC
 LIMIT 100
 `;
 
 /**
- * LIKE の特殊文字 % _ \ をエスケープする（ESCAPE '\' 用）
+ * LIKE の特殊文字 % _ をエスケープする（ESCAPE '!' 用）
  * @param {string} s
  * @returns {string}
  */
 function escapeLike(s) {
   return String(s)
-    .replace(/\\/g, "\\\\")
-    .replace(/%/g, "\\%")
-    .replace(/_/g, "\\_");
+    .replace(/!/g, "!!")
+    .replace(/%/g, "!%")
+    .replace(/_/g, "!_");
 }
 
 /**
@@ -60,7 +60,8 @@ export async function searchShared(claims, queryParams = {}) {
   const rows = await execute(SEARCH_SHARED_SQL, {
     owner_id: user.id,
     user_email: user.email,
-    q_like: qLike,
+    q_like_title: qLike,
+    q_like_content: qLike,
   });
 
   const results = rows.map((row) => ({

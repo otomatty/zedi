@@ -268,10 +268,25 @@ export function useSearchPages(query: string) {
     queryKey: pageKeys.search(userId, query),
     queryFn: async () => {
       if (!query.trim()) return [];
-      const repo = await getRepository();
-      return repo.searchPages(userId, query);
+      console.debug("[searchPages] Fetching", { query, userId });
+      try {
+        const repo = await getRepository();
+        const results = await repo.searchPages(userId, query);
+        console.debug("[searchPages] Success", {
+          query,
+          resultCount: results.length,
+        });
+        return results;
+      } catch (error) {
+        console.error("[searchPages] Failed", {
+          query,
+          error,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
     },
-    enabled: isLoaded && query.trim().length > 0,
+    enabled: isLoaded && query.trim().length >= 3,
   });
 }
 
@@ -284,10 +299,27 @@ export function useSearchSharedNotes(query: string) {
   return useQuery({
     queryKey: pageKeys.searchShared(query),
     queryFn: async () => {
-      const api = createApiClient({ getToken });
-      return api.searchSharedNotes(query);
+      console.debug("[searchSharedNotes] Fetching", { query });
+      try {
+        const api = createApiClient({ getToken });
+        const result = await api.searchSharedNotes(query);
+        console.debug("[searchSharedNotes] Success", {
+          query,
+          resultCount: result.results?.length ?? 0,
+        });
+        return result;
+      } catch (error) {
+        console.error("[searchSharedNotes] Failed", {
+          query,
+          error,
+          message: error instanceof Error ? error.message : String(error),
+          status: (error as { status?: number }).status,
+        });
+        throw error;
+      }
     },
-    enabled: isSignedIn && query.trim().length > 0,
+    enabled: isSignedIn && query.trim().length >= 3,
+    retry: false, // サーバーが 500 を返す場合リトライしない
   });
 }
 

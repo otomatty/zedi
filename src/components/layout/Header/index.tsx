@@ -1,8 +1,6 @@
 import React from "react";
-import { Search } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { SyncIndicator } from "@/components/layout/SyncIndicator";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HeaderLogo } from "./HeaderLogo";
 import { MonthNavigation } from "./MonthNavigation";
@@ -22,7 +20,6 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
   const { t } = useTranslation();
   const searchContext = useGlobalSearchContextOptional();
   const hasSearchContext = searchContext != null;
-  const openSearch = searchContext?.open;
 
   return (
     <header
@@ -33,30 +30,19 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
       )}
     >
       <Container className="flex h-16 items-center justify-between gap-4">
-        {/* Left: Logo & Month Navigation */}
+        {/* Left: Logo (hidden on mobile) & Month Navigation */}
         <div className="flex items-center gap-4 min-w-0">
-          <HeaderLogo />
+          <div className="hidden sm:block shrink-0">
+            <HeaderLogo />
+          </div>
           <MonthNavigation />
         </div>
 
-        {/* Center: Search bar or icon (when inside GlobalSearchProvider) */}
+        {/* Center: Search bar (all breakpoints when inside GlobalSearchProvider) */}
         {hasSearchContext && (
-          <>
-            <div className="hidden sm:flex flex-1 justify-center min-w-0 max-w-xl mx-2">
-              <HeaderSearchBar />
-            </div>
-            <div className="flex sm:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => openSearch?.()}
-                aria-label="ページを検索"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
-          </>
+          <div className="flex flex-1 justify-center min-w-0 max-w-xl mx-1 sm:mx-2">
+            <HeaderSearchBar />
+          </div>
         )}
 
         {/* Right: Sync, Apps menu, Auth (guest: login prompt + Sign In) */}

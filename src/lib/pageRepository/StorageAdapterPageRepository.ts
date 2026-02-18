@@ -8,7 +8,7 @@ import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
 import type { PageMetadata } from "@/lib/storageAdapter/types";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
-import { getPageListPreview } from "@/lib/contentUtils";
+import { getPageListPreview, extractPlainText } from "@/lib/contentUtils";
 
 const LOCAL_USER_ID = "local-user";
 
@@ -71,6 +71,12 @@ export class StorageAdapterPageRepository {
         isDeleted: false,
       };
       await this.adapter.upsertPage(meta);
+      // 検索インデックスを更新
+      const plainContent = content ? extractPlainText(content) : "";
+      const searchText = [title, plainContent].filter(Boolean).join(" ");
+      if (searchText) {
+        await this.adapter.updateSearchIndex(id, searchText);
+      }
       return metadataToPage(meta);
     }
 
@@ -91,6 +97,12 @@ export class StorageAdapterPageRepository {
       isDeleted: created.is_deleted === true,
     };
     await this.adapter.upsertPage(meta);
+    // 検索インデックスを更新
+    const plainContent = content ? extractPlainText(content) : "";
+    const searchText = [title, plainContent].filter(Boolean).join(" ");
+    if (searchText) {
+      await this.adapter.updateSearchIndex(created.id, searchText);
+    }
     return metadataToPage(meta);
   }
 
@@ -166,6 +178,15 @@ export class StorageAdapterPageRepository {
       updatedAt: now,
     };
     await this.adapter.upsertPage(meta);
+    // タイトルまたはコンテンツが変更された場合、検索インデックスを更新
+    if (updates.title !== undefined || updates.content !== undefined) {
+      const titleText = meta.title ?? "";
+      const contentText = updates.content
+        ? extractPlainText(updates.content)
+        : "";
+      const searchText = [titleText, contentText].filter(Boolean).join(" ");
+      await this.adapter.updateSearchIndex(pageId, searchText);
+    }
   }
 
   async deletePage(userId: string, pageId: string): Promise<void> {

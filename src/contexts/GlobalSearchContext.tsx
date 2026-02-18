@@ -2,13 +2,11 @@ import React, { createContext, useCallback, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
-import type { PageSummary } from "@/types/page";
 
 interface GlobalSearchContextValue {
   query: string;
   setQuery: (value: string) => void;
   searchResults: GlobalSearchResultItem[];
-  recentPages: PageSummary[];
   hasQuery: boolean;
   isOpen: boolean;
   open: () => void;
@@ -27,7 +25,6 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
     open,
     close,
     searchResults,
-    recentPages,
     hasQuery,
   } = useGlobalSearch();
 
@@ -47,7 +44,6 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
     query,
     setQuery,
     searchResults,
-    recentPages,
     hasQuery,
     isOpen,
     open,
