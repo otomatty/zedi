@@ -155,8 +155,8 @@ resource "aws_iam_role_policy" "lambda_resources" {
       },
       # API Gateway Management API — WebSocket postToConnection
       {
-        Effect = "Allow"
-        Action = ["execute-api:ManageConnections"]
+        Effect   = "Allow"
+        Action   = ["execute-api:ManageConnections"]
         Resource = ["${aws_apigatewayv2_api.ws.execution_arn}/*/*"]
       },
     ]
@@ -265,10 +265,10 @@ resource "aws_apigatewayv2_api" "ws" {
 }
 
 resource "aws_apigatewayv2_integration" "ws_lambda" {
-  api_id                 = aws_apigatewayv2_api.ws.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.ai_api.invoke_arn
-  integration_method     = "POST"
+  api_id                    = aws_apigatewayv2_api.ws.id
+  integration_type          = "AWS_PROXY"
+  integration_uri           = aws_lambda_function.ai_api.invoke_arn
+  integration_method        = "POST"
   content_handling_strategy = "CONVERT_TO_TEXT"
 }
 

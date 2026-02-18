@@ -6,17 +6,17 @@ aws_region  = "ap-northeast-1"
 
 # Networking
 vpc_cidr             = "10.0.0.0/16"
-availability_zones   = ["ap-northeast-1a", "ap-northeast-1c"]  # Aurora requires 2 AZs minimum
-enable_vpc_endpoints = true                  # Replaces NAT Gateway ($32 → $14)
+availability_zones   = ["ap-northeast-1a", "ap-northeast-1c"] # Aurora requires 2 AZs minimum
+enable_vpc_endpoints = true                                   # Replaces NAT Gateway ($32 → $14)
 
 # Database (Aurora Serverless v2) - scale-to-zero for dev cost savings
-aurora_min_capacity             = 0     # 0 = scale to zero with auto-pause
-aurora_max_capacity              = 4     # Maximum ACU when active
-aurora_seconds_until_auto_pause   = 600   # Pause after 10 min idle (300-86400)
-aurora_database_name             = "zedi"
+aurora_min_capacity             = 0   # 0 = scale to zero with auto-pause
+aurora_max_capacity             = 4   # Maximum ACU when active
+aurora_seconds_until_auto_pause = 600 # Pause after 10 min idle (300-86400)
+aurora_database_name            = "zedi"
 
 # Cache (ElastiCache Redis)
-redis_node_type       = "cache.t4g.micro"  # Graviton2, smallest instance
+redis_node_type       = "cache.t4g.micro" # Graviton2, smallest instance
 redis_num_cache_nodes = 1
 
 # Security (Cognito) - OAuth callback and logout URLs
@@ -32,14 +32,14 @@ github_oauth_client_id = "Ov23liz1wBIxySSlVUJU"
 enable_github_idp = true
 
 # ECS (Fargate Spot)
-use_fargate_spot       = true   # ~70% cost savings
-ecs_task_cpu           = 256    # 0.25 vCPU
-ecs_task_memory        = 512    # 512 MB
-ecs_desired_count      = 1      # Single instance for dev
-enable_ecs_autoscaling = false  # No autoscaling for dev
+use_fargate_spot       = true  # ~70% cost savings
+ecs_task_cpu           = 256   # 0.25 vCPU
+ecs_task_memory        = 512   # 512 MB
+ecs_desired_count      = 1     # Single instance for dev
+enable_ecs_autoscaling = false # No autoscaling for dev
 ecs_min_capacity       = 1
 ecs_max_capacity       = 4
-acm_certificate_arn    = ""     # No HTTPS for dev (uses HTTP)
+acm_certificate_arn    = "" # No HTTPS for dev (uses HTTP)
 
 # Domain (optional)
 domain_name         = ""

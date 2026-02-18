@@ -115,11 +115,11 @@ resource "aws_lambda_function" "webhook" {
 
   environment {
     variables = {
-      NODE_OPTIONS               = "--enable-source-maps"
-      ENVIRONMENT                = var.environment
-      AURORA_CLUSTER_ARN         = var.aurora_cluster_arn
-      DB_CREDENTIALS_SECRET      = var.db_credentials_secret_arn
-      AURORA_DATABASE_NAME       = var.aurora_database_name
+      NODE_OPTIONS                = "--enable-source-maps"
+      ENVIRONMENT                 = var.environment
+      AURORA_CLUSTER_ARN          = var.aurora_cluster_arn
+      DB_CREDENTIALS_SECRET       = var.db_credentials_secret_arn
+      AURORA_DATABASE_NAME        = var.aurora_database_name
       LEMONSQUEEZY_WEBHOOK_SECRET = "" # Will be set from Secrets Manager at runtime, or via env
     }
   }

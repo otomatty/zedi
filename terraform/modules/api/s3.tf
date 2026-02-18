@@ -44,8 +44,8 @@ resource "aws_s3_bucket_cors_configuration" "media" {
 
 # Lambda が Presigned URL を発行し、クライアントが PUT。Lambda は GetObject で確認用にも利用可能に。
 resource "aws_iam_role_policy" "lambda_s3_media" {
-  name   = "zedi-${var.environment}-api-lambda-s3-media"
-  role   = aws_iam_role.lambda.id
+  name = "zedi-${var.environment}-api-lambda-s3-media"
+  role = aws_iam_role.lambda.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

@@ -55,7 +55,7 @@ resource "aws_secretsmanager_secret" "thumbnail_keys" {
 resource "aws_secretsmanager_secret_version" "thumbnail_keys" {
   secret_id = aws_secretsmanager_secret.thumbnail_keys.id
   secret_string = jsonencode({
-    GOOGLE_CUSTOM_SEARCH_API_KEY    = var.google_custom_search_api_key
+    GOOGLE_CUSTOM_SEARCH_API_KEY   = var.google_custom_search_api_key
     GOOGLE_CUSTOM_SEARCH_ENGINE_ID = var.google_custom_search_engine_id
   })
 
@@ -130,8 +130,8 @@ resource "aws_iam_role_policy" "lambda_resources" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
         Resource = [
           aws_secretsmanager_secret.thumbnail_keys.arn,
           var.ai_secrets_arn,
@@ -177,18 +177,18 @@ resource "aws_lambda_function" "thumbnail_api" {
 
   environment {
     variables = {
-      NODE_OPTIONS           = "--enable-source-maps"
-      ENVIRONMENT           = var.environment
-      AURORA_CLUSTER_ARN    = var.aurora_cluster_arn
-      DB_CREDENTIALS_SECRET = var.db_credentials_secret_arn
-      AURORA_DATABASE_NAME  = var.aurora_database_name
-      THUMBNAIL_SECRETS_ARN = aws_secretsmanager_secret.thumbnail_keys.arn
-      AI_SECRETS_ARN        = var.ai_secrets_arn
-      RATE_LIMIT_TABLE     = var.rate_limit_table_name
-      COGNITO_USER_POOL_ID = var.cognito_user_pool_id
-      COGNITO_REGION       = data.aws_region.current.name
-      CORS_ORIGIN          = var.cors_origin
-      THUMBNAIL_BUCKET     = aws_s3_bucket.thumbnails.id
+      NODE_OPTIONS             = "--enable-source-maps"
+      ENVIRONMENT              = var.environment
+      AURORA_CLUSTER_ARN       = var.aurora_cluster_arn
+      DB_CREDENTIALS_SECRET    = var.db_credentials_secret_arn
+      AURORA_DATABASE_NAME     = var.aurora_database_name
+      THUMBNAIL_SECRETS_ARN    = aws_secretsmanager_secret.thumbnail_keys.arn
+      AI_SECRETS_ARN           = var.ai_secrets_arn
+      RATE_LIMIT_TABLE         = var.rate_limit_table_name
+      COGNITO_USER_POOL_ID     = var.cognito_user_pool_id
+      COGNITO_REGION           = data.aws_region.current.name
+      CORS_ORIGIN              = var.cors_origin
+      THUMBNAIL_BUCKET         = aws_s3_bucket.thumbnails.id
       THUMBNAIL_CLOUDFRONT_URL = "https://${aws_cloudfront_distribution.thumbnails.domain_name}"
     }
   }
@@ -221,13 +221,13 @@ resource "aws_cloudfront_distribution" "thumbnails" {
 
   origin {
     domain_name              = aws_s3_bucket.thumbnails.bucket_regional_domain_name
-    origin_id                 = "S3-${aws_s3_bucket.thumbnails.id}"
+    origin_id                = "S3-${aws_s3_bucket.thumbnails.id}"
     origin_access_control_id = aws_cloudfront_origin_access_control.thumbnails.id
   }
 
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
     target_origin_id       = "S3-${aws_s3_bucket.thumbnails.id}"
     viewer_protocol_policy = "redirect-to-https"
     compress               = true

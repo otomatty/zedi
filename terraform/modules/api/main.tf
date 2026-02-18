@@ -15,9 +15,9 @@ locals {
 
 resource "null_resource" "lambda_npm" {
   triggers = {
-    package_json    = filemd5("${path.module}/lambda/package.json")
-    package_lock    = fileexists("${path.module}/lambda/package-lock.json") ? filemd5("${path.module}/lambda/package-lock.json") : "no-lock"
-    zedi_auth_db    = fileexists("${path.root}/../packages/zedi-auth-db/dist/index.js") ? filemd5("${path.root}/../packages/zedi-auth-db/dist/index.js") : "no-pkg"
+    package_json = filemd5("${path.module}/lambda/package.json")
+    package_lock = fileexists("${path.module}/lambda/package-lock.json") ? filemd5("${path.module}/lambda/package-lock.json") : "no-lock"
+    zedi_auth_db = fileexists("${path.root}/../packages/zedi-auth-db/dist/index.js") ? filemd5("${path.root}/../packages/zedi-auth-db/dist/index.js") : "no-pkg"
   }
   provisioner "local-exec" {
     command     = "npm ci && node scripts/copy-zedi-auth-db.mjs"
@@ -38,8 +38,8 @@ resource "aws_iam_role" "lambda" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "lambda.amazonaws.com" }
     }]
   })
@@ -53,8 +53,8 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
 
 # Secrets Manager + RDS Data API (for C1-3 以降). Always attach; empty ARNs = no access.
 resource "aws_iam_role_policy" "lambda_db" {
-  name   = "zedi-${var.environment}-api-lambda-db"
-  role   = aws_iam_role.lambda.id
+  name = "zedi-${var.environment}-api-lambda-db"
+  role = aws_iam_role.lambda.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = concat(
@@ -89,13 +89,13 @@ resource "aws_lambda_function" "main" {
 
   environment {
     variables = {
-      NODE_OPTIONS           = "--enable-source-maps"
-      ENVIRONMENT            = var.environment
-      AURORA_DATABASE_NAME   = var.aurora_database_name
-      DB_CREDENTIALS_SECRET  = var.db_credentials_secret_arn
-      AURORA_CLUSTER_ARN     = var.aurora_cluster_arn
-      MEDIA_BUCKET           = aws_s3_bucket.media.id
-      CORS_ORIGIN            = var.cors_origin
+      NODE_OPTIONS          = "--enable-source-maps"
+      ENVIRONMENT           = var.environment
+      AURORA_DATABASE_NAME  = var.aurora_database_name
+      DB_CREDENTIALS_SECRET = var.db_credentials_secret_arn
+      AURORA_CLUSTER_ARN    = var.aurora_cluster_arn
+      MEDIA_BUCKET          = aws_s3_bucket.media.id
+      CORS_ORIGIN           = var.cors_origin
     }
   }
   tags = var.tags
@@ -121,7 +121,7 @@ resource "aws_apigatewayv2_api" "main" {
 
 resource "aws_apigatewayv2_authorizer" "jwt" {
   api_id           = aws_apigatewayv2_api.main.id
-  authorizer_type   = "JWT"
+  authorizer_type  = "JWT"
   identity_sources = ["$request.header.Authorization"]
   name             = "cognito-jwt"
 
@@ -173,7 +173,7 @@ resource "aws_apigatewayv2_route" "api_root_options" {
 resource "aws_apigatewayv2_route" "health" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /api/health"
-  target = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
 resource "aws_apigatewayv2_stage" "default" {

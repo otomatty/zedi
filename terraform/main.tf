@@ -66,9 +66,9 @@ locals {
 module "networking" {
   source = "./modules/networking"
 
-  environment         = var.environment
-  vpc_cidr            = var.vpc_cidr
-  availability_zones  = var.availability_zones
+  environment          = var.environment
+  vpc_cidr             = var.vpc_cidr
+  availability_zones   = var.availability_zones
   enable_vpc_endpoints = var.enable_vpc_endpoints
 
   tags = local.common_tags
@@ -83,7 +83,7 @@ module "cognito_github_proxy" {
   count  = var.enable_github_idp ? 1 : 0
   source = "./modules/cognito-github-proxy"
 
-  environment         = var.environment
+  environment          = var.environment
   github_client_id     = var.github_oauth_client_id
   github_client_secret = var.github_oauth_client_secret
   tags                 = local.common_tags
@@ -101,12 +101,12 @@ module "security" {
   tags          = local.common_tags
 
   # Federated IdP (optional; set in .tfvars or TF_VAR_* to enable)
-  google_client_id       = var.google_oauth_client_id
-  google_client_secret   = var.google_oauth_client_secret
-  github_client_id       = var.github_oauth_client_id
-  github_client_secret   = var.github_oauth_client_secret
-  enable_github_idp      = var.enable_github_idp
-  github_proxy_base_url  = var.enable_github_idp ? module.cognito_github_proxy[0].invoke_url : ""
+  google_client_id      = var.google_oauth_client_id
+  google_client_secret  = var.google_oauth_client_secret
+  github_client_id      = var.github_oauth_client_id
+  github_client_secret  = var.github_oauth_client_secret
+  enable_github_idp     = var.enable_github_idp
+  github_proxy_base_url = var.enable_github_idp ? module.cognito_github_proxy[0].invoke_url : ""
 
   # GitHub IdP 作成前にプロキシの Lambda/API が完全にデプロイ済みである必要がある
   depends_on = [module.cognito_github_proxy]
@@ -118,15 +118,15 @@ module "security" {
 module "database" {
   source = "./modules/database"
 
-  environment        = var.environment
-  vpc_id             = module.networking.vpc_id
-  vpc_cidr           = var.vpc_cidr
-  private_subnet_ids = module.networking.private_subnet_ids
-  database_name             = var.aurora_database_name
-  min_capacity              = var.aurora_min_capacity
-  max_capacity              = var.aurora_max_capacity
-  seconds_until_auto_pause  = var.aurora_seconds_until_auto_pause
-  tags                      = local.common_tags
+  environment              = var.environment
+  vpc_id                   = module.networking.vpc_id
+  vpc_cidr                 = var.vpc_cidr
+  private_subnet_ids       = module.networking.private_subnet_ids
+  database_name            = var.aurora_database_name
+  min_capacity             = var.aurora_min_capacity
+  max_capacity             = var.aurora_max_capacity
+  seconds_until_auto_pause = var.aurora_seconds_until_auto_pause
+  tags                     = local.common_tags
 }
 
 # =============================================================================
@@ -160,8 +160,8 @@ module "api" {
   cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
 
   db_credentials_secret_arn = module.database.db_credentials_secret_arn
-  aurora_cluster_arn       = module.database.cluster_arn
-  aurora_database_name     = var.aurora_database_name
+  aurora_cluster_arn        = module.database.cluster_arn
+  aurora_database_name      = var.aurora_database_name
 }
 
 # =============================================================================
@@ -264,8 +264,8 @@ module "thumbnail_api" {
 
   cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
 
-  google_custom_search_api_key    = var.thumbnail_google_custom_search_api_key
-  google_custom_search_engine_id  = var.thumbnail_google_custom_search_engine_id
+  google_custom_search_api_key   = var.thumbnail_google_custom_search_api_key
+  google_custom_search_engine_id = var.thumbnail_google_custom_search_engine_id
 }
 
 # =============================================================================
@@ -274,12 +274,12 @@ module "thumbnail_api" {
 module "cdn" {
   source = "./modules/cdn"
 
-  environment           = var.environment
-  domain_name           = var.domain_name
-  route53_zone_id       = var.route53_zone_id
-  create_route53_zone   = var.create_route53_zone
-  attach_custom_domain  = var.cdn_attach_custom_domain
-  tags                  = local.common_tags
+  environment          = var.environment
+  domain_name          = var.domain_name
+  route53_zone_id      = var.route53_zone_id
+  create_route53_zone  = var.create_route53_zone
+  attach_custom_domain = var.cdn_attach_custom_domain
+  tags                 = local.common_tags
 
   providers = {
     aws.us_east_1 = aws.us_east_1
