@@ -1,5 +1,4 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import { FileText, Link as LinkIcon } from "lucide-react";
 import {
   CommandDialog,
@@ -9,14 +8,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import { MatchTypeBadge } from "./MatchTypeBadge";
 import { HighlightedSnippet } from "./HighlightedSnippet";
 
 export function GlobalSearch() {
-  const navigate = useNavigate();
   const {
     query,
     setQuery,
@@ -26,19 +24,10 @@ export function GlobalSearch() {
     searchResults,
     recentPages,
     hasQuery,
-  } = useGlobalSearch();
+    handleSelect,
+  } = useGlobalSearchContext();
 
-  // Register keyboard shortcut
   useGlobalSearchShortcut(open);
-
-  const handleSelect = (pageId: string, noteId?: string) => {
-    if (noteId) {
-      navigate(`/note/${noteId}/page/${pageId}`);
-    } else {
-      navigate(`/page/${pageId}`);
-    }
-    close();
-  };
 
   return (
     <CommandDialog open={isOpen} onOpenChange={(open) => !open && close()}>
@@ -57,7 +46,7 @@ export function GlobalSearch() {
               <CommandItem
                 key={page.id}
                 value={`recent-${page.id}`}
-                onSelect={() => handleSelect(page.id)}
+                onSelect={() => handleSelect(page.id, undefined)}
                 className="flex items-center justify-between"
               >
                 <div className="flex items-center gap-2 min-w-0">

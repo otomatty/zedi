@@ -24,6 +24,7 @@ import NoteSettings from "./pages/NoteSettings.tsx";
 import NoteMembers from "./pages/NoteMembers.tsx";
 import Onboarding from "./pages/Onboarding";
 import { GlobalSearch } from "./components/search/GlobalSearch";
+import { GlobalSearchProvider } from "./contexts/GlobalSearchContext";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
@@ -39,8 +40,9 @@ const App = () => (
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <GlobalShortcutsProvider>
-          <GlobalSearch />
-          <Routes>
+          <GlobalSearchProvider>
+            <GlobalSearch />
+            <Routes>
             {/* Public routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/sign-in/*" element={<SignIn />} />
@@ -121,7 +123,8 @@ const App = () => (
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
+            </Routes>
+          </GlobalSearchProvider>
         </GlobalShortcutsProvider>
       </BrowserRouter>
     </TooltipProvider>
