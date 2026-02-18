@@ -75,20 +75,10 @@ const NotePageView: React.FC = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <div className="border-b border-border/60">
-        <Container className="flex items-center justify-between py-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" onClick={handleBack}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground truncate">
-                {note.title || "無題のノート"}
-              </p>
-              <h1 className="text-lg font-semibold truncate">
-                {page.title || "無題のページ"}
-              </h1>
-            </div>
-          </div>
+        <Container className="flex items-center justify-between h-10">
+          <Button variant="ghost" size="icon" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           {!canEdit && (
             <span className="text-xs text-muted-foreground">閲覧専用</span>
           )}

@@ -326,11 +326,9 @@ const PageEditor: React.FC = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <PageEditorHeader
         title={title}
-        onTitleChange={handleTitleChange}
         lastSaved={displayLastSaved}
         hasContent={isContentNotEmpty(content)}
         wikiStatus={wikiStatus}
-        errorMessage={errorMessage}
         onBack={handleBack}
         onDelete={handleDelete}
         onExportMarkdown={handleExportMarkdown}
@@ -359,6 +357,8 @@ const PageEditor: React.FC = () => {
         isWikiGenerating={isWikiGenerating}
         onContentChange={handleContentChange}
         onContentError={handleContentError}
+        onTitleChange={handleTitleChange}
+        errorMessage={errorMessage}
         collaboration={
           isLocalDocEnabled ? { ...collaboration } : undefined
         }

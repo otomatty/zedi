@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import Container from "@/components/layout/Container";
 import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { formatTimeAgo } from "@/lib/dateUtils";
@@ -25,12 +24,11 @@ import type { ConnectionStatus } from "@/lib/collaboration/types";
 import type { UserPresence } from "@/lib/collaboration/types";
 
 interface PageEditorHeaderProps {
+  /** Wiki Generator ボタン用（タイトル表示は PageTitleBlock で行う） */
   title: string;
-  onTitleChange: (value: string) => void;
   lastSaved: number | null;
   hasContent: boolean;
   wikiStatus: WikiGeneratorStatus;
-  errorMessage: string | null;
   onBack: () => void;
   onDelete: () => void;
   onExportMarkdown: () => void;
@@ -51,11 +49,9 @@ interface PageEditorHeaderProps {
  */
 export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   title,
-  onTitleChange,
   lastSaved,
   hasContent,
   wikiStatus,
-  errorMessage,
   onBack,
   onDelete,
   onExportMarkdown,
@@ -65,7 +61,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <Container className="flex h-14 items-center gap-4">
+      <Container className="flex h-16 items-center gap-4">
         <Button
           variant="ghost"
           size="icon"
@@ -75,16 +71,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
-        <div className="flex-1 min-w-0">
-          <Input
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            placeholder="ページタイトル"
-            className={`border-0 bg-transparent text-xl font-medium focus-visible:ring-0 px-0 h-auto py-1 ${
-              errorMessage ? "text-destructive" : ""
-            }`}
-          />
-        </div>
+        <div className="flex-1 min-w-0" aria-hidden="true" />
 
         <div className="flex items-center gap-2">
           {/* リアルタイムコラボ: 接続状態・オンラインユーザー */}

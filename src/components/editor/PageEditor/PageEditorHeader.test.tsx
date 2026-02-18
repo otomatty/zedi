@@ -39,11 +39,9 @@ vi.mock("@/lib/dateUtils", () => ({
 
 const defaultProps = {
   title: "テストページ",
-  onTitleChange: vi.fn(),
   lastSaved: null as number | null,
   hasContent: false,
   wikiStatus: "idle" as const,
-  errorMessage: null as string | null,
   onBack: vi.fn(),
   onDelete: vi.fn(),
   onExportMarkdown: vi.fn(),
@@ -61,12 +59,6 @@ describe("PageEditorHeader", () => {
   });
 
   describe("表示", () => {
-    it("タイトル入力とプレースホルダーを表示する", () => {
-      renderHeader({ title: "我的ページ" });
-      const input = screen.getByPlaceholderText("ページタイトル");
-      expect(input).toHaveValue("我的ページ");
-    });
-
     it("lastSaved があるとき「に保存」の表示がある", () => {
       renderHeader({ lastSaved: 1700000000000 });
       expect(screen.getByText(/formatted:1700000000000に保存/)).toBeInTheDocument();
@@ -75,18 +67,6 @@ describe("PageEditorHeader", () => {
     it("lastSaved が null のとき「に保存」を表示しない", () => {
       renderHeader({ lastSaved: null });
       expect(screen.queryByText(/に保存/)).not.toBeInTheDocument();
-    });
-
-    it("errorMessage があるときタイトル入力に text-destructive クラスが付く", () => {
-      const { container } = renderHeader({ errorMessage: "重複しています" });
-      const input = container.querySelector('input[placeholder="ページタイトル"]');
-      expect(input).toHaveClass("text-destructive");
-    });
-
-    it("errorMessage が null のときタイトル入力に text-destructive を付けない", () => {
-      const { container } = renderHeader({ errorMessage: null });
-      const input = container.querySelector('input[placeholder="ページタイトル"]');
-      expect(input).not.toHaveClass("text-destructive");
     });
 
     it("collaboration を渡すと ConnectionIndicator と UserAvatars を表示する", () => {
@@ -124,16 +104,6 @@ describe("PageEditorHeader", () => {
       const backButton = buttons[0];
       await user.click(backButton);
       expect(onBack).toHaveBeenCalledTimes(1);
-    });
-
-    it("タイトルを変更すると onTitleChange が呼ばれる", async () => {
-      const user = userEvent.setup();
-      const onTitleChange = vi.fn();
-      renderHeader({ onTitleChange });
-      const input = screen.getByPlaceholderText("ページタイトル");
-      await user.clear(input);
-      await user.type(input, "新しいタイトル");
-      expect(onTitleChange).toHaveBeenCalled();
     });
 
     it("Wiki Generator ボタンをクリックすると onGenerateWiki が呼ばれる", async () => {
