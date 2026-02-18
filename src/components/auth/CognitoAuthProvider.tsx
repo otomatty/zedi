@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -19,7 +20,12 @@ import {
   clearStorage,
   getLogoutUrl,
   parseIdToken,
+  isTokenValid,
+  needsRefresh,
+  hasRefreshToken,
+  proactiveRefreshTokens,
   type CognitoIdP,
+  type CognitoAuthState,
 } from "@/lib/auth/cognitoAuth";
 
 // Clerk-compatible user shape for useUser()
@@ -75,38 +81,106 @@ function getInitialAuthState(): ReturnType<typeof getStoredState> {
   return getStoredState();
 }
 
+// How often to check token freshness (every 60 seconds)
+const REFRESH_CHECK_INTERVAL_MS = 60 * 1000;
+
 export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [state, setState] = useState<ReturnType<typeof getStoredState>>(() => getInitialAuthState());
+  const refreshingRef = useRef(false);
 
-  const refreshState = useCallback(() => {
-    const next = getStoredState();
-    setState(next);
+  /**
+   * Attempt to refresh tokens and update React state.
+   * Returns true if refresh succeeded, false otherwise.
+   */
+  const tryRefresh = useCallback(async (currentState: CognitoAuthState): Promise<boolean> => {
+    if (refreshingRef.current) return false;
+    refreshingRef.current = true;
+    try {
+      const newState = await proactiveRefreshTokens(currentState);
+      setState(newState);
+      return true;
+    } catch (err) {
+      console.warn("[CognitoAuth] Token refresh failed, signing out.", err);
+      clearStorage();
+      setState(null);
+      return false;
+    } finally {
+      refreshingRef.current = false;
+    }
   }, []);
 
+  // On mount: load stored state and immediately refresh if tokens are expired/stale
   useEffect(() => {
-    refreshState();
-    setIsLoaded(true);
-  }, [refreshState]);
+    let cancelled = false;
+    const init = async () => {
+      const stored = getStoredState();
+      if (stored && hasRefreshToken(stored) && needsRefresh(stored)) {
+        // Tokens expired or about to expire — refresh now
+        const ok = await tryRefresh(stored);
+        if (!cancelled && !ok) {
+          setState(null);
+        }
+      } else {
+        if (!cancelled) setState(stored);
+      }
+      if (!cancelled) setIsLoaded(true);
+    };
+    init();
+    return () => { cancelled = true; };
+  }, [tryRefresh]);
+
+  // Periodic token refresh timer
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const current = getStoredState();
+      if (!current || !hasRefreshToken(current)) return;
+      if (needsRefresh(current)) {
+        tryRefresh(current);
+      }
+    }, REFRESH_CHECK_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [tryRefresh]);
+
+  // Also refresh when tab becomes visible again (user returns after idle)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      const current = getStoredState();
+      if (!current || !hasRefreshToken(current)) return;
+      if (needsRefresh(current)) {
+        tryRefresh(current);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [tryRefresh]);
 
   const getToken = useCallback(async (): Promise<string | null> => {
-    return getIdToken();
+    // getIdToken performs its own refresh-if-needed logic
+    const token = await getIdToken();
+    // Sync React state after potential refresh
+    setState(getStoredState());
+    return token;
   }, []);
 
   const signOut = useCallback(async (): Promise<void> => {
     clearStorage();
-    refreshState();
+    setState(null);
     window.location.href = getLogoutUrl();
-  }, [refreshState]);
+  }, []);
 
   const value = useMemo<CognitoAuthContextValue>(() => {
-    const isSignedIn = !!state?.tokens?.id_token && state.expiresAt > Date.now();
+    // User is signed in if we have tokens AND either they're still valid
+    // OR we have a refresh_token (meaning we can/will refresh them).
+    const signedIn = !!state?.tokens?.id_token &&
+      (isTokenValid(state) || hasRefreshToken(state));
     const userId = state?.tokens?.id_token
       ? parseIdToken(state.tokens.id_token)?.sub ?? null
       : null;
     return {
       isLoaded: true,
-      isSignedIn,
+      isSignedIn: signedIn,
       userId,
       sessionId: null,
       orgId: null,

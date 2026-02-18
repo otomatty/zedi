@@ -180,13 +180,47 @@ function saveToStorage(state: CognitoAuthState | null): void {
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
 /**
- * Get current auth state from storage (no async). Returns null if not signed in or expired.
+ * Get current auth state from storage (no async).
+ * Returns the state if tokens exist (even if id/access tokens are expired,
+ * as long as refresh_token is present — the caller should trigger a refresh).
+ * Returns null only if there are no stored tokens at all.
  */
 export function getStoredState(): CognitoAuthState | null {
   const state = loadFromStorage();
   if (!state) return null;
-  if (state.expiresAt <= Date.now()) return null;
   return state;
+}
+
+/**
+ * Check whether the id/access tokens are still valid (not expired).
+ */
+export function isTokenValid(state: CognitoAuthState): boolean {
+  return state.expiresAt > Date.now();
+}
+
+/**
+ * Check whether the tokens need refreshing (within REFRESH_BUFFER_MS of expiry or already expired).
+ */
+export function needsRefresh(state: CognitoAuthState): boolean {
+  return state.expiresAt - Date.now() <= REFRESH_BUFFER_MS;
+}
+
+/**
+ * Check whether the state has a refresh_token that can be used to obtain new tokens.
+ */
+export function hasRefreshToken(state: CognitoAuthState): boolean {
+  return !!state.tokens?.refresh_token;
+}
+
+/**
+ * Proactively refresh tokens and return new state. Throws on failure.
+ */
+export async function proactiveRefreshTokens(state: CognitoAuthState): Promise<CognitoAuthState> {
+  if (!state.tokens?.refresh_token) {
+    throw new Error("No refresh token available");
+  }
+  const newTokens = await refreshTokens(state.tokens.refresh_token);
+  return setTokens(newTokens);
 }
 
 /**

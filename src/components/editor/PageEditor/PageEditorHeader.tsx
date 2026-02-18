@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Container from "@/components/layout/Container";
+import { HeaderSearchBar } from "@/components/layout/Header/HeaderSearchBar";
+import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
 import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import type { WikiGeneratorStatus } from "./types";
@@ -59,6 +61,9 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   onGenerateWiki,
   collaboration,
 }) => {
+  const searchContext = useGlobalSearchContextOptional();
+  const hasSearchContext = searchContext != null;
+
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <Container className="flex h-16 items-center gap-4">
@@ -71,7 +76,14 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
-        <div className="flex-1 min-w-0" aria-hidden="true" />
+        {/* Center: Search bar */}
+        {hasSearchContext ? (
+          <div className="flex flex-1 justify-center min-w-0 max-w-xl mx-1 sm:mx-2">
+            <HeaderSearchBar />
+          </div>
+        ) : (
+          <div className="flex-1 min-w-0" aria-hidden="true" />
+        )}
 
         <div className="flex items-center gap-2">
           {/* リアルタイムコラボ: 接続状態・オンラインユーザー */}

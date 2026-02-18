@@ -38,6 +38,10 @@ scripts/migration/transform-for-aurora/output/
 *.sln
 *.sw?
 
+# Test coverage (Vitest, etc.)
+coverage/
+*.lcov
+
 # Playwright
 playwright-report/
 test-results/
