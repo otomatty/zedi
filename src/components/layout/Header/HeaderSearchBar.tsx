@@ -1,15 +1,16 @@
-import { useState, useRef, useEffect } from "react";
-import { Search, FileText, Link as LinkIcon } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Search, FileText, Link as LinkIcon, ArrowRight } from "lucide-react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
-import { MatchTypeBadge } from "@/components/search/MatchTypeBadge";
-import { HighlightedSnippet } from "@/components/search/HighlightedSnippet";
+import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
 import { cn } from "@/lib/utils";
 
 const PLACEHOLDER = "ページを検索...";
 const EMPTY_MESSAGE = "ページが見つかりません";
 const SHORTCUT_HINT = "⌘K";
+/** フッター「すべて表示」のインデックス（候補リストの末尾+1） */
+const FOOTER_INDEX = -2;
 
 export function HeaderSearchBar() {
   const {
@@ -18,14 +19,30 @@ export function HeaderSearchBar() {
     searchResults,
     hasQuery,
     handleSelect,
+    handleSearchSubmit,
   } = useGlobalSearchContext();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1); // -1 = 未選択
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const footerRef = useRef<HTMLButtonElement>(null);
+
+  // ⌘K でヘッダー検索バーにフォーカス
+  const handleShortcutFocus = useCallback(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+  useGlobalSearchShortcut(handleShortcutFocus);
 
   const showResults = hasQuery && searchResults.length > 0;
   const showEmpty = hasQuery && searchResults.length === 0;
   const hasContent = showResults || showEmpty;
+
+  // 候補数（フッター込みの最大インデックス計算用）
+  const itemCount = showResults ? searchResults.length : 0;
+  // hasQuery のときフッターがある → 総アイテム数 = itemCount + 1
+  const totalItems = hasQuery ? itemCount + 1 : itemCount;
 
   // hasQuery (3文字以上) になったらドロップダウンを開く
   useEffect(() => {
@@ -34,12 +51,93 @@ export function HeaderSearchBar() {
     }
   }, [hasQuery]);
 
-  const closeDropdown = () => setDropdownOpen(false);
+  // query が変わったら activeIndex をリセット
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [query]);
+
+  // activeIndex が変わったら対応する要素を scrollIntoView
+  useEffect(() => {
+    if (activeIndex === -1) return;
+    if (activeIndex === itemCount) {
+      // フッター
+      footerRef.current?.scrollIntoView({ block: "nearest" });
+    } else {
+      const items = listRef.current?.querySelectorAll("[role='option']");
+      items?.[activeIndex]?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeIndex, itemCount]);
+
+  const closeDropdown = () => {
+    setDropdownOpen(false);
+    setActiveIndex(-1);
+  };
 
   const onSelectItem = (pageId: string, noteId?: string) => {
     handleSelect(pageId, noteId);
-    setDropdownOpen(false);
+    closeDropdown();
   };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!dropdownOpen || totalItems === 0) {
+      // ドロップダウンが閉じているか候補なし
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleSearchSubmit();
+      }
+      if (e.key === "Escape") {
+        inputRef.current?.blur();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown": {
+        e.preventDefault();
+        setActiveIndex((prev) => {
+          const next = prev + 1;
+          return next >= totalItems ? 0 : next; // 末尾→先頭に循環
+        });
+        break;
+      }
+      case "ArrowUp": {
+        e.preventDefault();
+        setActiveIndex((prev) => {
+          const next = prev - 1;
+          return next < 0 ? totalItems - 1 : next; // 先頭→末尾に循環
+        });
+        break;
+      }
+      case "Enter": {
+        e.preventDefault();
+        if (activeIndex === -1 || activeIndex === itemCount) {
+          // 未選択 or フッター → 検索結果ページへ
+          closeDropdown();
+          handleSearchSubmit();
+        } else if (activeIndex >= 0 && activeIndex < itemCount) {
+          // 候補を選択
+          const item = searchResults[activeIndex];
+          if (item) {
+            onSelectItem(item.pageId, item.noteId);
+          }
+        }
+        break;
+      }
+      case "Escape": {
+        e.preventDefault();
+        closeDropdown();
+        inputRef.current?.blur();
+        break;
+      }
+    }
+  };
+
+  // aria-activedescendant 用の ID を生成
+  const getOptionId = (index: number) =>
+    index === itemCount ? "header-search-footer" : `header-search-option-${index}`;
+
+  const activeDescendant =
+    activeIndex >= 0 ? getOptionId(activeIndex) : undefined;
 
   return (
     <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
@@ -53,10 +151,12 @@ export function HeaderSearchBar() {
             aria-expanded={dropdownOpen}
             aria-autocomplete="list"
             aria-controls="header-search-list"
+            aria-activedescendant={activeDescendant}
             id="header-search-input"
             placeholder={PLACEHOLDER}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onKeyDown}
             className={cn(
               "h-9 w-full pl-9 pr-3 sm:pr-16 rounded-md bg-muted/50 border-muted-foreground/20",
               "placeholder:text-muted-foreground text-sm"
@@ -83,7 +183,7 @@ export function HeaderSearchBar() {
       >
         {!hasContent && (
           <div className="py-6 text-center text-sm text-muted-foreground">
-            3文字以上で検索、⌘K で詳細を開く
+            3文字以上で検索、Enter で検索結果を表示
           </div>
         )}
 
@@ -96,39 +196,64 @@ export function HeaderSearchBar() {
         {showResults && (
           <div className="py-2 overflow-y-auto">
             <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-              検索結果 ({searchResults.length}件)
+              候補 ({searchResults.length}件)
             </p>
-            <ul className="list-none" role="group" aria-label="検索結果">
-              {searchResults.map(({ pageId, noteId, title, highlightedText, matchType, sourceUrl }) => (
+            <ul ref={listRef} className="list-none" role="group" aria-label="検索候補">
+              {searchResults.map(({ pageId, noteId, title, sourceUrl }, index) => (
                 <li key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`}>
                   <button
+                    id={getOptionId(index)}
                     type="button"
                     role="option"
+                    aria-selected={activeIndex === index}
                     className={cn(
-                      "flex flex-col items-start gap-1 w-full px-3 py-2.5 text-left text-sm",
-                      "hover:bg-muted focus:bg-muted outline-none"
+                      "flex items-center gap-2 w-full px-3 py-2 text-left text-sm outline-none",
+                      activeIndex === index
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-muted"
                     )}
                     onClick={() => onSelectItem(pageId, noteId)}
+                    onMouseEnter={() => setActiveIndex(index)}
                   >
-                    <div className="flex items-center gap-2 w-full">
-                      {sourceUrl ? (
-                        <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className="font-medium truncate flex-1">
-                        {title}
-                      </span>
-                      <MatchTypeBadge type={matchType} />
-                    </div>
-                    <div className="pl-6 w-full">
-                      <HighlightedSnippet text={highlightedText} />
-                    </div>
+                    {sourceUrl ? (
+                      <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="font-medium truncate flex-1">
+                      {title}
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
           </div>
+        )}
+
+        {/* Enter で検索結果ページへのフッター */}
+        {hasQuery && (
+          <button
+            ref={footerRef}
+            id="header-search-footer"
+            type="button"
+            role="option"
+            aria-selected={activeIndex === itemCount}
+            className={cn(
+              "flex items-center justify-between w-full px-3 py-2.5 text-sm outline-none",
+              "border-t border-border text-muted-foreground",
+              activeIndex === itemCount
+                ? "bg-accent text-accent-foreground"
+                : "hover:bg-muted"
+            )}
+            onClick={() => {
+              closeDropdown();
+              handleSearchSubmit();
+            }}
+            onMouseEnter={() => setActiveIndex(itemCount)}
+          >
+            <span>「{query.trim()}」の検索結果をすべて表示</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+          </button>
         )}
       </PopoverContent>
     </Popover>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import {
   useSearchPages,
   useSearchSharedNotes,
@@ -93,7 +93,6 @@ export function searchPages(pages: Page[], query: string): SearchResult[] {
  */
 export function useGlobalSearch() {
   const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
 
   const debouncedQuery = useDebouncedValue(query, 150);
 
@@ -155,28 +154,9 @@ export function useGlobalSearch() {
       .map(({ score: _s, ...item }) => item);
   }, [serverSearchResults, sharedResults, debouncedQuery, keywords]);
 
-  const open = useCallback(() => setIsOpen(true), []);
-
-  const close = useCallback(() => {
-    setIsOpen(false);
-    setQuery("");
-  }, []);
-
-  const toggle = useCallback(() => {
-    if (isOpen) {
-      close();
-    } else {
-      open();
-    }
-  }, [isOpen, open, close]);
-
   return {
     query,
     setQuery,
-    isOpen,
-    open,
-    close,
-    toggle,
     searchResults,
     hasQuery: query.trim().length >= 3,
   };

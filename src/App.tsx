@@ -17,13 +17,13 @@ import StorageSettings from "./pages/StorageSettings";
 import GeneralSettings from "./pages/GeneralSettings";
 import Pricing from "./pages/Pricing";
 import Donate from "./pages/Donate";
+import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
 import NoteView from "./pages/NoteView";
 import NotePageView from "./pages/NotePageView";
 import NoteSettings from "./pages/NoteSettings.tsx";
 import NoteMembers from "./pages/NoteMembers.tsx";
 import Onboarding from "./pages/Onboarding";
-import { GlobalSearch } from "./components/search/GlobalSearch";
 import { GlobalSearchProvider } from "./contexts/GlobalSearchContext";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -41,7 +41,6 @@ const App = () => (
       >
         <GlobalShortcutsProvider>
           <GlobalSearchProvider>
-            <GlobalSearch />
             <Routes>
             {/* Public routes */}
             <Route path="/" element={<Landing />} />
@@ -63,6 +62,7 @@ const App = () => (
             />
             {/* Home and PageEditor: available without login (local-only mode) */}
             <Route path="/home" element={<Home />} />
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/notes/discover" element={<NotesDiscover />} />
             <Route
               path="/notes"

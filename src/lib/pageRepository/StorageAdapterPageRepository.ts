@@ -71,12 +71,6 @@ export class StorageAdapterPageRepository {
         isDeleted: false,
       };
       await this.adapter.upsertPage(meta);
-      // 検索インデックスを更新
-      const plainContent = content ? extractPlainText(content) : "";
-      const searchText = [title, plainContent].filter(Boolean).join(" ");
-      if (searchText) {
-        await this.adapter.updateSearchIndex(id, searchText);
-      }
       return metadataToPage(meta);
     }
 
@@ -97,12 +91,6 @@ export class StorageAdapterPageRepository {
       isDeleted: created.is_deleted === true,
     };
     await this.adapter.upsertPage(meta);
-    // 検索インデックスを更新
-    const plainContent = content ? extractPlainText(content) : "";
-    const searchText = [title, plainContent].filter(Boolean).join(" ");
-    if (searchText) {
-      await this.adapter.updateSearchIndex(created.id, searchText);
-    }
     return metadataToPage(meta);
   }
 

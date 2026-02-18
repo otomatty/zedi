@@ -8,10 +8,11 @@ interface GlobalSearchContextValue {
   setQuery: (value: string) => void;
   searchResults: GlobalSearchResultItem[];
   hasQuery: boolean;
-  isOpen: boolean;
-  open: () => void;
-  close: () => void;
   handleSelect: (pageId: string, noteId?: string) => void;
+  /** Enterキーで検索結果ページへ遷移 */
+  handleSearchSubmit: () => void;
+  /** ⌘K でヘッダー検索バーにフォーカス */
+  focusSearchInput: () => void;
 }
 
 const GlobalSearchContext = createContext<GlobalSearchContextValue | null>(null);
@@ -21,9 +22,6 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
   const {
     query,
     setQuery,
-    isOpen,
-    open,
-    close,
     searchResults,
     hasQuery,
   } = useGlobalSearch();
@@ -35,20 +33,33 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
       } else {
         navigate(`/page/${pageId}`);
       }
-      close();
     },
-    [navigate, close]
+    [navigate]
   );
+
+  const handleSearchSubmit = useCallback(() => {
+    const q = query.trim();
+    if (q) {
+      navigate(`/search?q=${encodeURIComponent(q)}`);
+    }
+  }, [query, navigate]);
+
+  const focusSearchInput = useCallback(() => {
+    const el = document.getElementById("header-search-input") as HTMLInputElement | null;
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, []);
 
   const value: GlobalSearchContextValue = {
     query,
     setQuery,
     searchResults,
     hasQuery,
-    isOpen,
-    open,
-    close,
     handleSelect,
+    handleSearchSubmit,
+    focusSearchInput,
   };
 
   return (
