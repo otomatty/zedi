@@ -25,7 +25,7 @@ export const UserMenu: React.FC = () => {
     <>
       <SignedOut>
         <Link to="/sign-in">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="default">
             {t("nav.signIn")}
           </Button>
         </Link>
@@ -35,9 +35,9 @@ export const UserMenu: React.FC = () => {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="relative h-8 w-8 rounded-full"
+              className="relative h-9 w-9 rounded-full"
             >
-              <Avatar className="h-8 w-8">
+              <Avatar className="h-9 w-9">
                 <AvatarImage
                   src={avatarUrl || user?.imageUrl}
                   alt={displayName || user?.fullName || "User"}

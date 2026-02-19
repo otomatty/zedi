@@ -143,7 +143,7 @@ export function HeaderSearchBar() {
     <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
       <PopoverAnchor asChild>
         <div className="relative flex min-w-0 flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
           <Input
             ref={inputRef}
             type="search"
@@ -158,12 +158,12 @@ export function HeaderSearchBar() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             className={cn(
-              "h-9 w-full pl-9 pr-3 sm:pr-16 rounded-md bg-muted/50 border-muted-foreground/20",
+              "h-10 w-full pl-10 pr-3 sm:pr-16 rounded-md bg-muted/50 border-muted-foreground/20",
               "placeholder:text-muted-foreground text-sm"
             )}
           />
           <span
-            className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center rounded border border-border bg-muted/80 px-1.5 py-0.5 text-[10px] text-muted-foreground pointer-events-none"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center rounded border border-border bg-muted/80 px-2 py-1 text-xs text-muted-foreground pointer-events-none"
             aria-hidden
           >
             {SHORTCUT_HINT}

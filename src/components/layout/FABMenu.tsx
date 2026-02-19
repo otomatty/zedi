@@ -35,7 +35,7 @@ const FABMenuItem: React.FC<FABMenuItemProps> = ({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-3 px-5 py-3",
+        "flex items-center gap-4 px-6 py-4",
         "rounded-full",
         "bg-secondary/80 text-secondary-foreground",
         "shadow-lg hover:shadow-xl",
@@ -52,8 +52,8 @@ const FABMenuItem: React.FC<FABMenuItemProps> = ({
         transitionDelay: isOpen ? `${delay}ms` : "0ms",
       }}
     >
-      <Icon className="h-5 w-5" />
-      <span className="text-sm font-medium">{label}</span>
+      <Icon className="h-6 w-6" />
+      <span className="text-base font-medium">{label}</span>
     </button>
   );
 };
@@ -93,7 +93,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
       {/* オーバーレイ（メニュー展開時） */}
       <div
         className={cn(
-          "fixed inset-0 z-30 bg-black/20",
+          "fixed inset-0 z-30 bg-black/35",
           "transition-opacity duration-200",
           open ? "opacity-100" : "pointer-events-none opacity-0"
         )}

@@ -138,16 +138,16 @@ const FloatingActionButton: React.FC = () => {
       disabled={isCreating}
       size="icon"
       className={cn(
-        "h-14 w-14 rounded-full",
+        "h-16 w-16 rounded-full",
         "shadow-elevated hover:shadow-glow",
         "transition-all duration-300",
         isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground/90"
       )}
     >
       {isMenuOpen ? (
-        <X className="h-6 w-6" />
+        <X className="h-7 w-7" />
       ) : (
-        <Plus className="h-6 w-6" />
+        <Plus className="h-7 w-7" />
       )}
     </Button>
   );

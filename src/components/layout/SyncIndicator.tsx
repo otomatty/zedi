@@ -63,11 +63,11 @@ export function SyncIndicator() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9"
             onClick={sync}
             disabled={isSyncing || syncStatus === "syncing"}
           >
-            <Icon className={cn("h-4 w-4", config.className)} />
+            <Icon className={cn("h-5 w-5", config.className)} />
             <span className="sr-only">{config.label}</span>
           </Button>
         </TooltipTrigger>

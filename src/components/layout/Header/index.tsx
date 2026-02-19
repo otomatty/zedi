@@ -29,18 +29,16 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
         className
       )}
     >
-      <Container className="flex h-16 items-center justify-between gap-4">
-        {/* Left: Logo (hidden on mobile) & Month Navigation */}
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="hidden sm:block shrink-0">
-            <HeaderLogo />
-          </div>
+      <Container className="flex h-[4.5rem] items-center justify-between gap-4">
+        {/* Left: Logo & Month Navigation（モバイルでは非表示にして検索バー左の余白を防ぐ） */}
+        <div className="hidden sm:flex items-center gap-4 min-w-0 shrink-0">
+          <HeaderLogo />
           <MonthNavigation />
         </div>
 
-        {/* Center: Search bar (all breakpoints when inside GlobalSearchProvider) */}
+        {/* Center: Search bar（モバイルでは先頭に表示） */}
         {hasSearchContext && (
-          <div className="flex flex-1 justify-center min-w-0 max-w-xl mx-1 sm:mx-2">
+          <div className="flex flex-1 justify-center min-w-0 max-w-xl sm:mx-2">
             <HeaderSearchBar />
           </div>
         )}

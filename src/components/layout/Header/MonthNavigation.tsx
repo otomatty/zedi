@@ -89,15 +89,15 @@ export const MonthNavigation: React.FC = () => {
   };
 
   return (
-    <div className="hidden sm:flex items-center gap-1">
+    <div className="hidden sm:flex items-center gap-1.5">
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8"
+        className="h-9 w-9"
         onClick={handlePrev}
         aria-label={t("home.pagination.previous")}
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-5 w-5" />
       </Button>
 
       <DropdownMenu>
@@ -105,7 +105,7 @@ export const MonthNavigation: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="min-w-[100px] font-medium text-muted-foreground hover:text-foreground"
+            className="h-9 min-w-[110px] font-medium text-muted-foreground hover:text-foreground text-sm"
             aria-label={t("home.period.selectMonth")}
           >
             <span className="text-center">{displayLabel}</span>
@@ -138,12 +138,12 @@ export const MonthNavigation: React.FC = () => {
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8"
+        className="h-9 w-9"
         onClick={handleNext}
         disabled={!canGoNext}
         aria-label={t("home.pagination.next")}
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-5 w-5" />
       </Button>
     </div>
   );

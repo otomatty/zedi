@@ -19,7 +19,7 @@ export const AppsMenu: React.FC = () => {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9"
             data-tour-id="tour-apps-menu"
           >
             <LayoutGrid className="h-5 w-5" />
