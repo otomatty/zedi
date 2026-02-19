@@ -43,7 +43,9 @@ function toParameter(name, value) {
     value: toParamValue(value),
   };
   // Help RDS Data API bind UUID values correctly so "uuid = :param" works.
-  if (isUuidString(value)) {
+  // DEBUG: link_text is TEXT; avoid UUID hint for param names that are known text columns.
+  const isKnownTextParam = name === "link_text" || name === "page_ids_csv";
+  if (isUuidString(value) && !isKnownTextParam) {
     param.typeHint = "UUID";
   }
   return param;
@@ -62,6 +64,8 @@ function delay(ms) {
 export async function execute(sql, params = {}) {
   const { resourceArn, secretArn, database } = getConfig();
   const parameters = Object.entries(params).map(([name, value]) => toParameter(name, value));
+
+  const debugLabel = process.env.DEBUG_SYNC_DB === "1";
 
   for (let attempt = 0; attempt < RESUME_MAX_RETRIES; attempt++) {
     try {
@@ -82,6 +86,34 @@ export async function execute(sql, params = {}) {
     } catch (error) {
       const isResumeError = error?.name === RESUME_ERROR_NAME;
       const isLast = attempt === RESUME_MAX_RETRIES - 1;
+
+      // Debug: on any execute failure, log query snippet and param type hints (text=uuid).
+      // Set Lambda env DEBUG_SYNC_DB=1 to also log param values (truncated).
+      const sqlSnippet = sql.replace(/\s+/g, " ").trim().slice(0, 400);
+      const paramHints = parameters.map((p) => ({
+        name: p.name,
+        typeHint: p.typeHint ?? "(string)",
+        valueType: typeof params[p.name],
+      }));
+      console.error("[DB_DEBUG] execute failed", {
+        message: error?.message,
+        code: error?.code,
+        sqlSnippet,
+        paramNames: Object.keys(params),
+        paramHints,
+        attempt: attempt + 1,
+      });
+      if (debugLabel && params) {
+        console.error("[DB_DEBUG] params (sanitized)", {
+          ...Object.fromEntries(
+            Object.entries(params).map(([k, v]) => [
+              k,
+              v == null ? null : String(v).slice(0, 80),
+            ])
+          ),
+        });
+      }
+
       if (!isResumeError || isLast) {
         throw error;
       }

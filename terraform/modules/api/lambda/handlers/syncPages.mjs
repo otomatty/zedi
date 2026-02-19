@@ -73,7 +73,7 @@ DELETE FROM ghost_links WHERE source_page_id IN (SELECT id FROM pages WHERE owne
 
 const INSERT_GHOST_LINK_SQL = `
 INSERT INTO ghost_links (link_text, source_page_id, original_target_page_id, original_note_id)
-VALUES (:link_text, :source_page_id, :original_target_page_id, :original_note_id)
+VALUES (CAST(:link_text AS text), :source_page_id, :original_target_page_id, :original_note_id)
 ON CONFLICT (link_text, source_page_id) DO NOTHING
 `;
 
@@ -138,12 +138,14 @@ export async function getSyncPages(claims, query = {}) {
   }
 
   const pageIdsCsv = ids.join(",");
+  console.log("[SYNC_DEBUG] GET sync/pages: page_ids count", ids.length, "csv length", pageIdsCsv.length);
   const linksRows = await execute(GET_LINKS_SQL, {
     page_ids_csv: pageIdsCsv,
   });
   const ghostRows = await execute(GET_GHOST_LINKS_SQL, {
     page_ids_csv: pageIdsCsv,
   });
+  console.log("[SYNC_DEBUG] GET sync/pages: links", linksRows.length, "ghost_links", ghostRows.length);
 
   return res.success({
     pages: pages.map(rowToPage),
@@ -218,27 +220,49 @@ export async function postSyncPages(claims, body = {}) {
   const ghostList = body?.ghost_links;
 
   if (Array.isArray(linkList)) {
+    console.log("[SYNC_DEBUG] links: delete for owner, then insert", linkList.length, "links");
     await execute(DELETE_LINKS_FOR_OWNER_SQL, { owner_id: ownerId });
-    for (const l of linkList) {
+    for (let i = 0; i < linkList.length; i++) {
+      const l = linkList[i];
       const sid = l?.source_id ?? l?.sourceId;
       const tid = l?.target_id ?? l?.targetId;
       if (sid && tid && myPageIds.includes(sid) && myPageIds.includes(tid)) {
+        console.log("[SYNC_DEBUG] INSERT_LINK", { i, source_id: sid?.slice(0, 8), target_id: tid?.slice(0, 8) });
         await execute(INSERT_LINK_SQL, { source_id: sid, target_id: tid });
       }
     }
   }
   if (Array.isArray(ghostList)) {
+    console.log("[SYNC_DEBUG] ghost_links: delete for owner, then insert", ghostList.length, "rows");
     await execute(DELETE_GHOST_LINKS_FOR_OWNER_SQL, { owner_id: ownerId });
-    for (const g of ghostList) {
+    for (let i = 0; i < ghostList.length; i++) {
+      const g = ghostList[i];
       const linkText = g?.link_text ?? g?.linkText ?? "";
       const sourcePageId = g?.source_page_id ?? g?.sourcePageId;
       if (!sourcePageId || !myPageIds.includes(sourcePageId)) continue;
-      await execute(INSERT_GHOST_LINK_SQL, {
-        link_text: linkText,
-        source_page_id: sourcePageId,
-        original_target_page_id: g?.original_target_page_id ?? g?.originalTargetPageId ?? null,
-        original_note_id: g?.original_note_id ?? g?.originalNoteId ?? null,
+      const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(linkText);
+      console.log("[SYNC_DEBUG] INSERT_GHOST_LINK", {
+        i,
+        link_text: linkText.slice(0, 60),
+        link_text_length: linkText.length,
+        link_text_looks_like_uuid: looksLikeUuid,
+        source_page_id: sourcePageId?.slice(0, 8),
       });
+      try {
+        await execute(INSERT_GHOST_LINK_SQL, {
+          link_text: linkText,
+          source_page_id: sourcePageId,
+          original_target_page_id: g?.original_target_page_id ?? g?.originalTargetPageId ?? null,
+          original_note_id: g?.original_note_id ?? g?.originalNoteId ?? null,
+        });
+      } catch (err) {
+        console.error("[SYNC_DEBUG] INSERT_GHOST_LINK failed at index", i, {
+          link_text: linkText.slice(0, 80),
+          source_page_id: sourcePageId,
+          error: err?.message,
+        });
+        throw err;
+      }
     }
   }
 
