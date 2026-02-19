@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 import { vi } from "vitest";
-import type { Client } from "@libsql/client/web";
-import { PageRepository } from "@/lib/pageRepository";
 
 /**
  * Mock the useAuth hook (Cognito/auth layer). Use in unit tests that need auth.
@@ -38,20 +36,6 @@ export function mockAuth(options?: { isSignedIn?: boolean }) {
     SignedOut: ({ children }: { children: ReactNode }) =>
       !isSignedIn ? children : null,
   }));
-}
-
-/**
- * Create a mock repository provider for testing
- */
-export function createMockRepositoryHook(client: Client) {
-  const repository = new PageRepository(client);
-
-  return {
-    getRepository: vi.fn().mockResolvedValue(repository),
-    userId: "test-user",
-    isSignedIn: false,
-    isLoaded: true,
-  };
 }
 
 /**
