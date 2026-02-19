@@ -37,6 +37,8 @@ export interface IPageRepository {
   removeGhostLink(linkText: string, sourcePageId: string): Promise<void>;
   getGhostLinkSources(linkText: string): Promise<string[]>;
   getGhostLinks(userId: string): Promise<GhostLink[]>;
+  /** Link texts (titles) for ghost links from a single source page. Used for delta sync. */
+  getGhostLinksBySourcePage(sourcePageId: string): Promise<string[]>;
   promoteGhostLink(userId: string, linkText: string): Promise<Page | null>;
 }
 
@@ -466,6 +468,17 @@ export class PageRepository {
       sourcePageId: row.source_page_id as string,
       createdAt: row.created_at as number,
     }));
+  }
+
+  /**
+   * Get ghost link texts for a single source page (for delta sync).
+   */
+  async getGhostLinksBySourcePage(sourcePageId: string): Promise<string[]> {
+    const result = await this.client.execute({
+      sql: `SELECT link_text FROM ghost_links WHERE source_page_id = ?`,
+      args: [sourcePageId],
+    });
+    return result.rows.map((row) => row.link_text as string);
   }
 
   /**

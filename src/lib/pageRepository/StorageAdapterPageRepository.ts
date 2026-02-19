@@ -280,6 +280,11 @@ export class StorageAdapterPageRepository {
     return all;
   }
 
+  async getGhostLinksBySourcePage(sourcePageId: string): Promise<string[]> {
+    const ghosts = await this.adapter.getGhostLinks(sourcePageId);
+    return ghosts.map((g) => g.linkText);
+  }
+
   async promoteGhostLink(userId: string, linkText: string): Promise<Page | null> {
     const sources = await this.getGhostLinkSources(linkText);
     if (sources.length < 2) return null;

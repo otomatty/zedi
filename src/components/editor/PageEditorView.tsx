@@ -15,7 +15,10 @@ import {
   usePage,
   useUpdatePage,
   useSyncWikiLinks,
+  useRepository,
+  pageKeys,
 } from "@/hooks/usePageQueries";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTitleValidation } from "@/hooks/useTitleValidation";
 import { generateAutoTitle, isContentNotEmpty, extractFirstImage } from "@/lib/contentUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +42,8 @@ const PageEditor: React.FC = () => {
   }, [isNewPage, navigate]);
 
   // React Query hooks
+  const queryClient = useQueryClient();
+  const { userId } = useRepository();
   const { data: page, isLoading, isError } = usePage(pageId);
   const updatePageMutation = useUpdatePage();
   const { syncLinks } = useSyncWikiLinks();
@@ -171,6 +176,11 @@ const PageEditor: React.FC = () => {
     syncWikiLinks: syncLinks,
     onSaveSuccess: () => {
       updateLastSaved(Date.now());
+      if (currentPageId && userId) {
+        queryClient.invalidateQueries({
+          queryKey: [...pageKeys.all, "linkedPages", userId, currentPageId],
+        });
+      }
     },
   });
 

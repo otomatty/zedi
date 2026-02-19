@@ -707,12 +707,12 @@ export function usePromoteGhostLink() {
 }
 
 /**
- * Hook to sync WikiLinks when saving a page
- * - Updates links table for existing pages
- * - Updates ghost_links table for non-existing pages
- * - Promotes ghost links if referenced from 2+ pages
+ * Hook to sync WikiLinks when saving a page (delta update).
+ * - Removes links/ghost_links that are no longer in content.
+ * - Adds or updates links for current content (existing pages → links, others → ghost_links).
  *
- * OPTIMIZED: Uses getPagesSummary() instead of getPages() to reduce Rows Read
+ * Only touches the saved page; no full-scan of all pages.
+ * OPTIMIZED: Uses getPagesSummary() for title↔id resolution (no content).
  */
 export function useSyncWikiLinks() {
   const { getRepository, userId } = useRepository();
@@ -724,32 +724,47 @@ export function useSyncWikiLinks() {
     ): Promise<void> => {
       const repo = await getRepository();
 
-      // OPTIMIZED: Use summary (no content) to check which links are valid
       const pages = await repo.getPagesSummary(userId);
       const pageTitleToId = new Map(
         pages.map((p) => [p.title.toLowerCase().trim(), p.id])
       );
+      const idToNormalizedTitle = new Map(
+        pages.map((p) => [p.id, p.title.toLowerCase().trim()])
+      );
+      const currentNormalizedTitles = new Set(
+        wikiLinks.map((l) => l.title.toLowerCase().trim())
+      );
 
-      // Process each WikiLink
+      // Delta: remove links that are no longer in content
+      const [oldOutgoingTargetIds, oldGhostTexts] = await Promise.all([
+        repo.getOutgoingLinks(sourcePageId),
+        repo.getGhostLinksBySourcePage(sourcePageId),
+      ]);
+      for (const targetId of oldOutgoingTargetIds) {
+        const norm = idToNormalizedTitle.get(targetId);
+        if (norm !== undefined && !currentNormalizedTitles.has(norm)) {
+          await repo.removeLink(sourcePageId, targetId);
+        }
+      }
+      for (const linkText of oldGhostTexts) {
+        const norm = linkText.toLowerCase().trim();
+        if (!currentNormalizedTitles.has(norm)) {
+          await repo.removeGhostLink(linkText, sourcePageId);
+        }
+      }
+
+      // Add/update: current content's links
       for (const link of wikiLinks) {
         const normalizedTitle = link.title.toLowerCase().trim();
         const targetPageId = pageTitleToId.get(normalizedTitle);
 
         if (targetPageId && targetPageId !== sourcePageId) {
-          // Existing page - add to links table
           await repo.addLink(sourcePageId, targetPageId);
-          // Remove from ghost_links if it was there
           await repo.removeGhostLink(link.title, sourcePageId);
         } else if (!targetPageId) {
-          // Non-existing page - add to ghost_links
           await repo.addGhostLink(link.title, sourcePageId);
         }
       }
-
-      // Note: Ghost links referenced from multiple pages will have their
-      // "referenced" attribute set to true for styling purposes, but
-      // pages are NOT automatically created. Users must explicitly create
-      // pages by clicking on the link.
     },
     [getRepository, userId]
   );
