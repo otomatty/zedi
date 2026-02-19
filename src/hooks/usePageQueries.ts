@@ -12,6 +12,7 @@ import { createStorageAdapter } from "@/lib/storageAdapter";
 import { createApiClient } from "@/lib/api";
 import { StorageAdapterPageRepository } from "@/lib/pageRepository/StorageAdapterPageRepository";
 import type { IPageRepository } from "@/lib/pageRepository";
+import { syncLinksWithRepo } from "@/lib/syncWikiLinks";
 import { getPageListPreview } from "@/lib/contentUtils";
 import type { Page, PageSummary } from "@/types/page";
 
@@ -723,48 +724,7 @@ export function useSyncWikiLinks() {
       wikiLinks: Array<{ title: string; exists: boolean }>
     ): Promise<void> => {
       const repo = await getRepository();
-
-      const pages = await repo.getPagesSummary(userId);
-      const pageTitleToId = new Map(
-        pages.map((p) => [p.title.toLowerCase().trim(), p.id])
-      );
-      const idToNormalizedTitle = new Map(
-        pages.map((p) => [p.id, p.title.toLowerCase().trim()])
-      );
-      const currentNormalizedTitles = new Set(
-        wikiLinks.map((l) => l.title.toLowerCase().trim())
-      );
-
-      // Delta: remove links that are no longer in content
-      const [oldOutgoingTargetIds, oldGhostTexts] = await Promise.all([
-        repo.getOutgoingLinks(sourcePageId),
-        repo.getGhostLinksBySourcePage(sourcePageId),
-      ]);
-      for (const targetId of oldOutgoingTargetIds) {
-        const norm = idToNormalizedTitle.get(targetId);
-        if (norm !== undefined && !currentNormalizedTitles.has(norm)) {
-          await repo.removeLink(sourcePageId, targetId);
-        }
-      }
-      for (const linkText of oldGhostTexts) {
-        const norm = linkText.toLowerCase().trim();
-        if (!currentNormalizedTitles.has(norm)) {
-          await repo.removeGhostLink(linkText, sourcePageId);
-        }
-      }
-
-      // Add/update: current content's links
-      for (const link of wikiLinks) {
-        const normalizedTitle = link.title.toLowerCase().trim();
-        const targetPageId = pageTitleToId.get(normalizedTitle);
-
-        if (targetPageId && targetPageId !== sourcePageId) {
-          await repo.addLink(sourcePageId, targetPageId);
-          await repo.removeGhostLink(link.title, sourcePageId);
-        } else if (!targetPageId) {
-          await repo.addGhostLink(link.title, sourcePageId);
-        }
-      }
+      await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks);
     },
     [getRepository, userId]
   );
