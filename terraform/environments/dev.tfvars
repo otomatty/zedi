@@ -12,7 +12,7 @@ enable_vpc_endpoints = true                                   # Replaces NAT Gat
 # Database (Aurora Serverless v2) - scale-to-zero for dev cost savings
 aurora_min_capacity             = 0   # 0 = scale to zero with auto-pause
 aurora_max_capacity             = 4   # Maximum ACU when active
-aurora_seconds_until_auto_pause = 600 # Pause after 10 min idle (300-86400)
+aurora_seconds_until_auto_pause = 300 # Pause after 5 min idle (300-86400)
 aurora_database_name            = "zedi"
 
 # Cache (ElastiCache Redis)

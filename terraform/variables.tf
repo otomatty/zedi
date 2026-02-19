@@ -45,9 +45,9 @@ variable "enable_vpc_endpoints" {
 # Database (Aurora)
 # =============================================================================
 variable "aurora_min_capacity" {
-  description = "Minimum ACU for Aurora Serverless v2"
+  description = "Minimum ACU for Aurora Serverless v2 (0 = scale-to-zero with auto-pause)"
   type        = number
-  default     = 0.5
+  default     = 0
 }
 
 variable "aurora_max_capacity" {
