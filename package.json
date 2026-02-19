@@ -5,10 +5,10 @@
   "private": true,
   "type": "module",
   "author": "Zedi Team",
-  "license": "MIT",
+  "license": "BSL-1.1",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/zedi.git"
+    "url": "https://github.com/otomatty/zedi.git"
   },
   "keywords": [
     "knowledge-management",
