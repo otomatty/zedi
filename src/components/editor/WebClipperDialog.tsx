@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link2, Loader2, AlertCircle, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWebClipper, type WebClipperStatus } from "@/hooks/useWebClipper";
 import { isValidUrl } from "@/lib/webClipper";
+import { useAuth } from "@/hooks/useAuth";
+import { createApiClient } from "@/lib/api";
 
 interface WebClipperDialogProps {
   open: boolean;
@@ -38,10 +40,15 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   onOpenChange,
   onClipped,
 }) => {
+  const { getToken } = useAuth();
+  const api = useMemo(
+    () => createApiClient({ getToken }),
+    [getToken]
+  );
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const { status, clippedContent, error, clip, reset, getTiptapContent } =
-    useWebClipper();
+    useWebClipper({ api });
 
   // ダイアログを閉じたときにリセット
   useEffect(() => {

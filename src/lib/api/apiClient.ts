@@ -356,6 +356,14 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
         query: { q: q.trim(), scope: "shared" },
       });
     },
+
+    /** POST /api/clip/fetch — fetch URL HTML server-side (for Web Clipping, avoids CORS). */
+    async clipFetchHtml(url: string): Promise<string> {
+      const { html } = await req<{ html: string }>("POST", "/api/clip/fetch", {
+        body: { url },
+      });
+      return html;
+    },
   };
 }
 

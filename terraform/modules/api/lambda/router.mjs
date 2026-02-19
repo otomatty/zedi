@@ -180,5 +180,11 @@ export async function route(rawPath, method, ctx) {
     return mediaConfirm(claims, ctx.body);
   }
 
+  // POST /api/clip/fetch — URL の HTML をサーバー側で取得（Web Clipping 用、CORS 回避）
+  if (method === "POST" && segments[0] === "clip" && segments[1] === "fetch") {
+    const { fetchHtml } = await import("./handlers/clip.mjs");
+    return fetchHtml(claims, ctx.body);
+  }
+
   return res.notFound("Not found");
 }
