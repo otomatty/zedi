@@ -61,18 +61,17 @@ const FloatingActionButton: React.FC = () => {
     thumbnailUrl?: string | null
   ) => {
     try {
-      // 新しいページを作成
       const newPage = await createPageMutation.mutateAsync({
         title,
         content,
+        sourceUrl,
+        thumbnailUrl,
       });
 
-      // sourceUrl と thumbnailUrl を含む更新は PageEditor で行われる
-      // ここでは基本的なページ作成後にナビゲート
+      // 取得した本文は API では保持されないため、初期表示用に state で渡してエディタで Y.Doc に反映する
       navigate(`/page/${newPage.id}`, {
         state: {
-          sourceUrl,
-          thumbnailUrl,
+          initialContent: content,
         },
       });
     } catch (error) {

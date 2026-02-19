@@ -8,6 +8,7 @@ import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
 import type { PageMetadata } from "@/lib/storageAdapter/types";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
+import type { CreatePageOptions } from "@/lib/pageRepository";
 import { getPageListPreview, extractPlainText } from "@/lib/contentUtils";
 
 const LOCAL_USER_ID = "local-user";
@@ -51,7 +52,8 @@ export class StorageAdapterPageRepository {
   async createPage(
     userId: string,
     title: string = "",
-    content: string = ""
+    content: string = "",
+    options?: CreatePageOptions
   ): Promise<Page> {
     const contentPreview = getPageListPreview(content);
     const now = Date.now();
@@ -64,8 +66,8 @@ export class StorageAdapterPageRepository {
         sourcePageId: null,
         title: title || null,
         contentPreview: contentPreview || null,
-        thumbnailUrl: null,
-        sourceUrl: null,
+        thumbnailUrl: options?.thumbnailUrl ?? null,
+        sourceUrl: options?.sourceUrl ?? null,
         createdAt: now,
         updatedAt: now,
         isDeleted: false,
@@ -77,6 +79,8 @@ export class StorageAdapterPageRepository {
     const created = await this.api.createPage({
       title: title || undefined,
       content_preview: contentPreview || undefined,
+      source_url: options?.sourceUrl ?? undefined,
+      thumbnail_url: options?.thumbnailUrl ?? undefined,
     });
     const meta: PageMetadata = {
       id: created.id,

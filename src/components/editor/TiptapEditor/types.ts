@@ -37,6 +37,10 @@ export interface TiptapEditorProps {
   collaborationConfig?: CollaborationConfig;
   /** 親がコンテンツにフォーカスするためのコールバック。editor 準備後に ref.current に focus() を代入 */
   focusContentRef?: MutableRefObject<(() => void) | null>;
+  /** URL から作成時など、Y.Doc が空のときに一度だけ反映する Tiptap JSON 文字列 */
+  initialContent?: string;
+  /** initialContent をエディタに反映したあとに呼ぶ */
+  onInitialContentApplied?: () => void;
 }
 
 /**

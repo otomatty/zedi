@@ -27,6 +27,10 @@ interface PageEditorContentProps {
   errorMessage?: string | null;
   /** リアルタイムコラボレーション（有効時のみ渡す）。ydoc 準備前に表示するローディング用 */
   collaboration?: UseCollaborationReturn;
+  /** URL から作成時など、Y.Doc が空のときに一度だけ反映する Tiptap JSON 文字列 */
+  initialContent?: string;
+  /** initialContent をエディタに反映したあとに呼ぶ */
+  onInitialContentApplied?: () => void;
 }
 
 /**
@@ -49,6 +53,8 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   onTitleChange,
   errorMessage = null,
   collaboration,
+  initialContent,
+  onInitialContentApplied,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
 
@@ -112,6 +118,8 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                   onContentError={onContentError}
                   collaborationConfig={collaborationConfig}
                   focusContentRef={contentFocusRef}
+                  initialContent={initialContent}
+                  onInitialContentApplied={onInitialContentApplied}
                 />
               </>
             )}

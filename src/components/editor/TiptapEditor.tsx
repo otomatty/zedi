@@ -65,6 +65,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   onContentError,
   collaborationConfig,
   focusContentRef,
+  initialContent,
+  onInitialContentApplied,
 }) => {
   const { checkReferenced } = useCheckGhostLinkReferenced();
   const { editorFontSizePx } = useGeneralSettings();
@@ -150,6 +152,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   }
 
   const editorRef = useRef<Editor | null>(null);
+  const initialContentAppliedRef = useRef(false);
   const openStorageSetupDialog = useCallback(() => {
     setStorageSetupDialogOpen(true);
   }, []);
@@ -299,6 +302,34 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       focusContentRef.current = null;
     };
   }, [editor, focusContentRef]);
+
+  // URL から作成時: Y.Doc が空のときに initialContent を一度だけ反映する
+  useEffect(() => {
+    if (
+      !editor ||
+      !collaborationConfig ||
+      !initialContent ||
+      initialContentAppliedRef.current
+    )
+      return;
+
+    const timer = setTimeout(() => {
+      if (initialContentAppliedRef.current) return;
+      const doc = editor.state.doc;
+      const isEmpty = doc.nodeSize <= 2;
+      if (!isEmpty) return;
+      try {
+        const parsed = JSON.parse(initialContent);
+        editor.commands.setContent(parsed);
+        initialContentAppliedRef.current = true;
+        onInitialContentApplied?.();
+      } catch (e) {
+        console.error("Failed to apply initial content from URL clip", e);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [editor, collaborationConfig, initialContent, onInitialContentApplied]);
 
   usePasteImageHandler({ editor, handleImageUpload });
 

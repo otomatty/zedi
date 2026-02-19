@@ -7,8 +7,14 @@ import { v4 as uuidv4 } from "uuid";
  * C3-7: Common interface for page repository implementations.
  * Implemented by PageRepository (libsql local/test) and StorageAdapterPageRepository (adapter + API).
  */
+/** Optional metadata when creating a page (e.g. from URL clip). */
+export interface CreatePageOptions {
+  sourceUrl?: string | null;
+  thumbnailUrl?: string | null;
+}
+
 export interface IPageRepository {
-  createPage(userId: string, title?: string, content?: string): Promise<Page>;
+  createPage(userId: string, title?: string, content?: string, options?: CreatePageOptions): Promise<Page>;
   getPage(userId: string, pageId: string): Promise<Page | null>;
   getPages(userId: string): Promise<Page[]>;
   getPagesSummary(userId: string): Promise<PageSummary[]>;
@@ -71,7 +77,8 @@ export class PageRepository {
   async createPage(
     userId: string,
     title: string = "",
-    content: string = ""
+    content: string = "",
+    _options?: CreatePageOptions
   ): Promise<Page> {
     const id = uuidv4();
     const now = Date.now();

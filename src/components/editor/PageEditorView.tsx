@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -184,30 +184,36 @@ const PageEditor: React.FC = () => {
     }
   }, [isNewPage, page, isInitialized, initialize]);
 
-  // Handle navigation state (from FAB URL creation)
+  // URL から作成時: state で渡された initialContent をエディタに渡す（Y.Doc に一度だけ反映する用）
+  const [pendingInitialContent, setPendingInitialContent] = useState<string | null>(null);
+
   useEffect(() => {
     const state = location.state as {
       sourceUrl?: string;
       thumbnailUrl?: string | null;
+      initialContent?: string;
     } | null;
 
-    if (state && currentPageId && isInitialized) {
-      const { sourceUrl: stateSourceUrl, thumbnailUrl: stateThumbnailUrl } = state;
+    if (!state || !currentPageId || !isInitialized) return;
 
-      if (stateSourceUrl || stateThumbnailUrl) {
-        // Update page with sourceUrl and thumbnailUrl from navigation state
-        setSourceUrl(stateSourceUrl || "");
-        updatePageMutation.mutate({
-          pageId: currentPageId,
-          updates: {
-            sourceUrl: stateSourceUrl || undefined,
-            thumbnailUrl: stateThumbnailUrl || undefined,
-          },
-        });
+    if (typeof state.initialContent === "string") {
+      setPendingInitialContent(state.initialContent);
+      navigate(location.pathname, { replace: true, state: null });
+      return;
+    }
 
-        // Clear the state to prevent re-processing
-        navigate(location.pathname, { replace: true, state: null });
-      }
+    // 後方互換: sourceUrl / thumbnailUrl のみ渡されている場合
+    const { sourceUrl: stateSourceUrl, thumbnailUrl: stateThumbnailUrl } = state;
+    if (stateSourceUrl || stateThumbnailUrl) {
+      setSourceUrl(stateSourceUrl || "");
+      updatePageMutation.mutate({
+        pageId: currentPageId,
+        updates: {
+          sourceUrl: stateSourceUrl || undefined,
+          thumbnailUrl: stateThumbnailUrl || undefined,
+        },
+      });
+      navigate(location.pathname, { replace: true, state: null });
     }
   }, [location.state, currentPageId, isInitialized, setSourceUrl, updatePageMutation, navigate, location.pathname]);
 
@@ -362,6 +368,8 @@ const PageEditor: React.FC = () => {
         collaboration={
           isLocalDocEnabled ? { ...collaboration } : undefined
         }
+        initialContent={pendingInitialContent ?? undefined}
+        onInitialContentApplied={() => setPendingInitialContent(null)}
       />
 
       <PageEditorDialogs

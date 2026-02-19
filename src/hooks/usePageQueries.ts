@@ -334,16 +334,19 @@ export function useCreatePage() {
     mutationFn: async ({
       title = "",
       content = "",
+      sourceUrl,
+      thumbnailUrl,
     }: {
       title?: string;
       content?: string;
+      sourceUrl?: string | null;
+      thumbnailUrl?: string | null;
     }) => {
-      // デバッグ: スタックトレースを出力
-      console.log("=== createPage called ===");
-      console.log("title:", title);
-      console.log("Stack trace:", new Error().stack);
       const repo = await getRepository();
-      return repo.createPage(userId, title, content);
+      return repo.createPage(userId, title, content, {
+        sourceUrl: sourceUrl ?? undefined,
+        thumbnailUrl: thumbnailUrl ?? undefined,
+      });
     },
     onSuccess: (newPage) => {
       console.log("=== createPage success ===", newPage.id);
