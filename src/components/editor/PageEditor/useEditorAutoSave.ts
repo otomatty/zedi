@@ -30,17 +30,47 @@ export function useEditorAutoSave({
   onSaveSuccess,
 }: UseEditorAutoSaveOptions): UseEditorAutoSaveReturn {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingRef = useRef<{
+    title: string;
+    content: string;
+    contentOnly: boolean;
+  } | null>(null);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Cleanup timeout on unmount
+  // アンマウント時に未実行の保存があれば即実行（/home 戻りでタイトルが消えるのを防ぐ）
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        const pending = pendingRef.current;
+        if (pending && pageId) {
+          const syncWikiLinksFromContent = async (contentToSync: string) => {
+            const wikiLinks = extractWikiLinksFromContent(contentToSync);
+            if (wikiLinks.length > 0) {
+              await syncWikiLinks(pageId, wikiLinks);
+            }
+          };
+          const saveAction = pending.contentOnly
+            ? () => onSaveContentOnly(pending.content)
+            : () => onSave({ title: pending.title, content: pending.content });
+          void (async () => {
+            try {
+              await saveAction();
+            } catch (e) {
+              console.error("Auto-save flush on unmount failed:", e);
+            }
+            try {
+              await syncWikiLinksFromContent(pending.content);
+            } catch {
+              // Ignore sync errors during unmount flush
+            }
+          })();
+        }
       }
     };
-  }, []);
+  }, [pageId, onSave, onSaveContentOnly, syncWikiLinks]);
 
   const saveChanges = useCallback(
     (newTitle: string, newContent: string, forceBlockTitle = false) => {
@@ -78,7 +108,10 @@ export function useEditorAutoSave({
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
+        pendingRef.current = { title: newTitle, content: newContent, contentOnly: true };
         saveTimeoutRef.current = setTimeout(() => {
+          saveTimeoutRef.current = null;
+          pendingRef.current = null;
           void runSave(() => onSaveContentOnly(newContent));
         }, debounceMs);
         return;
@@ -88,7 +121,10 @@ export function useEditorAutoSave({
         clearTimeout(saveTimeoutRef.current);
       }
 
+      pendingRef.current = { title: newTitle, content: newContent, contentOnly: false };
       saveTimeoutRef.current = setTimeout(() => {
+        saveTimeoutRef.current = null;
+        pendingRef.current = null;
         void runSave(() => onSave({ title: newTitle, content: newContent }));
       }, debounceMs);
     },

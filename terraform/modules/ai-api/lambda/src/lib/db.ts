@@ -25,7 +25,9 @@ function isUuidString(v: unknown): boolean {
 
 function toParameter(name: string, value: unknown) {
   const param: Record<string, unknown> = { name, value: toParamValue(value) };
-  if (isUuidString(value)) {
+  // Params that are TEXT columns must not get UUID typeHint or we get "text = uuid".
+  const isKnownTextParam = name === "cognito_sub"; // users.cognito_sub is TEXT; Cognito sub is often UUID-shaped
+  if (isUuidString(value) && !isKnownTextParam) {
     param.typeHint = "UUID";
   }
   return param;
