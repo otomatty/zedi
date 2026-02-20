@@ -40,7 +40,7 @@ resource "aws_lambda_function" "main" {
   role             = aws_iam_role.lambda.arn
   handler          = "index.handler"
   source_code_hash = data.archive_file.lambda.output_base64sha256
-  runtime          = "nodejs20.x"
+  runtime          = "nodejs22.x"
   timeout          = 15
 
   environment {

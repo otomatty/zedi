@@ -173,7 +173,7 @@ resource "aws_lambda_function" "ai_api" {
   role             = aws_iam_role.lambda.arn
   handler          = "index.handler"
   source_code_hash = data.archive_file.lambda.output_base64sha256
-  runtime          = "nodejs20.x"
+  runtime          = "nodejs22.x"
   timeout          = 90
   memory_size      = 512
 

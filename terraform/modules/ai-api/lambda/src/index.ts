@@ -22,7 +22,7 @@ import { handleGetUsage } from "./routes/usage.js";
 import { getEnvConfig } from "./lib/env.js";
 import { execute } from "./lib/db.js";
 import { writeSSE } from "./utils/sse.js";
-import { resolveUserId } from "zedi-auth-db";
+import { resolveUserId } from "./lib/resolveUserId.js";
 import type { EnvConfig, SSEPayload } from "./types/index.js";
 
 /** Resolve Cognito sub to users.id; throw if user not found in DB. */

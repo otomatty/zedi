@@ -14,12 +14,9 @@ await build({
   format: 'esm',
   minify: true,
   sourcemap: true,
+  treeShaking: true,
   external: [
-    '@aws-sdk/client-dynamodb',
-    '@aws-sdk/client-rds-data',
-    '@aws-sdk/client-s3',
-    '@aws-sdk/client-secrets-manager',
-    '@aws-sdk/s3-request-presigner',
+    '@aws-sdk/*',
   ],
   banner: {
     js: 'import { createRequire } from "module"; const require = createRequire(import.meta.url);',
