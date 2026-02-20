@@ -145,8 +145,8 @@ module "cache" {
 }
 
 # =============================================================================
-# Module: REST API (Lambda + API Gateway HTTP API + Cognito JWT)
-# C1-2: REST API 基盤
+# Module: Unified REST API (Hono Lambda + API Gateway HTTP API + Cognito JWT)
+# Phase 0-B: 4 Lambda → 1 Lambda 統合
 # =============================================================================
 module "api" {
   source = "./modules/api"
@@ -162,10 +162,22 @@ module "api" {
   db_credentials_secret_arn = module.database.db_credentials_secret_arn
   aurora_cluster_arn        = module.database.cluster_arn
   aurora_database_name      = var.aurora_database_name
+
+  # Cross-module resources (統合 Lambda が使用)
+  ai_secrets_arn             = module.ai_api.ai_secrets_arn
+  rate_limit_table_name      = module.ai_api.rate_limit_table_name
+  rate_limit_table_arn       = module.ai_api.rate_limit_table_arn
+  websocket_api_execution_arn = module.ai_api.websocket_api_execution_arn
+  thumbnail_secrets_arn      = module.thumbnail_api.thumbnail_secrets_arn
+  thumbnails_bucket_name     = module.thumbnail_api.thumbnails_bucket_name
+  thumbnails_bucket_arn      = module.thumbnail_api.thumbnails_bucket_arn
+  thumbnail_cloudfront_url   = module.thumbnail_api.cloudfront_url
+  lemonsqueezy_secret_arn    = module.subscription.lemonsqueezy_secret_arn
 }
 
 # =============================================================================
-# Module: AI API (HTTP API GW + WebSocket API GW + Lambda + DynamoDB + Secrets)
+# Module: AI API (WebSocket API GW + Lambda + DynamoDB + Secrets)
+# Phase 0-B: HTTP routes は api モジュールに統合、WebSocket は維持
 # =============================================================================
 module "ai_api" {
   source = "./modules/ai-api"
@@ -181,7 +193,7 @@ module "ai_api" {
 
   cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
 
-  # Share the HTTP API Gateway for GET /api/ai/* routes
+  # HTTP API GW は引き続き WebSocket Lambda の HTTP ルート用（将来削除予定）
   api_id = module.api.api_id
 }
 
@@ -225,44 +237,25 @@ module "realtime" {
 }
 
 # =============================================================================
-# Module: Subscription (LemonSqueezy Webhook)
+# Module: Subscription (LemonSqueezy Secrets Manager)
+# Phase 0-B: Lambda は api モジュールに統合、Secrets のみ残存
 # =============================================================================
 module "subscription" {
   source = "./modules/subscription"
 
   environment = var.environment
   tags        = local.common_tags
-
-  db_credentials_secret_arn = module.database.db_credentials_secret_arn
-  aurora_cluster_arn        = module.database.cluster_arn
-  aurora_database_name      = var.aurora_database_name
-
-  api_id = module.api.api_id
 }
 
 # =============================================================================
-# Module: Thumbnail API (image search, AI generate, commit → S3 + CloudFront)
+# Module: Thumbnail API (S3 + CloudFront + Secrets)
+# Phase 0-B: Lambda は api モジュールに統合、S3/CloudFront/Secrets のみ残存
 # =============================================================================
 module "thumbnail_api" {
   source = "./modules/thumbnail-api"
 
   environment = var.environment
   tags        = local.common_tags
-
-  cognito_user_pool_id = module.security.user_pool_id
-
-  db_credentials_secret_arn = module.database.db_credentials_secret_arn
-  aurora_cluster_arn        = module.database.cluster_arn
-  aurora_database_name      = var.aurora_database_name
-
-  api_id            = module.api.api_id
-  api_execution_arn = module.api.api_execution_arn
-  authorizer_id     = module.api.authorizer_id
-
-  rate_limit_table_name = module.ai_api.rate_limit_table_name
-  ai_secrets_arn        = module.ai_api.ai_secrets_arn
-
-  cors_origin = var.environment == "prod" ? "https://zedi-note.app" : "*"
 
   google_custom_search_api_key   = var.thumbnail_google_custom_search_api_key
   google_custom_search_engine_id = var.thumbnail_google_custom_search_engine_id

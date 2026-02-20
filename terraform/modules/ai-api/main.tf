@@ -196,64 +196,12 @@ resource "aws_lambda_function" "ai_api" {
 }
 
 ################################################################################
-# HTTP API Gateway routes (added to shared API Gateway)
-# GET /api/ai/models — model listing (no auth, handled in Lambda)
-# GET /api/ai/usage  — usage info (no auth at GW level, Lambda verifies JWT)
+# HTTP API routes — REMOVED (Phase 0-B: 統合 Lambda に移行)
+# GET /api/ai/models, usage, subscription は api モジュールの統合 Lambda が処理
 ################################################################################
 
-resource "aws_apigatewayv2_integration" "ai_http" {
-  api_id                 = var.api_id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.ai_api.invoke_arn
-  integration_method     = "POST"
-  payload_format_version = "2.0"
-}
-
-resource "aws_apigatewayv2_route" "ai_models" {
-  api_id    = var.api_id
-  route_key = "GET /api/ai/models"
-  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
-}
-
-resource "aws_apigatewayv2_route" "ai_models_options" {
-  api_id    = var.api_id
-  route_key = "OPTIONS /api/ai/models"
-  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
-}
-
-resource "aws_apigatewayv2_route" "ai_usage" {
-  api_id    = var.api_id
-  route_key = "GET /api/ai/usage"
-  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
-}
-
-resource "aws_apigatewayv2_route" "ai_usage_options" {
-  api_id    = var.api_id
-  route_key = "OPTIONS /api/ai/usage"
-  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
-}
-
-resource "aws_apigatewayv2_route" "ai_subscription" {
-  api_id    = var.api_id
-  route_key = "GET /api/ai/subscription"
-  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
-}
-
-resource "aws_apigatewayv2_route" "ai_subscription_options" {
-  api_id    = var.api_id
-  route_key = "OPTIONS /api/ai/subscription"
-  target    = "integrations/${aws_apigatewayv2_integration.ai_http.id}"
-}
-
-resource "aws_lambda_permission" "apigw_http" {
-  statement_id  = "AllowAPIGatewayInvokeAIAPI"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.ai_api.function_name
-  principal     = "apigateway.amazonaws.com"
-}
-
 ################################################################################
-# WebSocket API Gateway (streaming chat)
+# WebSocket API Gateway (streaming chat) — 維持
 ################################################################################
 
 resource "aws_apigatewayv2_api" "ws" {

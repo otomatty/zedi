@@ -102,17 +102,13 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
 
       # Lambda modules use file() in Terraform; dist must exist before validate/plan
-      - name: Build shared package (ai-api dependency)
-        run: npm install && npm run build
-        working-directory: packages/zedi-auth-db
+      - name: Build api Lambda
+        run: npm ci && npm run build
+        working-directory: terraform/modules/api/lambda
 
       - name: Build ai-api Lambda
         run: npm ci && npm run build
         working-directory: terraform/modules/ai-api/lambda
-
-      - name: Build thumbnail-api Lambda
-        run: npm ci && npm run build
-        working-directory: terraform/modules/thumbnail-api/lambda
 
       - name: Terraform Init (no backend)
         run: terraform init -backend=false

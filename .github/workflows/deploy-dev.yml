@@ -43,17 +43,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-1
 
-      - name: Build shared packages
-        working-directory: packages/zedi-auth-db
-        run: npm install && npm run build
+      - name: Build api Lambda
+        run: npm ci && npm run build
+        working-directory: terraform/modules/api/lambda
 
       - name: Build ai-api Lambda
         run: npm ci && npm run build
         working-directory: terraform/modules/ai-api/lambda
-
-      - name: Build thumbnail-api Lambda
-        run: npm ci && npm run build
-        working-directory: terraform/modules/thumbnail-api/lambda
 
       - name: Terraform Init
         working-directory: terraform

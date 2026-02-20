@@ -25,7 +25,17 @@ output "rate_limit_table_name" {
   value       = aws_dynamodb_table.rate_limit.name
 }
 
+output "rate_limit_table_arn" {
+  description = "DynamoDB table ARN for rate limiting"
+  value       = aws_dynamodb_table.rate_limit.arn
+}
+
 output "ai_secrets_arn" {
   description = "ARN of the AI provider keys secret"
   value       = aws_secretsmanager_secret.ai_keys.arn
+}
+
+output "websocket_api_execution_arn" {
+  description = "WebSocket API execution ARN for execute-api:ManageConnections"
+  value       = aws_apigatewayv2_api.ws.execution_arn
 }

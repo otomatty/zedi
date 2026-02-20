@@ -25,14 +25,6 @@ updates:
     open-pull-requests-limit: 5
     labels: [dependencies]
 
-  # Shared package
-  - package-ecosystem: npm
-    directory: /packages/zedi-auth-db
-    schedule:
-      interval: weekly
-      day: monday
-    labels: [dependencies]
-
   # Terraform providers
   - package-ecosystem: terraform
     directory: /terraform

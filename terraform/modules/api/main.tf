@@ -1,35 +1,50 @@
-# Zedi REST API Module
-# API Gateway HTTP API + Lambda + Cognito JWT Authorizer
-# C1-2: REST API 基盤
+# Zedi Unified API Module
+# API Gateway HTTP API + Hono Lambda + Cognito JWT Authorizer
+# Phase 0-B: 4 Lambda → 1 Lambda 統合
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
+# Normalize path for file()/fileexists() on Windows
 locals {
-  cognito_issuer = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${var.cognito_user_pool_id}"
+  cognito_issuer  = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${var.cognito_user_pool_id}"
+  lambda_dist_dir = "${replace(path.module, "\\", "/")}/lambda/dist"
 }
 
 ################################################################################
-# Lambda: npm install を apply 前に実行（node_modules を ZIP に含める）
+# Build Lambda (esbuild TypeScript → dist/index.mjs)
 ################################################################################
 
-resource "null_resource" "lambda_npm" {
+resource "null_resource" "lambda_build" {
   triggers = {
+    src_hash = sha256(join("", [
+      for f in fileset("${path.module}/lambda/src", "**/*.ts") :
+      filemd5("${path.module}/lambda/src/${f}")
+    ]))
     package_json = filemd5("${path.module}/lambda/package.json")
-    package_lock = fileexists("${path.module}/lambda/package-lock.json") ? filemd5("${path.module}/lambda/package-lock.json") : "no-lock"
-    zedi_auth_db = fileexists("${path.root}/../packages/zedi-auth-db/dist/index.js") ? filemd5("${path.root}/../packages/zedi-auth-db/dist/index.js") : "no-pkg"
   }
+
   provisioner "local-exec" {
-    command     = "npm ci && node scripts/copy-zedi-auth-db.mjs"
+    command     = "npm ci && npm run build"
     working_dir = "${path.module}/lambda"
   }
 }
 
 data "archive_file" "lambda" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda"
   output_path = "${path.module}/lambda.zip"
-  depends_on  = [null_resource.lambda_npm]
+
+  source {
+    content  = file("${local.lambda_dist_dir}/index.mjs")
+    filename = "index.mjs"
+  }
+
+  source {
+    content  = fileexists("${local.lambda_dist_dir}/index.mjs.map") ? file("${local.lambda_dist_dir}/index.mjs.map") : "{}"
+    filename = "index.mjs.map"
+  }
+
+  depends_on = [null_resource.lambda_build]
 }
 
 resource "aws_iam_role" "lambda" {
@@ -51,29 +66,54 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Secrets Manager + RDS Data API (for C1-3 以降). Always attach; empty ARNs = no access.
+# Secrets Manager + RDS Data API + DynamoDB + additional Secrets (統合 Lambda 用)
 resource "aws_iam_role_policy" "lambda_db" {
   name = "zedi-${var.environment}-api-lambda-db"
   role = aws_iam_role.lambda.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = concat(
-      var.db_credentials_secret_arn != "" ? [{
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [var.db_credentials_secret_arn]
-      }] : [],
+      # RDS Data API
       var.aurora_cluster_arn != "" ? [{
-        Effect   = "Allow"
-        Action   = ["rds-data:ExecuteStatement", "rds-data:BatchExecuteStatement"]
+        Effect = "Allow"
+        Action = [
+          "rds-data:ExecuteStatement",
+          "rds-data:BatchExecuteStatement",
+        ]
         Resource = [var.aurora_cluster_arn]
       }] : [],
-      # IAM requires at least one statement; no-op when no DB configured
-      var.db_credentials_secret_arn == "" && var.aurora_cluster_arn == "" ? [{
+      # Secrets Manager — DB credentials + AI keys + Thumbnail keys + LemonSqueezy
+      [{
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = compact([
+          var.db_credentials_secret_arn,
+          var.ai_secrets_arn,
+          var.thumbnail_secrets_arn,
+          var.lemonsqueezy_secret_arn,
+        ])
+      }],
+      # DynamoDB — Rate limiting
+      var.rate_limit_table_arn != "" ? [{
+        Effect = "Allow"
+        Action = [
+          "dynamodb:UpdateItem",
+          "dynamodb:GetItem",
+        ]
+        Resource = [var.rate_limit_table_arn]
+      }] : [],
+      # S3 — Thumbnails bucket
+      var.thumbnails_bucket_arn != "" ? [{
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+        Resource = ["${var.thumbnails_bucket_arn}/*"]
+      }] : [],
+      # API Gateway Management API — WebSocket postToConnection
+      var.websocket_api_execution_arn != "" ? [{
         Effect   = "Allow"
-        Action   = ["lambda:GetFunction"]
-        Resource = [aws_lambda_function.main.arn]
-      }] : []
+        Action   = ["execute-api:ManageConnections"]
+        Resource = ["${var.websocket_api_execution_arn}/*/*"]
+      }] : [],
     )
   })
 }
@@ -84,18 +124,27 @@ resource "aws_lambda_function" "main" {
   role             = aws_iam_role.lambda.arn
   handler          = "index.handler"
   source_code_hash = data.archive_file.lambda.output_base64sha256
-  runtime          = "nodejs20.x"
-  timeout          = 30
+  runtime          = "nodejs22.x"
+  timeout          = 90
+  memory_size      = 512
 
   environment {
     variables = {
-      NODE_OPTIONS          = "--enable-source-maps"
-      ENVIRONMENT           = var.environment
-      AURORA_DATABASE_NAME  = var.aurora_database_name
-      DB_CREDENTIALS_SECRET = var.db_credentials_secret_arn
-      AURORA_CLUSTER_ARN    = var.aurora_cluster_arn
-      MEDIA_BUCKET          = aws_s3_bucket.media.id
-      CORS_ORIGIN           = var.cors_origin
+      NODE_OPTIONS             = "--enable-source-maps"
+      ENVIRONMENT              = var.environment
+      AURORA_DATABASE_NAME     = var.aurora_database_name
+      DB_CREDENTIALS_SECRET    = var.db_credentials_secret_arn
+      AURORA_CLUSTER_ARN       = var.aurora_cluster_arn
+      MEDIA_BUCKET             = aws_s3_bucket.media.id
+      CORS_ORIGIN              = var.cors_origin
+      COGNITO_USER_POOL_ID     = var.cognito_user_pool_id
+      COGNITO_REGION           = data.aws_region.current.name
+      AI_SECRETS_ARN           = var.ai_secrets_arn
+      RATE_LIMIT_TABLE         = var.rate_limit_table_name
+      THUMBNAIL_SECRETS_ARN    = var.thumbnail_secrets_arn
+      THUMBNAIL_BUCKET         = var.thumbnails_bucket_name
+      THUMBNAIL_CLOUDFRONT_URL = var.thumbnail_cloudfront_url
+      LEMONSQUEEZY_SECRET_ARN  = var.lemonsqueezy_secret_arn
     }
   }
   tags = var.tags
@@ -173,6 +222,20 @@ resource "aws_apigatewayv2_route" "api_root_options" {
 resource "aws_apigatewayv2_route" "health" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "GET /api/health"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+# Webhook（認証なし — Lambda 内で署名検証）
+resource "aws_apigatewayv2_route" "webhook_lemonsqueezy" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /api/webhooks/lemonsqueezy"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+# AI models（認証なし — Lambda 内で authOptional）
+resource "aws_apigatewayv2_route" "ai_models" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "GET /api/ai/models"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

@@ -1,13 +1,13 @@
 # Zedi Thumbnail API Module - Outputs
 
-output "lambda_function_name" {
-  description = "Thumbnail API Lambda function name"
-  value       = aws_lambda_function.thumbnail_api.function_name
-}
-
 output "thumbnails_bucket_name" {
   description = "S3 bucket name for thumbnails"
   value       = aws_s3_bucket.thumbnails.id
+}
+
+output "thumbnails_bucket_arn" {
+  description = "S3 bucket ARN for thumbnails"
+  value       = aws_s3_bucket.thumbnails.arn
 }
 
 output "cloudfront_domain" {

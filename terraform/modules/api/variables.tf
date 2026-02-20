@@ -56,3 +56,61 @@ variable "aurora_database_name" {
   type        = string
   default     = "zedi"
 }
+
+# =============================================================================
+# Cross-module resources (統合 Lambda が使用)
+# =============================================================================
+
+variable "ai_secrets_arn" {
+  description = "ARN of AI provider keys secret (from ai-api module)"
+  type        = string
+  default     = ""
+}
+
+variable "rate_limit_table_name" {
+  description = "DynamoDB table name for rate limiting (from ai-api module)"
+  type        = string
+  default     = ""
+}
+
+variable "rate_limit_table_arn" {
+  description = "DynamoDB table ARN for rate limiting (from ai-api module)"
+  type        = string
+  default     = ""
+}
+
+variable "thumbnail_secrets_arn" {
+  description = "ARN of thumbnail keys secret (from thumbnail-api module)"
+  type        = string
+  default     = ""
+}
+
+variable "thumbnails_bucket_name" {
+  description = "S3 bucket name for thumbnails (from thumbnail-api module)"
+  type        = string
+  default     = ""
+}
+
+variable "thumbnails_bucket_arn" {
+  description = "S3 bucket ARN for thumbnails (from thumbnail-api module)"
+  type        = string
+  default     = ""
+}
+
+variable "thumbnail_cloudfront_url" {
+  description = "CloudFront URL for thumbnail delivery (from thumbnail-api module)"
+  type        = string
+  default     = ""
+}
+
+variable "lemonsqueezy_secret_arn" {
+  description = "ARN of LemonSqueezy secret (from subscription module)"
+  type        = string
+  default     = ""
+}
+
+variable "websocket_api_execution_arn" {
+  description = "WebSocket API execution ARN for execute-api:ManageConnections (from ai-api module)"
+  type        = string
+  default     = ""
+}
