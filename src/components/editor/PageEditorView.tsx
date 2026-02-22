@@ -137,7 +137,7 @@ const PageEditor: React.FC = () => {
   usePageEditorKeyboard({ onBack: handleBack });
 
   // Auto-save hook
-  const { saveChanges, lastSaved: autoSaveLastSaved } = useEditorAutoSave({
+  const { saveChanges, lastSaved: autoSaveLastSaved, isSyncingLinks } = useEditorAutoSave({
     pageId: currentPageId,
     debounceMs: 500,
     shouldBlockSave,
@@ -371,6 +371,7 @@ const PageEditor: React.FC = () => {
         pageId={pageId}
         isNewPage={isNewPage}
         isWikiGenerating={isWikiGenerating}
+        isSyncingLinks={isSyncingLinks}
         onContentChange={handleContentChange}
         onContentError={handleContentError}
         onTitleChange={handleTitleChange}

@@ -15,6 +15,7 @@ interface UseEditorAutoSaveReturn {
   saveChanges: (title: string, content: string, forceBlockTitle?: boolean) => void;
   lastSaved: number | null;
   isSaving: boolean;
+  isSyncingLinks: boolean;
 }
 
 /**
@@ -37,6 +38,7 @@ export function useEditorAutoSave({
   } | null>(null);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncingLinks, setIsSyncingLinks] = useState(false);
 
   // アンマウント時に未実行の保存があれば即実行（/home 戻りでタイトルが消えるのを防ぐ）
   useEffect(() => {
@@ -86,17 +88,21 @@ export function useEditorAutoSave({
 
       const runSave = async (saveAction: () => boolean | Promise<boolean>) => {
         setIsSaving(true);
+        setIsSyncingLinks(true);
         try {
           const didSave = await saveAction();
+          try {
+            await syncWikiLinksFromContent(newContent);
+          } finally {
+            setIsSyncingLinks(false);
+          }
           if (didSave) {
             setLastSaved(Date.now());
             onSaveSuccess?.();
           }
         } catch (error) {
           console.error("Auto-save failed:", error);
-        }
-        try {
-          await syncWikiLinksFromContent(newContent);
+          setIsSyncingLinks(false);
         } finally {
           setIsSaving(false);
         }
@@ -135,5 +141,6 @@ export function useEditorAutoSave({
     saveChanges,
     lastSaved,
     isSaving,
+    isSyncingLinks,
   };
 }

@@ -9,6 +9,7 @@ import { useCreatePage } from "@/hooks/usePageQueries";
 
 interface LinkedPagesSectionProps {
   pageId: string;
+  isSyncingLinks?: boolean;
 }
 
 function LinkedPagesSkeleton() {
@@ -18,7 +19,7 @@ function LinkedPagesSkeleton() {
         <Skeleton className="h-4 w-4" />
         <Skeleton className="h-4 w-24" />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {[1, 2, 3, 4, 5].map((i) => (
           <Skeleton key={i} className="h-24 w-full" />
         ))}
@@ -27,12 +28,12 @@ function LinkedPagesSkeleton() {
   );
 }
 
-export function LinkedPagesSection({ pageId }: LinkedPagesSectionProps) {
+export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPagesSectionProps) {
   const { data, isLoading } = useLinkedPages(pageId);
   const navigate = useNavigate();
   const createPageMutation = useCreatePage();
 
-  if (isLoading) {
+  if (isLoading || isSyncingLinks) {
     return <LinkedPagesSkeleton />;
   }
 
@@ -97,7 +98,7 @@ export function LinkedPagesSection({ pageId }: LinkedPagesSectionProps) {
             <FilePlus className="h-4 w-4" />
             <span>新しいリンク ({ghostLinks.length})</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {ghostLinks.map((title) => (
               <GhostLinkCard
                 key={title}

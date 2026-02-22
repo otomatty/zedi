@@ -17,6 +17,7 @@ interface PageEditorContentProps {
   isNewPage: boolean;
   isWikiGenerating: boolean;
   isReadOnly?: boolean;
+  isSyncingLinks?: boolean;
   showLinkedPages?: boolean;
   showToolbar?: boolean;
   onContentChange: (content: string) => void;
@@ -46,6 +47,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   isNewPage,
   isWikiGenerating,
   isReadOnly,
+  isSyncingLinks = false,
   showLinkedPages = true,
   showToolbar = true,
   onContentChange,
@@ -127,7 +129,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
 
           {/* Linked Pages Section */}
           {showLinkedPages && currentPageId && (
-            <LinkedPagesSection pageId={currentPageId} />
+            <LinkedPagesSection pageId={currentPageId} isSyncingLinks={isSyncingLinks} />
           )}
       </Container>
     </main>
