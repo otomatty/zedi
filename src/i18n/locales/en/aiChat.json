@@ -42,6 +42,7 @@
     "suggestWikiLinks": "🔗 Add [[{{title}}]] link to original page"
   },
   "empty": {
-    "messages": "Messages will appear here"
+    "messages": "Messages will appear here",
+    "pageConversations": "No conversation history for this page yet"
   }
 }

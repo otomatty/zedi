@@ -39,7 +39,6 @@ export const useAIChatStore = create<AIChatUIState>()(
       name: 'ai-chat-storage',
       partialize: (state) => ({
         isOpen: state.isOpen,
-        activeConversationId: state.activeConversationId,
         contextEnabled: state.contextEnabled,
       }),
     }

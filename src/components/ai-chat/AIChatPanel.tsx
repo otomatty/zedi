@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { AIChatHeader } from './AIChatHeader';
 import { AIChatInput } from './AIChatInput';
 import { AIChatMessages } from './AIChatMessages';
@@ -23,7 +23,14 @@ export function AIChatPanel() {
     updateConversation,
     deleteConversation,
     getConversation,
+    getConversationsForPage,
   } = useAIChatConversations();
+
+  // 現在のページに紐付いた会話一覧
+  const pageConversations = getConversationsForPage(
+    pageContext?.pageId,
+    pageContext?.type
+  );
 
   const {
     messages,
@@ -35,6 +42,17 @@ export function AIChatPanel() {
     pageContext,
     contextEnabled,
   });
+
+  // ページ切り替え検知: pageId が変わったら会話をリセットして新規チャット画面にする
+  const prevPageKeyRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const currentKey = pageContext?.pageId ?? pageContext?.type ?? undefined;
+    if (prevPageKeyRef.current !== undefined && currentKey !== prevPageKeyRef.current) {
+      setActiveConversation(null);
+      clearMessages();
+    }
+    prevPageKeyRef.current = currentKey;
+  }, [pageContext?.pageId, pageContext?.type, setActiveConversation, clearMessages]);
 
   // アクティブな会話の変更時にメッセージを読み込み
   useEffect(() => {
@@ -114,7 +132,7 @@ export function AIChatPanel() {
       
       {showConversationList && (
         <AIChatConversationList
-          conversations={conversations}
+          conversations={pageConversations}
           onSelect={handleSelectConversation}
           onDelete={handleDeleteConversation}
         />

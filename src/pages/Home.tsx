@@ -39,19 +39,19 @@ const Home: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen bg-background flex flex-col">
       <QuickTour run={isTourRunning} onComplete={completeTour} />
 
       <Header />
 
       <ContentWithAIChat>
-      <main className="py-6">
-        <Container>
-          <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
-            <PageGrid isSeeding={isSeeding} />
-          </div>
-        </Container>
-      </main>
+        <main className="py-6">
+          <Container>
+            <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
+              <PageGrid isSeeding={isSeeding} />
+            </div>
+          </Container>
+        </main>
       </ContentWithAIChat>
 
       <FloatingActionButton />

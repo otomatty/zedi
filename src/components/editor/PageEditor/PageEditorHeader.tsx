@@ -79,7 +79,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
 
         {/* Center: Search bar */}
         {hasSearchContext ? (
-          <div className="flex flex-1 justify-center min-w-0 max-w-xl mx-1 sm:mx-2">
+          <div className="flex flex-1 justify-center min-w-0 max-w-xl">
             <HeaderSearchBar />
           </div>
         ) : (

@@ -35,21 +35,19 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           <MonthNavigation />
         </div>
 
-        {/* Center: Search bar（モバイルでは先頭に表示） */}
-        {hasSearchContext && (
-          <div className="flex flex-1 justify-center min-w-0 max-w-xl sm:mx-2">
-            <HeaderSearchBar />
-          </div>
-        )}
+        {/* Center: Search bar & AI Chat button */}
+        <div className="flex flex-1 justify-center min-w-0 max-w-xl sm:mx-2 items-center gap-2">
+          {hasSearchContext && <HeaderSearchBar />}
+          <AIChatButton />
+        </div>
 
-        {/* Right: AI Chat button & Unified menu */}
+        {/* Right: Unified menu */}
         <div className="flex items-center gap-2 shrink-0">
           {!isSignedIn && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
               {t("common.guestSyncPrompt")}
             </span>
           )}
-          <AIChatButton />
           <UnifiedMenu />
         </div>
       </Container>

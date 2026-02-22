@@ -96,11 +96,30 @@ export function useAIChatConversations() {
     [conversations]
   );
 
+  /** 指定ページに紐付いた会話をフィルタして返す */
+  const getConversationsForPage = useCallback(
+    (pageId: string | undefined, contextType?: string): Conversation[] => {
+      if (pageId) {
+        return conversations.filter((c) => c.pageContext?.pageId === pageId);
+      }
+      // pageId がない場合はコンテキストタイプでフィルタ
+      if (contextType) {
+        return conversations.filter(
+          (c) => c.pageContext?.type === contextType && !c.pageContext?.pageId
+        );
+      }
+      // fallback: pageContext がない会話
+      return conversations.filter((c) => !c.pageContext);
+    },
+    [conversations]
+  );
+
   return {
     conversations,
     createConversation,
     updateConversation,
     deleteConversation,
     getConversation,
+    getConversationsForPage,
   };
 }

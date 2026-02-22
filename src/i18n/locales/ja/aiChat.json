@@ -42,6 +42,7 @@
     "suggestWikiLinks": "🔗 元ページに [[{{title}}]] リンクを追加"
   },
   "empty": {
-    "messages": "メッセージ一覧がここに表示されます"
+    "messages": "メッセージ一覧がここに表示されます",
+    "pageConversations": "このページの会話履歴はまだありません"
   }
 }

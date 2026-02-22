@@ -35,7 +35,7 @@ export function AIChatConversationList({
       <div className="flex-1 overflow-y-auto p-2">
         {conversations.length === 0 ? (
           <div className="text-center text-muted-foreground text-sm py-8">
-            {t('aiChat.empty.messages')}
+            {t('aiChat.empty.pageConversations')}
           </div>
         ) : (
           <div className="space-y-1">

@@ -142,7 +142,7 @@ export function HeaderSearchBar() {
   return (
     <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
       <PopoverAnchor asChild>
-        <div className="relative flex min-w-0 flex-1 max-w-md">
+        <div className="relative flex min-w-0 flex-1 w-full">
           <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
           <Input
             ref={inputRef}
