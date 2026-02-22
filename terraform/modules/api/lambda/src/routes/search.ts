@@ -4,7 +4,6 @@
  * GET /api/search?q=&scope= — pg_bigm による全文検索
  */
 import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
 import { sql } from 'drizzle-orm';
 import { authRequired } from '../middleware/auth';
 import type { AppEnv } from '../types';
@@ -71,7 +70,7 @@ app.get('/', authRequired, async (c) => {
     `);
   }
 
-  return c.json({ results });
+  return c.json({ results: results.rows });
 });
 
 export default app;
