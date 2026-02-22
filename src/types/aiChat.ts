@@ -15,6 +15,8 @@ export interface ChatMessage {
   content: string;              // テキスト（Markdown）
   actions?: ChatAction[];       // AI提案のアクションカード
   referencedPages?: ReferencedPage[]; // このメッセージに添付された参照ページ
+  /** このメッセージの生成に使用されたモデル表示名 */
+  modelDisplayName?: string;
   timestamp: number;
   isStreaming?: boolean;
   error?: string;

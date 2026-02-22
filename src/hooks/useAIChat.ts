@@ -54,6 +54,13 @@ export function useAIChat({ pageContext, contextEnabled, existingPageTitles = []
         throw new Error('AI settings not configured');
       }
 
+      // ストアで選択されたモデルがあればそちらを優先
+      const { selectedModel } = useAIChatStore.getState();
+      const effectiveProvider = selectedModel?.provider ?? settings.provider;
+      const effectiveModel = selectedModel?.model ?? settings.model;
+      const effectiveModelId = selectedModel?.id ?? settings.modelId;
+      const modelDisplayName = selectedModel?.displayName ?? effectiveModel;
+
       const context = contextEnabled ? pageContext : null;
       // Collect all referenced pages from this message and conversation history
       const allRefsInConversation = [...messages, userMessage]
@@ -72,8 +79,8 @@ export function useAIChat({ pageContext, contextEnabled, existingPageTitles = []
       ];
 
       const request: AIServiceRequest = {
-        provider: settings.provider,
-        model: settings.model,
+        provider: effectiveProvider,
+        model: effectiveModel,
         messages: apiMessages,
         options: {
           stream: true,
@@ -81,8 +88,16 @@ export function useAIChat({ pageContext, contextEnabled, existingPageTitles = []
         },
       };
 
+      // 使用するモデル情報でsettingsを上書き（callAIServiceに渡すため）
+      const effectiveSettings: typeof settings = {
+        ...settings,
+        provider: effectiveProvider,
+        model: effectiveModel,
+        modelId: effectiveModelId,
+      };
+
       await callAIService(
-        settings,
+        effectiveSettings,
         request,
         {
           onChunk: (chunk) => {
@@ -106,6 +121,7 @@ export function useAIChat({ pageContext, contextEnabled, existingPageTitles = []
                       ...m,
                       content: finalContent,
                       isStreaming: false,
+                      modelDisplayName,
                       actions: actions.length > 0 ? actions : undefined,
                     }
                   : m

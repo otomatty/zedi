@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ReferencedPage } from '../types/aiChat';
+import type { AIProviderType } from '../types/ai';
+
+interface SelectedModel {
+  id: string;           // namespaced id e.g. "openai:gpt-4o-mini"
+  provider: AIProviderType;
+  model: string;        // API model ID e.g. "gpt-4o-mini"
+  displayName: string;
+}
 
 interface AIChatUIState {
   isOpen: boolean;
@@ -10,6 +18,8 @@ interface AIChatUIState {
   showConversationList: boolean;
   /** コンテキストメニューなど外部からの参照追加リクエスト */
   pendingPageToAdd: ReferencedPage | null;
+  /** チャット欄で選択中のモデル */
+  selectedModel: SelectedModel | null;
 
   // Actions
   togglePanel: () => void;
@@ -20,6 +30,7 @@ interface AIChatUIState {
   toggleContext: () => void;
   toggleConversationList: () => void;
   setPendingPageToAdd: (page: ReferencedPage | null) => void;
+  setSelectedModel: (model: SelectedModel | null) => void;
 }
 
 export const useAIChatStore = create<AIChatUIState>()(
@@ -31,6 +42,7 @@ export const useAIChatStore = create<AIChatUIState>()(
       contextEnabled: true,
       showConversationList: false,
       pendingPageToAdd: null,
+      selectedModel: null,
 
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
       openPanel: () => set({ isOpen: true }),
@@ -40,12 +52,14 @@ export const useAIChatStore = create<AIChatUIState>()(
       toggleContext: () => set((state) => ({ contextEnabled: !state.contextEnabled })),
       toggleConversationList: () => set((state) => ({ showConversationList: !state.showConversationList })),
       setPendingPageToAdd: (page) => set({ pendingPageToAdd: page }),
+      setSelectedModel: (model) => set({ selectedModel: model }),
     }),
     {
       name: 'ai-chat-storage',
       partialize: (state) => ({
         isOpen: state.isOpen,
         contextEnabled: state.contextEnabled,
+        selectedModel: state.selectedModel,
       }),
     }
   )

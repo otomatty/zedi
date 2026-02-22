@@ -101,7 +101,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
       />
 
       {/* FABメニューコンテナ */}
-      <div className="z-40 flex flex-col items-end gap-3">
+      <div className="relative z-40 flex flex-col items-end gap-3">
         {/* メニューアイテム（上方向に展開） */}
         <div className="mb-2 flex flex-col items-end gap-3">
           {menuItems.map((item, index) => (

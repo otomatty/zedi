@@ -45,6 +45,10 @@
     "messages": "メッセージ一覧がここに表示されます",
     "pageConversations": "このページの会話履歴はまだありません"
   },
+  "modelSelector": {
+    "select": "モデルを選択",
+    "tooltip": "AIモデルを切り替え"
+  },
   "referencedPages": {
     "added": "「{{title}}」を参照に追加しました",
     "alreadyAdded": "「{{title}}」は既に参照に追加されています",

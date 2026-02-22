@@ -6,6 +6,7 @@ import { useAIChatContext } from '../../contexts/AIChatContext';
 import { usePagesSummary } from '../../hooks/usePageQueries';
 import type { ReferencedPage } from '../../types/aiChat';
 import { ZEDI_PAGE_MIME_TYPE, MAX_REFERENCED_PAGES } from '../../types/aiChat';
+import { AIChatModelSelector } from './AIChatModelSelector';
 import { cn } from '../../lib/utils';
 
 // FileText SVG for inline chip icons (Lucide icon paths)
@@ -404,14 +405,15 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       <form
         onSubmit={handleSubmit}
         className={cn(
-          'relative flex items-end gap-2 bg-background border rounded-lg p-2 focus-within:ring-1 focus-within:ring-primary transition-all',
+          'relative bg-background border rounded-lg p-2 focus-within:ring-1 focus-within:ring-primary transition-all',
           isDraggingOver && 'ring-2 ring-primary border-primary bg-primary/5',
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="flex-1 relative min-w-0">
+        {/* Full-width input area */}
+        <div className="relative min-w-0">
           <div
             ref={editorRef}
             contentEditable
@@ -431,25 +433,30 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
           )}
         </div>
 
-        {isStreaming ? (
-          <button
-            type="button"
-            onClick={onStopStreaming}
-            className="p-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors shrink-0"
-            title={t('aiChat.actions.stop')}
-          >
-            <Square className="w-4 h-4 fill-current" />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={isEmpty}
-            className="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-            title={t('aiChat.actions.send')}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        )}
+        {/* Bottom row: Model selector (left) + Send/Stop button (right) */}
+        <div className="flex items-center justify-between mt-1 pt-1 border-t border-border/50">
+          <AIChatModelSelector />
+
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={onStopStreaming}
+              className="p-1.5 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors shrink-0"
+              title={t('aiChat.actions.stop')}
+            >
+              <Square className="w-4 h-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isEmpty}
+              className="p-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              title={t('aiChat.actions.send')}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Drop overlay */}

@@ -78,6 +78,13 @@ export function AIChatMessage({ message, onExecuteAction }: AIChatMessageProps) 
             </div>
           )}
         </div>
+
+        {/* Model name label for assistant messages */}
+        {!isUser && message.modelDisplayName && !message.isStreaming && (
+          <span className="text-[10px] text-muted-foreground mt-0.5 px-1">
+            {message.modelDisplayName}
+          </span>
+        )}
         
         {message.error && (
           <div className="text-xs text-destructive mt-1">

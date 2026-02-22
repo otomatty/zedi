@@ -45,6 +45,10 @@
     "messages": "Messages will appear here",
     "pageConversations": "No conversation history for this page yet"
   },
+  "modelSelector": {
+    "select": "Select model",
+    "tooltip": "Switch AI model"
+  },
   "referencedPages": {
     "added": "Added \"{{title}}\" as reference",
     "alreadyAdded": "\"{{title}}\" is already referenced",

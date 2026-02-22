@@ -10,6 +10,12 @@ import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const FloatingActionButton: React.FC = () => {
   const { t } = useTranslation();
@@ -132,30 +138,35 @@ const FloatingActionButton: React.FC = () => {
 
   // メインFABボタン
   const fabButton = (
-    <Button
-      data-tour-id="tour-fab"
-      onClick={() => setIsMenuOpen(!isMenuOpen)}
-      disabled={isCreating}
-      className={cn(
-        "h-16 rounded-full group",
-        "shadow-elevated hover:shadow-glow",
-        "transition-all duration-300 ease-in-out",
-        isMenuOpen
-          ? "w-16 bg-muted-foreground hover:bg-muted-foreground/90"
-          : "w-16 hover:w-auto hover:pl-5 hover:pr-6"
-      )}
-    >
-      {isMenuOpen ? (
-        <X className="h-7 w-7" />
-      ) : (
-        <span className="flex items-center">
-          <Plus className="h-7 w-7 flex-shrink-0" />
-          <span className="inline-block max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-[12rem] group-hover:ml-2 transition-all duration-300 ease-in-out text-sm font-medium">
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            data-tour-id="tour-fab"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            disabled={isCreating}
+            className={cn(
+              "h-16 w-16 rounded-full",
+              "shadow-elevated",
+              "transition-all duration-300 ease-in-out",
+              "hover:scale-105 hover:bg-primary",
+              isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground"
+            )}
+          >
+            {isMenuOpen ? (
+              <X className="h-7 w-7" />
+            ) : (
+              <Plus className="h-7 w-7" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        {!isMenuOpen && (
+          <TooltipContent side="left">
             {t("common.createPageAction")}
-          </span>
-        </span>
-      )}
-    </Button>
+          </TooltipContent>
+        )}
+      </Tooltip>
+    </TooltipProvider>
   );
 
   return (
