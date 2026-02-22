@@ -190,7 +190,19 @@ app.post('/', authRequired, async (c) => {
     })
     .returning();
 
-  return c.json({ page: result[0] }, 201);
+  const row = result[0]!;
+  return c.json({
+    id: row.id,
+    owner_id: row.ownerId,
+    source_page_id: row.sourcePageId ?? null,
+    title: row.title ?? null,
+    content_preview: row.contentPreview ?? null,
+    thumbnail_url: row.thumbnailUrl ?? null,
+    source_url: row.sourceUrl ?? null,
+    created_at: row.createdAt.toISOString(),
+    updated_at: row.updatedAt.toISOString(),
+    is_deleted: row.isDeleted,
+  }, 201);
 });
 
 // ── DELETE /pages/:id ───────────────────────────────────────────────────────
@@ -217,7 +229,7 @@ app.delete('/:id', authRequired, async (c) => {
     .set({ isDeleted: true, updatedAt: new Date() })
     .where(eq(pages.id, pageId));
 
-  return c.json({ deleted: true });
+  return c.json({ id: pageId, deleted: true });
 });
 
 export default app;

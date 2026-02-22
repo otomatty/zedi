@@ -55,26 +55,30 @@ GitHub 上でこのリポジトリをフォークしてください。
 ### 2. ローカルにクローン
 
 ```bash
-git clone https://github.com/your-username/zedi.git
+git clone https://github.com/<your-username>/zedi.git
 cd zedi
 ```
 
-### 3. 依存関係をインストール
+### 3. セットアップ
 
 ```bash
+# セットアップスクリプトを実行（推奨）
+bash scripts/setup.sh
+
+# または手動で
 bun install
 ```
 
-### 4. 開発サーバーを起動
+### 4. upstream を設定
+
+```bash
+git remote add upstream https://github.com/otomatty/zedi.git
+```
+
+### 5. 開発サーバーを起動
 
 ```bash
 bun run dev
-```
-
-### 5. upstream を設定
-
-```bash
-git remote add upstream https://github.com/original-owner/zedi.git
 ```
 
 ---
@@ -111,7 +115,7 @@ git remote add upstream https://github.com/original-owner/zedi.git
    - テストを追加
    - ドキュメントを更新
 
-4. **テストを実行**
+4. **テストとコード品質チェック**
    ```bash
    # ユニットテスト
    bun run test
@@ -121,7 +125,16 @@ git remote add upstream https://github.com/original-owner/zedi.git
 
    # Lint
    bun run lint
+
+   # コードフォーマット
+   bun run format
+
+   # フォーマットチェック（CI で実行されるのと同じ）
+   bun run format:check
    ```
+
+   > **Note:** コミット時に [husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) が自動的にリント・フォーマットを実行します。
+   > コミットメッセージは [Conventional Commits](https://www.conventionalcommits.org/) に従う必要があります（[commitlint](https://commitlint.js.org/) で検証）。
 
 5. **コミットしてプッシュ**
    ```bash

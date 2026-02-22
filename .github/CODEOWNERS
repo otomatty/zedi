@@ -1,0 +1,16 @@
+# Default owner for all files
+* @otomatty
+
+# Frontend components
+/src/components/ @otomatty
+/src/pages/ @otomatty
+
+# Infrastructure & CI
+/.github/ @otomatty
+/workers/ @otomatty
+/docker-compose*.yml @otomatty
+/Dockerfile* @otomatty
+
+# Documentation
+/docs/ @otomatty
+*.md @otomatty
