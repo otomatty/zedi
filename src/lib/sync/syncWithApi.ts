@@ -57,7 +57,7 @@ let consecutiveFailures = 0;
 /** Maximum consecutive failures before giving up automatic retries. */
 const MAX_CONSECUTIVE_FAILURES = 3;
 const PAGE_PUSH_CHUNK_SIZE = 100;
-export type SyncStatus = "idle" | "syncing" | "synced" | "error";
+export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "db-resuming";
 let syncStatus: SyncStatus = "idle";
 const syncStatusListeners = new Set<(status: SyncStatus) => void>();
 
@@ -79,6 +79,13 @@ export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () 
   syncStatusListeners.add(listener);
   listener(syncStatus);
   return () => syncStatusListeners.delete(listener);
+}
+
+// Listen for db-resuming events from apiClient (503 auto-retry)
+if (typeof window !== "undefined") {
+  window.addEventListener("zedi:db-resuming", () => {
+    setSyncStatus("db-resuming");
+  });
 }
 
 export function isSyncInProgress(): boolean {
@@ -127,10 +134,10 @@ function normalizeSyncResponse(raw: unknown): {
       ? (candidate as Record<string, unknown>)
       : null;
 
-  const pages = obj?.pages;
-  const links = obj?.links;
-  const ghostLinks = obj?.ghost_links;
-  const serverTime = obj?.server_time;
+  const pages = obj?.pages || [];
+  const links = obj?.links || [];
+  const ghostLinks = obj?.ghost_links || [];
+  const serverTime = obj?.server_time || obj?.synced_at;
 
   if (!Array.isArray(pages) || !Array.isArray(links) || !Array.isArray(ghostLinks)) {
     const keys = obj ? Object.keys(obj).join(", ") : "non-object";
@@ -195,6 +202,19 @@ export async function syncWithApi(
     const res = normalizeSyncResponse(await api.getSyncPages(since));
     for (const row of res.pages) {
       const meta = syncPageToMetadata(row);
+
+      // LWW チェック: ローカルの方が新しければスキップ（ローカル編集を保護）
+      // スキップされたページは後の PUSH で サーバーに反映される
+      const local = await adapter.getPage(meta.id);
+      if (local && local.updatedAt > meta.updatedAt) {
+        console.log(
+          `[Sync/API] Pull skip (local newer): ${meta.id} ` +
+          `local=${new Date(local.updatedAt).toISOString()} > ` +
+          `server=${new Date(meta.updatedAt).toISOString()}`
+        );
+        continue;
+      }
+
       await adapter.upsertPage(meta);
     }
 

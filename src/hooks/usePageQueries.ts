@@ -9,7 +9,7 @@ import {
   type SyncStatus,
 } from "@/lib/sync";
 import { createStorageAdapter } from "@/lib/storageAdapter";
-import { createApiClient } from "@/lib/api";
+import { createApiClient, ApiError } from "@/lib/api";
 import { StorageAdapterPageRepository } from "@/lib/pageRepository/StorageAdapterPageRepository";
 import type { IPageRepository } from "@/lib/pageRepository";
 import { syncLinksWithRepo } from "@/lib/syncWikiLinks";
@@ -161,7 +161,18 @@ export function useRepository() {
         console.error("Initial sync failed:", error);
         // Refetch so UI reflects current IndexedDB state (e.g. partial pull)
         queryClient.invalidateQueries({ queryKey: pageKeys.all });
-        // NOTE: Do NOT delete from initialSyncRequestedForUser here.
+
+        // 503 (DB resuming) での失敗時は遅延リトライ
+        // apiClient の自動リトライ (4×10s) でも復帰しなかった場合のフォールバック
+        if (error instanceof ApiError && error.code === "DATABASE_RESUMING") {
+          console.log("[Sync] DB was resuming, scheduling delayed retry in 15s");
+          initialSyncRequestedForUser.delete(userId);
+          setTimeout(() => {
+            initialSyncRequestedForUser.delete(userId);
+            queryClient.invalidateQueries({ queryKey: pageKeys.all });
+          }, 15_000);
+        }
+        // NOTE: Do NOT delete from initialSyncRequestedForUser here for other errors.
         // Removing the guard on failure previously caused infinite retry loops
         // when the API was unreachable (CORS, network error, invalid JSON, etc.).
         // Manual retry via useSync() or page reload will re-attempt.

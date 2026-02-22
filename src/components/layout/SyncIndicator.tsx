@@ -1,4 +1,4 @@
-import { Cloud, CloudOff, Loader2, Check } from "lucide-react";
+import { Cloud, CloudOff, Loader2, Check, DatabaseZap } from "lucide-react";
 import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -50,6 +50,12 @@ export function SyncIndicator() {
       label: t("common.syncErrorLabel"),
       description: t("common.syncErrorDescription"),
       className: "text-destructive",
+    },
+    "db-resuming": {
+      icon: DatabaseZap,
+      label: t("common.syncDbResumingLabel", "DB starting…"),
+      description: t("common.syncDbResumingDescription", "Database is waking up. Please wait a moment."),
+      className: "text-amber-500 animate-pulse",
     },
   };
 

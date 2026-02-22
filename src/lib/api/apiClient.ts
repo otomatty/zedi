@@ -49,6 +49,11 @@ function getDefaultBaseUrl(): string {
   return (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
 }
 
+/** Maximum retries when server returns 503 (DATABASE_RESUMING). */
+const MAX_DB_RESUMING_RETRIES = 4;
+/** Default wait time (ms) when Retry-After header is absent. */
+const DEFAULT_RETRY_AFTER_MS = 10_000;
+
 async function request<T>(
   method: string,
   path: string,
@@ -73,55 +78,82 @@ async function request<T>(
   if (options.body !== undefined) {
     init.body = JSON.stringify(options.body);
   }
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), init);
-  } catch (networkError) {
-    // Network-level failures (CORS blocked, DNS failure, offline, etc.)
-    throw new ApiError(
-      `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
-      0,
-      "NETWORK_ERROR"
-    );
-  }
-  const text = await res.text();
-  let data: unknown;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    // Response was not valid JSON — log a snippet for debugging
-    const snippet = text.length > 200 ? text.slice(0, 200) + "…" : text;
-    throw new ApiError(
-      `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
-      res.status,
-      "INVALID_JSON"
-    );
-  }
-  if (!res.ok) {
-    const envelope = data as ApiEnvelope<unknown> | null;
-    const legacy = data as { message?: string; code?: string } | null;
-    const msg =
-      envelope?.error?.message ??
-      legacy?.message ??
-      res.statusText;
-    const code = envelope?.error?.code ?? legacy?.code;
-    throw new ApiError(msg, res.status, code);
+
+  for (let attempt = 0; attempt <= MAX_DB_RESUMING_RETRIES; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), init);
+    } catch (networkError) {
+      // Network-level failures (CORS blocked, DNS failure, offline, etc.)
+      throw new ApiError(
+        `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
+        0,
+        "NETWORK_ERROR"
+      );
+    }
+
+    // ── 503 + DATABASE_RESUMING → auto-retry with Retry-After ──
+    if (res.status === 503 && attempt < MAX_DB_RESUMING_RETRIES) {
+      const retryAfterSec = parseInt(res.headers.get("Retry-After") ?? "", 10);
+      const waitMs = retryAfterSec > 0 ? retryAfterSec * 1000 : DEFAULT_RETRY_AFTER_MS;
+      console.log(
+        `[API] 503 Database resuming (attempt ${attempt + 1}/${MAX_DB_RESUMING_RETRIES}), ` +
+        `retrying in ${waitMs / 1000}s…`
+      );
+      // Notify UI so SyncIndicator can show "DB starting…"
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("zedi:db-resuming", {
+            detail: { attempt: attempt + 1, retryAfterMs: waitMs },
+          })
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+
+    const text = await res.text();
+    let data: unknown;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      // Response was not valid JSON — log a snippet for debugging
+      const snippet = text.length > 200 ? text.slice(0, 200) + "…" : text;
+      throw new ApiError(
+        `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
+        res.status,
+        "INVALID_JSON"
+      );
+    }
+    if (!res.ok) {
+      const envelope = data as ApiEnvelope<unknown> | null;
+      const legacy = data as { message?: string; code?: string } | null;
+      const msg =
+        envelope?.error?.message ??
+        legacy?.message ??
+        res.statusText;
+      const code = envelope?.error?.code ?? legacy?.code;
+      throw new ApiError(msg, res.status, code);
+    }
+
+    // Server success responses are wrapped as { ok: true, data: ... }.
+    const envelope = data as ApiEnvelope<T> | null;
+    if (
+      envelope &&
+      typeof envelope === "object" &&
+      "ok" in envelope &&
+      envelope.ok === true &&
+      "data" in envelope
+    ) {
+      return envelope.data as T;
+    }
+
+    // Backward compatibility: if server returns raw payload, keep accepting it.
+    return data as T;
   }
 
-  // Server success responses are wrapped as { ok: true, data: ... }.
-  const envelope = data as ApiEnvelope<T> | null;
-  if (
-    envelope &&
-    typeof envelope === "object" &&
-    "ok" in envelope &&
-    envelope.ok === true &&
-    "data" in envelope
-  ) {
-    return envelope.data as T;
-  }
-
-  // Backward compatibility: if server returns raw payload, keep accepting it.
-  return data as T;
+  // All retries exhausted (503 persisted)
+  throw new ApiError("Database is still resuming after retries", 503, "DATABASE_RESUMING");
 }
 
 async function requestOptionalAuth<T>(

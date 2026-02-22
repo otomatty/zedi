@@ -6,7 +6,7 @@
  */
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { eq, and, gt, sql } from 'drizzle-orm';
+import { eq, and, gt, sql, inArray } from 'drizzle-orm';
 import { pages, links, ghostLinks, pageContents } from '../schema';
 import { authRequired } from '../middleware/auth';
 import type { AppEnv } from '../types';
@@ -22,6 +22,7 @@ app.get('/', authRequired, async (c) => {
   let query = db
     .select({
       id: pages.id,
+      owner_id: pages.ownerId,
       title: pages.title,
       content_preview: pages.contentPreview,
       thumbnail_url: pages.thumbnailUrl,
@@ -42,10 +43,42 @@ app.get('/', authRequired, async (c) => {
   }
 
   const rows = await query.orderBy(pages.updatedAt);
+  const pageIds = rows.map((r) => r.id);
+
+  let linksRows: typeof links.$inferSelect[] = [];
+  let ghostLinksRows: typeof ghostLinks.$inferSelect[] = [];
+
+  if (pageIds.length > 0) {
+    linksRows = await db
+      .select()
+      .from(links)
+      .where(inArray(links.sourceId, pageIds));
+
+    ghostLinksRows = await db
+      .select()
+      .from(ghostLinks)
+      .where(inArray(ghostLinks.sourcePageId, pageIds));
+  }
 
   return c.json({
-    pages: rows,
-    synced_at: new Date().toISOString(),
+    pages: rows.map((r) => ({
+      ...r,
+      created_at: r.created_at.toISOString(),
+      updated_at: r.updated_at.toISOString(),
+    })),
+    links: linksRows.map((l) => ({
+      source_id: l.sourceId,
+      target_id: l.targetId,
+      created_at: l.createdAt.toISOString(),
+    })),
+    ghost_links: ghostLinksRows.map((g) => ({
+      link_text: g.linkText,
+      source_page_id: g.sourcePageId,
+      created_at: g.createdAt.toISOString(),
+      original_target_page_id: g.originalTargetPageId,
+      original_note_id: g.originalNoteId,
+    })),
+    server_time: new Date().toISOString(),
   });
 });
 
