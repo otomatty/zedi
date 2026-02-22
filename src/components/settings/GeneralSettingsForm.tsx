@@ -21,6 +21,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
 import {
   THEME_OPTIONS,
   FONT_SIZE_OPTIONS,
@@ -56,6 +57,7 @@ export const GeneralSettingsForm: React.FC = () => {
 
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRunTourAgain = useCallback(() => {
@@ -102,7 +104,8 @@ export const GeneralSettingsForm: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* プロフィール設定（先頭） */}
+      {/* プロフィール設定（先頭） — サインイン時のみ表示 */}
+      {isSignedIn && (
       <Card>
         <CardHeader>
           <CardTitle>{t("generalSettings.profile.title")}</CardTitle>
@@ -175,6 +178,7 @@ export const GeneralSettingsForm: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* 表示設定: テーマ + フォントサイズ */}
       <Card>

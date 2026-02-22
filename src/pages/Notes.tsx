@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { NotesLayout } from "@/components/note/NotesLayout";
 import { useNotes, useCreateNote } from "@/hooks/useNoteQueries";
+import { useAuth } from "@/hooks/useAuth";
 import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { NoteCard } from "@/components/note/NoteCard";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ const Notes: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isSignedIn } = useAuth();
   const { data: notes = [], isLoading } = useNotes();
   const createNoteMutation = useCreateNote();
 
@@ -91,6 +93,22 @@ const Notes: React.FC = () => {
       });
     }
   };
+
+  if (!isSignedIn) {
+    return (
+      <NotesLayout>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <h1 className="text-2xl font-semibold mb-4">{t("notes.title")}</h1>
+          <p className="text-muted-foreground mb-6">
+            {t("notes.signInRequired", "ノートを利用するにはサインインが必要です")}
+          </p>
+          <Link to="/sign-in">
+            <Button>{t("nav.signIn")}</Button>
+          </Link>
+        </div>
+      </NotesLayout>
+    );
+  }
 
   return (
     <NotesLayout>

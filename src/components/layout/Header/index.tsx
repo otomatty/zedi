@@ -1,12 +1,10 @@
 import React from "react";
 import Container from "@/components/layout/Container";
-import { SyncIndicator } from "@/components/layout/SyncIndicator";
 import { cn } from "@/lib/utils";
 import { HeaderLogo } from "./HeaderLogo";
 import { MonthNavigation } from "./MonthNavigation";
 import { HeaderSearchBar } from "./HeaderSearchBar";
-import { AppsMenu } from "./AppsMenu";
-import { UserMenu } from "./UserMenu";
+import { UnifiedMenu } from "./UnifiedMenu";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
@@ -43,16 +41,14 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           </div>
         )}
 
-        {/* Right: Sync, Apps menu, Auth (guest: login prompt + Sign In) */}
+        {/* Right: Unified menu */}
         <div className="flex items-center gap-2 shrink-0">
-          <SyncIndicator />
-          <AppsMenu />
           {!isSignedIn && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
               {t("common.guestSyncPrompt")}
             </span>
           )}
-          <UserMenu />
+          <UnifiedMenu />
         </div>
       </Container>
     </header>

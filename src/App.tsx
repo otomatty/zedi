@@ -64,63 +64,14 @@ const App = () => (
             <Route path="/home" element={<Home />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/notes/discover" element={<NotesDiscover />} />
-            <Route
-              path="/notes"
-              element={
-                <ProtectedRoute>
-                  <Notes />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/notes" element={<Notes />} />
             <Route path="/page/:id" element={<PageEditorPage />} />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings/ai"
-              element={
-                <ProtectedRoute>
-                  <AISettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings/storage"
-              element={
-                <ProtectedRoute>
-                  <StorageSettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings/general"
-              element={
-                <ProtectedRoute>
-                  <GeneralSettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/pricing"
-              element={
-                <ProtectedRoute>
-                  <Pricing />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/donate"
-              element={
-                <ProtectedRoute>
-                  <Donate />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/ai" element={<AISettings />} />
+            <Route path="/settings/storage" element={<StorageSettings />} />
+            <Route path="/settings/general" element={<GeneralSettings />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/donate" element={<Donate />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
             </Routes>

@@ -83,5 +83,6 @@
   "loginToViewMyNotes": "Sign in to view your notes",
   "addNewPageToNote": "Add new page",
   "newPageTitle": "Page title",
-  "viewCount": "{{count}} views"
+  "viewCount": "{{count}} views",
+  "signInRequired": "Sign in to use Notes"
 }

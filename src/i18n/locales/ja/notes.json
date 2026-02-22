@@ -83,5 +83,6 @@
   "loginToViewMyNotes": "ログインしてノートを表示",
   "addNewPageToNote": "新規ページを追加",
   "newPageTitle": "ページタイトル",
-  "viewCount": "{{count}} 回閲覧"
+  "viewCount": "{{count}} 回閲覧",
+  "signInRequired": "ノートを利用するにはサインインが必要です"
 }

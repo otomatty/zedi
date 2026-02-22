@@ -36,7 +36,7 @@ interface UseStorageSettingsReturn {
 }
 
 export function useStorageSettings(): UseStorageSettingsReturn {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const [settings, setSettings] = useState<StorageSettings>(
     getDefaultStorageSettings()
   );
@@ -121,6 +121,15 @@ export function useStorageSettings(): UseStorageSettingsReturn {
 
   // 接続テストを実行する（デフォルト優先のときはデフォルトストレージ、外部のときは選択中の外部プロバイダー）
   const test = useCallback(async (): Promise<ConnectionTestResult> => {
+    if (!isSignedIn && settings.preferDefaultStorage !== false) {
+      const noAuthResult: ConnectionTestResult = {
+        success: false,
+        message: "デフォルトストレージのテストにはサインインが必要です",
+      };
+      setTestResult(noAuthResult);
+      return noAuthResult;
+    }
+
     setIsTesting(true);
     setTestResult(null);
 
@@ -144,7 +153,7 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     } finally {
       setIsTesting(false);
     }
-  }, [settings, getToken]);
+  }, [settings, getToken, isSignedIn]);
 
   // 設定をリセットする
   const reset = useCallback(() => {
