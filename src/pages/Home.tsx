@@ -44,7 +44,7 @@ const Home: React.FC = () => {
 
       <Header />
 
-      <ContentWithAIChat>
+      <ContentWithAIChat floatingAction={<FloatingActionButton />}>
         <main className="py-6">
           <Container>
             <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
@@ -53,8 +53,6 @@ const Home: React.FC = () => {
           </Container>
         </main>
       </ContentWithAIChat>
-
-      <FloatingActionButton />
     </div>
   );
 };

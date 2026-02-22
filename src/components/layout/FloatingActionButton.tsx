@@ -136,18 +136,24 @@ const FloatingActionButton: React.FC = () => {
       data-tour-id="tour-fab"
       onClick={() => setIsMenuOpen(!isMenuOpen)}
       disabled={isCreating}
-      size="icon"
       className={cn(
-        "h-16 w-16 rounded-full",
+        "h-16 rounded-full group",
         "shadow-elevated hover:shadow-glow",
-        "transition-all duration-300",
-        isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground/90"
+        "transition-all duration-300 ease-in-out",
+        isMenuOpen
+          ? "w-16 bg-muted-foreground hover:bg-muted-foreground/90"
+          : "w-16 hover:w-auto hover:pl-5 hover:pr-6"
       )}
     >
       {isMenuOpen ? (
         <X className="h-7 w-7" />
       ) : (
-        <Plus className="h-7 w-7" />
+        <span className="flex items-center">
+          <Plus className="h-7 w-7 flex-shrink-0" />
+          <span className="inline-block max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-[12rem] group-hover:ml-2 transition-all duration-300 ease-in-out text-sm font-medium">
+            {t("common.createPageAction")}
+          </span>
+        </span>
       )}
     </Button>
   );

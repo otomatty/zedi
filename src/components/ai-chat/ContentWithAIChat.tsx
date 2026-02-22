@@ -11,9 +11,10 @@ import { cn } from '../../lib/utils';
 
 interface ContentWithAIChatProps {
   children: React.ReactNode;
+  floatingAction?: React.ReactNode;
 }
 
-export function ContentWithAIChat({ children }: ContentWithAIChatProps) {
+export function ContentWithAIChat({ children, floatingAction }: ContentWithAIChatProps) {
   const isMobile = useIsMobile();
   const { isOpen, togglePanel } = useAIChatStore();
   const { setAIChatAvailable } = useAIChatContext();
@@ -28,6 +29,11 @@ export function ContentWithAIChat({ children }: ContentWithAIChatProps) {
     return (
       <>
         {children}
+        {floatingAction && (
+          <div className="fixed bottom-6 right-6 z-40">
+            {floatingAction}
+          </div>
+        )}
         <Drawer open={isOpen} onOpenChange={(open) => { if (!open) togglePanel(); }}>
           <DrawerContent className="h-[85vh]">
             <AIChatPanel />
@@ -39,8 +45,15 @@ export function ContentWithAIChat({ children }: ContentWithAIChatProps) {
 
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
-      <div className="flex-1 overflow-y-auto transition-all duration-300 ease-in-out">
-        {children}
+      <div className="flex-1 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-y-auto transition-all duration-300 ease-in-out">
+          {children}
+        </div>
+        {floatingAction && (
+          <div className="absolute bottom-6 right-6 z-40">
+            {floatingAction}
+          </div>
+        )}
       </div>
       <div 
         className={cn(
