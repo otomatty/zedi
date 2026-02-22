@@ -24,6 +24,7 @@ import { ConnectionIndicator } from "../ConnectionIndicator";
 import { UserAvatars } from "../UserAvatars";
 import type { ConnectionStatus } from "@/lib/collaboration/types";
 import type { UserPresence } from "@/lib/collaboration/types";
+import { AIChatButton } from "@/components/layout/Header/AIChatButton";
 
 interface PageEditorHeaderProps {
   /** Wiki Generator ボタン用（タイトル表示は PageTitleBlock で行う） */
@@ -98,6 +99,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
               <UserAvatars users={collaboration.onlineUsers} className="shrink-0" />
             </>
           )}
+          <AIChatButton />
           {/* Wiki Generator Button - タイトルがあり本文が空の場合のみ表示 */}
           <WikiGeneratorButton
             title={title}

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Header from "@/components/layout/Header";
@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { useNote, useNotePage } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
+import { useAIChatContext } from "@/contexts/AIChatContext";
 
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
 
   const { note, access, source, isLoading: isNoteLoading } = useNote(
     noteId ?? "",
@@ -34,7 +36,9 @@ const NotePageView: React.FC = () => {
     }
   }, [navigate, noteId]);
 
-  const canEdit = Boolean(access?.canEdit);
+  // canEdit: ノートのロール（owner/editor）または自分のページであれば編集可能
+  const isOwnPage = Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
+  const canEdit = Boolean(access?.canEdit) || isOwnPage;
   const collaborationPageId = page?.id ?? "";
   const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
   const collaboration = useCollaboration({
@@ -42,6 +46,20 @@ const NotePageView: React.FC = () => {
     enabled: isCollaborationEnabled,
     mode: "collaborative",
   });
+
+  // canEdit時のみAIチャットにページコンテキストを設定
+  const { setPageContext } = useAIChatContext();
+  useEffect(() => {
+    if (canEdit && page) {
+      setPageContext({
+        type: 'editor',
+        pageId: page.id,
+        pageTitle: page.title,
+        pageContent: page.content?.slice(0, 3000) ?? '',
+      });
+    }
+    return () => setPageContext(null);
+  }, [canEdit, page, setPageContext]);
 
   if (isNoteLoading || isPageLoading) {
     return (
@@ -85,21 +103,40 @@ const NotePageView: React.FC = () => {
         </Container>
       </div>
 
-      <PageEditorContent
-        content={page.content}
-        title={page.title}
-        sourceUrl={page.sourceUrl}
-        currentPageId={page.id}
-        pageId={page.id}
-        isNewPage={false}
-        isWikiGenerating={false}
-        isReadOnly={!canEdit}
-        showLinkedPages={false}
-        showToolbar={canEdit}
-        onContentChange={() => undefined}
-        onContentError={() => undefined}
-        collaboration={isCollaborationEnabled ? collaboration : undefined}
-      />
+      {canEdit ? (
+        <ContentWithAIChat>
+          <PageEditorContent
+            content={page.content}
+            title={page.title}
+            sourceUrl={page.sourceUrl}
+            currentPageId={page.id}
+            pageId={page.id}
+            isNewPage={false}
+            isWikiGenerating={false}
+            isReadOnly={!canEdit}
+            showLinkedPages={false}
+            showToolbar={canEdit}
+            onContentChange={() => undefined}
+            onContentError={() => undefined}
+            collaboration={isCollaborationEnabled ? collaboration : undefined}
+          />
+        </ContentWithAIChat>
+      ) : (
+        <PageEditorContent
+          content={page.content}
+          title={page.title}
+          sourceUrl={page.sourceUrl}
+          currentPageId={page.id}
+          pageId={page.id}
+          isNewPage={false}
+          isWikiGenerating={false}
+          isReadOnly={true}
+          showLinkedPages={false}
+          showToolbar={false}
+          onContentChange={() => undefined}
+          onContentError={() => undefined}
+        />
+      )}
     </div>
   );
 };

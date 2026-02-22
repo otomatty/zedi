@@ -11,6 +11,8 @@ import { PageEditorHeader } from "./PageEditor/PageEditorHeader";
 import { PageEditorAlerts } from "./PageEditor/PageEditorAlerts";
 import { PageEditorContent } from "./PageEditor/PageEditorContent";
 import { PageEditorDialogs } from "./PageEditor/PageEditorDialogs";
+import { ContentWithAIChat } from "../ai-chat/ContentWithAIChat";
+import { useAIChatContext } from "../../contexts/AIChatContext";
 import {
   usePage,
   useUpdatePage,
@@ -320,6 +322,20 @@ const PageEditor: React.FC = () => {
     navigate(`/settings/ai?${search}`);
   }, [resetWiki, navigate, location.pathname, location.search]);
 
+  // AI Chat context: ページコンテキストを設定
+  const { setPageContext } = useAIChatContext();
+  useEffect(() => {
+    if (title || currentPageId) {
+      setPageContext({
+        type: 'editor',
+        pageId: currentPageId || undefined,
+        pageTitle: title,
+        pageContent: content ? content.substring(0, 3000) : undefined,
+      });
+    }
+    return () => setPageContext(null);
+  }, [title, currentPageId, setPageContext]);
+
   // Show loading state
   if (!isNewPage && isLoading) {
     return (
@@ -353,6 +369,7 @@ const PageEditor: React.FC = () => {
         collaboration={undefined}
       />
 
+      <ContentWithAIChat>
       <PageEditorAlerts
         duplicatePage={duplicatePage}
         errorMessage={errorMessage}
@@ -382,6 +399,7 @@ const PageEditor: React.FC = () => {
         initialContent={pendingInitialContent ?? undefined}
         onInitialContentApplied={() => setPendingInitialContent(null)}
       />
+      </ContentWithAIChat>
 
       <PageEditorDialogs
         deleteConfirmOpen={deleteConfirmOpen}

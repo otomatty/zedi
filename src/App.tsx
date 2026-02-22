@@ -27,6 +27,7 @@ import Onboarding from "./pages/Onboarding";
 import { GlobalSearchProvider } from "./contexts/GlobalSearchContext";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { AIChatProvider } from "./contexts/AIChatContext";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
       <BrowserRouter
         future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
+        <AIChatProvider>
         <GlobalShortcutsProvider>
           <GlobalSearchProvider>
             <Routes>
@@ -77,6 +79,7 @@ const App = () => (
             </Routes>
           </GlobalSearchProvider>
         </GlobalShortcutsProvider>
+        </AIChatProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

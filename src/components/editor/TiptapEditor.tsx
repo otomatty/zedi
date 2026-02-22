@@ -39,7 +39,6 @@ import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { useImageUploadManager } from "./TiptapEditor/useImageUploadManager";
 import { usePasteImageHandler } from "./TiptapEditor/usePasteImageHandler";
 import { useStorageActions } from "./TiptapEditor/useStorageActions";
-import { EditorBottomToolbar } from "@/components/editor/TiptapEditor/EditorBottomToolbar";
 import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
 import { useAuth } from "@/hooks/useAuth";
 import { extractFirstImage } from "@/lib/contentUtils";
@@ -652,15 +651,6 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           isReadOnly={isReadOnly}
           hasThumbnail={hasThumbnail}
           onSelectThumbnail={handleInsertThumbnailImage}
-        />
-      )}
-
-      {showToolbar && (
-        <EditorBottomToolbar
-          isReadOnly={isReadOnly}
-          showDiagramAction={selectedText.length > 0}
-          onInsertImage={handleInsertImageClick}
-          onGenerateDiagram={handleOpenMermaidDialog}
         />
       )}
 

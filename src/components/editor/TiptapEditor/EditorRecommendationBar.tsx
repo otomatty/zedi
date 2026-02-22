@@ -219,7 +219,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
   if (!canSearch) return null;
 
   return (
-    <div className="fixed bottom-14 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <Container className="flex flex-col gap-2 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

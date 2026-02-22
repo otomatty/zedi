@@ -7,6 +7,7 @@ import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { QuickTour } from "@/components/tour/QuickTour";
 import { useSeedData } from "@/hooks/useSeedData";
 import { useOnboarding } from "@/hooks/useOnboarding";
+import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 
 const HOME_PATH = "/home";
 
@@ -43,6 +44,7 @@ const Home: React.FC = () => {
 
       <Header />
 
+      <ContentWithAIChat>
       <main className="py-6">
         <Container>
           <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
@@ -50,6 +52,7 @@ const Home: React.FC = () => {
           </div>
         </Container>
       </main>
+      </ContentWithAIChat>
 
       <FloatingActionButton />
     </div>

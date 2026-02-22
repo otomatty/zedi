@@ -1,0 +1,47 @@
+{
+  "title": "AI",
+  "actions": {
+    "close": "Close",
+    "newConversation": "New Conversation",
+    "conversationList": "Conversations",
+    "send": "Send",
+    "stop": "Stop",
+    "createPage": "Create",
+    "editAndCreate": "Edit & Create",
+    "appendToPage": "Append",
+    "createMultiple": "Create All",
+    "addLink": "Add Link"
+  },
+  "placeholders": {
+    "default": "Type a message...",
+    "withContext": "Ask about this page..."
+  },
+  "context": {
+    "referencing": "Referencing \"{{title}}\""
+  },
+  "welcome": {
+    "editor": {
+      "title": "How can I help you?",
+      "summarize": "📝 Summarize this page",
+      "suggestLinks": "🔗 Suggest related keywords",
+      "translate": "🌐 Translate to English",
+      "deepDive": "💡 Deep dive into this topic"
+    },
+    "default": {
+      "title": "Ask me anything.\\nI can create pages from our conversation.",
+      "organize": "🧠 Organize what I learned recently",
+      "explain": "📖 Explain about...",
+      "brainstorm": "🗂️ Brainstorm ideas",
+      "draft": "✍️ Draft a blog post"
+    }
+  },
+  "suggestions": {
+    "createPage": "📄 Create new page \"{{title}}\"",
+    "createMultiplePages": "📄 Generation candidates:",
+    "appendToPage": "📄 Extract as independent page \"{{title}}\"",
+    "suggestWikiLinks": "🔗 Add [[{{title}}]] link to original page"
+  },
+  "empty": {
+    "messages": "Messages will appear here"
+  }
+}

@@ -5,6 +5,7 @@ import { HeaderLogo } from "./HeaderLogo";
 import { MonthNavigation } from "./MonthNavigation";
 import { HeaderSearchBar } from "./HeaderSearchBar";
 import { UnifiedMenu } from "./UnifiedMenu";
+import { AIChatButton } from "./AIChatButton";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
@@ -41,13 +42,14 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           </div>
         )}
 
-        {/* Right: Unified menu */}
+        {/* Right: AI Chat button & Unified menu */}
         <div className="flex items-center gap-2 shrink-0">
           {!isSignedIn && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
               {t("common.guestSyncPrompt")}
             </span>
           )}
+          <AIChatButton />
           <UnifiedMenu />
         </div>
       </Container>

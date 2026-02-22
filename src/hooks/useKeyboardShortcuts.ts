@@ -1,6 +1,8 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCreateNewPage } from "./useCreateNewPage";
+import { useAIChatStore } from "../stores/aiChatStore";
+import { useAIChatContext } from "../contexts/AIChatContext";
 
 interface KeyboardShortcutsOptions {
   onShowShortcuts?: () => void;
@@ -14,6 +16,8 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
   const location = useLocation();
   const { onShowShortcuts } = options;
   const { createNewPage, isCreating } = useCreateNewPage();
+  const { togglePanel } = useAIChatStore();
+  const { aiChatAvailable } = useAIChatContext();
   const isCreatingRef = useRef(isCreating);
   isCreatingRef.current = isCreating;
 
@@ -52,10 +56,19 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         return;
       }
 
+      // Cmd+Shift+A / Ctrl+Shift+A - Toggle AI Chat（利用可能時のみ）
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "a") {
+        if (aiChatAvailable) {
+          e.preventDefault();
+          togglePanel();
+        }
+        return;
+      }
+
       // Skip other shortcuts if editing
       if (isEditing) return;
     },
-    [navigate, location.pathname, onShowShortcuts]
+    [navigate, location.pathname, onShowShortcuts, togglePanel, aiChatAvailable]
   );
 
   useEffect(() => {
@@ -85,7 +98,10 @@ export const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
   },
 
   // Editor
-  { key: "[[", description: "WikiLink を挿入", category: "editor" },
+  { key: "[[" , description: "WikiLink を挿入", category: "editor" },
+
+  // AI
+  { key: "⌘⇧A", description: "AIチャットを開く", category: "ai" },
   { key: "# ", description: "見出し H1", category: "editor" },
   { key: "## ", description: "見出し H2", category: "editor" },
   { key: "### ", description: "見出し H3", category: "editor" },
