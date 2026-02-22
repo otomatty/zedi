@@ -1,6 +1,6 @@
 import React from 'react';
-import { Sparkles, User } from 'lucide-react';
-import { ChatMessage, ChatAction } from '../../types/aiChat';
+import { Sparkles, User, FileText } from 'lucide-react';
+import { ChatMessage, ChatAction, ReferencedPage } from '../../types/aiChat';
 import { getDisplayContent } from '../../lib/aiChatActions';
 import { AIChatActionCard } from './AIChatActionCard';
 import ReactMarkdown from 'react-markdown';
@@ -9,6 +9,42 @@ import remarkGfm from 'remark-gfm';
 interface AIChatMessageProps {
   message: ChatMessage;
   onExecuteAction?: (action: ChatAction) => void;
+}
+
+/** Render user message content with inline @PageTitle styled as badges */
+function renderUserContent(content: string, referencedPages?: ReferencedPage[]) {
+  if (!referencedPages || referencedPages.length === 0) {
+    return <div className="whitespace-pre-wrap break-words">{content}</div>;
+  }
+
+  // Build a regex that matches @Title for each referenced page
+  const escapedTitles = referencedPages.map((p) =>
+    p.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  );
+  const pattern = new RegExp(`(@(?:${escapedTitles.join('|')}))(?=\\s|$)`, 'g');
+  const parts = content.split(pattern);
+
+  return (
+    <div className="whitespace-pre-wrap break-words">
+      {parts.map((part, i) => {
+        const matchedRef = referencedPages.find(
+          (p) => part === `@${p.title}`
+        );
+        if (matchedRef) {
+          return (
+            <span
+              key={i}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0 rounded bg-primary-foreground/20 text-primary-foreground/90 text-xs font-medium align-baseline mx-0.5"
+            >
+              <FileText className="w-3 h-3 shrink-0" />
+              {matchedRef.title}
+            </span>
+          );
+        }
+        return <React.Fragment key={i}>{part}</React.Fragment>;
+      })}
+    </div>
+  );
 }
 
 export function AIChatMessage({ message, onExecuteAction }: AIChatMessageProps) {
@@ -30,7 +66,7 @@ export function AIChatMessage({ message, onExecuteAction }: AIChatMessageProps) 
             : 'bg-muted text-foreground rounded-tl-sm'
         }`}>
           {isUser ? (
-            <div className="whitespace-pre-wrap break-words">{displayContent}</div>
+            renderUserContent(displayContent, message.referencedPages)
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none break-words">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>

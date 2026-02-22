@@ -1,10 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Link2, Copy, Trash2 } from "lucide-react";
+import { Link2, Copy, Trash2, Sparkles } from "lucide-react";
 import type { PageSummary } from "@/types/page";
+import { ZEDI_PAGE_MIME_TYPE } from "@/types/aiChat";
 import { cn } from "@/lib/utils";
 import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
 import { useToast } from "@/hooks/use-toast";
+import { useAIChatStore } from "@/stores/aiChatStore";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useTranslation } from "react-i18next";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -31,18 +35,48 @@ interface PageCardProps {
 const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const createPageMutation = useCreatePage();
   const deletePageMutation = useDeletePage();
   const pageDetailQuery = usePage(page.id, { enabled: false });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  const isMobile = useIsMobile();
+  const { openPanel, setPendingPageToAdd } = useAIChatStore();
 
   const preview = page.contentPreview ?? "";
   const thumbnail = page.thumbnailUrl;
   const isClipped = !!page.sourceUrl;
 
   const handleClick = () => {
+    // ドラッグ直後のクリックを無視
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      return;
+    }
     navigate(`/page/${page.id}`);
   };
+
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    const data = JSON.stringify({ id: page.id, title: page.title || '無題のページ' });
+    e.dataTransfer.setData(ZEDI_PAGE_MIME_TYPE, data);
+    e.dataTransfer.effectAllowed = 'link';
+    setIsDragging(true);
+    isDraggingRef.current = true;
+  }, [page.id, page.title]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    // クリック抑制は短い遅延後にリセット
+    setTimeout(() => { isDraggingRef.current = false; }, 100);
+  }, []);
+
+  const handleAddToAIChat = useCallback(() => {
+    const title = page.title || '無題のページ';
+    setPendingPageToAdd({ id: page.id, title });
+    openPanel();
+  }, [page.id, page.title, setPendingPageToAdd, openPanel]);
 
   const handleDuplicate = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -100,6 +134,9 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
+            draggable={!isMobile}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
             onClick={handleClick}
             className={cn(
               "page-card w-full text-left rounded-lg overflow-hidden",
@@ -107,7 +144,8 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
               "transition-all duration-200 group",
               "animate-fade-in opacity-0",
               "aspect-square flex flex-col",
-              index <= 5 && `stagger-${Math.min(index + 1, 5)}`
+              index <= 5 && `stagger-${Math.min(index + 1, 5)}`,
+              isDragging && "opacity-50 ring-2 ring-primary"
             )}
             style={{
               animationFillMode: "forwards",
@@ -150,6 +188,11 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
           </button>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
+          <ContextMenuItem onClick={handleAddToAIChat}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            {t('aiChat.referencedPages.addToChat')}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
           <ContextMenuItem
             onClick={handleDuplicate}
             disabled={createPageMutation.isPending}

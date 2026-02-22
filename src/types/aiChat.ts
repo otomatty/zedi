@@ -14,6 +14,7 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;              // テキスト（Markdown）
   actions?: ChatAction[];       // AI提案のアクションカード
+  referencedPages?: ReferencedPage[]; // このメッセージに添付された参照ページ
   timestamp: number;
   isStreaming?: boolean;
   error?: string;
@@ -62,6 +63,18 @@ export interface SuggestWikiLinksAction {
   }>;
   reason: string;
 }
+
+/** ドラッグ&ドロップで参照されたページ */
+export interface ReferencedPage {
+  id: string;
+  title: string;
+}
+
+/** AIチャットのページD&Dに使うMIMEタイプ */
+export const ZEDI_PAGE_MIME_TYPE = 'application/x-zedi-page';
+
+/** 参照ページの最大数 */
+export const MAX_REFERENCED_PAGES = 5;
 
 /** ページコンテキスト（各ページが提供） */
 export interface PageContext {

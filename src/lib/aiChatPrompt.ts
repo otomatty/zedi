@@ -1,4 +1,4 @@
-import { PageContext } from '../types/aiChat';
+import { PageContext, ReferencedPage } from '../types/aiChat';
 
 function buildContextSection(context: PageContext): string {
   let section = '## 現在のコンテキスト\n';
@@ -26,9 +26,20 @@ function buildContextSection(context: PageContext): string {
   return section;
 }
 
+function buildReferencedPagesSection(referencedPages: ReferencedPage[]): string {
+  if (referencedPages.length === 0) return '';
+  let section = '\n## 参照ページ\n';
+  section += 'ユーザーが以下のページをAIチャットの参照として追加しています。これらのページの情報を踏まえて回答してください。\n';
+  for (const page of referencedPages) {
+    section += `\n### ${page.title}\n(ページID: ${page.id})\n`;
+  }
+  return section;
+}
+
 export function buildSystemPrompt(
   context: PageContext | null,
-  existingPageTitles: string[]
+  existingPageTitles: string[],
+  referencedPages: ReferencedPage[] = []
 ): string {
   return `
 あなたは Zedi のAIアシスタントです。
@@ -64,5 +75,6 @@ ${existingPageTitles.map(t => `- ${t}`).join('\n')}
 上記のタイトルに関連するキーワードが会話に出た場合、[[WikiLink]]として参照できることを提案してください。
 
 ${context ? buildContextSection(context) : ''}
+${buildReferencedPagesSection(referencedPages)}
 `;
 }

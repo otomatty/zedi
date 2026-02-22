@@ -29,7 +29,7 @@ export function AIChatButton() {
   return (
     <button
       onClick={handleClick}
-      className={`group relative flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all duration-300 ${
+      className={`group relative flex items-center gap-1.5 px-3 py-2 rounded-md transition-all duration-300 ${
         isOpen
           ? 'bg-gradient-to-r from-violet-500 via-fuchsia-500 to-blue-500 text-white shadow-sm'
           : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
@@ -61,11 +61,11 @@ export function AIChatButton() {
       )}
 
       <Sparkles
-        className={`relative w-5 h-5 ${isStreaming ? 'animate-pulse' : ''}`}
+        className={`relative w-6 h-6 ${isStreaming ? 'animate-pulse' : ''}`}
         style={isOpen ? { stroke: 'currentColor' } : { stroke: 'url(#ai-sparkle-gradient)' }}
         aria-hidden="true"
       />
-      <span className="relative font-medium text-sm">AI</span>
+      <span className="relative font-medium text-md">AI</span>
     </button>
   );
 }

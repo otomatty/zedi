@@ -44,5 +44,16 @@
   "empty": {
     "messages": "Messages will appear here",
     "pageConversations": "No conversation history for this page yet"
+  },
+  "referencedPages": {
+    "added": "Added \"{{title}}\" as reference",
+    "alreadyAdded": "\"{{title}}\" is already referenced",
+    "limitReached": "Maximum {{max}} reference pages allowed",
+    "dragHint": "Drag pages here to\nadd as AI reference",
+    "dropHint": "Drop here to add as reference",
+    "welcomeHint": "💡 Drag & drop page cards or type @ to reference pages",
+    "addToChat": "Add to AI Chat",
+    "mentionHint": "Search pages with @",
+    "noResults": "No matching pages found"
   }
 }

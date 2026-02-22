@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ReferencedPage } from '../types/aiChat';
 
 interface AIChatUIState {
   isOpen: boolean;
@@ -7,6 +8,8 @@ interface AIChatUIState {
   isStreaming: boolean;
   contextEnabled: boolean;
   showConversationList: boolean;
+  /** コンテキストメニューなど外部からの参照追加リクエスト */
+  pendingPageToAdd: ReferencedPage | null;
 
   // Actions
   togglePanel: () => void;
@@ -16,6 +19,7 @@ interface AIChatUIState {
   setStreaming: (isStreaming: boolean) => void;
   toggleContext: () => void;
   toggleConversationList: () => void;
+  setPendingPageToAdd: (page: ReferencedPage | null) => void;
 }
 
 export const useAIChatStore = create<AIChatUIState>()(
@@ -26,6 +30,7 @@ export const useAIChatStore = create<AIChatUIState>()(
       isStreaming: false,
       contextEnabled: true,
       showConversationList: false,
+      pendingPageToAdd: null,
 
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
       openPanel: () => set({ isOpen: true }),
@@ -34,6 +39,7 @@ export const useAIChatStore = create<AIChatUIState>()(
       setStreaming: (isStreaming) => set({ isStreaming }),
       toggleContext: () => set((state) => ({ contextEnabled: !state.contextEnabled })),
       toggleConversationList: () => set((state) => ({ showConversationList: !state.showConversationList })),
+      setPendingPageToAdd: (page) => set({ pendingPageToAdd: page }),
     }),
     {
       name: 'ai-chat-storage',

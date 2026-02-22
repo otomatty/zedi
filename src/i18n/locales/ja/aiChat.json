@@ -44,5 +44,16 @@
   "empty": {
     "messages": "メッセージ一覧がここに表示されます",
     "pageConversations": "このページの会話履歴はまだありません"
+  },
+  "referencedPages": {
+    "added": "「{{title}}」を参照に追加しました",
+    "alreadyAdded": "「{{title}}」は既に参照に追加されています",
+    "limitReached": "参照ページは最大{{max}}件までです",
+    "dragHint": "ページをドラッグして\nAIの参照に追加",
+    "dropHint": "ここにドロップして参照に追加",
+    "welcomeHint": "💡 ページカードをドラッグ&ドロップ、または @ でページを参照できます",
+    "addToChat": "AIチャットに追加",
+    "mentionHint": "@ でページを検索",
+    "noResults": "該当するページがありません"
   }
 }

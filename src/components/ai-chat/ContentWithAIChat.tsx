@@ -1,13 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { useAIChatStore } from '../../stores/aiChatStore';
 import { useAIChatContext } from '../../contexts/AIChatContext';
 import { AIChatPanel } from './AIChatPanel';
+import { ZEDI_PAGE_MIME_TYPE } from '../../types/aiChat';
 import {
   Drawer,
   DrawerContent,
 } from '../ui/drawer';
 import { cn } from '../../lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface ContentWithAIChatProps {
   children: React.ReactNode;
@@ -16,14 +18,60 @@ interface ContentWithAIChatProps {
 
 export function ContentWithAIChat({ children, floatingAction }: ContentWithAIChatProps) {
   const isMobile = useIsMobile();
-  const { isOpen, togglePanel } = useAIChatStore();
+  const { isOpen, togglePanel, openPanel } = useAIChatStore();
   const { setAIChatAvailable } = useAIChatContext();
+  const { t } = useTranslation();
+  const [isDraggingPage, setIsDraggingPage] = useState(false);
+  const [isHoveringHint, setIsHoveringHint] = useState(false);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // このコンポーネントがマウントされている間、AIチャットが利用可能であることを通知
   useEffect(() => {
     setAIChatAvailable(true);
     return () => setAIChatAvailable(false);
   }, [setAIChatAvailable]);
+
+  // Detect page drag globally (for showing hint zone when panel is closed)
+  useEffect(() => {
+    const handleGlobalDragStart = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes(ZEDI_PAGE_MIME_TYPE)) {
+        setIsDraggingPage(true);
+      }
+    };
+    const handleGlobalDragEnd = () => {
+      setIsDraggingPage(false);
+      setIsHoveringHint(false);
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    };
+    const handleGlobalDrop = () => {
+      setIsDraggingPage(false);
+      setIsHoveringHint(false);
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    };
+    document.addEventListener('dragstart', handleGlobalDragStart);
+    document.addEventListener('dragend', handleGlobalDragEnd);
+    document.addEventListener('drop', handleGlobalDrop);
+    return () => {
+      document.removeEventListener('dragstart', handleGlobalDragStart);
+      document.removeEventListener('dragend', handleGlobalDragEnd);
+      document.removeEventListener('drop', handleGlobalDrop);
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    };
+  }, []);
+
+  const handleHintDragEnter = useCallback(() => {
+    hintTimerRef.current = setTimeout(() => {
+      openPanel();
+      setIsDraggingPage(false);
+      setIsHoveringHint(false);
+    }, 800);
+    setIsHoveringHint(true);
+  }, [openPanel]);
+
+  const handleHintDragLeave = useCallback(() => {
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    setIsHoveringHint(false);
+  }, []);
 
   if (isMobile) {
     return (
@@ -65,6 +113,27 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
           <AIChatPanel />
         </div>
       </div>
+
+      {/* Drop hint zone when panel is closed and user is dragging a page */}
+      {!isOpen && isDraggingPage && (
+        <div
+          className={cn(
+            "fixed right-0 top-0 bottom-0 w-16 z-50 flex items-center justify-center transition-all duration-200",
+            isHoveringHint ? "bg-primary/20 w-24" : "bg-primary/5"
+          )}
+          onDragEnter={handleHintDragEnter}
+          onDragLeave={handleHintDragLeave}
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes(ZEDI_PAGE_MIME_TYPE)) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div className="writing-mode-vertical text-xs text-primary font-medium whitespace-nowrap" style={{ writingMode: 'vertical-rl' }}>
+            {t('aiChat.referencedPages.dragHint')}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

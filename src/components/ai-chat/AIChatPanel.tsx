@@ -8,7 +8,7 @@ import { useAIChatStore } from '../../stores/aiChatStore';
 import { useAIChatContext } from '../../contexts/AIChatContext';
 import { useAIChat } from '../../hooks/useAIChat';
 import { useAIChatConversations } from '../../hooks/useAIChatConversations';
-import { ChatAction, CreatePageAction, CreateMultiplePagesAction } from '../../types/aiChat';
+import { ChatAction, CreatePageAction, CreateMultiplePagesAction, ReferencedPage } from '../../types/aiChat';
 import { useCreatePage } from '../../hooks/usePageQueries';
 import { useNavigate } from 'react-router-dom';
 
@@ -73,7 +73,7 @@ export function AIChatPanel() {
     }
   }, [messages, activeConversationId, updateConversation]);
 
-  const handleSendMessage = useCallback((content: string) => {
+  const handleSendMessage = useCallback((content: string, referencedPages: ReferencedPage[] = []) => {
     // 現在の会話がない場合は新規作成
     if (!activeConversationId) {
       const newConv = createConversation(
@@ -83,7 +83,7 @@ export function AIChatPanel() {
       );
       setActiveConversation(newConv.id);
     }
-    sendMessage(content);
+    sendMessage(content, referencedPages);
   }, [activeConversationId, createConversation, pageContext, setActiveConversation, sendMessage]);
 
   const handleSelectConversation = useCallback((id: string) => {

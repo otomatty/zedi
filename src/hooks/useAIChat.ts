@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { ChatMessage, ChatAction, Conversation, PageContext } from '../types/aiChat';
+import { ChatMessage, ChatAction, Conversation, PageContext, ReferencedPage } from '../types/aiChat';
 import { callAIService, AIServiceRequest } from '../lib/aiService';
 import { loadAISettings } from '../lib/aiSettings';
 import { buildSystemPrompt } from '../lib/aiChatPrompt';
@@ -19,7 +19,7 @@ export function useAIChat({ pageContext, contextEnabled, existingPageTitles = []
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingContentRef = useRef<string>('');
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, messageRefs: ReferencedPage[] = []) => {
     setError(null);
 
     // ユーザーメッセージを追加
@@ -27,6 +27,7 @@ export function useAIChat({ pageContext, contextEnabled, existingPageTitles = []
       id: crypto.randomUUID(),
       role: 'user',
       content,
+      referencedPages: messageRefs.length > 0 ? messageRefs : undefined,
       timestamp: Date.now(),
     };
     setMessages((prev) => [...prev, userMessage]);
@@ -54,7 +55,14 @@ export function useAIChat({ pageContext, contextEnabled, existingPageTitles = []
       }
 
       const context = contextEnabled ? pageContext : null;
-      const systemPrompt = buildSystemPrompt(context, existingPageTitles);
+      // Collect all referenced pages from this message and conversation history
+      const allRefsInConversation = [...messages, userMessage]
+        .flatMap((m) => m.referencedPages ?? []);
+      // Deduplicate by id
+      const uniqueRefs = allRefsInConversation.filter(
+        (ref, idx, arr) => arr.findIndex((r) => r.id === ref.id) === idx
+      );
+      const systemPrompt = buildSystemPrompt(context, existingPageTitles, uniqueRefs);
 
       // 会話履歴からメッセージを構築
       const allMessages = [...messages, userMessage];

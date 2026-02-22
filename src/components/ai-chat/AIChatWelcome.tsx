@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, GripVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAIChatContext } from '../../contexts/AIChatContext';
 
@@ -47,6 +47,14 @@ export function AIChatWelcome({ onSuggestionClick }: AIChatWelcomeProps) {
           </button>
         ))}
       </div>
+
+      {/* Drag & drop / @mention hint */}
+      {!isEditor && (
+        <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+          <GripVertical className="w-3.5 h-3.5" />
+          <span>{t('aiChat.referencedPages.welcomeHint')}</span>
+        </div>
+      )}
     </div>
   );
 }
