@@ -105,12 +105,13 @@ app.get("/:id", authRequired, async (c) => {
     throw new HTTPException(404, { message: "Media not found" });
   }
 
-  // 署名付き GET URL を生成して 302 リダイレクト
+  const row = result[0];
+  if (!row) throw new HTTPException(404, { message: "Media not found" });
   const signedUrl = await getSignedUrl(
     s3,
     new GetObjectCommand({
       Bucket: env.MEDIA_BUCKET,
-      Key: result[0]!.s3Key,
+      Key: row.s3Key,
     }),
     { expiresIn: 3600 },
   );

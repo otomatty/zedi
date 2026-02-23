@@ -83,7 +83,9 @@ describe("cognitoAuth", () => {
       expect(state.expiresAt).toBeGreaterThanOrEqual(before + 7200 * 1000);
       expect(state.expiresAt).toBeLessThanOrEqual(Date.now() + 7200 * 1000);
 
-      const stored = JSON.parse(localStorage.getItem("zedi_cognito_auth")!);
+      const storedRaw = localStorage.getItem("zedi_cognito_auth");
+      expect(storedRaw).toBeTruthy();
+      const stored = JSON.parse(storedRaw ?? "{}");
       expect(stored.tokens.id_token).toBe("id-tok");
     });
   });

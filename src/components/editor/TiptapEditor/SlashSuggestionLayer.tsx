@@ -184,7 +184,7 @@ export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
   suggestionRef,
   onClose,
 }) => {
-  if (!suggestionState?.active || !position || !editor) return null;
+  if (!suggestionState?.active || !suggestionState.range || !position || !editor) return null;
 
   return (
     <div
@@ -198,7 +198,7 @@ export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
         ref={suggestionRef}
         editor={editor}
         query={suggestionState.query}
-        range={suggestionState.range!}
+        range={suggestionState.range}
         onClose={onClose}
       />
     </div>

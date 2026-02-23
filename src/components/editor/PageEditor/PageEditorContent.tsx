@@ -71,12 +71,15 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   );
 
   const collaborationConfig =
-    useCollaborationMode && collaboration
+    useCollaborationMode &&
+    collaboration?.ydoc &&
+    collaboration?.xmlFragment &&
+    collaboration?.collaborationUser
       ? {
-          ydoc: collaboration.ydoc!,
-          xmlFragment: collaboration.xmlFragment!,
-          awareness: collaboration.awareness, // undefined in local mode
-          user: collaboration.collaborationUser!,
+          ydoc: collaboration.ydoc,
+          xmlFragment: collaboration.xmlFragment,
+          awareness: collaboration.awareness,
+          user: collaboration.collaborationUser,
           updateCursor: collaboration.updateCursor,
           updateSelection: collaboration.updateSelection,
         }

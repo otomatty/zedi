@@ -26,37 +26,31 @@ let googleMock: {
 
 // OpenAI SDKのモック
 vi.mock("openai", () => ({
-  default: class OpenAI {
-    constructor() {
-      if (!openAIMock) {
-        throw new Error("OpenAI mock is not configured");
-      }
-      return openAIMock;
+  default: function OpenAI() {
+    if (!openAIMock) {
+      throw new Error("OpenAI mock is not configured");
     }
+    return openAIMock;
   },
 }));
 
 // Anthropic SDKのモック
 vi.mock("@anthropic-ai/sdk", () => ({
-  default: class Anthropic {
-    constructor() {
-      if (!anthropicMock) {
-        throw new Error("Anthropic mock is not configured");
-      }
-      return anthropicMock;
+  default: function Anthropic() {
+    if (!anthropicMock) {
+      throw new Error("Anthropic mock is not configured");
     }
+    return anthropicMock;
   },
 }));
 
 // Google GenAI SDKのモック
 vi.mock("@google/genai", () => ({
-  GoogleGenAI: class GoogleGenAI {
-    constructor() {
-      if (!googleMock) {
-        throw new Error("GoogleGenAI mock is not configured");
-      }
-      return googleMock;
+  GoogleGenAI: function GoogleGenAI() {
+    if (!googleMock) {
+      throw new Error("GoogleGenAI mock is not configured");
     }
+    return googleMock;
   },
 }));
 

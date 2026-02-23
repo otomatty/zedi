@@ -1043,14 +1043,14 @@ async function main(): Promise<void> {
       console.error("❌ Prod and dev connections required for prod-to-dev.");
       process.exit(1);
     }
-    await runDirection("prod-to-dev", prodConn!, devConn!, config, options);
+    await runDirection("prod-to-dev", prodConn, devConn, config, options);
   }
   if (options.direction === "dev-to-prod" || options.direction === "bidirectional") {
     if (!prodConn || !devConn) {
       console.error("❌ Prod and dev connections required for dev-to-prod.");
       process.exit(1);
     }
-    await runDirection("dev-to-prod", prodConn!, devConn!, config, options);
+    await runDirection("dev-to-prod", prodConn, devConn, config, options);
   }
 
   console.log(`

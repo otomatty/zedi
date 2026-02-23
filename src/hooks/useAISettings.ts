@@ -133,7 +133,8 @@ export function useAISettings(): UseAISettingsReturn {
         setAvailableModels(result.models);
         // 現在選択中のモデルが新しいリストにない場合、最初のモデルを選択
         if (!result.models.includes(settings.model)) {
-          setSettings((prev) => ({ ...prev, model: result.models![0] }));
+          const first = result.models[0];
+          if (first) setSettings((prev) => ({ ...prev, model: first }));
         }
       }
 

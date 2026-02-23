@@ -115,14 +115,15 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
             }
           },
         },
-        collaboration: useCollaborationMode
-          ? {
-              document: collaborationConfig!.ydoc,
-              field: "default",
-              awareness: collaborationConfig!.awareness,
-              user: collaborationConfig!.user,
-            }
-          : undefined,
+        collaboration:
+          useCollaborationMode && collaborationConfig
+            ? {
+                document: collaborationConfig.ydoc,
+                field: "default",
+                awareness: collaborationConfig.awareness,
+                user: collaborationConfig.user,
+              }
+            : undefined,
       }),
       content: useCollaborationMode ? undefined : initialParsedContent,
       autofocus: autoFocus ? "end" : false,

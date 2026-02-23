@@ -6,25 +6,22 @@ const mockYDocDestroy = vi.fn();
 const mockYDocGetXmlFragment = vi.fn().mockReturnValue({ toJSON: () => "" });
 
 vi.mock("yjs", () => ({
-  Doc: class {
-    on = mockYDocOn;
-    destroy = mockYDocDestroy;
-    getXmlFragment = mockYDocGetXmlFragment;
+  Doc: function Doc() {
+    return { on: mockYDocOn, destroy: mockYDocDestroy, getXmlFragment: mockYDocGetXmlFragment };
   },
   encodeStateAsUpdate: vi.fn(() => new Uint8Array([0, 0])),
   applyUpdate: vi.fn(),
-  XmlFragment: class {},
-  XmlElement: class {},
-  XmlText: class {},
+  XmlFragment: function XmlFragment() {},
+  XmlElement: function XmlElement() {},
+  XmlText: function XmlText() {},
 }));
 
 const mockIdbOn = vi.fn();
 const mockIdbDestroy = vi.fn();
 
 vi.mock("y-indexeddb", () => ({
-  IndexeddbPersistence: class {
-    on = mockIdbOn;
-    destroy = mockIdbDestroy;
+  IndexeddbPersistence: function IndexeddbPersistence() {
+    return { on: mockIdbOn, destroy: mockIdbDestroy };
   },
 }));
 

@@ -61,8 +61,8 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     if (!editor) return;
     const chips = editor.querySelectorAll<HTMLElement>("[data-page-id]");
     const newRefs = Array.from(chips).map((el) => ({
-      id: el.dataset.pageId!,
-      title: el.dataset.pageTitle!,
+      id: el.dataset.pageId ?? "",
+      title: el.dataset.pageTitle ?? "",
     }));
     setPendingRefs((prev) => {
       if (prev.length === newRefs.length && prev.every((r, i) => r.id === newRefs[i]?.id))
