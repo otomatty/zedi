@@ -44,11 +44,11 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
 
-      // strict 由来ルールの段階的対応（現状は warn、徐々に error へ移行推奨）
-      "@typescript-eslint/no-non-null-assertion": "warn",
-      "@typescript-eslint/no-extraneous-class": "warn",
-      "@typescript-eslint/no-useless-constructor": "warn",
-      "@typescript-eslint/no-dynamic-delete": "warn",
+      // strict 由来ルール（Phase 2-B: warn → error 化完了）
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-extraneous-class": "error",
+      "@typescript-eslint/no-useless-constructor": "error",
+      "@typescript-eslint/no-dynamic-delete": "error",
 
       // --- 未使用コードの削除 (YAGNI) ---
       "@typescript-eslint/no-unused-vars": [
