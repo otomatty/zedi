@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { useWebClipper } from "./useWebClipper";
 import type { ClippedContent } from "@/lib/webClipper";
 
@@ -13,8 +13,7 @@ vi.mock("@/lib/webClipper", () => ({
 }));
 
 vi.mock("@/lib/htmlToTiptap", () => ({
-  formatClippedContentAsTiptap: (...args: unknown[]) =>
-    mockFormatClippedContentAsTiptap(...args),
+  formatClippedContentAsTiptap: (...args: unknown[]) => mockFormatClippedContentAsTiptap(...args),
 }));
 
 const fakeContent: ClippedContent = {

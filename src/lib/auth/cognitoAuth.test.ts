@@ -33,16 +33,14 @@ function makeFakeTokens(overrides?: Partial<CognitoTokens>): CognitoTokens {
 describe("cognitoAuth", () => {
   beforeEach(() => {
     localStorage.clear();
-    import.meta.env.VITE_COGNITO_DOMAIN = "test.auth.example.com";
-    import.meta.env.VITE_COGNITO_CLIENT_ID = "test-client-id";
-    import.meta.env.VITE_COGNITO_REDIRECT_URI = "http://localhost:3000/auth/callback";
+    vi.stubEnv("VITE_COGNITO_DOMAIN", "test.auth.example.com");
+    vi.stubEnv("VITE_COGNITO_CLIENT_ID", "test-client-id");
+    vi.stubEnv("VITE_COGNITO_REDIRECT_URI", "http://localhost:3000/auth/callback");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    delete import.meta.env.VITE_COGNITO_DOMAIN;
-    delete import.meta.env.VITE_COGNITO_CLIENT_ID;
-    delete import.meta.env.VITE_COGNITO_REDIRECT_URI;
+    vi.unstubAllEnvs();
   });
 
   describe("parseIdToken", () => {
@@ -189,9 +187,9 @@ describe("cognitoAuth", () => {
         refresh_token: "new-refresh",
         expires_in: 3600,
       };
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(responseTokens), { status: 200 })
-      );
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(JSON.stringify(responseTokens), { status: 200 }));
 
       const result = await exchangeCodeForTokens("auth-code-123");
 
@@ -209,13 +207,9 @@ describe("cognitoAuth", () => {
     });
 
     it("throws on non-OK response", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("Bad Request", { status: 400 })
-      );
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("Bad Request", { status: 400 }));
 
-      await expect(exchangeCodeForTokens("bad-code")).rejects.toThrow(
-        "Token exchange failed"
-      );
+      await expect(exchangeCodeForTokens("bad-code")).rejects.toThrow("Token exchange failed");
     });
   });
 
@@ -227,7 +221,7 @@ describe("cognitoAuth", () => {
         expires_in: 3600,
       };
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(responseData), { status: 200 })
+        new Response(JSON.stringify(responseData), { status: 200 }),
       );
 
       const result = await refreshTokens("original-refresh");
@@ -246,7 +240,7 @@ describe("cognitoAuth", () => {
         expires_in: 3600,
       };
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(responseData), { status: 200 })
+        new Response(JSON.stringify(responseData), { status: 200 }),
       );
 
       const result = await refreshTokens("original-refresh");

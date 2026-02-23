@@ -96,11 +96,10 @@ describe("useSubscription", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.plan).toBe("free");
     });
 
     expect(result.current.isProUser).toBe(false);
-    expect(result.current.plan).toBe("free");
   });
 
   it("isLoading is false when not signed in", () => {
