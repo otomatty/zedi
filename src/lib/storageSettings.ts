@@ -59,7 +59,7 @@ export async function loadStorageSettings(): Promise<StorageSettings | null> {
     const parsed = JSON.parse(stored) as StorageSettings;
 
     // 認証情報を復号化
-    const config = { ...parsed.config };
+    let config: typeof parsed.config = { ...parsed.config };
 
     for (const field of SENSITIVE_FIELDS) {
       const value = config[field as keyof typeof config];
@@ -69,7 +69,8 @@ export async function loadStorageSettings(): Promise<StorageSettings | null> {
         } catch {
           // 復号化に失敗した場合はフィールドをクリア
           console.warn(`Failed to decrypt field: ${field}`);
-          delete (config as Record<string, unknown>)[field];
+          const { [field]: _, ...rest } = config as Record<string, unknown>;
+          config = rest as typeof config;
         }
       }
     }

@@ -103,7 +103,9 @@ describe("aiClient", () => {
   describe("saveCachedModels", () => {
     it("saves models to localStorage", () => {
       saveCachedModels("openai", ["gpt-5-mini"]);
-      const stored = JSON.parse(localStorage.getItem(CACHE_KEY)!);
+      const raw = localStorage.getItem(CACHE_KEY);
+      expect(raw).toBeTruthy();
+      const stored = JSON.parse(raw ?? "{}");
       expect(stored.openai.models).toEqual(["gpt-5-mini"]);
       expect(stored.openai.provider).toBe("openai");
       expect(stored.openai.cachedAt).toBeGreaterThan(0);

@@ -76,7 +76,8 @@ export async function validateModelAccess(
     throw new Error("Model not found or inactive");
   }
 
-  const m = model[0]!;
+  const m = model[0];
+  if (!m) throw new Error("Model not found or inactive");
   if (m.tierRequired === "pro" && tier === "free") {
     throw new Error("FORBIDDEN");
   }

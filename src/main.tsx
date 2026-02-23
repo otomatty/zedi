@@ -23,7 +23,9 @@ if (!isE2EMode && !import.meta.env.VITE_COGNITO_CLIENT_ID) {
   console.warn("[Auth] VITE_COGNITO_CLIENT_ID is not set; sign-in will fail.");
 }
 
-createRoot(document.getElementById("root")!).render(
+const rootEl = document.getElementById("root");
+if (!rootEl) throw new Error("Root element #root not found");
+createRoot(rootEl).render(
   <StrictMode>
     <AuthProvider>
       <App />

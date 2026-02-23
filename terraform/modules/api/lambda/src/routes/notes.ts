@@ -48,8 +48,8 @@ async function getNoteRole(
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!noteResult.length) return { role: null, note: null };
-  const note = noteResult[0]!;
+  const note = noteResult[0];
+  if (!note) return { role: null, note: null };
 
   // オーナーチェック
   if (note.ownerId === userId) return { role: "owner", note };
@@ -68,8 +68,9 @@ async function getNoteRole(
       )
       .limit(1);
 
-    if (member.length) {
-      return { role: member[0]!.role as "editor" | "viewer", note };
+    const firstMember = member[0];
+    if (firstMember) {
+      return { role: firstMember.role as "editor" | "viewer", note };
     }
   }
 
@@ -139,8 +140,9 @@ app.put("/:noteId", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
-  if (note[0]!.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  const noteRow = note[0];
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
   const body = await c.req.json<{
     title?: string;
@@ -180,8 +182,9 @@ app.delete("/:noteId", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
-  if (note[0]!.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  const noteRow = note[0];
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
   await db
     .update(notes)
@@ -418,10 +421,12 @@ app.put("/:noteId/pages", authRequired, async (c) => {
 
   // page_ids の順番で sort_order を更新
   for (let i = 0; i < body.page_ids.length; i++) {
+    const pageId = body.page_ids[i];
+    if (!pageId) continue;
     await db
       .update(notePages)
       .set({ sortOrder: i, updatedAt: new Date() })
-      .where(and(eq(notePages.noteId, noteId), eq(notePages.pageId, body.page_ids[i]!)));
+      .where(and(eq(notePages.noteId, noteId), eq(notePages.pageId, pageId)));
   }
 
   await db.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
@@ -473,8 +478,9 @@ app.post("/:noteId/members", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
-  if (note[0]!.ownerId !== userId) {
+  const noteRow = note[0];
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) {
     throw new HTTPException(403, { message: "Only the owner can add members" });
   }
 
@@ -520,8 +526,9 @@ app.delete("/:noteId/members/:memberEmail", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
-  if (note[0]!.ownerId !== userId) {
+  const noteRow = note[0];
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) {
     throw new HTTPException(403, { message: "Only the owner can remove members" });
   }
 

@@ -28,13 +28,16 @@ export function AIChatModelSelector() {
         const settings = await loadAISettings();
         const savedModelId = settings?.modelId;
         const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
-        const initial = matched ?? available[0]!;
-        setSelectedModel({
-          id: initial.id,
-          provider: initial.provider,
-          model: initial.modelId,
-          displayName: initial.displayName,
-        });
+        const first = available[0];
+        const initial = matched ?? first;
+        if (initial) {
+          setSelectedModel({
+            id: initial.id,
+            provider: initial.provider,
+            model: initial.modelId,
+            displayName: initial.displayName,
+          });
+        }
       }
     } catch {
       // フォールバック: 設定画面のモデルを使用

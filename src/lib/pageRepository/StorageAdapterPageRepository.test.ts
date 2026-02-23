@@ -126,8 +126,10 @@ describe("StorageAdapterPageRepository", () => {
 
       const page = await repo.getPage(LOCAL_USER_ID, "page-1");
       expect(page).not.toBeNull();
-      expect(page!.id).toBe("page-1");
-      expect(page!.title).toBe("Hello");
+      if (page) {
+        expect(page.id).toBe("page-1");
+        expect(page.title).toBe("Hello");
+      }
     });
 
     it("returns null when page not found", async () => {
@@ -308,7 +310,7 @@ describe("StorageAdapterPageRepository", () => {
       (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(pages);
       const dup = await repo.checkDuplicateTitle(LOCAL_USER_ID, "Unique Title");
       expect(dup).not.toBeNull();
-      expect(dup!.id).toBe("p1");
+      if (dup) expect(dup.id).toBe("p1");
     });
 
     it("excludes current page from duplicate check", async () => {

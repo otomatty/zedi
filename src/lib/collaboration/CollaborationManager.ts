@@ -293,7 +293,7 @@ export class CollaborationManager {
     const onlineUsers: UserPresence[] = [];
 
     states.forEach((state, clientId) => {
-      if (clientId !== this.awareness!.clientID && state.userId) {
+      if (clientId !== (this.awareness?.clientID ?? null) && state.userId) {
         onlineUsers.push(state as UserPresence);
       }
     });
