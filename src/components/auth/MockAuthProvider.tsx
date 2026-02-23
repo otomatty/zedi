@@ -37,9 +37,7 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
     orgRole: null,
     orgSlug: null,
     getToken: async () => "mock_e2e_token_for_testing",
-    signOut: async () => {
-      console.log("[E2E Mock] Sign out called");
-    },
+    signOut: async () => {},
   };
 
   return <MockAuthContext.Provider value={mockAuthValue}>{children}</MockAuthContext.Provider>;

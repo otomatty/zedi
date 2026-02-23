@@ -67,7 +67,6 @@ export function useSync() {
 
     setIsSyncing(true);
     try {
-      console.log("[Sync] Manual sync requested", { userId });
       // Manual sync: reset failure counter and force past the auto-retry guard
       resetSyncFailures();
       await runAuroraSync(userId, getToken, { force: true });
@@ -141,7 +140,6 @@ export function useRepository() {
 
     (async () => {
       try {
-        console.log("[Sync] Initial sync requested", { userId });
         // Ensure user row exists in Aurora (POST /api/users/upsert) before first sync
         const api = apiRef.current;
         if (api) {
@@ -162,7 +160,6 @@ export function useRepository() {
         // 503 (DB resuming) での失敗時は遅延リトライ
         // apiClient の自動リトライ (4×10s) でも復帰しなかった場合のフォールバック
         if (error instanceof ApiError && error.code === "DATABASE_RESUMING") {
-          console.log("[Sync] DB was resuming, scheduling delayed retry in 15s");
           initialSyncRequestedForUser.delete(userId);
           setTimeout(() => {
             initialSyncRequestedForUser.delete(userId);
@@ -358,7 +355,6 @@ export function useCreatePage() {
       });
     },
     onSuccess: (newPage) => {
-      console.log("=== createPage success ===", newPage.id);
       // Invalidate and refetch pages list
       queryClient.invalidateQueries({ queryKey: pageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: pageKeys.summaries() });

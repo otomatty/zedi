@@ -99,10 +99,6 @@ async function request<T>(
     if (res.status === 503 && attempt < MAX_DB_RESUMING_RETRIES) {
       const retryAfterSec = parseInt(res.headers.get("Retry-After") ?? "", 10);
       const waitMs = retryAfterSec > 0 ? retryAfterSec * 1000 : DEFAULT_RETRY_AFTER_MS;
-      console.log(
-        `[API] 503 Database resuming (attempt ${attempt + 1}/${MAX_DB_RESUMING_RETRIES}), ` +
-          `retrying in ${waitMs / 1000}s…`,
-      );
       // Notify UI so SyncIndicator can show "DB starting…"
       if (typeof window !== "undefined") {
         window.dispatchEvent(

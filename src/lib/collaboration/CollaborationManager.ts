@@ -59,7 +59,6 @@ export class CollaborationManager {
     this.idbProvider = new IndexeddbPersistence(`zedi-doc-${pageId}`, this.ydoc);
 
     this.idbProvider.on("synced", () => {
-      console.log("[Collab] IndexedDB synced");
       if (this.mode === "local") {
         // 個人ページ: IndexedDB synced 後に Aurora から最新 Y.Doc を fetch してマージ
         this.fetchAndMergeFromAurora();
@@ -77,7 +76,6 @@ export class CollaborationManager {
     try {
       const token = await this.getAuthToken();
       if (!token || this.destroyed) {
-        console.log("[Collab] No auth token, local-only mode");
         this.updateState({ status: "connected", isSynced: true });
         this.startLocalObserver();
         return;
@@ -105,7 +103,6 @@ export class CollaborationManager {
           const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
           if (binary.length > 2) {
             Y.applyUpdate(this.ydoc, binary);
-            console.log(`[Collab] Merged Aurora Y.Doc (${binary.length} bytes) into local`);
           }
         }
       } else if (res.status === 404) {
@@ -181,9 +178,7 @@ export class CollaborationManager {
       });
 
       if (this.destroyed) return;
-      if (res.ok) {
-        console.log(`[Collab] Saved Y.Doc to Aurora (${state.length} bytes)`);
-      } else {
+      if (!res.ok) {
         console.warn(`[Collab] Aurora save failed: ${res.status}`);
       }
     } catch (err) {
@@ -232,13 +227,11 @@ export class CollaborationManager {
       document: this.ydoc,
       token: () => this.getAuthToken(),
       onStatus: ({ status }) => {
-        console.log(`[Collab] WebSocket status: ${status}`);
         this.updateState({
           status: status as ConnectionStatus,
         });
       },
       onSynced: ({ state: isSynced }) => {
-        console.log(`[Collab] Sync status: ${isSynced}`);
         this.updateState({ isSynced });
       },
     });
