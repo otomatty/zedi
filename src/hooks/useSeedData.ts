@@ -236,7 +236,6 @@ export function useSeedData() {
     if (pages.length === 0) {
       hasSeededRef.current = true;
       setIsSeeding(true);
-      console.log("Seeding tutorial pages...");
 
       // Create tutorial pages sequentially
       const seedPages = async () => {
@@ -246,7 +245,6 @@ export function useSeedData() {
               title: tutorialPage.title,
               content: tutorialPage.content,
             });
-            console.log("Created tutorial page:", tutorialPage.title);
             // Small delay to ensure proper ordering
             await new Promise((resolve) => setTimeout(resolve, 50));
           } catch (error) {
@@ -254,7 +252,6 @@ export function useSeedData() {
           }
         }
         localStorage.setItem(SEED_KEY, "true");
-        console.log("Tutorial pages seeded successfully");
       };
 
       seedPages().finally(() => setIsSeeding(false));
