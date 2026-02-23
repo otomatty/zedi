@@ -6,9 +6,9 @@
  * Aurora auto-pause からの復帰中は 503 + Retry-After を返し、
  * それ以外は 500 Internal Server Error を返す。
  */
-import type { ErrorHandler } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import type { AppEnv } from '../types';
+import type { ErrorHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
+import type { AppEnv } from "../types";
 
 /**
  * DatabaseResumingException をエラーチェーン (cause) から検知する。
@@ -17,12 +17,12 @@ import type { AppEnv } from '../types';
 function isDatabaseResumingError(err: unknown): boolean {
   let current: unknown = err;
   for (let depth = 0; depth < 5; depth++) {
-    if (!current || typeof current !== 'object') return false;
-    const name = (current as { name?: string }).name ?? '';
-    const message = (current as { message?: string }).message ?? '';
+    if (!current || typeof current !== "object") return false;
+    const name = (current as { name?: string }).name ?? "";
+    const message = (current as { message?: string }).message ?? "";
     if (
-      name === 'DatabaseResumingException' ||
-      message.includes('is resuming after being auto-paused')
+      name === "DatabaseResumingException" ||
+      message.includes("is resuming after being auto-paused")
     ) {
       return true;
     }
@@ -35,11 +35,8 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
   // ── Aurora auto-pause 復帰中の検知 ──
   if (isDatabaseResumingError(err)) {
     console.warn(`[api] ${c.req.method} ${c.req.path} → 503 Aurora resuming`);
-    c.header('Retry-After', '10');
-    return c.json(
-      { error: 'Database is resuming', code: 'DATABASE_RESUMING' },
-      503,
-    );
+    c.header("Retry-After", "10");
+    return c.json({ error: "Database is resuming", code: "DATABASE_RESUMING" }, 503);
   }
 
   if (err instanceof HTTPException) {
@@ -49,7 +46,7 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
   }
 
   // 既知のエラーメッセージからステータスコードを判定
-  const message = err instanceof Error ? err.message : 'Internal server error';
+  const message = err instanceof Error ? err.message : "Internal server error";
   const statusMap: Record<string, number> = {
     UNAUTHORIZED: 401,
     FORBIDDEN: 403,
