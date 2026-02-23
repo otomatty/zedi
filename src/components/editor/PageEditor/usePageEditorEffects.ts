@@ -154,5 +154,5 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
       });
     }
     return () => setPageContext(null);
-  }, [title, currentPageId, setPageContext]);
+  }, [title, currentPageId, content, setPageContext]);
 }

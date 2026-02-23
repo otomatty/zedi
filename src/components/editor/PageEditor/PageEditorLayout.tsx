@@ -126,7 +126,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
           onContentError={onContentError}
           onTitleChange={onTitleChange}
           errorMessage={errorMessage}
-          collaboration={isLocalDocEnabled ? { ...collaboration } : undefined}
+          collaboration={isLocalDocEnabled ? collaboration : undefined}
           initialContent={pendingInitialContent ?? undefined}
           onInitialContentApplied={onPendingInitialContentClear}
         />
