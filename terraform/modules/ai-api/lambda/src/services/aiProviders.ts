@@ -8,7 +8,7 @@
  */
 
 import type { AIChatRequest, AIChatResponse, TokenUsage, SSEPayload } from "../types/index.js";
-import { consumeProviderSSE, writeSSE } from "../utils/sse.js";
+import { consumeProviderSSE } from "../utils/sse.js";
 
 // =============================================================================
 // OpenAI

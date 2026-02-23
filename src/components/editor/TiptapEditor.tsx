@@ -17,7 +17,7 @@ import {
 } from "./extensions/WikiLinkSuggestion";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 import { useCheckGhostLinkReferenced } from "@/hooks/usePageQueries";
-import { useContentSanitizer, type ContentError } from "./TiptapEditor/useContentSanitizer";
+import { useContentSanitizer } from "./TiptapEditor/useContentSanitizer";
 import { useWikiLinkNavigation } from "./TiptapEditor/useWikiLinkNavigation";
 import { useWikiLinkStatusSync } from "./TiptapEditor/useWikiLinkStatusSync";
 import { createEditorExtensions, defaultEditorProps } from "./TiptapEditor/editorConfig";

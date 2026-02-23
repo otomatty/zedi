@@ -2,7 +2,7 @@
  * Drizzle ORM Schema: thumbnail_tier_quotas, thumbnail_objects
  * Source: db/aurora/005_thumbnail_storage.sql
  */
-import { pgTable, uuid, text, bigint, timestamp, index, varchar } from "drizzle-orm/pg-core";
+import { pgTable, uuid, bigint, timestamp, index, varchar } from "drizzle-orm/pg-core";
 
 // ── thumbnail_tier_quotas ────────────────────────────────────────────────────
 export const thumbnailTierQuotas = pgTable("thumbnail_tier_quotas", {

@@ -13,8 +13,6 @@ import type {
 } from "@/lib/collaboration/types";
 import { getUserColor } from "@/lib/collaboration/types";
 import { useAuth, useUser } from "@/hooks/useAuth";
-import type * as Y from "yjs";
-import type { Awareness } from "y-protocols/awareness";
 
 const LOCAL_USER_ID = "local-user";
 

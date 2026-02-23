@@ -16,7 +16,6 @@ import {
   getAuthorizeUrl,
   getIdToken,
   getStoredState,
-  setTokens,
   clearStorage,
   getLogoutUrl,
   parseIdToken,

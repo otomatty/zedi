@@ -1,11 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import {
-  ChatMessage,
-  ChatAction,
-  Conversation,
-  PageContext,
-  ReferencedPage,
-} from "../types/aiChat";
+import { ChatMessage, PageContext, ReferencedPage } from "../types/aiChat";
 import { callAIService, AIServiceRequest } from "../lib/aiService";
 import { loadAISettings } from "../lib/aiSettings";
 import { buildSystemPrompt } from "../lib/aiChatPrompt";
