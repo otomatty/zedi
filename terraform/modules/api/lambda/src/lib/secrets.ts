@@ -57,26 +57,25 @@ export async function getThumbnailSecrets(
   return _thumbCache;
 }
 
-// ── Webhook Secret ──────────────────────────────────────────────────────────
-let _webhookCache: string | null = null;
-let _webhookCacheAt = 0;
+// ── Polar Secrets ───────────────────────────────────────────────────────────
+interface PolarSecrets {
+  POLAR_ACCESS_TOKEN: string;
+  POLAR_WEBHOOK_SECRET: string;
+}
 
-export async function getWebhookSecret(secretArn: string): Promise<string> {
+let _polarCache: PolarSecrets | null = null;
+let _polarCacheAt = 0;
+
+export async function getPolarSecrets(secretArn: string): Promise<PolarSecrets> {
   const now = Date.now();
-  if (_webhookCache && now - _webhookCacheAt < CACHE_TTL) return _webhookCache;
+  if (_polarCache && now - _polarCacheAt < CACHE_TTL) return _polarCache;
   const res = await client.send(
     new GetSecretValueCommand({ SecretId: secretArn }),
   );
-  if (!res.SecretString) throw new Error('Webhook secret not found');
-  // シークレットが JSON の場合と plain string の場合を両方サポート
-  try {
-    const parsed = JSON.parse(res.SecretString) as Record<string, string>;
-    _webhookCache = parsed.WEBHOOK_SECRET || res.SecretString;
-  } catch {
-    _webhookCache = res.SecretString;
-  }
-  _webhookCacheAt = now;
-  return _webhookCache;
+  if (!res.SecretString) throw new Error('Polar secrets not found');
+  _polarCache = JSON.parse(res.SecretString) as PolarSecrets;
+  _polarCacheAt = now;
+  return _polarCache;
 }
 
 /**

@@ -146,20 +146,20 @@ const Pricing: React.FC = () => {
         consumedUnits: usage.consumedUnits,
         budgetUnits: usage.budgetUnits,
         remaining: Math.max(0, usage.budgetUnits - usage.consumedUnits),
-        tier: currentPlan,
+        tier: currentPlan === "pro" ? "paid" : "free",
         yearMonth: new Date().toISOString().slice(0, 7),
       }
     : null;
 
-  const handleSelectPro = () => {
+  const handleSelectPro = async () => {
     if (!userId) return;
-    openProCheckout(userId, billingInterval);
+    await openProCheckout(userId, billingInterval);
     // User may return from checkout in same tab; refetch after a short delay
-    setTimeout(() => refetch(), 2000);
+    setTimeout(() => refetch(), 5000);
   };
 
-  const handleManageSubscription = () => {
-    openCustomerPortal();
+  const handleManageSubscription = async () => {
+    await openCustomerPortal();
   };
 
   return (

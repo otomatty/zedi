@@ -44,8 +44,11 @@ export function getEnvConfig(): EnvConfig {
     AI_SECRETS_ARN: optional('AI_SECRETS_ARN'),
     RATE_LIMIT_TABLE: optional('RATE_LIMIT_TABLE'),
 
-    // Subscription webhook
-    WEBHOOK_SECRET: optional('WEBHOOK_SECRET'),
+    // Environment
+    ENVIRONMENT: optional('ENVIRONMENT', 'dev'),
+
+    // Subscription (Polar)
+    POLAR_SECRET_ARN: optional('POLAR_SECRET_ARN'),
 
     // Thumbnail
     THUMBNAIL_SECRETS_ARN: optional('THUMBNAIL_SECRETS_ARN'),

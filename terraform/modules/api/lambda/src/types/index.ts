@@ -47,8 +47,11 @@ export interface EnvConfig {
   AI_SECRETS_ARN: string;
   RATE_LIMIT_TABLE: string;
 
-  // Subscription webhook
-  WEBHOOK_SECRET: string;
+  // Environment
+  ENVIRONMENT: string;
+
+  // Subscription (Polar)
+  POLAR_SECRET_ARN: string;
 
   // Thumbnail
   THUMBNAIL_SECRETS_ARN: string;

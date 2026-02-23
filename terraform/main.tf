@@ -164,15 +164,15 @@ module "api" {
   aurora_database_name      = var.aurora_database_name
 
   # Cross-module resources (統合 Lambda が使用)
-  ai_secrets_arn             = module.ai_api.ai_secrets_arn
-  rate_limit_table_name      = module.ai_api.rate_limit_table_name
-  rate_limit_table_arn       = module.ai_api.rate_limit_table_arn
+  ai_secrets_arn              = module.ai_api.ai_secrets_arn
+  rate_limit_table_name       = module.ai_api.rate_limit_table_name
+  rate_limit_table_arn        = module.ai_api.rate_limit_table_arn
   websocket_api_execution_arn = module.ai_api.websocket_api_execution_arn
-  thumbnail_secrets_arn      = module.thumbnail_api.thumbnail_secrets_arn
-  thumbnails_bucket_name     = module.thumbnail_api.thumbnails_bucket_name
-  thumbnails_bucket_arn      = module.thumbnail_api.thumbnails_bucket_arn
-  thumbnail_cloudfront_url   = module.thumbnail_api.cloudfront_url
-  lemonsqueezy_secret_arn    = module.subscription.lemonsqueezy_secret_arn
+  thumbnail_secrets_arn       = module.thumbnail_api.thumbnail_secrets_arn
+  thumbnails_bucket_name      = module.thumbnail_api.thumbnails_bucket_name
+  thumbnails_bucket_arn       = module.thumbnail_api.thumbnails_bucket_arn
+  thumbnail_cloudfront_url    = module.thumbnail_api.cloudfront_url
+  polar_secret_arn            = module.subscription.polar_secret_arn
 }
 
 # =============================================================================

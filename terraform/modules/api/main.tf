@@ -82,7 +82,7 @@ resource "aws_iam_role_policy" "lambda_db" {
         ]
         Resource = [var.aurora_cluster_arn]
       }] : [],
-      # Secrets Manager — DB credentials + AI keys + Thumbnail keys + LemonSqueezy
+      # Secrets Manager — DB credentials + AI keys + Thumbnail keys + Polar
       [{
         Effect = "Allow"
         Action = ["secretsmanager:GetSecretValue"]
@@ -90,7 +90,7 @@ resource "aws_iam_role_policy" "lambda_db" {
           var.db_credentials_secret_arn,
           var.ai_secrets_arn,
           var.thumbnail_secrets_arn,
-          var.lemonsqueezy_secret_arn,
+          var.polar_secret_arn,
         ])
       }],
       # DynamoDB — Rate limiting
@@ -104,8 +104,8 @@ resource "aws_iam_role_policy" "lambda_db" {
       }] : [],
       # S3 — Thumbnails bucket
       var.thumbnails_bucket_arn != "" ? [{
-        Effect = "Allow"
-        Action = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
         Resource = ["${var.thumbnails_bucket_arn}/*"]
       }] : [],
       # API Gateway Management API — WebSocket postToConnection
@@ -144,7 +144,7 @@ resource "aws_lambda_function" "main" {
       THUMBNAIL_SECRETS_ARN    = var.thumbnail_secrets_arn
       THUMBNAIL_BUCKET         = var.thumbnails_bucket_name
       THUMBNAIL_CLOUDFRONT_URL = var.thumbnail_cloudfront_url
-      LEMONSQUEEZY_SECRET_ARN  = var.lemonsqueezy_secret_arn
+      POLAR_SECRET_ARN         = var.polar_secret_arn
     }
   }
   tags = var.tags
@@ -226,9 +226,9 @@ resource "aws_apigatewayv2_route" "health" {
 }
 
 # Webhook（認証なし — Lambda 内で署名検証）
-resource "aws_apigatewayv2_route" "webhook_lemonsqueezy" {
+resource "aws_apigatewayv2_route" "webhook_polar" {
   api_id    = aws_apigatewayv2_api.main.id
-  route_key = "POST /api/webhooks/lemonsqueezy"
+  route_key = "POST /api/webhooks/polar"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

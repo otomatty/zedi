@@ -27,7 +27,8 @@ import aiSubscriptionRoutes from './routes/ai/subscription';
 import thumbSearchRoutes from './routes/thumbnail/imageSearch';
 import thumbGenerateRoutes from './routes/thumbnail/imageGenerate';
 import thumbCommitRoutes from './routes/thumbnail/commit';
-import webhookLemonRoutes from './routes/webhooks/lemonsqueezy';
+import webhookPolarRoutes from './routes/webhooks/polar';
+import checkoutRoutes from './routes/checkout';
 
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
@@ -59,8 +60,11 @@ export function createApp(): Hono<AppEnv> {
   // Health check (no auth)
   app.route('/api', healthRoutes);
 
-  // Webhook (no JWT auth — uses HMAC signature)
-  app.route('/api/webhooks/lemonsqueezy', webhookLemonRoutes);
+  // Webhook (no JWT auth — uses Standard Webhooks signature)
+  app.route('/api/webhooks/polar', webhookPolarRoutes);
+
+  // Checkout & Customer Portal (auth required)
+  app.route('/api', checkoutRoutes);
 
   // Users
   app.route('/api/users', userRoutes);

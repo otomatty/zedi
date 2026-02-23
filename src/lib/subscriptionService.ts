@@ -1,5 +1,7 @@
 /**
- * Subscription service — handles LemonSqueezy checkout and subscription state
+ * Subscription service — handles Polar checkout and subscription state
+ *
+ * @see https://polar.sh/docs/features/checkout/session
  */
 
 export interface SubscriptionState {
@@ -56,55 +58,86 @@ export async function fetchSubscription(): Promise<SubscriptionState> {
 export type BillingInterval = "monthly" | "yearly";
 
 /**
- * Open LemonSqueezy checkout for the Pro plan.
- * Passes the user's Cognito sub and billing interval as custom_data for the webhook.
+ * Open Polar checkout for the Pro plan.
+ * Creates a Checkout Session via the backend API, which sets
+ * customerExternalId to the Cognito userId for webhook reconciliation.
  */
-export function openProCheckout(
+export async function openProCheckout(
   userId: string,
   billingInterval: BillingInterval
-): void {
-  const storeId = import.meta.env.VITE_LEMONSQUEEZY_STORE_ID || "";
+): Promise<void> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    console.error("API base URL not configured");
+    return;
+  }
+
   const productId =
     billingInterval === "yearly"
-      ? import.meta.env.VITE_LEMONSQUEEZY_AI_YEARLY_PRODUCT_ID
-      : import.meta.env.VITE_LEMONSQUEEZY_AI_MONTHLY_PRODUCT_ID ||
-        import.meta.env.VITE_LEMONSQUEEZY_AI_PRODUCT_ID ||
-        "";
+      ? import.meta.env.VITE_POLAR_PRO_YEARLY_PRODUCT_ID
+      : import.meta.env.VITE_POLAR_PRO_MONTHLY_PRODUCT_ID;
 
-  if (!storeId || !productId) {
-    console.error("LemonSqueezy store/product IDs not configured");
+  if (!productId) {
+    console.error("Polar product ID not configured");
     return;
   }
 
-  const checkoutUrl = new URL(
-    `https://${storeId}.lemonsqueezy.com/buy/${productId}`
-  );
-  checkoutUrl.searchParams.set("checkout[custom][user_id]", userId);
-  checkoutUrl.searchParams.set(
-    "checkout[custom][billing_interval]",
-    billingInterval
-  );
-  window.open(checkoutUrl.toString(), "_blank");
-}
-
-/**
- * @deprecated Use openProCheckout(userId, 'monthly') for new Pro plan.
- * Open a LemonSqueezy checkout for the AI Power subscription.
- * Passes the user's Cognito sub as custom_data so the webhook
- * can associate the subscription with the correct user.
- */
-export function openAISubscriptionCheckout(userId: string): void {
-  openProCheckout(userId, "monthly");
-}
-
-/**
- * Open the LemonSqueezy customer portal for managing subscriptions.
- */
-export function openCustomerPortal(): void {
-  const portalUrl = import.meta.env.VITE_LEMONSQUEEZY_PORTAL_URL;
-  if (!portalUrl) {
-    console.error("LemonSqueezy portal URL not configured");
+  const { getIdToken } = await import("@/lib/auth");
+  const token = await getIdToken();
+  if (!token) {
+    console.error("Auth token not available");
     return;
   }
-  window.open(portalUrl, "_blank");
+
+  const response = await fetch(`${apiBaseUrl}/api/checkout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ productId }),
+  });
+
+  if (!response.ok) {
+    console.error("Failed to create checkout session");
+    return;
+  }
+
+  const { url } = (await response.json()) as { url: string };
+  window.open(url, "_blank");
+}
+
+/**
+ * Open the Polar customer portal for managing subscriptions.
+ * Requests a portal URL from the backend API.
+ */
+export async function openCustomerPortal(): Promise<void> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    console.error("API base URL not configured");
+    return;
+  }
+
+  const { getIdToken } = await import("@/lib/auth");
+  const token = await getIdToken();
+  if (!token) {
+    console.error("Auth token not available");
+    return;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/customer-portal`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    console.error("Failed to get customer portal URL");
+    return;
+  }
+
+  const { url } = (await response.json()) as { url: string };
+  window.open(url, "_blank");
 }

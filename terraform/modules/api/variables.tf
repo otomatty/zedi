@@ -103,8 +103,8 @@ variable "thumbnail_cloudfront_url" {
   default     = ""
 }
 
-variable "lemonsqueezy_secret_arn" {
-  description = "ARN of LemonSqueezy secret (from subscription module)"
+variable "polar_secret_arn" {
+  description = "ARN of Polar secret (from subscription module)"
   type        = string
   default     = ""
 }
