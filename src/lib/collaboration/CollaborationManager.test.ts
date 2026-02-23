@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CollaborationManager } from "./CollaborationManager";
-import * as Y from "yjs";
 
 const mockYDocOn = vi.fn();
 const mockYDocDestroy = vi.fn();

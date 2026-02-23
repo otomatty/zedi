@@ -2,7 +2,7 @@
  * Drizzle ORM Schema: users
  * Source: db/aurora/001_schema.sql — users テーブル
  */
-import { pgTable, uuid, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, index } from "drizzle-orm/pg-core";
 
 export const users = pgTable(
   "users",

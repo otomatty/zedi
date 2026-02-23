@@ -23,24 +23,7 @@ import {
   aiTierBudgets,
 } from "..";
 import { thumbnailTierQuotas, thumbnailObjects } from "../thumbnails";
-import type {
-  User,
-  Page,
-  Note,
-  NotePage,
-  NoteMember,
-  Link,
-  GhostLink,
-  PageContent,
-  Media,
-  Subscription,
-  AiModel,
-  AiUsageLog,
-  AiMonthlyUsage,
-  AiTierBudget,
-  ThumbnailTierQuota,
-  ThumbnailObject,
-} from "..";
+import type { User, Page, Note, Subscription } from "..";
 
 /** ヘルパー: テーブルの DB カラム名一覧 */
 function getColumnNames(table: Parameters<typeof getTableColumns>[0]): string[] {

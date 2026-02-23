@@ -1,7 +1,7 @@
 // ストレージ設定を管理するカスタムフック
 
 import { useState, useEffect, useCallback } from "react";
-import { StorageSettings, StorageProviderType, DEFAULT_STORAGE_SETTINGS } from "@/types/storage";
+import { StorageSettings } from "@/types/storage";
 import {
   loadStorageSettings,
   saveStorageSettings,
@@ -10,7 +10,6 @@ import {
 } from "@/lib/storageSettings";
 import {
   getStorageProvider,
-  isProviderConfigured,
   isStorageConfiguredForUpload,
   ConnectionTestResult,
 } from "@/lib/storage";

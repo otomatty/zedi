@@ -8,11 +8,7 @@ import React, {
 } from "react";
 import type { Editor } from "@tiptap/core";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
-import {
-  slashCommandItems,
-  filterSlashCommandItems,
-  type SlashCommandItem,
-} from "./slashCommandItems";
+import { slashCommandItems, filterSlashCommandItems } from "./slashCommandItems";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import {

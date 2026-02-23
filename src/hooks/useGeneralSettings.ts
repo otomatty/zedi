@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "next-themes";
 import {
   GeneralSettings,
-  DEFAULT_GENERAL_SETTINGS,
   EditorFontSize,
   ThemeMode,
   UILocale,

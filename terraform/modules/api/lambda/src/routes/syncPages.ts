@@ -6,8 +6,8 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, gt, sql, inArray } from "drizzle-orm";
-import { pages, links, ghostLinks, pageContents } from "../schema";
+import { eq, and, gt, inArray } from "drizzle-orm";
+import { pages, links, ghostLinks } from "../schema";
 import { authRequired } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
