@@ -30,16 +30,12 @@ export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
     .where(eq(users.cognitoSub, sub))
     .limit(1);
 
-  if (!result.length) {
-    throw new HTTPException(401, { message: "User not found" });
-  }
-
   const user = result[0];
-  if (user) {
-    c.set("cognitoSub", sub);
-    c.set("userId", user.id);
-    c.set("userEmail", user.email);
-  }
+  if (!user) throw new HTTPException(401, { message: "User not found" });
+
+  c.set("cognitoSub", sub);
+  c.set("userId", user.id);
+  c.set("userEmail", user.email);
   await next();
 });
 
@@ -60,13 +56,11 @@ export const authOptional = createMiddleware<AppEnv>(async (c, next) => {
       .where(eq(users.cognitoSub, sub))
       .limit(1);
 
-    if (result.length) {
-      const user = result[0];
-      if (user) {
-        c.set("cognitoSub", sub);
-        c.set("userId", user.id);
-        c.set("userEmail", user.email);
-      }
+    const user = result[0];
+    if (user) {
+      c.set("cognitoSub", sub);
+      c.set("userId", user.id);
+      c.set("userEmail", user.email);
     }
   }
 

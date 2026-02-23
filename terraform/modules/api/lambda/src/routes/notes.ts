@@ -48,7 +48,6 @@ async function getNoteRole(
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!noteResult.length) return { role: null, note: null };
   const note = noteResult[0];
   if (!note) return { role: null, note: null };
 
@@ -69,9 +68,9 @@ async function getNoteRole(
       )
       .limit(1);
 
-    if (member.length) {
-      const firstMember = member[0];
-      if (firstMember) return { role: firstMember.role as "editor" | "viewer", note };
+    const firstMember = member[0];
+    if (firstMember) {
+      return { role: firstMember.role as "editor" | "viewer", note };
     }
   }
 
@@ -141,9 +140,9 @@ app.put("/:noteId", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
   const noteRow = note[0];
-  if (noteRow?.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
   const body = await c.req.json<{
     title?: string;
@@ -183,9 +182,9 @@ app.delete("/:noteId", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
   const noteRow = note[0];
-  if (noteRow?.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
   await db
     .update(notes)
@@ -479,9 +478,9 @@ app.post("/:noteId/members", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
   const noteRow = note[0];
-  if (noteRow?.ownerId !== userId) {
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) {
     throw new HTTPException(403, { message: "Only the owner can add members" });
   }
 
@@ -527,9 +526,9 @@ app.delete("/:noteId/members/:memberEmail", authRequired, async (c) => {
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
     .limit(1);
 
-  if (!note.length) throw new HTTPException(404, { message: "Note not found" });
   const noteRow = note[0];
-  if (noteRow?.ownerId !== userId) {
+  if (!noteRow) throw new HTTPException(404, { message: "Note not found" });
+  if (noteRow.ownerId !== userId) {
     throw new HTTPException(403, { message: "Only the owner can remove members" });
   }
 

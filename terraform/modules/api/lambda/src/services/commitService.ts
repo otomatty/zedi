@@ -44,10 +44,9 @@ async function fetchImageAsBuffer(
 ): Promise<{ buffer: Buffer; mimeType: string; ext: string }> {
   if (sourceUrl.startsWith("data:")) {
     const match = sourceUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) throw new Error("Invalid data URI");
+    if (!match?.[1] || !match[2]) throw new Error("Invalid data URI");
     const mimeType = match[1];
     const base64 = match[2];
-    if (mimeType === undefined || base64 === undefined) throw new Error("Invalid data URI");
     const buffer = Buffer.from(base64, "base64");
     const ext = mimeType.split("/")[1]?.split("+")[0] || "png";
     return { buffer, mimeType, ext };

@@ -101,10 +101,6 @@ app.get("/:id", authRequired, async (c) => {
 
   const result = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
 
-  if (!result.length) {
-    throw new HTTPException(404, { message: "Media not found" });
-  }
-
   const row = result[0];
   if (!row) throw new HTTPException(404, { message: "Media not found" });
   const signedUrl = await getSignedUrl(
