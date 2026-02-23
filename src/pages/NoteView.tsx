@@ -32,7 +32,7 @@ const NoteView: React.FC = () => {
   const { noteId } = useParams<{ noteId: string }>();
   const { toast } = useToast();
 
-  const { userId, isSignedIn } = useNoteApi();
+  const { isSignedIn } = useNoteApi();
   const {
     note,
     access,

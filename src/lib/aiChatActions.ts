@@ -10,7 +10,7 @@ export function parseActions(content: string): ChatAction[] {
     try {
       const action = JSON.parse(match[2]) as ChatAction;
       actions.push(action);
-    } catch (e) {
+    } catch {
       console.warn("Failed to parse action:", match[2]);
     }
   }

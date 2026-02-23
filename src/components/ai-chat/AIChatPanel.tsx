@@ -29,7 +29,6 @@ export function AIChatPanel() {
   const navigate = useNavigate();
   const createPageMutation = useCreatePage();
   const {
-    conversations,
     createConversation,
     updateConversation,
     deleteConversation,

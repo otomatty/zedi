@@ -115,7 +115,6 @@ const SyncStatusRow: React.FC = () => {
   const syncStatus = useSyncStatus();
   const { sync, isSyncing } = useSync();
   const configs = useSyncStatusConfig();
-  const { t } = useTranslation();
 
   if (!isSignedIn) return null;
 

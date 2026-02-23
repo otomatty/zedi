@@ -91,7 +91,6 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
 
             if (match) {
               const query = match[2]; // text after "/"
-              const slashOffset = match[0].length - match[2].length; // length of prefix including "/"
               const from = $from.pos - match[0].length + match[1].length; // start at "/"
               const to = $from.pos;
 

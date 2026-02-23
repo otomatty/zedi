@@ -73,13 +73,6 @@ function ensureDb(): Promise<IDBDatabase> {
   return Promise.resolve(adapterDb);
 }
 
-function getStore(mode: IDBTransactionMode, name: string): Promise<IDBObjectStore> {
-  return ensureDb().then((db) => {
-    const tx = db.transaction(name, mode);
-    return tx.objectStore(name);
-  });
-}
-
 function openDb(userId: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME_PREFIX + userId, DB_VERSION);

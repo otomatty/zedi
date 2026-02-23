@@ -9,7 +9,6 @@ name: Terraform Plan
 
 on:
   pull_request:
-    branches: [main, develop]
     paths:
       - "terraform/**"
       - "server/hono/**"
@@ -49,10 +48,6 @@ jobs:
       - name: Terraform Init
         working-directory: terraform
         run: terraform init
-
-      - name: Select workspace
-        working-directory: terraform
-        run: terraform workspace select "$TF_WORKSPACE"
 
       - name: Terraform Plan
         id: plan
