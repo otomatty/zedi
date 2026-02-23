@@ -1,7 +1,7 @@
-import React from 'react';
-import { Sparkles, ClipboardList, Plus, X } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { useAIChatStore } from '../../stores/aiChatStore';
+import React from "react";
+import { Sparkles, ClipboardList, Plus, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useAIChatStore } from "../../stores/aiChatStore";
 
 export function AIChatHeader() {
   const { t } = useTranslation();
@@ -12,32 +12,32 @@ export function AIChatHeader() {
   };
 
   return (
-    <div className="flex items-center justify-between p-4 border-b">
+    <div className="flex items-center justify-between border-b p-4">
       <div className="flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-primary" />
-        <h2 className="font-semibold">{t('aiChat.title')}</h2>
+        <Sparkles className="h-5 w-5 text-primary" />
+        <h2 className="font-semibold">{t("aiChat.title")}</h2>
       </div>
       <div className="flex items-center gap-2">
         <button
           onClick={toggleConversationList}
-          className="p-2 hover:bg-muted rounded-md transition-colors"
-          title={t('aiChat.actions.conversationList')}
+          className="rounded-md p-2 transition-colors hover:bg-muted"
+          title={t("aiChat.actions.conversationList")}
         >
-          <ClipboardList className="w-4 h-4" />
+          <ClipboardList className="h-4 w-4" />
         </button>
         <button
           onClick={handleNewConversation}
-          className="p-2 hover:bg-muted rounded-md transition-colors"
-          title={t('aiChat.actions.newConversation')}
+          className="rounded-md p-2 transition-colors hover:bg-muted"
+          title={t("aiChat.actions.newConversation")}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-4 w-4" />
         </button>
         <button
           onClick={closePanel}
-          className="p-2 hover:bg-muted rounded-md transition-colors"
-          title={t('aiChat.actions.close')}
+          className="rounded-md p-2 transition-colors hover:bg-muted"
+          title={t("aiChat.actions.close")}
         >
-          <X className="w-4 h-4" />
+          <X className="h-4 w-4" />
         </button>
       </div>
     </div>

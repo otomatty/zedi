@@ -4,10 +4,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  fetchSubscription,
-  type SubscriptionState,
-} from "@/lib/subscriptionService";
+import { fetchSubscription, type SubscriptionState } from "@/lib/subscriptionService";
 
 const subscriptionQueryKey = ["subscription"] as const;
 
@@ -34,12 +31,7 @@ export interface UseSubscriptionResult {
 
 export function useSubscription(): UseSubscriptionResult {
   const { isSignedIn } = useAuth();
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: subscriptionQueryKey,
     queryFn: fetchSubscription,
     enabled: isSignedIn === true,
@@ -55,7 +47,8 @@ export function useSubscription(): UseSubscriptionResult {
   };
 
   const state = data ?? fallback;
-  const isProUser = state.plan === "pro" && (state.status === "active" || state.status === "trialing");
+  const isProUser =
+    state.plan === "pro" && (state.status === "active" || state.status === "trialing");
 
   return {
     plan: state.plan,

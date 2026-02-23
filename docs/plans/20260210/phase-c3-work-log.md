@@ -8,19 +8,19 @@
 
 ## 1. 作業サマリー
 
-| タスク | 内容 | 状態 |
-|--------|------|------|
-| **C3-1** | StorageAdapter インターフェース定義 | 完了 |
-| **C3-2** | IndexedDBStorageAdapter 実装 | 完了 |
-| **C3-3** | API クライアント実装 | 完了 |
-| **C3-4** | ストレージ選択ロジック（createStorageAdapter） | 完了 |
-| **C3-5** | 個人ページを「Y.Doc のみ」に統一 | 完了 |
-| **C3-6** | 同期ロジックの差し替え | 完了 |
-| **C3-7** | PageRepository の抽象化 | 完了 |
-| **C3-8** | 検索の切り替え | 完了 |
-| **C3-9** | ノート一覧・ノート内ページの API 化 | 完了 |
-| **C3-10** | 型・ID の UUID 化 | 完了 |
-| **C3-11** | turso.ts の段階的削除 | 完了 |
+| タスク    | 内容                                           | 状態 |
+| --------- | ---------------------------------------------- | ---- |
+| **C3-1**  | StorageAdapter インターフェース定義            | 完了 |
+| **C3-2**  | IndexedDBStorageAdapter 実装                   | 完了 |
+| **C3-3**  | API クライアント実装                           | 完了 |
+| **C3-4**  | ストレージ選択ロジック（createStorageAdapter） | 完了 |
+| **C3-5**  | 個人ページを「Y.Doc のみ」に統一               | 完了 |
+| **C3-6**  | 同期ロジックの差し替え                         | 完了 |
+| **C3-7**  | PageRepository の抽象化                        | 完了 |
+| **C3-8**  | 検索の切り替え                                 | 完了 |
+| **C3-9**  | ノート一覧・ノート内ページの API 化            | 完了 |
+| **C3-10** | 型・ID の UUID 化                              | 完了 |
+| **C3-11** | turso.ts の段階的削除                          | 完了 |
 
 ---
 
@@ -45,7 +45,7 @@
 - **成果物**
   - **実装:** `src/lib/storageAdapter/IndexedDBStorageAdapter.ts`  
     全メソッドを実装。DB 名は `zedi-storage-${userId}`（initialize(userId) でオープン）。モジュールレベルの単一 DB インスタンスを共有（createStorageAdapter で 1 インスタンス想定）。
-  - **IndexedDB スキーマ（version 1）**  
+  - **IndexedDB スキーマ（version 1）**
     - **my_pages** — keyPath: id。インデックス: updated_at, created_at。値は PageMetadata 相当（camelCase）。
     - **my_links** — keyPath: [sourceId, targetId]。インデックス: by_source, by_target。
     - **my_ghost_links** — keyPath: [linkText, sourcePageId]。インデックス: by_source。
@@ -144,9 +144,9 @@
   - **getNote:** `GET_CURRENT_USER_ROLE_SQL` で current_user_role を取得し、レスポンスに `current_user_role` を追加。
   - **updateNoteMember:** PUT /api/notes/:id/members/:email（body: { role }）を追加。`UPDATE_NOTE_MEMBER_ROLE_SQL` と router に PUT ルートを追加。
 - **成果物（フロント）**
-  - **型:** `src/lib/api/types.ts` に NoteListItem（role, page_count, member_count  optional）、GetNoteResponse（current_user_role, pages）、NoteMemberItem を追加。
+  - **型:** `src/lib/api/types.ts` に NoteListItem（role, page_count, member_count optional）、GetNoteResponse（current_user_role, pages）、NoteMemberItem を追加。
   - **apiClient:** getNoteMembers、createNote、updateNote、deleteNote、addNotePage、removeNotePage、addNoteMember、removeNoteMember、updateNoteMember を追加。getNotes / getNote の戻り型を上記型に合わせる。
-  - **useNoteQueries:** Turso と useNoteRepository を廃止。useNoteApi() で createApiClient({ getToken }) と userId / userEmail / isLoaded / isSignedIn を提供。useNotes → api.getNotes() を NoteSummary[] にマップ。useNote → api.getNote() を NoteWithAccess にマップ（current_user_role で buildAccessFromApi）。useNotePages → api.getNote().pages を PageSummary[] に。useNotePage → api.getNote().pages から該当ページを Page に。useNoteMembers → api.getNoteMembers() を NoteMember[] に。全 mutation を api.* に差し替え。
+  - **useNoteQueries:** Turso と useNoteRepository を廃止。useNoteApi() で createApiClient({ getToken }) と userId / userEmail / isLoaded / isSignedIn を提供。useNotes → api.getNotes() を NoteSummary[] にマップ。useNote → api.getNote() を NoteWithAccess にマップ（current_user_role で buildAccessFromApi）。useNotePages → api.getNote().pages を PageSummary[] に。useNotePage → api.getNote().pages から該当ページを Page に。useNoteMembers → api.getNoteMembers() を NoteMember[] に。全 mutation を api.\* に差し替え。
   - **NotesSection:** useNoteRepository を useNoteApi に変更。
 - **結果**  
   ノート一覧・詳細・ページ一覧・メンバー一覧および作成・更新・削除・ページ追加削除・メンバー招待・ロール変更・メンバー削除はすべて API 経由。useNoteQueries から Turso と useTurso は参照されない。
@@ -178,42 +178,42 @@
 
 ## 3. 成果物一覧（パス）
 
-| 種別 | パス | 備考 |
-|------|------|------|
-| C3-1 型 | `src/lib/storageAdapter/types.ts` | PageMetadata, Link, GhostLink, SearchResult |
-| C3-1 インターフェース | `src/lib/storageAdapter/StorageAdapter.ts` | StorageAdapter |
-| C3-2 実装 | `src/lib/storageAdapter/IndexedDBStorageAdapter.ts` | 全メソッド実装済み（IndexedDB + y-indexeddb） |
-| C3-3 型 | `src/lib/api/types.ts` | API リクエスト/レスポンス型 |
-| C3-3 クライアント | `src/lib/api/apiClient.ts` | createApiClient, ApiError |
-| C3-3 エントリ | `src/lib/api/index.ts` | re-export |
-| C3-4 ファクトリ | `src/lib/storageAdapter/createStorageAdapter.ts` | createStorageAdapter, isTauri |
-| C3-4 エントリ | `src/lib/storageAdapter/index.ts` | re-export |
-| 環境変数型 | `src/vite-env.d.ts` | VITE_ZEDI_API_BASE_URL 追加 |
-| C3-5 CollaborationManager | `src/lib/collaboration/CollaborationManager.ts` | mode: local \| collaborative |
-| C3-5 型 | `src/lib/collaboration/types.ts` | CollaborationMode, UseCollaborationOptions.mode |
-| C3-5 フック | `src/hooks/useCollaboration.ts` | mode オプション（デフォルト local） |
-| C3-6 sync | `src/lib/sync/syncWithApi.ts` | syncWithApi, runAuroraSync |
-| C3-6 エントリ | `src/lib/sync/index.ts` | re-export |
-| C3-7 インターフェース | `src/lib/pageRepository.ts` | IPageRepository 追加 |
-| C3-7 実装 | `src/lib/pageRepository/StorageAdapterPageRepository.ts` | adapter + api |
-| C3-7 フック | `src/hooks/usePageQueries.ts` | useRepository, useSync 差し替え |
-| C3-8 API | `terraform/.../handlers/search.mjs` | レスポンスに note_id 追加 |
-| C3-8 型 | `src/lib/api/types.ts` | SearchSharedResponse.results.note_id |
-| C3-8 フック | `src/hooks/usePageQueries.ts` | useSearchSharedNotes |
-| C3-8 フック | `src/hooks/useGlobalSearch.ts` | 個人+共有マージ、GlobalSearchResultItem |
-| C3-8 UI | `src/components/search/GlobalSearch.tsx` | handleSelect(pageId, noteId?) |
-| C3-9 API listNotes | `terraform/.../handlers/notes.mjs` | role, page_count, member_count |
-| C3-9 API getNote | `terraform/.../handlers/notes.mjs` | current_user_role |
-| C3-9 API updateNoteMember | `terraform/.../handlers/notes.mjs`, router.mjs | PUT /api/notes/:id/members/:email |
-| C3-9 型 | `src/lib/api/types.ts` | NoteListItem, GetNoteResponse, NoteMemberItem |
-| C3-9 apiClient | `src/lib/api/apiClient.ts` | getNoteMembers, createNote, updateNote, deleteNote, addNotePage, removeNotePage, addNoteMember, removeNoteMember, updateNoteMember |
-| C3-9 フック | `src/hooks/useNoteQueries.ts` | useNoteApi, API ベースの useNotes / useNote / useNotePages / useNotePage / useNoteMembers と全 mutation |
-| C3-9 UI | `src/components/note/NotesSection.tsx` | useNoteApi |
-| C3-10 依存 | package.json | uuid 追加、nanoid 削除 |
-| C3-10 ID 生成 | pageRepository.ts, noteRepository.ts, pageStore.ts | nanoid → uuid v4 |
-| C3-11 sync | src/lib/sync/syncWithApi.ts, index.ts | hasNeverSynced 追加 |
-| C3-11 UI | src/components/page/PageGrid.tsx | hasNeverSynced を @/lib/sync から取得 |
-| C3-11 削除 | turso.ts, useTurso.ts, localDatabase.ts | 削除 |
+| 種別                      | パス                                                     | 備考                                                                                                                               |
+| ------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| C3-1 型                   | `src/lib/storageAdapter/types.ts`                        | PageMetadata, Link, GhostLink, SearchResult                                                                                        |
+| C3-1 インターフェース     | `src/lib/storageAdapter/StorageAdapter.ts`               | StorageAdapter                                                                                                                     |
+| C3-2 実装                 | `src/lib/storageAdapter/IndexedDBStorageAdapter.ts`      | 全メソッド実装済み（IndexedDB + y-indexeddb）                                                                                      |
+| C3-3 型                   | `src/lib/api/types.ts`                                   | API リクエスト/レスポンス型                                                                                                        |
+| C3-3 クライアント         | `src/lib/api/apiClient.ts`                               | createApiClient, ApiError                                                                                                          |
+| C3-3 エントリ             | `src/lib/api/index.ts`                                   | re-export                                                                                                                          |
+| C3-4 ファクトリ           | `src/lib/storageAdapter/createStorageAdapter.ts`         | createStorageAdapter, isTauri                                                                                                      |
+| C3-4 エントリ             | `src/lib/storageAdapter/index.ts`                        | re-export                                                                                                                          |
+| 環境変数型                | `src/vite-env.d.ts`                                      | VITE_ZEDI_API_BASE_URL 追加                                                                                                        |
+| C3-5 CollaborationManager | `src/lib/collaboration/CollaborationManager.ts`          | mode: local \| collaborative                                                                                                       |
+| C3-5 型                   | `src/lib/collaboration/types.ts`                         | CollaborationMode, UseCollaborationOptions.mode                                                                                    |
+| C3-5 フック               | `src/hooks/useCollaboration.ts`                          | mode オプション（デフォルト local）                                                                                                |
+| C3-6 sync                 | `src/lib/sync/syncWithApi.ts`                            | syncWithApi, runAuroraSync                                                                                                         |
+| C3-6 エントリ             | `src/lib/sync/index.ts`                                  | re-export                                                                                                                          |
+| C3-7 インターフェース     | `src/lib/pageRepository.ts`                              | IPageRepository 追加                                                                                                               |
+| C3-7 実装                 | `src/lib/pageRepository/StorageAdapterPageRepository.ts` | adapter + api                                                                                                                      |
+| C3-7 フック               | `src/hooks/usePageQueries.ts`                            | useRepository, useSync 差し替え                                                                                                    |
+| C3-8 API                  | `terraform/.../handlers/search.mjs`                      | レスポンスに note_id 追加                                                                                                          |
+| C3-8 型                   | `src/lib/api/types.ts`                                   | SearchSharedResponse.results.note_id                                                                                               |
+| C3-8 フック               | `src/hooks/usePageQueries.ts`                            | useSearchSharedNotes                                                                                                               |
+| C3-8 フック               | `src/hooks/useGlobalSearch.ts`                           | 個人+共有マージ、GlobalSearchResultItem                                                                                            |
+| C3-8 UI                   | `src/components/search/GlobalSearch.tsx`                 | handleSelect(pageId, noteId?)                                                                                                      |
+| C3-9 API listNotes        | `terraform/.../handlers/notes.mjs`                       | role, page_count, member_count                                                                                                     |
+| C3-9 API getNote          | `terraform/.../handlers/notes.mjs`                       | current_user_role                                                                                                                  |
+| C3-9 API updateNoteMember | `terraform/.../handlers/notes.mjs`, router.mjs           | PUT /api/notes/:id/members/:email                                                                                                  |
+| C3-9 型                   | `src/lib/api/types.ts`                                   | NoteListItem, GetNoteResponse, NoteMemberItem                                                                                      |
+| C3-9 apiClient            | `src/lib/api/apiClient.ts`                               | getNoteMembers, createNote, updateNote, deleteNote, addNotePage, removeNotePage, addNoteMember, removeNoteMember, updateNoteMember |
+| C3-9 フック               | `src/hooks/useNoteQueries.ts`                            | useNoteApi, API ベースの useNotes / useNote / useNotePages / useNotePage / useNoteMembers と全 mutation                            |
+| C3-9 UI                   | `src/components/note/NotesSection.tsx`                   | useNoteApi                                                                                                                         |
+| C3-10 依存                | package.json                                             | uuid 追加、nanoid 削除                                                                                                             |
+| C3-10 ID 生成             | pageRepository.ts, noteRepository.ts, pageStore.ts       | nanoid → uuid v4                                                                                                                   |
+| C3-11 sync                | src/lib/sync/syncWithApi.ts, index.ts                    | hasNeverSynced 追加                                                                                                                |
+| C3-11 UI                  | src/components/page/PageGrid.tsx                         | hasNeverSynced を @/lib/sync から取得                                                                                              |
+| C3-11 削除                | turso.ts, useTurso.ts, localDatabase.ts                  | 削除                                                                                                                               |
 
 ---
 
@@ -228,29 +228,29 @@
 
 ## 5. 関連ドキュメント
 
-| ドキュメント | 用途 |
-|-------------|------|
-| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md) | タスク細分化・Phase C3 一覧 |
-| [zedi-rearchitecture-spec.md](../specs/zedi-rearchitecture-spec.md) | 仕様 §6 ストレージ、§13 API |
-| [zedi-data-structure-spec.md](../specs/zedi-data-structure-spec.md) | DB スキーマ・エンティティ |
-| [phase-c1-work-log.md](phase-c1-work-log.md) | C1 API エンドポイント・ハンドラー |
-| [phase-c2-work-log.md](phase-c2-work-log.md) | C2 データ移行完了・Aurora 投入済み |
+| ドキュメント                                                         | 用途                               |
+| -------------------------------------------------------------------- | ---------------------------------- |
+| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md) | タスク細分化・Phase C3 一覧        |
+| [zedi-rearchitecture-spec.md](../specs/zedi-rearchitecture-spec.md)  | 仕様 §6 ストレージ、§13 API        |
+| [zedi-data-structure-spec.md](../specs/zedi-data-structure-spec.md)  | DB スキーマ・エンティティ          |
+| [phase-c1-work-log.md](phase-c1-work-log.md)                         | C1 API エンドポイント・ハンドラー  |
+| [phase-c2-work-log.md](phase-c2-work-log.md)                         | C2 データ移行完了・Aurora 投入済み |
 
 ---
 
 ## 6. 作業履歴（実施日・内容）
 
-| 日付 | 実施内容 |
-|------|----------|
+| 日付           | 実施内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **2026-02-10** | **C3-1, C3-3, C3-4 実施** — ① StorageAdapter インターフェースと型（types.ts, StorageAdapter.ts）を定義。② IndexedDBStorageAdapter をスタブで追加し、createStorageAdapter() で Web 時はこれを返すよう実装。③ API クライアント（apiClient.ts, types.ts）を新規作成。getSyncPages, postSyncPages, getPageContent, putPageContent, createPage, deletePage, getNotes, getNote, searchSharedNotes を実装。Cognito トークンは getToken で注入。VITE_ZEDI_API_BASE_URL を vite-env.d.ts に追加。④ Phase C3 作業ログ（本ドキュメント）を新規作成。 |
-| **2026-02-10** | **C3-2 実施** — IndexedDBStorageAdapter をフル実装。IndexedDB に my_pages / my_links / my_ghost_links / search_index / meta / ydoc_versions を定義。Y.Doc は y-indexeddb（zedi-doc-{pageId}）で getYDocState / saveYDocState を実装。検索は search_index のテキストを JS でフィルタし my_pages から title を取得。lastSyncTime は meta ストアに保存。 |
-| **2026-02-10** | **C3-5 実施** — CollaborationManager に mode: 'local' \| 'collaborative' を導入。local 時は idb synced 後に WebSocket に接続せず status='connected', isSynced=true のみ設定。useCollaboration に mode オプションを追加（デフォルト 'local'）。PageEditorView は従来どおり useCollaboration を利用し、個人ページでは Hocuspocus 接続なしに。types に CollaborationMode を追加、index から export。 |
-| **2026-02-10** | **C3-6 実施** — API 同期モジュールを新設。syncWithApi(adapter, api, userId) で GET /api/sync/pages?since= の PULL と adapter への適用、adapter からの収集と POST /api/sync/pages の PUSH、lastSyncTime の adapter での保持を実装。runAuroraSync(userId, getToken) で createStorageAdapter + createApiClient を組み合わせて実行。src/lib/sync/syncWithApi.ts と index.ts を追加。呼び出しの切り替え（usePageQueries → runAuroraSync）は C3-7 で実施予定。 |
-| **2026-02-10** | **C3-7 実施** — PageRepository を抽象化。IPageRepository を pageRepository.ts に追加。StorageAdapterPageRepository を pageRepository/StorageAdapterPageRepository.ts に実装（adapter + api + userId）。useRepository を StorageAdapter + createApiClient で初期化し、getRepository で StorageAdapterPageRepository を返すように変更。初期同期・手動同期を runAuroraSync に統一。useSyncStatus は @/lib/sync の getSyncStatus / subscribeSyncStatus を使用。syncWithApi に SyncStatus と setSyncStatus を追加。 |
-| **2026-02-10** | **C3-8 実施** — 検索の切り替え。検索 API レスポンスに note_id を追加（search.mjs, types.ts）。useSearchSharedNotes を usePageQueries に追加。useGlobalSearch で useSearchPages（個人）と useSearchSharedNotes（共有）をマージし、GlobalSearchResultItem[] で返す。GlobalSearch で handleSelect(pageId, noteId?) により共有は /note/:noteId/page/:pageId、個人は /page/:pageId へ遷移。 |
-| **2026-02-10** | **C3-9 実施** — ノート一覧・ノート内ページの API 化。listNotes に role / page_count / member_count を追加。getNote に current_user_role を追加。PUT /api/notes/:id/members/:email（updateNoteMember）を追加。apiClient に getNoteMembers と全ノート mutation を追加。useNoteQueries を Turso 廃止し useNoteApi + api ベースに全面変更。NotesSection を useNoteApi に変更。 |
-| **2026-02-10** | **C3-10 実施** — 型・ID の UUID 化。uuid パッケージを追加し、pageRepository / noteRepository / pageStore の ID 生成を nanoid から uuid v4 に変更。nanoid 依存を削除。 |
-| **2026-02-10** | **C3-11 実施** — turso.ts の段階的削除。sync に hasNeverSynced を追加し PageGrid を @/lib/sync に切り替え。turso.ts / useTurso.ts / localDatabase.ts を削除。 |
+| **2026-02-10** | **C3-2 実施** — IndexedDBStorageAdapter をフル実装。IndexedDB に my_pages / my_links / my_ghost_links / search_index / meta / ydoc_versions を定義。Y.Doc は y-indexeddb（zedi-doc-{pageId}）で getYDocState / saveYDocState を実装。検索は search_index のテキストを JS でフィルタし my_pages から title を取得。lastSyncTime は meta ストアに保存。                                                                                                                                                                                     |
+| **2026-02-10** | **C3-5 実施** — CollaborationManager に mode: 'local' \| 'collaborative' を導入。local 時は idb synced 後に WebSocket に接続せず status='connected', isSynced=true のみ設定。useCollaboration に mode オプションを追加（デフォルト 'local'）。PageEditorView は従来どおり useCollaboration を利用し、個人ページでは Hocuspocus 接続なしに。types に CollaborationMode を追加、index から export。                                                                                                                                         |
+| **2026-02-10** | **C3-6 実施** — API 同期モジュールを新設。syncWithApi(adapter, api, userId) で GET /api/sync/pages?since= の PULL と adapter への適用、adapter からの収集と POST /api/sync/pages の PUSH、lastSyncTime の adapter での保持を実装。runAuroraSync(userId, getToken) で createStorageAdapter + createApiClient を組み合わせて実行。src/lib/sync/syncWithApi.ts と index.ts を追加。呼び出しの切り替え（usePageQueries → runAuroraSync）は C3-7 で実施予定。                                                                                  |
+| **2026-02-10** | **C3-7 実施** — PageRepository を抽象化。IPageRepository を pageRepository.ts に追加。StorageAdapterPageRepository を pageRepository/StorageAdapterPageRepository.ts に実装（adapter + api + userId）。useRepository を StorageAdapter + createApiClient で初期化し、getRepository で StorageAdapterPageRepository を返すように変更。初期同期・手動同期を runAuroraSync に統一。useSyncStatus は @/lib/sync の getSyncStatus / subscribeSyncStatus を使用。syncWithApi に SyncStatus と setSyncStatus を追加。                            |
+| **2026-02-10** | **C3-8 実施** — 検索の切り替え。検索 API レスポンスに note_id を追加（search.mjs, types.ts）。useSearchSharedNotes を usePageQueries に追加。useGlobalSearch で useSearchPages（個人）と useSearchSharedNotes（共有）をマージし、GlobalSearchResultItem[] で返す。GlobalSearch で handleSelect(pageId, noteId?) により共有は /note/:noteId/page/:pageId、個人は /page/:pageId へ遷移。                                                                                                                                                    |
+| **2026-02-10** | **C3-9 実施** — ノート一覧・ノート内ページの API 化。listNotes に role / page_count / member_count を追加。getNote に current_user_role を追加。PUT /api/notes/:id/members/:email（updateNoteMember）を追加。apiClient に getNoteMembers と全ノート mutation を追加。useNoteQueries を Turso 廃止し useNoteApi + api ベースに全面変更。NotesSection を useNoteApi に変更。                                                                                                                                                                |
+| **2026-02-10** | **C3-10 実施** — 型・ID の UUID 化。uuid パッケージを追加し、pageRepository / noteRepository / pageStore の ID 生成を nanoid から uuid v4 に変更。nanoid 依存を削除。                                                                                                                                                                                                                                                                                                                                                                     |
+| **2026-02-10** | **C3-11 実施** — turso.ts の段階的削除。sync に hasNeverSynced を追加し PageGrid を @/lib/sync に切り替え。turso.ts / useTurso.ts / localDatabase.ts を削除。                                                                                                                                                                                                                                                                                                                                                                             |
 
 ---
 

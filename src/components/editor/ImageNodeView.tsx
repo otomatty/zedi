@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
-import {
-  Copy,
-  ExternalLink,
-  MoreHorizontal,
-  RefreshCcw,
-  Trash2,
-} from "lucide-react";
+import { Copy, ExternalLink, MoreHorizontal, RefreshCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,8 +36,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
   };
 
   const options = extension.options as StorageImageOptions;
-  const providerLabel =
-    options.getProviderLabel?.(storageProviderId) || "不明";
+  const providerLabel = options.getProviderLabel?.(storageProviderId) || "不明";
   const canDeleteFromStorage = options.canDeleteFromStorage?.(storageProviderId);
 
   const [hasLoadError, setHasLoadError] = useState(false);
@@ -119,33 +112,27 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
   return (
     <NodeViewWrapper className="my-4 max-w-full">
       <div
-        className={`relative group inline-block max-w-full ${
-          selected ? "ring-2 ring-primary rounded-lg" : ""
+        className={`group relative inline-block max-w-full ${
+          selected ? "rounded-lg ring-2 ring-primary" : ""
         }`}
       >
         {hasLoadError ? (
-          <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-4">
-            <p className="text-sm text-destructive font-medium">
-              画像の読み込みに失敗しました
-            </p>
-            {src && (
-              <p className="text-xs text-muted-foreground break-all mt-1">
-                {src}
-              </p>
-            )}
-            <div className="flex gap-2 mt-3">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <p className="text-sm font-medium text-destructive">画像の読み込みに失敗しました</p>
+            {src && <p className="mt-1 break-all text-xs text-muted-foreground">{src}</p>}
+            <div className="mt-3 flex gap-2">
               <Button size="sm" variant="outline" onClick={handleReload}>
-                <RefreshCcw className="h-4 w-4 mr-1" />
+                <RefreshCcw className="mr-1 h-4 w-4" />
                 再読み込み
               </Button>
               <Button size="sm" variant="outline" onClick={handleCopyUrl}>
-                <Copy className="h-4 w-4 mr-1" />
+                <Copy className="mr-1 h-4 w-4" />
                 URLをコピー
               </Button>
             </div>
           </div>
         ) : isAuthRequiredUrl && !authenticatedSrc && getAuthenticatedImageUrl ? (
-          <div className="flex items-center justify-center min-h-[120px] rounded-lg border bg-muted/50 text-muted-foreground text-sm">
+          <div className="flex min-h-[120px] items-center justify-center rounded-lg border bg-muted/50 text-sm text-muted-foreground">
             読み込み中…
           </div>
         ) : (
@@ -159,7 +146,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
           />
         )}
 
-        <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute right-2 top-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
           <Badge variant="secondary" className="text-[10px]">
             保存先: {providerLabel}
           </Badge>
@@ -171,16 +158,16 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleCopyUrl}>
-                <Copy className="h-4 w-4 mr-2" />
+                <Copy className="mr-2 h-4 w-4" />
                 URLをコピー
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleOpenUrl}>
-                <ExternalLink className="h-4 w-4 mr-2" />
+                <ExternalLink className="mr-2 h-4 w-4" />
                 別タブで開く
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleDeleteFromNote}>
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 メモから削除
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -188,7 +175,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
                 disabled={!canDeleteFromStorage || isDeleting}
                 className="text-destructive focus:text-destructive"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 ストレージから削除
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -204,13 +191,8 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>
-                キャンセル
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteFromStorage}
-                disabled={isDeleting}
-              >
+              <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteFromStorage} disabled={isDeleting}>
                 削除する
               </AlertDialogAction>
             </AlertDialogFooter>

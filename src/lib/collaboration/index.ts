@@ -2,7 +2,7 @@
  * Collaboration module exports
  */
 
-export { CollaborationManager } from './CollaborationManager';
+export { CollaborationManager } from "./CollaborationManager";
 export type {
   ConnectionStatus,
   UserPresence,
@@ -10,6 +10,6 @@ export type {
   CollaborationMode,
   UseCollaborationOptions,
   UseCollaborationReturn,
-} from './types';
-export type { CollaborationManagerMode } from './CollaborationManager';
-export { USER_COLORS, getUserColor } from './types';
+} from "./types";
+export type { CollaborationManagerMode } from "./CollaborationManager";
+export { USER_COLORS, getUserColor } from "./types";

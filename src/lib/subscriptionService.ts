@@ -64,7 +64,7 @@ export type BillingInterval = "monthly" | "yearly";
  */
 export async function openProCheckout(
   userId: string,
-  billingInterval: BillingInterval
+  billingInterval: BillingInterval,
 ): Promise<void> {
   const apiBaseUrl = getAIAPIBaseUrl();
   if (!apiBaseUrl) {

@@ -2,38 +2,47 @@
  * Drizzle ORM Schema: notes, note_pages, note_members
  * Source: db/aurora/001_schema.sql + 006_notes_edit_permission.sql + 007_notes_official_and_view_count.sql
  */
-import { pgTable, uuid, text, timestamp, boolean, integer, primaryKey, index } from 'drizzle-orm/pg-core';
-import { users } from './users';
-import { pages } from './pages';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  primaryKey,
+  index,
+} from "drizzle-orm/pg-core";
+import { users } from "./users";
+import { pages } from "./pages";
 
 // ── notes ────────────────────────────────────────────────────────────────────
 export const notes = pgTable(
-  'notes',
+  "notes",
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id')
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    title: text('title'),
-    visibility: text('visibility', { enum: ['private', 'public', 'unlisted', 'restricted'] })
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title"),
+    visibility: text("visibility", { enum: ["private", "public", "unlisted", "restricted"] })
       .notNull()
-      .default('private'),
-    editPermission: text('edit_permission', {
-      enum: ['owner_only', 'members_editors', 'any_logged_in'],
+      .default("private"),
+    editPermission: text("edit_permission", {
+      enum: ["owner_only", "members_editors", "any_logged_in"],
     })
       .notNull()
-      .default('owner_only'),
-    isOfficial: boolean('is_official').notNull().default(false),
-    viewCount: integer('view_count').notNull().default(0),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-    isDeleted: boolean('is_deleted').default(false).notNull(),
+      .default("owner_only"),
+    isOfficial: boolean("is_official").notNull().default(false),
+    viewCount: integer("view_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
   },
   (table) => [
-    index('idx_notes_owner_id').on(table.ownerId),
-    index('idx_notes_visibility').on(table.visibility),
-    index('idx_notes_edit_permission').on(table.editPermission),
-    index('idx_notes_is_official').on(table.isOfficial),
+    index("idx_notes_owner_id").on(table.ownerId),
+    index("idx_notes_visibility").on(table.visibility),
+    index("idx_notes_edit_permission").on(table.editPermission),
+    index("idx_notes_is_official").on(table.isOfficial),
   ],
 );
 
@@ -42,26 +51,26 @@ export type NewNote = typeof notes.$inferInsert;
 
 // ── note_pages ───────────────────────────────────────────────────────────────
 export const notePages = pgTable(
-  'note_pages',
+  "note_pages",
   {
-    noteId: uuid('note_id')
+    noteId: uuid("note_id")
       .notNull()
-      .references(() => notes.id, { onDelete: 'cascade' }),
-    pageId: uuid('page_id')
+      .references(() => notes.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
       .notNull()
-      .references(() => pages.id, { onDelete: 'cascade' }),
-    addedByUserId: uuid('added_by_user_id')
+      .references(() => pages.id, { onDelete: "cascade" }),
+    addedByUserId: uuid("added_by_user_id")
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    sortOrder: integer('sort_order').notNull().default(0),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-    isDeleted: boolean('is_deleted').default(false).notNull(),
+      .references(() => users.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.noteId, table.pageId] }),
-    index('idx_note_pages_note_id').on(table.noteId),
-    index('idx_note_pages_page_id').on(table.pageId),
+    index("idx_note_pages_note_id").on(table.noteId),
+    index("idx_note_pages_page_id").on(table.pageId),
   ],
 );
 
@@ -70,24 +79,26 @@ export type NewNotePage = typeof notePages.$inferInsert;
 
 // ── note_members ─────────────────────────────────────────────────────────────
 export const noteMembers = pgTable(
-  'note_members',
+  "note_members",
   {
-    noteId: uuid('note_id')
+    noteId: uuid("note_id")
       .notNull()
-      .references(() => notes.id, { onDelete: 'cascade' }),
-    memberEmail: text('member_email').notNull(),
-    role: text('role', { enum: ['viewer', 'editor'] }).notNull().default('viewer'),
-    invitedByUserId: uuid('invited_by_user_id')
+      .references(() => notes.id, { onDelete: "cascade" }),
+    memberEmail: text("member_email").notNull(),
+    role: text("role", { enum: ["viewer", "editor"] })
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-    isDeleted: boolean('is_deleted').default(false).notNull(),
+      .default("viewer"),
+    invitedByUserId: uuid("invited_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.noteId, table.memberEmail] }),
-    index('idx_note_members_note_id').on(table.noteId),
-    index('idx_note_members_email').on(table.memberEmail),
+    index("idx_note_members_note_id").on(table.noteId),
+    index("idx_note_members_email").on(table.memberEmail),
   ],
 );
 

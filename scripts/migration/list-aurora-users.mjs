@@ -12,8 +12,7 @@ import { RDSDataClient, ExecuteStatementCommand } from "@aws-sdk/client-rds-data
 
 const REGION = process.env.AWS_REGION || "ap-northeast-1";
 const CLUSTER_ARN =
-  process.env.CLUSTER_ARN ||
-  "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
+  process.env.CLUSTER_ARN || "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
 const SECRET_ARN =
   process.env.SECRET_ARN ||
   "arn:aws:secretsmanager:ap-northeast-1:590183877893:secret:zedi-dev-db-credentials-x1aCah";
@@ -40,12 +39,14 @@ async function main() {
         secretArn: SECRET_ARN,
         database: DATABASE,
         sql,
-      })
+      }),
     );
   } catch (e) {
     console.error("Failed to query Aurora:", e.message);
     if (e.message?.includes("Secret") || e.message?.includes("ResourceNotFoundException")) {
-      console.error("Set SECRET_ARN to current value: terraform -chdir=terraform output -raw db_credentials_secret_arn");
+      console.error(
+        "Set SECRET_ARN to current value: terraform -chdir=terraform output -raw db_credentials_secret_arn",
+      );
     }
     process.exit(1);
   }
@@ -61,10 +62,10 @@ async function main() {
   }
 
   console.log(
-    "id (UUID)                            | cognito_sub (max 40)        | email                      | display_name | created_at"
+    "id (UUID)                            | cognito_sub (max 40)        | email                      | display_name | created_at",
   );
   console.log(
-    "-------------------------------------+-----------------------------+----------------------------+--------------+---------------------------"
+    "-------------------------------------+-----------------------------+----------------------------+--------------+---------------------------",
   );
   for (const row of rows) {
     const [id, cognito_sub, email, display_name, created_at] = row;

@@ -12,38 +12,38 @@
 
 「誰がこのノートを見られますか？」に対応します。既存の `visibility` を閲覧専用として使用します。
 
-| 値 | 説明 |
-|---|---|
-| `private` | 自分だけ（オーナーとメンバーのみ） |
-| `restricted` | 招待したメンバーだけ |
-| `unlisted` | リンクを知っている人（一覧には出さない） |
-| `public` | 誰でも（公開一覧に表示） |
+| 値           | 説明                                     |
+| ------------ | ---------------------------------------- |
+| `private`    | 自分だけ（オーナーとメンバーのみ）       |
+| `restricted` | 招待したメンバーだけ                     |
+| `unlisted`   | リンクを知っている人（一覧には出さない） |
+| `public`     | 誰でも（公開一覧に表示）                 |
 
 ### 編集権限（Edit Permission）
 
 「誰がこのノートに投稿（ページの追加・編集）できますか？」に対応します。`notes.edit_permission` で保持します（別途マイグレーションで追加）。
 
-| 値 | 説明 |
-|---|---|
-| `owner_only` | 自分（オーナー）だけ |
-| `members_editors` | オーナーと編集メンバー |
-| `any_logged_in` | ログインしている人なら誰でも（ページ追加のみ推奨） |
+| 値                | 説明                                               |
+| ----------------- | -------------------------------------------------- |
+| `owner_only`      | 自分（オーナー）だけ                               |
+| `members_editors` | オーナーと編集メンバー                             |
+| `any_logged_in`   | ログインしている人なら誰でも（ページ追加のみ推奨） |
 
 ### メンバーロール
 
-| 値 | 説明 |
-|---|---|
-| `viewer` | 閲覧のみ |
+| 値       | 説明                     |
+| -------- | ------------------------ |
+| `viewer` | 閲覧のみ                 |
 | `editor` | ページの追加・削除が可能 |
 
 ### URL構成
 
-| パス | 説明 |
-|---|---|
-| `/note/:noteId` | ノート内ページ一覧 |
-| `/note/:noteId/page/:pageId` | ノート内の個別ページ（読み取り専用） |
-| `/note/:noteId/settings` | ノート設定（タイトル・閲覧権限・編集権限） |
-| `/note/:noteId/members` | メンバー管理（招待・権限変更・削除） |
+| パス                         | 説明                                       |
+| ---------------------------- | ------------------------------------------ |
+| `/note/:noteId`              | ノート内ページ一覧                         |
+| `/note/:noteId/page/:pageId` | ノート内の個別ページ（読み取り専用）       |
+| `/note/:noteId/settings`     | ノート設定（タイトル・閲覧権限・編集権限） |
+| `/note/:noteId/members`      | メンバー管理（招待・権限変更・削除）       |
 
 ---
 
@@ -201,14 +201,15 @@ CREATE INDEX IF NOT EXISTS idx_note_members_email ON note_members(member_email);
    ```
 
    期待される結果:
+
    ```json
    [
-     {"name":"pages"},
-     {"name":"links"},
-     {"name":"ghost_links"},
-     {"name":"notes"},
-     {"name":"note_pages"},
-     {"name":"note_members"}
+     { "name": "pages" },
+     { "name": "links" },
+     { "name": "ghost_links" },
+     { "name": "notes" },
+     { "name": "note_pages" },
+     { "name": "note_members" }
    ]
    ```
 
@@ -218,58 +219,58 @@ CREATE INDEX IF NOT EXISTS idx_note_members_email ON note_members(member_email);
 
 ### 型定義
 
-| ファイル | 説明 |
-|---|---|
-| `src/types/note.ts` | ノート関連の型定義 |
+| ファイル            | 説明                          |
+| ------------------- | ----------------------------- |
+| `src/types/note.ts` | ノート関連の型定義            |
 | `src/types/page.ts` | ページ型に`ownerUserId`を追加 |
 
 ### リポジトリ
 
-| ファイル | 説明 |
-|---|---|
+| ファイル                    | 説明             |
+| --------------------------- | ---------------- |
 | `src/lib/noteRepository.ts` | ノートのCRUD操作 |
 
 ### React Hooks
 
-| ファイル | 説明 |
-|---|---|
+| ファイル                      | 説明                          |
+| ----------------------------- | ----------------------------- |
 | `src/hooks/useNoteQueries.ts` | ノート関連のReact Queryフック |
 
 ### ページコンポーネント
 
-| ファイル | 説明 |
-|---|---|
-| `src/pages/NoteView.tsx` | ノート内ページ一覧 |
+| ファイル                     | 説明                               |
+| ---------------------------- | ---------------------------------- |
+| `src/pages/NoteView.tsx`     | ノート内ページ一覧                 |
 | `src/pages/NotePageView.tsx` | ノート内ページの読み取り専用ビュー |
-| `src/pages/NoteSettings.tsx` | ノート設定ページ |
-| `src/pages/NoteMembers.tsx` | メンバー管理ページ |
+| `src/pages/NoteSettings.tsx` | ノート設定ページ                   |
+| `src/pages/NoteMembers.tsx`  | メンバー管理ページ                 |
 
 ### UIコンポーネント
 
-| ファイル | 説明 |
-|---|---|
-| `src/components/note/NoteCard.tsx` | ノートカード（ホーム画面用） |
-| `src/components/note/NotePageCard.tsx` | ノート内ページカード |
-| `src/components/note/NotesSection.tsx` | ホーム画面のノートセクション |
-| `src/components/note/NoteVisibilityBadge.tsx` | 公開範囲バッジ |
+| ファイル                                      | 説明                         |
+| --------------------------------------------- | ---------------------------- |
+| `src/components/note/NoteCard.tsx`            | ノートカード（ホーム画面用） |
+| `src/components/note/NotePageCard.tsx`        | ノート内ページカード         |
+| `src/components/note/NotesSection.tsx`        | ホーム画面のノートセクション |
+| `src/components/note/NoteVisibilityBadge.tsx` | 公開範囲バッジ               |
 
 ### 同期処理
 
-| ファイル | 説明 |
-|---|---|
+| ファイル           | 説明                               |
+| ------------------ | ---------------------------------- |
 | `src/lib/turso.ts` | ノート関連テーブルの同期処理を追加 |
 
 ### ルーティング
 
-| ファイル | 説明 |
-|---|---|
+| ファイル      | 説明                     |
+| ------------- | ------------------------ |
 | `src/App.tsx` | ノート関連のルートを追加 |
 
 ### マイグレーション
 
-| ファイル | 説明 |
-|---|---|
-| `db/schema.sql` | 完全なスキーマ定義（参照用） |
+| ファイル                                 | 説明                                |
+| ---------------------------------------- | ----------------------------------- |
+| `db/schema.sql`                          | 完全なスキーマ定義（参照用）        |
 | `db/migrations/001_add_notes_tables.sql` | ノートテーブルのマイグレーションSQL |
 
 ---

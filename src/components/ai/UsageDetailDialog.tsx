@@ -25,9 +25,7 @@ interface UsageDetailDialogProps {
  * - ティア情報
  * - アップグレード導線
  */
-export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({
-  children,
-}) => {
+export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({ children }) => {
   const [usage, setUsage] = useState<AIUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -70,9 +68,7 @@ export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({
             <Sparkles className="h-5 w-5" />
             AI使用量
           </DialogTitle>
-          <DialogDescription>
-            今月のAI機能の使用状況
-          </DialogDescription>
+          <DialogDescription>今月のAI機能の使用状況</DialogDescription>
         </DialogHeader>
 
         {loading ? (
@@ -92,7 +88,7 @@ export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({
                       ? "text-destructive"
                       : isWarning
                         ? "text-yellow-600 dark:text-yellow-400"
-                        : "text-foreground"
+                        : "text-foreground",
                   )}
                 >
                   {percent.toFixed(1)}%
@@ -103,7 +99,7 @@ export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({
                 className={cn(
                   "h-3",
                   isDanger && "[&>div]:bg-destructive",
-                  isWarning && !isDanger && "[&>div]:bg-yellow-500"
+                  isWarning && !isDanger && "[&>div]:bg-yellow-500",
                 )}
               />
             </div>
@@ -111,7 +107,7 @@ export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({
             {/* Stats */}
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg border p-3">
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="mb-1 flex items-center gap-1.5">
                   <Zap className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">消費</span>
                 </div>
@@ -121,7 +117,7 @@ export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({
                 <p className="text-[10px] text-muted-foreground">Cost Units</p>
               </div>
               <div className="rounded-lg border p-3">
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="mb-1 flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">上限</span>
                 </div>
@@ -139,9 +135,7 @@ export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({
                   <p className="text-sm font-medium">
                     {usage.tier === "paid" ? "有料プラン" : "無料プラン"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {usage.yearMonth}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{usage.yearMonth}</p>
                 </div>
                 {usage.tier === "free" && (
                   <Button variant="default" size="sm" asChild>

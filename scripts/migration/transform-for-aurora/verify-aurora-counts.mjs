@@ -18,8 +18,7 @@ const outputDir = join(__dirname, "output");
 
 const REGION = process.env.AWS_REGION || "ap-northeast-1";
 const CLUSTER_ARN =
-  process.env.CLUSTER_ARN ||
-  "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
+  process.env.CLUSTER_ARN || "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
 const SECRET_ARN =
   process.env.SECRET_ARN ||
   "arn:aws:secretsmanager:ap-northeast-1:590183877893:secret:zedi-dev-db-credentials-x1aCah";
@@ -46,7 +45,7 @@ async function getAuroraCount(table) {
       secretArn: SECRET_ARN,
       database: DATABASE,
       sql,
-    })
+    }),
   );
   const records = response.records ?? [];
   if (records.length === 0) return null;
@@ -79,8 +78,7 @@ async function main() {
     ?.slice("--page-contents=".length);
 
   const transformFile = transformPath || (await findLatest("aurora-transform-"));
-  const pageContentsFile =
-    pageContentsPath || (await findLatest("page-contents-with-text-"));
+  const pageContentsFile = pageContentsPath || (await findLatest("page-contents-with-text-"));
 
   if (!transformFile) {
     console.error("aurora-transform-*.json not found. Run C2-2 first.");
@@ -92,9 +90,7 @@ async function main() {
   }
 
   const transformData = JSON.parse(await readFile(transformFile, "utf8"));
-  const pageContentsData = JSON.parse(
-    await readFile(pageContentsFile, "utf8")
-  );
+  const pageContentsData = JSON.parse(await readFile(pageContentsFile, "utf8"));
 
   const expected = {
     users: (transformData.users ?? []).length,

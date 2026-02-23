@@ -18,7 +18,10 @@ function assert(condition, message) {
 async function run(name, event, expectations) {
   const res = await handler(event, mockContext);
   assert(res && typeof res.statusCode === "number", `${name}: response has statusCode`);
-  assert(res.statusCode === expectations.status, `${name}: expected status ${expectations.status}, got ${res.statusCode}`);
+  assert(
+    res.statusCode === expectations.status,
+    `${name}: expected status ${expectations.status}, got ${res.statusCode}`,
+  );
   if (expectations.bodyOk !== undefined) {
     let data;
     try {
@@ -27,28 +30,78 @@ async function run(name, event, expectations) {
       throw new Error(`${name}: body is not JSON`);
     }
     if (expectations.bodyOk) {
-      assert(data.ok === true, `${name}: expected ok: true, got ${JSON.stringify(data).slice(0, 80)}`);
+      assert(
+        data.ok === true,
+        `${name}: expected ok: true, got ${JSON.stringify(data).slice(0, 80)}`,
+      );
     } else {
-      assert(data.ok === false, `${name}: expected ok: false, got ${JSON.stringify(data).slice(0, 80)}`);
+      assert(
+        data.ok === false,
+        `${name}: expected ok: false, got ${JSON.stringify(data).slice(0, 80)}`,
+      );
     }
   }
   if (expectations.bodyContains) {
     assert(
       (res.body || "").includes(expectations.bodyContains),
-      `${name}: body should contain "${expectations.bodyContains}"`
+      `${name}: body should contain "${expectations.bodyContains}"`,
     );
   }
 }
 
 async function main() {
   const tests = [
-    ["GET /api/health (no auth)", { requestContext: { http: { method: "GET" } }, rawPath: "/api/health" }, { status: 200, bodyOk: true }],
-    ["GET /api/me (with claims)", { requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s1", email: "e@x.com" } } } }, rawPath: "/api/me" }, { status: 200, bodyOk: true }],
-    ["GET /api/users (no path id) -> 404", { requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s1" } } } }, rawPath: "/api/users" }, { status: 404 }],
-    ["GET /api/search (scope missing) -> 400", { requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s1" } } } }, rawPath: "/api/search", queryStringParameters: { q: "x" } }, { status: 400, bodyOk: false, bodyContains: "scope=shared" }],
-    ["OPTIONS /api/health -> 204", { requestContext: { http: { method: "OPTIONS" } }, rawPath: "/api/health" }, { status: 204 }],
-    ["GET /api/unknown -> 404", { requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s1" } } } }, rawPath: "/api/unknown" }, { status: 404 }],
-    ["GET /api (no token) -> 401", { requestContext: { http: { method: "GET" } }, rawPath: "/api/me" }, { status: 401, bodyOk: false }],
+    [
+      "GET /api/health (no auth)",
+      { requestContext: { http: { method: "GET" } }, rawPath: "/api/health" },
+      { status: 200, bodyOk: true },
+    ],
+    [
+      "GET /api/me (with claims)",
+      {
+        requestContext: {
+          http: { method: "GET" },
+          authorizer: { jwt: { claims: { sub: "s1", email: "e@x.com" } } },
+        },
+        rawPath: "/api/me",
+      },
+      { status: 200, bodyOk: true },
+    ],
+    [
+      "GET /api/users (no path id) -> 404",
+      {
+        requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s1" } } } },
+        rawPath: "/api/users",
+      },
+      { status: 404 },
+    ],
+    [
+      "GET /api/search (scope missing) -> 400",
+      {
+        requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s1" } } } },
+        rawPath: "/api/search",
+        queryStringParameters: { q: "x" },
+      },
+      { status: 400, bodyOk: false, bodyContains: "scope=shared" },
+    ],
+    [
+      "OPTIONS /api/health -> 204",
+      { requestContext: { http: { method: "OPTIONS" } }, rawPath: "/api/health" },
+      { status: 204 },
+    ],
+    [
+      "GET /api/unknown -> 404",
+      {
+        requestContext: { http: { method: "GET" }, authorizer: { jwt: { claims: { sub: "s1" } } } },
+        rawPath: "/api/unknown",
+      },
+      { status: 404 },
+    ],
+    [
+      "GET /api (no token) -> 401",
+      { requestContext: { http: { method: "GET" } }, rawPath: "/api/me" },
+      { status: 401, bodyOk: false },
+    ],
   ];
 
   let passed = 0;

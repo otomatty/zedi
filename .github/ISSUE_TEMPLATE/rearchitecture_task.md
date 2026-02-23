@@ -1,9 +1,9 @@
 ---
 name: リアーキテクチャ タスク
 about: リアーキテクチャ計画のタスクを管理する
-title: '[Rearchitecture] '
+title: "[Rearchitecture] "
 labels: rearchitecture
-assignees: ''
+assignees: ""
 ---
 
 ## タスク概要
@@ -22,7 +22,7 @@ assignees: ''
 
 <!-- このタスクが「完了」となる基準 -->
 
-- [ ] 
+- [ ]
 
 ## 依存タスク
 

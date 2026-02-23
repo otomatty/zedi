@@ -23,15 +23,15 @@
 
 ## 2. 決定事項一覧
 
-| 項目 | 決定内容 |
-|------|----------|
-| **スティッキータイトルバーの見た目** | ヘッダーと同様に半透明＋ブラー（`bg-background/95 backdrop-blur` 等） |
-| **ノート名の表示** | ページ詳細ページでは表示しない（削除） |
-| **タイトル入力のフォーカス** | 控えめなスタイルで「見出し」感を維持（リング・ボーダーは最小限） |
-| **プレースホルダー** | 「タイトル」のみ表示。文字色は薄く（`text-muted-foreground`） |
-| **アニメーション** | スティッキータイトルバーの出現・非表示にフェード／スライド等のトランジションを入れる |
-| **ヘッダー高さ** | 統一する。**h-16（64px）** に揃える（現状: PageEditorHeader は h-14、共通 Header は h-16） |
-| **テスト** | タイトル入力関連のテストを新コンポーネントに合わせて修正する |
+| 項目                                 | 決定内容                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------ |
+| **スティッキータイトルバーの見た目** | ヘッダーと同様に半透明＋ブラー（`bg-background/95 backdrop-blur` 等）                      |
+| **ノート名の表示**                   | ページ詳細ページでは表示しない（削除）                                                     |
+| **タイトル入力のフォーカス**         | 控えめなスタイルで「見出し」感を維持（リング・ボーダーは最小限）                           |
+| **プレースホルダー**                 | 「タイトル」のみ表示。文字色は薄く（`text-muted-foreground`）                              |
+| **アニメーション**                   | スティッキータイトルバーの出現・非表示にフェード／スライド等のトランジションを入れる       |
+| **ヘッダー高さ**                     | 統一する。**h-16（64px）** に揃える（現状: PageEditorHeader は h-14、共通 Header は h-16） |
+| **テスト**                           | タイトル入力関連のテストを新コンポーネントに合わせて修正する                               |
 
 ---
 
@@ -39,9 +39,9 @@
 
 ### 3.1 現状
 
-| コンポーネント | ファイル | 高さ |
-|----------------|----------|------|
-| 共通 Header | `src/components/layout/Header/index.tsx` | `h-16` |
+| コンポーネント   | ファイル                                                | 高さ   |
+| ---------------- | ------------------------------------------------------- | ------ |
+| 共通 Header      | `src/components/layout/Header/index.tsx`                | `h-16` |
 | PageEditorHeader | `src/components/editor/PageEditor/PageEditorHeader.tsx` | `h-14` |
 
 ### 3.2 変更後
@@ -67,26 +67,26 @@
 
 **Props**
 
-| Prop | 型 | 必須 | 説明 |
-|------|-----|------|------|
-| `title` | `string` | ○ | 表示・編集するタイトル |
-| `onTitleChange` | `(value: string) => void` | 編集時のみ | タイトル変更時のコールバック（編集モード時） |
-| `isReadOnly` | `boolean` | - | 閲覧専用なら true。デフォルト false |
-| `errorMessage` | `string \| null` | - | バリデーションエラー（例: 重複）。ある場合にスタイル表示 |
-| `placeholder` | `string` | - | プレースホルダー。デフォルト「タイトル」 |
-| `titleRef` | `React.RefObject<HTMLElement \| null>` | - | IntersectionObserver 用。タイトルブロックのルート要素に ref を付与 |
+| Prop            | 型                                     | 必須       | 説明                                                               |
+| --------------- | -------------------------------------- | ---------- | ------------------------------------------------------------------ |
+| `title`         | `string`                               | ○          | 表示・編集するタイトル                                             |
+| `onTitleChange` | `(value: string) => void`              | 編集時のみ | タイトル変更時のコールバック（編集モード時）                       |
+| `isReadOnly`    | `boolean`                              | -          | 閲覧専用なら true。デフォルト false                                |
+| `errorMessage`  | `string \| null`                       | -          | バリデーションエラー（例: 重複）。ある場合にスタイル表示           |
+| `placeholder`   | `string`                               | -          | プレースホルダー。デフォルト「タイトル」                           |
+| `titleRef`      | `React.RefObject<HTMLElement \| null>` | -          | IntersectionObserver 用。タイトルブロックのルート要素に ref を付与 |
 
 **表示仕様**
 
-- **編集モード**（`isReadOnly === false`）  
-  - 自動伸長する **textarea** を使用（または 1 行で足りる場合は入力欄 1 行）。  
-  - 見た目: 見出し風（例: `text-2xl` または `text-3xl`、`font-semibold`）。  
-  - フォーカス時: 控えめ（`focus-visible:ring-2 focus-visible:ring-ring/20` 程度、または `focus-visible:outline-none` ＋薄い下線のみ）。  
-  - プレースホルダー: 「タイトル」。文字色は **薄く**（`placeholder:text-muted-foreground`）。  
+- **編集モード**（`isReadOnly === false`）
+  - 自動伸長する **textarea** を使用（または 1 行で足りる場合は入力欄 1 行）。
+  - 見た目: 見出し風（例: `text-2xl` または `text-3xl`、`font-semibold`）。
+  - フォーカス時: 控えめ（`focus-visible:ring-2 focus-visible:ring-ring/20` 程度、または `focus-visible:outline-none` ＋薄い下線のみ）。
+  - プレースホルダー: 「タイトル」。文字色は **薄く**（`placeholder:text-muted-foreground`）。
   - エラー時: `errorMessage` があるときは `text-destructive` 等で表示。
 
-- **閲覧モード**（`isReadOnly === true`）  
-  - 編集不可。`h1` または同等の見出しとして表示し、長文は折り返す（`whitespace-normal`）。  
+- **閲覧モード**（`isReadOnly === true`）
+  - 編集不可。`h1` または同等の見出しとして表示し、長文は折り返す（`whitespace-normal`）。
   - 表示テキスト: `title || '無題のページ'` など。
 
 **レイアウト**
@@ -104,22 +104,22 @@
 
 **Props**
 
-| Prop | 型 | 必須 | 説明 |
-|------|-----|------|------|
-| `visible` | `boolean` | ○ | バーを表示するか |
-| `title` | `string` | ○ | 表示するタイトル（1 行で省略表示） |
-| `onClick` | `() => void` | ○ | クリック時にタイトル位置へスクロールする処理 |
-| `titleRef` | `React.RefObject<HTMLElement \| null>` | - | スクロール先要素（PageTitleBlock の ref を渡す） |
+| Prop       | 型                                     | 必須 | 説明                                             |
+| ---------- | -------------------------------------- | ---- | ------------------------------------------------ |
+| `visible`  | `boolean`                              | ○    | バーを表示するか                                 |
+| `title`    | `string`                               | ○    | 表示するタイトル（1 行で省略表示）               |
+| `onClick`  | `() => void`                           | ○    | クリック時にタイトル位置へスクロールする処理     |
+| `titleRef` | `React.RefObject<HTMLElement \| null>` | -    | スクロール先要素（PageTitleBlock の ref を渡す） |
 
 **表示・スタイル**
 
-- **見た目**: ヘッダーと同様の半透明＋ブラー。  
-  - 例: `bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60`  
+- **見た目**: ヘッダーと同様の半透明＋ブラー。
+  - 例: `bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60`
   - ボーダー: `border-b border-border`
 - **レイアウト**: 高さはコンパクトに（例: `h-10` または `h-12`）。`Container` 内で 1 行表示、長いタイトルは **truncate**。
 - **位置**: `sticky top-16 z-40`（ヘッダー `h-16` の直下）。
-- **アニメーション**: 出現・非表示にトランジションを付ける。  
-  - 例: `transition-all duration-200` と、`visible` に応じた `opacity` および `transform`（例: 上からスライド）または `max-height` で制御。  
+- **アニメーション**: 出現・非表示にトランジションを付ける。
+  - 例: `transition-all duration-200` と、`visible` に応じた `opacity` および `transform`（例: 上からスライド）または `max-height` で制御。
   - 非表示時は `pointer-events-none` でクリック不可にし、レイアウトシフトを防ぐ場合は `invisible` や `opacity-0` で非表示にする。
 
 **インタラクション**
@@ -154,16 +154,16 @@
 **変更内容**
 
 - **先頭に PageTitleBlock を追加**する。順序: **PageTitleBlock** → SourceUrlBadge → TiptapEditor → LinkedPagesSection。
-- PageTitleBlock に渡すもの:  
+- PageTitleBlock に渡すもの:
   - `title`, `onTitleChange`（編集時）, `isReadOnly`（既存の `isReadOnly` を流用）, `errorMessage`（新規 prop で親から渡す）, `titleRef`（StickyTitleBar と共有する ref）。
-- **新規 Props**:  
-  - `onTitleChange?: (value: string) => void`（編集可能な画面のみ渡す）  
-  - `errorMessage?: string | null`  
+- **新規 Props**:
+  - `onTitleChange?: (value: string) => void`（編集可能な画面のみ渡す）
+  - `errorMessage?: string | null`
   - `titleRef?: React.RefObject<HTMLElement | null>`（省略可。StickyTitleBar とタイトルブロックの両方で使う）
 
 **NotePageView からの利用**
 
-- NotePageView では `onTitleChange` を渡さず、`isReadOnly` を true（または編集不可時）にすれば、PageTitleBlock は閲覧表示のみになる。  
+- NotePageView では `onTitleChange` を渡さず、`isReadOnly` を true（または編集不可時）にすれば、PageTitleBlock は閲覧表示のみになる。
 - ノート内ページで編集可能な場合は、将来 `onTitleChange` を渡す拡張が可能。
 
 ---
@@ -175,10 +175,10 @@
 **変更内容**
 
 - タイトル関連の state（`title`, `handleTitleChange`）は **PageEditorContent に渡す**（現状の `title` は既に PageEditorContent に渡しているので、`onTitleChange` と `errorMessage` を追加）。
-- **StickyTitleBar を配置**する。  
-  - 表示条件: タイトルがビューポート外に出たとき（IntersectionObserver で検知）。  
+- **StickyTitleBar を配置**する。
+  - 表示条件: タイトルがビューポート外に出たとき（IntersectionObserver で検知）。
   - クリック時: タイトルブロック要素の `scrollIntoView({ behavior: 'smooth', block: 'start' })` を実行。
-- **IntersectionObserver** は PageEditorView で行うか、StickyTitleBar 内で行うかどちらか。  
+- **IntersectionObserver** は PageEditorView で行うか、StickyTitleBar 内で行うかどちらか。
   - 推奨: **StickyTitleBar** に `titleRef` と「タイトルが画面内にあるか」を渡し、StickyTitleBar 内で Observer を張り、`visible` を親に伝えるか、StickyTitleBar が内部で `visible` を決めて表示する。
 - PageEditorHeader には **title / onTitleChange / errorMessage を渡さない**（削除）。
 
@@ -190,13 +190,13 @@
 
 **変更内容**
 
-- **ヘッダー下のバーを変更**する。  
-  - **ノート名・ページタイトルの表示を削除**する。  
-  - 残すもの: **戻るボタン** と、必要なら **閲覧専用ラベル** のみ。バー自体は高さを小さくするか、ヘッダーと一体化（戻るだけならヘッダー左に戻るボタンを出す等）してもよい。  
+- **ヘッダー下のバーを変更**する。
+  - **ノート名・ページタイトルの表示を削除**する。
+  - 残すもの: **戻るボタン** と、必要なら **閲覧専用ラベル** のみ。バー自体は高さを小さくするか、ヘッダーと一体化（戻るだけならヘッダー左に戻るボタンを出す等）してもよい。
   - 仕様上は「ノート名は表示しない」なので、タイトルは PageEditorContent 内の PageTitleBlock のみで表示する。
-- **PageEditorContent** に、既存どおり `title={page.title}`、`isReadOnly={!canEdit}` を渡す。  
+- **PageEditorContent** に、既存どおり `title={page.title}`、`isReadOnly={!canEdit}` を渡す。
   - `onTitleChange` は渡さない（ノート内ページではタイトル編集をしない前提でよい場合）、または将来編集対応するなら渡す。
-- スティッキータイトルバーは **PageEditorContent 内で共通表示**するか、NotePageView でも StickyTitleBar を同じロジックで表示する。  
+- スティッキータイトルバーは **PageEditorContent 内で共通表示**するか、NotePageView でも StickyTitleBar を同じロジックで表示する。
   - 推奨: PageEditorContent 内で「タイトル ref」「タイトルが可視か」を扱い、StickyTitleBar も PageEditorContent 内に含めて、PageEditor / NotePageView の両方で同じレイアout にすると重複が少ない。
 
 ---
@@ -218,12 +218,12 @@
 
 **削除・変更するテスト**
 
-- タイトル入力に関するテストを **削除** または **修正** する。  
-  - 「タイトル入力とプレースホルダーを表示する」→ 削除。  
-  - 「タイトルを変更すると onTitleChange が呼ばれる」→ 削除。  
-  - 「errorMessage があるときタイトル入力に text-destructive クラスが付く」→ 削除。  
+- タイトル入力に関するテストを **削除** または **修正** する。
+  - 「タイトル入力とプレースホルダーを表示する」→ 削除。
+  - 「タイトルを変更すると onTitleChange が呼ばれる」→ 削除。
+  - 「errorMessage があるときタイトル入力に text-destructive クラスが付く」→ 削除。
   - 「errorMessage が null のときタイトル入力に text-destructive を付けない」→ 削除。
-- **defaultProps から削除**: `title`, `onTitleChange`, `errorMessage`。  
+- **defaultProps から削除**: `title`, `onTitleChange`, `errorMessage`。
 - 上記削除後も、戻る・Wiki・ドロップダウン・コラボ等のテストは **そのまま維持** する。
 
 ### 7.2 PageTitleBlock のテスト（新規）

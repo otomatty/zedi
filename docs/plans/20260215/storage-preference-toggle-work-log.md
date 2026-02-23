@@ -7,13 +7,13 @@
 
 ## 1. 作業サマリー
 
-| 項目 | 内容 |
-|------|------|
-| 機能概要 | 画像の保存先を「デフォルトストレージ」または「外部ストレージ」で優先選択できるトグルを設定画面に追加。UI 上は「S3」表記を使わず「デフォルトストレージ」のみ表示。 |
-| 新規ファイル | 0 件 |
-| 変更ファイル | 12 件 |
-| ビルド | 成功 |
-| 既存テスト | ストレージ変更に起因する失敗なし（他要因の失敗は既存のまま） |
+| 項目         | 内容                                                                                                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 機能概要     | 画像の保存先を「デフォルトストレージ」または「外部ストレージ」で優先選択できるトグルを設定画面に追加。UI 上は「S3」表記を使わず「デフォルトストレージ」のみ表示。 |
+| 新規ファイル | 0 件                                                                                                                                                              |
+| 変更ファイル | 12 件                                                                                                                                                             |
+| ビルド       | 成功                                                                                                                                                              |
+| 既存テスト   | ストレージ変更に起因する失敗なし（他要因の失敗は既存のまま）                                                                                                      |
 
 ---
 
@@ -28,19 +28,19 @@
 
 ## 3. 変更ファイル一覧
 
-| ファイルパス | 変更内容の概要 |
-|--------------|----------------|
-| `src/types/storage.ts` | `preferDefaultStorage` 追加、s3 表示名を「デフォルトストレージ」に、`EXTERNAL_STORAGE_PROVIDERS` 追加 |
-| `src/lib/storage/index.ts` | `getSettingsForUpload` / `isStorageConfiguredForUpload` 追加、エラーメッセージの文言変更 |
-| `src/lib/storage/providers/S3Provider.ts` | `name` およびユーザー向けメッセージを「デフォルトストレージ」に変更 |
-| `src/lib/storageSettings.ts` | 読み込み時の正規化（preferDefaultStorage / provider）、`isConfigured` の算出、`isStorageConfigured()` の実装変更 |
-| `src/hooks/useStorageSettings.ts` | トグルで外部に切り替えたときの provider リセット、保存時の `isConfigured` 算出、接続テストで実効設定を使用 |
-| `src/hooks/useImageUpload.ts` | `getSettingsForUpload` / `isStorageConfiguredForUpload` を利用するように変更 |
-| `src/components/settings/StorageSettingsForm.tsx` | トグル UI 追加、外部時のみ Select（EXTERNAL_STORAGE_PROVIDERS）、説明文・Alert 文言変更 |
-| `src/components/editor/TiptapEditor.tsx` | 実効プロバイダーと `isStorageConfiguredForUpload` でストレージ状態を算出 |
-| `src/components/editor/PageEditorView.tsx` | 上記と同様 |
-| `src/components/editor/TiptapEditor/useImageUploadManager.ts` | アップロード・storageProviderId に `getSettingsForUpload(storageSettings)` を使用 |
-| `src/components/editor/TiptapEditor/useStorageActions.ts` | 削除時のプロバイダー取得・比較に実効設定を使用 |
+| ファイルパス                                                  | 変更内容の概要                                                                                                   |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `src/types/storage.ts`                                        | `preferDefaultStorage` 追加、s3 表示名を「デフォルトストレージ」に、`EXTERNAL_STORAGE_PROVIDERS` 追加            |
+| `src/lib/storage/index.ts`                                    | `getSettingsForUpload` / `isStorageConfiguredForUpload` 追加、エラーメッセージの文言変更                         |
+| `src/lib/storage/providers/S3Provider.ts`                     | `name` およびユーザー向けメッセージを「デフォルトストレージ」に変更                                              |
+| `src/lib/storageSettings.ts`                                  | 読み込み時の正規化（preferDefaultStorage / provider）、`isConfigured` の算出、`isStorageConfigured()` の実装変更 |
+| `src/hooks/useStorageSettings.ts`                             | トグルで外部に切り替えたときの provider リセット、保存時の `isConfigured` 算出、接続テストで実効設定を使用       |
+| `src/hooks/useImageUpload.ts`                                 | `getSettingsForUpload` / `isStorageConfiguredForUpload` を利用するように変更                                     |
+| `src/components/settings/StorageSettingsForm.tsx`             | トグル UI 追加、外部時のみ Select（EXTERNAL_STORAGE_PROVIDERS）、説明文・Alert 文言変更                          |
+| `src/components/editor/TiptapEditor.tsx`                      | 実効プロバイダーと `isStorageConfiguredForUpload` でストレージ状態を算出                                         |
+| `src/components/editor/PageEditorView.tsx`                    | 上記と同様                                                                                                       |
+| `src/components/editor/TiptapEditor/useImageUploadManager.ts` | アップロード・storageProviderId に `getSettingsForUpload(storageSettings)` を使用                                |
+| `src/components/editor/TiptapEditor/useStorageActions.ts`     | 削除時のプロバイダー取得・比較に実効設定を使用                                                                   |
 
 ---
 

@@ -54,9 +54,7 @@ export const MathEditDialog: React.FC<MathEditDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>
-            {isBlock ? "ブロック数式を編集" : "インライン数式を編集"}
-          </DialogTitle>
+          <DialogTitle>{isBlock ? "ブロック数式を編集" : "インライン数式を編集"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -66,7 +64,7 @@ export const MathEditDialog: React.FC<MathEditDialogProps> = ({
             onChange={(e) => setLatex(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="LaTeX を入力（例: E = mc^2）"
-            className="font-mono text-sm min-h-[120px]"
+            className="min-h-[120px] font-mono text-sm"
             rows={isBlock ? 6 : 3}
           />
           <p className="text-xs text-muted-foreground">

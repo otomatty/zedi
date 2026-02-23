@@ -79,8 +79,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     handleCancelCreate,
   } = useWikiLinkNavigation();
 
-  const [suggestionState, setSuggestionState] =
-    useState<WikiLinkSuggestionState | null>(null);
+  const [suggestionState, setSuggestionState] = useState<WikiLinkSuggestionState | null>(null);
   const [suggestionPos, setSuggestionPos] = useState<{
     top: number;
     left: number;
@@ -99,20 +98,13 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
   const [selectedTextForMermaid, setSelectedTextForMermaid] = useState("");
   const [selectedText, setSelectedText] = useState("");
-  const hasThumbnail = useMemo(
-    () => Boolean(extractFirstImage(content)),
-    [content]
-  );
+  const hasThumbnail = useMemo(() => Boolean(extractFirstImage(content)), [content]);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const {
-    settings: storageSettings,
-    isLoading: isStorageLoading,
-  } = useStorageSettings();
-  const isStorageConfigured =
-    !isStorageLoading && isStorageConfiguredForUpload(storageSettings);
+  const { settings: storageSettings, isLoading: isStorageLoading } = useStorageSettings();
+  const isStorageConfigured = !isStorageLoading && isStorageConfiguredForUpload(storageSettings);
   const effectiveProvider = getSettingsForUpload(storageSettings).provider;
   const currentStorageProvider = getStorageProviderById(effectiveProvider);
   const [storageSetupDialogOpen, setStorageSetupDialogOpen] = useState(false);
@@ -156,17 +148,13 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     setStorageSetupDialogOpen(true);
   }, []);
 
-  const {
-    getProviderLabel,
-    handleCopyImageUrl,
-    canDeleteFromStorage,
-    handleDeleteFromStorage,
-  } = useStorageActions({
-    storageSettings,
-    isStorageConfigured,
-    currentStorageProvider,
-    toast,
-  });
+  const { getProviderLabel, handleCopyImageUrl, canDeleteFromStorage, handleDeleteFromStorage } =
+    useStorageActions({
+      storageSettings,
+      isStorageConfigured,
+      currentStorageProvider,
+      toast,
+    });
 
   const {
     fileInputRef,
@@ -193,102 +181,104 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
 
   // local モード（個人ページ）は awareness なしでも Y.Doc コラボレーション有効
   const useCollaborationMode = Boolean(
-    collaborationConfig?.xmlFragment &&
-      collaborationConfig?.user
+    collaborationConfig?.xmlFragment && collaborationConfig?.user,
   );
 
-  const editor = useEditor({
-    extensions: createEditorExtensions({
-      placeholder,
-      onLinkClick: handleLinkClick,
-      onStateChange: handleStateChange,
-      onSlashStateChange: handleSlashStateChange,
-      imageUploadOptions: {
-        onRetry: handleRetryUpload,
-        onRemove: handleRemoveUpload,
-        getProviderLabel,
-      },
-      imageOptions: {
-        getProviderLabel,
-        canDeleteFromStorage,
-        onDeleteFromStorage: handleDeleteFromStorage,
-        onCopyUrl: handleCopyImageUrl,
-        getAuthenticatedImageUrl: async (url: string) => {
-          const token = await getToken();
-          if (!token) return null;
-          try {
-            const r = await fetch(url, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!r.ok) return null;
-            const blob = await r.blob();
-            return URL.createObjectURL(blob);
-          } catch {
-            return null;
+  const editor = useEditor(
+    {
+      extensions: createEditorExtensions({
+        placeholder,
+        onLinkClick: handleLinkClick,
+        onStateChange: handleStateChange,
+        onSlashStateChange: handleSlashStateChange,
+        imageUploadOptions: {
+          onRetry: handleRetryUpload,
+          onRemove: handleRemoveUpload,
+          getProviderLabel,
+        },
+        imageOptions: {
+          getProviderLabel,
+          canDeleteFromStorage,
+          onDeleteFromStorage: handleDeleteFromStorage,
+          onCopyUrl: handleCopyImageUrl,
+          getAuthenticatedImageUrl: async (url: string) => {
+            const token = await getToken();
+            if (!token) return null;
+            try {
+              const r = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!r.ok) return null;
+              const blob = await r.blob();
+              return URL.createObjectURL(blob);
+            } catch {
+              return null;
+            }
+          },
+        },
+        collaboration: useCollaborationMode
+          ? {
+              document: collaborationConfig!.ydoc,
+              field: "default",
+              awareness: collaborationConfig!.awareness, // undefined in local mode
+              user: collaborationConfig!.user,
+            }
+          : undefined,
+      }),
+      content: useCollaborationMode ? undefined : initialParsedContent,
+      autofocus: autoFocus ? "end" : false,
+      editable: !isReadOnly,
+      // Prevent SSR hydration issues
+      immediatelyRender: false,
+      editorProps: {
+        ...defaultEditorProps,
+        handleKeyDown: (view, event) => {
+          // Slash suggestion takes priority when active
+          if (slashState?.active && slashRef.current) {
+            return slashRef.current.onKeyDown(event);
           }
+          if (suggestionState?.active && suggestionRef.current) {
+            return suggestionRef.current.onKeyDown(event);
+          }
+          return false;
         },
       },
-      collaboration: useCollaborationMode
-        ? {
-            document: collaborationConfig!.ydoc,
-            field: "default",
-            awareness: collaborationConfig!.awareness, // undefined in local mode
-            user: collaborationConfig!.user,
+      onUpdate: ({ editor }) => {
+        // Only call onChange after editor has been properly initialized with content
+        // This prevents overwriting page content with empty editor state
+        if (!isEditorInitializedRef.current) {
+          const currentJson = JSON.stringify(editor.getJSON());
+          const isEmpty = currentJson.length <= 50; // Empty doc is ~47 chars
+
+          // If user is typing in a new/empty page, mark as initialized
+          if (!isEmpty) {
+            isEditorInitializedRef.current = true;
+          } else {
+            return;
           }
-        : undefined,
-    }),
-    content: useCollaborationMode ? undefined : initialParsedContent,
-    autofocus: autoFocus ? "end" : false,
-    editable: !isReadOnly,
-    // Prevent SSR hydration issues
-    immediatelyRender: false,
-    editorProps: {
-      ...defaultEditorProps,
-      handleKeyDown: (view, event) => {
-        // Slash suggestion takes priority when active
-        if (slashState?.active && slashRef.current) {
-          return slashRef.current.onKeyDown(event);
         }
-        if (suggestionState?.active && suggestionRef.current) {
-          return suggestionRef.current.onKeyDown(event);
+        const json = JSON.stringify(editor.getJSON());
+        onChange(json);
+      },
+      onCreate: () => {
+        // If content was provided at initialization, mark as initialized
+        if (initialParsedContent) {
+          isEditorInitializedRef.current = true;
         }
-        return false;
+      },
+      onSelectionUpdate: ({ editor }) => {
+        const { from, to } = editor.state.selection;
+        const text = editor.state.doc.textBetween(from, to, " ");
+        lastSelectionRef.current = { from, to };
+        setSelectedText(text.trim());
+        if (useCollaborationMode && collaborationConfig?.awareness) {
+          collaborationConfig.updateCursor(from, to);
+          collaborationConfig.updateSelection(from, to);
+        }
       },
     },
-    onUpdate: ({ editor }) => {
-      // Only call onChange after editor has been properly initialized with content
-      // This prevents overwriting page content with empty editor state
-      if (!isEditorInitializedRef.current) {
-        const currentJson = JSON.stringify(editor.getJSON());
-        const isEmpty = currentJson.length <= 50; // Empty doc is ~47 chars
-        
-        // If user is typing in a new/empty page, mark as initialized
-        if (!isEmpty) {
-          isEditorInitializedRef.current = true;
-        } else {
-          return;
-        }
-      }
-      const json = JSON.stringify(editor.getJSON());
-      onChange(json);
-    },
-    onCreate: () => {
-      // If content was provided at initialization, mark as initialized
-      if (initialParsedContent) {
-        isEditorInitializedRef.current = true;
-      }
-    },
-    onSelectionUpdate: ({ editor }) => {
-      const { from, to } = editor.state.selection;
-      const text = editor.state.doc.textBetween(from, to, " ");
-      lastSelectionRef.current = { from, to };
-      setSelectedText(text.trim());
-      if (useCollaborationMode && collaborationConfig?.awareness) {
-        collaborationConfig.updateCursor(from, to);
-        collaborationConfig.updateSelection(from, to);
-      }
-    },
-  }, [pageId, useCollaborationMode]);
+    [pageId, useCollaborationMode],
+  );
 
   useEffect(() => {
     editorRef.current = editor;
@@ -304,12 +294,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
 
   // URL から作成時: Y.Doc が空のときに initialContent を一度だけ反映する
   useEffect(() => {
-    if (
-      !editor ||
-      !collaborationConfig ||
-      !initialContent ||
-      initialContentAppliedRef.current
-    )
+    if (!editor || !collaborationConfig || !initialContent || initialContentAppliedRef.current)
       return;
 
     const timer = setTimeout(() => {
@@ -402,8 +387,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     const handler = () => {
       handleInsertImageClick();
     };
-    window.addEventListener('slash-command-insert-image', handler);
-    return () => window.removeEventListener('slash-command-insert-image', handler);
+    window.addEventListener("slash-command-insert-image", handler);
+    return () => window.removeEventListener("slash-command-insert-image", handler);
   }, [handleInsertImageClick]);
 
   const handleSuggestionSelect = useCallback(
@@ -445,16 +430,16 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       editor.view.dispatch(
         editor.view.state.tr.setMeta(wikiLinkSuggestionPluginKey, {
           close: true,
-        })
+        }),
       );
     },
-    [editor, suggestionState, checkReferenced, pageId]
+    [editor, suggestionState, checkReferenced, pageId],
   );
 
   const handleSuggestionClose = useCallback(() => {
     if (!editor) return;
     editor.view.dispatch(
-      editor.view.state.tr.setMeta(wikiLinkSuggestionPluginKey, { close: true })
+      editor.view.state.tr.setMeta(wikiLinkSuggestionPluginKey, { close: true }),
     );
   }, [editor]);
 
@@ -470,7 +455,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       // 選択テキストを削除してMermaidを挿入
       editor.chain().focus().deleteSelection().insertMermaid(code).run();
     },
-    [editor]
+    [editor],
   );
 
   const { getToken } = useAuth();
@@ -500,21 +485,18 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       const altText = alt || pageTitle || "thumbnail";
 
       try {
-        const response = await fetch(
-          `${thumbnailApiBaseUrl}/api/thumbnail/commit`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              sourceUrl: imageUrl,
-              fallbackUrl: previewUrl,
-              title: altText,
-            }),
-          }
-        );
+        const response = await fetch(`${thumbnailApiBaseUrl}/api/thumbnail/commit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            sourceUrl: imageUrl,
+            fallbackUrl: previewUrl,
+            title: altText,
+          }),
+        });
 
         if (!response.ok) {
           let message = `画像の保存に失敗しました: ${response.status}`;
@@ -554,20 +536,17 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       } catch (error) {
         toast({
           title: "画像の保存に失敗しました",
-          description:
-            error instanceof Error ? error.message : "画像の保存に失敗しました",
+          description: error instanceof Error ? error.message : "画像の保存に失敗しました",
           variant: "destructive",
         });
       }
     },
-    [editor, getToken, thumbnailApiBaseUrl, pageTitle, toast]
+    [editor, getToken, thumbnailApiBaseUrl, pageTitle, toast],
   );
 
   const handleSlashClose = useCallback(() => {
     if (!editor) return;
-    editor.view.dispatch(
-      editor.view.state.tr.setMeta(slashSuggestionPluginKey, { close: true })
-    );
+    editor.view.dispatch(editor.view.state.tr.setMeta(slashSuggestionPluginKey, { close: true }));
   }, [editor]);
 
   const handleGoToStorageSettings = useCallback(() => {
@@ -579,7 +558,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   return (
     <div
       ref={editorContainerRef}
-      className={cn("relative", className, isDraggingOver && "ring-2 ring-primary ring-dashed")}
+      className={cn("relative", className, isDraggingOver && "ring-dashed ring-2 ring-primary")}
       style={{ "--editor-font-size": `${editorFontSizePx}px` } as React.CSSProperties}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

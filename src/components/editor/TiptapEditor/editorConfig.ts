@@ -102,9 +102,7 @@ export interface EditorExtensionsOptions {
 /**
  * Create the array of Tiptap extensions for the editor
  */
-export function createEditorExtensions(
-  options: EditorExtensionsOptions
-): Extension[] {
+export function createEditorExtensions(options: EditorExtensionsOptions): Extension[] {
   const useCollaboration = Boolean(options.collaboration);
 
   return [

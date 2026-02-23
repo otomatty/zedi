@@ -133,14 +133,10 @@ test.describe("Linked Pages Cards", () => {
     if (isVisible) {
       await expect(linkSection).toBeVisible();
       // Verify Target Page is shown in the links
-      await expect(
-        page.locator(".border-t").getByText("Target Page")
-      ).toBeVisible();
+      await expect(page.locator(".border-t").getByText("Target Page")).toBeVisible();
     } else {
       // Log for debugging but don't fail the test entirely
-      console.log(
-        "Note: Link section not visible - link processing may be async"
-      );
+      console.log("Note: Link section not visible - link processing may be async");
     }
   });
 
@@ -178,9 +174,7 @@ test.describe("Linked Pages Cards", () => {
       await expect(ghostSection).toBeVisible();
       await expect(page.getByText("Non Existing Page")).toBeVisible();
     } else {
-      console.log(
-        "Note: Ghost link section not visible - link processing may be async"
-      );
+      console.log("Note: Ghost link section not visible - link processing may be async");
     }
   });
 });

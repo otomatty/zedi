@@ -1,6 +1,6 @@
-import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 export interface SlashSuggestionState {
   active: boolean;
@@ -9,7 +9,7 @@ export interface SlashSuggestionState {
   decorations: DecorationSet;
 }
 
-export const slashSuggestionPluginKey = new PluginKey<SlashSuggestionState>('slashSuggestion');
+export const slashSuggestionPluginKey = new PluginKey<SlashSuggestionState>("slashSuggestion");
 
 export interface SlashSuggestionOptions {
   onStateChange?: (state: SlashSuggestionState) => void;
@@ -24,7 +24,7 @@ export interface SlashSuggestionOptions {
  * The text after "/" is treated as a filter query.
  */
 export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
-  name: 'slashSuggestion',
+  name: "slashSuggestion",
 
   addOptions() {
     return {
@@ -43,7 +43,7 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
           init() {
             return {
               active: false,
-              query: '',
+              query: "",
               range: null,
               decorations: DecorationSet.empty,
             };
@@ -56,7 +56,7 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
             if (meta?.close) {
               const nextState: SlashSuggestionState = {
                 active: false,
-                query: '',
+                query: "",
                 range: null,
                 decorations: DecorationSet.empty,
               };
@@ -72,7 +72,7 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
               if (prev.active) {
                 const nextState: SlashSuggestionState = {
                   active: false,
-                  query: '',
+                  query: "",
                   range: null,
                   decorations: DecorationSet.empty,
                 };
@@ -83,7 +83,7 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
             }
 
             // Get text before cursor within the current text block
-            const textBefore = $from.parent.textBetween(0, $from.parentOffset, null, '\ufffc');
+            const textBefore = $from.parent.textBetween(0, $from.parentOffset, null, "\ufffc");
 
             // Match "/" at the start of line, or " /" preceded by a space.
             // Capture the query after "/"
@@ -92,12 +92,12 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
             if (match) {
               const query = match[2]; // text after "/"
               const slashOffset = match[0].length - match[2].length; // length of prefix including "/"
-              const from = $from.pos - match[0].length + (match[1].length); // start at "/"
+              const from = $from.pos - match[0].length + match[1].length; // start at "/"
               const to = $from.pos;
 
               const decorations = DecorationSet.create(newState.doc, [
                 Decoration.inline(from, to, {
-                  class: 'slash-command-typing',
+                  class: "slash-command-typing",
                 }),
               ]);
 
@@ -116,7 +116,7 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
             if (prev.active) {
               const nextState: SlashSuggestionState = {
                 active: false,
-                query: '',
+                query: "",
                 range: null,
                 decorations: DecorationSet.empty,
               };

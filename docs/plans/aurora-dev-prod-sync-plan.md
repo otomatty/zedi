@@ -9,13 +9,13 @@
 
 ### 1.1 既存の同期スクリプト（Turso 前提）
 
-| 項目 | 内容 |
-|------|------|
-| スクリプト | `scripts/sync/sync-dev-data.ts` |
-| 接続 | `@libsql/client` で Turso (libsql) に接続 |
-| 認証情報 | `.env.production` / `.env.development` の `VITE_TURSO_DATABASE_URL`, `VITE_TURSO_AUTH_TOKEN` |
+| 項目       | 内容                                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------------ |
+| スクリプト | `scripts/sync/sync-dev-data.ts`                                                                        |
+| 接続       | `@libsql/client` で Turso (libsql) に接続                                                              |
+| 認証情報   | `.env.production` / `.env.development` の `VITE_TURSO_DATABASE_URL`, `VITE_TURSO_AUTH_TOKEN`           |
 | マッピング | `scripts/sync/dev-user-mapping.json` で **Clerk** の `productionUserId` / `developmentUserId` を紐付け |
-| 同期対象 | `pages`, `links`, `ghost_links`（Turso スキーマ: TEXT id, INTEGER 日時） |
+| 同期対象   | `pages`, `links`, `ghost_links`（Turso スキーマ: TEXT id, INTEGER 日時）                               |
 
 **結論:** 本番・開発が Aurora に移行したため、このスクリプトは **現状のままでは利用できない**（Turso 用であり、Aurora のスキーマ・接続方式と一致しない）。
 
@@ -44,15 +44,15 @@
   - **email:** 本番・開発の `users` を email で検索し、それぞれの `users.id` を取得。同一人物を同じ email で登録している前提。
   - **cognito_sub:** 本番と開発で同じ Cognito User Pool を使う場合は `cognito_sub` が一致するため、それでユーザーを特定可能。
   - **明示マッピング:** 本番の `users.id`（または cognito_sub）と開発の `users.id`（または cognito_sub）を設定ファイルで明示的に紐付ける。
-- **同期対象テーブルと順序:**  
-  1. **users** … 開発側にいなければ upsert（email / cognito_sub で判定）。  
-  2. **pages** … 対象ユーザーの `owner_id` のページをコピー。`owner_id` は開発側の `users.id` に差し替え。  
-  3. **page_contents** … 上記 pages に紐づく行をそのままコピー（page_id はそのまま）。  
-  4. **notes** … 対象ユーザーが owner のノートをコピー。`owner_id` を開発側に差し替え。  
-  5. **note_pages** … 上記 notes/pages に紐づく行をコピー（note_id, page_id はそのまま）。  
-  6. **note_members** … 対象ノートのメンバー。`invited_by_user_id` は開発側ユーザーにマッピング可能なら差し替え。  
-  7. **links** … 対象ユーザーのページに紐づくリンクをコピー（source_id, target_id は page_id をそのまま使うため変更不要）。  
-  8. **ghost_links** … 同様に source_page_id が対象のページのものをコピー。  
+- **同期対象テーブルと順序:**
+  1. **users** … 開発側にいなければ upsert（email / cognito_sub で判定）。
+  2. **pages** … 対象ユーザーの `owner_id` のページをコピー。`owner_id` は開発側の `users.id` に差し替え。
+  3. **page_contents** … 上記 pages に紐づく行をそのままコピー（page_id はそのまま）。
+  4. **notes** … 対象ユーザーが owner のノートをコピー。`owner_id` を開発側に差し替え。
+  5. **note_pages** … 上記 notes/pages に紐づく行をコピー（note_id, page_id はそのまま）。
+  6. **note_members** … 対象ノートのメンバー。`invited_by_user_id` は開発側ユーザーにマッピング可能なら差し替え。
+  7. **links** … 対象ユーザーのページに紐づくリンクをコピー（source_id, target_id は page_id をそのまま使うため変更不要）。
+  8. **ghost_links** … 同様に source_page_id が対象のページのものをコピー。
   9. **media** … 対象ユーザーの `owner_id` のメディアをコピー。`owner_id` を開発側に差し替え。
 
 - **競合解決:** 既存と同様に `updated_at` ベースの「latest-wins」や「production-wins」などをオプションで選択可能にするとよい。
@@ -60,8 +60,8 @@
 ### 2.2 方針 B: Bastion / DATABASE_URL で psql 接続
 
 - **接続:** `db/aurora/apply.sh` と同様に、本番・開発それぞれに `DATABASE_URL`（または Secrets Manager から取得した接続文字列）で **psql / node-postgres** 接続する。
-- **メリット:** 大量データのバルク COPY や複雑なトランザクションが書きやすい。  
-- **デメリット:** VPC アクセス（Bastion や VPN）が必要で、ローカル実行環境の前提が増える。  
+- **メリット:** 大量データのバルク COPY や複雑なトランザクションが書きやすい。
+- **デメリット:** VPC アクセス（Bastion や VPN）が必要で、ローカル実行環境の前提が増える。
 - **評価:** 運用で Bastion が標準であれば検討の価値あり。まずは RDS Data API で足りるか試し、必要なら B を検討するのが現実的。
 
 ### 2.3 方針 C: 手動エクスポート／インポート
@@ -136,10 +136,10 @@
 
 ## 4. ドキュメント・運用の更新
 
-- **`docs/guides/dev-environment-setup.md`**  
-  - 「Turso」を前提にした説明を、**Aurora が開発・本番の DB である**前提に更新する。  
+- **`docs/guides/dev-environment-setup.md`**
+  - 「Turso」を前提にした説明を、**Aurora が開発・本番の DB である**前提に更新する。
   - 開発者データ同期については「特定ユーザーだけ同期する場合は `scripts/sync/sync-aurora-dev-data` と Aurora 用マッピングを参照」と記載し、本ドキュメント（`docs/plans/aurora-dev-prod-sync-plan.md`）へのリンクを張る。
-- **`scripts/sync/README.md`**（存在しなければ作成）  
+- **`scripts/sync/README.md`**（存在しなければ作成）
   - Turso 用 `sync-dev-data.ts` と Aurora 用スクリプトの役割の違い、必要な環境変数、マッピングファイルの例を簡潔にまとめる。
 
 ---

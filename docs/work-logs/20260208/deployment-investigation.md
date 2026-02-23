@@ -7,11 +7,11 @@
 
 ## 1. 結論サマリー
 
-| 対象 | デプロイ状況 | 備考 |prod
-|------|--------------|------|
-| **AWS（Terraform）** | **dev のみ** | 本番（prod）は未 apply。state は dev 環境のリソースのみ。 |
-| **フロントエンド（Vite/React）** | **リポジトリ内に自動デプロイなし** | CI はビルドまで。zedi-note.app の配信元は本リポジトリの workflow では未定義。 |
-| **Cloudflare Workers（AI / サムネイル API）** | **本番デプロイあり** | main ブランチ push 時などに `deploy-workers.yml` で `--env production` デプロイ。 |
+| 対象                                          | デプロイ状況                       | 備考                                                                              | prod |
+| --------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- | ---- |
+| **AWS（Terraform）**                          | **dev のみ**                       | 本番（prod）は未 apply。state は dev 環境のリソースのみ。                         |
+| **フロントエンド（Vite/React）**              | **リポジトリ内に自動デプロイなし** | CI はビルドまで。zedi-note.app の配信元は本リポジトリの workflow では未定義。     |
+| **Cloudflare Workers（AI / サムネイル API）** | **本番デプロイあり**               | main ブランチ push 時などに `deploy-workers.yml` で `--env production` デプロイ。 |
 
 ---
 
@@ -33,7 +33,7 @@
   - Redis: `zedi-dev-redis`
   - ECR: `zedi-dev-hocuspocus`
 
-**結論:** 本番用の `-var-file=environments/prod.tfvars` での apply は**未実施**。本番用 Cognito（zedi-prod-*）や本番用 ECS/ALB は存在しない。
+**結論:** 本番用の `-var-file=environments/prod.tfvars` での apply は**未実施**。本番用 Cognito（zedi-prod-\*）や本番用 ECS/ALB は存在しない。
 
 ---
 
@@ -43,7 +43,7 @@
 
 - **CI（.github/workflows/ci.yml）:** PR / push で lint, type-check, test, **build** まで。デプロイステップはなし。
 - **Vercel / Netlify:** `vercel.json` / `netlify.toml` 等の設定ファイルは**存在しない**。
-- **public/_redirects, _headers:** SPA 用の設定（`/* /index.html 200`）があり、Netlify または Cloudflare Pages で使う形式。どちらで配信しているかはリポジトリからは不明。
+- **public/\_redirects, \_headers:** SPA 用の設定（`/* /index.html 200`）があり、Netlify または Cloudflare Pages で使う形式。どちらで配信しているかはリポジトリからは不明。
 
 ### 3.2 解釈
 
@@ -76,12 +76,12 @@
 
 **結論: リポジトリ内では「どこにデプロイするか」は特定されていない。**
 
-| 項目 | 内容 |
-|------|------|
-| **本番 URL** | ドキュメント・Cognito コールバック・Workers CORS で **zedi-note.app** を想定。 |
-| **配信元** | **未定義**。`vercel.json` / `netlify.toml` / Cloudflare Pages 用の設定ファイルは存在しない。CI にデプロイステップもない。 |
+| 項目                   | 内容                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **本番 URL**           | ドキュメント・Cognito コールバック・Workers CORS で **zedi-note.app** を想定。                                                                                                                                                                                                                                            |
+| **配信元**             | **未定義**。`vercel.json` / `netlify.toml` / Cloudflare Pages 用の設定ファイルは存在しない。CI にデプロイステップもない。                                                                                                                                                                                                 |
 | **想定されうる選択肢** | ・**Vercel** … Phase C ドキュメントで「C1 を Vercel 等で行う場合」と記載あり。<br>・**Netlify / Cloudflare Pages** … `public/_redirects`・`_headers` が SPA 用の形式で、これらのサービスでそのまま使える。<br>・**AWS（C2）** … 将来、Phase 6 として CloudFront + S3 で配信する計画（Terraform cdn モジュールは未実装）。 |
-| **環境変数の渡し方** | どのサービスでも、ビルド時に `VITE_*` を設定し、本番用 Cognito / Turso / Realtime の値を注入してビルド・デプロイすればよい。 |
+| **環境変数の渡し方**   | どのサービスでも、ビルド時に `VITE_*` を設定し、本番用 Cognito / Turso / Realtime の値を注入してビルド・デプロイすればよい。                                                                                                                                                                                              |
 
 実際に zedi-note.app をどこでホストしているかは、DNS の向き先や利用中のホスティングのダッシュボードで確認する必要がある。
 
@@ -89,9 +89,9 @@
 
 ## 7. 次のアクション（Phase C1 に向けて）
 
-1. **本番 Terraform の適用**  
+1. **本番 Terraform の適用**
    - IdP の Client ID/Secret を準備し、`prod.tfvars` を設定したうえで、本番用に `terraform apply -var-file=environments/prod.tfvars` を実行する。
-2. **フロントの本番デプロイ**  
+2. **フロントの本番デプロイ**
    - 現状の配信手段（Vercel / Netlify / Cloudflare Pages 等）を確認し、本番用環境変数（VITE_COGNITO_DOMAIN, VITE_COGNITO_CLIENT_ID 等）を設定してビルド・デプロイする。リポジトリにフロント用の deploy workflow を追加するかは任意。
-3. **本番 Turso**  
+3. **本番 Turso**
    - 本番 DB が Turso のままの場合、Phase B と同様に本番 Turso の user_id を Cognito sub に移行する必要がある。

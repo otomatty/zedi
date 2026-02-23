@@ -7,12 +7,7 @@ import {
   convertMarkdownToTiptapContent,
 } from "@/lib/wikiGenerator";
 
-export type WikiGeneratorStatus =
-  | "idle"
-  | "generating"
-  | "completed"
-  | "error"
-  | "cancelled";
+export type WikiGeneratorStatus = "idle" | "generating" | "completed" | "error" | "cancelled";
 
 export interface UseWikiGeneratorReturn {
   status: WikiGeneratorStatus;
@@ -35,9 +30,7 @@ export function useWikiGenerator(): UseWikiGeneratorReturn {
   const [streamedContent, setStreamedContent] = useState("");
   const [result, setResult] = useState<WikiGeneratorResult | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [throttledTiptapContent, setThrottledTiptapContent] = useState<
-    string | null
-  >(null);
+  const [throttledTiptapContent, setThrottledTiptapContent] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -91,7 +84,7 @@ export function useWikiGenerator(): UseWikiGeneratorReturn {
           abortControllerRef.current = null;
         },
       },
-      abortControllerRef.current.signal
+      abortControllerRef.current.signal,
     );
   }, []);
 

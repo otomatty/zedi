@@ -45,39 +45,49 @@
 ## ✨ Features
 
 ### 📅 Date Grid
+
 日付ごとにグループ化されたページをグリッド表示。「いつ何を書いたか」が一目瞭然。
 
 ### 🔗 WikiLinks
+
 `[[ページタイトル]]` 記法で簡単にページ間リンク。オートコンプリート付きで既存ページにすばやくアクセス。
 
 ### 🤖 AI Wiki Generator
+
 キーワードを選択して AI に解説を生成させると、関連トピックへのリンクも自動挿入。知識のネットワークが自動的に広がります。
 
 ### 🌐 Web Clipper
+
 URL を入力するだけで Web ページの本文を自動抽出。あとから自分のペースでキーワードをリンク化できます。
 
 ### 🔍 Global Search
+
 `Cmd+K` / `Ctrl+K` で全文検索を起動。キーワードを含むページを瞬時に発見。
 
 ### 🔀 Linked Pages
+
 ページ下部に関連ページを自動表示：
+
 - **Outgoing Links** — このページからリンクしている先
 - **Backlinks** — このページにリンクしている元
 - **2-hop Links** — リンク先のリンク先まで辿れる
 
 ### ⌨️ Keyboard Shortcuts
+
 - `Cmd/Ctrl + K` — グローバル検索
 - `Cmd/Ctrl + N` — 新規ページ作成
 - `Cmd/Ctrl + H` — ホーム画面へ
 - `Cmd/Ctrl + /` — ショートカット一覧
 
 ### 📝 Markdown Editor
+
 Tiptap ベースのリッチエディタ。Markdown ショートカットでシームレスに書ける。
+
 - `# ` → 見出し
 - `- ` → 箇条書き
 - `> ` → 引用
 - `**text**` → 太字
-- ``` ` ``` → コードブロック
+- `` ` `` → コードブロック
 
 ---
 
@@ -161,6 +171,7 @@ bun run docker:logs
 ```
 
 起動後、以下のURLでアクセスできます：
+
 - インスタンス1: http://localhost:30000
 - インスタンス2: http://localhost:30001
 - インスタンス3: http://localhost:30002
@@ -199,20 +210,20 @@ VITE_ZEDI_API_BASE_URL=https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.c
 
 ## 🛠 Tech Stack
 
-| Category | Technology |
-|----------|-----------|
-| **Frontend** | React 18 + TypeScript |
-| **Build Tool** | Vite |
-| **Editor** | Tiptap (ProseMirror) |
-| **Styling** | Tailwind CSS + shadcn/ui |
-| **State** | Zustand + TanStack Query |
-| **Auth** | Cognito (Google/GitHub OAuth) |
-| **Database** | Aurora (PostgreSQL) via API / IndexedDB (local・ブラウザ) |
-| **Realtime** | Hocuspocus (Y.js) — リアルタイム共同編集 |
-| **Billing** | LemonSqueezy（Pro プラン） |
-| **AI** | OpenAI / Anthropic / Google Gemini |
-| **Deploy** | AWS (S3 + CloudFront, Lambda + API Gateway) |
-| **Testing** | Vitest + Playwright |
+| Category       | Technology                                                |
+| -------------- | --------------------------------------------------------- |
+| **Frontend**   | React 18 + TypeScript                                     |
+| **Build Tool** | Vite                                                      |
+| **Editor**     | Tiptap (ProseMirror)                                      |
+| **Styling**    | Tailwind CSS + shadcn/ui                                  |
+| **State**      | Zustand + TanStack Query                                  |
+| **Auth**       | Cognito (Google/GitHub OAuth)                             |
+| **Database**   | Aurora (PostgreSQL) via API / IndexedDB (local・ブラウザ) |
+| **Realtime**   | Hocuspocus (Y.js) — リアルタイム共同編集                  |
+| **Billing**    | LemonSqueezy（Pro プラン）                                |
+| **AI**         | OpenAI / Anthropic / Google Gemini                        |
+| **Deploy**     | AWS (S3 + CloudFront, Lambda + API Gateway)               |
+| **Testing**    | Vitest + Playwright                                       |
 
 ---
 

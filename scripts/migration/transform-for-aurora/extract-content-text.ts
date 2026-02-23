@@ -55,7 +55,9 @@ async function findLatestPageContents(): Promise<string | null> {
     return null;
   }
   const jsonFiles = files
-    .filter((f) => f.startsWith("page-contents-") && !f.includes("with-text") && f.endsWith(".json"))
+    .filter(
+      (f) => f.startsWith("page-contents-") && !f.includes("with-text") && f.endsWith(".json"),
+    )
     .sort()
     .reverse();
   return jsonFiles.length ? join(outputDir, jsonFiles[0]) : null;
@@ -65,7 +67,7 @@ async function main() {
   const inputPath = process.argv[2] || (await findLatestPageContents());
   if (!inputPath) {
     console.error(
-      "Usage: bun run scripts/migration/transform-for-aurora/extract-content-text.ts [path/to/page-contents.json]"
+      "Usage: bun run scripts/migration/transform-for-aurora/extract-content-text.ts [path/to/page-contents.json]",
     );
     console.error("Or run after C2-3 (default: latest page-contents-*.json in output/)");
     process.exit(1);
@@ -124,7 +126,9 @@ async function main() {
     page_contents: withText,
     _meta: {
       ...(typeof data._meta === "object" && data._meta !== null ? data._meta : {}),
-      content_text_extracted: withText.filter((x) => x.content_text != null && x.content_text !== "").length,
+      content_text_extracted: withText.filter(
+        (x) => x.content_text != null && x.content_text !== "",
+      ).length,
       errors,
     },
   };
@@ -136,7 +140,10 @@ async function main() {
 
   console.log("C2-4 extract-content-text done.");
   console.log("  page_contents:", withText.length);
-  console.log("  with content_text:", withText.filter((x) => x.content_text != null && x.content_text !== "").length);
+  console.log(
+    "  with content_text:",
+    withText.filter((x) => x.content_text != null && x.content_text !== "").length,
+  );
   if (errors > 0) console.log("  errors:", errors);
   console.log("Wrote", outPath);
 }

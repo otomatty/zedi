@@ -33,7 +33,7 @@ export function useStorageActions({
           : currentStorageProvider;
       return provider?.name ?? "未設定";
     },
-    [currentStorageProvider, effectiveProvider]
+    [currentStorageProvider, effectiveProvider],
   );
 
   const handleCopyImageUrl = useCallback(
@@ -48,7 +48,7 @@ export function useStorageActions({
         });
       }
     },
-    [toast]
+    [toast],
   );
 
   const canDeleteFromStorage = useCallback(
@@ -62,7 +62,7 @@ export function useStorageActions({
         return false;
       }
     },
-    [isStorageConfigured, storageSettings, effectiveProvider]
+    [isStorageConfigured, storageSettings, effectiveProvider],
   );
 
   const handleDeleteFromStorage = useCallback(
@@ -107,7 +107,7 @@ export function useStorageActions({
       await provider.deleteImage(url);
       toast({ title: "ストレージから削除しました" });
     },
-    [isStorageConfigured, storageSettings, toast]
+    [isStorageConfigured, storageSettings, toast],
   );
 
   return {

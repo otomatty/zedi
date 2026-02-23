@@ -22,16 +22,15 @@ async function getOrCreateEncryptionKey(): Promise<CryptoKey> {
       keyData,
       { name: ALGORITHM, length: KEY_LENGTH },
       true,
-      ["encrypt", "decrypt"]
+      ["encrypt", "decrypt"],
     );
   }
 
   // 新しいキーを生成
-  const key = await crypto.subtle.generateKey(
-    { name: ALGORITHM, length: KEY_LENGTH },
-    true,
-    ["encrypt", "decrypt"]
-  );
+  const key = await crypto.subtle.generateKey({ name: ALGORITHM, length: KEY_LENGTH }, true, [
+    "encrypt",
+    "decrypt",
+  ]);
 
   // キーをエクスポートして保存
   const exportedKey = await crypto.subtle.exportKey("raw", key);
@@ -57,11 +56,7 @@ export async function encrypt(plaintext: string): Promise<string> {
   const data = encoder.encode(plaintext);
 
   // 暗号化
-  const encryptedData = await crypto.subtle.encrypt(
-    { name: ALGORITHM, iv },
-    key,
-    data
-  );
+  const encryptedData = await crypto.subtle.encrypt({ name: ALGORITHM, iv }, key, data);
 
   // IV + 暗号化データを結合
   const combined = new Uint8Array(iv.length + encryptedData.byteLength);
@@ -88,11 +83,7 @@ export async function decrypt(ciphertext: string): Promise<string> {
   const encryptedData = combined.slice(IV_LENGTH);
 
   // 復号化
-  const decryptedData = await crypto.subtle.decrypt(
-    { name: ALGORITHM, iv },
-    key,
-    encryptedData
-  );
+  const decryptedData = await crypto.subtle.decrypt({ name: ALGORITHM, iv }, key, encryptedData);
 
   // Uint8Arrayを文字列に変換
   const decoder = new TextDecoder();

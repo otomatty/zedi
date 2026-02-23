@@ -1,16 +1,16 @@
 /**
  * AI 使用量サービス — コスト計算・予算チェック・使用量記録
  */
-import { eq, and, sql } from 'drizzle-orm';
-import { aiModels, aiUsageLogs, aiMonthlyUsage, aiTierBudgets } from '../schema';
-import type { Database, UserTier, UsageCheckResult, TokenUsage } from '../types';
+import { eq, and, sql } from "drizzle-orm";
+import { aiModels, aiUsageLogs, aiMonthlyUsage, aiTierBudgets } from "../schema";
+import type { Database, UserTier, UsageCheckResult, TokenUsage } from "../types";
 
 /**
  * 現在の年月文字列 (例: "2026-07")
  */
 function currentYearMonth(): string {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /**
@@ -30,18 +30,13 @@ export async function checkUsage(
     .where(eq(aiTierBudgets.tier, tier))
     .limit(1);
 
-  const budgetUnits = budgetRow[0]?.monthlyBudgetUnits ?? (tier === 'pro' ? 100000 : 10000);
+  const budgetUnits = budgetRow[0]?.monthlyBudgetUnits ?? (tier === "pro" ? 100000 : 10000);
 
   // 月間使用量取得
   const usageRow = await db
     .select({ totalCostUnits: aiMonthlyUsage.totalCostUnits })
     .from(aiMonthlyUsage)
-    .where(
-      and(
-        eq(aiMonthlyUsage.userId, userId),
-        eq(aiMonthlyUsage.yearMonth, yearMonth),
-      ),
-    )
+    .where(and(eq(aiMonthlyUsage.userId, userId), eq(aiMonthlyUsage.yearMonth, yearMonth)))
     .limit(1);
 
   const consumedUnits = Number(usageRow[0]?.totalCostUnits ?? 0);
@@ -78,12 +73,12 @@ export async function validateModelAccess(
     .limit(1);
 
   if (!model.length) {
-    throw new Error('Model not found or inactive');
+    throw new Error("Model not found or inactive");
   }
 
   const m = model[0]!;
-  if (m.tierRequired === 'pro' && tier === 'free') {
-    throw new Error('FORBIDDEN');
+  if (m.tierRequired === "pro" && tier === "free") {
+    throw new Error("FORBIDDEN");
   }
 
   return {
@@ -103,8 +98,7 @@ export function calculateCost(
   outputCostUnits: number,
 ): number {
   return Math.ceil(
-    (usage.inputTokens / 1000) * inputCostUnits +
-      (usage.outputTokens / 1000) * outputCostUnits,
+    (usage.inputTokens / 1000) * inputCostUnits + (usage.outputTokens / 1000) * outputCostUnits,
   );
 }
 
@@ -117,7 +111,7 @@ export async function recordUsage(
   feature: string,
   usage: TokenUsage,
   costUnits: number,
-  apiMode: 'system' | 'user_key',
+  apiMode: "system" | "user_key",
   db: Database,
 ): Promise<void> {
   const yearMonth = currentYearMonth();

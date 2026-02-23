@@ -85,4 +85,3 @@
    - ECS desired count を 2 以上にして Redis 経由の更新伝播確認。
 3. **content_text 更新**
    - 必要なら Hocuspocus 保存時に `content_text` 抽出更新を追加（検索品質向上）。
-

@@ -130,16 +130,17 @@ const PageEditor: React.FC = () => {
   });
 
   // Markdown export hook
-  const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(
-    title,
-    content
-  );
+  const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(title, content);
 
   // Keyboard shortcuts hook
   usePageEditorKeyboard({ onBack: handleBack });
 
   // Auto-save hook
-  const { saveChanges, lastSaved: autoSaveLastSaved, isSyncingLinks } = useEditorAutoSave({
+  const {
+    saveChanges,
+    lastSaved: autoSaveLastSaved,
+    isSyncingLinks,
+  } = useEditorAutoSave({
     pageId: currentPageId,
     debounceMs: 500,
     shouldBlockSave,
@@ -227,7 +228,15 @@ const PageEditor: React.FC = () => {
       });
       navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location.state, currentPageId, isInitialized, setSourceUrl, updatePageMutation, navigate, location.pathname]);
+  }, [
+    location.state,
+    currentPageId,
+    isInitialized,
+    setSourceUrl,
+    updatePageMutation,
+    navigate,
+    location.pathname,
+  ]);
 
   // Handle page not found
   useEffect(() => {
@@ -260,15 +269,7 @@ const PageEditor: React.FC = () => {
       }
       resetWiki();
     }
-  }, [
-    wikiStatus,
-    getTiptapContent,
-    title,
-    saveChanges,
-    resetWiki,
-    toast,
-    setContent,
-  ]);
+  }, [wikiStatus, getTiptapContent, title, saveChanges, resetWiki, toast, setContent]);
 
   // Auto-save on changes
   const handleContentChange = useCallback(
@@ -282,7 +283,7 @@ const PageEditor: React.FC = () => {
       }
       saveChanges(autoTitle || title, newContent);
     },
-    [title, saveChanges, validateTitle, setContent, setTitle]
+    [title, saveChanges, validateTitle, setContent, setTitle],
   );
 
   const handleTitleChange = useCallback(
@@ -291,7 +292,7 @@ const PageEditor: React.FC = () => {
       validateTitle(newTitle);
       saveChanges(newTitle, content);
     },
-    [content, saveChanges, validateTitle, setTitle]
+    [content, saveChanges, validateTitle, setTitle],
   );
 
   // コンテンツエラーのコールバック
@@ -299,7 +300,7 @@ const PageEditor: React.FC = () => {
     (error: ContentError | null) => {
       setContentError(error);
     },
-    [setContentError]
+    [setContentError],
   );
 
   // 既存ページを開くハンドラー
@@ -327,7 +328,7 @@ const PageEditor: React.FC = () => {
   useEffect(() => {
     if (title || currentPageId) {
       setPageContext({
-        type: 'editor',
+        type: "editor",
         pageId: currentPageId || undefined,
         pageTitle: title,
         pageContent: content ? content.substring(0, 3000) : undefined,
@@ -339,7 +340,7 @@ const PageEditor: React.FC = () => {
   // Show loading state
   if (!isNewPage && isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -348,14 +349,14 @@ const PageEditor: React.FC = () => {
   // Show loading for new page creation
   if (isNewPage && !isInitialized) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <PageEditorHeader
         title={title}
         lastSaved={displayLastSaved}
@@ -370,35 +371,33 @@ const PageEditor: React.FC = () => {
       />
 
       <ContentWithAIChat>
-      <PageEditorAlerts
-        duplicatePage={duplicatePage}
-        errorMessage={errorMessage}
-        title={title}
-        onOpenDuplicatePage={handleOpenDuplicatePage}
-        isWikiGenerating={isWikiGenerating}
-        onCancelWiki={cancelWiki}
-        contentError={contentError}
-      />
+        <PageEditorAlerts
+          duplicatePage={duplicatePage}
+          errorMessage={errorMessage}
+          title={title}
+          onOpenDuplicatePage={handleOpenDuplicatePage}
+          isWikiGenerating={isWikiGenerating}
+          onCancelWiki={cancelWiki}
+          contentError={contentError}
+        />
 
-      <PageEditorContent
-        content={content}
-        title={title}
-        sourceUrl={sourceUrl}
-        currentPageId={currentPageId}
-        pageId={pageId}
-        isNewPage={isNewPage}
-        isWikiGenerating={isWikiGenerating}
-        isSyncingLinks={isSyncingLinks}
-        onContentChange={handleContentChange}
-        onContentError={handleContentError}
-        onTitleChange={handleTitleChange}
-        errorMessage={errorMessage}
-        collaboration={
-          isLocalDocEnabled ? { ...collaboration } : undefined
-        }
-        initialContent={pendingInitialContent ?? undefined}
-        onInitialContentApplied={() => setPendingInitialContent(null)}
-      />
+        <PageEditorContent
+          content={content}
+          title={title}
+          sourceUrl={sourceUrl}
+          currentPageId={currentPageId}
+          pageId={pageId}
+          isNewPage={isNewPage}
+          isWikiGenerating={isWikiGenerating}
+          isSyncingLinks={isSyncingLinks}
+          onContentChange={handleContentChange}
+          onContentError={handleContentError}
+          onTitleChange={handleTitleChange}
+          errorMessage={errorMessage}
+          collaboration={isLocalDocEnabled ? { ...collaboration } : undefined}
+          initialContent={pendingInitialContent ?? undefined}
+          onInitialContentApplied={() => setPendingInitialContent(null)}
+        />
       </ContentWithAIChat>
 
       <PageEditorDialogs

@@ -6,20 +6,20 @@
  * POST   /api/pages             — 新規ページ作成
  * DELETE /api/pages/:id         — ページ論理削除
  */
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { eq, and, sql } from 'drizzle-orm';
-import { pages, pageContents } from '../schema';
-import { authRequired } from '../middleware/auth';
-import type { AppEnv } from '../types';
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { eq, and, sql } from "drizzle-orm";
+import { pages, pageContents } from "../schema";
+import { authRequired } from "../middleware/auth";
+import type { AppEnv } from "../types";
 
 const app = new Hono<AppEnv>();
 
 // ── GET /pages/:id/content ──────────────────────────────────────────────────
-app.get('/:id/content', authRequired, async (c) => {
-  const pageId = c.req.param('id');
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.get("/:id/content", authRequired, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const db = c.get("db");
 
   // ページ所有者確認
   const page = await db
@@ -29,10 +29,10 @@ app.get('/:id/content', authRequired, async (c) => {
     .limit(1);
 
   if (!page.length) {
-    throw new HTTPException(404, { message: 'Page not found' });
+    throw new HTTPException(404, { message: "Page not found" });
   }
   if (page[0]!.ownerId !== userId) {
-    throw new HTTPException(403, { message: 'Forbidden' });
+    throw new HTTPException(403, { message: "Forbidden" });
   }
 
   // コンテンツ取得
@@ -50,10 +50,10 @@ app.get('/:id/content', authRequired, async (c) => {
   const row = content[0]!;
   const ydocBase64 =
     row.ydocState instanceof Buffer
-      ? row.ydocState.toString('base64')
-      : typeof row.ydocState === 'string'
+      ? row.ydocState.toString("base64")
+      : typeof row.ydocState === "string"
         ? row.ydocState
-        : Buffer.from(row.ydocState as unknown as ArrayBufferLike).toString('base64');
+        : Buffer.from(row.ydocState as unknown as ArrayBufferLike).toString("base64");
 
   return c.json({
     content: ydocBase64,
@@ -64,10 +64,10 @@ app.get('/:id/content', authRequired, async (c) => {
 });
 
 // ── PUT /pages/:id/content ──────────────────────────────────────────────────
-app.put('/:id/content', authRequired, async (c) => {
-  const pageId = c.req.param('id');
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.put("/:id/content", authRequired, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const db = c.get("db");
 
   const body = await c.req.json<{
     content: string; // base64-encoded Y.Doc
@@ -77,7 +77,7 @@ app.put('/:id/content', authRequired, async (c) => {
   }>();
 
   if (!body.content) {
-    throw new HTTPException(400, { message: 'content is required' });
+    throw new HTTPException(400, { message: "content is required" });
   }
 
   // ページ所有者確認
@@ -88,13 +88,13 @@ app.put('/:id/content', authRequired, async (c) => {
     .limit(1);
 
   if (!page.length) {
-    throw new HTTPException(404, { message: 'Page not found' });
+    throw new HTTPException(404, { message: "Page not found" });
   }
   if (page[0]!.ownerId !== userId) {
-    throw new HTTPException(403, { message: 'Forbidden' });
+    throw new HTTPException(403, { message: "Forbidden" });
   }
 
-  const ydocBuffer = Buffer.from(body.content, 'base64');
+  const ydocBuffer = Buffer.from(body.content, "base64");
 
   // UPSERT page_contents with optimistic locking
   if (body.expected_version != null) {
@@ -107,12 +107,7 @@ app.put('/:id/content', authRequired, async (c) => {
         contentText: body.content_text ?? null,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(pageContents.pageId, pageId),
-          eq(pageContents.version, body.expected_version),
-        ),
-      )
+      .where(and(eq(pageContents.pageId, pageId), eq(pageContents.version, body.expected_version)))
       .returning();
 
     if (!updated.length) {
@@ -170,9 +165,9 @@ app.put('/:id/content', authRequired, async (c) => {
 });
 
 // ── POST /pages ─────────────────────────────────────────────────────────────
-app.post('/', authRequired, async (c) => {
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.post("/", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
 
   const body = await c.req.json<{
     title?: string;
@@ -191,25 +186,28 @@ app.post('/', authRequired, async (c) => {
     .returning();
 
   const row = result[0]!;
-  return c.json({
-    id: row.id,
-    owner_id: row.ownerId,
-    source_page_id: row.sourcePageId ?? null,
-    title: row.title ?? null,
-    content_preview: row.contentPreview ?? null,
-    thumbnail_url: row.thumbnailUrl ?? null,
-    source_url: row.sourceUrl ?? null,
-    created_at: row.createdAt.toISOString(),
-    updated_at: row.updatedAt.toISOString(),
-    is_deleted: row.isDeleted,
-  }, 201);
+  return c.json(
+    {
+      id: row.id,
+      owner_id: row.ownerId,
+      source_page_id: row.sourcePageId ?? null,
+      title: row.title ?? null,
+      content_preview: row.contentPreview ?? null,
+      thumbnail_url: row.thumbnailUrl ?? null,
+      source_url: row.sourceUrl ?? null,
+      created_at: row.createdAt.toISOString(),
+      updated_at: row.updatedAt.toISOString(),
+      is_deleted: row.isDeleted,
+    },
+    201,
+  );
 });
 
 // ── DELETE /pages/:id ───────────────────────────────────────────────────────
-app.delete('/:id', authRequired, async (c) => {
-  const pageId = c.req.param('id');
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.delete("/:id", authRequired, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const db = c.get("db");
 
   const page = await db
     .select({ id: pages.id, ownerId: pages.ownerId })
@@ -218,10 +216,10 @@ app.delete('/:id', authRequired, async (c) => {
     .limit(1);
 
   if (!page.length) {
-    throw new HTTPException(404, { message: 'Page not found' });
+    throw new HTTPException(404, { message: "Page not found" });
   }
   if (page[0]!.ownerId !== userId) {
-    throw new HTTPException(403, { message: 'Forbidden' });
+    throw new HTTPException(403, { message: "Forbidden" });
   }
 
   await db

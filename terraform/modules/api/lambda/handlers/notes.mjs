@@ -295,7 +295,8 @@ function rowToMember(row) {
 function rowToNoteListItem(row) {
   return {
     ...rowToNote(row),
-    role: row.member_role === "owner" ? "owner" : row.member_role === "editor" ? "editor" : "viewer",
+    role:
+      row.member_role === "owner" ? "owner" : row.member_role === "editor" ? "editor" : "viewer",
     page_count: Number(row.page_count ?? 0),
     member_count: Number(row.member_count ?? 0),
   };
@@ -509,7 +510,8 @@ export async function addNotePage(claims, noteId, body = {}) {
       added_by_user_id: user.id,
       sort_order: sortOrder,
     });
-    if (rows.length === 0) return res.badRequest("Page could not be added (invalid page or duplicate)");
+    if (rows.length === 0)
+      return res.badRequest("Page could not be added (invalid page or duplicate)");
     return res.success(rows[0]);
   }
 
@@ -561,7 +563,8 @@ export async function removeNotePage(claims, noteId, pageId) {
   const isAddedByMe = pageRow.added_by_user_id === user.id;
   const canEdit = await canEditNote(noteId, user.id, user.email);
   const canDelete = isOwner || (canEdit && isAddedByMe);
-  if (!canDelete) return res.forbidden("You do not have permission to remove this page from the note");
+  if (!canDelete)
+    return res.forbidden("You do not have permission to remove this page from the note");
 
   const rows = await execute(REMOVE_NOTE_PAGE_SQL, { note_id: noteId, page_id: pageId });
   if (rows.length === 0) return res.notFound("Note page not found");

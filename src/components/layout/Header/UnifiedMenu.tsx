@@ -21,11 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -38,7 +34,7 @@ const SM_BREAKPOINT = 640;
 
 function useIsSmallScreen() {
   const [isSmall, setIsSmall] = useState<boolean>(
-    typeof window !== "undefined" ? window.innerWidth < SM_BREAKPOINT : false
+    typeof window !== "undefined" ? window.innerWidth < SM_BREAKPOINT : false,
   );
 
   useEffect(() => {
@@ -61,13 +57,16 @@ type SyncStatusKey = "idle" | "syncing" | "synced" | "error" | "db-resuming";
 function useSyncStatusConfig() {
   const { t } = useTranslation();
 
-  const configs: Record<SyncStatusKey, {
-    icon: React.FC<{ className?: string }>;
-    label: string;
-    description: string;
-    dotColor: string;
-    iconClassName: string;
-  }> = {
+  const configs: Record<
+    SyncStatusKey,
+    {
+      icon: React.FC<{ className?: string }>;
+      label: string;
+      description: string;
+      dotColor: string;
+      iconClassName: string;
+    }
+  > = {
     idle: {
       icon: Cloud,
       label: t("common.syncIdleLabel"),
@@ -99,7 +98,10 @@ function useSyncStatusConfig() {
     "db-resuming": {
       icon: DatabaseZap,
       label: t("common.syncDbResumingLabel", "DB starting…"),
-      description: t("common.syncDbResumingDescription", "Database is waking up. Please wait a moment."),
+      description: t(
+        "common.syncDbResumingDescription",
+        "Database is waking up. Please wait a moment.",
+      ),
       dotColor: "bg-amber-500 animate-pulse",
       iconClassName: "text-amber-500 animate-pulse",
     },
@@ -130,14 +132,12 @@ const SyncStatusRow: React.FC = () => {
           type="button"
           onClick={sync}
           disabled={isSyncing || syncStatus === "syncing"}
-          className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Icon className={cn("h-4 w-4 shrink-0", config.iconClassName)} />
-          <div className="flex flex-col items-start min-w-0">
-            <span className="font-medium text-xs">{config.label}</span>
-            <span className="text-[11px] text-muted-foreground truncate">
-              {config.description}
-            </span>
+          <div className="flex min-w-0 flex-col items-start">
+            <span className="text-xs font-medium">{config.label}</span>
+            <span className="truncate text-[11px] text-muted-foreground">{config.description}</span>
           </div>
         </button>
       </div>
@@ -173,9 +173,9 @@ const NavItems: React.FC<{
             key={item.path}
             type="button"
             onClick={() => onNavigate(item.path)}
-            className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-muted transition-colors"
+            className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted"
           >
-            <item.icon className="h-5 w-5 text-muted-foreground shrink-0" />
+            <item.icon className="h-5 w-5 shrink-0 text-muted-foreground" />
             <span className="text-sm font-medium">{item.label}</span>
           </button>
         ))}
@@ -190,7 +190,7 @@ const NavItems: React.FC<{
           key={item.path}
           type="button"
           onClick={() => onNavigate(item.path)}
-          className="flex flex-col items-center gap-2 rounded-lg p-3 hover:bg-muted transition-colors"
+          className="flex flex-col items-center gap-2 rounded-lg p-3 transition-colors hover:bg-muted"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
             <item.icon className="h-5 w-5 text-muted-foreground" />
@@ -221,7 +221,7 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
       navigate(path);
       onClose();
     },
-    [navigate, onClose]
+    [navigate, onClose],
   );
 
   return (
@@ -233,18 +233,14 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
             src={avatarUrl || user?.imageUrl}
             alt={displayName || user?.fullName || "User"}
           />
-          <AvatarFallback>
-            {(displayName || user?.firstName)?.charAt(0) ?? "U"}
-          </AvatarFallback>
+          <AvatarFallback>{(displayName || user?.firstName)?.charAt(0) ?? "U"}</AvatarFallback>
         </Avatar>
-        <div className="flex flex-col space-y-0.5 leading-none min-w-0">
+        <div className="flex min-w-0 flex-col space-y-0.5 leading-none">
           {(displayName || user?.fullName) && (
-            <p className="font-medium text-sm truncate">
-              {displayName || user?.fullName}
-            </p>
+            <p className="truncate text-sm font-medium">{displayName || user?.fullName}</p>
           )}
           {user?.primaryEmailAddress && (
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="truncate text-xs text-muted-foreground">
               {user.primaryEmailAddress.emailAddress}
             </p>
           )}
@@ -269,7 +265,7 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
             signOut();
             onClose();
           }}
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
         >
           <LogOut className="h-4 w-4" />
           {t("nav.signOut")}
@@ -295,7 +291,7 @@ const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "g
       navigate(path);
       onClose();
     },
-    [navigate, onClose]
+    [navigate, onClose],
   );
 
   return (
@@ -332,26 +328,19 @@ const AvatarTrigger = React.forwardRef<
   const dotColor = isSignedIn ? configs[syncStatus].dotColor : undefined;
 
   return (
-    <Button
-      ref={ref}
-      variant="ghost"
-      className="relative h-9 w-9 rounded-full"
-      {...props}
-    >
+    <Button ref={ref} variant="ghost" className="relative h-9 w-9 rounded-full" {...props}>
       <Avatar className="h-9 w-9">
         <AvatarImage
           src={avatarUrl || user?.imageUrl}
           alt={displayName || user?.fullName || "User"}
         />
-        <AvatarFallback>
-          {(displayName || user?.firstName)?.charAt(0) ?? "U"}
-        </AvatarFallback>
+        <AvatarFallback>{(displayName || user?.firstName)?.charAt(0) ?? "U"}</AvatarFallback>
       </Avatar>
       {dotColor && (
         <span
           className={cn(
             "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background",
-            dotColor
+            dotColor,
           )}
         />
       )}
@@ -414,7 +403,7 @@ const MobileMenu: React.FC = () => {
       <SignedIn>
         <Sheet open={open} onOpenChange={setOpen}>
           <AvatarTrigger onClick={() => setOpen(true)} />
-          <SheetContent side="right" className="w-3/4 sm:max-w-sm p-4">
+          <SheetContent side="right" className="w-3/4 p-4 sm:max-w-sm">
             <VisuallyHidden>
               <SheetTitle>メニュー</SheetTitle>
             </VisuallyHidden>
@@ -425,7 +414,7 @@ const MobileMenu: React.FC = () => {
       <SignedOut>
         <Sheet open={open} onOpenChange={setOpen}>
           <GuestTrigger onClick={() => setOpen(true)} />
-          <SheetContent side="right" className="w-3/4 sm:max-w-sm p-4">
+          <SheetContent side="right" className="w-3/4 p-4 sm:max-w-sm">
             <VisuallyHidden>
               <SheetTitle>メニュー</SheetTitle>
             </VisuallyHidden>

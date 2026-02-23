@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { ChatMessage, ChatAction } from '../../types/aiChat';
-import { AIChatMessage } from './AIChatMessage';
-import { AIChatWelcome } from './AIChatWelcome';
+import React, { useEffect, useRef } from "react";
+import { ChatMessage, ChatAction } from "../../types/aiChat";
+import { AIChatMessage } from "./AIChatMessage";
+import { AIChatWelcome } from "./AIChatWelcome";
 
 interface AIChatMessagesProps {
   messages: ChatMessage[];
@@ -9,7 +9,11 @@ interface AIChatMessagesProps {
   onExecuteAction?: (action: ChatAction) => void;
 }
 
-export function AIChatMessages({ messages, onSuggestionClick, onExecuteAction }: AIChatMessagesProps) {
+export function AIChatMessages({
+  messages,
+  onSuggestionClick,
+  onExecuteAction,
+}: AIChatMessagesProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 新しいメッセージが追加されたら自動スクロール
@@ -28,16 +32,9 @@ export function AIChatMessages({ messages, onSuggestionClick, onExecuteAction }:
   }
 
   return (
-    <div 
-      ref={scrollRef}
-      className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
-    >
+    <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto scroll-smooth p-4">
       {messages.map((message) => (
-        <AIChatMessage
-          key={message.id}
-          message={message}
-          onExecuteAction={onExecuteAction}
-        />
+        <AIChatMessage key={message.id} message={message} onExecuteAction={onExecuteAction} />
       ))}
     </div>
   );

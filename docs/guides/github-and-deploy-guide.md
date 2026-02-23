@@ -10,7 +10,7 @@ GitHub で開発を進め、本番（zedi-note.app）に反映するまでの流
 
 main ブランチに push すると、**対象パス**（`src/`, `public/`, `index.html`, `vite.config.ts`, `package.json`, `package-lock.json`）に変更があった場合に **Deploy Frontend (prod)** ワークフローが動きます。
 
-- ビルド（本番用 VITE_* は GitHub Secrets から注入）
+- ビルド（本番用 VITE\_\* は GitHub Secrets から注入）
 - S3 へアップロード（`zedi-prod-frontend-590183877893`）
 - CloudFront のキャッシュ無効化（`/*`）
 
@@ -56,26 +56,26 @@ main ブランチに push すると、**対象パス**（`src/`, `public/`, `ind
 
 ### 2.1 必須
 
-| Secret 名 | 説明 | 例・取得方法 |
-|-----------|------|----------------------|
-| **AWS_ACCESS_KEY_ID** | 本番 S3 に書き込める IAM のアクセスキー | IAM ユーザーで発行 |
-| **AWS_SECRET_ACCESS_KEY** | 上記のシークレットキー | 同上 |
-| **PROD_FRONTEND_S3_BUCKET** | 本番フロント用 S3 バケット名 | `zedi-prod-frontend-590183877893` |
-| **PROD_CLOUDFRONT_DISTRIBUTION_ID** | CloudFront 配信 ID（無効化用） | `E30K53ZAPT4J6C` |
-| **VITE_COGNITO_DOMAIN** | 本番 Cognito のホスト（https:// なし） | Terraform: `terraform output -raw cognito_hosted_ui_url` から `https://` を除く |
-| **VITE_COGNITO_CLIENT_ID** | 本番 Cognito のクライアント ID | Terraform: `terraform output -raw cognito_client_id` |
+| Secret 名                           | 説明                                    | 例・取得方法                                                                    |
+| ----------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
+| **AWS_ACCESS_KEY_ID**               | 本番 S3 に書き込める IAM のアクセスキー | IAM ユーザーで発行                                                              |
+| **AWS_SECRET_ACCESS_KEY**           | 上記のシークレットキー                  | 同上                                                                            |
+| **PROD_FRONTEND_S3_BUCKET**         | 本番フロント用 S3 バケット名            | `zedi-prod-frontend-590183877893`                                               |
+| **PROD_CLOUDFRONT_DISTRIBUTION_ID** | CloudFront 配信 ID（無効化用）          | `E30K53ZAPT4J6C`                                                                |
+| **VITE_COGNITO_DOMAIN**             | 本番 Cognito のホスト（https:// なし）  | Terraform: `terraform output -raw cognito_hosted_ui_url` から `https://` を除く |
+| **VITE_COGNITO_CLIENT_ID**          | 本番 Cognito のクライアント ID          | Terraform: `terraform output -raw cognito_client_id`                            |
 
 ### 2.2 本番アプリ動作に必要なもの（推奨）
 
-| Secret 名 | 説明 | 例 |
-|-----------|------|-----|
-| **VITE_COGNITO_REDIRECT_URI** | 本番コールバック URL | `https://zedi-note.app/auth/callback` |
-| **VITE_COGNITO_LOGOUT_REDIRECT_URI** | 本番ログアウト後 URL | `https://zedi-note.app` |
-| **VITE_TURSO_DATABASE_URL** | 本番 Turso DB URL | libsql://... |
-| **VITE_TURSO_AUTH_TOKEN** | 本番 Turso 用トークン | （利用する場合） |
-| **VITE_AI_API_BASE_URL** | 本番 AI API の URL | Workers 等の URL |
-| **VITE_THUMBNAIL_API_BASE_URL** | 本番サムネイル API の URL | 同上 |
-| **VITE_REALTIME_URL** | 本番 WebSocket URL | `wss://...` または `ws://...`（本番 ALB 等） |
+| Secret 名                            | 説明                      | 例                                           |
+| ------------------------------------ | ------------------------- | -------------------------------------------- |
+| **VITE_COGNITO_REDIRECT_URI**        | 本番コールバック URL      | `https://zedi-note.app/auth/callback`        |
+| **VITE_COGNITO_LOGOUT_REDIRECT_URI** | 本番ログアウト後 URL      | `https://zedi-note.app`                      |
+| **VITE_TURSO_DATABASE_URL**          | 本番 Turso DB URL         | libsql://...                                 |
+| **VITE_TURSO_AUTH_TOKEN**            | 本番 Turso 用トークン     | （利用する場合）                             |
+| **VITE_AI_API_BASE_URL**             | 本番 AI API の URL        | Workers 等の URL                             |
+| **VITE_THUMBNAIL_API_BASE_URL**      | 本番サムネイル API の URL | 同上                                         |
+| **VITE_REALTIME_URL**                | 本番 WebSocket URL        | `wss://...` または `ws://...`（本番 ALB 等） |
 
 ※ 未設定の項目はビルド時に空になり、アプリ側のフォールバックや未使用の場合は動作する場合があります。本番で使う機能に応じて設定してください。
 
@@ -126,11 +126,11 @@ terraform output -raw cloudfront_domain_name # 参考（CNAME 先）
 
 ### 3.2 主な変数ファイル
 
-| ファイル | 用途 |
-|----------|------|
-| **environments/prod.tfvars** | 本番用の公開パラメータ（ドメイン、インスタンス数など） |
-| **environments/prod.secret.env** | 本番用の秘密（TF_VAR_*）。Git にコミットしない |
-| **environments/dev.tfvars** | 開発用 |
+| ファイル                         | 用途                                                   |
+| -------------------------------- | ------------------------------------------------------ |
+| **environments/prod.tfvars**     | 本番用の公開パラメータ（ドメイン、インスタンス数など） |
+| **environments/prod.secret.env** | 本番用の秘密（TF*VAR*\*）。Git にコミットしない        |
+| **environments/dev.tfvars**      | 開発用                                                 |
 
 ---
 
@@ -155,21 +155,21 @@ terraform output -raw cloudfront_domain_name # 参考（CNAME 先）
 
 ## 6. よく使うコマンド早見
 
-| やりたいこと | コマンド例 |
-|--------------|------------|
-| 本番の Terraform 状態を確認 | `cd terraform && terraform workspace select prod && terraform plan -var-file=environments/prod.tfvars` |
-| 本番の CloudFront ドメイン名を確認 | `terraform -chdir=terraform output -raw cloudfront_domain_name`（prod 選択済み前提） |
-| 手動でフロントを本番デプロイ | `bun run build` → `aws s3 sync dist/ s3://zedi-prod-frontend-590183877893/ --delete` → `aws cloudfront create-invalidation --distribution-id E30K53ZAPT4J6C --paths "/*"` |
-| 本番 Cognito の値を確認 | `terraform -chdir=terraform output cognito_hosted_ui_url cognito_client_id`（prod 選択済み前提） |
+| やりたいこと                       | コマンド例                                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 本番の Terraform 状態を確認        | `cd terraform && terraform workspace select prod && terraform plan -var-file=environments/prod.tfvars`                                                                    |
+| 本番の CloudFront ドメイン名を確認 | `terraform -chdir=terraform output -raw cloudfront_domain_name`（prod 選択済み前提）                                                                                      |
+| 手動でフロントを本番デプロイ       | `bun run build` → `aws s3 sync dist/ s3://zedi-prod-frontend-590183877893/ --delete` → `aws cloudfront create-invalidation --distribution-id E30K53ZAPT4J6C --paths "/*"` |
+| 本番 Cognito の値を確認            | `terraform -chdir=terraform output cognito_hosted_ui_url cognito_client_id`（prod 選択済み前提）                                                                          |
 
 ---
 
 ## 7. 参照ドキュメント
 
-| ドキュメント | 内容 |
-|-------------|------|
-| docs/guides/env-variables-guide.md | VITE_* の一覧と本番の目安 |
+| ドキュメント                                                   | 内容                                |
+| -------------------------------------------------------------- | ----------------------------------- |
+| docs/guides/env-variables-guide.md                             | VITE\_\* の一覧と本番の目安         |
 | docs/work-logs/20260208/frontend-cdn-and-cloudflare-summary.md | CDN・Cloudflare の詳細と CNAME メモ |
-| docs/work-logs/20260208/work-summary-and-next-steps.md | 作業サマリーと今後の進め方 |
-| docs/plans/20260208/aws-frontend-deploy-terraform-plan.md | フロントデプロイの設計 |
-| .github/workflows/deploy-frontend.yml | デプロイワークフローの定義 |
+| docs/work-logs/20260208/work-summary-and-next-steps.md         | 作業サマリーと今後の進め方          |
+| docs/plans/20260208/aws-frontend-deploy-terraform-plan.md      | フロントデプロイの設計              |
+| .github/workflows/deploy-frontend.yml                          | デプロイワークフローの定義          |

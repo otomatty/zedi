@@ -3,10 +3,7 @@
  * Same interface as former Clerk useAuth/useUser for drop-in replacement.
  */
 import React from "react";
-import {
-  useCognitoAuth,
-  useCognitoUser,
-} from "@/components/auth/CognitoAuthProvider";
+import { useCognitoAuth, useCognitoUser } from "@/components/auth/CognitoAuthProvider";
 import {
   useMockAuth,
   MOCK_USER_ID,

@@ -9,14 +9,14 @@
 
 本ドキュメントは、Phase C4（Hocuspocus 永続化）および C-Collab（共有ノート / 個人ページの共同編集モード制御）に関する一連の作業をまとめたものです。
 
-| フェーズ | 内容 | 状態 |
-|----------|------|------|
-| C4-1 | Aurora 永続化 | ✅ 完了 |
-| C4-2 | Redis 連携 | ✅ 完了 |
-| C4-3 | 認可の統一 | ✅ 完了 |
+| フェーズ   | 内容                                 | 状態    |
+| ---------- | ------------------------------------ | ------- |
+| C4-1       | Aurora 永続化                        | ✅ 完了 |
+| C4-2       | Redis 連携                           | ✅ 完了 |
+| C4-3       | 認可の統一                           | ✅ 完了 |
 | C-Collab-1 | 共有ノート内ページのリアルタイム編集 | ✅ 完了 |
-| C-Collab-2 | 個人ページは Hocuspocus を使わない | ✅ 完了 |
-| インフラ | Terraform ドリフト修正、ECS デプロイ | ✅ 完了 |
+| C-Collab-2 | 個人ページは Hocuspocus を使わない   | ✅ 完了 |
+| インフラ   | Terraform ドリフト修正、ECS デプロイ | ✅ 完了 |
 
 ---
 
@@ -119,15 +119,15 @@
 
 ## 7. 変更ファイル一覧
 
-| 種別 | パス |
-|------|------|
-| サーバー | `server/hocuspocus/src/index.ts` |
-| サーバー | `server/hocuspocus/package.json` |
-| サーバー | `server/hocuspocus/package-lock.json` |
-| インフラ | `terraform/modules/realtime/main.tf` |
-| インフラ | `terraform/modules/database/main.tf` |
-| インフラ | `terraform/modules/security/main.tf` |
-| フロント | `src/pages/NotePageView.tsx` |
+| 種別     | パス                                       |
+| -------- | ------------------------------------------ |
+| サーバー | `server/hocuspocus/src/index.ts`           |
+| サーバー | `server/hocuspocus/package.json`           |
+| サーバー | `server/hocuspocus/package-lock.json`      |
+| インフラ | `terraform/modules/realtime/main.tf`       |
+| インフラ | `terraform/modules/database/main.tf`       |
+| インフラ | `terraform/modules/security/main.tf`       |
+| フロント | `src/pages/NotePageView.tsx`               |
 | フロント | `src/components/editor/PageEditorView.tsx` |
 
 ---
@@ -147,8 +147,8 @@
 
 ## 9. 関連ドキュメント
 
-| ドキュメント | 用途 |
-|-------------|------|
-| [phase-c4-proposal.md](phase-c4-proposal.md) | C4 の設計・タスク詳細 |
-| [phase-c4-work-log.md](phase-c4-work-log.md) | C4 実装の作業ログ |
+| ドキュメント                                 | 用途                               |
+| -------------------------------------------- | ---------------------------------- |
+| [phase-c4-proposal.md](phase-c4-proposal.md) | C4 の設計・タスク詳細              |
+| [phase-c4-work-log.md](phase-c4-work-log.md) | C4 実装の作業ログ                  |
 | [phase-c3-work-log.md](phase-c3-work-log.md) | C3 mode local/collaborative の前提 |

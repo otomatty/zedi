@@ -11,13 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useProfile } from "@/hooks/useProfile";
@@ -106,96 +100,82 @@ export const GeneralSettingsForm: React.FC = () => {
     <div className="space-y-6">
       {/* プロフィール設定（先頭） — サインイン時のみ表示 */}
       {isSignedIn && (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("generalSettings.profile.title")}</CardTitle>
-          <CardDescription>
-            {t("generalSettings.profile.description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* アカウント名 */}
-          <div className="space-y-2">
-            <Label htmlFor="displayName">
-              {t("generalSettings.profile.displayName")}
-            </Label>
-            <Input
-              id="displayName"
-              value={profile.displayName}
-              onChange={(e) =>
-                updateProfileAndSave({ displayName: e.target.value })
-              }
-              placeholder={t("generalSettings.profile.displayNamePlaceholder")}
-              maxLength={100}
-            />
-            <p className="text-xs text-muted-foreground">
-              {t("generalSettings.profile.displayNameHelp")}
-            </p>
-          </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("generalSettings.profile.title")}</CardTitle>
+            <CardDescription>{t("generalSettings.profile.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* アカウント名 */}
+            <div className="space-y-2">
+              <Label htmlFor="displayName">{t("generalSettings.profile.displayName")}</Label>
+              <Input
+                id="displayName"
+                value={profile.displayName}
+                onChange={(e) => updateProfileAndSave({ displayName: e.target.value })}
+                placeholder={t("generalSettings.profile.displayNamePlaceholder")}
+                maxLength={100}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("generalSettings.profile.displayNameHelp")}
+              </p>
+            </div>
 
-          {/* サムネイル */}
-          <div className="space-y-3">
-            <Label>{t("generalSettings.profile.avatar")}</Label>
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage
-                  src={profile.avatarUrl || avatarUrl}
-                  alt={displayName}
-                />
-                <AvatarFallback className="text-lg">
-                  {displayName?.charAt(0) ?? "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {t("generalSettings.profile.avatarUpload")}
-                </Button>
-                {profile.avatarUrl && (
+            {/* サムネイル */}
+            <div className="space-y-3">
+              <Label>{t("generalSettings.profile.avatar")}</Label>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={profile.avatarUrl || avatarUrl} alt={displayName} />
+                  <AvatarFallback className="text-lg">
+                    {displayName?.charAt(0) ?? "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-2">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="text-destructive"
-                    onClick={() => updateProfileAndSave({ avatarUrl: "" })}
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    {t("generalSettings.profile.avatarRemove")}
+                    {t("generalSettings.profile.avatarUpload")}
                   </Button>
-                )}
+                  {profile.avatarUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => updateProfileAndSave({ avatarUrl: "" })}
+                    >
+                      {t("generalSettings.profile.avatarRemove")}
+                    </Button>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                />
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarFileChange}
-                className="hidden"
-              />
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
       )}
 
       {/* 表示設定: テーマ + フォントサイズ */}
       <Card>
         <CardHeader>
           <CardTitle>{t("generalSettings.display.title")}</CardTitle>
-          <CardDescription>
-            {t("generalSettings.display.description")}
-          </CardDescription>
+          <CardDescription>{t("generalSettings.display.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* テーマ */}
           <div className="space-y-2">
             <Label htmlFor="theme">{t("generalSettings.theme.label")}</Label>
-            <Select
-              value={settings.theme}
-              onValueChange={(v) => updateTheme(v as ThemeMode)}
-            >
+            <Select value={settings.theme} onValueChange={(v) => updateTheme(v as ThemeMode)}>
               <SelectTrigger id="theme" className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -211,14 +191,10 @@ export const GeneralSettingsForm: React.FC = () => {
 
           {/* フォントサイズ */}
           <div className="space-y-2">
-            <Label htmlFor="fontSize">
-              {t("generalSettings.fontSize.label")}
-            </Label>
+            <Label htmlFor="fontSize">{t("generalSettings.fontSize.label")}</Label>
             <Select
               value={settings.editorFontSize}
-              onValueChange={(v) =>
-                updateEditorFontSize(v as EditorFontSize)
-              }
+              onValueChange={(v) => updateEditorFontSize(v as EditorFontSize)}
             >
               <SelectTrigger id="fontSize" className="w-full">
                 <SelectValue />
@@ -242,9 +218,7 @@ export const GeneralSettingsForm: React.FC = () => {
             <Compass className="h-5 w-5" />
             {t("generalSettings.tour.title")}
           </CardTitle>
-          <CardDescription>
-            {t("generalSettings.tour.description")}
-          </CardDescription>
+          <CardDescription>{t("generalSettings.tour.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button variant="outline" onClick={handleRunTourAgain}>
@@ -257,19 +231,12 @@ export const GeneralSettingsForm: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle>{t("generalSettings.language.title")}</CardTitle>
-          <CardDescription>
-            {t("generalSettings.language.description")}
-          </CardDescription>
+          <CardDescription>{t("generalSettings.language.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <Label htmlFor="locale">
-              {t("generalSettings.language.label")}
-            </Label>
-            <Select
-              value={settings.locale}
-              onValueChange={(v) => updateLocale(v as UILocale)}
-            >
+            <Label htmlFor="locale">{t("generalSettings.language.label")}</Label>
+            <Select value={settings.locale} onValueChange={(v) => updateLocale(v as UILocale)}>
               <SelectTrigger id="locale" className="w-full">
                 <SelectValue />
               </SelectTrigger>

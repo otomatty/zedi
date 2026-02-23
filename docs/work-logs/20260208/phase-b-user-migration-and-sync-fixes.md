@@ -7,15 +7,15 @@
 
 ## 1. サマリー
 
-| # | 作業内容 | 成果物・変更 |
-|---|----------|--------------|
-| 1 | Phase B 実装状況の確認と移行対象ユーザー取得（B1） | 実装状況ドキュメント作成、Turso から Clerk user_id 一覧取得スクリプト作成・実行 |
-| 2 | ユーザーマッピングの検討とメール紐づけ | マッピング方針（Gmail→Google Workspace 対応含む）の文書化、マッピング表作成 |
-| 3 | Cognito sub 取得とマッピング表更新 | サインイン後の sub をマッピングに反映 |
-| 4 | DB 更新スクリプトの作成と移行実行（B4・B5） | スクリプト作成、ドライラン・本実行で Turso の user_id 系を Cognito sub に更新 |
-| 5 | 移行後 0 ページのままになる事象の修正 | ローカル 0 件時に全件取得するよう同期ロジックを追加 |
-| 6 | 全件取得を「手動同期時のみ」に限定 | `syncWithRemote` にオプション追加、`triggerSync` 時のみ `forceFullSyncWhenLocalEmpty` を有効化 |
-| 7 | Turso の AWS 移行後方針の明記 | `src/lib/turso.ts` に Phase C3（Turso→Aurora）への参照コメントを追加 |
+| #   | 作業内容                                           | 成果物・変更                                                                                   |
+| --- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1   | Phase B 実装状況の確認と移行対象ユーザー取得（B1） | 実装状況ドキュメント作成、Turso から Clerk user_id 一覧取得スクリプト作成・実行                |
+| 2   | ユーザーマッピングの検討とメール紐づけ             | マッピング方針（Gmail→Google Workspace 対応含む）の文書化、マッピング表作成                    |
+| 3   | Cognito sub 取得とマッピング表更新                 | サインイン後の sub をマッピングに反映                                                          |
+| 4   | DB 更新スクリプトの作成と移行実行（B4・B5）        | スクリプト作成、ドライラン・本実行で Turso の user_id 系を Cognito sub に更新                  |
+| 5   | 移行後 0 ページのままになる事象の修正              | ローカル 0 件時に全件取得するよう同期ロジックを追加                                            |
+| 6   | 全件取得を「手動同期時のみ」に限定                 | `syncWithRemote` にオプション追加、`triggerSync` 時のみ `forceFullSyncWhenLocalEmpty` を有効化 |
+| 7   | Turso の AWS 移行後方針の明記                      | `src/lib/turso.ts` に Phase C3（Turso→Aurora）への参照コメントを追加                           |
 
 ---
 
@@ -33,9 +33,9 @@
 - **ドキュメント:** `docs/plans/20260208/user-migration-mapping.md` を作成・更新。
   - メールアドレスが変わる場合（Gmail → Google Workspace カスタムドメイン）も、移行後に使うアカウントでサインインした時の Cognito sub でマッピングすればよい旨を記載。
   - 紐づけ: 以前 **saedgewell@gmail.com**、移行後サインイン **akimasa.sugai@saedgewell.com**。
-- **マッピング表（実ファイル）:**  
-  - `docs/plans/20260208/clerk-to-cognito-mapping.json`  
-  - `docs/plans/20260208/clerk_to_cognito_mapping.csv`  
+- **マッピング表（実ファイル）:**
+  - `docs/plans/20260208/clerk-to-cognito-mapping.json`
+  - `docs/plans/20260208/clerk_to_cognito_mapping.csv`
   - 取得した Cognito sub: `b7f4ea38-3061-7040-ff13-e060a4b620f0` を記入済み。
 
 ### 2.3 B4: DB 更新スクリプト と B5: 移行実行
@@ -61,19 +61,19 @@
 
 ## 3. 変更・追加したファイル一覧
 
-| 種別 | パス |
-|------|------|
-| 新規 | `docs/work-logs/20260208/phase-b-implementation-status.md` |
-| 新規 | `docs/plans/20260208/user-migration-mapping.md` |
-| 新規 | `docs/plans/20260208/clerk-users-to-migrate.json` |
-| 新規 | `docs/plans/20260208/clerk-to-cognito-mapping.json` |
-| 新規 | `docs/plans/20260208/clerk_to_cognito_mapping.csv` |
-| 新規 | `scripts/migration/list-clerk-users.ts` |
-| 新規 | `scripts/migration/update-user-ids-to-cognito.ts` |
-| 新規 | `docs/work-logs/20260208/phase-b-user-migration-and-sync-fixes.md`（本ログ） |
+| 種別 | パス                                                                                                                          |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 新規 | `docs/work-logs/20260208/phase-b-implementation-status.md`                                                                    |
+| 新規 | `docs/plans/20260208/user-migration-mapping.md`                                                                               |
+| 新規 | `docs/plans/20260208/clerk-users-to-migrate.json`                                                                             |
+| 新規 | `docs/plans/20260208/clerk-to-cognito-mapping.json`                                                                           |
+| 新規 | `docs/plans/20260208/clerk_to_cognito_mapping.csv`                                                                            |
+| 新規 | `scripts/migration/list-clerk-users.ts`                                                                                       |
+| 新規 | `scripts/migration/update-user-ids-to-cognito.ts`                                                                             |
+| 新規 | `docs/work-logs/20260208/phase-b-user-migration-and-sync-fixes.md`（本ログ）                                                  |
 | 更新 | `src/lib/turso.ts`（SyncWithRemoteOptions、forceFullSyncWhenLocalEmpty、triggerSync のオプション渡し、Turso→Aurora コメント） |
-| 更新 | `package.json`（migration:list-clerk-users 系、migration:update-user-ids 系） |
-| 更新 | `docs/plans/20260208/next-steps-work-plan.md`（§8 進捗メモを Phase B 完了に更新） |
+| 更新 | `package.json`（migration:list-clerk-users 系、migration:update-user-ids 系）                                                 |
+| 更新 | `docs/plans/20260208/next-steps-work-plan.md`（§8 進捗メモを Phase B 完了に更新）                                             |
 
 ---
 
@@ -97,14 +97,14 @@
 
 ## 5. 参照するべき作業計画書・ドキュメント
 
-| ドキュメント | パス | 用途 |
-|-------------|------|------|
-| **次のステップ 作業計画書** | `docs/plans/20260208/next-steps-work-plan.md` | Phase A/B/C の全体像、Phase C のタスク一覧、進捗メモ。次は §5 Phase C および §8 を参照。 |
-| **実装計画・現状サマリー** | `docs/plans/20260123/implementation-status-and-roadmap.md` | AWS 移行・リアルタイム編集の全体像、DB 移行（Turso→Aurora）の位置づけ。§2 AWS環境への移行 を参照。 |
-| **Clerk→Cognito 移行調査** | `docs/plans/20260203/clerk-to-cognito-migration-investigation.md` | 既存ユーザー移行方針の詳細。§5.4 既存ユーザー移行・メール切り替え を参照。 |
-| **移行ユーザーのマッピング検討** | `docs/plans/20260208/user-migration-mapping.md` | マッピングの考え方、メールが変わる場合の対応、マッピング表フォーマット。 |
-| **環境変数ガイド** | `docs/guides/env-variables-guide.md` | 本番デプロイ時の環境変数設定。 |
-| **Cognito IdP 設定ガイド** | `docs/guides/cognito-google-github-idp-setup.md` | Google/GitHub IdP の設定手順。 |
+| ドキュメント                     | パス                                                              | 用途                                                                                               |
+| -------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **次のステップ 作業計画書**      | `docs/plans/20260208/next-steps-work-plan.md`                     | Phase A/B/C の全体像、Phase C のタスク一覧、進捗メモ。次は §5 Phase C および §8 を参照。           |
+| **実装計画・現状サマリー**       | `docs/plans/20260123/implementation-status-and-roadmap.md`        | AWS 移行・リアルタイム編集の全体像、DB 移行（Turso→Aurora）の位置づけ。§2 AWS環境への移行 を参照。 |
+| **Clerk→Cognito 移行調査**       | `docs/plans/20260203/clerk-to-cognito-migration-investigation.md` | 既存ユーザー移行方針の詳細。§5.4 既存ユーザー移行・メール切り替え を参照。                         |
+| **移行ユーザーのマッピング検討** | `docs/plans/20260208/user-migration-mapping.md`                   | マッピングの考え方、メールが変わる場合の対応、マッピング表フォーマット。                           |
+| **環境変数ガイド**               | `docs/guides/env-variables-guide.md`                              | 本番デプロイ時の環境変数設定。                                                                     |
+| **Cognito IdP 設定ガイド**       | `docs/guides/cognito-google-github-idp-setup.md`                  | Google/GitHub IdP の設定手順。                                                                     |
 
 ---
 

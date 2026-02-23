@@ -134,7 +134,7 @@ export function useEditorAutoSave({
         void runSave(() => onSave({ title: newTitle, content: newContent }));
       }, debounceMs);
     },
-    [pageId, debounceMs, shouldBlockSave, onSave, onSaveContentOnly, syncWikiLinks, onSaveSuccess]
+    [pageId, debounceMs, shouldBlockSave, onSave, onSaveContentOnly, syncWikiLinks, onSaveSuccess],
   );
 
   return {

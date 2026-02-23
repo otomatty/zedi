@@ -35,8 +35,7 @@ export function useImageUpload(): UseImageUploadReturn {
     error: null,
   });
 
-  const isConfigured =
-    !isLoading && isStorageConfiguredForUpload(settings);
+  const isConfigured = !isLoading && isStorageConfiguredForUpload(settings);
 
   /**
    * 単一の画像をアップロード
@@ -45,9 +44,7 @@ export function useImageUpload(): UseImageUploadReturn {
     async (file: File): Promise<string> => {
       // ストレージ設定の確認
       if (!isStorageConfiguredForUpload(settings)) {
-        throw new Error(
-          "ストレージが設定されていません。設定画面でストレージを設定してください。"
-        );
+        throw new Error("ストレージが設定されていません。設定画面でストレージを設定してください。");
       }
 
       // 画像ファイルの検証
@@ -83,8 +80,7 @@ export function useImageUpload(): UseImageUploadReturn {
 
         return url;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "アップロードに失敗しました";
+        const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
         setState((prev) => ({
           ...prev,
           isUploading: false,
@@ -93,7 +89,7 @@ export function useImageUpload(): UseImageUploadReturn {
         throw error;
       }
     },
-    [settings, getToken]
+    [settings, getToken],
   );
 
   /**
@@ -116,16 +112,13 @@ export function useImageUpload(): UseImageUploadReturn {
 
       try {
         // 並列でアップロード
-        const urls = await Promise.all(
-          imageFiles.map((file) => uploadImage(file))
-        );
+        const urls = await Promise.all(imageFiles.map((file) => uploadImage(file)));
 
         setState((prev) => ({ ...prev, isUploading: false }));
 
         return urls;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "アップロードに失敗しました";
+        const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
         setState((prev) => ({
           ...prev,
           isUploading: false,
@@ -134,7 +127,7 @@ export function useImageUpload(): UseImageUploadReturn {
         throw error;
       }
     },
-    [uploadImage]
+    [uploadImage],
   );
 
   /**

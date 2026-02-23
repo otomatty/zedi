@@ -1,11 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import {
-  ChevronLeft,
-  Image as ImageIcon,
-  Loader2,
-  Sparkles,
-  Wand2,
-} from "lucide-react";
+import { ChevronLeft, Image as ImageIcon, Loader2, Sparkles, Wand2 } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,11 +22,7 @@ interface EditorRecommendationBarProps {
   pageTitle: string;
   isReadOnly: boolean;
   hasThumbnail: boolean;
-  onSelectThumbnail: (
-    imageUrl: string,
-    alt: string,
-    previewUrl?: string
-  ) => void;
+  onSelectThumbnail: (imageUrl: string, alt: string, previewUrl?: string) => void;
 }
 
 type RecommendationMode = "actions" | "thumbnails" | "generating";
@@ -65,60 +55,58 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
 
   const loadCandidates = useCallback(
     async (cursor?: string | null) => {
-    if (!trimmedTitle) {
-      setErrorMessage("タイトルを入力してください");
-      return;
-    }
-
-    const query = trimmedTitle;
-    lastQueryRef.current = query;
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const token = await getToken();
-      if (!token) {
-        setErrorMessage("ログインが必要です");
+      if (!trimmedTitle) {
+        setErrorMessage("タイトルを入力してください");
         return;
       }
-      const params = new URLSearchParams({
-        query,
-        limit: "10",
-      });
-      if (cursor) {
-        params.set("cursor", cursor);
-      }
-      const response = await fetch(
-        `${thumbnailApiBaseUrl}/api/thumbnail/image-search?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+
+      const query = trimmedTitle;
+      lastQueryRef.current = query;
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const token = await getToken();
+        if (!token) {
+          setErrorMessage("ログインが必要です");
+          return;
         }
-      );
+        const params = new URLSearchParams({
+          query,
+          limit: "10",
+        });
+        if (cursor) {
+          params.set("cursor", cursor);
+        }
+        const response = await fetch(
+          `${thumbnailApiBaseUrl}/api/thumbnail/image-search?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
 
-      if (!response.ok) {
-        throw new Error(`画像検索に失敗しました: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`画像検索に失敗しました: ${response.status}`);
+        }
+
+        const data = (await response.json()) as {
+          items?: ThumbnailCandidate[];
+          nextCursor?: string;
+        };
+
+        setCandidates(data.items || []);
+        setNextCursor(data.nextCursor ?? null);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "画像の取得に失敗しました");
+        setNextCursor(null);
+      } finally {
+        setIsLoading(false);
       }
-
-      const data = (await response.json()) as {
-        items?: ThumbnailCandidate[];
-        nextCursor?: string;
-      };
-
-      setCandidates(data.items || []);
-      setNextCursor(data.nextCursor ?? null);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "画像の取得に失敗しました"
-      );
-      setNextCursor(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getToken, thumbnailApiBaseUrl, trimmedTitle]);
+    },
+    [getToken, thumbnailApiBaseUrl, trimmedTitle],
+  );
 
   const handleOpenThumbnailPicker = useCallback(() => {
     if (!canSearch) return;
@@ -143,7 +131,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
       setMode("actions");
       setErrorMessage(null);
     },
-    [onSelectThumbnail]
+    [onSelectThumbnail],
   );
 
   const handleNextPage = useCallback(() => {
@@ -168,27 +156,22 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
         setMode("actions");
         return;
       }
-      const response = await fetch(
-        `${thumbnailApiBaseUrl}/api/thumbnail/image-generate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            prompt: trimmedTitle,
-            aspectRatio: "16:9",
-            imageSize: "2K",
-          }),
-        }
-      );
+      const response = await fetch(`${thumbnailApiBaseUrl}/api/thumbnail/image-generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          prompt: trimmedTitle,
+          aspectRatio: "16:9",
+          imageSize: "2K",
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `画像生成に失敗しました: ${response.status}`
-        );
+        throw new Error(errorData.error || `画像生成に失敗しました: ${response.status}`);
       }
 
       const data = (await response.json()) as {
@@ -200,11 +183,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
       onSelectThumbnail(data.imageUrl, trimmedTitle, data.imageUrl);
       setMode("actions");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "画像の生成に失敗しました"
-      );
+      setErrorMessage(error instanceof Error ? error.message : "画像の生成に失敗しました");
       setMode("actions");
     } finally {
       setIsLoading(false);
@@ -237,13 +216,8 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
               >
                 次へ
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={handleBackToActions}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
+              <Button type="button" size="sm" variant="ghost" onClick={handleBackToActions}>
+                <ChevronLeft className="mr-1 h-4 w-4" />
                 戻る
               </Button>
             </div>
@@ -252,13 +226,8 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
 
         {mode === "actions" && (
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleOpenThumbnailPicker}
-            >
-              <ImageIcon className="h-4 w-4 mr-1" />
+            <Button type="button" size="sm" variant="outline" onClick={handleOpenThumbnailPicker}>
+              <ImageIcon className="mr-1 h-4 w-4" />
               画像を検索
             </Button>
             <Button
@@ -268,7 +237,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
               onClick={handleGenerateImage}
               disabled={isLoading}
             >
-              <Wand2 className="h-4 w-4 mr-1" />
+              <Wand2 className="mr-1 h-4 w-4" />
               AIで生成
             </Button>
             <span className="text-xs text-muted-foreground">
@@ -285,18 +254,11 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
                 画像を生成中...
               </div>
             )}
-            {errorMessage && (
-              <div className="text-xs text-destructive">{errorMessage}</div>
-            )}
+            {errorMessage && <div className="text-xs text-destructive">{errorMessage}</div>}
             {!isLoading && !errorMessage && (
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleBackToActions}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
+                <Button type="button" size="sm" variant="ghost" onClick={handleBackToActions}>
+                  <ChevronLeft className="mr-1 h-4 w-4" />
                   戻る
                 </Button>
               </div>
@@ -312,34 +274,30 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
                 画像を検索中...
               </div>
             )}
-            {errorMessage && (
-              <div className="text-xs text-destructive">{errorMessage}</div>
-            )}
+            {errorMessage && <div className="text-xs text-destructive">{errorMessage}</div>}
             {!isLoading && !errorMessage && candidates.length === 0 && (
-              <div className="text-xs text-muted-foreground">
-                候補が見つかりませんでした
-              </div>
+              <div className="text-xs text-muted-foreground">候補が見つかりませんでした</div>
             )}
 
             {candidates.length > 0 && (
               <div
                 ref={scrollRef}
                 onWheel={handleWheel}
-                className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1"
+                className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1"
               >
                 {candidates.map((candidate) => (
                   <button
                     key={candidate.id}
                     type="button"
                     onClick={() => handleSelectCandidate(candidate)}
-                    className="snap-start shrink-0 text-left"
+                    className="shrink-0 snap-start text-left"
                   >
                     <div className="flex flex-col gap-1">
                       <div className="rounded-md border bg-background p-1">
                         <img
                           src={candidate.previewUrl}
                           alt={candidate.alt}
-                          className="h-16 sm:h-24 w-auto rounded object-cover"
+                          className="h-16 w-auto rounded object-cover sm:h-24"
                           loading="lazy"
                         />
                       </div>

@@ -2,12 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Bot, Image as ImageIcon, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Container from "@/components/layout/Container";
 import { useTranslation } from "react-i18next";
 
@@ -18,12 +13,7 @@ interface SettingsItemProps {
   to: string;
 }
 
-const SettingsItem: React.FC<SettingsItemProps> = ({
-  icon,
-  title,
-  description,
-  to,
-}) => {
+const SettingsItem: React.FC<SettingsItemProps> = ({ icon, title, description, to }) => {
   const navigate = useNavigate();
 
   return (
@@ -64,7 +54,7 @@ const Settings: React.FC = () => {
       {/* Content */}
       <main className="py-6">
         <Container>
-          <div className="space-y-2 max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl space-y-2">
             <SettingsItem
               icon={<Settings2 className="h-5 w-5" />}
               title={t("settings.general.title")}

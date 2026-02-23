@@ -2,15 +2,15 @@
  * Drizzle ORM Schema: テーブル間リレーション定義
  * Drizzle の relations() API でクエリビルダ用のリレーションを宣言する
  */
-import { relations } from 'drizzle-orm';
-import { users } from './users';
-import { pages } from './pages';
-import { notes, notePages, noteMembers } from './notes';
-import { links, ghostLinks } from './links';
-import { pageContents } from './pageContents';
-import { media } from './media';
-import { subscriptions } from './subscriptions';
-import { aiUsageLogs, aiMonthlyUsage } from './aiModels';
+import { relations } from "drizzle-orm";
+import { users } from "./users";
+import { pages } from "./pages";
+import { notes, notePages, noteMembers } from "./notes";
+import { links, ghostLinks } from "./links";
+import { pageContents } from "./pageContents";
+import { media } from "./media";
+import { subscriptions } from "./subscriptions";
+import { aiUsageLogs, aiMonthlyUsage } from "./aiModels";
 
 // ── users ────────────────────────────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -34,7 +34,7 @@ export const pagesRelations = relations(pages, ({ one, many }) => ({
   sourcePage: one(pages, {
     fields: [pages.sourcePageId],
     references: [pages.id],
-    relationName: 'sourcePageRef',
+    relationName: "sourcePageRef",
   }),
   content: one(pageContents, {
     fields: [pages.id],
@@ -42,9 +42,9 @@ export const pagesRelations = relations(pages, ({ one, many }) => ({
   }),
   notePages: many(notePages),
   media: many(media),
-  outgoingLinks: many(links, { relationName: 'sourceLinks' }),
-  incomingLinks: many(links, { relationName: 'targetLinks' }),
-  ghostLinksFrom: many(ghostLinks, { relationName: 'ghostLinkSource' }),
+  outgoingLinks: many(links, { relationName: "sourceLinks" }),
+  incomingLinks: many(links, { relationName: "targetLinks" }),
+  ghostLinksFrom: many(ghostLinks, { relationName: "ghostLinkSource" }),
 }));
 
 // ── notes ────────────────────────────────────────────────────────────────────
@@ -90,12 +90,12 @@ export const linksRelations = relations(links, ({ one }) => ({
   source: one(pages, {
     fields: [links.sourceId],
     references: [pages.id],
-    relationName: 'sourceLinks',
+    relationName: "sourceLinks",
   }),
   target: one(pages, {
     fields: [links.targetId],
     references: [pages.id],
-    relationName: 'targetLinks',
+    relationName: "targetLinks",
   }),
 }));
 
@@ -104,12 +104,12 @@ export const ghostLinksRelations = relations(ghostLinks, ({ one }) => ({
   sourcePage: one(pages, {
     fields: [ghostLinks.sourcePageId],
     references: [pages.id],
-    relationName: 'ghostLinkSource',
+    relationName: "ghostLinkSource",
   }),
   originalTargetPage: one(pages, {
     fields: [ghostLinks.originalTargetPageId],
     references: [pages.id],
-    relationName: 'ghostLinkOriginalTarget',
+    relationName: "ghostLinkOriginalTarget",
   }),
   originalNote: one(notes, {
     fields: [ghostLinks.originalNoteId],

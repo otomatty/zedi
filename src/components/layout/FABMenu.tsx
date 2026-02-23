@@ -3,12 +3,7 @@ import { FileText, Link2, Image } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
-export type FABMenuOption =
-  | "blank"
-  | "url"
-  | "image"
-  | "template"
-  | "voice";
+export type FABMenuOption = "blank" | "url" | "image" | "template" | "voice";
 
 interface FABMenuItemProps {
   icon: React.ElementType;
@@ -41,12 +36,10 @@ const FABMenuItem: React.FC<FABMenuItemProps> = ({
         "shadow-lg hover:shadow-xl",
         "backdrop-blur-sm",
         "transition-all duration-200 ease-out",
-        "hover:bg-secondary hover:scale-[1.02] active:scale-[0.98]",
+        "hover:scale-[1.02] hover:bg-secondary active:scale-[0.98]",
         "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-        isOpen
-          ? "translate-y-0 opacity-100"
-          : "pointer-events-none translate-y-4 opacity-0",
-        disabled && "cursor-not-allowed opacity-50 hover:scale-100"
+        isOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0",
+        disabled && "cursor-not-allowed opacity-50 hover:scale-100",
       )}
       style={{
         transitionDelay: isOpen ? `${delay}ms` : "0ms",
@@ -65,12 +58,7 @@ interface FABMenuProps {
   trigger: React.ReactNode;
 }
 
-export const FABMenu: React.FC<FABMenuProps> = ({
-  open,
-  onOpenChange,
-  onSelect,
-  trigger,
-}) => {
+export const FABMenu: React.FC<FABMenuProps> = ({ open, onOpenChange, onSelect, trigger }) => {
   const { t } = useTranslation();
   const handleSelect = (option: FABMenuOption) => {
     onSelect(option);
@@ -95,7 +83,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
         className={cn(
           "fixed inset-0 z-30 bg-black/35",
           "transition-opacity duration-200",
-          open ? "opacity-100" : "pointer-events-none opacity-0"
+          open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={() => onOpenChange(false)}
       />

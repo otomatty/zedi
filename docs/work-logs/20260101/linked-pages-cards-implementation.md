@@ -1,11 +1,11 @@
 # 作業ログ: Linked Pages Cards 実装
 
-| 項目           | 内容                                       |
-| :------------- | :----------------------------------------- |
-| **日付**       | 2026 年 1 月 1 日                          |
-| **機能**       | Linked Pages Cards（リンクカード表示）     |
-| **Phase**      | Phase 4                                    |
-| **ステータス** | ✅ 完了                                    |
+| 項目           | 内容                                   |
+| :------------- | :------------------------------------- |
+| **日付**       | 2026 年 1 月 1 日                      |
+| **機能**       | Linked Pages Cards（リンクカード表示） |
+| **Phase**      | Phase 4                                |
+| **ステータス** | ✅ 完了                                |
 
 ---
 
@@ -23,34 +23,34 @@
 
 #### 機能実装
 
-| ファイル                                      | 役割                                                   |
-| :-------------------------------------------- | :----------------------------------------------------- |
-| `src/hooks/useLinkedPages.ts`                 | リンクデータ取得フック（計算ロジック含む）             |
-| `src/components/page/LinkedPagesSection.tsx`  | リンクカードセクション（メインコンポーネント）         |
-| `src/components/page/PageLinkCard.tsx`        | 個別ページカードコンポーネント                         |
-| `src/components/page/GhostLinkCard.tsx`       | Ghost Link（新しいリンク）カード                       |
-| `src/components/page/LinkSection.tsx`         | リンクセクションコンポーネント                         |
-| `src/components/page/LinkGroupRow.tsx`        | 2階層リンクの横並び表示コンポーネント（新規追加）      |
+| ファイル                                     | 役割                                              |
+| :------------------------------------------- | :------------------------------------------------ |
+| `src/hooks/useLinkedPages.ts`                | リンクデータ取得フック（計算ロジック含む）        |
+| `src/components/page/LinkedPagesSection.tsx` | リンクカードセクション（メインコンポーネント）    |
+| `src/components/page/PageLinkCard.tsx`       | 個別ページカードコンポーネント                    |
+| `src/components/page/GhostLinkCard.tsx`      | Ghost Link（新しいリンク）カード                  |
+| `src/components/page/LinkSection.tsx`        | リンクセクションコンポーネント                    |
+| `src/components/page/LinkGroupRow.tsx`       | 2階層リンクの横並び表示コンポーネント（新規追加） |
 
 #### テスト環境
 
-| ファイル                     | 役割                                    |
-| :--------------------------- | :-------------------------------------- |
-| `src/test/setup.ts`          | Vitestセットアップ（モック設定）        |
-| `src/test/testDatabase.ts`   | sql.js インメモリDB用テストユーティリティ |
-| `src/test/testWrapper.tsx`   | React Query / Router用テストラッパー    |
-| `src/test/mocks.ts`          | モック関数群                            |
-| `playwright.config.ts`       | Playwright設定                          |
+| ファイル                   | 役割                                      |
+| :------------------------- | :---------------------------------------- |
+| `src/test/setup.ts`        | Vitestセットアップ（モック設定）          |
+| `src/test/testDatabase.ts` | sql.js インメモリDB用テストユーティリティ |
+| `src/test/testWrapper.tsx` | React Query / Router用テストラッパー      |
+| `src/test/mocks.ts`        | モック関数群                              |
+| `playwright.config.ts`     | Playwright設定                            |
 
 #### テストファイル
 
-| ファイル                                             | テスト数 | 内容                                           |
-| :--------------------------------------------------- | :------- | :--------------------------------------------- |
-| `src/hooks/useLinkedPages.test.ts`                   | 21       | 計算ロジックテスト（Outgoing/Backlinks/2-hop/Ghost/グループ化） |
-| `src/components/page/PageLinkCard.test.tsx`          | 7        | カードコンポーネントの表示・動作テスト         |
-| `src/components/page/GhostLinkCard.test.tsx`         | 4        | Ghost Linkカードのテスト                       |
-| `src/components/page/LinkedPagesSection.test.tsx`    | 9        | 統合テスト（各セクションの表示・ナビゲーション・グループ表示）|
-| `e2e/linked-pages.spec.ts`                           | 6        | E2Eテスト（ブラウザ上での操作）                |
+| ファイル                                          | テスト数 | 内容                                                            |
+| :------------------------------------------------ | :------- | :-------------------------------------------------------------- |
+| `src/hooks/useLinkedPages.test.ts`                | 21       | 計算ロジックテスト（Outgoing/Backlinks/2-hop/Ghost/グループ化） |
+| `src/components/page/PageLinkCard.test.tsx`       | 7        | カードコンポーネントの表示・動作テスト                          |
+| `src/components/page/GhostLinkCard.test.tsx`      | 4        | Ghost Linkカードのテスト                                        |
+| `src/components/page/LinkedPagesSection.test.tsx` | 9        | 統合テスト（各セクションの表示・ナビゲーション・グループ表示）  |
+| `e2e/linked-pages.spec.ts`                        | 6        | E2Eテスト（ブラウザ上での操作）                                 |
 
 ### 修正ファイル
 
@@ -79,11 +79,11 @@ bun add -D @playwright/test
 
 ページエディタ下部に以下のセクションを表示：
 
-| セクション             | アイコン | 内容                                                       |
-| :--------------------- | :------- | :--------------------------------------------------------- |
+| セクション              | アイコン | 内容                                                        |
+| :---------------------- | :------- | :---------------------------------------------------------- |
 | **2階層リンクグループ** | 🔗       | 2階層先がある場合、左にリンク元カード、右に子ページを横並び |
-| **リンク**             | 🔗       | リンク先（子なし）と被リンクを統合したセクション           |
-| **新しいリンク**       | 📝       | 存在しないリンク先（クリックでページ作成）                 |
+| **リンク**              | 🔗       | リンク先（子なし）と被リンクを統合したセクション            |
+| **新しいリンク**        | 📝       | 存在しないリンク先（クリックでページ作成）                  |
 
 ### 2. カード表示内容
 
@@ -130,10 +130,10 @@ bun run test:e2e:ui      # UIモード
 
 ### テスト結果
 
-| テスト種別      | ファイル数 | テスト数 | 結果      |
-| :-------------- | :--------- | :------- | :-------- |
-| 統合テスト      | 4          | 41       | ✅ 全パス |
-| E2Eテスト       | 1          | 6        | ✅ 全パス |
+| テスト種別 | ファイル数 | テスト数 | 結果      |
+| :--------- | :--------- | :------- | :-------- |
+| 統合テスト | 4          | 41       | ✅ 全パス |
+| E2Eテスト  | 1          | 6        | ✅ 全パス |
 
 ### テストカバレッジ
 

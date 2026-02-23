@@ -1,11 +1,7 @@
 // Gyazo ストレージプロバイダー
 // Access Tokenで動作するシンプルなプロバイダー
 
-import {
-  StorageProviderInterface,
-  UploadOptions,
-  ConnectionTestResult,
-} from "../types";
+import { StorageProviderInterface, UploadOptions, ConnectionTestResult } from "../types";
 
 /**
  * Gyazo API レスポンス
@@ -61,9 +57,7 @@ export class GyazoProvider implements StorageProviderInterface {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      throw new Error(
-        `Gyazo upload failed: ${response.status} ${errorText}`
-      );
+      throw new Error(`Gyazo upload failed: ${response.status} ${errorText}`);
     }
 
     const data: GyazoResponse = await response.json();

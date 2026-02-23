@@ -248,9 +248,7 @@ describe("aiSettings - 回帰テスト", () => {
         isConfigured: true,
       };
 
-      await expect(saveAISettings(settings)).rejects.toThrow(
-        "AI設定の保存に失敗しました"
-      );
+      await expect(saveAISettings(settings)).rejects.toThrow("AI設定の保存に失敗しました");
     });
   });
 });

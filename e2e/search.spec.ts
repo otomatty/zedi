@@ -7,9 +7,7 @@ test.describe("Global Search - UI Tests", () => {
     await helpers.goToHome(page);
   });
 
-  test("should open search dialog with keyboard shortcut Cmd+K", async ({
-    page,
-  }) => {
+  test("should open search dialog with keyboard shortcut Cmd+K", async ({ page }) => {
     // Press Cmd+K
     await page.keyboard.press("Meta+k");
     await page.waitForTimeout(300);
@@ -133,9 +131,7 @@ test.describe("Global Search - Data Tests", () => {
     // This test is skipped because it requires proper data synchronization
   });
 
-  test.skip("should show search results count (requires data persistence)", async ({
-    page,
-  }) => {
+  test.skip("should show search results count (requires data persistence)", async ({ page }) => {
     // This test is skipped because it requires proper data synchronization
   });
 });

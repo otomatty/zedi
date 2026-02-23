@@ -87,18 +87,19 @@ bun run dev
 
 ### ブランチ命名規則
 
-| Type | Format | Example |
-|------|--------|---------|
-| Feature | `feature/description` | `feature/add-backlinks` |
-| Bug Fix | `fix/description` | `fix/search-crash` |
-| Refactor | `refactor/description` | `refactor/editor-hooks` |
-| Documentation | `docs/description` | `docs/update-readme` |
+| Type          | Format                 | Example                 |
+| ------------- | ---------------------- | ----------------------- |
+| Feature       | `feature/description`  | `feature/add-backlinks` |
+| Bug Fix       | `fix/description`      | `fix/search-crash`      |
+| Refactor      | `refactor/description` | `refactor/editor-hooks` |
+| Documentation | `docs/description`     | `docs/update-readme`    |
 
 ### 開発フロー
 
 > 📖 **詳細なブランチ戦略**: [ブランチ戦略ガイド](../docs/guides/branch-strategy.md) を参照してください。
 
 1. **develop ブランチから最新を取得**
+
    ```bash
    git fetch origin
    git checkout develop
@@ -106,6 +107,7 @@ bun run dev
    ```
 
 2. **機能ブランチを作成**
+
    ```bash
    git checkout -b feature/your-feature
    ```
@@ -116,6 +118,7 @@ bun run dev
    - ドキュメントを更新
 
 4. **テストとコード品質チェック**
+
    ```bash
    # ユニットテスト
    bun run test
@@ -137,6 +140,7 @@ bun run dev
    > コミットメッセージは [Conventional Commits](https://www.conventionalcommits.org/) に従う必要があります（[commitlint](https://commitlint.js.org/) で検証）。
 
 5. **コミットしてプッシュ**
+
    ```bash
    git add .
    git commit -m "feat: add backlinks feature"
@@ -162,18 +166,22 @@ bun run dev
 
 ```markdown
 ## 概要
+
 変更内容の簡単な説明
 
 ## 変更点
+
 - 変更点 1
 - 変更点 2
 
 ## テスト方法
+
 この変更をテストする手順
 
 ## スクリーンショット（UI 変更がある場合）
 
 ## 関連 Issue
+
 Closes #123
 ```
 
@@ -196,12 +204,12 @@ Closes #123
 ```typescript
 // ✅ Good
 function getPage(id: string): Page | undefined {
-  return pages.find(p => p.id === id);
+  return pages.find((p) => p.id === id);
 }
 
 // ❌ Bad
 function getPage(id) {
-  return pages.find(p => p.id === id);
+  return pages.find((p) => p.id === id);
 }
 ```
 
@@ -261,16 +269,16 @@ src/
 
 ### Type
 
-| Type | Description |
-|------|-------------|
-| `feat` | 新機能 |
-| `fix` | バグ修正 |
-| `docs` | ドキュメントのみの変更 |
-| `style` | コードの意味に影響しない変更（空白、フォーマット等） |
-| `refactor` | バグ修正でも機能追加でもないコード変更 |
-| `perf` | パフォーマンス改善 |
-| `test` | テストの追加・修正 |
-| `chore` | ビルドプロセスやツールの変更 |
+| Type       | Description                                          |
+| ---------- | ---------------------------------------------------- |
+| `feat`     | 新機能                                               |
+| `fix`      | バグ修正                                             |
+| `docs`     | ドキュメントのみの変更                               |
+| `style`    | コードの意味に影響しない変更（空白、フォーマット等） |
+| `refactor` | バグ修正でも機能追加でもないコード変更               |
+| `perf`     | パフォーマンス改善                                   |
+| `test`     | テストの追加・修正                                   |
+| `chore`    | ビルドプロセスやツールの変更                         |
 
 ### 例
 
@@ -303,25 +311,31 @@ refactor(hooks): simplify usePageQueries
 
 ```markdown
 ## バグの概要
+
 検索結果をクリックしてもページが開かない
 
 ## 再現手順
+
 1. Cmd+K で検索を開く
 2. 「テスト」と入力
 3. 検索結果をクリック
 
 ## 期待する動作
+
 クリックしたページが開く
 
 ## 実際の動作
+
 何も起きない
 
 ## 環境
+
 - OS: macOS Sonoma 14.2
 - Browser: Chrome 120
 - Zedi: v0.1.0
 
 ## スクリーンショット
+
 [スクリーンショットをここに貼り付け]
 ```
 

@@ -33,11 +33,13 @@ GET https://zedi-dev-....auth.ap-northeast-1.amazoncognito.com/error?error=redir
 1. **Terraform で Cognito を正しい URL で再適用する**
    - `terraform/variables.tf` のデフォルトは `http://localhost:30000/auth/callback`。`environments/dev.tfvars` でも `cognito_callback_urls = ["http://localhost:30000/auth/callback"]` になっているか確認する。
    - 以下で plan を確認してから apply する（dev の場合）:
+
    ```bash
    cd terraform
    terraform plan -var-file=environments/dev.tfvars
    terraform apply -var-file=environments/dev.tfvars
    ```
+
    - apply 後、AWS コンソールの Cognito → ユーザープール → アプリの統合 → 当該クライアントで「許可されているコールバック URL」に `http://localhost:30000/auth/callback` が含まれているか確認する。
 
 2. **開いている URL を確認する**
@@ -71,19 +73,23 @@ GET https://zedi-dev-....auth.ap-northeast-1.amazoncognito.com/error?error=redir
 2. **apply の直前に secret を読み込んでから実行**
    - **Bash / Git Bash:** 環境変数を子プロセス（terraform）に渡すため、`set -a` で export してから読み込む。
    - **本番の例:**
+
    ```bash
    cd terraform
    set -a && . environments/prod.secret.env && set +a
    terraform apply -var-file=environments/prod.tfvars
    ```
+
    - **開発の例:**
+
    ```bash
    cd terraform
    set -a && . environments/dev.secret.env && set +a
    terraform apply -var-file=environments/dev.tfvars
    ```
+
    - 単に `source` しただけでは、シェルによっては terraform に変数が渡らず、plan に IdP の変更が出ないことがある。
-   apply 後、Cognito の「アプリの統合」→ 当該クライアントで「Google」「GitHub」が有効になっているはず。
+     apply 後、Cognito の「アプリの統合」→ 当該クライアントで「Google」「GitHub」が有効になっているはず。
 
 3. **開発で Google を使う場合:** GCP の「承認済みのリダイレクト URI」に **開発用 Cognito** の URL を 1 件追加する（本番と別クライアントなら別途追加）。例: `https://zedi-dev-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse`
 
@@ -101,9 +107,11 @@ GET https://zedi-dev-....auth.ap-northeast-1.amazoncognito.com/error?error=redir
 **対処:**
 
 1. **現在の Client ID を確認**
+
    ```bash
    cd terraform && terraform workspace select prod && terraform output -raw cognito_client_id
    ```
+
    例: `1aoffob0l5avca6335tq6co7p`
 
 2. **`.env.production` を更新**
@@ -111,9 +119,11 @@ GET https://zedi-dev-....auth.ap-northeast-1.amazoncognito.com/error?error=redir
    - あわせて `VITE_COGNITO_DOMAIN=` が `zedi-prod-590183877893.auth.ap-northeast-1.amazoncognito.com`（`https://` なし）になっているか確認する。
 
 3. **フロントを再ビルド・再デプロイ**
+
    ```bash
    bun run deploy:prod
    ```
+
    GitHub Actions でデプロイしている場合は、**Secrets** の `VITE_COGNITO_CLIENT_ID`（と必要なら `VITE_COGNITO_DOMAIN`）を上記の値に更新し、ワークフローを再実行する。
 
 4. ブラウザのキャッシュを消すかシークレットウィンドウで https://zedi-note.app にアクセスし直す。
@@ -164,11 +174,11 @@ https://zedi-prod-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpr
 
 `/auth/callback?error=...&error_description=...` のようにクエリが付いている場合、画面に `error_description` が表示されます。
 
-| 例（error / error_description） | 想定原因 |
-|----------------------------------|----------|
-| `redirect_uri_mismatch` など     | GCP のリダイレクト URI が上記 §1 と一致していない |
-| `access_denied`                 | ユーザーが同意画面で「キャンセル」した |
-| `invalid_grant`                  | コードの二重使用や有効期限切れ。再度サインインからやり直す |
+| 例（error / error_description） | 想定原因                                                   |
+| ------------------------------- | ---------------------------------------------------------- |
+| `redirect_uri_mismatch` など    | GCP のリダイレクト URI が上記 §1 と一致していない          |
+| `access_denied`                 | ユーザーが同意画面で「キャンセル」した                     |
+| `invalid_grant`                 | コードの二重使用や有効期限切れ。再度サインインからやり直す |
 
 ---
 
@@ -185,7 +195,7 @@ https://zedi-prod-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpr
 - [ ] GCP の本番用 OAuth クライアントに **Cognito の** `https://zedi-prod-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse` が 1 件ある
 - [ ] Cognito のコールバック URL に `https://zedi-note.app/auth/callback` と（www を使う場合）`https://www.zedi-note.app/auth/callback` がある
 - [ ] ブラウザでシークレットウィンドウ／別アカウントで試す（キャッシュの影響を除く）
-- [ ] 本番ビルドに本番の Cognito Client ID / Domain が入っている（GitHub Secrets の VITE_COGNITO_* または .env.production）
+- [ ] 本番ビルドに本番の Cognito Client ID / Domain が入っている（GitHub Secrets の VITE*COGNITO*\* または .env.production）
 
 ---
 

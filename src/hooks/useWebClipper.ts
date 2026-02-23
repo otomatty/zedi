@@ -3,20 +3,11 @@
  * api を渡すとサーバー側で HTML 取得（CORS 回避）。未指定時は CORS プロキシにフォールバック。
  */
 import { useState, useCallback } from "react";
-import {
-  clipWebPage,
-  getClipErrorMessage,
-  type ClippedContent,
-} from "@/lib/webClipper";
+import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/webClipper";
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
 import type { ApiClient } from "@/lib/api/apiClient";
 
-export type WebClipperStatus =
-  | "idle"
-  | "fetching"
-  | "extracting"
-  | "completed"
-  | "error";
+export type WebClipperStatus = "idle" | "fetching" | "extracting" | "completed" | "error";
 
 export interface UseWebClipperOptions {
   /** 指定時は POST /api/clip/fetch でサーバー側取得を優先（CORS 回避） */
@@ -35,14 +26,12 @@ export interface UseWebClipperReturn {
 export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipperReturn {
   const { api } = options;
   const [status, setStatus] = useState<WebClipperStatus>("idle");
-  const [clippedContent, setClippedContent] = useState<ClippedContent | null>(
-    null
-  );
+  const [clippedContent, setClippedContent] = useState<ClippedContent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchHtmlFn = useCallback(
     (url: string) => (api ? api.clipFetchHtml(url) : Promise.reject(new Error("No API"))),
-    [api]
+    [api],
   );
 
   const clip = useCallback(
@@ -65,7 +54,7 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
         return null;
       }
     },
-    [api, fetchHtmlFn]
+    [api, fetchHtmlFn],
   );
 
   const reset = useCallback(() => {
@@ -80,7 +69,7 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
     const tiptapDoc = formatClippedContentAsTiptap(
       clippedContent.content,
       clippedContent.sourceUrl,
-      clippedContent.siteName
+      clippedContent.siteName,
     );
 
     return JSON.stringify(tiptapDoc);

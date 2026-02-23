@@ -89,38 +89,34 @@ const Onboarding: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b px-4 py-4">
         <h1 className="text-lg font-semibold">{t("onboarding.title")}</h1>
-        <div className="flex gap-2 mt-2">
+        <div className="mt-2 flex gap-2">
           {STEPS.map((s) => (
             <div
               key={s}
-              className={`h-1 flex-1 rounded-full ${
-                s <= step ? "bg-primary" : "bg-muted"
-              }`}
+              className={`h-1 flex-1 rounded-full ${s <= step ? "bg-primary" : "bg-muted"}`}
               aria-hidden
             />
           ))}
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6">
+      <main className="flex flex-1 flex-col items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
           {/* Step 1: Profile */}
           {step === 1 && (
             <>
-              <div className="text-center space-y-1">
-                <h2 className="text-xl font-medium">
-                  {t("onboarding.profile.heading")}
-                </h2>
+              <div className="space-y-1 text-center">
+                <h2 className="text-xl font-medium">{t("onboarding.profile.heading")}</h2>
                 <p className="text-sm text-muted-foreground">
                   {t("onboarding.profile.description")}
                 </p>
@@ -133,13 +129,13 @@ const Onboarding: React.FC = () => {
                   <Input
                     id="onboarding-displayName"
                     value={profile.displayName}
-                    onChange={(e) =>
-                      updateProfile({ displayName: e.target.value })
-                    }
+                    onChange={(e) => updateProfile({ displayName: e.target.value })}
                     placeholder={t("generalSettings.profile.displayNamePlaceholder")}
                     maxLength={100}
                     aria-invalid={displayNameInvalid}
-                    aria-describedby={displayNameInvalid ? "onboarding-displayName-error" : undefined}
+                    aria-describedby={
+                      displayNameInvalid ? "onboarding-displayName-error" : undefined
+                    }
                   />
                   {displayNameInvalid && (
                     <p
@@ -160,10 +156,7 @@ const Onboarding: React.FC = () => {
                   <Label>{t("generalSettings.profile.avatar")}</Label>
                   <div className="flex items-center gap-4">
                     <Avatar className="h-16 w-16">
-                      <AvatarImage
-                        src={profile.avatarUrl || avatarUrl}
-                        alt={displayName}
-                      />
+                      <AvatarImage src={profile.avatarUrl || avatarUrl} alt={displayName} />
                       <AvatarFallback className="text-lg">
                         {displayName?.charAt(0) ?? "U"}
                       </AvatarFallback>
@@ -205,22 +198,15 @@ const Onboarding: React.FC = () => {
           {/* Step 2: Language */}
           {step === 2 && (
             <>
-              <div className="text-center space-y-1">
-                <h2 className="text-xl font-medium">
-                  {t("onboarding.language.heading")}
-                </h2>
+              <div className="space-y-1 text-center">
+                <h2 className="text-xl font-medium">{t("onboarding.language.heading")}</h2>
                 <p className="text-sm text-muted-foreground">
                   {t("onboarding.language.description")}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label id="onboarding-locale-label">
-                  {t("generalSettings.language.label")}
-                </Label>
-                <Select
-                  value={settings.locale}
-                  onValueChange={(v) => updateLocale(v as UILocale)}
-                >
+                <Label id="onboarding-locale-label">{t("generalSettings.language.label")}</Label>
+                <Select value={settings.locale} onValueChange={(v) => updateLocale(v as UILocale)}>
                   <SelectTrigger
                     id="onboarding-locale"
                     aria-labelledby="onboarding-locale-label"
@@ -243,20 +229,12 @@ const Onboarding: React.FC = () => {
           {/* Step 3: Tour choice */}
           {step === 3 && (
             <>
-              <div className="text-center space-y-1">
-                <h2 className="text-xl font-medium">
-                  {t("onboarding.tour.heading")}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {t("onboarding.tour.description")}
-                </p>
+              <div className="space-y-1 text-center">
+                <h2 className="text-xl font-medium">{t("onboarding.tour.heading")}</h2>
+                <p className="text-sm text-muted-foreground">{t("onboarding.tour.description")}</p>
               </div>
               <div className="flex flex-col gap-3">
-                <Button
-                  onClick={handleCompleteWithTour}
-                  size="lg"
-                  className="w-full"
-                >
+                <Button onClick={handleCompleteWithTour} size="lg" className="w-full">
                   {t("onboarding.tour.startTour")}
                 </Button>
                 <Button

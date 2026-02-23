@@ -14,55 +14,43 @@ import { MatchTypeBadge } from "./MatchTypeBadge";
 import { HighlightedSnippet } from "./HighlightedSnippet";
 
 export function GlobalSearch() {
-  const {
-    query,
-    setQuery,
-    isOpen,
-    open,
-    close,
-    searchResults,
-    hasQuery,
-    handleSelect,
-  } = useGlobalSearchContext();
+  const { query, setQuery, isOpen, open, close, searchResults, hasQuery, handleSelect } =
+    useGlobalSearchContext();
 
   useGlobalSearchShortcut(open);
 
   return (
     <CommandDialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <CommandInput
-        placeholder="ページを検索..."
-        value={query}
-        onValueChange={setQuery}
-      />
+      <CommandInput placeholder="ページを検索..." value={query} onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>ページが見つかりません</CommandEmpty>
 
         {/* Search Results (personal + shared merged, C3-8) */}
         {hasQuery && searchResults.length > 0 && (
           <CommandGroup heading={`検索結果 (${searchResults.length}件)`}>
-            {searchResults.map(({ pageId, noteId, title, highlightedText, matchType, sourceUrl }) => (
-              <CommandItem
-                key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`}
-                value={`search-${pageId}-${title}`}
-                onSelect={() => handleSelect(pageId, noteId)}
-                className="flex flex-col items-start gap-1 py-3"
-              >
-                <div className="flex items-center gap-2 w-full">
-                  {sourceUrl ? (
-                    <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="font-medium truncate flex-1">
-                    {title}
-                  </span>
-                  <MatchTypeBadge type={matchType} />
-                </div>
-                <div className="pl-6 w-full">
-                  <HighlightedSnippet text={highlightedText} />
-                </div>
-              </CommandItem>
-            ))}
+            {searchResults.map(
+              ({ pageId, noteId, title, highlightedText, matchType, sourceUrl }) => (
+                <CommandItem
+                  key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`}
+                  value={`search-${pageId}-${title}`}
+                  onSelect={() => handleSelect(pageId, noteId)}
+                  className="flex flex-col items-start gap-1 py-3"
+                >
+                  <div className="flex w-full items-center gap-2">
+                    {sourceUrl ? (
+                      <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="flex-1 truncate font-medium">{title}</span>
+                    <MatchTypeBadge type={matchType} />
+                  </div>
+                  <div className="w-full pl-6">
+                    <HighlightedSnippet text={highlightedText} />
+                  </div>
+                </CommandItem>
+              ),
+            )}
           </CommandGroup>
         )}
       </CommandList>

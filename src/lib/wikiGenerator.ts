@@ -174,7 +174,7 @@ async function generateWithOpenAI(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new OpenAI({
     apiKey: settings.apiKey,
@@ -187,9 +187,7 @@ async function generateWithOpenAI(
   const isSearchModel = settings.model.includes("search");
 
   // Web検索対応モデルの場合、web_search_optionsを追加
-  const webSearchOptions = isSearchModel
-    ? { search_context_size: "medium" as const }
-    : undefined;
+  const webSearchOptions = isSearchModel ? { search_context_size: "medium" as const } : undefined;
 
   const stream = await client.chat.completions.create(
     {
@@ -200,7 +198,7 @@ async function generateWithOpenAI(
       stream: true,
       web_search_options: webSearchOptions,
     },
-    { signal: abortSignal }
+    { signal: abortSignal },
   );
 
   let fullContent = "";
@@ -235,9 +233,7 @@ function isClaudeWebSearchSupported(model: string): boolean {
     "claude-haiku-3.5",
     "claude-3-5-haiku",
   ];
-  return supportedPatterns.some((pattern) =>
-    model.toLowerCase().includes(pattern.toLowerCase())
-  );
+  return supportedPatterns.some((pattern) => model.toLowerCase().includes(pattern.toLowerCase()));
 }
 
 /**
@@ -247,7 +243,7 @@ async function generateWithAnthropic(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new Anthropic({
     apiKey: settings.apiKey,
@@ -285,10 +281,7 @@ async function generateWithAnthropic(
       throw new Error("ABORTED");
     }
 
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
       const content = event.delta.text;
       fullContent += content;
       callbacks.onChunk(content);
@@ -307,7 +300,7 @@ async function generateWithGoogle(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   // 新しい @google/genai SDK を使用
   const client = new GoogleGenAI({ apiKey: settings.apiKey });
@@ -357,7 +350,7 @@ async function generateWithGoogle(
 export async function generateWikiContentStream(
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   try {
     const settings = await getAISettingsOrThrow();
@@ -396,7 +389,7 @@ export async function generateWikiContentStream(
             callbacks.onError(error);
           },
         },
-        abortSignal
+        abortSignal,
       );
       return;
     }

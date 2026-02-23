@@ -46,14 +46,14 @@ export class StorageAdapterPageRepository {
   constructor(
     private adapter: StorageAdapter,
     private api: ApiClient,
-    private userId: string
+    private userId: string,
   ) {}
 
   async createPage(
     userId: string,
     title: string = "",
     content: string = "",
-    options?: CreatePageOptions
+    options?: CreatePageOptions,
   ): Promise<Page> {
     const contentPreview = getPageListPreview(content);
     const now = Date.now();
@@ -131,15 +131,13 @@ export class StorageAdapterPageRepository {
   async checkDuplicateTitle(
     userId: string,
     title: string,
-    excludePageId?: string
+    excludePageId?: string,
   ): Promise<Page | null> {
     const trimmed = title.trim();
     if (!trimmed) return null;
     const list = await this.adapter.getAllPages();
     const m = list.find(
-      (p) =>
-        (p.title ?? "").trim() === trimmed &&
-        (!excludePageId || p.id !== excludePageId)
+      (p) => (p.title ?? "").trim() === trimmed && (!excludePageId || p.id !== excludePageId),
     );
     return m ? metadataToPage(m) : null;
   }
@@ -147,7 +145,7 @@ export class StorageAdapterPageRepository {
   async updatePage(
     userId: string,
     pageId: string,
-    updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>
+    updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>,
   ): Promise<void> {
     const existing = await this.adapter.getPage(pageId);
     if (!existing) return;
@@ -160,22 +158,15 @@ export class StorageAdapterPageRepository {
           ? getPageListPreview(updates.content)
           : existing.contentPreview,
       thumbnailUrl:
-        updates.thumbnailUrl !== undefined
-          ? updates.thumbnailUrl
-          : existing.thumbnailUrl,
-      sourceUrl:
-        updates.sourceUrl !== undefined
-          ? updates.sourceUrl
-          : existing.sourceUrl,
+        updates.thumbnailUrl !== undefined ? updates.thumbnailUrl : existing.thumbnailUrl,
+      sourceUrl: updates.sourceUrl !== undefined ? updates.sourceUrl : existing.sourceUrl,
       updatedAt: now,
     };
     await this.adapter.upsertPage(meta);
     // タイトルまたはコンテンツが変更された場合、検索インデックスを更新
     if (updates.title !== undefined || updates.content !== undefined) {
       const titleText = meta.title ?? "";
-      const contentText = updates.content
-        ? extractPlainText(updates.content)
-        : "";
+      const contentText = updates.content ? extractPlainText(updates.content) : "";
       const searchText = [titleText, contentText].filter(Boolean).join(" ");
       await this.adapter.updateSearchIndex(pageId, searchText);
     }
@@ -202,17 +193,14 @@ export class StorageAdapterPageRepository {
     const links = await this.adapter.getLinks(sourceId);
     const now = Date.now();
     if (links.some((l) => l.targetId === targetId)) return;
-    await this.adapter.saveLinks(sourceId, [
-      ...links,
-      { sourceId, targetId, createdAt: now },
-    ]);
+    await this.adapter.saveLinks(sourceId, [...links, { sourceId, targetId, createdAt: now }]);
   }
 
   async removeLink(sourceId: string, targetId: string): Promise<void> {
     const links = await this.adapter.getLinks(sourceId);
     await this.adapter.saveLinks(
       sourceId,
-      links.filter((l) => l.targetId !== targetId)
+      links.filter((l) => l.targetId !== targetId),
     );
   }
 
@@ -250,7 +238,7 @@ export class StorageAdapterPageRepository {
     const ghosts = await this.adapter.getGhostLinks(sourcePageId);
     await this.adapter.saveGhostLinks(
       sourcePageId,
-      ghosts.filter((g) => g.linkText !== linkText)
+      ghosts.filter((g) => g.linkText !== linkText),
     );
   }
 
@@ -274,7 +262,7 @@ export class StorageAdapterPageRepository {
           linkText: g.linkText,
           sourcePageId: g.sourcePageId,
           createdAt: g.createdAt,
-        }))
+        })),
       );
     }
     return all;

@@ -53,7 +53,7 @@ describe("LinkedPagesSection", () => {
     return render(
       <TestWrapper queryClient={queryClient}>
         <LinkedPagesSection pageId="test-page-id" />
-      </TestWrapper>
+      </TestWrapper>,
     );
   };
 

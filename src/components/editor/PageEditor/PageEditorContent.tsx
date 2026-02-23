@@ -66,8 +66,9 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   }, []);
 
   // local モード（個人ページ）は awareness 不要。collaborative モードのみ awareness 必須。
-  const useCollaborationMode =
-    Boolean(collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.collaborationUser);
+  const useCollaborationMode = Boolean(
+    collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.collaborationUser,
+  );
 
   const collaborationConfig =
     useCollaborationMode && collaboration
@@ -82,55 +83,55 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
       : undefined;
 
   return (
-    <main className="flex-1 pt-6 pb-32">
+    <main className="flex-1 pb-32 pt-6">
       <Container>
-          {/* ページタイトル（コンテンツ上部） */}
-          <PageTitleBlock
-            title={title}
-            onTitleChange={onTitleChange}
-            isReadOnly={isEditorReadOnly}
-            errorMessage={errorMessage}
-            onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
-          />
-          {/* Source URL Badge - クリップしたページの場合に表示 */}
-          {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
+        {/* ページタイトル（コンテンツ上部） */}
+        <PageTitleBlock
+          title={title}
+          onTitleChange={onTitleChange}
+          isReadOnly={isEditorReadOnly}
+          errorMessage={errorMessage}
+          onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
+        />
+        {/* Source URL Badge - クリップしたページの場合に表示 */}
+        {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
 
-          {/* エディター（生成中はオーバーレイを表示） */}
-          <div className="relative">
-            {collaboration && !useCollaborationMode && (
-              <div className="flex items-center justify-center min-h-[200px] text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="ml-2">リアルタイム編集を準備中...</span>
-              </div>
-            )}
-            {(useCollaborationMode || !collaboration) && (
-              <>
-                {isWikiGenerating && (
-                  <div className="absolute inset-0 bg-background/30 pointer-events-none z-10 rounded-md" />
-                )}
-                <TiptapEditor
-                  content={content}
-                  onChange={onContentChange}
-                  autoFocus={isNewPage}
-                  className="min-h-[calc(100vh-200px)]"
-                  pageId={currentPageId || pageId || undefined}
-                  pageTitle={title}
-                  isReadOnly={isEditorReadOnly}
-                  showToolbar={showToolbar}
-                  onContentError={onContentError}
-                  collaborationConfig={collaborationConfig}
-                  focusContentRef={contentFocusRef}
-                  initialContent={initialContent}
-                  onInitialContentApplied={onInitialContentApplied}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Linked Pages Section */}
-          {showLinkedPages && currentPageId && (
-            <LinkedPagesSection pageId={currentPageId} isSyncingLinks={isSyncingLinks} />
+        {/* エディター（生成中はオーバーレイを表示） */}
+        <div className="relative">
+          {collaboration && !useCollaborationMode && (
+            <div className="flex min-h-[200px] items-center justify-center text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">リアルタイム編集を準備中...</span>
+            </div>
           )}
+          {(useCollaborationMode || !collaboration) && (
+            <>
+              {isWikiGenerating && (
+                <div className="pointer-events-none absolute inset-0 z-10 rounded-md bg-background/30" />
+              )}
+              <TiptapEditor
+                content={content}
+                onChange={onContentChange}
+                autoFocus={isNewPage}
+                className="min-h-[calc(100vh-200px)]"
+                pageId={currentPageId || pageId || undefined}
+                pageTitle={title}
+                isReadOnly={isEditorReadOnly}
+                showToolbar={showToolbar}
+                onContentError={onContentError}
+                collaborationConfig={collaborationConfig}
+                focusContentRef={contentFocusRef}
+                initialContent={initialContent}
+                onInitialContentApplied={onInitialContentApplied}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Linked Pages Section */}
+        {showLinkedPages && currentPageId && (
+          <LinkedPagesSection pageId={currentPageId} isSyncingLinks={isSyncingLinks} />
+        )}
       </Container>
     </main>
   );

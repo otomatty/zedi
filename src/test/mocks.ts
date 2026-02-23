@@ -31,10 +31,8 @@ export function mockAuth(options?: { isSignedIn?: boolean }) {
           }
         : null,
     }),
-    SignedIn: ({ children }: { children: ReactNode }) =>
-      isSignedIn ? children : null,
-    SignedOut: ({ children }: { children: ReactNode }) =>
-      !isSignedIn ? children : null,
+    SignedIn: ({ children }: { children: ReactNode }) => (isSignedIn ? children : null),
+    SignedOut: ({ children }: { children: ReactNode }) => (!isSignedIn ? children : null),
   }));
 }
 

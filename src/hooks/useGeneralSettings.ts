@@ -10,10 +10,7 @@ import {
   UILocale,
   FONT_SIZE_OPTIONS,
 } from "@/types/generalSettings";
-import {
-  loadGeneralSettings,
-  saveGeneralSettings,
-} from "@/lib/generalSettings";
+import { loadGeneralSettings, saveGeneralSettings } from "@/lib/generalSettings";
 import { useTranslation } from "react-i18next";
 
 interface UseGeneralSettingsReturn {
@@ -29,9 +26,7 @@ interface UseGeneralSettingsReturn {
 }
 
 export function useGeneralSettings(): UseGeneralSettingsReturn {
-  const [settings, setSettings] = useState<GeneralSettings>(
-    () => loadGeneralSettings()
-  );
+  const [settings, setSettings] = useState<GeneralSettings>(() => loadGeneralSettings());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { setTheme } = useTheme();

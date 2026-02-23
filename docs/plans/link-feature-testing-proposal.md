@@ -19,21 +19,21 @@
 
 ### 2.1 実装済みのテスト（変更なし）
 
-| 対象 | ファイル | 内容 |
-|------|----------|------|
-| リンク計算（純粋関数） | `src/hooks/useLinkedPages.test.ts` | `pageToCard`、`calculateLinkedPages` をテスト。Tiptap コンテンツから outgoing/backlinks/ghost/2-hop の算出のみ。**リポジトリ・sync は一切使わない**。 |
-| リンク一覧 UI | `src/components/page/LinkedPagesSection.test.tsx` | `useLinkedPages` と `useCreatePage` をモックし、渡された `LinkedPagesData` の表示・クリック動作をテスト。**データ取得・sync はテストしない**。 |
+| 対象                   | ファイル                                          | 内容                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| リンク計算（純粋関数） | `src/hooks/useLinkedPages.test.ts`                | `pageToCard`、`calculateLinkedPages` をテスト。Tiptap コンテンツから outgoing/backlinks/ghost/2-hop の算出のみ。**リポジトリ・sync は一切使わない**。 |
+| リンク一覧 UI          | `src/components/page/LinkedPagesSection.test.tsx` | `useLinkedPages` と `useCreatePage` をモックし、渡された `LinkedPagesData` の表示・クリック動作をテスト。**データ取得・sync はテストしない**。        |
 
 ### 2.2 テスト用ヘルパー（削除・変更済み）
 
-| ファイル | 変更内容 |
-|----------|----------|
+| ファイル                   | 変更内容                                                                                                                                                                                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/test/testDatabase.ts` | **libSQL 依存を削除**。`createTestClient`、`createTestRepository`、`insertTestPage`、`insertTestLink`、`insertTestGhostLink`、`clearTestDatabase`、`TestPageData` は**削除済み**。残っているのは **`createWikiLinkContent`** と **`createPlainTextContent`** のみ（`useLinkedPages.test.ts` で使用）。 |
 
 ### 2.3 削除したテスト
 
-| テスト | ファイル | 削除理由 |
-|--------|----------|----------|
+| テスト                                              | ファイル                                | 削除理由                                                                                                                                                           |
+| --------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **PageRepository のリンク／ゴースト操作**（旧 3.1） | `src/test/pageRepository.links.test.ts` | 本番未使用の **PageRepository クラス（libSQL 版）** および **libSQL** をコードベースから削除したため、このテストの対象が存在しなくなった。テストファイルごと削除。 |
 
 ### 2.4 テストされていない部分（現状）
@@ -124,26 +124,26 @@
 
 ## 4. 実装状況サマリ
 
-| 項目 | ステータス | 備考 |
-|------|------------|------|
+| 項目                                      | ステータス   | 備考                                                                                                           |
+| ----------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------- |
 | **3.1 PageRepository のリンク／ゴースト** | **削除済み** | テストファイル `pageRepository.links.test.ts` を削除。対象の PageRepository クラスはコードベースから削除済み。 |
-| **3.2 syncLinks の差分同期** | **実装済み** | `src/lib/syncWikiLinks.ts` + `src/hooks/useSyncWikiLinks.test.ts`。 |
-| **3.3 calculateLinkedPagesOptimized** | **実装済み** | `useLinkedPages.test.ts` に describe 追加。 |
-| **3.4 useEditorAutoSave と sync 連携** | **実装済み** | `src/components/editor/PageEditor/useEditorAutoSave.test.ts`。 |
-| **3.5 保存成功時の invalidate** | **実装済み** | useEditorAutoSave.test.ts で onSaveSuccess 内の invalidateQueries を検証。 |
-| **3.6 useLinkedPages 統合** | **未実装** | モック repo で実施可能（createTestRepository は利用不可）。 |
+| **3.2 syncLinks の差分同期**              | **実装済み** | `src/lib/syncWikiLinks.ts` + `src/hooks/useSyncWikiLinks.test.ts`。                                            |
+| **3.3 calculateLinkedPagesOptimized**     | **実装済み** | `useLinkedPages.test.ts` に describe 追加。                                                                    |
+| **3.4 useEditorAutoSave と sync 連携**    | **実装済み** | `src/components/editor/PageEditor/useEditorAutoSave.test.ts`。                                                 |
+| **3.5 保存成功時の invalidate**           | **実装済み** | useEditorAutoSave.test.ts で onSaveSuccess 内の invalidateQueries を検証。                                     |
+| **3.6 useLinkedPages 統合**               | **未実装**   | モック repo で実施可能（createTestRepository は利用不可）。                                                    |
 
 ---
 
 ## 5. 実装優先度と順序（今後の作業用）
 
-| 優先度 | 項目 | 理由 |
-|--------|------|------|
-| 1 | syncLinks の差分同期（3.2） | 保存時の挙動の要。モック repo で十分テスト可能。 |
-| 2 | calculateLinkedPagesOptimized（3.3） | 既存の useLinkedPages.test.ts の延長で足せる。 |
-| 3 | useEditorAutoSave と sync 連携（3.4） | 保存フローと sync の接続点を保証。 |
-| 4 | 保存成功時の invalidate（3.5） | 小さな仕様の明文化。 |
-| 5 | useLinkedPages 統合（3.6） | 必要なら後から追加。 |
+| 優先度 | 項目                                  | 理由                                             |
+| ------ | ------------------------------------- | ------------------------------------------------ |
+| 1      | syncLinks の差分同期（3.2）           | 保存時の挙動の要。モック repo で十分テスト可能。 |
+| 2      | calculateLinkedPagesOptimized（3.3）  | 既存の useLinkedPages.test.ts の延長で足せる。   |
+| 3      | useEditorAutoSave と sync 連携（3.4） | 保存フローと sync の接続点を保証。               |
+| 4      | 保存成功時の invalidate（3.5）        | 小さな仕様の明文化。                             |
+| 5      | useLinkedPages 統合（3.6）            | 必要なら後から追加。                             |
 
 ---
 

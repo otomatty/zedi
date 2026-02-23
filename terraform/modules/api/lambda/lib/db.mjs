@@ -45,9 +45,7 @@ function toParameter(name, value) {
   // Help RDS Data API bind UUID values correctly so "uuid = :param" works.
   // Params that are TEXT columns (or CSV strings) must not get UUID typeHint or we get "text = uuid".
   const isKnownTextParam =
-    name === "link_text" ||
-    name === "page_ids_csv" ||
-    name === "cognito_sub"; // users.cognito_sub is TEXT; Cognito sub is often UUID-shaped
+    name === "link_text" || name === "page_ids_csv" || name === "cognito_sub"; // users.cognito_sub is TEXT; Cognito sub is often UUID-shaped
   if (isUuidString(value) && !isKnownTextParam) {
     param.typeHint = "UUID";
   }
@@ -109,10 +107,7 @@ export async function execute(sql, params = {}) {
       if (debugLabel && params) {
         console.error("[DB_DEBUG] params (sanitized)", {
           ...Object.fromEntries(
-            Object.entries(params).map(([k, v]) => [
-              k,
-              v == null ? null : String(v).slice(0, 80),
-            ])
+            Object.entries(params).map(([k, v]) => [k, v == null ? null : String(v).slice(0, 80)]),
           ),
         });
       }

@@ -34,6 +34,7 @@
      `name`（FQDN）と `value` が Cloudflare に登録する CNAME の「名前」「ターゲット」に対応。Cloudflare では「名前」は FQDN からドメインを除いた部分（例: `_abc123.zedi-note.app` → 名前は `_abc123`）。
    - **B) AWS CLI**  
      証明書は **us-east-1** にあるため `--region us-east-1` を指定する:
+
      ```bash
      # 証明書 ARN を調べる（zedi-note.app のドメインのもの）
      aws acm list-certificates --region us-east-1 --query "CertificateSummaryList[?DomainName=='zedi-note.app'].CertificateArn" --output text
@@ -42,8 +43,11 @@
      aws acm describe-certificate --certificate-arn <上記のARN> --region us-east-1 \
        --query "Certificate.DomainValidationOptions[0].ResourceRecord" --output table
      ```
+
      `Name` が CNAME の名前、`Value` がターゲット。Cloudflare に「CNAME」タイプで 1 件追加（プロキシ: **DNS のみ**）。
+
    - 証明書が「発行済み」になるのを待つ。
+
 2. **カスタムドメインの付与**
    - `prod.tfvars` で `cdn_attach_custom_domain = true` に変更し、`terraform apply` で CloudFront に ACM と aliases（zedi-note.app, www.zedi-note.app）を付与。
 3. **Cloudflare で本番 CNAME**
@@ -53,7 +57,7 @@
 
 - **追加:** `.github/workflows/deploy-frontend.yml`
 - **トリガー:** main への push（パス: `src/`, `public/`, `index.html`, `vite.config.ts`, `package.json`, `package-lock.json`）、または `workflow_dispatch`
-- **手順:** チェックアウト → Bun セットアップ → 依存関係インストール → 本番用 VITE_* を Secrets から渡して `bun run build` → `aws s3 sync dist/` → CloudFront invalidation
+- **手順:** チェックアウト → Bun セットアップ → 依存関係インストール → 本番用 VITE\_\* を Secrets から渡して `bun run build` → `aws s3 sync dist/` → CloudFront invalidation
 - **必要な GitHub Secrets:** プラン文書およびワークフロー内コメントを参照。少なくとも:
   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
   - `PROD_FRONTEND_S3_BUCKET`（例: zedi-prod-frontend-590183877893）

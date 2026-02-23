@@ -9,12 +9,7 @@ interface LinkSectionProps {
   onPageClick: (pageId: string) => void;
 }
 
-export function LinkSection({
-  title,
-  icon,
-  pages,
-  onPageClick,
-}: LinkSectionProps) {
+export function LinkSection({ title, icon, pages, onPageClick }: LinkSectionProps) {
   if (pages.length === 0) return null;
 
   return (
@@ -27,13 +22,9 @@ export function LinkSection({
           </span>
         </div>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {pages.map((page) => (
-          <PageLinkCard
-            key={page.id}
-            page={page}
-            onClick={() => onPageClick(page.id)}
-          />
+          <PageLinkCard key={page.id} page={page} onClick={() => onPageClick(page.id)} />
         ))}
       </div>
     </div>

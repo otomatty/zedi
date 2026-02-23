@@ -214,12 +214,8 @@ export async function clipWebPage(url: string): Promise<ClippedContent> {
   const doc = parser.parseFromString(html, "text/html");
 
   // 3. OGP 情報を抽出
-  const ogTitle = doc
-    .querySelector('meta[property="og:title"]')
-    ?.getAttribute("content");
-  const ogImage = doc
-    .querySelector('meta[property="og:image"]')
-    ?.getAttribute("content");
+  const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute("content");
+  const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute("content");
   const ogDescription = doc
     .querySelector('meta[property="og:description"]')
     ?.getAttribute("content");

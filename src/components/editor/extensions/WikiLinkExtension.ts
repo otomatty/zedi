@@ -14,10 +14,7 @@ export interface WikiLinkOptions {
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     wikiLink: {
-      setWikiLink: (attributes: {
-        title: string;
-        exists: boolean;
-      }) => ReturnType;
+      setWikiLink: (attributes: { title: string; exists: boolean }) => ReturnType;
       unsetWikiLink: () => ReturnType;
     };
   }
@@ -53,8 +50,7 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
       },
       referenced: {
         default: false,
-        parseHTML: (element) =>
-          element.getAttribute("data-referenced") === "true",
+        parseHTML: (element) => element.getAttribute("data-referenced") === "true",
         renderHTML: (attributes) => ({
           "data-referenced": String(attributes.referenced),
         }),
@@ -72,11 +68,9 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
 
   renderHTML({ HTMLAttributes }) {
     const exists =
-      HTMLAttributes["data-exists"] === "true" ||
-      HTMLAttributes["data-exists"] === true;
+      HTMLAttributes["data-exists"] === "true" || HTMLAttributes["data-exists"] === true;
     const referenced =
-      HTMLAttributes["data-referenced"] === "true" ||
-      HTMLAttributes["data-referenced"] === true;
+      HTMLAttributes["data-referenced"] === "true" || HTMLAttributes["data-referenced"] === true;
 
     // Determine CSS class based on link status
     let className = "wiki-link";
@@ -113,14 +107,11 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
             const target = event.target as HTMLElement;
 
             // Check if clicked on a wiki-link element
-            const wikiLinkElement = target.closest(
-              "[data-wiki-link]"
-            ) as HTMLElement | null;
+            const wikiLinkElement = target.closest("[data-wiki-link]") as HTMLElement | null;
             if (!wikiLinkElement) return false;
 
             const title = wikiLinkElement.getAttribute("data-title");
-            const exists =
-              wikiLinkElement.getAttribute("data-exists") === "true";
+            const exists = wikiLinkElement.getAttribute("data-exists") === "true";
 
             if (title) {
               event.preventDefault();

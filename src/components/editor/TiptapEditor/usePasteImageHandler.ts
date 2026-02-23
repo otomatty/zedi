@@ -6,10 +6,7 @@ interface UsePasteImageHandlerParams {
   handleImageUpload: (files: FileList | File[]) => void;
 }
 
-export function usePasteImageHandler({
-  editor,
-  handleImageUpload,
-}: UsePasteImageHandlerParams) {
+export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImageHandlerParams) {
   useEffect(() => {
     if (!editor) return;
 
@@ -18,9 +15,7 @@ export function usePasteImageHandler({
       const text = event.clipboardData?.getData("text/plain");
 
       if (items) {
-        const imageItems = Array.from(items).filter((item) =>
-          item.type.startsWith("image/")
-        );
+        const imageItems = Array.from(items).filter((item) => item.type.startsWith("image/"));
 
         if (imageItems.length > 0) {
           event.preventDefault();

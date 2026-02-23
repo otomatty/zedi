@@ -1,9 +1,9 @@
-import { useTranslation } from 'react-i18next';
-import { useAIChatStore } from '../../../stores/aiChatStore';
-import { useAIChatContext } from '../../../contexts/AIChatContext';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { loadAISettings } from '../../../lib/aiSettings';
-import { Sparkles } from 'lucide-react';
+import { useTranslation } from "react-i18next";
+import { useAIChatStore } from "../../../stores/aiChatStore";
+import { useAIChatContext } from "../../../contexts/AIChatContext";
+import { useNavigate, useLocation } from "react-router-dom";
+import { loadAISettings } from "../../../lib/aiSettings";
+import { Sparkles } from "lucide-react";
 
 export function AIChatButton() {
   const { t } = useTranslation();
@@ -29,16 +29,16 @@ export function AIChatButton() {
   return (
     <button
       onClick={handleClick}
-      className={`group relative flex items-center gap-1.5 px-3 py-2 rounded-md transition-all duration-300 ${
+      className={`group relative flex items-center gap-1.5 rounded-md px-3 py-2 transition-all duration-300 ${
         isOpen
-          ? 'bg-gradient-to-r from-violet-500 via-fuchsia-500 to-blue-500 text-white shadow-sm'
-          : 'hover:bg-accent/50 text-muted-foreground hover:text-foreground'
+          ? "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-blue-500 text-white shadow-sm"
+          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
       }`}
-      title={`${t('aiChat.title')} (Ctrl+Shift+A)`}
+      title={`${t("aiChat.title")} (Ctrl+Shift+A)`}
     >
       {/* ホバー時の背景グロー効果 (開いていない時のみ) */}
       {!isOpen && (
-        <div className="absolute inset-0 rounded-md bg-gradient-to-r from-violet-500 via-fuchsia-500 to-blue-500 opacity-0 group-hover:opacity-10 blur transition-opacity duration-500" />
+        <div className="absolute inset-0 rounded-md bg-gradient-to-r from-violet-500 via-fuchsia-500 to-blue-500 opacity-0 blur transition-opacity duration-500 group-hover:opacity-10" />
       )}
 
       {/* グラデーションの定義だけを行う非表示のSVG (開いていない時のみ使用) */}
@@ -47,13 +47,28 @@ export function AIChatButton() {
           <defs>
             <linearGradient id="ai-sparkle-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#8B5CF6">
-                <animate attributeName="stop-color" values="#8B5CF6;#EC4899;#3B82F6;#8B5CF6" dur="4s" repeatCount="indefinite" />
+                <animate
+                  attributeName="stop-color"
+                  values="#8B5CF6;#EC4899;#3B82F6;#8B5CF6"
+                  dur="4s"
+                  repeatCount="indefinite"
+                />
               </stop>
               <stop offset="50%" stopColor="#EC4899">
-                <animate attributeName="stop-color" values="#EC4899;#3B82F6;#8B5CF6;#EC4899" dur="4s" repeatCount="indefinite" />
+                <animate
+                  attributeName="stop-color"
+                  values="#EC4899;#3B82F6;#8B5CF6;#EC4899"
+                  dur="4s"
+                  repeatCount="indefinite"
+                />
               </stop>
               <stop offset="100%" stopColor="#3B82F6">
-                <animate attributeName="stop-color" values="#3B82F6;#8B5CF6;#EC4899;#3B82F6" dur="4s" repeatCount="indefinite" />
+                <animate
+                  attributeName="stop-color"
+                  values="#3B82F6;#8B5CF6;#EC4899;#3B82F6"
+                  dur="4s"
+                  repeatCount="indefinite"
+                />
               </stop>
             </linearGradient>
           </defs>
@@ -61,11 +76,11 @@ export function AIChatButton() {
       )}
 
       <Sparkles
-        className={`relative w-6 h-6 ${isStreaming ? 'animate-pulse' : ''}`}
-        style={isOpen ? { stroke: 'currentColor' } : { stroke: 'url(#ai-sparkle-gradient)' }}
+        className={`relative h-6 w-6 ${isStreaming ? "animate-pulse" : ""}`}
+        style={isOpen ? { stroke: "currentColor" } : { stroke: "url(#ai-sparkle-gradient)" }}
         aria-hidden="true"
       />
-      <span className="relative font-medium text-md">AI</span>
+      <span className="text-md relative font-medium">AI</span>
     </button>
   );
 }

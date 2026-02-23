@@ -1,11 +1,5 @@
 import React, { useMemo } from "react";
-import Joyride, {
-  CallBackProps,
-  STATUS,
-  EVENTS,
-  ACTIONS,
-  Step,
-} from "react-joyride";
+import Joyride, { CallBackProps, STATUS, EVENTS, ACTIONS, Step } from "react-joyride";
 import { useTranslation } from "react-i18next";
 
 export interface QuickTourProps {
@@ -14,10 +8,10 @@ export interface QuickTourProps {
 }
 
 const STEP_TARGETS: (string | undefined)[] = [
-  "[data-tour-id=\"tour-home-page-grid\"]",
-  "[data-tour-id=\"tour-apps-menu\"]",
+  '[data-tour-id="tour-home-page-grid"]',
+  '[data-tour-id="tour-apps-menu"]',
   "body",
-  "[data-tour-id=\"tour-fab\"]",
+  '[data-tour-id="tour-fab"]',
   "body",
   "body",
 ];
@@ -57,7 +51,7 @@ export const QuickTour: React.FC<QuickTourProps> = ({ run, onComplete }) => {
       next: t("tour.buttons.next"),
       skip: t("tour.buttons.skip"),
     }),
-    [t]
+    [t],
   );
 
   if (!run) return null;

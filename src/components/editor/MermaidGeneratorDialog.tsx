@@ -35,19 +35,10 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   onInsert,
 }) => {
   const navigate = useNavigate();
-  const {
-    status,
-    result,
-    error,
-    isAIConfigured,
-    generate,
-    reset,
-    checkAIConfigured,
-  } = useMermaidGenerator();
+  const { status, result, error, isAIConfigured, generate, reset, checkAIConfigured } =
+    useMermaidGenerator();
 
-  const [selectedTypes, setSelectedTypes] = useState<MermaidDiagramType[]>([
-    "flowchart",
-  ]);
+  const [selectedTypes, setSelectedTypes] = useState<MermaidDiagramType[]>(["flowchart"]);
   const [previewSvg, setPreviewSvg] = useState<string>("");
   const [previewError, setPreviewError] = useState<string | null>(null);
 
@@ -73,9 +64,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
           setPreviewSvg(svg);
           setPreviewError(null);
         } catch (err) {
-          setPreviewError(
-            err instanceof Error ? err.message : "プレビューエラー"
-          );
+          setPreviewError(err instanceof Error ? err.message : "プレビューエラー");
           setPreviewSvg("");
         }
       }
@@ -86,7 +75,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
 
   const handleTypeToggle = (type: MermaidDiagramType) => {
     setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
     );
   };
 
@@ -130,7 +119,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
               キャンセル
             </Button>
             <Button onClick={handleGoToSettings}>
-              <Settings className="h-4 w-4 mr-2" />
+              <Settings className="mr-2 h-4 w-4" />
               設定画面へ
             </Button>
           </DialogFooter>
@@ -141,18 +130,16 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
+      <DialogContent className="max-h-[80vh] max-w-2xl overflow-auto">
         <DialogHeader>
           <DialogTitle>Mermaidダイアグラムを生成</DialogTitle>
-          <DialogDescription>
-            選択したテキストからダイアグラムを生成します。
-          </DialogDescription>
+          <DialogDescription>選択したテキストからダイアグラムを生成します。</DialogDescription>
         </DialogHeader>
 
         {/* 選択されたテキスト */}
         <div className="space-y-2">
           <Label>選択されたテキスト</Label>
-          <div className="p-3 bg-muted rounded-md text-sm max-h-24 overflow-auto">
+          <div className="max-h-24 overflow-auto rounded-md bg-muted p-3 text-sm">
             {selectedText}
           </div>
         </div>
@@ -164,7 +151,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
             {DIAGRAM_TYPES.map((type) => (
               <div
                 key={type.id}
-                className="flex items-start space-x-2 p-2 rounded border hover:bg-muted/50 cursor-pointer"
+                className="flex cursor-pointer items-start space-x-2 rounded border p-2 hover:bg-muted/50"
                 onClick={() => handleTypeToggle(type.id)}
               >
                 <Checkbox
@@ -173,15 +160,10 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
                   onCheckedChange={() => handleTypeToggle(type.id)}
                 />
                 <div className="flex-1">
-                  <Label
-                    htmlFor={type.id}
-                    className="text-sm font-medium cursor-pointer"
-                  >
+                  <Label htmlFor={type.id} className="cursor-pointer text-sm font-medium">
                     {type.name}
                   </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {type.description}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{type.description}</p>
                 </div>
               </div>
             ))}
@@ -190,33 +172,24 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
 
         {/* 生成ボタン / 生成中表示 */}
         {status === "idle" && (
-          <Button
-            onClick={handleGenerate}
-            disabled={selectedTypes.length === 0}
-            className="w-full"
-          >
+          <Button onClick={handleGenerate} disabled={selectedTypes.length === 0} className="w-full">
             ダイアグラムを生成
           </Button>
         )}
 
         {status === "generating" && (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <Loader2 className="mr-2 h-6 w-6 animate-spin" />
             <span>生成中...</span>
           </div>
         )}
 
         {/* エラー表示 */}
         {status === "error" && error && (
-          <div className="p-4 bg-destructive/10 text-destructive rounded-md">
+          <div className="rounded-md bg-destructive/10 p-4 text-destructive">
             <p className="font-medium">エラーが発生しました</p>
             <p className="text-sm">{error.message}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerate}
-              className="mt-2"
-            >
+            <Button variant="outline" size="sm" onClick={handleGenerate} className="mt-2">
               再試行
             </Button>
           </div>
@@ -227,7 +200,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>生成されたコード</Label>
-              <pre className="p-3 bg-muted rounded-md text-sm overflow-auto max-h-32 font-mono">
+              <pre className="max-h-32 overflow-auto rounded-md bg-muted p-3 font-mono text-sm">
                 {result.code}
               </pre>
             </div>
@@ -235,12 +208,12 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
             <div className="space-y-2">
               <Label>プレビュー</Label>
               {previewError ? (
-                <div className="p-4 bg-destructive/10 text-destructive rounded-md text-sm">
+                <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
                   {previewError}
                 </div>
               ) : previewSvg ? (
                 <div
-                  className="p-4 bg-white dark:bg-gray-900 rounded-md border flex justify-center overflow-auto"
+                  className="flex justify-center overflow-auto rounded-md border bg-white p-4 dark:bg-gray-900"
                   dangerouslySetInnerHTML={{ __html: previewSvg }}
                 />
               ) : (

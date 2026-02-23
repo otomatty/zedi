@@ -4,18 +4,22 @@
  * 未ログイン時は local-user で IndexedDB のみ使用（Aurora 同期なし）。
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { CollaborationManager } from '@/lib/collaboration/CollaborationManager';
-import type { CollaborationState, UseCollaborationOptions, UseCollaborationReturn } from '@/lib/collaboration/types';
-import { getUserColor } from '@/lib/collaboration/types';
-import { useAuth, useUser } from '@/hooks/useAuth';
-import type * as Y from 'yjs';
-import type { Awareness } from 'y-protocols/awareness';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { CollaborationManager } from "@/lib/collaboration/CollaborationManager";
+import type {
+  CollaborationState,
+  UseCollaborationOptions,
+  UseCollaborationReturn,
+} from "@/lib/collaboration/types";
+import { getUserColor } from "@/lib/collaboration/types";
+import { useAuth, useUser } from "@/hooks/useAuth";
+import type * as Y from "yjs";
+import type { Awareness } from "y-protocols/awareness";
 
-const LOCAL_USER_ID = 'local-user';
+const LOCAL_USER_ID = "local-user";
 
 const initialState: CollaborationState = {
-  status: 'connecting',
+  status: "connecting",
   isSynced: false,
   onlineUsers: [],
   pendingChanges: 0,
@@ -36,7 +40,7 @@ const initialState: CollaborationState = {
 export function useCollaboration({
   pageId,
   enabled = true,
-  mode = 'local',
+  mode = "local",
 }: UseCollaborationOptions): UseCollaborationReturn {
   const { userId, getToken, isSignedIn } = useAuth();
   const { user } = useUser();
@@ -48,11 +52,11 @@ export function useCollaboration({
   // Manager初期化（ゲスト時も local モードで IndexedDB のみ有効）
   useEffect(() => {
     if (!enabled || !pageId) {
-      setState(prev => ({ ...prev, status: 'disconnected' }));
+      setState((prev) => ({ ...prev, status: "disconnected" }));
       return;
     }
 
-    const userName = (isSignedIn && user) ? (user.fullName || user.firstName || 'Anonymous') : 'Guest';
+    const userName = isSignedIn && user ? user.fullName || user.firstName || "Anonymous" : "Guest";
 
     const manager = new CollaborationManager(
       pageId,
@@ -63,11 +67,11 @@ export function useCollaboration({
           const token = await getToken();
           return token;
         } catch (error) {
-          console.error('[useCollaboration] Failed to get token:', error);
+          console.error("[useCollaboration] Failed to get token:", error);
           return null;
         }
       },
-      { mode }
+      { mode },
     );
 
     managerRef.current = manager;
@@ -81,7 +85,16 @@ export function useCollaboration({
       manager.destroy();
       managerRef.current = null;
     };
-  }, [pageId, effectiveUserId, enabled, mode, getToken, isSignedIn, user?.fullName, user?.firstName]);
+  }, [
+    pageId,
+    effectiveUserId,
+    enabled,
+    mode,
+    getToken,
+    isSignedIn,
+    user?.fullName,
+    user?.firstName,
+  ]);
 
   // カーソル位置更新
   const updateCursor = useCallback((anchor: number, head: number) => {
@@ -101,7 +114,7 @@ export function useCollaboration({
   const collaborationUser =
     enabled && effectiveUserId
       ? {
-          name: (isSignedIn && user) ? (user.fullName || user.firstName || 'Anonymous') : 'Guest',
+          name: isSignedIn && user ? user.fullName || user.firstName || "Anonymous" : "Guest",
           color: getUserColor(effectiveUserId),
         }
       : undefined;

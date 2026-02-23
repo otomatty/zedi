@@ -29,10 +29,8 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
           return (
             <div
               key={provider.id}
-              className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
-                isSelected
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-muted/50"
+              className={`flex items-start space-x-3 rounded-lg border p-3 transition-colors ${
+                isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
               }`}
             >
               <RadioGroupItem
@@ -44,14 +42,12 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               <div className="flex-1">
                 <Label
                   htmlFor={`provider-${provider.id}`}
-                  className="cursor-pointer font-medium flex items-center gap-2"
+                  className="flex cursor-pointer items-center gap-2 font-medium"
                 >
                   {provider.name}
                 </Label>
                 {provider.description && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {provider.description}
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{provider.description}</p>
                 )}
               </div>
             </div>

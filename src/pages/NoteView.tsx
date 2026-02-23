@@ -6,7 +6,14 @@ import Container from "@/components/layout/Container";
 import { NotePageCard } from "@/components/note/NotePageCard";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -42,7 +49,7 @@ const NoteView: React.FC = () => {
   const { data: notePages = [], isLoading: isPagesLoading } = useNotePages(
     noteId ?? "",
     noteSource,
-    Boolean(access?.canView)
+    Boolean(access?.canView),
   );
 
   const { data: allPages = [] } = usePagesSummary();
@@ -54,10 +61,7 @@ const NoteView: React.FC = () => {
   const [pageFilter, setPageFilter] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
 
-  const notePageIds = useMemo(
-    () => new Set(notePages.map((page) => page.id)),
-    [notePages]
-  );
+  const notePageIds = useMemo(() => new Set(notePages.map((page) => page.id)), [notePages]);
 
   const availablePages = useMemo(() => {
     return allPages.filter((page) => !notePageIds.has(page.id));
@@ -66,11 +70,8 @@ const NoteView: React.FC = () => {
   const filteredPages = useMemo(() => {
     const query = pageFilter.trim().toLowerCase();
     if (!query) return availablePages;
-    return availablePages.filter((page) =>
-      (page.title || "").toLowerCase().includes(query)
-    );
+    return availablePages.filter((page) => (page.title || "").toLowerCase().includes(query));
   }, [availablePages, pageFilter]);
-
 
   const handleAddPage = async (pageId: string) => {
     if (!noteId) return;
@@ -107,7 +108,6 @@ const NoteView: React.FC = () => {
     }
   };
 
-
   if (isNoteLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -127,9 +127,7 @@ const NoteView: React.FC = () => {
         <Header />
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">
-              {t("notes.noteNotFoundOrNoAccess")}
-            </p>
+            <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
           </Container>
         </main>
       </div>
@@ -144,13 +142,11 @@ const NoteView: React.FC = () => {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold truncate">
+                <h1 className="truncate text-xl font-semibold">
                   {note.title || t("notes.untitledNote")}
                 </h1>
                 <NoteVisibilityBadge visibility={note.visibility} />
-                {note.isOfficial && (
-                  <Badge variant="secondary">{t("notes.officialBadge")}</Badge>
-                )}
+                {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 {t("notes.pagesCount", { count: notePages.length })}
@@ -168,9 +164,7 @@ const NoteView: React.FC = () => {
                 </>
               )}
               {!isSignedIn && access?.canView && (
-                <span className="text-sm text-muted-foreground">
-                  {t("notes.loginToPost")}
-                </span>
+                <span className="text-sm text-muted-foreground">{t("notes.loginToPost")}</span>
               )}
               {canShowAddPage && (
                 <Dialog open={isAddPageOpen} onOpenChange={setIsAddPageOpen}>
@@ -205,14 +199,16 @@ const NoteView: React.FC = () => {
                       </div>
                       {canEdit && (
                         <>
-                          <div className="border-t pt-3 space-y-2">
-                            <label className="text-sm font-medium">{t("notes.searchByTitle")}</label>
+                          <div className="space-y-2 border-t pt-3">
+                            <label className="text-sm font-medium">
+                              {t("notes.searchByTitle")}
+                            </label>
                             <Input
                               value={pageFilter}
                               onChange={(event) => setPageFilter(event.target.value)}
                               placeholder={t("notes.searchByTitle")}
                             />
-                            <div className="max-h-64 overflow-y-auto space-y-2">
+                            <div className="max-h-64 space-y-2 overflow-y-auto">
                               {filteredPages.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
                                   {t("notes.noPagesToAdd")}
@@ -234,10 +230,7 @@ const NoteView: React.FC = () => {
                       )}
                     </div>
                     <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsAddPageOpen(false)}
-                      >
+                      <Button variant="outline" onClick={() => setIsAddPageOpen(false)}>
                         {t("notes.close")}
                       </Button>
                     </DialogFooter>
@@ -250,11 +243,9 @@ const NoteView: React.FC = () => {
             {isPagesLoading ? (
               <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
             ) : notePages.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("notes.noPagesYet")}
-              </p>
+              <p className="text-sm text-muted-foreground">{t("notes.noPagesYet")}</p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {notePages.map((page) => (
                   <div key={page.id} className="relative">
                     <NotePageCard noteId={note.id} page={page} />
@@ -263,7 +254,7 @@ const NoteView: React.FC = () => {
                         type="button"
                         variant="secondary"
                         size="icon"
-                        className="absolute top-2 right-2 h-7 w-7"
+                        className="absolute right-2 top-2 h-7 w-7"
                         onClick={() => handleRemovePage(page.id)}
                       >
                         <Trash2 className="h-4 w-4" />

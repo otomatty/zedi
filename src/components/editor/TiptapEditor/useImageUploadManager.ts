@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type MutableRefObject,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -38,9 +32,7 @@ export function useImageUploadManager({
 }: UseImageUploadManagerParams) {
   const { getToken } = useAuth();
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [pendingRetryUploadId, setPendingRetryUploadId] = useState<string | null>(
-    null
-  );
+  const [pendingRetryUploadId, setPendingRetryUploadId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadFilesRef = useRef<Map<string, File>>(new Map());
   const uploadPreviewUrlsRef = useRef<Map<string, string>>(new Map());
@@ -85,7 +77,7 @@ export function useImageUploadManager({
         view.dispatch(tr);
       }
     },
-    [editorRef]
+    [editorRef],
   );
 
   const replaceUploadNodeWithImage = useCallback(
@@ -102,9 +94,7 @@ export function useImageUploadManager({
 
       state.doc.descendants((node, pos) => {
         if (node.type.name === "imageUpload" && node.attrs.uploadId === uploadId) {
-          tr = tr
-            .delete(pos, pos + node.nodeSize)
-            .insert(pos, imageType.create(attrs));
+          tr = tr.delete(pos, pos + node.nodeSize).insert(pos, imageType.create(attrs));
           replaced = true;
           return false;
         }
@@ -118,7 +108,7 @@ export function useImageUploadManager({
       }
       cleanupUploadResources(uploadId);
     },
-    [cleanupUploadResources, editorRef, onChange]
+    [cleanupUploadResources, editorRef, onChange],
   );
 
   const removeUploadNode = useCallback(
@@ -144,7 +134,7 @@ export function useImageUploadManager({
       }
       cleanupUploadResources(uploadId);
     },
-    [cleanupUploadResources, editorRef]
+    [cleanupUploadResources, editorRef],
   );
 
   const startUpload = useCallback(
@@ -164,8 +154,7 @@ export function useImageUploadManager({
       } catch (error) {
         toast({
           title: "ストレージ設定エラー",
-          description:
-            error instanceof Error ? error.message : "設定内容を確認してください",
+          description: error instanceof Error ? error.message : "設定内容を確認してください",
           variant: "destructive",
         });
         throw error;
@@ -184,10 +173,7 @@ export function useImageUploadManager({
 
       const timerId = window.setInterval(() => {
         if (hasRealProgress) return;
-        simulatedProgress = Math.min(
-          90,
-          simulatedProgress + Math.floor(Math.random() * 8) + 4
-        );
+        simulatedProgress = Math.min(90, simulatedProgress + Math.floor(Math.random() * 8) + 4);
         updateUploadNodeAttributes(uploadId, {
           progress: simulatedProgress,
         });
@@ -212,8 +198,7 @@ export function useImageUploadManager({
           storageProviderId: uploadSettings.provider,
         });
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "画像のアップロードに失敗しました";
+        const message = error instanceof Error ? error.message : "画像のアップロードに失敗しました";
         updateUploadNodeAttributes(uploadId, {
           status: "error",
           errorMessage: message,
@@ -233,7 +218,7 @@ export function useImageUploadManager({
       toast,
       updateUploadNodeAttributes,
       replaceUploadNodeWithImage,
-    ]
+    ],
   );
 
   const handleRetryUpload = useCallback(
@@ -252,14 +237,14 @@ export function useImageUploadManager({
       setPendingRetryUploadId(uploadId);
       fileInputRef.current?.click();
     },
-    [startUpload, updateUploadNodeAttributes]
+    [startUpload, updateUploadNodeAttributes],
   );
 
   const handleRemoveUpload = useCallback(
     (uploadId: string) => {
       removeUploadNode(uploadId);
     },
-    [removeUploadNode]
+    [removeUploadNode],
   );
 
   const createUploadId = useCallback(() => {
@@ -299,11 +284,14 @@ export function useImageUploadManager({
           },
         };
       }),
-    [createUploadId, storageSettings.provider]
+    [createUploadId, storageSettings.provider],
   );
 
   const insertUploadItems = useCallback(
-    (uploadItems: Array<{ uploadId: string; file: File; attrs: Record<string, unknown> }>, insertAtStart: boolean) => {
+    (
+      uploadItems: Array<{ uploadId: string; file: File; attrs: Record<string, unknown> }>,
+      insertAtStart: boolean,
+    ) => {
       const activeEditor = editorRef.current;
       if (!activeEditor) return;
       const content = uploadItems.map((item) => ({
@@ -319,7 +307,7 @@ export function useImageUploadManager({
       }
       chain.run();
     },
-    [editorRef]
+    [editorRef],
   );
 
   const startUploads = useCallback(
@@ -328,7 +316,7 @@ export function useImageUploadManager({
         void startUpload(item.uploadId, item.file);
       });
     },
-    [startUpload]
+    [startUpload],
   );
 
   const handleImageUpload = useCallback(
@@ -348,9 +336,7 @@ export function useImageUploadManager({
         return;
       }
 
-      const imageFiles = Array.from(files).filter((file) =>
-        file.type.startsWith("image/")
-      );
+      const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
 
       if (imageFiles.length === 0) {
         toast({
@@ -384,7 +370,7 @@ export function useImageUploadManager({
       restoreSelectionIfNeeded,
       startUploads,
       toast,
-    ]
+    ],
   );
 
   const handleImageUploadAtStart = useCallback(
@@ -404,9 +390,7 @@ export function useImageUploadManager({
         return;
       }
 
-      const imageFiles = Array.from(files).filter((file) =>
-        file.type.startsWith("image/")
-      );
+      const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
 
       if (imageFiles.length === 0) {
         toast({
@@ -437,7 +421,7 @@ export function useImageUploadManager({
       pendingRetryUploadId,
       startUploads,
       toast,
-    ]
+    ],
   );
 
   const handleRetryWithFile = useCallback(
@@ -459,7 +443,7 @@ export function useImageUploadManager({
       });
       void startUpload(uploadId, file);
     },
-    [startUpload, storageSettings.provider, updateUploadNodeAttributes]
+    [startUpload, storageSettings.provider, updateUploadNodeAttributes],
   );
 
   const handleFileInputChange = useCallback(
@@ -477,7 +461,7 @@ export function useImageUploadManager({
 
       e.target.value = "";
     },
-    [handleImageUpload, handleRetryWithFile, pendingRetryUploadId]
+    [handleImageUpload, handleRetryWithFile, pendingRetryUploadId],
   );
 
   const handleInsertImageClick = useCallback(() => {
@@ -518,7 +502,7 @@ export function useImageUploadManager({
         handleImageUpload(e.dataTransfer.files);
       }
     },
-    [handleImageUpload]
+    [handleImageUpload],
   );
 
   useEffect(() => {

@@ -50,10 +50,6 @@ export async function handler(event, context) {
     return response;
   } catch (err) {
     console.error("Lambda error:", err);
-    return res.error(
-      err.message || "Internal server error",
-      500,
-      "INTERNAL_ERROR"
-    );
+    return res.error(err.message || "Internal server error", 500, "INTERNAL_ERROR");
   }
 }

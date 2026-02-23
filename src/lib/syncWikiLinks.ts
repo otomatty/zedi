@@ -16,18 +16,12 @@ export async function syncLinksWithRepo(
   repo: IPageRepository,
   userId: string,
   sourcePageId: string,
-  wikiLinks: WikiLinkForSync[]
+  wikiLinks: WikiLinkForSync[],
 ): Promise<void> {
   const pages = await repo.getPagesSummary(userId);
-  const pageTitleToId = new Map(
-    pages.map((p) => [p.title.toLowerCase().trim(), p.id])
-  );
-  const idToNormalizedTitle = new Map(
-    pages.map((p) => [p.id, p.title.toLowerCase().trim()])
-  );
-  const currentNormalizedTitles = new Set(
-    wikiLinks.map((l) => l.title.toLowerCase().trim())
-  );
+  const pageTitleToId = new Map(pages.map((p) => [p.title.toLowerCase().trim(), p.id]));
+  const idToNormalizedTitle = new Map(pages.map((p) => [p.id, p.title.toLowerCase().trim()]));
+  const currentNormalizedTitles = new Set(wikiLinks.map((l) => l.title.toLowerCase().trim()));
 
   // Delta: remove links that are no longer in content
   const [oldOutgoingTargetIds, oldGhostTexts] = await Promise.all([

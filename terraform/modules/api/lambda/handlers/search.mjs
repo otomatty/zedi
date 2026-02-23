@@ -31,10 +31,7 @@ LIMIT 100
  * @returns {string}
  */
 function escapeLike(s) {
-  return String(s)
-    .replace(/!/g, "!!")
-    .replace(/%/g, "!%")
-    .replace(/_/g, "!_");
+  return String(s).replace(/!/g, "!!").replace(/%/g, "!%").replace(/_/g, "!_");
 }
 
 /**

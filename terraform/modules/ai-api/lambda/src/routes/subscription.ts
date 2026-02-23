@@ -20,7 +20,7 @@ export interface SubscriptionResponse {
 
 export async function handleGetSubscription(
   userId: string,
-  env: EnvConfig
+  env: EnvConfig,
 ): Promise<SubscriptionResponse> {
   const [sub, usageCheck] = await Promise.all([
     getSubscription(userId, env),

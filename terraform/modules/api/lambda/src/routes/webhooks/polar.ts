@@ -6,23 +6,23 @@
  *
  * @see https://polar.sh/docs/integrate/webhooks/delivery
  */
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { eq } from 'drizzle-orm';
-import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
-import { subscriptions, users } from '../../schema';
-import type { AppEnv } from '../../types';
-import { getPolarSecrets } from '../../lib/secrets';
-import { getEnvConfig } from '../../env';
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { eq } from "drizzle-orm";
+import { validateEvent, WebhookVerificationError } from "@polar-sh/sdk/webhooks";
+import { subscriptions, users } from "../../schema";
+import type { AppEnv } from "../../types";
+import { getPolarSecrets } from "../../lib/secrets";
+import { getEnvConfig } from "../../env";
 
 const app = new Hono<AppEnv>();
 
-app.post('/', async (c) => {
+app.post("/", async (c) => {
   const env = getEnvConfig();
   const secretArn = env.POLAR_SECRET_ARN;
 
   if (!secretArn) {
-    throw new HTTPException(500, { message: 'Polar secret ARN not configured' });
+    throw new HTTPException(500, { message: "Polar secret ARN not configured" });
   }
 
   // Secrets Manager から Webhook シークレットを取得
@@ -30,7 +30,7 @@ app.post('/', async (c) => {
   const webhookSecret = secrets.POLAR_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    throw new HTTPException(500, { message: 'Polar webhook secret not configured' });
+    throw new HTTPException(500, { message: "Polar webhook secret not configured" });
   }
 
   // Standard Webhooks 署名検証
@@ -48,15 +48,15 @@ app.post('/', async (c) => {
     };
   } catch (error) {
     if (error instanceof WebhookVerificationError) {
-      console.error('[polar-webhook] Signature verification failed:', error.message);
-      throw new HTTPException(403, { message: 'Invalid webhook signature' });
+      console.error("[polar-webhook] Signature verification failed:", error.message);
+      throw new HTTPException(403, { message: "Invalid webhook signature" });
     }
     throw error;
   }
 
   const eventType = event.type;
   const data = event.data;
-  const db = c.get('db');
+  const db = c.get("db");
 
   // ── userId を解決 ──
   // Polar の customer.external_id に Cognito userId を格納している前提
@@ -75,7 +75,7 @@ app.post('/', async (c) => {
   if (!userId) {
     console.error(`[polar-webhook] Cannot resolve userId for event ${eventType}`);
     // Webhook は 2xx を返さないと再送され続ける
-    return c.json({ received: true, warning: 'userId not resolved' });
+    return c.json({ received: true, warning: "userId not resolved" });
   }
 
   // Polar の subscription/order ID
@@ -85,11 +85,7 @@ app.post('/', async (c) => {
   // billing_interval を判定 (Polar: 'month' | 'year')
   const recurringInterval = data.recurringInterval as string | undefined;
   const billingInterval =
-    recurringInterval === 'month'
-      ? 'monthly'
-      : recurringInterval === 'year'
-        ? 'yearly'
-        : null;
+    recurringInterval === "month" ? "monthly" : recurringInterval === "year" ? "yearly" : null;
 
   // 期間情報
   const currentPeriodStart = data.currentPeriodStart as string | undefined;
@@ -97,39 +93,31 @@ app.post('/', async (c) => {
 
   switch (eventType) {
     // ── サブスクリプション有効化 ──
-    case 'subscription.created':
-    case 'subscription.active':
-    case 'subscription.uncanceled': {
+    case "subscription.created":
+    case "subscription.active":
+    case "subscription.uncanceled": {
       await db
         .insert(subscriptions)
         .values({
           userId,
-          plan: 'pro',
-          status: 'active',
+          plan: "pro",
+          status: "active",
           externalId,
           externalCustomerId,
           billingInterval,
-          currentPeriodStart: currentPeriodStart
-            ? new Date(currentPeriodStart)
-            : null,
-          currentPeriodEnd: currentPeriodEnd
-            ? new Date(currentPeriodEnd)
-            : null,
+          currentPeriodStart: currentPeriodStart ? new Date(currentPeriodStart) : null,
+          currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : null,
         })
         .onConflictDoUpdate({
           target: subscriptions.userId,
           set: {
-            plan: 'pro',
-            status: 'active',
+            plan: "pro",
+            status: "active",
             externalId,
             externalCustomerId,
             billingInterval,
-            currentPeriodStart: currentPeriodStart
-              ? new Date(currentPeriodStart)
-              : undefined,
-            currentPeriodEnd: currentPeriodEnd
-              ? new Date(currentPeriodEnd)
-              : undefined,
+            currentPeriodStart: currentPeriodStart ? new Date(currentPeriodStart) : undefined,
+            currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : undefined,
             updatedAt: new Date(),
           },
         });
@@ -139,11 +127,11 @@ app.post('/', async (c) => {
     }
 
     // ── キャンセル（期間終了時予約 or 即時） ──
-    case 'subscription.canceled': {
+    case "subscription.canceled": {
       await db
         .update(subscriptions)
         .set({
-          status: 'canceled',
+          status: "canceled",
           updatedAt: new Date(),
         })
         .where(eq(subscriptions.userId, userId));
@@ -153,12 +141,12 @@ app.post('/', async (c) => {
     }
 
     // ── 最終無効化（billing 停止 + 特典剥奪） ──
-    case 'subscription.revoked': {
+    case "subscription.revoked": {
       await db
         .update(subscriptions)
         .set({
-          plan: 'free',
-          status: 'canceled',
+          plan: "free",
+          status: "canceled",
           updatedAt: new Date(),
         })
         .where(eq(subscriptions.userId, userId));
@@ -168,11 +156,11 @@ app.post('/', async (c) => {
     }
 
     // ── 支払い失敗 ──
-    case 'subscription.past_due': {
+    case "subscription.past_due": {
       await db
         .update(subscriptions)
         .set({
-          status: 'past_due',
+          status: "past_due",
           updatedAt: new Date(),
         })
         .where(eq(subscriptions.userId, userId));
@@ -182,28 +170,24 @@ app.post('/', async (c) => {
     }
 
     // ── catch-all: subscription.updated ──
-    case 'subscription.updated': {
+    case "subscription.updated": {
       const status = data.status as string | undefined;
-      if (status === 'past_due') {
+      if (status === "past_due") {
         await db
           .update(subscriptions)
-          .set({ status: 'past_due', updatedAt: new Date() })
+          .set({ status: "past_due", updatedAt: new Date() })
           .where(eq(subscriptions.userId, userId));
         console.log(`[polar-webhook] ${eventType}: userId=${userId} → past_due (via updated)`);
-      } else if (status === 'active') {
+      } else if (status === "active") {
         // 期間更新など
         await db
           .update(subscriptions)
           .set({
-            plan: 'pro',
-            status: 'active',
+            plan: "pro",
+            status: "active",
             billingInterval,
-            currentPeriodStart: currentPeriodStart
-              ? new Date(currentPeriodStart)
-              : undefined,
-            currentPeriodEnd: currentPeriodEnd
-              ? new Date(currentPeriodEnd)
-              : undefined,
+            currentPeriodStart: currentPeriodStart ? new Date(currentPeriodStart) : undefined,
+            currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : undefined,
             updatedAt: new Date(),
           })
           .where(eq(subscriptions.userId, userId));
@@ -213,7 +197,7 @@ app.post('/', async (c) => {
     }
 
     // ── 支払い成功（更新時） ──
-    case 'order.paid': {
+    case "order.paid": {
       console.log(`[polar-webhook] ${eventType}: order paid for userId=${userId}`);
       // 期間情報は subscription.updated で更新されるため、ここではログのみ
       break;

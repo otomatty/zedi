@@ -16,7 +16,7 @@ function getJWKS(env: EnvConfig) {
   let jwks = jwksCache.get(key);
   if (!jwks) {
     const url = new URL(
-      `https://cognito-idp.${env.COGNITO_REGION}.amazonaws.com/${env.COGNITO_USER_POOL_ID}/.well-known/jwks.json`
+      `https://cognito-idp.${env.COGNITO_REGION}.amazonaws.com/${env.COGNITO_USER_POOL_ID}/.well-known/jwks.json`,
     );
     jwks = createRemoteJWKSet(url);
     jwksCache.set(key, jwks);
@@ -28,18 +28,13 @@ function getJWKS(env: EnvConfig) {
  * Extract and verify JWT from the request.
  * Returns the Cognito `sub` claim (user ID).
  */
-export async function verifyToken(
-  event: APIGatewayProxyEventV2,
-  env: EnvConfig
-): Promise<string> {
+export async function verifyToken(event: APIGatewayProxyEventV2, env: EnvConfig): Promise<string> {
   const authHeader = event.headers?.authorization || event.headers?.Authorization;
   if (!authHeader) {
     throw new Error("UNAUTHORIZED");
   }
 
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : authHeader;
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
 
   return verifyTokenString(token, env);
 }
@@ -48,10 +43,7 @@ export async function verifyToken(
  * Verify a raw JWT token string.
  * Returns the Cognito `sub` claim (user ID).
  */
-export async function verifyTokenString(
-  token: string,
-  env: EnvConfig
-): Promise<string> {
+export async function verifyTokenString(token: string, env: EnvConfig): Promise<string> {
   if (!token) {
     throw new Error("UNAUTHORIZED");
   }

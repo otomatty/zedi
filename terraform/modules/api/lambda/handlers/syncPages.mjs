@@ -121,9 +121,8 @@ export async function getSyncPages(claims, query = {}) {
   if (!ownerId) return res.unauthorized("User not found");
 
   const since = query?.since?.trim();
-  const pages =
-    since ?
-      await execute(GET_PAGES_SQL, { owner_id: ownerId, since })
+  const pages = since
+    ? await execute(GET_PAGES_SQL, { owner_id: ownerId, since })
     : await execute(GET_PAGES_NO_SINCE_SQL, { owner_id: ownerId });
 
   const pageIds = await execute(GET_MY_PAGE_IDS_SQL, { owner_id: ownerId });
@@ -138,14 +137,24 @@ export async function getSyncPages(claims, query = {}) {
   }
 
   const pageIdsCsv = ids.join(",");
-  console.log("[SYNC_DEBUG] GET sync/pages: page_ids count", ids.length, "csv length", pageIdsCsv.length);
+  console.log(
+    "[SYNC_DEBUG] GET sync/pages: page_ids count",
+    ids.length,
+    "csv length",
+    pageIdsCsv.length,
+  );
   const linksRows = await execute(GET_LINKS_SQL, {
     page_ids_csv: pageIdsCsv,
   });
   const ghostRows = await execute(GET_GHOST_LINKS_SQL, {
     page_ids_csv: pageIdsCsv,
   });
-  console.log("[SYNC_DEBUG] GET sync/pages: links", linksRows.length, "ghost_links", ghostRows.length);
+  console.log(
+    "[SYNC_DEBUG] GET sync/pages: links",
+    linksRows.length,
+    "ghost_links",
+    ghostRows.length,
+  );
 
   return res.success({
     pages: pages.map(rowToPage),
@@ -227,20 +236,29 @@ export async function postSyncPages(claims, body = {}) {
       const sid = l?.source_id ?? l?.sourceId;
       const tid = l?.target_id ?? l?.targetId;
       if (sid && tid && myPageIds.includes(sid) && myPageIds.includes(tid)) {
-        console.log("[SYNC_DEBUG] INSERT_LINK", { i, source_id: sid?.slice(0, 8), target_id: tid?.slice(0, 8) });
+        console.log("[SYNC_DEBUG] INSERT_LINK", {
+          i,
+          source_id: sid?.slice(0, 8),
+          target_id: tid?.slice(0, 8),
+        });
         await execute(INSERT_LINK_SQL, { source_id: sid, target_id: tid });
       }
     }
   }
   if (Array.isArray(ghostList)) {
-    console.log("[SYNC_DEBUG] ghost_links: delete for owner, then insert", ghostList.length, "rows");
+    console.log(
+      "[SYNC_DEBUG] ghost_links: delete for owner, then insert",
+      ghostList.length,
+      "rows",
+    );
     await execute(DELETE_GHOST_LINKS_FOR_OWNER_SQL, { owner_id: ownerId });
     for (let i = 0; i < ghostList.length; i++) {
       const g = ghostList[i];
       const linkText = g?.link_text ?? g?.linkText ?? "";
       const sourcePageId = g?.source_page_id ?? g?.sourcePageId;
       if (!sourcePageId || !myPageIds.includes(sourcePageId)) continue;
-      const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(linkText);
+      const looksLikeUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(linkText);
       console.log("[SYNC_DEBUG] INSERT_GHOST_LINK", {
         i,
         link_text: linkText.slice(0, 60),

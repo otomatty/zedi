@@ -2,10 +2,7 @@
  * Secrets Manager client — caches AI provider API keys
  */
 
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from "@aws-sdk/client-secrets-manager";
+import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 
 const client = new SecretsManagerClient({});
 
@@ -37,10 +34,7 @@ export async function getAISecrets(secretArn: string): Promise<AISecrets> {
   return _cached;
 }
 
-export function getRequiredSecret(
-  secrets: AISecrets,
-  key: keyof AISecrets
-): string {
+export function getRequiredSecret(secrets: AISecrets, key: keyof AISecrets): string {
   const value = secrets[key];
   if (!value) {
     throw new Error(`AI secret ${key} is not configured`);

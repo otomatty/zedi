@@ -10,8 +10,7 @@ import { RDSDataClient, ExecuteStatementCommand } from "@aws-sdk/client-rds-data
 
 const REGION = process.env.AWS_REGION || "ap-northeast-1";
 const CLUSTER_ARN =
-  process.env.CLUSTER_ARN ||
-  "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
+  process.env.CLUSTER_ARN || "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
 const SECRET_ARN =
   process.env.SECRET_ARN ||
   "arn:aws:secretsmanager:ap-northeast-1:590183877893:secret:zedi-dev-db-credentials-x1aCah";
@@ -27,7 +26,7 @@ async function runStatement(sql) {
         secretArn: SECRET_ARN,
         database: DATABASE,
         sql,
-      })
+      }),
     );
     return true;
   } catch (e) {

@@ -1,9 +1,9 @@
 /**
  * Google Custom Search API — 画像検索
  */
-import type { ImageSearchItem } from '../types';
+import type { ImageSearchItem } from "../types";
 
-const API_BASE = 'https://www.googleapis.com/customsearch/v1';
+const API_BASE = "https://www.googleapis.com/customsearch/v1";
 
 export async function searchImages(
   query: string,
@@ -22,23 +22,23 @@ export async function searchImages(
     key: apiKey,
     cx: searchEngineId,
     q: query,
-    searchType: 'image',
+    searchType: "image",
     num: String(num),
     start: String(start),
-    imgSize: 'large',
-    imgType: 'photo',
-    safe: 'active',
+    imgSize: "large",
+    imgType: "photo",
+    safe: "active",
   });
 
   const response = await fetch(`${API_BASE}?${params.toString()}`, {
     headers: {
-      'User-Agent': 'zedi-thumbnail-api/1.0 (https://zedi.app)',
-      Accept: 'application/json',
+      "User-Agent": "zedi-thumbnail-api/1.0 (https://zedi.app)",
+      Accept: "application/json",
     },
   });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => '');
+    const text = await response.text().catch(() => "");
     throw new Error(`Google Custom Search failed: ${response.status} - ${text}`);
   }
 

@@ -60,7 +60,7 @@ function renderOnboarding() {
   return render(
     <MemoryRouter>
       <Onboarding />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -85,9 +85,7 @@ describe("Onboarding", () => {
       mockProfile = { displayName: "", avatarUrl: "" };
       renderOnboarding();
 
-      expect(
-        screen.getByText("onboarding.profile.displayNameRequired")
-      ).toBeInTheDocument();
+      expect(screen.getByText("onboarding.profile.displayNameRequired")).toBeInTheDocument();
     });
 
     it("enables Next button when display name is non-empty", () => {
@@ -114,9 +112,7 @@ describe("Onboarding", () => {
       mockProfile = { displayName: "My Name", avatarUrl: "" };
       renderOnboarding();
 
-      expect(
-        screen.queryByText("onboarding.profile.displayNameRequired")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("onboarding.profile.displayNameRequired")).not.toBeInTheDocument();
     });
   });
 });

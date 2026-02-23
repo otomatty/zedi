@@ -73,10 +73,7 @@ export const AI_PROVIDERS: AIProvider[] = [
   {
     id: "google",
     name: "Google",
-    defaultModels: [
-      "gemini-3-flash-preview",
-      "gemini-3-pro-preview",
-    ],
+    defaultModels: ["gemini-3-flash-preview", "gemini-3-pro-preview"],
     apiKeyPrefix: "AIza",
     apiKeyHelpUrl: "https://aistudio.google.com/app/apikey",
     placeholder: "AIza...",
@@ -96,10 +93,7 @@ export const AI_PROVIDERS: AIProvider[] = [
   {
     id: "anthropic",
     name: "Anthropic",
-    defaultModels: [
-      "claude-opus-4-6",
-      "claude-sonnet-4-20250514",
-    ],
+    defaultModels: ["claude-opus-4-6", "claude-sonnet-4-20250514"],
     apiKeyPrefix: "sk-ant-",
     apiKeyHelpUrl: "https://console.anthropic.com/settings/keys",
     placeholder: "sk-ant-...",

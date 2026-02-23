@@ -68,17 +68,20 @@ fix/* (バグ修正)
 ### 新機能開発の流れ
 
 1. **developブランチから最新を取得**
+
    ```bash
    git checkout develop
    git pull origin develop
    ```
 
 2. **機能ブランチを作成**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
 3. **開発とコミット**
+
    ```bash
    # 変更を実装
    git add .
@@ -86,6 +89,7 @@ fix/* (バグ修正)
    ```
 
 4. **リモートにプッシュ**
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -100,6 +104,7 @@ fix/* (バグ修正)
 ### リリースの流れ
 
 1. **developブランチが安定したら、mainにマージ**
+
    ```bash
    git checkout main
    git merge develop
@@ -115,6 +120,7 @@ fix/* (バグ修正)
 ### 緊急バグ修正の流れ（hotfix）
 
 1. **mainブランチからhotfixブランチを作成**
+
    ```bash
    git checkout main
    git pull origin main
@@ -122,6 +128,7 @@ fix/* (バグ修正)
    ```
 
 2. **修正を実装してコミット**
+
    ```bash
    # 修正を実装
    git add .
@@ -129,12 +136,13 @@ fix/* (バグ修正)
    ```
 
 3. **mainとdevelopの両方にマージ**
+
    ```bash
    # mainにマージ
    git checkout main
    git merge hotfix/critical-bug
    git push origin main
-   
+
    # developにもマージ
    git checkout develop
    git merge hotfix/critical-bug

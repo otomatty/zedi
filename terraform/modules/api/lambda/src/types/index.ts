@@ -2,9 +2,9 @@
  * 統合 API — 共通型定義
  */
 
-import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from 'aws-lambda';
-import type { AwsDataApiPgDatabase } from 'drizzle-orm/aws-data-api/pg';
-import type * as schema from '../schema';
+import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
+import type { AwsDataApiPgDatabase } from "drizzle-orm/aws-data-api/pg";
+import type * as schema from "../schema";
 
 // ── Hono App Environment ────────────────────────────────────────────────────
 export type AppEnv = {
@@ -60,10 +60,10 @@ export interface EnvConfig {
 }
 
 // ── AI Types ────────────────────────────────────────────────────────────────
-export type AIProviderType = 'openai' | 'anthropic' | 'google';
-export type AIMessageRole = 'user' | 'assistant' | 'system';
-export type UserTier = 'free' | 'pro';
-export type ApiMode = 'system' | 'user_key';
+export type AIProviderType = "openai" | "anthropic" | "google";
+export type AIMessageRole = "user" | "assistant" | "system";
+export type UserTier = "free" | "pro";
+export type ApiMode = "system" | "user_key";
 
 export interface AIMessage {
   role: AIMessageRole;
@@ -75,7 +75,7 @@ export interface AIChatOptions {
   maxTokens?: number;
   stream?: boolean;
   feature?: string;
-  webSearchOptions?: { search_context_size: 'medium' | 'low' | 'high' };
+  webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
   useWebSearch?: boolean;
   useGoogleSearch?: boolean;
 }
@@ -149,5 +149,5 @@ export interface ImageGenerateResponse {
 
 export interface CommitResponse {
   imageUrl: string;
-  provider: 's3';
+  provider: "s3";
 }

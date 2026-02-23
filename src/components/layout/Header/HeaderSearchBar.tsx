@@ -13,14 +13,8 @@ const SHORTCUT_HINT = "⌘K";
 const FOOTER_INDEX = -2;
 
 export function HeaderSearchBar() {
-  const {
-    query,
-    setQuery,
-    searchResults,
-    hasQuery,
-    handleSelect,
-    handleSearchSubmit,
-  } = useGlobalSearchContext();
+  const { query, setQuery, searchResults, hasQuery, handleSelect, handleSearchSubmit } =
+    useGlobalSearchContext();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1); // -1 = 未選択
@@ -136,14 +130,13 @@ export function HeaderSearchBar() {
   const getOptionId = (index: number) =>
     index === itemCount ? "header-search-footer" : `header-search-option-${index}`;
 
-  const activeDescendant =
-    activeIndex >= 0 ? getOptionId(activeIndex) : undefined;
+  const activeDescendant = activeIndex >= 0 ? getOptionId(activeIndex) : undefined;
 
   return (
     <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
       <PopoverAnchor asChild>
-        <div className="relative flex min-w-0 flex-1 w-full">
-          <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 shrink-0 text-muted-foreground pointer-events-none" />
+        <div className="relative flex w-full min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 shrink-0 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={inputRef}
             type="search"
@@ -158,12 +151,12 @@ export function HeaderSearchBar() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             className={cn(
-              "h-10 w-full pl-10 pr-3 sm:pr-16 rounded-md bg-muted/50 border-muted-foreground/20",
-              "placeholder:text-muted-foreground text-sm"
+              "h-10 w-full rounded-md border-muted-foreground/20 bg-muted/50 pl-10 pr-3 sm:pr-16",
+              "text-sm placeholder:text-muted-foreground",
             )}
           />
           <span
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center rounded border border-border bg-muted/80 px-2 py-1 text-xs text-muted-foreground pointer-events-none"
+            className="pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2 items-center rounded border border-border bg-muted/80 px-2 py-1 text-xs text-muted-foreground sm:inline-flex"
             aria-hidden
           >
             {SHORTCUT_HINT}
@@ -177,7 +170,7 @@ export function HeaderSearchBar() {
         sideOffset={4}
         className={cn(
           "w-[var(--radix-popover-trigger-width)] min-w-[280px] max-w-[400px] p-0",
-          "max-h-[min(70vh,400px)] overflow-hidden flex flex-col"
+          "flex max-h-[min(70vh,400px)] flex-col overflow-hidden",
         )}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
@@ -188,13 +181,11 @@ export function HeaderSearchBar() {
         )}
 
         {showEmpty && (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            {EMPTY_MESSAGE}
-          </div>
+          <div className="py-6 text-center text-sm text-muted-foreground">{EMPTY_MESSAGE}</div>
         )}
 
         {showResults && (
-          <div className="py-2 overflow-y-auto">
+          <div className="overflow-y-auto py-2">
             <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
               候補 ({searchResults.length}件)
             </p>
@@ -207,10 +198,8 @@ export function HeaderSearchBar() {
                     role="option"
                     aria-selected={activeIndex === index}
                     className={cn(
-                      "flex items-center gap-2 w-full px-3 py-2 text-left text-sm outline-none",
-                      activeIndex === index
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-muted"
+                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none",
+                      activeIndex === index ? "bg-accent text-accent-foreground" : "hover:bg-muted",
                     )}
                     onClick={() => onSelectItem(pageId, noteId)}
                     onMouseEnter={() => setActiveIndex(index)}
@@ -220,9 +209,7 @@ export function HeaderSearchBar() {
                     ) : (
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                     )}
-                    <span className="font-medium truncate flex-1">
-                      {title}
-                    </span>
+                    <span className="flex-1 truncate font-medium">{title}</span>
                   </button>
                 </li>
               ))}
@@ -239,11 +226,9 @@ export function HeaderSearchBar() {
             role="option"
             aria-selected={activeIndex === itemCount}
             className={cn(
-              "flex items-center justify-between w-full px-3 py-2.5 text-sm outline-none",
+              "flex w-full items-center justify-between px-3 py-2.5 text-sm outline-none",
               "border-t border-border text-muted-foreground",
-              activeIndex === itemCount
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-muted"
+              activeIndex === itemCount ? "bg-accent text-accent-foreground" : "hover:bg-muted",
             )}
             onClick={() => {
               closeDropdown();

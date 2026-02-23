@@ -14,12 +14,12 @@ interface LinkedPagesSectionProps {
 
 function LinkedPagesSkeleton() {
   return (
-    <div className="border-t pt-6 mt-6 space-y-4">
+    <div className="mt-6 space-y-4 border-t pt-6">
       <div className="flex items-center gap-2">
         <Skeleton className="h-4 w-4" />
         <Skeleton className="h-4 w-24" />
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {[1, 2, 3, 4, 5].map((i) => (
           <Skeleton key={i} className="h-24 w-full" />
         ))}
@@ -39,16 +39,13 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
 
   if (!data) return null;
 
-  const { outgoingLinks, outgoingLinksWithChildren, backlinks, ghostLinks } =
-    data;
+  const { outgoingLinks, outgoingLinksWithChildren, backlinks, ghostLinks } = data;
 
   // Combine outgoing links (without children) and backlinks into "リンク" section
   const allLinks = [...outgoingLinks, ...backlinks];
 
   const hasAnyLinks =
-    allLinks.length > 0 ||
-    outgoingLinksWithChildren.length > 0 ||
-    ghostLinks.length > 0;
+    allLinks.length > 0 || outgoingLinksWithChildren.length > 0 || ghostLinks.length > 0;
 
   if (!hasAnyLinks) return null;
 
@@ -67,7 +64,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
   };
 
   return (
-    <div className="border-t pt-6 mt-6 space-y-6">
+    <div className="mt-6 space-y-6 border-t pt-6">
       {/* Links with 2-hop children (horizontal layout) */}
       {outgoingLinksWithChildren.length > 0 && (
         <div className="space-y-4">
@@ -98,7 +95,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
             <FilePlus className="h-4 w-4" />
             <span>新しいリンク ({ghostLinks.length})</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {ghostLinks.map((title) => (
               <GhostLinkCard
                 key={title}

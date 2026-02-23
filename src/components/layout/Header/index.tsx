@@ -25,26 +25,26 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
       className={cn(
         "sticky top-0 z-50 border-b border-border",
         "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-        className
+        className,
       )}
     >
       <Container className="flex h-[4.5rem] items-center justify-between gap-4">
         {/* Left: Logo & Month Navigation（モバイルでは非表示にして検索バー左の余白を防ぐ） */}
-        <div className="hidden sm:flex items-center gap-4 min-w-0 shrink-0">
+        <div className="hidden min-w-0 shrink-0 items-center gap-4 sm:flex">
           <HeaderLogo />
           <MonthNavigation />
         </div>
 
         {/* Center: Search bar & AI Chat button */}
-        <div className="flex flex-1 justify-center min-w-0 max-w-xl sm:mx-2 items-center gap-2">
+        <div className="flex min-w-0 max-w-xl flex-1 items-center justify-center gap-2 sm:mx-2">
           {hasSearchContext && <HeaderSearchBar />}
           <AIChatButton />
         </div>
 
         {/* Right: Unified menu */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           {!isSignedIn && (
-            <span className="text-xs text-muted-foreground hidden sm:inline">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
               {t("common.guestSyncPrompt")}
             </span>
           )}

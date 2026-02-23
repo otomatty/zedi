@@ -66,11 +66,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const locked = models.filter((m) => !m.available);
 
   return (
-    <Select
-      value={value}
-      onValueChange={handleChange}
-      disabled={disabled}
-    >
+    <Select value={value} onValueChange={handleChange} disabled={disabled}>
       <SelectTrigger className={className}>
         <SelectValue placeholder="モデルを選択" />
       </SelectTrigger>
@@ -79,7 +75,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           <SelectItem key={model.id} value={model.id}>
             <div className="flex items-center gap-2">
               <span>{model.displayName}</span>
-              <Badge variant="secondary" className="text-[10px] px-1 py-0">
+              <Badge variant="secondary" className="px-1 py-0 text-[10px]">
                 {model.provider}
               </Badge>
             </div>
@@ -90,7 +86,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             <div className="flex items-center gap-2">
               <Lock className="h-3 w-3 text-muted-foreground" />
               <span className="text-muted-foreground">{model.displayName}</span>
-              <Badge variant="outline" className="text-[10px] px-1 py-0">
+              <Badge variant="outline" className="px-1 py-0 text-[10px]">
                 有料
               </Badge>
             </div>

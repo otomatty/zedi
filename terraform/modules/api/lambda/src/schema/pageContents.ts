@@ -2,8 +2,8 @@
  * Drizzle ORM Schema: page_contents
  * Source: db/aurora/001_schema.sql — page_contents テーブル (Y.Doc persistence)
  */
-import { pgTable, uuid, text, bigint, timestamp, customType } from 'drizzle-orm/pg-core';
-import { pages } from './pages';
+import { pgTable, uuid, text, bigint, timestamp, customType } from "drizzle-orm/pg-core";
+import { pages } from "./pages";
 
 /**
  * PostgreSQL BYTEA 型のカスタムタイプ
@@ -11,18 +11,18 @@ import { pages } from './pages';
  */
 const bytea = customType<{ data: Buffer; dpiType: string }>({
   dataType() {
-    return 'bytea';
+    return "bytea";
   },
 });
 
-export const pageContents = pgTable('page_contents', {
-  pageId: uuid('page_id')
+export const pageContents = pgTable("page_contents", {
+  pageId: uuid("page_id")
     .primaryKey()
-    .references(() => pages.id, { onDelete: 'cascade' }),
-  ydocState: bytea('ydoc_state').notNull(),
-  version: bigint('version', { mode: 'number' }).notNull().default(1),
-  contentText: text('content_text'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    .references(() => pages.id, { onDelete: "cascade" }),
+  ydocState: bytea("ydoc_state").notNull(),
+  version: bigint("version", { mode: "number" }).notNull().default(1),
+  contentText: text("content_text"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Note: pg_bigm の GIN インデックス (idx_page_contents_text_bigm) は

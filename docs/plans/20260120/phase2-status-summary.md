@@ -2,14 +2,14 @@
 
 ## 📊 実装状況
 
-| 項目 | 状態 | 備考 |
-|------|------|------|
-| AIエージェント用APIサーバー | ✅ 完了 | Cloudflare Workers、Honoベース |
-| 認証・認可 | ✅ 完了 | Clerk JWT検証、`jose`ライブラリ使用 |
-| レート制限 | ✅ 完了 | ユーザー単位・IP単位対応 |
-| クライアント側実装 | ✅ 完了 | `aiService.ts`の`api_server`モード実装 |
-| ストリーミング対応 | ✅ 完了 | SSE形式でストリーミングレスポンス |
-| テスト修正 | ✅ 完了 | モック実装の改善、全テスト通過 |
+| 項目                        | 状態    | 備考                                   |
+| --------------------------- | ------- | -------------------------------------- |
+| AIエージェント用APIサーバー | ✅ 完了 | Cloudflare Workers、Honoベース         |
+| 認証・認可                  | ✅ 完了 | Clerk JWT検証、`jose`ライブラリ使用    |
+| レート制限                  | ✅ 完了 | ユーザー単位・IP単位対応               |
+| クライアント側実装          | ✅ 完了 | `aiService.ts`の`api_server`モード実装 |
+| ストリーミング対応          | ✅ 完了 | SSE形式でストリーミングレスポンス      |
+| テスト修正                  | ✅ 完了 | モック実装の改善、全テスト通過         |
 
 ## ✅ 完了した作業
 
@@ -68,6 +68,7 @@ Tests  157 passed (157)
 ### 新規作成
 
 #### バックエンド（Cloudflare Workers）
+
 - `workers/ai-api/src/index.ts` (27行)
 - `workers/ai-api/src/routes/chat.ts` (114行)
 - `workers/ai-api/src/services/aiProviders.ts` (271行)
@@ -82,6 +83,7 @@ Tests  157 passed (157)
 - `workers/ai-api/.gitignore`
 
 #### ドキュメント
+
 - `docs/plans/20260120/phase2-implementation-status.md` - 実装状況調査レポート
 - `docs/plans/20260120/implementation-log-phase2.md` - 実装ログ
 - `docs/plans/20260120/phase2-status-summary.md` - 本ドキュメント
@@ -115,9 +117,11 @@ Tests  157 passed (157)
 ### 環境変数の設定が必要
 
 **フロントエンド**:
+
 - `VITE_AI_API_BASE_URL` - AI APIのベースURL
 
 **バックエンド（Cloudflare Workers）**:
+
 - `CLERK_JWKS_URL` - Clerk JWKSエンドポイント（必須）
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_AI_API_KEY` - 使用するプロバイダーのAPIキー（必須）
 

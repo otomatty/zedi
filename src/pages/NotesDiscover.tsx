@@ -23,10 +23,10 @@ const NotesDiscover: React.FC = () => {
         <>
           {officialSummaries.length > 0 && (
             <section className="mb-10">
-              <h2 className="text-lg font-medium text-foreground mb-4">
+              <h2 className="mb-4 text-lg font-medium text-foreground">
                 {t("notes.sectionOfficial")}
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {officialSummaries.map((note, index) => (
                   <NoteCard key={note.id} note={note} index={index} />
                 ))}
@@ -35,7 +35,7 @@ const NotesDiscover: React.FC = () => {
           )}
 
           <section>
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-lg font-medium text-foreground">
                 {t("notes.sectionPublicNotes")}
               </h2>
@@ -44,10 +44,10 @@ const NotesDiscover: React.FC = () => {
                   type="button"
                   onClick={() => setSort("updated")}
                   className={cn(
-                    "px-3 py-1.5 text-sm rounded-md transition-colors",
+                    "rounded-md px-3 py-1.5 text-sm transition-colors",
                     sort === "updated"
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {t("notes.sortUpdated")}
@@ -56,10 +56,10 @@ const NotesDiscover: React.FC = () => {
                   type="button"
                   onClick={() => setSort("popular")}
                   className={cn(
-                    "px-3 py-1.5 text-sm rounded-md transition-colors",
+                    "rounded-md px-3 py-1.5 text-sm transition-colors",
                     sort === "popular"
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {t("notes.sortPopular")}
@@ -67,11 +67,9 @@ const NotesDiscover: React.FC = () => {
               </div>
             </div>
             {normalSummaries.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("notes.noNotesYet")}
-              </p>
+              <p className="text-sm text-muted-foreground">{t("notes.noNotesYet")}</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {normalSummaries.map((note, index) => (
                   <NoteCard key={note.id} note={note} index={index} />
                 ))}

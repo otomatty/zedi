@@ -9,7 +9,12 @@
  *   bun run scripts/sync/resolve-aurora-cognito-sub.ts [--config path]
  */
 
-import { RDSDataClient, ExecuteStatementCommand, type Field, type SqlParameter } from "@aws-sdk/client-rds-data";
+import {
+  RDSDataClient,
+  ExecuteStatementCommand,
+  type Field,
+  type SqlParameter,
+} from "@aws-sdk/client-rds-data";
 import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -42,7 +47,10 @@ function buildParams(params: Record<string, unknown>): SqlParameter[] {
 
 function createConnection(config: AuroraConfig) {
   const client = new RDSDataClient({ region: REGION });
-  async function query(sql: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>[]> {
+  async function query(
+    sql: string,
+    params: Record<string, unknown> = {},
+  ): Promise<Record<string, unknown>[]> {
     for (let attempt = 0; attempt < RESUME_MAX_RETRIES; attempt++) {
       try {
         const cmd = new ExecuteStatementCommand({
@@ -57,7 +65,8 @@ function createConnection(config: AuroraConfig) {
         if (!res.formattedRecords) return [];
         return JSON.parse(res.formattedRecords) as Record<string, unknown>[];
       } catch (err: unknown) {
-        const name = err && typeof err === "object" && "name" in err ? (err as { name: string }).name : "";
+        const name =
+          err && typeof err === "object" && "name" in err ? (err as { name: string }).name : "";
         if (name !== RESUME_ERROR_NAME || attempt === RESUME_MAX_RETRIES - 1) throw err;
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
@@ -121,7 +130,7 @@ async function main() {
     try {
       [prodRow] = await prodConn.query(
         "SELECT id, cognito_sub, email FROM users WHERE email = :email LIMIT 1",
-        { email }
+        { email },
       );
     } catch (e) {
       prodError = e instanceof Error ? e.message : String(e);
@@ -129,7 +138,7 @@ async function main() {
     try {
       [devRow] = await devConn.query(
         "SELECT id, cognito_sub, email FROM users WHERE email = :email LIMIT 1",
-        { email }
+        { email },
       );
     } catch (e) {
       devError = e instanceof Error ? e.message : String(e);
@@ -139,12 +148,18 @@ async function main() {
     const devSub = devRow ? (devRow.cognito_sub as string) : null;
 
     console.log(`Email: ${email}`);
-    console.log(`  productionCognitoSub:  ${prodSub ?? (prodError ? `(error: ${prodError})` : "(not found in prod)")}`);
-    console.log(`  developmentCognitoSub: ${devSub ?? (devError ? `(error: ${devError})` : "(not found in dev)")}`);
+    console.log(
+      `  productionCognitoSub:  ${prodSub ?? (prodError ? `(error: ${prodError})` : "(not found in prod)")}`,
+    );
+    console.log(
+      `  developmentCognitoSub: ${devSub ?? (devError ? `(error: ${devError})` : "(not found in dev)")}`,
+    );
     console.log("");
   }
 
-  console.log("上記の値を dev-user-mapping-aurora.json の各 developer の productionCognitoSub / developmentCognitoSub にコピーしてください。\n");
+  console.log(
+    "上記の値を dev-user-mapping-aurora.json の各 developer の productionCognitoSub / developmentCognitoSub にコピーしてください。\n",
+  );
 }
 
 main().catch((err) => {

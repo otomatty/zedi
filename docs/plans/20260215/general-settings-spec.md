@@ -9,13 +9,13 @@
 
 設定トップ（`/settings`）に「一般設定」を追加し、以下の 4 カテゴリを 1 つの一般設定画面（`/settings/general`）で編集できるようにする。
 
-| カテゴリ | 設定項目 | 説明 |
-|----------|----------|------|
-| **表示** | テーマ | ライト / ダーク / システム |
-| **表示** | フォントサイズ | エディタ本文の文字サイズ（標準 / やや大きめ / 大きめ） |
-| **言語** | 言語 | UI の表示言語（日本語 / English） |
-| **プロフィール** | アカウント名 | 画面上に表示する名前（表示名） |
-| **プロフィール** | サムネイル | ヘッダー等に表示するアバター画像（URL またはアップロード） |
+| カテゴリ         | 設定項目       | 説明                                                       |
+| ---------------- | -------------- | ---------------------------------------------------------- |
+| **表示**         | テーマ         | ライト / ダーク / システム                                 |
+| **表示**         | フォントサイズ | エディタ本文の文字サイズ（標準 / やや大きめ / 大きめ）     |
+| **言語**         | 言語           | UI の表示言語（日本語 / English）                          |
+| **プロフィール** | アカウント名   | 画面上に表示する名前（表示名）                             |
+| **プロフィール** | サムネイル     | ヘッダー等に表示するアバター画像（URL またはアップロード） |
 
 ---
 
@@ -47,45 +47,45 @@
 
 ### 3.1 テーマ
 
-| 項目 | 内容 |
-|------|------|
-| 設定値 | `system` \| `light` \| `dark` |
-| 表示名 | システムに従う / ライト / ダーク |
-| UI | Select または 3 択の Segmented Control |
-| 保存先 | localStorage（`zedi-general-settings` 内の `theme`） |
-| 反映 | next-themes の `setTheme()` を呼び、`ThemeProvider` をルートに設置して `document` の class を切り替え |
-| 初回 | 未設定時は `system` |
+| 項目   | 内容                                                                                                  |
+| ------ | ----------------------------------------------------------------------------------------------------- |
+| 設定値 | `system` \| `light` \| `dark`                                                                         |
+| 表示名 | システムに従う / ライト / ダーク                                                                      |
+| UI     | Select または 3 択の Segmented Control                                                                |
+| 保存先 | localStorage（`zedi-general-settings` 内の `theme`）                                                  |
+| 反映   | next-themes の `setTheme()` を呼び、`ThemeProvider` をルートに設置して `document` の class を切り替え |
+| 初回   | 未設定時は `system`                                                                                   |
 
 ### 3.2 フォントサイズ
 
-| 項目 | 内容 |
-|------|------|
-| 設定値 | `normal` \| `large` \| `x-large`（対応する px は 14 / 16 / 18 など、既存スタイルに合わせて定義） |
-| 表示名 | 標準 / やや大きめ / 大きめ |
-| UI | Select |
-| 適用範囲 | ページエディタ（Tiptap）の本文コンテンツ領域のみ。他レイアウトは変更しない |
-| 保存先 | localStorage（`zedi-general-settings` 内の `editorFontSize`） |
-| 実装 | エディタのラッパーに CSS 変数（例: `--editor-font-size`）を渡し、設定値で切り替え |
+| 項目     | 内容                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| 設定値   | `normal` \| `large` \| `x-large`（対応する px は 14 / 16 / 18 など、既存スタイルに合わせて定義） |
+| 表示名   | 標準 / やや大きめ / 大きめ                                                                       |
+| UI       | Select                                                                                           |
+| 適用範囲 | ページエディタ（Tiptap）の本文コンテンツ領域のみ。他レイアウトは変更しない                       |
+| 保存先   | localStorage（`zedi-general-settings` 内の `editorFontSize`）                                    |
+| 実装     | エディタのラッパーに CSS 変数（例: `--editor-font-size`）を渡し、設定値で切り替え                |
 
 ### 3.3 言語
 
-| 項目 | 内容 |
-|------|------|
-| 設定値 | `ja` \| `en`（第一弾はこの 2 つ） |
-| 表示名 | 日本語 / English |
-| UI | Select |
-| 保存先 | localStorage（`zedi-general-settings` 内の `locale`） |
-| 反映 | i18n プロバイダの言語キーを切り替え。未設定時は `ja`（またはブラウザ言語に近い方） |
-| 前提 | react-i18next（または同等）の導入、文言のリソース化。既存の日本語文字列をキー参照に移行 |
+| 項目   | 内容                                                                                    |
+| ------ | --------------------------------------------------------------------------------------- |
+| 設定値 | `ja` \| `en`（第一弾はこの 2 つ）                                                       |
+| 表示名 | 日本語 / English                                                                        |
+| UI     | Select                                                                                  |
+| 保存先 | localStorage（`zedi-general-settings` 内の `locale`）                                   |
+| 反映   | i18n プロバイダの言語キーを切り替え。未設定時は `ja`（またはブラウザ言語に近い方）      |
+| 前提   | react-i18next（または同等）の導入、文言のリソース化。既存の日本語文字列をキー参照に移行 |
 
 ### 3.4 プロフィール（アカウント名・サムネイル）
 
-| 項目 | 内容 |
-|------|------|
-| アカウント名 | 画面上で表示する名前（表示名）。最大長はバックエンドの仕様に合わせる（例: 100 文字）。空の場合は Cognito の `name` または `cognito:username` をフォールバック表示 |
-| サムネイル | ヘッダーのユーザーメニュー等で表示するアバター画像。**URL 入力** または **画像アップロード** のいずれかで設定。空の場合は Cognito の `picture` をフォールバック表示 |
-| 保存先 | バックエンド（`POST /api/users/upsert`）に `display_name` / `avatar_url` を送信。フロントでは「最後に保存した値」をキャッシュしてもよいが、表示は原則バックエンドまたは Cognito の組み合わせで行う |
-| 取得 | 初回表示・設定画面表示時に **GET /api/users/me**（または同等）で `display_name` / `avatar_url` を取得。未実装の場合はバックエンドに API 追加。取得できない間は Cognito の値のみ表示し、編集保存で upsert する |
+| 項目         | 内容                                                                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| アカウント名 | 画面上で表示する名前（表示名）。最大長はバックエンドの仕様に合わせる（例: 100 文字）。空の場合は Cognito の `name` または `cognito:username` をフォールバック表示                                             |
+| サムネイル   | ヘッダーのユーザーメニュー等で表示するアバター画像。**URL 入力** または **画像アップロード** のいずれかで設定。空の場合は Cognito の `picture` をフォールバック表示                                           |
+| 保存先       | バックエンド（`POST /api/users/upsert`）に `display_name` / `avatar_url` を送信。フロントでは「最後に保存した値」をキャッシュしてもよいが、表示は原則バックエンドまたは Cognito の組み合わせで行う            |
+| 取得         | 初回表示・設定画面表示時に **GET /api/users/me**（または同等）で `display_name` / `avatar_url` を取得。未実装の場合はバックエンドに API 追加。取得できない間は Cognito の値のみ表示し、編集保存で upsert する |
 
 **サムネイルのアップロード仕様**
 
@@ -103,9 +103,9 @@
 
 ## 4. 画面・ルーティング
 
-| パス | ページ | 内容 |
-|------|--------|------|
-| `/settings` | Settings.tsx | 既存の「AI 設定」「画像ストレージ設定」に加え、**「一般設定」** カードを追加。タップで `/settings/general` へ遷移 |
+| パス                | ページ                      | 内容                                                                                                                            |
+| ------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `/settings`         | Settings.tsx                | 既存の「AI 設定」「画像ストレージ設定」に加え、**「一般設定」** カードを追加。タップで `/settings/general` へ遷移               |
 | `/settings/general` | GeneralSettings.tsx（新規） | ヘッダー（戻る + 「一般設定」）+ 一般設定フォーム。既存の AISettings / StorageSettings と同じレイアウト（Container, max-w-2xl） |
 
 - **一般設定フォーム**: 1 つの Card 内で「テーマ」「フォントサイズ」「言語」「プロフィール（アカウント名・サムネイル）」のセクションを並べる、またはセクションごとに Card を分けてもよい。保存は 1 つの「保存」ボタンで一括、またはテーマのみ即時反映など、仕様に合わせて調整。
@@ -151,19 +151,19 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
 
 ## 6. ファイル構成案
 
-| 種別 | ファイル | 役割 |
-|------|----------|------|
-| 型 | `src/types/generalSettings.ts` | ThemeMode, EditorFontSize, UILocale, GeneralSettings |
-| 永続化 | `src/lib/generalSettings.ts` | load / save general settings（localStorage） |
-| フック | `src/hooks/useGeneralSettings.ts` | 一般設定の読み込み・更新・保存 |
-| フック | `src/hooks/useProfile.ts` | プロフィール取得・更新（API）、表示用 displayName / avatarUrl |
-| ページ | `src/pages/GeneralSettings.tsx` | 一般設定ページ（ヘッダー + フォーム） |
-| コンポーネント | `src/components/settings/GeneralSettingsForm.tsx` | テーマ・フォントサイズ・言語・プロフィールのフォーム |
-| ルート | `App.tsx` | `/settings/general` を追加し、GeneralSettings を Protected で表示 |
-| 設定トップ | `src/pages/Settings.tsx` | 「一般設定」カードを追加 |
-| テーマ | `main.tsx` または `App.tsx` | ThemeProvider（next-themes）を設置 |
-| 言語 | 新規 | i18n プロバイダ・リソース（例: `src/i18n/`）、既存文言のキー化 |
-| 表示 | `CognitoAuthProvider` または useUser | プロフィール取得 API の結果をマージして fullName / imageUrl を提供 |
+| 種別           | ファイル                                          | 役割                                                               |
+| -------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| 型             | `src/types/generalSettings.ts`                    | ThemeMode, EditorFontSize, UILocale, GeneralSettings               |
+| 永続化         | `src/lib/generalSettings.ts`                      | load / save general settings（localStorage）                       |
+| フック         | `src/hooks/useGeneralSettings.ts`                 | 一般設定の読み込み・更新・保存                                     |
+| フック         | `src/hooks/useProfile.ts`                         | プロフィール取得・更新（API）、表示用 displayName / avatarUrl      |
+| ページ         | `src/pages/GeneralSettings.tsx`                   | 一般設定ページ（ヘッダー + フォーム）                              |
+| コンポーネント | `src/components/settings/GeneralSettingsForm.tsx` | テーマ・フォントサイズ・言語・プロフィールのフォーム               |
+| ルート         | `App.tsx`                                         | `/settings/general` を追加し、GeneralSettings を Protected で表示  |
+| 設定トップ     | `src/pages/Settings.tsx`                          | 「一般設定」カードを追加                                           |
+| テーマ         | `main.tsx` または `App.tsx`                       | ThemeProvider（next-themes）を設置                                 |
+| 言語           | 新規                                              | i18n プロバイダ・リソース（例: `src/i18n/`）、既存文言のキー化     |
+| 表示           | `CognitoAuthProvider` または useUser              | プロフィール取得 API の結果をマージして fullName / imageUrl を提供 |
 
 ---
 
@@ -179,12 +179,12 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
 
 ## 8. まとめ
 
-| 項目 | 内容 |
-|------|------|
-| 設定項目 | テーマ / フォントサイズ / 言語 / プロフィール（アカウント名・サムネイル） |
+| 項目                   | 内容                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| 設定項目               | テーマ / フォントサイズ / 言語 / プロフィール（アカウント名・サムネイル）              |
 | テーマ・フォント・言語 | クライアント localStorage（`zedi-general-settings`）＋ ThemeProvider / CSS 変数 / i18n |
-| プロフィール | バックエンド（upsertMe + 取得用 API）。表示はバックエンド優先、未設定時は Cognito |
-| 画面 | 設定トップに「一般設定」カード、`/settings/general` で一画面にまとめて編集 |
-| 前提 | next-themes の ThemeProvider、i18n 基盤、プロフィール取得 API（必要に応じて新規追加） |
+| プロフィール           | バックエンド（upsertMe + 取得用 API）。表示はバックエンド優先、未設定時は Cognito      |
+| 画面                   | 設定トップに「一般設定」カード、`/settings/general` で一画面にまとめて編集             |
+| 前提                   | next-themes の ThemeProvider、i18n 基盤、プロフィール取得 API（必要に応じて新規追加）  |
 
 この仕様に沿って実装すれば、テーマ・フォントサイズ・言語・プロフィール（アカウント名・サムネイル）を一般設定から一括で設定できる。

@@ -35,8 +35,8 @@ ERROR: insert or update on table "ai_usage_logs" violates foreign key constraint
   - HTTP/WebSocket とも `const userId = await verifyToken(event, env)`（または `verifyTokenString`）で取得した値をそのまま `handleChat`, `handleChatStreaming`, `handleGetUsage`, `handleGetSubscription`, `checkRateLimit` などに渡している。
 - **terraform/modules/ai-api/lambda/src/services/usageService.ts**
   - `recordUsage({ userId, ... })` 内で  
-    `INSERT INTO ai_usage_logs (user_id, ...) VALUES (CAST(:userId AS uuid), ...)`  
-  としている。ここに渡っている `userId` は上記の **Cognito sub**。
+     `INSERT INTO ai_usage_logs (user_id, ...) VALUES (CAST(:userId AS uuid), ...)`  
+    としている。ここに渡っている `userId` は上記の **Cognito sub**。
 
 つまり、**Cognito sub を UUID として `ai_usage_logs.user_id` に挿入している**が、その値は `users.id` ではないため FK 制約に違反する。
 
@@ -44,13 +44,13 @@ ERROR: insert or update on table "ai_usage_logs" violates foreign key constraint
 
 他のモジュールでは **Cognito sub → `users.id` に変換してから** FK カラムを使っている。
 
-| 場所 | 処理 |
-|------|------|
-| **terraform/modules/api/lambda/handlers/notes.mjs** | `getCurrentUser(claims)` で `SELECT id, email FROM users WHERE cognito_sub = :sub` を実行し、`ownerId: r.id`（= `users.id`）を返して利用。 |
-| **terraform/modules/api/lambda/handlers/pages.mjs** | JWT の `sub` から `SELECT id FROM users WHERE cognito_sub = :cognito_sub` で **users.id** を取得し、それを owner_id として使用。 |
-| **terraform/modules/api/lambda/handlers/syncPages.mjs** | 同様に `sub` → `users.id` を取得して使用。 |
-| **terraform/modules/api/lambda/handlers/media.mjs** | 同様に `sub` → `users.id` を取得。 |
-| **server/hocuspocus/src/index.ts** | `getCurrentUserBySub(cognitoSub)` で `SELECT id, email FROM users WHERE cognito_sub = $1` を実行し、得た **users.id** で権限チェック。 |
+| 場所                                                    | 処理                                                                                                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **terraform/modules/api/lambda/handlers/notes.mjs**     | `getCurrentUser(claims)` で `SELECT id, email FROM users WHERE cognito_sub = :sub` を実行し、`ownerId: r.id`（= `users.id`）を返して利用。 |
+| **terraform/modules/api/lambda/handlers/pages.mjs**     | JWT の `sub` から `SELECT id FROM users WHERE cognito_sub = :cognito_sub` で **users.id** を取得し、それを owner_id として使用。           |
+| **terraform/modules/api/lambda/handlers/syncPages.mjs** | 同様に `sub` → `users.id` を取得して使用。                                                                                                 |
+| **terraform/modules/api/lambda/handlers/media.mjs**     | 同様に `sub` → `users.id` を取得。                                                                                                         |
+| **server/hocuspocus/src/index.ts**                      | `getCurrentUserBySub(cognitoSub)` で `SELECT id, email FROM users WHERE cognito_sub = $1` を実行し、得た **users.id** で権限チェック。     |
 
 AI Lambda だけが **この変換を行わずに `sub` をそのまま DB の user_id として使っている**。
 

@@ -15,8 +15,7 @@ const Home: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isSeeding } = useSeedData();
-  const { needsSetupWizard, isTourRunning, startTour, completeTour } =
-    useOnboarding();
+  const { needsSetupWizard, isTourRunning, startTour, completeTour } = useOnboarding();
 
   // When returning from onboarding with "start tour", trigger the tour
   useEffect(() => {
@@ -39,7 +38,7 @@ const Home: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col">
+    <div className="flex h-screen flex-col bg-background">
       <QuickTour run={isTourRunning} onComplete={completeTour} />
 
       <Header />

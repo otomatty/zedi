@@ -10,12 +10,7 @@ import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const FloatingActionButton: React.FC = () => {
   const { t } = useTranslation();
@@ -64,7 +59,7 @@ const FloatingActionButton: React.FC = () => {
     title: string,
     content: string,
     sourceUrl: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
   ) => {
     try {
       const newPage = await createPageMutation.mutateAsync({
@@ -93,7 +88,7 @@ const FloatingActionButton: React.FC = () => {
   const handleImageCreated = async (
     imageUrl: string,
     extractedText?: string,
-    description?: string
+    description?: string,
   ) => {
     try {
       // コンテンツを構築
@@ -112,9 +107,7 @@ const FloatingActionButton: React.FC = () => {
           },
           {
             type: "paragraph",
-            content: extractedText
-              ? [{ type: "text", text: extractedText }]
-              : [],
+            content: extractedText ? [{ type: "text", text: extractedText }] : [],
           },
         ],
       };
@@ -150,21 +143,13 @@ const FloatingActionButton: React.FC = () => {
               "shadow-elevated",
               "transition-all duration-300 ease-in-out",
               "hover:scale-105 hover:bg-primary",
-              isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground"
+              isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground",
             )}
           >
-            {isMenuOpen ? (
-              <X className="h-7 w-7" />
-            ) : (
-              <Plus className="h-7 w-7" />
-            )}
+            {isMenuOpen ? <X className="h-7 w-7" /> : <Plus className="h-7 w-7" />}
           </Button>
         </TooltipTrigger>
-        {!isMenuOpen && (
-          <TooltipContent side="left">
-            {t("common.createPageAction")}
-          </TooltipContent>
-        )}
+        {!isMenuOpen && <TooltipContent side="left">{t("common.createPageAction")}</TooltipContent>}
       </Tooltip>
     </TooltipProvider>
   );

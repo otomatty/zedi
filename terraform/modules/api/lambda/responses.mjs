@@ -45,7 +45,7 @@ export function error(message, statusCode = 500, code = "INTERNAL_ERROR") {
       ok: false,
       error: { code, message },
     },
-    statusCode
+    statusCode,
   );
 }
 

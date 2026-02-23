@@ -1,12 +1,7 @@
 // AI設定を管理するカスタムフック
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  AISettings,
-  getDefaultModel,
-  getDefaultModels,
-  getProviderById,
-} from "@/types/ai";
+import { AISettings, getDefaultModel, getDefaultModels, getProviderById } from "@/types/ai";
 import {
   loadAISettings,
   saveAISettings,
@@ -39,9 +34,7 @@ export function useAISettings(): UseAISettingsReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(
-    null,
-  );
+  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
 
   // 初期読み込み
   useEffect(() => {
@@ -132,10 +125,7 @@ export function useAISettings(): UseAISettingsReturn {
     setIsTesting(true);
     setTestResult(null);
     try {
-      const result = await testConnection(
-        settings.provider,
-        settings.apiKey,
-      );
+      const result = await testConnection(settings.provider, settings.apiKey);
       setTestResult(result);
 
       // テスト成功時、取得したモデル一覧で更新
@@ -159,11 +149,7 @@ export function useAISettings(): UseAISettingsReturn {
     } finally {
       setIsTesting(false);
     }
-  }, [
-    settings.provider,
-    settings.apiKey,
-    settings.model,
-  ]);
+  }, [settings.provider, settings.apiKey, settings.model]);
 
   // 設定をリセットする
   const reset = useCallback(() => {

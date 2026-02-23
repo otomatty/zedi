@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 /**
  * A wrapper component that protects routes requiring authentication.
  * Redirects to the sign-in page if the user is not signed in.
- * 
+ *
  * Note: E2E test mode is handled at the useAuth hook level via VITE_E2E_TEST.
  */
 export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
@@ -22,7 +22,7 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
     return (
       fallback ?? (
         <div className="flex h-screen items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
         </div>
       )
     );
@@ -52,7 +52,7 @@ export function AuthGate({ signedIn, signedOut, loading }: AuthGateProps) {
     return (
       loading ?? (
         <div className="flex h-screen items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
         </div>
       )
     );

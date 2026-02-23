@@ -40,18 +40,18 @@
 
 ### 原因1: ページカードのプレビューが出ない
 
-| 要因 | 説明 |
-|------|------|
-| **Aurora の `content_preview` が NULL** | 移行時や従来の保存フローでは `pages.content_preview` が更新されておらず、多くの行が NULL だった |
-| **差分 sync で更新が拾われない** | 後から SQL で `content_preview` だけを backfill しても `updated_at` を変えていなかったため、クライアントの「前回 sync 時刻以降」の差分取得に含まれず、古い NULL のまま pull されていた |
-| **PUT content で preview を更新していない** | 編集保存時に `PUT /api/pages/:id/content` は `page_contents` だけを更新し、`pages.content_preview` を更新していなかった |
+| 要因                                        | 説明                                                                                                                                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Aurora の `content_preview` が NULL**     | 移行時や従来の保存フローでは `pages.content_preview` が更新されておらず、多くの行が NULL だった                                                                                        |
+| **差分 sync で更新が拾われない**            | 後から SQL で `content_preview` だけを backfill しても `updated_at` を変えていなかったため、クライアントの「前回 sync 時刻以降」の差分取得に含まれず、古い NULL のまま pull されていた |
+| **PUT content で preview を更新していない** | 編集保存時に `PUT /api/pages/:id/content` は `page_contents` だけを更新し、`pages.content_preview` を更新していなかった                                                                |
 
 ### 原因2: エディターにコンテンツが表示されない
 
-| 要因 | 説明 |
-|------|------|
+| 要因                             | 説明                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Y.Doc のフィールド名の不一致** | 移行スクリプト（`tiptap-to-ydoc.ts`）は **`prosemirrorJSONToYDoc(..., "default")`** により、Y.Doc の XmlFragment を **`"default"`** という名前で保存していた。一方、フロントの CollaborationManager と TiptapEditor は **`"prosemirror"`** という名前で `getXmlFragment('prosemirror')` / `Collaboration.configure({ field: "prosemirror" })` を参照していた。Aurora に保存されているデータは `"default"` に入っているため、`"prosemirror"` を読んでも空で、エディターが空表示になっていた |
-| **コンテンツ取得経路の喪失** | 個人ページで「準備中」を消すために `useCollaboration` を丸ごと外したことで、Y.Doc を読みにいく処理がなくなり、`page.content` は常に `""`（Repository はメタデータのみ返す）のままだった |
+| **コンテンツ取得経路の喪失**     | 個人ページで「準備中」を消すために `useCollaboration` を丸ごと外したことで、Y.Doc を読みにいく処理がなくなり、`page.content` は常に `""`（Repository はメタデータのみ返す）のままだった                                                                                                                                                                                                                                                                                                    |
 
 ### 原因3: 「リアルタイム編集を準備中」が個人ページに出る
 
@@ -116,16 +116,16 @@
 
 ## 変更・影響したファイル一覧
 
-| 種別 | パス | 変更内容の要約 |
-|------|------|----------------|
-| フロント | `src/components/editor/PageEditorView.tsx` | 個人ページで `useCollaboration` を復元（Y.Doc 読み込みのため） |
-| フロント | `src/components/editor/PageEditor/PageEditorContent.tsx` | コラボ準備完了判定から awareness を必須から外す |
-| フロント | `src/components/editor/TiptapEditor/types.ts` | `CollaborationConfig.awareness` をオプショナルに |
-| フロント | `src/components/editor/TiptapEditor.tsx` | `field: "prosemirror"` → `"default"`、awareness ありきのカーソル更新をガード |
-| フロント | `src/components/editor/TiptapEditor/editorConfig.ts` | awareness があるときだけ CollaborationCaret を追加、`field` は呼び出し元から渡すため変更なし |
-| フロント | `src/lib/collaboration/CollaborationManager.ts` | Aurora からの fetch/マージ、Aurora への save、全 XmlFragment 参照を `'default'` に統一 |
-| バックエンド | `terraform/modules/api/lambda/handlers/pages.mjs` | `PUT /api/pages/:id/content` で `pages.content_preview` を `content_text` の先頭 200 文字で更新 |
-| DB | Aurora `pages` テーブル | backfill: `content_preview` を `content_text` から設定、続けて `updated_at` を NOW() で更新（sync で取得されるようにするため） |
+| 種別         | パス                                                     | 変更内容の要約                                                                                                                 |
+| ------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| フロント     | `src/components/editor/PageEditorView.tsx`               | 個人ページで `useCollaboration` を復元（Y.Doc 読み込みのため）                                                                 |
+| フロント     | `src/components/editor/PageEditor/PageEditorContent.tsx` | コラボ準備完了判定から awareness を必須から外す                                                                                |
+| フロント     | `src/components/editor/TiptapEditor/types.ts`            | `CollaborationConfig.awareness` をオプショナルに                                                                               |
+| フロント     | `src/components/editor/TiptapEditor.tsx`                 | `field: "prosemirror"` → `"default"`、awareness ありきのカーソル更新をガード                                                   |
+| フロント     | `src/components/editor/TiptapEditor/editorConfig.ts`     | awareness があるときだけ CollaborationCaret を追加、`field` は呼び出し元から渡すため変更なし                                   |
+| フロント     | `src/lib/collaboration/CollaborationManager.ts`          | Aurora からの fetch/マージ、Aurora への save、全 XmlFragment 参照を `'default'` に統一                                         |
+| バックエンド | `terraform/modules/api/lambda/handlers/pages.mjs`        | `PUT /api/pages/:id/content` で `pages.content_preview` を `content_text` の先頭 200 文字で更新                                |
+| DB           | Aurora `pages` テーブル                                  | backfill: `content_preview` を `content_text` から設定、続けて `updated_at` を NOW() で更新（sync で取得されるようにするため） |
 
 ---
 

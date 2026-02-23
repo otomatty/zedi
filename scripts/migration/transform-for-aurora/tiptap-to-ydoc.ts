@@ -97,7 +97,12 @@ function parseContent(content: string | null): { type: "doc"; content?: unknown[
   if (content == null || String(content).trim() === "") return EMPTY_DOC;
   try {
     const parsed = JSON.parse(String(content)) as unknown;
-    if (parsed && typeof parsed === "object" && "type" in parsed && (parsed as { type: string }).type === "doc") {
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "type" in parsed &&
+      (parsed as { type: string }).type === "doc"
+    ) {
       return sanitizeNode(parsed) as { type: "doc"; content?: unknown[] };
     }
   } catch (_) {
@@ -130,7 +135,9 @@ async function findLatestTransform(): Promise<string | null> {
 async function main() {
   const inputPath = process.argv[2] || (await findLatestTransform());
   if (!inputPath) {
-    console.error("Usage: bun run scripts/migration/transform-for-aurora/tiptap-to-ydoc.ts [path/to/aurora-transform.json]");
+    console.error(
+      "Usage: bun run scripts/migration/transform-for-aurora/tiptap-to-ydoc.ts [path/to/aurora-transform.json]",
+    );
     console.error("Or run after C2-2 (default: latest aurora-transform-*.json in output/)");
     process.exit(1);
   }

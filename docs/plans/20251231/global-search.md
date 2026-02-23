@@ -148,11 +148,7 @@ export interface SearchResult {
   score: number;
 }
 
-export function searchPages(
-  pages: Page[],
-  query: string,
-  limit: number = 10
-): SearchResult[] {
+export function searchPages(pages: Page[], query: string, limit: number = 10): SearchResult[] {
   if (!query.trim()) {
     return [];
   }
@@ -176,7 +172,7 @@ export function searchPages(
 
       const matchedText = extractMatchedSnippet(
         titleMatch ? page.title : getTextFromTiptapJSON(page.content),
-        normalizedQuery
+        normalizedQuery,
       );
 
       results.push({ page, matchedText, score });
@@ -189,11 +185,7 @@ export function searchPages(
   return results.slice(0, limit);
 }
 
-function calculateScore(
-  titleMatch: boolean,
-  contentMatch: boolean,
-  updatedAt: number
-): number {
+function calculateScore(titleMatch: boolean, contentMatch: boolean, updatedAt: number): number {
   let score = 0;
 
   // タイトルマッチは高スコア
@@ -207,11 +199,7 @@ function calculateScore(
   return score;
 }
 
-function extractMatchedSnippet(
-  text: string,
-  query: string,
-  contextLength: number = 50
-): string {
+function extractMatchedSnippet(text: string, query: string, contextLength: number = 50): string {
   const lowerText = text.toLowerCase();
   const index = lowerText.indexOf(query.toLowerCase());
 

@@ -4,11 +4,11 @@
  * API GW の JWT Authorizer が事前に検証したトークンの claims を読み取り、
  * cognitoSub → users.id を Drizzle ORM で解決して Context にセットする。
  */
-import { createMiddleware } from 'hono/factory';
-import { HTTPException } from 'hono/http-exception';
-import { eq } from 'drizzle-orm';
-import { users } from '../schema';
-import type { AppEnv } from '../types';
+import { createMiddleware } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
+import { eq } from "drizzle-orm";
+import { users } from "../schema";
+import type { AppEnv } from "../types";
 
 /**
  * 認証必須ミドルウェア
@@ -17,13 +17,13 @@ import type { AppEnv } from '../types';
 export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
   const event = c.env?.event;
   const rawSub = event?.requestContext?.authorizer?.jwt?.claims?.sub;
-  const sub = typeof rawSub === 'string' ? rawSub : undefined;
+  const sub = typeof rawSub === "string" ? rawSub : undefined;
 
   if (!sub) {
-    throw new HTTPException(401, { message: 'Unauthorized' });
+    throw new HTTPException(401, { message: "Unauthorized" });
   }
 
-  const db = c.get('db');
+  const db = c.get("db");
   const result = await db
     .select({ id: users.id, email: users.email })
     .from(users)
@@ -31,12 +31,12 @@ export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
     .limit(1);
 
   if (!result.length) {
-    throw new HTTPException(401, { message: 'User not found' });
+    throw new HTTPException(401, { message: "User not found" });
   }
 
-  c.set('cognitoSub', sub);
-  c.set('userId', result[0]!.id);
-  c.set('userEmail', result[0]!.email);
+  c.set("cognitoSub", sub);
+  c.set("userId", result[0]!.id);
+  c.set("userEmail", result[0]!.email);
   await next();
 });
 
@@ -47,10 +47,10 @@ export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
 export const authOptional = createMiddleware<AppEnv>(async (c, next) => {
   const event = c.env?.event;
   const rawSub = event?.requestContext?.authorizer?.jwt?.claims?.sub;
-  const sub = typeof rawSub === 'string' ? rawSub : undefined;
+  const sub = typeof rawSub === "string" ? rawSub : undefined;
 
   if (sub) {
-    const db = c.get('db');
+    const db = c.get("db");
     const result = await db
       .select({ id: users.id, email: users.email })
       .from(users)
@@ -58,9 +58,9 @@ export const authOptional = createMiddleware<AppEnv>(async (c, next) => {
       .limit(1);
 
     if (result.length) {
-      c.set('cognitoSub', sub);
-      c.set('userId', result[0]!.id);
-      c.set('userEmail', result[0]!.email);
+      c.set("cognitoSub", sub);
+      c.set("userId", result[0]!.id);
+      c.set("userEmail", result[0]!.email);
     }
   }
 

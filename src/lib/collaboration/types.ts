@@ -6,7 +6,7 @@
 /**
  * WebSocket接続状態
  */
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
 /**
  * ユーザーのプレゼンス情報（他ユーザーへ共有される情報）
@@ -29,7 +29,7 @@ export interface UserPresence {
     to: number;
   } | null;
   /** ステータス */
-  status: 'active' | 'idle' | 'away';
+  status: "active" | "idle" | "away";
   /** 最終アクティビティ時刻 */
   lastActivity: number;
 }
@@ -53,7 +53,7 @@ export interface CollaborationState {
  * - local: 個人ページ。Y.Doc + y-indexeddb のみ。WebSocket 接続なし。
  * - collaborative: 共有ノート内ページ。Hocuspocus でリアルタイム共同編集。
  */
-export type CollaborationMode = 'local' | 'collaborative';
+export type CollaborationMode = "local" | "collaborative";
 
 /**
  * useCollaborationフックのオプション
@@ -72,11 +72,11 @@ export interface UseCollaborationOptions {
  */
 export interface UseCollaborationReturn extends CollaborationState {
   /** Y.Docインスタンス */
-  ydoc: import('yjs').Doc | undefined;
+  ydoc: import("yjs").Doc | undefined;
   /** TiptapのXmlFragment */
-  xmlFragment: import('yjs').XmlFragment | undefined;
+  xmlFragment: import("yjs").XmlFragment | undefined;
   /** Awarenessインスタンス */
-  awareness: import('y-protocols/awareness').Awareness | undefined;
+  awareness: import("y-protocols/awareness").Awareness | undefined;
   /** CollaborationCaret用のユーザー情報（name, color） */
   collaborationUser: { name: string; color: string } | undefined;
   /** カーソル位置を更新 */
@@ -92,16 +92,16 @@ export interface UseCollaborationReturn extends CollaborationState {
  * コラボレーションカーソル表示用
  */
 export const USER_COLORS = [
-  '#f87171', // red-400
-  '#fb923c', // orange-400
-  '#fbbf24', // amber-400
-  '#a3e635', // lime-400
-  '#34d399', // emerald-400
-  '#22d3ee', // cyan-400
-  '#60a5fa', // blue-400
-  '#a78bfa', // violet-400
-  '#f472b6', // pink-400
-  '#818cf8', // indigo-400
+  "#f87171", // red-400
+  "#fb923c", // orange-400
+  "#fbbf24", // amber-400
+  "#a3e635", // lime-400
+  "#34d399", // emerald-400
+  "#22d3ee", // cyan-400
+  "#60a5fa", // blue-400
+  "#a78bfa", // violet-400
+  "#f472b6", // pink-400
+  "#818cf8", // indigo-400
 ] as const;
 
 /**
@@ -114,7 +114,7 @@ export function getUserColor(userId?: string): string {
   // ユーザーIDのハッシュから色を決定（同じユーザーは常に同じ色）
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
-    hash = ((hash << 5) - hash) + userId.charCodeAt(i);
+    hash = (hash << 5) - hash + userId.charCodeAt(i);
     hash |= 0;
   }
   return USER_COLORS[Math.abs(hash) % USER_COLORS.length];

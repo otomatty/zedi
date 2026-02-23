@@ -4,9 +4,9 @@
 
 ## 概要
 
-| Worker | 用途 | 開発用名 | 本番用名 |
-|--------|------|----------|----------|
-| ai-api | AI チャット API | `zedi-ai-api-dev` | `zedi-ai-api` |
+| Worker        | 用途                    | 開発用名                 | 本番用名             |
+| ------------- | ----------------------- | ------------------------ | -------------------- |
+| ai-api        | AI チャット API         | `zedi-ai-api-dev`        | `zedi-ai-api`        |
 | thumbnail-api | サムネイル検索/生成 API | `zedi-thumbnail-api-dev` | `zedi-thumbnail-api` |
 
 ## 前提条件
@@ -119,6 +119,7 @@ npx wrangler secret put GOOGLE_GEMINI_API_KEY --env production
 ```
 
 > 💡 **ヒント**: パイプを使って値を直接渡すこともできます（非推奨：コマンド履歴に残る可能性があります）
+>
 > ```bash
 > echo "your_secret_value" | npx wrangler secret put SECRET_NAME --env production
 > ```
@@ -312,10 +313,10 @@ npx wrangler secret put OPENAI_API_KEY
 
 リポジトリの **Settings** → **Secrets and variables** → **Actions** で以下を追加：
 
-| Secret 名 | 値 |
-|-----------|-----|
-| `CLOUDFLARE_API_TOKEN` | 手順 1 で作成した API トークン |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare ダッシュボードの URL から取得（`dash.cloudflare.com/<ACCOUNT_ID>/...`）|
+| Secret 名               | 値                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | 手順 1 で作成した API トークン                                                     |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare ダッシュボードの URL から取得（`dash.cloudflare.com/<ACCOUNT_ID>/...`） |
 
 ### 5.2 ワークフローの動作
 
@@ -351,11 +352,11 @@ CORS_ORIGIN = "https://zedi-note.app/"
 
 ### 環境の指定
 
-| コマンド | デプロイ先 |
-|----------|------------|
-| `wrangler deploy` | 開発環境（`*-dev`） |
-| `wrangler deploy --env production` | 本番環境 |
-| `wrangler dev` | ローカル開発サーバー |
+| コマンド                           | デプロイ先           |
+| ---------------------------------- | -------------------- |
+| `wrangler deploy`                  | 開発環境（`*-dev`）  |
+| `wrangler deploy --env production` | 本番環境             |
+| `wrangler dev`                     | ローカル開発サーバー |
 
 ---
 

@@ -11,7 +11,10 @@ import { handler } from "./index.mjs";
 const mockContext = { awsRequestId: "local", getRemainingTimeInMillis: () => 30000 };
 
 const events = [
-  { name: "GET /api/health", event: { requestContext: { http: { method: "GET" } }, rawPath: "/api/health" } },
+  {
+    name: "GET /api/health",
+    event: { requestContext: { http: { method: "GET" } }, rawPath: "/api/health" },
+  },
   {
     name: "GET /api/me (with claims)",
     event: {

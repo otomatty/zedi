@@ -92,15 +92,7 @@ export function usePageDeletion({
       }
     }
     navigate("/home");
-  }, [
-    navigate,
-    currentPageId,
-    title,
-    content,
-    deletePageMutation,
-    shouldBlockSave,
-    toast,
-  ]);
+  }, [navigate, currentPageId, title, content, deletePageMutation, shouldBlockSave, toast]);
 
   const handleConfirmDelete = useCallback(() => {
     if (currentPageId) {

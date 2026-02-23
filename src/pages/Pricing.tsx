@@ -58,12 +58,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <Card
-      className={cn(
-        "relative flex flex-col",
-        popular && "border-primary shadow-lg"
-      )}
-    >
+    <Card className={cn("relative flex flex-col", popular && "border-primary shadow-lg")}>
       {popular && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
           {t("pricing.recommended")}
@@ -83,26 +78,19 @@ const PlanCard: React.FC<PlanCardProps> = ({
       <CardContent className="flex-1">
         <div className="mb-6">
           <span className="text-3xl font-bold">{price}</span>
-          {priceNote && (
-            <span className="text-sm text-muted-foreground ml-2">
-              {priceNote}
-            </span>
-          )}
+          {priceNote && <span className="ml-2 text-sm text-muted-foreground">{priceNote}</span>}
         </div>
         <ul className="space-y-3">
           {features.map((feature, index) => (
             <li key={index} className="flex items-start gap-2">
               <Check
                 className={cn(
-                  "h-4 w-4 mt-0.5 shrink-0",
-                  feature.included ? "text-primary" : "text-muted-foreground/30"
+                  "mt-0.5 h-4 w-4 shrink-0",
+                  feature.included ? "text-primary" : "text-muted-foreground/30",
                 )}
               />
               <span
-                className={cn(
-                  "text-sm",
-                  !feature.included && "text-muted-foreground line-through"
-                )}
+                className={cn("text-sm", !feature.included && "text-muted-foreground line-through")}
               >
                 {feature.text}
               </span>
@@ -129,16 +117,9 @@ type BillingInterval = "monthly" | "yearly";
 
 const Pricing: React.FC = () => {
   const { userId, isSignedIn } = useAuth();
-  const {
-    plan: currentPlan,
-    isProUser,
-    usage,
-    isLoading,
-    refetch,
-  } = useSubscription();
+  const { plan: currentPlan, isProUser, usage, isLoading, refetch } = useSubscription();
 
-  const [billingInterval, setBillingInterval] =
-    useState<BillingInterval>("monthly");
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
 
   const usageForBar: AIUsage | null = usage
     ? {
@@ -177,15 +158,15 @@ const Pricing: React.FC = () => {
 
       <main className="py-8">
         <Container>
-          <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold mb-2">シンプルな料金プラン</h2>
+          <div className="mb-10 text-center">
+            <h2 className="mb-2 text-2xl font-bold">シンプルな料金プラン</h2>
             <p className="text-muted-foreground">
               Free で基本機能とクラウド同期。Pro で無制限ページとフルAI機能。
             </p>
           </div>
 
           {/* Monthly / Yearly toggle for Pro */}
-          <div className="flex justify-center gap-2 mb-6">
+          <div className="mb-6 flex justify-center gap-2">
             <Button
               variant={billingInterval === "monthly" ? "default" : "outline"}
               size="sm"
@@ -202,7 +183,7 @@ const Pricing: React.FC = () => {
             </Button>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 max-w-4xl mx-auto">
+          <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
             <PlanCard
               name="Free"
               description="基本機能を無料で"
@@ -220,10 +201,7 @@ const Pricing: React.FC = () => {
               buttonVariant="outline"
               current={!isProUser}
               extraContent={
-                isSignedIn &&
-                usageForBar && (
-                  <UsageBar usage={usageForBar} autoRefresh={false} />
-                )
+                isSignedIn && usageForBar && <UsageBar usage={usageForBar} autoRefresh={false} />
               }
             />
 
@@ -256,18 +234,14 @@ const Pricing: React.FC = () => {
           </div>
 
           {isLoading && (
-            <p className="text-center text-sm text-muted-foreground mt-4">
-              プラン情報を取得中...
-            </p>
+            <p className="mt-4 text-center text-sm text-muted-foreground">プラン情報を取得中...</p>
           )}
 
-          <div className="mt-12 max-w-3xl mx-auto">
-            <h3 className="text-lg font-semibold mb-4 text-center">
-              AI機能について
-            </h3>
+          <div className="mx-auto mt-12 max-w-3xl">
+            <h3 className="mb-4 text-center text-lg font-semibold">AI機能について</h3>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="p-4 rounded-lg border">
-                <h4 className="font-medium mb-2 flex items-center gap-2">
+              <div className="rounded-lg border p-4">
+                <h4 className="mb-2 flex items-center gap-2 font-medium">
                   <Sparkles className="h-4 w-4 text-primary" />
                   Free プラン
                 </h4>
@@ -277,8 +251,8 @@ const Pricing: React.FC = () => {
                   <li>- Wiki生成、Mermaid図 生成</li>
                 </ul>
               </div>
-              <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
-                <h4 className="font-medium mb-2 flex items-center gap-2">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <h4 className="mb-2 flex items-center gap-2 font-medium">
                   <Zap className="h-4 w-4 text-primary" />
                   Pro プラン
                 </h4>
@@ -289,38 +263,31 @@ const Pricing: React.FC = () => {
                 </ul>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground text-center mt-4">
+            <p className="mt-4 text-center text-xs text-muted-foreground">
               自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。
             </p>
           </div>
 
-          <div className="mt-12 max-w-3xl mx-auto">
-            <h3 className="text-lg font-semibold mb-4 text-center">
-              よくある質問
-            </h3>
+          <div className="mx-auto mt-12 max-w-3xl">
+            <h3 className="mb-4 text-center text-lg font-semibold">よくある質問</h3>
             <div className="space-y-4">
-              <div className="p-4 rounded-lg border">
-                <h4 className="font-medium mb-1">
-                  Proプランの使用量はどう計算されますか？
-                </h4>
+              <div className="rounded-lg border p-4">
+                <h4 className="mb-1 font-medium">Proプランの使用量はどう計算されますか？</h4>
                 <p className="text-sm text-muted-foreground">
                   利用するモデルとトークン消費量に応じたコストユニットで計算されます。
-                  軽量モデルなら月に数百回の生成が可能です。
-                  設定画面で現在の使用率を確認できます。
+                  軽量モデルなら月に数百回の生成が可能です。 設定画面で現在の使用率を確認できます。
                 </p>
               </div>
-              <div className="p-4 rounded-lg border">
-                <h4 className="font-medium mb-1">
-                  自分のAPIキーとサブスクの違いは？
-                </h4>
+              <div className="rounded-lg border p-4">
+                <h4 className="mb-1 font-medium">自分のAPIキーとサブスクの違いは？</h4>
                 <p className="text-sm text-muted-foreground">
                   サブスクではZediのAI基盤を通じて簡単にAI機能を使えます。
                   自分のAPIキーを設定すると使用量制限なく利用できますが、
                   各プロバイダーとの個別契約と料金が必要です。
                 </p>
               </div>
-              <div className="p-4 rounded-lg border">
-                <h4 className="font-medium mb-1">返金ポリシーはありますか？</h4>
+              <div className="rounded-lg border p-4">
+                <h4 className="mb-1 font-medium">返金ポリシーはありますか？</h4>
                 <p className="text-sm text-muted-foreground">
                   購入後14日以内であれば全額返金いたします。
                   お問い合わせフォームからご連絡ください。

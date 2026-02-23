@@ -25,8 +25,7 @@ export const noteKeys = {
     [...noteKeys.all, "public", sort, limit, offset] as const,
   pages: () => [...noteKeys.all, "pages"] as const,
   pageList: (noteId: string) => [...noteKeys.pages(), noteId] as const,
-  page: (noteId: string, pageId: string) =>
-    [...noteKeys.pages(), noteId, pageId] as const,
+  page: (noteId: string, pageId: string) => [...noteKeys.pages(), noteId, pageId] as const,
   members: () => [...noteKeys.all, "members"] as const,
   memberList: (noteId: string) => [...noteKeys.members(), noteId] as const,
 };
@@ -81,7 +80,7 @@ function apiNoteToNoteSummary(item: NoteListItem): import("@/types/note").NoteSu
 
 /** Map Discover API item to NoteSummary for NoteCard. */
 export function mapDiscoverItemToNoteSummary(
-  item: DiscoverResponse["official"][0]
+  item: DiscoverResponse["official"][0],
 ): import("@/types/note").NoteSummary {
   return {
     ...apiNoteToNote({ ...item, is_deleted: false }),
@@ -94,7 +93,7 @@ export function mapDiscoverItemToNoteSummary(
 function buildAccessFromApi(
   note: Note,
   currentUserRole: "owner" | "editor" | "viewer" | "guest",
-  userId?: string
+  userId?: string,
 ): NoteAccess {
   const isOwner = currentUserRole === "owner";
   const isEditor = currentUserRole === "editor";
@@ -103,8 +102,7 @@ function buildAccessFromApi(
   const canView = isOwner || isEditor || isViewer || isGuest;
   const canEdit = isOwner || isEditor;
   const canAddPage =
-    canEdit ||
-    (note.editPermission === "any_logged_in" && canView && Boolean(userId));
+    canEdit || (note.editPermission === "any_logged_in" && canView && Boolean(userId));
   const canManageMembers = isOwner;
   const canDeletePage = (addedByUserId: string) => {
     if (isOwner) return true;
@@ -236,7 +234,7 @@ export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 
 export function useNotePages(
   noteId: string,
   _source?: "local" | "remote",
-  enabled: boolean = true
+  enabled: boolean = true,
 ) {
   const { api, isLoaded, userId } = useNoteApi();
 
@@ -257,7 +255,7 @@ export function useNotePage(
   noteId: string,
   pageId: string,
   _source?: "local" | "remote",
-  enabled: boolean = true
+  enabled: boolean = true,
 ) {
   const { api, isLoaded, isSignedIn } = useNoteApi();
 
@@ -444,13 +442,7 @@ export function useRemoveNoteMember() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      noteId,
-      memberEmail,
-    }: {
-      noteId: string;
-      memberEmail: string;
-    }) => {
+    mutationFn: async ({ noteId, memberEmail }: { noteId: string; memberEmail: string }) => {
       await api.removeNoteMember(noteId, memberEmail);
     },
     onSuccess: (_, variables) => {

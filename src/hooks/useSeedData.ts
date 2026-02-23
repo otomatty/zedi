@@ -40,9 +40,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "1つのページには1つのアイデアだけ" },
-                  ],
+                  content: [{ type: "text", text: "1つのページには1つのアイデアだけ" }],
                 },
               ],
             },
@@ -65,9 +63,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "整理は後回し。まずは書き留める" },
-                  ],
+                  content: [{ type: "text", text: "整理は後回し。まずは書き留める" }],
                 },
               ],
             },
@@ -103,9 +99,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "内部リンク: 既存のページへの接続" },
-                  ],
+                  content: [{ type: "text", text: "内部リンク: 既存のページへの接続" }],
                 },
               ],
             },
@@ -192,9 +186,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "完璧を目指さず、まずは書き留める" },
-                  ],
+                  content: [{ type: "text", text: "完璧を目指さず、まずは書き留める" }],
                 },
               ],
             },

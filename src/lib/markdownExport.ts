@@ -142,9 +142,7 @@ function convertListItemContent(item: TiptapNode): string {
       // Handle nested lists
       if (child.type === "bulletList" || child.type === "orderedList") {
         const nestedList =
-          child.type === "bulletList"
-            ? convertList(child, "-")
-            : convertOrderedList(child);
+          child.type === "bulletList" ? convertList(child, "-") : convertOrderedList(child);
         return (
           "\n" +
           nestedList
@@ -230,10 +228,7 @@ function sanitizeFilename(name: string): string {
 /**
  * Copy Markdown content to clipboard
  */
-export async function copyMarkdownToClipboard(
-  title: string,
-  content: string
-): Promise<void> {
+export async function copyMarkdownToClipboard(title: string, content: string): Promise<void> {
   const markdown = tiptapToMarkdown(content);
 
   // Add title as H1 if not empty

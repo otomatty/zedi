@@ -35,13 +35,13 @@
 
 ## 4. 実施した対応
 
-1. **CollaborationManager を HocuspocusProvider に差し替え**  
-   - パッケージ: `@hocuspocus/provider` を追加し、`WebsocketProvider` の代わりに `HocuspocusProvider` を使用。  
+1. **CollaborationManager を HocuspocusProvider に差し替え**
+   - パッケージ: `@hocuspocus/provider` を追加し、`WebsocketProvider` の代わりに `HocuspocusProvider` を使用。
    - Hocuspocus が期待する認証フロー（Auth メッセージ送信）に準拠する。
 
-2. **Cognito 統一時の方針（調査メモ）**  
-   - クライアント: `getAuthToken()` を Cognito の ID token / Access token 取得に変更。  
-   - サーバー: `onAuthenticate` 内で Cognito JWT を検証（`aws-jwt-verify` 等）。  
+2. **Cognito 統一時の方針（調査メモ）**
+   - クライアント: `getAuthToken()` を Cognito の ID token / Access token 取得に変更。
+   - サーバー: `onAuthenticate` 内で Cognito JWT を検証（`aws-jwt-verify` 等）。
    - Terraform: ECS タスクには既に `COGNITO_USER_POOL_ID` / `COGNITO_REGION` が渡されている。
 
 ---
@@ -63,9 +63,9 @@
 
 ## 6. 関連ドキュメント
 
-| ドキュメント | パス |
-|-------------|------|
-| 実装計画・現状 | docs/plans/20260123/implementation-status-and-roadmap.md |
-| Hocuspocus デプロイ | docs/work-logs/20260201/hocuspocus-server-deployment.md |
-| Tiptap コラボセットアップ | docs/work-logs/20260201/tiptap-collaboration-setup.md |
+| ドキュメント               | パス                                                      |
+| -------------------------- | --------------------------------------------------------- |
+| 実装計画・現状             | docs/plans/20260123/implementation-status-and-roadmap.md  |
+| Hocuspocus デプロイ        | docs/work-logs/20260201/hocuspocus-server-deployment.md   |
+| Tiptap コラボセットアップ  | docs/work-logs/20260201/tiptap-collaboration-setup.md     |
 | Tiptap Hocuspocus Provider | https://tiptap.dev/docs/hocuspocus/provider/configuration |

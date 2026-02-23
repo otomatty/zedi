@@ -4,14 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth, SignedIn, SignedOut } from "@/hooks/useAuth";
-import {
-  FileText,
-  Link as LinkIcon,
-  Search,
-  Cloud,
-  Sparkles,
-  ArrowRight,
-} from "lucide-react";
+import { FileText, Link as LinkIcon, Search, Cloud, Sparkles, ArrowRight } from "lucide-react";
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -19,11 +12,7 @@ interface FeatureCardProps {
   description: string;
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({
-  icon,
-  title,
-  description,
-}) => (
+const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => (
   <Card className="border-border/50 bg-card/50 backdrop-blur">
     <CardContent className="pt-6">
       <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -43,7 +32,7 @@ const Landing: React.FC = () => {
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
       </div>
     );
   }
@@ -54,11 +43,31 @@ const Landing: React.FC = () => {
   }
 
   const features = [
-    { icon: <FileText className="h-6 w-6" />, title: t("landing.feature1Title"), description: t("landing.feature1Description") },
-    { icon: <LinkIcon className="h-6 w-6" />, title: t("landing.feature2Title"), description: t("landing.feature2Description") },
-    { icon: <Search className="h-6 w-6" />, title: t("landing.feature3Title"), description: t("landing.feature3Description") },
-    { icon: <Cloud className="h-6 w-6" />, title: t("landing.feature4Title"), description: t("landing.feature4Description") },
-    { icon: <Sparkles className="h-6 w-6" />, title: t("landing.feature5Title"), description: t("landing.feature5Description") },
+    {
+      icon: <FileText className="h-6 w-6" />,
+      title: t("landing.feature1Title"),
+      description: t("landing.feature1Description"),
+    },
+    {
+      icon: <LinkIcon className="h-6 w-6" />,
+      title: t("landing.feature2Title"),
+      description: t("landing.feature2Description"),
+    },
+    {
+      icon: <Search className="h-6 w-6" />,
+      title: t("landing.feature3Title"),
+      description: t("landing.feature3Description"),
+    },
+    {
+      icon: <Cloud className="h-6 w-6" />,
+      title: t("landing.feature4Title"),
+      description: t("landing.feature4Description"),
+    },
+    {
+      icon: <Sparkles className="h-6 w-6" />,
+      title: t("landing.feature5Title"),
+      description: t("landing.feature5Description"),
+    },
   ];
 
   return (
@@ -66,7 +75,7 @@ const Landing: React.FC = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-xl font-bold tracking-tight text-transparent">
             Zedi
           </h1>
           <div className="flex items-center gap-4">
@@ -141,12 +150,8 @@ const Landing: React.FC = () => {
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-16">
         <div className="mx-auto max-w-2xl rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 p-8 text-center sm:p-12">
-          <h3 className="mb-4 text-2xl font-bold sm:text-3xl">
-            {t("landing.ctaTitle")}
-          </h3>
-          <p className="mb-6 text-muted-foreground">
-            {t("landing.ctaDescription")}
-          </p>
+          <h3 className="mb-4 text-2xl font-bold sm:text-3xl">{t("landing.ctaTitle")}</h3>
+          <p className="mb-6 text-muted-foreground">{t("landing.ctaDescription")}</p>
           <SignedOut>
             <Link to="/sign-in">
               <Button size="lg">

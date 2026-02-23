@@ -11,28 +11,28 @@
 
 ### 2.1 認証まわり（名前の取得元）
 
-| 箇所 | 内容 |
-|------|------|
-| `src/lib/auth/cognitoAuth.ts` | `parseIdToken()` で ID トークンから `name`, `cognito:username`, `picture`, `email` を取得。 |
+| 箇所                                          | 内容                                                                                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/auth/cognitoAuth.ts`                 | `parseIdToken()` で ID トークンから `name`, `cognito:username`, `picture`, `email` を取得。                                                                               |
 | `src/components/auth/CognitoAuthProvider.tsx` | `userFromToken()` で `fullName = parsed?.name ?? parsed?.["cognito:username"] ?? ""` を算出。Google/GitHub の表示名は `user.fullName` または `user.username` で利用可能。 |
 
 → **Google/GitHub のアカウント名は既に `useUser().user.fullName` / `user.username` で取得可能。**
 
 ### 2.2 プロフィール（useProfile）
 
-| 箇所 | 内容 |
-|------|------|
+| 箇所                      | 内容                                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------- | --- | ------------------------------------------------------------------------------ |
 | `src/hooks/useProfile.ts` | 編集用の `profile.displayName` は API `upsertMe` のレスポンスで初期化。未設定時は空文字 `""`。 |
-| 同上 | **表示用**の `displayName` は `profile.displayName || user?.fullName ?? user?.username ?? ""` で算出（Cognito フォールバックあり）。 |
+| 同上                      | **表示用**の `displayName` は `profile.displayName                                             |     | user?.fullName ?? user?.username ?? ""` で算出（Cognito フォールバックあり）。 |
 
 → **フォームの入力値は `profile.displayName` のみ参照しているため、バックエンドが空で返すと入力欄は空のまま。**
 
 ### 2.3 ウィザード（Onboarding）
 
-| 箇所 | 内容 |
-|------|------|
-| `src/pages/Onboarding.tsx` | Step 1 で `<Input value={profile.displayName} onChange={…} />` を使用。 |
-| 同上 | 「次へ」は `isProfileSaving` のときのみ disabled。**表示名が空でも次へ進める。** |
+| 箇所                                    | 内容                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/pages/Onboarding.tsx`              | Step 1 で `<Input value={profile.displayName} onChange={…} />` を使用。           |
+| 同上                                    | 「次へ」は `isProfileSaving` のときのみ disabled。**表示名が空でも次へ進める。**  |
 | `docs/onboarding-wizard-ux-proposal.md` | Step 1 の説明は「表示名とプロフィール画像を設定します（**任意**）」となっている。 |
 
 → **現状は表示名が空でも次へ進め、かつ IdP 名の自動入力はされない。**
@@ -74,13 +74,13 @@
 
 ## 4. 変更ファイル一覧（案）
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `src/hooks/useProfile.ts` | プロフィール取得後、`display_name` が空なら `user.fullName ?? user.username` で `profile.displayName` を初期化。 |
-| `src/pages/Onboarding.tsx` | Step 1 で表示名の空チェック、次へボタンの disabled、エラーメッセージ表示を追加。 |
-| `src/i18n/locales/ja/onboarding.json` | `profile.description` を必須を明示する文言に変更。表示名必須用のエラーキーを追加。 |
-| `src/i18n/locales/en/onboarding.json` | 同上（英語）。 |
-| （任意）`src/i18n/locales/ja/generalSettings.json` | `displayNameHelp` を「空欄の場合は…」から「サインイン時の名前が初期値として入ります」などに変更可能。 |
+| ファイル                                           | 変更内容                                                                                                         |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `src/hooks/useProfile.ts`                          | プロフィール取得後、`display_name` が空なら `user.fullName ?? user.username` で `profile.displayName` を初期化。 |
+| `src/pages/Onboarding.tsx`                         | Step 1 で表示名の空チェック、次へボタンの disabled、エラーメッセージ表示を追加。                                 |
+| `src/i18n/locales/ja/onboarding.json`              | `profile.description` を必須を明示する文言に変更。表示名必須用のエラーキーを追加。                               |
+| `src/i18n/locales/en/onboarding.json`              | 同上（英語）。                                                                                                   |
+| （任意）`src/i18n/locales/ja/generalSettings.json` | `displayNameHelp` を「空欄の場合は…」から「サインイン時の名前が初期値として入ります」などに変更可能。            |
 
 ---
 

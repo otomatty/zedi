@@ -92,7 +92,7 @@ const SlashSuggestionMenu = forwardRef<
         onClose();
       }
     },
-    [items, editor, range, onClose]
+    [items, editor, range, onClose],
   );
 
   // Scroll selected item into view
@@ -137,10 +137,8 @@ const SlashSuggestionMenu = forwardRef<
 
   if (items.length === 0) {
     return (
-      <div className="bg-popover border border-border rounded-lg shadow-elevated overflow-hidden min-w-[240px] animate-fade-in">
-        <div className="px-3 py-2 text-sm text-muted-foreground">
-          {t("editor.slashNoResults")}
-        </div>
+      <div className="shadow-elevated min-w-[240px] animate-fade-in overflow-hidden rounded-lg border border-border bg-popover">
+        <div className="px-3 py-2 text-sm text-muted-foreground">{t("editor.slashNoResults")}</div>
       </div>
     );
   }
@@ -148,7 +146,7 @@ const SlashSuggestionMenu = forwardRef<
   return (
     <div
       ref={listRef}
-      className="bg-popover border border-border rounded-lg shadow-elevated overflow-hidden min-w-[240px] max-w-[320px] max-h-[320px] overflow-y-auto animate-fade-in"
+      className="shadow-elevated max-h-[320px] min-w-[240px] max-w-[320px] animate-fade-in overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover"
       role="listbox"
       aria-label={t("editor.slashMenuAriaLabel")}
     >
@@ -162,18 +160,14 @@ const SlashSuggestionMenu = forwardRef<
               aria-selected={index === selectedIndex}
               onClick={() => selectItem(index)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-left text-sm transition-colors",
-                index === selectedIndex
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-muted"
+                "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                index === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted",
               )}
             >
-              {Icon && (
-                <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-              )}
-              <div className="flex flex-col min-w-0">
-                <span className="font-medium truncate">{t(`editor.slash.${item.id}.title`)}</span>
-                <span className="text-xs text-muted-foreground truncate">
+              {Icon && <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate font-medium">{t(`editor.slash.${item.id}.title`)}</span>
+                <span className="truncate text-xs text-muted-foreground">
                   {t(`editor.slash.${item.id}.description`)}
                 </span>
               </div>

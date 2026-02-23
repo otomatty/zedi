@@ -1,11 +1,7 @@
 // ストレージ設定を管理するカスタムフック
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  StorageSettings,
-  StorageProviderType,
-  DEFAULT_STORAGE_SETTINGS,
-} from "@/types/storage";
+import { StorageSettings, StorageProviderType, DEFAULT_STORAGE_SETTINGS } from "@/types/storage";
 import {
   loadStorageSettings,
   saveStorageSettings,
@@ -27,9 +23,7 @@ interface UseStorageSettingsReturn {
   isTesting: boolean;
   testResult: ConnectionTestResult | null;
   updateSettings: (updates: Partial<StorageSettings>) => void;
-  updateConfig: (
-    updates: Partial<StorageSettings["config"]>
-  ) => void;
+  updateConfig: (updates: Partial<StorageSettings["config"]>) => void;
   save: () => Promise<boolean>;
   test: () => Promise<ConnectionTestResult>;
   reset: () => void;
@@ -37,15 +31,11 @@ interface UseStorageSettingsReturn {
 
 export function useStorageSettings(): UseStorageSettingsReturn {
   const { getToken, isSignedIn } = useAuth();
-  const [settings, setSettings] = useState<StorageSettings>(
-    getDefaultStorageSettings()
-  );
+  const [settings, setSettings] = useState<StorageSettings>(getDefaultStorageSettings());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(
-    null
-  );
+  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
 
   // 初期読み込み
   useEffect(() => {
@@ -88,17 +78,14 @@ export function useStorageSettings(): UseStorageSettingsReturn {
   }, []);
 
   // 設定のconfigを更新する
-  const updateConfig = useCallback(
-    (updates: Partial<StorageSettings["config"]>) => {
-      setSettings((prev) => ({
-        ...prev,
-        config: { ...prev.config, ...updates },
-      }));
-      // 設定変更時はテスト結果をリセット
-      setTestResult(null);
-    },
-    []
-  );
+  const updateConfig = useCallback((updates: Partial<StorageSettings["config"]>) => {
+    setSettings((prev) => ({
+      ...prev,
+      config: { ...prev.config, ...updates },
+    }));
+    // 設定変更時はテスト結果をリセット
+    setTestResult(null);
+  }, []);
 
   // 設定を保存する
   const save = useCallback(async (): Promise<boolean> => {

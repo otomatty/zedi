@@ -9,41 +9,41 @@
 
 ### 1.1 認証プロバイダ・エントリ
 
-| ファイル | 役割 |
-|----------|------|
-| `src/main.tsx` | `ClerkProvider` でアプリをラップ。E2E 時は `MockClerkProvider`。`VITE_CLERK_PUBLISHABLE_KEY` 必須。 |
-| `src/components/auth/MockClerkProvider.tsx` | E2E 用のモック。`useMockAuth` / `getToken` / `userId` / `signOut` を提供。 |
+| ファイル                                    | 役割                                                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `src/main.tsx`                              | `ClerkProvider` でアプリをラップ。E2E 時は `MockClerkProvider`。`VITE_CLERK_PUBLISHABLE_KEY` 必須。 |
+| `src/components/auth/MockClerkProvider.tsx` | E2E 用のモック。`useMockAuth` / `getToken` / `userId` / `signOut` を提供。                          |
 
 ### 1.2 認証フックの抽象化
 
-| ファイル | 役割 |
-|----------|------|
+| ファイル               | 役割                                                                                            |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
 | `src/hooks/useAuth.ts` | `useAuth` / `useUser` / `SignedIn` / `SignedOut` を提供。通常時は Clerk、E2E 時は Mock に委譲。 |
 
 **重要:** アプリの多くのコンポーネントは **Clerk を直接 import していない**。`@/hooks/useAuth` と `@/components/auth/ProtectedRoute` 経由のみ。一方、以下は **Clerk 直接参照** あり。
 
 ### 1.3 Clerk を直接参照しているファイル
 
-| ファイル | 参照内容 | 移行時の対応 |
-|----------|----------|--------------|
-| `src/pages/SignIn.tsx` | `SignIn as ClerkSignIn` from `@clerk/clerk-react` | Cognito 用のサインイン画面に差し替え（Hosted UI リダイレクト or カスタムフォーム） |
-| `src/components/layout/Header.tsx` | `useUser`, `useClerk` from `@clerk/clerk-react`（`signOut` 用） | `useAuth` / `useUser` と Cognito の `signOut` に統一 |
+| ファイル                           | 参照内容                                                        | 移行時の対応                                                                       |
+| ---------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `src/pages/SignIn.tsx`             | `SignIn as ClerkSignIn` from `@clerk/clerk-react`               | Cognito 用のサインイン画面に差し替え（Hosted UI リダイレクト or カスタムフォーム） |
+| `src/components/layout/Header.tsx` | `useUser`, `useClerk` from `@clerk/clerk-react`（`signOut` 用） | `useAuth` / `useUser` と Cognito の `signOut` に統一                               |
 
 ### 1.4 トークン取得（getToken）の利用箇所
 
 Clerk の `getToken(options?)` は **JWT を返す**。オプションで `template: "turso"` を指定している箇所あり（Clerk JWT テンプレート「turso」用）。Cognito 移行後は **ID Token / Access Token** で同等の役割を満たす。
 
-| ファイル | 用途 | 備考 |
-|----------|------|------|
-| `src/hooks/useCollaboration.ts` | `getToken()`（引数なし） | Hocuspocus の Auth メッセージ用。Cognito では **ID Token** を渡す想定。 |
-| `src/hooks/usePageQueries.ts` | `getToken({ template: "turso" })` | Turso 認証・同期用。Aurora 移行後は **Cognito ID Token** で API 認証に利用。 |
-| `src/hooks/useTurso.ts` | `getToken({ template: "turso" })` | `createAuthenticatedTursoClient` に JWT を渡す。Aurora 移行まで Turso を使う場合は Cognito JWT に差し替え。 |
-| `src/lib/aiService.ts` | `getClerkToken()`（内部で `getToken({ template: "turso" })`） | AI API 呼び出しの `Authorization: Bearer`。Cognito ID Token に差し替え。 |
+| ファイル                        | 用途                                                          | 備考                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `src/hooks/useCollaboration.ts` | `getToken()`（引数なし）                                      | Hocuspocus の Auth メッセージ用。Cognito では **ID Token** を渡す想定。                                     |
+| `src/hooks/usePageQueries.ts`   | `getToken({ template: "turso" })`                             | Turso 認証・同期用。Aurora 移行後は **Cognito ID Token** で API 認証に利用。                                |
+| `src/hooks/useTurso.ts`         | `getToken({ template: "turso" })`                             | `createAuthenticatedTursoClient` に JWT を渡す。Aurora 移行まで Turso を使う場合は Cognito JWT に差し替え。 |
+| `src/lib/aiService.ts`          | `getClerkToken()`（内部で `getToken({ template: "turso" })`） | AI API 呼び出しの `Authorization: Bearer`。Cognito ID Token に差し替え。                                    |
 
 ### 1.5 Turso 認証（移行期のみ）
 
-| ファイル | 役割 |
-|----------|------|
+| ファイル           | 役割                                                                                                                                                                                                                                                                                                  |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/lib/turso.ts` | `createAuthenticatedTursoClient(jwtToken)`。現状は Clerk JWT または `VITE_TURSO_AUTH_TOKEN` フォールバック。Aurora 移行後は Turso 認証は不要になるが、**移行期間中**は Cognito で発行した JWT を Turso に渡す必要があるかは Turso 側の JWT 検証設定次第（多くの場合は Aurora 切り替えと同時に廃止）。 |
 
 ### 1.6 その他
@@ -102,14 +102,14 @@ Clerk の `getToken(options?)` は **JWT を返す**。オプションで `templ
 
 ## 4. 確定仕様（2026-02-03 反映）
 
-| 項目 | 決定内容 |
-|------|----------|
-| メール・パスワード認証 | 使用しない（OAuth のみ） |
-| サインアップ / パスワードリセット | 不要（Google/GitHub 初回サインインで Cognito がユーザー自動作成） |
-| OAuth コールバック URL | 本番: `https://zedi-note.app/auth/callback` / 開発: `http://localhost:30000/auth/callback` |
-| ログアウト後の戻り先 | 本番: `https://zedi-note.app` / 開発: `http://localhost:30000` |
-| 既存ユーザー（Clerk）移行 | 今回フェーズで実施（Clerk userId → Cognito sub マッピング、DB `user_id` 更新） |
-| Google/GitHub OAuth | 既存の OAuth アプリを Cognito IdP に登録する |
+| 項目                              | 決定内容                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| メール・パスワード認証            | 使用しない（OAuth のみ）                                                                   |
+| サインアップ / パスワードリセット | 不要（Google/GitHub 初回サインインで Cognito がユーザー自動作成）                          |
+| OAuth コールバック URL            | 本番: `https://zedi-note.app/auth/callback` / 開発: `http://localhost:30000/auth/callback` |
+| ログアウト後の戻り先              | 本番: `https://zedi-note.app` / 開発: `http://localhost:30000`                             |
+| 既存ユーザー（Clerk）移行         | 今回フェーズで実施（Clerk userId → Cognito sub マッピング、DB `user_id` 更新）             |
+| Google/GitHub OAuth               | 既存の OAuth アプリを Cognito IdP に登録する                                               |
 
 ---
 
@@ -119,27 +119,27 @@ Clerk の `getToken(options?)` は **JWT を返す**。オプションで `templ
 
 ### 5.1 フロントエンド共通
 
-| # | タスク | 詳細 |
-|---|--------|------|
-| 1 | **Cognito 用 Auth コンテキスト・ストア** | トークン（id_token / access_token / refresh_token）とユーザー情報（sub, email 等）を保持。localStorage 等への永続化。リフレッシュは有効期限前に実行。 |
-| 2 | **useAuth / useUser の Cognito 版** | 既存の `useAuth` の戻り値（`isLoaded`, `isSignedIn`, `userId`, `getToken`, `signOut` 等）を維持しつつ、中身を Cognito の状態・`getIdToken()` に差し替え。E2E 時は従来どおり `MockClerkProvider` に委譲。 |
-| 3 | **getToken の意味の統一** | 現行: Clerk の `getToken()` / `getToken({ template: "turso" })`。移行後: **Cognito の ID Token** を返す関数に統一（Turso 用テンプレートは不要。必要なら同じ ID Token をそのまま利用）。 |
-| 4 | **サインイン画面の差し替え** | Clerk の `<SignIn>` を廃止し、「Google でサインイン」「GitHub でサインイン」ボタンのみのカスタム画面に。クリックで Cognito OAuth 認可 URL へリダイレクト。ルート `/auth/callback` で code 受取 → token 交換 → トークン保存。 |
-| 5 | **Header の signOut** | `useClerk()` の `signOut` をやめ、Cognito のサインアウト（トークン破棄＋必要なら GlobalSignOut 呼び出し）に差し替え。`useUser` は `useAuth` 経由の Cognito ユーザーに統一。 |
-| 6 | **ProtectedRoute / AuthGate** | 変更不要（`useAuth` の `isSignedIn` / `isLoaded` に依存するため、useAuth の差し替えで対応）。 |
-| 7 | **AI API 用トークン** | `src/lib/aiService.ts` の `getClerkToken()` を廃止し、Cognito の ID Token を返す共通の `getAuthToken()` に差し替え。 |
-| 8 | **Turso 用 JWT（移行期）** | Aurora に完全移行するまで Turso を使う場合、`createAuthenticatedTursoClient` に渡すトークンを Cognito ID Token に変更。Turso が Cognito の JWKS で検証できるかは Turso 側設定次第。できない場合は Aurora 移行までフォールバックトークン等で対応するか、Turso を読取専用にする等の検討。 |
-| 9 | **環境変数** | `VITE_CLERK_PUBLISHABLE_KEY` を削除し、`VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_AWS_REGION` 等を追加。`.env.example` 更新。 |
-| 10 | **main.tsx** | `ClerkProvider` を削除し、Cognito 用の **AuthProvider**（トークン管理＋useAuth 提供）でラップ。E2E 時は従来どおり `MockClerkProvider`。 |
-| 11 | **パッケージ** | `@clerk/clerk-react` を削除。Cognito OAuth 用に `@aws-sdk/client-cognito-identity-provider`（token エンドポイント用）等を追加。メール/パスワード未使用のため SRP 用ライブラリは不要。 |
-| 11a | **Google/GitHub サインイン** | サインイン画面に「Google でサインイン」「GitHub でサインイン」ボタンのみ。クリック時に Cognito OAuth 認可 URL（`identity_provider=Google` / `identity_provider=GitHub`）へリダイレクト。`/auth/callback` で code → token 交換し、トークンを保存。 |
+| #   | タスク                                   | 詳細                                                                                                                                                                                                                                                                                    |
+| --- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Cognito 用 Auth コンテキスト・ストア** | トークン（id_token / access_token / refresh_token）とユーザー情報（sub, email 等）を保持。localStorage 等への永続化。リフレッシュは有効期限前に実行。                                                                                                                                   |
+| 2   | **useAuth / useUser の Cognito 版**      | 既存の `useAuth` の戻り値（`isLoaded`, `isSignedIn`, `userId`, `getToken`, `signOut` 等）を維持しつつ、中身を Cognito の状態・`getIdToken()` に差し替え。E2E 時は従来どおり `MockClerkProvider` に委譲。                                                                                |
+| 3   | **getToken の意味の統一**                | 現行: Clerk の `getToken()` / `getToken({ template: "turso" })`。移行後: **Cognito の ID Token** を返す関数に統一（Turso 用テンプレートは不要。必要なら同じ ID Token をそのまま利用）。                                                                                                 |
+| 4   | **サインイン画面の差し替え**             | Clerk の `<SignIn>` を廃止し、「Google でサインイン」「GitHub でサインイン」ボタンのみのカスタム画面に。クリックで Cognito OAuth 認可 URL へリダイレクト。ルート `/auth/callback` で code 受取 → token 交換 → トークン保存。                                                            |
+| 5   | **Header の signOut**                    | `useClerk()` の `signOut` をやめ、Cognito のサインアウト（トークン破棄＋必要なら GlobalSignOut 呼び出し）に差し替え。`useUser` は `useAuth` 経由の Cognito ユーザーに統一。                                                                                                             |
+| 6   | **ProtectedRoute / AuthGate**            | 変更不要（`useAuth` の `isSignedIn` / `isLoaded` に依存するため、useAuth の差し替えで対応）。                                                                                                                                                                                           |
+| 7   | **AI API 用トークン**                    | `src/lib/aiService.ts` の `getClerkToken()` を廃止し、Cognito の ID Token を返す共通の `getAuthToken()` に差し替え。                                                                                                                                                                    |
+| 8   | **Turso 用 JWT（移行期）**               | Aurora に完全移行するまで Turso を使う場合、`createAuthenticatedTursoClient` に渡すトークンを Cognito ID Token に変更。Turso が Cognito の JWKS で検証できるかは Turso 側設定次第。できない場合は Aurora 移行までフォールバックトークン等で対応するか、Turso を読取専用にする等の検討。 |
+| 9   | **環境変数**                             | `VITE_CLERK_PUBLISHABLE_KEY` を削除し、`VITE_COGNITO_USER_POOL_ID` / `VITE_COGNITO_CLIENT_ID` / `VITE_AWS_REGION` 等を追加。`.env.example` 更新。                                                                                                                                       |
+| 10  | **main.tsx**                             | `ClerkProvider` を削除し、Cognito 用の **AuthProvider**（トークン管理＋useAuth 提供）でラップ。E2E 時は従来どおり `MockClerkProvider`。                                                                                                                                                 |
+| 11  | **パッケージ**                           | `@clerk/clerk-react` を削除。Cognito OAuth 用に `@aws-sdk/client-cognito-identity-provider`（token エンドポイント用）等を追加。メール/パスワード未使用のため SRP 用ライブラリは不要。                                                                                                   |
+| 11a | **Google/GitHub サインイン**             | サインイン画面に「Google でサインイン」「GitHub でサインイン」ボタンのみ。クリック時に Cognito OAuth 認可 URL（`identity_provider=Google` / `identity_provider=GitHub`）へリダイレクト。`/auth/callback` で code → token 交換し、トークンを保存。                                       |
 
 ### 5.2 リアルタイム（Hocuspocus）
 
-| # | タスク | 詳細 |
-|---|--------|------|
-| 12 | **useCollaboration / CollaborationManager** | `getAuthToken` に渡す関数を、Clerk の `getToken()` から **Cognito の ID Token を返す関数** に変更（`useAuth` 経由で取得する形でよい）。 |
-| 13 | **Hocuspocus サーバー onAuthenticate** | `server/hocuspocus/src/index.ts` の `onAuthenticate` で、受け取った `token` を **Cognito JWT** として検証（例: `aws-jwt-verify` の `CognitoJwtVerifier`）。issuer: `https://cognito-idp.{region}.amazonaws.com/{userPoolId}`、`token_use`: `id` または `access`、有効期限。検証成功時は `sub` を user.id にマッピング。ECS には既に `COGNITO_USER_POOL_ID` / `COGNITO_REGION` が渡されている。 |
+| #   | タスク                                      | 詳細                                                                                                                                                                                                                                                                                                                                                                                           |
+| --- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 12  | **useCollaboration / CollaborationManager** | `getAuthToken` に渡す関数を、Clerk の `getToken()` から **Cognito の ID Token を返す関数** に変更（`useAuth` 経由で取得する形でよい）。                                                                                                                                                                                                                                                        |
+| 13  | **Hocuspocus サーバー onAuthenticate**      | `server/hocuspocus/src/index.ts` の `onAuthenticate` で、受け取った `token` を **Cognito JWT** として検証（例: `aws-jwt-verify` の `CognitoJwtVerifier`）。issuer: `https://cognito-idp.{region}.amazonaws.com/{userPoolId}`、`token_use`: `id` または `access`、有効期限。検証成功時は `sub` を user.id にマッピング。ECS には既に `COGNITO_USER_POOL_ID` / `COGNITO_REGION` が渡されている。 |
 
 ### 5.3 バックエンド（API・DB）
 
@@ -147,11 +147,11 @@ Clerk の `getToken(options?)` は **JWT を返す**。オプションで `templ
 
 ### 5.4 既存ユーザー移行（Clerk → Cognito）
 
-| # | タスク | 詳細 |
-|---|--------|------|
-| 18 | **移行マッピング** | 既存 Clerk ユーザーと Cognito ユーザーの対応表を作成。移行手順: 同一メールで Cognito にサインイン（Google/GitHub）させる、または事前に Cognito にユーザーを作成し `sub` を発行。Clerk `userId` → Cognito `sub` のマッピングを保持。 |
-| 19 | **DB の user_id 更新** | Turso（および将来 Aurora）の `pages.user_id` / `notes.owner_user_id` 等、Clerk の `user_xxxx` を参照しているカラムを、移行後の Cognito `sub` に一括更新。マッピング表に基づいて UPDATE。 |
-| 20 | **移行スクリプト・手順** | 移行を実行するスクリプトまたは手順書。ダウンタイムまたはメンテナンスウィンドウでの実施方針を記載。 |
+| #   | タスク                   | 詳細                                                                                                                                                                                                                                |
+| --- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 18  | **移行マッピング**       | 既存 Clerk ユーザーと Cognito ユーザーの対応表を作成。移行手順: 同一メールで Cognito にサインイン（Google/GitHub）させる、または事前に Cognito にユーザーを作成し `sub` を発行。Clerk `userId` → Cognito `sub` のマッピングを保持。 |
+| 19  | **DB の user_id 更新**   | Turso（および将来 Aurora）の `pages.user_id` / `notes.owner_user_id` 等、Clerk の `user_xxxx` を参照しているカラムを、移行後の Cognito `sub` に一括更新。マッピング表に基づいて UPDATE。                                            |
+| 20  | **移行スクリプト・手順** | 移行を実行するスクリプトまたは手順書。ダウンタイムまたはメンテナンスウィンドウでの実施方針を記載。                                                                                                                                  |
 
 #### メールアドレスが変わるユーザー（Google Workspace 等）について
 
@@ -171,17 +171,17 @@ Cognito の `sub` は、**そのユーザーが初めて Cognito にサインイ
 
 ### 5.5 Terraform・設定
 
-| # | タスク | 詳細 |
-|---|--------|------|
-| 14 | **Callback URL** | 本番: `https://zedi-note.app/auth/callback`、開発: `http://localhost:30000/auth/callback` を `cognito_callback_urls` に設定。ログアウト後: 本番 `https://zedi-note.app`、開発 `http://localhost:30000` を `cognito_logout_urls` に設定。`dev.tfvars` / `prod.tfvars` で反映済み。 |
+| #   | タスク                | 詳細                                                                                                                                                                                                                                                                                                                                        |
+| --- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 14  | **Callback URL**      | 本番: `https://zedi-note.app/auth/callback`、開発: `http://localhost:30000/auth/callback` を `cognito_callback_urls` に設定。ログアウト後: 本番 `https://zedi-note.app`、開発 `http://localhost:30000` を `cognito_logout_urls` に設定。`dev.tfvars` / `prod.tfvars` で反映済み。                                                           |
 | 15a | **Google/GitHub IdP** | `aws_cognito_identity_provider` で Google と GitHub を User Pool に追加。App Client の `supported_identity_providers` に `Google`, `GitHub` を追加。既存 OAuth アプリの Client ID / Client Secret を Cognito に登録（variable または Secrets Manager）。メール/パスワード未使用のため `USER_PASSWORD_AUTH` / `USER_SRP_AUTH` は追加しない。 |
 
 ### 5.6 E2E・テスト
 
-| # | タスク | 詳細 |
-|---|--------|------|
-| 16 | **E2E** | `MockClerkProvider` はそのまま利用。`useAuth` が E2E 時にモックを返すため、Cognito 実装後も E2E は変更不要でよい。 |
-| 17 | **単体テスト** | Clerk をモックしている箇所（`src/test/mocks.ts`）は、`useAuth` のインターフェースが同じであれば、Cognito 実装後もモックの形を維持可能。必要に応じて「Cognito 用のモック」に差し替え。 |
+| #   | タスク         | 詳細                                                                                                                                                                                  |
+| --- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16  | **E2E**        | `MockClerkProvider` はそのまま利用。`useAuth` が E2E 時にモックを返すため、Cognito 実装後も E2E は変更不要でよい。                                                                    |
+| 17  | **単体テスト** | Clerk をモックしている箇所（`src/test/mocks.ts`）は、`useAuth` のインターフェースが同じであれば、Cognito 実装後もモックの形を維持可能。必要に応じて「Cognito 用のモック」に差し替え。 |
 
 ---
 
@@ -204,13 +204,13 @@ Turso は Aurora 移行完了まで残す場合、上記 5 の時点で Cognito 
 
 ## 7. 参照ドキュメント
 
-| ドキュメント | パス |
-|-------------|------|
-| 実装計画・現状 | `docs/plans/20260123/implementation-status-and-roadmap.md` |
-| Cognito 統合メモ（Hocuspocus） | `docs/work-logs/20260202/realtime-4401-unauthorized-investigation.md` |
-| アプリ実装計画（CognitoAuthClient 例） | `docs/specs/application-implementation-plan.md` §4.5 |
-| AWS 接続情報（Cognito ID 等） | `docs/work-logs/20260131/aws-connection-summary.md` |
-| Terraform Cognito | `terraform/modules/security/main.tf` |
+| ドキュメント                           | パス                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| 実装計画・現状                         | `docs/plans/20260123/implementation-status-and-roadmap.md`            |
+| Cognito 統合メモ（Hocuspocus）         | `docs/work-logs/20260202/realtime-4401-unauthorized-investigation.md` |
+| アプリ実装計画（CognitoAuthClient 例） | `docs/specs/application-implementation-plan.md` §4.5                  |
+| AWS 接続情報（Cognito ID 等）          | `docs/work-logs/20260131/aws-connection-summary.md`                   |
+| Terraform Cognito                      | `terraform/modules/security/main.tf`                                  |
 
 ---
 

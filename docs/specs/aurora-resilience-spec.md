@@ -19,17 +19,20 @@ Aurora Serverless v2 の自動ポーズ（`aurora_seconds_until_auto_pause = 600
 ### 2.1 Lambda 側
 
 #### `terraform/modules/api/lambda/src/middleware/db.ts`
+
 ```typescript
 // 現在: DB クライアントを Context にセットするだけ
 export const dbMiddleware = createMiddleware<AppEnv>(async (c, next) => {
-  c.set('db', getDb());
+  c.set("db", getDb());
   await next();
 });
 ```
+
 - **問題**: DB操作で `DatabaseResumingException` が発生しても、エラーハンドラーが一律 500 を返す
 - エラーハンドラー (`middleware/errorHandler.ts`) にも Aurora 固有のエラー判定はない
 
 #### `terraform/modules/api/lambda/src/middleware/errorHandler.ts`
+
 ```typescript
 // 現在: HTTPException以外は message ベースの statusMap か 500
 const statusMap: Record<string, number> = {
@@ -41,10 +44,12 @@ const status = statusMap[message] ?? 500;
 ```
 
 #### `terraform/modules/api/lambda/src/routes/users.ts` (POST /upsert)
+
 - `authRequired` を使わず JWT claims から `sub` と `email` を直接読み取る
 - DB 操作（INSERT ... ON CONFLICT DO UPDATE）で `DatabaseResumingException` が発生 → 500エラー
 
 #### `terraform/modules/api/lambda/src/routes/syncPages.ts`
+
 - GET: `authRequired` → DB から `pages`, `links`, `ghost_links` を取得
 - POST: `authRequired` → LWW でページを同期
 - いずれも DB 操作で `DatabaseResumingException` → 500エラー
@@ -52,53 +57,60 @@ const status = statusMap[message] ?? 500;
 ### 2.2 フロントエンド側
 
 #### `src/lib/api/apiClient.ts` — `request()` 関数
+
 ```typescript
 // 現在: !res.ok なら ApiError をスロー。503の特別処理なし
 if (!res.ok) {
   throw new ApiError(msg, res.status, code);
 }
 ```
+
 - 503 (Service Unavailable) も他のエラーと同様に即座に失敗
 
 #### `src/hooks/usePageQueries.ts` — `useRepository()` 初回同期
+
 ```typescript
 // 現在のフロー:
 // 1. upsertMe() を呼ぶ（失敗しても warn で続行）
 // 2. runAuroraSync() を呼ぶ（失敗したら error をログ、リトライなし）
 // 3. initialSyncRequestedForUser に登録（失敗しても削除しない = 再実行されない）
 ```
+
 - **問題**: upsertMe も sync も失敗した場合、手動同期（SyncIndicator）以外では再試行されない
 - Aurora 復帰後も自動では再実行されない
 
 #### `src/hooks/useProfile.ts`
+
 ```typescript
 // 現在: upsertMe({}) を呼んでプロフィール取得。失敗時は warn でキャッシュのまま
 const result = await api.upsertMe({});
 ```
 
 #### `src/lib/sync/syncWithApi.ts` — PULL ロジック
+
 ```typescript
 // 現在: サーバーのデータを無条件で IndexedDB に upsert
 const res = normalizeSyncResponse(await api.getSyncPages(since));
 for (const row of res.pages) {
   const meta = syncPageToMetadata(row);
-  await adapter.upsertPage(meta);  // ← LWW チェックなし、無条件上書き
+  await adapter.upsertPage(meta); // ← LWW チェックなし、無条件上書き
 }
 ```
+
 - **問題**: Aurora 停止中にローカルで編集したページが、PULL で古いサーバーデータに上書きされる可能性がある
 - PUSH では `updatedAt > lastSync` で差分検出するが、PULL で先にローカルが上書きされると差分がなくなる
 
 #### `src/lib/sync/syncWithApi.ts` — PUSH ロジック（LWW 実装済み）
+
 ```typescript
 // フロントエンド側: ローカルで lastSync 以降に変更されたページのみ PUSH
 const pagesForPush = lastSync
-  ? allLocalPages.filter(
-      (p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id)
-    )
+  ? allLocalPages.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id))
   : allLocalPages;
 ```
 
 #### `terraform/modules/api/lambda/src/routes/syncPages.ts` — サーバー側 LWW（実装済み）
+
 ```typescript
 // サーバー側: client の updated_at > server の updated_at なら更新
 if (existing.length === 0) {
@@ -188,6 +200,7 @@ function isDatabaseResumingError(err: unknown): boolean {
 ```
 
 **変更理由**:
+
 - Lambda の実行時間を最小化（リトライを Lambda 内で行わない）
 - `Retry-After: 10` ヘッダーでクライアントに適切な待機時間を通知
 - `code: 'DATABASE_RESUMING'` でフロントエンドが種別を判定可能
@@ -248,6 +261,7 @@ async function request<T>(
 ```
 
 **変更理由**:
+
 - `Retry-After` ヘッダーに準拠した待機（Aurora 復帰を待つ）
 - 最大4回 × 10秒 = 最大40秒で Aurora 復帰をカバー（通常15〜30秒で復帰）
 - `CustomEvent` でUI通知を可能に（後述の SyncStatus 連携）
@@ -312,6 +326,7 @@ useEffect(() => {
 ```
 
 **変更理由**:
+
 - apiClient.ts の 503 リトライ（最大40秒）で大半はカバーされる
 - それでも失敗した場合のフォールバックとして15秒後に再試行
 - `initialSyncRequestedForUser` のガードを解除することで再実行を許可
@@ -337,8 +352,8 @@ for (const row of res.pages) {
   if (local && local.updatedAt > meta.updatedAt) {
     console.log(
       `[Sync/API] Pull skip (local newer): ${meta.id} ` +
-      `local=${new Date(local.updatedAt).toISOString()} > ` +
-      `server=${new Date(meta.updatedAt).toISOString()}`
+        `local=${new Date(local.updatedAt).toISOString()} > ` +
+        `server=${new Date(meta.updatedAt).toISOString()}`,
     );
     continue;
   }
@@ -374,9 +389,9 @@ PUSH: ローカル pageA (updatedAt=T2) をサーバーに送信
 
 ```typescript
 // db-resuming イベントを検知して SyncStatus を更新
-if (typeof window !== 'undefined') {
-  window.addEventListener('zedi:db-resuming', () => {
-    setSyncStatus('db-resuming');
+if (typeof window !== "undefined") {
+  window.addEventListener("zedi:db-resuming", () => {
+    setSyncStatus("db-resuming");
   });
 }
 ```
@@ -433,36 +448,40 @@ if (typeof window !== 'undefined') {
 
 ## 5. 変更ファイル一覧
 
-| # | ファイルパス | 変更内容 |
-|---|---|---|
-| 1 | `terraform/modules/api/lambda/src/middleware/errorHandler.ts` | `isDatabaseResumingError()` 追加、503 + Retry-After 返却 |
-| 2 | `src/lib/api/apiClient.ts` | `request()` に 503 自動リトライ + CustomEvent 発火 |
-| 3 | `src/lib/sync/syncWithApi.ts` | PULL 時の LWW チェック追加、`SyncStatus` に `"db-resuming"` 追加 |
-| 4 | `src/hooks/usePageQueries.ts` | 503 失敗時の遅延リトライ（フォールバック） |
+| #   | ファイルパス                                                  | 変更内容                                                         |
+| --- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | `terraform/modules/api/lambda/src/middleware/errorHandler.ts` | `isDatabaseResumingError()` 追加、503 + Retry-After 返却         |
+| 2   | `src/lib/api/apiClient.ts`                                    | `request()` に 503 自動リトライ + CustomEvent 発火               |
+| 3   | `src/lib/sync/syncWithApi.ts`                                 | PULL 時の LWW チェック追加、`SyncStatus` に `"db-resuming"` 追加 |
+| 4   | `src/hooks/usePageQueries.ts`                                 | 503 失敗時の遅延リトライ（フォールバック）                       |
 
 ---
 
 ## 6. テスト観点
 
 ### 6.1 Lambda 側
+
 - [ ] `DatabaseResumingException` が cause チェーンに含まれるエラーで 503 が返ること
 - [ ] `Retry-After` ヘッダーが設定されること
 - [ ] Aurora 復帰後は通常の 200 レスポンスが返ること
 - [ ] 他のエラー（400, 401, 500 等）には影響しないこと
 
 ### 6.2 フロントエンド: apiClient
+
 - [ ] 503 + Retry-After 受信時にリトライされること
 - [ ] MAX_DB_RESUMING_RETRIES 超過で ApiError がスローされること
 - [ ] `zedi:db-resuming` CustomEvent が発火されること
 - [ ] 503 以外のエラーではリトライされないこと
 
 ### 6.3 フロントエンド: PULL LWW
+
 - [ ] ローカルが新しいページは PULL でスキップされること
 - [ ] サーバーが新しいページは PULL で上書きされること
 - [ ] ローカルにないページは新規作成されること
 - [ ] PULL でスキップされたページが PUSH で正しくサーバーに送信されること
 
 ### 6.4 E2E シナリオ
+
 - [ ] Aurora 停止中にアプリ起動 → ローカルデータ表示 → Aurora 復帰 → 自動同期成功
 - [ ] Aurora 停止中にページ編集 → Aurora 復帰 → 同期でローカル変更が保持されること
 - [ ] 初回同期失敗 → 15秒後の自動リトライで成功すること
@@ -471,12 +490,12 @@ if (typeof window !== 'undefined') {
 
 ## 7. コスト影響
 
-| 項目 | Before | After |
-|---|---|---|
-| Lambda 実行時間 (Aurora 停止時) | 最大30秒（タイムアウトまでハング） | 数百ms（即座に503返却） |
-| Lambda 課金 | 30秒 × $0.0000166667/GB秒 | ~0.5秒 × N回 |
-| Aurora | 変更なし（auto-pause 維持） | 変更なし |
-| API Gateway | 変更なし | 503 応答も課金対象だが微小 |
+| 項目                            | Before                             | After                      |
+| ------------------------------- | ---------------------------------- | -------------------------- |
+| Lambda 実行時間 (Aurora 停止時) | 最大30秒（タイムアウトまでハング） | 数百ms（即座に503返却）    |
+| Lambda 課金                     | 30秒 × $0.0000166667/GB秒          | ~0.5秒 × N回               |
+| Aurora                          | 変更なし（auto-pause 維持）        | 変更なし                   |
+| API Gateway                     | 変更なし                           | 503 応答も課金対象だが微小 |
 
 ---
 

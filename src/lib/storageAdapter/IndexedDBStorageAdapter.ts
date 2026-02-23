@@ -68,7 +68,8 @@ function storedToPage(s: StoredPage): PageMetadata {
 }
 
 function ensureDb(): Promise<IDBDatabase> {
-  if (!adapterDb) throw new Error("IndexedDBStorageAdapter: not initialized. Call initialize(userId) first.");
+  if (!adapterDb)
+    throw new Error("IndexedDBStorageAdapter: not initialized. Call initialize(userId) first.");
   return Promise.resolve(adapterDb);
 }
 
@@ -97,7 +98,9 @@ function openDb(userId: string): Promise<IDBDatabase> {
         links.createIndex("by_target", "targetId", { unique: false });
       }
       if (!db.objectStoreNames.contains("my_ghost_links")) {
-        const ghost = db.createObjectStore("my_ghost_links", { keyPath: ["linkText", "sourcePageId"] });
+        const ghost = db.createObjectStore("my_ghost_links", {
+          keyPath: ["linkText", "sourcePageId"],
+        });
         ghost.createIndex("by_source", "sourcePageId", { unique: false });
       }
       if (!db.objectStoreNames.contains("search_index")) {
@@ -147,7 +150,11 @@ function loadYDocState(pageId: string): Promise<Uint8Array | null> {
 }
 
 /** Save state to y-indexeddb and set version in our store. */
-async function saveYDocStateToIdb(pageId: string, state: Uint8Array, version: number): Promise<void> {
+async function saveYDocStateToIdb(
+  pageId: string,
+  state: Uint8Array,
+  version: number,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const doc = new Y.Doc();
     Y.applyUpdate(doc, state);
@@ -183,7 +190,7 @@ function getYDocVersionFromStore(pageId: string): Promise<number> {
         const req = tx.objectStore("ydoc_versions").get(pageId);
         req.onsuccess = () => resolve((req.result?.version as number) ?? 1);
         req.onerror = () => resolve(1);
-      })
+      }),
   );
 }
 
@@ -195,7 +202,7 @@ function setYDocVersion(pageId: string, version: number): Promise<void> {
         const req = tx.objectStore("ydoc_versions").put({ pageId, version });
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
-      })
+      }),
   );
 }
 
@@ -289,7 +296,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
       const req = index.getAll(pageId);
       req.onsuccess = () => {
         const rows = (req.result as StoredLink[]) || [];
-        resolve(rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })));
+        resolve(
+          rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })),
+        );
       };
       req.onerror = () => reject(req.error);
     });
@@ -303,7 +312,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
       const req = index.getAll(pageId);
       req.onsuccess = () => {
         const rows = (req.result as StoredLink[]) || [];
-        resolve(rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })));
+        resolve(
+          rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })),
+        );
       };
       req.onerror = () => reject(req.error);
     });
@@ -349,7 +360,7 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
             createdAt: r.createdAt,
             originalTargetPageId: r.originalTargetPageId ?? null,
             originalNoteId: r.originalNoteId ?? null,
-          }))
+          })),
         );
       };
       req.onerror = () => reject(req.error);

@@ -7,17 +7,17 @@ Aurora Serverless v2 用のスキーマ定義です。
 
 ## テーブル一覧
 
-| テーブル | 説明 |
-|----------|------|
-| users | ユーザー（Cognito 対応） |
-| pages | ページ（メタデータ。本文は page_contents） |
-| page_contents | Y.Doc 永続化（ydoc_state, content_text）＋全文検索 |
-| notes | ノート（共有コンテナ） |
-| note_pages | ノートとページの紐付け |
-| note_members | ノートメンバー（招待・ロール） |
-| links | ページ間リンク |
-| ghost_links | 未作成リンク（original_target_page_id / original_note_id 含む） |
-| media | メディア（S3 キー・メタデータ） |
+| テーブル      | 説明                                                            |
+| ------------- | --------------------------------------------------------------- |
+| users         | ユーザー（Cognito 対応）                                        |
+| pages         | ページ（メタデータ。本文は page_contents）                      |
+| page_contents | Y.Doc 永続化（ydoc_state, content_text）＋全文検索              |
+| notes         | ノート（共有コンテナ）                                          |
+| note_pages    | ノートとページの紐付け                                          |
+| note_members  | ノートメンバー（招待・ロール）                                  |
+| links         | ページ間リンク                                                  |
+| ghost_links   | 未作成リンク（original_target_page_id / original_note_id 含む） |
+| media         | メディア（S3 キー・メタデータ）                                 |
 
 ## dev 環境への適用手順
 

@@ -39,8 +39,7 @@ export const CreatePageDialog: React.FC<CreatePageDialogProps> = ({
         <AlertDialogHeader>
           <AlertDialogTitle>ページを作成しますか？</AlertDialogTitle>
           <AlertDialogDescription>
-            「{pageTitle}」というタイトルのページはまだ存在しません。
-            新しいページを作成しますか？
+            「{pageTitle}」というタイトルのページはまだ存在しません。 新しいページを作成しますか？
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

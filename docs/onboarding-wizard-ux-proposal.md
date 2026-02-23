@@ -4,13 +4,13 @@
 
 ### 1.1 初回アクセス時の流れ（現状）
 
-| ステップ | 内容 |
-|----------|------|
-| 1 | ユーザーがサインイン（例: Google） |
-| 2 | `AuthCallback` でトークン取得後、`/home` にリダイレクト |
-| 3 | Home ページ表示。約 500ms 後に **WelcomeModal** を表示 |
-| 4 | モーダルで「Zediへようこそ！」＋ 3 つの機能紹介（書く・繋ぐ・発見）＋ クイックヒントを表示 |
-| 5 | ユーザーは「始める」でモーダルを閉じる（**クイックツアーを見る** は Home から渡されておらず、ツアー起動は未実装） |
+| ステップ | 内容                                                                                                              |
+| -------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1        | ユーザーがサインイン（例: Google）                                                                                |
+| 2        | `AuthCallback` でトークン取得後、`/home` にリダイレクト                                                           |
+| 3        | Home ページ表示。約 500ms 後に **WelcomeModal** を表示                                                            |
+| 4        | モーダルで「Zediへようこそ！」＋ 3 つの機能紹介（書く・繋ぐ・発見）＋ クイックヒントを表示                        |
+| 5        | ユーザーは「始める」でモーダルを閉じる（**クイックツアーを見る** は Home から渡されておらず、ツアー起動は未実装） |
 
 ### 1.2 関連する既存実装
 
@@ -124,21 +124,21 @@
 
 ### 2.3 既存機能との対応
 
-| 要件 | 既存実装 | 対応方針 |
-|------|----------|----------|
-| ユーザー名 | `useProfile().profile.displayName` + API | ウィザード Step 1 で入力・保存 |
-| プロフィール画像 | `useProfile().profile.avatarUrl` + API | ウィザード Step 1 でアップロード/削除 |
-| 使用言語 | `useGeneralSettings().locale` + `LOCALE_OPTIONS` | ウィザード Step 2 で選択し即時反映 |
-| ツアー実施/スキップ | `useOnboarding().startTour`（未実装） | Step 3 で選択。スキップ時は `markTourCompleted` 相当で「ツアー不要」を記録 |
-| 初回判定 | （削除: `hasSeenWelcome`） | `hasCompletedSetupWizard` でウィザード完了時 true |
+| 要件                | 既存実装                                         | 対応方針                                                                   |
+| ------------------- | ------------------------------------------------ | -------------------------------------------------------------------------- |
+| ユーザー名          | `useProfile().profile.displayName` + API         | ウィザード Step 1 で入力・保存                                             |
+| プロフィール画像    | `useProfile().profile.avatarUrl` + API           | ウィザード Step 1 でアップロード/削除                                      |
+| 使用言語            | `useGeneralSettings().locale` + `LOCALE_OPTIONS` | ウィザード Step 2 で選択し即時反映                                         |
+| ツアー実施/スキップ | `useOnboarding().startTour`（未実装）            | Step 3 で選択。スキップ時は `markTourCompleted` 相当で「ツアー不要」を記録 |
+| 初回判定            | （削除: `hasSeenWelcome`）                       | `hasCompletedSetupWizard` でウィザード完了時 true                          |
 
 ### 2.4 削除・変更したもの（反映済み）
 
 - **削除:** WelcomeModal コンポーネントおよび `hasSeenWelcome` / `markWelcomeSeen`。
-- **変更済み:**  
-  - `onboardingState`: `hasCompletedSetupWizard` と `markSetupWizardCompleted()` を追加。  
-  - `useOnboarding`: `needsSetupWizard` と `completeSetupWizard` を公開。初回時はウィザード未完了として扱う。  
-  - Home: 初回時は `/onboarding` へリダイレクト。WelcomeModal は削除。  
+- **変更済み:**
+  - `onboardingState`: `hasCompletedSetupWizard` と `markSetupWizardCompleted()` を追加。
+  - `useOnboarding`: `needsSetupWizard` と `completeSetupWizard` を公開。初回時はウィザード未完了として扱う。
+  - Home: 初回時は `/onboarding` へリダイレクト。WelcomeModal は削除。
   - 新規ページ: `pages/Onboarding.tsx`（`/onboarding`）でウィザードを表示。
 
 ---

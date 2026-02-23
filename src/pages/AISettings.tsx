@@ -23,7 +23,7 @@ const AISettings: React.FC = () => {
       {/* Content */}
       <main className="py-6">
         <Container>
-          <div className="max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl">
             <AISettingsForm />
           </div>
         </Container>

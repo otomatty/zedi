@@ -25,11 +25,11 @@ const skeletonItems = Array.from({ length: 20 }, (_, index) => index);
 const PageGridSkeleton: React.FC = () => {
   return (
     <div className="pb-24">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {skeletonItems.map((index) => (
           <div
             key={`page-skeleton-${index}`}
-            className="page-card w-full rounded-lg overflow-hidden bg-card border border-border/50 aspect-square flex flex-col"
+            className="page-card flex aspect-square w-full flex-col overflow-hidden rounded-lg border border-border/50 bg-card"
           >
             <div className="p-3 pb-2">
               <div className="flex items-start gap-1.5">
@@ -40,7 +40,7 @@ const PageGridSkeleton: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="flex-1 min-h-0 px-3 pb-3">
+            <div className="min-h-0 flex-1 px-3 pb-3">
               <Skeleton className="h-full w-full" />
             </div>
           </div>
@@ -51,13 +51,11 @@ const PageGridSkeleton: React.FC = () => {
 };
 
 /** 月フィルタで0件のときの空状態（全期間を表示へ誘導） */
-const MonthFilterEmptyState: React.FC<{ onShowAll: () => void }> = ({
-  onShowAll,
-}) => {
+const MonthFilterEmptyState: React.FC<{ onShowAll: () => void }> = ({ onShowAll }) => {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-      <p className="text-muted-foreground mb-4">{t("home.monthFilter.empty")}</p>
+    <div className="flex flex-col items-center justify-center px-4 py-24 text-center">
+      <p className="mb-4 text-muted-foreground">{t("home.monthFilter.empty")}</p>
       <Button variant="outline" onClick={onShowAll}>
         {t("home.monthFilter.showAll")}
       </Button>
@@ -79,9 +77,7 @@ const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false }) => {
   const monthParam = parseMonthParam(searchParams.toString());
 
   const sortedPages = useMemo(() => {
-    return [...pages]
-      .filter((p) => !p.isDeleted)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return [...pages].filter((p) => !p.isDeleted).sort((a, b) => b.updatedAt - a.updatedAt);
   }, [pages]);
 
   const filteredPages = useMemo(() => {
@@ -89,12 +85,10 @@ const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false }) => {
     return sortedPages.filter((p) => isTimestampInMonth(p.updatedAt, monthParam));
   }, [sortedPages, monthParam]);
 
-  const isInitialSyncPending =
-    isSignedIn && hasNeverSynced() && syncStatus !== "error";
+  const isInitialSyncPending = isSignedIn && hasNeverSynced() && syncStatus !== "error";
   const hasPages = sortedPages.length > 0;
   const shouldShowSkeleton =
-    !hasPages &&
-    (isLoading || syncStatus === "syncing" || isInitialSyncPending || isSeeding);
+    !hasPages && (isLoading || syncStatus === "syncing" || isInitialSyncPending || isSeeding);
 
   const handleShowAll = () => {
     setSearchParams({});
@@ -114,7 +108,7 @@ const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false }) => {
 
   return (
     <div className="pb-24">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {filteredPages.map((page: PageSummary, index: number) => (
           <PageCard key={page.id} page={page} index={index} />
         ))}

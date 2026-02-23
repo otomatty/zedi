@@ -3,11 +3,7 @@
  * ログイン済みユーザーが画像を Zedi の S3 にアップロード。API: POST /api/media/upload → PUT → POST /api/media/confirm
  */
 
-import {
-  StorageProviderInterface,
-  UploadOptions,
-  ConnectionTestResult,
-} from "../types";
+import { StorageProviderInterface, UploadOptions, ConnectionTestResult } from "../types";
 
 export interface S3ProviderContext {
   getToken: () => Promise<string | null>;
@@ -22,7 +18,8 @@ function getDefaultBaseUrl(): string {
  * 画像 URL を返す（GET /api/media/:id にすると 302 で署名付き S3 URL へリダイレクト）
  */
 function buildImageUrl(baseUrl: string, mediaId: string): string {
-  const base = baseUrl.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
+  const base =
+    baseUrl.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
   return `${base}/api/media/${mediaId}`;
 }
 
@@ -42,10 +39,14 @@ export class S3Provider implements StorageProviderInterface {
   async uploadImage(file: File, options?: UploadOptions): Promise<string> {
     const token = await this.getToken();
     if (!token) {
-      throw new Error("ログインしていません。デフォルトストレージを使うにはサインインしてください。");
+      throw new Error(
+        "ログインしていません。デフォルトストレージを使うにはサインインしてください。",
+      );
     }
 
-    const base = this.baseUrl.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
+    const base =
+      this.baseUrl.replace(/\/$/, "") ||
+      (typeof window !== "undefined" ? window.location.origin : "");
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -62,17 +63,22 @@ export class S3Provider implements StorageProviderInterface {
     });
     if (!uploadRes.ok) {
       const err = await uploadRes.text().catch(() => "");
-      throw new Error(uploadRes.status === 503 ? "メディアアップロードは現在利用できません" : `アップロード準備に失敗しました: ${err || uploadRes.status}`);
+      throw new Error(
+        uploadRes.status === 503
+          ? "メディアアップロードは現在利用できません"
+          : `アップロード準備に失敗しました: ${err || uploadRes.status}`,
+      );
     }
     interface UploadPayload {
       upload_url: string;
       media_id: string;
       s3_key: string;
     }
-    const raw = await uploadRes.json() as { data?: UploadPayload } | UploadPayload;
-    const data: UploadPayload = (raw && typeof raw === "object" && "data" in raw && raw.data)
-      ? raw.data
-      : (raw as UploadPayload);
+    const raw = (await uploadRes.json()) as { data?: UploadPayload } | UploadPayload;
+    const data: UploadPayload =
+      raw && typeof raw === "object" && "data" in raw && raw.data
+        ? raw.data
+        : (raw as UploadPayload);
     const uploadUrl = data.upload_url;
     const mediaId = data.media_id;
     const s3Key = data.s3_key;

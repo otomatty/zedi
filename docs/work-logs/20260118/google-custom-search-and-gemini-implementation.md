@@ -9,6 +9,7 @@
 既存のWikipedia/Wikimedia/Openverseベースの検索機能を廃止し、Google Custom Search APIとGemini API（Imagen）を使用した新しい実装に置き換えました。
 
 **変更内容**:
+
 1. Google Custom Search APIによる一般Web画像検索
 2. Gemini API（Imagen）による画像生成機能
 3. base64データURIのGyazoアップロード対応
@@ -20,14 +21,17 @@
 ### 1. Google Custom Search APIの統合
 
 #### 1.1 新規ファイル
+
 - `workers/thumbnail-api/src/services/search/google-custom-search.ts`
   - Google Custom Search APIを使用した画像検索実装
 
 #### 1.2 更新ファイル
+
 - `workers/thumbnail-api/src/services/search/index.ts`
   - 既存のWikipedia/Wikimedia/Openverse検索をGoogle Custom Searchに置き換え
 
 #### 1.3 機能
+
 - 一般Web画像の検索
 - ページング対応（最大100件まで）
 - 画像サイズ・タイプのフィルタリング（large, photo）
@@ -38,12 +42,14 @@
 ### 2. Gemini API（Imagen）の統合
 
 #### 2.1 新規ファイル
+
 - `workers/thumbnail-api/src/services/generation/gemini.ts`
   - Gemini APIを使用した画像生成実装
 - `workers/thumbnail-api/src/routes/image-generate.ts`
   - 画像生成エンドポイント
 
 #### 2.2 機能
+
 - テキストプロンプトから画像生成
 - アスペクト比の指定（デフォルト: 16:9）
 - 画像サイズの指定（デフォルト: 2K）
@@ -54,10 +60,12 @@
 ### 3. base64データURIのGyazoアップロード対応
 
 #### 3.1 更新ファイル
+
 - `workers/thumbnail-api/src/services/gyazo.ts`
   - base64データURIを直接処理できるように拡張
 
 #### 3.2 機能
+
 - データURIの検出と処理
 - base64デコード
 - MIMEタイプの自動判定
@@ -67,11 +75,13 @@
 ### 4. フロントエンドの更新
 
 #### 4.1 更新ファイル
+
 - `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx`
   - 画像生成ボタンの追加
   - 生成モードの追加
 
 #### 4.2 機能
+
 - 「AIで生成」ボタンの追加
 - 画像生成中のローディング表示
 - エラーハンドリング
@@ -81,13 +91,15 @@
 ### 5. 環境変数の追加
 
 #### 5.1 更新ファイル
+
 - `workers/thumbnail-api/src/types/env.ts`
 
 #### 5.2 必要な環境変数
+
 ```typescript
-GOOGLE_CUSTOM_SEARCH_API_KEY: string;      // Google Custom Search APIキー
-GOOGLE_CUSTOM_SEARCH_ENGINE_ID: string;    // カスタム検索エンジンID
-GOOGLE_GEMINI_API_KEY: string;             // Gemini APIキー
+GOOGLE_CUSTOM_SEARCH_API_KEY: string; // Google Custom Search APIキー
+GOOGLE_CUSTOM_SEARCH_ENGINE_ID: string; // カスタム検索エンジンID
+GOOGLE_GEMINI_API_KEY: string; // Gemini APIキー
 ```
 
 ---
@@ -113,15 +125,17 @@ POST /api/image-generate
 ```
 
 **リクエストボディ**:
+
 ```json
 {
   "prompt": "画像の説明文",
-  "aspectRatio": "16:9",  // オプション、デフォルト: "16:9"
-  "imageSize": "2K"       // オプション、デフォルト: "2K"
+  "aspectRatio": "16:9", // オプション、デフォルト: "16:9"
+  "imageSize": "2K" // オプション、デフォルト: "2K"
 }
 ```
 
 **レスポンス**:
+
 ```json
 {
   "imageUrl": "data:image/png;base64,...",
@@ -134,6 +148,7 @@ POST /api/image-generate
 ## 設定手順
 
 **詳細な設定手順は、別ドキュメントを参照してください:**
+
 - **`docs/guides/google-apis-setup-guide.md`** - ステップバイステップの設定ガイド
 
 ### 概要
@@ -158,10 +173,12 @@ POST /api/image-generate
 ## コスト
 
 ### Google Custom Search API
+
 - **無料枠**: 1日100リクエスト（月約3,000リクエスト）
 - **有料**: $5 / 1,000リクエスト
 
 ### Gemini API (Imagen)
+
 - **Imagen 4 Fast**: $0.02 / 画像
 - **Imagen 4**: $0.04 / 画像
 - **Imagen 4 Ultra**: $0.06 / 画像

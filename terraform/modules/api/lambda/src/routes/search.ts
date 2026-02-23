@@ -3,30 +3,30 @@
  *
  * GET /api/search?q=&scope= — pg_bigm による全文検索
  */
-import { Hono } from 'hono';
-import { sql } from 'drizzle-orm';
-import { authRequired } from '../middleware/auth';
-import type { AppEnv } from '../types';
+import { Hono } from "hono";
+import { sql } from "drizzle-orm";
+import { authRequired } from "../middleware/auth";
+import type { AppEnv } from "../types";
 
 const app = new Hono<AppEnv>();
 
-app.get('/', authRequired, async (c) => {
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.get("/", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
 
-  const query = c.req.query('q')?.trim();
+  const query = c.req.query("q")?.trim();
   if (!query) {
     return c.json({ results: [] });
   }
 
-  const scope = c.req.query('scope') || 'own';
-  const limit = Math.min(Math.max(Number(c.req.query('limit') || 20), 1), 100);
+  const scope = c.req.query("scope") || "own";
+  const limit = Math.min(Math.max(Number(c.req.query("limit") || 20), 1), 100);
 
   // pg_bigm 全文検索
   // scope: 'own' = 自分のページのみ, 'shared' = ノート経由の共有ページも含む
   let results;
 
-  if (scope === 'shared') {
+  if (scope === "shared") {
     results = await db.execute(sql`
       SELECT p.id, p.title, p.content_preview, p.updated_at,
              pc.content_text,

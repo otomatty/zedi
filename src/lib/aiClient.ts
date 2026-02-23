@@ -3,12 +3,7 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import {
-  AISettings,
-  AIProviderType,
-  CachedModels,
-  getDefaultModels,
-} from "@/types/ai";
+import { AISettings, AIProviderType, CachedModels, getDefaultModels } from "@/types/ai";
 
 export type AIClient = OpenAI | Anthropic | GoogleGenAI;
 
@@ -72,15 +67,10 @@ export function getCachedModels(provider: AIProviderType): string[] | null {
 /**
  * モデル一覧をキャッシュに保存
  */
-export function saveCachedModels(
-  provider: AIProviderType,
-  models: string[],
-): void {
+export function saveCachedModels(provider: AIProviderType, models: string[]): void {
   try {
     const cached = localStorage.getItem(MODELS_CACHE_KEY);
-    const allCached: Record<string, CachedModels> = cached
-      ? JSON.parse(cached)
-      : {};
+    const allCached: Record<string, CachedModels> = cached ? JSON.parse(cached) : {};
 
     allCached[provider] = {
       provider,
@@ -169,10 +159,7 @@ async function fetchGoogleModels(apiKey: string): Promise<string[]> {
   const geminiModels = (data.models || [])
     .filter((m: { name: string; supportedGenerationMethods?: string[] }) => {
       const name = m.name.replace("models/", "");
-      return (
-        name.includes("gemini") &&
-        m.supportedGenerationMethods?.includes("generateContent")
-      );
+      return name.includes("gemini") && m.supportedGenerationMethods?.includes("generateContent");
     })
     .map((m: { name: string }) => m.name.replace("models/", ""))
     .sort((a: string, b: string) => {
@@ -193,9 +180,7 @@ async function fetchGoogleModels(apiKey: string): Promise<string[]> {
 /**
  * OpenAI APIの接続テスト（モデル一覧も取得）
  */
-async function testOpenAIConnection(
-  apiKey: string,
-): Promise<ConnectionTestResult> {
+async function testOpenAIConnection(apiKey: string): Promise<ConnectionTestResult> {
   try {
     const models = await fetchOpenAIModels(apiKey);
 
@@ -208,13 +193,9 @@ async function testOpenAIConnection(
       models,
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-    if (
-      errorMessage.includes("401") ||
-      errorMessage.includes("invalid_api_key")
-    ) {
+    if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key")) {
       return {
         success: false,
         message: "APIキーが無効です",
@@ -234,9 +215,7 @@ async function testOpenAIConnection(
  * Anthropic APIの接続テスト
  * Note: AnthropicはモデルリストAPIを公開していないため、デフォルトモデルを使用
  */
-async function testAnthropicConnection(
-  apiKey: string,
-): Promise<ConnectionTestResult> {
+async function testAnthropicConnection(apiKey: string): Promise<ConnectionTestResult> {
   try {
     const client = new Anthropic({
       apiKey,
@@ -264,13 +243,9 @@ async function testAnthropicConnection(
       message: "予期しないレスポンス形式です",
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-    if (
-      errorMessage.includes("401") ||
-      errorMessage.includes("authentication")
-    ) {
+    if (errorMessage.includes("401") || errorMessage.includes("authentication")) {
       return {
         success: false,
         message: "APIキーが無効です",
@@ -289,9 +264,7 @@ async function testAnthropicConnection(
 /**
  * Google AI APIの接続テスト（モデル一覧も取得）
  */
-async function testGoogleConnection(
-  apiKey: string,
-): Promise<ConnectionTestResult> {
+async function testGoogleConnection(apiKey: string): Promise<ConnectionTestResult> {
   try {
     // モデル一覧を取得
     const models = await fetchGoogleModels(apiKey);
@@ -305,13 +278,9 @@ async function testGoogleConnection(
       models,
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-    if (
-      errorMessage.includes("API_KEY_INVALID") ||
-      errorMessage.includes("400")
-    ) {
+    if (errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("400")) {
       return {
         success: false,
         message: "APIキーが無効です",

@@ -67,7 +67,7 @@ export function useProfile(): UseProfileReturn {
       try {
         const api = createApiClient({ getToken });
         // upsert を body なしで呼ぶと現在のユーザー情報が返る想定
-        const result = await api.upsertMe({}) as Record<string, unknown> | null;
+        const result = (await api.upsertMe({})) as Record<string, unknown> | null;
         if (result && typeof result === "object") {
           const rawDisplayName = (result.display_name as string) ?? "";
           const rawAvatarUrl = (result.avatar_url as string) ?? "";
