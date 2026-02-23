@@ -9,7 +9,6 @@ import * as Y from "yjs";
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
-const COGNITO_REGION = process.env.COGNITO_REGION || process.env.AWS_REGION || "ap-northeast-1";
 const DATABASE_URL = process.env.DATABASE_URL;
 const DB_CREDENTIALS_JSON = process.env.DB_CREDENTIALS_JSON;
 
@@ -340,7 +339,7 @@ const hocuspocus = new Hocuspocus({
     await saveDocumentToDb(pageId, document as Y.Doc);
   },
 
-  async onChange({ documentName }) {
+  async onChange({ documentName: _documentName }) {
     // ドキュメント変更時（デバウンス前）
   },
 });

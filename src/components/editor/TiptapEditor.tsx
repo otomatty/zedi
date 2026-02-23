@@ -94,10 +94,10 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
-  // Mermaid generator state
+  // Mermaid generator state (setSelectedTextForMermaid は未使用: ダイアログを開く処理が未実装)
   const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
-  const [selectedTextForMermaid, setSelectedTextForMermaid] = useState("");
-  const [selectedText, setSelectedText] = useState("");
+  const [selectedTextForMermaid, _setSelectedTextForMermaid] = useState("");
+  const [_selectedText, setSelectedText] = useState("");
   const hasThumbnail = useMemo(() => Boolean(extractFirstImage(content)), [content]);
 
   const navigate = useNavigate();
@@ -442,12 +442,6 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       editor.view.state.tr.setMeta(wikiLinkSuggestionPluginKey, { close: true }),
     );
   }, [editor]);
-
-  const handleOpenMermaidDialog = useCallback(() => {
-    if (!selectedText) return;
-    setSelectedTextForMermaid(selectedText);
-    setMermaidDialogOpen(true);
-  }, [selectedText]);
 
   const handleInsertMermaid = useCallback(
     (code: string) => {

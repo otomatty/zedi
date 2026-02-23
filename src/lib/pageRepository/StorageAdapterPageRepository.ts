@@ -103,24 +103,24 @@ export class StorageAdapterPageRepository {
     return m ? metadataToPage(m) : null;
   }
 
-  async getPages(userId: string): Promise<Page[]> {
+  async getPages(_userId: string): Promise<Page[]> {
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPage);
   }
 
-  async getPagesSummary(userId: string): Promise<PageSummary[]> {
+  async getPagesSummary(_userId: string): Promise<PageSummary[]> {
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPageSummary);
   }
 
-  async getPagesByIds(userId: string, pageIds: string[]): Promise<Page[]> {
+  async getPagesByIds(_userId: string, pageIds: string[]): Promise<Page[]> {
     if (pageIds.length === 0) return [];
     const list = await this.adapter.getAllPages();
     const idSet = new Set(pageIds);
     return list.filter((m) => idSet.has(m.id)).map(metadataToPage);
   }
 
-  async getPageByTitle(userId: string, title: string): Promise<Page | null> {
+  async getPageByTitle(_userId: string, title: string): Promise<Page | null> {
     const trimmed = title.trim();
     if (!trimmed) return null;
     const list = await this.adapter.getAllPages();
@@ -214,7 +214,7 @@ export class StorageAdapterPageRepository {
     return links.map((l) => l.sourceId);
   }
 
-  async getLinks(userId: string): Promise<Link[]> {
+  async getLinks(_userId: string): Promise<Link[]> {
     const pages = await this.adapter.getAllPages();
     const all: Link[] = [];
     for (const p of pages) {
@@ -252,7 +252,7 @@ export class StorageAdapterPageRepository {
     return sources;
   }
 
-  async getGhostLinks(userId: string): Promise<GhostLink[]> {
+  async getGhostLinks(_userId: string): Promise<GhostLink[]> {
     const pages = await this.adapter.getAllPages();
     const all: GhostLink[] = [];
     for (const p of pages) {

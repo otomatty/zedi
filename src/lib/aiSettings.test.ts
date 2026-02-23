@@ -17,7 +17,6 @@ vi.mock("./encryption", () => ({
 
 // encryptとdecryptをvi.mockedで使えるようにする
 const mockedEncrypt = vi.mocked(encrypt);
-const mockedDecrypt = vi.mocked(decrypt);
 
 describe("aiSettings - 回帰テスト", () => {
   beforeEach(() => {

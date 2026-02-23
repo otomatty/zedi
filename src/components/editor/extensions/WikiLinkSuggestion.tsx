@@ -25,7 +25,7 @@ export interface WikiLinkSuggestionHandle {
 export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
   ({ query, onSelect, onClose }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const { pages, searchPages } = usePageStore();
+    const { pages } = usePageStore();
 
     // Get matching pages
     const getItems = useCallback((): SuggestionItem[] => {

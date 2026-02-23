@@ -77,7 +77,7 @@ export class GyazoProvider implements StorageProviderInterface {
     try {
       // 1x1の透明PNGを作成してテスト
       const testImage = this.createTestImage();
-      const url = await this.uploadImage(testImage);
+      await this.uploadImage(testImage);
 
       return {
         success: true,

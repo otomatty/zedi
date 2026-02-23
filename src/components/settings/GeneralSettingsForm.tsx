@@ -32,17 +32,14 @@ export const GeneralSettingsForm: React.FC = () => {
   const {
     settings,
     isLoading: isGeneralLoading,
-    isSaving: isGeneralSaving,
     updateTheme,
     updateEditorFontSize,
     updateLocale,
-    save: saveGeneral,
   } = useGeneralSettings();
 
   const {
     profile,
     isLoading: isProfileLoading,
-    isSaving: isProfileSaving,
     updateProfile,
     save: saveProfile,
     displayName,

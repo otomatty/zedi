@@ -9,8 +9,6 @@ import { cn } from "@/lib/utils";
 const PLACEHOLDER = "ページを検索...";
 const EMPTY_MESSAGE = "ページが見つかりません";
 const SHORTCUT_HINT = "⌘K";
-/** フッター「すべて表示」のインデックス（候補リストの末尾+1） */
-const FOOTER_INDEX = -2;
 
 export function HeaderSearchBar() {
   const { query, setQuery, searchResults, hasQuery, handleSelect, handleSearchSubmit } =

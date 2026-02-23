@@ -126,9 +126,9 @@ export class CloudflareR2Provider implements StorageProviderInterface {
    * 実運用では aws4 ライブラリの使用を推奨します。
    */
   private async signRequest(
-    method: string,
-    url: string,
-    body?: File,
+    _method: string,
+    _url: string,
+    _body?: File,
   ): Promise<Record<string, string>> {
     const now = new Date();
     const amzDate =

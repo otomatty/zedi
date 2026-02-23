@@ -22,7 +22,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageUpload } from "@/hooks/useImageUpload";
 
-type ImageSource = "camera" | "gallery" | "clipboard";
 type ProcessingMode = "ocr" | "describe" | "none";
 
 interface ImageCreateDialogProps {

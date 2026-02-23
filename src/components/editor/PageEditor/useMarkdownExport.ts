@@ -26,7 +26,7 @@ export function useMarkdownExport(title: string, content: string): UseMarkdownEx
       toast({
         title: "Markdownをクリップボードにコピーしました",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "コピーに失敗しました",
         variant: "destructive",
