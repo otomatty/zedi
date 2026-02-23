@@ -38,7 +38,7 @@ vi.mock('../env', () => ({
     MEDIA_BUCKET: 'test-media-bucket',
     AI_SECRETS_ARN: 'arn:aws:secretsmanager:test:ai',
     RATE_LIMIT_TABLE: 'test-rate-limit',
-    WEBHOOK_SECRET: 'test-webhook-secret',
+    POLAR_SECRET_ARN: 'arn:aws:secretsmanager:test:polar',
     THUMBNAIL_SECRETS_ARN: 'arn:aws:secretsmanager:test:thumbnail',
     THUMBNAIL_BUCKET: 'test-thumbnail-bucket',
     THUMBNAIL_CLOUDFRONT_URL: 'https://thumbnails.example.com',
