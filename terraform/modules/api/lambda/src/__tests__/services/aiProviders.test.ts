@@ -200,7 +200,7 @@ describe('aiProviders', () => {
 
       await callProvider('openai', 'sk-test', 'gpt-4o', messages);
 
-      const url = mockFetch.mock.calls[0][0] as string;
+      const url = mockFetch.mock.calls[0]?.[0] as string;
       expect(url).toContain('openai.com');
     });
   });
