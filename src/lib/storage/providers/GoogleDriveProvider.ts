@@ -217,38 +217,36 @@ export class GoogleDriveProvider implements StorageProviderInterface {
    */
   async testConnection(): Promise<ConnectionTestResult> {
     try {
-      // ユーザー情報を取得してアクセス確認
       const response = await fetch("https://www.googleapis.com/drive/v3/about?fields=user", {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
         },
       });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          // トークンリフレッシュを試みる
-          if (this.refreshToken) {
-            try {
-              await this.refreshAccessToken();
-              return {
-                success: true,
-                message: "Google Driveへの接続に成功しました（トークンを更新しました）",
-              };
-            } catch {
-              throw new Error("認証の更新に失敗しました。再認証が必要です。");
-            }
-          }
-          throw new Error("認証に失敗しました。再認証が必要です。");
-        }
-        throw new Error(`HTTP ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          success: true,
+          message: `Google Drive (${data.user?.emailAddress}) への接続に成功しました`,
+        };
       }
 
-      const data = await response.json();
+      if (response.status === 401 && this.refreshToken) {
+        try {
+          await this.refreshAccessToken();
+          return {
+            success: true,
+            message: "Google Driveへの接続に成功しました（トークンを更新しました）",
+          };
+        } catch {
+          throw new Error("認証の更新に失敗しました。再認証が必要です。");
+        }
+      }
 
-      return {
-        success: true,
-        message: `Google Drive (${data.user?.emailAddress}) への接続に成功しました`,
-      };
+      if (response.status === 401) {
+        throw new Error("認証に失敗しました。再認証が必要です。");
+      }
+      throw new Error(`HTTP ${response.status}`);
     } catch (error) {
       return {
         success: false,

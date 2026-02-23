@@ -55,27 +55,42 @@ export class StorageAdapterPageRepository {
     content: string = "",
     options?: CreatePageOptions,
   ): Promise<Page> {
+    if (userId === LOCAL_USER_ID) {
+      return this.createPageLocal(title, content, options);
+    }
+    return this.createPageRemote(title, content, options);
+  }
+
+  private async createPageLocal(
+    title: string,
+    content: string,
+    options?: CreatePageOptions,
+  ): Promise<Page> {
     const contentPreview = getPageListPreview(content);
     const now = Date.now();
+    const id = crypto.randomUUID();
+    const meta: PageMetadata = {
+      id,
+      ownerId: LOCAL_USER_ID,
+      sourcePageId: null,
+      title: title || null,
+      contentPreview: contentPreview || null,
+      thumbnailUrl: options?.thumbnailUrl ?? null,
+      sourceUrl: options?.sourceUrl ?? null,
+      createdAt: now,
+      updatedAt: now,
+      isDeleted: false,
+    };
+    await this.adapter.upsertPage(meta);
+    return metadataToPage(meta);
+  }
 
-    if (userId === LOCAL_USER_ID) {
-      const id = crypto.randomUUID();
-      const meta: PageMetadata = {
-        id,
-        ownerId: userId,
-        sourcePageId: null,
-        title: title || null,
-        contentPreview: contentPreview || null,
-        thumbnailUrl: options?.thumbnailUrl ?? null,
-        sourceUrl: options?.sourceUrl ?? null,
-        createdAt: now,
-        updatedAt: now,
-        isDeleted: false,
-      };
-      await this.adapter.upsertPage(meta);
-      return metadataToPage(meta);
-    }
-
+  private async createPageRemote(
+    title: string,
+    content: string,
+    options?: CreatePageOptions,
+  ): Promise<Page> {
+    const contentPreview = getPageListPreview(content);
     const created = await this.api.createPage({
       title: title || undefined,
       content_preview: contentPreview || undefined,

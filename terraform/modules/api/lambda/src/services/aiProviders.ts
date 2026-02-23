@@ -353,6 +353,17 @@ export async function* streamGoogle(
 
 // ── SSE ストリームパーサー (共通) ───────────────────────────────────────────
 
+function tryParseSSELine<T>(line: string, parse: (raw: string) => T | null): T | null {
+  if (!line.startsWith("data:")) return null;
+  const payload = line.slice(5).trim();
+  if (!payload || payload === "[DONE]") return null;
+  try {
+    return parse(payload);
+  } catch {
+    return null;
+  }
+}
+
 async function* parseSSEStream<T>(
   body: ReadableStream<Uint8Array>,
   parse: (raw: string) => T | null,
@@ -373,17 +384,9 @@ async function* parseSSEStream<T>(
         const line = buffer.slice(0, newlineIndex).trim();
         buffer = buffer.slice(newlineIndex + 1);
 
-        if (line.startsWith("data:")) {
-          const payload = line.slice(5).trim();
-          if (payload && payload !== "[DONE]") {
-            try {
-              const result = parse(payload);
-              if (result) yield result;
-            } catch {
-              // skip invalid JSON
-            }
-          }
-        }
+        const result = tryParseSSELine(line, parse);
+        if (result) yield result;
+
         newlineIndex = buffer.indexOf("\n");
       }
     }
