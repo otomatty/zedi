@@ -274,14 +274,9 @@ export function useSearchPages(query: string) {
     queryKey: pageKeys.search(userId, query),
     queryFn: async () => {
       if (!query.trim()) return [];
-      console.debug("[searchPages] Fetching", { query, userId });
       try {
         const repo = await getRepository();
         const results = await repo.searchPages(userId, query);
-        console.debug("[searchPages] Success", {
-          query,
-          resultCount: results.length,
-        });
         return results;
       } catch (error) {
         console.error("[searchPages] Failed", {
@@ -305,14 +300,9 @@ export function useSearchSharedNotes(query: string) {
   return useQuery({
     queryKey: pageKeys.searchShared(query),
     queryFn: async () => {
-      console.debug("[searchSharedNotes] Fetching", { query });
       try {
         const api = createApiClient({ getToken });
         const result = await api.searchSharedNotes(query);
-        console.debug("[searchSharedNotes] Success", {
-          query,
-          resultCount: result.results?.length ?? 0,
-        });
         return result;
       } catch (error) {
         console.error("[searchSharedNotes] Failed", {

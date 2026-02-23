@@ -107,7 +107,6 @@ export class CollaborationManager {
         }
       } else if (res.status === 404) {
         // コンテンツ未保存のページでは 404 は想定内。エラー扱いしない。
-        console.debug("[Collab] No content in Aurora yet (404)");
       } else {
         console.warn(`[Collab] Aurora content fetch failed: ${res.status}`);
       }
