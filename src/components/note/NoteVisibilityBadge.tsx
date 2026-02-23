@@ -21,13 +21,7 @@ interface NoteVisibilityBadgeProps {
   visibility: NoteVisibility;
 }
 
-export const NoteVisibilityBadge: React.FC<NoteVisibilityBadgeProps> = ({
-  visibility,
-}) => {
+export const NoteVisibilityBadge: React.FC<NoteVisibilityBadgeProps> = ({ visibility }) => {
   const { t } = useTranslation();
-  return (
-    <Badge variant={visibilityVariant[visibility]}>
-      {t(visibilityKeys[visibility])}
-    </Badge>
-  );
+  return <Badge variant={visibilityVariant[visibility]}>{t(visibilityKeys[visibility])}</Badge>;
 };

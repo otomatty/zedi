@@ -3,20 +3,20 @@
  *
  * 認証オプショナル: ログインユーザーは tier に応じたモデルを取得
  */
-import { Hono } from 'hono';
-import { eq, asc } from 'drizzle-orm';
-import { aiModels } from '../../schema';
-import { authOptional } from '../../middleware/auth';
-import { getUserTier } from '../../services/subscriptionService';
-import type { AppEnv, UserTier } from '../../types';
+import { Hono } from "hono";
+import { eq, asc } from "drizzle-orm";
+import { aiModels } from "../../schema";
+import { authOptional } from "../../middleware/auth";
+import { getUserTier } from "../../services/subscriptionService";
+import type { AppEnv, UserTier } from "../../types";
 
 const app = new Hono<AppEnv>();
 
-app.get('/', authOptional, async (c) => {
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.get("/", authOptional, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
 
-  let tier: UserTier = 'free';
+  let tier: UserTier = "free";
   if (userId) {
     tier = await getUserTier(userId, db);
   }
@@ -38,7 +38,7 @@ app.get('/', authOptional, async (c) => {
   // tier に応じてフィルタリング
   const filtered = models.map((m) => ({
     ...m,
-    available: tier === 'pro' || m.tier_required === 'free',
+    available: tier === "pro" || m.tier_required === "free",
   }));
 
   return c.json({ models: filtered, tier });

@@ -140,9 +140,7 @@ const NoteSettings: React.FC = () => {
         <Header />
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">
-              {t("notes.noteNotFoundOrNoAccess")}
-            </p>
+            <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
           </Container>
         </main>
       </div>
@@ -157,10 +155,10 @@ const NoteSettings: React.FC = () => {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold truncate">{t("notes.noteSettings")}</h1>
+                <h1 className="truncate text-xl font-semibold">{t("notes.noteSettings")}</h1>
                 <NoteVisibilityBadge visibility={visibility} />
               </div>
-              <p className="mt-1 text-sm text-muted-foreground truncate">
+              <p className="mt-1 truncate text-sm text-muted-foreground">
                 {note.title || t("notes.untitledNote")}
               </p>
             </div>
@@ -170,21 +168,14 @@ const NoteSettings: React.FC = () => {
           </div>
 
           {!canManage ? (
-            <p className="mt-6 text-sm text-muted-foreground">
-              {t("notes.noPermissionToEdit")}
-            </p>
+            <p className="mt-6 text-sm text-muted-foreground">{t("notes.noPermissionToEdit")}</p>
           ) : (
             <>
               <section className="mt-6 rounded-lg border border-border/60 p-4">
-                <h2 className="text-sm font-semibold mb-3">{t("notes.shareLink")}</h2>
+                <h2 className="mb-3 text-sm font-semibold">{t("notes.shareLink")}</h2>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Input value={noteUrl} readOnly />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyLink}
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={handleCopyLink}>
                     <Copy className="mr-2 h-4 w-4" />
                     {t("notes.copy")}
                   </Button>
@@ -192,7 +183,7 @@ const NoteSettings: React.FC = () => {
               </section>
 
               <section className="mt-6 rounded-lg border border-border/60 p-4">
-                <h2 className="text-sm font-semibold mb-3">{t("notes.visibilitySettings")}</h2>
+                <h2 className="mb-3 text-sm font-semibold">{t("notes.visibilitySettings")}</h2>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="note-title-input">{t("notes.noteTitle")}</Label>
@@ -248,27 +239,21 @@ const NoteSettings: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end">
-                  <Button
-                    onClick={handleSaveNote}
-                    disabled={updateNoteMutation.isPending}
-                  >
+                  <Button onClick={handleSaveNote} disabled={updateNoteMutation.isPending}>
                     {updateNoteMutation.isPending ? t("common.saving") : t("common.save")}
                   </Button>
                 </div>
               </section>
 
               <section className="mt-6 rounded-lg border border-destructive/40 p-4">
-                <h2 className="text-sm font-semibold text-destructive mb-3">
+                <h2 className="mb-3 text-sm font-semibold text-destructive">
                   {t("notes.deleteSection")}
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {t("notes.deleteSectionDescription")}
                 </p>
                 <div className="mt-4 flex justify-end">
-                  <Button
-                    variant="destructive"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                  >
+                  <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
                     {t("notes.deleteNote")}
                   </Button>
                 </div>
@@ -278,15 +263,14 @@ const NoteSettings: React.FC = () => {
         </Container>
       </main>
 
-      <AlertDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("notes.deleteConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("notes.deleteConfirmDescription", { title: note.title || t("notes.untitledNote") })}
+              {t("notes.deleteConfirmDescription", {
+                title: note.title || t("notes.untitledNote"),
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

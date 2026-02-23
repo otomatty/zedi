@@ -17,7 +17,12 @@
  *   --config <path> マッピング設定ファイル（既定: dev-user-mapping-aurora.json）
  */
 
-import { RDSDataClient, ExecuteStatementCommand, type Field, type SqlParameter } from "@aws-sdk/client-rds-data";
+import {
+  RDSDataClient,
+  ExecuteStatementCommand,
+  type Field,
+  type SqlParameter,
+} from "@aws-sdk/client-rds-data";
 import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -27,7 +32,8 @@ const __dirname = dirname(__filename);
 
 const RESUME_ERROR_NAME = "DatabaseResumingException";
 const RESUME_MAX_RETRIES = 4;
-const BATCH_PAGES = 100;const BATCH_PAGE_CONTENTS = 10; // RDS Data API response limit 1 MB; ydoc_state BYTEA can be large
+const BATCH_PAGES = 100;
+const BATCH_PAGE_CONTENTS = 10; // RDS Data API response limit 1 MB; ydoc_state BYTEA can be large
 const REGION = process.env.AWS_REGION || "ap-northeast-1";
 
 // ---------------------------------------------------------------------------
@@ -180,7 +186,10 @@ function toParam(name: string, value: unknown): SqlParameter {
     name,
     value: toParamValue(value),
   };
-  if (typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+  if (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  ) {
     param.typeHint = "UUID";
   }
   return param;
@@ -198,7 +207,8 @@ function createConnection(config: AuroraConfig) {
       try {
         return await fn();
       } catch (err: unknown) {
-        const name = err && typeof err === "object" && "name" in err ? (err as { name: string }).name : "";
+        const name =
+          err && typeof err === "object" && "name" in err ? (err as { name: string }).name : "";
         if (name !== RESUME_ERROR_NAME || attempt === RESUME_MAX_RETRIES - 1) throw err;
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
@@ -207,7 +217,10 @@ function createConnection(config: AuroraConfig) {
   }
 
   return {
-    async query(sql: string, params: Record<string, unknown> = {}): Promise<Record<string, unknown>[]> {
+    async query(
+      sql: string,
+      params: Record<string, unknown> = {},
+    ): Promise<Record<string, unknown>[]> {
       return executeWithRetry(async () => {
         const cmd = new ExecuteStatementCommand({
           resourceArn: config.clusterArn,
@@ -248,7 +261,7 @@ function loadAuroraConfig(role: "prod" | "dev"): AuroraConfig {
   const secretArn = process.env[`${prefix}_SECRET_ARN`];
   if (!clusterArn || !secretArn) {
     throw new Error(
-      `Missing ${prefix}_CLUSTER_ARN or ${prefix}_SECRET_ARN. Set env for ${role} Aurora (e.g. terraform output -raw db_credentials_secret_arn for dev).`
+      `Missing ${prefix}_CLUSTER_ARN or ${prefix}_SECRET_ARN. Set env for ${role} Aurora (e.g. terraform output -raw db_credentials_secret_arn for dev).`,
     );
   }
   return {
@@ -295,11 +308,11 @@ const defaultSyncOptions: SyncOptions = {
 
 async function findUserByEmail(
   conn: ReturnType<typeof createConnection>,
-  email: string
+  email: string,
 ): Promise<UserRow | null> {
   const rows = await conn.query(
     "SELECT id, cognito_sub, email, display_name, avatar_url, created_at, updated_at FROM users WHERE email = :email LIMIT 1",
-    { email }
+    { email },
   );
   if (rows.length === 0) return null;
   const r = rows[0];
@@ -316,11 +329,11 @@ async function findUserByEmail(
 
 async function findUserByCognitoSub(
   conn: ReturnType<typeof createConnection>,
-  cognitoSub: string
+  cognitoSub: string,
 ): Promise<UserRow | null> {
   const rows = await conn.query(
     "SELECT id, cognito_sub, email, display_name, avatar_url, created_at, updated_at FROM users WHERE cognito_sub = :cognito_sub LIMIT 1",
-    { cognito_sub: cognitoSub }
+    { cognito_sub: cognitoSub },
   );
   if (rows.length === 0) return null;
   const r = rows[0];
@@ -339,7 +352,7 @@ async function findUserByCognitoSub(
 async function resolveUser(
   conn: ReturnType<typeof createConnection>,
   entry: DeveloperEntry,
-  side: "prod" | "dev"
+  side: "prod" | "dev",
 ): Promise<UserRow | null> {
   const cognitoSub = side === "prod" ? entry.productionCognitoSub : entry.developmentCognitoSub;
   if (cognitoSub) return findUserByCognitoSub(conn, cognitoSub);
@@ -349,7 +362,7 @@ async function resolveUser(
 async function resolveSourceUser(
   conn: ReturnType<typeof createConnection>,
   entry: DeveloperEntry,
-  direction: "prod-to-dev" | "dev-to-prod"
+  direction: "prod-to-dev" | "dev-to-prod",
 ): Promise<UserRow | null> {
   return resolveUser(conn, entry, direction === "prod-to-dev" ? "prod" : "dev");
 }
@@ -357,7 +370,7 @@ async function resolveSourceUser(
 async function resolveTargetUser(
   conn: ReturnType<typeof createConnection>,
   entry: DeveloperEntry,
-  direction: "prod-to-dev" | "dev-to-prod"
+  direction: "prod-to-dev" | "dev-to-prod",
 ): Promise<UserRow | null> {
   return resolveUser(conn, entry, direction === "prod-to-dev" ? "dev" : "prod");
 }
@@ -367,7 +380,7 @@ async function ensureTargetUser(
   targetConn: ReturnType<typeof createConnection>,
   sourceUser: UserRow,
   entry: DeveloperEntry,
-  direction: "prod-to-dev" | "dev-to-prod"
+  direction: "prod-to-dev" | "dev-to-prod",
 ): Promise<UserRow> {
   let target = await resolveTargetUser(targetConn, entry, direction);
   if (target) return target;
@@ -389,12 +402,15 @@ async function ensureTargetUser(
       avatar_url: sourceUser.avatar_url,
       created_at: sourceUser.created_at,
       updated_at: sourceUser.updated_at,
-    }
+    },
   );
 
   target = await resolveTargetUser(targetConn, entry, direction);
   if (!target) {
-    target = (await findUserByCognitoSub(targetConn, sourceUser.cognito_sub)) ?? (await findUserByEmail(targetConn, sourceUser.email)) ?? null;
+    target =
+      (await findUserByCognitoSub(targetConn, sourceUser.cognito_sub)) ??
+      (await findUserByEmail(targetConn, sourceUser.email)) ??
+      null;
   }
   if (!target) throw new Error(`Failed to create or find target user for ${entry.email}`);
   return target;
@@ -407,7 +423,7 @@ async function ensureTargetUser(
 async function fetchPages(
   conn: ReturnType<typeof createConnection>,
   ownerId: string,
-  syncDeleted: boolean
+  syncDeleted: boolean,
 ): Promise<PageRow[]> {
   const sql = syncDeleted
     ? "SELECT id, owner_id, source_page_id, title, content_preview, thumbnail_url, source_url, created_at, updated_at, is_deleted FROM pages WHERE owner_id = CAST(:owner_id AS uuid) ORDER BY updated_at"
@@ -431,7 +447,7 @@ function shouldOverwritePage(
   existing: PageRow | null,
   source: PageRow,
   direction: Direction,
-  conflictResolution: ConflictResolution
+  conflictResolution: ConflictResolution,
 ): boolean {
   if (!existing) return true;
   switch (conflictResolution) {
@@ -453,7 +469,7 @@ async function syncPages(
   targetUserId: string,
   direction: Direction,
   conflictResolution: ConflictResolution,
-  syncDeleted: boolean
+  syncDeleted: boolean,
 ): Promise<{ synced: number; skipped: number }> {
   const sourcePages = await fetchPages(sourceConn, sourceUserId, syncDeleted);
   const existingPages = await fetchPages(targetConn, targetUserId, true);
@@ -486,7 +502,7 @@ async function syncPages(
           created_at: page.created_at,
           updated_at: page.updated_at,
           is_deleted: page.is_deleted,
-        }
+        },
       );
     }
     synced++;
@@ -501,7 +517,7 @@ async function syncPages(
 
 async function fetchPageContents(
   conn: ReturnType<typeof createConnection>,
-  pageIds: string[]
+  pageIds: string[],
 ): Promise<PageContentRow[]> {
   if (pageIds.length === 0) return [];
   const out: PageContentRow[] = [];
@@ -516,7 +532,12 @@ async function fetchPageContents(
       const ydoc = r.ydoc_state;
       out.push({
         page_id: r.page_id as string,
-        ydoc_state: typeof ydoc === "string" ? ydoc : (ydoc != null ? Buffer.from(ydoc as ArrayBuffer).toString("base64") : ""),
+        ydoc_state:
+          typeof ydoc === "string"
+            ? ydoc
+            : ydoc != null
+              ? Buffer.from(ydoc as ArrayBuffer).toString("base64")
+              : "",
         version: Number(r.version),
         content_text: (r.content_text as string) ?? null,
         updated_at: r.updated_at as string,
@@ -530,7 +551,7 @@ async function syncPageContents(
   sourceConn: ReturnType<typeof createConnection>,
   targetConn: ReturnType<typeof createConnection>,
   pageIds: string[],
-  contents: PageContentRow[]
+  contents: PageContentRow[],
 ): Promise<number> {
   if (pageIds.length === 0 || contents.length === 0) return 0;
   let count = 0;
@@ -546,7 +567,7 @@ async function syncPageContents(
           version: row.version,
           content_text: row.content_text,
           updated_at: row.updated_at,
-        }
+        },
       );
     }
     count++;
@@ -561,7 +582,7 @@ async function syncPageContents(
 async function fetchNotes(
   conn: ReturnType<typeof createConnection>,
   ownerId: string,
-  syncDeleted: boolean
+  syncDeleted: boolean,
 ): Promise<NoteRow[]> {
   const sql = syncDeleted
     ? "SELECT id, owner_id, title, visibility, created_at, updated_at, is_deleted FROM notes WHERE owner_id = CAST(:owner_id AS uuid)"
@@ -583,7 +604,7 @@ async function syncNotes(
   targetConn: ReturnType<typeof createConnection>,
   sourceUserId: string,
   targetUserId: string,
-  syncDeleted: boolean
+  syncDeleted: boolean,
 ): Promise<number> {
   const notes = await fetchNotes(sourceConn, sourceUserId, syncDeleted);
   let count = 0;
@@ -601,7 +622,7 @@ async function syncNotes(
           created_at: row.created_at,
           updated_at: row.updated_at,
           is_deleted: row.is_deleted,
-        }
+        },
       );
     }
     count++;
@@ -609,7 +630,10 @@ async function syncNotes(
   return count;
 }
 
-async function fetchNotePages(conn: ReturnType<typeof createConnection>, noteIds: string[]): Promise<NotePageRow[]> {
+async function fetchNotePages(
+  conn: ReturnType<typeof createConnection>,
+  noteIds: string[],
+): Promise<NotePageRow[]> {
   if (noteIds.length === 0) return [];
   const out: NotePageRow[] = [];
   for (let i = 0; i < noteIds.length; i += BATCH_PAGES) {
@@ -638,7 +662,7 @@ async function syncNotePages(
   targetConn: ReturnType<typeof createConnection>,
   noteIds: string[],
   addedByMap: Map<string, string>,
-  defaultAddedByUserId: string
+  defaultAddedByUserId: string,
 ): Promise<number> {
   const rows = await fetchNotePages(sourceConn, noteIds);
   let count = 0;
@@ -657,7 +681,7 @@ async function syncNotePages(
           created_at: row.created_at,
           updated_at: row.updated_at,
           is_deleted: row.is_deleted,
-        }
+        },
       );
     }
     count++;
@@ -665,7 +689,10 @@ async function syncNotePages(
   return count;
 }
 
-async function fetchNoteMembers(conn: ReturnType<typeof createConnection>, noteIds: string[]): Promise<NoteMemberRow[]> {
+async function fetchNoteMembers(
+  conn: ReturnType<typeof createConnection>,
+  noteIds: string[],
+): Promise<NoteMemberRow[]> {
   if (noteIds.length === 0) return [];
   const out: NoteMemberRow[] = [];
   for (let i = 0; i < noteIds.length; i += BATCH_PAGES) {
@@ -694,7 +721,7 @@ async function syncNoteMembers(
   targetConn: ReturnType<typeof createConnection>,
   noteIds: string[],
   invitedByMap: Map<string, string>,
-  defaultInvitedByUserId: string
+  defaultInvitedByUserId: string,
 ): Promise<number> {
   const rows = await fetchNoteMembers(sourceConn, noteIds);
   let count = 0;
@@ -713,7 +740,7 @@ async function syncNoteMembers(
           created_at: row.created_at,
           updated_at: row.updated_at,
           is_deleted: row.is_deleted,
-        }
+        },
       );
     }
     count++;
@@ -725,7 +752,10 @@ async function syncNoteMembers(
 // Sync: links, ghost_links
 // ---------------------------------------------------------------------------
 
-async function fetchLinks(conn: ReturnType<typeof createConnection>, sourcePageIds: string[]): Promise<LinkRow[]> {
+async function fetchLinks(
+  conn: ReturnType<typeof createConnection>,
+  sourcePageIds: string[],
+): Promise<LinkRow[]> {
   if (sourcePageIds.length === 0) return [];
   const out: LinkRow[] = [];
   for (let i = 0; i < sourcePageIds.length; i += BATCH_PAGES) {
@@ -747,14 +777,14 @@ async function fetchLinks(conn: ReturnType<typeof createConnection>, sourcePageI
 
 async function syncLinks(
   targetConn: ReturnType<typeof createConnection>,
-  links: LinkRow[]
+  links: LinkRow[],
 ): Promise<number> {
   let count = 0;
   for (const row of links) {
     if (!dryRun) {
       await targetConn.run(
         `INSERT INTO links (source_id, target_id, created_at) VALUES (CAST(:source_id AS uuid), CAST(:target_id AS uuid), CAST(:created_at AS timestamptz)) ON CONFLICT (source_id, target_id) DO NOTHING`,
-        { source_id: row.source_id, target_id: row.target_id, created_at: row.created_at }
+        { source_id: row.source_id, target_id: row.target_id, created_at: row.created_at },
       );
     }
     count++;
@@ -762,7 +792,10 @@ async function syncLinks(
   return count;
 }
 
-async function fetchGhostLinks(conn: ReturnType<typeof createConnection>, sourcePageIds: string[]): Promise<GhostLinkRow[]> {
+async function fetchGhostLinks(
+  conn: ReturnType<typeof createConnection>,
+  sourcePageIds: string[],
+): Promise<GhostLinkRow[]> {
   if (sourcePageIds.length === 0) return [];
   const out: GhostLinkRow[] = [];
   for (let i = 0; i < sourcePageIds.length; i += BATCH_PAGES) {
@@ -786,7 +819,7 @@ async function fetchGhostLinks(conn: ReturnType<typeof createConnection>, source
 
 async function syncGhostLinks(
   targetConn: ReturnType<typeof createConnection>,
-  ghostLinks: GhostLinkRow[]
+  ghostLinks: GhostLinkRow[],
 ): Promise<number> {
   let count = 0;
   for (const row of ghostLinks) {
@@ -801,7 +834,7 @@ async function syncGhostLinks(
           created_at: row.created_at,
           original_target_page_id: row.original_target_page_id,
           original_note_id: row.original_note_id,
-        }
+        },
       );
     }
     count++;
@@ -815,11 +848,11 @@ async function syncGhostLinks(
 
 async function fetchMedia(
   conn: ReturnType<typeof createConnection>,
-  ownerId: string
+  ownerId: string,
 ): Promise<MediaRow[]> {
   const rows = await conn.query(
     "SELECT id, owner_id, page_id, s3_key, file_name, content_type, file_size, created_at FROM media WHERE owner_id = CAST(:owner_id AS uuid)",
-    { owner_id: ownerId }
+    { owner_id: ownerId },
   );
   return rows.map((r) => ({
     id: r.id as string,
@@ -837,7 +870,7 @@ async function syncMedia(
   sourceConn: ReturnType<typeof createConnection>,
   targetConn: ReturnType<typeof createConnection>,
   sourceUserId: string,
-  targetUserId: string
+  targetUserId: string,
 ): Promise<number> {
   const rows = await fetchMedia(sourceConn, sourceUserId);
   let count = 0;
@@ -856,7 +889,7 @@ async function syncMedia(
           content_type: row.content_type,
           file_size: row.file_size,
           created_at: row.created_at,
-        }
+        },
       );
     }
     count++;
@@ -873,7 +906,7 @@ async function runDirection(
   prodConn: ReturnType<typeof createConnection>,
   devConn: ReturnType<typeof createConnection>,
   config: MappingConfig,
-  options: SyncOptions
+  options: SyncOptions,
 ): Promise<void> {
   const sourceRole = direction === "prod-to-dev" ? "prod" : "dev";
   const targetRole = direction === "prod-to-dev" ? "dev" : "prod";
@@ -907,25 +940,47 @@ async function runDirection(
       targetUser.id,
       direction,
       options.conflictResolution,
-      options.syncDeleted
+      options.syncDeleted,
     );
     log(`  Pages: ${pagesSynced} synced, ${pagesSkipped} skipped`, "info");
 
-    const pageIds = (await fetchPages(sourceConn, sourceUser.id, options.syncDeleted)).map((p) => p.id);
+    const pageIds = (await fetchPages(sourceConn, sourceUser.id, options.syncDeleted)).map(
+      (p) => p.id,
+    );
     const contents = await fetchPageContents(sourceConn, pageIds);
     const contentCount = await syncPageContents(sourceConn, targetConn, pageIds, contents);
     log(`  Page contents: ${contentCount}`, "verbose");
 
-    const noteCount = await syncNotes(sourceConn, targetConn, sourceUser.id, targetUser.id, options.syncDeleted);
+    const noteCount = await syncNotes(
+      sourceConn,
+      targetConn,
+      sourceUser.id,
+      targetUser.id,
+      options.syncDeleted,
+    );
     log(`  Notes: ${noteCount}`, "verbose");
 
-    const noteIds = (await fetchNotes(sourceConn, sourceUser.id, options.syncDeleted)).map((n) => n.id);
+    const noteIds = (await fetchNotes(sourceConn, sourceUser.id, options.syncDeleted)).map(
+      (n) => n.id,
+    );
     const addedByMap = new Map<string, string>([[sourceUser.id, targetUser.id]]);
-    const notePagesCount = await syncNotePages(sourceConn, targetConn, noteIds, addedByMap, targetUser.id);
+    const notePagesCount = await syncNotePages(
+      sourceConn,
+      targetConn,
+      noteIds,
+      addedByMap,
+      targetUser.id,
+    );
     log(`  Note pages: ${notePagesCount}`, "verbose");
 
     const invitedByMap = new Map<string, string>([[sourceUser.id, targetUser.id]]);
-    const noteMembersCount = await syncNoteMembers(sourceConn, targetConn, noteIds, invitedByMap, targetUser.id);
+    const noteMembersCount = await syncNoteMembers(
+      sourceConn,
+      targetConn,
+      noteIds,
+      invitedByMap,
+      targetUser.id,
+    );
     log(`  Note members: ${noteMembersCount}`, "verbose");
 
     const links = await fetchLinks(sourceConn, pageIds);

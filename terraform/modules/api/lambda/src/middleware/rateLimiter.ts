@@ -7,11 +7,11 @@
  *   count (Number)  — リクエストカウント
  *   ttl (Number)    — DynamoDB TTL (Unix 秒)
  */
-import { createMiddleware } from 'hono/factory';
-import { HTTPException } from 'hono/http-exception';
-import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
-import { getEnvConfig } from '../env';
-import type { AppEnv } from '../types';
+import { createMiddleware } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
+import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { getEnvConfig } from "../env";
+import type { AppEnv } from "../types";
 
 const client = new DynamoDBClient({});
 
@@ -27,9 +27,9 @@ function getWindowKey(): string {
  * userId は auth ミドルウェアで先にセットされている前提
  */
 export const rateLimiter = createMiddleware<AppEnv>(async (c, next) => {
-  const userId = c.get('userId');
+  const userId = c.get("userId");
   if (!userId) {
-    throw new HTTPException(401, { message: 'Unauthorized' });
+    throw new HTTPException(401, { message: "Unauthorized" });
   }
 
   const env = getEnvConfig();
@@ -48,26 +48,25 @@ export const rateLimiter = createMiddleware<AppEnv>(async (c, next) => {
       new UpdateItemCommand({
         TableName: env.RATE_LIMIT_TABLE,
         Key: { pk: { S: pk } },
-        UpdateExpression:
-          'SET #count = if_not_exists(#count, :zero) + :one, #ttl = :ttl',
-        ExpressionAttributeNames: { '#count': 'count', '#ttl': 'ttl' },
+        UpdateExpression: "SET #count = if_not_exists(#count, :zero) + :one, #ttl = :ttl",
+        ExpressionAttributeNames: { "#count": "count", "#ttl": "ttl" },
         ExpressionAttributeValues: {
-          ':zero': { N: '0' },
-          ':one': { N: '1' },
-          ':ttl': { N: String(ttl) },
+          ":zero": { N: "0" },
+          ":one": { N: "1" },
+          ":ttl": { N: String(ttl) },
         },
-        ReturnValues: 'UPDATED_NEW',
+        ReturnValues: "UPDATED_NEW",
       }),
     );
 
     const count = Number(result.Attributes?.count?.N ?? 0);
     if (count > MAX_REQUESTS) {
-      throw new HTTPException(429, { message: 'RATE_LIMIT_EXCEEDED' });
+      throw new HTTPException(429, { message: "RATE_LIMIT_EXCEEDED" });
     }
   } catch (err: unknown) {
     if (err instanceof HTTPException) throw err;
     // DynamoDB 障害時: fail-open
-    console.error('Rate limit check failed:', err);
+    console.error("Rate limit check failed:", err);
   }
 
   await next();

@@ -10,9 +10,7 @@ interface GlobalShortcutsProviderProps {
  * Provider component that enables global keyboard shortcuts
  * Must be used inside BrowserRouter
  */
-export function GlobalShortcutsProvider({
-  children,
-}: GlobalShortcutsProviderProps) {
+export function GlobalShortcutsProvider({ children }: GlobalShortcutsProviderProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const handleShowShortcuts = useCallback(() => {
@@ -27,10 +25,7 @@ export function GlobalShortcutsProvider({
   return (
     <>
       {children}
-      <KeyboardShortcutsDialog
-        open={shortcutsOpen}
-        onOpenChange={setShortcutsOpen}
-      />
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </>
   );
 }

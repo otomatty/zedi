@@ -11,17 +11,17 @@
 Tiptap エディターに以下の記法・機能を追加し、ノート／Wiki の表現力と利便性を高める。  
 あわせて **スラッシュコマンド（/）** により、Markdown 記法のベースとなるブロックをメニューから挿入できるようにする。
 
-| # | 機能 | 概要 | 優先度 |
-|---|------|------|--------|
-| 0 | **スラッシュコマンド（/）** | `/` 入力で挿入可能なブロック一覧を表示し、選択で該当ブロックを挿入。Markdown 記法の「入力の入口」として利用。 | 高 |
-| 1 | タスクリスト | チェックボックス付きリスト（`- [ ]` / `- [x]`） | 高 |
-| 2 | ハイライト | テキストのマーカー強調（`==text==`） | 高 |
-| 3 | 下線 | アンダーライン（`<u>`） | 高 |
-| 4 | テーブル | 表の挿入・編集（行/列の追加・削除） | 高 |
-| 5 | 文字色 | テキスト色・背景色の指定 | 中 |
-| 6 | 数式 | LaTeX によるインライン/ブロック数式（KaTeX） | 中 |
-| 7 | **コードブロック（シンタックスハイライト）** | 言語選択付きコードブロック。GitHub と同様の配色でシンタックスハイライトを表示。 | 高 |
-| 8 | **Mermaid（ダイアグラム）** | 既存の Mermaid 拡張。スラッシュメニュー「ダイアグラム」で挿入。フローチャート等の図を記法で記述。 | 高（既存） |
+| #   | 機能                                         | 概要                                                                                                          | 優先度     |
+| --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------- |
+| 0   | **スラッシュコマンド（/）**                  | `/` 入力で挿入可能なブロック一覧を表示し、選択で該当ブロックを挿入。Markdown 記法の「入力の入口」として利用。 | 高         |
+| 1   | タスクリスト                                 | チェックボックス付きリスト（`- [ ]` / `- [x]`）                                                               | 高         |
+| 2   | ハイライト                                   | テキストのマーカー強調（`==text==`）                                                                          | 高         |
+| 3   | 下線                                         | アンダーライン（`<u>`）                                                                                       | 高         |
+| 4   | テーブル                                     | 表の挿入・編集（行/列の追加・削除）                                                                           | 高         |
+| 5   | 文字色                                       | テキスト色・背景色の指定                                                                                      | 中         |
+| 6   | 数式                                         | LaTeX によるインライン/ブロック数式（KaTeX）                                                                  | 中         |
+| 7   | **コードブロック（シンタックスハイライト）** | 言語選択付きコードブロック。GitHub と同様の配色でシンタックスハイライトを表示。                               | 高         |
+| 8   | **Mermaid（ダイアグラム）**                  | 既存の Mermaid 拡張。スラッシュメニュー「ダイアグラム」で挿入。フローチャート等の図を記法で記述。             | 高（既存） |
 
 ---
 
@@ -31,24 +31,24 @@ Tiptap エディターに以下の記法・機能を追加し、ノート／Wiki
 
 既存の Tiptap は `^3.18.0` を使用。同一メジャー内で `^3.18.0` に揃える。
 
-| パッケージ | 用途 | 備考 |
-|------------|------|------|
-| `@tiptap/extension-task-list` | タスクリスト | `@tiptap/extension-list` に依存（StarterKit に含まれる list と共存） |
-| `@tiptap/extension-task-item` | タスク項目（チェックボックス） | task-list に含まれる場合あり。要確認。 |
-| `@tiptap/extension-highlight` | ハイライト | 単体で利用可能 |
-| `@tiptap/extension-underline` | 下線 | 単体で利用可能 |
-| `@tiptap/extension-table` | テーブル | table, tableRow, tableCell, tableHeader |
-| `@tiptap/extension-table-row` | テーブル行 | extension-table に含まれるか要確認 |
-| `@tiptap/extension-table-cell` | テーブルセル | 同上 |
-| `@tiptap/extension-table-header` | テーブルヘッダー | 同上 |
-| `@tiptap/extension-text-style` | 文字スタイル基盤 | 文字色の前提。`color` 属性を扱う土台 |
-| `@tiptap/extension-color` | 文字色 | TextStyle に依存 |
-| `@tiptap/extension-mathematics` | 数式（LaTeX） | インライン/ブロック両対応 |
-| `katex` | 数式レンダリング | Mathematics が使用。CSS の import が必要 |
-| `@tiptap/suggestion` | スラッシュコマンド用（任意） | トリガー文字 `/` とサジェスト UI を統合。カスタムプラグインで代替可。 |
-| `lowlight` | コードブロックのシンタックスハイライト | highlight.js の文法を利用。CodeBlockLowlight に渡す。 |
-| `@tiptap/extension-code-block-lowlight` | シンタックスハイライト付きコードブロック | 既存の CodeBlock（StarterKit）を差し替える。 |
-| `highlight.js`（テーマ CSS のみ利用可） | GitHub 風配色 | `github` / `github-dark` テーマの CSS。npm では `highlight.js` または CDN から取得。 |
+| パッケージ                              | 用途                                     | 備考                                                                                 |
+| --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| `@tiptap/extension-task-list`           | タスクリスト                             | `@tiptap/extension-list` に依存（StarterKit に含まれる list と共存）                 |
+| `@tiptap/extension-task-item`           | タスク項目（チェックボックス）           | task-list に含まれる場合あり。要確認。                                               |
+| `@tiptap/extension-highlight`           | ハイライト                               | 単体で利用可能                                                                       |
+| `@tiptap/extension-underline`           | 下線                                     | 単体で利用可能                                                                       |
+| `@tiptap/extension-table`               | テーブル                                 | table, tableRow, tableCell, tableHeader                                              |
+| `@tiptap/extension-table-row`           | テーブル行                               | extension-table に含まれるか要確認                                                   |
+| `@tiptap/extension-table-cell`          | テーブルセル                             | 同上                                                                                 |
+| `@tiptap/extension-table-header`        | テーブルヘッダー                         | 同上                                                                                 |
+| `@tiptap/extension-text-style`          | 文字スタイル基盤                         | 文字色の前提。`color` 属性を扱う土台                                                 |
+| `@tiptap/extension-color`               | 文字色                                   | TextStyle に依存                                                                     |
+| `@tiptap/extension-mathematics`         | 数式（LaTeX）                            | インライン/ブロック両対応                                                            |
+| `katex`                                 | 数式レンダリング                         | Mathematics が使用。CSS の import が必要                                             |
+| `@tiptap/suggestion`                    | スラッシュコマンド用（任意）             | トリガー文字 `/` とサジェスト UI を統合。カスタムプラグインで代替可。                |
+| `lowlight`                              | コードブロックのシンタックスハイライト   | highlight.js の文法を利用。CodeBlockLowlight に渡す。                                |
+| `@tiptap/extension-code-block-lowlight` | シンタックスハイライト付きコードブロック | 既存の CodeBlock（StarterKit）を差し替える。                                         |
+| `highlight.js`（テーマ CSS のみ利用可） | GitHub 風配色                            | `github` / `github-dark` テーマの CSS。npm では `highlight.js` または CDN から取得。 |
 
 **インストール例:**
 
@@ -68,13 +68,13 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 依存関係とテストしやすさを考慮し、以下の順で実装する。
 
-| フェーズ | 内容 | 理由 |
-|----------|------|------|
-| **Phase 0** | **スラッシュコマンド（/）** | `/` でブロック挿入メニューを表示。Markdown 記法の「入力の入口」として、他フェーズで追加するブロックをメニューから挿入できるようにする。先に実装すると、以降のブロック追加時にメニュー項目を足すだけでよい。 |
-| **Phase 1** | タスクリスト・ハイライト・下線・**コードブロック（シンタックスハイライト）** | 単純な拡張追加＋コードブロックを CodeBlockLowlight に差し替え。サニタイザ・CSS・Bubble Menu を共通化。スラッシュメニューに「タスクリスト」「ハイライト」「コードブロック」等を追加。 |
-| **Phase 2** | テーブル | ノードが複数（table, tableRow, tableCell, tableHeader）。挿入 UI が必要。スラッシュメニューに「テーブル」を追加。 |
-| **Phase 3** | 文字色 | TextStyle + Color。カラーピッカーまたはプリセット UI が必要。 |
-| **Phase 4** | 数式 | KaTeX の読み込み・CSS。インライン/ブロック挿入と編集ダイアログ。スラッシュメニューに「数式」を追加。 |
+| フェーズ    | 内容                                                                         | 理由                                                                                                                                                                                                        |
+| ----------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Phase 0** | **スラッシュコマンド（/）**                                                  | `/` でブロック挿入メニューを表示。Markdown 記法の「入力の入口」として、他フェーズで追加するブロックをメニューから挿入できるようにする。先に実装すると、以降のブロック追加時にメニュー項目を足すだけでよい。 |
+| **Phase 1** | タスクリスト・ハイライト・下線・**コードブロック（シンタックスハイライト）** | 単純な拡張追加＋コードブロックを CodeBlockLowlight に差し替え。サニタイザ・CSS・Bubble Menu を共通化。スラッシュメニューに「タスクリスト」「ハイライト」「コードブロック」等を追加。                        |
+| **Phase 2** | テーブル                                                                     | ノードが複数（table, tableRow, tableCell, tableHeader）。挿入 UI が必要。スラッシュメニューに「テーブル」を追加。                                                                                           |
+| **Phase 3** | 文字色                                                                       | TextStyle + Color。カラーピッカーまたはプリセット UI が必要。                                                                                                                                               |
+| **Phase 4** | 数式                                                                         | KaTeX の読み込み・CSS。インライン/ブロック挿入と編集ダイアログ。スラッシュメニューに「数式」を追加。                                                                                                        |
 
 ---
 
@@ -126,23 +126,23 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 以下をスラッシュメニューの項目として用意する。Phase 1〜4 で追加するブロックは、対応する拡張実装後に項目を追加する。
 
-| 項目（表示名） | エイリアス（検索用） | 挿入内容 | 備考 |
-|----------------|----------------------|----------|------|
-| 段落 | 段落, paragraph, p | 空の段落 | 現在のブロックを段落に変換 |
-| 見出し1 | 見出し1, h1, 大見出し | `heading` level 1 | |
-| 見出し2 | 見出し2, h2 | `heading` level 2 | |
-| 見出し3 | 見出し3, h3 | `heading` level 3 | |
-| 箇条書き | 箇条書き, ul, リスト, bullet | `bulletList` + `listItem` | |
-| 番号付きリスト | 番号, ol, 順序付き | `orderedList` + `listItem` | |
-| タスクリスト | タスク, todo, チェック | `taskList` + `taskItem`（Phase 1 で追加） | |
-| 引用 | 引用, blockquote, quote | `blockquote` | |
-| コードブロック | コード, code, pre | `codeBlock` | |
-| 水平線 | 区切り線, hr, 水平 | `horizontalRule` | |
-| テーブル | テーブル, 表, table | 3x3 等のテーブル（Phase 2 で追加） | |
-| 画像 | 画像, image, img | 画像挿入（ファイル選択ダイアログを開く） | 既存の `handleInsertImageClick` と連携 |
-| ダイアグラム（Mermaid） | ダイアグラム, mermaid, 図 | 空の Mermaid ブロック。既存の Mermaid 拡張と連携。テキスト選択後にダイアグラム生成も利用可。 | 記法として Mermaid を明示的にサポート |
-| 数式（インライン） | 数式, math, インライン | 空のインライン数式ノード（Phase 4 で追加） | |
-| 数式（ブロック） | 数式ブロック, block math | 空のブロック数式ノード（Phase 4 で追加） | |
+| 項目（表示名）          | エイリアス（検索用）         | 挿入内容                                                                                     | 備考                                   |
+| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 段落                    | 段落, paragraph, p           | 空の段落                                                                                     | 現在のブロックを段落に変換             |
+| 見出し1                 | 見出し1, h1, 大見出し        | `heading` level 1                                                                            |                                        |
+| 見出し2                 | 見出し2, h2                  | `heading` level 2                                                                            |                                        |
+| 見出し3                 | 見出し3, h3                  | `heading` level 3                                                                            |                                        |
+| 箇条書き                | 箇条書き, ul, リスト, bullet | `bulletList` + `listItem`                                                                    |                                        |
+| 番号付きリスト          | 番号, ol, 順序付き           | `orderedList` + `listItem`                                                                   |                                        |
+| タスクリスト            | タスク, todo, チェック       | `taskList` + `taskItem`（Phase 1 で追加）                                                    |                                        |
+| 引用                    | 引用, blockquote, quote      | `blockquote`                                                                                 |                                        |
+| コードブロック          | コード, code, pre            | `codeBlock`                                                                                  |                                        |
+| 水平線                  | 区切り線, hr, 水平           | `horizontalRule`                                                                             |                                        |
+| テーブル                | テーブル, 表, table          | 3x3 等のテーブル（Phase 2 で追加）                                                           |                                        |
+| 画像                    | 画像, image, img             | 画像挿入（ファイル選択ダイアログを開く）                                                     | 既存の `handleInsertImageClick` と連携 |
+| ダイアグラム（Mermaid） | ダイアグラム, mermaid, 図    | 空の Mermaid ブロック。既存の Mermaid 拡張と連携。テキスト選択後にダイアグラム生成も利用可。 | 記法として Mermaid を明示的にサポート  |
+| 数式（インライン）      | 数式, math, インライン       | 空のインライン数式ノード（Phase 4 で追加）                                                   |                                        |
+| 数式（ブロック）        | 数式ブロック, block math     | 空のブロック数式ノード（Phase 4 で追加）                                                     |                                        |
 
 エイリアスは日本語・英語の両方で検索できるようにする。
 
@@ -170,12 +170,12 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 ### 5.5 成果物（予定）
 
-| 成果物 | 説明 |
-|--------|------|
-| **SlashSuggestionPlugin** | `src/components/editor/extensions/slashSuggestionPlugin.ts`。`/` 検知と state（active, query, range）、decorations、close meta。 |
-| **SlashSuggestionLayer** | `src/components/editor/TiptapEditor/SlashSuggestionLayer.tsx`。メニュー項目の表示・フィルタ・選択・キーボード用 ref。 |
-| **slashCommandItems** | メニュー項目の定義（タイトル・エイリアス・挿入処理）。`src/components/editor/TiptapEditor/slashCommandItems.ts` または editorConfig 内に配列として持つ。 |
-| **TiptapEditor.tsx** | SlashSuggestionPlugin を extension に追加。SlashSuggestionLayer を配置。handleKeyDown でスラッシュ用 ref を呼ぶ分岐を追加。 |
+| 成果物                    | 説明                                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SlashSuggestionPlugin** | `src/components/editor/extensions/slashSuggestionPlugin.ts`。`/` 検知と state（active, query, range）、decorations、close meta。                         |
+| **SlashSuggestionLayer**  | `src/components/editor/TiptapEditor/SlashSuggestionLayer.tsx`。メニュー項目の表示・フィルタ・選択・キーボード用 ref。                                    |
+| **slashCommandItems**     | メニュー項目の定義（タイトル・エイリアス・挿入処理）。`src/components/editor/TiptapEditor/slashCommandItems.ts` または editorConfig 内に配列として持つ。 |
+| **TiptapEditor.tsx**      | SlashSuggestionPlugin を extension に追加。SlashSuggestionLayer を配置。handleKeyDown でスラッシュ用 ref を呼ぶ分岐を追加。                              |
 
 ---
 
@@ -242,12 +242,12 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 #### 6.5.5 成果物（予定）
 
-| 成果物 | 説明 |
-|--------|------|
-| `editorConfig.ts` | StarterKit の `codeBlock: false`、CodeBlockLowlight の追加、lowlight インスタンス（`createLowlight(common)`）の渡し方 |
-| 言語リスト | 言語選択用の「表示名 ⇔ lowlight 言語名」のマッピング。定数ファイルまたは editorConfig 付近に定義。 |
-| **CodeBlockLanguageSelect**（任意） | コードブロック選択時に表示する言語ドロップダウンコンポーネント。NodeView のツールバーまたは Bubble Menu で表示。 |
-| `index.css` または別 CSS | `highlight.js/styles/github.css` の import。ダークモード時は `github-dark.css` を条件付きで読み込む。 |
+| 成果物                              | 説明                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `editorConfig.ts`                   | StarterKit の `codeBlock: false`、CodeBlockLowlight の追加、lowlight インスタンス（`createLowlight(common)`）の渡し方 |
+| 言語リスト                          | 言語選択用の「表示名 ⇔ lowlight 言語名」のマッピング。定数ファイルまたは editorConfig 付近に定義。                    |
+| **CodeBlockLanguageSelect**（任意） | コードブロック選択時に表示する言語ドロップダウンコンポーネント。NodeView のツールバーまたは Bubble Menu で表示。      |
+| `index.css` または別 CSS            | `highlight.js/styles/github.css` の import。ダークモード時は `github-dark.css` を条件付きで読み込む。                 |
 
 ---
 
@@ -327,24 +327,24 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 ## 10. ファイル変更一覧（予定）
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `package.json` | 上記 npm パッケージの追加 |
-| `src/components/editor/TiptapEditor/editorConfig.ts` | 各拡張の import と `createEditorExtensions` への追加 |
-| `src/lib/contentUtils.ts` | SUPPORTED_NODE_TYPES / SUPPORTED_MARK_TYPES の更新 |
-| `src/lib/contentUtils.test.ts` | 新ノード・マークのサニタイズテスト追加 |
-| `src/index.css` | タスクリスト・ハイライト・下線・テーブル・数式用の `.tiptap-editor` 内スタイル |
-| `src/components/editor/TiptapEditor.tsx` | Bubble Menu 用コンポーネントの配置、数式用ダイアログの状態とハンドラ |
-| **新規** `src/components/editor/TiptapEditor/EditorBubbleMenu.tsx` | Bubble Menu：太字・イタリック・ハイライト・タスクリスト・箇条書き・番号付きリスト・文字色・テーブル挿入 |
-| **新規** `src/components/editor/TiptapEditor/TableBubbleMenu.tsx`（任意） | セル選択時のテーブル操作メニュー |
-| **新規** `src/components/editor/TiptapEditor/MathEditDialog.tsx` | 数式（LaTeX）編集ダイアログ |
-| `src/main.tsx`（または TiptapEditor 内） | `import 'katex/dist/katex.min.css'` |
-| **新規** `src/components/editor/extensions/slashSuggestionPlugin.ts` | スラッシュ（/）検知プラグイン（Phase 0） |
-| **新規** `src/components/editor/TiptapEditor/SlashSuggestionLayer.tsx` | スラッシュメニュー UI（Phase 0） |
-| **新規** `src/components/editor/TiptapEditor/slashCommandItems.ts`（または editorConfig 内） | スラッシュメニュー項目定義（Phase 0） |
-| lowlight 初期化（common または all） | editorConfig または専用ファイルで `createLowlight(common)` を渡す（Phase 1） |
-| **新規** `src/components/editor/TiptapEditor/CodeBlockLanguageSelect.tsx`（任意） | コードブロック用言語ドロップダウン（Phase 1） |
-| `src/index.css` またはエントリ | `highlight.js/styles/github.css`（および任意で `github-dark.css`）の import（Phase 1） |
+| ファイル                                                                                     | 変更内容                                                                                                |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `package.json`                                                                               | 上記 npm パッケージの追加                                                                               |
+| `src/components/editor/TiptapEditor/editorConfig.ts`                                         | 各拡張の import と `createEditorExtensions` への追加                                                    |
+| `src/lib/contentUtils.ts`                                                                    | SUPPORTED_NODE_TYPES / SUPPORTED_MARK_TYPES の更新                                                      |
+| `src/lib/contentUtils.test.ts`                                                               | 新ノード・マークのサニタイズテスト追加                                                                  |
+| `src/index.css`                                                                              | タスクリスト・ハイライト・下線・テーブル・数式用の `.tiptap-editor` 内スタイル                          |
+| `src/components/editor/TiptapEditor.tsx`                                                     | Bubble Menu 用コンポーネントの配置、数式用ダイアログの状態とハンドラ                                    |
+| **新規** `src/components/editor/TiptapEditor/EditorBubbleMenu.tsx`                           | Bubble Menu：太字・イタリック・ハイライト・タスクリスト・箇条書き・番号付きリスト・文字色・テーブル挿入 |
+| **新規** `src/components/editor/TiptapEditor/TableBubbleMenu.tsx`（任意）                    | セル選択時のテーブル操作メニュー                                                                        |
+| **新規** `src/components/editor/TiptapEditor/MathEditDialog.tsx`                             | 数式（LaTeX）編集ダイアログ                                                                             |
+| `src/main.tsx`（または TiptapEditor 内）                                                     | `import 'katex/dist/katex.min.css'`                                                                     |
+| **新規** `src/components/editor/extensions/slashSuggestionPlugin.ts`                         | スラッシュ（/）検知プラグイン（Phase 0）                                                                |
+| **新規** `src/components/editor/TiptapEditor/SlashSuggestionLayer.tsx`                       | スラッシュメニュー UI（Phase 0）                                                                        |
+| **新規** `src/components/editor/TiptapEditor/slashCommandItems.ts`（または editorConfig 内） | スラッシュメニュー項目定義（Phase 0）                                                                   |
+| lowlight 初期化（common または all）                                                         | editorConfig または専用ファイルで `createLowlight(common)` を渡す（Phase 1）                            |
+| **新規** `src/components/editor/TiptapEditor/CodeBlockLanguageSelect.tsx`（任意）            | コードブロック用言語ドロップダウン（Phase 1）                                                           |
+| `src/index.css` またはエントリ                                                               | `highlight.js/styles/github.css`（および任意で `github-dark.css`）の import（Phase 1）                  |
 
 ---
 
@@ -364,7 +364,7 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 - **StarterKit との重複:** TaskList / TaskItem が StarterKit の List と競合しないか、公式ドキュメントと実機で確認する。必要なら StarterKit の `bulletList` を無効にせず、TaskList を追加する形でよい。
 - **テーブルとコラボ:** テーブルのセル編集が Y.js で正しくマージされるか、既存の Collaboration で問題が出ないか確認する。
 - **数式のバンドルサイズ:** KaTeX はそこそこ大きい。動的 import（`import('katex')`）で数式挿入時のみ読み込む検討は、実装コストと相談。
-- **既存コンテンツ:** サニタイザで「未知のノード」として削除されないよう、必ず SUPPORTED_* を先行して更新する。
+- **既存コンテンツ:** サニタイザで「未知のノード」として削除されないよう、必ず SUPPORTED\_\* を先行して更新する。
 - **スラッシュと WikiLink:** `/` と `[[` の両方が有効なとき、`handleKeyDown` でどちらの state が active かを判定し、適切なハンドラにだけ委譲する。競合で両方反応しないようにする。
 - **コードブロック差し替え:** StarterKit の `codeBlock: false` を忘れずに指定する。さもないと CodeBlock と CodeBlockLowlight が二重に登録され競合する。lowlight の `common` と `all` はバンドルサイズが異なるため、必要な言語だけ登録するか `common` で足りるか検討する。
 
@@ -390,45 +390,45 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 ### 14.1 サニタイザ・エラー表示（提案）
 
-| 項目 | 提案内容 |
-|------|----------|
+| 項目                              | 提案内容                                                                                                                                           |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **未知ノード/マーク削除時の通知** | サニタイズで削除が発生した場合、トストで「一部の書式を削除しました」と簡潔に通知する。同一セッションでの重複通知を避け、過剰にならないようにする。 |
 
 ### 14.2 読み取り専用時の挙動（提案）
 
-| 項目 | 提案内容 |
-|------|----------|
+| 項目                                            | 提案内容                                                                                                                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **スラッシュメニュー・Bubble Menu・ツールバー** | 読み取り専用（`isReadOnly`）のときは、これらを**非表示**にする。編集不可であることが分かりやすく、誤タップ・誤操作も防げる。既存の `isReadOnly` の扱いと整合させる。 |
 
 ### 14.3 アクセシビリティ（提案）
 
-| 項目 | 提案内容 |
-|------|----------|
-| **タスクリストのチェックボックス** | `aria-label` は状態に応じて「未完了」「完了」など短い文言にする。アプリの言語設定（日本語/英語）に合わせる。Tiptap TaskItem の `a11y.checkboxLabel` オプションで指定する。 |
+| 項目                                | 提案内容                                                                                                                                                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **タスクリストのチェックボックス**  | `aria-label` は状態に応じて「未完了」「完了」など短い文言にする。アプリの言語設定（日本語/英語）に合わせる。Tiptap TaskItem の `a11y.checkboxLabel` オプションで指定する。                               |
 | **スラッシュメニュー・Bubble Menu** | スラッシュメニューは矢印キーで項目移動・Enter で選択・Escape で閉じる。Bubble Menu の各ボタンはフォーカス可能にし、`aria-label`（例:「太字」「イタリック」）を付与。スクリーンリーダーで操作可能にする。 |
-| **数式の代替テキスト** | 数式ノードに `aria-label` で LaTeX ソースの要約または「数式」を付与。編集時はツールチップでソースを表示するのも有効。 |
+| **数式の代替テキスト**              | 数式ノードに `aria-label` で LaTeX ソースの要約または「数式」を付与。編集時はツールチップでソースを表示するのも有効。                                                                                    |
 
 ### 14.4 モバイル（提案）
 
-| 項目 | 提案内容 |
-|------|----------|
+| 項目                   | 提案内容                                                                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **スラッシュメニュー** | モバイルではカーソル（キャレット）付近または画面中央付近に表示。項目数が多いためリストはスクロール可能にする。必要なら「よく使う」項目を上に出す。 |
 
 ### 14.5 Markdown インポート/エクスポート（提案）
 
-| 項目 | 提案内容 |
-|------|----------|
-| **エクスポート** | 既存の `markdownExport` を拡張し、タスクリストは `- [ ]` / `- [x]`、テーブルは `|` 区切り、コードブロックは ` ```言語名 `、数式は `$...$` / `$$...$$` で出力する（GitHub Flavored Markdown に近い形）。 |
-| **インポート** | 上記と同じ記法を解釈し、該当する Tiptap ノードに変換する。Markdown テーブルの自動変換は §7 で仕様確定済み。 |
+| 項目             | 提案内容                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **エクスポート** | 既存の `markdownExport` を拡張し、タスクリストは `- [ ]` / `- [x]`、テーブルは `                            | `区切り、コードブロックは` ```言語名 `、数式は `$...$` / `$$...$$` で出力する（GitHub Flavored Markdown に近い形）。 |
+| **インポート**   | 上記と同じ記法を解釈し、該当する Tiptap ノードに変換する。Markdown テーブルの自動変換は §7 で仕様確定済み。 |
 
 ### 14.6 数式の細部（提案）
 
-| 項目 | 提案内容 |
-|------|----------|
+| 項目                                | 提案内容                                                                                                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **既存 `$...$` のマイグレーション** | オプションとして、`onCreate` で `migrateMathStrings(editor)` を実行。コラボ時は `provider.on('synced', () => migrateMathStrings(editor))` で初回同期後に実行。初期リリースではマイグレーションなしでもよい。 |
-| **KaTeX の読み込み** | 初回から静的 import でよい（実装が単純）。バンドルが気になる場合は、数式ノード表示時やダイアログ表示時の動的 import を検討。 |
-| **不正 LaTeX の扱い** | `katexOptions: { throwOnError: false }` とし、不正な部分はエラーにせずプレーンテキストとして表示する。 |
+| **KaTeX の読み込み**                | 初回から静的 import でよい（実装が単純）。バンドルが気になる場合は、数式ノード表示時やダイアログ表示時の動的 import を検討。                                                                                 |
+| **不正 LaTeX の扱い**               | `katexOptions: { throwOnError: false }` とし、不正な部分はエラーにせずプレーンテキストとして表示する。                                                                                                       |
 
 ---
 
-*以上、Tiptap エディター拡張機能の実装計画書とする。*
+_以上、Tiptap エディター拡張機能の実装計画書とする。_

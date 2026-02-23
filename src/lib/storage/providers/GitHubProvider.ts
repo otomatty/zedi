@@ -38,12 +38,7 @@ export class GitHubProvider implements StorageProviderInterface {
   private readonly path: string;
   private readonly apiUrl = "https://api.github.com";
 
-  constructor(config: {
-    repository: string;
-    token: string;
-    branch?: string;
-    path?: string;
-  }) {
+  constructor(config: { repository: string; token: string; branch?: string; path?: string }) {
     if (!config.repository || !config.token) {
       throw new Error("GitHub configuration is incomplete");
     }
@@ -85,9 +80,7 @@ export class GitHubProvider implements StorageProviderInterface {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        `GitHub upload failed: ${response.status} ${
-          errorData.message || response.statusText
-        }`
+        `GitHub upload failed: ${response.status} ${errorData.message || response.statusText}`,
       );
     }
 
@@ -103,9 +96,7 @@ export class GitHubProvider implements StorageProviderInterface {
    */
   async deleteImage(url: string): Promise<void> {
     // URLからファイルパスを抽出
-    const match = url.match(
-      /raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\/(.+)$/
-    );
+    const match = url.match(/raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\/(.+)$/);
     if (!match) {
       throw new Error("Invalid GitHub image URL");
     }
@@ -167,9 +158,7 @@ export class GitHubProvider implements StorageProviderInterface {
           throw new Error("認証に失敗しました。トークンを確認してください。");
         }
         if (response.status === 404) {
-          throw new Error(
-            "リポジトリが見つかりません。リポジトリ名を確認してください。"
-          );
+          throw new Error("リポジトリが見つかりません。リポジトリ名を確認してください。");
         }
         throw new Error(`HTTP ${response.status}`);
       }
@@ -181,8 +170,7 @@ export class GitHubProvider implements StorageProviderInterface {
         return {
           success: false,
           message: "書き込み権限がありません",
-          error:
-            "トークンにrepoスコープがあることを確認してください",
+          error: "トークンにrepoスコープがあることを確認してください",
         };
       }
 

@@ -108,8 +108,7 @@ function removeEmptyElements(element: Element): void {
 
     // テキストコンテンツが空で、子要素もない場合は削除
     const hasContent =
-      child.textContent?.trim() ||
-      child.querySelector("img, video, iframe, hr, br");
+      child.textContent?.trim() || child.querySelector("img, video, iframe, hr, br");
     if (!hasContent && child.children.length === 0) {
       child.remove();
     }
@@ -139,7 +138,7 @@ export function tiptapJSONToString(json: object): string {
 export function formatClippedContentAsTiptap(
   content: string,
   sourceUrl: string,
-  siteName?: string | null
+  siteName?: string | null,
 ): object {
   const mainContent = htmlToTiptapJSON(content);
 

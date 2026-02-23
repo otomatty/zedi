@@ -4,12 +4,12 @@
 
 ### 1.1 現在のLLM使用箇所
 
-| 機能 | ファイル | 使用箇所 |
-|------|---------|---------|
-| **Wiki生成** | `src/lib/wikiGenerator.ts` | `generateWithOpenAI()`, `generateWithAnthropic()`, `generateWithGoogle()` |
-| **Mermaid生成** | `src/lib/mermaidGenerator.ts` | `generateWithOpenAI()`, `generateWithAnthropic()`, `generateWithGoogle()` |
-| **AIクライアント生成** | `src/lib/aiClient.ts` | `createAIClient()` |
-| **接続テスト** | `src/lib/aiClient.ts` | `testConnection()`, `testOpenAIConnection()`, etc. |
+| 機能                   | ファイル                      | 使用箇所                                                                  |
+| ---------------------- | ----------------------------- | ------------------------------------------------------------------------- |
+| **Wiki生成**           | `src/lib/wikiGenerator.ts`    | `generateWithOpenAI()`, `generateWithAnthropic()`, `generateWithGoogle()` |
+| **Mermaid生成**        | `src/lib/mermaidGenerator.ts` | `generateWithOpenAI()`, `generateWithAnthropic()`, `generateWithGoogle()` |
+| **AIクライアント生成** | `src/lib/aiClient.ts`         | `createAIClient()`                                                        |
+| **接続テスト**         | `src/lib/aiClient.ts`         | `testConnection()`, `testOpenAIConnection()`, etc.                        |
 
 ### 1.2 現在の実装パターン
 
@@ -19,10 +19,10 @@ async function generateWithOpenAI(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new OpenAI({
-    apiKey: settings.apiKey,  // ← 直接APIキーを使用
+    apiKey: settings.apiKey, // ← 直接APIキーを使用
     dangerouslyAllowBrowser: true,
   });
   // ...
@@ -30,6 +30,7 @@ async function generateWithOpenAI(
 ```
 
 **問題点:**
+
 - APIキーを直接使用しているため、APIサーバー経由モードに対応できない
 - 各生成関数が個別にクライアントを作成しており、モード判定ロジックがない
 
@@ -58,8 +59,8 @@ export type APIMode = "user_api_key" | "api_server";
 
 export interface AISettings {
   provider: AIProviderType;
-  apiKey: string;  // ユーザーAPIキーモード時のみ使用
-  apiMode: APIMode;  // ← 新規追加
+  apiKey: string; // ユーザーAPIキーモード時のみ使用
+  apiMode: APIMode; // ← 新規追加
   model: string;
   isConfigured: boolean;
   ollamaEndpoint?: string;
@@ -68,7 +69,7 @@ export interface AISettings {
 export const DEFAULT_AI_SETTINGS: AISettings = {
   provider: "ollama",
   apiKey: "",
-  apiMode: "api_server",  // ← デフォルトはAPIサーバー経由
+  apiMode: "api_server", // ← デフォルトはAPIサーバー経由
   model: "qwen2.5:7b",
   isConfigured: false,
   ollamaEndpoint: "http://localhost:11434",
@@ -110,7 +111,7 @@ export async function callAIService(
     onComplete?: (response: AIServiceResponse) => void;
     onError?: (error: Error) => void;
   },
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   if (settings.apiMode === "user_api_key") {
     // 既存の実装を使用（直接API呼び出し）
@@ -132,11 +133,11 @@ async function callAIWithUserKey(
     onComplete?: (response: AIServiceResponse) => void;
     onError?: (error: Error) => void;
   },
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   // 既存のcreateAIClient()を使用
   const client = createAIClient(settings);
-  
+
   // プロバイダーごとの処理（既存ロジックを再利用）
   switch (settings.provider) {
     case "openai":
@@ -160,7 +161,7 @@ async function callAIWithServer(
     onComplete?: (response: AIServiceResponse) => void;
     onError?: (error: Error) => void;
   },
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   // ユーザー認証トークンを取得（既存の認証システムを使用）
   const userToken = await getUserAuthToken();
@@ -172,7 +173,7 @@ async function callAIWithServer(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${userToken}`,
+      Authorization: `Bearer ${userToken}`,
     },
     body: JSON.stringify({
       provider: settings.provider,
@@ -232,12 +233,13 @@ async function callAIWithServer(
 ### 3.1 `src/lib/wikiGenerator.ts`
 
 **修正前:**
+
 ```typescript
 async function generateWithOpenAI(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new OpenAI({
     apiKey: settings.apiKey,
@@ -248,12 +250,13 @@ async function generateWithOpenAI(
 ```
 
 **修正後:**
+
 ```typescript
 async function generateWithOpenAI(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
 
@@ -282,7 +285,7 @@ async function generateWithOpenAI(
         callbacks.onError(error);
       },
     },
-    abortSignal
+    abortSignal,
   );
 }
 ```
@@ -335,12 +338,12 @@ const updateSettings = useCallback((updates: Partial<AISettings>) => {
 // APIモード選択セクション
 <div className="space-y-4">
   <Label>利用モード</Label>
-  
+
   <div className="space-y-2">
     <div className="flex items-center space-x-2">
       <RadioGroup
         value={settings.apiMode}
-        onValueChange={(value) => 
+        onValueChange={(value) =>
           updateSettings({ apiMode: value as APIMode })
         }
       >
@@ -490,9 +493,7 @@ export async function loadAISettings(): Promise<AISettings | null> {
 
     // 後方互換性: apiModeがない場合は自動判定
     if (!parsed.apiMode) {
-      parsed.apiMode = parsed.apiKey.trim() !== "" 
-        ? "user_api_key" 
-        : "api_server";
+      parsed.apiMode = parsed.apiKey.trim() !== "" ? "user_api_key" : "api_server";
     }
 
     // APIキーを復号化

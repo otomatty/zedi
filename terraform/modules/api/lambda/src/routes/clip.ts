@@ -3,18 +3,18 @@
  *
  * POST /api/clip/fetch — URL から HTML をサーバーサイドで取得
  */
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { authRequired } from '../middleware/auth';
-import type { AppEnv } from '../types';
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { authRequired } from "../middleware/auth";
+import type { AppEnv } from "../types";
 
 const app = new Hono<AppEnv>();
 
-app.post('/fetch', authRequired, async (c) => {
+app.post("/fetch", authRequired, async (c) => {
   const body = await c.req.json<{ url?: string }>();
 
   if (!body.url?.trim()) {
-    throw new HTTPException(400, { message: 'url is required' });
+    throw new HTTPException(400, { message: "url is required" });
   }
 
   const url = body.url.trim();
@@ -22,11 +22,11 @@ app.post('/fetch', authRequired, async (c) => {
   // URL バリデーション
   try {
     const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      throw new HTTPException(400, { message: 'Only http/https URLs are supported' });
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new HTTPException(400, { message: "Only http/https URLs are supported" });
     }
   } catch {
-    throw new HTTPException(400, { message: 'Invalid URL' });
+    throw new HTTPException(400, { message: "Invalid URL" });
   }
 
   const controller = new AbortController();
@@ -35,10 +35,10 @@ app.post('/fetch', authRequired, async (c) => {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'zedi-clip/1.0 (https://zedi.app)',
-        Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
+        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
       },
-      redirect: 'follow',
+      redirect: "follow",
       signal: controller.signal,
     });
 
@@ -48,7 +48,7 @@ app.post('/fetch', authRequired, async (c) => {
       });
     }
 
-    const contentType = response.headers.get('content-type') || '';
+    const contentType = response.headers.get("content-type") || "";
     const html = await response.text();
 
     return c.json({
@@ -59,9 +59,7 @@ app.post('/fetch', authRequired, async (c) => {
   } catch (err) {
     if (err instanceof HTTPException) throw err;
     const message =
-      err instanceof Error && err.name === 'AbortError'
-        ? 'Request timed out'
-        : 'Fetch failed';
+      err instanceof Error && err.name === "AbortError" ? "Request timed out" : "Fetch failed";
     throw new HTTPException(502, { message });
   } finally {
     clearTimeout(timeout);

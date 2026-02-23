@@ -38,8 +38,12 @@ const BASELINE = BASELINE_IDX !== -1 ? process.argv[BASELINE_IDX + 1] : null;
 if (!CLUSTER_ARN || !SECRET_ARN) {
   console.error("Error: CLUSTER_ARN and SECRET_ARN environment variables are required.");
   console.error("  Set them directly or obtain from terraform output:");
-  console.error("    export CLUSTER_ARN=$(cd ../../terraform && terraform output -raw aurora_cluster_arn)");
-  console.error("    export SECRET_ARN=$(cd ../../terraform && terraform output -raw db_credentials_secret_arn)");
+  console.error(
+    "    export CLUSTER_ARN=$(cd ../../terraform && terraform output -raw aurora_cluster_arn)",
+  );
+  console.error(
+    "    export SECRET_ARN=$(cd ../../terraform && terraform output -raw db_credentials_secret_arn)",
+  );
   process.exit(1);
 }
 
@@ -66,13 +70,15 @@ function runSql(sql, tmpDir) {
 function querySql(sql, tmpDir) {
   const result = runSql(sql, tmpDir);
   if (!result.ok) return null;
-  try { return JSON.parse(result.output); } catch { return null; }
+  try {
+    return JSON.parse(result.output);
+  } catch {
+    return null;
+  }
 }
 
 function extractStatements(content) {
-  const stripped = content
-    .replace(/^\s*--[^\n]*$/gm, "")
-    .replace(/\n\s*\/\*[\s\S]*?\*\//g, "");
+  const stripped = content.replace(/^\s*--[^\n]*$/gm, "").replace(/\n\s*\/\*[\s\S]*?\*\//g, "");
   return stripped
     .split(/\s*;\s*\n/)
     .map((s) => s.trim())

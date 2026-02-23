@@ -17,9 +17,7 @@ interface TableBubbleMenuProps {
   editor: Editor;
 }
 
-export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({
-  editor,
-}) => {
+export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
   return (
     <BubbleMenu
       editor={editor}
@@ -28,7 +26,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({
         return editor.isActive("table");
       }}
     >
-      <div className="flex items-center gap-0.5 bg-popover border border-border rounded-lg shadow-elevated p-1 animate-fade-in">
+      <div className="shadow-elevated flex animate-fade-in items-center gap-0.5 rounded-lg border border-border bg-popover p-1">
         {/* Add row before */}
         <TableButton
           onClick={() => editor.chain().focus().addRowBefore().run()}
@@ -57,7 +55,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({
           <Rows3 className="h-3.5 w-3.5" />
         </TableButton>
 
-        <div className="w-px h-5 bg-border mx-0.5" />
+        <div className="mx-0.5 h-5 w-px bg-border" />
 
         {/* Add column before */}
         <TableButton
@@ -87,7 +85,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({
           <Columns3 className="h-3.5 w-3.5" />
         </TableButton>
 
-        <div className="w-px h-5 bg-border mx-0.5" />
+        <div className="mx-0.5 h-5 w-px bg-border" />
 
         {/* Toggle header row */}
         <TableButton
@@ -127,10 +125,10 @@ function TableButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "p-1.5 rounded-md transition-colors",
+        "rounded-md p-1.5 transition-colors",
         variant === "destructive"
           ? "text-destructive/70 hover:bg-destructive/10 hover:text-destructive"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
       {...props}
     >

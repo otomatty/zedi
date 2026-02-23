@@ -19,7 +19,7 @@ export function writeSSE(stream: NodeJS.WritableStream, payload: SSEPayload): vo
 export async function consumeProviderSSE(
   body: ReadableStream<Uint8Array>,
   onData: (raw: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();

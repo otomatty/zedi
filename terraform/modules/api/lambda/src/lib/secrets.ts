@@ -3,10 +3,7 @@
  *
  * AI API キーとサムネイル API キーのキャッシュ付き取得。
  */
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from '@aws-sdk/client-secrets-manager';
+import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 
 const client = new SecretsManagerClient({});
 
@@ -30,10 +27,8 @@ let _aiCacheAt = 0;
 export async function getAISecrets(secretArn: string): Promise<AISecrets> {
   const now = Date.now();
   if (_aiCache && now - _aiCacheAt < CACHE_TTL) return _aiCache;
-  const res = await client.send(
-    new GetSecretValueCommand({ SecretId: secretArn }),
-  );
-  if (!res.SecretString) throw new Error('AI secrets not found');
+  const res = await client.send(new GetSecretValueCommand({ SecretId: secretArn }));
+  if (!res.SecretString) throw new Error("AI secrets not found");
   _aiCache = JSON.parse(res.SecretString) as AISecrets;
   _aiCacheAt = now;
   return _aiCache;
@@ -43,15 +38,11 @@ export async function getAISecrets(secretArn: string): Promise<AISecrets> {
 let _thumbCache: ThumbnailSecrets | null = null;
 let _thumbCacheAt = 0;
 
-export async function getThumbnailSecrets(
-  secretArn: string,
-): Promise<ThumbnailSecrets> {
+export async function getThumbnailSecrets(secretArn: string): Promise<ThumbnailSecrets> {
   const now = Date.now();
   if (_thumbCache && now - _thumbCacheAt < CACHE_TTL) return _thumbCache;
-  const res = await client.send(
-    new GetSecretValueCommand({ SecretId: secretArn }),
-  );
-  if (!res.SecretString) throw new Error('Thumbnail secrets not found');
+  const res = await client.send(new GetSecretValueCommand({ SecretId: secretArn }));
+  if (!res.SecretString) throw new Error("Thumbnail secrets not found");
   _thumbCache = JSON.parse(res.SecretString) as ThumbnailSecrets;
   _thumbCacheAt = now;
   return _thumbCache;
@@ -69,10 +60,8 @@ let _polarCacheAt = 0;
 export async function getPolarSecrets(secretArn: string): Promise<PolarSecrets> {
   const now = Date.now();
   if (_polarCache && now - _polarCacheAt < CACHE_TTL) return _polarCache;
-  const res = await client.send(
-    new GetSecretValueCommand({ SecretId: secretArn }),
-  );
-  if (!res.SecretString) throw new Error('Polar secrets not found');
+  const res = await client.send(new GetSecretValueCommand({ SecretId: secretArn }));
+  if (!res.SecretString) throw new Error("Polar secrets not found");
   _polarCache = JSON.parse(res.SecretString) as PolarSecrets;
   _polarCacheAt = now;
   return _polarCache;
@@ -83,7 +72,7 @@ export async function getPolarSecrets(secretArn: string): Promise<PolarSecrets> 
  */
 export function getRequired<T>(secrets: T, key: keyof T): string {
   const value = secrets[key];
-  if (value == null || String(value).trim() === '') {
+  if (value == null || String(value).trim() === "") {
     throw new Error(`Secret ${String(key)} is not configured`);
   }
   return String(value);

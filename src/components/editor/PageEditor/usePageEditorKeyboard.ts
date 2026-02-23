@@ -8,9 +8,7 @@ interface UsePageEditorKeyboardOptions {
  * Hook for page editor keyboard shortcuts
  * Intercepts Cmd+H / Ctrl+H to go back with proper cleanup
  */
-export function usePageEditorKeyboard({
-  onBack,
-}: UsePageEditorKeyboardOptions): void {
+export function usePageEditorKeyboard({ onBack }: UsePageEditorKeyboardOptions): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd+H / Ctrl+H - ホームに戻る（handleBackを通す）

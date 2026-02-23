@@ -7,9 +7,9 @@
  *   - DB_CREDENTIALS_SECRET
  *   - AURORA_DATABASE_NAME (default: "zedi")
  */
-import { drizzle, type AwsDataApiPgDatabase } from 'drizzle-orm/aws-data-api/pg';
-import { RDSDataClient } from '@aws-sdk/client-rds-data';
-import * as schema from '../schema';
+import { drizzle, type AwsDataApiPgDatabase } from "drizzle-orm/aws-data-api/pg";
+import { RDSDataClient } from "@aws-sdk/client-rds-data";
+import * as schema from "../schema";
 
 export interface DbEnv {
   AURORA_CLUSTER_ARN: string;
@@ -22,7 +22,7 @@ export interface DbEnv {
  */
 export function createDb(env: DbEnv): AwsDataApiPgDatabase<typeof schema> {
   return drizzle(new RDSDataClient({}), {
-    database: env.AURORA_DATABASE_NAME ?? 'zedi',
+    database: env.AURORA_DATABASE_NAME ?? "zedi",
     resourceArn: env.AURORA_CLUSTER_ARN,
     secretArn: env.DB_CREDENTIALS_SECRET,
     schema,
@@ -40,7 +40,7 @@ export function getDb(): AwsDataApiPgDatabase<typeof schema> {
   const clusterArn = process.env.AURORA_CLUSTER_ARN;
   const secretArn = process.env.DB_CREDENTIALS_SECRET;
   if (!clusterArn || !secretArn) {
-    throw new Error('AURORA_CLUSTER_ARN and DB_CREDENTIALS_SECRET must be set');
+    throw new Error("AURORA_CLUSTER_ARN and DB_CREDENTIALS_SECRET must be set");
   }
 
   _db = createDb({

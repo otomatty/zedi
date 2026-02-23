@@ -46,12 +46,9 @@ export default defineConfig(({ mode }) => {
         target: "esnext",
       },
     },
-    plugins: [
-      wasm(),
-      topLevelAwait(),
-      react(),
-      mode === "development" && componentTagger(),
-    ].filter(Boolean),
+    plugins: [wasm(), topLevelAwait(), react(), mode === "development" && componentTagger()].filter(
+      Boolean,
+    ),
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

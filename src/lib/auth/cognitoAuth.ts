@@ -54,7 +54,7 @@ function base64UrlDecode(str: string): string {
       atob(padded)
         .split("")
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+        .join(""),
     );
   } catch {
     return "";
@@ -71,7 +71,8 @@ export function parseIdToken(idToken: string): CognitoUserFromToken | null {
       email: payload.email != null ? String(payload.email) : undefined,
       name: payload.name != null ? String(payload.name) : undefined,
       picture: payload.picture != null ? String(payload.picture) : undefined,
-      "cognito:username": payload["cognito:username"] != null ? String(payload["cognito:username"]) : undefined,
+      "cognito:username":
+        payload["cognito:username"] != null ? String(payload["cognito:username"]) : undefined,
     };
   } catch {
     return null;

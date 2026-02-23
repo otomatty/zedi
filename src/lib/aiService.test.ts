@@ -60,8 +60,6 @@ vi.mock("@google/genai", () => ({
   },
 }));
 
-
-
 describe("aiService - 回帰テスト", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -141,12 +139,17 @@ describe("aiService - 回帰テスト", () => {
   describe("callAIService - ユーザーAPIキーモード（既存機能の回帰テスト）", () => {
     const createTestSettings = (
       provider: AISettings["provider"],
-      apiKey: string = "test-key"
+      apiKey: string = "test-key",
     ): AISettings => ({
       provider,
       apiKey,
       apiMode: "user_api_key",
-      model: provider === "openai" ? "gpt-4o" : provider === "anthropic" ? "claude-3-5-sonnet-20241022" : "gemini-2.5-flash",
+      model:
+        provider === "openai"
+          ? "gpt-4o"
+          : provider === "anthropic"
+            ? "claude-3-5-sonnet-20241022"
+            : "gemini-2.5-flash",
       isConfigured: true,
     });
 
@@ -257,7 +260,7 @@ describe("aiService - 回帰テスト", () => {
           expect.objectContaining({
             stream: true,
           }),
-          expect.anything()
+          expect.anything(),
         );
 
         expect(callbacks.onChunk).toHaveBeenCalledTimes(3);
@@ -317,7 +320,7 @@ describe("aiService - 回帰テスト", () => {
             messages: [{ role: "user", content: "Hello" }],
             max_tokens: 100,
           }),
-          expect.anything()
+          expect.anything(),
         );
 
         expect(callbacks.onComplete).toHaveBeenCalledWith({
@@ -437,7 +440,7 @@ describe("aiService - 回帰テスト", () => {
             config: expect.objectContaining({
               temperature: 0.7,
             }),
-          })
+          }),
         );
 
         expect(callbacks.onComplete).toHaveBeenCalledWith({
@@ -462,11 +465,7 @@ describe("aiService - 回帰テスト", () => {
         };
 
         // ストリーミングチャンクのモック
-        const mockChunks = [
-          { text: "Hello" },
-          { text: ", " },
-          { text: "world!" },
-        ];
+        const mockChunks = [{ text: "Hello" }, { text: ", " }, { text: "world!" }];
 
         async function* mockStream() {
           for (const chunk of mockChunks) {
@@ -474,9 +473,7 @@ describe("aiService - 回帰テスト", () => {
           }
         }
 
-        const mockGenerateContentStream = vi
-          .fn()
-          .mockResolvedValue(mockStream());
+        const mockGenerateContentStream = vi.fn().mockResolvedValue(mockStream());
         const mockClient = {
           models: {
             generateContent: vi.fn(),
@@ -531,9 +528,7 @@ describe("aiService - 回帰テスト", () => {
 
         await callAIService(settings, request, callbacks);
 
-        expect(callbacks.onError).toHaveBeenCalledWith(
-          expect.any(Error)
-        );
+        expect(callbacks.onError).toHaveBeenCalledWith(expect.any(Error));
         expect(callbacks.onComplete).not.toHaveBeenCalled();
       });
 
@@ -554,7 +549,7 @@ describe("aiService - 回帰テスト", () => {
         expect(callbacks.onError).toHaveBeenCalledWith(
           expect.objectContaining({
             message: expect.stringContaining("Unknown provider"),
-          })
+          }),
         );
       });
     });

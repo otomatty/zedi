@@ -1,9 +1,9 @@
 ---
 name: バグ報告
 about: バグを報告して改善に貢献する
-title: '[Bug] '
+title: "[Bug] "
 labels: bug
-assignees: ''
+assignees: ""
 ---
 
 ## バグの概要
@@ -12,9 +12,9 @@ assignees: ''
 
 ## 再現手順
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## 期待する動作
 

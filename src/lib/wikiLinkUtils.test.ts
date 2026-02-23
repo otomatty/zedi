@@ -16,12 +16,16 @@ describe("extractWikiLinksFromContent", () => {
             {
               type: "text",
               text: "Link A",
-              marks: [{ type: "wikiLink", attrs: { title: "Page A", exists: true, referenced: false } }],
+              marks: [
+                { type: "wikiLink", attrs: { title: "Page A", exists: true, referenced: false } },
+              ],
             },
             {
               type: "text",
               text: "Link B",
-              marks: [{ type: "wikiLink", attrs: { title: "Page B", exists: false, referenced: true } }],
+              marks: [
+                { type: "wikiLink", attrs: { title: "Page B", exists: false, referenced: true } },
+              ],
             },
           ],
         },
@@ -66,7 +70,9 @@ describe("updateWikiLinkAttributes", () => {
             {
               type: "text",
               text: "Link",
-              marks: [{ type: "wikiLink", attrs: { title: "Page A", exists: false, referenced: false } }],
+              marks: [
+                { type: "wikiLink", attrs: { title: "Page A", exists: false, referenced: false } },
+              ],
             },
           ],
         },
@@ -93,7 +99,9 @@ describe("updateWikiLinkAttributes", () => {
             {
               type: "text",
               text: "Link",
-              marks: [{ type: "wikiLink", attrs: { title: "Page A", exists: true, referenced: false } }],
+              marks: [
+                { type: "wikiLink", attrs: { title: "Page A", exists: true, referenced: false } },
+              ],
             },
           ],
         },

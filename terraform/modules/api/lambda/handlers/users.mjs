@@ -29,11 +29,7 @@ FROM users WHERE id = :id
  */
 export async function upsert(claims, body = {}) {
   const cognito_sub = claims?.sub;
-  const email =
-    body?.email ??
-    claims?.email ??
-    claims?.["cognito:username"] ??
-    "";
+  const email = body?.email ?? claims?.email ?? claims?.["cognito:username"] ?? "";
   if (!cognito_sub || !email) {
     return res.badRequest("sub and email are required");
   }

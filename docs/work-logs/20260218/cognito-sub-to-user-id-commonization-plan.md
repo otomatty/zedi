@@ -7,13 +7,13 @@
 
 ## 2. 現状整理
 
-| モジュール | 言語/形式 | 解決の有無 | 取得内容 | DB アクセス |
-|------------|------------|------------|----------|-------------|
-| **API Lambda** (pages, syncPages, media) | .mjs (ESM) | あり（各ハンドラ内） | `id` のみ (`getOwnerId`) | RDS Data API `execute(sql, params)` |
-| **API Lambda** (notes, search) | .mjs (ESM) | あり（各ハンドラ内） | `id` + `email` (`getCurrentUser`) | 同上 |
-| **API Lambda** (users) | .mjs (ESM) | upsert のみ（解決ではない） | 行全体 | 同上 |
-| **AI Lambda** | TypeScript | **なし**（sub をそのまま使用） | — | RDS Data API `execute(sql, params, env)` |
-| **Hocuspocus** | TypeScript | あり（自前） | `id` + `email` (`getCurrentUserBySub`) | pg `client.query($1, [cognitoSub])` |
+| モジュール                               | 言語/形式  | 解決の有無                     | 取得内容                               | DB アクセス                              |
+| ---------------------------------------- | ---------- | ------------------------------ | -------------------------------------- | ---------------------------------------- |
+| **API Lambda** (pages, syncPages, media) | .mjs (ESM) | あり（各ハンドラ内）           | `id` のみ (`getOwnerId`)               | RDS Data API `execute(sql, params)`      |
+| **API Lambda** (notes, search)           | .mjs (ESM) | あり（各ハンドラ内）           | `id` + `email` (`getCurrentUser`)      | 同上                                     |
+| **API Lambda** (users)                   | .mjs (ESM) | upsert のみ（解決ではない）    | 行全体                                 | 同上                                     |
+| **AI Lambda**                            | TypeScript | **なし**（sub をそのまま使用） | —                                      | RDS Data API `execute(sql, params, env)` |
+| **Hocuspocus**                           | TypeScript | あり（自前）                   | `id` + `email` (`getCurrentUserBySub`) | pg `client.query($1, [cognitoSub])`      |
 
 - **API Lambda**: 各ハンドラで `GET_USER_ID_SQL` / `GET_USER_SQL` と `getOwnerId(claims)` / `getCurrentUser(claims)` が重複。
 - **AI Lambda**: `verifyToken` が返す Cognito `sub` をそのまま usage/subscription/rate-limit に渡しており、`ai_usage_logs` / `ai_monthly_usage` の FK 違反の原因になっている。
@@ -54,48 +54,48 @@
 
 ### Phase 1: 共有パッケージの追加
 
-| # | 作業内容 | 詳細 |
-|---|----------|------|
-| 1.1 | パッケージ配置 | リポジトリルートに `packages/zedi-auth-db`（または `libs/zedi-auth-db`）を新規作成。 |
-| 1.2 | パッケージ内容 | (1) **SQL 定数**: `RESOLVE_USER_ID_SQL`, `RESOLVE_USER_SQL`（`:cognito_sub` 使用）。(2) **関数**: `resolveUserId(cognitoSub, execute)`, `resolveUser(cognitoSub, execute)`。依存は極力なし（型のみ `Record` 等）。 |
-| 1.3 | ビルド・出力 | TypeScript で書き、ESM を出力。API Lambda は ESM、AI Lambda は TS から参照するため、`package.json` の `main`/`exports` で ESM を指定。 |
-| 1.4 | リポジトリ内参照 | API Lambda・AI Lambda の `package.json` に `"zedi-auth-db": "file:../../../../packages/zedi-auth-db"` のようなローカル依存を追加（パスは構成に合わせて調整）。 |
+| #   | 作業内容         | 詳細                                                                                                                                                                                                               |
+| --- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.1 | パッケージ配置   | リポジトリルートに `packages/zedi-auth-db`（または `libs/zedi-auth-db`）を新規作成。                                                                                                                               |
+| 1.2 | パッケージ内容   | (1) **SQL 定数**: `RESOLVE_USER_ID_SQL`, `RESOLVE_USER_SQL`（`:cognito_sub` 使用）。(2) **関数**: `resolveUserId(cognitoSub, execute)`, `resolveUser(cognitoSub, execute)`。依存は極力なし（型のみ `Record` 等）。 |
+| 1.3 | ビルド・出力     | TypeScript で書き、ESM を出力。API Lambda は ESM、AI Lambda は TS から参照するため、`package.json` の `main`/`exports` で ESM を指定。                                                                             |
+| 1.4 | リポジトリ内参照 | API Lambda・AI Lambda の `package.json` に `"zedi-auth-db": "file:../../../../packages/zedi-auth-db"` のようなローカル依存を追加（パスは構成に合わせて調整）。                                                     |
 
 - **ExecuteFn**: 上記のとおり `(sql, params) => Promise<Record<string, unknown>[]>` とし、各 Lambda の既存 `execute` をそのまま（または薄いラッパーで）渡す。
 
 ### Phase 2: API Lambda の置き換え
 
-| # | 作業内容 | 詳細 |
-|---|----------|------|
-| 2.1 | 共通モジュール利用 | `handlers/pages.mjs`, `handlers/syncPages.mjs`, `handlers/media.mjs` で、`GET_USER_ID_SQL` + `getOwnerId(claims)` を削除し、`resolveUserId(claims?.sub, execute)` に置き換え。 |
-| 2.2 | id+email 利用箇所 | `handlers/notes.mjs`, `handlers/search.mjs` で、`GET_USER_SQL` + `getCurrentUser(claims)` を削除し、`resolveUser(claims?.sub, execute)` に置き換え。返り値は `{ id, email }` なので、既存の `ownerId` / `user.email` は `id` / `email` に読み替え。 |
-| 2.3 | users.mjs | upsert はそのまま。cognito_sub → users.id の「解決だけ」は行っていないため、このモジュールでは共通化対象外（必要なら呼び出し元で resolve を使う程度）。 |
-| 2.4 | 重複 SQL 削除 | 上記ハンドラから `GET_USER_ID_SQL` / `GET_USER_SQL` 定義を削除し、一箇所の実装（共有パッケージ）に寄せる。 |
+| #   | 作業内容           | 詳細                                                                                                                                                                                                                                                |
+| --- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.1 | 共通モジュール利用 | `handlers/pages.mjs`, `handlers/syncPages.mjs`, `handlers/media.mjs` で、`GET_USER_ID_SQL` + `getOwnerId(claims)` を削除し、`resolveUserId(claims?.sub, execute)` に置き換え。                                                                      |
+| 2.2 | id+email 利用箇所  | `handlers/notes.mjs`, `handlers/search.mjs` で、`GET_USER_SQL` + `getCurrentUser(claims)` を削除し、`resolveUser(claims?.sub, execute)` に置き換え。返り値は `{ id, email }` なので、既存の `ownerId` / `user.email` は `id` / `email` に読み替え。 |
+| 2.3 | users.mjs          | upsert はそのまま。cognito_sub → users.id の「解決だけ」は行っていないため、このモジュールでは共通化対象外（必要なら呼び出し元で resolve を使う程度）。                                                                                             |
+| 2.4 | 重複 SQL 削除      | 上記ハンドラから `GET_USER_ID_SQL` / `GET_USER_SQL` 定義を削除し、一箇所の実装（共有パッケージ）に寄せる。                                                                                                                                          |
 
 ### Phase 3: AI Lambda の修正（FK 違反解消＋共通化）
 
-| # | 作業内容 | 詳細 |
-|---|----------|------|
-| 3.1 | 認証後の解決レイヤー追加 | `verifyToken` / `verifyTokenString` で得た Cognito `sub` を、DB に渡す直前に `resolveUserId(sub, (sql, params) => execute(sql, params, env))` で `users.id` に変換する。 |
-| 3.2 | 解決結果が null のとき | 401 を返す（または既存の UNAUTHORIZED と同じ扱い）。メッセージは「User not found」等でよい。 |
-| 3.3 | 渡す値の統一 | `handleChat`, `handleChatStreaming`, `handleGetUsage`, `handleGetSubscription`, `checkRateLimit` など、これまで `userId`（= sub）を渡していた箇所には、すべて **解決後の `users.id`** を渡す。 |
-| 3.4 | 依存追加 | AI Lambda の `package.json` に `zedi-auth-db` を追加し、`resolveUserId` を import。 |
+| #   | 作業内容                 | 詳細                                                                                                                                                                                           |
+| --- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.1 | 認証後の解決レイヤー追加 | `verifyToken` / `verifyTokenString` で得た Cognito `sub` を、DB に渡す直前に `resolveUserId(sub, (sql, params) => execute(sql, params, env))` で `users.id` に変換する。                       |
+| 3.2 | 解決結果が null のとき   | 401 を返す（または既存の UNAUTHORIZED と同じ扱い）。メッセージは「User not found」等でよい。                                                                                                   |
+| 3.3 | 渡す値の統一             | `handleChat`, `handleChatStreaming`, `handleGetUsage`, `handleGetSubscription`, `checkRateLimit` など、これまで `userId`（= sub）を渡していた箇所には、すべて **解決後の `users.id`** を渡す。 |
+| 3.4 | 依存追加                 | AI Lambda の `package.json` に `zedi-auth-db` を追加し、`resolveUserId` を import。                                                                                                            |
 
 - **注意**: WebSocket 経路でも同様に、メッセージから取り出した JWT を検証して得た `sub` を `resolveUserId` で解決し、その `users.id` を以降の処理に渡す。
 
 ### Phase 4: Hocuspocus の扱い
 
-| # | 作業内容 | 詳細 |
-|---|----------|------|
+| #   | 作業内容               | 詳細                                                                                                                                                                            |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4.1 | コード共通化は行わない | pg は `$1` プレースホルダかつ `client.query` のため、RDS Data API 用の共有パッケージとはインターフェースが異なる。現状の `getCurrentUserBySub(client, cognitoSub)` を維持する。 |
-| 4.2 | 契約の明示 | 関数上またはモジュール先頭にコメントを追加し、「Cognito sub → users.id（および email）の解決。契約は docs/... または packages/zedi-auth-db の resolveUser と同一」と記載する。 |
+| 4.2 | 契約の明示             | 関数上またはモジュール先頭にコメントを追加し、「Cognito sub → users.id（および email）の解決。契約は docs/... または packages/zedi-auth-db の resolveUser と同一」と記載する。  |
 
 ### Phase 5: ドキュメント・テスト
 
-| # | 作業内容 | 詳細 |
-|---|----------|------|
-| 5.1 | 仕様ドキュメント | 「認証後の DB 用 user 識別子は必ず users.id に解決する」ことを、既存の調査メモ（ai-usage-logs-fk-investigation.md）や API 設計ドキュメントに追記する。 |
-| 5.2 | 動作確認 | API Lambda: 既存の pages/notes/sync/media/search が、認証ユーザーで従来どおり動作することを確認。AI Lambda: Wiki 生成等で ai_usage_logs に正常に INSERT され、FK エラーが出ないことを確認。 |
+| #   | 作業内容         | 詳細                                                                                                                                                                                        |
+| --- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5.1 | 仕様ドキュメント | 「認証後の DB 用 user 識別子は必ず users.id に解決する」ことを、既存の調査メモ（ai-usage-logs-fk-investigation.md）や API 設計ドキュメントに追記する。                                      |
+| 5.2 | 動作確認         | API Lambda: 既存の pages/notes/sync/media/search が、認証ユーザーで従来どおり動作することを確認。AI Lambda: Wiki 生成等で ai_usage_logs に正常に INSERT され、FK エラーが出ないことを確認。 |
 
 ## 5. ディレクトリ・ファイル構成（案）
 

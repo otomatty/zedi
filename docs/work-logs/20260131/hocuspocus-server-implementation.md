@@ -10,12 +10,14 @@
 このドキュメントでは、AWS ECS Fargate上で動作するHocuspocusリアルタイム同期サーバーの実装手順を説明します。
 
 Terraformで以下のインフラは構築済みです：
+
 - ✅ ECR Repository (`zedi-dev-hocuspocus`)
 - ✅ ECS Cluster (`zedi-dev-cluster`)
 - ✅ ECS Service (`zedi-dev-hocuspocus`)
 - ✅ ALB (`zedi-dev-alb`)
 
 **残りの作業（このドキュメントの範囲）:**
+
 - Hocuspocusサーバーのコード実装
 - Dockerイメージのビルドとプッシュ
 - ECSサービスの更新
@@ -102,23 +104,19 @@ server/
 ### 4.2 src/index.ts
 
 ```typescript
-import { Server } from '@hocuspocus/server';
-import { Database } from '@hocuspocus/extension-database';
-import { Redis } from '@hocuspocus/extension-redis';
-import { createDatabaseExtension } from './extensions/database.js';
-import { createRedisExtension } from './extensions/redis.js';
-import { createAuthExtension } from './extensions/auth.js';
+import { Server } from "@hocuspocus/server";
+import { Database } from "@hocuspocus/extension-database";
+import { Redis } from "@hocuspocus/extension-redis";
+import { createDatabaseExtension } from "./extensions/database.js";
+import { createRedisExtension } from "./extensions/redis.js";
+import { createAuthExtension } from "./extensions/auth.js";
 
-const PORT = parseInt(process.env.PORT || '1234', 10);
+const PORT = parseInt(process.env.PORT || "1234", 10);
 
 const server = Server.configure({
   port: PORT,
-  
-  extensions: [
-    createAuthExtension(),
-    createRedisExtension(),
-    createDatabaseExtension(),
-  ],
+
+  extensions: [createAuthExtension(), createRedisExtension(), createDatabaseExtension()],
 
   async onConnect({ connection, documentName }) {
     console.log(`Client connected to document: ${documentName}`);
@@ -130,12 +128,12 @@ const server = Server.configure({
 });
 
 // Health check endpoint
-import http from 'http';
+import http from "http";
 
 const healthServer = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'healthy' }));
+  if (req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "healthy" }));
   } else {
     res.writeHead(404);
     res.end();
@@ -153,12 +151,12 @@ server.listen();
 ### 4.3 src/extensions/auth.ts
 
 ```typescript
-import { Extension } from '@hocuspocus/server';
-import jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
+import { Extension } from "@hocuspocus/server";
+import jwt from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
 
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID!;
-const COGNITO_REGION = process.env.COGNITO_REGION || 'ap-northeast-1';
+const COGNITO_REGION = process.env.COGNITO_REGION || "ap-northeast-1";
 
 const client = jwksClient({
   jwksUri: `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/jwks.json`,
@@ -179,27 +177,32 @@ export function createAuthExtension(): Extension {
   return {
     async onAuthenticate({ token, documentName }) {
       if (!token) {
-        throw new Error('Authentication required');
+        throw new Error("Authentication required");
       }
 
       return new Promise((resolve, reject) => {
-        jwt.verify(token, getKey, {
-          algorithms: ['RS256'],
-          issuer: `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}`,
-        }, (err, decoded) => {
-          if (err) {
-            reject(new Error('Invalid token'));
-            return;
-          }
-          
-          const payload = decoded as { sub: string; email: string };
-          resolve({
-            user: {
-              id: payload.sub,
-              email: payload.email,
-            },
-          });
-        });
+        jwt.verify(
+          token,
+          getKey,
+          {
+            algorithms: ["RS256"],
+            issuer: `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}`,
+          },
+          (err, decoded) => {
+            if (err) {
+              reject(new Error("Invalid token"));
+              return;
+            }
+
+            const payload = decoded as { sub: string; email: string };
+            resolve({
+              user: {
+                id: payload.sub,
+                email: payload.email,
+              },
+            });
+          },
+        );
       });
     },
   };
@@ -209,12 +212,12 @@ export function createAuthExtension(): Extension {
 ### 4.4 src/extensions/redis.ts
 
 ```typescript
-import { Redis } from '@hocuspocus/extension-redis';
-import IORedis from 'ioredis';
+import { Redis } from "@hocuspocus/extension-redis";
+import IORedis from "ioredis";
 
 export function createRedisExtension() {
   const REDIS_URL = process.env.REDIS_URL!;
-  
+
   return new Redis({
     redis: new IORedis(REDIS_URL, {
       tls: {},
@@ -227,15 +230,15 @@ export function createRedisExtension() {
 ### 4.5 src/extensions/database.ts
 
 ```typescript
-import { Database } from '@hocuspocus/extension-database';
-import pg from 'pg';
+import { Database } from "@hocuspocus/extension-database";
+import pg from "pg";
 
 const { Pool } = pg;
 
 export function createDatabaseExtension() {
   const pool = new Pool({
     host: process.env.DATABASE_HOST,
-    database: process.env.DATABASE_NAME || 'zedi',
+    database: process.env.DATABASE_NAME || "zedi",
     user: process.env.DATABASE_USER,
     password: process.env.DATABASE_PASSWORD,
     port: 5432,
@@ -244,19 +247,18 @@ export function createDatabaseExtension() {
 
   return new Database({
     fetch: async ({ documentName }) => {
-      const result = await pool.query(
-        'SELECT content FROM documents WHERE name = $1',
-        [documentName]
-      );
+      const result = await pool.query("SELECT content FROM documents WHERE name = $1", [
+        documentName,
+      ]);
       return result.rows[0]?.content || null;
     },
-    
+
     store: async ({ documentName, state }) => {
       await pool.query(
         `INSERT INTO documents (name, content, updated_at) 
          VALUES ($1, $2, NOW()) 
          ON CONFLICT (name) DO UPDATE SET content = $2, updated_at = NOW()`,
-        [documentName, state]
+        [documentName, state],
       );
     },
   });
@@ -379,15 +381,15 @@ aws logs tail /aws/ecs/zedi-dev/hocuspocus --follow
 
 ECSタスク定義で設定済みの環境変数:
 
-| 変数名 | 値 | 説明 |
-|--------|-----|------|
-| PORT | 1234 | サーバーポート |
-| NODE_ENV | development | 実行環境 |
-| REDIS_URL | rediss://master.zedi-dev-redis... | Redis接続文字列 |
-| COGNITO_USER_POOL_ID | ap-northeast-1_Q5fQJZkgd | Cognito User Pool ID |
-| COGNITO_REGION | ap-northeast-1 | Cognitoリージョン |
-| AWS_REGION | ap-northeast-1 | AWSリージョン |
-| DATABASE_URL | Secrets Manager経由 | DB接続情報 |
+| 変数名               | 値                                | 説明                 |
+| -------------------- | --------------------------------- | -------------------- |
+| PORT                 | 1234                              | サーバーポート       |
+| NODE_ENV             | development                       | 実行環境             |
+| REDIS_URL            | rediss://master.zedi-dev-redis... | Redis接続文字列      |
+| COGNITO_USER_POOL_ID | ap-northeast-1_Q5fQJZkgd          | Cognito User Pool ID |
+| COGNITO_REGION       | ap-northeast-1                    | Cognitoリージョン    |
+| AWS_REGION           | ap-northeast-1                    | AWSリージョン        |
+| DATABASE_URL         | Secrets Manager経由               | DB接続情報           |
 
 ---
 
@@ -419,12 +421,12 @@ aws ecs describe-tasks \
 
 ## 10. 関連ドキュメント
 
-| ドキュメント | パス |
-|-------------|------|
-| Phase 5 作業ログ | [aws-infrastructure-phase5-realtime.md](./aws-infrastructure-phase5-realtime.md) |
+| ドキュメント             | パス                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Phase 5 作業ログ         | [aws-infrastructure-phase5-realtime.md](./aws-infrastructure-phase5-realtime.md)                           |
 | リアルタイム同時編集仕様 | [../../specs/realtime-collaboration-specification.md](../../specs/realtime-collaboration-specification.md) |
-| AWS接続情報サマリー | [aws-connection-summary.md](./aws-connection-summary.md) |
+| AWS接続情報サマリー      | [aws-connection-summary.md](./aws-connection-summary.md)                                                   |
 
 ---
 
-*このドキュメントは Terraform 以外で実施が必要な作業をまとめています。*
+_このドキュメントは Terraform 以外で実施が必要な作業をまとめています。_

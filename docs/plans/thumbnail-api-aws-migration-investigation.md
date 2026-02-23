@@ -4,30 +4,30 @@
 
 ### 1.1 構成
 
-| 項目 | 内容 |
-|------|------|
-| 場所 | `workers/thumbnail-api/` |
-| フレームワーク | Hono |
-| デプロイ | Wrangler (Cloudflare Workers) |
+| 項目           | 内容                          |
+| -------------- | ----------------------------- |
+| 場所           | `workers/thumbnail-api/`      |
+| フレームワーク | Hono                          |
+| デプロイ       | Wrangler (Cloudflare Workers) |
 
 ### 1.2 エンドポイント一覧
 
-| メソッド | パス | 概要 | 認証 |
-|----------|------|------|------|
-| GET | `/api/image-search` | 画像検索（Google Custom Search） | なし |
-| POST | `/api/image-generate` | 画像生成（Gemini） | なし |
-| POST | `/api/thumbnail/commit` | Gyazo へアップロード | ヘッダー `x-gyazo-access-token` または env `GYAZO_ACCESS_TOKEN` |
+| メソッド | パス                    | 概要                             | 認証                                                            |
+| -------- | ----------------------- | -------------------------------- | --------------------------------------------------------------- |
+| GET      | `/api/image-search`     | 画像検索（Google Custom Search） | なし                                                            |
+| POST     | `/api/image-generate`   | 画像生成（Gemini）               | なし                                                            |
+| POST     | `/api/thumbnail/commit` | Gyazo へアップロード             | ヘッダー `x-gyazo-access-token` または env `GYAZO_ACCESS_TOKEN` |
 
 ### 1.3 環境変数（wrangler.toml / Env）
 
-| 変数名 | 用途 |
-|--------|------|
-| `CORS_ORIGIN` | CORS 許可オリジン |
-| `GOOGLE_GEMINI_API_KEY` | 画像生成（Gemini API） |
-| `GOOGLE_CUSTOM_SEARCH_API_KEY` | 画像検索（Custom Search API） |
-| `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | 画像検索（検索エンジン ID） |
-| `GYAZO_ACCESS_TOKEN` | thumbnail/commit のフォールバック用 |
-| `OPENVERSE_API_URL` 等 | 型定義のみ（現在未使用） |
+| 変数名                           | 用途                                |
+| -------------------------------- | ----------------------------------- |
+| `CORS_ORIGIN`                    | CORS 許可オリジン                   |
+| `GOOGLE_GEMINI_API_KEY`          | 画像生成（Gemini API）              |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY`   | 画像検索（Custom Search API）       |
+| `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | 画像検索（検索エンジン ID）         |
+| `GYAZO_ACCESS_TOKEN`             | thumbnail/commit のフォールバック用 |
+| `OPENVERSE_API_URL` 等           | 型定義のみ（現在未使用）            |
 
 ### 1.4 画像検索の実装
 
@@ -140,17 +140,17 @@
 
 ## 6. 参照ファイル一覧
 
-| 役割 | パス |
-|------|------|
-| Worker エントリ | `workers/thumbnail-api/src/index.ts` |
-| 画像検索ルート | `workers/thumbnail-api/src/routes/image-search.ts` |
-| 画像生成ルート | `workers/thumbnail-api/src/routes/image-generate.ts` |
-| thumbnail/commit ルート | `workers/thumbnail-api/src/routes/thumbnail-commit.ts` |
-| 検索集約 | `workers/thumbnail-api/src/services/search/index.ts` |
-| Google Custom Search | `workers/thumbnail-api/src/services/search/google-custom-search.ts` |
-| 画像生成（Gemini） | `workers/thumbnail-api/src/services/generation/gemini.ts` |
-| Gyazo アップロード | `workers/thumbnail-api/src/services/gyazo.ts` |
-| 型定義 | `workers/thumbnail-api/src/types/api.ts`, `env.ts` |
-| ai-api Terraform | `terraform/modules/ai-api/main.tf` |
-| ai-api Lambda ハンドラ | `terraform/modules/ai-api/lambda/src/index.ts` |
-| フロント呼び出し | `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx` |
+| 役割                    | パス                                                                |
+| ----------------------- | ------------------------------------------------------------------- |
+| Worker エントリ         | `workers/thumbnail-api/src/index.ts`                                |
+| 画像検索ルート          | `workers/thumbnail-api/src/routes/image-search.ts`                  |
+| 画像生成ルート          | `workers/thumbnail-api/src/routes/image-generate.ts`                |
+| thumbnail/commit ルート | `workers/thumbnail-api/src/routes/thumbnail-commit.ts`              |
+| 検索集約                | `workers/thumbnail-api/src/services/search/index.ts`                |
+| Google Custom Search    | `workers/thumbnail-api/src/services/search/google-custom-search.ts` |
+| 画像生成（Gemini）      | `workers/thumbnail-api/src/services/generation/gemini.ts`           |
+| Gyazo アップロード      | `workers/thumbnail-api/src/services/gyazo.ts`                       |
+| 型定義                  | `workers/thumbnail-api/src/types/api.ts`, `env.ts`                  |
+| ai-api Terraform        | `terraform/modules/ai-api/main.tf`                                  |
+| ai-api Lambda ハンドラ  | `terraform/modules/ai-api/lambda/src/index.ts`                      |
+| フロント呼び出し        | `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx`    |

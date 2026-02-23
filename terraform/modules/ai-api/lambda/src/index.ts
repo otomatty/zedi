@@ -26,14 +26,8 @@ import { resolveUserId } from "./lib/resolveUserId.js";
 import type { EnvConfig, SSEPayload } from "./types/index.js";
 
 /** Resolve Cognito sub to users.id; throw if user not found in DB. */
-async function requireResolvedUserId(
-  cognitoSub: string,
-  env: EnvConfig
-): Promise<string> {
-  const userId = await resolveUserId(
-    cognitoSub,
-    (sql, params) => execute(sql, params, env)
-  );
+async function requireResolvedUserId(cognitoSub: string, env: EnvConfig): Promise<string> {
+  const userId = await resolveUserId(cognitoSub, (sql, params) => execute(sql, params, env));
   if (!userId) {
     throw new Error("UNAUTHORIZED");
   }
@@ -55,7 +49,7 @@ function getCorsHeaders(env: EnvConfig): Record<string, string> {
 function jsonResponse(
   body: unknown,
   statusCode: number,
-  env: EnvConfig
+  env: EnvConfig,
 ): { statusCode: number; headers: Record<string, string>; body: string } {
   return {
     statusCode,
@@ -101,9 +95,7 @@ async function handleHttpEvent(event: APIGatewayProxyEventV2) {
       try {
         const sub = await verifyToken(event, env);
         userId =
-          (await resolveUserId(sub, (sql, params) =>
-            execute(sql, params, env)
-          )) ?? undefined;
+          (await resolveUserId(sub, (sql, params) => execute(sql, params, env))) ?? undefined;
       } catch {
         // Anonymous access returns free-tier models only
       }
@@ -177,22 +169,19 @@ declare const awslambda: {
     handler: (
       event: APIGatewayProxyEventV2,
       responseStream: NodeJS.WritableStream,
-      context: unknown
-    ) => Promise<void>
+      context: unknown,
+    ) => Promise<void>,
   ) => unknown;
   HttpResponseStream: {
     from: (
       stream: NodeJS.WritableStream,
-      metadata: { statusCode: number; headers: Record<string, string> }
+      metadata: { statusCode: number; headers: Record<string, string> },
     ) => NodeJS.WritableStream;
   };
 };
 
 export const streamHandler = awslambda.streamifyResponse(
-  async (
-    event: APIGatewayProxyEventV2,
-    responseStream: NodeJS.WritableStream
-  ) => {
+  async (event: APIGatewayProxyEventV2, responseStream: NodeJS.WritableStream) => {
     const env = getEnvConfig();
     const method = event.requestContext?.http?.method ?? "GET";
     const rawPath = event.rawPath ?? "/";
@@ -270,7 +259,7 @@ export const streamHandler = awslambda.streamifyResponse(
       stream.write(JSON.stringify({ error: message }));
       stream.end();
     }
-  }
+  },
 );
 
 // ---------------------------------------------------------------------------
@@ -292,7 +281,7 @@ interface WebSocketEvent {
 }
 
 async function handleWebSocketEvent(
-  event: WebSocketEvent
+  event: WebSocketEvent,
 ): Promise<{ statusCode: number; body: string }> {
   const env = getEnvConfig();
   const { routeKey, connectionId, domainName, stage } = event.requestContext;
@@ -348,8 +337,7 @@ async function handleWebSocketEvent(
 
         return { statusCode: 200, body: "" };
       } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Internal server error";
+        const message = err instanceof Error ? err.message : "Internal server error";
         try {
           await sendToConnection(apiGw, connectionId, {
             error: message,
@@ -373,12 +361,12 @@ async function handleWebSocketEvent(
 async function sendToConnection(
   apiGw: ApiGatewayManagementApiClient,
   connectionId: string,
-  payload: SSEPayload
+  payload: SSEPayload,
 ): Promise<void> {
   await apiGw.send(
     new PostToConnectionCommand({
       ConnectionId: connectionId,
       Data: new TextEncoder().encode(JSON.stringify(payload)),
-    })
+    }),
   );
 }

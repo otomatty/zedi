@@ -24,7 +24,9 @@ async function main(): Promise<void> {
   console.log("[deploy] Loading env from:", envPath);
   const loaded = await loadEnvFile(envPath);
   if (!loaded) {
-    console.warn("[deploy] Env file not found. Copy .env.production.example to .env.production and set values.");
+    console.warn(
+      "[deploy] Env file not found. Copy .env.production.example to .env.production and set values.",
+    );
   }
 
   const bucket = process.env.PROD_FRONTEND_S3_BUCKET;
@@ -33,7 +35,7 @@ async function main(): Promise<void> {
 
   if (!bucket || !distributionId) {
     console.error(
-      "[deploy] Missing PROD_FRONTEND_S3_BUCKET or PROD_CLOUDFRONT_DISTRIBUTION_ID. Set them in .env.production (see .env.production.example)."
+      "[deploy] Missing PROD_FRONTEND_S3_BUCKET or PROD_CLOUDFRONT_DISTRIBUTION_ID. Set them in .env.production (see .env.production.example).",
     );
     process.exit(1);
   }
@@ -41,7 +43,7 @@ async function main(): Promise<void> {
   if (!apiBaseUrl) {
     console.error(
       "[deploy] Missing VITE_ZEDI_API_BASE_URL. Set it in .env.production (e.g. terraform output -raw api_invoke_url). " +
-        "Without it, /api/* requests go to the frontend origin and return HTML, causing 'Invalid JSON response' on /home."
+        "Without it, /api/* requests go to the frontend origin and return HTML, causing 'Invalid JSON response' on /home.",
     );
     process.exit(1);
   }
@@ -62,15 +64,12 @@ async function main(): Promise<void> {
 
   // 2. S3 sync
   console.log("[deploy] Syncing dist/ to s3://" + bucket + "/ ...");
-  const syncProc = Bun.spawn(
-    ["aws", "s3", "sync", "dist/", `s3://${bucket}/`, "--delete"],
-    {
-      cwd: ROOT,
-      env: process.env,
-      stdout: "inherit",
-      stderr: "inherit",
-    }
-  );
+  const syncProc = Bun.spawn(["aws", "s3", "sync", "dist/", `s3://${bucket}/`, "--delete"], {
+    cwd: ROOT,
+    env: process.env,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   const syncExit = await syncProc.exited;
   if (syncExit !== 0) {
     console.error("[deploy] S3 sync failed.");
@@ -94,7 +93,7 @@ async function main(): Promise<void> {
       env: process.env,
       stdout: "inherit",
       stderr: "inherit",
-    }
+    },
   );
   const invalExit = await invalProc.exited;
   if (invalExit !== 0) {

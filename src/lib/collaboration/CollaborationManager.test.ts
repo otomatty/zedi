@@ -58,9 +58,7 @@ describe("CollaborationManager", () => {
 
   describe("subscribe", () => {
     it("notifies listeners of state changes", () => {
-      const manager = new CollaborationManager(
-        "page-1", "user-1", "Test User", mockGetAuthToken,
-      );
+      const manager = new CollaborationManager("page-1", "user-1", "Test User", mockGetAuthToken);
       const listener = vi.fn();
 
       manager.subscribe(listener);
@@ -72,9 +70,7 @@ describe("CollaborationManager", () => {
     });
 
     it("returns unsubscribe function", () => {
-      const manager = new CollaborationManager(
-        "page-1", "user-1", "Test User", mockGetAuthToken,
-      );
+      const manager = new CollaborationManager("page-1", "user-1", "Test User", mockGetAuthToken);
       const listener = vi.fn();
 
       const unsubscribe = manager.subscribe(listener);
@@ -90,27 +86,21 @@ describe("CollaborationManager", () => {
 
   describe("document", () => {
     it("returns the Y.Doc", () => {
-      const manager = new CollaborationManager(
-        "page-1", "user-1", "Test User", mockGetAuthToken,
-      );
+      const manager = new CollaborationManager("page-1", "user-1", "Test User", mockGetAuthToken);
       expect(manager.document).toBeDefined();
     });
   });
 
   describe("isConnected", () => {
     it("returns false initially", () => {
-      const manager = new CollaborationManager(
-        "page-1", "user-1", "Test User", mockGetAuthToken,
-      );
+      const manager = new CollaborationManager("page-1", "user-1", "Test User", mockGetAuthToken);
       expect(manager.isConnected).toBe(false);
     });
   });
 
   describe("destroy", () => {
     it("clears listeners and destroys providers", () => {
-      const manager = new CollaborationManager(
-        "page-1", "user-1", "Test User", mockGetAuthToken,
-      );
+      const manager = new CollaborationManager("page-1", "user-1", "Test User", mockGetAuthToken);
       const listener = vi.fn();
       manager.subscribe(listener);
       listener.mockClear();

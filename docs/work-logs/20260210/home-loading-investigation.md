@@ -35,33 +35,33 @@
 
 ### 2.1 同期状態（syncStatus）
 
-| 役割 | ファイル | 内容 |
-|------|----------|------|
-| 状態の保持・購読 | `src/lib/sync/syncWithApi.ts` | `syncStatus`（idle / syncing / synced / error）、`hasCompletedFirstSync`、`subscribeSyncStatus` |
-| フック | `src/hooks/usePageQueries.ts` | `useSyncStatus()` → `getSyncStatus()` と `subscribeSyncStatus(setStatus)` |
-| 同期実行 | `src/lib/sync/syncWithApi.ts` | `syncWithApi()` 開始時に `setSyncStatus("syncing")`、成功で `"synced"`、失敗で `"error"`。**finally** で `hasCompletedFirstSync = true` |
+| 役割             | ファイル                      | 内容                                                                                                                                    |
+| ---------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 状態の保持・購読 | `src/lib/sync/syncWithApi.ts` | `syncStatus`（idle / syncing / synced / error）、`hasCompletedFirstSync`、`subscribeSyncStatus`                                         |
+| フック           | `src/hooks/usePageQueries.ts` | `useSyncStatus()` → `getSyncStatus()` と `subscribeSyncStatus(setStatus)`                                                               |
+| 同期実行         | `src/lib/sync/syncWithApi.ts` | `syncWithApi()` 開始時に `setSyncStatus("syncing")`、成功で `"synced"`、失敗で `"error"`。**finally** で `hasCompletedFirstSync = true` |
 
 - **重要**: `hasNeverSynced()` は `!hasCompletedFirstSync`。同期が **成功でも失敗でも** 一度 `syncWithApi` が終われば `hasCompletedFirstSync` が true になり、`hasNeverSynced()` は false になる。
 
 ### 2.2 ページ一覧データ（usePagesSummary）
 
-| 役割 | ファイル | 内容 |
-|------|----------|------|
-| リポジトリ取得 | `src/hooks/usePageQueries.ts` | `useRepository()` → `isLoaded = isLoaded(auth) && isAdapterReady`。adapter は `createStorageAdapter()`（IndexedDB） |
-| 一覧取得 | 同上 | `usePagesSummary()` → queryKey: `pageKeys.summary(userId)`、queryFn: `getRepository()` → `repo.getPagesSummary(userId)` |
-| 実体 | `src/lib/pageRepository/StorageAdapterPageRepository.ts` | `getPagesSummary()` は `adapter.getAllPages()` を呼ぶだけ |
-| ストレージ | `src/lib/storageAdapter/IndexedDBStorageAdapter.ts` | `getAllPages()` は IndexedDB の `my_pages` から取得 |
+| 役割           | ファイル                                                 | 内容                                                                                                                    |
+| -------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| リポジトリ取得 | `src/hooks/usePageQueries.ts`                            | `useRepository()` → `isLoaded = isLoaded(auth) && isAdapterReady`。adapter は `createStorageAdapter()`（IndexedDB）     |
+| 一覧取得       | 同上                                                     | `usePagesSummary()` → queryKey: `pageKeys.summary(userId)`、queryFn: `getRepository()` → `repo.getPagesSummary(userId)` |
+| 実体           | `src/lib/pageRepository/StorageAdapterPageRepository.ts` | `getPagesSummary()` は `adapter.getAllPages()` を呼ぶだけ                                                               |
+| ストレージ     | `src/lib/storageAdapter/IndexedDBStorageAdapter.ts`      | `getAllPages()` は IndexedDB の `my_pages` から取得                                                                     |
 
 - **isLoading**: `usePagesSummary()` では `isLoading = query.isLoading || !isLoaded`。つまり **adapter が準備できるまで** および **初回クエリが終わるまで** true。
 
 ### 2.3 初期同期（Initial Sync）のタイミング
 
-| 場所 | ファイル | 処理 |
-|------|----------|------|
-| トリガー | `src/hooks/usePageQueries.ts`（useRepository） | `isSignedIn && userId && isAdapterReady` のとき、**1回だけ**（`initialSyncRequestedForUser` でガード）`runAuroraSync(userId, getToken)` を **fire-and-forget**（await しない）で実行 |
-| 実行 | `src/lib/sync/syncWithApi.ts` | `runAuroraSync()` → 別途 `createStorageAdapter()` と `createApiClient()` で adapter/api を生成 → `syncWithApi(adapter, api, userId)` |
-| API | `src/lib/api/apiClient.ts` | `getSyncPages(since?)` → GET `/api/sync/pages?since=...` |
-| バックエンド | `terraform/modules/api/lambda/handlers/syncPages.mjs` | `getSyncPages(claims, query)`。Aurora から pages / links / ghost_links を取得して返す |
+| 場所         | ファイル                                              | 処理                                                                                                                                                                                 |
+| ------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| トリガー     | `src/hooks/usePageQueries.ts`（useRepository）        | `isSignedIn && userId && isAdapterReady` のとき、**1回だけ**（`initialSyncRequestedForUser` でガード）`runAuroraSync(userId, getToken)` を **fire-and-forget**（await しない）で実行 |
+| 実行         | `src/lib/sync/syncWithApi.ts`                         | `runAuroraSync()` → 別途 `createStorageAdapter()` と `createApiClient()` で adapter/api を生成 → `syncWithApi(adapter, api, userId)`                                                 |
+| API          | `src/lib/api/apiClient.ts`                            | `getSyncPages(since?)` → GET `/api/sync/pages?since=...`                                                                                                                             |
+| バックエンド | `terraform/modules/api/lambda/handlers/syncPages.mjs` | `getSyncPages(claims, query)`。Aurora から pages / links / ghost_links を取得して返す                                                                                                |
 
 - **注意**: `runAuroraSync` は **await されていない** ため、初期同期が完了する前に `usePagesSummary` の queryFn が走り、その時点では IndexedDB にまだ PULL 結果が入っておらず **空配列** が返る可能性がある。
 
@@ -90,11 +90,11 @@
 
 - **runAuroraSync**（= `syncWithApi`）が **完了していない** と、`syncStatus` は "syncing" のまま。
 - 考えられる要因:
-  1. **GET /api/sync/pages** がレスポンスを返さない  
+  1. **GET /api/sync/pages** がレスポンスを返さない
      - Lambda タイムアウト（terraform: `timeout = 30` 秒）、Aurora の復帰遅延、ネットワークエラーなど。
-  2. **POST /api/sync/pages**（PUSH）が重い  
+  2. **POST /api/sync/pages**（PUSH）が重い
      - ページ数が多いと chunk 送信で時間がかかり、Lambda 30秒で打ち切られる可能性。
-  3. **syncWithApi 内のどこかで例外**  
+  3. **syncWithApi 内のどこかで例外**
      - catch される前に別の理由でハングしている、など。
 
 この場合、**ヘッダーの SyncIndicator が「同期中」のまま**になり、PageGrid も「ページ0件かつ同期中」でスケルトンが続く。
@@ -121,12 +121,12 @@
 
 ## 4. インフラ（Terraform / AWS）の関連箇所
 
-| 役割 | 場所 | 内容 |
-|------|------|------|
-| Lambda タイムアウト | `terraform/modules/api/main.tf` | `timeout = 30`（秒） |
-| Sync API | `terraform/modules/api/lambda/router.mjs` | GET/POST `/api/sync/pages` → `handlers/syncPages.mjs` の `getSyncPages` / `postSyncPages` |
-| DB アクセス | `terraform/modules/api/lambda/handlers/syncPages.mjs` | `execute()` で Aurora（RDS Data API）にクエリ |
-| DB ラッパー | `terraform/modules/api/lambda/lib/db.mjs` | RDS Data API。`DatabaseResumingException` 時に最大4回リトライ（1秒刻みのディレイ） |
+| 役割                | 場所                                                  | 内容                                                                                      |
+| ------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Lambda タイムアウト | `terraform/modules/api/main.tf`                       | `timeout = 30`（秒）                                                                      |
+| Sync API            | `terraform/modules/api/lambda/router.mjs`             | GET/POST `/api/sync/pages` → `handlers/syncPages.mjs` の `getSyncPages` / `postSyncPages` |
+| DB アクセス         | `terraform/modules/api/lambda/handlers/syncPages.mjs` | `execute()` で Aurora（RDS Data API）にクエリ                                             |
+| DB ラッパー         | `terraform/modules/api/lambda/lib/db.mjs`             | RDS Data API。`DatabaseResumingException` 時に最大4回リトライ（1秒刻みのディレイ）        |
 
 - 同期が 30 秒を超えると Lambda がタイムアウトし、クライアントにはエラーが返る。その場合 `syncWithApi` は catch で `setSyncStatus("error")` し、finally で `hasCompletedFirstSync = true` になるため、**ローディングではなく「同期エラー」表示**になる想定。
 - 「ずっとローディング」になるのは、**レスポンスが返ってこない**（タイムアウトも含めてクライアントに結果が届かない）か、**syncWithApi の try 内のどこかでハングしている**可能性が高い。
@@ -135,17 +135,17 @@
 
 ## 5. 修正の方向性（推奨）
 
-1. **同期完了後に一覧を再取得する**  
-   - 初期同期（runAuroraSync）完了後に、手動 sync と同様に `queryClient.invalidateQueries({ queryKey: pageKeys.all })`（または少なくとも `pageKeys.summaries()`）を実行する。  
-   - これにより、初回に空で返したあとでも、同期で IndexedDB にデータが入った時点で一覧が再表示される（EmptyState から一覧表示に変わる）。  
+1. **同期完了後に一覧を再取得する**
+   - 初期同期（runAuroraSync）完了後に、手動 sync と同様に `queryClient.invalidateQueries({ queryKey: pageKeys.all })`（または少なくとも `pageKeys.summaries()`）を実行する。
+   - これにより、初回に空で返したあとでも、同期で IndexedDB にデータが入った時点で一覧が再表示される（EmptyState から一覧表示に変わる）。
    - ただし「ずっとローディング」の主因が「同期が終わらない」ことなら、invalidate だけでは解消しない。
 
-2. **syncStatus が "syncing" のままになる原因の切り分け**  
-   - ブラウザの開発者ツールで Network タブ: GET `/api/sync/pages` が pending のままか、エラーか、遅延か確認。  
-   - Console: `[Sync] Initial sync requested` のあと、`[Sync/API] Completed` や `[Sync/API] Failed` が出ているか確認。  
+2. **syncStatus が "syncing" のままになる原因の切り分け**
+   - ブラウザの開発者ツールで Network タブ: GET `/api/sync/pages` が pending のままか、エラーか、遅延か確認。
+   - Console: `[Sync] Initial sync requested` のあと、`[Sync/API] Completed` や `[Sync/API] Failed` が出ているか確認。
    - Lambda / API Gateway のログでタイムアウトや 5xx の有無を確認。
 
-3. **ローディング条件の見直し（オプション）**  
+3. **ローディング条件の見直し（オプション）**
    - 「ローカルにすでにページがあるなら、同期中でも一覧を表示する」ようにする場合:  
      `shouldShowSkeleton` を「`!hasPages` かつ …」のままにしつつ、**hasPages を「usePagesSummary の data」だけでなく「adapter にデータがあるか」も考慮する**のは複雑になるため、まずは **同期完了後の invalidate** と **同期が完了しない原因の特定** を優先するのがよい。
 
@@ -172,6 +172,7 @@
 差分 sync のはずが、PUSH は毎回全件をサーバーに送り直していた。
 
 **対応2**: `src/lib/sync/syncWithApi.ts` のPUSHフェーズを修正。
+
 - `lastSync` がある（delta sync の）場合、`updatedAt > lastSync` かつ今回 PULL で受け取っていないページだけを PUSH 対象にフィルタ
 - ローカルに変更がなければ PUSH を完全にスキップ（POST リクエスト 0 回）
 - links / ghost_links も PUSH 対象ページ分だけ収集するよう変更

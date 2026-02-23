@@ -14,7 +14,10 @@ export async function loadEnvFile(filePath: string): Promise<boolean> {
     if (match) {
       const key = match[1].trim();
       let value = match[2].trim();
-      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.slice(1, -1);
       }
       process.env[key] = value;

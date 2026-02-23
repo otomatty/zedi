@@ -22,6 +22,7 @@ src/components/editor/PageEditor/
 ```
 
 **配置ルール**:
+
 - **コンポーネントディレクトリ内**: そのコンポーネントでのみ使用されるロジック
 - **`src/hooks/`**: 複数のコンポーネントで共有されるフック
 - **`src/lib/`**: 複数の場所で使用されるユーティリティ
@@ -50,30 +51,32 @@ Phase 3: コンポーネント分割
 ### 問題点
 
 #### TiptapEditor.tsx (720行)
-| 行数 | 責務 | 問題 |
-|-----|------|-----|
-| 79-189 | WikiLinkナビゲーション | ページ検索、作成確認ダイアログ |
-| 191-246 | コンテンツサニタイズ | エラーメッセージ構築を含む |
-| 248-339 | エディター初期化 | 拡張設定、イベントハンドラー |
-| 341-401 | コンテンツ更新 | サニタイズ + エラー報告 |
-| 403-545 | WikiLinkステータス更新 | DB照会、マーク属性更新 |
-| 547-564 | サジェスト位置計算 | UI位置計算 |
-| 566-636 | 選択・Mermaid処理 | テキスト選択、Mermaid挿入 |
-| 638-716 | JSX | 複数のポップアップ、ダイアログ |
+
+| 行数    | 責務                   | 問題                           |
+| ------- | ---------------------- | ------------------------------ |
+| 79-189  | WikiLinkナビゲーション | ページ検索、作成確認ダイアログ |
+| 191-246 | コンテンツサニタイズ   | エラーメッセージ構築を含む     |
+| 248-339 | エディター初期化       | 拡張設定、イベントハンドラー   |
+| 341-401 | コンテンツ更新         | サニタイズ + エラー報告        |
+| 403-545 | WikiLinkステータス更新 | DB照会、マーク属性更新         |
+| 547-564 | サジェスト位置計算     | UI位置計算                     |
+| 566-636 | 選択・Mermaid処理      | テキスト選択、Mermaid挿入      |
+| 638-716 | JSX                    | 複数のポップアップ、ダイアログ |
 
 **問題**: 1つのコンポーネントに6つ以上の独立した責務が混在
 
 #### PageEditorView.tsx (836行)
-| 行数 | 責務 | 問題 |
-|-----|------|-----|
-| 76-155 | 状態定義 | 15個以上のuseState |
-| 157-218 | ページライフサイクル | 作成、読み込み、エラー |
-| 220-278 | 保存ロジック | debounce、WikiLink同期 |
-| 280-331 | Wiki生成連携 | useWikiGeneratorとの連携 |
-| 302-386 | イベントハンドラー | 多数のコールバック |
-| 388-528 | 削除・ナビゲーション | 複雑な条件分岐 |
-| 530-555 | ローディング表示 | 2種類のローディング |
-| 557-831 | JSX | 280行のレンダリング |
+
+| 行数    | 責務                 | 問題                     |
+| ------- | -------------------- | ------------------------ |
+| 76-155  | 状態定義             | 15個以上のuseState       |
+| 157-218 | ページライフサイクル | 作成、読み込み、エラー   |
+| 220-278 | 保存ロジック         | debounce、WikiLink同期   |
+| 280-331 | Wiki生成連携         | useWikiGeneratorとの連携 |
+| 302-386 | イベントハンドラー   | 多数のコールバック       |
+| 388-528 | 削除・ナビゲーション | 複雑な条件分岐           |
+| 530-555 | ローディング表示     | 2種類のローディング      |
+| 557-831 | JSX                  | 280行のレンダリング      |
 
 **問題**: 状態管理とUIが密結合、テストが困難
 
@@ -101,7 +104,7 @@ interface UsePageEditorStateReturn {
   lastSaved: number | null;
   isInitialized: boolean;
   isLoading: boolean;
-  
+
   // アクション
   setTitle: (title: string) => void;
   setContent: (content: string) => void;
@@ -109,7 +112,7 @@ interface UsePageEditorStateReturn {
   reset: () => void;
 }
 
-export function usePageEditorState(pageId: string): UsePageEditorStateReturn
+export function usePageEditorState(pageId: string): UsePageEditorStateReturn;
 ```
 
 **抽出元**: `PageEditorView.tsx` 91-140行、194-207行
@@ -133,7 +136,7 @@ interface UseEditorAutoSaveReturn {
   isSaving: boolean;
 }
 
-export function useEditorAutoSave(options: UseEditorAutoSaveOptions): UseEditorAutoSaveReturn
+export function useEditorAutoSave(options: UseEditorAutoSaveOptions): UseEditorAutoSaveReturn;
 ```
 
 **抽出元**: `PageEditorView.tsx` 220-278行
@@ -153,7 +156,7 @@ interface UseWikiLinkNavigationReturn {
   handleCancelCreate: () => void;
 }
 
-export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn
+export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn;
 ```
 
 **抽出元**: `TiptapEditor.tsx` 79-189行
@@ -172,7 +175,7 @@ interface UseWikiLinkStatusSyncOptions {
   onChange: (content: string) => void;
 }
 
-export function useWikiLinkStatusSync(options: UseWikiLinkStatusSyncOptions): void
+export function useWikiLinkStatusSync(options: UseWikiLinkStatusSyncOptions): void;
 ```
 
 **抽出元**: `TiptapEditor.tsx` 403-545行
@@ -192,8 +195,8 @@ interface UseContentSanitizerReturn {
 
 export function useContentSanitizer(
   content: string,
-  onError?: (error: ContentError | null) => void
-): UseContentSanitizerReturn
+  onError?: (error: ContentError | null) => void,
+): UseContentSanitizerReturn;
 ```
 
 **抽出元**: `TiptapEditor.tsx` 191-246行、348-401行
@@ -214,8 +217,8 @@ interface UseEditorSelectionMenuReturn {
 
 export function useEditorSelectionMenu(
   editor: Editor | null,
-  containerRef: React.RefObject<HTMLDivElement>
-): UseEditorSelectionMenuReturn
+  containerRef: React.RefObject<HTMLDivElement>,
+): UseEditorSelectionMenuReturn;
 ```
 
 **抽出元**: `TiptapEditor.tsx` 317-338行、618-636行
@@ -275,6 +278,7 @@ e2e/
 ```
 
 **配置の判断基準**:
+
 - `usePageEditorState.ts` → PageEditor専用 → PageEditor/内
 - `useWikiLinkNavigation.ts` → TiptapEditor専用 → TiptapEditor/内
 - `extensions/` → 複数コンポーネントで共有 → 共通ディレクトリ
@@ -315,11 +319,11 @@ interface PageEditorAlertsProps {
   title: string;
   errorMessage: string | null;
   onOpenDuplicatePage: () => void;
-  
+
   isWikiGenerating: boolean;
   wikiTitle: string;
   onCancelWiki: () => void;
-  
+
   contentError: ContentError | null;
 }
 ```
@@ -419,16 +423,17 @@ export interface EditorPosition {
 
 #### 1.1 調査結果 ✅
 
-| 問題 | 場所 | 影響度 | 詳細 |
-|-----|------|-------|------|
-| **sanitizeTiptapContent重複呼び出し** | TiptapEditor.tsx 200行, 352行 | 🔴 高 | コンポーネント本体とuseEffect内で同じ処理が2回実行される。再レンダリング時に無駄なサニタイズ処理が発生。 |
-| **buildContentErrorMessage関数の再作成** | TiptapEditor.tsx 231-246行 | 🟡 中 | レンダリングごとに新しい関数インスタンスが作成される。useCallbackまたはコンポーネント外に移動すべき。 |
-| **大量のデバッグログ** | TiptapEditor.tsx 417-539行 | 🟡 中 | 22箇所のconsole.log/group。本番ビルドでは不要。環境変数でON/OFF切り替え、または削除。 |
-| **extractWikiLinksFromContent重複呼び出し** | PageEditorView.tsx 227行, TiptapEditor.tsx 415行 | 🟠 中低 | 保存時とステータス更新時に同じコンテンツからWikiLinkを2回抽出。ただし異なるタイミングなので許容範囲。 |
+| 問題                                        | 場所                                             | 影響度  | 詳細                                                                                                     |
+| ------------------------------------------- | ------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------- |
+| **sanitizeTiptapContent重複呼び出し**       | TiptapEditor.tsx 200行, 352行                    | 🔴 高   | コンポーネント本体とuseEffect内で同じ処理が2回実行される。再レンダリング時に無駄なサニタイズ処理が発生。 |
+| **buildContentErrorMessage関数の再作成**    | TiptapEditor.tsx 231-246行                       | 🟡 中   | レンダリングごとに新しい関数インスタンスが作成される。useCallbackまたはコンポーネント外に移動すべき。    |
+| **大量のデバッグログ**                      | TiptapEditor.tsx 417-539行                       | 🟡 中   | 22箇所のconsole.log/group。本番ビルドでは不要。環境変数でON/OFF切り替え、または削除。                    |
+| **extractWikiLinksFromContent重複呼び出し** | PageEditorView.tsx 227行, TiptapEditor.tsx 415行 | 🟠 中低 | 保存時とステータス更新時に同じコンテンツからWikiLinkを2回抽出。ただし異なるタイミングなので許容範囲。    |
 
 #### 1.2 修正計画
 
 **優先度: 高**
+
 1. [ ] `sanitizeTiptapContent`の重複呼び出しを解消
    - コンポーネント本体での呼び出しを削除
    - useEffect内でのみサニタイズを実行
@@ -437,14 +442,14 @@ export interface EditorPosition {
 2. [ ] `buildContentErrorMessage`をコンポーネント外に移動
    - `src/lib/contentUtils.ts` に移動（sanitizeTiptapContentと同じ場所）
 
-**優先度: 中**
-3. [ ] デバッグログの整理
-   - 開発時のみログを出力するユーティリティ関数を作成
-   - または `import.meta.env.DEV` で条件分岐
+**優先度: 中** 3. [ ] デバッグログの整理
 
-**優先度: 低**
-4. [ ] extractWikiLinksFromContentの呼び出しは現状維持
-   - 異なるタイミング（保存時 vs ステータス更新時）での呼び出しのため、重複ではない
+- 開発時のみログを出力するユーティリティ関数を作成
+- または `import.meta.env.DEV` で条件分岐
+
+**優先度: 低** 4. [ ] extractWikiLinksFromContentの呼び出しは現状維持
+
+- 異なるタイミング（保存時 vs ステータス更新時）での呼び出しのため、重複ではない
 
 ### Phase 2: カスタムフック抽出（コロケーション）
 
@@ -480,32 +485,32 @@ export interface EditorPosition {
 
 ### Before
 
-| ファイル | 行数 | 責務数 |
-|---------|------|-------|
-| TiptapEditor.tsx | 720 | 6+ |
-| PageEditorView.tsx | 836 | 7+ |
-| **合計** | **1,556** | **13+** |
+| ファイル           | 行数      | 責務数  |
+| ------------------ | --------- | ------- |
+| TiptapEditor.tsx   | 720       | 6+      |
+| PageEditorView.tsx | 836       | 7+      |
+| **合計**           | **1,556** | **13+** |
 
 ### After（予想）
 
-| ファイル | 行数 | 責務数 |
-|---------|------|-------|
-| PageEditor/index.tsx | ~150 | 1 (統合) |
-| PageEditorHeader.tsx | ~100 | 1 |
-| PageEditorAlerts.tsx | ~80 | 1 |
-| PageEditorDialogs.tsx | ~80 | 1 |
-| TiptapEditor/index.tsx | ~200 | 1 (統合) |
-| EditorCore.tsx | ~100 | 1 |
-| EditorSelectionMenu.tsx | ~50 | 1 |
-| usePageEditorState.ts | ~80 | 1 |
-| useEditorAutoSave.ts | ~60 | 1 |
-| useWikiLinkNavigation.ts | ~80 | 1 |
-| useWikiLinkStatusSync.ts | ~100 | 1 |
-| useContentSanitizer.ts | ~50 | 1 |
-| useEditorSelectionMenu.ts | ~40 | 1 |
-| editorConfig.ts | ~40 | 1 |
-| types/editor.ts | ~30 | 1 |
-| **合計** | **~1,240** | **15 (1責務/ファイル)** |
+| ファイル                  | 行数       | 責務数                  |
+| ------------------------- | ---------- | ----------------------- |
+| PageEditor/index.tsx      | ~150       | 1 (統合)                |
+| PageEditorHeader.tsx      | ~100       | 1                       |
+| PageEditorAlerts.tsx      | ~80        | 1                       |
+| PageEditorDialogs.tsx     | ~80        | 1                       |
+| TiptapEditor/index.tsx    | ~200       | 1 (統合)                |
+| EditorCore.tsx            | ~100       | 1                       |
+| EditorSelectionMenu.tsx   | ~50        | 1                       |
+| usePageEditorState.ts     | ~80        | 1                       |
+| useEditorAutoSave.ts      | ~60        | 1                       |
+| useWikiLinkNavigation.ts  | ~80        | 1                       |
+| useWikiLinkStatusSync.ts  | ~100       | 1                       |
+| useContentSanitizer.ts    | ~50        | 1                       |
+| useEditorSelectionMenu.ts | ~40        | 1                       |
+| editorConfig.ts           | ~40        | 1                       |
+| types/editor.ts           | ~30        | 1                       |
+| **合計**                  | **~1,240** | **15 (1責務/ファイル)** |
 
 ### メリット
 

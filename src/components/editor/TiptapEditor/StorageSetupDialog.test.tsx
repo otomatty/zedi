@@ -9,13 +9,7 @@ describe("StorageSetupDialog", () => {
     const onOpenChange = vi.fn();
     const onConfirm = vi.fn();
 
-    render(
-      <StorageSetupDialog
-        open={true}
-        onOpenChange={onOpenChange}
-        onConfirm={onConfirm}
-      />
-    );
+    render(<StorageSetupDialog open={true} onOpenChange={onOpenChange} onConfirm={onConfirm} />);
 
     await user.click(screen.getByRole("button", { name: "今すぐ設定" }));
 

@@ -45,7 +45,7 @@ interface Config {
 const DEFAULT_CONFIG: Config = {
   sessionDirectory: path.join(
     os.homedir(),
-    "Library/Application Support/Code/User/workspaceStorage"
+    "Library/Application Support/Code/User/workspaceStorage",
   ),
   rawOutputDirectory: path.join(os.homedir(), "zedi-copilot-logs/raw"),
   summaryOutputDirectory: path.join(os.homedir(), "zedi-copilot-logs/summary"),
@@ -193,10 +193,7 @@ function getWorkspaceName(sessionPath: string, config: Config): string {
   if (!match) return "unknown";
 
   const workspaceHash = match[1];
-  const workspaceDir = path.join(
-    config.sessionDirectory,
-    workspaceHash
-  );
+  const workspaceDir = path.join(config.sessionDirectory, workspaceHash);
   const workspaceJsonPath = path.join(workspaceDir, "workspace.json");
 
   try {
@@ -254,7 +251,7 @@ function parseSession(sessionPath: string): Conversation[] {
 function conversationsToMarkdown(
   conversations: Conversation[],
   project: string,
-  date: string
+  date: string,
 ): string {
   const lines: string[] = [
     `# ${date} GitHub Copilot との会話`,
@@ -310,14 +307,14 @@ async function checkModelAvailable(config: Config): Promise<boolean> {
 async function summarizeWithOllama(
   conversations: Conversation[],
   project: string,
-  config: Config
+  config: Config,
 ): Promise<WorkLog | null> {
   // プロンプトを構築
   const conversationText = conversations
     .slice(0, 20) // 最大20会話まで
     .map(
       (conv) =>
-        `**ユーザー**: ${conv.userMessage.substring(0, 500)}\n\n**Copilot**: ${conv.assistantMessage.substring(0, 1000)}`
+        `**ユーザー**: ${conv.userMessage.substring(0, 500)}\n\n**Copilot**: ${conv.assistantMessage.substring(0, 1000)}`,
     )
     .join("\n\n---\n\n");
 
@@ -354,8 +351,7 @@ ${conversationText}
         messages: [
           {
             role: "system",
-            content:
-              "あなたは作業ログを整理するアシスタントです。必ずJSON形式で出力してください。",
+            content: "あなたは作業ログを整理するアシスタントです。必ずJSON形式で出力してください。",
           },
           { role: "user", content: prompt },
         ],
@@ -483,9 +479,7 @@ function workLogToTiptapJson(workLog: WorkLog): string {
 
   // タグ（WikiLink形式）
   if (workLog.tags.length > 0) {
-    const tagContent: unknown[] = [
-      { type: "text", text: "タグ: ", marks: [{ type: "bold" }] },
-    ];
+    const tagContent: unknown[] = [{ type: "text", text: "タグ: ", marks: [{ type: "bold" }] }];
 
     workLog.tags.forEach((tag, index) => {
       tagContent.push({
@@ -574,7 +568,7 @@ async function syncSession(
   sessionPath: string,
   config: Config,
   state: SyncState,
-  summarize: boolean
+  summarize: boolean,
 ): Promise<boolean> {
   const sessionId = path.basename(sessionPath, ".json");
 
@@ -616,14 +610,14 @@ async function syncSession(
       // Markdown形式
       const summaryMdPath = path.join(
         config.summaryOutputDirectory,
-        `${isoDate}_${project}_summary.md`
+        `${isoDate}_${project}_summary.md`,
       );
       fs.writeFileSync(summaryMdPath, workLogToMarkdown(workLog));
 
       // Tiptap JSON形式（Zediインポート用）
       const summaryJsonPath = path.join(
         config.summaryOutputDirectory,
-        `${isoDate}_${project}_summary.json`
+        `${isoDate}_${project}_summary.json`,
       );
       fs.writeFileSync(summaryJsonPath, workLogToTiptapJson(workLog));
 
@@ -655,18 +649,12 @@ async function watchLoop(config: Config): Promise<void> {
   // Ollamaの確認
   const ollamaAvailable = await checkOllamaAvailable(config);
   if (!ollamaAvailable) {
-    log(
-      "Ollamaに接続できません。要約なしで同期します。",
-      "warn"
-    );
+    log("Ollamaに接続できません。要約なしで同期します。", "warn");
     log(`Ollamaを起動してください: ollama serve`, "info");
   } else {
     const modelAvailable = await checkModelAvailable(config);
     if (!modelAvailable) {
-      log(
-        `モデル "${config.ollamaModel}" がインストールされていません。`,
-        "warn"
-      );
+      log(`モデル "${config.ollamaModel}" がインストールされていません。`, "warn");
       log(`インストール: ollama pull ${config.ollamaModel}`, "info");
     } else {
       log(`Ollama接続OK: ${config.ollamaModel}`, "success");
@@ -691,9 +679,7 @@ async function watchLoop(config: Config): Promise<void> {
       }
     }
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, config.pollInterval * 1000)
-    );
+    await new Promise((resolve) => setTimeout(resolve, config.pollInterval * 1000));
   }
 }
 
@@ -716,12 +702,7 @@ async function syncOnce(config: Config, all: boolean = false): Promise<void> {
   let syncedCount = 0;
   for (const sessionPath of sessionFiles) {
     try {
-      const synced = await syncSession(
-        sessionPath,
-        config,
-        state,
-        modelAvailable
-      );
+      const synced = await syncSession(sessionPath, config, state, modelAvailable);
       if (synced) syncedCount++;
     } catch (error) {
       log(`セッション同期エラー: ${error}`, "error");

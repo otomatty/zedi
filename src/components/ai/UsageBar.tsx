@@ -71,11 +71,7 @@ export const UsageBar: React.FC<UsageBarProps> = ({
   const isWarning = percent >= 80;
   const isDanger = percent >= 95;
 
-  const barColor = isDanger
-    ? "bg-destructive"
-    : isWarning
-      ? "bg-yellow-500"
-      : "bg-primary";
+  const barColor = isDanger ? "bg-destructive" : isWarning ? "bg-yellow-500" : "bg-primary";
 
   if (compact) {
     return (
@@ -84,13 +80,13 @@ export const UsageBar: React.FC<UsageBarProps> = ({
         title={`AI使用量: ${percent.toFixed(1)}%`}
       >
         <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-        <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
+        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
           <div
             className={cn("h-full rounded-full transition-all", barColor)}
             style={{ width: `${percent}%` }}
           />
         </div>
-        <span className="text-[10px] text-muted-foreground tabular-nums">
+        <span className="text-[10px] tabular-nums text-muted-foreground">
           {percent.toFixed(0)}%
         </span>
       </div>
@@ -108,16 +104,16 @@ export const UsageBar: React.FC<UsageBarProps> = ({
           className={cn(
             "text-sm tabular-nums",
             isDanger
-              ? "text-destructive font-medium"
+              ? "font-medium text-destructive"
               : isWarning
                 ? "text-yellow-600 dark:text-yellow-400"
-                : "text-muted-foreground"
+                : "text-muted-foreground",
           )}
         >
           {percent.toFixed(1)}%
         </span>
       </div>
-      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={cn("h-full rounded-full transition-all duration-300", barColor)}
           style={{ width: `${percent}%` }}

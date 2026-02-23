@@ -77,11 +77,11 @@ export interface PageEditorDialogsProps {
   onDeleteReasonChange: (reason: string) => void;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
-  
+
   // Wiki generator error dialog
   wikiError: string | null;
   onDismissWikiError: () => void;
-  
+
   // Web clipper dialog
   webClipperOpen: boolean;
   onWebClipperOpenChange: (open: boolean) => void;
@@ -89,6 +89,6 @@ export interface PageEditorDialogsProps {
     title: string,
     content: string,
     sourceUrl: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
   ) => void;
 }

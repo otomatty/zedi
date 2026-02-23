@@ -20,17 +20,14 @@ const SCHEMA_PATH = join(__dirname, SCHEMA_FILE);
 
 const REGION = process.env.AWS_REGION || "ap-northeast-1";
 const CLUSTER_ARN =
-  process.env.CLUSTER_ARN ||
-  "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
+  process.env.CLUSTER_ARN || "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
 const SECRET_ARN =
   process.env.SECRET_ARN ||
   "arn:aws:secretsmanager:ap-northeast-1:590183877893:secret:zedi-dev-db-credentials-QbCDfb";
 const DATABASE = process.env.DATABASE || "zedi";
 
 function extractStatements(content) {
-  const stripped = content
-    .replace(/^\s*--[^\n]*$/gm, "")
-    .replace(/\n\s*\/\*[\s\S]*?\*\//g, "");
+  const stripped = content.replace(/^\s*--[^\n]*$/gm, "").replace(/\n\s*\/\*[\s\S]*?\*\//g, "");
   const parts = stripped.split(/\s*;\s*\n/).map((s) => s.trim());
   return parts.filter((s) => s.length > 0).map((s) => (s.endsWith(";") ? s : s + ";"));
 }

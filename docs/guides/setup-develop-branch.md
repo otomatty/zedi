@@ -51,13 +51,11 @@ git push -u origin develop
    - ✅ **Require a pull request before merging**
      - Require approvals: **1**
      - ✅ Dismiss stale pull request approvals when new commits are pushed
-   
    - ✅ **Require status checks to pass before merging**
      - ✅ Require branches to be up to date before merging
      - 必須チェックを選択:
        - `lint-and-test`
        - `e2e-tests`
-   
    - ✅ **Include administrators**
      - 管理者にも保護ルールを適用
 
@@ -73,16 +71,13 @@ git push -u origin develop
    - ✅ **Require a pull request before merging**
      - Require approvals: **1** (または2)
      - ✅ Dismiss stale pull request approvals when new commits are pushed
-   
    - ✅ **Require status checks to pass before merging**
      - ✅ Require branches to be up to date before merging
      - 必須チェックを選択:
        - `lint-and-test`
        - `e2e-tests`
-   
    - ✅ **Require conversation resolution before merging**
      - すべてのコメントが解決されるまでマージをブロック
-   
    - ✅ **Include administrators**
      - 管理者にも保護ルールを適用
 

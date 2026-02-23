@@ -11,7 +11,12 @@ export interface CreatePageOptions {
 }
 
 export interface IPageRepository {
-  createPage(userId: string, title?: string, content?: string, options?: CreatePageOptions): Promise<Page>;
+  createPage(
+    userId: string,
+    title?: string,
+    content?: string,
+    options?: CreatePageOptions,
+  ): Promise<Page>;
   getPage(userId: string, pageId: string): Promise<Page | null>;
   getPages(userId: string): Promise<Page[]>;
   getPagesSummary(userId: string): Promise<PageSummary[]>;
@@ -21,7 +26,7 @@ export interface IPageRepository {
   updatePage(
     userId: string,
     pageId: string,
-    updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>
+    updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>,
   ): Promise<void>;
   deletePage(userId: string, pageId: string): Promise<void>;
   searchPages(userId: string, query: string): Promise<Page[]>;

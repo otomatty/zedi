@@ -4,12 +4,7 @@ import type { Page } from "@/types/page";
 import { createPlainTextContent } from "@/test/testDatabase";
 
 // Helper to create a test page
-function createTestPage(
-  id: string,
-  title: string,
-  content: string,
-  options?: Partial<Page>
-): Page {
+function createTestPage(id: string, title: string, content: string, options?: Partial<Page>): Page {
   const now = Date.now();
   return {
     id,
@@ -61,9 +56,7 @@ describe("searchPages", () => {
     });
 
     it("should be case insensitive", () => {
-      const pages = [
-        createTestPage("1", "Hello World", createPlainTextContent("content")),
-      ];
+      const pages = [createTestPage("1", "Hello World", createPlainTextContent("content"))];
 
       const results = searchPages(pages, "hello");
 
@@ -114,7 +107,7 @@ describe("searchPages", () => {
         createTestPage(
           "1",
           "深層学習",
-          createPlainTextContent("機械学習とニューラルネットワークを使った深層学習")
+          createPlainTextContent("機械学習とニューラルネットワークを使った深層学習"),
         ),
         createTestPage("2", "機械学習", createPlainTextContent("入門書")),
       ];
@@ -128,9 +121,7 @@ describe("searchPages", () => {
 
   describe("Match Type", () => {
     it("should identify exact_title match", () => {
-      const pages = [
-        createTestPage("1", "機械学習", createPlainTextContent("content")),
-      ];
+      const pages = [createTestPage("1", "機械学習", createPlainTextContent("content"))];
 
       const results = searchPages(pages, "機械学習");
 
@@ -138,9 +129,7 @@ describe("searchPages", () => {
     });
 
     it("should identify title match", () => {
-      const pages = [
-        createTestPage("1", "機械学習入門", createPlainTextContent("別のコンテンツ")),
-      ];
+      const pages = [createTestPage("1", "機械学習入門", createPlainTextContent("別のコンテンツ"))];
 
       const results = searchPages(pages, "機械学習");
 
@@ -148,9 +137,7 @@ describe("searchPages", () => {
     });
 
     it("should identify content match", () => {
-      const pages = [
-        createTestPage("1", "入門書", createPlainTextContent("機械学習について")),
-      ];
+      const pages = [createTestPage("1", "入門書", createPlainTextContent("機械学習について"))];
 
       const results = searchPages(pages, "機械学習");
 
@@ -158,9 +145,7 @@ describe("searchPages", () => {
     });
 
     it("should identify both match", () => {
-      const pages = [
-        createTestPage("1", "機械学習入門", createPlainTextContent("機械学習の基礎")),
-      ];
+      const pages = [createTestPage("1", "機械学習入門", createPlainTextContent("機械学習の基礎"))];
 
       const results = searchPages(pages, "機械学習");
 
@@ -170,9 +155,7 @@ describe("searchPages", () => {
 
   describe("Highlighted Text", () => {
     it("should highlight keywords in snippet", () => {
-      const pages = [
-        createTestPage("1", "Title", createPlainTextContent("機械学習は重要です")),
-      ];
+      const pages = [createTestPage("1", "Title", createPlainTextContent("機械学習は重要です"))];
 
       const results = searchPages(pages, "機械学習");
 
@@ -181,11 +164,7 @@ describe("searchPages", () => {
 
     it("should highlight multiple keywords", () => {
       const pages = [
-        createTestPage(
-          "1",
-          "Title",
-          createPlainTextContent("機械学習とニューラルネットワーク")
-        ),
+        createTestPage("1", "Title", createPlainTextContent("機械学習とニューラルネットワーク")),
       ];
 
       const results = searchPages(pages, "機械学習 ニューラル");
@@ -214,7 +193,7 @@ describe("searchPages", () => {
 
     it("should limit results to 10", () => {
       const pages = Array.from({ length: 15 }, (_, i) =>
-        createTestPage(`${i}`, `Test Page ${i}`, createPlainTextContent("content"))
+        createTestPage(`${i}`, `Test Page ${i}`, createPlainTextContent("content")),
       );
 
       const results = searchPages(pages, "Test");
@@ -243,7 +222,7 @@ describe("searchPages", () => {
   describe("Smart Snippet", () => {
     it("should extract meaningful snippet around keyword", () => {
       const longContent = createPlainTextContent(
-        "最初の文章です。機械学習は人工知能の一分野であり、データから学習します。最後の文章です。"
+        "最初の文章です。機械学習は人工知能の一分野であり、データから学習します。最後の文章です。",
       );
       const pages = [createTestPage("1", "Title", longContent)];
 
@@ -262,9 +241,7 @@ describe("searchPages", () => {
     });
 
     it("should handle pages with empty content", () => {
-      const pages = [
-        createTestPage("1", "Test Page", ""),
-      ];
+      const pages = [createTestPage("1", "Test Page", "")];
 
       const results = searchPages(pages, "Test");
 

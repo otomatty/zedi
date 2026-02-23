@@ -8,17 +8,17 @@
 
 ## 1. 作業サマリー
 
-| タスク | 内容 | 状態 | Issue | 紐づけコミット |
-|--------|------|------|-------|----------------|
-| **C1-1** | Aurora DDL 作成・適用 | 完了 | #16 | 37952d8 |
-| **C1-2** | REST API 基盤 | 完了 | #17 | 5c7b0d9 |
-| **C1-3** | ユーザー API | 完了 | #18 | 91c14e3 |
-| **C1-4** | ページ・同期 API（メタデータ） | 完了 | - | 既存実装 |
-| **C1-5** | ページ・コンテンツ API | 完了 | #20 | 3b2c3d5 |
-| **C1-6** | ノート API | 完了 | #21 | 0dfd45e |
-| **C1-7** | 検索 API | 完了 | #22 | 37c998f |
-| **C1-8** | メディア API | 完了 | #23 | 9abb48d |
-| **C1-9** | API テスト・デプロイ | 完了 | - | 本作業 |
+| タスク   | 内容                           | 状態 | Issue | 紐づけコミット |
+| -------- | ------------------------------ | ---- | ----- | -------------- |
+| **C1-1** | Aurora DDL 作成・適用          | 完了 | #16   | 37952d8        |
+| **C1-2** | REST API 基盤                  | 完了 | #17   | 5c7b0d9        |
+| **C1-3** | ユーザー API                   | 完了 | #18   | 91c14e3        |
+| **C1-4** | ページ・同期 API（メタデータ） | 完了 | -     | 既存実装       |
+| **C1-5** | ページ・コンテンツ API         | 完了 | #20   | 3b2c3d5        |
+| **C1-6** | ノート API                     | 完了 | #21   | 0dfd45e        |
+| **C1-7** | 検索 API                       | 完了 | #22   | 37c998f        |
+| **C1-8** | メディア API                   | 完了 | #23   | 9abb48d        |
+| **C1-9** | API テスト・デプロイ           | 完了 | -     | 本作業         |
 
 ---
 
@@ -54,7 +54,7 @@
 - **成果物**
   - **RDS Data API ラッパー:** `terraform/modules/api/lambda/lib/db.mjs`  
     `execute(sql, params)`、`formatRecordsAs: "JSON"` で行配列取得
-  - **ユーザーハンドラー:** `terraform/modules/api/lambda/handlers/users.mjs`  
+  - **ユーザーハンドラー:** `terraform/modules/api/lambda/handlers/users.mjs`
     - `POST /api/users/upsert`: cognito_sub / email（JWT または body）で users を upsert、body で display_name / avatar_url を任意指定
     - `GET /api/users/:id`: ユーザー 1 件取得、なしなら 404
   - **ルーター:** 上記パスを `router.mjs` に追加。`index.mjs` で `body`・`pathParameters` をパースして context に渡す
@@ -102,7 +102,7 @@
 
 - **成果物**
   - **ハンドラー:** `terraform/modules/api/lambda/handlers/search.mjs`
-    - **GET /api/search?q=&scope=shared** 自分がアクセス可能なノート（owner または member）に含まれるページを、`pages.title` および `page_contents.content_text` で LIKE 検索。pg_bigm（GIN gin_bigm_ops）によりインデックスで高速化。q 空または scope≠shared は 400/空配列。LIKE の % _ \ はエスケープ。最大 100 件。
+    - **GET /api/search?q=&scope=shared** 自分がアクセス可能なノート（owner または member）に含まれるページを、`pages.title` および `page_contents.content_text` で LIKE 検索。pg*bigm（GIN gin_bigm_ops）によりインデックスで高速化。q 空または scope≠shared は 400/空配列。LIKE の % * \ はエスケープ。最大 100 件。
   - **ルーター:** `GET /api/search` を `router.mjs` に追加。
 
 ### 2.8 C1-8: メディア API
@@ -122,7 +122,7 @@
   - **統合テスト:** `terraform/modules/api/lambda/test-api.mjs`  
     Lambda ハンドラーをモックイベントで実行し、期待する status / body を検証。GET /api/health（200）, GET /api/me（200）, 認証なしで 401, scope 未指定で 400, 未知パスで 404, OPTIONS で 204 など 7 ケース。DB/S3 未設定でも実行可能。`node test-api.mjs` で実行、成功時 exit 0。
   - **dev デプロイ手順・テスト手順:** `terraform/modules/api/README.md` に「dev 環境のみデプロイ」「prod 環境」「テスト（C1-9）」を追記。環境変数はルートの module.database 出力を参照する旨を明記。
-- **環境変数・Secrets:** Lambda の AURORA_* / DB_CREDENTIALS_SECRET はルートの `module.database` から渡す。dev デプロイ前に database モジュールの適用が必要。
+- **環境変数・Secrets:** Lambda の AURORA\_\* / DB_CREDENTIALS_SECRET はルートの `module.database` から渡す。dev デプロイ前に database モジュールの適用が必要。
 
 ### 2.10 デプロイ（prod）
 
@@ -152,28 +152,28 @@
 
 ## 3. 成果物一覧（パス）
 
-| 種別 | パス | 備考 |
-|------|------|------|
-| DDL | `db/aurora/001_schema.sql` | 全テーブル定義 |
-| DDL 適用 | `db/aurora/apply-data-api.mjs` | Data API で実行 |
-| DDL 適用 | `db/aurora/apply.sh` | psql + Secrets Manager |
-| 説明 | `db/aurora/README.md` | テーブル一覧・適用手順 |
-| Terraform API モジュール | `terraform/modules/api/main.tf` | Lambda, API GW, Authorizer, null_resource |
-| Terraform API モジュール | `terraform/modules/api/variables.tf`, `outputs.tf` | 変数・出力 |
-| Lambda エントリ | `terraform/modules/api/lambda/index.mjs` | ハンドラー・body/claims 渡し |
-| Lambda 共通 | `terraform/modules/api/lambda/responses.mjs` | CORS・success/error |
-| Lambda ルート | `terraform/modules/api/lambda/router.mjs` | パス・メソッドでディスパッチ |
-| Lambda DB | `terraform/modules/api/lambda/lib/db.mjs` | RDS Data API 実行 |
-| Lambda ユーザー | `terraform/modules/api/lambda/handlers/users.mjs` | upsert / getById |
-| Lambda 同期 | `terraform/modules/api/lambda/handlers/syncPages.mjs` | GET/POST /api/sync/pages |
-| Lambda ページ | `terraform/modules/api/lambda/handlers/pages.mjs` | content GET/PUT, pages POST/DELETE |
-| Lambda ノート | `terraform/modules/api/lambda/handlers/notes.mjs` | notes CRUD, pages, members |
-| Lambda 検索 | `terraform/modules/api/lambda/handlers/search.mjs` | GET /api/search scope=shared |
-| Lambda メディア | `terraform/modules/api/lambda/handlers/media.mjs` | POST /api/media/upload, confirm |
-| S3 メディア | `terraform/modules/api/s3.tf` | メディア用バケット・Lambda IAM |
-| API 統合テスト | `terraform/modules/api/lambda/test-api.mjs` | C1-9。モックイベントで status/body 検証 |
-| Lambda ローカル確認 | `terraform/modules/api/lambda/run-local.mjs` | モックイベントでルーティング確認 |
-| API モジュール説明 | `terraform/modules/api/README.md` | ルート・デプロイ・環境変数 |
+| 種別                     | パス                                                  | 備考                                      |
+| ------------------------ | ----------------------------------------------------- | ----------------------------------------- |
+| DDL                      | `db/aurora/001_schema.sql`                            | 全テーブル定義                            |
+| DDL 適用                 | `db/aurora/apply-data-api.mjs`                        | Data API で実行                           |
+| DDL 適用                 | `db/aurora/apply.sh`                                  | psql + Secrets Manager                    |
+| 説明                     | `db/aurora/README.md`                                 | テーブル一覧・適用手順                    |
+| Terraform API モジュール | `terraform/modules/api/main.tf`                       | Lambda, API GW, Authorizer, null_resource |
+| Terraform API モジュール | `terraform/modules/api/variables.tf`, `outputs.tf`    | 変数・出力                                |
+| Lambda エントリ          | `terraform/modules/api/lambda/index.mjs`              | ハンドラー・body/claims 渡し              |
+| Lambda 共通              | `terraform/modules/api/lambda/responses.mjs`          | CORS・success/error                       |
+| Lambda ルート            | `terraform/modules/api/lambda/router.mjs`             | パス・メソッドでディスパッチ              |
+| Lambda DB                | `terraform/modules/api/lambda/lib/db.mjs`             | RDS Data API 実行                         |
+| Lambda ユーザー          | `terraform/modules/api/lambda/handlers/users.mjs`     | upsert / getById                          |
+| Lambda 同期              | `terraform/modules/api/lambda/handlers/syncPages.mjs` | GET/POST /api/sync/pages                  |
+| Lambda ページ            | `terraform/modules/api/lambda/handlers/pages.mjs`     | content GET/PUT, pages POST/DELETE        |
+| Lambda ノート            | `terraform/modules/api/lambda/handlers/notes.mjs`     | notes CRUD, pages, members                |
+| Lambda 検索              | `terraform/modules/api/lambda/handlers/search.mjs`    | GET /api/search scope=shared              |
+| Lambda メディア          | `terraform/modules/api/lambda/handlers/media.mjs`     | POST /api/media/upload, confirm           |
+| S3 メディア              | `terraform/modules/api/s3.tf`                         | メディア用バケット・Lambda IAM            |
+| API 統合テスト           | `terraform/modules/api/lambda/test-api.mjs`           | C1-9。モックイベントで status/body 検証   |
+| Lambda ローカル確認      | `terraform/modules/api/lambda/run-local.mjs`          | モックイベントでルーティング確認          |
+| API モジュール説明       | `terraform/modules/api/README.md`                     | ルート・デプロイ・環境変数                |
 
 ---
 
@@ -212,32 +212,32 @@
 
 ## 6. 関連ドキュメント
 
-| ドキュメント | 用途 |
-|-------------|------|
-| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md) | タスク細分化・Phase C/D/E 一覧・推奨実施順序 |
-| [phase-c2-work-log.md](phase-c2-work-log.md) | Phase C2 データ移行（Turso エクスポート〜Aurora インポート）作業ログ |
-| [zedi-rearchitecture-spec.md](../specs/zedi-rearchitecture-spec.md) | リアーキテクチャ仕様の正本（§13 API、§14 サーバー、§16 移行計画） |
-| [zedi-data-structure-spec.md](../specs/zedi-data-structure-spec.md) | DB スキーマ・エンティティ定義（users, pages, notes 等） |
-| [turso-to-aurora-migration-decisions.md](20260208/turso-to-aurora-migration-decisions.md) | Turso → Aurora 移行の決定事項 |
-| [phase-c-work-breakdown.md](20260208/phase-c-work-breakdown.md) | Phase C の位置づけ・概要 |
-| [db/aurora/README.md](../../db/aurora/README.md) | Aurora DDL の適用手順 |
-| [terraform/modules/api/README.md](../../terraform/modules/api/README.md) | REST API モジュールのルート・デプロイ・環境変数 |
-| [.github/ISSUE_TEMPLATE/rearchitecture_task.md](../../.github/ISSUE_TEMPLATE/rearchitecture_task.md) | リアーキテクチャ用 Issue テンプレート |
+| ドキュメント                                                                                         | 用途                                                                 |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md)                                 | タスク細分化・Phase C/D/E 一覧・推奨実施順序                         |
+| [phase-c2-work-log.md](phase-c2-work-log.md)                                                         | Phase C2 データ移行（Turso エクスポート〜Aurora インポート）作業ログ |
+| [zedi-rearchitecture-spec.md](../specs/zedi-rearchitecture-spec.md)                                  | リアーキテクチャ仕様の正本（§13 API、§14 サーバー、§16 移行計画）    |
+| [zedi-data-structure-spec.md](../specs/zedi-data-structure-spec.md)                                  | DB スキーマ・エンティティ定義（users, pages, notes 等）              |
+| [turso-to-aurora-migration-decisions.md](20260208/turso-to-aurora-migration-decisions.md)            | Turso → Aurora 移行の決定事項                                        |
+| [phase-c-work-breakdown.md](20260208/phase-c-work-breakdown.md)                                      | Phase C の位置づけ・概要                                             |
+| [db/aurora/README.md](../../db/aurora/README.md)                                                     | Aurora DDL の適用手順                                                |
+| [terraform/modules/api/README.md](../../terraform/modules/api/README.md)                             | REST API モジュールのルート・デプロイ・環境変数                      |
+| [.github/ISSUE_TEMPLATE/rearchitecture_task.md](../../.github/ISSUE_TEMPLATE/rearchitecture_task.md) | リアーキテクチャ用 Issue テンプレート                                |
 
 ---
 
 ## 7. コミット・Issue 対応一覧
 
-| コミット | 内容 | クローズした Issue |
-|----------|------|--------------------|
-| 37952d8 | feat: add initial Aurora PostgreSQL schema and application scripts | #16 [C1-1] |
-| 5c7b0d9 | feat(api): add REST API module with Lambda, API Gateway, and Cognito integration | #17 [C1-2] |
-| 91c14e3 | feat(api): enhance Lambda module with user management and automatic npm installation | #18 [C1-3] |
-| 3b2c3d5 | ページ・コンテンツ API（GET/PUT content, POST/DELETE pages） | #20 [C1-5] |
-| 0dfd45e | ノート API（notes CRUD, pages, members） | #21 [C1-6] |
-| 37c998f | 検索 API（GET /api/search?q=&scope=shared） | #22 [C1-7] |
-| 9abb48d | メディア API（Presigned URL, confirm）+ S3 バケット | #23 [C1-8] |
-| a819173 | C1-9: test-api.mjs, README デプロイ・テスト手順 | - |
+| コミット | 内容                                                                                 | クローズした Issue |
+| -------- | ------------------------------------------------------------------------------------ | ------------------ |
+| 37952d8  | feat: add initial Aurora PostgreSQL schema and application scripts                   | #16 [C1-1]         |
+| 5c7b0d9  | feat(api): add REST API module with Lambda, API Gateway, and Cognito integration     | #17 [C1-2]         |
+| 91c14e3  | feat(api): enhance Lambda module with user management and automatic npm installation | #18 [C1-3]         |
+| 3b2c3d5  | ページ・コンテンツ API（GET/PUT content, POST/DELETE pages）                         | #20 [C1-5]         |
+| 0dfd45e  | ノート API（notes CRUD, pages, members）                                             | #21 [C1-6]         |
+| 37c998f  | 検索 API（GET /api/search?q=&scope=shared）                                          | #22 [C1-7]         |
+| 9abb48d  | メディア API（Presigned URL, confirm）+ S3 バケット                                  | #23 [C1-8]         |
+| a819173  | C1-9: test-api.mjs, README デプロイ・テスト手順                                      | -                  |
 
 ---
 

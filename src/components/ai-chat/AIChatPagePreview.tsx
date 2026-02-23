@@ -1,8 +1,8 @@
-import React from 'react';
-import { useTranslation } from 'react-i18next';
-import { CreatePageAction } from '../../types/aiChat';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { CreatePageAction } from "../../types/aiChat";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface AIChatPagePreviewProps {
   action: CreatePageAction;
@@ -11,41 +11,29 @@ interface AIChatPagePreviewProps {
   onCancel: () => void;
 }
 
-export function AIChatPagePreview({
-  action,
-  onConfirm,
-  onEdit,
-  onCancel,
-}: AIChatPagePreviewProps) {
+export function AIChatPagePreview({ action, onConfirm, onEdit, onCancel }: AIChatPagePreviewProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="border border-primary/50 bg-card rounded-lg overflow-hidden animate-in fade-in duration-200">
+    <div className="overflow-hidden rounded-lg border border-primary/50 bg-card duration-200 animate-in fade-in">
       {/* Header */}
-      <div className="px-4 py-3 border-b bg-primary/5">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          📄 {action.title}
-        </h3>
+      <div className="border-b bg-primary/5 px-4 py-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">📄 {action.title}</h3>
       </div>
 
       {/* Content Preview */}
-      <div className="px-4 py-3 max-h-48 overflow-y-auto">
+      <div className="max-h-48 overflow-y-auto px-4 py-3">
         <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {action.content}
-          </ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{action.content}</ReactMarkdown>
         </div>
       </div>
 
       {/* WikiLinks */}
       {action.suggestedLinks.length > 0 && (
-        <div className="px-4 py-2 border-t bg-muted/30">
+        <div className="border-t bg-muted/30 px-4 py-2">
           <div className="flex flex-wrap gap-1">
             {action.suggestedLinks.map((link) => (
-              <span
-                key={link}
-                className="text-xs bg-primary/10 text-primary rounded px-1.5 py-0.5"
-              >
+              <span key={link} className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
                 [[{link}]]
               </span>
             ))}
@@ -54,24 +42,24 @@ export function AIChatPagePreview({
       )}
 
       {/* Actions */}
-      <div className="px-4 py-3 border-t flex gap-2 justify-end">
+      <div className="flex justify-end gap-2 border-t px-4 py-3">
         <button
           onClick={onCancel}
-          className="px-3 py-1.5 text-xs border rounded-md hover:bg-accent transition-colors"
+          className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-accent"
         >
           キャンセル
         </button>
         <button
           onClick={onEdit}
-          className="px-3 py-1.5 text-xs border rounded-md hover:bg-accent transition-colors"
+          className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-accent"
         >
-          {t('aiChat.actions.editAndCreate')}
+          {t("aiChat.actions.editAndCreate")}
         </button>
         <button
           onClick={onConfirm}
-          className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
-          {t('aiChat.actions.createPage')}
+          {t("aiChat.actions.createPage")}
         </button>
       </div>
     </div>

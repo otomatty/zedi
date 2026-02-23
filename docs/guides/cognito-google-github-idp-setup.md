@@ -27,36 +27,36 @@ Google と GitHub の両方で、この **同じ URL** を「リダイレクト 
 
 ### 1.1 Google Cloud Console で OAuth クライアントを作成
 
-1. **Google Cloud Console** を開く  
+1. **Google Cloud Console** を開く
    - https://console.cloud.google.com/
 
-2. **プロジェクトを選択**（または新規作成）  
+2. **プロジェクトを選択**（または新規作成）
    - 画面上部のプロジェクト名をクリックし、Zedi 用のプロジェクトを選択。
 
-3. **認証情報ページへ**  
-   - 左メニュー: **API とサービス** → **認証情報**  
+3. **認証情報ページへ**
+   - 左メニュー: **API とサービス** → **認証情報**
    - または https://console.cloud.google.com/apis/credentials
 
 4. **「認証情報を作成」→「OAuth クライアント ID」** をクリック。
 
-5. **同意画面の設定**（初回のみ）  
+5. **同意画面の設定**（初回のみ）
    - OAuth 同意画面が未設定の場合は、「同意画面を構成」を案内されるので、**外部**（または内部）を選び、アプリ名・サポートメールなどを入力して保存。
 
-6. **アプリケーションの種類**  
+6. **アプリケーションの種類**
    - **「ウェブアプリケーション」** を選択。
 
-7. **名前**  
+7. **名前**
    - 例: `Zedi (Cognito IdP)` など任意の名前。
 
-8. **承認済みのリダイレクト URI** に **1 件追加**  
-   - **URI**: 上記で確認した Cognito の IdP 用 URL  
-   - 例（開発）: `https://zedi-dev-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse`  
+8. **承認済みのリダイレクト URI** に **1 件追加**
+   - **URI**: 上記で確認した Cognito の IdP 用 URL
+   - 例（開発）: `https://zedi-dev-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse`
    - 本番用の Cognito ドメインを使う場合は、本番用の同じ形式の URL を追加。
 
 9. **作成** をクリック。
 
-10. **クライアント ID** と **クライアント シークレット** が表示されるので、控えておく。  
-    - クライアント ID: `xxxxx.apps.googleusercontent.com` 形式  
+10. **クライアント ID** と **クライアント シークレット** が表示されるので、控えておく。
+    - クライアント ID: `xxxxx.apps.googleusercontent.com` 形式
     - クライアント シークレット: `GOCSPX-xxxxx` 形式（再表示できないので必ず保存）。
 
 ### 1.2 Terraform に渡す
@@ -70,24 +70,24 @@ Google と GitHub の両方で、この **同じ URL** を「リダイレクト 
 
 ### 2.1 GitHub で OAuth アプリを作成
 
-1. **GitHub** にログインし、**Developer settings** を開く  
-   - https://github.com/settings/developers  
+1. **GitHub** にログインし、**Developer settings** を開く
+   - https://github.com/settings/developers
    - または プロフィールアイコン → **Settings** → 左メニュー最下部 **Developer settings**
 
 2. **OAuth Apps** の **「New OAuth App」**（または「OAuth アプリを登録」）をクリック。
 
 3. 次のように入力する。
 
-   | 項目 | 入力例 |
-   |------|--------|
-   | **Application name** | `Zedi (Dev)` など |
-   | **Homepage URL** | `http://localhost:30000`（開発）または本番のアプリ URL |
+   | 項目                           | 入力例                                                                                                                                 |
+   | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+   | **Application name**           | `Zedi (Dev)` など                                                                                                                      |
+   | **Homepage URL**               | `http://localhost:30000`（開発）または本番のアプリ URL                                                                                 |
    | **Authorization callback URL** | Cognito の IdP 用 URL（Google と同じ）<br>例: `https://zedi-dev-590183877893.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse` |
 
 4. **Register application** をクリック。
 
-5. 次の画面で **Client ID** が表示される。**「Generate a new client secret」** で Client Secret を発行し、両方を控える。  
-   - Client ID: `Iv1.xxxxx` 形式  
+5. 次の画面で **Client ID** が表示される。**「Generate a new client secret」** で Client Secret を発行し、両方を控える。
+   - Client ID: `Iv1.xxxxx` 形式
    - Client secret: 再表示できないので必ず保存。
 
 ### 2.2 Terraform に渡す
@@ -134,16 +134,20 @@ github_oauth_client_id = "Iv1.xxxxx"                           # GitHub の Clie
 **手順**:
 
 1. **例ファイルをコピーして作成する**
+
    ```bash
    cp terraform/environments/dev.secret.env.example terraform/environments/dev.secret.env
    ```
+
    Windows の場合は、`dev.secret.env.example` をコピーし、`dev.secret.env` という名前で保存する。
 
 2. **dev.secret.env を開き、`=` の右に実際のシークレットを書く**
+
    ```bash
    TF_VAR_google_oauth_client_secret=GOCSPX-あなたのGoogleのシークレット
    TF_VAR_github_oauth_client_secret=あなたのGitHubのシークレット
    ```
+
    - 値にスペースや特殊文字が含まれる場合は、全体をダブルクォートで囲む: `TF_VAR_google_oauth_client_secret="GOCSPX-xxx"`
    - 先頭が `#` の行はコメントとして無視される。
 
@@ -201,11 +205,11 @@ terraform -chdir=terraform apply -var-file=environments/dev.tfvars
 
 ## 6. よくあるトラブル
 
-| 現象 | 確認すること |
-|------|----------------|
-| リダイレクト URI が無効 | Google / GitHub の「リダイレクト URI」「Authorization callback URL」が、Cognito の **IdP 用 URL**（`/oauth2/idpresponse`）と **完全一致**しているか。プロトコル・ホスト・パスの typo や余分なスラッシュに注意。 |
-| Cognito で IdP が有効にならない | Terraform apply が成功しているか。`supported_identity_providers` に Google / GitHub が含まれるのは、対応する `google_oauth_client_id` / `github_oauth_client_id` が **空でない** 場合のみ。 |
-| サインイン後にエラー | アプリ側のコールバック URL（`cognito_callback_urls`）に `http://localhost:30000/auth/callback`（開発）が含まれているか。Terraform の `cognito_callback_urls` と `.env` の `VITE_COGNITO_REDIRECT_URI`（未設定時は origin + `/auth/callback`）が一致しているか。 |
+| 現象                            | 確認すること                                                                                                                                                                                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| リダイレクト URI が無効         | Google / GitHub の「リダイレクト URI」「Authorization callback URL」が、Cognito の **IdP 用 URL**（`/oauth2/idpresponse`）と **完全一致**しているか。プロトコル・ホスト・パスの typo や余分なスラッシュに注意。                                                 |
+| Cognito で IdP が有効にならない | Terraform apply が成功しているか。`supported_identity_providers` に Google / GitHub が含まれるのは、対応する `google_oauth_client_id` / `github_oauth_client_id` が **空でない** 場合のみ。                                                                     |
+| サインイン後にエラー            | アプリ側のコールバック URL（`cognito_callback_urls`）に `http://localhost:30000/auth/callback`（開発）が含まれているか。Terraform の `cognito_callback_urls` と `.env` の `VITE_COGNITO_REDIRECT_URI`（未設定時は origin + `/auth/callback`）が一致しているか。 |
 
 ---
 

@@ -38,7 +38,7 @@ interface UsePageEditorStateOptions {
 /**
  * Hook to manage page editor state
  * Handles page data initialization, state management, and lifecycle
- * 
+ *
  * NOTE: PageEditorViewはkey={pageId}でマウントされるため、
  * ページ遷移時は完全に再マウントされる。
  * このリセットロジックは安全のために残しているが、
@@ -84,7 +84,7 @@ export function usePageEditorState({
       setIsInitialized(true);
       onInitialized?.(page);
     },
-    [onInitialized]
+    [onInitialized],
   );
 
   const reset = useCallback(() => {

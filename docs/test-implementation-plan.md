@@ -1,12 +1,12 @@
 # テスト実装計画 (Test Implementation Plan)
 
-| 項目         | 内容                                     |
-| :----------- | :--------------------------------------- |
-| 作成日       | 2026-02-23                               |
-| 対象         | Zedi - Zero-Friction Knowledge Network   |
-| 現在の状態   | Phase 1 完了（基盤テスト実装済み）       |
-| テスト総数   | 226 テスト（36 ファイル）                |
-| 合格率       | 215/226（95%、失敗 11 件は既存の問題）   |
+| 項目       | 内容                                   |
+| :--------- | :------------------------------------- |
+| 作成日     | 2026-02-23                             |
+| 対象       | Zedi - Zero-Friction Knowledge Network |
+| 現在の状態 | Phase 1 完了（基盤テスト実装済み）     |
+| テスト総数 | 226 テスト（36 ファイル）              |
+| 合格率     | 215/226（95%、失敗 11 件は既存の問題） |
 
 ---
 
@@ -16,43 +16,43 @@
 
 #### バックエンド（API Lambda）
 
-| ファイル                      | テスト数 | カバー範囲                                       |
-| :---------------------------- | :------- | :----------------------------------------------- |
-| `app.test.ts`                 | 既存     | ヘルスチェック、CORS、404、認証要求              |
-| `schema.test.ts`              | 既存     | Drizzle ORM スキーマ定義の整合性                 |
-| `client.test.ts`              | 既存     | DB クライアント接続                              |
-| `pages.test.ts`               | 12       | CRUD、コンテンツ取得、楽観ロック、認可           |
-| `syncPages.test.ts`           | 8        | デルタ/フル同期、LWW、リンク同期                 |
-| `notes.test.ts`               | 18       | CRUD、ページ管理、メンバー管理、権限             |
-| `users.test.ts`               | 8        | ユーザー作成/更新、メールによるアカウント統合     |
-| `search.test.ts`              | 5        | 空クエリ、pg_bigm 検索、own/shared スコープ      |
-| `clip.test.ts`                | 5        | URL バリデーション、HTML フェッチ                |
-| `media.test.ts`               | 7        | プリサインド URL、アップロード確認、S3 リダイレクト |
+| ファイル            | テスト数 | カバー範囲                                          |
+| :------------------ | :------- | :-------------------------------------------------- |
+| `app.test.ts`       | 既存     | ヘルスチェック、CORS、404、認証要求                 |
+| `schema.test.ts`    | 既存     | Drizzle ORM スキーマ定義の整合性                    |
+| `client.test.ts`    | 既存     | DB クライアント接続                                 |
+| `pages.test.ts`     | 12       | CRUD、コンテンツ取得、楽観ロック、認可              |
+| `syncPages.test.ts` | 8        | デルタ/フル同期、LWW、リンク同期                    |
+| `notes.test.ts`     | 18       | CRUD、ページ管理、メンバー管理、権限                |
+| `users.test.ts`     | 8        | ユーザー作成/更新、メールによるアカウント統合       |
+| `search.test.ts`    | 5        | 空クエリ、pg_bigm 検索、own/shared スコープ         |
+| `clip.test.ts`      | 5        | URL バリデーション、HTML フェッチ                   |
+| `media.test.ts`     | 7        | プリサインド URL、アップロード確認、S3 リダイレクト |
 
 #### フロントエンド
 
-| ファイル                      | テスト数 | カバー範囲                                       |
-| :---------------------------- | :------- | :----------------------------------------------- |
-| `apiClient.test.ts`           | 10       | 認証、レスポンス処理、503 リトライ               |
-| `syncWithApi.test.ts`         | 13       | プル/プッシュ、LWW 競合解決、エラー処理          |
-| `aiService.test.ts`           | 既存     | AI サービスロジック                              |
-| `aiSettings.test.ts`          | 既存     | AI 設定の永続化                                  |
-| `contentUtils.test.ts`        | 既存     | コンテンツユーティリティ                         |
-| `searchUtils.test.ts`         | 既存     | 検索スコアリング、ハイライト                     |
-| `useLinkedPages.test.ts`      | 既存     | リンクページ計算、2-hop リンク                   |
-| `useSyncWikiLinks.test.ts`    | 既存     | WikiLink 同期ロジック                            |
-| `useProfile.test.ts`          | 既存     | プロフィール管理                                 |
-| `useGlobalSearch.test.ts`     | 既存     | グローバル検索フック                             |
-| `useEditorAutoSave.test.ts`   | 既存     | 自動保存ロジック                                 |
-| その他コンポーネントテスト    | 既存     | PageTitleBlock、LinkedPagesSection 等            |
+| ファイル                    | テスト数 | カバー範囲                              |
+| :-------------------------- | :------- | :-------------------------------------- |
+| `apiClient.test.ts`         | 10       | 認証、レスポンス処理、503 リトライ      |
+| `syncWithApi.test.ts`       | 13       | プル/プッシュ、LWW 競合解決、エラー処理 |
+| `aiService.test.ts`         | 既存     | AI サービスロジック                     |
+| `aiSettings.test.ts`        | 既存     | AI 設定の永続化                         |
+| `contentUtils.test.ts`      | 既存     | コンテンツユーティリティ                |
+| `searchUtils.test.ts`       | 既存     | 検索スコアリング、ハイライト            |
+| `useLinkedPages.test.ts`    | 既存     | リンクページ計算、2-hop リンク          |
+| `useSyncWikiLinks.test.ts`  | 既存     | WikiLink 同期ロジック                   |
+| `useProfile.test.ts`        | 既存     | プロフィール管理                        |
+| `useGlobalSearch.test.ts`   | 既存     | グローバル検索フック                    |
+| `useEditorAutoSave.test.ts` | 既存     | 自動保存ロジック                        |
+| その他コンポーネントテスト  | 既存     | PageTitleBlock、LinkedPagesSection 等   |
 
 #### E2E テスト（Playwright）
 
-| ファイル                      | カバー範囲                               |
-| :---------------------------- | :--------------------------------------- |
-| `page-editor.spec.ts`         | ページエディタの操作フロー               |
-| `search.spec.ts`              | 検索機能の E2E フロー                    |
-| `linked-pages.spec.ts`        | リンクページ表示の E2E フロー            |
+| ファイル               | カバー範囲                    |
+| :--------------------- | :---------------------------- |
+| `page-editor.spec.ts`  | ページエディタの操作フロー    |
+| `search.spec.ts`       | 検索機能の E2E フロー         |
+| `linked-pages.spec.ts` | リンクページ表示の E2E フロー |
 
 ### 0.2 未テスト領域の概観
 
@@ -93,24 +93,24 @@
 
 ### 1.2 テスト対象の優先順位付け
 
-| 優先度 | 基準                                                           |
-| :----- | :------------------------------------------------------------- |
-| P0     | セキュリティ、決済、データ整合性に直結するコード               |
-| P1     | ユーザーの主要操作フロー（CRUD、検索、同期）に関わるコード     |
-| P2     | ビジネスロジック（AI 機能、サブスクリプション）                 |
-| P3     | UI コンポーネント（インタラクション中心のもの）                |
-| P4     | ユーティリティ、設定、プレゼンテーション用コンポーネント       |
+| 優先度 | 基準                                                       |
+| :----- | :--------------------------------------------------------- |
+| P0     | セキュリティ、決済、データ整合性に直結するコード           |
+| P1     | ユーザーの主要操作フロー（CRUD、検索、同期）に関わるコード |
+| P2     | ビジネスロジック（AI 機能、サブスクリプション）            |
+| P3     | UI コンポーネント（インタラクション中心のもの）            |
+| P4     | ユーティリティ、設定、プレゼンテーション用コンポーネント   |
 
 ### 1.3 モック戦略
 
-| 依存先              | モック方法                                    |
-| :------------------ | :-------------------------------------------- |
-| データベース         | `createMockDb()` ヘルパー（Phase 1 で実装済み） |
-| AWS SDK             | `vi.mock` でクラスモック（Phase 1 で実装済み）  |
-| 外部 API（AI 等）    | `vi.mock` + `mockResolvedValue`               |
-| ブラウザ API         | `vi.stubGlobal` / `jsdom`                     |
-| Hono ミドルウェア    | `vi.mock` でコンテキスト注入（Phase 1 で実装済み）|
-| タイマー             | `vi.useFakeTimers`（Phase 1 で実装済み）       |
+| 依存先            | モック方法                                         |
+| :---------------- | :------------------------------------------------- |
+| データベース      | `createMockDb()` ヘルパー（Phase 1 で実装済み）    |
+| AWS SDK           | `vi.mock` でクラスモック（Phase 1 で実装済み）     |
+| 外部 API（AI 等） | `vi.mock` + `mockResolvedValue`                    |
+| ブラウザ API      | `vi.stubGlobal` / `jsdom`                          |
+| Hono ミドルウェア | `vi.mock` でコンテキスト注入（Phase 1 で実装済み） |
+| タイマー          | `vi.useFakeTimers`（Phase 1 で実装済み）           |
 
 ---
 
@@ -122,12 +122,12 @@
 
 ### 2.1 ミドルウェアテスト
 
-| ファイル                | 優先度 | テスト内容                                           |
-| :---------------------- | :----- | :--------------------------------------------------- |
-| `middleware/auth.ts`    | P0     | JWT 検証、トークン期限切れ、不正トークン拒否、cognitoSub/userId のコンテキスト設定 |
-| `middleware/errorHandler.ts` | P0 | 各種エラーのレスポンス変換、DATABASE_RESUMING 検出、スタックトレース除去（本番） |
-| `middleware/rateLimiter.ts`  | P1 | DynamoDB レート制限、制限超過時の 429、TTL 管理      |
-| `middleware/db.ts`           | P1 | DB 接続の初期化、コンテキストへの注入、接続エラー処理 |
+| ファイル                     | 優先度 | テスト内容                                                                         |
+| :--------------------------- | :----- | :--------------------------------------------------------------------------------- |
+| `middleware/auth.ts`         | P0     | JWT 検証、トークン期限切れ、不正トークン拒否、cognitoSub/userId のコンテキスト設定 |
+| `middleware/errorHandler.ts` | P0     | 各種エラーのレスポンス変換、DATABASE_RESUMING 検出、スタックトレース除去（本番）   |
+| `middleware/rateLimiter.ts`  | P1     | DynamoDB レート制限、制限超過時の 429、TTL 管理                                    |
+| `middleware/db.ts`           | P1     | DB 接続の初期化、コンテキストへの注入、接続エラー処理                              |
 
 #### テスト方針
 
@@ -138,13 +138,13 @@
 
 ### 2.2 サービスレイヤーテスト
 
-| ファイル                        | 優先度 | テスト内容                                     |
-| :------------------------------ | :----- | :--------------------------------------------- |
-| `services/aiProviders.ts`       | P1     | 各プロバイダー（OpenAI/Anthropic/Google）のリクエスト構築、ストリーミング処理、エラーハンドリング |
-| `services/subscriptionService.ts` | P0   | プラン判定、利用量チェック、アクセス権限       |
-| `services/usageService.ts`      | P1     | 使用量記録、月次リセット、制限チェック         |
-| `services/commitService.ts`     | P2     | サムネイルコミット処理                         |
-| `services/imageSearch.ts`       | P2     | 画像検索クエリ構築とレスポンス解析             |
+| ファイル                          | 優先度 | テスト内容                                                                                        |
+| :-------------------------------- | :----- | :------------------------------------------------------------------------------------------------ |
+| `services/aiProviders.ts`         | P1     | 各プロバイダー（OpenAI/Anthropic/Google）のリクエスト構築、ストリーミング処理、エラーハンドリング |
+| `services/subscriptionService.ts` | P0     | プラン判定、利用量チェック、アクセス権限                                                          |
+| `services/usageService.ts`        | P1     | 使用量記録、月次リセット、制限チェック                                                            |
+| `services/commitService.ts`       | P2     | サムネイルコミット処理                                                                            |
+| `services/imageSearch.ts`         | P2     | 画像検索クエリ構築とレスポンス解析                                                                |
 
 ---
 
@@ -156,10 +156,10 @@
 
 ### 3.1 決済関連（P0）
 
-| ファイル                       | テスト内容                                      |
-| :----------------------------- | :---------------------------------------------- |
-| `routes/checkout.ts`           | チェックアウトセッション作成、カスタマーポータル URL 生成、認証チェック |
-| `routes/webhooks/polar.ts`     | Webhook 署名検証、イベント処理（支払い成功/失敗/キャンセル）、冪等性 |
+| ファイル                   | テスト内容                                                              |
+| :------------------------- | :---------------------------------------------------------------------- |
+| `routes/checkout.ts`       | チェックアウトセッション作成、カスタマーポータル URL 生成、認証チェック |
+| `routes/webhooks/polar.ts` | Webhook 署名検証、イベント処理（支払い成功/失敗/キャンセル）、冪等性    |
 
 #### テスト方針
 
@@ -169,20 +169,20 @@
 
 ### 3.2 AI 関連（P1）
 
-| ファイル                         | テスト内容                                    |
-| :------------------------------- | :-------------------------------------------- |
-| `routes/ai/chat.ts`             | チャットリクエストの構築、ストリーミングレスポンス、コンテキスト注入 |
-| `routes/ai/models.ts`           | 利用可能モデル一覧の取得、サブスクリプションに応じたフィルタリング |
-| `routes/ai/subscription.ts`     | サブスクリプション状態の取得/更新             |
-| `routes/ai/usage.ts`            | 使用量の記録/取得、月次制限チェック           |
+| ファイル                    | テスト内容                                                           |
+| :-------------------------- | :------------------------------------------------------------------- |
+| `routes/ai/chat.ts`         | チャットリクエストの構築、ストリーミングレスポンス、コンテキスト注入 |
+| `routes/ai/models.ts`       | 利用可能モデル一覧の取得、サブスクリプションに応じたフィルタリング   |
+| `routes/ai/subscription.ts` | サブスクリプション状態の取得/更新                                    |
+| `routes/ai/usage.ts`        | 使用量の記録/取得、月次制限チェック                                  |
 
 ### 3.3 サムネイル関連（P2）
 
-| ファイル                            | テスト内容                                  |
-| :---------------------------------- | :------------------------------------------ |
-| `routes/thumbnail/commit.ts`        | サムネイルのコミット処理                    |
-| `routes/thumbnail/imageGenerate.ts` | AI 画像生成リクエスト、レスポンス処理       |
-| `routes/thumbnail/imageSearch.ts`   | 画像検索クエリとレスポンスの変換            |
+| ファイル                            | テスト内容                            |
+| :---------------------------------- | :------------------------------------ |
+| `routes/thumbnail/commit.ts`        | サムネイルのコミット処理              |
+| `routes/thumbnail/imageGenerate.ts` | AI 画像生成リクエスト、レスポンス処理 |
+| `routes/thumbnail/imageSearch.ts`   | 画像検索クエリとレスポンスの変換      |
 
 ---
 
@@ -194,11 +194,11 @@
 
 ### 4.1 認証（P0）
 
-| ファイル                          | テスト内容                                    |
-| :-------------------------------- | :-------------------------------------------- |
-| `lib/auth/cognitoAuth.ts`        | OAuth フロー（リダイレクト/コールバック）、トークン管理、リフレッシュ |
-| `hooks/useAuth.ts`               | 認証状態管理、ログイン/ログアウト、認証エラー |
-| `components/auth/ProtectedRoute.tsx` | 未認証時のリダイレクト、認証済み時のレンダリング |
+| ファイル                             | テスト内容                                                            |
+| :----------------------------------- | :-------------------------------------------------------------------- |
+| `lib/auth/cognitoAuth.ts`            | OAuth フロー（リダイレクト/コールバック）、トークン管理、リフレッシュ |
+| `hooks/useAuth.ts`                   | 認証状態管理、ログイン/ログアウト、認証エラー                         |
+| `components/auth/ProtectedRoute.tsx` | 未認証時のリダイレクト、認証済み時のレンダリング                      |
 
 #### テスト方針
 
@@ -208,11 +208,11 @@
 
 ### 4.2 ストレージアダプター（P1）
 
-| ファイル                                       | テスト内容                                |
-| :--------------------------------------------- | :---------------------------------------- |
-| `lib/storageAdapter/IndexedDBStorageAdapter.ts` | CRUD 操作、クエリ、バルク操作、エラー処理 |
-| `lib/storageAdapter/createStorageAdapter.ts`    | 設定に応じたアダプターの選択ロジック      |
-| `lib/pageRepository/StorageAdapterPageRepository.ts` | ページリポジトリの変換ロジック       |
+| ファイル                                             | テスト内容                                |
+| :--------------------------------------------------- | :---------------------------------------- |
+| `lib/storageAdapter/IndexedDBStorageAdapter.ts`      | CRUD 操作、クエリ、バルク操作、エラー処理 |
+| `lib/storageAdapter/createStorageAdapter.ts`         | 設定に応じたアダプターの選択ロジック      |
+| `lib/pageRepository/StorageAdapterPageRepository.ts` | ページリポジトリの変換ロジック            |
 
 #### テスト方針
 
@@ -221,11 +221,11 @@
 
 ### 4.3 画像ストレージプロバイダー（P2）
 
-| ファイル                               | テスト内容                           |
-| :------------------------------------- | :----------------------------------- |
-| `lib/storage/providers/S3Provider.ts`  | プリサインド URL 生成、アップロード  |
-| `lib/storage/providers/GyazoProvider.ts` | Gyazo API 連携                     |
-| `lib/storage/providers/CloudflareR2Provider.ts` | R2 API 連携                 |
+| ファイル                                        | テスト内容                          |
+| :---------------------------------------------- | :---------------------------------- |
+| `lib/storage/providers/S3Provider.ts`           | プリサインド URL 生成、アップロード |
+| `lib/storage/providers/GyazoProvider.ts`        | Gyazo API 連携                      |
+| `lib/storage/providers/CloudflareR2Provider.ts` | R2 API 連携                         |
 
 ---
 
@@ -237,21 +237,21 @@
 
 ### 5.1 AI チャット（P1）
 
-| ファイル                          | テスト内容                                    |
-| :-------------------------------- | :-------------------------------------------- |
-| `lib/aiChatPrompt.ts`            | プロンプト構築ロジック、コンテキスト注入      |
-| `lib/aiChatActions.ts`           | アクション解析（ページ作成、リンク挿入等）    |
-| `lib/aiClient.ts`                | AI クライアントのリクエスト/レスポンス処理    |
-| `hooks/useAIChat.ts`             | チャットフロー、メッセージ管理、ストリーミング |
-| `hooks/useAIChatConversations.ts`| 会話の永続化、切替、削除                      |
-| `stores/aiChatStore.ts`          | チャット状態の管理                            |
+| ファイル                          | テスト内容                                     |
+| :-------------------------------- | :--------------------------------------------- |
+| `lib/aiChatPrompt.ts`             | プロンプト構築ロジック、コンテキスト注入       |
+| `lib/aiChatActions.ts`            | アクション解析（ページ作成、リンク挿入等）     |
+| `lib/aiClient.ts`                 | AI クライアントのリクエスト/レスポンス処理     |
+| `hooks/useAIChat.ts`              | チャットフロー、メッセージ管理、ストリーミング |
+| `hooks/useAIChatConversations.ts` | 会話の永続化、切替、削除                       |
+| `stores/aiChatStore.ts`           | チャット状態の管理                             |
 
 ### 5.2 コラボレーション（P1）
 
-| ファイル                                  | テスト内容                              |
-| :---------------------------------------- | :-------------------------------------- |
+| ファイル                                    | テスト内容                              |
+| :------------------------------------------ | :-------------------------------------- |
 | `lib/collaboration/CollaborationManager.ts` | Y.js ドキュメント同期、接続管理、再接続 |
-| `hooks/useCollaboration.ts`               | コラボレーション状態管理                |
+| `hooks/useCollaboration.ts`                 | コラボレーション状態管理                |
 
 #### テスト方針
 
@@ -260,23 +260,23 @@
 
 ### 5.3 ページ操作フック（P1）
 
-| ファイル                         | テスト内容                                  |
-| :------------------------------- | :------------------------------------------ |
-| `hooks/usePageQueries.ts`        | ページデータのフェッチ、キャッシュ、ミューテーション |
-| `hooks/useNoteQueries.ts`        | ノートデータのフェッチ、キャッシュ          |
-| `hooks/useWebClipper.ts`         | Web クリッピングフロー                      |
-| `hooks/useSubscription.ts`       | サブスクリプション状態管理                  |
+| ファイル                   | テスト内容                                           |
+| :------------------------- | :--------------------------------------------------- |
+| `hooks/usePageQueries.ts`  | ページデータのフェッチ、キャッシュ、ミューテーション |
+| `hooks/useNoteQueries.ts`  | ノートデータのフェッチ、キャッシュ                   |
+| `hooks/useWebClipper.ts`   | Web クリッピングフロー                               |
+| `hooks/useSubscription.ts` | サブスクリプション状態管理                           |
 
 ### 5.4 ユーティリティ（P2）
 
-| ファイル                    | テスト内容                                    |
-| :-------------------------- | :-------------------------------------------- |
-| `lib/webClipper.ts`         | HTML 解析、Readability 変換、メタデータ抽出   |
-| `lib/markdownExport.ts`     | Tiptap JSON → Markdown 変換の精度             |
-| `lib/htmlToTiptap.ts`       | HTML → Tiptap JSON 変換                       |
-| `lib/wikiLinkUtils.ts`      | WikiLink 抽出・解析ユーティリティ             |
-| `lib/dateUtils.ts`          | 日付フォーマット、グルーピング               |
-| `lib/encryption.ts`         | 暗号化/復号化の往復テスト                     |
+| ファイル                | テスト内容                                  |
+| :---------------------- | :------------------------------------------ |
+| `lib/webClipper.ts`     | HTML 解析、Readability 変換、メタデータ抽出 |
+| `lib/markdownExport.ts` | Tiptap JSON → Markdown 変換の精度           |
+| `lib/htmlToTiptap.ts`   | HTML → Tiptap JSON 変換                     |
+| `lib/wikiLinkUtils.ts`  | WikiLink 抽出・解析ユーティリティ           |
+| `lib/dateUtils.ts`      | 日付フォーマット、グルーピング              |
+| `lib/encryption.ts`     | 暗号化/復号化の往復テスト                   |
 
 ---
 
@@ -288,15 +288,15 @@
 
 ### 6.1 エディタコンポーネント（P2）
 
-| ファイル                                   | テスト内容                              |
-| :----------------------------------------- | :-------------------------------------- |
-| `components/editor/TiptapEditor.tsx`        | 初期化、コンテンツ表示、コールバック    |
-| `components/editor/PageEditorView.tsx`      | ページ読み込み/保存フロー               |
-| `extensions/WikiLinkExtension.ts`           | WikiLink の挿入/解析/レンダリング       |
-| `extensions/MermaidExtension.ts`            | Mermaid ブロックの挿入/レンダリング     |
-| `WikiLinkSuggestionLayer.tsx`               | サジェストの表示/選択/フィルタリング    |
-| `SlashSuggestionLayer.tsx`                  | スラッシュコマンドの表示/実行           |
-| `EditorBubbleMenu.tsx`                      | バブルメニューの表示/操作               |
+| ファイル                               | テスト内容                           |
+| :------------------------------------- | :----------------------------------- |
+| `components/editor/TiptapEditor.tsx`   | 初期化、コンテンツ表示、コールバック |
+| `components/editor/PageEditorView.tsx` | ページ読み込み/保存フロー            |
+| `extensions/WikiLinkExtension.ts`      | WikiLink の挿入/解析/レンダリング    |
+| `extensions/MermaidExtension.ts`       | Mermaid ブロックの挿入/レンダリング  |
+| `WikiLinkSuggestionLayer.tsx`          | サジェストの表示/選択/フィルタリング |
+| `SlashSuggestionLayer.tsx`             | スラッシュコマンドの表示/実行        |
+| `EditorBubbleMenu.tsx`                 | バブルメニューの表示/操作            |
 
 #### テスト方針
 
@@ -306,20 +306,20 @@
 
 ### 6.2 AI チャット UI（P2）
 
-| ファイル                              | テスト内容                            |
-| :------------------------------------ | :------------------------------------ |
-| `components/ai-chat/AIChatPanel.tsx`  | パネルの開閉、メッセージ送信、表示    |
-| `components/ai-chat/AIChatInput.tsx`  | 入力、送信、キーボードショートカット  |
-| `components/ai-chat/AIChatMessage.tsx`| メッセージのレンダリング、アクション  |
+| ファイル                               | テスト内容                           |
+| :------------------------------------- | :----------------------------------- |
+| `components/ai-chat/AIChatPanel.tsx`   | パネルの開閉、メッセージ送信、表示   |
+| `components/ai-chat/AIChatInput.tsx`   | 入力、送信、キーボードショートカット |
+| `components/ai-chat/AIChatMessage.tsx` | メッセージのレンダリング、アクション |
 
 ### 6.3 レイアウト & ナビゲーション（P3）
 
-| ファイル                                    | テスト内容                          |
-| :------------------------------------------ | :---------------------------------- |
-| `components/layout/Header/index.tsx`         | ヘッダー表示、ナビゲーション       |
-| `components/layout/GlobalShortcutsProvider`  | キーボードショートカットの動作     |
-| `components/page/PageGrid.tsx`               | グリッドレイアウト、レスポンシブ   |
-| `components/page/DateSection.tsx`            | 日付セクションのグルーピング       |
+| ファイル                                    | テスト内容                       |
+| :------------------------------------------ | :------------------------------- |
+| `components/layout/Header/index.tsx`        | ヘッダー表示、ナビゲーション     |
+| `components/layout/GlobalShortcutsProvider` | キーボードショートカットの動作   |
+| `components/page/PageGrid.tsx`              | グリッドレイアウト、レスポンシブ |
+| `components/page/DateSection.tsx`           | 日付セクションのグルーピング     |
 
 ---
 
@@ -331,15 +331,15 @@
 
 ### 7.1 追加 E2E シナリオ
 
-| シナリオ                   | 優先度 | 内容                                              |
-| :------------------------- | :----- | :------------------------------------------------ |
-| AI チャット                | P1     | メッセージ送信 → AI 応答表示 → アクション実行     |
-| Web クリッピング           | P1     | URL 入力 → ページ生成 → コンテンツ確認            |
-| ノート（共有）             | P1     | ノート作成 → ページ追加 → メンバー招待            |
-| 認証フロー                 | P2     | サインイン → コールバック → リダイレクト           |
-| 設定変更                   | P2     | AI 設定/ストレージ設定の変更 → 反映確認           |
-| オフライン → オンライン    | P2     | オフライン編集 → 再接続 → 同期確認                |
-| サブスクリプション         | P3     | プラン選択 → チェックアウト → 機能アンロック       |
+| シナリオ                | 優先度 | 内容                                          |
+| :---------------------- | :----- | :-------------------------------------------- |
+| AI チャット             | P1     | メッセージ送信 → AI 応答表示 → アクション実行 |
+| Web クリッピング        | P1     | URL 入力 → ページ生成 → コンテンツ確認        |
+| ノート（共有）          | P1     | ノート作成 → ページ追加 → メンバー招待        |
+| 認証フロー              | P2     | サインイン → コールバック → リダイレクト      |
+| 設定変更                | P2     | AI 設定/ストレージ設定の変更 → 反映確認       |
+| オフライン → オンライン | P2     | オフライン編集 → 再接続 → 同期確認            |
+| サブスクリプション      | P3     | プラン選択 → チェックアウト → 機能アンロック  |
 
 ### 7.2 E2E テスト環境
 
@@ -385,22 +385,22 @@ Phase 6 と 7 は並行作業が可能。
 
 ### 9.1 カバレッジ目標
 
-| カテゴリ             | 目標（行カバレッジ） | 備考                                |
-| :------------------- | :------------------- | :---------------------------------- |
-| ミドルウェア         | 90%+                 | セキュリティクリティカル            |
-| サービスレイヤー     | 85%+                 | ビジネスロジック集中                |
-| API ルート           | 80%+                 | 正常系 + 主要エラー系               |
-| フロントエンド Lib   | 85%+                 | 純粋なロジック                      |
-| フロントエンド Hooks | 75%+                 | 副作用を含むため完全カバーは困難    |
-| コンポーネント       | 70%+                 | インタラクション中心にテスト        |
-| E2E                  | 主要フロー 100%      | クリティカルパスの全網羅            |
+| カテゴリ             | 目標（行カバレッジ） | 備考                             |
+| :------------------- | :------------------- | :------------------------------- |
+| ミドルウェア         | 90%+                 | セキュリティクリティカル         |
+| サービスレイヤー     | 85%+                 | ビジネスロジック集中             |
+| API ルート           | 80%+                 | 正常系 + 主要エラー系            |
+| フロントエンド Lib   | 85%+                 | 純粋なロジック                   |
+| フロントエンド Hooks | 75%+                 | 副作用を含むため完全カバーは困難 |
+| コンポーネント       | 70%+                 | インタラクション中心にテスト     |
+| E2E                  | 主要フロー 100%      | クリティカルパスの全網羅         |
 
 ### 9.2 テスト命名規約
 
 ```typescript
-describe('対象モジュール名', () => {
-  describe('メソッド名 or シナリオ', () => {
-    it('should 期待される振る舞い when 条件', () => {
+describe("対象モジュール名", () => {
+  describe("メソッド名 or シナリオ", () => {
+    it("should 期待される振る舞い when 条件", () => {
       // Arrange → Act → Assert
     });
   });
@@ -409,11 +409,11 @@ describe('対象モジュール名', () => {
 
 ### 9.3 CI/CD との統合
 
-| ステージ       | 実行テスト                | ゲート条件                  |
-| :------------- | :------------------------ | :-------------------------- |
-| PR チェック    | ユニット + 統合テスト     | 全テスト合格                |
-| マージ前       | 上記 + E2E テスト         | 全テスト合格 + カバレッジ閾値 |
-| デプロイ後     | スモークテスト（E2E 一部）| ヘルスチェック + 主要フロー  |
+| ステージ    | 実行テスト                 | ゲート条件                    |
+| :---------- | :------------------------- | :---------------------------- |
+| PR チェック | ユニット + 統合テスト      | 全テスト合格                  |
+| マージ前    | 上記 + E2E テスト          | 全テスト合格 + カバレッジ閾値 |
+| デプロイ後  | スモークテスト（E2E 一部） | ヘルスチェック + 主要フロー   |
 
 ---
 
@@ -452,20 +452,20 @@ describe('対象モジュール名', () => {
 
 ```typescript
 // ミドルウェアのモック（認証バイパス）
-vi.mock('../../middleware/auth', () => ({
+vi.mock("../../middleware/auth", () => ({
   authRequired: vi.fn(() => async (c, next) => {
-    c.set('userId', TEST_USER_ID);
-    c.set('cognitoSub', TEST_COGNITO_SUB);
-    c.set('userEmail', TEST_USER_EMAIL);
+    c.set("userId", TEST_USER_ID);
+    c.set("cognitoSub", TEST_COGNITO_SUB);
+    c.set("userEmail", TEST_USER_EMAIL);
     await next();
   }),
 }));
 
 // DB のモック
 const mockDb = createMockDb();
-vi.mock('../../middleware/db', () => ({
+vi.mock("../../middleware/db", () => ({
   dbMiddleware: vi.fn(() => async (c, next) => {
-    c.set('db', mockDb);
+    c.set("db", mockDb);
     await next();
   }),
 }));

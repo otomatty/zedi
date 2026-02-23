@@ -1,15 +1,12 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useIsMobile } from '../../hooks/use-mobile';
-import { useAIChatStore } from '../../stores/aiChatStore';
-import { useAIChatContext } from '../../contexts/AIChatContext';
-import { AIChatPanel } from './AIChatPanel';
-import { ZEDI_PAGE_MIME_TYPE } from '../../types/aiChat';
-import {
-  Drawer,
-  DrawerContent,
-} from '../ui/drawer';
-import { cn } from '../../lib/utils';
-import { useTranslation } from 'react-i18next';
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useIsMobile } from "../../hooks/use-mobile";
+import { useAIChatStore } from "../../stores/aiChatStore";
+import { useAIChatContext } from "../../contexts/AIChatContext";
+import { AIChatPanel } from "./AIChatPanel";
+import { ZEDI_PAGE_MIME_TYPE } from "../../types/aiChat";
+import { Drawer, DrawerContent } from "../ui/drawer";
+import { cn } from "../../lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface ContentWithAIChatProps {
   children: React.ReactNode;
@@ -48,13 +45,13 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
       setIsHoveringHint(false);
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     };
-    document.addEventListener('dragstart', handleGlobalDragStart);
-    document.addEventListener('dragend', handleGlobalDragEnd);
-    document.addEventListener('drop', handleGlobalDrop);
+    document.addEventListener("dragstart", handleGlobalDragStart);
+    document.addEventListener("dragend", handleGlobalDragEnd);
+    document.addEventListener("drop", handleGlobalDrop);
     return () => {
-      document.removeEventListener('dragstart', handleGlobalDragStart);
-      document.removeEventListener('dragend', handleGlobalDragEnd);
-      document.removeEventListener('drop', handleGlobalDrop);
+      document.removeEventListener("dragstart", handleGlobalDragStart);
+      document.removeEventListener("dragend", handleGlobalDragEnd);
+      document.removeEventListener("drop", handleGlobalDrop);
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     };
   }, []);
@@ -77,12 +74,13 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
     return (
       <>
         {children}
-        {floatingAction && (
-          <div className="fixed bottom-6 right-6 z-40">
-            {floatingAction}
-          </div>
-        )}
-        <Drawer open={isOpen} onOpenChange={(open) => { if (!open) togglePanel(); }}>
+        {floatingAction && <div className="fixed bottom-6 right-6 z-40">{floatingAction}</div>}
+        <Drawer
+          open={isOpen}
+          onOpenChange={(open) => {
+            if (!open) togglePanel();
+          }}
+        >
           <DrawerContent className="h-[85vh]">
             <AIChatPanel />
           </DrawerContent>
@@ -92,24 +90,22 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
   }
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden">
-      <div className="flex-1 relative overflow-hidden">
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0 overflow-y-auto transition-all duration-300 ease-in-out">
           {children}
         </div>
-        {floatingAction && (
-          <div className="absolute bottom-6 right-6 z-40">
-            {floatingAction}
-          </div>
-        )}
+        {floatingAction && <div className="absolute bottom-6 right-6 z-40">{floatingAction}</div>}
       </div>
-      <div 
+      <div
         className={cn(
-          "sticky top-0 h-[calc(100vh-4.5rem)] flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
-          isOpen ? "w-[30%] min-w-[280px] max-w-[45%] border-l opacity-100" : "w-0 min-w-0 border-l-0 opacity-0"
+          "sticky top-0 h-[calc(100vh-4.5rem)] flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
+          isOpen
+            ? "w-[30%] min-w-[280px] max-w-[45%] border-l opacity-100"
+            : "w-0 min-w-0 border-l-0 opacity-0",
         )}
       >
-        <div className="w-[30vw] min-w-[280px] max-w-[45vw] h-full">
+        <div className="h-full w-[30vw] min-w-[280px] max-w-[45vw]">
           <AIChatPanel />
         </div>
       </div>
@@ -118,8 +114,8 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
       {!isOpen && isDraggingPage && (
         <div
           className={cn(
-            "fixed right-0 top-0 bottom-0 w-16 z-50 flex items-center justify-center transition-all duration-200",
-            isHoveringHint ? "bg-primary/20 w-24" : "bg-primary/5"
+            "fixed bottom-0 right-0 top-0 z-50 flex w-16 items-center justify-center transition-all duration-200",
+            isHoveringHint ? "w-24 bg-primary/20" : "bg-primary/5",
           )}
           onDragEnter={handleHintDragEnter}
           onDragLeave={handleHintDragLeave}
@@ -129,8 +125,11 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
             }
           }}
         >
-          <div className="writing-mode-vertical text-xs text-primary font-medium whitespace-nowrap" style={{ writingMode: 'vertical-rl' }}>
-            {t('aiChat.referencedPages.dragHint')}
+          <div
+            className="writing-mode-vertical whitespace-nowrap text-xs font-medium text-primary"
+            style={{ writingMode: "vertical-rl" }}
+          >
+            {t("aiChat.referencedPages.dragHint")}
           </div>
         </div>
       )}

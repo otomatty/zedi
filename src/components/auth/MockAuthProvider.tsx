@@ -42,11 +42,7 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
     },
   };
 
-  return (
-    <MockAuthContext.Provider value={mockAuthValue}>
-      {children}
-    </MockAuthContext.Provider>
-  );
+  return <MockAuthContext.Provider value={mockAuthValue}>{children}</MockAuthContext.Provider>;
 }
 
 export function useMockAuth(): MockAuthContextValue {

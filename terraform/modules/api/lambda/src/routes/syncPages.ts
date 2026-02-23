@@ -4,20 +4,20 @@
  * GET  /api/sync/pages  — 差分ページ取得 (since クエリパラメータ)
  * POST /api/sync/pages  — ページ + リンク バルク同期
  */
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { eq, and, gt, sql, inArray } from 'drizzle-orm';
-import { pages, links, ghostLinks, pageContents } from '../schema';
-import { authRequired } from '../middleware/auth';
-import type { AppEnv } from '../types';
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { eq, and, gt, sql, inArray } from "drizzle-orm";
+import { pages, links, ghostLinks, pageContents } from "../schema";
+import { authRequired } from "../middleware/auth";
+import type { AppEnv } from "../types";
 
 const app = new Hono<AppEnv>();
 
 // ── GET /sync/pages ─────────────────────────────────────────────────────────
-app.get('/', authRequired, async (c) => {
-  const userId = c.get('userId');
-  const db = c.get('db');
-  const since = c.req.query('since');
+app.get("/", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
+  const since = c.req.query("since");
 
   let query = db
     .select({
@@ -37,22 +37,17 @@ app.get('/', authRequired, async (c) => {
     .$dynamic();
 
   if (since) {
-    query = query.where(
-      and(eq(pages.ownerId, userId), gt(pages.updatedAt, new Date(since))),
-    );
+    query = query.where(and(eq(pages.ownerId, userId), gt(pages.updatedAt, new Date(since))));
   }
 
   const rows = await query.orderBy(pages.updatedAt);
   const pageIds = rows.map((r) => r.id);
 
-  let linksRows: typeof links.$inferSelect[] = [];
-  let ghostLinksRows: typeof ghostLinks.$inferSelect[] = [];
+  let linksRows: (typeof links.$inferSelect)[] = [];
+  let ghostLinksRows: (typeof ghostLinks.$inferSelect)[] = [];
 
   if (pageIds.length > 0) {
-    linksRows = await db
-      .select()
-      .from(links)
-      .where(inArray(links.sourceId, pageIds));
+    linksRows = await db.select().from(links).where(inArray(links.sourceId, pageIds));
 
     ghostLinksRows = await db
       .select()
@@ -83,9 +78,9 @@ app.get('/', authRequired, async (c) => {
 });
 
 // ── POST /sync/pages ────────────────────────────────────────────────────────
-app.post('/', authRequired, async (c) => {
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.post("/", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
 
   const body = await c.req.json<{
     pages: Array<{
@@ -111,7 +106,7 @@ app.post('/', authRequired, async (c) => {
   }>();
 
   if (!body.pages?.length) {
-    throw new HTTPException(400, { message: 'pages array is required' });
+    throw new HTTPException(400, { message: "pages array is required" });
   }
 
   const results: Array<{ id: string; action: string }> = [];
@@ -140,7 +135,7 @@ app.post('/', authRequired, async (c) => {
         createdAt: clientTime,
         updatedAt: clientTime,
       });
-      results.push({ id: p.id, action: 'created' });
+      results.push({ id: p.id, action: "created" });
     } else if (clientTime > existing[0]!.updatedAt) {
       // クライアント側が新しい: 更新
       await db
@@ -155,9 +150,9 @@ app.post('/', authRequired, async (c) => {
           updatedAt: clientTime,
         })
         .where(eq(pages.id, p.id));
-      results.push({ id: p.id, action: 'updated' });
+      results.push({ id: p.id, action: "updated" });
     } else {
-      results.push({ id: p.id, action: 'skipped' });
+      results.push({ id: p.id, action: "skipped" });
     }
   }
 
@@ -184,9 +179,7 @@ app.post('/', authRequired, async (c) => {
   if (body.ghost_links?.length) {
     const sourceIds = [...new Set(body.ghost_links.map((g) => g.source_page_id))];
     for (const sourceId of sourceIds) {
-      await db
-        .delete(ghostLinks)
-        .where(eq(ghostLinks.sourcePageId, sourceId));
+      await db.delete(ghostLinks).where(eq(ghostLinks.sourcePageId, sourceId));
     }
     for (const gl of body.ghost_links) {
       await db

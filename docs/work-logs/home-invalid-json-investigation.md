@@ -21,11 +21,11 @@
 
 ### 1. API のベース URL
 
-| ファイル | 内容 |
-|----------|------|
-| `src/lib/api/apiClient.ts` | `getDefaultBaseUrl()` は `import.meta.env.VITE_ZEDI_API_BASE_URL ?? ""`。空のときは `request()` 内で `window.location.origin` を使用（57行目付近）。 |
-| `src/lib/sync/syncWithApi.ts` | `api.getSyncPages(since)` → `apiClient` の `GET /api/sync/pages` を呼ぶ。 |
-| `src/hooks/usePageQueries.ts` | 認証済みユーザーで初期同期時に `runAuroraSync()` → `syncWithApi()` → `api.getSyncPages()`。 |
+| ファイル                      | 内容                                                                                                                                                 |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/api/apiClient.ts`    | `getDefaultBaseUrl()` は `import.meta.env.VITE_ZEDI_API_BASE_URL ?? ""`。空のときは `request()` 内で `window.location.origin` を使用（57行目付近）。 |
+| `src/lib/sync/syncWithApi.ts` | `api.getSyncPages(since)` → `apiClient` の `GET /api/sync/pages` を呼ぶ。                                                                            |
+| `src/hooks/usePageQueries.ts` | 認証済みユーザーで初期同期時に `runAuroraSync()` → `syncWithApi()` → `api.getSyncPages()`。                                                          |
 
 ### 2. エラーが発生する箇所
 
@@ -63,7 +63,7 @@
    - 必要なら `deploy-to-aws.ts` でビルド前に `VITE_ZEDI_API_BASE_URL` が空でないことをチェックし、空ならエラー終了するようにすると安全。
 
 3. **再デプロイ**
-   - 上記を設定したうえで `bun run deploy:prod` で再ビルド・再デプロイする。  
+   - 上記を設定したうえで `bun run deploy:prod` で再ビルド・再デプロイする。
    - ビルド時に正しい API URL が埋め込まれたクライアントが配信されれば、`/home` の Sync/API は API Gateway を叩くようになり、Invalid JSON は解消される。
 
 ## 補足

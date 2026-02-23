@@ -1,32 +1,28 @@
 /**
  * POST /api/ai/chat — AI チャット (ストリーミング + 非ストリーミング)
  */
-import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
-import { HTTPException } from 'hono/http-exception';
-import { authRequired } from '../../middleware/auth';
-import { rateLimiter } from '../../middleware/rateLimiter';
-import { getEnvConfig } from '../../env';
-import { getAISecrets, getRequired } from '../../lib/secrets';
-import { getUserTier } from '../../services/subscriptionService';
+import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
+import { HTTPException } from "hono/http-exception";
+import { authRequired } from "../../middleware/auth";
+import { rateLimiter } from "../../middleware/rateLimiter";
+import { getEnvConfig } from "../../env";
+import { getAISecrets, getRequired } from "../../lib/secrets";
+import { getUserTier } from "../../services/subscriptionService";
 import {
   checkUsage,
   validateModelAccess,
   calculateCost,
   recordUsage,
-} from '../../services/usageService';
-import {
-  callProvider,
-  streamProvider,
-  getProviderApiKeyName,
-} from '../../services/aiProviders';
-import type { AppEnv, AIChatRequest, SSEPayload, AIProviderType } from '../../types';
+} from "../../services/usageService";
+import { callProvider, streamProvider, getProviderApiKeyName } from "../../services/aiProviders";
+import type { AppEnv, AIChatRequest, SSEPayload, AIProviderType } from "../../types";
 
 const app = new Hono<AppEnv>();
 
-app.post('/', authRequired, rateLimiter, async (c) => {
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.post("/", authRequired, rateLimiter, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
   const env = getEnvConfig();
 
   const body = await c.req.json<AIChatRequest>();
@@ -34,7 +30,7 @@ app.post('/', authRequired, rateLimiter, async (c) => {
   // バリデーション
   if (!body.provider || !body.model || !body.messages?.length) {
     throw new HTTPException(400, {
-      message: 'provider, model, and messages are required',
+      message: "provider, model, and messages are required",
     });
   }
 
@@ -47,7 +43,7 @@ app.post('/', authRequired, rateLimiter, async (c) => {
   // 使用量チェック
   const usageCheck = await checkUsage(userId, tier, db);
   if (!usageCheck.allowed) {
-    throw new HTTPException(429, { message: 'Monthly budget exceeded' });
+    throw new HTTPException(429, { message: "Monthly budget exceeded" });
   }
 
   // API キー取得
@@ -55,13 +51,13 @@ app.post('/', authRequired, rateLimiter, async (c) => {
   const apiKeyName = getProviderApiKeyName(body.provider);
   const apiKey = getRequired(secrets, apiKeyName as keyof typeof secrets);
 
-  const feature = body.options?.feature ?? 'chat';
+  const feature = body.options?.feature ?? "chat";
   const isStreaming = body.options?.stream ?? false;
 
   if (isStreaming) {
     // ── ストリーミング応答 ──
     return streamSSE(c, async (stream) => {
-      let totalContent = '';
+      let totalContent = "";
       let inputTokens = 0;
       let outputTokens = 0;
 
@@ -114,14 +110,14 @@ app.post('/', authRequired, rateLimiter, async (c) => {
               feature,
               { inputTokens, outputTokens },
               costUnits,
-              'system',
+              "system",
               db,
             );
           }
         }
       } catch (err) {
         const errorPayload: SSEPayload = {
-          error: err instanceof Error ? err.message : 'Stream error',
+          error: err instanceof Error ? err.message : "Stream error",
           done: true,
         };
         await stream.writeSSE({ data: JSON.stringify(errorPayload) });
@@ -145,15 +141,7 @@ app.post('/', authRequired, rateLimiter, async (c) => {
   );
 
   // 使用量を記録
-  await recordUsage(
-    userId,
-    body.model,
-    feature,
-    result.usage,
-    costUnits,
-    'system',
-    db,
-  );
+  await recordUsage(userId, body.model, feature, result.usage, costUnits, "system", db);
 
   const updatedUsage = await checkUsage(userId, tier, db);
 

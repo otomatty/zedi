@@ -14,7 +14,8 @@ const RESUME_MAX_RETRIES = 4;
 function toParamValue(v: unknown) {
   if (v === null || v === undefined) return { isNull: true };
   if (typeof v === "string") return { stringValue: v };
-  if (typeof v === "number") return Number.isInteger(v) ? { longValue: v } : { stringValue: String(v) };
+  if (typeof v === "number")
+    return Number.isInteger(v) ? { longValue: v } : { stringValue: String(v) };
   if (typeof v === "boolean") return { booleanValue: v };
   return { stringValue: String(v) };
 }
@@ -43,7 +44,7 @@ function delay(ms: number) {
 export async function execute<T = Record<string, unknown>>(
   sql: string,
   params: Record<string, unknown> = {},
-  env?: EnvConfig
+  env?: EnvConfig,
 ): Promise<T[]> {
   const resourceArn = env?.AURORA_CLUSTER_ARN ?? process.env.AURORA_CLUSTER_ARN!;
   const secretArn = env?.DB_CREDENTIALS_SECRET ?? process.env.DB_CREDENTIALS_SECRET!;

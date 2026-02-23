@@ -11,7 +11,7 @@ const CACHE_TTL = 30 * 1000; // 30 seconds
 
 export async function getSubscription(
   userId: string,
-  env: EnvConfig
+  env: EnvConfig,
 ): Promise<Subscription | null> {
   const now = Date.now();
   const cached = _cache.get(userId);
@@ -25,7 +25,7 @@ export async function getSubscription(
      WHERE user_id = CAST(:userId AS uuid) AND status IN ('active', 'trialing')
      LIMIT 1`,
     { userId },
-    env
+    env,
   );
 
   const sub = rows.length > 0 ? rows[0] : null;

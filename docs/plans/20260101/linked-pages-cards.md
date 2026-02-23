@@ -25,14 +25,14 @@
 
 ### リンク表示仕様
 
-| 項目                 | 内容                                                             |
-| :------------------- | :--------------------------------------------------------------- |
-| **Outgoing Links**   | ページ内の WikiLink から抽出。存在するページのみ表示             |
-| **Backlinks**        | links テーブルから target_id でクエリ                            |
-| **2-hop Links**      | Outgoing Links のページが持つ Outgoing Links（重複排除）         |
-| **カード表示内容**   | ページタイトル、本文プレビュー（50 文字）、更新日時              |
-| **表示件数**         | 各セクション最大 6 件（「もっと見る」で展開）                    |
-| **Ghost Links 表示** | 存在しないリンク先も点線スタイルで表示（クリックで作成ダイアログ）|
+| 項目                 | 内容                                                               |
+| :------------------- | :----------------------------------------------------------------- |
+| **Outgoing Links**   | ページ内の WikiLink から抽出。存在するページのみ表示               |
+| **Backlinks**        | links テーブルから target_id でクエリ                              |
+| **2-hop Links**      | Outgoing Links のページが持つ Outgoing Links（重複排除）           |
+| **カード表示内容**   | ページタイトル、本文プレビュー（50 文字）、更新日時                |
+| **表示件数**         | 各セクション最大 6 件（「もっと見る」で展開）                      |
+| **Ghost Links 表示** | 存在しないリンク先も点線スタイルで表示（クリックで作成ダイアログ） |
 
 ---
 
@@ -117,18 +117,18 @@
 // hooks/useLinkedPages.ts
 
 export interface LinkedPagesData {
-  outgoingLinks: PageCard[];     // このページからリンクしているページ
-  backlinks: PageCard[];         // このページにリンクしているページ
-  twoHopLinks: PageCard[];       // 2階層先のページ
-  ghostLinks: string[];          // 存在しないリンク先
+  outgoingLinks: PageCard[]; // このページからリンクしているページ
+  backlinks: PageCard[]; // このページにリンクしているページ
+  twoHopLinks: PageCard[]; // 2階層先のページ
+  ghostLinks: string[]; // 存在しないリンク先
 }
 
 export interface PageCard {
   id: string;
   title: string;
-  preview: string;              // 本文プレビュー（50文字）
+  preview: string; // 本文プレビュー（50文字）
   updatedAt: number;
-  sourceUrl?: string;           // Webクリップの場合
+  sourceUrl?: string; // Webクリップの場合
 }
 
 export function useLinkedPages(pageId: string) {
@@ -150,10 +150,8 @@ export function useLinkedPages(pageId: string) {
 
       // 2. 全ページを取得してマッピング
       const allPages = await repo.getPages(userId);
-      const pageByTitle = new Map(
-        allPages.map(p => [p.title.toLowerCase().trim(), p])
-      );
-      const pageById = new Map(allPages.map(p => [p.id, p]));
+      const pageByTitle = new Map(allPages.map((p) => [p.title.toLowerCase().trim(), p]));
+      const pageById = new Map(allPages.map((p) => [p.id, p]));
 
       // 3. Outgoing Links（存在するページのみ）
       const outgoingLinks: PageCard[] = [];
@@ -177,9 +175,9 @@ export function useLinkedPages(pageId: string) {
       // 4. Backlinks（linksテーブルから取得）
       const backlinkIds = await repo.getBacklinks(pageId);
       const backlinks: PageCard[] = backlinkIds
-        .map(id => pageById.get(id))
+        .map((id) => pageById.get(id))
         .filter((p): p is Page => p !== undefined && !p.isDeleted)
-        .map(p => ({
+        .map((p) => ({
           id: p.id,
           title: p.title,
           preview: getContentPreview(p.content, 50),
@@ -202,7 +200,7 @@ export function useLinkedPages(pageId: string) {
             targetPage &&
             targetPage.id !== pageId &&
             !twoHopSet.has(targetPage.id) &&
-            !outgoingLinks.some(o => o.id === targetPage.id)
+            !outgoingLinks.some((o) => o.id === targetPage.id)
           ) {
             twoHopSet.add(targetPage.id);
             twoHopLinks.push({
@@ -400,18 +398,18 @@ src/
 
 ## 実装ステップ
 
-| Step | 内容                                               | 見積もり |
-| :--- | :------------------------------------------------- | :------- |
-| 1    | Repository に getBacklinks メソッド追加            | 1 時間   |
-| 2    | useLinkedPages フックの実装                        | 2 時間   |
-| 3    | PageLinkCard コンポーネントの実装                  | 1 時間   |
-| 4    | GhostLinkCard コンポーネントの実装                 | 30 分    |
-| 5    | LinkSection コンポーネントの実装                   | 1 時間   |
-| 6    | LinkedPagesSection の実装                          | 1.5 時間 |
-| 7    | 2-hop Links の取得ロジック実装                     | 1.5 時間 |
-| 8    | PageEditorView への統合                            | 30 分    |
-| 9    | レスポンシブ対応とスタイリング                     | 1 時間   |
-| 10   | テストと調整                                       | 1 時間   |
+| Step | 内容                                    | 見積もり |
+| :--- | :-------------------------------------- | :------- |
+| 1    | Repository に getBacklinks メソッド追加 | 1 時間   |
+| 2    | useLinkedPages フックの実装             | 2 時間   |
+| 3    | PageLinkCard コンポーネントの実装       | 1 時間   |
+| 4    | GhostLinkCard コンポーネントの実装      | 30 分    |
+| 5    | LinkSection コンポーネントの実装        | 1 時間   |
+| 6    | LinkedPagesSection の実装               | 1.5 時間 |
+| 7    | 2-hop Links の取得ロジック実装          | 1.5 時間 |
+| 8    | PageEditorView への統合                 | 30 分    |
+| 9    | レスポンシブ対応とスタイリング          | 1 時間   |
+| 10   | テストと調整                            | 1 時間   |
 
 **合計見積もり: 約 11 時間**
 
@@ -421,20 +419,20 @@ src/
 
 ### パフォーマンス
 
-| 懸念事項                    | 対策                                                     |
-| :-------------------------- | :------------------------------------------------------- |
-| 大量のページがある場合      | 各セクション最大 10 件に制限、staleTime を設定           |
-| 2-hop Links の計算コスト    | 遅延ロード（Collapsible で展開時に取得）                 |
-| リンク変更時のキャッシュ    | ページ保存時に関連クエリを invalidate                    |
+| 懸念事項                 | 対策                                           |
+| :----------------------- | :--------------------------------------------- |
+| 大量のページがある場合   | 各セクション最大 10 件に制限、staleTime を設定 |
+| 2-hop Links の計算コスト | 遅延ロード（Collapsible で展開時に取得）       |
+| リンク変更時のキャッシュ | ページ保存時に関連クエリを invalidate          |
 
 ### エッジケース
 
-| ケース                     | 対応                                           |
-| :------------------------- | :--------------------------------------------- |
-| 自分自身へのリンク         | 表示から除外                                   |
-| 削除されたページへのリンク | Ghost Link として扱う                          |
-| 循環リンク                 | 重複排除で対応                                 |
-| リンクが大量にある場合     | 「もっと見る」で展開表示                       |
+| ケース                     | 対応                     |
+| :------------------------- | :----------------------- |
+| 自分自身へのリンク         | 表示から除外             |
+| 削除されたページへのリンク | Ghost Link として扱う    |
+| 循環リンク                 | 重複排除で対応           |
+| リンクが大量にある場合     | 「もっと見る」で展開表示 |
 
 ---
 

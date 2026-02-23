@@ -1,21 +1,18 @@
 /**
  * サムネイルコミットサービス — 画像取得 → S3 アップロード → DB 記録
  */
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { eq, sql } from 'drizzle-orm';
-import { thumbnailObjects, thumbnailTierQuotas } from '../schema';
-import { getUserTier } from './subscriptionService';
-import type { Database, EnvConfig } from '../types';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { eq, sql } from "drizzle-orm";
+import { thumbnailObjects, thumbnailTierQuotas } from "../schema";
+import { getUserTier } from "./subscriptionService";
+import type { Database, EnvConfig } from "../types";
 
 const s3 = new S3Client({});
 
 /**
  * ティアごとのストレージクォータ (バイト) を取得
  */
-async function getStorageQuotaBytes(
-  tier: string,
-  db: Database,
-): Promise<number> {
+async function getStorageQuotaBytes(tier: string, db: Database): Promise<number> {
   const rows = await db
     .select({ storageLimitBytes: thumbnailTierQuotas.storageLimitBytes })
     .from(thumbnailTierQuotas)
@@ -28,10 +25,7 @@ async function getStorageQuotaBytes(
 /**
  * ユーザーの使用済みストレージ (バイト) を取得
  */
-async function getStorageUsedBytes(
-  userId: string,
-  db: Database,
-): Promise<number> {
+async function getStorageUsedBytes(userId: string, db: Database): Promise<number> {
   const rows = await db
     .select({
       sum: sql<string>`COALESCE(SUM(${thumbnailObjects.sizeBytes}), 0)::text`,
@@ -48,20 +42,20 @@ async function getStorageUsedBytes(
 async function fetchImageAsBuffer(
   sourceUrl: string,
 ): Promise<{ buffer: Buffer; mimeType: string; ext: string }> {
-  if (sourceUrl.startsWith('data:')) {
+  if (sourceUrl.startsWith("data:")) {
     const match = sourceUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) throw new Error('Invalid data URI');
+    if (!match) throw new Error("Invalid data URI");
     const mimeType = match[1]!;
     const base64 = match[2]!;
-    const buffer = Buffer.from(base64, 'base64');
-    const ext = mimeType.split('/')[1]?.split('+')[0] || 'png';
+    const buffer = Buffer.from(base64, "base64");
+    const ext = mimeType.split("/")[1]?.split("+")[0] || "png";
     return { buffer, mimeType, ext };
   }
 
   const response = await fetch(sourceUrl, {
     headers: {
-      'User-Agent': 'zedi-thumbnail-api/1.0 (https://zedi.app)',
-      Accept: 'image/*,*/*;q=0.8',
+      "User-Agent": "zedi-thumbnail-api/1.0 (https://zedi.app)",
+      Accept: "image/*,*/*;q=0.8",
     },
   });
 
@@ -69,15 +63,15 @@ async function fetchImageAsBuffer(
     throw new Error(`Image fetch failed: ${response.status}`);
   }
 
-  const contentType = response.headers.get('content-type') || 'image/png';
-  if (!contentType.startsWith('image/')) {
-    throw new Error('URL is not an image');
+  const contentType = response.headers.get("content-type") || "image/png";
+  if (!contentType.startsWith("image/")) {
+    throw new Error("URL is not an image");
   }
 
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
-  const mimeType = contentType.split(';')[0]!.trim();
-  const ext = mimeType.split('/')[1]?.split('+')[0] || 'png';
+  const mimeType = contentType.split(";")[0]!.trim();
+  const ext = mimeType.split("/")[1]?.split("+")[0] || "png";
   return { buffer, mimeType, ext };
 }
 
@@ -119,7 +113,7 @@ export async function commitImage(
   const usedBytes = await getStorageUsedBytes(userId, db);
 
   if (usedBytes + sizeBytes > quotaBytes) {
-    throw new Error('STORAGE_QUOTA_EXCEEDED');
+    throw new Error("STORAGE_QUOTA_EXCEEDED");
   }
 
   // S3 アップロード
@@ -143,6 +137,6 @@ export async function commitImage(
     sizeBytes,
   });
 
-  const baseUrl = env.THUMBNAIL_CLOUDFRONT_URL.replace(/\/$/, '');
+  const baseUrl = env.THUMBNAIL_CLOUDFRONT_URL.replace(/\/$/, "");
   return { imageUrl: `${baseUrl}/${s3Key}` };
 }

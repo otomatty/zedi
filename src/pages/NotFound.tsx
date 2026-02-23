@@ -9,22 +9,17 @@ const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
+    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center animate-fade-in">
-        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="animate-fade-in text-center">
+        <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-muted">
           <span className="text-4xl font-bold text-muted-foreground">404</span>
         </div>
-        <h1 className="text-2xl font-bold mb-2">{t("errors.notFoundTitle")}</h1>
-        <p className="text-muted-foreground mb-8">
-          {t("errors.notFoundDescription")}
-        </p>
+        <h1 className="mb-2 text-2xl font-bold">{t("errors.notFoundTitle")}</h1>
+        <p className="mb-8 text-muted-foreground">{t("errors.notFoundDescription")}</p>
         <Button asChild>
           <Link to="/" className="gap-2">
             <Home className="h-4 w-4" />

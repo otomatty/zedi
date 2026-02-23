@@ -19,14 +19,16 @@ export type StorageProviderContext = S3ProviderContext;
  */
 export function getStorageProvider(
   settings: StorageSettings,
-  context?: StorageProviderContext
+  context?: StorageProviderContext,
 ): StorageProviderInterface {
   const { provider, config } = settings;
 
   switch (provider) {
     case "s3":
       if (!context?.getToken) {
-        throw new Error("デフォルトストレージを使うには getToken が必要です（ログインしてください）");
+        throw new Error(
+          "デフォルトストレージを使うには getToken が必要です（ログインしてください）",
+        );
       }
       return new S3Provider(config as Record<string, unknown>, {
         getToken: context.getToken,
@@ -68,10 +70,7 @@ export function getStorageProvider(
       });
 
     case "google-drive":
-      if (
-        !config.googleDriveClientId ||
-        !config.googleDriveAccessToken
-      ) {
+      if (!config.googleDriveClientId || !config.googleDriveAccessToken) {
         throw new Error("Google Drive の設定が不完全です");
       }
       return new GoogleDriveProvider({
@@ -92,7 +91,7 @@ export function getStorageProvider(
  */
 export function isProviderConfigured(
   provider: StorageProviderType,
-  config: StorageSettings["config"]
+  config: StorageSettings["config"],
 ): boolean {
   switch (provider) {
     case "gyazo":
@@ -110,10 +109,7 @@ export function isProviderConfigured(
       return !!(config.githubRepository && config.githubToken);
 
     case "google-drive":
-      return !!(
-        config.googleDriveClientId &&
-        config.googleDriveAccessToken
-      );
+      return !!(config.googleDriveClientId && config.googleDriveAccessToken);
 
     case "s3":
       return true;
@@ -145,10 +141,7 @@ export function getSettingsForUpload(settings: StorageSettings): StorageSettings
  */
 export function isStorageConfiguredForUpload(settings: StorageSettings): boolean {
   if (settings.preferDefaultStorage !== false) return true;
-  return (
-    settings.provider !== "s3" &&
-    isProviderConfigured(settings.provider, settings.config)
-  );
+  return settings.provider !== "s3" && isProviderConfigured(settings.provider, settings.config);
 }
 
 // Re-export types

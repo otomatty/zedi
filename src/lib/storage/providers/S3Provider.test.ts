@@ -30,15 +30,13 @@ describe("S3Provider", () => {
             media_id: "media-123",
             s3_key: "uploads/media-123.png",
           }),
-          { status: 200 }
-        )
+          { status: 200 },
+        ),
       );
 
       fetchSpy.mockResolvedValueOnce(new Response(null, { status: 200 }));
 
-      fetchSpy.mockResolvedValueOnce(
-        new Response(JSON.stringify({ ok: true }), { status: 200 })
-      );
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
       const url = await provider.uploadImage(createTestFile());
 
@@ -61,18 +59,14 @@ describe("S3Provider", () => {
     it("throws when not authenticated (getToken returns null)", async () => {
       getToken.mockResolvedValue(null);
 
-      await expect(provider.uploadImage(createTestFile())).rejects.toThrow(
-        /ログインしていません/
-      );
+      await expect(provider.uploadImage(createTestFile())).rejects.toThrow(/ログインしていません/);
     });
 
     it("throws on presigned URL failure", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response("error", { status: 500 })
-      );
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response("error", { status: 500 }));
 
       await expect(provider.uploadImage(createTestFile())).rejects.toThrow(
-        /アップロード準備に失敗しました/
+        /アップロード準備に失敗しました/,
       );
     });
 
@@ -86,14 +80,14 @@ describe("S3Provider", () => {
             media_id: "media-123",
             s3_key: "uploads/media-123.png",
           }),
-          { status: 200 }
-        )
+          { status: 200 },
+        ),
       );
 
       fetchSpy.mockResolvedValueOnce(new Response(null, { status: 403 }));
 
       await expect(provider.uploadImage(createTestFile())).rejects.toThrow(
-        /アップロードに失敗しました/
+        /アップロードに失敗しました/,
       );
     });
   });
@@ -109,13 +103,11 @@ describe("S3Provider", () => {
             media_id: "media-test",
             s3_key: "uploads/media-test.png",
           }),
-          { status: 200 }
-        )
+          { status: 200 },
+        ),
       );
       fetchSpy.mockResolvedValueOnce(new Response(null, { status: 200 }));
-      fetchSpy.mockResolvedValueOnce(
-        new Response(JSON.stringify({ ok: true }), { status: 200 })
-      );
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
       const result = await provider.testConnection();
       expect(result.success).toBe(true);

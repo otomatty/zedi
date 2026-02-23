@@ -75,9 +75,7 @@ export const StorageSettingsForm: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   const useExternalStorage = settings.preferDefaultStorage === false;
-  const currentProvider = getStorageProviderById(
-    useExternalStorage ? settings.provider : "s3"
-  );
+  const currentProvider = getStorageProviderById(useExternalStorage ? settings.provider : "s3");
 
   const getSafeReturnTo = useCallback((): string | null => {
     const returnTo = searchParams.get("returnTo");
@@ -157,9 +155,7 @@ export const StorageSettingsForm: React.FC = () => {
           <Image className="h-5 w-5" />
           {t("storageSettings.title")}
         </CardTitle>
-        <CardDescription>
-          {t("storageSettings.description")}
-        </CardDescription>
+        <CardDescription>{t("storageSettings.description")}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
@@ -178,9 +174,7 @@ export const StorageSettingsForm: React.FC = () => {
           <Switch
             id="prefer-default"
             checked={useExternalStorage}
-            onCheckedChange={(checked) =>
-              updateSettings({ preferDefaultStorage: !checked })
-            }
+            onCheckedChange={(checked) => updateSettings({ preferDefaultStorage: !checked })}
             disabled={isSaving || isTesting}
           />
         </div>
@@ -221,7 +215,8 @@ export const StorageSettingsForm: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1">
                           <Badge variant="outline" className="text-[10px]">
-                            {t("storageSettings.difficultyLabel")}: {t(`storageSettings.difficulty.${provider.setupDifficulty}`)}
+                            {t("storageSettings.difficultyLabel")}:{" "}
+                            {t(`storageSettings.difficulty.${provider.setupDifficulty}`)}
                           </Badge>
                           <Badge variant="secondary" className="text-[10px]">
                             {t(`storageSettings.providers.${provider.id}.freeTier`)}
@@ -235,7 +230,8 @@ export const StorageSettingsForm: React.FC = () => {
               {currentProvider && (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="outline" className="text-[10px]">
-                    {t("storageSettings.difficultyLabel")}: {t(`storageSettings.difficulty.${currentProvider.setupDifficulty}`)}
+                    {t("storageSettings.difficultyLabel")}:{" "}
+                    {t(`storageSettings.difficulty.${currentProvider.setupDifficulty}`)}
                   </Badge>
                   <Badge variant="secondary" className="text-[10px]">
                     {t(`storageSettings.providers.${currentProvider.id}.freeTier`)}
@@ -308,13 +304,13 @@ export const StorageSettingsForm: React.FC = () => {
               <XCircle className="h-4 w-4" />
             )}
             <AlertTitle>
-              {testResult.success ? t("storageSettings.connectionSuccess") : t("storageSettings.connectionFailed")}
+              {testResult.success
+                ? t("storageSettings.connectionSuccess")
+                : t("storageSettings.connectionFailed")}
             </AlertTitle>
             <AlertDescription>
               {testResult.message}
-              {testResult.error && (
-                <span className="block text-xs mt-1">{testResult.error}</span>
-              )}
+              {testResult.error && <span className="mt-1 block text-xs">{testResult.error}</span>}
             </AlertDescription>
           </Alert>
         )}
@@ -322,14 +318,17 @@ export const StorageSettingsForm: React.FC = () => {
         {/* Setup Guide Link (外部ストレージのみ) */}
         {currentProvider && currentProvider.helpUrl && (
           <div className="rounded-lg border border-border bg-muted/50 p-4">
-            <h4 className="text-sm font-medium mb-2">{t("storageSettings.setupGuideTitle")}</h4>
+            <h4 className="mb-2 text-sm font-medium">{t("storageSettings.setupGuideTitle")}</h4>
             <a
               href={currentProvider.helpUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
-              {t("storageSettings.setupGuideLink", { name: t(`storageSettings.providers.${currentProvider.id}.name`) })} <ExternalLink className="h-3 w-3" />
+              {t("storageSettings.setupGuideLink", {
+                name: t(`storageSettings.providers.${currentProvider.id}.name`),
+              })}{" "}
+              <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         )}
@@ -338,12 +337,8 @@ export const StorageSettingsForm: React.FC = () => {
       <CardFooter className="flex justify-between">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isSaving || isTesting}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" disabled={isSaving || isTesting}>
+              <Trash2 className="mr-2 h-4 w-4" />
               {t("common.reset")}
             </Button>
           </AlertDialogTrigger>
@@ -356,20 +351,14 @@ export const StorageSettingsForm: React.FC = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-              <AlertDialogAction onClick={handleReset}>
-                {t("common.reset")}
-              </AlertDialogAction>
+              <AlertDialogAction onClick={handleReset}>{t("common.reset")}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleTest}
-            disabled={isSaving || isTesting}
-          >
-            {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <Button variant="outline" onClick={handleTest} disabled={isSaving || isTesting}>
+            {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t("storageSettings.testConnection")}
           </Button>
         </div>
@@ -433,15 +422,21 @@ const GyazoSettings: React.FC<GyazoSettingsProps> = ({
         </a>
         {t("storageSettings.gyazo.getTokenHelp")}
       </p>
-      <div className="rounded-lg border border-border bg-muted/50 p-3 mt-2">
-        <p className="text-xs font-medium mb-1">{t("storageSettings.gyazo.callbackUrlTitle")}</p>
+      <div className="mt-2 rounded-lg border border-border bg-muted/50 p-3">
+        <p className="mb-1 text-xs font-medium">{t("storageSettings.gyazo.callbackUrlTitle")}</p>
         <p className="text-xs text-muted-foreground">
           {t("storageSettings.gyazo.callbackUrlDescription")}
         </p>
-        <ul className="text-xs text-muted-foreground mt-1 ml-4 list-disc space-y-0.5">
-          <li><code className="bg-muted px-1 rounded">http://localhost:5173/callback</code></li>
-          <li><code className="bg-muted px-1 rounded">urn:ietf:wg:oauth:2.0:oob</code></li>
-          <li><code className="bg-muted px-1 rounded">zedi://oauth/callback</code></li>
+        <ul className="ml-4 mt-1 list-disc space-y-0.5 text-xs text-muted-foreground">
+          <li>
+            <code className="rounded bg-muted px-1">http://localhost:5173/callback</code>
+          </li>
+          <li>
+            <code className="rounded bg-muted px-1">urn:ietf:wg:oauth:2.0:oob</code>
+          </li>
+          <li>
+            <code className="rounded bg-muted px-1">zedi://oauth/callback</code>
+          </li>
         </ul>
       </div>
     </div>
@@ -646,9 +641,7 @@ const CloudflareR2Settings: React.FC<CloudflareR2SettingsProps> = ({
           placeholder={t("storageSettings.r2.publicUrlPlaceholder")}
           disabled={disabled}
         />
-        <p className="text-xs text-muted-foreground">
-          {t("storageSettings.r2.publicUrlHelp")}
-        </p>
+        <p className="text-xs text-muted-foreground">{t("storageSettings.r2.publicUrlHelp")}</p>
       </div>
     </div>
   );
@@ -689,7 +682,7 @@ const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
             href="https://console.cloud.google.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary hover:underline ml-1"
+            className="ml-1 text-primary hover:underline"
           >
             {t("storageSettings.googleDrive.oauthAlertLink")}
           </a>
@@ -710,7 +703,9 @@ const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="googleDriveClientSecret">{t("storageSettings.googleDrive.clientSecret")}</Label>
+        <Label htmlFor="googleDriveClientSecret">
+          {t("storageSettings.googleDrive.clientSecret")}
+        </Label>
         <div className="relative">
           <Input
             id="googleDriveClientSecret"
@@ -738,7 +733,9 @@ const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="googleDriveAccessToken">{t("storageSettings.googleDrive.accessToken")}</Label>
+        <Label htmlFor="googleDriveAccessToken">
+          {t("storageSettings.googleDrive.accessToken")}
+        </Label>
         <Input
           id="googleDriveAccessToken"
           type={showSecrets ? "text" : "password"}
@@ -750,7 +747,9 @@ const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="googleDriveRefreshToken">{t("storageSettings.googleDrive.refreshToken")}</Label>
+        <Label htmlFor="googleDriveRefreshToken">
+          {t("storageSettings.googleDrive.refreshToken")}
+        </Label>
         <Input
           id="googleDriveRefreshToken"
           type={showSecrets ? "text" : "password"}

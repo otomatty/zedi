@@ -4,30 +4,30 @@
 
 ## 必須（本番で設定済み）
 
-| 変数 | .env.production | 備考 |
-|------|-----------------|------|
-| VITE_COGNITO_DOMAIN | ✅ | |
-| VITE_COGNITO_CLIENT_ID | ✅ | |
-| VITE_COGNITO_REDIRECT_URI | ✅ | |
-| VITE_COGNITO_LOGOUT_REDIRECT_URI | ✅ | |
-| VITE_ZEDI_API_BASE_URL | ✅ | AI API（HTTP）・サムネイル API も同一 URL で共通化済み。末尾 `/` はコード側で除去。 |
-| VITE_AI_WS_URL | ✅ | AI ストリーミング用。Terraform: terraform output -raw ai_api_websocket_url |
-| VITE_REALTIME_URL | ✅ | |
-| PROD_FRONTEND_S3_BUCKET | ✅ | deploy:prod 用 |
-| PROD_CLOUDFRONT_DISTRIBUTION_ID | ✅ | deploy:prod 用 |
+| 変数                             | .env.production | 備考                                                                                |
+| -------------------------------- | --------------- | ----------------------------------------------------------------------------------- |
+| VITE_COGNITO_DOMAIN              | ✅              |                                                                                     |
+| VITE_COGNITO_CLIENT_ID           | ✅              |                                                                                     |
+| VITE_COGNITO_REDIRECT_URI        | ✅              |                                                                                     |
+| VITE_COGNITO_LOGOUT_REDIRECT_URI | ✅              |                                                                                     |
+| VITE_ZEDI_API_BASE_URL           | ✅              | AI API（HTTP）・サムネイル API も同一 URL で共通化済み。末尾 `/` はコード側で除去。 |
+| VITE_AI_WS_URL                   | ✅              | AI ストリーミング用。Terraform: terraform output -raw ai_api_websocket_url          |
+| VITE_REALTIME_URL                | ✅              |                                                                                     |
+| PROD_FRONTEND_S3_BUCKET          | ✅              | deploy:prod 用                                                                      |
+| PROD_CLOUDFRONT_DISTRIBUTION_ID  | ✅              | deploy:prod 用                                                                      |
 
 ## コード共通化（2026-02-16）
 
 - **VITE_AI_API_BASE_URL / VITE_THUMBNAIL_API_BASE_URL** は使用廃止。AI（HTTP）・サムネイルはすべて **VITE_ZEDI_API_BASE_URL** を参照。
 
-## 任意（VITE_LEMONSQUEEZY_* のみ）
+## 任意（VITE*LEMONSQUEEZY*\* のみ）
 
-| 変数 | .env.production | 備考 |
-|------|-----------------|------|
-| VITE_LEMONSQUEEZY_STORE_ID | ❌ | Pro プラン課金時のみ。 |
-| VITE_LEMONSQUEEZY_AI_MONTHLY_PRODUCT_ID | ❌ | 同上。 |
-| VITE_LEMONSQUEEZY_AI_YEARLY_PRODUCT_ID | ❌ | 同上。 |
-| VITE_LEMONSQUEEZY_PORTAL_URL | ❌ | 顧客ポータル（任意）。 |
+| 変数                                    | .env.production | 備考                   |
+| --------------------------------------- | --------------- | ---------------------- |
+| VITE_LEMONSQUEEZY_STORE_ID              | ❌              | Pro プラン課金時のみ。 |
+| VITE_LEMONSQUEEZY_AI_MONTHLY_PRODUCT_ID | ❌              | 同上。                 |
+| VITE_LEMONSQUEEZY_AI_YEARLY_PRODUCT_ID  | ❌              | 同上。                 |
+| VITE_LEMONSQUEEZY_PORTAL_URL            | ❌              | 顧客ポータル（任意）。 |
 
 ## 推奨アクション
 

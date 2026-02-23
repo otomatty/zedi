@@ -2,10 +2,10 @@
 
 ## 1. 概要
 
-| 項目 | 内容 |
-|------|------|
-| **機能名** | ヘッダー検索バー |
-| **目的** | どのページからも検索を利用可能にし、検索できることを視覚的にわかりやすくする |
+| 項目         | 内容                                                                           |
+| ------------ | ------------------------------------------------------------------------------ |
+| **機能名**   | ヘッダー検索バー                                                               |
+| **目的**     | どのページからも検索を利用可能にし、検索できることを視覚的にわかりやすくする   |
 | **関連要望** | ・どのページからも検索ができるようにする<br>・検索できることをわかりやすくする |
 
 ---
@@ -22,12 +22,12 @@
 
 **主なファイル:**
 
-| 役割 | パス |
-|------|------|
-| UI | `src/components/search/GlobalSearch.tsx` |
-| ロジック | `src/hooks/useGlobalSearch.ts` |
-| ショートカット | `src/hooks/useGlobalSearchShortcut.ts` |
-| コマンドUI | `src/components/ui/command.tsx`（CommandDialog / CommandInput） |
+| 役割           | パス                                                            |
+| -------------- | --------------------------------------------------------------- |
+| UI             | `src/components/search/GlobalSearch.tsx`                        |
+| ロジック       | `src/hooks/useGlobalSearch.ts`                                  |
+| ショートカット | `src/hooks/useGlobalSearchShortcut.ts`                          |
+| コマンドUI     | `src/components/ui/command.tsx`（CommandDialog / CommandInput） |
 
 **問題点:**
 
@@ -102,7 +102,7 @@
 ### 4.1 状態共有（Context）
 
 - **GlobalSearchContext** を新設し、`open` と `close` だけを提供する。
-- **Provider** は、`useGlobalSearch()` を呼ぶコンポーネントでよい。  
+- **Provider** は、`useGlobalSearch()` を呼ぶコンポーネントでよい。
   - 実装パターン: `GlobalSearchProvider` が `useGlobalSearch()` を実行し、返り値の `open` / `close` を Context に渡す。同一 Provider 内で `<GlobalSearch />`（CommandDialog）をレンダリングし、`children` で App のルート以下を包む。
 - **ヘッダー**（またはヘッダー内の `HeaderSearchTrigger`）は `useGlobalSearchContext()` で `open` を取得し、ボタンクリックで `open()` を呼ぶ。
 
@@ -121,13 +121,13 @@ App
 
 ### 4.3 新規・変更ファイル（案）
 
-| 種別 | パス | 内容 |
-|------|------|------|
-| 新規 | `src/contexts/GlobalSearchContext.tsx` | GlobalSearchContext, GlobalSearchProvider, useGlobalSearchContext |
-| 変更 | `src/App.tsx` | GlobalSearchProvider でラップし、GlobalSearch を Provider の子に |
-| 新規 | `src/components/layout/Header/HeaderSearchTrigger.tsx` | 検索トリガー（バー風ボタン or アイコンボタン） |
-| 変更 | `src/components/layout/Header/index.tsx` | HeaderSearchTrigger を中央付近に配置 |
-| 変更 | `src/components/search/GlobalSearch.tsx` | useGlobalSearch の代わりに Context から open/close を取得するか、Provider 側で useGlobalSearch を呼び open/close を Context に渡すのみ（GlobalSearch は従来どおり useGlobalSearch を利用しても可。その場合は Provider が useGlobalSearch を呼び、open/close を Context に渡し、GlobalSearch は Context 経由で isOpen を参照するなど、役割分担は一通りに決める） |
+| 種別 | パス                                                   | 内容                                                                                                                                                                                                                                                                                                                                                            |
+| ---- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 新規 | `src/contexts/GlobalSearchContext.tsx`                 | GlobalSearchContext, GlobalSearchProvider, useGlobalSearchContext                                                                                                                                                                                                                                                                                               |
+| 変更 | `src/App.tsx`                                          | GlobalSearchProvider でラップし、GlobalSearch を Provider の子に                                                                                                                                                                                                                                                                                                |
+| 新規 | `src/components/layout/Header/HeaderSearchTrigger.tsx` | 検索トリガー（バー風ボタン or アイコンボタン）                                                                                                                                                                                                                                                                                                                  |
+| 変更 | `src/components/layout/Header/index.tsx`               | HeaderSearchTrigger を中央付近に配置                                                                                                                                                                                                                                                                                                                            |
+| 変更 | `src/components/search/GlobalSearch.tsx`               | useGlobalSearch の代わりに Context から open/close を取得するか、Provider 側で useGlobalSearch を呼び open/close を Context に渡すのみ（GlobalSearch は従来どおり useGlobalSearch を利用しても可。その場合は Provider が useGlobalSearch を呼び、open/close を Context に渡し、GlobalSearch は Context 経由で isOpen を参照するなど、役割分担は一通りに決める） |
 
 **Context の役割分担（2 案）:**
 
@@ -144,14 +144,14 @@ App
 
 ## 5. 実装ステップ（案）
 
-| Step | 内容 | 備考 |
-|------|------|------|
-| 1 | GlobalSearchContext / Provider の追加 | useGlobalSearch を Provider 内で呼び、open/close を Context に渡す。GlobalSearch は Context から開閉と必要なら query 系を受け取るよう変更。 |
-| 2 | App.tsx を GlobalSearchProvider でラップ | GlobalSearch を Provider の子として配置。 |
-| 3 | HeaderSearchTrigger の新規作成 | バー風ボタン or アイコンボタン。クリックで context.open()。ショートカット表記（⌘K）と aria-label。 |
-| 4 | Header に HeaderSearchTrigger を配置 | 中央付近に配置し、レスポンシブでアイコンのみにするか検討。 |
-| 5 | 必要に応じて i18n キー追加・既存文言の置き換え | プレースホルダー・トリガーラベル。 |
-| 6 | 動作確認 | ヘッダー表示画面でトリガーからダイアログが開くこと、Ctrl+K でも従来どおり開くこと、Esc で閉じることを確認。 |
+| Step | 内容                                           | 備考                                                                                                                                        |
+| ---- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | GlobalSearchContext / Provider の追加          | useGlobalSearch を Provider 内で呼び、open/close を Context に渡す。GlobalSearch は Context から開閉と必要なら query 系を受け取るよう変更。 |
+| 2    | App.tsx を GlobalSearchProvider でラップ       | GlobalSearch を Provider の子として配置。                                                                                                   |
+| 3    | HeaderSearchTrigger の新規作成                 | バー風ボタン or アイコンボタン。クリックで context.open()。ショートカット表記（⌘K）と aria-label。                                          |
+| 4    | Header に HeaderSearchTrigger を配置           | 中央付近に配置し、レスポンシブでアイコンのみにするか検討。                                                                                  |
+| 5    | 必要に応じて i18n キー追加・既存文言の置き換え | プレースホルダー・トリガーラベル。                                                                                                          |
+| 6    | 動作確認                                       | ヘッダー表示画面でトリガーからダイアログが開くこと、Ctrl+K でも従来どおり開くこと、Esc で閉じることを確認。                                 |
 
 ---
 

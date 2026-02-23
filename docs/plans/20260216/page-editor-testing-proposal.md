@@ -9,23 +9,27 @@
 **ファイル:** `src/components/editor/PageEditor/PageEditorHeader.test.tsx`
 
 ### 方針
+
 - 子コンポーネント（WikiGeneratorButton, ConnectionIndicator, UserAvatars）をモックし、ヘッダー単体の表示・コールバックに集中する。
 - `formatTimeAgo` をモックして lastSaved 表示を安定してアサートする。
 
 ### カバーしている内容
 
-| カテゴリ | 内容 |
-|----------|------|
-| **表示** | タイトル入力・プレースホルダー、lastSaved の有無、errorMessage 時の `text-destructive`、collaboration 時の ConnectionIndicator / UserAvatars、**ストレージ表示がヘッダーにないこと** |
+| カテゴリ             | 内容                                                                                                                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **表示**             | タイトル入力・プレースホルダー、lastSaved の有無、errorMessage 時の `text-destructive`、collaboration 時の ConnectionIndicator / UserAvatars、**ストレージ表示がヘッダーにないこと**                   |
 | **インタラクション** | 戻る → onBack、タイトル変更 → onTitleChange、Wiki Generator → onGenerateWiki、ドロップダウンから「Markdownでエクスポート」「Markdownをコピー」「削除」→ 各コールバック、collaboration 時の onReconnect |
 
 ### 実行方法
+
 ```bash
 npx vitest run src/components/editor/PageEditor/PageEditorHeader.test.tsx
 ```
+
 ※ 全体テストは `bun test` だと Vitest 設定が効かず jsdom 未設定になるため、`npx vitest run` を推奨。
 
 ### 共通 setup の修正
+
 `src/test/setup.ts` で `ResizeObserver` / `IntersectionObserver` を **class ベースのモック** に変更済み。Radix の DropdownMenu（floating-ui）が `new ResizeObserver()` するため、従来の `vi.fn().mockImplementation(() => ({...}))` だとコンストラクタとして扱えずエラーになっていた。
 
 ---
@@ -35,6 +39,7 @@ npx vitest run src/components/editor/PageEditor/PageEditorHeader.test.tsx
 PageEditorView は次のような依存が多く、**ユニットテストでフルレンダーするより、軽い統合 or E2E でカバーする**のが現実的。
 
 ### 主な依存
+
 - `useParams` / `useNavigate` / `useLocation`
 - `usePage`, `useUpdatePage`, `useSyncWikiLinks` (React Query)
 - `usePageEditorState`, `useEditorAutoSave`, `usePageDeletion`, `useMarkdownExport`, `usePageEditorKeyboard`
@@ -74,10 +79,10 @@ vi.mock("react-router-dom", () => ({
 
 ## 3. まとめ
 
-| 対象 | 状態 | 備考 |
-|------|------|------|
-| **PageEditorHeader** | ✅ テスト追加済み | 表示・インタラクション・ストレージ非表示をカバー |
-| **PageEditorView** | 未実装（方針のみ） | 軽いリダイレクトテスト or E2E でカバー推奨 |
-| **共通 setup** | ✅ ResizeObserver/IntersectionObserver を class モックに変更 | ドロップダウン利用コンポーネントのテストが通るようになった |
+| 対象                 | 状態                                                         | 備考                                                       |
+| -------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| **PageEditorHeader** | ✅ テスト追加済み                                            | 表示・インタラクション・ストレージ非表示をカバー           |
+| **PageEditorView**   | 未実装（方針のみ）                                           | 軽いリダイレクトテスト or E2E でカバー推奨                 |
+| **共通 setup**       | ✅ ResizeObserver/IntersectionObserver を class モックに変更 | ドロップダウン利用コンポーネントのテストが通るようになった |
 
 テスト実行は `npx vitest run` で行うと、vite.config の jsdom と setup が適用され、PageEditorHeader 含め既存のコンポーネントテストが安定して動作する。

@@ -35,8 +35,7 @@ export const StorageImage = Image.extend<StorageImageOptions>({
       ...this.parent?.(),
       storageProviderId: {
         default: null,
-        parseHTML: (element) =>
-          element.getAttribute("data-storage-provider") || null,
+        parseHTML: (element) => element.getAttribute("data-storage-provider") || null,
         renderHTML: (attributes) =>
           attributes.storageProviderId
             ? { "data-storage-provider": attributes.storageProviderId }
@@ -59,7 +58,7 @@ export const StorageImage = Image.extend<StorageImageOptions>({
               src: imageUrl,
               alt: imageUrl.split("/").pop() || "image",
               title: imageUrl,
-            })
+            }),
           );
         },
       }),

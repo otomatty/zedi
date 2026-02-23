@@ -67,7 +67,7 @@ export async function callAIService(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const apiMode = getEffectiveAPIMode(settings);
 
@@ -87,7 +87,7 @@ async function callAIWithUserKey(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   try {
     switch (settings.provider) {
@@ -104,9 +104,7 @@ async function callAIWithUserKey(
         throw new Error(`Unknown provider: ${settings.provider}`);
     }
   } catch (error) {
-    callbacks.onError?.(
-      error instanceof Error ? error : new Error("AI API呼び出しエラー")
-    );
+    callbacks.onError?.(error instanceof Error ? error : new Error("AI API呼び出しエラー"));
   }
 }
 
@@ -125,7 +123,7 @@ async function getAuthToken(): Promise<string | null> {
 async function callAIWithServer(
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const wsUrl = getAIWSUrl();
 
@@ -145,7 +143,7 @@ async function callAIWithServerWS(
   wsUrl: string,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
@@ -198,7 +196,7 @@ async function callAIWithServerWS(
           model: request.model,
           messages: request.messages,
           options: { ...request.options, stream: true },
-        })
+        }),
       );
     };
 
@@ -266,7 +264,7 @@ async function callAIWithServerWS(
 async function callAIWithServerHTTP(
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   try {
     const apiBaseUrl = getAIAPIBaseUrl();
@@ -296,8 +294,7 @@ async function callAIWithServerHTTP(
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null);
-      const message =
-        errorBody?.error || response.statusText || "AI API呼び出しエラー";
+      const message = errorBody?.error || response.statusText || "AI API呼び出しエラー";
       throw new Error(message);
     }
 
@@ -392,9 +389,7 @@ async function callAIWithServerHTTP(
       usage: data.usage,
     });
   } catch (error) {
-    callbacks.onError?.(
-      error instanceof Error ? error : new Error("AI API呼び出しエラー")
-    );
+    callbacks.onError?.(error instanceof Error ? error : new Error("AI API呼び出しエラー"));
   }
 }
 
@@ -405,7 +400,7 @@ async function callOpenAI(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new OpenAI({
     apiKey: settings.apiKey,
@@ -426,7 +421,7 @@ async function callOpenAI(
         stream: true,
         web_search_options: request.options.webSearchOptions,
       },
-      { signal: abortSignal }
+      { signal: abortSignal },
     );
 
     let fullContent = "";
@@ -460,7 +455,7 @@ async function callOpenAI(
         temperature: request.options?.temperature ?? 0.7,
         stream: false,
       },
-      { signal: abortSignal }
+      { signal: abortSignal },
     );
 
     const content = response.choices[0]?.message?.content || "";
@@ -478,7 +473,7 @@ async function callAnthropic(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new Anthropic({
     apiKey: settings.apiKey,
@@ -495,13 +490,10 @@ async function callAnthropic(
       "claude-haiku-3.5",
       "claude-3-5-haiku",
     ];
-    return supportedPatterns.some((pattern) =>
-      model.toLowerCase().includes(pattern.toLowerCase())
-    );
+    return supportedPatterns.some((pattern) => model.toLowerCase().includes(pattern.toLowerCase()));
   };
 
-  const useWebSearch =
-    request.options?.useWebSearch ?? isClaudeWebSearchSupported(request.model);
+  const useWebSearch = request.options?.useWebSearch ?? isClaudeWebSearchSupported(request.model);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestParams: any = {
@@ -535,10 +527,7 @@ async function callAnthropic(
         throw new Error("ABORTED");
       }
 
-      if (
-        event.type === "content_block_delta" &&
-        event.delta.type === "text_delta"
-      ) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
         const content = event.delta.text;
         fullContent += content;
         callbacks.onChunk?.(content);
@@ -556,8 +545,7 @@ async function callAnthropic(
     });
 
     const textBlock = response.content.find((block) => block.type === "text");
-    const content =
-      textBlock && textBlock.type === "text" ? textBlock.text : "";
+    const content = textBlock && textBlock.type === "text" ? textBlock.text : "";
 
     callbacks.onComplete?.({
       content,
@@ -573,7 +561,7 @@ async function callGoogle(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new GoogleGenAI({ apiKey: settings.apiKey });
 
@@ -702,7 +690,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
         models: data.models,
         tier: data.tier,
         cachedAt: Date.now(),
-      } satisfies CachedServerModels)
+      } satisfies CachedServerModels),
     );
   } catch {
     // localStorage write failed, ignore

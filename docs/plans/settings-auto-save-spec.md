@@ -2,11 +2,11 @@
 
 ## 現在の実装状況
 
-| 画面 | 保存対象 | 保存トリガー | 通知 |
-|------|----------|--------------|------|
-| **一般設定** (GeneralSettingsForm) | テーマ・フォント・言語（即時保存済み）、プロフィール（表示名・アバター） | 保存ボタン（saveGeneral + saveProfile） | useToast (Radix) |
-| **AI設定** (AISettingsForm) | プロバイダー、モデル、APIキー、apiMode 等 | 保存ボタン | useToast |
-| **ストレージ設定** (StorageSettingsForm) | 保存先トグル、プロバイダー、各プロバイダー用 config | 保存ボタン | useToast |
+| 画面                                     | 保存対象                                                                 | 保存トリガー                            | 通知             |
+| ---------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------- | ---------------- |
+| **一般設定** (GeneralSettingsForm)       | テーマ・フォント・言語（即時保存済み）、プロフィール（表示名・アバター） | 保存ボタン（saveGeneral + saveProfile） | useToast (Radix) |
+| **AI設定** (AISettingsForm)              | プロバイダー、モデル、APIキー、apiMode 等                                | 保存ボタン                              | useToast         |
+| **ストレージ設定** (StorageSettingsForm) | 保存先トグル、プロバイダー、各プロバイダー用 config                      | 保存ボタン                              | useToast         |
 
 - 通知は現在すべて `useToast`（Radix）。Sonner は `App.tsx` で `<Toaster as Sonner />` として配置済み。
 - 一般設定のテーマ・フォント・言語は前回対応で「変更即時保存」済み。未保存なのはプロフィールのみ。

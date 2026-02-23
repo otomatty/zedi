@@ -43,7 +43,7 @@ const NoteMembers: React.FC = () => {
   const canManageMembers = Boolean(access?.canManageMembers && source === "local");
   const { data: members = [], isLoading: isMembersLoading } = useNoteMembers(
     noteId ?? "",
-    canManageMembers
+    canManageMembers,
   );
 
   const addMemberMutation = useAddNoteMember();
@@ -70,10 +70,7 @@ const NoteMembers: React.FC = () => {
     }
   };
 
-  const handleUpdateMemberRole = async (
-    email: string,
-    role: NoteMemberRole
-  ) => {
+  const handleUpdateMemberRole = async (email: string, role: NoteMemberRole) => {
     if (!noteId) return;
     try {
       await updateMemberRoleMutation.mutateAsync({
@@ -118,9 +115,7 @@ const NoteMembers: React.FC = () => {
         <Header />
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">
-              {t("notes.noteNotFoundOrNoAccess")}
-            </p>
+            <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
           </Container>
         </main>
       </div>
@@ -134,8 +129,8 @@ const NoteMembers: React.FC = () => {
         <Container>
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold truncate">{t("notes.members")}</h1>
-              <p className="mt-1 text-sm text-muted-foreground truncate">
+              <h1 className="truncate text-xl font-semibold">{t("notes.members")}</h1>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
                 {note.title || t("notes.untitledNote")}
               </p>
             </div>
@@ -150,7 +145,7 @@ const NoteMembers: React.FC = () => {
             </p>
           ) : (
             <section className="mt-6 rounded-lg border border-border/60 p-4">
-              <h2 className="text-sm font-semibold mb-4">{t("notes.inviteMember")}</h2>
+              <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
               <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
                 <Input
                   value={memberEmail}
@@ -159,9 +154,7 @@ const NoteMembers: React.FC = () => {
                 />
                 <Select
                   value={memberRole}
-                  onValueChange={(value) =>
-                    setMemberRole(value as NoteMemberRole)
-                  }
+                  onValueChange={(value) => setMemberRole(value as NoteMemberRole)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t("notes.role")} />
@@ -181,9 +174,7 @@ const NoteMembers: React.FC = () => {
                 {isMembersLoading ? (
                   <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
                 ) : members.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t("notes.noMembersYet")}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t("notes.noMembersYet")}</p>
                 ) : (
                   members.map((member) => (
                     <div
@@ -195,10 +186,7 @@ const NoteMembers: React.FC = () => {
                         <Select
                           value={member.role}
                           onValueChange={(value) =>
-                            handleUpdateMemberRole(
-                              member.memberEmail,
-                              value as NoteMemberRole
-                            )
+                            handleUpdateMemberRole(member.memberEmail, value as NoteMemberRole)
                           }
                         >
                           <SelectTrigger className="w-32">
@@ -206,10 +194,7 @@ const NoteMembers: React.FC = () => {
                           </SelectTrigger>
                           <SelectContent>
                             {memberRoleOptions.map((option) => (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value}
-                              >
+                              <SelectItem key={option.value} value={option.value}>
                                 {option.label}
                               </SelectItem>
                             ))}

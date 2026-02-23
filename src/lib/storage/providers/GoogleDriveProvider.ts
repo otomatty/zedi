@@ -89,16 +89,11 @@ export class GoogleDriveProvider implements StorageProviderInterface {
       JSON.stringify(metadata);
 
     const filePart =
-      delimiter +
-      `Content-Type: ${file.type}\r\n` +
-      "Content-Transfer-Encoding: base64\r\n\r\n";
+      delimiter + `Content-Type: ${file.type}\r\n` + "Content-Transfer-Encoding: base64\r\n\r\n";
 
     // Base64エンコード
     const base64 = btoa(
-      new Uint8Array(fileBuffer).reduce(
-        (data, byte) => data + String.fromCharCode(byte),
-        ""
-      )
+      new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
     );
 
     const requestBody = metadataPart + filePart + base64 + closeDelimiter;
@@ -113,7 +108,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
           "Content-Type": `multipart/related; boundary=${boundary}`,
         },
         body: requestBody,
-      }
+      },
     );
 
     // トークンが期限切れの場合はリフレッシュして再試行
@@ -128,7 +123,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
             "Content-Type": `multipart/related; boundary=${boundary}`,
           },
           body: requestBody,
-        }
+        },
       );
     }
 
@@ -137,7 +132,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
       throw new Error(
         `Google Drive upload failed: ${response.status} ${
           errorData.error?.message || response.statusText
-        }`
+        }`,
       );
     }
 
@@ -205,15 +200,12 @@ export class GoogleDriveProvider implements StorageProviderInterface {
     }
     const fileId = match[1];
 
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-        },
-      }
-    );
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+    });
 
     if (!response.ok && response.status !== 404) {
       throw new Error(`Failed to delete file: ${response.status}`);
@@ -226,14 +218,11 @@ export class GoogleDriveProvider implements StorageProviderInterface {
   async testConnection(): Promise<ConnectionTestResult> {
     try {
       // ユーザー情報を取得してアクセス確認
-      const response = await fetch(
-        "https://www.googleapis.com/drive/v3/about?fields=user",
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        }
-      );
+      const response = await fetch("https://www.googleapis.com/drive/v3/about?fields=user", {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+      });
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -243,13 +232,10 @@ export class GoogleDriveProvider implements StorageProviderInterface {
               await this.refreshAccessToken();
               return {
                 success: true,
-                message:
-                  "Google Driveへの接続に成功しました（トークンを更新しました）",
+                message: "Google Driveへの接続に成功しました（トークンを更新しました）",
               };
             } catch {
-              throw new Error(
-                "認証の更新に失敗しました。再認証が必要です。"
-              );
+              throw new Error("認証の更新に失敗しました。再認証が必要です。");
             }
           }
           throw new Error("認証に失敗しました。再認証が必要です。");
@@ -276,9 +262,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
    * OAuth2認証URLを生成
    */
   static getAuthUrl(clientId: string, redirectUri: string): string {
-    const scope = encodeURIComponent(
-      "https://www.googleapis.com/auth/drive.file"
-    );
+    const scope = encodeURIComponent("https://www.googleapis.com/auth/drive.file");
     return (
       `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${clientId}&` +
@@ -297,7 +281,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
     code: string,
     clientId: string,
     clientSecret: string,
-    redirectUri: string
+    redirectUri: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",

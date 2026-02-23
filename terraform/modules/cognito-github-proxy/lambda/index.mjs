@@ -28,7 +28,11 @@ export async function handler(event) {
   const baseUrl = getBaseUrl(event.requestContext);
 
   // GET /.well-known/openid-configuration
-  if (method === "GET" && (path === "/.well-known/openid-configuration" || path.endsWith(".well-known/openid-configuration"))) {
+  if (
+    method === "GET" &&
+    (path === "/.well-known/openid-configuration" ||
+      path.endsWith(".well-known/openid-configuration"))
+  ) {
     return json({
       issuer: baseUrl,
       authorization_endpoint: "https://github.com/login/oauth/authorize",
@@ -41,7 +45,10 @@ export async function handler(event) {
   }
 
   // GET /.well-known/jwks.json (Cognito may request; GitHub OAuth does not use JWTs for user endpoint)
-  if (method === "GET" && (path === "/.well-known/jwks.json" || path.endsWith(".well-known/jwks.json"))) {
+  if (
+    method === "GET" &&
+    (path === "/.well-known/jwks.json" || path.endsWith(".well-known/jwks.json"))
+  ) {
     return json({ keys: [] });
   }
 
@@ -67,10 +74,14 @@ export async function handler(event) {
       return json({ error: "invalid_request", error_description: "missing code" }, 400);
     }
     if (!client_id || !client_secret) {
-      return json({
-        error: "invalid_request",
-        error_description: "GitHub proxy missing client_id or client_secret (set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Lambda env)",
-      }, 400);
+      return json(
+        {
+          error: "invalid_request",
+          error_description:
+            "GitHub proxy missing client_id or client_secret (set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Lambda env)",
+        },
+        400,
+      );
     }
 
     const res = await fetch(GITHUB_TOKEN_URL, {
@@ -86,7 +97,10 @@ export async function handler(event) {
 
     const data = await res.json().catch(() => ({}));
     if (data.error) {
-      return json({ error: data.error, error_description: data.error_description || "token exchange failed" }, 400);
+      return json(
+        { error: data.error, error_description: data.error_description || "token exchange failed" },
+        400,
+      );
     }
     return json(data);
   }
@@ -96,7 +110,10 @@ export async function handler(event) {
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
     const token = auth.replace(/^Bearer\s+/i, "").trim();
     if (!token) {
-      return json({ error: "unauthorized", error_description: "missing Authorization header" }, 401);
+      return json(
+        { error: "unauthorized", error_description: "missing Authorization header" },
+        401,
+      );
     }
 
     const res = await fetch(GITHUB_USER_URL, {

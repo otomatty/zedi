@@ -89,7 +89,7 @@ export const MonthNavigation: React.FC = () => {
   };
 
   return (
-    <div className="hidden sm:flex items-center gap-1.5">
+    <div className="hidden items-center gap-1.5 sm:flex">
       <Button
         variant="ghost"
         size="icon"
@@ -105,7 +105,7 @@ export const MonthNavigation: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-9 min-w-[110px] font-medium text-muted-foreground hover:text-foreground text-sm"
+            className="h-9 min-w-[110px] text-sm font-medium text-muted-foreground hover:text-foreground"
             aria-label={t("home.period.selectMonth")}
           >
             <span className="text-center">{displayLabel}</span>

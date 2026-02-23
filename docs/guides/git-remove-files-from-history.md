@@ -64,19 +64,19 @@ git filter-repo --version
 
 このリポジトリで履歴から外したいファイルは以下です。
 
-| 種類 | パス |
-|------|------|
-| Lambda zip | `terraform/modules/ai-api/lambda.zip` |
-| | `terraform/modules/api/lambda.zip` |
-| | `terraform/modules/subscription/lambda.zip` |
-| | `terraform/modules/thumbnail-api/lambda.zip` |
-| Terraform plan | `terraform/tfplan` |
-| | `terraform/tfplan-api` |
-| | `terraform/tfplan-cdn` |
-| | `terraform/tfplan-cdn2` |
-| | `terraform/tfplan-custom-domain` |
-| | `terraform/tfplan-scalezero` |
-| | `terraform/tfplan-ws` |
+| 種類           | パス                                         |
+| -------------- | -------------------------------------------- |
+| Lambda zip     | `terraform/modules/ai-api/lambda.zip`        |
+|                | `terraform/modules/api/lambda.zip`           |
+|                | `terraform/modules/subscription/lambda.zip`  |
+|                | `terraform/modules/thumbnail-api/lambda.zip` |
+| Terraform plan | `terraform/tfplan`                           |
+|                | `terraform/tfplan-api`                       |
+|                | `terraform/tfplan-cdn`                       |
+|                | `terraform/tfplan-cdn2`                      |
+|                | `terraform/tfplan-custom-domain`             |
+|                | `terraform/tfplan-scalezero`                 |
+|                | `terraform/tfplan-ws`                        |
 
 ---
 

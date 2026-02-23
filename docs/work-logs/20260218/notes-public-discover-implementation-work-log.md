@@ -40,48 +40,48 @@ SCHEMA_FILE=007_notes_official_and_view_count.sql node apply-data-api.mjs
 
 ### Phase 1: 型定義
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `src/types/note.ts` | `NoteEditPermission` 追加。`Note` に `editPermission`, `isOfficial`, `viewCount`。`NoteAccess` に `editPermission`, `canAddPage`, `canDeletePage(addedByUserId)`。 |
-| `src/lib/api/types.ts` | `NoteListItem` / `GetNoteResponse` に `edit_permission`, `is_official`, `view_count`。`GetNoteResponse.current_user_role` に `"guest"`。`DiscoverResponse`, `DiscoverNoteItem` 追加。 |
-| `src/lib/noteRepository.ts` | `rowToNote` に新カラム反映。`buildAccess` に `canAddPage`, `canDeletePage`, `editPermission`。 |
-| `src/hooks/useNoteQueries.ts` | `apiNoteToNote` / `apiNoteToNoteSummary` に新フィールド。`buildAccessFromApi` を guest・canAddPage・canDeletePage 対応に。 |
+| ファイル                      | 変更内容                                                                                                                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/types/note.ts`           | `NoteEditPermission` 追加。`Note` に `editPermission`, `isOfficial`, `viewCount`。`NoteAccess` に `editPermission`, `canAddPage`, `canDeletePage(addedByUserId)`。                    |
+| `src/lib/api/types.ts`        | `NoteListItem` / `GetNoteResponse` に `edit_permission`, `is_official`, `view_count`。`GetNoteResponse.current_user_role` に `"guest"`。`DiscoverResponse`, `DiscoverNoteItem` 追加。 |
+| `src/lib/noteRepository.ts`   | `rowToNote` に新カラム反映。`buildAccess` に `canAddPage`, `canDeletePage`, `editPermission`。                                                                                        |
+| `src/hooks/useNoteQueries.ts` | `apiNoteToNote` / `apiNoteToNoteSummary` に新フィールド。`buildAccessFromApi` を guest・canAddPage・canDeletePage 対応に。                                                            |
 
 ### Phase 2: バックエンド API
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `terraform/modules/api/lambda/router.mjs` | 認証オプションルート（GET notes/discover, GET notes/:id）。`getDiscover` を discover 用に先マッチ。 |
+| ファイル                                          | 変更内容                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `terraform/modules/api/lambda/router.mjs`         | 認証オプションルート（GET notes/discover, GET notes/:id）。`getDiscover` を discover 用に先マッチ。                                                                                                                                                                       |
 | `terraform/modules/api/lambda/handlers/notes.mjs` | ゲスト閲覧（public/unlisted）、view_count インクリメント、`getDiscover`、`canAddPage`・ページ追加時の owner_id 分岐、`removeNotePage` の削除権限（オーナー全削除可・editor は自分追加分のみ）、createNote/updateNote の edit_permission、listNotes の返却フィールド追加。 |
-| `server/hocuspocus/src/index.ts` | `canEditNotePage` に `edit_permission = 'any_logged_in'` かつ public/unlisted のときログイン済みを編集可に。 |
+| `server/hocuspocus/src/index.ts`                  | `canEditNotePage` に `edit_permission = 'any_logged_in'` かつ public/unlisted のときログイン済みを編集可に。                                                                                                                                                              |
 
 ### Phase 3: フロント API クライアント・権限・2軸 UI
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `src/lib/api/apiClient.ts` | `requestOptionalAuth`、`getPublicNotes` 追加。`getNote` を認証オプションに。createNote/updateNote の body に `edit_permission`。 |
+| ファイル                      | 変更内容                                                                                                                                                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/api/apiClient.ts`    | `requestOptionalAuth`、`getPublicNotes` 追加。`getNote` を認証オプションに。createNote/updateNote の body に `edit_permission`。                                                                                                                        |
 | `src/hooks/useNoteQueries.ts` | `useNote` の enabled から isSignedIn 削除。`usePublicNotes`、`mapDiscoverItemToNoteSummary` 追加。`useCreateNote`/`useUpdateNote` に editPermission。`useAddPageToNote` に title。`useNotePages` の戻りを `NotePageSummary[]`（addedByUserId 付き）に。 |
-| `src/pages/Notes.tsx` | 作成ダイアログに edit_permission と visibility の組み合わせ制約。 |
-| `src/pages/NoteSettings.tsx` | edit_permission の変更 UI と組み合わせ制約。 |
-| `src/pages/NoteView.tsx` | ページ追加を canEdit \|\| canAddPage で表示。削除を canDeletePage(page.addedByUserId) で表示。新規ページ追加（title）フォーム、公式バッジ、未ログイン時「ログインして投稿」。 |
+| `src/pages/Notes.tsx`         | 作成ダイアログに edit_permission と visibility の組み合わせ制約。                                                                                                                                                                                       |
+| `src/pages/NoteSettings.tsx`  | edit_permission の変更 UI と組み合わせ制約。                                                                                                                                                                                                            |
+| `src/pages/NoteView.tsx`      | ページ追加を canEdit \|\| canAddPage で表示。削除を canDeletePage(page.addedByUserId) で表示。新規ページ追加（title）フォーム、公式バッジ、未ログイン時「ログインして投稿」。                                                                           |
 
 ### Phase 4: /notes タブ + Discover
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `src/App.tsx` | `/notes/discover` を Public ルートで追加（/notes より前）。 |
+| ファイル                              | 変更内容                                                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `src/App.tsx`                         | `/notes/discover` を Public ルートで追加（/notes より前）。                                              |
 | `src/components/note/NotesLayout.tsx` | **新規**。タブ「参加中のノート」「公開ノート」。未ログインで「参加中のノート」クリック時は /sign-in へ。 |
-| `src/pages/Notes.tsx` | `NotesLayout` でラップ。参加中ノートのみ表示。 |
-| `src/pages/NotesDiscover.tsx` | **新規**。公式セクション + 公開ノート（更新順/人気順）。 |
-| `src/components/note/NoteCard.tsx` | `note.isOfficial` のとき公式バッジ表示。 |
+| `src/pages/Notes.tsx`                 | `NotesLayout` でラップ。参加中ノートのみ表示。                                                           |
+| `src/pages/NotesDiscover.tsx`         | **新規**。公式セクション + 公開ノート（更新順/人気順）。                                                 |
+| `src/components/note/NoteCard.tsx`    | `note.isOfficial` のとき公式バッジ表示。                                                                 |
 
 ### Phase 6: i18n・バッジ
 
-| ファイル | 変更内容 |
-|----------|----------|
-| `src/i18n/locales/en/notes.json` | editPermission, tabMyNotes, tabDiscover, officialBadge, sortUpdated, sortPopular, sectionOfficial, sectionPublicNotes, loginToPost, loginToViewMyNotes, addNewPageToNote, newPageTitle, viewCount を追加。 |
-| `src/i18n/locales/ja/notes.json` | 上記キーの日本語を追加。 |
-| `src/components/note/NoteVisibilityBadge.tsx` | ラベルを useTranslation のキーに変更。 |
+| ファイル                                      | 変更内容                                                                                                                                                                                                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/i18n/locales/en/notes.json`              | editPermission, tabMyNotes, tabDiscover, officialBadge, sortUpdated, sortPopular, sectionOfficial, sectionPublicNotes, loginToPost, loginToViewMyNotes, addNewPageToNote, newPageTitle, viewCount を追加。 |
+| `src/i18n/locales/ja/notes.json`              | 上記キーの日本語を追加。                                                                                                                                                                                   |
+| `src/components/note/NoteVisibilityBadge.tsx` | ラベルを useTranslation のキーに変更。                                                                                                                                                                     |
 
 ---
 

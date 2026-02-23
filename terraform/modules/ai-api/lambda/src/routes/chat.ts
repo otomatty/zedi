@@ -11,11 +11,7 @@ import type {
   TokenUsage,
 } from "../types/index.js";
 import { getAISecrets, getRequiredSecret } from "../lib/secrets.js";
-import {
-  checkUsage,
-  recordUsage,
-  validateModelAccess,
-} from "../services/usageService.js";
+import { checkUsage, recordUsage, validateModelAccess } from "../services/usageService.js";
 import {
   fetchOpenAI,
   fetchAnthropic,
@@ -57,10 +53,7 @@ function validateRequest(body: unknown): AIChatRequest {
 // Provider API key resolution
 // =============================================================================
 
-async function getProviderKey(
-  provider: AIProviderType,
-  env: EnvConfig
-): Promise<string> {
+async function getProviderKey(provider: AIProviderType, env: EnvConfig): Promise<string> {
   const secrets = await getAISecrets(env.AI_SECRETS_ARN);
   switch (provider) {
     case "openai":
@@ -81,7 +74,7 @@ async function getProviderKey(
 export async function handleChat(
   userId: string,
   body: unknown,
-  env: EnvConfig
+  env: EnvConfig,
 ): Promise<AIChatResponse> {
   const request = validateRequest(body);
   const modelId = resolveModelId(request.provider, request.model);
@@ -124,7 +117,7 @@ export async function handleChat(
       tokenUsage: result.tokenUsage,
       apiMode: "system",
     },
-    env
+    env,
   );
 
   return {
@@ -148,7 +141,7 @@ export async function handleChatStreaming(
   body: unknown,
   env: EnvConfig,
   sendFn: (payload: SSEPayload) => void | Promise<void>,
-  onEnd?: () => void
+  onEnd?: () => void,
 ): Promise<void> {
   try {
     const request = validateRequest(body);
@@ -197,7 +190,7 @@ export async function handleChatStreaming(
         tokenUsage,
         apiMode: "system",
       },
-      env
+      env,
     );
 
     // Send final usage info

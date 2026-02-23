@@ -1,15 +1,15 @@
-import { Hocuspocus } from '@hocuspocus/server';
-import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { WebSocketServer } from 'ws';
-import { CognitoJwtVerifier } from 'aws-jwt-verify';
-import { Redis } from '@hocuspocus/extension-redis';
-import { Pool, PoolClient } from 'pg';
-import * as Y from 'yjs';
+import { Hocuspocus } from "@hocuspocus/server";
+import { createServer, IncomingMessage, ServerResponse } from "http";
+import { WebSocketServer } from "ws";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
+import { Redis } from "@hocuspocus/extension-redis";
+import { Pool, PoolClient } from "pg";
+import * as Y from "yjs";
 
-const PORT = parseInt(process.env.PORT || '1234', 10);
+const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
-const COGNITO_REGION = process.env.COGNITO_REGION || process.env.AWS_REGION || 'ap-northeast-1';
+const COGNITO_REGION = process.env.COGNITO_REGION || process.env.AWS_REGION || "ap-northeast-1";
 const DATABASE_URL = process.env.DATABASE_URL;
 const DB_CREDENTIALS_JSON = process.env.DB_CREDENTIALS_JSON;
 
@@ -33,21 +33,20 @@ type DbCredentialPayload = {
   dbname?: string;
 };
 
-const cognitoVerifier =
-  COGNITO_USER_POOL_ID
-    ? CognitoJwtVerifier.create({
-        userPoolId: COGNITO_USER_POOL_ID,
-        tokenUse: 'id',
-        clientId: null, // 署名・有効期限のみ検証（clientId は未チェック）
-      })
-    : null;
+const cognitoVerifier = COGNITO_USER_POOL_ID
+  ? CognitoJwtVerifier.create({
+      userPoolId: COGNITO_USER_POOL_ID,
+      tokenUse: "id",
+      clientId: null, // 署名・有効期限のみ検証（clientId は未チェック）
+    })
+  : null;
 
 let pgPool: Pool | null = null;
 const documentConnectionCounts = new Map<string, number>();
 
 function parsePageId(documentName: string): string | null {
-  if (!documentName.startsWith('page-')) return null;
-  const pageId = documentName.slice('page-'.length).trim();
+  if (!documentName.startsWith("page-")) return null;
+  const pageId = documentName.slice("page-".length).trim();
   return pageId.length > 0 ? pageId : null;
 }
 
@@ -64,13 +63,13 @@ function parseDbCredentialsFromSecret(): string | null {
     const db = encodeURIComponent(payload.dbname);
     return `postgresql://${user}:${pass}@${payload.host}:${port}/${db}`;
   } catch (error) {
-    console.error('[DB] Failed to parse DB_CREDENTIALS_JSON:', error);
+    console.error("[DB] Failed to parse DB_CREDENTIALS_JSON:", error);
     return null;
   }
 }
 
 function resolveDatabaseUrl(): string | null {
-  if (DATABASE_URL && DATABASE_URL.includes('://')) {
+  if (DATABASE_URL && DATABASE_URL.includes("://")) {
     return DATABASE_URL;
   }
   return parseDbCredentialsFromSecret();
@@ -81,7 +80,7 @@ function getPool(): Pool {
   const connectionString = resolveDatabaseUrl();
   if (!connectionString) {
     throw new Error(
-      'Database connection is not configured. Set DATABASE_URL (postgres URL) or DB_CREDENTIALS_JSON (Secrets Manager JSON).'
+      "Database connection is not configured. Set DATABASE_URL (postgres URL) or DB_CREDENTIALS_JSON (Secrets Manager JSON).",
     );
   }
   pgPool = new Pool({
@@ -98,8 +97,8 @@ function getPool(): Pool {
  */
 async function getCurrentUserBySub(client: PoolClient, cognitoSub: string): Promise<DbUser | null> {
   const result = await client.query<{ id: string; email: string }>(
-    'SELECT id, email FROM users WHERE cognito_sub = $1 LIMIT 1',
-    [cognitoSub]
+    "SELECT id, email FROM users WHERE cognito_sub = $1 LIMIT 1",
+    [cognitoSub],
   );
   const row = result.rows[0];
   if (!row?.id || !row?.email) return null;
@@ -130,23 +129,28 @@ async function canEditNotePage(client: PoolClient, pageId: string, user: DbUser)
         )
       LIMIT 1
     `,
-    [pageId, user.id, user.email]
+    [pageId, user.id, user.email],
   );
   return result.rows.length > 0;
 }
 
 async function pageBelongsToAnyNote(client: PoolClient, pageId: string): Promise<boolean> {
-  const result = await client.query('SELECT 1 FROM note_pages WHERE page_id = $1 AND is_deleted = FALSE LIMIT 1', [
-    pageId,
-  ]);
+  const result = await client.query(
+    "SELECT 1 FROM note_pages WHERE page_id = $1 AND is_deleted = FALSE LIMIT 1",
+    [pageId],
+  );
   return result.rows.length > 0;
 }
 
-async function isPersonalPageOwner(client: PoolClient, pageId: string, userId: string): Promise<boolean> {
-  const result = await client.query('SELECT 1 FROM pages WHERE id = $1 AND owner_id = $2 AND is_deleted = FALSE LIMIT 1', [
-    pageId,
-    userId,
-  ]);
+async function isPersonalPageOwner(
+  client: PoolClient,
+  pageId: string,
+  userId: string,
+): Promise<boolean> {
+  const result = await client.query(
+    "SELECT 1 FROM pages WHERE id = $1 AND owner_id = $2 AND is_deleted = FALSE LIMIT 1",
+    [pageId, userId],
+  );
   return result.rows.length > 0;
 }
 
@@ -155,7 +159,7 @@ async function assertEditPermission(pageId: string, cognitoSub: string): Promise
   try {
     const currentUser = await getCurrentUserBySub(client, cognitoSub);
     if (!currentUser) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     if (await canEditNotePage(client, pageId, currentUser)) {
@@ -164,14 +168,14 @@ async function assertEditPermission(pageId: string, cognitoSub: string): Promise
 
     const isShared = await pageBelongsToAnyNote(client, pageId);
     if (isShared) {
-      throw new Error('Forbidden');
+      throw new Error("Forbidden");
     }
 
     if (await isPersonalPageOwner(client, pageId, currentUser.id)) {
       return;
     }
 
-    throw new Error('Forbidden');
+    throw new Error("Forbidden");
   } finally {
     client.release();
   }
@@ -181,8 +185,8 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
   const client = await getPool().connect();
   try {
     const result = await client.query<{ ydoc_state: Buffer }>(
-      'SELECT ydoc_state FROM page_contents WHERE page_id = $1 LIMIT 1',
-      [pageId]
+      "SELECT ydoc_state FROM page_contents WHERE page_id = $1 LIMIT 1",
+      [pageId],
     );
     const doc = new Y.Doc();
     const row = result.rows[0];
@@ -208,7 +212,7 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
               version = page_contents.version + 1,
               updated_at = NOW()
       `,
-      [pageId, encodedState]
+      [pageId, encodedState],
     );
   } finally {
     client.release();
@@ -224,7 +228,7 @@ function parseRedisOptions(redisUrl: string): Record<string, unknown> {
   if (parsed.password) {
     options.password = decodeURIComponent(parsed.password);
   }
-  if (parsed.protocol === 'rediss:') {
+  if (parsed.protocol === "rediss:") {
     options.tls = {};
   }
   return options;
@@ -235,14 +239,14 @@ if (REDIS_URL) {
   try {
     const redisOptions = parseRedisOptions(REDIS_URL);
     extensions.push(new Redis(redisOptions as never));
-    console.log('[Redis] Extension enabled');
+    console.log("[Redis] Extension enabled");
   } catch (error) {
-    console.error('[Redis] Invalid REDIS_URL; Redis extension disabled:', error);
+    console.error("[Redis] Invalid REDIS_URL; Redis extension disabled:", error);
   }
 }
 
 const hocuspocus = new Hocuspocus({
-  name: 'zedi-hocuspocus',
+  name: "zedi-hocuspocus",
   extensions,
 
   // デバウンス設定（ドキュメント保存の頻度制御）
@@ -253,28 +257,28 @@ const hocuspocus = new Hocuspocus({
   timeout: 30000,
 
   async onAuthenticate({ token, documentName }) {
-    console.log(`[Auth] Document: ${documentName}, Token: ${token ? 'provided' : 'none'}`);
+    console.log(`[Auth] Document: ${documentName}, Token: ${token ? "provided" : "none"}`);
 
     if (cognitoVerifier) {
       if (!token) {
-        throw new Error('Authentication required');
+        throw new Error("Authentication required");
       }
       let payload: Record<string, unknown>;
       try {
         payload = (await cognitoVerifier.verify(token)) as Record<string, unknown>;
       } catch (err) {
-        console.warn('[Auth] Cognito JWT verification failed:', err);
-        throw new Error('Invalid token');
+        console.warn("[Auth] Cognito JWT verification failed:", err);
+        throw new Error("Invalid token");
       }
 
       const sub = payload.sub as string;
-      const name = (payload.name as string) || (payload['cognito:username'] as string) || sub;
+      const name = (payload.name as string) || (payload["cognito:username"] as string) || sub;
       const pageId = parsePageId(documentName);
       if (!pageId) {
-        throw new Error('Invalid document name');
+        throw new Error("Invalid document name");
       }
       await assertEditPermission(pageId, sub);
-      const email = typeof payload.email === 'string' ? payload.email : undefined;
+      const email = typeof payload.email === "string" ? payload.email : undefined;
       const user: AuthenticatedUser = {
         id: sub,
         name,
@@ -285,7 +289,7 @@ const hocuspocus = new Hocuspocus({
     }
 
     // 開発用: Cognito 未設定時は全許可
-    return { user: { id: 'dev-user', name: 'Developer' } };
+    return { user: { id: "dev-user", name: "Developer" } };
   },
 
   async onConnect({ documentName }) {
@@ -344,65 +348,67 @@ const hocuspocus = new Hocuspocus({
 // カスタムHTTPサーバー（ヘルスチェック用）
 const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
   // ヘルスチェックエンドポイント
-  if (req.url === '/health' || req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'healthy',
-      service: 'zedi-hocuspocus',
-      timestamp: new Date().toISOString(),
-      connections: hocuspocus.getConnectionsCount(),
-      documents: hocuspocus.getDocumentsCount(),
-    }));
+  if (req.url === "/health" || req.url === "/") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "healthy",
+        service: "zedi-hocuspocus",
+        timestamp: new Date().toISOString(),
+        connections: hocuspocus.getConnectionsCount(),
+        documents: hocuspocus.getDocumentsCount(),
+      }),
+    );
     return;
   }
 
   // その他のリクエストは404
-  res.writeHead(404, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ error: 'Not Found' }));
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Not Found" }));
 });
 
 // WebSocketサーバーをHTTPサーバーにアタッチ
 const wss = new WebSocketServer({ server: httpServer });
 
 // WebSocket接続をHocuspocusに渡す
-wss.on('connection', (socket, request) => {
+wss.on("connection", (socket, request) => {
   hocuspocus.handleConnection(socket, request);
 });
 
 // サーバー起動
 httpServer.listen(PORT, () => {
-  console.log('========================================');
-  console.log('  Zedi Hocuspocus Server Started');
-  console.log('========================================');
+  console.log("========================================");
+  console.log("  Zedi Hocuspocus Server Started");
+  console.log("========================================");
   console.log(`  Port:         ${PORT}`);
   console.log(`  Health:       http://localhost:${PORT}/health`);
   console.log(`  WebSocket:    ws://localhost:${PORT}`);
-  console.log(`  Redis:        ${REDIS_URL ? 'Enabled' : 'Disabled'}`);
-  console.log(`  Environment:  ${process.env.NODE_ENV || 'development'}`);
-  console.log('========================================');
+  console.log(`  Redis:        ${REDIS_URL ? "Enabled" : "Disabled"}`);
+  console.log(`  Environment:  ${process.env.NODE_ENV || "development"}`);
+  console.log("========================================");
 });
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('[Shutdown] SIGTERM received, closing server...');
+process.on("SIGTERM", async () => {
+  console.log("[Shutdown] SIGTERM received, closing server...");
   hocuspocus.closeConnections();
   if (pgPool) {
     await pgPool.end();
   }
   httpServer.close(() => {
-    console.log('[Shutdown] Server closed');
+    console.log("[Shutdown] Server closed");
     process.exit(0);
   });
 });
 
-process.on('SIGINT', async () => {
-  console.log('[Shutdown] SIGINT received, closing server...');
+process.on("SIGINT", async () => {
+  console.log("[Shutdown] SIGINT received, closing server...");
   hocuspocus.closeConnections();
   if (pgPool) {
     await pgPool.end();
   }
   httpServer.close(() => {
-    console.log('[Shutdown] Server closed');
+    console.log("[Shutdown] Server closed");
     process.exit(0);
   });
 });

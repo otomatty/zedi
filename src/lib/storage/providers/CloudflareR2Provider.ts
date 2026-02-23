@@ -46,7 +46,7 @@ export class CloudflareR2Provider implements StorageProviderInterface {
 
   /**
    * 画像をR2にアップロード
-   * 
+   *
    * 注意: ブラウザから直接S3互換APIを呼び出すにはCORS設定が必要です。
    * 実運用では、Cloudflare WorkerをプロキシとしてAPIを呼び出すことを推奨します。
    */
@@ -73,9 +73,7 @@ export class CloudflareR2Provider implements StorageProviderInterface {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      throw new Error(
-        `Cloudflare R2 upload failed: ${response.status} ${errorText}`
-      );
+      throw new Error(`Cloudflare R2 upload failed: ${response.status} ${errorText}`);
     }
 
     // 公開URLを返す
@@ -123,17 +121,21 @@ export class CloudflareR2Provider implements StorageProviderInterface {
 
   /**
    * AWS Signature Version 4 を使用したリクエスト署名
-   * 
+   *
    * 注意: これは簡略化した実装です。
    * 実運用では aws4 ライブラリの使用を推奨します。
    */
   private async signRequest(
     method: string,
     url: string,
-    body?: File
+    body?: File,
   ): Promise<Record<string, string>> {
     const now = new Date();
-    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "").slice(0, 15) + "Z";
+    const amzDate =
+      now
+        .toISOString()
+        .replace(/[:-]|\.\d{3}/g, "")
+        .slice(0, 15) + "Z";
     const dateStamp = amzDate.slice(0, 8);
 
     const region = "auto";
@@ -149,14 +151,13 @@ export class CloudflareR2Provider implements StorageProviderInterface {
     const credential = `${this.accessKeyId}/${dateStamp}/${region}/${service}/aws4_request`;
 
     // 署名付きヘッダー
-    const signedHeaders = Object.keys(headers)
-      .sort()
-      .join(";");
+    const signedHeaders = Object.keys(headers).sort().join(";");
 
     // Authorization ヘッダー
     // 注意: 実際のAWS SigV4署名はもっと複雑です
     // ブラウザでの実装には制限があるため、Workerを推奨
-    headers["Authorization"] = `AWS4-HMAC-SHA256 Credential=${credential}, SignedHeaders=${signedHeaders}, Signature=placeholder`;
+    headers["Authorization"] =
+      `AWS4-HMAC-SHA256 Credential=${credential}, SignedHeaders=${signedHeaders}, Signature=placeholder`;
 
     return headers;
   }

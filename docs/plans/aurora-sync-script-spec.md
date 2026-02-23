@@ -25,12 +25,12 @@ bun run sync:aurora:dev [options]
 
 ### 2.2 オプション
 
-| オプション | 説明 | デフォルト |
-|-----------|------|------------|
-| `--dry-run` | 実際の書き込みを行わず、同期対象件数などのみ表示 | false |
-| `--verbose` | 詳細ログ（対象ページIDやスキップ理由など）を表示 | false |
-| `--direction <dir>` | 同期方向: `prod-to-dev` \| `dev-to-prod` \| `bidirectional` | 設定ファイルの syncOptions.direction |
-| `--config <path>` | マッピング設定ファイルのパス | `scripts/sync/dev-user-mapping-aurora.json` |
+| オプション          | 説明                                                        | デフォルト                                  |
+| ------------------- | ----------------------------------------------------------- | ------------------------------------------- |
+| `--dry-run`         | 実際の書き込みを行わず、同期対象件数などのみ表示            | false                                       |
+| `--verbose`         | 詳細ログ（対象ページIDやスキップ理由など）を表示            | false                                       |
+| `--direction <dir>` | 同期方向: `prod-to-dev` \| `dev-to-prod` \| `bidirectional` | 設定ファイルの syncOptions.direction        |
+| `--config <path>`   | マッピング設定ファイルのパス                                | `scripts/sync/dev-user-mapping-aurora.json` |
 
 ### 2.3 終了コード
 
@@ -81,15 +81,15 @@ interface Config {
 
 ## 4. 環境変数
 
-| 変数名 | 必須 | 説明 |
-|--------|------|------|
-| `PROD_AURORA_CLUSTER_ARN` | 本番→開発 or 双方向で本番を読む場合 | 本番 Aurora クラスター ARN |
-| `PROD_AURORA_SECRET_ARN` | 上に同じ | 本番 DB 認証情報の Secrets Manager ARN |
-| `DEV_AURORA_CLUSTER_ARN` | 常に（開発を読む or 書く） | 開発 Aurora クラスター ARN |
-| `DEV_AURORA_SECRET_ARN` | 常に | 開発 DB 認証情報の Secrets Manager ARN |
-| `PROD_AURORA_DATABASE` | 任意 | 本番 DB 名。省略時 `zedi` |
-| `DEV_AURORA_DATABASE` | 任意 | 開発 DB 名。省略時 `zedi` |
-| `AWS_REGION` | 任意 | RDS Data API のリージョン。省略時 `ap-northeast-1` |
+| 変数名                    | 必須                                | 説明                                               |
+| ------------------------- | ----------------------------------- | -------------------------------------------------- |
+| `PROD_AURORA_CLUSTER_ARN` | 本番→開発 or 双方向で本番を読む場合 | 本番 Aurora クラスター ARN                         |
+| `PROD_AURORA_SECRET_ARN`  | 上に同じ                            | 本番 DB 認証情報の Secrets Manager ARN             |
+| `DEV_AURORA_CLUSTER_ARN`  | 常に（開発を読む or 書く）          | 開発 Aurora クラスター ARN                         |
+| `DEV_AURORA_SECRET_ARN`   | 常に                                | 開発 DB 認証情報の Secrets Manager ARN             |
+| `PROD_AURORA_DATABASE`    | 任意                                | 本番 DB 名。省略時 `zedi`                          |
+| `DEV_AURORA_DATABASE`     | 任意                                | 開発 DB 名。省略時 `zedi`                          |
+| `AWS_REGION`              | 任意                                | RDS Data API のリージョン。省略時 `ap-northeast-1` |
 
 ---
 
@@ -108,17 +108,17 @@ interface Config {
 
 ### 5.3 テーブル別同期順序とルール
 
-| 順序 | テーブル | 内容 |
-|------|----------|------|
-| 1 | users | ターゲットにいなければ upsert（上記で実施済みのため、ここではスキップ可能）。 |
-| 2 | pages | `owner_id = sourceUserId` の行を取得。競合時は conflictResolution に従う。INSERT 時は `owner_id = targetUserId`、`id` はそのまま。 |
-| 3 | page_contents | 上記 pages の `id` 一覧に紐づく行をコピー。`page_id` はそのまま。BYTEA は RDS Data API の blob で受け渡し。 |
-| 4 | notes | `owner_id = sourceUserId` の行をコピー。`owner_id = targetUserId` に差し替え。`id` はそのまま。 |
-| 5 | note_pages | コピーした notes/pages に紐づく行。`added_by_user_id` がソースユーザーなら targetUserId に差し替え。 |
-| 6 | note_members | 上記 notes に紐づく行。`invited_by_user_id` がソースユーザーなら targetUserId に差し替え。 |
-| 7 | links | 対象ユーザーのページを source に持つ行。`source_id`/`target_id` はそのまま。 |
-| 8 | ghost_links | 対象ユーザーのページを `source_page_id` に持つ行。そのままコピー。 |
-| 9 | media | `owner_id = sourceUserId` の行をコピー。`owner_id = targetUserId` に差し替え。 |
+| 順序 | テーブル      | 内容                                                                                                                               |
+| ---- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | users         | ターゲットにいなければ upsert（上記で実施済みのため、ここではスキップ可能）。                                                      |
+| 2    | pages         | `owner_id = sourceUserId` の行を取得。競合時は conflictResolution に従う。INSERT 時は `owner_id = targetUserId`、`id` はそのまま。 |
+| 3    | page_contents | 上記 pages の `id` 一覧に紐づく行をコピー。`page_id` はそのまま。BYTEA は RDS Data API の blob で受け渡し。                        |
+| 4    | notes         | `owner_id = sourceUserId` の行をコピー。`owner_id = targetUserId` に差し替え。`id` はそのまま。                                    |
+| 5    | note_pages    | コピーした notes/pages に紐づく行。`added_by_user_id` がソースユーザーなら targetUserId に差し替え。                               |
+| 6    | note_members  | 上記 notes に紐づく行。`invited_by_user_id` がソースユーザーなら targetUserId に差し替え。                                         |
+| 7    | links         | 対象ユーザーのページを source に持つ行。`source_id`/`target_id` はそのまま。                                                       |
+| 8    | ghost_links   | 対象ユーザーのページを `source_page_id` に持つ行。そのままコピー。                                                                 |
+| 9    | media         | `owner_id = sourceUserId` の行をコピー。`owner_id = targetUserId` に差し替え。                                                     |
 
 ### 5.4 競合解決（pages / notes の updated_at）
 

@@ -7,7 +7,7 @@ import { checkUsage } from "../services/usageService.js";
 
 export async function handleGetUsage(
   userId: string,
-  env: EnvConfig
+  env: EnvConfig,
 ): Promise<{
   usagePercent: number;
   consumedUnits: number;

@@ -17,7 +17,7 @@ interface ModelResponse {
 
 export async function handleGetModels(
   userId: string | undefined,
-  env: EnvConfig
+  env: EnvConfig,
 ): Promise<{ models: ModelResponse[]; tier: string }> {
   const models = await getActiveModels(env);
 

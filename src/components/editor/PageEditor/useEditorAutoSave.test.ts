@@ -1,11 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { renderHook, act } from "@testing-library/react";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEditorAutoSave } from "./useEditorAutoSave";
 import { extractWikiLinksFromContent } from "@/lib/wikiLinkUtils";
 import { createWikiLinkContent } from "@/test/testDatabase";
@@ -36,7 +32,7 @@ describe("useEditorAutoSave", () => {
           onSave,
           onSaveContentOnly,
           syncWikiLinks,
-        })
+        }),
       );
 
       act(() => {
@@ -75,7 +71,7 @@ describe("useEditorAutoSave", () => {
           onSave,
           onSaveContentOnly,
           syncWikiLinks,
-        })
+        }),
       );
 
       act(() => {
@@ -103,7 +99,7 @@ describe("useEditorAutoSave", () => {
           onSave,
           onSaveContentOnly: vi.fn().mockResolvedValue(false),
           syncWikiLinks,
-        })
+        }),
       );
 
       act(() => {
@@ -133,7 +129,7 @@ describe("useEditorAutoSave", () => {
           onSaveContentOnly: vi.fn().mockResolvedValue(true),
           syncWikiLinks: vi.fn().mockResolvedValue(undefined),
           onSaveSuccess,
-        })
+        }),
       );
 
       act(() => {
@@ -159,7 +155,7 @@ describe("useEditorAutoSave", () => {
           onSaveContentOnly: vi.fn().mockResolvedValue(false),
           syncWikiLinks: vi.fn().mockResolvedValue(undefined),
           onSaveSuccess,
-        })
+        }),
       );
 
       act(() => {
@@ -180,12 +176,7 @@ describe("useEditorAutoSave", () => {
       const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
       const userId = "user-1";
       const currentPageId = "page-1";
-      const linkedPagesKey = [
-        ...pageKeys.all,
-        "linkedPages",
-        userId,
-        currentPageId,
-      ];
+      const linkedPagesKey = [...pageKeys.all, "linkedPages", userId, currentPageId];
 
       const useAutoSaveWithInvalidate = () => {
         const client = useQueryClient();

@@ -85,7 +85,7 @@ export function useTitleValidation(options: UseTitleValidationOptions) {
         });
       }, debounceMs);
     },
-    [checkDuplicate, currentPageId, isLoaded, isNewPage, debounceMs]
+    [checkDuplicate, currentPageId, isLoaded, isNewPage, debounceMs],
   );
 
   /**

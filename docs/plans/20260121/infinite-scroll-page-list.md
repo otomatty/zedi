@@ -9,11 +9,11 @@
 
 ## 現状の問題
 
-| 項目 | 現状 | 問題点 |
-|------|------|--------|
-| データ取得 | `getPagesSummary()` で全件取得 | ページ数に比例して遅くなる |
-| ソート | フロント側で `updatedAt` 降順 | 全件メモリに載せる必要がある |
-| 描画 | 全カードを DOM に生成 | 1000件超えると描画負荷大 |
+| 項目       | 現状                           | 問題点                       |
+| ---------- | ------------------------------ | ---------------------------- |
+| データ取得 | `getPagesSummary()` で全件取得 | ページ数に比例して遅くなる   |
+| ソート     | フロント側で `updatedAt` 降順  | 全件メモリに載せる必要がある |
+| 描画       | 全カードを DOM に生成          | 1000件超えると描画負荷大     |
 
 ## 目標
 
@@ -48,6 +48,7 @@
 ```
 
 **実装のポイント:**
+
 - `isFetchingNextPage` が `true` の間、`pages` 配列の末尾にプレースホルダーを追加
 - プレースホルダーは `{ isPlaceholder: true, id: string }` の形式
 - `isPlaceholder()` 型ガードで判定し、スケルトンカード or 実カードを描画
@@ -55,12 +56,12 @@
 
 ## 技術選定
 
-| 要素 | 選定 | 理由 |
-|------|------|------|
-| ページング方式 | **カーソル型** | OFFSET方式より大規模時に高速 |
-| カーソルキー | `updated_at` + `id` 複合 | ユニーク性を保証 |
-| データ取得 | `useInfiniteQuery` | React Query の無限スクロール対応 |
-| 仮想化 | `@tanstack/react-virtual` | 既にインストール済み、軽量 |
+| 要素           | 選定                      | 理由                             |
+| -------------- | ------------------------- | -------------------------------- |
+| ページング方式 | **カーソル型**            | OFFSET方式より大規模時に高速     |
+| カーソルキー   | `updated_at` + `id` 複合  | ユニーク性を保証                 |
+| データ取得     | `useInfiniteQuery`        | React Query の無限スクロール対応 |
+| 仮想化         | `@tanstack/react-virtual` | 既にインストール済み、軽量       |
 
 ## 詳細設計
 
@@ -103,7 +104,7 @@ export type PageGridItem = PageSummary | PageSummaryPlaceholder;
  * プレースホルダーかどうかを判定する型ガード
  */
 export function isPlaceholder(item: PageGridItem): item is PageSummaryPlaceholder {
-  return 'isPlaceholder' in item && item.isPlaceholder === true;
+  return "isPlaceholder" in item && item.isPlaceholder === true;
 }
 ```
 
@@ -175,11 +176,11 @@ async getPagesSummaryPage(
 
 import { useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import type { 
-  PageCursor, 
-  PageSummaryPage, 
+import type {
+  PageCursor,
+  PageSummaryPage,
   PageGridItem,
-  PageSummaryPlaceholder 
+  PageSummaryPlaceholder,
 } from "@/types/page";
 
 // Query keys に追加
@@ -190,7 +191,7 @@ export const pageKeys = {
 
 /**
  * Hook to fetch page summaries with infinite scroll
- * 
+ *
  * 追加読み込み中は末尾にプレースホルダーを追加し、
  * データ取得完了後に実データに置き換わる
  */
@@ -219,13 +220,10 @@ export function usePagesSummaryInfinite(limit: number = 20) {
     if (!query.isFetchingNextPage) return allPages;
 
     // 次のページ読み込み中は、limit 個のプレースホルダーを追加
-    const placeholders: PageSummaryPlaceholder[] = Array.from(
-      { length: limit },
-      (_, i) => ({
-        isPlaceholder: true as const,
-        id: `placeholder-${i}`,
-      })
-    );
+    const placeholders: PageSummaryPlaceholder[] = Array.from({ length: limit }, (_, i) => ({
+      isPlaceholder: true as const,
+      id: `placeholder-${i}`,
+    }));
 
     return [...allPages, ...placeholders];
   }, [allPages, query.isFetchingNextPage, limit]);
@@ -447,7 +445,7 @@ onSuccess: (newPage) => {
           return page;
         }),
       };
-    }
+    },
   );
 };
 ```
@@ -458,7 +456,7 @@ onSuccess: (newPage) => {
 
 ```sql
 -- ローカル・リモート両方に適用
-CREATE INDEX IF NOT EXISTS idx_pages_user_updated_id 
+CREATE INDEX IF NOT EXISTS idx_pages_user_updated_id
   ON pages(user_id, updated_at DESC, id DESC);
 ```
 
@@ -493,11 +491,11 @@ CREATE INDEX IF NOT EXISTS idx_pages_user_updated_id
 
 ## リスクと対策
 
-| リスク | 対策 |
-|--------|------|
-| 同期中にカーソルがずれる | invalidateQueries で再取得 |
+| リスク                           | 対策                           |
+| -------------------------------- | ------------------------------ |
+| 同期中にカーソルがずれる         | invalidateQueries で再取得     |
 | 仮想化でアニメーションが効かない | カード出現アニメーションを調整 |
-| グリッドレイアウトとの相性 | 行単位の仮想化で対応 |
+| グリッドレイアウトとの相性       | 行単位の仮想化で対応           |
 
 ## 将来の拡張
 

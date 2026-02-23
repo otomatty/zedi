@@ -10,14 +10,14 @@
 
 ### 1.1 完了した作業
 
-| # | 作業内容 | ステータス |
-|---|----------|-----------|
-| 1 | Realtime モジュール作成 | ✅ 完了 |
-| 2 | ECR Repository 作成 | ✅ 完了 |
-| 3 | ECS Cluster デプロイ | ✅ 完了 |
-| 4 | ECS Service (Fargate Spot) デプロイ | ✅ 完了 |
-| 5 | Application Load Balancer デプロイ | ✅ 完了 |
-| 6 | Security Groups 作成 | ✅ 完了 |
+| #   | 作業内容                            | ステータス |
+| --- | ----------------------------------- | ---------- |
+| 1   | Realtime モジュール作成             | ✅ 完了    |
+| 2   | ECR Repository 作成                 | ✅ 完了    |
+| 3   | ECS Cluster デプロイ                | ✅ 完了    |
+| 4   | ECS Service (Fargate Spot) デプロイ | ✅ 完了    |
+| 5   | Application Load Balancer デプロイ  | ✅ 完了    |
+| 6   | Security Groups 作成                | ✅ 完了    |
 
 ### 1.2 作成したファイル
 
@@ -32,18 +32,18 @@ terraform/modules/realtime/
 
 ## 2. デプロイ済みリソース
 
-| リソースタイプ | 名前/ID | 詳細 |
-|---------------|---------|------|
-| ECR Repository | `zedi-dev-hocuspocus` | Hocuspocus Dockerイメージ用 |
-| ECS Cluster | `zedi-dev-cluster` | Fargate Spot対応 |
-| ECS Service | `zedi-dev-hocuspocus` | Fargate Spot, 1タスク |
-| ECS Task Definition | `zedi-dev-hocuspocus` | 256 CPU, 512MB Memory |
-| ALB | `zedi-dev-alb` | WebSocket用 |
-| Target Group | `zedi-dev-hocuspocus-tg` | Port 1234 |
-| ALB Listener | HTTP:80 | Forwardリスナー (開発環境) |
-| Security Group | `sg-005d15fa364266625` | ALB用 (Port 80, 443) |
-| Security Group | `sg-0c1a9c8f33540cf05` | ECS Tasks用 (Port 1234) |
-| CloudWatch Log Group | `/aws/ecs/zedi-dev/hocuspocus` | ECSログ (7日保持) |
+| リソースタイプ       | 名前/ID                        | 詳細                        |
+| -------------------- | ------------------------------ | --------------------------- |
+| ECR Repository       | `zedi-dev-hocuspocus`          | Hocuspocus Dockerイメージ用 |
+| ECS Cluster          | `zedi-dev-cluster`             | Fargate Spot対応            |
+| ECS Service          | `zedi-dev-hocuspocus`          | Fargate Spot, 1タスク       |
+| ECS Task Definition  | `zedi-dev-hocuspocus`          | 256 CPU, 512MB Memory       |
+| ALB                  | `zedi-dev-alb`                 | WebSocket用                 |
+| Target Group         | `zedi-dev-hocuspocus-tg`       | Port 1234                   |
+| ALB Listener         | HTTP:80                        | Forwardリスナー (開発環境)  |
+| Security Group       | `sg-005d15fa364266625`         | ALB用 (Port 80, 443)        |
+| Security Group       | `sg-0c1a9c8f33540cf05`         | ECS Tasks用 (Port 1234)     |
+| CloudWatch Log Group | `/aws/ecs/zedi-dev/hocuspocus` | ECSログ (7日保持)           |
 
 ---
 
@@ -63,34 +63,34 @@ ecs_service_name           = "zedi-dev-hocuspocus"
 
 ### 4.1 ECS Fargate Spot 設定
 
-| 設定項目 | 値 |
-|----------|-----|
-| クラスター名 | zedi-dev-cluster |
-| サービス名 | zedi-dev-hocuspocus |
-| キャパシティプロバイダー | FARGATE_SPOT (100%) |
-| タスクCPU | 256 (0.25 vCPU) |
-| タスクメモリ | 512 MB |
-| 希望タスク数 | 1 |
-| コンテナポート | 1234 |
-| ネットワークモード | awsvpc |
-| ログ保持期間 | 7日 (開発環境) |
-| Circuit Breaker | 有効 (ロールバック有効) |
-| オートスケーリング | 無効 (開発環境) |
+| 設定項目                 | 値                      |
+| ------------------------ | ----------------------- |
+| クラスター名             | zedi-dev-cluster        |
+| サービス名               | zedi-dev-hocuspocus     |
+| キャパシティプロバイダー | FARGATE_SPOT (100%)     |
+| タスクCPU                | 256 (0.25 vCPU)         |
+| タスクメモリ             | 512 MB                  |
+| 希望タスク数             | 1                       |
+| コンテナポート           | 1234                    |
+| ネットワークモード       | awsvpc                  |
+| ログ保持期間             | 7日 (開発環境)          |
+| Circuit Breaker          | 有効 (ロールバック有効) |
+| オートスケーリング       | 無効 (開発環境)         |
 
 ### 4.2 ALB 設定
 
-| 設定項目 | 値 |
-|----------|-----|
-| 名前 | zedi-dev-alb |
-| タイプ | Application Load Balancer |
-| スキーム | Internet-facing |
-| HTTP/2 | 有効 |
-| リスナー | HTTP:80 → Target Group |
-| ターゲットタイプ | IP |
-| ヘルスチェックパス | /health |
-| ヘルスチェック間隔 | 30秒 |
-| スティッキネス | 有効 (24時間, lb_cookie) |
-| 削除保護 | 無効 (開発環境) |
+| 設定項目           | 値                        |
+| ------------------ | ------------------------- |
+| 名前               | zedi-dev-alb              |
+| タイプ             | Application Load Balancer |
+| スキーム           | Internet-facing           |
+| HTTP/2             | 有効                      |
+| リスナー           | HTTP:80 → Target Group    |
+| ターゲットタイプ   | IP                        |
+| ヘルスチェックパス | /health                   |
+| ヘルスチェック間隔 | 30秒                      |
+| スティッキネス     | 有効 (24時間, lb_cookie)  |
+| 削除保護           | 無効 (開発環境)           |
 
 ---
 
@@ -99,6 +99,7 @@ ecs_service_name           = "zedi-dev-hocuspocus"
 ⚠️ **重要:** ECSサービスはDockerイメージがECRにプッシュされるまでタスクが起動しません。
 
 以下の作業が必要です:
+
 1. Hocuspocusサーバーの実装
 2. Dockerイメージのビルド
 3. ECRへのプッシュ
@@ -110,12 +111,12 @@ ecs_service_name           = "zedi-dev-hocuspocus"
 
 ## 6. 関連ドキュメント
 
-| ドキュメント | パス |
-|-------------|------|
-| Phase 4 作業ログ | [aws-infrastructure-phase4-cache.md](./aws-infrastructure-phase4-cache.md) |
-| Hocuspocus実装ガイド | [hocuspocus-server-implementation.md](./hocuspocus-server-implementation.md) |
+| ドキュメント             | パス                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Phase 4 作業ログ         | [aws-infrastructure-phase4-cache.md](./aws-infrastructure-phase4-cache.md)                                 |
+| Hocuspocus実装ガイド     | [hocuspocus-server-implementation.md](./hocuspocus-server-implementation.md)                               |
 | リアルタイム同時編集仕様 | [../../specs/realtime-collaboration-specification.md](../../specs/realtime-collaboration-specification.md) |
 
 ---
 
-*作成日: 2026-01-31*
+_作成日: 2026-01-31_

@@ -16,8 +16,7 @@ export function useOnboarding() {
   const [isTourRunning, setIsTourRunning] = useState(false);
 
   /** True when signed-in user has not completed the setup wizard */
-  const needsSetupWizard =
-    isSignedIn && !state.hasCompletedSetupWizard;
+  const needsSetupWizard = isSignedIn && !state.hasCompletedSetupWizard;
 
   const completeSetupWizard = useCallback(() => {
     markSetupWizardCompleted();

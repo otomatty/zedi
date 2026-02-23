@@ -86,7 +86,9 @@ const REFRESH_CHECK_INTERVAL_MS = 60 * 1000;
 
 export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [state, setState] = useState<ReturnType<typeof getStoredState>>(() => getInitialAuthState());
+  const [state, setState] = useState<ReturnType<typeof getStoredState>>(() =>
+    getInitialAuthState(),
+  );
   const refreshingRef = useRef(false);
 
   /**
@@ -127,7 +129,9 @@ export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
       if (!cancelled) setIsLoaded(true);
     };
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [tryRefresh]);
 
   // Periodic token refresh timer
@@ -173,10 +177,9 @@ export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
   const value = useMemo<CognitoAuthContextValue>(() => {
     // User is signed in if we have tokens AND either they're still valid
     // OR we have a refresh_token (meaning we can/will refresh them).
-    const signedIn = !!state?.tokens?.id_token &&
-      (isTokenValid(state) || hasRefreshToken(state));
+    const signedIn = !!state?.tokens?.id_token && (isTokenValid(state) || hasRefreshToken(state));
     const userId = state?.tokens?.id_token
-      ? parseIdToken(state.tokens.id_token)?.sub ?? null
+      ? (parseIdToken(state.tokens.id_token)?.sub ?? null)
       : null;
     return {
       isLoaded: true,
@@ -191,11 +194,7 @@ export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
     };
   }, [state, getToken, signOut]);
 
-  return (
-    <CognitoAuthContext.Provider value={value}>
-      {children}
-    </CognitoAuthContext.Provider>
-  );
+  return <CognitoAuthContext.Provider value={value}>{children}</CognitoAuthContext.Provider>;
 }
 
 export function useCognitoAuth(): CognitoAuthContextValue {
@@ -212,7 +211,11 @@ export { getAuthorizeUrl, type CognitoIdP };
 /**
  * Get current user from stored id_token (Clerk-compatible shape). Call only when isSignedIn.
  */
-export function useCognitoUser(): { isLoaded: boolean; isSignedIn: boolean; user: CognitoAuthUser | null } {
+export function useCognitoUser(): {
+  isLoaded: boolean;
+  isSignedIn: boolean;
+  user: CognitoAuthUser | null;
+} {
   const { isLoaded, isSignedIn, userId } = useCognitoAuth();
   const state = getStoredState();
   const user = useMemo(() => {

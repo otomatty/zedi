@@ -18,8 +18,10 @@ function syncPageToMetadata(row: SyncPageItem): PageMetadata {
     contentPreview: row.content_preview ?? null,
     thumbnailUrl: row.thumbnail_url ?? null,
     sourceUrl: row.source_url ?? null,
-    createdAt: typeof row.created_at === "string" ? new Date(row.created_at).getTime() : row.created_at,
-    updatedAt: typeof row.updated_at === "string" ? new Date(row.updated_at).getTime() : row.updated_at,
+    createdAt:
+      typeof row.created_at === "string" ? new Date(row.created_at).getTime() : row.created_at,
+    updatedAt:
+      typeof row.updated_at === "string" ? new Date(row.updated_at).getTime() : row.updated_at,
     isDeleted: row.is_deleted === true,
   };
 }
@@ -117,12 +119,7 @@ function normalizeSyncResponse(raw: unknown): {
 
   // Be robust to accidentally wrapped envelopes: { ok, data }.
   for (let i = 0; i < 3; i++) {
-    if (
-      candidate &&
-      typeof candidate === "object" &&
-      "ok" in candidate &&
-      "data" in candidate
-    ) {
+    if (candidate && typeof candidate === "object" && "ok" in candidate && "data" in candidate) {
       candidate = (candidate as { data: unknown }).data;
       continue;
     }
@@ -130,9 +127,7 @@ function normalizeSyncResponse(raw: unknown): {
   }
 
   const obj =
-    candidate && typeof candidate === "object"
-      ? (candidate as Record<string, unknown>)
-      : null;
+    candidate && typeof candidate === "object" ? (candidate as Record<string, unknown>) : null;
 
   const pages = obj?.pages || [];
   const links = obj?.links || [];
@@ -142,7 +137,7 @@ function normalizeSyncResponse(raw: unknown): {
   if (!Array.isArray(pages) || !Array.isArray(links) || !Array.isArray(ghostLinks)) {
     const keys = obj ? Object.keys(obj).join(", ") : "non-object";
     throw new TypeError(
-      `[Sync/API] Invalid sync payload shape. Expected arrays: pages/links/ghost_links, got keys: ${keys}`
+      `[Sync/API] Invalid sync payload shape. Expected arrays: pages/links/ghost_links, got keys: ${keys}`,
     );
   }
 
@@ -164,7 +159,9 @@ export async function syncWithApi(
   adapter: StorageAdapter,
   api: ApiClient,
   userId: string,
-  options?: SyncWithApiOptions & { /** Skip the consecutive-failure guard (for manual sync). */ force?: boolean }
+  options?: SyncWithApiOptions & {
+    /** Skip the consecutive-failure guard (for manual sync). */ force?: boolean;
+  },
 ): Promise<void> {
   if (syncInProgress) {
     console.log("[Sync/API] Skipped: sync already in progress");
@@ -173,7 +170,7 @@ export async function syncWithApi(
 
   if (!options?.force && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
     console.warn(
-      `[Sync/API] Skipped: ${consecutiveFailures} consecutive failures. Use manual sync to retry.`
+      `[Sync/API] Skipped: ${consecutiveFailures} consecutive failures. Use manual sync to retry.`,
     );
     return;
   }
@@ -195,7 +192,7 @@ export async function syncWithApi(
     const isInitialSync = since === undefined;
 
     console.log(
-      `[Sync/API] Starting ${isInitialSync ? "initial" : "delta"} sync (since: ${since ?? "full"})`
+      `[Sync/API] Starting ${isInitialSync ? "initial" : "delta"} sync (since: ${since ?? "full"})`,
     );
 
     // --- PULL ---
@@ -209,8 +206,8 @@ export async function syncWithApi(
       if (local && local.updatedAt > meta.updatedAt) {
         console.log(
           `[Sync/API] Pull skip (local newer): ${meta.id} ` +
-          `local=${new Date(local.updatedAt).toISOString()} > ` +
-          `server=${new Date(meta.updatedAt).toISOString()}`
+            `local=${new Date(local.updatedAt).toISOString()} > ` +
+            `server=${new Date(meta.updatedAt).toISOString()}`,
         );
         continue;
       }
@@ -228,7 +225,8 @@ export async function syncWithApi(
       const links: Link[] = items.map((l) => ({
         sourceId: l.source_id,
         targetId: l.target_id,
-        createdAt: typeof l.created_at === "string" ? new Date(l.created_at).getTime() : l.created_at,
+        createdAt:
+          typeof l.created_at === "string" ? new Date(l.created_at).getTime() : l.created_at,
       }));
       await adapter.saveLinks(sourceId, links);
     }
@@ -243,7 +241,8 @@ export async function syncWithApi(
       const ghostLinks: GhostLink[] = items.map((g) => ({
         linkText: g.link_text,
         sourcePageId: g.source_page_id,
-        createdAt: typeof g.created_at === "string" ? new Date(g.created_at).getTime() : g.created_at,
+        createdAt:
+          typeof g.created_at === "string" ? new Date(g.created_at).getTime() : g.created_at,
         originalTargetPageId: g.original_target_page_id ?? null,
         originalNoteId: g.original_note_id ?? null,
       }));
@@ -260,7 +259,7 @@ export async function syncWithApi(
       consecutiveFailures = 0; // Reset on success
       setSyncStatus("synced");
       console.log(
-        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, pushed 0 pages`
+        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, pushed 0 pages`,
       );
       return;
     }
@@ -270,9 +269,7 @@ export async function syncWithApi(
     const pulledPageIds = new Set(res.pages.map((r) => r.id));
     const allLocalPages = await adapter.getAllPages();
     const pagesForPush = lastSync
-      ? allLocalPages.filter(
-          (p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id)
-        )
+      ? allLocalPages.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id))
       : allLocalPages; // Initial sync with existing local data: push all
 
     // If no local changes need pushing, skip the expensive POST requests.
@@ -282,7 +279,7 @@ export async function syncWithApi(
       consecutiveFailures = 0;
       setSyncStatus("synced");
       console.log(
-        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, no local changes to push`
+        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, no local changes to push`,
       );
       return;
     }
@@ -316,7 +313,7 @@ export async function syncWithApi(
     // Send pages in chunks, then send links/ghost_links once.
     if (pushPages.length > PAGE_PUSH_CHUNK_SIZE) {
       console.log(
-        `[Sync/API] Pushing ${pushPages.length} pages in chunks of ${PAGE_PUSH_CHUNK_SIZE}`
+        `[Sync/API] Pushing ${pushPages.length} pages in chunks of ${PAGE_PUSH_CHUNK_SIZE}`,
       );
       for (let i = 0; i < pushPages.length; i += PAGE_PUSH_CHUNK_SIZE) {
         const chunk = pushPages.slice(i, i + PAGE_PUSH_CHUNK_SIZE);
@@ -341,13 +338,13 @@ export async function syncWithApi(
     consecutiveFailures = 0; // Reset on success
     setSyncStatus("synced");
     console.log(
-      `[Sync/API] Completed: pulled ${res.pages.length} pages, pushed ${pushPages.length} pages`
+      `[Sync/API] Completed: pulled ${res.pages.length} pages, pushed ${pushPages.length} pages`,
     );
   } catch (error) {
     consecutiveFailures++;
     console.error(
       `[Sync/API] Failed (attempt ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`,
-      error
+      error,
     );
     setSyncStatus("error");
     throw error;
@@ -365,7 +362,7 @@ export async function syncWithApi(
 export async function runAuroraSync(
   userId: string,
   getToken: () => Promise<string | null>,
-  options?: SyncWithApiOptions & { force?: boolean }
+  options?: SyncWithApiOptions & { force?: boolean },
 ): Promise<void> {
   const { createStorageAdapter } = await import("@/lib/storageAdapter");
   const { createApiClient } = await import("@/lib/api");

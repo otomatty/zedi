@@ -24,14 +24,15 @@ function loadConfig(target: "prod" | "dev") {
   const prefix = target === "prod" ? "PROD_AURORA" : "DEV_AURORA";
   const clusterArn = process.env[`${prefix}_CLUSTER_ARN`];
   const secretArn = process.env[`${prefix}_SECRET_ARN`];
-  if (!clusterArn || !secretArn) throw new Error(`Missing ${prefix}_CLUSTER_ARN or ${prefix}_SECRET_ARN`);
+  if (!clusterArn || !secretArn)
+    throw new Error(`Missing ${prefix}_CLUSTER_ARN or ${prefix}_SECRET_ARN`);
   return { clusterArn, secretArn, database: process.env[`${prefix}_DATABASE`] || "zedi" };
 }
 
 async function run(
   config: { clusterArn: string; secretArn: string; database: string },
   sql: string,
-  params: Record<string, string>
+  params: Record<string, string>,
 ) {
   const client = new RDSDataClient({ region: REGION });
   const parameters = Object.entries(params).map(([name, value]) => ({
@@ -48,11 +49,12 @@ async function run(
           database: config.database,
           sql,
           parameters,
-        })
+        }),
       );
       return;
     } catch (err: unknown) {
-      const name = err && typeof err === "object" && "name" in err ? (err as { name: string }).name : "";
+      const name =
+        err && typeof err === "object" && "name" in err ? (err as { name: string }).name : "";
       if (name !== RESUME_ERROR_NAME || attempt === RESUME_MAX_RETRIES - 1) throw err;
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
     }

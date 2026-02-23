@@ -23,9 +23,7 @@ const SENSITIVE_FIELDS = [
  * ストレージ設定を保存する
  * 認証情報は暗号化して保存
  */
-export async function saveStorageSettings(
-  settings: StorageSettings
-): Promise<void> {
+export async function saveStorageSettings(settings: StorageSettings): Promise<void> {
   try {
     // 認証情報を暗号化したコピーを作成
     const configToStore = { ...settings.config };
@@ -77,10 +75,7 @@ export async function loadStorageSettings(): Promise<StorageSettings | null> {
     }
 
     const preferDefaultStorage = parsed.preferDefaultStorage !== false;
-    const provider =
-      !preferDefaultStorage && parsed.provider === "s3"
-        ? "gyazo"
-        : parsed.provider;
+    const provider = !preferDefaultStorage && parsed.provider === "s3" ? "gyazo" : parsed.provider;
 
     return {
       ...parsed,

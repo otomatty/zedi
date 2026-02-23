@@ -5,7 +5,7 @@
  * Optional な環境変数は空文字列をデフォルトとし、
  * 対応ルートが使用されない環境ではエラーにしない。
  */
-import type { EnvConfig } from './types';
+import type { EnvConfig } from "./types";
 
 let _cached: EnvConfig | null = null;
 
@@ -18,42 +18,38 @@ export function getEnvConfig(): EnvConfig {
     return v;
   };
 
-  const optional = (key: string, fallback = ''): string =>
-    process.env[key] || fallback;
+  const optional = (key: string, fallback = ""): string => process.env[key] || fallback;
 
   _cached = {
     // Aurora DB (required)
-    AURORA_CLUSTER_ARN: required('AURORA_CLUSTER_ARN'),
-    DB_CREDENTIALS_SECRET: required('DB_CREDENTIALS_SECRET'),
-    AURORA_DATABASE_NAME: optional('AURORA_DATABASE_NAME', 'zedi'),
+    AURORA_CLUSTER_ARN: required("AURORA_CLUSTER_ARN"),
+    DB_CREDENTIALS_SECRET: required("DB_CREDENTIALS_SECRET"),
+    AURORA_DATABASE_NAME: optional("AURORA_DATABASE_NAME", "zedi"),
 
     // Auth
-    COGNITO_USER_POOL_ID: optional('COGNITO_USER_POOL_ID'),
-    COGNITO_REGION: optional(
-      'COGNITO_REGION',
-      process.env.AWS_REGION || 'ap-northeast-1',
-    ),
+    COGNITO_USER_POOL_ID: optional("COGNITO_USER_POOL_ID"),
+    COGNITO_REGION: optional("COGNITO_REGION", process.env.AWS_REGION || "ap-northeast-1"),
 
     // CORS
-    CORS_ORIGIN: optional('CORS_ORIGIN', '*'),
+    CORS_ORIGIN: optional("CORS_ORIGIN", "*"),
 
     // Media
-    MEDIA_BUCKET: optional('MEDIA_BUCKET'),
+    MEDIA_BUCKET: optional("MEDIA_BUCKET"),
 
     // AI
-    AI_SECRETS_ARN: optional('AI_SECRETS_ARN'),
-    RATE_LIMIT_TABLE: optional('RATE_LIMIT_TABLE'),
+    AI_SECRETS_ARN: optional("AI_SECRETS_ARN"),
+    RATE_LIMIT_TABLE: optional("RATE_LIMIT_TABLE"),
 
     // Environment
-    ENVIRONMENT: optional('ENVIRONMENT', 'dev'),
+    ENVIRONMENT: optional("ENVIRONMENT", "dev"),
 
     // Subscription (Polar)
-    POLAR_SECRET_ARN: optional('POLAR_SECRET_ARN'),
+    POLAR_SECRET_ARN: optional("POLAR_SECRET_ARN"),
 
     // Thumbnail
-    THUMBNAIL_SECRETS_ARN: optional('THUMBNAIL_SECRETS_ARN'),
-    THUMBNAIL_BUCKET: optional('THUMBNAIL_BUCKET'),
-    THUMBNAIL_CLOUDFRONT_URL: optional('THUMBNAIL_CLOUDFRONT_URL'),
+    THUMBNAIL_SECRETS_ARN: optional("THUMBNAIL_SECRETS_ARN"),
+    THUMBNAIL_BUCKET: optional("THUMBNAIL_BUCKET"),
+    THUMBNAIL_CLOUDFRONT_URL: optional("THUMBNAIL_CLOUDFRONT_URL"),
   };
 
   return _cached;

@@ -10,11 +10,11 @@
 
 ### 1.2 スコープ
 
-| 機能 | 現状 (Worker) | 移行後 (AWS Lambda) |
-|------|----------------|----------------------|
-| 画像検索 | GET /api/image-search (Google Custom Search) | 同一ロジック・同一 API |
-| 画像生成 | POST /api/image-generate (Gemini) | 同一ロジック・api_server と同じキー |
-| 画像保存 (commit) | POST /api/thumbnail/commit (Gyazo) | **S3 を標準**。ユーザー別クォータ（free/pro） |
+| 機能              | 現状 (Worker)                                | 移行後 (AWS Lambda)                           |
+| ----------------- | -------------------------------------------- | --------------------------------------------- |
+| 画像検索          | GET /api/image-search (Google Custom Search) | 同一ロジック・同一 API                        |
+| 画像生成          | POST /api/image-generate (Gemini)            | 同一ロジック・api_server と同じキー           |
+| 画像保存 (commit) | POST /api/thumbnail/commit (Gyazo)           | **S3 を標準**。ユーザー別クォータ（free/pro） |
 
 - 移行後は **Gyazo は標準経路から外す**。commit は S3 への保存のみを提供する。
 - レート制限は ai-api と **同じ DynamoDB テーブル** に統合する。
@@ -50,12 +50,12 @@
 
 - **ベース URL**: 既存 REST API と同じ（`VITE_AI_API_BASE_URL` と同一ベースでよい。フロントでは `VITE_THUMBNAIL_API_BASE_URL` を廃止し、REST API ベース URL に統一するか、同一値で設定する）。
 
-| メソッド | パス | 説明 |
-|----------|------|------|
-| GET | /api/thumbnail/image-search | 画像検索 |
-| POST | /api/thumbnail/image-generate | 画像生成 |
-| POST | /api/thumbnail/commit | 画像を S3 に保存 |
-| OPTIONS | 上記各パス | CORS プリフライト |
+| メソッド | パス                          | 説明              |
+| -------- | ----------------------------- | ----------------- |
+| GET      | /api/thumbnail/image-search   | 画像検索          |
+| POST     | /api/thumbnail/image-generate | 画像生成          |
+| POST     | /api/thumbnail/commit         | 画像を S3 に保存  |
+| OPTIONS  | 上記各パス                    | CORS プリフライト |
 
 - API Gateway では、既存の `ANY /api/{proxy+}` より**具体的なルートを優先**するため、`GET /api/thumbnail/image-search` 等を先に登録し、Thumbnail Lambda に転送する。
 
@@ -222,7 +222,7 @@
 
 - **保存場所**: Aurora にテーブルを用意し、オブジェクトごとのサイズを記録する。
 - **推奨スキーマ**:
-  - `thumbnail_objects`:  
+  - `thumbnail_objects`:
     - `id` (UUID, PK), `user_id` (UUID), `s3_key` (VARCHAR), `size_bytes` (BIGINT), `created_at` (TIMESTAMPTZ)
   - ユーザーごとの使用量: `SELECT SUM(size_bytes) FROM thumbnail_objects WHERE user_id = :userId`
 - commit 時: アップロード成功後に上記テーブルに 1 行 INSERT。削除機能を将来つける場合は、DELETE 時に該当行を削除し、使用量から減算する。
@@ -278,20 +278,20 @@
 
 **thumbnail_tier_quotas**
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| tier | VARCHAR(32) PK | 'free', 'pro' |
-| storage_limit_bytes | BIGINT | 上限バイト数 |
+| カラム              | 型             | 説明          |
+| ------------------- | -------------- | ------------- |
+| tier                | VARCHAR(32) PK | 'free', 'pro' |
+| storage_limit_bytes | BIGINT         | 上限バイト数  |
 
 **thumbnail_objects**
 
-| カラム | 型 | 説明 |
-|--------|-----|------|
-| id | UUID PK | オブジェクト ID |
-| user_id | UUID | 所有者（Cognito sub） |
-| s3_key | VARCHAR(512) | S3 オブジェクトキー |
-| size_bytes | BIGINT | サイズ |
-| created_at | TIMESTAMPTZ | 作成日時 |
+| カラム     | 型           | 説明                  |
+| ---------- | ------------ | --------------------- |
+| id         | UUID PK      | オブジェクト ID       |
+| user_id    | UUID         | 所有者（Cognito sub） |
+| s3_key     | VARCHAR(512) | S3 オブジェクトキー   |
+| size_bytes | BIGINT       | サイズ                |
+| created_at | TIMESTAMPTZ  | 作成日時              |
 
 - `user_id` にインデックスを張り、`SUM(size_bytes) WHERE user_id = ?` を高速化する。
 
@@ -392,13 +392,13 @@ INSERT INTO thumbnail_tier_quotas (tier, storage_limit_bytes) VALUES
 
 ## 12. まとめ
 
-| 項目 | 内容 |
-|------|------|
-| 認証 | Cognito JWT 必須 |
-| 画像検索 | Google Custom Search、Thumbnail 用 Secrets |
-| 画像生成 | Gemini gemini-2.5-flash-image、ai 用 Secrets |
-| 画像保存 | S3 標準、ユーザー別クォータ（free/pro）、Aurora で使用量管理 |
-| レート制限 | ai-api と同一 DynamoDB |
-| URL | GET/POST /api/thumbnail/image-search, image-generate, commit |
+| 項目       | 内容                                                         |
+| ---------- | ------------------------------------------------------------ |
+| 認証       | Cognito JWT 必須                                             |
+| 画像検索   | Google Custom Search、Thumbnail 用 Secrets                   |
+| 画像生成   | Gemini gemini-2.5-flash-image、ai 用 Secrets                 |
+| 画像保存   | S3 標準、ユーザー別クォータ（free/pro）、Aurora で使用量管理 |
+| レート制限 | ai-api と同一 DynamoDB                                       |
+| URL        | GET/POST /api/thumbnail/image-search, image-generate, commit |
 
 この仕様に基づき、Terraform モジュールと Lambda 実装を行う。

@@ -10,14 +10,14 @@
 
 ### 1.1 完了した作業
 
-| # | 作業内容 | ステータス |
-|---|----------|-----------|
-| 1 | AWS初期セットアップガイド作成 | ✅ 完了 |
-| 2 | Terraform Phase 1 (Networking) コード作成 | ✅ 完了 |
-| 3 | Terraform init/validate/plan 実行 | ✅ 完了 |
-| 4 | Terraform apply でAWSにデプロイ | ✅ 完了 |
-| 5 | .gitignore にTerraform除外設定追加 | ✅ 完了 |
-| 6 | Git コミット | ✅ 完了 |
+| #   | 作業内容                                  | ステータス |
+| --- | ----------------------------------------- | ---------- |
+| 1   | AWS初期セットアップガイド作成             | ✅ 完了    |
+| 2   | Terraform Phase 1 (Networking) コード作成 | ✅ 完了    |
+| 3   | Terraform init/validate/plan 実行         | ✅ 完了    |
+| 4   | Terraform apply でAWSにデプロイ           | ✅ 完了    |
+| 5   | .gitignore にTerraform除外設定追加        | ✅ 完了    |
+| 6   | Git コミット                              | ✅ 完了    |
 
 ### 1.2 作成・変更したファイル
 
@@ -53,20 +53,20 @@ zedi/
 
 ### 2.1 リソース一覧
 
-| リソースタイプ | 名前/ID | 詳細 |
-|---------------|---------|------|
-| VPC | `vpc-04acab2235ceb032e` | CIDR: 10.0.0.0/16 |
-| Internet Gateway | `igw-076739583e5f1da89` | - |
-| Public Subnet | `subnet-0ab16cd5ece570673` | AZ: ap-northeast-1a, CIDR: 10.0.0.0/24 |
-| Private Subnet | `subnet-01deac6f1dfdbc4c8` | AZ: ap-northeast-1a, CIDR: 10.0.100.0/24 |
-| Public Route Table | `rtb-025ad386c6f035409` | 0.0.0.0/0 → IGW |
-| Private Route Table | `rtb-05835561c545bb02e` | - |
-| Security Group | `sg-0f73a9e5ed1b2acc1` | VPC Endpoints用 |
-| VPC Endpoint (ECR API) | `vpce-02c3fc17b98cd3baa` | Interface型 |
-| VPC Endpoint (ECR DKR) | `vpce-05d664ff12a432f7a` | Interface型 |
-| VPC Endpoint (Logs) | `vpce-0a0875e507c6e3fd4` | Interface型 |
-| VPC Endpoint (Secrets) | `vpce-00983f4896fd211ef` | Interface型 |
-| VPC Endpoint (S3) | `vpce-07b0316e32b3180db` | Gateway型（無料） |
+| リソースタイプ         | 名前/ID                    | 詳細                                     |
+| ---------------------- | -------------------------- | ---------------------------------------- |
+| VPC                    | `vpc-04acab2235ceb032e`    | CIDR: 10.0.0.0/16                        |
+| Internet Gateway       | `igw-076739583e5f1da89`    | -                                        |
+| Public Subnet          | `subnet-0ab16cd5ece570673` | AZ: ap-northeast-1a, CIDR: 10.0.0.0/24   |
+| Private Subnet         | `subnet-01deac6f1dfdbc4c8` | AZ: ap-northeast-1a, CIDR: 10.0.100.0/24 |
+| Public Route Table     | `rtb-025ad386c6f035409`    | 0.0.0.0/0 → IGW                          |
+| Private Route Table    | `rtb-05835561c545bb02e`    | -                                        |
+| Security Group         | `sg-0f73a9e5ed1b2acc1`     | VPC Endpoints用                          |
+| VPC Endpoint (ECR API) | `vpce-02c3fc17b98cd3baa`   | Interface型                              |
+| VPC Endpoint (ECR DKR) | `vpce-05d664ff12a432f7a`   | Interface型                              |
+| VPC Endpoint (Logs)    | `vpce-0a0875e507c6e3fd4`   | Interface型                              |
+| VPC Endpoint (Secrets) | `vpce-00983f4896fd211ef`   | Interface型                              |
+| VPC Endpoint (S3)      | `vpce-07b0316e32b3180db`   | Gateway型（無料）                        |
 
 ### 2.2 Terraform State
 
@@ -90,16 +90,16 @@ Environment: dev
 
 ### 4.1 仕様書
 
-| ドキュメント | パス | 内容 |
-|-------------|------|------|
+| ドキュメント             | パス                                                                                                   | 内容                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
 | リアルタイム同時編集仕様 | [docs/specs/realtime-collaboration-specification.md](../specs/realtime-collaboration-specification.md) | 全体アーキテクチャ、データフロー、API仕様 |
-| Terraform実装計画 | [docs/specs/aws-terraform-implementation-plan.md](../specs/aws-terraform-implementation-plan.md) | 各モジュールの詳細設計、コスト試算 |
-| アプリケーション実装計画 | [docs/specs/application-implementation-plan.md](../specs/application-implementation-plan.md) | Hocuspocusサーバー、クライアント実装 |
+| Terraform実装計画        | [docs/specs/aws-terraform-implementation-plan.md](../specs/aws-terraform-implementation-plan.md)       | 各モジュールの詳細設計、コスト試算        |
+| アプリケーション実装計画 | [docs/specs/application-implementation-plan.md](../specs/application-implementation-plan.md)           | Hocuspocusサーバー、クライアント実装      |
 
 ### 4.2 ガイド
 
-| ドキュメント | パス | 内容 |
-|-------------|------|------|
+| ドキュメント        | パス                                                                           | 内容                                       |
+| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------ |
 | AWS初期セットアップ | [docs/guides/aws-initial-setup-guide.md](../guides/aws-initial-setup-guide.md) | IAMユーザー作成、CLI設定、バックエンド準備 |
 
 ---
@@ -108,19 +108,20 @@ Environment: dev
 
 ### 5.1 Phase概要
 
-| Phase | モジュール | 内容 | 推定時間 | ステータス |
-|-------|-----------|------|----------|-----------|
-| 1 | networking | VPC, Subnets, VPC Endpoints | 30分 | ✅ **完了** |
-| 2 | security | Cognito, IAM Roles, WAF | 30分 | ⏳ 次回 |
-| 3 | database | Aurora Serverless v2 | 20分 | ⏳ 未着手 |
-| 4 | cache | ElastiCache Redis | 15分 | ⏳ 未着手 |
-| 5 | realtime | ECS Fargate Spot, ALB | 45分 | ⏳ 未着手 |
-| 6 | cdn | CloudFront, S3 | 20分 | ⏳ 未着手 |
-| 7 | monitoring | CloudWatch Alarms, Dashboards | 15分 | ⏳ 未着手 |
+| Phase | モジュール | 内容                          | 推定時間 | ステータス  |
+| ----- | ---------- | ----------------------------- | -------- | ----------- |
+| 1     | networking | VPC, Subnets, VPC Endpoints   | 30分     | ✅ **完了** |
+| 2     | security   | Cognito, IAM Roles, WAF       | 30分     | ⏳ 次回     |
+| 3     | database   | Aurora Serverless v2          | 20分     | ⏳ 未着手   |
+| 4     | cache      | ElastiCache Redis             | 15分     | ⏳ 未着手   |
+| 5     | realtime   | ECS Fargate Spot, ALB         | 45分     | ⏳ 未着手   |
+| 6     | cdn        | CloudFront, S3                | 20分     | ⏳ 未着手   |
+| 7     | monitoring | CloudWatch Alarms, Dashboards | 15分     | ⏳ 未着手   |
 
 ### 5.2 Phase 2: Security モジュール（次回作業）
 
 作成するファイル:
+
 ```
 terraform/modules/security/
 ├── main.tf          # Cognito User Pool, IAM Roles
@@ -129,6 +130,7 @@ terraform/modules/security/
 ```
 
 主なリソース:
+
 - Amazon Cognito User Pool（認証）
 - Cognito User Pool Client
 - IAM Role for ECS Task Execution
@@ -138,17 +140,20 @@ terraform/modules/security/
 ### 5.3 Phase 3-7 概要
 
 **Phase 3: Database**
+
 - Aurora Serverless v2 (PostgreSQL)
 - DB Subnet Group
 - Security Group
 - Secrets Manager (DB credentials)
 
 **Phase 4: Cache**
+
 - ElastiCache Redis (cache.t4g.micro)
 - Subnet Group
 - Security Group
 
 **Phase 5: Realtime**
+
 - ECR Repository
 - ECS Cluster
 - ECS Task Definition
@@ -158,12 +163,14 @@ terraform/modules/security/
 - Security Groups
 
 **Phase 6: CDN**
+
 - S3 Bucket (Frontend hosting)
 - CloudFront Distribution
 - Origin Access Control
 - （オプション）ACM Certificate
 
 **Phase 7: Monitoring**
+
 - CloudWatch Log Groups
 - CloudWatch Alarms
 - SNS Topic (通知)
@@ -192,15 +199,15 @@ $TF = "C:\Users\saedg\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terrafor
 
 ### 6.2 Terraformコマンド早見表
 
-| コマンド | 用途 |
-|----------|------|
-| `terraform init` | 初期化（モジュール追加時に再実行） |
-| `terraform validate` | 構文チェック |
-| `terraform plan -var-file="environments/dev.tfvars"` | 変更プレビュー |
-| `terraform apply -var-file="environments/dev.tfvars"` | 適用 |
-| `terraform destroy -var-file="environments/dev.tfvars"` | 全削除（注意！） |
-| `terraform state list` | 管理中リソース一覧 |
-| `terraform output` | 出力値確認 |
+| コマンド                                                | 用途                               |
+| ------------------------------------------------------- | ---------------------------------- |
+| `terraform init`                                        | 初期化（モジュール追加時に再実行） |
+| `terraform validate`                                    | 構文チェック                       |
+| `terraform plan -var-file="environments/dev.tfvars"`    | 変更プレビュー                     |
+| `terraform apply -var-file="environments/dev.tfvars"`   | 適用                               |
+| `terraform destroy -var-file="environments/dev.tfvars"` | 全削除（注意！）                   |
+| `terraform state list`                                  | 管理中リソース一覧                 |
+| `terraform output`                                      | 出力値確認                         |
 
 ### 6.3 注意事項
 
@@ -240,16 +247,16 @@ $TF = "C:\Users\saedg\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terrafor
 
 ### 7.1 コスト内訳（予定）
 
-| サービス | 月額コスト |
-|----------|-----------|
-| VPC Endpoints (4 Interface) | ~$14 |
-| Aurora Serverless v2 (0.5-4 ACU) | ~$30 |
-| ElastiCache (cache.t4g.micro) | ~$12 |
-| ECS Fargate Spot | ~$8 |
-| ALB | ~$16 |
-| CloudFront | ~$1 |
-| その他 (S3, CloudWatch等) | ~$5 |
-| **合計** | **~$76/月** |
+| サービス                         | 月額コスト  |
+| -------------------------------- | ----------- |
+| VPC Endpoints (4 Interface)      | ~$14        |
+| Aurora Serverless v2 (0.5-4 ACU) | ~$30        |
+| ElastiCache (cache.t4g.micro)    | ~$12        |
+| ECS Fargate Spot                 | ~$8         |
+| ALB                              | ~$16        |
+| CloudFront                       | ~$1         |
+| その他 (S3, CloudWatch等)        | ~$5         |
+| **合計**                         | **~$76/月** |
 
 ### 7.2 アーキテクチャ図
 
@@ -285,10 +292,10 @@ $TF = "C:\Users\saedg\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terrafor
 
 ## 8. 変更履歴
 
-| 日付 | 作業内容 | 担当 |
-|------|----------|------|
-| 2026-01-31 | Phase 1 (Networking) 完了 | - |
+| 日付       | 作業内容                  | 担当 |
+| ---------- | ------------------------- | ---- |
+| 2026-01-31 | Phase 1 (Networking) 完了 | -    |
 
 ---
 
-*このログは`docs/work-logs/20260131/aws-infrastructure-phase1.md`に保存されています。*
+_このログは`docs/work-logs/20260131/aws-infrastructure-phase1.md`に保存されています。_

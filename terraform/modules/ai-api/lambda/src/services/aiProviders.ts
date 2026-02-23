@@ -16,7 +16,7 @@ import { consumeProviderSSE, writeSSE } from "../utils/sse.js";
 
 export async function fetchOpenAI(
   apiKey: string,
-  request: AIChatRequest
+  request: AIChatRequest,
 ): Promise<AIChatResponse & { tokenUsage: TokenUsage }> {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -34,7 +34,7 @@ export async function fetchOpenAI(
     }),
   });
 
-  const data = await response.json() as Record<string, unknown>;
+  const data = (await response.json()) as Record<string, unknown>;
   if (!response.ok) {
     const message = (data?.error as Record<string, string>)?.message || "OpenAI API error";
     throw new Error(message);
@@ -57,7 +57,7 @@ export async function streamOpenAI(
   apiKey: string,
   request: AIChatRequest,
   stream: NodeJS.WritableStream,
-  writeFn: (payload: SSEPayload) => void
+  writeFn: (payload: SSEPayload) => void,
 ): Promise<TokenUsage> {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -77,7 +77,7 @@ export async function streamOpenAI(
   });
 
   if (!response.ok) {
-    const data = await response.json() as Record<string, unknown>;
+    const data = (await response.json()) as Record<string, unknown>;
     const message = (data?.error as Record<string, string>)?.message || "OpenAI API error";
     throw new Error(message);
   }
@@ -115,7 +115,7 @@ export async function streamOpenAI(
 
 export async function fetchAnthropic(
   apiKey: string,
-  request: AIChatRequest
+  request: AIChatRequest,
 ): Promise<AIChatResponse & { tokenUsage: TokenUsage }> {
   const systemPrompt = request.messages
     .filter((m) => m.role === "system")
@@ -143,7 +143,7 @@ export async function fetchAnthropic(
     }),
   });
 
-  const data = await response.json() as Record<string, unknown>;
+  const data = (await response.json()) as Record<string, unknown>;
   if (!response.ok) {
     const message = (data?.error as Record<string, string>)?.message || "Anthropic API error";
     throw new Error(message);
@@ -167,7 +167,7 @@ export async function streamAnthropic(
   apiKey: string,
   request: AIChatRequest,
   stream: NodeJS.WritableStream,
-  writeFn: (payload: SSEPayload) => void
+  writeFn: (payload: SSEPayload) => void,
 ): Promise<TokenUsage> {
   const systemPrompt = request.messages
     .filter((m) => m.role === "system")
@@ -196,7 +196,7 @@ export async function streamAnthropic(
   });
 
   if (!response.ok) {
-    const data = await response.json() as Record<string, unknown>;
+    const data = (await response.json()) as Record<string, unknown>;
     const message = (data?.error as Record<string, string>)?.message || "Anthropic API error";
     throw new Error(message);
   }
@@ -241,7 +241,7 @@ export async function streamAnthropic(
 
 export async function fetchGoogle(
   apiKey: string,
-  request: AIChatRequest
+  request: AIChatRequest,
 ): Promise<AIChatResponse & { tokenUsage: TokenUsage }> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${request.model}:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
@@ -260,20 +260,28 @@ export async function fetchGoogle(
     }),
   });
 
-  const data = await response.json() as Record<string, unknown>;
+  const data = (await response.json()) as Record<string, unknown>;
   if (!response.ok) {
     const message = (data?.error as Record<string, string>)?.message || "Google AI API error";
     throw new Error(message);
   }
 
   const candidates = data?.candidates as Array<Record<string, unknown>> | undefined;
-  const parts = (candidates?.[0]?.content as Record<string, unknown>)?.parts as Array<{ text?: string }> | undefined;
-  const content = parts?.map((p) => p.text).filter(Boolean).join("") ?? "";
+  const parts = (candidates?.[0]?.content as Record<string, unknown>)?.parts as
+    | Array<{ text?: string }>
+    | undefined;
+  const content =
+    parts
+      ?.map((p) => p.text)
+      .filter(Boolean)
+      .join("") ?? "";
 
-  const usageMetadata = data?.usageMetadata as {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-  } | undefined;
+  const usageMetadata = data?.usageMetadata as
+    | {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+      }
+    | undefined;
 
   return {
     content,
@@ -293,7 +301,7 @@ export async function streamGoogle(
   apiKey: string,
   request: AIChatRequest,
   stream: NodeJS.WritableStream,
-  writeFn: (payload: SSEPayload) => void
+  writeFn: (payload: SSEPayload) => void,
 ): Promise<TokenUsage> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${request.model}:streamGenerateContent?alt=sse&key=${apiKey}`;
   const response = await fetch(url, {
@@ -313,7 +321,7 @@ export async function streamGoogle(
   });
 
   if (!response.ok) {
-    const data = await response.json() as Record<string, unknown>;
+    const data = (await response.json()) as Record<string, unknown>;
     const message = (data?.error as Record<string, string>)?.message || "Google AI API error";
     throw new Error(message);
   }
@@ -335,7 +343,8 @@ export async function streamGoogle(
     }
     if (payload?.usageMetadata) {
       tokenUsage.inputTokens = payload.usageMetadata.promptTokenCount ?? tokenUsage.inputTokens;
-      tokenUsage.outputTokens = payload.usageMetadata.candidatesTokenCount ?? tokenUsage.outputTokens;
+      tokenUsage.outputTokens =
+        payload.usageMetadata.candidatesTokenCount ?? tokenUsage.outputTokens;
     }
   });
 

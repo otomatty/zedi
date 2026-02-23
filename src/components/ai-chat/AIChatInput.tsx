@@ -1,31 +1,37 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
-import { Send, Square, FileText } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { useAIChatStore } from '../../stores/aiChatStore';
-import { useAIChatContext } from '../../contexts/AIChatContext';
-import { usePagesSummary } from '../../hooks/usePageQueries';
-import type { ReferencedPage } from '../../types/aiChat';
-import { ZEDI_PAGE_MIME_TYPE, MAX_REFERENCED_PAGES } from '../../types/aiChat';
-import { AIChatModelSelector } from './AIChatModelSelector';
-import { cn } from '../../lib/utils';
+import React, { useState, useRef, useEffect, useCallback, useMemo, useDeferredValue } from "react";
+import { Send, Square, FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useAIChatStore } from "../../stores/aiChatStore";
+import { useAIChatContext } from "../../contexts/AIChatContext";
+import { usePagesSummary } from "../../hooks/usePageQueries";
+import type { ReferencedPage } from "../../types/aiChat";
+import { ZEDI_PAGE_MIME_TYPE, MAX_REFERENCED_PAGES } from "../../types/aiChat";
+import { AIChatModelSelector } from "./AIChatModelSelector";
+import { cn } from "../../lib/utils";
 
 // FileText SVG for inline chip icons (Lucide icon paths)
-const FILE_TEXT_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>';
+const FILE_TEXT_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>';
 
 /** contentEditable 内に挿入するインラインチップ要素を生成 */
 function createChipElement(id: string, title: string): HTMLSpanElement {
-  const chip = document.createElement('span');
-  chip.contentEditable = 'false';
+  const chip = document.createElement("span");
+  chip.contentEditable = "false";
   chip.dataset.pageId = id;
   chip.dataset.pageTitle = title;
   chip.className =
-    'inline-flex items-center gap-0.5 px-1.5 py-0.5 mx-0.5 rounded bg-primary/10 text-primary text-xs align-middle cursor-default select-none';
-  chip.innerHTML = FILE_TEXT_SVG + '<span class="truncate max-w-[120px]">' + escapeHtml(title) + '</span>';
+    "inline-flex items-center gap-0.5 px-1.5 py-0.5 mx-0.5 rounded bg-primary/10 text-primary text-xs align-middle cursor-default select-none";
+  chip.innerHTML =
+    FILE_TEXT_SVG + '<span class="truncate max-w-[120px]">' + escapeHtml(title) + "</span>";
   return chip;
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 interface AIChatInputProps {
@@ -53,13 +59,14 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
   const syncRefsFromDOM = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    const chips = editor.querySelectorAll<HTMLElement>('[data-page-id]');
+    const chips = editor.querySelectorAll<HTMLElement>("[data-page-id]");
     const newRefs = Array.from(chips).map((el) => ({
       id: el.dataset.pageId!,
       title: el.dataset.pageTitle!,
     }));
     setPendingRefs((prev) => {
-      if (prev.length === newRefs.length && prev.every((r, i) => r.id === newRefs[i]?.id)) return prev;
+      if (prev.length === newRefs.length && prev.every((r, i) => r.id === newRefs[i]?.id))
+        return prev;
       return newRefs;
     });
   }, []);
@@ -69,7 +76,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     const editor = editorRef.current;
     if (!editor) return;
     const hasContent =
-      (editor.textContent?.trim() ?? '') !== '' || editor.querySelector('[data-page-id]') !== null;
+      (editor.textContent?.trim() ?? "") !== "" || editor.querySelector("[data-page-id]") !== null;
     setIsEmpty(!hasContent);
   }, []);
 
@@ -95,7 +102,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       }
 
       // チップ後にスペースを挿入してカーソルを配置
-      const spacer = document.createTextNode('\u00A0');
+      const spacer = document.createTextNode("\u00A0");
       chip.after(spacer);
 
       const cursorSel = window.getSelection();
@@ -122,7 +129,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
 
     const editor = editorRef.current;
     if (editor?.querySelector(`[data-page-id="${CSS.escape(id)}"]`)) return;
-    const chips = editor?.querySelectorAll('[data-page-id]');
+    const chips = editor?.querySelectorAll("[data-page-id]");
     if (chips && chips.length >= MAX_REFERENCED_PAGES) return;
 
     insertChipAtCursor(id, title);
@@ -138,8 +145,8 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     return pages
       .filter((p) => !p.isDeleted && !pendingIds.has(p.id))
       .filter((p) => {
-        const title = (p.title || '無題のページ').toLowerCase();
-        return q === '' || title.includes(q);
+        const title = (p.title || "無題のページ").toLowerCase();
+        return q === "" || title.includes(q);
       })
       .slice(0, 8);
   }, [deferredMentionQuery, pages, pendingRefs]);
@@ -153,7 +160,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     }
     const node = sel.getRangeAt(0).startContainer;
     if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || '';
+      const text = node.textContent || "";
       const cursorPos = sel.getRangeAt(0).startOffset;
       const beforeCursor = text.slice(0, cursorPos);
       const atMatch = beforeCursor.match(/(^|[\s\u00A0])@([^\s@\u00A0]*)$/);
@@ -172,13 +179,13 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       const editor = editorRef.current;
       if (!editor) return;
 
-      const existingChips = editor.querySelectorAll('[data-page-id]');
+      const existingChips = editor.querySelectorAll("[data-page-id]");
       if (existingChips.length >= MAX_REFERENCED_PAGES) {
         setMentionQuery(null);
         return;
       }
 
-      const title = page.title || '無題のページ';
+      const title = page.title || "無題のページ";
       const sel = window.getSelection();
       if (!sel || !sel.rangeCount) {
         setMentionQuery(null);
@@ -192,10 +199,10 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
         return;
       }
 
-      const text = node.textContent || '';
+      const text = node.textContent || "";
       const cursorPos = range.startOffset;
       const beforeCursor = text.slice(0, cursorPos);
-      const lastAt = beforeCursor.lastIndexOf('@');
+      const lastAt = beforeCursor.lastIndexOf("@");
       if (lastAt < 0) {
         setMentionQuery(null);
         return;
@@ -210,7 +217,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       deleteRange.insertNode(chip);
 
       // チップ後にスペースを追加
-      const spacer = document.createTextNode('\u00A0');
+      const spacer = document.createTextNode("\u00A0");
       chip.after(spacer);
 
       const newRange = document.createRange();
@@ -237,22 +244,22 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
   /** エディタの内容をテキスト＋参照ページとして取得 */
   const getEditorContent = useCallback((): { text: string; refs: ReferencedPage[] } => {
     const editor = editorRef.current;
-    if (!editor) return { text: '', refs: [] };
+    if (!editor) return { text: "", refs: [] };
 
-    let text = '';
+    let text = "";
     const refs: ReferencedPage[] = [];
 
     const walk = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent || '';
+        text += node.textContent || "";
       } else if (node instanceof HTMLElement) {
         if (node.dataset.pageId) {
-          refs.push({ id: node.dataset.pageId, title: node.dataset.pageTitle || '' });
-          text += `@${node.dataset.pageTitle || ''}`;
-        } else if (node.tagName === 'BR') {
-          text += '\n';
-        } else if (node.tagName === 'DIV' || node.tagName === 'P') {
-          if (text.length > 0 && !text.endsWith('\n')) text += '\n';
+          refs.push({ id: node.dataset.pageId, title: node.dataset.pageTitle || "" });
+          text += `@${node.dataset.pageTitle || ""}`;
+        } else if (node.tagName === "BR") {
+          text += "\n";
+        } else if (node.tagName === "DIV" || node.tagName === "P") {
+          if (text.length > 0 && !text.endsWith("\n")) text += "\n";
           node.childNodes.forEach(walk);
         } else {
           node.childNodes.forEach(walk);
@@ -261,7 +268,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     };
     editor.childNodes.forEach(walk);
 
-    text = text.replace(/\u00A0/g, ' ').trim();
+    text = text.replace(/\u00A0/g, " ").trim();
     return { text, refs };
   }, []);
 
@@ -275,7 +282,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
 
       onSendMessage(text, refs);
 
-      if (editorRef.current) editorRef.current.innerHTML = '';
+      if (editorRef.current) editorRef.current.innerHTML = "";
       setPendingRefs([]);
       setIsEmpty(true);
       setMentionQuery(null);
@@ -287,32 +294,32 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       // @メンションドロップダウンが開いている場合
       if (mentionQuery !== null && mentionCandidates.length > 0) {
-        if (e.key === 'ArrowDown') {
+        if (e.key === "ArrowDown") {
           e.preventDefault();
           setMentionIndex((prev) => Math.min(prev + 1, mentionCandidates.length - 1));
           return;
         }
-        if (e.key === 'ArrowUp') {
+        if (e.key === "ArrowUp") {
           e.preventDefault();
           setMentionIndex((prev) => Math.max(prev - 1, 0));
           return;
         }
-        if (e.key === 'Enter' || e.key === 'Tab') {
+        if (e.key === "Enter" || e.key === "Tab") {
           e.preventDefault();
           const selected = mentionCandidates[mentionIndex];
           if (selected) {
-            selectMentionPage({ id: selected.id, title: selected.title || '無題のページ' });
+            selectMentionPage({ id: selected.id, title: selected.title || "無題のページ" });
           }
           return;
         }
-        if (e.key === 'Escape') {
+        if (e.key === "Escape") {
           e.preventDefault();
           setMentionQuery(null);
           return;
         }
       }
 
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
       }
@@ -323,15 +330,15 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
   /** ペースト時はプレーンテキストのみ挿入 */
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    if (text) document.execCommand('insertText', false, text);
+    const text = e.clipboardData.getData("text/plain");
+    if (text) document.execCommand("insertText", false, text);
   }, []);
 
   // --- D&D handlers ---
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (e.dataTransfer.types.includes(ZEDI_PAGE_MIME_TYPE)) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'link';
+      e.dataTransfer.dropEffect = "link";
       if (!isDraggingOverRef.current) {
         isDraggingOverRef.current = true;
         setIsDraggingOver(true);
@@ -357,7 +364,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
         const editor = editorRef.current;
         if (!editor) return;
         if (editor.querySelector(`[data-page-id="${CSS.escape(id)}"]`)) return;
-        if (editor.querySelectorAll('[data-page-id]').length >= MAX_REFERENCED_PAGES) return;
+        if (editor.querySelectorAll("[data-page-id]").length >= MAX_REFERENCED_PAGES) return;
         insertChipAtCursor(id, title);
       } catch {
         // ignore
@@ -367,9 +374,9 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
   );
 
   const placeholder =
-    contextEnabled && pageContext?.type === 'editor'
-      ? t('aiChat.placeholders.withContext')
-      : t('aiChat.placeholders.default');
+    contextEnabled && pageContext?.type === "editor"
+      ? t("aiChat.placeholders.withContext")
+      : t("aiChat.placeholders.default");
 
   const showMentionDropdown = mentionQuery !== null && mentionCandidates.length > 0;
 
@@ -379,24 +386,24 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       {showMentionDropdown && (
         <div
           ref={dropdownRef}
-          className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50 max-h-[240px] overflow-y-auto"
+          className="absolute bottom-full left-0 right-0 z-50 mb-1 max-h-[240px] overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
         >
           {mentionCandidates.map((page, idx) => (
             <button
               key={page.id}
               type="button"
               className={cn(
-                'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
-                idx === mentionIndex && 'bg-accent',
+                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
+                idx === mentionIndex && "bg-accent",
               )}
               onMouseDown={(e) => {
                 e.preventDefault();
-                selectMentionPage({ id: page.id, title: page.title || '無題のページ' });
+                selectMentionPage({ id: page.id, title: page.title || "無題のページ" });
               }}
               onMouseEnter={() => setMentionIndex(idx)}
             >
-              <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
-              <span className="truncate">{page.title || '無題のページ'}</span>
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{page.title || "無題のページ"}</span>
             </button>
           ))}
         </div>
@@ -405,8 +412,8 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       <form
         onSubmit={handleSubmit}
         className={cn(
-          'relative bg-background border rounded-lg p-2 focus-within:ring-1 focus-within:ring-primary transition-all',
-          isDraggingOver && 'ring-2 ring-primary border-primary bg-primary/5',
+          "relative rounded-lg border bg-background p-2 transition-all focus-within:ring-1 focus-within:ring-primary",
+          isDraggingOver && "border-primary bg-primary/5 ring-2 ring-primary",
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -424,36 +431,36 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
             onInput={handleEditorInput}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            className="max-h-[120px] min-h-[24px] overflow-y-auto bg-transparent p-1 text-sm outline-none whitespace-pre-wrap [word-break:break-word]"
+            className="max-h-[120px] min-h-[24px] overflow-y-auto whitespace-pre-wrap bg-transparent p-1 text-sm outline-none [word-break:break-word]"
           />
           {isEmpty && (
-            <div className="absolute inset-0 p-1 text-sm text-muted-foreground pointer-events-none truncate">
+            <div className="pointer-events-none absolute inset-0 truncate p-1 text-sm text-muted-foreground">
               {placeholder}
             </div>
           )}
         </div>
 
         {/* Bottom row: Model selector (left) + Send/Stop button (right) */}
-        <div className="flex items-center justify-between mt-1 pt-1 border-t border-border/50">
+        <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-1">
           <AIChatModelSelector />
 
           {isStreaming ? (
             <button
               type="button"
               onClick={onStopStreaming}
-              className="p-1.5 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors shrink-0"
-              title={t('aiChat.actions.stop')}
+              className="shrink-0 rounded-md bg-destructive p-1.5 text-destructive-foreground transition-colors hover:bg-destructive/90"
+              title={t("aiChat.actions.stop")}
             >
-              <Square className="w-4 h-4 fill-current" />
+              <Square className="h-4 w-4 fill-current" />
             </button>
           ) : (
             <button
               type="submit"
               disabled={isEmpty}
-              className="p-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-              title={t('aiChat.actions.send')}
+              className="shrink-0 rounded-md bg-primary p-1.5 text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              title={t("aiChat.actions.send")}
             >
-              <Send className="w-4 h-4" />
+              <Send className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -461,8 +468,10 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
 
       {/* Drop overlay */}
       {isDraggingOver && (
-        <div className="absolute inset-0 flex items-center justify-center bg-primary/5 rounded-lg pointer-events-none z-10">
-          <span className="text-xs text-primary font-medium">{t('aiChat.referencedPages.dropHint')}</span>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-primary/5">
+          <span className="text-xs font-medium text-primary">
+            {t("aiChat.referencedPages.dropHint")}
+          </span>
         </div>
       )}
     </div>

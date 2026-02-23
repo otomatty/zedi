@@ -23,7 +23,7 @@ interface WebClipperDialogProps {
     title: string,
     content: string,
     sourceUrl: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
   ) => void;
 }
 
@@ -41,14 +41,10 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   onClipped,
 }) => {
   const { getToken } = useAuth();
-  const api = useMemo(
-    () => createApiClient({ getToken }),
-    [getToken]
-  );
+  const api = useMemo(() => createApiClient({ getToken }), [getToken]);
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
-  const { status, clippedContent, error, clip, reset, getTiptapContent } =
-    useWebClipper({ api });
+  const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
 
   // ダイアログを閉じたときにリセット
   useEffect(() => {
@@ -82,12 +78,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     if (result) {
       const tiptapContent = getTiptapContent();
       if (tiptapContent) {
-        onClipped(
-          result.title,
-          tiptapContent,
-          result.sourceUrl,
-          result.thumbnailUrl
-        );
+        onClipped(result.title, tiptapContent, result.sourceUrl, result.thumbnailUrl);
         onOpenChange(false);
       }
     }
@@ -113,8 +104,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
             URLから取り込み
           </DialogTitle>
           <DialogDescription>
-            Webページの本文を抽出してページとして保存します。
-            引用元URLは自動的に記録されます。
+            Webページの本文を抽出してページとして保存します。 引用元URLは自動的に記録されます。
           </DialogDescription>
         </DialogHeader>
 
@@ -152,9 +142,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
                 <div className="space-y-1">
                   <div className="font-medium">{clippedContent.title}</div>
                   {clippedContent.siteName && (
-                    <div className="text-xs opacity-70">
-                      {clippedContent.siteName}
-                    </div>
+                    <div className="text-xs opacity-70">{clippedContent.siteName}</div>
                   )}
                 </div>
               </AlertDescription>
@@ -176,11 +164,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isProcessing}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
             キャンセル
           </Button>
           <Button onClick={handleClip} disabled={isProcessing || !url.trim()}>

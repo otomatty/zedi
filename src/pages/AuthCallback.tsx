@@ -30,7 +30,7 @@ export default function AuthCallback() {
       const qs = window.location.search;
       const msg = qs
         ? `No authorization code in URL. Query: ${qs}`
-        : "No authorization code received. If you clicked \"Sign in with Google\", check that GCP has the Cognito redirect URI (see docs/guides/troubleshooting-cognito-google-callback.md).";
+        : 'No authorization code received. If you clicked "Sign in with Google", check that GCP has the Cognito redirect URI (see docs/guides/troubleshooting-cognito-google-callback.md).';
       setError(msg);
       return;
     }
@@ -62,8 +62,8 @@ export default function AuthCallback() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <p className="text-destructive mb-4">{error}</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <p className="mb-4 text-destructive">{error}</p>
         <a href="/sign-in" className="text-primary hover:underline">
           {t("auth.backToSignIn")}
         </a>
@@ -72,7 +72,7 @@ export default function AuthCallback() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <p className="text-muted-foreground">{t("auth.signingIn")}</p>
     </div>
   );

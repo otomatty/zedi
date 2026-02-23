@@ -8,14 +8,14 @@
 
 ## 1. 作業サマリー
 
-| 項目 | 内容 |
-|------|------|
-| 完了フェーズ | Phase 0（スラッシュコマンド）、Phase 1（タスクリスト・ハイライト・下線・コードブロック）、Phase 2（テーブル）、Phase 3（文字色）、Phase 4（数式）、共通作業 |
-| 新規ファイル | 7 件 |
-| 変更ファイル | 6 件 |
-| 追加 npm パッケージ | 19 パッケージ（依存含む） |
-| ビルド | 成功 |
-| 関連テスト | contentUtils 31 件すべて通過 |
+| 項目                | 内容                                                                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 完了フェーズ        | Phase 0（スラッシュコマンド）、Phase 1（タスクリスト・ハイライト・下線・コードブロック）、Phase 2（テーブル）、Phase 3（文字色）、Phase 4（数式）、共通作業 |
+| 新規ファイル        | 7 件                                                                                                                                                        |
+| 変更ファイル        | 6 件                                                                                                                                                        |
+| 追加 npm パッケージ | 19 パッケージ（依存含む）                                                                                                                                   |
+| ビルド              | 成功                                                                                                                                                        |
+| 関連テスト          | contentUtils 31 件すべて通過                                                                                                                                |
 
 ---
 
@@ -39,15 +39,15 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 ## 3. 新規作成ファイル
 
-| ファイルパス | 説明 |
-|--------------|------|
-| `src/components/editor/extensions/slashSuggestionPlugin.ts` | スラッシュコマンド用 ProseMirror プラグイン。行頭または「スペース + /」でトリガー。`/` 以降の文字列を query として保持し、`onStateChange` で親に通知。`slashSuggestionPluginKey` で `close` meta を処理。 |
-| `src/components/editor/TiptapEditor/slashCommandItems.ts` | スラッシュメニュー項目定義（15 項目）。`id`, `title`, `description`, `aliases`, `icon`, `isAvailable(editor)`, `action(editor, range)`。`filterSlashCommandItems()` で query と拡張の有無でフィルタ。 |
-| `src/components/editor/TiptapEditor/SlashSuggestionLayer.tsx` | スラッシュメニュー UI。`SlashSuggestionHandle` ref で ArrowUp/Down・Enter・Escape を処理。Lucide アイコン・説明文表示。`slashCommandItems` と `filterSlashCommandItems` を利用。 |
-| `src/components/editor/TiptapEditor/EditorBubbleMenu.tsx` | テキスト選択時の Bubble Menu。太字・イタリック・取り消し線・コード・ハイライト、箇条書き・番号付き・タスクリスト、テーブル挿入、文字色（8 色プリセット + デフォルト）。`TiptapBubbleMenu` を使用。 |
-| `src/components/editor/TiptapEditor/TableBubbleMenu.tsx` | テーブル内セル選択時の Bubble Menu。行の追加（前/後）・削除、列の追加（前/後）・削除、ヘッダー行トグル、テーブル削除。 |
-| `src/components/editor/TiptapEditor/MathEditDialog.tsx` | 数式（LaTeX）編集用ダイアログ。`initialLatex`, `isBlock`, `onSave(latex)`。Ctrl+Enter で保存。Radix Dialog + Textarea。 |
-| `docs/plans/20260215/editor-extensions-work-log.md` | 本作業ログ。 |
+| ファイルパス                                                  | 説明                                                                                                                                                                                                      |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/editor/extensions/slashSuggestionPlugin.ts`   | スラッシュコマンド用 ProseMirror プラグイン。行頭または「スペース + /」でトリガー。`/` 以降の文字列を query として保持し、`onStateChange` で親に通知。`slashSuggestionPluginKey` で `close` meta を処理。 |
+| `src/components/editor/TiptapEditor/slashCommandItems.ts`     | スラッシュメニュー項目定義（15 項目）。`id`, `title`, `description`, `aliases`, `icon`, `isAvailable(editor)`, `action(editor, range)`。`filterSlashCommandItems()` で query と拡張の有無でフィルタ。     |
+| `src/components/editor/TiptapEditor/SlashSuggestionLayer.tsx` | スラッシュメニュー UI。`SlashSuggestionHandle` ref で ArrowUp/Down・Enter・Escape を処理。Lucide アイコン・説明文表示。`slashCommandItems` と `filterSlashCommandItems` を利用。                          |
+| `src/components/editor/TiptapEditor/EditorBubbleMenu.tsx`     | テキスト選択時の Bubble Menu。太字・イタリック・取り消し線・コード・ハイライト、箇条書き・番号付き・タスクリスト、テーブル挿入、文字色（8 色プリセット + デフォルト）。`TiptapBubbleMenu` を使用。        |
+| `src/components/editor/TiptapEditor/TableBubbleMenu.tsx`      | テーブル内セル選択時の Bubble Menu。行の追加（前/後）・削除、列の追加（前/後）・削除、ヘッダー行トグル、テーブル削除。                                                                                    |
+| `src/components/editor/TiptapEditor/MathEditDialog.tsx`       | 数式（LaTeX）編集用ダイアログ。`initialLatex`, `isBlock`, `onSave(latex)`。Ctrl+Enter で保存。Radix Dialog + Textarea。                                                                                   |
+| `docs/plans/20260215/editor-extensions-work-log.md`           | 本作業ログ。                                                                                                                                                                                              |
 
 ---
 
@@ -89,23 +89,23 @@ bun add @tiptap/extension-task-list @tiptap/extension-task-item \
 
 ## 5. スラッシュメニュー項目一覧
 
-| 表示名 | エイリアス（検索用） | 挿入内容 |
-|--------|----------------------|----------|
-| 段落 | 段落, paragraph, p, text | setParagraph |
-| 見出し1 | 見出し1, h1, 大見出し, heading | heading level 1 |
-| 見出し2 | 見出し2, h2, 中見出し, heading | heading level 2 |
-| 見出し3 | 見出し3, h3, 小見出し, heading | heading level 3 |
-| 箇条書き | 箇条書き, ul, リスト, bullet, list | toggleBulletList |
-| 番号付きリスト | 番号, ol, 順序付き, ordered, number | toggleOrderedList |
-| タスクリスト | タスク, todo, チェック, task, checkbox | toggleTaskList |
-| 引用 | 引用, blockquote, quote | setBlockquote |
-| コードブロック | コード, code, pre, プログラム | setCodeBlock |
-| 水平線 | 区切り線, hr, 水平, divider, separator | setHorizontalRule |
-| テーブル | テーブル, 表, table | insertTable(3x3, withHeaderRow) |
-| 画像 | 画像, image, img, 写真 | カスタムイベントでファイル選択 |
-| ダイアグラム | ダイアグラム, mermaid, 図, diagram, flowchart | insertMermaid(サンプル) |
-| 数式（インライン） | 数式, math, インライン, latex | insertContent(math, E=mc^2) |
-| 数式（ブロック） | 数式ブロック, block math, ブロック数式, equation | insertContent(mathBlock) |
+| 表示名             | エイリアス（検索用）                             | 挿入内容                        |
+| ------------------ | ------------------------------------------------ | ------------------------------- |
+| 段落               | 段落, paragraph, p, text                         | setParagraph                    |
+| 見出し1            | 見出し1, h1, 大見出し, heading                   | heading level 1                 |
+| 見出し2            | 見出し2, h2, 中見出し, heading                   | heading level 2                 |
+| 見出し3            | 見出し3, h3, 小見出し, heading                   | heading level 3                 |
+| 箇条書き           | 箇条書き, ul, リスト, bullet, list               | toggleBulletList                |
+| 番号付きリスト     | 番号, ol, 順序付き, ordered, number              | toggleOrderedList               |
+| タスクリスト       | タスク, todo, チェック, task, checkbox           | toggleTaskList                  |
+| 引用               | 引用, blockquote, quote                          | setBlockquote                   |
+| コードブロック     | コード, code, pre, プログラム                    | setCodeBlock                    |
+| 水平線             | 区切り線, hr, 水平, divider, separator           | setHorizontalRule               |
+| テーブル           | テーブル, 表, table                              | insertTable(3x3, withHeaderRow) |
+| 画像               | 画像, image, img, 写真                           | カスタムイベントでファイル選択  |
+| ダイアグラム       | ダイアグラム, mermaid, 図, diagram, flowchart    | insertMermaid(サンプル)         |
+| 数式（インライン） | 数式, math, インライン, latex                    | insertContent(math, E=mc^2)     |
+| 数式（ブロック）   | 数式ブロック, block math, ブロック数式, equation | insertContent(mathBlock)        |
 
 ---
 

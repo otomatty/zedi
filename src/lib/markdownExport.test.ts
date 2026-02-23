@@ -37,8 +37,14 @@ describe("tiptapToMarkdown", () => {
         {
           type: "bulletList",
           content: [
-            { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item A" }] }] },
-            { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item B" }] }] },
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Item A" }] }],
+            },
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Item B" }] }],
+            },
           ],
         },
       ],
@@ -55,8 +61,14 @@ describe("tiptapToMarkdown", () => {
         {
           type: "orderedList",
           content: [
-            { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "First" }] }] },
-            { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Second" }] }] },
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "First" }] }],
+            },
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Second" }] }],
+            },
           ],
         },
       ],
@@ -72,9 +84,7 @@ describe("tiptapToMarkdown", () => {
       content: [
         {
           type: "blockquote",
-          content: [
-            { type: "paragraph", content: [{ type: "text", text: "Quoted text" }] },
-          ],
+          content: [{ type: "paragraph", content: [{ type: "text", text: "Quoted text" }] }],
         },
       ],
     });
@@ -156,9 +166,7 @@ describe("tiptapToMarkdown", () => {
       content: [
         {
           type: "paragraph",
-          content: [
-            { type: "wikiLink", attrs: { title: "My Page" } },
-          ],
+          content: [{ type: "wikiLink", attrs: { title: "My Page" } }],
         },
       ],
     });

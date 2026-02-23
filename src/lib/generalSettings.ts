@@ -1,9 +1,6 @@
 // 一般設定の保存/読み込み機能（localStorage）
 
-import {
-  GeneralSettings,
-  DEFAULT_GENERAL_SETTINGS,
-} from "@/types/generalSettings";
+import { GeneralSettings, DEFAULT_GENERAL_SETTINGS } from "@/types/generalSettings";
 
 const STORAGE_KEY = "zedi-general-settings";
 

@@ -5,22 +5,22 @@
  * POST /api/media/confirm  — アップロード完了通知
  * GET  /api/media/:id      — メディア取得 (302 → S3 signed URL)
  */
-import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
-import { eq } from 'drizzle-orm';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { media } from '../schema';
-import { getEnvConfig } from '../env';
-import { authRequired } from '../middleware/auth';
-import type { AppEnv } from '../types';
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { eq } from "drizzle-orm";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { media } from "../schema";
+import { getEnvConfig } from "../env";
+import { authRequired } from "../middleware/auth";
+import type { AppEnv } from "../types";
 
 const s3 = new S3Client({});
 const app = new Hono<AppEnv>();
 
 // ── POST /media/upload ──────────────────────────────────────────────────────
-app.post('/upload', authRequired, async (c) => {
-  const userId = c.get('userId');
+app.post("/upload", authRequired, async (c) => {
+  const userId = c.get("userId");
   const env = getEnvConfig();
 
   const body = await c.req.json<{
@@ -32,7 +32,7 @@ app.post('/upload', authRequired, async (c) => {
 
   if (!body.file_name || !body.content_type) {
     throw new HTTPException(400, {
-      message: 'file_name and content_type are required',
+      message: "file_name and content_type are required",
     });
   }
 
@@ -58,9 +58,9 @@ app.post('/upload', authRequired, async (c) => {
 });
 
 // ── POST /media/confirm ─────────────────────────────────────────────────────
-app.post('/confirm', authRequired, async (c) => {
-  const userId = c.get('userId');
-  const db = c.get('db');
+app.post("/confirm", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
 
   const body = await c.req.json<{
     media_id: string;
@@ -73,7 +73,7 @@ app.post('/confirm', authRequired, async (c) => {
 
   if (!body.media_id || !body.s3_key) {
     throw new HTTPException(400, {
-      message: 'media_id and s3_key are required',
+      message: "media_id and s3_key are required",
     });
   }
 
@@ -94,19 +94,15 @@ app.post('/confirm', authRequired, async (c) => {
 });
 
 // ── GET /media/:id ──────────────────────────────────────────────────────────
-app.get('/:id', authRequired, async (c) => {
-  const mediaId = c.req.param('id');
-  const db = c.get('db');
+app.get("/:id", authRequired, async (c) => {
+  const mediaId = c.req.param("id");
+  const db = c.get("db");
   const env = getEnvConfig();
 
-  const result = await db
-    .select()
-    .from(media)
-    .where(eq(media.id, mediaId))
-    .limit(1);
+  const result = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
 
   if (!result.length) {
-    throw new HTTPException(404, { message: 'Media not found' });
+    throw new HTTPException(404, { message: "Media not found" });
   }
 
   // 署名付き GET URL を生成して 302 リダイレクト

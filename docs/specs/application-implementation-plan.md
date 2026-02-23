@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0  
 **Created:** 2026-01-31  
-**Status:** Draft  
+**Status:** Draft
 
 ---
 
@@ -107,16 +107,16 @@ src/
 ```typescript
 // server/src/hocuspocus/server.ts
 
-import { Hocuspocus } from '@hocuspocus/server';
-import { Logger } from '@hocuspocus/extension-logger';
-import { Redis } from '@hocuspocus/extension-redis';
-import { config } from '../config';
-import { databaseExtension } from './extensions/database';
-import { onAuthenticate } from './hooks/onAuthenticate';
-import { onConnect } from './hooks/onConnect';
-import { onDisconnect } from './hooks/onDisconnect';
-import { onLoadDocument } from './hooks/onLoadDocument';
-import { metricsExtension } from './extensions/metrics';
+import { Hocuspocus } from "@hocuspocus/server";
+import { Logger } from "@hocuspocus/extension-logger";
+import { Redis } from "@hocuspocus/extension-redis";
+import { config } from "../config";
+import { databaseExtension } from "./extensions/database";
+import { onAuthenticate } from "./hooks/onAuthenticate";
+import { onConnect } from "./hooks/onConnect";
+import { onDisconnect } from "./hooks/onDisconnect";
+import { onLoadDocument } from "./hooks/onLoadDocument";
+import { metricsExtension } from "./extensions/metrics";
 
 export function createHocuspocusServer() {
   const server = new Hocuspocus({
@@ -125,7 +125,7 @@ export function createHocuspocusServer() {
     timeout: 30000,
     debounce: 2000,
     maxDebounce: 10000,
-    quiet: config.environment === 'production',
+    quiet: config.environment === "production",
 
     extensions: [
       // ログ
@@ -187,13 +187,9 @@ export function createHocuspocusServer() {
 ```typescript
 // server/src/hocuspocus/hooks/onAuthenticate.ts
 
-import {
-  onAuthenticatePayload,
-  Forbidden,
-  Unauthorized,
-} from '@hocuspocus/server';
-import { verifyJWT, JWTPayload } from '../../services/auth';
-import { checkDocumentAccess } from '../../services/document';
+import { onAuthenticatePayload, Forbidden, Unauthorized } from "@hocuspocus/server";
+import { verifyJWT, JWTPayload } from "../../services/auth";
+import { checkDocumentAccess } from "../../services/document";
 
 export async function onAuthenticate({
   documentName,
@@ -201,26 +197,26 @@ export async function onAuthenticate({
 }: onAuthenticatePayload): Promise<{ user: JWTPayload }> {
   // トークン検証
   if (!token) {
-    throw new Unauthorized('Token required');
+    throw new Unauthorized("Token required");
   }
 
   let user: JWTPayload;
   try {
     user = await verifyJWT(token);
   } catch (error) {
-    console.error('[Auth] JWT verification failed:', error);
-    throw new Unauthorized('Invalid token');
+    console.error("[Auth] JWT verification failed:", error);
+    throw new Unauthorized("Invalid token");
   }
 
   // ドキュメントアクセス権確認
-  const [, pageId] = documentName.split('-');
+  const [, pageId] = documentName.split("-");
   if (!pageId) {
-    throw new Forbidden('Invalid document name');
+    throw new Forbidden("Invalid document name");
   }
 
-  const hasAccess = await checkDocumentAccess(user.sub, pageId, 'edit');
+  const hasAccess = await checkDocumentAccess(user.sub, pageId, "edit");
   if (!hasAccess) {
-    throw new Forbidden('Access denied');
+    throw new Forbidden("Access denied");
   }
 
   return { user };
@@ -232,24 +228,24 @@ export async function onAuthenticate({
 ```typescript
 // server/src/hocuspocus/extensions/database.ts
 
-import { Extension, onLoadDocumentPayload, onStoreDocumentPayload } from '@hocuspocus/server';
-import * as Y from 'yjs';
-import { db } from '../../db/client';
-import { extractTextFromYDoc, extractTitleFromYDoc } from '../../utils/yjs';
+import { Extension, onLoadDocumentPayload, onStoreDocumentPayload } from "@hocuspocus/server";
+import * as Y from "yjs";
+import { db } from "../../db/client";
+import { extractTextFromYDoc, extractTitleFromYDoc } from "../../utils/yjs";
 
 class DatabaseExtension implements Extension {
   /**
    * ドキュメント読み込み時
    */
   async onLoadDocument({ documentName, document }: onLoadDocumentPayload): Promise<void> {
-    const [, pageId] = documentName.split('-');
+    const [, pageId] = documentName.split("-");
     if (!pageId) return;
 
     console.log(`[DB] Loading document: ${pageId}`);
 
     const result = await db.query(
-      'SELECT ydoc_state FROM documents WHERE id = $1 AND is_deleted = FALSE',
-      [pageId]
+      "SELECT ydoc_state FROM documents WHERE id = $1 AND is_deleted = FALSE",
+      [pageId],
     );
 
     if (result.rows.length > 0 && result.rows[0].ydoc_state) {
@@ -265,7 +261,7 @@ class DatabaseExtension implements Extension {
    * ドキュメント保存時（デバウンス後）
    */
   async onStoreDocument({ documentName, document, state }: onStoreDocumentPayload): Promise<void> {
-    const [, pageId] = documentName.split('-');
+    const [, pageId] = documentName.split("-");
     if (!pageId) return;
 
     // Y.Docからテキスト抽出（検索用）
@@ -287,7 +283,7 @@ class DatabaseExtension implements Extension {
         ydoc_version = documents.ydoc_version + 1,
         updated_at = NOW()
       `,
-      [pageId, Buffer.from(state), title, contentText, contentPreview]
+      [pageId, Buffer.from(state), title, contentText, contentPreview],
     );
 
     console.log(`[DB] Stored document: ${pageId}`);
@@ -363,11 +359,11 @@ CMD ["node", "dist/index.js"]
 ```typescript
 // src/lib/collaboration/CollaborationManager.ts
 
-import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
-import { IndexeddbPersistence } from 'y-indexeddb';
-import { Awareness } from 'y-protocols/awareness';
-import type { UserPresence, ConnectionStatus, CollaborationState } from './types';
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
+import { IndexeddbPersistence } from "y-indexeddb";
+import { Awareness } from "y-protocols/awareness";
+import type { UserPresence, ConnectionStatus, CollaborationState } from "./types";
 
 export class CollaborationManager {
   private ydoc: Y.Doc;
@@ -382,27 +378,24 @@ export class CollaborationManager {
   constructor(
     pageId: string,
     userId: string,
-    private getAuthToken: () => Promise<string | null>
+    private getAuthToken: () => Promise<string | null>,
   ) {
     this.pageId = pageId;
     this.userId = userId;
     this.ydoc = new Y.Doc();
 
     this.state = {
-      status: 'connecting',
+      status: "connecting",
       isSynced: false,
       onlineUsers: [],
       pendingChanges: 0,
     };
 
     // Layer 2: IndexedDB永続化（常時有効）
-    this.idbProvider = new IndexeddbPersistence(
-      `zedi-doc-${pageId}`,
-      this.ydoc
-    );
+    this.idbProvider = new IndexeddbPersistence(`zedi-doc-${pageId}`, this.ydoc);
 
-    this.idbProvider.on('synced', () => {
-      console.log('[Collab] IndexedDB synced');
+    this.idbProvider.on("synced", () => {
+      console.log("[Collab] IndexedDB synced");
       // ローカル同期完了後にWebSocket接続
       this.connectWebSocket();
     });
@@ -411,30 +404,25 @@ export class CollaborationManager {
   private async connectWebSocket() {
     const token = await this.getAuthToken();
     if (!token) {
-      console.warn('[Collab] No auth token, staying offline');
-      this.updateState({ status: 'disconnected' });
+      console.warn("[Collab] No auth token, staying offline");
+      this.updateState({ status: "disconnected" });
       return;
     }
 
-    const wsUrl = import.meta.env.VITE_REALTIME_URL || 'wss://realtime.zedi-note.app';
-    
-    this.wsProvider = new WebsocketProvider(
-      wsUrl,
-      `page-${this.pageId}`,
-      this.ydoc,
-      {
-        params: { token },
-        connect: true,
-        awareness: new Awareness(this.ydoc),
-        resyncInterval: 10000,
-        maxBackoffTime: 30000,
-      }
-    );
+    const wsUrl = import.meta.env.VITE_REALTIME_URL || "wss://realtime.zedi-note.app";
+
+    this.wsProvider = new WebsocketProvider(wsUrl, `page-${this.pageId}`, this.ydoc, {
+      params: { token },
+      connect: true,
+      awareness: new Awareness(this.ydoc),
+      resyncInterval: 10000,
+      maxBackoffTime: 30000,
+    });
 
     this.awareness = this.wsProvider.awareness;
 
     // 接続状態監視
-    this.wsProvider.on('status', ({ status }: { status: string }) => {
+    this.wsProvider.on("status", ({ status }: { status: string }) => {
       console.log(`[Collab] WebSocket status: ${status}`);
       this.updateState({
         status: status as ConnectionStatus,
@@ -442,19 +430,19 @@ export class CollaborationManager {
     });
 
     // 同期完了
-    this.wsProvider.on('sync', (isSynced: boolean) => {
+    this.wsProvider.on("sync", (isSynced: boolean) => {
       console.log(`[Collab] Sync status: ${isSynced}`);
       this.updateState({ isSynced });
     });
 
     // プレゼンス変更
-    this.awareness.on('change', () => {
+    this.awareness.on("change", () => {
       this.updatePresence();
     });
 
     // ローカルプレゼンス設定
     this.setLocalPresence({
-      status: 'active',
+      status: "active",
       cursor: null,
       selection: null,
     });
@@ -534,7 +522,7 @@ export class CollaborationManager {
    * XmlFragmentを取得（Tiptap用）
    */
   get xmlFragment(): Y.XmlFragment {
-    return this.ydoc.getXmlFragment('prosemirror');
+    return this.ydoc.getXmlFragment("prosemirror");
   }
 
   /**
@@ -584,10 +572,10 @@ export class CollaborationManager {
 ```typescript
 // src/hooks/useCollaboration.ts
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { CollaborationManager } from '@/lib/collaboration/CollaborationManager';
-import type { CollaborationState } from '@/lib/collaboration/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { CollaborationManager } from "@/lib/collaboration/CollaborationManager";
+import type { CollaborationState } from "@/lib/collaboration/types";
+import { useAuth } from "@/hooks/useAuth";
 
 interface UseCollaborationOptions {
   pageId: string;
@@ -597,7 +585,7 @@ interface UseCollaborationOptions {
 export function useCollaboration({ pageId, enabled = true }: UseCollaborationOptions) {
   const { userId, getToken } = useAuth();
   const [state, setState] = useState<CollaborationState>({
-    status: 'connecting',
+    status: "connecting",
     isSynced: false,
     onlineUsers: [],
     pendingChanges: 0,
@@ -608,14 +596,10 @@ export function useCollaboration({ pageId, enabled = true }: UseCollaborationOpt
   useEffect(() => {
     if (!enabled || !pageId || !userId) return;
 
-    const manager = new CollaborationManager(
-      pageId,
-      userId,
-      async () => {
-        const token = await getToken();
-        return token;
-      }
-    );
+    const manager = new CollaborationManager(pageId, userId, async () => {
+      const token = await getToken();
+      return token;
+    });
 
     managerRef.current = manager;
 
@@ -911,15 +895,15 @@ import {
   InitiateAuthCommand,
   GetUserCommand,
   GlobalSignOutCommand,
-} from '@aws-sdk/client-cognito-identity-provider';
+} from "@aws-sdk/client-cognito-identity-provider";
 import {
   CognitoIdentityClient,
   GetIdCommand,
   GetCredentialsForIdentityCommand,
-} from '@aws-sdk/client-cognito-identity';
+} from "@aws-sdk/client-cognito-identity";
 
 const config = {
-  region: import.meta.env.VITE_AWS_REGION || 'ap-northeast-1',
+  region: import.meta.env.VITE_AWS_REGION || "ap-northeast-1",
   userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
   clientId: import.meta.env.VITE_COGNITO_CLIENT_ID,
   identityPoolId: import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID,
@@ -964,7 +948,7 @@ class CognitoAuthClient {
   }
 
   private loadFromStorage() {
-    const stored = localStorage.getItem('zedi_auth');
+    const stored = localStorage.getItem("zedi_auth");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -972,16 +956,16 @@ class CognitoAuthClient {
           this.state = parsed;
         }
       } catch {
-        localStorage.removeItem('zedi_auth');
+        localStorage.removeItem("zedi_auth");
       }
     }
   }
 
   private saveToStorage() {
     if (this.state.tokens) {
-      localStorage.setItem('zedi_auth', JSON.stringify(this.state));
+      localStorage.setItem("zedi_auth", JSON.stringify(this.state));
     } else {
-      localStorage.removeItem('zedi_auth');
+      localStorage.removeItem("zedi_auth");
     }
   }
 
@@ -994,7 +978,7 @@ class CognitoAuthClient {
    */
   async signIn(email: string, password: string): Promise<void> {
     const command = new InitiateAuthCommand({
-      AuthFlow: 'USER_PASSWORD_AUTH',
+      AuthFlow: "USER_PASSWORD_AUTH",
       ClientId: config.clientId,
       AuthParameters: {
         USERNAME: email,
@@ -1005,11 +989,10 @@ class CognitoAuthClient {
     const response = await cognitoClient.send(command);
 
     if (!response.AuthenticationResult) {
-      throw new Error('Authentication failed');
+      throw new Error("Authentication failed");
     }
 
-    const { AccessToken, IdToken, RefreshToken, ExpiresIn } =
-      response.AuthenticationResult;
+    const { AccessToken, IdToken, RefreshToken, ExpiresIn } = response.AuthenticationResult;
 
     this.state.tokens = {
       accessToken: AccessToken!,
@@ -1034,10 +1017,10 @@ class CognitoAuthClient {
         await cognitoClient.send(
           new GlobalSignOutCommand({
             AccessToken: this.state.tokens.accessToken,
-          })
+          }),
         );
       } catch (error) {
-        console.error('Sign out error:', error);
+        console.error("Sign out error:", error);
       }
     }
 
@@ -1062,9 +1045,9 @@ class CognitoAuthClient {
       response.UserAttributes?.find((attr) => attr.Name === name)?.Value;
 
     this.state.user = {
-      sub: getAttribute('sub')!,
-      email: getAttribute('email')!,
-      displayName: getAttribute('custom:display_name'),
+      sub: getAttribute("sub")!,
+      email: getAttribute("email")!,
+      displayName: getAttribute("custom:display_name"),
     };
   }
 
@@ -1073,11 +1056,11 @@ class CognitoAuthClient {
    */
   async refreshTokens(): Promise<void> {
     if (!this.state.tokens?.refreshToken) {
-      throw new Error('No refresh token');
+      throw new Error("No refresh token");
     }
 
     const command = new InitiateAuthCommand({
-      AuthFlow: 'REFRESH_TOKEN_AUTH',
+      AuthFlow: "REFRESH_TOKEN_AUTH",
       ClientId: config.clientId,
       AuthParameters: {
         REFRESH_TOKEN: this.state.tokens.refreshToken,
@@ -1087,7 +1070,7 @@ class CognitoAuthClient {
     const response = await cognitoClient.send(command);
 
     if (!response.AuthenticationResult) {
-      throw new Error('Token refresh failed');
+      throw new Error("Token refresh failed");
     }
 
     const { AccessToken, IdToken, ExpiresIn } = response.AuthenticationResult;
@@ -1114,7 +1097,7 @@ class CognitoAuthClient {
       try {
         await this.refreshTokens();
       } catch (error) {
-        console.error('Token refresh failed:', error);
+        console.error("Token refresh failed:", error);
         await this.signOut();
         return null;
       }
@@ -1156,11 +1139,11 @@ export const cognitoClient = new CognitoAuthClient();
 ```typescript
 // scripts/migration/turso-to-aurora.ts
 
-import { createClient } from '@libsql/client';
-import { Pool } from 'pg';
-import * as Y from 'yjs';
-import { prosemirrorJSONToYXmlFragment } from 'y-prosemirror';
-import { schema } from '../../server/src/utils/tiptapSchema';
+import { createClient } from "@libsql/client";
+import { Pool } from "pg";
+import * as Y from "yjs";
+import { prosemirrorJSONToYXmlFragment } from "y-prosemirror";
+import { schema } from "../../server/src/utils/tiptapSchema";
 
 const tursoClient = createClient({
   url: process.env.TURSO_DATABASE_URL!,
@@ -1172,12 +1155,10 @@ const auroraPool = new Pool({
 });
 
 async function migrateUsers() {
-  console.log('Migrating users...');
+  console.log("Migrating users...");
 
   // Tursoからユーザー取得（Clerkのuser_id）
-  const result = await tursoClient.execute(
-    'SELECT DISTINCT user_id FROM pages'
-  );
+  const result = await tursoClient.execute("SELECT DISTINCT user_id FROM pages");
 
   for (const row of result.rows) {
     const userId = row.user_id as string;
@@ -1189,7 +1170,7 @@ async function migrateUsers() {
       VALUES ($1, $1, $1 || '@migrated.local', NOW())
       ON CONFLICT (id) DO NOTHING
       `,
-      [userId]
+      [userId],
     );
   }
 
@@ -1197,7 +1178,7 @@ async function migrateUsers() {
 }
 
 async function migratePages() {
-  console.log('Migrating pages...');
+  console.log("Migrating pages...");
 
   const result = await tursoClient.execute(`
     SELECT id, user_id, title, content, content_preview, thumbnail_url, 
@@ -1212,11 +1193,11 @@ async function migratePages() {
     try {
       // Tiptap JSON → Y.Doc変換
       const ydoc = new Y.Doc();
-      
+
       if (row.content) {
         try {
           const tiptapContent = JSON.parse(row.content as string);
-          const yXmlFragment = ydoc.getXmlFragment('prosemirror');
+          const yXmlFragment = ydoc.getXmlFragment("prosemirror");
           prosemirrorJSONToYXmlFragment(schema, tiptapContent, yXmlFragment);
         } catch (parseError) {
           console.warn(`Failed to parse content for page ${row.id}:`, parseError);
@@ -1225,10 +1206,10 @@ async function migratePages() {
       }
 
       // メタデータ設定
-      const meta = ydoc.getMap('meta');
-      meta.set('title', row.title || '');
-      meta.set('createdAt', row.created_at);
-      meta.set('updatedAt', row.updated_at);
+      const meta = ydoc.getMap("meta");
+      meta.set("title", row.title || "");
+      meta.set("createdAt", row.created_at);
+      meta.set("updatedAt", row.updated_at);
 
       // Y.Docをバイナリにエンコード
       const ydocState = Y.encodeStateAsUpdate(ydoc);
@@ -1257,7 +1238,7 @@ async function migratePages() {
           row.is_deleted === 1,
           new Date(row.created_at as number),
           new Date(row.updated_at as number),
-        ]
+        ],
       );
 
       migrated++;
@@ -1274,9 +1255,9 @@ async function migratePages() {
 }
 
 async function migrateLinks() {
-  console.log('Migrating links...');
+  console.log("Migrating links...");
 
-  const result = await tursoClient.execute('SELECT * FROM links');
+  const result = await tursoClient.execute("SELECT * FROM links");
 
   for (const row of result.rows) {
     await auroraPool.query(
@@ -1285,7 +1266,7 @@ async function migrateLinks() {
       VALUES ($1, $2, $3)
       ON CONFLICT DO NOTHING
       `,
-      [row.source_id, row.target_id, new Date(row.created_at as number)]
+      [row.source_id, row.target_id, new Date(row.created_at as number)],
     );
   }
 
@@ -1293,9 +1274,9 @@ async function migrateLinks() {
 }
 
 async function migrateGhostLinks() {
-  console.log('Migrating ghost links...');
+  console.log("Migrating ghost links...");
 
-  const result = await tursoClient.execute('SELECT * FROM ghost_links');
+  const result = await tursoClient.execute("SELECT * FROM ghost_links");
 
   for (const row of result.rows) {
     await auroraPool.query(
@@ -1304,7 +1285,7 @@ async function migrateGhostLinks() {
       VALUES ($1, $2, $3)
       ON CONFLICT DO NOTHING
       `,
-      [row.link_text, row.source_page_id, new Date(row.created_at as number)]
+      [row.link_text, row.source_page_id, new Date(row.created_at as number)],
     );
   }
 
@@ -1312,7 +1293,7 @@ async function migrateGhostLinks() {
 }
 
 async function main() {
-  console.log('Starting migration from Turso to Aurora...\n');
+  console.log("Starting migration from Turso to Aurora...\n");
 
   try {
     await migrateUsers();
@@ -1320,9 +1301,9 @@ async function main() {
     await migrateLinks();
     await migrateGhostLinks();
 
-    console.log('\n✅ Migration completed successfully!');
+    console.log("\n✅ Migration completed successfully!");
   } catch (error) {
-    console.error('\n❌ Migration failed:', error);
+    console.error("\n❌ Migration failed:", error);
     process.exit(1);
   } finally {
     await auroraPool.end();
@@ -1338,52 +1319,52 @@ main();
 
 ### Phase 2: サーバーサイド実装 (Week 3-4)
 
-| # | タスク | 優先度 | 見積時間 |
-|---|--------|--------|----------|
-| 2.1 | server/ プロジェクト初期化 | 高 | 2h |
-| 2.2 | Hocuspocusサーバー基本実装 | 高 | 4h |
-| 2.3 | 認証フック (onAuthenticate) | 高 | 4h |
-| 2.4 | Redis拡張実装 | 高 | 4h |
-| 2.5 | Database拡張実装 | 高 | 6h |
-| 2.6 | CloudWatch Metrics実装 | 中 | 3h |
-| 2.7 | Dockerfile作成 | 高 | 2h |
-| 2.8 | ECRプッシュ・ECSデプロイ | 高 | 4h |
-| 2.9 | 動作確認・デバッグ | 高 | 8h |
+| #   | タスク                      | 優先度 | 見積時間 |
+| --- | --------------------------- | ------ | -------- |
+| 2.1 | server/ プロジェクト初期化  | 高     | 2h       |
+| 2.2 | Hocuspocusサーバー基本実装  | 高     | 4h       |
+| 2.3 | 認証フック (onAuthenticate) | 高     | 4h       |
+| 2.4 | Redis拡張実装               | 高     | 4h       |
+| 2.5 | Database拡張実装            | 高     | 6h       |
+| 2.6 | CloudWatch Metrics実装      | 中     | 3h       |
+| 2.7 | Dockerfile作成              | 高     | 2h       |
+| 2.8 | ECRプッシュ・ECSデプロイ    | 高     | 4h       |
+| 2.9 | 動作確認・デバッグ          | 高     | 8h       |
 
 ### Phase 3: クライアントサイド実装 (Week 5-6)
 
-| # | タスク | 優先度 | 見積時間 |
-|---|--------|--------|----------|
-| 3.1 | CollaborationManager実装 | 高 | 8h |
-| 3.2 | useCollaborationフック | 高 | 4h |
-| 3.3 | CollaborativeEditor実装 | 高 | 8h |
-| 3.4 | PresenceCursors実装 | 中 | 4h |
-| 3.5 | ConnectionIndicator実装 | 中 | 2h |
-| 3.6 | UserAvatars実装 | 中 | 2h |
-| 3.7 | Cognito認証クライアント | 高 | 6h |
-| 3.8 | useAuthフック移行 | 高 | 4h |
-| 3.9 | PageEditor統合 | 高 | 6h |
-| 3.10 | オフライン対応テスト | 高 | 4h |
+| #    | タスク                   | 優先度 | 見積時間 |
+| ---- | ------------------------ | ------ | -------- |
+| 3.1  | CollaborationManager実装 | 高     | 8h       |
+| 3.2  | useCollaborationフック   | 高     | 4h       |
+| 3.3  | CollaborativeEditor実装  | 高     | 8h       |
+| 3.4  | PresenceCursors実装      | 中     | 4h       |
+| 3.5  | ConnectionIndicator実装  | 中     | 2h       |
+| 3.6  | UserAvatars実装          | 中     | 2h       |
+| 3.7  | Cognito認証クライアント  | 高     | 6h       |
+| 3.8  | useAuthフック移行        | 高     | 4h       |
+| 3.9  | PageEditor統合           | 高     | 6h       |
+| 3.10 | オフライン対応テスト     | 高     | 4h       |
 
 ### Phase 4: 移行・テスト (Week 7)
 
-| # | タスク | 優先度 | 見積時間 |
-|---|--------|--------|----------|
-| 4.1 | データ移行スクリプト作成 | 高 | 6h |
-| 4.2 | 開発環境でのテスト移行 | 高 | 4h |
-| 4.3 | E2Eテスト更新 | 中 | 8h |
-| 4.4 | 負荷テスト実施 | 中 | 4h |
-| 4.5 | バグ修正・最適化 | 高 | 8h |
+| #   | タスク                   | 優先度 | 見積時間 |
+| --- | ------------------------ | ------ | -------- |
+| 4.1 | データ移行スクリプト作成 | 高     | 6h       |
+| 4.2 | 開発環境でのテスト移行   | 高     | 4h       |
+| 4.3 | E2Eテスト更新            | 中     | 8h       |
+| 4.4 | 負荷テスト実施           | 中     | 4h       |
+| 4.5 | バグ修正・最適化         | 高     | 8h       |
 
 ### Phase 5: 本番移行 (Week 8)
 
-| # | タスク | 優先度 | 見積時間 |
-|---|--------|--------|----------|
-| 5.1 | 本番データ移行 | 高 | 4h |
-| 5.2 | DNS切り替え | 高 | 2h |
-| 5.3 | 監視・アラート確認 | 高 | 4h |
-| 5.4 | ロールバック計画確認 | 高 | 2h |
-| 5.5 | 旧環境停止 | 低 | 2h |
+| #   | タスク               | 優先度 | 見積時間 |
+| --- | -------------------- | ------ | -------- |
+| 5.1 | 本番データ移行       | 高     | 4h       |
+| 5.2 | DNS切り替え          | 高     | 2h       |
+| 5.3 | 監視・アラート確認   | 高     | 4h       |
+| 5.4 | ロールバック計画確認 | 高     | 2h       |
+| 5.5 | 旧環境停止           | 低     | 2h       |
 
 ---
 
@@ -1394,20 +1375,20 @@ main();
 ```typescript
 // CollaborationManager.test.ts
 
-describe('CollaborationManager', () => {
-  it('should initialize with IndexedDB persistence', async () => {
-    const manager = new CollaborationManager('test-page', 'user-1', async () => null);
+describe("CollaborationManager", () => {
+  it("should initialize with IndexedDB persistence", async () => {
+    const manager = new CollaborationManager("test-page", "user-1", async () => null);
     expect(manager.document).toBeDefined();
     manager.destroy();
   });
 
-  it('should handle offline mode when no token', async () => {
-    const manager = new CollaborationManager('test-page', 'user-1', async () => null);
+  it("should handle offline mode when no token", async () => {
+    const manager = new CollaborationManager("test-page", "user-1", async () => null);
     // 状態がdisconnectedになることを確認
     manager.destroy();
   });
 
-  it('should sync changes when reconnected', async () => {
+  it("should sync changes when reconnected", async () => {
     // オフライン→オンライン遷移のテスト
   });
 });
@@ -1418,10 +1399,10 @@ describe('CollaborationManager', () => {
 ```typescript
 // e2e/collaboration.spec.ts
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test.describe('Realtime Collaboration', () => {
-  test('two users can edit simultaneously', async ({ browser }) => {
+test.describe("Realtime Collaboration", () => {
+  test("two users can edit simultaneously", async ({ browser }) => {
     // 2つのブラウザコンテキストを作成
     const context1 = await browser.newContext();
     const context2 = await browser.newContext();
@@ -1430,30 +1411,30 @@ test.describe('Realtime Collaboration', () => {
     const page2 = await context2.newPage();
 
     // 同じページを開く
-    await page1.goto('/page/test-page');
-    await page2.goto('/page/test-page');
+    await page1.goto("/page/test-page");
+    await page2.goto("/page/test-page");
 
     // User1が入力
-    await page1.locator('.ProseMirror').type('Hello from User 1');
+    await page1.locator(".ProseMirror").type("Hello from User 1");
 
     // User2に反映されることを確認
-    await expect(page2.locator('.ProseMirror')).toContainText('Hello from User 1');
+    await expect(page2.locator(".ProseMirror")).toContainText("Hello from User 1");
 
     // User2が入力
-    await page2.locator('.ProseMirror').type(' and User 2');
+    await page2.locator(".ProseMirror").type(" and User 2");
 
     // User1に反映されることを確認
-    await expect(page1.locator('.ProseMirror')).toContainText('Hello from User 1 and User 2');
+    await expect(page1.locator(".ProseMirror")).toContainText("Hello from User 1 and User 2");
   });
 
-  test('changes persist after offline period', async ({ page }) => {
-    await page.goto('/page/test-page');
+  test("changes persist after offline period", async ({ page }) => {
+    await page.goto("/page/test-page");
 
     // ネットワークをオフラインに
     await page.context().setOffline(true);
 
     // オフライン中に編集
-    await page.locator('.ProseMirror').type('Offline edit');
+    await page.locator(".ProseMirror").type("Offline edit");
 
     // オンラインに復帰
     await page.context().setOffline(false);
@@ -1463,7 +1444,7 @@ test.describe('Realtime Collaboration', () => {
 
     // ページをリロードしても内容が保持されていることを確認
     await page.reload();
-    await expect(page.locator('.ProseMirror')).toContainText('Offline edit');
+    await expect(page.locator(".ProseMirror")).toContainText("Offline edit");
   });
 });
 ```

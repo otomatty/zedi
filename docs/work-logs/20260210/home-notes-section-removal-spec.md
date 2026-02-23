@@ -4,13 +4,13 @@
 
 ### 1.1 /home の構成 (`src/pages/Home.tsx`)
 
-| 順序 | コンポーネント | 役割 |
-|------|----------------|------|
-| 1 | `Header` | ロゴ、月ナビ、同期インジケータ、ショートカット、認証メニュー |
-| 2 | **`NotesSection`** | **「公開ノート」セクション（一覧 + 新規ノート作成）** ← 削除対象 |
-| 3 | `PageGrid` | 自分自身のページ一覧（カードグリッド） |
-| 4 | `FloatingActionButton` | 新規ページ作成（空白/URL/画像など） |
-| 5 | `WelcomeModal` | 初回ウェルカムモーダル |
+| 順序 | コンポーネント         | 役割                                                             |
+| ---- | ---------------------- | ---------------------------------------------------------------- |
+| 1    | `Header`               | ロゴ、月ナビ、同期インジケータ、ショートカット、認証メニュー     |
+| 2    | **`NotesSection`**     | **「公開ノート」セクション（一覧 + 新規ノート作成）** ← 削除対象 |
+| 3    | `PageGrid`             | 自分自身のページ一覧（カードグリッド）                           |
+| 4    | `FloatingActionButton` | 新規ページ作成（空白/URL/画像など）                              |
+| 5    | `WelcomeModal`         | 初回ウェルカムモーダル                                           |
 
 ### 1.2 NotesSection の役割 (`src/components/note/NotesSection.tsx`)
 
@@ -23,16 +23,16 @@
 
 ### 1.3 PageGrid（残す部分）
 
-- **データ**: `usePagesSummary()` → `useRepository().getRepository().getPagesSummary(userId)`  
+- **データ**: `usePagesSummary()` → `useRepository().getRepository().getPagesSummary(userId)`
   - StorageAdapter（IndexedDB + 同期）経由で **自分自身のページ（`/page/:id` のもの）のみ** を取得
 - ノート内ページ（`/note/:noteId/page/:pageId`）は別API・別クエリで取得しており、ここには含まれない  
-→ **すでに「自分自身のページのみ」に集中したデータになっている**
+  → **すでに「自分自身のページのみ」に集中したデータになっている**
 
 ### 1.4 ノート機能の他の入口
 
 - **ノート一覧・新規ノート**: 現状は **/home の NotesSection のみ**
-- **既存ノートの閲覧・編集**:  
-  - URL を直接開く: `/note/:noteId`, `/note/:noteId/page/:pageId`, `/note/:noteId/settings`, `/note/:noteId/members`  
+- **既存ノートの閲覧・編集**:
+  - URL を直接開く: `/note/:noteId`, `/note/:noteId/page/:pageId`, `/note/:noteId/settings`, `/note/:noteId/members`
   - **GlobalSearch**: 検索結果に「共有ノート内のページ」が含まれており、選択で `/note/:noteId/page/:pageId` に遷移可能
 - **Header / FAB**: ノート作成・ノート一覧へのリンクはなし（ページ用のみ）
 
@@ -54,11 +54,11 @@
 
 ### Q1. ノート機能の扱い
 
-- **A) ノート機能は維持するが、/home からだけ外す**  
+- **A) ノート機能は維持するが、/home からだけ外す**
   - ノート一覧・新規ノートの入口を **別ルートに移す** かどうか決めたいです。
   - 例: `/notes` を新設し、「ノート一覧 + 新規ノート」をそこに集約する。
   - この場合、`NotesSection` は `/notes` 用に流用するか、似たUIを `/notes` で再実装する形になります。
-- **B) ノート機能自体をアプリから廃止する**  
+- **B) ノート機能自体をアプリから廃止する**
   - その場合は NotesSection 削除に加え、`/note/*` ルート・NoteView 等・useNoteQueries の利用箇所の整理・削除範囲の検討が必要です。
 
 どちらに近い想定でしょうか？（「とりあえず /home からだけ外す」なら A として、別ルートは後決めでも可です。）
@@ -79,9 +79,9 @@
 
 ### Q4. NotesSection コンポーネントの扱い
 
-- **/home からだけ削除し、ノート一覧は別ルートに移す場合**:  
+- **/home からだけ削除し、ノート一覧は別ルートに移す場合**:
   - `NotesSection` をそのまま `/notes` 用に使うか、`/notes` 用の新コンポーネントに切り出してから `NotesSection` を廃止するか、どちらでも対応可能です。
-- **ノート一覧をどこにも表示しない場合**:  
+- **ノート一覧をどこにも表示しない場合**:
   - `NotesSection` は未使用になるため、削除してよいです。
 
 ---

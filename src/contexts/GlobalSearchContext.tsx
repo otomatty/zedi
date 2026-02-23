@@ -19,12 +19,7 @@ const GlobalSearchContext = createContext<GlobalSearchContextValue | null>(null)
 
 export function GlobalSearchProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
-  const {
-    query,
-    setQuery,
-    searchResults,
-    hasQuery,
-  } = useGlobalSearch();
+  const { query, setQuery, searchResults, hasQuery } = useGlobalSearch();
 
   const handleSelect = useCallback(
     (pageId: string, noteId?: string) => {
@@ -34,7 +29,7 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
         navigate(`/page/${pageId}`);
       }
     },
-    [navigate]
+    [navigate],
   );
 
   const handleSearchSubmit = useCallback(() => {
@@ -62,11 +57,7 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
     focusSearchInput,
   };
 
-  return (
-    <GlobalSearchContext.Provider value={value}>
-      {children}
-    </GlobalSearchContext.Provider>
-  );
+  return <GlobalSearchContext.Provider value={value}>{children}</GlobalSearchContext.Provider>;
 }
 
 export function useGlobalSearchContext(): GlobalSearchContextValue {

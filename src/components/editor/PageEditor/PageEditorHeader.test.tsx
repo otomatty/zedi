@@ -38,7 +38,11 @@ vi.mock("@/lib/dateUtils", () => ({
 }));
 
 vi.mock("@/components/layout/Header/AIChatButton", () => ({
-  AIChatButton: () => <button type="button" data-testid="ai-chat-btn">AI</button>,
+  AIChatButton: () => (
+    <button type="button" data-testid="ai-chat-btn">
+      AI
+    </button>
+  ),
 }));
 
 vi.mock("@/contexts/GlobalSearchContext", () => ({

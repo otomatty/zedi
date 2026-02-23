@@ -8,25 +8,25 @@
 
 ## 1. 完了したPhase
 
-| Phase | モジュール | 内容 | ステータス | ドキュメント |
-|-------|-----------|------|-----------|-------------|
-| 1 | networking | VPC, Subnets, VPC Endpoints | ✅ 完了 | [Phase 1](./aws-infrastructure-phase1.md) |
-| 2 | security | Cognito, IAM Roles | ✅ 完了 | [Phase 2](./aws-infrastructure-phase2-security.md) |
-| 3 | database | Aurora Serverless v2 | ✅ 完了 | [Phase 3](./aws-infrastructure-phase3-database.md) |
-| 4 | cache | ElastiCache Redis | ✅ 完了 | [Phase 4](./aws-infrastructure-phase4-cache.md) |
-| 5 | realtime | ECS Fargate Spot, ALB | ✅ 完了 | [Phase 5](./aws-infrastructure-phase5-realtime.md) |
-| 6 | cdn | CloudFront, S3 | ⏳ 次回 | - |
-| 7 | monitoring | CloudWatch Alarms | ⏳ 未着手 | - |
+| Phase | モジュール | 内容                        | ステータス | ドキュメント                                       |
+| ----- | ---------- | --------------------------- | ---------- | -------------------------------------------------- |
+| 1     | networking | VPC, Subnets, VPC Endpoints | ✅ 完了    | [Phase 1](./aws-infrastructure-phase1.md)          |
+| 2     | security   | Cognito, IAM Roles          | ✅ 完了    | [Phase 2](./aws-infrastructure-phase2-security.md) |
+| 3     | database   | Aurora Serverless v2        | ✅ 完了    | [Phase 3](./aws-infrastructure-phase3-database.md) |
+| 4     | cache      | ElastiCache Redis           | ✅ 完了    | [Phase 4](./aws-infrastructure-phase4-cache.md)    |
+| 5     | realtime   | ECS Fargate Spot, ALB       | ✅ 完了    | [Phase 5](./aws-infrastructure-phase5-realtime.md) |
+| 6     | cdn        | CloudFront, S3              | ⏳ 次回    | -                                                  |
+| 7     | monitoring | CloudWatch Alarms           | ⏳ 未着手  | -                                                  |
 
 ---
 
 ## 2. Terraform以外の残作業
 
-| 作業 | ステータス | ドキュメント |
-|------|-----------|-------------|
-| Hocuspocusサーバー実装 | ⏳ 未着手 | [実装ガイド](./hocuspocus-server-implementation.md) |
-| DockerイメージビルドとECRプッシュ | ⏳ 未着手 | [実装ガイド](./hocuspocus-server-implementation.md) |
-| ECSサービス更新（イメージプッシュ後） | ⏳ 未着手 | [実装ガイド](./hocuspocus-server-implementation.md) |
+| 作業                                  | ステータス | ドキュメント                                        |
+| ------------------------------------- | ---------- | --------------------------------------------------- |
+| Hocuspocusサーバー実装                | ⏳ 未着手  | [実装ガイド](./hocuspocus-server-implementation.md) |
+| DockerイメージビルドとECRプッシュ     | ⏳ 未着手  | [実装ガイド](./hocuspocus-server-implementation.md) |
+| ECSサービス更新（イメージプッシュ後） | ⏳ 未着手  | [実装ガイド](./hocuspocus-server-implementation.md) |
 
 ---
 
@@ -115,21 +115,22 @@ $TF = "C:\Users\saedg\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terrafor
 
 ## 6. 月額コスト概算
 
-| サービス | 月額コスト |
-|----------|-----------|
-| VPC Endpoints | ~$14 |
-| Aurora Serverless v2 | ~$25-30 |
-| ElastiCache | ~$12 |
-| ECS Fargate Spot | ~$8 |
-| ALB | ~$16 |
-| その他 | ~$1 |
-| **合計** | **~$76/月** |
+| サービス             | 月額コスト  |
+| -------------------- | ----------- |
+| VPC Endpoints        | ~$14        |
+| Aurora Serverless v2 | ~$25-30     |
+| ElastiCache          | ~$12        |
+| ECS Fargate Spot     | ~$8         |
+| ALB                  | ~$16        |
+| その他               | ~$1         |
+| **合計**             | **~$76/月** |
 
 ---
 
 ## 7. ドキュメント一覧
 
 ### 作業ログ（Phase別）
+
 - [Phase 1: Networking](./aws-infrastructure-phase1.md)
 - [Phase 2: Security](./aws-infrastructure-phase2-security.md)
 - [Phase 3: Database](./aws-infrastructure-phase3-database.md)
@@ -137,14 +138,16 @@ $TF = "C:\Users\saedg\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terrafor
 - [Phase 5: Realtime](./aws-infrastructure-phase5-realtime.md)
 
 ### 実装ガイド
+
 - [Hocuspocusサーバー実装ガイド](./hocuspocus-server-implementation.md)
 - [AWS接続情報サマリー](./aws-connection-summary.md)
 
 ### 関連仕様書
+
 - [リアルタイム同時編集仕様](../../specs/realtime-collaboration-specification.md)
 - [Terraform実装計画](../../specs/aws-terraform-implementation-plan.md)
 - [アプリケーション実装計画](../../specs/application-implementation-plan.md)
 
 ---
 
-*このドキュメントは2026-01-31の作業ログのインデックスです。*
+_このドキュメントは2026-01-31の作業ログのインデックスです。_

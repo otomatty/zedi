@@ -35,12 +35,9 @@ export const pageKeys = {
   summaries: () => [...pageKeys.all, "summary"] as const,
   summary: (userId: string) => [...pageKeys.summaries(), userId] as const,
   details: () => [...pageKeys.all, "detail"] as const,
-  detail: (userId: string, pageId: string) =>
-    [...pageKeys.details(), userId, pageId] as const,
-  search: (userId: string, query: string) =>
-    [...pageKeys.all, "search", userId, query] as const,
-  searchShared: (query: string) =>
-    [...pageKeys.all, "searchShared", query] as const,
+  detail: (userId: string, pageId: string) => [...pageKeys.details(), userId, pageId] as const,
+  search: (userId: string, query: string) => [...pageKeys.all, "search", userId, query] as const,
+  searchShared: (query: string) => [...pageKeys.all, "searchShared", query] as const,
 };
 
 /**
@@ -367,10 +364,7 @@ export function useCreatePage() {
       queryClient.invalidateQueries({ queryKey: pageKeys.summaries() });
 
       // Optimistically update the cache
-      queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [
-        newPage,
-        ...old,
-      ]);
+      queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [newPage, ...old]);
 
       // Also update summary cache
       const newSummary: PageSummary = {
@@ -384,10 +378,10 @@ export function useCreatePage() {
         updatedAt: newPage.updatedAt,
         isDeleted: newPage.isDeleted,
       };
-      queryClient.setQueryData<PageSummary[]>(
-        pageKeys.summary(userId),
-        (old = []) => [newSummary, ...old]
-      );
+      queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) => [
+        newSummary,
+        ...old,
+      ]);
     },
   });
 }
@@ -405,16 +399,10 @@ export function useUpdatePage() {
       updates,
     }: {
       pageId: string;
-      updates: Partial<
-        Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">
-      >;
+      updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>;
     }) => {
-      const getCachedPage = (
-        targetPageId: string
-      ): Page | PageSummary | null => {
-        const detail = queryClient.getQueryData<Page | null>(
-          pageKeys.detail(userId, targetPageId)
-        );
+      const getCachedPage = (targetPageId: string): Page | PageSummary | null => {
+        const detail = queryClient.getQueryData<Page | null>(pageKeys.detail(userId, targetPageId));
         if (detail) return detail;
 
         const list = queryClient.getQueryData<Page[]>(pageKeys.list(userId));
@@ -423,9 +411,7 @@ export function useUpdatePage() {
           if (found) return found;
         }
 
-        const summaries = queryClient.getQueryData<PageSummary[]>(
-          pageKeys.summary(userId)
-        );
+        const summaries = queryClient.getQueryData<PageSummary[]>(pageKeys.summary(userId));
         if (summaries) {
           const found = summaries.find((page) => page.id === targetPageId);
           if (found) return found;
@@ -435,12 +421,10 @@ export function useUpdatePage() {
       };
 
       const existing = getCachedPage(pageId);
-      const existingContent =
-        existing && "content" in existing ? existing.content : undefined;
+      const existingContent = existing && "content" in existing ? existing.content : undefined;
 
-      const actualUpdates: Partial<
-        Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">
-      > = {};
+      const actualUpdates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">> =
+        {};
 
       if (updates.title !== undefined) {
         if (!existing || existing.title !== updates.title) {
@@ -475,22 +459,18 @@ export function useUpdatePage() {
       if (skipped) return;
       const now = Date.now();
       const contentPreview =
-        updates.content !== undefined
-          ? getPageListPreview(updates.content)
-          : undefined;
+        updates.content !== undefined ? getPageListPreview(updates.content) : undefined;
 
       // Update the specific page in cache
-      queryClient.setQueryData<Page | null>(
-        pageKeys.detail(userId, pageId),
-        (old) =>
-          old
-            ? {
-                ...old,
-                ...updates,
-                ...(contentPreview !== undefined ? { contentPreview } : {}),
-                updatedAt: now,
-              }
-            : null
+      queryClient.setQueryData<Page | null>(pageKeys.detail(userId, pageId), (old) =>
+        old
+          ? {
+              ...old,
+              ...updates,
+              ...(contentPreview !== undefined ? { contentPreview } : {}),
+              updatedAt: now,
+            }
+          : null,
       );
 
       // Update the page in the list cache
@@ -503,26 +483,19 @@ export function useUpdatePage() {
                 ...(contentPreview !== undefined ? { contentPreview } : {}),
                 updatedAt: now,
               }
-            : page
-        )
+            : page,
+        ),
       );
 
       // Update the page in the summary cache (only title, thumbnailUrl, sourceUrl)
       const summaryUpdates: Partial<PageSummary> = { updatedAt: now };
       if (updates.title !== undefined) summaryUpdates.title = updates.title;
-      if (updates.thumbnailUrl !== undefined)
-        summaryUpdates.thumbnailUrl = updates.thumbnailUrl;
-      if (updates.sourceUrl !== undefined)
-        summaryUpdates.sourceUrl = updates.sourceUrl;
-      if (contentPreview !== undefined)
-        summaryUpdates.contentPreview = contentPreview;
+      if (updates.thumbnailUrl !== undefined) summaryUpdates.thumbnailUrl = updates.thumbnailUrl;
+      if (updates.sourceUrl !== undefined) summaryUpdates.sourceUrl = updates.sourceUrl;
+      if (contentPreview !== undefined) summaryUpdates.contentPreview = contentPreview;
 
-      queryClient.setQueryData<PageSummary[]>(
-        pageKeys.summary(userId),
-        (old = []) =>
-          old.map((page) =>
-            page.id === pageId ? { ...page, ...summaryUpdates } : page
-          )
+      queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) =>
+        old.map((page) => (page.id === pageId ? { ...page, ...summaryUpdates } : page)),
       );
     },
   });
@@ -544,13 +517,12 @@ export function useDeletePage() {
     onSuccess: (pageId) => {
       // Remove from list cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) =>
-        old.filter((page) => page.id !== pageId)
+        old.filter((page) => page.id !== pageId),
       );
 
       // Remove from summary cache
-      queryClient.setQueryData<PageSummary[]>(
-        pageKeys.summary(userId),
-        (old = []) => old.filter((page) => page.id !== pageId)
+      queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) =>
+        old.filter((page) => page.id !== pageId),
       );
 
       // Invalidate detail query
@@ -588,13 +560,7 @@ export function useAddLink() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      sourceId,
-      targetId,
-    }: {
-      sourceId: string;
-      targetId: string;
-    }) => {
+    mutationFn: async ({ sourceId, targetId }: { sourceId: string; targetId: string }) => {
       const repo = await getRepository();
       await repo.addLink(sourceId, targetId);
     },
@@ -612,13 +578,7 @@ export function useRemoveLink() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      sourceId,
-      targetId,
-    }: {
-      sourceId: string;
-      targetId: string;
-    }) => {
+    mutationFn: async ({ sourceId, targetId }: { sourceId: string; targetId: string }) => {
       const repo = await getRepository();
       await repo.removeLink(sourceId, targetId);
     },
@@ -642,16 +602,14 @@ export function useCheckGhostLinkReferenced() {
         const repo = await getRepository();
         const sources = await repo.getGhostLinkSources(linkText);
         // Referenced if at least one OTHER page has this ghost link
-        const otherSources = currentPageId
-          ? sources.filter((id) => id !== currentPageId)
-          : sources;
+        const otherSources = currentPageId ? sources.filter((id) => id !== currentPageId) : sources;
         return otherSources.length > 0;
       } catch (error) {
         console.error("Error checking ghost link:", error);
         return false;
       }
     },
-    [getRepository]
+    [getRepository],
   );
 
   return { checkReferenced };
@@ -674,7 +632,7 @@ export function useCheckDuplicateTitle() {
         return null;
       }
     },
-    [getRepository, userId, isLoaded]
+    [getRepository, userId, isLoaded],
   );
 
   return { checkDuplicate, isLoaded };
@@ -687,13 +645,7 @@ export function useAddGhostLink() {
   const { getRepository } = useRepository();
 
   return useMutation({
-    mutationFn: async ({
-      linkText,
-      sourcePageId,
-    }: {
-      linkText: string;
-      sourcePageId: string;
-    }) => {
+    mutationFn: async ({ linkText, sourcePageId }: { linkText: string; sourcePageId: string }) => {
       const repo = await getRepository();
       await repo.addGhostLink(linkText, sourcePageId);
     },
@@ -732,12 +684,12 @@ export function useSyncWikiLinks() {
   const syncLinks = useCallback(
     async (
       sourcePageId: string,
-      wikiLinks: Array<{ title: string; exists: boolean }>
+      wikiLinks: Array<{ title: string; exists: boolean }>,
     ): Promise<void> => {
       const repo = await getRepository();
       await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks);
     },
-    [getRepository, userId]
+    [getRepository, userId],
   );
 
   return { syncLinks };
@@ -755,7 +707,7 @@ export function useWikiLinkExistsChecker() {
   const checkExistence = useCallback(
     async (
       titles: string[],
-      currentPageId?: string
+      currentPageId?: string,
     ): Promise<{
       pageTitles: Set<string>;
       referencedTitles: Set<string>;
@@ -768,9 +720,7 @@ export function useWikiLinkExistsChecker() {
 
       // OPTIMIZED: Use summary (no content) to check existence
       const pages = await repo.getPagesSummary(userId);
-      const pageTitles = new Set(
-        pages.map((p) => p.title.toLowerCase().trim())
-      );
+      const pageTitles = new Set(pages.map((p) => p.title.toLowerCase().trim()));
 
       // Get ghost links to check referenced status
       const ghostLinks = await repo.getGhostLinks(userId);
@@ -789,9 +739,7 @@ export function useWikiLinkExistsChecker() {
       for (const title of titles) {
         const normalized = title.toLowerCase().trim();
         const sources = ghostLinksByText.get(normalized) || [];
-        const otherSources = currentPageId
-          ? sources.filter((id) => id !== currentPageId)
-          : sources;
+        const otherSources = currentPageId ? sources.filter((id) => id !== currentPageId) : sources;
         if (otherSources.length > 0) {
           referencedTitles.add(normalized);
         }
@@ -799,7 +747,7 @@ export function useWikiLinkExistsChecker() {
 
       return { pageTitles, referencedTitles };
     },
-    [getRepository, userId, isLoaded]
+    [getRepository, userId, isLoaded],
   );
 
   return { checkExistence, isLoaded };

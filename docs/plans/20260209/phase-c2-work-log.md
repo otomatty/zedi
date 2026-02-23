@@ -8,16 +8,16 @@
 
 ## 1. 作業サマリー
 
-| タスク | 内容 | 状態 |
-|--------|------|------|
-| **C2-1** | Turso エクスポート（全テーブル → 単一 JSON） | 完了 |
-| **C2-2** | ID 変換・users 生成（nanoid→UUID、Aurora 用変換） | 完了 |
-| **C2-3** | Tiptap JSON → Y.Doc（page_contents 用 ydoc_state） | 完了 |
-| **C2-4** | content_text 抽出（全文検索用） | 完了 |
-| **C2-5** | Aurora インポート（RDS Data API） | 完了・本番実行済み |
-| **C2-6** | ghost_links 拡張 | 完了 |
-| **C2-7** | 整合性検証（件数比較） | 完了 |
-| **C2-8** | ロールバック手順書 | 完了 |
+| タスク   | 内容                                               | 状態               |
+| -------- | -------------------------------------------------- | ------------------ |
+| **C2-1** | Turso エクスポート（全テーブル → 単一 JSON）       | 完了               |
+| **C2-2** | ID 変換・users 生成（nanoid→UUID、Aurora 用変換）  | 完了               |
+| **C2-3** | Tiptap JSON → Y.Doc（page_contents 用 ydoc_state） | 完了               |
+| **C2-4** | content_text 抽出（全文検索用）                    | 完了               |
+| **C2-5** | Aurora インポート（RDS Data API）                  | 完了・本番実行済み |
+| **C2-6** | ghost_links 拡張                                   | 完了               |
+| **C2-7** | 整合性検証（件数比較）                             | 完了               |
+| **C2-8** | ロールバック手順書                                 | 完了               |
 
 ---
 
@@ -72,7 +72,7 @@
 - **目的**  
   page_contents の Y.Doc からプレーンテキストを抽出し、Aurora の `page_contents.content_text`（pg_bigm 全文検索用）を付与する。
 - **成果物**
-  - **スクリプト:** `scripts/migration/transform-for-aurora/extract-content-text.ts` … C2-3 の page-contents-*.json を読み、Y.Doc → yXmlFragmentToProsemirrorJSON で JSON に戻し、全 text ノードを連結して content_text を生成
+  - **スクリプト:** `scripts/migration/transform-for-aurora/extract-content-text.ts` … C2-3 の page-contents-\*.json を読み、Y.Doc → yXmlFragmentToProsemirrorJSON で JSON に戻し、全 text ノードを連結して content_text を生成
 - **出力**  
   `output/page-contents-with-text-<timestamp>.json`（各 page_content に content_text 追加）。C2-5 ではこのファイルの page_contents を使用
 - **実行例**  
@@ -129,38 +129,39 @@
 
 ## 3. 成果物一覧（パス）
 
-| 種別 | パス | 備考 |
-|------|------|------|
-| C2-1 形式定義 | `scripts/migration/export-turso/EXPORT_FORMAT.md` | エクスポート JSON の定義 |
-| C2-1 スクリプト | `scripts/migration/export-turso/export-turso.mjs` | Turso → 単一 JSON |
-| C2-1 説明 | `scripts/migration/export-turso/README.md` | 実行方法・前提 |
-| C2-2 スクリプト | `scripts/migration/transform-for-aurora/transform-id-and-users.mjs` | ID 変換・users 生成 |
-| C2-3 スクリプト | `scripts/migration/transform-for-aurora/tiptap-to-ydoc.ts` | Tiptap JSON → Y.Doc |
-| C2-4 スクリプト | `scripts/migration/transform-for-aurora/extract-content-text.ts` | content_text 抽出 |
-| C2-5 スクリプト | `scripts/migration/transform-for-aurora/import-to-aurora.mjs` | Aurora インポート |
-| C2-6 ghost_links 拡張 | （スキーマ C1-1・変換 C2-2・インポート C2-5・API で対応済み。新規成果物なし） | - |
-| C2-7 スクリプト | `scripts/migration/transform-for-aurora/verify-aurora-counts.mjs` | 整合性検証（件数比較） |
-| C2-8 手順書 | `docs/plans/20260209/phase-c2-rollback-procedure.md` | ロールバック手順 |
-| 説明（C2-2〜C2-7） | `scripts/migration/transform-for-aurora/README.md` | 実行方法・出力形式 |
+| 種別                  | パス                                                                          | 備考                     |
+| --------------------- | ----------------------------------------------------------------------------- | ------------------------ |
+| C2-1 形式定義         | `scripts/migration/export-turso/EXPORT_FORMAT.md`                             | エクスポート JSON の定義 |
+| C2-1 スクリプト       | `scripts/migration/export-turso/export-turso.mjs`                             | Turso → 単一 JSON        |
+| C2-1 説明             | `scripts/migration/export-turso/README.md`                                    | 実行方法・前提           |
+| C2-2 スクリプト       | `scripts/migration/transform-for-aurora/transform-id-and-users.mjs`           | ID 変換・users 生成      |
+| C2-3 スクリプト       | `scripts/migration/transform-for-aurora/tiptap-to-ydoc.ts`                    | Tiptap JSON → Y.Doc      |
+| C2-4 スクリプト       | `scripts/migration/transform-for-aurora/extract-content-text.ts`              | content_text 抽出        |
+| C2-5 スクリプト       | `scripts/migration/transform-for-aurora/import-to-aurora.mjs`                 | Aurora インポート        |
+| C2-6 ghost_links 拡張 | （スキーマ C1-1・変換 C2-2・インポート C2-5・API で対応済み。新規成果物なし） | -                        |
+| C2-7 スクリプト       | `scripts/migration/transform-for-aurora/verify-aurora-counts.mjs`             | 整合性検証（件数比較）   |
+| C2-8 手順書           | `docs/plans/20260209/phase-c2-rollback-procedure.md`                          | ロールバック手順         |
+| 説明（C2-2〜C2-7）    | `scripts/migration/transform-for-aurora/README.md`                            | 実行方法・出力形式       |
 
-**出力ディレクトリ（gitignore 済み）**  
-- `scripts/migration/export-turso/output/` … Turso エクスポート JSON  
-- `scripts/migration/transform-for-aurora/output/` … aurora-transform-*.json, page-contents-*.json, page-contents-with-text-*.json  
+**出力ディレクトリ（gitignore 済み）**
+
+- `scripts/migration/export-turso/output/` … Turso エクスポート JSON
+- `scripts/migration/transform-for-aurora/output/` … aurora-transform-_.json, page-contents-_.json, page-contents-with-text-\*.json
 
 ---
 
 ## 4. 本番インポート結果（2026-02-09）
 
-| テーブル | 件数 | 失敗 |
-|----------|------|------|
-| users | 1 | 0 |
-| pages | 1331 | 0 |
-| notes | 3 | 0 |
-| note_pages | 0 | 0 |
-| note_members | 0 | 0 |
-| links | 1 | 0 |
-| ghost_links | 0 | 0 |
-| page_contents | 1331 | 0 |
+| テーブル      | 件数 | 失敗 |
+| ------------- | ---- | ---- |
+| users         | 1    | 0    |
+| pages         | 1331 | 0    |
+| notes         | 3    | 0    |
+| note_pages    | 0    | 0    |
+| note_members  | 0    | 0    |
+| links         | 1    | 0    |
+| ghost_links   | 0    | 0    |
+| page_contents | 1331 | 0    |
 
 - **環境:** dev Aurora（CLUSTER_ARN / SECRET_ARN / DATABASE は環境変数または既定値）
 - **所要時間:** 約 3 分（約 2600+ API 呼び出し）
@@ -175,23 +176,23 @@
 
 ## 6. 関連ドキュメント
 
-| ドキュメント | 用途 |
-|-------------|------|
-| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md) | タスク細分化・Phase C/D/E 一覧 |
-| [zedi-rearchitecture-spec.md](../specs/zedi-rearchitecture-spec.md) | リアーキテクチャ仕様（§16 移行計画） |
-| [zedi-data-structure-spec.md](../specs/zedi-data-structure-spec.md) | DB スキーマ・エンティティ定義 |
-| [turso-to-aurora-migration-decisions.md](20260208/turso-to-aurora-migration-decisions.md) | Turso → Aurora 移行の決定事項 |
-| [db/aurora/README.md](../../db/aurora/README.md) | Aurora DDL の適用手順 |
-| [phase-c1-work-log.md](phase-c1-work-log.md) | Phase C1 作業ログ（Aurora DDL・REST API） |
-| [phase-c2-rollback-procedure.md](phase-c2-rollback-procedure.md) | C2-8 ロールバック手順書 |
+| ドキュメント                                                                              | 用途                                      |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md)                      | タスク細分化・Phase C/D/E 一覧            |
+| [zedi-rearchitecture-spec.md](../specs/zedi-rearchitecture-spec.md)                       | リアーキテクチャ仕様（§16 移行計画）      |
+| [zedi-data-structure-spec.md](../specs/zedi-data-structure-spec.md)                       | DB スキーマ・エンティティ定義             |
+| [turso-to-aurora-migration-decisions.md](20260208/turso-to-aurora-migration-decisions.md) | Turso → Aurora 移行の決定事項             |
+| [db/aurora/README.md](../../db/aurora/README.md)                                          | Aurora DDL の適用手順                     |
+| [phase-c1-work-log.md](phase-c1-work-log.md)                                              | Phase C1 作業ログ（Aurora DDL・REST API） |
+| [phase-c2-rollback-procedure.md](phase-c2-rollback-procedure.md)                          | C2-8 ロールバック手順書                   |
 
 ---
 
 ## 7. 作業履歴（実施日・内容）
 
-| 日付 | 実施内容 |
-|------|----------|
-| **2026-02-09** | **C2-1〜C2-5 実施** — Turso エクスポート、ID 変換・users 生成、Tiptap→Y.Doc 変換、content_text 抽出、Aurora インポートを実施。dev Aurora へ本番インポート実行（users 1, pages 1331, notes 3, links 1, page_contents 1331 等。所要約 3 分）。 |
+| 日付           | 実施内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **2026-02-09** | **C2-1〜C2-5 実施** — Turso エクスポート、ID 変換・users 生成、Tiptap→Y.Doc 変換、content_text 抽出、Aurora インポートを実施。dev Aurora へ本番インポート実行（users 1, pages 1331, notes 3, links 1, page_contents 1331 等。所要約 3 分）。                                                                                                                                                                                                                                                                                                                                                                       |
 | **2026-02-10** | **作業計画書との照合・C2-6〜C2-8 対応** — ① 計画書（phase-c2-work-log）と実装の照合で C2-1〜C2-5 完了を確認。② **C2-7** 整合性検証スクリプト `verify-aurora-counts.mjs` を新規作成（変換 JSON 件数と Aurora COUNT の比較）。③ **C2-8** ロールバック手順書 `phase-c2-rollback-procedure.md` を新規作成。④ **C2-6** ghost_links 拡張を、スキーマ（C1-1）・変換（C2-2）・インポート（C2-5）・API で対応済みと確認し完了扱いに。⑤ `transform-for-aurora/README.md` に C2-7 の実行方法を追記。⑥ 本作業ログに C2-6〜C2-8 の実施内容（§2.6〜2.8）、成果物一覧への追記、今後の作業の更新、作業履歴（本セクション）を反映。 |
 
 ---

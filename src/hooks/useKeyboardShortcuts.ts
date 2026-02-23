@@ -26,9 +26,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
       // Skip if user is typing in an input/textarea (except for specific shortcuts)
       const target = e.target as HTMLElement;
       const isEditing =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
 
       // Cmd+N / Ctrl+N - New page (always works)
       if ((e.metaKey || e.ctrlKey) && e.key === "n") {
@@ -68,7 +66,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
       // Skip other shortcuts if editing
       if (isEditing) return;
     },
-    [navigate, location.pathname, onShowShortcuts, togglePanel, aiChatAvailable]
+    [navigate, location.pathname, onShowShortcuts, togglePanel, aiChatAvailable],
   );
 
   useEffect(() => {
@@ -98,7 +96,7 @@ export const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
   },
 
   // Editor
-  { key: "[[" , description: "WikiLink を挿入", category: "editor" },
+  { key: "[[", description: "WikiLink を挿入", category: "editor" },
 
   // AI
   { key: "⌘⇧A", description: "AIチャットを開く", category: "ai" },

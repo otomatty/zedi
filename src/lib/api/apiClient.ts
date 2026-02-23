@@ -32,7 +32,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public code?: string
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -59,10 +59,13 @@ async function request<T>(
   path: string,
   getToken: () => Promise<string | null>,
   baseUrl: string,
-  options: { body?: unknown; query?: Record<string, string> } = {}
+  options: { body?: unknown; query?: Record<string, string> } = {},
 ): Promise<T> {
   const base = baseUrl.replace(/\/$/, "");
-  const url = new URL(path.startsWith("/") ? path : `/${path}`, base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"));
+  const url = new URL(
+    path.startsWith("/") ? path : `/${path}`,
+    base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"),
+  );
   if (options.query) {
     Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
   }
@@ -88,7 +91,7 @@ async function request<T>(
       throw new ApiError(
         `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
         0,
-        "NETWORK_ERROR"
+        "NETWORK_ERROR",
       );
     }
 
@@ -98,14 +101,14 @@ async function request<T>(
       const waitMs = retryAfterSec > 0 ? retryAfterSec * 1000 : DEFAULT_RETRY_AFTER_MS;
       console.log(
         `[API] 503 Database resuming (attempt ${attempt + 1}/${MAX_DB_RESUMING_RETRIES}), ` +
-        `retrying in ${waitMs / 1000}s…`
+          `retrying in ${waitMs / 1000}s…`,
       );
       // Notify UI so SyncIndicator can show "DB starting…"
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("zedi:db-resuming", {
             detail: { attempt: attempt + 1, retryAfterMs: waitMs },
-          })
+          }),
         );
       }
       await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -122,16 +125,13 @@ async function request<T>(
       throw new ApiError(
         `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
         res.status,
-        "INVALID_JSON"
+        "INVALID_JSON",
       );
     }
     if (!res.ok) {
       const envelope = data as ApiEnvelope<unknown> | null;
       const legacy = data as { message?: string; code?: string } | null;
-      const msg =
-        envelope?.error?.message ??
-        legacy?.message ??
-        res.statusText;
+      const msg = envelope?.error?.message ?? legacy?.message ?? res.statusText;
       const code = envelope?.error?.code ?? legacy?.code;
       throw new ApiError(msg, res.status, code);
     }
@@ -161,10 +161,13 @@ async function requestOptionalAuth<T>(
   path: string,
   getToken: () => Promise<string | null>,
   baseUrl: string,
-  options: { body?: unknown; query?: Record<string, string> } = {}
+  options: { body?: unknown; query?: Record<string, string> } = {},
 ): Promise<T> {
   const base = baseUrl.replace(/\/$/, "");
-  const url = new URL(path.startsWith("/") ? path : `/${path}`, base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"));
+  const url = new URL(
+    path.startsWith("/") ? path : `/${path}`,
+    base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"),
+  );
   if (options.query) {
     Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
   }
@@ -182,7 +185,7 @@ async function requestOptionalAuth<T>(
     throw new ApiError(
       `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
       0,
-      "NETWORK_ERROR"
+      "NETWORK_ERROR",
     );
   }
   const text = await res.text();
@@ -194,16 +197,13 @@ async function requestOptionalAuth<T>(
     throw new ApiError(
       `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
       res.status,
-      "INVALID_JSON"
+      "INVALID_JSON",
     );
   }
   if (!res.ok) {
     const envelope = data as ApiEnvelope<unknown> | null;
     const legacy = data as { message?: string; code?: string } | null;
-    const msg =
-      envelope?.error?.message ??
-      legacy?.message ??
-      res.statusText;
+    const msg = envelope?.error?.message ?? legacy?.message ?? res.statusText;
     const code = envelope?.error?.code ?? legacy?.code;
     throw new ApiError(msg, res.status, code);
   }
@@ -227,13 +227,13 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
   const req = <T>(
     method: string,
     path: string,
-    opts: { body?: unknown; query?: Record<string, string> } = {}
+    opts: { body?: unknown; query?: Record<string, string> } = {},
   ) => request<T>(method, path, getToken, baseUrl, opts);
 
   const reqOptionalAuth = <T>(
     method: string,
     path: string,
-    opts: { body?: unknown; query?: Record<string, string> } = {}
+    opts: { body?: unknown; query?: Record<string, string> } = {},
   ) => requestOptionalAuth<T>(method, path, getToken, baseUrl, opts);
 
   return {
@@ -260,15 +260,10 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     },
 
     /** PUT /api/pages/:id/content — upload Y.Doc state. Optional version for optimistic lock. */
-    async putPageContent(
-      pageId: string,
-      body: PutPageContentBody
-    ): Promise<{ version: number }> {
-      return req<{ version: number }>(
-        "PUT",
-        `/api/pages/${encodeURIComponent(pageId)}/content`,
-        { body }
-      );
+    async putPageContent(pageId: string, body: PutPageContentBody): Promise<{ version: number }> {
+      return req<{ version: number }>("PUT", `/api/pages/${encodeURIComponent(pageId)}/content`, {
+        body,
+      });
     },
 
     /** POST /api/pages — create page. Returns created page (snake_case). */
@@ -280,7 +275,7 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     async deletePage(pageId: string): Promise<{ id: string; deleted: boolean }> {
       return req<{ id: string; deleted: boolean }>(
         "DELETE",
-        `/api/pages/${encodeURIComponent(pageId)}`
+        `/api/pages/${encodeURIComponent(pageId)}`,
       );
     },
 
@@ -315,18 +310,20 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     },
 
     /** POST /api/notes — create note. */
-    async createNote(body: {
-      title?: string;
-      visibility?: string;
-      edit_permission?: string;
-    } = {}): Promise<NoteListItem> {
+    async createNote(
+      body: {
+        title?: string;
+        visibility?: string;
+        edit_permission?: string;
+      } = {},
+    ): Promise<NoteListItem> {
       return req<NoteListItem>("POST", "/api/notes", { body });
     },
 
     /** PUT /api/notes/:id — update note (owner only). */
     async updateNote(
       noteId: string,
-      body: { title?: string; visibility?: string; edit_permission?: string }
+      body: { title?: string; visibility?: string; edit_permission?: string },
     ): Promise<NoteListItem> {
       return req<NoteListItem>("PUT", `/api/notes/${encodeURIComponent(noteId)}`, { body });
     },
@@ -335,36 +332,47 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     async deleteNote(noteId: string): Promise<{ id: string; deleted: boolean }> {
       return req<{ id: string; deleted: boolean }>(
         "DELETE",
-        `/api/notes/${encodeURIComponent(noteId)}`
+        `/api/notes/${encodeURIComponent(noteId)}`,
       );
     },
 
     /** POST /api/notes/:id/pages — add page { pageId } or create new { title }. */
     async addNotePage(
       noteId: string,
-      body: { pageId?: string; page_id?: string; title?: string }
+      body: { pageId?: string; page_id?: string; title?: string },
     ): Promise<unknown> {
       return req("POST", `/api/notes/${encodeURIComponent(noteId)}/pages`, { body });
     },
 
     /** DELETE /api/notes/:id/pages/:pageId — remove page from note. */
-    async removeNotePage(noteId: string, pageId: string): Promise<{ note_id: string; page_id: string; removed: boolean }> {
-      return req("DELETE", `/api/notes/${encodeURIComponent(noteId)}/pages/${encodeURIComponent(pageId)}`);
+    async removeNotePage(
+      noteId: string,
+      pageId: string,
+    ): Promise<{ note_id: string; page_id: string; removed: boolean }> {
+      return req(
+        "DELETE",
+        `/api/notes/${encodeURIComponent(noteId)}/pages/${encodeURIComponent(pageId)}`,
+      );
     },
 
     /** POST /api/notes/:id/members — add member (owner only). */
     async addNoteMember(
       noteId: string,
-      body: { member_email: string; role?: string }
+      body: { member_email: string; role?: string },
     ): Promise<NoteMemberItem> {
-      return req<NoteMemberItem>("POST", `/api/notes/${encodeURIComponent(noteId)}/members`, { body });
+      return req<NoteMemberItem>("POST", `/api/notes/${encodeURIComponent(noteId)}/members`, {
+        body,
+      });
     },
 
     /** DELETE /api/notes/:id/members/:email — remove member (owner only). */
-    async removeNoteMember(noteId: string, memberEmail: string): Promise<{ note_id: string; member_email: string; removed: boolean }> {
+    async removeNoteMember(
+      noteId: string,
+      memberEmail: string,
+    ): Promise<{ note_id: string; member_email: string; removed: boolean }> {
       return req(
         "DELETE",
-        `/api/notes/${encodeURIComponent(noteId)}/members/${encodeURIComponent(memberEmail)}`
+        `/api/notes/${encodeURIComponent(noteId)}/members/${encodeURIComponent(memberEmail)}`,
       );
     },
 
@@ -372,12 +380,12 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     async updateNoteMember(
       noteId: string,
       memberEmail: string,
-      body: { role: "editor" | "viewer" }
+      body: { role: "editor" | "viewer" },
     ): Promise<NoteMemberItem> {
       return req<NoteMemberItem>(
         "PUT",
         `/api/notes/${encodeURIComponent(noteId)}/members/${encodeURIComponent(memberEmail)}`,
-        { body }
+        { body },
       );
     },
 

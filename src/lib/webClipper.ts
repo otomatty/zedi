@@ -4,10 +4,7 @@
 import { Readability } from "@mozilla/readability";
 
 // CORSプロキシ（複数のフォールバックを用意）
-const CORS_PROXIES = [
-  "https://api.allorigins.win/raw?url=",
-  "https://corsproxy.io/?",
-];
+const CORS_PROXIES = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?"];
 
 export interface ClippedContent {
   title: string;
@@ -49,8 +46,7 @@ async function fetchWithProxy(url: string): Promise<string> {
     try {
       const response = await fetch(proxy + encodeURIComponent(url), {
         headers: {
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
       });
 
@@ -84,8 +80,7 @@ export function extractOGPData(doc: Document): OGPData {
 
   return {
     title: getMetaContent("og:title"),
-    description:
-      getMetaContent("og:description") || getMetaContent("description"),
+    description: getMetaContent("og:description") || getMetaContent("description"),
     image: getMetaContent("og:image"),
     siteName: getMetaContent("og:site_name"),
   };
@@ -153,10 +148,7 @@ function sanitizeHtml(html: string): string {
  * @param url - 取得するURL
  * @param fetchHtml - 未指定時はCORSプロキシを使用。指定時はサーバー側取得APIなどでHTMLを取得
  */
-export async function clipWebPage(
-  url: string,
-  fetchHtmlFn?: FetchHtmlFn
-): Promise<ClippedContent> {
+export async function clipWebPage(url: string, fetchHtmlFn?: FetchHtmlFn): Promise<ClippedContent> {
   if (!isValidUrl(url)) {
     throw new Error("有効なURLを入力してください");
   }
@@ -193,9 +185,7 @@ export async function clipWebPage(
   const article = reader.parse();
 
   if (!article) {
-    throw new Error(
-      "本文の抽出に失敗しました。このページは対応していない可能性があります。"
-    );
+    throw new Error("本文の抽出に失敗しました。このページは対応していない可能性があります。");
   }
 
   // サニタイズされたコンテンツ
@@ -221,10 +211,7 @@ export function getClipErrorMessage(error: unknown): string {
     if (error.message.includes("有効なURL")) {
       return "有効なURLを入力してください。";
     }
-    if (
-      error.message.includes("Failed to fetch") ||
-      error.message.includes("NetworkError")
-    ) {
+    if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
       return "ネットワークエラーが発生しました。接続を確認してください。";
     }
     if (error.message.includes("Request timed out") || error.message.includes("TIMEOUT")) {

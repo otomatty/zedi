@@ -36,7 +36,9 @@ function toBool(v) {
 
 /** Aurora users.email は NOT NULL のためプレースホルダーを使用（初回ログインで API が更新） */
 function placeholderEmail(cognitoSub) {
-  const safe = String(cognitoSub).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 100);
+  const safe = String(cognitoSub)
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .slice(0, 100);
   return `migration+${safe}@zedi.invalid`;
 }
 
@@ -47,7 +49,10 @@ async function findLatestExport() {
   } catch (_) {
     return null;
   }
-  const jsonFiles = files.filter((f) => f.startsWith("turso-export-") && f.endsWith(".json")).sort().reverse();
+  const jsonFiles = files
+    .filter((f) => f.startsWith("turso-export-") && f.endsWith(".json"))
+    .sort()
+    .reverse();
   return jsonFiles.length ? join(exportOutputDir, jsonFiles[0]) : null;
 }
 
@@ -55,7 +60,9 @@ async function main() {
   const inputPath = process.argv[2] || (await findLatestExport());
   if (!inputPath) {
     console.error("Usage: node transform-id-and-users.mjs [path/to/turso-export.json]");
-    console.error("Or run from project root after C2-1 export (default: latest file in export-turso/output/)");
+    console.error(
+      "Or run from project root after C2-1 export (default: latest file in export-turso/output/)",
+    );
     process.exit(1);
   }
 
@@ -107,7 +114,8 @@ async function main() {
   }
   // source_page_id で参照されるが一覧にない ID があれば追加
   for (const p of pages) {
-    if (p.source_page_id && !pageIdMap.has(p.source_page_id)) pageIdMap.set(p.source_page_id, randomUUID());
+    if (p.source_page_id && !pageIdMap.has(p.source_page_id))
+      pageIdMap.set(p.source_page_id, randomUUID());
   }
 
   // 4) note id マッピング
@@ -120,7 +128,7 @@ async function main() {
   const auroraPages = pages.map((p) => ({
     id: pageIdMap.get(p.id),
     owner_id: userMap.get(p.user_id),
-    source_page_id: p.source_page_id ? pageIdMap.get(p.source_page_id) ?? null : null,
+    source_page_id: p.source_page_id ? (pageIdMap.get(p.source_page_id) ?? null) : null,
     title: p.title ?? null,
     content_preview: p.content_preview ?? null,
     thumbnail_url: p.thumbnail_url ?? null,
@@ -165,7 +173,10 @@ async function main() {
 
   // 9) note_pages（note_id, page_id がマップに存在するもののみ）
   const auroraNotePages = notePages
-    .filter((np) => noteIdMap.has(np.note_id) && pageIdMap.has(np.page_id) && userMap.has(np.added_by_user_id))
+    .filter(
+      (np) =>
+        noteIdMap.has(np.note_id) && pageIdMap.has(np.page_id) && userMap.has(np.added_by_user_id),
+    )
     .map((np) => ({
       note_id: noteIdMap.get(np.note_id),
       page_id: pageIdMap.get(np.page_id),

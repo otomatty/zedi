@@ -15,13 +15,11 @@ function createMockRepo(overrides: {
   return {
     getPagesSummary: overrides.getPagesSummary ?? vi.fn().mockResolvedValue([]),
     getOutgoingLinks: overrides.getOutgoingLinks ?? vi.fn().mockResolvedValue([]),
-    getGhostLinksBySourcePage:
-      overrides.getGhostLinksBySourcePage ?? vi.fn().mockResolvedValue([]),
+    getGhostLinksBySourcePage: overrides.getGhostLinksBySourcePage ?? vi.fn().mockResolvedValue([]),
     addLink: overrides.addLink ?? vi.fn().mockResolvedValue(undefined),
     removeLink: overrides.removeLink ?? vi.fn().mockResolvedValue(undefined),
     addGhostLink: overrides.addGhostLink ?? vi.fn().mockResolvedValue(undefined),
-    removeGhostLink:
-      overrides.removeGhostLink ?? vi.fn().mockResolvedValue(undefined),
+    removeGhostLink: overrides.removeGhostLink ?? vi.fn().mockResolvedValue(undefined),
     createPage: vi.fn(),
     getPage: vi.fn(),
     getPages: vi.fn(),
@@ -173,9 +171,7 @@ describe("syncLinksWithRepo", () => {
         removeLink,
       });
 
-      await syncLinksWithRepo(repo, userId, sourcePageId, [
-        { title: "Page B", exists: true },
-      ]);
+      await syncLinksWithRepo(repo, userId, sourcePageId, [{ title: "Page B", exists: true }]);
 
       expect(removeLink).toHaveBeenCalledTimes(1);
       expect(removeLink).toHaveBeenCalledWith(sourcePageId, "page-a");
@@ -246,9 +242,7 @@ describe("syncLinksWithRepo", () => {
         addGhostLink,
       });
 
-      await syncLinksWithRepo(repo, userId, sourcePageId, [
-        { title: "My Page", exists: true },
-      ]);
+      await syncLinksWithRepo(repo, userId, sourcePageId, [{ title: "My Page", exists: true }]);
 
       expect(addLink).not.toHaveBeenCalled();
       expect(addGhostLink).not.toHaveBeenCalled();

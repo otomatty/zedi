@@ -3,13 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Coffee, Heart, Sparkles, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Container from "@/components/layout/Container";
 
 interface DonationOptionProps {
@@ -28,16 +22,16 @@ const DonationOption: React.FC<DonationOptionProps> = ({
   href,
 }) => {
   return (
-    <Card className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50 group">
+    <Card className="group cursor-pointer transition-all hover:border-primary/50 hover:shadow-md">
       <a href={href} target="_blank" rel="noopener noreferrer">
         <CardHeader className="flex flex-row items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
             {icon}
           </div>
           <div className="flex-1">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               {title}
-              <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ExternalLink className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
             </CardTitle>
             <CardDescription className="text-sm">{description}</CardDescription>
           </div>
@@ -75,20 +69,20 @@ const Donate: React.FC = () => {
       {/* Content */}
       <main className="py-8">
         <Container>
-          <div className="max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl">
             {/* Hero Section */}
-            <div className="text-center mb-10">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-white mb-4">
+            <div className="mb-10 text-center">
+              <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-white">
                 <Heart className="h-8 w-8" />
               </div>
-              <h2 className="text-2xl font-bold mb-3">{t("donate.heroTitle")}</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
+              <h2 className="mb-3 text-2xl font-bold">{t("donate.heroTitle")}</h2>
+              <p className="mx-auto max-w-md text-muted-foreground">
                 {t("donate.heroDescription")}
               </p>
             </div>
 
             {/* Donation Options */}
-            <div className="space-y-4 mb-10">
+            <div className="mb-10 space-y-4">
               <DonationOption
                 icon={<Coffee className="h-5 w-5" />}
                 title={t("donate.coffeeTitle")}
@@ -120,22 +114,20 @@ const Donate: React.FC = () => {
             </div>
 
             {/* Thank You Message */}
-            <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
               <CardContent className="py-6">
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-2">
+                  <p className="mb-2 text-sm text-muted-foreground">
                     {t("donate.thankYouHeading")}
                   </p>
-                  <p className="text-sm">
-                    {t("donate.thankYouBody")}
-                  </p>
+                  <p className="text-sm">{t("donate.thankYouBody")}</p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Other Ways to Support */}
             <div className="mt-10">
-              <h3 className="text-lg font-semibold mb-4 text-center">
+              <h3 className="mb-4 text-center text-lg font-semibold">
                 {t("donate.otherWaysTitle")}
               </h3>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -144,7 +136,7 @@ const Donate: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">⭐</span>
                       <div>
-                        <p className="font-medium text-sm">{t("donate.githubStarTitle")}</p>
+                        <p className="text-sm font-medium">{t("donate.githubStarTitle")}</p>
                         <p className="text-xs text-muted-foreground">
                           {t("donate.githubStarDescription")}
                         </p>
@@ -157,7 +149,7 @@ const Donate: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">📣</span>
                       <div>
-                        <p className="font-medium text-sm">{t("donate.shareTitle")}</p>
+                        <p className="text-sm font-medium">{t("donate.shareTitle")}</p>
                         <p className="text-xs text-muted-foreground">
                           {t("donate.shareDescription")}
                         </p>
@@ -170,7 +162,7 @@ const Donate: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">🐛</span>
                       <div>
-                        <p className="font-medium text-sm">{t("donate.reportBugTitle")}</p>
+                        <p className="text-sm font-medium">{t("donate.reportBugTitle")}</p>
                         <p className="text-xs text-muted-foreground">
                           {t("donate.reportBugDescription")}
                         </p>
@@ -183,7 +175,7 @@ const Donate: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">💡</span>
                       <div>
-                        <p className="font-medium text-sm">{t("donate.requestFeatureTitle")}</p>
+                        <p className="text-sm font-medium">{t("donate.requestFeatureTitle")}</p>
                         <p className="text-xs text-muted-foreground">
                           {t("donate.requestFeatureDescription")}
                         </p>

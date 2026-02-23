@@ -8,26 +8,20 @@
  *   ttl (Number)      — Unix epoch seconds for DynamoDB TTL
  */
 
-import {
-  DynamoDBClient,
-  UpdateItemCommand,
-} from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import type { EnvConfig } from "../types/index.js";
 
 const client = new DynamoDBClient({});
 
 const WINDOW_SECONDS = 3600; // 1 hour window
-const MAX_REQUESTS = 120;    // 120 requests per hour
+const MAX_REQUESTS = 120; // 120 requests per hour
 
 function getWindowKey(): string {
   const now = Math.floor(Date.now() / 1000);
   return String(Math.floor(now / WINDOW_SECONDS));
 }
 
-export async function checkRateLimit(
-  userId: string,
-  env: EnvConfig
-): Promise<void> {
+export async function checkRateLimit(userId: string, env: EnvConfig): Promise<void> {
   const windowKey = getWindowKey();
   const pk = `user:${userId}:${windowKey}`;
   const ttl = Math.floor(Date.now() / 1000) + WINDOW_SECONDS + 60; // extra 60s buffer

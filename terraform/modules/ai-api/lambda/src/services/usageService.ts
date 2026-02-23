@@ -38,7 +38,7 @@ async function loadModels(env: EnvConfig): Promise<Map<string, AIModel>> {
   const rows = await execute<AIModel>(
     "SELECT * FROM ai_models WHERE is_active = TRUE ORDER BY sort_order",
     {},
-    env
+    env,
   );
 
   _modelCache = new Map(rows.map((r) => [r.id, r]));
@@ -72,7 +72,7 @@ async function loadBudgets(env: EnvConfig): Promise<Map<string, number>> {
   const rows = await execute<{ tier: string; monthly_budget_units: number }>(
     "SELECT tier, monthly_budget_units FROM ai_tier_budgets",
     {},
-    env
+    env,
   );
 
   _budgetCache = new Map(rows.map((r) => [r.tier, r.monthly_budget_units]));
@@ -89,17 +89,14 @@ async function getTierBudget(tier: string, env: EnvConfig): Promise<number> {
 // Monthly usage lookup
 // =============================================================================
 
-async function getMonthlyUsage(
-  userId: string,
-  env: EnvConfig
-): Promise<MonthlyUsage> {
+async function getMonthlyUsage(userId: string, env: EnvConfig): Promise<MonthlyUsage> {
   const yearMonth = getCurrentYearMonth();
   const rows = await execute<MonthlyUsage>(
     `SELECT user_id, year_month, total_cost_units, request_count
      FROM ai_monthly_usage
      WHERE user_id = CAST(:userId AS uuid) AND year_month = :yearMonth`,
     { userId, yearMonth },
-    env
+    env,
   );
 
   if (rows.length > 0) return rows[0];
@@ -116,10 +113,7 @@ async function getMonthlyUsage(
 // Usage check (pre-request)
 // =============================================================================
 
-export async function checkUsage(
-  userId: string,
-  env: EnvConfig
-): Promise<UsageCheckResult> {
+export async function checkUsage(userId: string, env: EnvConfig): Promise<UsageCheckResult> {
   const subscription = await getSubscription(userId, env);
   const tier = subscription?.plan ?? "free";
   const budgetUnits = await getTierBudget(tier, env);
@@ -140,13 +134,10 @@ export async function checkUsage(
 // Cost calculation
 // =============================================================================
 
-export function calculateCostUnits(
-  model: AIModel,
-  tokenUsage: TokenUsage
-): number {
+export function calculateCostUnits(model: AIModel, tokenUsage: TokenUsage): number {
   return Math.ceil(
     (tokenUsage.inputTokens / 1000) * model.input_cost_units +
-    (tokenUsage.outputTokens / 1000) * model.output_cost_units
+      (tokenUsage.outputTokens / 1000) * model.output_cost_units,
   );
 }
 
@@ -162,7 +153,7 @@ export async function recordUsage(
     tokenUsage: TokenUsage;
     apiMode: "system" | "user_key";
   },
-  env: EnvConfig
+  env: EnvConfig,
 ): Promise<{ costUnits: number; usagePercent: number }> {
   const model = await getModel(params.modelId, env);
   const costUnits = calculateCostUnits(model, params.tokenUsage);
@@ -181,7 +172,7 @@ export async function recordUsage(
       costUnits,
       apiMode: params.apiMode,
     },
-    env
+    env,
   );
 
   // Upsert monthly aggregate
@@ -194,7 +185,7 @@ export async function recordUsage(
        request_count = ai_monthly_usage.request_count + 1,
        updated_at = NOW()`,
     { userId: params.userId, yearMonth, costUnits },
-    env
+    env,
   );
 
   // Return updated usage percent
@@ -215,7 +206,7 @@ export async function recordUsage(
 export async function validateModelAccess(
   userId: string,
   modelId: string,
-  env: EnvConfig
+  env: EnvConfig,
 ): Promise<AIModel> {
   const model = await getModel(modelId, env);
   const subscription = await getSubscription(userId, env);

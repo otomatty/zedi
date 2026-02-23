@@ -5,9 +5,7 @@ import type { ApiClient } from "@/lib/api/apiClient";
 import type { PageMetadata, Link } from "@/lib/storageAdapter/types";
 
 vi.mock("@/lib/contentUtils", () => ({
-  getPageListPreview: vi.fn((content: string) =>
-    content ? content.slice(0, 50) : ""
-  ),
+  getPageListPreview: vi.fn((content: string) => (content ? content.slice(0, 50) : "")),
   extractPlainText: vi.fn((content: string) => content ?? ""),
 }));
 
@@ -100,11 +98,7 @@ describe("StorageAdapterPageRepository", () => {
         is_deleted: false,
       });
 
-      const authRepo = new StorageAdapterPageRepository(
-        adapter,
-        api,
-        AUTH_USER_ID
-      );
+      const authRepo = new StorageAdapterPageRepository(adapter, api, AUTH_USER_ID);
       const page = await authRepo.createPage(AUTH_USER_ID, "API Page", "body");
 
       expect(api.createPage).toHaveBeenCalledOnce();
@@ -170,9 +164,7 @@ describe("StorageAdapterPageRepository", () => {
           isDeleted: false,
         },
       ];
-      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(
-        pages
-      );
+      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(pages);
 
       const result = await repo.getPages(LOCAL_USER_ID);
       expect(result).toHaveLength(2);
@@ -195,9 +187,7 @@ describe("StorageAdapterPageRepository", () => {
         updatedAt: 2000,
         isDeleted: false,
       };
-      (adapter.getPage as ReturnType<typeof vi.fn>).mockResolvedValue(
-        existing
-      );
+      (adapter.getPage as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
 
       await repo.updatePage(LOCAL_USER_ID, "page-1", {
         title: "New Title",
@@ -220,11 +210,7 @@ describe("StorageAdapterPageRepository", () => {
     });
 
     it("deletes from adapter and API for authenticated user", async () => {
-      const authRepo = new StorageAdapterPageRepository(
-        adapter,
-        api,
-        AUTH_USER_ID
-      );
+      const authRepo = new StorageAdapterPageRepository(adapter, api, AUTH_USER_ID);
       await authRepo.deletePage(AUTH_USER_ID, "page-1");
 
       expect(adapter.deletePage).toHaveBeenCalledWith("page-1");
@@ -239,8 +225,7 @@ describe("StorageAdapterPageRepository", () => {
       await repo.addLink("source-1", "target-1");
 
       expect(adapter.saveLinks).toHaveBeenCalledOnce();
-      const saved = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock
-        .calls[0][1] as Link[];
+      const saved = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock.calls[0][1] as Link[];
       expect(saved).toHaveLength(1);
       expect(saved[0].sourceId).toBe("source-1");
       expect(saved[0].targetId).toBe("target-1");
@@ -263,8 +248,7 @@ describe("StorageAdapterPageRepository", () => {
 
       await repo.removeLink("s1", "t1");
 
-      const saved = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock
-        .calls[0][1] as Link[];
+      const saved = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock.calls[0][1] as Link[];
       expect(saved).toHaveLength(1);
       expect(saved[0].targetId).toBe("t2");
     });
@@ -321,37 +305,21 @@ describe("StorageAdapterPageRepository", () => {
     ];
 
     it("finds duplicate title", async () => {
-      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(
-        pages
-      );
-      const dup = await repo.checkDuplicateTitle(
-        LOCAL_USER_ID,
-        "Unique Title"
-      );
+      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(pages);
+      const dup = await repo.checkDuplicateTitle(LOCAL_USER_ID, "Unique Title");
       expect(dup).not.toBeNull();
       expect(dup!.id).toBe("p1");
     });
 
     it("excludes current page from duplicate check", async () => {
-      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(
-        pages
-      );
-      const dup = await repo.checkDuplicateTitle(
-        LOCAL_USER_ID,
-        "Unique Title",
-        "p1"
-      );
+      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(pages);
+      const dup = await repo.checkDuplicateTitle(LOCAL_USER_ID, "Unique Title", "p1");
       expect(dup).toBeNull();
     });
 
     it("returns null when no duplicate found", async () => {
-      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(
-        pages
-      );
-      const dup = await repo.checkDuplicateTitle(
-        LOCAL_USER_ID,
-        "Nonexistent Title"
-      );
+      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(pages);
+      const dup = await repo.checkDuplicateTitle(LOCAL_USER_ID, "Nonexistent Title");
       expect(dup).toBeNull();
     });
   });

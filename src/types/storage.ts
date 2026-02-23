@@ -120,15 +120,11 @@ export const DEFAULT_STORAGE_SETTINGS: StorageSettings = {
 };
 
 /** 外部ストレージのみ（Select で使用） */
-export const EXTERNAL_STORAGE_PROVIDERS = STORAGE_PROVIDERS.filter(
-  (p) => p.id !== "s3"
-);
+export const EXTERNAL_STORAGE_PROVIDERS = STORAGE_PROVIDERS.filter((p) => p.id !== "s3");
 
 /**
  * プロバイダーIDから情報を取得
  */
-export function getStorageProviderById(
-  id: StorageProviderType
-): StorageProviderInfo | undefined {
+export function getStorageProviderById(id: StorageProviderType): StorageProviderInfo | undefined {
   return STORAGE_PROVIDERS.find((p) => p.id === id);
 }

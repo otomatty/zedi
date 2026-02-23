@@ -1,4 +1,4 @@
-import { ChatAction } from '../types/aiChat';
+import { ChatAction } from "../types/aiChat";
 
 /** AI応答テキストからアクションカードを抽出 */
 export function parseActions(content: string): ChatAction[] {
@@ -20,8 +20,5 @@ export function parseActions(content: string): ChatAction[] {
 
 /** アクションカードのコンテンツを除いた表示用テキスト */
 export function getDisplayContent(content: string): string {
-  return content.replace(
-    /<!-- zedi-action:[\w-]+ -->[\s\S]*?<!-- \/zedi-action -->/g,
-    ""
-  ).trim();
+  return content.replace(/<!-- zedi-action:[\w-]+ -->[\s\S]*?<!-- \/zedi-action -->/g, "").trim();
 }

@@ -31,9 +31,7 @@ interface EditorBubbleMenuProps {
   editor: Editor;
 }
 
-export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
-  editor,
-}) => {
+export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({ editor }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const toggleBold = useCallback(() => {
@@ -69,11 +67,7 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
   }, [editor]);
 
   const insertTable = useCallback(() => {
-    editor
-      .chain()
-      .focus()
-      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-      .run();
+    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
   }, [editor]);
 
   const setColor = useCallback(
@@ -85,15 +79,11 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
       }
       setShowColorPicker(false);
     },
-    [editor]
+    [editor],
   );
 
-  const hasTable = !!editor.extensionManager.extensions.find(
-    (e) => e.name === "table"
-  );
-  const hasTaskList = !!editor.extensionManager.extensions.find(
-    (e) => e.name === "taskList"
-  );
+  const hasTable = !!editor.extensionManager.extensions.find((e) => e.name === "table");
+  const hasTaskList = !!editor.extensionManager.extensions.find((e) => e.name === "taskList");
 
   return (
     <BubbleMenu
@@ -107,7 +97,7 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
         return true;
       }}
     >
-      <div className="flex items-center gap-0.5 bg-popover border border-border rounded-lg shadow-elevated p-1 animate-fade-in">
+      <div className="shadow-elevated flex animate-fade-in items-center gap-0.5 rounded-lg border border-border bg-popover p-1">
         {/* Bold */}
         <BubbleButton
           onClick={toggleBold}
@@ -158,7 +148,7 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
           <Highlighter className="h-4 w-4" />
         </BubbleButton>
 
-        <div className="w-px h-5 bg-border mx-0.5" />
+        <div className="mx-0.5 h-5 w-px bg-border" />
 
         {/* Bullet List */}
         <BubbleButton
@@ -192,7 +182,7 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
           </BubbleButton>
         )}
 
-        <div className="w-px h-5 bg-border mx-0.5" />
+        <div className="mx-0.5 h-5 w-px bg-border" />
 
         {/* Table insert */}
         {hasTable && (
@@ -218,7 +208,7 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
           </BubbleButton>
 
           {showColorPicker && (
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-popover border border-border rounded-lg shadow-elevated p-2 z-50 animate-fade-in">
+            <div className="shadow-elevated absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 animate-fade-in rounded-lg border border-border bg-popover p-2">
               <div className="grid grid-cols-4 gap-1.5">
                 {PRESET_COLORS.map((color) => (
                   <button
@@ -226,8 +216,8 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({
                     onClick={() => setColor(color.value)}
                     title={color.label}
                     className={cn(
-                      "w-6 h-6 rounded-md border border-border transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring",
-                      !color.value && "bg-foreground"
+                      "h-6 w-6 rounded-md border border-border transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring",
+                      !color.value && "bg-foreground",
                     )}
                     style={color.value ? { backgroundColor: color.value } : undefined}
                   />
@@ -257,10 +247,10 @@ function BubbleButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "p-1.5 rounded-md transition-colors",
+        "rounded-md p-1.5 transition-colors",
         isActive
           ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
       {...props}
     >

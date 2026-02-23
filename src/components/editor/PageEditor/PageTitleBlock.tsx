@@ -40,7 +40,7 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
       e.preventDefault();
       onEnterMoveToContent?.();
     },
-    [onEnterMoveToContent]
+    [onEnterMoveToContent],
   );
 
   const handleChange = useCallback(
@@ -48,13 +48,13 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
       const value = e.target.value.replace(/\n/g, "");
       onTitleChange?.(value);
     },
-    [onTitleChange]
+    [onTitleChange],
   );
 
   if (isReadOnly) {
     return (
-      <div ref={titleRef} className="pt-6 pb-2">
-        <h1 className="text-2xl font-semibold whitespace-normal break-words">
+      <div ref={titleRef} className="pb-2 pt-6">
+        <h1 className="whitespace-normal break-words text-2xl font-semibold">
           {title || "無題のページ"}
         </h1>
       </div>
@@ -62,7 +62,7 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
   }
 
   return (
-    <div ref={titleRef} className="pt-6 pb-2">
+    <div ref={titleRef} className="pb-2 pt-6">
       <input
         type="text"
         value={title}
@@ -74,13 +74,13 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
           "placeholder:text-muted-foreground",
           "focus:outline-none",
           "min-h-[2.5rem] py-0 leading-tight",
-          errorMessage ? "text-destructive" : ""
+          errorMessage ? "text-destructive" : "",
         )}
         aria-label={placeholder}
         aria-invalid={Boolean(errorMessage)}
       />
       {errorMessage && (
-        <p className="text-sm text-destructive mt-1" role="alert">
+        <p className="mt-1 text-sm text-destructive" role="alert">
           {errorMessage}
         </p>
       )}

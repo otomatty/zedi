@@ -16,16 +16,18 @@ const NotePageView: React.FC = () => {
   const navigate = useNavigate();
   const { isSignedIn, userId } = useAuth();
 
-  const { note, access, source, isLoading: isNoteLoading } = useNote(
-    noteId ?? "",
-    { allowRemote: true }
-  );
+  const {
+    note,
+    access,
+    source,
+    isLoading: isNoteLoading,
+  } = useNote(noteId ?? "", { allowRemote: true });
 
   const { data: page, isLoading: isPageLoading } = useNotePage(
     noteId ?? "",
     pageId ?? "",
     source,
-    Boolean(access?.canView)
+    Boolean(access?.canView),
   );
 
   const handleBack = useCallback(() => {
@@ -52,10 +54,10 @@ const NotePageView: React.FC = () => {
   useEffect(() => {
     if (canEdit && page) {
       setPageContext({
-        type: 'editor',
+        type: "editor",
         pageId: page.id,
         pageTitle: page.title,
-        pageContent: page.content?.slice(0, 3000) ?? '',
+        pageContent: page.content?.slice(0, 3000) ?? "",
       });
     }
     return () => setPageContext(null);
@@ -90,16 +92,14 @@ const NotePageView: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <div className="border-b border-border/60">
-        <Container className="flex items-center justify-between h-10">
+        <Container className="flex h-10 items-center justify-between">
           <Button variant="ghost" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          {!canEdit && (
-            <span className="text-xs text-muted-foreground">閲覧専用</span>
-          )}
+          {!canEdit && <span className="text-xs text-muted-foreground">閲覧専用</span>}
         </Container>
       </div>
 

@@ -107,10 +107,7 @@ describe("sanitizeTiptapContent", () => {
             {
               type: "text",
               text: "Bold and unsupported",
-              marks: [
-                { type: "bold" },
-                { type: "unsupportedMark" },
-              ],
+              marks: [{ type: "bold" }, { type: "unsupportedMark" }],
             },
           ],
         },
@@ -188,9 +185,28 @@ describe("sanitizeTiptapContent", () => {
       content: [
         { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Heading" }] },
         { type: "paragraph", content: [{ type: "text", text: "Paragraph" }] },
-        { type: "blockquote", content: [{ type: "paragraph", content: [{ type: "text", text: "Quote" }] }] },
-        { type: "bulletList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }] }] },
-        { type: "orderedList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }] }] },
+        {
+          type: "blockquote",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "Quote" }] }],
+        },
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }],
+            },
+          ],
+        },
+        {
+          type: "orderedList",
+          content: [
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }],
+            },
+          ],
+        },
         { type: "codeBlock", content: [{ type: "text", text: "code" }] },
         { type: "horizontalRule" },
         { type: "mermaid", attrs: { code: "graph TD" } },
@@ -239,13 +255,19 @@ describe("sanitizeTiptapContent", () => {
             {
               type: "tableRow",
               content: [
-                { type: "tableHeader", content: [{ type: "paragraph", content: [{ type: "text", text: "Header" }] }] },
+                {
+                  type: "tableHeader",
+                  content: [{ type: "paragraph", content: [{ type: "text", text: "Header" }] }],
+                },
               ],
             },
             {
               type: "tableRow",
               content: [
-                { type: "tableCell", content: [{ type: "paragraph", content: [{ type: "text", text: "Cell" }] }] },
+                {
+                  type: "tableCell",
+                  content: [{ type: "paragraph", content: [{ type: "text", text: "Cell" }] }],
+                },
               ],
             },
           ],
@@ -283,8 +305,16 @@ describe("sanitizeTiptapContent", () => {
             { type: "text", text: "italic", marks: [{ type: "italic" }] },
             { type: "text", text: "strike", marks: [{ type: "strike" }] },
             { type: "text", text: "code", marks: [{ type: "code" }] },
-            { type: "text", text: "link", marks: [{ type: "link", attrs: { href: "https://example.com" } }] },
-            { type: "text", text: "wikiLink", marks: [{ type: "wikiLink", attrs: { title: "Page" } }] },
+            {
+              type: "text",
+              text: "link",
+              marks: [{ type: "link", attrs: { href: "https://example.com" } }],
+            },
+            {
+              type: "text",
+              text: "wikiLink",
+              marks: [{ type: "wikiLink", attrs: { title: "Page" } }],
+            },
           ],
         },
       ],
@@ -321,7 +351,11 @@ describe("sanitizeTiptapContent", () => {
         {
           type: "paragraph",
           content: [
-            { type: "text", text: "colored", marks: [{ type: "textStyle", attrs: { color: "#dc2626" } }] },
+            {
+              type: "text",
+              text: "colored",
+              marks: [{ type: "textStyle", attrs: { color: "#dc2626" } }],
+            },
           ],
         },
       ],
@@ -357,9 +391,7 @@ describe("validateTiptapContent", () => {
       content: [
         {
           type: "paragraph",
-          content: [
-            { type: "text", text: "test", marks: [{ type: "customMark" }] },
-          ],
+          content: [{ type: "text", text: "test", marks: [{ type: "customMark" }] }],
         },
       ],
     });
@@ -416,9 +448,7 @@ describe("getContentPreview", () => {
   it("should return trimmed preview", () => {
     const content = JSON.stringify({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: "Short text" }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Short text" }] }],
     });
 
     expect(getContentPreview(content)).toBe("Short text");
@@ -428,9 +458,7 @@ describe("getContentPreview", () => {
     const longText = "A".repeat(200);
     const content = JSON.stringify({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: longText }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: longText }] }],
     });
 
     const preview = getContentPreview(content, 50);
@@ -461,9 +489,7 @@ describe("generateAutoTitle", () => {
     const longText = "A".repeat(100);
     const content = JSON.stringify({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: longText }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: longText }] }],
     });
 
     const title = generateAutoTitle(content);

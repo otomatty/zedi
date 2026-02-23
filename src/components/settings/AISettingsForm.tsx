@@ -171,7 +171,10 @@ export const AISettingsForm: React.FC = () => {
   const handleReset = () => {
     reset();
     setUseOwnKey(false);
-    toast({ title: t("aiSettings.resetToast"), description: t("aiSettings.resetToastDescription") });
+    toast({
+      title: t("aiSettings.resetToast"),
+      description: t("aiSettings.resetToastDescription"),
+    });
   };
 
   if (isLoading) {
@@ -191,9 +194,7 @@ export const AISettingsForm: React.FC = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">{t("aiSettings.title")}</CardTitle>
-        <CardDescription>
-          {t("aiSettings.description")}
-        </CardDescription>
+        <CardDescription>{t("aiSettings.description")}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
@@ -228,7 +229,7 @@ export const AISettingsForm: React.FC = () => {
                           <SelectItem key={model.id} value={model.id}>
                             <div className="flex items-center gap-2">
                               <span>{model.displayName}</span>
-                              <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                              <Badge variant="secondary" className="px-1 py-0 text-[10px]">
                                 {model.provider}
                               </Badge>
                             </div>
@@ -239,17 +240,11 @@ export const AISettingsForm: React.FC = () => {
                     {lockedServerModels.length > 0 && (
                       <>
                         {lockedServerModels.map((model) => (
-                          <SelectItem
-                            key={model.id}
-                            value={model.id}
-                            disabled
-                          >
+                          <SelectItem key={model.id} value={model.id} disabled>
                             <div className="flex items-center gap-2">
                               <Lock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">
-                                {model.displayName}
-                              </span>
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                              <span className="text-muted-foreground">{model.displayName}</span>
+                              <Badge variant="outline" className="px-1 py-0 text-[10px]">
                                 {t("aiSettings.paid")}
                               </Badge>
                             </div>
@@ -260,9 +255,7 @@ export const AISettingsForm: React.FC = () => {
                   </SelectContent>
                 </Select>
               )}
-              <p className="text-xs text-muted-foreground">
-                {t("aiSettings.serverModeHelp")}
-              </p>
+              <p className="text-xs text-muted-foreground">{t("aiSettings.serverModeHelp")}</p>
             </div>
           </>
         )}
@@ -357,7 +350,9 @@ export const AISettingsForm: React.FC = () => {
                   <XCircle className="h-4 w-4" />
                 )}
                 <AlertTitle>
-                  {testResult.success ? t("aiSettings.connectionSuccess") : t("aiSettings.connectionFailed")}
+                  {testResult.success
+                    ? t("aiSettings.connectionSuccess")
+                    : t("aiSettings.connectionFailed")}
                 </AlertTitle>
                 <AlertDescription className="whitespace-pre-wrap">
                   {testResult.message}
@@ -367,7 +362,7 @@ export const AISettingsForm: React.FC = () => {
 
             {/* API Key Help */}
             <div className="rounded-lg border border-border bg-muted/50 p-4">
-              <h4 className="text-sm font-medium mb-2">{t("aiSettings.apiKeySources")}</h4>
+              <h4 className="mb-2 text-sm font-medium">{t("aiSettings.apiKeySources")}</h4>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li>
                   <a
@@ -408,12 +403,8 @@ export const AISettingsForm: React.FC = () => {
       <CardFooter className="flex justify-between">
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isSaving || isTesting}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" disabled={isSaving || isTesting}>
+              <Trash2 className="mr-2 h-4 w-4" />
               {t("common.reset")}
             </Button>
           </AlertDialogTrigger>
@@ -426,9 +417,7 @@ export const AISettingsForm: React.FC = () => {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-              <AlertDialogAction onClick={handleReset}>
-                {t("common.reset")}
-              </AlertDialogAction>
+              <AlertDialogAction onClick={handleReset}>{t("common.reset")}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -440,7 +429,7 @@ export const AISettingsForm: React.FC = () => {
               onClick={handleTest}
               disabled={isSaving || isTesting || !settings.apiKey}
             >
-              {isTesting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("aiSettings.testConnection")}
             </Button>
           )}

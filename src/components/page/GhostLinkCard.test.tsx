@@ -19,17 +19,17 @@ describe("GhostLinkCard", () => {
   it("should call onClick when clicked", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
-    
+
     render(<GhostLinkCard title="New Page" onClick={onClick} />);
-    
+
     await user.click(screen.getByText("New Page"));
-    
+
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it("should have dashed border style", () => {
     render(<GhostLinkCard title="Test" onClick={() => {}} />);
-    
+
     // The card should have border-dashed class
     const card = screen.getByText("Test").closest('[class*="border-dashed"]');
     expect(card).toBeInTheDocument();

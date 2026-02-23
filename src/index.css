@@ -109,7 +109,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
   }
 
   /* Custom scrollbar */
@@ -123,7 +123,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/20 rounded-full;
+    @apply rounded-full bg-muted-foreground/20;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -144,13 +144,11 @@
 
   /* Link styles in editor */
   .internal-link {
-    @apply text-link underline decoration-link/30 underline-offset-2 
-           hover:decoration-link/60 transition-colors cursor-pointer;
+    @apply cursor-pointer text-link underline decoration-link/30 underline-offset-2 transition-colors hover:decoration-link/60;
   }
 
   .ghost-link {
-    @apply text-ghost-link underline decoration-dashed decoration-ghost-link/40 
-           underline-offset-2 hover:decoration-ghost-link/70 transition-colors cursor-pointer;
+    @apply cursor-pointer text-ghost-link underline decoration-ghost-link/40 decoration-dashed underline-offset-2 transition-colors hover:decoration-ghost-link/70;
   }
 
   /* FAB animation */
@@ -170,7 +168,7 @@
 
   /* Date header sticky */
   .date-header {
-    @apply sticky top-0 z-10 backdrop-blur-md bg-background/80;
+    @apply sticky top-0 z-10 bg-background/80 backdrop-blur-md;
   }
 
   /* Editor focus ring */
@@ -180,7 +178,7 @@
 
   /* Tiptap editor styles */
   .tiptap-editor {
-    @apply outline-none min-h-[200px];
+    @apply min-h-[200px] outline-none;
     font-size: var(--editor-font-size, 14px);
   }
 
@@ -189,15 +187,15 @@
   }
 
   .tiptap-editor h1 {
-    @apply text-2xl font-bold mb-4 mt-6 first:mt-0;
+    @apply mb-4 mt-6 text-2xl font-bold first:mt-0;
   }
 
   .tiptap-editor h2 {
-    @apply text-xl font-semibold mb-3 mt-5 first:mt-0;
+    @apply mb-3 mt-5 text-xl font-semibold first:mt-0;
   }
 
   .tiptap-editor h3 {
-    @apply text-lg font-medium mb-2 mt-4 first:mt-0;
+    @apply mb-2 mt-4 text-lg font-medium first:mt-0;
   }
 
   .tiptap-editor ul,
@@ -218,15 +216,15 @@
   }
 
   .tiptap-editor blockquote {
-    @apply border-l-2 border-primary/40 pl-4 italic text-muted-foreground mb-3;
+    @apply mb-3 border-l-2 border-primary/40 pl-4 italic text-muted-foreground;
   }
 
   .tiptap-editor code {
-    @apply font-mono text-sm bg-muted px-1.5 py-0.5 rounded;
+    @apply rounded bg-muted px-1.5 py-0.5 font-mono text-sm;
   }
 
   .tiptap-editor pre {
-    @apply font-mono text-sm bg-muted p-4 rounded-lg mb-3 overflow-x-auto;
+    @apply mb-3 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm;
   }
 
   .tiptap-editor pre code {
@@ -235,23 +233,23 @@
 
   /* Task list styles */
   .tiptap-editor ul[data-type="taskList"] {
-    @apply list-none pl-0 mb-3;
+    @apply mb-3 list-none pl-0;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] {
-    @apply flex items-start gap-2 mb-1;
+    @apply mb-1 flex items-start gap-2;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > label {
-    @apply flex items-center shrink-0 mt-1;
+    @apply mt-1 flex shrink-0 items-center;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > label input[type="checkbox"] {
-    @apply h-4 w-4 rounded border-border accent-primary cursor-pointer;
+    @apply h-4 w-4 cursor-pointer rounded border-border accent-primary;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > div {
-    @apply flex-1 min-w-0;
+    @apply min-w-0 flex-1;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div {
@@ -265,12 +263,12 @@
 
   /* Highlight styles */
   .tiptap-editor mark {
-    @apply bg-yellow-300/40 rounded-sm px-0.5;
+    @apply rounded-sm bg-yellow-300/40 px-0.5;
   }
 
   /* Table styles */
   .tiptap-editor .tableWrapper {
-    @apply overflow-x-auto mb-3;
+    @apply mb-3 overflow-x-auto;
   }
 
   .tiptap-editor table {
@@ -279,7 +277,7 @@
 
   .tiptap-editor th,
   .tiptap-editor td {
-    @apply border border-border px-3 py-2 text-left align-top min-w-[80px];
+    @apply min-w-[80px] border border-border px-3 py-2 text-left align-top;
   }
 
   .tiptap-editor th {
@@ -308,7 +306,7 @@
 
   /* Code block language label */
   .tiptap-editor pre .code-block-language {
-    @apply absolute top-2 right-2 text-xs text-muted-foreground bg-muted/80 px-2 py-0.5 rounded;
+    @apply absolute right-2 top-2 rounded bg-muted/80 px-2 py-0.5 text-xs text-muted-foreground;
   }
 
   /* Light mode: override hljs token colors for better readability */
@@ -363,7 +361,7 @@
 
   /* Mathematics (KaTeX) styles */
   .tiptap-editor .Tiptap-mathematics-editor {
-    @apply font-mono text-sm bg-muted px-2 py-1 rounded border border-border;
+    @apply rounded border border-border bg-muted px-2 py-1 font-mono text-sm;
   }
 
   .tiptap-editor .Tiptap-mathematics-render {
@@ -371,7 +369,7 @@
   }
 
   .tiptap-editor .Tiptap-mathematics-render--editable:hover {
-    @apply bg-accent/30 rounded;
+    @apply rounded bg-accent/30;
   }
 
   .tiptap-editor .Tiptap-mathematics-editor--active {
@@ -384,14 +382,13 @@
   }
 
   .tiptap-editor .is-editor-empty:first-child::before {
-    @apply text-muted-foreground pointer-events-none float-left h-0;
+    @apply pointer-events-none float-left h-0 text-muted-foreground;
     content: attr(data-placeholder);
   }
 
   /* Wiki link styling */
   .wiki-link {
-    @apply text-link font-medium hover:underline cursor-pointer 
-           transition-colors duration-200 rounded px-0.5 -mx-0.5;
+    @apply -mx-0.5 cursor-pointer rounded px-0.5 font-medium text-link transition-colors duration-200 hover:underline;
     background: hsl(var(--link-color) / 0.1);
   }
 
@@ -401,10 +398,7 @@
 
   /* Referenced link - exists in other pages but no page created yet */
   .wiki-link-referenced {
-    @apply text-link-referenced font-medium cursor-pointer 
-           border-b border-dashed border-current
-           hover:border-solid transition-colors duration-200 
-           rounded px-0.5 -mx-0.5;
+    @apply text-link-referenced -mx-0.5 cursor-pointer rounded border-b border-dashed border-current px-0.5 font-medium transition-colors duration-200 hover:border-solid;
     background: hsl(var(--link-referenced) / 0.1);
   }
 
@@ -414,10 +408,7 @@
 
   /* Ghost link - new link, not referenced elsewhere */
   .wiki-link-ghost {
-    @apply text-ghost-link font-medium cursor-pointer 
-           border-b border-dashed border-ghost-link/50 
-           hover:border-ghost-link transition-colors duration-200 
-           rounded px-0.5 -mx-0.5;
+    @apply -mx-0.5 cursor-pointer rounded border-b border-dashed border-ghost-link/50 px-0.5 font-medium text-ghost-link transition-colors duration-200 hover:border-ghost-link;
     background: hsl(var(--link-ghost) / 0.1);
   }
 
@@ -499,4 +490,3 @@
     animation-delay: 0.25s;
   }
 }
-

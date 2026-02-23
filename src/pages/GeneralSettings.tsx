@@ -19,16 +19,14 @@ const GeneralSettings: React.FC = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-semibold">
-            {t("settings.general.title")}
-          </h1>
+          <h1 className="text-xl font-semibold">{t("settings.general.title")}</h1>
         </Container>
       </header>
 
       {/* Content */}
       <main className="py-6">
         <Container>
-          <div className="max-w-2xl mx-auto">
+          <div className="mx-auto max-w-2xl">
             <GeneralSettingsForm />
           </div>
         </Container>

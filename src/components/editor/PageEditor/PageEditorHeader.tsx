@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  ArrowLeft,
-  Trash2,
-  MoreHorizontal,
-  Download,
-  Copy,
-} from "lucide-react";
+import { ArrowLeft, Trash2, MoreHorizontal, Download, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -68,22 +62,17 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <Container className="flex h-16 items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="shrink-0"
-        >
+        <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
         {/* Center: Search bar */}
         {hasSearchContext ? (
-          <div className="flex flex-1 justify-center min-w-0 max-w-xl">
+          <div className="flex min-w-0 max-w-xl flex-1 justify-center">
             <HeaderSearchBar />
           </div>
         ) : (
-          <div className="flex-1 min-w-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1" aria-hidden="true" />
         )}
 
         <div className="flex items-center gap-2">
@@ -108,7 +97,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
             status={wikiStatus}
           />
           {lastSaved && (
-            <span className="text-xs text-muted-foreground hidden sm:inline">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
               {formatTimeAgo(lastSaved)}に保存
             </span>
           )}

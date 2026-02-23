@@ -28,8 +28,8 @@ describe("GyazoProvider", () => {
             url: "https://i.gyazo.com/abc.png",
             type: "png",
           }),
-          { status: 200 }
-        )
+          { status: 200 },
+        ),
       );
 
       const url = await provider.uploadImage(createTestFile());
@@ -38,24 +38,21 @@ describe("GyazoProvider", () => {
 
     it("throws on non-OK response", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response("Unauthorized", { status: 401 })
+        new Response("Unauthorized", { status: 401 }),
       );
 
       await expect(provider.uploadImage(createTestFile())).rejects.toThrow(
-        /Gyazo upload failed: 401/
+        /Gyazo upload failed: 401/,
       );
     });
 
     it("throws when no URL returned", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(
-          JSON.stringify({ image_id: "img-1", url: "" }),
-          { status: 200 }
-        )
+        new Response(JSON.stringify({ image_id: "img-1", url: "" }), { status: 200 }),
       );
 
       await expect(provider.uploadImage(createTestFile())).rejects.toThrow(
-        "Gyazo upload failed: No URL returned"
+        "Gyazo upload failed: No URL returned",
       );
     });
   });
@@ -68,8 +65,8 @@ describe("GyazoProvider", () => {
             image_id: "img-1",
             url: "https://i.gyazo.com/test.png",
           }),
-          { status: 200 }
-        )
+          { status: 200 },
+        ),
       );
 
       const result = await provider.testConnection();
@@ -78,9 +75,7 @@ describe("GyazoProvider", () => {
     });
 
     it("returns failure on error", async () => {
-      vi.spyOn(globalThis, "fetch").mockRejectedValue(
-        new Error("Network error")
-      );
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
 
       const result = await provider.testConnection();
       expect(result.success).toBe(false);

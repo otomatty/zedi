@@ -11,10 +11,7 @@ interface SourceUrlBadgeProps {
  * 引用元URLを表示するバッジコンポーネント
  * ページエディタの上部に表示
  */
-export const SourceUrlBadge: React.FC<SourceUrlBadgeProps> = ({
-  sourceUrl,
-  className,
-}) => {
+export const SourceUrlBadge: React.FC<SourceUrlBadgeProps> = ({ sourceUrl, className }) => {
   // URLからホスト名を抽出
   const getDisplayUrl = (url: string): string => {
     try {
@@ -30,10 +27,10 @@ export const SourceUrlBadge: React.FC<SourceUrlBadgeProps> = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg",
-        "bg-muted/50 border border-border/50",
+        "flex items-center gap-2 rounded-lg px-3 py-2",
+        "border border-border/50 bg-muted/50",
         "text-sm text-muted-foreground",
-        className
+        className,
       )}
     >
       <Link2 className="h-4 w-4 shrink-0 text-primary" />
@@ -42,7 +39,7 @@ export const SourceUrlBadge: React.FC<SourceUrlBadgeProps> = ({
         href={sourceUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1 text-primary hover:underline truncate"
+        className="flex items-center gap-1 truncate text-primary hover:underline"
       >
         <span className="truncate">{displayUrl}</span>
         <ExternalLink className="h-3 w-3 shrink-0" />

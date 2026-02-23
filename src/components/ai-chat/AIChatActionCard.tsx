@@ -1,12 +1,12 @@
-import React from 'react';
-import { useTranslation } from 'react-i18next';
+import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChatAction,
   CreatePageAction,
   AppendToPageAction,
   CreateMultiplePagesAction,
   SuggestWikiLinksAction,
-} from '../../types/aiChat';
+} from "../../types/aiChat";
 
 interface AIChatActionCardProps {
   action: ChatAction;
@@ -15,13 +15,13 @@ interface AIChatActionCardProps {
 
 export function AIChatActionCard({ action, onExecute }: AIChatActionCardProps) {
   switch (action.type) {
-    case 'create-page':
+    case "create-page":
       return <CreatePageCard action={action} onExecute={onExecute} />;
-    case 'append-to-page':
+    case "append-to-page":
       return <AppendToPageCard action={action} onExecute={onExecute} />;
-    case 'create-multiple-pages':
+    case "create-multiple-pages":
       return <CreateMultiplePagesCard action={action} onExecute={onExecute} />;
-    case 'suggest-wiki-links':
+    case "suggest-wiki-links":
       return <SuggestWikiLinksCard action={action} onExecute={onExecute} />;
     default:
       return null;
@@ -38,26 +38,23 @@ function CreatePageCard({
   const { t } = useTranslation();
 
   return (
-    <div className="border border-primary/50 bg-primary/5 rounded-lg p-4 animate-in fade-in duration-200">
-      <p className="text-sm font-medium mb-2">
-        {t('aiChat.suggestions.createPage', { title: action.title })}
+    <div className="rounded-lg border border-primary/50 bg-primary/5 p-4 duration-200 animate-in fade-in">
+      <p className="mb-2 text-sm font-medium">
+        {t("aiChat.suggestions.createPage", { title: action.title })}
       </p>
-      <p className="text-xs text-muted-foreground mb-2">{action.reason}</p>
+      <p className="mb-2 text-xs text-muted-foreground">{action.reason}</p>
 
       {action.content && (
-        <div className="text-xs bg-muted/50 rounded p-2 mb-3 max-h-24 overflow-hidden">
+        <div className="mb-3 max-h-24 overflow-hidden rounded bg-muted/50 p-2 text-xs">
           {action.content.slice(0, 200)}
-          {action.content.length > 200 && '...'}
+          {action.content.length > 200 && "..."}
         </div>
       )}
 
       {action.suggestedLinks.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
+        <div className="mb-3 flex flex-wrap gap-1">
           {action.suggestedLinks.map((link) => (
-            <span
-              key={link}
-              className="text-xs bg-primary/10 text-primary rounded px-1.5 py-0.5"
-            >
+            <span key={link} className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
               [[{link}]]
             </span>
           ))}
@@ -67,15 +64,15 @@ function CreatePageCard({
       <div className="flex gap-2">
         <button
           onClick={() => onExecute(action)}
-          className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
-          {t('aiChat.actions.createPage')}
+          {t("aiChat.actions.createPage")}
         </button>
         <button
-          onClick={() => onExecute({ ...action, type: 'create-page' })}
-          className="px-3 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
+          onClick={() => onExecute({ ...action, type: "create-page" })}
+          className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
         >
-          {t('aiChat.actions.editAndCreate')}
+          {t("aiChat.actions.editAndCreate")}
         </button>
       </div>
     </div>
@@ -92,24 +89,24 @@ function AppendToPageCard({
   const { t } = useTranslation();
 
   return (
-    <div className="border border-primary/50 bg-primary/5 rounded-lg p-4 animate-in fade-in duration-200">
-      <p className="text-sm font-medium mb-2">
-        {t('aiChat.suggestions.appendToPage', { title: action.pageTitle })}
+    <div className="rounded-lg border border-primary/50 bg-primary/5 p-4 duration-200 animate-in fade-in">
+      <p className="mb-2 text-sm font-medium">
+        {t("aiChat.suggestions.appendToPage", { title: action.pageTitle })}
       </p>
-      <p className="text-xs text-muted-foreground mb-2">{action.reason}</p>
+      <p className="mb-2 text-xs text-muted-foreground">{action.reason}</p>
 
       {action.content && (
-        <div className="text-xs bg-muted/50 rounded p-2 mb-3 max-h-24 overflow-hidden">
+        <div className="mb-3 max-h-24 overflow-hidden rounded bg-muted/50 p-2 text-xs">
           {action.content.slice(0, 200)}
-          {action.content.length > 200 && '...'}
+          {action.content.length > 200 && "..."}
         </div>
       )}
 
       <button
         onClick={() => onExecute(action)}
-        className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
       >
-        {t('aiChat.actions.appendToPage')}
+        {t("aiChat.actions.appendToPage")}
       </button>
     </div>
   );
@@ -124,7 +121,7 @@ function CreateMultiplePagesCard({
 }) {
   const { t } = useTranslation();
   const [selected, setSelected] = React.useState<Set<number>>(
-    new Set(action.pages.map((_, i) => i))
+    new Set(action.pages.map((_, i) => i)),
   );
 
   const togglePage = (index: number) => {
@@ -140,18 +137,13 @@ function CreateMultiplePagesCard({
   };
 
   return (
-    <div className="border border-primary/50 bg-primary/5 rounded-lg p-4 animate-in fade-in duration-200">
-      <p className="text-sm font-medium mb-2">
-        {t('aiChat.suggestions.createMultiplePages')}
-      </p>
-      <p className="text-xs text-muted-foreground mb-2">{action.reason}</p>
+    <div className="rounded-lg border border-primary/50 bg-primary/5 p-4 duration-200 animate-in fade-in">
+      <p className="mb-2 text-sm font-medium">{t("aiChat.suggestions.createMultiplePages")}</p>
+      <p className="mb-2 text-xs text-muted-foreground">{action.reason}</p>
 
-      <div className="space-y-1.5 mb-3">
+      <div className="mb-3 space-y-1.5">
         {action.pages.map((page, i) => (
-          <label
-            key={i}
-            className="flex items-center gap-2 text-xs cursor-pointer"
-          >
+          <label key={i} className="flex cursor-pointer items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={selected.has(i)}
@@ -164,7 +156,7 @@ function CreateMultiplePagesCard({
       </div>
 
       {action.linkStructure.length > 0 && (
-        <div className="text-xs text-muted-foreground mb-3">
+        <div className="mb-3 text-xs text-muted-foreground">
           {action.linkStructure.map((link, i) => (
             <div key={i}>
               {link.from} → [[{link.to}]]
@@ -182,9 +174,9 @@ function CreateMultiplePagesCard({
           onExecute(filteredAction);
         }}
         disabled={selected.size === 0}
-        className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
       >
-        {t('aiChat.actions.createMultiple')}
+        {t("aiChat.actions.createMultiple")}
       </button>
     </div>
   );
@@ -200,14 +192,14 @@ function SuggestWikiLinksCard({
   const { t } = useTranslation();
 
   return (
-    <div className="border border-primary/50 bg-primary/5 rounded-lg p-4 animate-in fade-in duration-200">
-      <p className="text-sm font-medium mb-2">{action.reason}</p>
+    <div className="rounded-lg border border-primary/50 bg-primary/5 p-4 duration-200 animate-in fade-in">
+      <p className="mb-2 text-sm font-medium">{action.reason}</p>
 
-      <div className="flex flex-wrap gap-1 mb-3">
+      <div className="mb-3 flex flex-wrap gap-1">
         {action.links.map((link) => (
           <span
             key={link.keyword}
-            className="text-xs bg-primary/10 text-primary rounded px-1.5 py-0.5"
+            className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary"
           >
             [[{link.existingPageTitle || link.keyword}]]
           </span>
@@ -216,9 +208,9 @@ function SuggestWikiLinksCard({
 
       <button
         onClick={() => onExecute(action)}
-        className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
       >
-        {t('aiChat.actions.addLink')}
+        {t("aiChat.actions.addLink")}
       </button>
     </div>
   );

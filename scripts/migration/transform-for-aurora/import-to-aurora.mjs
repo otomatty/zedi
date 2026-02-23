@@ -19,8 +19,7 @@ const outputDir = join(__dirname, "output");
 
 const REGION = process.env.AWS_REGION || "ap-northeast-1";
 const CLUSTER_ARN =
-  process.env.CLUSTER_ARN ||
-  "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
+  process.env.CLUSTER_ARN || "arn:aws:rds:ap-northeast-1:590183877893:cluster:zedi-dev-cluster";
 const SECRET_ARN =
   process.env.SECRET_ARN ||
   "arn:aws:secretsmanager:ap-northeast-1:590183877893:secret:zedi-dev-db-credentials-x1aCah";
@@ -45,7 +44,7 @@ async function runStatement(sql, parameters = []) {
         database: DATABASE,
         sql,
         ...(parameters.length ? { parameters } : {}),
-      })
+      }),
     );
     return true;
   } catch (e) {
@@ -64,7 +63,7 @@ async function runQueryOne(sql, parameters = []) {
         database: DATABASE,
         sql,
         ...(parameters.length ? { parameters } : {}),
-      })
+      }),
     );
     const records = response.records ?? [];
     if (records.length === 0) return null;
@@ -85,15 +84,22 @@ async function findLatest(pattern, desc) {
   } catch (_) {
     return null;
   }
-  const matched = files.filter((f) => f.startsWith(pattern) && f.endsWith(".json")).sort().reverse();
+  const matched = files
+    .filter((f) => f.startsWith(pattern) && f.endsWith(".json"))
+    .sort()
+    .reverse();
   return matched.length ? join(outputDir, matched[0]) : null;
 }
 
 async function main() {
   const argv = process.argv.slice(2);
   const dryRun = argv.includes("--dry-run");
-  const transformPath = argv.find((a) => a.startsWith("--transform="))?.slice("--transform=".length);
-  const pageContentsPath = argv.find((a) => a.startsWith("--page-contents="))?.slice("--page-contents=".length);
+  const transformPath = argv
+    .find((a) => a.startsWith("--transform="))
+    ?.slice("--transform=".length);
+  const pageContentsPath = argv
+    .find((a) => a.startsWith("--page-contents="))
+    ?.slice("--page-contents=".length);
 
   const transformFile = transformPath || (await findLatest("aurora-transform-"));
   const pageContentsFile = pageContentsPath || (await findLatest("page-contents-with-text-"));
@@ -158,10 +164,9 @@ async function main() {
   // transform の user id → Aurora の user id（既存ユーザーは SELECT で取得）
   const ownerIdMap = new Map();
   for (const row of users) {
-    const auroraId = await runQueryOne(
-      `SELECT id FROM users WHERE cognito_sub = :cognito_sub`,
-      [param("cognito_sub", row.cognito_sub)]
-    );
+    const auroraId = await runQueryOne(`SELECT id FROM users WHERE cognito_sub = :cognito_sub`, [
+      param("cognito_sub", row.cognito_sub),
+    ]);
     if (auroraId) ownerIdMap.set(row.id, auroraId);
   }
 
@@ -300,7 +305,8 @@ async function main() {
   const nowIso = new Date().toISOString();
   for (let i = 0; i < page_contents.length; i++) {
     const row = page_contents[i];
-    if (i > 0 && i % 200 === 0) console.log("  page_contents progress:", i, "/", page_contents.length);
+    if (i > 0 && i % 200 === 0)
+      console.log("  page_contents progress:", i, "/", page_contents.length);
     const sql = `INSERT INTO page_contents (page_id, ydoc_state, version, content_text, updated_at)
       VALUES (CAST(:page_id AS uuid), decode(:ydoc_b64, 'base64'), :version, :content_text, CAST(:updated_at AS timestamptz))
       ON CONFLICT (page_id) DO UPDATE SET ydoc_state = EXCLUDED.ydoc_state, version = EXCLUDED.version, content_text = EXCLUDED.content_text, updated_at = EXCLUDED.updated_at`;
@@ -323,7 +329,8 @@ async function main() {
     const row = page_contents[i];
     const preview = row.content_preview ?? null;
     if (preview == null || String(preview).trim() === "") continue;
-    if (i > 0 && i % 200 === 0) console.log("  content_preview progress:", i, "/", page_contents.length);
+    if (i > 0 && i % 200 === 0)
+      console.log("  content_preview progress:", i, "/", page_contents.length);
     const sql = `UPDATE pages SET content_preview = COALESCE(NULLIF(TRIM(content_preview), ''), :content_preview) WHERE id = CAST(:page_id AS uuid) AND (content_preview IS NULL OR TRIM(content_preview) = '')`;
     const params = [param("content_preview", preview), param("page_id", row.page_id)];
     if (await runStatement(sql, params)) ok++;

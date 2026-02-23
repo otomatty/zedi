@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0  
 **Created:** 2026-01-31  
-**Status:** Draft  
+**Status:** Draft
 
 ---
 
@@ -1302,20 +1302,20 @@ log_retention_days = 14
 
 ### Phase 1: AWS基盤構築 (Week 1-2)
 
-| # | タスク | 優先度 | 依存 | 見積時間 |
-|---|--------|--------|------|----------|
-| 1.1 | Terraform backend (S3 + DynamoDB) | 高 | - | 2h |
-| 1.2 | Networking モジュール実装 | 高 | 1.1 | 4h |
-| 1.3 | Security モジュール実装 | 高 | 1.2 | 4h |
-| 1.4 | Database モジュール実装 | 高 | 1.2, 1.3 | 4h |
-| 1.5 | Cache モジュール実装 | 高 | 1.2, 1.3 | 3h |
-| 1.6 | Auth モジュール実装 | 高 | - | 4h |
-| 1.7 | Realtime モジュール実装 | 高 | 1.2-1.5 | 8h |
-| 1.8 | CDN モジュール実装 | 中 | 1.2 | 4h |
-| 1.9 | API モジュール実装 | 中 | 1.2, 1.4 | 6h |
-| 1.10 | Monitoring モジュール実装 | 中 | 1.2-1.7 | 4h |
-| 1.11 | Dev環境デプロイ | 高 | 1.1-1.10 | 4h |
-| 1.12 | 動作確認・調整 | 高 | 1.11 | 8h |
+| #    | タスク                            | 優先度 | 依存     | 見積時間 |
+| ---- | --------------------------------- | ------ | -------- | -------- |
+| 1.1  | Terraform backend (S3 + DynamoDB) | 高     | -        | 2h       |
+| 1.2  | Networking モジュール実装         | 高     | 1.1      | 4h       |
+| 1.3  | Security モジュール実装           | 高     | 1.2      | 4h       |
+| 1.4  | Database モジュール実装           | 高     | 1.2, 1.3 | 4h       |
+| 1.5  | Cache モジュール実装              | 高     | 1.2, 1.3 | 3h       |
+| 1.6  | Auth モジュール実装               | 高     | -        | 4h       |
+| 1.7  | Realtime モジュール実装           | 高     | 1.2-1.5  | 8h       |
+| 1.8  | CDN モジュール実装                | 中     | 1.2      | 4h       |
+| 1.9  | API モジュール実装                | 中     | 1.2, 1.4 | 6h       |
+| 1.10 | Monitoring モジュール実装         | 中     | 1.2-1.7  | 4h       |
+| 1.11 | Dev環境デプロイ                   | 高     | 1.1-1.10 | 4h       |
+| 1.12 | 動作確認・調整                    | 高     | 1.11     | 8h       |
 
 ---
 
@@ -1324,6 +1324,7 @@ log_retention_days = 14
 ### 設計方針: コスト最適化構成
 
 以下のコスト削減策を適用:
+
 - **NAT Gateway → VPC Endpoint**: $32/月 → $14/月 (約55%削減)
 - **Fargate → Fargate Spot**: 約70%削減
 - **Graviton2インスタンス**: 約20%削減
@@ -1331,46 +1332,46 @@ log_retention_days = 14
 
 ### 6.1 開発環境 (月額)
 
-| サービス | スペック | 概算コスト | 備考 |
-|---------|---------|-----------|------|
-| Aurora Serverless v2 | 0.5 ACU (最小) | ~$25 | アイドル時は最小課金 |
-| ElastiCache | cache.t4g.micro x 1 | ~$12 | Graviton2 |
-| ECS Fargate Spot | 0.25 vCPU, 0.5GB x 1 | ~$3 | Spot割引 |
-| VPC Endpoints | Interface x 4 | ~$15 | NAT Gateway代替 |
-| ALB | 1台 | ~$16 | |
-| CloudFront | 最小 | ~$1 | |
-| S3 | ~1GB | ~$0.03 | |
-| CloudWatch | 基本 | ~$3 | |
-| Route 53 | 1ゾーン | ~$0.50 | |
-| Secrets Manager | 2シークレット | ~$0.80 | |
-| **合計** | | **~$76/月** | 約11,400円/月 |
+| サービス             | スペック             | 概算コスト  | 備考                 |
+| -------------------- | -------------------- | ----------- | -------------------- |
+| Aurora Serverless v2 | 0.5 ACU (最小)       | ~$25        | アイドル時は最小課金 |
+| ElastiCache          | cache.t4g.micro x 1  | ~$12        | Graviton2            |
+| ECS Fargate Spot     | 0.25 vCPU, 0.5GB x 1 | ~$3         | Spot割引             |
+| VPC Endpoints        | Interface x 4        | ~$15        | NAT Gateway代替      |
+| ALB                  | 1台                  | ~$16        |                      |
+| CloudFront           | 最小                 | ~$1         |                      |
+| S3                   | ~1GB                 | ~$0.03      |                      |
+| CloudWatch           | 基本                 | ~$3         |                      |
+| Route 53             | 1ゾーン              | ~$0.50      |                      |
+| Secrets Manager      | 2シークレット        | ~$0.80      |                      |
+| **合計**             |                      | **~$76/月** | 約11,400円/月        |
 
 ### 6.2 本番環境 (月額・小規模: 数名ユーザー)
 
-| サービス | スペック | 概算コスト | 備考 |
-|---------|---------|-----------|------|
-| Aurora Serverless v2 | 0.5-4 ACU | ~$25 | 使用時のみスケール |
-| ElastiCache | cache.t4g.micro x 1 | ~$12 | Graviton2 |
-| ECS Fargate Spot | 0.25 vCPU, 0.5GB x 1 | ~$3 | Spot割引 |
-| VPC Endpoints | Interface x 4 | ~$15 | NAT Gateway代替 |
-| ALB | 1台 | ~$16 | |
-| CloudFront | 最小 | ~$1 | |
-| S3 | ~5GB | ~$0.15 | |
-| CloudWatch | 基本 | ~$3 | |
-| Route 53 | 1ゾーン | ~$0.50 | |
-| Secrets Manager | 2シークレット | ~$0.80 | |
-| **合計** | | **~$76/月** | 約11,400円/月 |
+| サービス             | スペック             | 概算コスト  | 備考               |
+| -------------------- | -------------------- | ----------- | ------------------ |
+| Aurora Serverless v2 | 0.5-4 ACU            | ~$25        | 使用時のみスケール |
+| ElastiCache          | cache.t4g.micro x 1  | ~$12        | Graviton2          |
+| ECS Fargate Spot     | 0.25 vCPU, 0.5GB x 1 | ~$3         | Spot割引           |
+| VPC Endpoints        | Interface x 4        | ~$15        | NAT Gateway代替    |
+| ALB                  | 1台                  | ~$16        |                    |
+| CloudFront           | 最小                 | ~$1         |                    |
+| S3                   | ~5GB                 | ~$0.15      |                    |
+| CloudWatch           | 基本                 | ~$3         |                    |
+| Route 53             | 1ゾーン              | ~$0.50      |                    |
+| Secrets Manager      | 2シークレット        | ~$0.80      |                    |
+| **合計**             |                      | **~$76/月** | 約11,400円/月      |
 
 ### 6.3 スケールアップ時の参考コスト
 
 ユーザー数増加に応じて以下のようにスケール:
 
-| ユーザー規模 | 月額コスト | 主な変更点 |
-|-------------|-----------|------------|
-| ~5名 | ~$76/月 | 現構成 |
-| ~50名 | ~$120/月 | Aurora 2ACU, ECS x2 |
-| ~500名 | ~$300/月 | Aurora 4ACU, Redis large, ECS x3 |
-| ~1000名以上 | ~$500/月〜 | Multi-AZ, Reserved Capacity検討 |
+| ユーザー規模 | 月額コスト | 主な変更点                       |
+| ------------ | ---------- | -------------------------------- |
+| ~5名         | ~$76/月    | 現構成                           |
+| ~50名        | ~$120/月   | Aurora 2ACU, ECS x2              |
+| ~500名       | ~$300/月   | Aurora 4ACU, Redis large, ECS x3 |
+| ~1000名以上  | ~$500/月〜 | Multi-AZ, Reserved Capacity検討  |
 
 ---
 

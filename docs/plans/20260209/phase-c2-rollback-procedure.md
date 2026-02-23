@@ -33,16 +33,16 @@
 
 ### 3.2 クライアントの切り替え
 
-1. **環境変数・ビルド設定**  
-   - 本番ビルドで「Aurora 用 API 接続」ではなく「Turso 直結」を使うように切り替える。  
-   - 例: 機能フラグ `USE_AURORA_API=true` を `false` に変更し、`turso.ts` のリモート接続を有効にする。  
+1. **環境変数・ビルド設定**
+   - 本番ビルドで「Aurora 用 API 接続」ではなく「Turso 直結」を使うように切り替える。
+   - 例: 機能フラグ `USE_AURORA_API=true` を `false` に変更し、`turso.ts` のリモート接続を有効にする。
    - または、Turso 接続を行う**旧バージョン（C3 移行前）のクライアント**をタグから再デプロイする。
 
-2. **デプロイ**  
-   - 上記設定でビルドし、本番環境にデプロイする。  
+2. **デプロイ**
+   - 上記設定でビルドし、本番環境にデプロイする。
    - ユーザーには「一時的に旧仕様で接続しています」等の告知を検討する。
 
-3. **動作確認**  
+3. **動作確認**
    - ログイン・ページ一覧・ページ編集・ノート一覧などが Turso に対して正常に動作することを確認する。
 
 ### 3.3 Aurora 側の扱い
@@ -55,8 +55,8 @@
 ## 4. 再移行（Turso → Aurora を再度行う場合）
 
 1. 原因の解消（Aurora / API の修正、またはインフラ変更）を実施する。
-2. Aurora の既存データをどうするか決定する。  
-   - 運用データが入っていない dev なら、`TRUNCATE ... CASCADE` でクリアしてから C2-2 以降を再実行してもよい。  
+2. Aurora の既存データをどうするか決定する。
+   - 運用データが入っていない dev なら、`TRUNCATE ... CASCADE` でクリアしてから C2-2 以降を再実行してもよい。
    - 本番で既にユーザーデータが入っている場合は、追い込みや差分移行の手順を別途検討する。
 3. C2-1（Turso エクスポート）から順に実行し、C2-5（Aurora インポート）まで実施する。
 4. C2-7（整合性検証）で件数一致を確認したうえで、再度クライアントを Aurora 用に切り替える。
@@ -65,12 +65,12 @@
 
 ## 5. 関連ドキュメント
 
-| ドキュメント | 用途 |
-|-------------|------|
-| [phase-c2-work-log.md](phase-c2-work-log.md) | C2 作業ログ・成果物一覧 |
-| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md) | C2-8 タスク定義 |
+| ドキュメント                                                                              | 用途                                   |
+| ----------------------------------------------------------------------------------------- | -------------------------------------- |
+| [phase-c2-work-log.md](phase-c2-work-log.md)                                              | C2 作業ログ・成果物一覧                |
+| [rearchitecture-task-breakdown.md](rearchitecture-task-breakdown.md)                      | C2-8 タスク定義                        |
 | [turso-to-aurora-migration-decisions.md](20260208/turso-to-aurora-migration-decisions.md) | 移行方針・Turso 読み取り専用で残す方針 |
-| [import-to-aurora.mjs](../../scripts/migration/transform-for-aurora/import-to-aurora.mjs) | Aurora インポート（再移行時に使用） |
+| [import-to-aurora.mjs](../../scripts/migration/transform-for-aurora/import-to-aurora.mjs) | Aurora インポート（再移行時に使用）    |
 
 ---
 
