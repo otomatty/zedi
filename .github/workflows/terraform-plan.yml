@@ -9,7 +9,6 @@ name: Terraform Plan
 
 on:
   pull_request:
-    branches: [main, develop]
     paths:
       - "terraform/**"
       - "server/hono/**"
