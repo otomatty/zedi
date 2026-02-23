@@ -37,6 +37,14 @@ vi.mock("@/lib/dateUtils", () => ({
   formatTimeAgo: (ts: number) => `formatted:${ts}`,
 }));
 
+vi.mock("@/components/layout/Header/AIChatButton", () => ({
+  AIChatButton: () => <button type="button" data-testid="ai-chat-btn">AI</button>,
+}));
+
+vi.mock("@/contexts/GlobalSearchContext", () => ({
+  useGlobalSearchContextOptional: () => null,
+}));
+
 const defaultProps = {
   title: "テストページ",
   lastSaved: null as number | null,
