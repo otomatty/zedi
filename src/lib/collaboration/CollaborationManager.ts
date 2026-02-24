@@ -370,11 +370,13 @@ export class CollaborationManager {
       this.auroraSaveTimer = null;
     }
 
-    // 最終保存（同期的にタイマーなしで呼び出し）
+    // 最終保存: ydoc 破棄前に同期的にステートをエンコードし、非同期で送信
     if (this.mode === "local" && this.auroraFetched) {
-      this.destroyed = false; // saveToAurora のガードを一時的に解除
-      this.saveToAurora();
-      this.destroyed = true;
+      const state = Y.encodeStateAsUpdate(this.ydoc);
+      if (state.length > 2) {
+        const contentText = this.extractText(this.ydoc.getXmlFragment("default"));
+        this.fireAndForgetSave(state, contentText);
+      }
     }
 
     // プレゼンスをクリア
@@ -388,5 +390,43 @@ export class CollaborationManager {
     this.ydoc.destroy();
 
     this.listeners.clear();
+  }
+
+  /**
+   * 破棄後の最終保存。エンコード済みステートを受け取り、ydoc に依存しない。
+   * keepalive: true でページ離脱後もリクエストが完了するようにする。
+   */
+  private fireAndForgetSave(state: Uint8Array, contentText: string): void {
+    this.getAuthToken()
+      .then((token) => {
+        if (!token) return;
+
+        let b64 = "";
+        const chunkSize = 8192;
+        for (let i = 0; i < state.length; i += chunkSize) {
+          b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
+        }
+        b64 = btoa(b64);
+
+        const baseUrl = (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+        const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+        const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
+
+        return fetch(url, {
+          method: "PUT",
+          keepalive: true,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            ydoc_state: b64,
+            content_text: contentText,
+          }),
+        });
+      })
+      .catch(() => {
+        // 最終保存の失敗は無視（ページ離脱中のため処理不能）
+      });
   }
 }

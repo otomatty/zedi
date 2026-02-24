@@ -40,7 +40,7 @@ app.get("/:id/content", authRequired, async (c) => {
     .limit(1);
 
   const row = content[0];
-  if (!row) return c.json({ content: null, version: 0 });
+  if (!row) throw new HTTPException(404, { message: "Page content not found" });
   const ydocBase64 =
     row.ydocState instanceof Buffer
       ? row.ydocState.toString("base64")
@@ -49,7 +49,7 @@ app.get("/:id/content", authRequired, async (c) => {
         : Buffer.from(row.ydocState as unknown as ArrayBufferLike).toString("base64");
 
   return c.json({
-    content: ydocBase64,
+    ydoc_state: ydocBase64,
     version: row.version,
     content_text: row.contentText,
     updated_at: row.updatedAt?.toISOString(),
@@ -63,14 +63,14 @@ app.put("/:id/content", authRequired, async (c) => {
   const db = c.get("db");
 
   const body = await c.req.json<{
-    content: string; // base64-encoded Y.Doc
+    ydoc_state: string; // base64-encoded Y.Doc state
     expected_version?: number;
     content_text?: string;
     title?: string;
   }>();
 
-  if (!body.content) {
-    throw new HTTPException(400, { message: "content is required" });
+  if (!body.ydoc_state) {
+    throw new HTTPException(400, { message: "ydoc_state is required" });
   }
 
   // ページ所有者確認
@@ -84,7 +84,7 @@ app.put("/:id/content", authRequired, async (c) => {
   if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
   if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
-  const ydocBuffer = Buffer.from(body.content, "base64");
+  const ydocBuffer = Buffer.from(body.ydoc_state, "base64");
 
   // UPSERT page_contents with optimistic locking
   if (body.expected_version != null) {

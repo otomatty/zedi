@@ -49,7 +49,11 @@ export function useEditorLifecycle({
       return;
     const timer = setTimeout(() => {
       if (initialContentAppliedRef.current) return;
-      if (editor.state.doc.nodeSize > 2) return;
+      // ProseMirror empty doc (doc + one empty paragraph) has nodeSize 4, not 2
+      const doc = editor.state.doc;
+      const isEmpty =
+        doc.nodeSize <= 4 || (doc.childCount === 1 && (doc.firstChild?.content.size ?? 0) === 0);
+      if (!isEmpty) return;
       try {
         editor.commands.setContent(JSON.parse(initialContent));
         initialContentAppliedRef.current = true;
