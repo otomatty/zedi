@@ -30,7 +30,7 @@ export default function SearchResults() {
   const searchQuery = (searchParams.get("q") ?? "").trim();
 
   useEffect(() => {
-    if (searchQuery) setQuery(searchQuery);
+    setQuery(searchQuery);
   }, [searchQuery, setQuery]);
 
   const { data: personalResults = [], isLoading: isPersonalLoading } = useSearchPages(searchQuery);

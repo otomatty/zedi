@@ -86,7 +86,17 @@ function useAIChatInputChips() {
 export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
   const { t } = useTranslation();
   const chips = useAIChatInputChips();
-  const { editorRef, syncRefsFromDOM, checkEmpty, insertChipAtCursor, getEditorContent } = chips;
+  const {
+    pendingRefs,
+    isEmpty,
+    editorRef,
+    syncRefsFromDOM,
+    checkEmpty,
+    insertChipAtCursor,
+    getEditorContent,
+    setPendingRefs,
+    setIsEmpty,
+  } = chips;
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -100,7 +110,7 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
   const mentionCandidates = useMemo(() => {
     if (deferredMentionQuery === null) return [];
     const q = deferredMentionQuery.toLowerCase();
-    const pendingIds = new Set(chips.pendingRefs.map((r) => r.id));
+    const pendingIds = new Set(pendingRefs.map((r) => r.id));
     return pages
       .filter((p) => !p.isDeleted && !pendingIds.has(p.id))
       .filter((p) => {
@@ -108,7 +118,7 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
         return q === "" || title.includes(q);
       })
       .slice(0, 8);
-  }, [deferredMentionQuery, pages, chips.pendingRefs]);
+  }, [deferredMentionQuery, pages, pendingRefs]);
 
   const detectMention = useCallback(() => {
     const sel = window.getSelection();
@@ -157,15 +167,15 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
     (e?: React.FormEvent) => {
       e?.preventDefault();
       if (isStreaming) return;
-      const { text, refs } = chips.getEditorContent();
+      const { text, refs } = getEditorContent();
       if (!text) return;
       onSendMessage(text, refs);
       if (editorRef.current) editorRef.current.innerHTML = "";
-      chips.setPendingRefs([]);
-      chips.setIsEmpty(true);
+      setPendingRefs([]);
+      setIsEmpty(true);
       setMentionQuery(null);
     },
-    [isStreaming, chips, onSendMessage],
+    [isStreaming, getEditorContent, onSendMessage, setPendingRefs, setIsEmpty],
   );
 
   const handleKeyDown = useCallback(
@@ -253,7 +263,7 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
   return {
     editorRef,
     dropdownRef,
-    isEmpty: chips.isEmpty,
+    isEmpty,
     isStreaming,
     isDraggingOver,
     placeholder,

@@ -16,7 +16,7 @@ export interface SearchResultCardItem {
 }
 
 function formatDate(ts: number): string {
-  if (!ts) return "";
+  if (ts <= 0 || !Number.isFinite(ts)) return "";
   const d = new Date(ts);
   return d.toLocaleDateString("ja-JP", {
     year: "numeric",
@@ -60,7 +60,7 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
             ) : (
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
-            <h3 className="flex-1 truncate text-base font-medium">{item.title}</h3>
+            <span className="flex-1 truncate text-base font-medium">{item.title}</span>
             <MatchTypeBadge type={item.matchType} />
             {item.noteId && (
               <span className="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-900 dark:text-blue-300">

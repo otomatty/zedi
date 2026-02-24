@@ -68,7 +68,7 @@ export function HeaderSearchDropdownContent({
           </p>
           <ul ref={listRef} className="list-none" role="group" aria-label="検索候補">
             {searchResults.map(({ pageId, noteId, title, sourceUrl }, index) => (
-              <li key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`}>
+              <li key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`} role="none">
                 <button
                   id={getOptionId(index)}
                   type="button"

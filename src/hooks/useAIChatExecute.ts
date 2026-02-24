@@ -68,9 +68,25 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
   streamingContentRef.current = "";
   abortControllerRef.current = new AbortController();
 
-  const settings = await loadAISettings();
-  if (!settings) {
-    throw new Error("AI settings not configured");
+  let settings: AISettings;
+  try {
+    const loaded = await loadAISettings();
+    if (!loaded) {
+      throw new Error("AI settings not configured");
+    }
+    settings = loaded;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "AI設定の読み込みに失敗しました";
+    setMessages((prev) =>
+      updateAssistantMessage(prev, assistantMessageId, {
+        content: "",
+        isStreaming: false,
+        error: errorMessage,
+      }),
+    );
+    setStreaming(false);
+    setError(errorMessage);
+    return;
   }
 
   const { selectedModel } = useAIChatStore.getState();

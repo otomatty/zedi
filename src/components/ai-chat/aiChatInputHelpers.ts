@@ -93,6 +93,7 @@ export function replaceMentionWithChip(
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
+  if (!editor.contains(range.startContainer)) return;
   const node = range.startContainer;
   if (node.nodeType !== Node.TEXT_NODE) return;
   const text = node.textContent || "";

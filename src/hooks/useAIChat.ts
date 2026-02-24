@@ -22,19 +22,25 @@ export function useAIChat({
 
   const sendMessage = useCallback(
     async (content: string, messageRefs: ReferencedPage[] = []) => {
-      await executeSendMessage({
-        content,
-        messageRefs,
-        currentMessages: messages,
-        pageContext,
-        contextEnabled,
-        existingPageTitles,
-        setMessages,
-        setError,
-        setStreaming,
-        streamingContentRef,
-        abortControllerRef,
-      });
+      try {
+        await executeSendMessage({
+          content,
+          messageRefs,
+          currentMessages: messages,
+          pageContext,
+          contextEnabled,
+          existingPageTitles,
+          setMessages,
+          setError,
+          setStreaming,
+          streamingContentRef,
+          abortControllerRef,
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        setError(errorMessage);
+        setStreaming(false);
+      }
     },
     [messages, pageContext, contextEnabled, existingPageTitles, setStreaming],
   );
@@ -62,7 +68,7 @@ export function useAIChat({
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
     if (lastUserMsg) {
       setMessages((prev) => prev.filter((m) => !m.error));
-      sendMessage(lastUserMsg.content);
+      sendMessage(lastUserMsg.content, lastUserMsg.referencedPages ?? []);
     }
   }, [messages, sendMessage]);
 

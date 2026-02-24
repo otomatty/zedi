@@ -47,8 +47,8 @@ export function replaceUploadNodeWithImageImpl(
   if (replaced) {
     view.dispatch(tr);
     onChange(JSON.stringify(editor.getJSON()));
+    cleanup(uploadId);
   }
-  cleanup(uploadId);
 }
 
 export function removeUploadNodeImpl(
@@ -68,8 +68,10 @@ export function removeUploadNodeImpl(
     }
     return true;
   });
-  if (removed) view.dispatch(tr);
-  cleanup(uploadId);
+  if (removed) {
+    view.dispatch(tr);
+    cleanup(uploadId);
+  }
 }
 
 export interface RunUploadParams {
@@ -112,8 +114,13 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
   try {
     provider = getStorageProvider(uploadSettings, { getToken });
   } catch (error) {
-    onStorageError(error instanceof Error ? error.message : "設定内容を確認してください");
-    throw error;
+    const message = error instanceof Error ? error.message : "設定内容を確認してください";
+    onStorageError(message);
+    updateUploadNodeAttributes(uploadId, {
+      status: "error",
+      errorMessage: message,
+    });
+    return;
   }
 
   let hasRealProgress = false;
@@ -157,7 +164,7 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
     updateUploadNodeAttributes(uploadId, { status: "error", errorMessage: message });
   } finally {
     const activeTimer = uploadTimersRef.current.get(uploadId);
-    if (activeTimer) {
+    if (activeTimer !== undefined) {
       window.clearInterval(activeTimer);
       uploadTimersRef.current.delete(uploadId);
     }
