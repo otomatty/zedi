@@ -22,6 +22,109 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { StorageImageOptions } from "./extensions/StorageImageExtension";
 
+function ImageNodeErrorState({
+  src,
+  onReload,
+  onCopyUrl,
+}: {
+  src?: string;
+  onReload: () => void;
+  onCopyUrl: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+      <p className="text-sm font-medium text-destructive">画像の読み込みに失敗しました</p>
+      {src && <p className="mt-1 break-all text-xs text-muted-foreground">{src}</p>}
+      <div className="mt-3 flex gap-2">
+        <Button size="sm" variant="outline" onClick={onReload}>
+          <RefreshCcw className="mr-1 h-4 w-4" />
+          再読み込み
+        </Button>
+        <Button size="sm" variant="outline" onClick={onCopyUrl}>
+          <Copy className="mr-1 h-4 w-4" />
+          URLをコピー
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ImageNodeToolbar({
+  providerLabel,
+  onCopyUrl,
+  onOpenUrl,
+  onDeleteFromNote,
+  onDeleteFromStorage,
+  canDeleteFromStorage,
+  isDeleting,
+  confirmOpen,
+  setConfirmOpen,
+}: {
+  providerLabel: string;
+  onCopyUrl: () => void;
+  onOpenUrl: () => void;
+  onDeleteFromNote: () => void;
+  onDeleteFromStorage: () => void;
+  canDeleteFromStorage: boolean;
+  isDeleting: boolean;
+  confirmOpen: boolean;
+  setConfirmOpen: (v: boolean) => void;
+}) {
+  return (
+    <div className="absolute right-2 top-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+      <Badge variant="secondary" className="text-[10px]">
+        保存先: {providerLabel}
+      </Badge>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="ghost">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onCopyUrl}>
+            <Copy className="mr-2 h-4 w-4" />
+            URLをコピー
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onOpenUrl}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            別タブで開く
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onDeleteFromNote}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            メモから削除
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setConfirmOpen(true)}
+            disabled={!canDeleteFromStorage || isDeleting}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            ストレージから削除
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ストレージから削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              ストレージ上の画像も削除されます。この操作は取り消せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction onClick={onDeleteFromStorage} disabled={isDeleting}>
+              削除する
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 export const ImageNodeView: React.FC<NodeViewProps> = ({
   node,
   selected,
@@ -117,20 +220,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
         }`}
       >
         {hasLoadError ? (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-            <p className="text-sm font-medium text-destructive">画像の読み込みに失敗しました</p>
-            {src && <p className="mt-1 break-all text-xs text-muted-foreground">{src}</p>}
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleReload}>
-                <RefreshCcw className="mr-1 h-4 w-4" />
-                再読み込み
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleCopyUrl}>
-                <Copy className="mr-1 h-4 w-4" />
-                URLをコピー
-              </Button>
-            </div>
-          </div>
+          <ImageNodeErrorState src={src} onReload={handleReload} onCopyUrl={handleCopyUrl} />
         ) : isAuthRequiredUrl && !authenticatedSrc && getAuthenticatedImageUrl ? (
           <div className="flex min-h-[120px] items-center justify-center rounded-lg border bg-muted/50 text-sm text-muted-foreground">
             読み込み中…
@@ -146,58 +236,17 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
           />
         )}
 
-        <div className="absolute right-2 top-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-          <Badge variant="secondary" className="text-[10px]">
-            保存先: {providerLabel}
-          </Badge>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleCopyUrl}>
-                <Copy className="mr-2 h-4 w-4" />
-                URLをコピー
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleOpenUrl}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                別タブで開く
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleDeleteFromNote}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                メモから削除
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setConfirmOpen(true)}
-                disabled={!canDeleteFromStorage || isDeleting}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                ストレージから削除
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>ストレージから削除しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                ストレージ上の画像も削除されます。この操作は取り消せません。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteFromStorage} disabled={isDeleting}>
-                削除する
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ImageNodeToolbar
+          providerLabel={providerLabel}
+          onCopyUrl={handleCopyUrl}
+          onOpenUrl={handleOpenUrl}
+          onDeleteFromNote={handleDeleteFromNote}
+          onDeleteFromStorage={handleDeleteFromStorage}
+          canDeleteFromStorage={Boolean(canDeleteFromStorage)}
+          isDeleting={isDeleting}
+          confirmOpen={confirmOpen}
+          setConfirmOpen={setConfirmOpen}
+        />
       </div>
     </NodeViewWrapper>
   );

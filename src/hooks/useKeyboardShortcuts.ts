@@ -23,50 +23,51 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Skip if user is typing in an input/textarea (except for specific shortcuts)
       const target = e.target as HTMLElement;
       const isEditing =
         target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-
-      // Cmd+N / Ctrl+N - New page (always works)
-      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
-        e.preventDefault();
-        if (!isCreatingRef.current) {
-          createNewPage();
-        }
-        return;
-      }
-
-      // Cmd+H / Ctrl+H - Go home (always works)
-      if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        e.preventDefault();
-        // Only navigate if not already on home
-        if (location.pathname !== "/") {
-          navigate("/");
-        }
-        return;
-      }
-
-      // Cmd+/ or Ctrl+/ - Show shortcuts (always works)
-      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
-        e.preventDefault();
-        onShowShortcuts?.();
-        return;
-      }
-
-      // Cmd+Shift+A / Ctrl+Shift+A - Toggle AI Chat（利用可能時のみ）
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "a") {
-        if (aiChatAvailable) {
-          e.preventDefault();
-          togglePanel();
-        }
-        return;
-      }
-
-      // Skip other shortcuts if editing
       if (isEditing) return;
+
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+      const shortcuts: Array<{ match: boolean; handle: () => void }> = [
+        {
+          match: mod && e.key === "n",
+          handle: () => {
+            e.preventDefault();
+            if (!isCreatingRef.current) createNewPage();
+          },
+        },
+        {
+          match: mod && e.key === "h",
+          handle: () => {
+            e.preventDefault();
+            if (location.pathname !== "/") navigate("/");
+          },
+        },
+        {
+          match: mod && e.key === "/",
+          handle: () => {
+            e.preventDefault();
+            onShowShortcuts?.();
+          },
+        },
+        {
+          match: Boolean(mod && e.shiftKey && key === "a" && aiChatAvailable),
+          handle: () => {
+            e.preventDefault();
+            togglePanel();
+          },
+        },
+      ];
+      for (const s of shortcuts) {
+        if (s.match) {
+          s.handle();
+          return;
+        }
+      }
     },
-    [navigate, location.pathname, onShowShortcuts, togglePanel, aiChatAvailable],
+    [navigate, location.pathname, createNewPage, onShowShortcuts, togglePanel, aiChatAvailable],
   );
 
   useEffect(() => {

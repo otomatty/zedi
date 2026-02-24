@@ -11,6 +11,15 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 import { useAIChatContext } from "@/contexts/AIChatContext";
 
+function canEditPage(
+  access: { canEdit?: boolean } | undefined,
+  userId: string | undefined,
+  page: { ownerUserId?: string } | null | undefined,
+): boolean {
+  if (access?.canEdit) return true;
+  return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
+}
+
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
@@ -38,9 +47,7 @@ const NotePageView: React.FC = () => {
     }
   }, [navigate, noteId]);
 
-  // canEdit: ノートのロール（owner/editor）または自分のページであれば編集可能
-  const isOwnPage = Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
-  const canEdit = Boolean(access?.canEdit) || isOwnPage;
+  const canEdit = canEditPage(access, userId, page);
   const collaborationPageId = page?.id ?? "";
   const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
   const collaboration = useCollaboration({
@@ -63,7 +70,9 @@ const NotePageView: React.FC = () => {
     return () => setPageContext(null);
   }, [canEdit, page, setPageContext]);
 
-  if (isNoteLoading || isPageLoading) {
+  const isLoading = isNoteLoading || isPageLoading;
+  const isNotFound = !note || !access?.canView || !page;
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -75,8 +84,7 @@ const NotePageView: React.FC = () => {
       </div>
     );
   }
-
-  if (!note || !access?.canView || !page) {
+  if (isNotFound) {
     return (
       <div className="min-h-screen bg-background">
         <Header />

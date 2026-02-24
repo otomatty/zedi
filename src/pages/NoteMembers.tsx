@@ -28,6 +28,115 @@ const memberRoleKeys: Record<NoteMemberRole, string> = {
   editor: "notes.roleEditor",
 };
 
+function NoteMembersLoadingOrDenied({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="py-10">
+        <Container>{children}</Container>
+      </main>
+    </div>
+  );
+}
+
+interface NoteMembersManageSectionProps {
+  members: Array<{ memberEmail: string; role: NoteMemberRole }>;
+  isMembersLoading: boolean;
+  memberEmail: string;
+  setMemberEmail: (v: string) => void;
+  memberRole: NoteMemberRole;
+  setMemberRole: (v: NoteMemberRole) => void;
+  roleOptions: Array<{ value: NoteMemberRole; label: string }>;
+  onAddMember: () => Promise<void>;
+  onUpdateRole: (email: string, role: NoteMemberRole) => Promise<void>;
+  onRemoveMember: (email: string) => Promise<void>;
+}
+
+function NoteMembersManageSection({
+  members,
+  isMembersLoading,
+  memberEmail,
+  setMemberEmail,
+  memberRole,
+  setMemberRole,
+  roleOptions,
+  onAddMember,
+  onUpdateRole,
+  onRemoveMember,
+}: NoteMembersManageSectionProps) {
+  const { t } = useTranslation();
+  return (
+    <section className="mt-6 rounded-lg border border-border/60 p-4">
+      <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
+      <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
+        <Input
+          value={memberEmail}
+          onChange={(event) => setMemberEmail(event.target.value)}
+          placeholder={t("notes.emailPlaceholder")}
+        />
+        <Select
+          value={memberRole}
+          onValueChange={(value) => setMemberRole(value as NoteMemberRole)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t("notes.role")} />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => (
+              <SelectItem key={value} value={value}>
+                {t(memberRoleKeys[value])}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button onClick={onAddMember}>{t("notes.add")}</Button>
+      </div>
+      <div className="mt-4 space-y-3">
+        {isMembersLoading ? (
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("notes.noMembersYet")}</p>
+        ) : (
+          members.map((member) => (
+            <div
+              key={member.memberEmail}
+              className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-2"
+            >
+              <div className="text-sm">{member.memberEmail}</div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={member.role}
+                  onValueChange={(value) =>
+                    onUpdateRole(member.memberEmail, value as NoteMemberRole)
+                  }
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveMember(member.memberEmail)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 const NoteMembers: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
@@ -52,6 +161,10 @@ const NoteMembers: React.FC = () => {
 
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<NoteMemberRole>("viewer");
+  const memberRoleOptions = (Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => ({
+    value,
+    label: t(memberRoleKeys[value]),
+  }));
 
   const handleAddMember = async () => {
     if (!noteId || !memberEmail.trim()) return;
@@ -98,27 +211,16 @@ const NoteMembers: React.FC = () => {
 
   if (isNoteLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="py-10">
-          <Container>
-            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-          </Container>
-        </main>
-      </div>
+      <NoteMembersLoadingOrDenied>
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      </NoteMembersLoadingOrDenied>
     );
   }
-
   if (!note || !access?.canView) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="py-10">
-          <Container>
-            <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
-          </Container>
-        </main>
-      </div>
+      <NoteMembersLoadingOrDenied>
+        <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
+      </NoteMembersLoadingOrDenied>
     );
   }
 
@@ -144,75 +246,18 @@ const NoteMembers: React.FC = () => {
               {t("notes.noPermissionToManageMembers")}
             </p>
           ) : (
-            <section className="mt-6 rounded-lg border border-border/60 p-4">
-              <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
-              <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
-                <Input
-                  value={memberEmail}
-                  onChange={(event) => setMemberEmail(event.target.value)}
-                  placeholder={t("notes.emailPlaceholder")}
-                />
-                <Select
-                  value={memberRole}
-                  onValueChange={(value) => setMemberRole(value as NoteMemberRole)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("notes.role")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(memberRoleKeys[value])}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAddMember}>{t("notes.add")}</Button>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {isMembersLoading ? (
-                  <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-                ) : members.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("notes.noMembersYet")}</p>
-                ) : (
-                  members.map((member) => (
-                    <div
-                      key={member.memberEmail}
-                      className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-2"
-                    >
-                      <div className="text-sm">{member.memberEmail}</div>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={member.role}
-                          onValueChange={(value) =>
-                            handleUpdateMemberRole(member.memberEmail, value as NoteMemberRole)
-                          }
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {memberRoleOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveMember(member.memberEmail)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
+            <NoteMembersManageSection
+              members={members}
+              isMembersLoading={isMembersLoading}
+              memberEmail={memberEmail}
+              setMemberEmail={setMemberEmail}
+              memberRole={memberRole}
+              setMemberRole={setMemberRole}
+              roleOptions={memberRoleOptions}
+              onAddMember={handleAddMember}
+              onUpdateRole={handleUpdateMemberRole}
+              onRemoveMember={handleRemoveMember}
+            />
           )}
         </Container>
       </main>
