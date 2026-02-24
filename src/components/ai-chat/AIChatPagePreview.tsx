@@ -1,4 +1,3 @@
-import React from "react";
 import { useTranslation } from "react-i18next";
 import { CreatePageAction } from "../../types/aiChat";
 import ReactMarkdown from "react-markdown";

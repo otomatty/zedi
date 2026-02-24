@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronDown, Check, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAIChatStore } from "../../stores/aiChatStore";

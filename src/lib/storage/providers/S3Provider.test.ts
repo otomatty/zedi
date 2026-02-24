@@ -11,7 +11,7 @@ describe("S3Provider", () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    getToken = vi.fn().mockResolvedValue("test-jwt-token");
+    getToken = vi.fn<[], Promise<string | null>>().mockResolvedValue("test-jwt-token");
     const ctx: S3ProviderContext = {
       getToken,
       baseUrl: "https://api.example.com",

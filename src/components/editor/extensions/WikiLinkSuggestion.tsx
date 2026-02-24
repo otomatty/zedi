@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
 import { Editor } from "@tiptap/core";
 import { usePageStore } from "@/stores/pageStore";
 import { cn } from "@/lib/utils";

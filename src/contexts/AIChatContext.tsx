@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { PageContext } from "../types/aiChat";
 
 interface AIChatContextValue {

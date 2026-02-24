@@ -15,6 +15,7 @@ function createTestPage(id: string, title: string, content: string, options?: Pa
   const now = Date.now();
   return {
     id,
+    ownerUserId: "test-user",
     title,
     content,
     createdAt: now,

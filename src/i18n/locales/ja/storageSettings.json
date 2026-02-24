@@ -1,6 +1,6 @@
 {
   "title": "画像ストレージ設定",
-  "description": "デフォルトでは画像はデフォルトストレージに保存されます。トグルで外部ストレージに切り替え、Gyazo や Cloudflare R2 などに保存することもできます。",
+  "description": "デフォルトでは画像はデフォルトストレージに保存されます。トグルで外部ストレージに切り替え、Gyazo や Google Drive などに保存することもできます。",
   "storageDestination": "画像の保存先",
   "saveToDefault": "デフォルトストレージに保存します",
   "saveToExternal": "外部ストレージに保存します",
@@ -37,11 +37,6 @@
       "description": "Access Tokenで簡単セットアップ",
       "freeTier": "無料プランあり"
     },
-    "cloudflare-r2": {
-      "name": "Cloudflare R2",
-      "description": "S3互換ストレージ、10GB/月無料",
-      "freeTier": "10GB/月無料"
-    },
     "github": {
       "name": "GitHub",
       "description": "GitHubリポジトリに画像を保存",
@@ -70,19 +65,6 @@
     "branchPlaceholder": "main",
     "path": "保存先パス",
     "pathPlaceholder": "images"
-  },
-  "r2": {
-    "bucket": "バケット名",
-    "bucketPlaceholder": "my-bucket",
-    "accountId": "Account ID",
-    "accountIdPlaceholder": "Cloudflare Account ID",
-    "accessKeyId": "Access Key ID",
-    "accessKeyIdPlaceholder": "Access Key ID",
-    "secretAccessKey": "Secret Access Key",
-    "secretAccessKeyPlaceholder": "Secret Access Key",
-    "publicUrl": "公開URL（オプション）",
-    "publicUrlPlaceholder": "https://your-domain.com",
-    "publicUrlHelp": "カスタムドメインを使用する場合に入力"
   },
   "googleDrive": {
     "oauthAlertTitle": "⚠️ OAuth2認証が必要です",

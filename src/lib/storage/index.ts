@@ -3,7 +3,6 @@
 import { StorageSettings, StorageProviderType } from "@/types/storage";
 import { StorageProviderInterface } from "./types";
 import { GyazoProvider } from "./providers/GyazoProvider";
-import { CloudflareR2Provider } from "./providers/CloudflareR2Provider";
 import { GitHubProvider } from "./providers/GitHubProvider";
 import { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
 import { S3Provider, type S3ProviderContext } from "./providers/S3Provider";
@@ -23,7 +22,10 @@ export function getStorageProvider(
 ): StorageProviderInterface {
   const { provider, config } = settings;
 
-  switch (provider) {
+  // Legacy: cloudflare-r2 is no longer supported; use default storage
+  const effectiveProvider = provider === "cloudflare-r2" ? "s3" : (provider as StorageProviderType);
+
+  switch (effectiveProvider) {
     case "s3":
       if (!context?.getToken) {
         throw new Error(
@@ -40,23 +42,6 @@ export function getStorageProvider(
         throw new Error("Gyazo Access Token が設定されていません");
       }
       return new GyazoProvider(config.gyazoAccessToken);
-
-    case "cloudflare-r2":
-      if (
-        !config.r2Bucket ||
-        !config.r2AccountId ||
-        !config.r2AccessKeyId ||
-        !config.r2SecretAccessKey
-      ) {
-        throw new Error("Cloudflare R2 の設定が不完全です");
-      }
-      return new CloudflareR2Provider({
-        bucket: config.r2Bucket,
-        accountId: config.r2AccountId,
-        accessKeyId: config.r2AccessKeyId,
-        secretAccessKey: config.r2SecretAccessKey,
-        publicUrl: config.r2PublicUrl,
-      });
 
     case "github":
       if (!config.githubRepository || !config.githubToken) {
@@ -96,14 +81,6 @@ export function isProviderConfigured(
   switch (provider) {
     case "gyazo":
       return !!config.gyazoAccessToken;
-
-    case "cloudflare-r2":
-      return !!(
-        config.r2Bucket &&
-        config.r2AccountId &&
-        config.r2AccessKeyId &&
-        config.r2SecretAccessKey
-      );
 
     case "github":
       return !!(config.githubRepository && config.githubToken);
@@ -147,7 +124,6 @@ export function isStorageConfiguredForUpload(settings: StorageSettings): boolean
 // Re-export types
 export * from "./types";
 export { GyazoProvider } from "./providers/GyazoProvider";
-export { CloudflareR2Provider } from "./providers/CloudflareR2Provider";
 export { GitHubProvider } from "./providers/GitHubProvider";
 export { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
 export { S3Provider } from "./providers/S3Provider";
