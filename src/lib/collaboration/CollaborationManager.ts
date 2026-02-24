@@ -139,6 +139,19 @@ export class CollaborationManager {
     }, AURORA_SAVE_DEBOUNCE_MS);
   }
 
+  /**
+   * Cancel debounce and save to Aurora immediately (e.g. after applying URL-clip initial content).
+   * No-op in collaborative mode or when destroyed.
+   */
+  flushSave(): void {
+    if (this.destroyed || this.mode !== "local") return;
+    if (this.auroraSaveTimer) {
+      clearTimeout(this.auroraSaveTimer);
+      this.auroraSaveTimer = null;
+    }
+    void this.saveToAurora();
+  }
+
   private async saveToAurora(): Promise<void> {
     if (this.destroyed) return;
     try {

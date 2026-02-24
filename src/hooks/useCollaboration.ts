@@ -109,6 +109,11 @@ export function useCollaboration({
     managerRef.current?.reconnect();
   }, []);
 
+  // URL 取り込みなどで initialContent 適用後に即時 Aurora 保存する
+  const flushSave = useCallback(() => {
+    managerRef.current?.flushSave();
+  }, []);
+
   const collaborationUser =
     enabled && effectiveUserId
       ? {
@@ -126,5 +131,6 @@ export function useCollaboration({
     updateCursor,
     updateSelection,
     reconnect,
+    flushSave,
   };
 }

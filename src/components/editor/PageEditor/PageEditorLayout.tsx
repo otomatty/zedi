@@ -128,7 +128,10 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
           errorMessage={errorMessage}
           collaboration={isLocalDocEnabled ? collaboration : undefined}
           initialContent={pendingInitialContent ?? undefined}
-          onInitialContentApplied={onPendingInitialContentClear}
+          onInitialContentApplied={() => {
+            collaboration?.flushSave?.();
+            onPendingInitialContentClear();
+          }}
         />
       </ContentWithAIChat>
 

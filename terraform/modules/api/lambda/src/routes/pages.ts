@@ -165,8 +165,10 @@ app.post("/", authRequired, async (c) => {
 
   const body = await c.req.json<{
     title?: string;
+    content_preview?: string;
     source_page_id?: string;
     source_url?: string;
+    thumbnail_url?: string | null;
   }>();
 
   const result = await db
@@ -174,8 +176,10 @@ app.post("/", authRequired, async (c) => {
     .values({
       ownerId: userId,
       title: body.title ?? null,
+      contentPreview: body.content_preview ?? null,
       sourcePageId: body.source_page_id ?? null,
       sourceUrl: body.source_url ?? null,
+      thumbnailUrl: body.thumbnail_url ?? null,
     })
     .returning();
 
