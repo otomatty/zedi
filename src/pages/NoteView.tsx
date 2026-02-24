@@ -27,6 +27,270 @@ import { usePagesSummary } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 
+function getNoteViewPermissions(
+  access: { canEdit?: boolean; canAddPage?: boolean; canManageMembers?: boolean } | undefined,
+  noteSource: string,
+) {
+  const canEdit = Boolean(access?.canEdit && noteSource === "local");
+  const canAddPage = Boolean(access?.canAddPage);
+  const canShowAddPage = canEdit || canAddPage;
+  const canManageMembers = Boolean(access?.canManageMembers && noteSource === "local");
+  return { canEdit, canAddPage, canShowAddPage, canManageMembers };
+}
+
+function NoteViewLoadingOrDenied({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="py-10">
+        <Container>{children}</Container>
+      </main>
+    </div>
+  );
+}
+
+interface PageSummary {
+  id: string;
+  title?: string | null;
+}
+
+interface NoteViewAddPageDialogContentProps {
+  newPageTitle: string;
+  setNewPageTitle: (v: string) => void;
+  pageFilter: string;
+  setPageFilter: (v: string) => void;
+  filteredPages: PageSummary[];
+  canEdit: boolean;
+  onAddByTitle: () => Promise<void>;
+  onAddByPageId: (pageId: string) => Promise<void>;
+  isPending: boolean;
+  onClose: () => void;
+}
+
+function NoteViewAddPageDialogContent({
+  newPageTitle,
+  setNewPageTitle,
+  pageFilter,
+  setPageFilter,
+  filteredPages,
+  canEdit,
+  onAddByTitle,
+  onAddByPageId,
+  isPending,
+  onClose,
+}: NoteViewAddPageDialogContentProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{t("notes.addPageDialogTitle")}</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{t("notes.addNewPageToNote")}</label>
+          <div className="flex gap-2">
+            <Input
+              value={newPageTitle}
+              onChange={(e) => setNewPageTitle(e.target.value)}
+              placeholder={t("notes.newPageTitle")}
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={onAddByTitle}
+              disabled={!newPageTitle.trim() || isPending}
+            >
+              {t("notes.add")}
+            </Button>
+          </div>
+        </div>
+        {canEdit && (
+          <>
+            <div className="space-y-2 border-t pt-3">
+              <label className="text-sm font-medium">{t("notes.searchByTitle")}</label>
+              <Input
+                value={pageFilter}
+                onChange={(event) => setPageFilter(event.target.value)}
+                placeholder={t("notes.searchByTitle")}
+              />
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {filteredPages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("notes.noPagesToAdd")}</p>
+                ) : (
+                  filteredPages.map((page) => (
+                    <button
+                      key={page.id}
+                      onClick={() => onAddByPageId(page.id)}
+                      className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border"
+                    >
+                      {page.title || t("notes.untitledPage")}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>
+          {t("notes.close")}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+interface NoteViewPageGridProps {
+  noteId: string;
+  notePages: Array<{ id: string; addedByUserId?: string | null }>;
+  canDeletePage: (addedByUserId: string | null | undefined) => boolean;
+  onRemovePage: (pageId: string) => Promise<void>;
+}
+
+function NoteViewPageGrid({
+  noteId,
+  notePages,
+  canDeletePage,
+  onRemovePage,
+}: NoteViewPageGridProps) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {notePages.map((page) => (
+        <div key={page.id} className="relative">
+          <NotePageCard noteId={noteId} page={page} />
+          {canDeletePage(page.addedByUserId) && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute right-2 top-2 h-7 w-7"
+              onClick={() => onRemovePage(page.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface NoteViewHeaderActionsProps {
+  noteId: string;
+  canManageMembers: boolean;
+  isSignedIn: boolean;
+  canView: boolean;
+  canShowAddPage: boolean;
+  isAddPageOpen: boolean;
+  setIsAddPageOpen: (v: boolean) => void;
+  newPageTitle: string;
+  setNewPageTitle: (v: string) => void;
+  pageFilter: string;
+  setPageFilter: (v: string) => void;
+  filteredPages: PageSummary[];
+  canEdit: boolean;
+  onAddByTitle: () => Promise<void>;
+  onAddByPageId: (pageId: string) => Promise<void>;
+  addPagePending: boolean;
+}
+
+function NoteViewHeaderActions({
+  noteId,
+  canManageMembers,
+  isSignedIn,
+  canView,
+  canShowAddPage,
+  isAddPageOpen,
+  setIsAddPageOpen,
+  newPageTitle,
+  setNewPageTitle,
+  pageFilter,
+  setPageFilter,
+  filteredPages,
+  canEdit,
+  onAddByTitle,
+  onAddByPageId,
+  addPagePending,
+}: NoteViewHeaderActionsProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-2">
+      {canManageMembers && (
+        <>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/note/${noteId}/members`}>{t("notes.members")}</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/note/${noteId}/settings`}>{t("notes.settings")}</Link>
+          </Button>
+        </>
+      )}
+      {!isSignedIn && canView && (
+        <span className="text-sm text-muted-foreground">{t("notes.loginToPost")}</span>
+      )}
+      {canShowAddPage && (
+        <Dialog open={isAddPageOpen} onOpenChange={setIsAddPageOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              {t("notes.addPage")}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <NoteViewAddPageDialogContent
+              newPageTitle={newPageTitle}
+              setNewPageTitle={setNewPageTitle}
+              pageFilter={pageFilter}
+              setPageFilter={setPageFilter}
+              filteredPages={filteredPages}
+              canEdit={canEdit}
+              onAddByTitle={onAddByTitle}
+              onAddByPageId={onAddByPageId}
+              isPending={addPagePending}
+              onClose={() => setIsAddPageOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+interface NoteViewMainContentProps {
+  noteId: string;
+  notePages: Array<{ id: string; addedByUserId?: string | null }>;
+  isPagesLoading: boolean;
+  canDeletePage: (addedByUserId: string | null | undefined) => boolean;
+  onRemovePage: (pageId: string) => Promise<void>;
+}
+
+function NoteViewMainContent({
+  noteId,
+  notePages,
+  isPagesLoading,
+  canDeletePage,
+  onRemovePage,
+}: NoteViewMainContentProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-4">
+      {isPagesLoading ? (
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      ) : notePages.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("notes.noPagesYet")}</p>
+      ) : (
+        <NoteViewPageGrid
+          noteId={noteId}
+          notePages={notePages}
+          canDeletePage={canDeletePage}
+          onRemovePage={onRemovePage}
+        />
+      )}
+    </div>
+  );
+}
+
 const NoteView: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
@@ -41,10 +305,10 @@ const NoteView: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const noteSource = source === "remote" ? "remote" : "local";
-  const canEdit = Boolean(access?.canEdit && noteSource === "local");
-  const canAddPage = Boolean(access?.canAddPage);
-  const canShowAddPage = canEdit || canAddPage;
-  const canManageMembers = Boolean(access?.canManageMembers && noteSource === "local");
+  const { canEdit, canShowAddPage, canManageMembers } = getNoteViewPermissions(access, noteSource);
+  const isLoading = isNoteLoading;
+  const isNotFound = !note || !access?.canView;
+  const canDeletePage = access?.canDeletePage ?? (() => false);
 
   const { data: notePages = [], isLoading: isPagesLoading } = useNotePages(
     noteId ?? "",
@@ -108,29 +372,18 @@ const NoteView: React.FC = () => {
     }
   };
 
-  if (isNoteLoading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="py-10">
-          <Container>
-            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-          </Container>
-        </main>
-      </div>
+      <NoteViewLoadingOrDenied>
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      </NoteViewLoadingOrDenied>
     );
   }
-
-  if (!note || !access?.canView) {
+  if (isNotFound) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="py-10">
-          <Container>
-            <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
-          </Container>
-        </main>
-      </div>
+      <NoteViewLoadingOrDenied>
+        <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
+      </NoteViewLoadingOrDenied>
     );
   }
 
@@ -152,119 +405,32 @@ const NoteView: React.FC = () => {
                 {t("notes.pagesCount", { count: notePages.length })}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {canManageMembers && (
-                <>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/note/${note.id}/members`}>{t("notes.members")}</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/note/${note.id}/settings`}>{t("notes.settings")}</Link>
-                  </Button>
-                </>
-              )}
-              {!isSignedIn && access?.canView && (
-                <span className="text-sm text-muted-foreground">{t("notes.loginToPost")}</span>
-              )}
-              {canShowAddPage && (
-                <Dialog open={isAddPageOpen} onOpenChange={setIsAddPageOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t("notes.addPage")}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t("notes.addPageDialogTitle")}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">{t("notes.addNewPageToNote")}</label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={newPageTitle}
-                            onChange={(e) => setNewPageTitle(e.target.value)}
-                            placeholder={t("notes.newPageTitle")}
-                          />
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleAddNewPageByTitle}
-                            disabled={!newPageTitle.trim() || addPageMutation.isPending}
-                          >
-                            {t("notes.add")}
-                          </Button>
-                        </div>
-                      </div>
-                      {canEdit && (
-                        <>
-                          <div className="space-y-2 border-t pt-3">
-                            <label className="text-sm font-medium">
-                              {t("notes.searchByTitle")}
-                            </label>
-                            <Input
-                              value={pageFilter}
-                              onChange={(event) => setPageFilter(event.target.value)}
-                              placeholder={t("notes.searchByTitle")}
-                            />
-                            <div className="max-h-64 space-y-2 overflow-y-auto">
-                              {filteredPages.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                  {t("notes.noPagesToAdd")}
-                                </p>
-                              ) : (
-                                filteredPages.map((page) => (
-                                  <button
-                                    key={page.id}
-                                    onClick={() => handleAddPage(page.id)}
-                                    className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border"
-                                  >
-                                    {page.title || t("notes.untitledPage")}
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsAddPageOpen(false)}>
-                        {t("notes.close")}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
+            <NoteViewHeaderActions
+              noteId={note.id}
+              canManageMembers={canManageMembers}
+              isSignedIn={isSignedIn}
+              canView={Boolean(access?.canView)}
+              canShowAddPage={canShowAddPage}
+              isAddPageOpen={isAddPageOpen}
+              setIsAddPageOpen={setIsAddPageOpen}
+              newPageTitle={newPageTitle}
+              setNewPageTitle={setNewPageTitle}
+              pageFilter={pageFilter}
+              setPageFilter={setPageFilter}
+              filteredPages={filteredPages}
+              canEdit={canEdit}
+              onAddByTitle={handleAddNewPageByTitle}
+              onAddByPageId={handleAddPage}
+              addPagePending={addPageMutation.isPending}
+            />
           </div>
-          <div className="mt-4">
-            {isPagesLoading ? (
-              <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-            ) : notePages.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("notes.noPagesYet")}</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {notePages.map((page) => (
-                  <div key={page.id} className="relative">
-                    <NotePageCard noteId={note.id} page={page} />
-                    {access?.canDeletePage(page.addedByUserId) && (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        className="absolute right-2 top-2 h-7 w-7"
-                        onClick={() => handleRemovePage(page.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <NoteViewMainContent
+            noteId={note.id}
+            notePages={notePages}
+            isPagesLoading={isPagesLoading}
+            canDeletePage={canDeletePage}
+            onRemovePage={handleRemovePage}
+          />
         </Container>
       </main>
     </div>

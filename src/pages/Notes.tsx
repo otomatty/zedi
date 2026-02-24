@@ -47,6 +47,96 @@ const allowedEditPermissions: Record<NoteVisibility, NoteEditPermission[]> = {
   public: ["owner_only", "members_editors", "any_logged_in"],
 };
 
+interface CreateNoteDialogContentProps {
+  title: string;
+  setTitle: (v: string) => void;
+  visibility: NoteVisibility;
+  setVisibility: (v: NoteVisibility) => void;
+  editPermission: NoteEditPermission;
+  setEditPermission: (v: NoteEditPermission) => void;
+  onCreate: () => Promise<void>;
+  isPending: boolean;
+}
+
+function CreateNoteDialogContent({
+  title,
+  setTitle,
+  visibility,
+  setVisibility,
+  editPermission,
+  setEditPermission,
+  onCreate,
+  isPending,
+}: CreateNoteDialogContentProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{t("notes.newNoteDialogTitle")}</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 py-2">
+        <div className="space-y-2">
+          <Label htmlFor="note-title">{t("notes.noteTitle")}</Label>
+          <Input
+            id="note-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={t("notes.titlePlaceholder")}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>{t("notes.visibility")}</Label>
+          <Select
+            value={visibility}
+            onValueChange={(v) => {
+              const next = v as NoteVisibility;
+              setVisibility(next);
+              const allowed = allowedEditPermissions[next];
+              if (!allowed.includes(editPermission)) {
+                setEditPermission(allowed[0]);
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("notes.selectVisibility")} />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(visibilityKeys) as NoteVisibility[]).map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t(visibilityKeys[value])}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>{t("notes.editPermission")}</Label>
+          <Select
+            value={editPermission}
+            onValueChange={(v) => setEditPermission(v as NoteEditPermission)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {allowedEditPermissions[visibility].map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t(editPermissionKeys[value])}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="button" onClick={onCreate} disabled={isPending}>
+          {isPending ? t("notes.creating") : t("notes.create")}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
 const Notes: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -109,7 +199,6 @@ const Notes: React.FC = () => {
 
   return (
     <NotesLayout>
-      {/* Page title & New note */}
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{t("notes.title")}</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -120,73 +209,20 @@ const Notes: React.FC = () => {
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("notes.newNoteDialogTitle")}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="note-title">{t("notes.noteTitle")}</Label>
-                <Input
-                  id="note-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={t("notes.titlePlaceholder")}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>{t("notes.visibility")}</Label>
-                <Select
-                  value={visibility}
-                  onValueChange={(v) => {
-                    const next = v as NoteVisibility;
-                    setVisibility(next);
-                    const allowed = allowedEditPermissions[next];
-                    if (!allowed.includes(editPermission)) {
-                      setEditPermission(allowed[0]);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("notes.selectVisibility")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(visibilityKeys) as NoteVisibility[]).map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(visibilityKeys[value])}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>{t("notes.editPermission")}</Label>
-                <Select
-                  value={editPermission}
-                  onValueChange={(v) => setEditPermission(v as NoteEditPermission)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allowedEditPermissions[visibility].map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(editPermissionKeys[value])}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" onClick={handleCreate} disabled={createNoteMutation.isPending}>
-                {createNoteMutation.isPending ? t("notes.creating") : t("notes.create")}
-              </Button>
-            </DialogFooter>
+            <CreateNoteDialogContent
+              title={title}
+              setTitle={setTitle}
+              visibility={visibility}
+              setVisibility={setVisibility}
+              editPermission={editPermission}
+              setEditPermission={setEditPermission}
+              onCreate={handleCreate}
+              isPending={createNoteMutation.isPending}
+            />
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* 参加しているノート */}
       <section className="mb-10">
         <h2 className="mb-4 text-lg font-medium text-foreground">
           {t("notes.sectionParticipating")}

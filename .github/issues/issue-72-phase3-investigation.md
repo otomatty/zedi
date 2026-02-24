@@ -41,11 +41,11 @@
 #### src/components
 
 | ファイル                                                         | 行    | ルール                 | 内容                           |
-| ---------------------------------------------------------------- | ----- | ---------------------- | ------------------------------ |
+| ---------------------------------------------------------------- | ----- | ---------------------- | ------------------------------ | ----------------------------------- |
 | `src/components/ai-chat/AIChatInput.tsx`                         | 42:8  | max-lines              | `AIChatInput` 373 行           |
 | `src/components/editor/ImageNodeView.tsx`                        | 25:55 | max-lines              | Arrow 166 行                   |
 | `src/components/editor/MermaidGeneratorDialog.tsx`               | 31:78 | max-lines              | Arrow 193 行                   |
-| `src/components/editor/PageEditor/PageEditorContent.tsx`         | 41:68 | complexity             | Arrow complexity 29            |
+| `src/components/editor/PageEditor/PageEditorContent.tsx`         | 41:68 | complexity             | Arrow complexity 29            | ✅ getCollaborationState 抽出で解消 |
 | `src/components/editor/TiptapEditor.tsx`                         | 41:51 | max-lines              | Arrow 199 行                   |
 | `src/components/editor/TiptapEditor/EditorBubbleMenu.tsx`        | 34:66 | max-lines              | Arrow 173 行                   |
 | `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx` | 30:80 | max-lines              | Arrow 282 行                   |
@@ -59,10 +59,10 @@
 
 #### src/hooks
 
-| ファイル                            | 行   | ルール     | 内容                |
-| ----------------------------------- | ---- | ---------- | ------------------- |
-| `src/hooks/useAIChat.ts`            | 15:8 | max-lines  | `useAIChat` 174 行  |
-| `src/hooks/useKeyboardShortcuts.ts` | 25:5 | complexity | Arrow complexity 21 |
+| ファイル                            | 行   | ルール     | 内容                | 対応                            |
+| ----------------------------------- | ---- | ---------- | ------------------- | ------------------------------- |
+| `src/hooks/useAIChat.ts`            | 15:8 | max-lines  | `useAIChat` 174 行  | -                               |
+| `src/hooks/useKeyboardShortcuts.ts` | 25:5 | complexity | Arrow complexity 21 | ✅ ルックアップテーブル化で解消 |
 
 #### src/lib（本番ロジック・要優先）
 
@@ -81,12 +81,12 @@
 #### src/pages
 
 | ファイル                      | 行     | ルール                 | 内容                        |
-| ----------------------------- | ------ | ---------------------- | --------------------------- |
+| ----------------------------- | ------ | ---------------------- | --------------------------- | ------------------------------------- |
 | `src/pages/NoteMembers.tsx`   | 31:31  | max-lines              | Arrow 179 行                |
-| `src/pages/NotePageView.tsx`  | 14:32  | complexity             | Arrow 23                    |
+| `src/pages/NotePageView.tsx`  | 14:32  | complexity             | Arrow 23                    | ✅ canEditPage 抽出・条件変数化で解消 |
 | `src/pages/NoteSettings.tsx`  | 52:32  | max-lines              | Arrow 224 行                |
 | `src/pages/NoteView.tsx`      | 30:28  | max-lines + complexity | Arrow 228 行, complexity 29 |
-| `src/pages/Notes.tsx`         | 50:25  | max-lines              | Arrow 152 行                |
+| `src/pages/Notes.tsx`         | 50:25  | max-lines              | Arrow 152 行                | ✅ CreateNoteDialogContent 抽出で解消 |
 | `src/pages/Onboarding.tsx`    | 30:30  | max-lines              | Arrow 229 行                |
 | `src/pages/Pricing.tsx`       | 118:27 | max-lines              | Arrow 172 行                |
 | `src/pages/SearchResults.tsx` | 34:16  | max-lines              | `SearchResults` 199 行      |
@@ -130,9 +130,9 @@
 - **優先度 2（本番ロジックの complexity）** ✅ 完了（2026-02-24）
   - `apiClient.ts`（`request`, `requestOptionalAuth`）, `aiService.ts`（`callAIWithServerHTTP`, `callOpenAI`）, `markdownExport.ts`（`convertNode`）, `StorageAdapterPageRepository.ts`（`createPage`）, `S3Provider.ts`（`uploadImage`）  
     → 分岐の抽出・ガード節・マップ化で complexity 20 以下に。
-- **優先度 3（UI・フックの長大関数）**
-  - `AIChatInput.tsx`（373 行）, `useImageUploadManager.ts`（464 行）, `HeaderSearchBar.tsx`, `SearchResults.tsx`, `useAIChat.ts` など  
-    → 子コンポーネント・カスタムフック・ハンドラの切り出しで 150 行以下に。
+- **優先度 3（UI・フックの長大関数）** ✅ 一部完了（PR #85 マージ済み）
+  - **対応済み:** `AIChatInput.tsx`, `useImageUploadManager.ts`, `HeaderSearchBar.tsx`, `SearchResults.tsx`, `useAIChat.ts` など（子コンポーネント・`useAIChatExecute`・`useImageUploadManagerHelpers` 等へ分割）。
+  - **残り:** `TiptapEditor.tsx`, `EditorBubbleMenu`, `EditorRecommendationBar`, `ImageNodeView`, `MermaidGeneratorDialog`, `PageEditorContent`, `ImageCreateDialog`, `PageCard`, `AISettingsForm`, `GeneralSettingsForm`, `StorageSettingsForm`, `useKeyboardShortcuts`, 各 pages（NoteMembers, NotePageView, NoteSettings, NoteView, Notes, Onboarding, Pricing）など。
 - **優先度 4（テストの長大 Arrow）**
   - 各 `*.test.ts` / `*.test.tsx` の長い `describe`/`it` コールバック  
     → テスト用ヘルパーや複数 `it` に分割（Issue の「一時的 eslint-disable」も選択肢）。
@@ -159,3 +159,32 @@
 - ルール方針: `docs/lint-and-format.md`
 - 閾値・override: `eslint.config.js`（66–70 行目、80–88 行目）
 - 再取得コマンド: `bun run lint 2>&1 | grep -E "complexity|max-lines-per-function|max-depth"`
+
+---
+
+## 6. 実施メモ（2026-02-24）
+
+以下の 4 件を対応し、該当 Phase 3 警告を解消した。
+
+| ファイル                                                 | 内容                                                                                                                                               |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/hooks/useKeyboardShortcuts.ts`                      | ショートカット分岐をルックアップテーブル（match/handle 配列）に変更し complexity 21→20 以下に。                                                    |
+| `src/pages/Notes.tsx`                                    | 新規ノート作成ダイアログの中身を `CreateNoteDialogContent` に切り出し、メインコンポーネントを 150 行以内に。                                       |
+| `src/pages/NotePageView.tsx`                             | `canEditPage()` ヘルパーと `isLoading` / `isNotFound` 変数で分岐を整理し complexity 23→20 以下に。                                                 |
+| `src/components/editor/PageEditor/PageEditorContent.tsx` | `getCollaborationState()` でコラボ状態と config を算出し、`showCollaborationLoading` / `showEditor` で JSX 分岐を簡略化。complexity 29→20 以下に。 |
+
+確認: `bun run lint`（該当 warn 解消）、`bun run test:run`、`bun run build` はいずれも成功。
+
+---
+
+## 7. 実施メモ（残作業対応）
+
+以下のファイルで Phase 3 警告を解消した。
+
+| ファイル                                          | 内容                                                                                                                                                                                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/pages/Pricing.tsx`                           | `PricingAiInfo` / `PricingFaq` / `BillingIntervalToggle` / `PricingPlanCards` に分割し max-lines 172→150 以下に。                                                                                                       |
+| `src/pages/NoteMembers.tsx`                       | `memberRoleOptions` 未定義を修正。`NoteMembersLoadingOrDenied` / `NoteMembersManageSection` に分割し max-lines 179→150 以下に。                                                                                         |
+| `src/components/editor/ImageNodeView.tsx`         | `ImageNodeErrorState` / `ImageNodeToolbar` に分割し max-lines 166→150 以下に。                                                                                                                                          |
+| `src/pages/NoteView.tsx`                          | `NoteViewLoadingOrDenied` / `NoteViewAddPageDialogContent` / `NoteViewPageGrid` / `NoteViewHeaderActions` / `NoteViewMainContent` / `getNoteViewPermissions` に分割し max-lines 228→150 以下・complexity 29→20 以下に。 |
+| `src/components/settings/GeneralSettingsForm.tsx` | `GeneralSettingsProfileCard` / `GeneralSettingsDisplayCards` に分割し max-lines 206→150 以下に。                                                                                                                        |
