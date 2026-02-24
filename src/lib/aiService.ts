@@ -294,13 +294,13 @@ function processSSEDataLine(
   return false;
 }
 
-/** HTTP ストリーミングレスポンスを SSE として読み、onComplete まで処理する */
+/** HTTP ストリーミングレスポンスを SSE として読み、onComplete まで処理する。正常完了時は true を返す。 */
 async function consumeSSEStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   state: { fullContent: string; finishReason?: string; lastUsage?: AIResponseUsage },
   callbacks: AIServiceCallbacks,
   abortSignal?: AbortSignal,
-): Promise<void> {
+): Promise<boolean> {
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -328,12 +328,13 @@ async function consumeSSEStream(
         continue;
       }
       if (processSSEDataLine(payload, state, callbacks)) {
-        return;
+        return true;
       }
 
       newlineIndex = buffer.indexOf("\n");
     }
   }
+  return false;
 }
 
 async function fetchAIChatResponse(
@@ -386,8 +387,8 @@ async function handleAIChatHttpResponse(
       finishReason: undefined as string | undefined,
       lastUsage: undefined as AIResponseUsage | undefined,
     };
-    await consumeSSEStream(reader, state, callbacks, abortSignal);
-    if (state.fullContent) {
+    const streamCompleted = await consumeSSEStream(reader, state, callbacks, abortSignal);
+    if (!streamCompleted && state.fullContent) {
       callbacks.onComplete?.({
         content: state.fullContent,
         finishReason: state.finishReason,

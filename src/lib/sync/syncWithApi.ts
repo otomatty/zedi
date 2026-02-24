@@ -193,19 +193,25 @@ async function applyPull(
     ghost_links: SyncGhostLinkItem[];
   },
 ): Promise<void> {
+  const pulledPageIds = new Set(res.pages.map((p) => p.id));
+
   for (const row of res.pages) {
     const meta = syncPageToMetadata(row);
     const local = await adapter.getPage(meta.id);
     if (local && local.updatedAt > meta.updatedAt) continue;
     await adapter.upsertPage(meta);
   }
+
   const linkBySource = new Map<string, SyncLinkItem[]>();
   for (const l of res.links) {
     const list = linkBySource.get(l.source_id) ?? [];
     list.push(l);
     linkBySource.set(l.source_id, list);
   }
-  for (const [sourceId, items] of linkBySource) {
+  const linkSources = new Set(pulledPageIds);
+  for (const sourceId of linkBySource.keys()) linkSources.add(sourceId);
+  for (const sourceId of linkSources) {
+    const items = linkBySource.get(sourceId) ?? [];
     const links: Link[] = items.map((l) => ({
       sourceId: l.source_id,
       targetId: l.target_id,
@@ -213,13 +219,17 @@ async function applyPull(
     }));
     await adapter.saveLinks(sourceId, links);
   }
+
   const ghostBySource = new Map<string, SyncGhostLinkItem[]>();
   for (const g of res.ghost_links) {
     const list = ghostBySource.get(g.source_page_id) ?? [];
     list.push(g);
     ghostBySource.set(g.source_page_id, list);
   }
-  for (const [sourcePageId, items] of ghostBySource) {
+  const ghostSources = new Set(pulledPageIds);
+  for (const sourceId of ghostBySource.keys()) ghostSources.add(sourceId);
+  for (const sourceId of ghostSources) {
+    const items = ghostBySource.get(sourceId) ?? [];
     const ghostLinks: GhostLink[] = items.map((g) => ({
       linkText: g.link_text,
       sourcePageId: g.source_page_id,
@@ -227,7 +237,7 @@ async function applyPull(
       originalTargetPageId: g.original_target_page_id ?? null,
       originalNoteId: g.original_note_id ?? null,
     }));
-    await adapter.saveGhostLinks(sourcePageId, ghostLinks);
+    await adapter.saveGhostLinks(sourceId, ghostLinks);
   }
 }
 
@@ -278,13 +288,13 @@ async function pushPagesToApi(
   if (pushPages.length > PAGE_PUSH_CHUNK_SIZE) {
     for (let i = 0; i < pushPages.length; i += PAGE_PUSH_CHUNK_SIZE) {
       const chunk = pushPages.slice(i, i + PAGE_PUSH_CHUNK_SIZE);
-      await api.postSyncPages({ pages: chunk });
+      const isLastChunk = i + PAGE_PUSH_CHUNK_SIZE >= pushPages.length;
+      await api.postSyncPages({
+        pages: chunk,
+        links: isLastChunk ? pushLinks : undefined,
+        ghost_links: isLastChunk ? pushGhostLinks : undefined,
+      });
     }
-    await api.postSyncPages({
-      pages: [],
-      links: pushLinks,
-      ghost_links: pushGhostLinks,
-    });
   } else {
     await api.postSyncPages({
       pages: pushPages,
