@@ -44,6 +44,19 @@ export class S3Provider implements StorageProviderInterface {
       );
     }
 
+    const { uploadUrl, mediaId, s3Key } = await this.requestUploadUrl(file, token);
+    await this.putToS3(uploadUrl, file);
+    if (options?.onProgress) {
+      options.onProgress({ loaded: file.size, total: file.size, percentage: 100 });
+    }
+    await this.confirmUpload(mediaId, s3Key, file, token);
+    return buildImageUrl(this.baseUrl, mediaId);
+  }
+
+  private async requestUploadUrl(
+    file: File,
+    token: string,
+  ): Promise<{ uploadUrl: string; mediaId: string; s3Key: string }> {
     const base =
       this.baseUrl.replace(/\/$/, "") ||
       (typeof window !== "undefined" ? window.location.origin : "");
@@ -51,8 +64,6 @@ export class S3Provider implements StorageProviderInterface {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     };
-
-    // 1) Presigned URL 取得
     const uploadRes = await fetch(`${base}/api/media/upload`, {
       method: "POST",
       headers,
@@ -79,14 +90,17 @@ export class S3Provider implements StorageProviderInterface {
       raw && typeof raw === "object" && "data" in raw && raw.data
         ? raw.data
         : (raw as UploadPayload);
-    const uploadUrl = data.upload_url;
-    const mediaId = data.media_id;
-    const s3Key = data.s3_key;
-    if (!uploadUrl || !mediaId || !s3Key) {
+    if (!data.upload_url || !data.media_id || !data.s3_key) {
       throw new Error("アップロード情報の取得に失敗しました");
     }
+    return {
+      uploadUrl: data.upload_url,
+      mediaId: data.media_id,
+      s3Key: data.s3_key,
+    };
+  }
 
-    // 2) S3 に PUT（Presigned URL は別オリジンなので CORS 許可が必要）
+  private async putToS3(uploadUrl: string, file: File): Promise<void> {
     const putRes = await fetch(uploadUrl, {
       method: "PUT",
       body: file,
@@ -97,13 +111,21 @@ export class S3Provider implements StorageProviderInterface {
     if (!putRes.ok) {
       throw new Error(`アップロードに失敗しました: ${putRes.status}`);
     }
+  }
 
-    // 進捗コールバック（PUT 完了時）
-    if (options?.onProgress) {
-      options.onProgress({ loaded: file.size, total: file.size, percentage: 100 });
-    }
-
-    // 3) 完了通知
+  private async confirmUpload(
+    mediaId: string,
+    s3Key: string,
+    file: File,
+    token: string,
+  ): Promise<void> {
+    const base =
+      this.baseUrl.replace(/\/$/, "") ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
     const confirmRes = await fetch(`${base}/api/media/confirm`, {
       method: "POST",
       headers,
@@ -119,8 +141,6 @@ export class S3Provider implements StorageProviderInterface {
       const err = await confirmRes.text().catch(() => "");
       throw new Error(`アップロードの登録に失敗しました: ${err || confirmRes.status}`);
     }
-
-    return buildImageUrl(this.baseUrl, mediaId);
   }
 
   async testConnection(): Promise<ConnectionTestResult> {

@@ -59,7 +59,6 @@ export class CollaborationManager {
     this.idbProvider = new IndexeddbPersistence(`zedi-doc-${pageId}`, this.ydoc);
 
     this.idbProvider.on("synced", () => {
-      console.log("[Collab] IndexedDB synced");
       if (this.mode === "local") {
         // 個人ページ: IndexedDB synced 後に Aurora から最新 Y.Doc を fetch してマージ
         this.fetchAndMergeFromAurora();
@@ -77,7 +76,6 @@ export class CollaborationManager {
     try {
       const token = await this.getAuthToken();
       if (!token || this.destroyed) {
-        console.log("[Collab] No auth token, local-only mode");
         this.updateState({ status: "connected", isSynced: true });
         this.startLocalObserver();
         return;
@@ -105,12 +103,10 @@ export class CollaborationManager {
           const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
           if (binary.length > 2) {
             Y.applyUpdate(this.ydoc, binary);
-            console.log(`[Collab] Merged Aurora Y.Doc (${binary.length} bytes) into local`);
           }
         }
       } else if (res.status === 404) {
         // コンテンツ未保存のページでは 404 は想定内。エラー扱いしない。
-        console.debug("[Collab] No content in Aurora yet (404)");
       } else {
         console.warn(`[Collab] Aurora content fetch failed: ${res.status}`);
       }
@@ -141,6 +137,19 @@ export class CollaborationManager {
     this.auroraSaveTimer = setTimeout(() => {
       this.saveToAurora();
     }, AURORA_SAVE_DEBOUNCE_MS);
+  }
+
+  /**
+   * Cancel debounce and save to Aurora immediately (e.g. after applying URL-clip initial content).
+   * No-op in collaborative mode or when destroyed.
+   */
+  flushSave(): void {
+    if (this.destroyed || this.mode !== "local") return;
+    if (this.auroraSaveTimer) {
+      clearTimeout(this.auroraSaveTimer);
+      this.auroraSaveTimer = null;
+    }
+    void this.saveToAurora();
   }
 
   private async saveToAurora(): Promise<void> {
@@ -181,9 +190,7 @@ export class CollaborationManager {
       });
 
       if (this.destroyed) return;
-      if (res.ok) {
-        console.log(`[Collab] Saved Y.Doc to Aurora (${state.length} bytes)`);
-      } else {
+      if (!res.ok) {
         console.warn(`[Collab] Aurora save failed: ${res.status}`);
       }
     } catch (err) {
@@ -232,13 +239,11 @@ export class CollaborationManager {
       document: this.ydoc,
       token: () => this.getAuthToken(),
       onStatus: ({ status }) => {
-        console.log(`[Collab] WebSocket status: ${status}`);
         this.updateState({
           status: status as ConnectionStatus,
         });
       },
       onSynced: ({ state: isSynced }) => {
-        console.log(`[Collab] Sync status: ${isSynced}`);
         this.updateState({ isSynced });
       },
     });
@@ -301,7 +306,7 @@ export class CollaborationManager {
     const onlineUsers: UserPresence[] = [];
 
     states.forEach((state, clientId) => {
-      if (clientId !== this.awareness!.clientID && state.userId) {
+      if (clientId !== (this.awareness?.clientID ?? null) && state.userId) {
         onlineUsers.push(state as UserPresence);
       }
     });
@@ -378,11 +383,13 @@ export class CollaborationManager {
       this.auroraSaveTimer = null;
     }
 
-    // 最終保存（同期的にタイマーなしで呼び出し）
+    // 最終保存: ydoc 破棄前に同期的にステートをエンコードし、非同期で送信
     if (this.mode === "local" && this.auroraFetched) {
-      this.destroyed = false; // saveToAurora のガードを一時的に解除
-      this.saveToAurora();
-      this.destroyed = true;
+      const state = Y.encodeStateAsUpdate(this.ydoc);
+      if (state.length > 2) {
+        const contentText = this.extractText(this.ydoc.getXmlFragment("default"));
+        this.fireAndForgetSave(state, contentText);
+      }
     }
 
     // プレゼンスをクリア
@@ -396,5 +403,43 @@ export class CollaborationManager {
     this.ydoc.destroy();
 
     this.listeners.clear();
+  }
+
+  /**
+   * 破棄後の最終保存。エンコード済みステートを受け取り、ydoc に依存しない。
+   * keepalive: true でページ離脱後もリクエストが完了するようにする。
+   */
+  private fireAndForgetSave(state: Uint8Array, contentText: string): void {
+    this.getAuthToken()
+      .then((token) => {
+        if (!token) return;
+
+        let b64 = "";
+        const chunkSize = 8192;
+        for (let i = 0; i < state.length; i += chunkSize) {
+          b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
+        }
+        b64 = btoa(b64);
+
+        const baseUrl = (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+        const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+        const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
+
+        return fetch(url, {
+          method: "PUT",
+          keepalive: true,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            ydoc_state: b64,
+            content_text: contentText,
+          }),
+        });
+      })
+      .catch(() => {
+        // 最終保存の失敗は無視（ページ離脱中のため処理不能）
+      });
   }
 }

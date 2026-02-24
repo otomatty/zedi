@@ -50,14 +50,14 @@ app.post("/upsert", async (c) => {
   const existing = await db.select().from(users).where(eq(users.cognitoSub, cognitoSub)).limit(1);
 
   let result;
-  if (existing.length > 0) {
-    // cognito_sub が既に存在 → UPDATE
+  const existingRow = existing[0];
+  if (existingRow) {
     result = await db
       .update(users)
       .set({
         email,
-        displayName: body.display_name || existing[0]!.displayName,
-        avatarUrl: body.avatar_url || existing[0]!.avatarUrl,
+        displayName: body.display_name || (existingRow.displayName ?? null),
+        avatarUrl: body.avatar_url || (existingRow.avatarUrl ?? null),
         updatedAt: new Date(),
       })
       .where(eq(users.cognitoSub, cognitoSub))
@@ -66,14 +66,14 @@ app.post("/upsert", async (c) => {
     // 新規ユーザー: 同一メールの行が既にあればそちらの cognito_sub を更新
     const existingByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
-    if (existingByEmail.length > 0) {
-      // 同じメールだが別の cognito_sub → cognito_sub を更新（アカウント統合）
+    const existingByEmailRow = existingByEmail[0];
+    if (existingByEmailRow) {
       result = await db
         .update(users)
         .set({
           cognitoSub,
-          displayName: body.display_name || existingByEmail[0]!.displayName,
-          avatarUrl: body.avatar_url || existingByEmail[0]!.avatarUrl,
+          displayName: body.display_name || (existingByEmailRow.displayName ?? null),
+          avatarUrl: body.avatar_url || (existingByEmailRow.avatarUrl ?? null),
           updatedAt: new Date(),
         })
         .where(eq(users.email, email))

@@ -80,7 +80,7 @@ function querySql(sql, tmpDir) {
 function extractStatements(content) {
   const stripped = content.replace(/^\s*--[^\n]*$/gm, "").replace(/\n\s*\/\*[\s\S]*?\*\//g, "");
   return stripped
-    .split(/\s*;\s*\n/)
+    .split(/\s*;\s*(?:\r?\n|$)/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
     .map((s) => (s.endsWith(";") ? s : s + ";"));
@@ -113,8 +113,9 @@ try {
     const files = getMigrationFiles().filter((f) => f.slice(0, 3) <= prefix);
     console.log(`Baselining ${files.length} migration(s) up to ${prefix}_*:`);
     for (const file of files) {
+      const safeFile = file.replace(/'/g, "''");
       const r = runSql(
-        `INSERT INTO _schema_migrations (filename) VALUES ('${file}') ON CONFLICT DO NOTHING;`,
+        `INSERT INTO _schema_migrations (filename) VALUES ('${safeFile}') ON CONFLICT DO NOTHING;`,
         tmpDir,
       );
       console.log(`  ${file}: ${r.ok ? "recorded" : "failed"}`);
@@ -184,7 +185,8 @@ try {
       process.exit(1);
     }
 
-    runSql(`INSERT INTO _schema_migrations (filename) VALUES ('${file}');`, tmpDir);
+    const safeFile = file.replace(/'/g, "''");
+    runSql(`INSERT INTO _schema_migrations (filename) VALUES ('${safeFile}');`, tmpDir);
     console.log(`${file}: ${ok} statement(s) applied.`);
   }
 

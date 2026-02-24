@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
 import { Editor } from "@tiptap/core";
 import { usePageStore } from "@/stores/pageStore";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ export interface WikiLinkSuggestionHandle {
 export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
   ({ query, onSelect, onClose }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const { pages, searchPages } = usePageStore();
+    const { pages } = usePageStore();
 
     // Get matching pages
     const getItems = useCallback((): SuggestionItem[] => {

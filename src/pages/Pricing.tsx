@@ -17,7 +17,11 @@ import { cn } from "@/lib/utils";
 import { UsageBar } from "@/components/ai/UsageBar";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
-import { openProCheckout, openCustomerPortal } from "@/lib/subscriptionService";
+import {
+  openProCheckout,
+  openCustomerPortal,
+  type BillingInterval,
+} from "@/lib/subscriptionService";
 import type { AIUsage } from "@/types/ai";
 
 interface PlanFeature {
@@ -113,10 +117,170 @@ const PlanCard: React.FC<PlanCardProps> = ({
   );
 };
 
-type BillingInterval = "monthly" | "yearly";
+function PricingAiInfo() {
+  return (
+    <div className="mx-auto mt-12 max-w-3xl">
+      <h3 className="mb-4 text-center text-lg font-semibold">AI機能について</h3>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-2 flex items-center gap-2 font-medium">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Free プラン
+          </h4>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>- 基本モデル（GPT-4o Mini, Gemini Flash 等）</li>
+            <li>- 月間使用量の制限あり</li>
+            <li>- Wiki生成、Mermaid図 生成</li>
+          </ul>
+        </div>
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <h4 className="mb-2 flex items-center gap-2 font-medium">
+            <Zap className="h-4 w-4 text-primary" />
+            Pro プラン
+          </h4>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>- 高性能モデル（GPT-4o, Claude Sonnet 4, Gemini Pro 等）</li>
+            <li>- 月間使用量が大幅に拡大</li>
+            <li>- 今後追加されるAI機能も利用可能</li>
+          </ul>
+        </div>
+      </div>
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。
+      </p>
+    </div>
+  );
+}
+
+function PricingFaq() {
+  return (
+    <div className="mx-auto mt-12 max-w-3xl">
+      <h3 className="mb-4 text-center text-lg font-semibold">よくある質問</h3>
+      <div className="space-y-4">
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-1 font-medium">Proプランの使用量はどう計算されますか？</h4>
+          <p className="text-sm text-muted-foreground">
+            利用するモデルとトークン消費量に応じたコストユニットで計算されます。
+            軽量モデルなら月に数百回の生成が可能です。 設定画面で現在の使用率を確認できます。
+          </p>
+        </div>
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-1 font-medium">自分のAPIキーとサブスクの違いは？</h4>
+          <p className="text-sm text-muted-foreground">
+            サブスクではZediのAI基盤を通じて簡単にAI機能を使えます。
+            自分のAPIキーを設定すると使用量制限なく利用できますが、
+            各プロバイダーとの個別契約と料金が必要です。
+          </p>
+        </div>
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-1 font-medium">返金ポリシーはありますか？</h4>
+          <p className="text-sm text-muted-foreground">
+            購入後14日以内であれば全額返金いたします。 お問い合わせフォームからご連絡ください。
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingIntervalToggle({
+  value,
+  onChange,
+}: {
+  value: BillingInterval;
+  onChange: (v: BillingInterval) => void;
+}) {
+  return (
+    <div className="mb-6 flex justify-center gap-2">
+      <Button
+        variant={value === "monthly" ? "default" : "outline"}
+        size="sm"
+        onClick={() => onChange("monthly")}
+      >
+        月額
+      </Button>
+      <Button
+        variant={value === "yearly" ? "default" : "outline"}
+        size="sm"
+        onClick={() => onChange("yearly")}
+      >
+        年額（2ヶ月分お得）
+      </Button>
+    </div>
+  );
+}
+
+interface PricingPlanCardsProps {
+  billingInterval: BillingInterval;
+  isProUser: boolean;
+  isSignedIn: boolean;
+  usageForBar: AIUsage | null;
+  onSelectPro: () => Promise<void>;
+  onManageSubscription: () => Promise<void>;
+}
+
+function PricingPlanCards({
+  billingInterval,
+  isProUser,
+  isSignedIn,
+  usageForBar,
+  onSelectPro,
+  onManageSubscription,
+}: PricingPlanCardsProps) {
+  return (
+    <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+      <PlanCard
+        name="Free"
+        description="基本機能を無料で"
+        price="¥0"
+        icon={<Sparkles className="h-5 w-5" />}
+        features={[
+          { text: "100ページまで", included: true },
+          { text: "クラウド同期", included: true },
+          { text: "Wiki リンク", included: true },
+          { text: "基本AIモデル（制限付き）", included: true },
+          { text: "無制限ページ", included: false },
+          { text: "高性能AIモデル", included: false },
+        ]}
+        buttonText="現在のプラン"
+        buttonVariant="outline"
+        current={!isProUser}
+        extraContent={
+          isSignedIn && usageForBar && <UsageBar usage={usageForBar} autoRefresh={false} />
+        }
+      />
+      <PlanCard
+        name="Pro"
+        description="無制限＋フルAI"
+        price={billingInterval === "yearly" ? "$100" : "$10"}
+        priceNote={billingInterval === "yearly" ? "/ 年" : "/ 月"}
+        icon={<Zap className="h-5 w-5" />}
+        popular
+        features={[
+          { text: "無制限ページ", included: true },
+          { text: "クラウド同期", included: true },
+          { text: "Wiki リンク", included: true },
+          { text: "全AIモデル（GPT-4o, Claude, Gemini Pro等）", included: true },
+          { text: "月間AI使用量 拡大", included: true },
+          { text: "自分のAPIキーも使用可", included: true },
+        ]}
+        buttonText={
+          isProUser
+            ? "サブスク管理"
+            : billingInterval === "yearly"
+              ? "Pro 年額で契約"
+              : "Pro 月額で契約"
+        }
+        onSelect={isProUser ? onManageSubscription : onSelectPro}
+        current={false}
+        disabled={!isSignedIn}
+      />
+    </div>
+  );
+}
 
 const Pricing: React.FC = () => {
-  const { userId, isSignedIn } = useAuth();
+  const { isSignedIn } = useAuth();
   const { plan: currentPlan, isProUser, usage, isLoading, refetch } = useSubscription();
 
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
@@ -133,8 +297,8 @@ const Pricing: React.FC = () => {
     : null;
 
   const handleSelectPro = async () => {
-    if (!userId) return;
-    await openProCheckout(userId, billingInterval);
+    if (!isSignedIn) return;
+    await openProCheckout(billingInterval);
     // User may return from checkout in same tab; refetch after a short delay
     setTimeout(() => refetch(), 5000);
   };
@@ -165,136 +329,23 @@ const Pricing: React.FC = () => {
             </p>
           </div>
 
-          {/* Monthly / Yearly toggle for Pro */}
-          <div className="mb-6 flex justify-center gap-2">
-            <Button
-              variant={billingInterval === "monthly" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setBillingInterval("monthly")}
-            >
-              月額
-            </Button>
-            <Button
-              variant={billingInterval === "yearly" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setBillingInterval("yearly")}
-            >
-              年額（2ヶ月分お得）
-            </Button>
-          </div>
+          <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
 
-          <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
-            <PlanCard
-              name="Free"
-              description="基本機能を無料で"
-              price="¥0"
-              icon={<Sparkles className="h-5 w-5" />}
-              features={[
-                { text: "100ページまで", included: true },
-                { text: "クラウド同期", included: true },
-                { text: "Wiki リンク", included: true },
-                { text: "基本AIモデル（制限付き）", included: true },
-                { text: "無制限ページ", included: false },
-                { text: "高性能AIモデル", included: false },
-              ]}
-              buttonText="現在のプラン"
-              buttonVariant="outline"
-              current={!isProUser}
-              extraContent={
-                isSignedIn && usageForBar && <UsageBar usage={usageForBar} autoRefresh={false} />
-              }
-            />
-
-            <PlanCard
-              name="Pro"
-              description="無制限＋フルAI"
-              price={billingInterval === "yearly" ? "$100" : "$10"}
-              priceNote={billingInterval === "yearly" ? "/ 年" : "/ 月"}
-              icon={<Zap className="h-5 w-5" />}
-              popular
-              features={[
-                { text: "無制限ページ", included: true },
-                { text: "クラウド同期", included: true },
-                { text: "Wiki リンク", included: true },
-                { text: "全AIモデル（GPT-4o, Claude, Gemini Pro等）", included: true },
-                { text: "月間AI使用量 拡大", included: true },
-                { text: "自分のAPIキーも使用可", included: true },
-              ]}
-              buttonText={
-                isProUser
-                  ? "サブスク管理"
-                  : billingInterval === "yearly"
-                    ? "Pro 年額で契約"
-                    : "Pro 月額で契約"
-              }
-              onSelect={isProUser ? handleManageSubscription : handleSelectPro}
-              current={isProUser}
-              disabled={!isSignedIn}
-            />
-          </div>
+          <PricingPlanCards
+            billingInterval={billingInterval}
+            isProUser={isProUser}
+            isSignedIn={isSignedIn}
+            usageForBar={usageForBar}
+            onSelectPro={handleSelectPro}
+            onManageSubscription={handleManageSubscription}
+          />
 
           {isLoading && (
             <p className="mt-4 text-center text-sm text-muted-foreground">プラン情報を取得中...</p>
           )}
 
-          <div className="mx-auto mt-12 max-w-3xl">
-            <h3 className="mb-4 text-center text-lg font-semibold">AI機能について</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-2 flex items-center gap-2 font-medium">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  Free プラン
-                </h4>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>- 基本モデル（GPT-4o Mini, Gemini Flash 等）</li>
-                  <li>- 月間使用量の制限あり</li>
-                  <li>- Wiki生成、Mermaid図 生成</li>
-                </ul>
-              </div>
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                <h4 className="mb-2 flex items-center gap-2 font-medium">
-                  <Zap className="h-4 w-4 text-primary" />
-                  Pro プラン
-                </h4>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>- 高性能モデル（GPT-4o, Claude Sonnet 4, Gemini Pro 等）</li>
-                  <li>- 月間使用量が大幅に拡大</li>
-                  <li>- 今後追加されるAI機能も利用可能</li>
-                </ul>
-              </div>
-            </div>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。
-            </p>
-          </div>
-
-          <div className="mx-auto mt-12 max-w-3xl">
-            <h3 className="mb-4 text-center text-lg font-semibold">よくある質問</h3>
-            <div className="space-y-4">
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-1 font-medium">Proプランの使用量はどう計算されますか？</h4>
-                <p className="text-sm text-muted-foreground">
-                  利用するモデルとトークン消費量に応じたコストユニットで計算されます。
-                  軽量モデルなら月に数百回の生成が可能です。 設定画面で現在の使用率を確認できます。
-                </p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-1 font-medium">自分のAPIキーとサブスクの違いは？</h4>
-                <p className="text-sm text-muted-foreground">
-                  サブスクではZediのAI基盤を通じて簡単にAI機能を使えます。
-                  自分のAPIキーを設定すると使用量制限なく利用できますが、
-                  各プロバイダーとの個別契約と料金が必要です。
-                </p>
-              </div>
-              <div className="rounded-lg border p-4">
-                <h4 className="mb-1 font-medium">返金ポリシーはありますか？</h4>
-                <p className="text-sm text-muted-foreground">
-                  購入後14日以内であれば全額返金いたします。
-                  お問い合わせフォームからご連絡ください。
-                </p>
-              </div>
-            </div>
-          </div>
+          <PricingAiInfo />
+          <PricingFaq />
         </Container>
       </main>
     </div>

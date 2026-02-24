@@ -47,6 +47,7 @@ import {
   EXTERNAL_STORAGE_PROVIDERS,
   StorageProviderType,
   getStorageProviderById,
+  STORAGE_PROVIDERS,
 } from "@/types/storage";
 import type { StorageSettings } from "@/types/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -75,7 +76,12 @@ export const StorageSettingsForm: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   const useExternalStorage = settings.preferDefaultStorage === false;
-  const currentProvider = getStorageProviderById(useExternalStorage ? settings.provider : "s3");
+  // Legacy: cloudflare-r2 is no longer supported; treat as default storage for display
+  const effectiveProvider = settings.provider === "cloudflare-r2" ? "s3" : settings.provider;
+  const useExternalStorageEffective = useExternalStorage && settings.provider !== "cloudflare-r2";
+  const currentProvider =
+    getStorageProviderById(useExternalStorageEffective ? effectiveProvider : "s3") ??
+    STORAGE_PROVIDERS[0];
 
   const getSafeReturnTo = useCallback((): string | null => {
     const returnTo = searchParams.get("returnTo");
@@ -179,7 +185,7 @@ export const StorageSettingsForm: React.FC = () => {
           />
         </div>
 
-        {!useExternalStorage && (
+        {!useExternalStorageEffective && (
           <Alert>
             <AlertTitle>{t("storageSettings.defaultStorageAlertTitle")}</AlertTitle>
             <AlertDescription>
@@ -189,12 +195,12 @@ export const StorageSettingsForm: React.FC = () => {
         )}
 
         {/* 外部ストレージ選択（外部を選んだときのみ表示） */}
-        {useExternalStorage && (
+        {useExternalStorageEffective && (
           <>
             <div className="space-y-2">
               <Label htmlFor="provider">{t("storageSettings.externalStorageLabel")}</Label>
               <Select
-                value={settings.provider}
+                value={effectiveProvider}
                 onValueChange={(value) =>
                   updateSettings({ provider: value as StorageProviderType })
                 }
@@ -244,7 +250,7 @@ export const StorageSettingsForm: React.FC = () => {
         )}
 
         {/* Provider-specific settings（外部ストレージのときのみ表示） */}
-        {useExternalStorage && settings.provider === "gyazo" && (
+        {useExternalStorageEffective && settings.provider === "gyazo" && (
           <GyazoSettings
             accessToken={settings.config.gyazoAccessToken || ""}
             onChange={(value) => updateConfig({ gyazoAccessToken: value })}
@@ -254,7 +260,7 @@ export const StorageSettingsForm: React.FC = () => {
           />
         )}
 
-        {useExternalStorage && settings.provider === "github" && (
+        {useExternalStorageEffective && settings.provider === "github" && (
           <GitHubSettings
             repository={settings.config.githubRepository || ""}
             token={settings.config.githubToken || ""}
@@ -267,21 +273,7 @@ export const StorageSettingsForm: React.FC = () => {
           />
         )}
 
-        {useExternalStorage && settings.provider === "cloudflare-r2" && (
-          <CloudflareR2Settings
-            bucket={settings.config.r2Bucket || ""}
-            accountId={settings.config.r2AccountId || ""}
-            accessKeyId={settings.config.r2AccessKeyId || ""}
-            secretAccessKey={settings.config.r2SecretAccessKey || ""}
-            publicUrl={settings.config.r2PublicUrl || ""}
-            onChange={(updates) => updateConfig(updates)}
-            showSecrets={showSecrets}
-            setShowSecrets={setShowSecrets}
-            disabled={isSaving || isTesting}
-          />
-        )}
-
-        {useExternalStorage && settings.provider === "google-drive" && (
+        {useExternalStorageEffective && settings.provider === "google-drive" && (
           <GoogleDriveSettings
             clientId={settings.config.googleDriveClientId || ""}
             clientSecret={settings.config.googleDriveClientSecret || ""}
@@ -534,114 +526,6 @@ const GitHubSettings: React.FC<GitHubSettingsProps> = ({
             disabled={disabled}
           />
         </div>
-      </div>
-    </div>
-  );
-};
-
-// Cloudflare R2 Settings Component
-interface CloudflareR2SettingsProps {
-  bucket: string;
-  accountId: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  publicUrl: string;
-  onChange: (updates: Record<string, string>) => void;
-  showSecrets: boolean;
-  setShowSecrets: (show: boolean) => void;
-  disabled: boolean;
-}
-
-const CloudflareR2Settings: React.FC<CloudflareR2SettingsProps> = ({
-  bucket,
-  accountId,
-  accessKeyId,
-  secretAccessKey,
-  publicUrl,
-  onChange,
-  showSecrets,
-  setShowSecrets,
-  disabled,
-}) => {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="r2Bucket">{t("storageSettings.r2.bucket")}</Label>
-          <Input
-            id="r2Bucket"
-            type="text"
-            value={bucket}
-            onChange={(e) => onChange({ r2Bucket: e.target.value })}
-            placeholder={t("storageSettings.r2.bucketPlaceholder")}
-            disabled={disabled}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="r2AccountId">{t("storageSettings.r2.accountId")}</Label>
-          <Input
-            id="r2AccountId"
-            type="text"
-            value={accountId}
-            onChange={(e) => onChange({ r2AccountId: e.target.value })}
-            placeholder={t("storageSettings.r2.accountIdPlaceholder")}
-            disabled={disabled}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="r2AccessKeyId">{t("storageSettings.r2.accessKeyId")}</Label>
-        <Input
-          id="r2AccessKeyId"
-          type="text"
-          value={accessKeyId}
-          onChange={(e) => onChange({ r2AccessKeyId: e.target.value })}
-          placeholder={t("storageSettings.r2.accessKeyIdPlaceholder")}
-          disabled={disabled}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="r2SecretAccessKey">{t("storageSettings.r2.secretAccessKey")}</Label>
-        <div className="relative">
-          <Input
-            id="r2SecretAccessKey"
-            type={showSecrets ? "text" : "password"}
-            value={secretAccessKey}
-            onChange={(e) => onChange({ r2SecretAccessKey: e.target.value })}
-            placeholder={t("storageSettings.r2.secretAccessKeyPlaceholder")}
-            disabled={disabled}
-            className="pr-10"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-            onClick={() => setShowSecrets(!showSecrets)}
-          >
-            {showSecrets ? (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="r2PublicUrl">{t("storageSettings.r2.publicUrl")}</Label>
-        <Input
-          id="r2PublicUrl"
-          type="text"
-          value={publicUrl}
-          onChange={(e) => onChange({ r2PublicUrl: e.target.value })}
-          placeholder={t("storageSettings.r2.publicUrlPlaceholder")}
-          disabled={disabled}
-        />
-        <p className="text-xs text-muted-foreground">{t("storageSettings.r2.publicUrlHelp")}</p>
       </div>
     </div>
   );

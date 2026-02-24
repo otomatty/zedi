@@ -109,37 +109,51 @@ export type SyncWithApiOptions = {
   forceFullSyncWhenLocalEmpty?: boolean;
 };
 
+/** Unwrap { ok, data } envelope at most 3 levels. */
+function unwrapEnvelope(raw: unknown): unknown {
+  let candidate: unknown = raw;
+  for (let i = 0; i < 3; i++) {
+    if (candidate && typeof candidate === "object" && "ok" in candidate && "data" in candidate) {
+      candidate = (candidate as { data: unknown }).data;
+    } else {
+      break;
+    }
+  }
+  return candidate;
+}
+
+/** Ensure pages, links, ghost_links are arrays; throw with descriptive message. */
+function validateSyncArrays(
+  obj: Record<string, unknown> | null,
+  pages: unknown,
+  links: unknown,
+  ghostLinks: unknown,
+): void {
+  if (Array.isArray(pages) && Array.isArray(links) && Array.isArray(ghostLinks)) {
+    return;
+  }
+  const keys = obj ? Object.keys(obj).join(", ") : "non-object";
+  throw new TypeError(
+    `[Sync/API] Invalid sync payload shape. Expected arrays: pages/links/ghost_links, got keys: ${keys}`,
+  );
+}
+
 function normalizeSyncResponse(raw: unknown): {
   pages: SyncPageItem[];
   links: SyncLinkItem[];
   ghost_links: SyncGhostLinkItem[];
   server_time?: string;
 } {
-  let candidate: unknown = raw;
-
-  // Be robust to accidentally wrapped envelopes: { ok, data }.
-  for (let i = 0; i < 3; i++) {
-    if (candidate && typeof candidate === "object" && "ok" in candidate && "data" in candidate) {
-      candidate = (candidate as { data: unknown }).data;
-      continue;
-    }
-    break;
-  }
-
+  const candidate = unwrapEnvelope(raw);
   const obj =
     candidate && typeof candidate === "object" ? (candidate as Record<string, unknown>) : null;
 
-  const pages = obj?.pages || [];
-  const links = obj?.links || [];
-  const ghostLinks = obj?.ghost_links || [];
-  const serverTime = obj?.server_time || obj?.synced_at;
+  const pages = obj?.pages ?? [];
+  const links = obj?.links ?? [];
+  const ghostLinks = obj?.ghost_links ?? [];
+  const serverTime = obj?.server_time ?? obj?.synced_at;
 
-  if (!Array.isArray(pages) || !Array.isArray(links) || !Array.isArray(ghostLinks)) {
-    const keys = obj ? Object.keys(obj).join(", ") : "non-object";
-    throw new TypeError(
-      `[Sync/API] Invalid sync payload shape. Expected arrays: pages/links/ghost_links, got keys: ${keys}`,
-    );
-  }
+  validateSyncArrays(obj, pages, links, ghostLinks);
 
   return {
     pages: pages as SyncPageItem[],
@@ -147,6 +161,137 @@ function normalizeSyncResponse(raw: unknown): {
     ghost_links: ghostLinks as SyncGhostLinkItem[],
     server_time: typeof serverTime === "string" ? serverTime : undefined,
   };
+}
+
+function shouldSkipSync(options?: SyncWithApiOptions & { force?: boolean }): boolean {
+  if (syncInProgress) return true;
+  if (!options?.force && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    console.warn(
+      `[Sync/API] Skipped: ${consecutiveFailures} consecutive failures. Use manual sync to retry.`,
+    );
+    return true;
+  }
+  return false;
+}
+
+function computeSince(
+  options: SyncWithApiOptions | undefined,
+  lastSync: number | null,
+  localPageCount: number,
+): string | undefined {
+  if (options?.forceFullSyncWhenLocalEmpty && localPageCount === 0) {
+    return undefined;
+  }
+  return lastSync ? new Date(lastSync).toISOString() : undefined;
+}
+
+async function applyPull(
+  adapter: StorageAdapter,
+  res: {
+    pages: SyncPageItem[];
+    links: SyncLinkItem[];
+    ghost_links: SyncGhostLinkItem[];
+  },
+): Promise<void> {
+  for (const row of res.pages) {
+    const meta = syncPageToMetadata(row);
+    const local = await adapter.getPage(meta.id);
+    if (local && local.updatedAt > meta.updatedAt) continue;
+    await adapter.upsertPage(meta);
+  }
+  const linkBySource = new Map<string, SyncLinkItem[]>();
+  for (const l of res.links) {
+    const list = linkBySource.get(l.source_id) ?? [];
+    list.push(l);
+    linkBySource.set(l.source_id, list);
+  }
+  for (const [sourceId, items] of linkBySource) {
+    const links: Link[] = items.map((l) => ({
+      sourceId: l.source_id,
+      targetId: l.target_id,
+      createdAt: typeof l.created_at === "string" ? new Date(l.created_at).getTime() : l.created_at,
+    }));
+    await adapter.saveLinks(sourceId, links);
+  }
+  const ghostBySource = new Map<string, SyncGhostLinkItem[]>();
+  for (const g of res.ghost_links) {
+    const list = ghostBySource.get(g.source_page_id) ?? [];
+    list.push(g);
+    ghostBySource.set(g.source_page_id, list);
+  }
+  for (const [sourcePageId, items] of ghostBySource) {
+    const ghostLinks: GhostLink[] = items.map((g) => ({
+      linkText: g.link_text,
+      sourcePageId: g.source_page_id,
+      createdAt: typeof g.created_at === "string" ? new Date(g.created_at).getTime() : g.created_at,
+      originalTargetPageId: g.original_target_page_id ?? null,
+      originalNoteId: g.original_note_id ?? null,
+    }));
+    await adapter.saveGhostLinks(sourcePageId, ghostLinks);
+  }
+}
+
+function getPagesForPush(
+  lastSync: number | null,
+  allLocalPages: PageMetadata[],
+  pulledPageIds: Set<string>,
+): PageMetadata[] {
+  return lastSync
+    ? allLocalPages.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id))
+    : allLocalPages;
+}
+
+async function finishSyncNoPush(
+  adapter: StorageAdapter,
+  res: { server_time?: string },
+): Promise<void> {
+  const newSyncTime = res.server_time ? new Date(res.server_time).getTime() : Date.now();
+  await adapter.setLastSyncTime(newSyncTime);
+  consecutiveFailures = 0;
+  setSyncStatus("synced");
+}
+
+function finishSyncIfNoPushNeeded(
+  adapter: StorageAdapter,
+  res: { server_time?: string },
+  isInitialSync: boolean,
+  localPageCount: number,
+  pagesForPush: PageMetadata[],
+): Promise<boolean> {
+  const noPush = (isInitialSync && localPageCount === 0) || pagesForPush.length === 0;
+  if (!noPush) return Promise.resolve(false);
+  return finishSyncNoPush(adapter, res).then(() => true);
+}
+
+async function pushPagesToApi(
+  api: ApiClient,
+  pushPages: PostSyncPageItem[],
+  pushLinks: Array<{ source_id: string; target_id: string; created_at: string }>,
+  pushGhostLinks: Array<{
+    link_text: string;
+    source_page_id: string;
+    created_at: string;
+    original_target_page_id: string | null;
+    original_note_id: string | null;
+  }>,
+): Promise<void> {
+  if (pushPages.length > PAGE_PUSH_CHUNK_SIZE) {
+    for (let i = 0; i < pushPages.length; i += PAGE_PUSH_CHUNK_SIZE) {
+      const chunk = pushPages.slice(i, i + PAGE_PUSH_CHUNK_SIZE);
+      await api.postSyncPages({ pages: chunk });
+    }
+    await api.postSyncPages({
+      pages: [],
+      links: pushLinks,
+      ghost_links: pushGhostLinks,
+    });
+  } else {
+    await api.postSyncPages({
+      pages: pushPages,
+      links: pushLinks,
+      ghost_links: pushGhostLinks,
+    });
+  }
 }
 
 /**
@@ -163,17 +308,7 @@ export async function syncWithApi(
     /** Skip the consecutive-failure guard (for manual sync). */ force?: boolean;
   },
 ): Promise<void> {
-  if (syncInProgress) {
-    console.log("[Sync/API] Skipped: sync already in progress");
-    return;
-  }
-
-  if (!options?.force && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-    console.warn(
-      `[Sync/API] Skipped: ${consecutiveFailures} consecutive failures. Use manual sync to retry.`,
-    );
-    return;
-  }
+  if (shouldSkipSync(options)) return;
 
   try {
     syncInProgress = true;
@@ -183,110 +318,21 @@ export async function syncWithApi(
     const lastSync = await adapter.getLastSyncTime();
     const allPages = await adapter.getAllPages();
     const localPageCount = allPages.length;
-    const since =
-      options?.forceFullSyncWhenLocalEmpty && localPageCount === 0
-        ? undefined
-        : lastSync
-          ? new Date(lastSync).toISOString()
-          : undefined;
+    const since = computeSince(options, lastSync, localPageCount);
     const isInitialSync = since === undefined;
 
-    console.log(
-      `[Sync/API] Starting ${isInitialSync ? "initial" : "delta"} sync (since: ${since ?? "full"})`,
-    );
-
-    // --- PULL ---
     const res = normalizeSyncResponse(await api.getSyncPages(since));
-    for (const row of res.pages) {
-      const meta = syncPageToMetadata(row);
+    await applyPull(adapter, res);
 
-      // LWW チェック: ローカルの方が新しければスキップ（ローカル編集を保護）
-      // スキップされたページは後の PUSH で サーバーに反映される
-      const local = await adapter.getPage(meta.id);
-      if (local && local.updatedAt > meta.updatedAt) {
-        console.log(
-          `[Sync/API] Pull skip (local newer): ${meta.id} ` +
-            `local=${new Date(local.updatedAt).toISOString()} > ` +
-            `server=${new Date(meta.updatedAt).toISOString()}`,
-        );
-        continue;
-      }
-
-      await adapter.upsertPage(meta);
-    }
-
-    const linkBySource = new Map<string, SyncLinkItem[]>();
-    for (const l of res.links) {
-      const list = linkBySource.get(l.source_id) ?? [];
-      list.push(l);
-      linkBySource.set(l.source_id, list);
-    }
-    for (const [sourceId, items] of linkBySource) {
-      const links: Link[] = items.map((l) => ({
-        sourceId: l.source_id,
-        targetId: l.target_id,
-        createdAt:
-          typeof l.created_at === "string" ? new Date(l.created_at).getTime() : l.created_at,
-      }));
-      await adapter.saveLinks(sourceId, links);
-    }
-
-    const ghostBySource = new Map<string, SyncGhostLinkItem[]>();
-    for (const g of res.ghost_links) {
-      const list = ghostBySource.get(g.source_page_id) ?? [];
-      list.push(g);
-      ghostBySource.set(g.source_page_id, list);
-    }
-    for (const [sourcePageId, items] of ghostBySource) {
-      const ghostLinks: GhostLink[] = items.map((g) => ({
-        linkText: g.link_text,
-        sourcePageId: g.source_page_id,
-        createdAt:
-          typeof g.created_at === "string" ? new Date(g.created_at).getTime() : g.created_at,
-        originalTargetPageId: g.original_target_page_id ?? null,
-        originalNoteId: g.original_note_id ?? null,
-      }));
-      await adapter.saveGhostLinks(sourcePageId, ghostLinks);
-    }
-
-    // --- PUSH ---
-    // If local was empty before initial full pull, pushing pulled server data
-    // back immediately is redundant and can take a very long time.
-    if (isInitialSync && localPageCount === 0) {
-      console.log("[Sync/API] Skip push: local was empty before initial full pull");
-      const newSyncTime = res.server_time ? new Date(res.server_time).getTime() : Date.now();
-      await adapter.setLastSyncTime(newSyncTime);
-      consecutiveFailures = 0; // Reset on success
-      setSyncStatus("synced");
-      console.log(
-        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, pushed 0 pages`,
-      );
-      return;
-    }
-
-    // Delta sync: only push pages that were modified locally since last sync.
-    // Pages just pulled from server don't need to be pushed back.
     const pulledPageIds = new Set(res.pages.map((r) => r.id));
     const allLocalPages = await adapter.getAllPages();
-    const pagesForPush = lastSync
-      ? allLocalPages.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id))
-      : allLocalPages; // Initial sync with existing local data: push all
+    const pagesForPush = getPagesForPush(lastSync, allLocalPages, pulledPageIds);
 
-    // If no local changes need pushing, skip the expensive POST requests.
-    if (pagesForPush.length === 0) {
-      const newSyncTime = res.server_time ? new Date(res.server_time).getTime() : Date.now();
-      await adapter.setLastSyncTime(newSyncTime);
-      consecutiveFailures = 0;
-      setSyncStatus("synced");
-      console.log(
-        `[Sync/API] Completed (pull-only): pulled ${res.pages.length} pages, no local changes to push`,
-      );
+    if (await finishSyncIfNoPushNeeded(adapter, res, isInitialSync, localPageCount, pagesForPush)) {
       return;
     }
 
     const pushPages: PostSyncPageItem[] = pagesForPush.map(metadataToSyncPage);
-
-    // Collect links/ghost_links only for pages being pushed (not all pages).
     const allLinks: Array<{ sourceId: string; targetId: string; createdAt: number }> = [];
     const allGhostLinks: Array<GhostLink> = [];
     for (const p of pagesForPush) {
@@ -295,7 +341,6 @@ export async function syncWithApi(
       const ghosts = await adapter.getGhostLinks(p.id);
       allGhostLinks.push(...ghosts);
     }
-
     const pushLinks = allLinks.map((l) => ({
       source_id: l.sourceId,
       target_id: l.targetId,
@@ -309,37 +354,12 @@ export async function syncWithApi(
       original_note_id: g.originalNoteId ?? null,
     }));
 
-    // POST /api/sync/pages can time out with large page counts (Lambda 30s).
-    // Send pages in chunks, then send links/ghost_links once.
-    if (pushPages.length > PAGE_PUSH_CHUNK_SIZE) {
-      console.log(
-        `[Sync/API] Pushing ${pushPages.length} pages in chunks of ${PAGE_PUSH_CHUNK_SIZE}`,
-      );
-      for (let i = 0; i < pushPages.length; i += PAGE_PUSH_CHUNK_SIZE) {
-        const chunk = pushPages.slice(i, i + PAGE_PUSH_CHUNK_SIZE);
-        await api.postSyncPages({ pages: chunk });
-      }
-      await api.postSyncPages({
-        pages: [],
-        links: pushLinks,
-        ghost_links: pushGhostLinks,
-      });
-    } else {
-      await api.postSyncPages({
-        pages: pushPages,
-        links: pushLinks,
-        ghost_links: pushGhostLinks,
-      });
-    }
+    await pushPagesToApi(api, pushPages, pushLinks, pushGhostLinks);
 
     const newSyncTime = res.server_time ? new Date(res.server_time).getTime() : Date.now();
     await adapter.setLastSyncTime(newSyncTime);
-
-    consecutiveFailures = 0; // Reset on success
+    consecutiveFailures = 0;
     setSyncStatus("synced");
-    console.log(
-      `[Sync/API] Completed: pulled ${res.pages.length} pages, pushed ${pushPages.length} pages`,
-    );
   } catch (error) {
     consecutiveFailures++;
     console.error(

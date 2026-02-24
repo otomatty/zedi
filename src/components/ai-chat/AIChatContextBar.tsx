@@ -1,4 +1,3 @@
-import React from "react";
 import { Paperclip, ToggleLeft, ToggleRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAIChatStore } from "../../stores/aiChatStore";

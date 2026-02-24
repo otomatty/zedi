@@ -1,4 +1,3 @@
-import React from "react";
 import { Sparkles, GripVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAIChatContext } from "../../contexts/AIChatContext";

@@ -13,8 +13,6 @@ import type {
 } from "@/lib/collaboration/types";
 import { getUserColor } from "@/lib/collaboration/types";
 import { useAuth, useUser } from "@/hooks/useAuth";
-import type * as Y from "yjs";
-import type { Awareness } from "y-protocols/awareness";
 
 const LOCAL_USER_ID = "local-user";
 
@@ -111,6 +109,11 @@ export function useCollaboration({
     managerRef.current?.reconnect();
   }, []);
 
+  // URL 取り込みなどで initialContent 適用後に即時 Aurora 保存する
+  const flushSave = useCallback(() => {
+    managerRef.current?.flushSave();
+  }, []);
+
   const collaborationUser =
     enabled && effectiveUserId
       ? {
@@ -128,5 +131,6 @@ export function useCollaboration({
     updateCursor,
     updateSelection,
     reconnect,
+    flushSave,
   };
 }

@@ -2,11 +2,33 @@ import React, { useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import TiptapEditor from "../TiptapEditor";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
+import type { CollaborationConfig } from "../TiptapEditor/types";
 import { SourceUrlBadge } from "../SourceUrlBadge";
 import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
 import Container from "@/components/layout/Container";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import { PageTitleBlock } from "./PageTitleBlock";
+
+function getCollaborationState(collaboration: UseCollaborationReturn | undefined): {
+  useCollaborationMode: boolean;
+  collaborationConfig: CollaborationConfig | undefined;
+} {
+  const ready = Boolean(
+    collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.collaborationUser,
+  );
+  if (!ready || !collaboration) {
+    return { useCollaborationMode: false, collaborationConfig: undefined };
+  }
+  const config: CollaborationConfig = {
+    ydoc: collaboration.ydoc,
+    xmlFragment: collaboration.xmlFragment,
+    awareness: collaboration.awareness,
+    user: collaboration.collaborationUser,
+    updateCursor: collaboration.updateCursor,
+    updateSelection: collaboration.updateSelection,
+  };
+  return { useCollaborationMode: true, collaborationConfig: config };
+}
 
 interface PageEditorContentProps {
   content: string;
@@ -65,22 +87,9 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
     contentFocusRef.current?.();
   }, []);
 
-  // local モード（個人ページ）は awareness 不要。collaborative モードのみ awareness 必須。
-  const useCollaborationMode = Boolean(
-    collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.collaborationUser,
-  );
-
-  const collaborationConfig =
-    useCollaborationMode && collaboration
-      ? {
-          ydoc: collaboration.ydoc!,
-          xmlFragment: collaboration.xmlFragment!,
-          awareness: collaboration.awareness, // undefined in local mode
-          user: collaboration.collaborationUser!,
-          updateCursor: collaboration.updateCursor,
-          updateSelection: collaboration.updateSelection,
-        }
-      : undefined;
+  const { useCollaborationMode, collaborationConfig } = getCollaborationState(collaboration);
+  const showCollaborationLoading = Boolean(collaboration && !useCollaborationMode);
+  const showEditor = useCollaborationMode || !collaboration;
 
   return (
     <main className="flex-1 pb-32 pt-6">
@@ -98,13 +107,13 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
 
         {/* エディター（生成中はオーバーレイを表示） */}
         <div className="relative">
-          {collaboration && !useCollaborationMode && (
+          {showCollaborationLoading && (
             <div className="flex min-h-[200px] items-center justify-center text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin" />
               <span className="ml-2">リアルタイム編集を準備中...</span>
             </div>
           )}
-          {(useCollaborationMode || !collaboration) && (
+          {showEditor && (
             <>
               {isWikiGenerating && (
                 <div className="pointer-events-none absolute inset-0 z-10 rounded-md bg-background/30" />

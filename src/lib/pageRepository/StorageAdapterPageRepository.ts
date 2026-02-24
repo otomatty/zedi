@@ -46,7 +46,6 @@ export class StorageAdapterPageRepository {
   constructor(
     private adapter: StorageAdapter,
     private api: ApiClient,
-    private userId: string,
   ) {}
 
   async createPage(
@@ -55,27 +54,42 @@ export class StorageAdapterPageRepository {
     content: string = "",
     options?: CreatePageOptions,
   ): Promise<Page> {
+    if (userId === LOCAL_USER_ID) {
+      return this.createPageLocal(title, content, options);
+    }
+    return this.createPageRemote(title, content, options);
+  }
+
+  private async createPageLocal(
+    title: string,
+    content: string,
+    options?: CreatePageOptions,
+  ): Promise<Page> {
     const contentPreview = getPageListPreview(content);
     const now = Date.now();
+    const id = crypto.randomUUID();
+    const meta: PageMetadata = {
+      id,
+      ownerId: LOCAL_USER_ID,
+      sourcePageId: null,
+      title: title || null,
+      contentPreview: contentPreview || null,
+      thumbnailUrl: options?.thumbnailUrl ?? null,
+      sourceUrl: options?.sourceUrl ?? null,
+      createdAt: now,
+      updatedAt: now,
+      isDeleted: false,
+    };
+    await this.adapter.upsertPage(meta);
+    return metadataToPage(meta);
+  }
 
-    if (userId === LOCAL_USER_ID) {
-      const id = crypto.randomUUID();
-      const meta: PageMetadata = {
-        id,
-        ownerId: userId,
-        sourcePageId: null,
-        title: title || null,
-        contentPreview: contentPreview || null,
-        thumbnailUrl: options?.thumbnailUrl ?? null,
-        sourceUrl: options?.sourceUrl ?? null,
-        createdAt: now,
-        updatedAt: now,
-        isDeleted: false,
-      };
-      await this.adapter.upsertPage(meta);
-      return metadataToPage(meta);
-    }
-
+  private async createPageRemote(
+    title: string,
+    content: string,
+    options?: CreatePageOptions,
+  ): Promise<Page> {
+    const contentPreview = getPageListPreview(content);
     const created = await this.api.createPage({
       title: title || undefined,
       content_preview: contentPreview || undefined,
@@ -98,29 +112,29 @@ export class StorageAdapterPageRepository {
     return metadataToPage(meta);
   }
 
-  async getPage(userId: string, pageId: string): Promise<Page | null> {
+  async getPage(_userId: string, pageId: string): Promise<Page | null> {
     const m = await this.adapter.getPage(pageId);
     return m ? metadataToPage(m) : null;
   }
 
-  async getPages(userId: string): Promise<Page[]> {
+  async getPages(_userId: string): Promise<Page[]> {
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPage);
   }
 
-  async getPagesSummary(userId: string): Promise<PageSummary[]> {
+  async getPagesSummary(_userId: string): Promise<PageSummary[]> {
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPageSummary);
   }
 
-  async getPagesByIds(userId: string, pageIds: string[]): Promise<Page[]> {
+  async getPagesByIds(_userId: string, pageIds: string[]): Promise<Page[]> {
     if (pageIds.length === 0) return [];
     const list = await this.adapter.getAllPages();
     const idSet = new Set(pageIds);
     return list.filter((m) => idSet.has(m.id)).map(metadataToPage);
   }
 
-  async getPageByTitle(userId: string, title: string): Promise<Page | null> {
+  async getPageByTitle(_userId: string, title: string): Promise<Page | null> {
     const trimmed = title.trim();
     if (!trimmed) return null;
     const list = await this.adapter.getAllPages();
@@ -129,7 +143,7 @@ export class StorageAdapterPageRepository {
   }
 
   async checkDuplicateTitle(
-    userId: string,
+    _userId: string,
     title: string,
     excludePageId?: string,
   ): Promise<Page | null> {
@@ -143,7 +157,7 @@ export class StorageAdapterPageRepository {
   }
 
   async updatePage(
-    userId: string,
+    _userId: string,
     pageId: string,
     updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>,
   ): Promise<void> {
@@ -179,7 +193,7 @@ export class StorageAdapterPageRepository {
     }
   }
 
-  async searchPages(userId: string, query: string): Promise<Page[]> {
+  async searchPages(_userId: string, query: string): Promise<Page[]> {
     const results = await this.adapter.searchPages(query);
     const pages: Page[] = [];
     for (const r of results) {
@@ -214,7 +228,7 @@ export class StorageAdapterPageRepository {
     return links.map((l) => l.sourceId);
   }
 
-  async getLinks(userId: string): Promise<Link[]> {
+  async getLinks(_userId: string): Promise<Link[]> {
     const pages = await this.adapter.getAllPages();
     const all: Link[] = [];
     for (const p of pages) {
@@ -252,7 +266,7 @@ export class StorageAdapterPageRepository {
     return sources;
   }
 
-  async getGhostLinks(userId: string): Promise<GhostLink[]> {
+  async getGhostLinks(_userId: string): Promise<GhostLink[]> {
     const pages = await this.adapter.getAllPages();
     const all: GhostLink[] = [];
     for (const p of pages) {

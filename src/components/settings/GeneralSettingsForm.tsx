@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,21 +28,198 @@ import { toast } from "@/components/ui/sonner";
 import { useTranslation } from "react-i18next";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 
+interface GeneralSettingsProfileCardProps {
+  profile: { displayName?: string; avatarUrl?: string };
+  avatarUrl: string | undefined;
+  displayName: string | undefined;
+  updateProfileAndSave: (updates: { displayName?: string; avatarUrl?: string }) => void;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  onAvatarFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+function GeneralSettingsProfileCard({
+  profile,
+  avatarUrl,
+  displayName,
+  updateProfileAndSave,
+  fileInputRef,
+  onAvatarFileChange,
+}: GeneralSettingsProfileCardProps) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("generalSettings.profile.title")}</CardTitle>
+        <CardDescription>{t("generalSettings.profile.description")}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="displayName">{t("generalSettings.profile.displayName")}</Label>
+          <Input
+            id="displayName"
+            value={profile.displayName ?? ""}
+            onChange={(e) => updateProfileAndSave({ displayName: e.target.value })}
+            placeholder={t("generalSettings.profile.displayNamePlaceholder")}
+            maxLength={100}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("generalSettings.profile.displayNameHelp")}
+          </p>
+        </div>
+        <div className="space-y-3">
+          <Label>{t("generalSettings.profile.avatar")}</Label>
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={profile.avatarUrl || avatarUrl} alt={displayName} />
+              <AvatarFallback className="text-lg">{displayName?.charAt(0) ?? "U"}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {t("generalSettings.profile.avatarUpload")}
+              </Button>
+              {profile.avatarUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => updateProfileAndSave({ avatarUrl: "" })}
+                >
+                  {t("generalSettings.profile.avatarRemove")}
+                </Button>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={onAvatarFileChange}
+              className="hidden"
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface GeneralSettingsDisplayCardsProps {
+  settings: { theme: ThemeMode; editorFontSize: EditorFontSize; locale: UILocale };
+  updateTheme: (v: ThemeMode) => void;
+  updateEditorFontSize: (v: EditorFontSize) => void;
+  updateLocale: (v: UILocale) => void;
+  onRunTourAgain: () => void;
+}
+
+function GeneralSettingsDisplayCards({
+  settings,
+  updateTheme,
+  updateEditorFontSize,
+  updateLocale,
+  onRunTourAgain,
+}: GeneralSettingsDisplayCardsProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("generalSettings.display.title")}</CardTitle>
+          <CardDescription>{t("generalSettings.display.description")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="theme">{t("generalSettings.theme.label")}</Label>
+            <Select value={settings.theme} onValueChange={(v) => updateTheme(v as ThemeMode)}>
+              <SelectTrigger id="theme" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {THEME_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {t(`generalSettings.theme.${opt.value}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="fontSize">{t("generalSettings.fontSize.label")}</Label>
+            <Select
+              value={settings.editorFontSize}
+              onValueChange={(v) => updateEditorFontSize(v as EditorFontSize)}
+            >
+              <SelectTrigger id="fontSize" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_SIZE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {t(`generalSettings.fontSize.${opt.value}`)} ({opt.px}px)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Compass className="h-5 w-5" />
+            {t("generalSettings.tour.title")}
+          </CardTitle>
+          <CardDescription>{t("generalSettings.tour.description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={onRunTourAgain}>
+            {t("generalSettings.tour.runAgain")}
+          </Button>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("generalSettings.language.title")}</CardTitle>
+          <CardDescription>{t("generalSettings.language.description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="locale">{t("generalSettings.language.label")}</Label>
+            <Select value={settings.locale} onValueChange={(v) => updateLocale(v as UILocale)}>
+              <SelectTrigger id="locale" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LOCALE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
 export const GeneralSettingsForm: React.FC = () => {
   const {
     settings,
     isLoading: isGeneralLoading,
-    isSaving: isGeneralSaving,
     updateTheme,
     updateEditorFontSize,
     updateLocale,
-    save: saveGeneral,
   } = useGeneralSettings();
 
   const {
     profile,
     isLoading: isProfileLoading,
-    isSaving: isProfileSaving,
     updateProfile,
     save: saveProfile,
     displayName,
@@ -53,6 +230,7 @@ export const GeneralSettingsForm: React.FC = () => {
   const navigate = useNavigate();
   const { isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarObjectUrlRef = useRef<string | null>(null);
 
   const handleRunTourAgain = useCallback(() => {
     navigate("/home", { state: { startTour: true } });
@@ -80,13 +258,28 @@ export const GeneralSettingsForm: React.FC = () => {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // ローカルプレビュー用に Object URL を使用
-      // 実際の運用ではストレージにアップロードして URL を取得する
+      if (profile.avatarUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(profile.avatarUrl);
+      }
+      if (avatarObjectUrlRef.current) {
+        URL.revokeObjectURL(avatarObjectUrlRef.current);
+        avatarObjectUrlRef.current = null;
+      }
       const objectUrl = URL.createObjectURL(file);
+      avatarObjectUrlRef.current = objectUrl;
       updateProfileAndSave({ avatarUrl: objectUrl });
     },
-    [updateProfileAndSave],
+    [updateProfileAndSave, profile.avatarUrl],
   );
+
+  useEffect(() => {
+    return () => {
+      if (avatarObjectUrlRef.current) {
+        URL.revokeObjectURL(avatarObjectUrlRef.current);
+        avatarObjectUrlRef.current = null;
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -98,159 +291,24 @@ export const GeneralSettingsForm: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* プロフィール設定（先頭） — サインイン時のみ表示 */}
       {isSignedIn && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("generalSettings.profile.title")}</CardTitle>
-            <CardDescription>{t("generalSettings.profile.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* アカウント名 */}
-            <div className="space-y-2">
-              <Label htmlFor="displayName">{t("generalSettings.profile.displayName")}</Label>
-              <Input
-                id="displayName"
-                value={profile.displayName}
-                onChange={(e) => updateProfileAndSave({ displayName: e.target.value })}
-                placeholder={t("generalSettings.profile.displayNamePlaceholder")}
-                maxLength={100}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("generalSettings.profile.displayNameHelp")}
-              </p>
-            </div>
-
-            {/* サムネイル */}
-            <div className="space-y-3">
-              <Label>{t("generalSettings.profile.avatar")}</Label>
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={profile.avatarUrl || avatarUrl} alt={displayName} />
-                  <AvatarFallback className="text-lg">
-                    {displayName?.charAt(0) ?? "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {t("generalSettings.profile.avatarUpload")}
-                  </Button>
-                  {profile.avatarUrl && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() => updateProfileAndSave({ avatarUrl: "" })}
-                    >
-                      {t("generalSettings.profile.avatarRemove")}
-                    </Button>
-                  )}
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarFileChange}
-                  className="hidden"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <GeneralSettingsProfileCard
+          profile={profile}
+          avatarUrl={avatarUrl}
+          displayName={displayName}
+          updateProfileAndSave={updateProfileAndSave}
+          fileInputRef={fileInputRef}
+          onAvatarFileChange={handleAvatarFileChange}
+        />
       )}
 
-      {/* 表示設定: テーマ + フォントサイズ */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("generalSettings.display.title")}</CardTitle>
-          <CardDescription>{t("generalSettings.display.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* テーマ */}
-          <div className="space-y-2">
-            <Label htmlFor="theme">{t("generalSettings.theme.label")}</Label>
-            <Select value={settings.theme} onValueChange={(v) => updateTheme(v as ThemeMode)}>
-              <SelectTrigger id="theme" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {THEME_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {t(`generalSettings.theme.${opt.value}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* フォントサイズ */}
-          <div className="space-y-2">
-            <Label htmlFor="fontSize">{t("generalSettings.fontSize.label")}</Label>
-            <Select
-              value={settings.editorFontSize}
-              onValueChange={(v) => updateEditorFontSize(v as EditorFontSize)}
-            >
-              <SelectTrigger id="fontSize" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_SIZE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {t(`generalSettings.fontSize.${opt.value}`)} ({opt.px}px)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* クイックツアー */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Compass className="h-5 w-5" />
-            {t("generalSettings.tour.title")}
-          </CardTitle>
-          <CardDescription>{t("generalSettings.tour.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={handleRunTourAgain}>
-            {t("generalSettings.tour.runAgain")}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* 言語設定 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("generalSettings.language.title")}</CardTitle>
-          <CardDescription>{t("generalSettings.language.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="locale">{t("generalSettings.language.label")}</Label>
-            <Select value={settings.locale} onValueChange={(v) => updateLocale(v as UILocale)}>
-              <SelectTrigger id="locale" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LOCALE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <GeneralSettingsDisplayCards
+        settings={settings}
+        updateTheme={updateTheme}
+        updateEditorFontSize={updateEditorFontSize}
+        updateLocale={updateLocale}
+        onRunTourAgain={handleRunTourAgain}
+      />
     </div>
   );
 };

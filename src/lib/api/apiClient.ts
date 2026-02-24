@@ -54,6 +54,41 @@ const MAX_DB_RESUMING_RETRIES = 4;
 /** Default wait time (ms) when Retry-After header is absent. */
 const DEFAULT_RETRY_AFTER_MS = 10_000;
 
+function parseResponseText(text: string, status: number): unknown {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    const snippet = text.length > 200 ? text.slice(0, 200) + "…" : text;
+    throw new ApiError(
+      `Invalid JSON response (HTTP ${status}): ${snippet}`,
+      status,
+      "INVALID_JSON",
+    );
+  }
+}
+
+function throwOnErrorResponse(data: unknown, res: Response): never {
+  const envelope = data as ApiEnvelope<unknown> | null;
+  const legacy = data as { message?: string; code?: string } | null;
+  const msg = envelope?.error?.message ?? legacy?.message ?? res.statusText;
+  const code = envelope?.error?.code ?? legacy?.code;
+  throw new ApiError(msg, res.status, code);
+}
+
+function unwrapEnvelope<T>(data: unknown): T {
+  const envelope = data as ApiEnvelope<T> | null;
+  if (
+    envelope &&
+    typeof envelope === "object" &&
+    "ok" in envelope &&
+    envelope.ok === true &&
+    "data" in envelope
+  ) {
+    return envelope.data as T;
+  }
+  return data as T;
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -87,7 +122,6 @@ async function request<T>(
     try {
       res = await fetch(url.toString(), init);
     } catch (networkError) {
-      // Network-level failures (CORS blocked, DNS failure, offline, etc.)
       throw new ApiError(
         `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
         0,
@@ -95,15 +129,9 @@ async function request<T>(
       );
     }
 
-    // ── 503 + DATABASE_RESUMING → auto-retry with Retry-After ──
     if (res.status === 503 && attempt < MAX_DB_RESUMING_RETRIES) {
       const retryAfterSec = parseInt(res.headers.get("Retry-After") ?? "", 10);
       const waitMs = retryAfterSec > 0 ? retryAfterSec * 1000 : DEFAULT_RETRY_AFTER_MS;
-      console.log(
-        `[API] 503 Database resuming (attempt ${attempt + 1}/${MAX_DB_RESUMING_RETRIES}), ` +
-          `retrying in ${waitMs / 1000}s…`,
-      );
-      // Notify UI so SyncIndicator can show "DB starting…"
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("zedi:db-resuming", {
@@ -116,43 +144,13 @@ async function request<T>(
     }
 
     const text = await res.text();
-    let data: unknown;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      // Response was not valid JSON — log a snippet for debugging
-      const snippet = text.length > 200 ? text.slice(0, 200) + "…" : text;
-      throw new ApiError(
-        `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
-        res.status,
-        "INVALID_JSON",
-      );
-    }
+    const data = parseResponseText(text, res.status);
     if (!res.ok) {
-      const envelope = data as ApiEnvelope<unknown> | null;
-      const legacy = data as { message?: string; code?: string } | null;
-      const msg = envelope?.error?.message ?? legacy?.message ?? res.statusText;
-      const code = envelope?.error?.code ?? legacy?.code;
-      throw new ApiError(msg, res.status, code);
+      throwOnErrorResponse(data, res);
     }
-
-    // Server success responses are wrapped as { ok: true, data: ... }.
-    const envelope = data as ApiEnvelope<T> | null;
-    if (
-      envelope &&
-      typeof envelope === "object" &&
-      "ok" in envelope &&
-      envelope.ok === true &&
-      "data" in envelope
-    ) {
-      return envelope.data as T;
-    }
-
-    // Backward compatibility: if server returns raw payload, keep accepting it.
-    return data as T;
+    return unwrapEnvelope<T>(data);
   }
 
-  // All retries exhausted (503 persisted)
   throw new ApiError("Database is still resuming after retries", 503, "DATABASE_RESUMING");
 }
 
@@ -189,35 +187,11 @@ async function requestOptionalAuth<T>(
     );
   }
   const text = await res.text();
-  let data: unknown;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    const snippet = text.length > 200 ? text.slice(0, 200) + "…" : text;
-    throw new ApiError(
-      `Invalid JSON response (HTTP ${res.status}): ${snippet}`,
-      res.status,
-      "INVALID_JSON",
-    );
-  }
+  const data = parseResponseText(text, res.status);
   if (!res.ok) {
-    const envelope = data as ApiEnvelope<unknown> | null;
-    const legacy = data as { message?: string; code?: string } | null;
-    const msg = envelope?.error?.message ?? legacy?.message ?? res.statusText;
-    const code = envelope?.error?.code ?? legacy?.code;
-    throw new ApiError(msg, res.status, code);
+    throwOnErrorResponse(data, res);
   }
-  const envelope = data as ApiEnvelope<T> | null;
-  if (
-    envelope &&
-    typeof envelope === "object" &&
-    "ok" in envelope &&
-    envelope.ok === true &&
-    "data" in envelope
-  ) {
-    return envelope.data as T;
-  }
-  return data as T;
+  return unwrapEnvelope<T>(data);
 }
 
 export function createApiClient(options?: Partial<ApiClientOptions>) {

@@ -258,6 +258,155 @@ async function callAIWithServerWS(
   });
 }
 
+/** SSE 1行（data: ペイロード）を処理し、ストリーム完了なら true を返す */
+function processSSEDataLine(
+  payload: string,
+  state: { fullContent: string; finishReason?: string; lastUsage?: AIResponseUsage },
+  callbacks: AIServiceCallbacks,
+): boolean {
+  const data = JSON.parse(payload) as {
+    content?: string;
+    done?: boolean;
+    finishReason?: string;
+    error?: string;
+    usage?: AIResponseUsage;
+  };
+  if (data.error) {
+    throw new Error(data.error);
+  }
+  if (data.content) {
+    state.fullContent += data.content;
+    callbacks.onChunk?.(data.content);
+  }
+  if (data.usage) {
+    state.lastUsage = data.usage;
+    callbacks.onUsageUpdate?.(data.usage);
+  }
+  if (data.done) {
+    state.finishReason = data.finishReason;
+    callbacks.onComplete?.({
+      content: state.fullContent,
+      finishReason: state.finishReason,
+      usage: state.lastUsage,
+    });
+    return true;
+  }
+  return false;
+}
+
+/** HTTP ストリーミングレスポンスを SSE として読み、onComplete まで処理する */
+async function consumeSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  state: { fullContent: string; finishReason?: string; lastUsage?: AIResponseUsage },
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    if (abortSignal?.aborted) {
+      throw new Error("ABORTED");
+    }
+
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (!line.startsWith("data:")) {
+        newlineIndex = buffer.indexOf("\n");
+        continue;
+      }
+      const payload = line.slice(5).trim();
+      if (!payload) {
+        newlineIndex = buffer.indexOf("\n");
+        continue;
+      }
+      if (processSSEDataLine(payload, state, callbacks)) {
+        return;
+      }
+
+      newlineIndex = buffer.indexOf("\n");
+    }
+  }
+}
+
+async function fetchAIChatResponse(
+  request: AIServiceRequest,
+  abortSignal?: AbortSignal,
+): Promise<Response> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    throw new Error("AI APIサーバーのURLが設定されていません");
+  }
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+  const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      provider: request.provider,
+      model: request.model,
+      messages: request.messages,
+      options: request.options,
+    }),
+    signal: abortSignal,
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    const message = errorBody?.error || response.statusText || "AI API呼び出しエラー";
+    throw new Error(message);
+  }
+  return response;
+}
+
+async function handleAIChatHttpResponse(
+  response: Response,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  if (request.options?.stream) {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("ストリーミングレスポンスが取得できません");
+    }
+    const state = {
+      fullContent: "",
+      finishReason: undefined as string | undefined,
+      lastUsage: undefined as AIResponseUsage | undefined,
+    };
+    await consumeSSEStream(reader, state, callbacks, abortSignal);
+    if (state.fullContent) {
+      callbacks.onComplete?.({
+        content: state.fullContent,
+        finishReason: state.finishReason,
+        usage: state.lastUsage,
+      });
+    }
+    return;
+  }
+  const data = (await response.json()) as AIServiceResponse;
+  if (data.usage) {
+    callbacks.onUsageUpdate?.(data.usage);
+  }
+  callbacks.onComplete?.({
+    content: data.content ?? "",
+    finishReason: data.finishReason,
+    usage: data.usage,
+  });
+}
+
 /**
  * HTTP API経由の呼び出し（フォールバック、非ストリーミング）
  */
@@ -267,130 +416,74 @@ async function callAIWithServerHTTP(
   abortSignal?: AbortSignal,
 ): Promise<void> {
   try {
-    const apiBaseUrl = getAIAPIBaseUrl();
-    if (!apiBaseUrl) {
-      throw new Error("AI APIサーバーのURLが設定されていません");
-    }
-
-    const token = await getAuthToken();
-    if (!token) {
-      throw new Error("AUTH_REQUIRED");
-    }
-
-    const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        provider: request.provider,
-        model: request.model,
-        messages: request.messages,
-        options: request.options,
-      }),
-      signal: abortSignal,
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => null);
-      const message = errorBody?.error || response.statusText || "AI API呼び出しエラー";
-      throw new Error(message);
-    }
-
-    if (request.options?.stream) {
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("ストリーミングレスポンスが取得できません");
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullContent = "";
-      let finishReason: string | undefined;
-      let lastUsage: AIResponseUsage | undefined;
-
-      while (true) {
-        if (abortSignal?.aborted) {
-          throw new Error("ABORTED");
-        }
-
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        let newlineIndex = buffer.indexOf("\n");
-        while (newlineIndex !== -1) {
-          const line = buffer.slice(0, newlineIndex).trim();
-          buffer = buffer.slice(newlineIndex + 1);
-
-          if (line.startsWith("data:")) {
-            const payload = line.slice(5).trim();
-            if (!payload) {
-              newlineIndex = buffer.indexOf("\n");
-              continue;
-            }
-
-            const data = JSON.parse(payload) as {
-              content?: string;
-              done?: boolean;
-              finishReason?: string;
-              error?: string;
-              usage?: AIResponseUsage;
-            };
-
-            if (data.error) {
-              throw new Error(data.error);
-            }
-
-            if (data.content) {
-              fullContent += data.content;
-              callbacks.onChunk?.(data.content);
-            }
-
-            // Usage info from the server (sent with final chunk)
-            if (data.usage) {
-              lastUsage = data.usage;
-              callbacks.onUsageUpdate?.(data.usage);
-            }
-
-            if (data.done) {
-              finishReason = data.finishReason;
-              callbacks.onComplete?.({
-                content: fullContent,
-                finishReason,
-                usage: lastUsage,
-              });
-              return;
-            }
-          }
-
-          newlineIndex = buffer.indexOf("\n");
-        }
-      }
-
-      if (fullContent) {
-        callbacks.onComplete?.({
-          content: fullContent,
-          finishReason,
-          usage: lastUsage,
-        });
-      }
-      return;
-    }
-
-    const data = (await response.json()) as AIServiceResponse;
-    if (data.usage) {
-      callbacks.onUsageUpdate?.(data.usage);
-    }
-    callbacks.onComplete?.({
-      content: data.content ?? "",
-      finishReason: data.finishReason,
-      usage: data.usage,
-    });
+    const response = await fetchAIChatResponse(request, abortSignal);
+    await handleAIChatHttpResponse(response, request, callbacks, abortSignal);
   } catch (error) {
     callbacks.onError?.(error instanceof Error ? error : new Error("AI API呼び出しエラー"));
   }
+}
+
+async function callOpenAIStream(
+  client: OpenAI,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const stream = await client.chat.completions.create(
+    {
+      model: request.model,
+      messages: request.messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      max_tokens: request.options?.maxTokens ?? 4000,
+      temperature: request.options?.temperature ?? 0.7,
+      stream: true,
+      web_search_options: request.options?.webSearchOptions,
+    },
+    { signal: abortSignal },
+  );
+  let fullContent = "";
+  for await (const chunk of stream) {
+    if (abortSignal?.aborted) {
+      throw new Error("ABORTED");
+    }
+    const content = chunk.choices[0]?.delta?.content || "";
+    if (content) {
+      fullContent += content;
+      callbacks.onChunk?.(content);
+    }
+  }
+  callbacks.onComplete?.({
+    content: fullContent,
+    finishReason: "stop",
+  });
+}
+
+async function callOpenAINonStream(
+  client: OpenAI,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const response = await client.chat.completions.create(
+    {
+      model: request.model,
+      messages: request.messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      max_tokens: request.options?.maxTokens ?? 4000,
+      temperature: request.options?.temperature ?? 0.7,
+      stream: false,
+    },
+    { signal: abortSignal },
+  );
+  const content = response.choices[0]?.message?.content || "";
+  callbacks.onComplete?.({
+    content,
+    finishReason: response.choices[0]?.finish_reason,
+  });
 }
 
 /**
@@ -406,63 +499,10 @@ async function callOpenAI(
     apiKey: settings.apiKey,
     dangerouslyAllowBrowser: true,
   });
-
   if (request.options?.stream) {
-    // ストリーミング処理
-    const stream = await client.chat.completions.create(
-      {
-        model: request.model,
-        messages: request.messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        max_tokens: request.options.maxTokens ?? 4000,
-        temperature: request.options.temperature ?? 0.7,
-        stream: true,
-        web_search_options: request.options.webSearchOptions,
-      },
-      { signal: abortSignal },
-    );
-
-    let fullContent = "";
-
-    for await (const chunk of stream) {
-      if (abortSignal?.aborted) {
-        throw new Error("ABORTED");
-      }
-
-      const content = chunk.choices[0]?.delta?.content || "";
-      if (content) {
-        fullContent += content;
-        callbacks.onChunk?.(content);
-      }
-    }
-
-    callbacks.onComplete?.({
-      content: fullContent,
-      finishReason: "stop",
-    });
+    await callOpenAIStream(client, request, callbacks, abortSignal);
   } else {
-    // 非ストリーミング処理
-    const response = await client.chat.completions.create(
-      {
-        model: request.model,
-        messages: request.messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        max_tokens: request.options?.maxTokens ?? 4000,
-        temperature: request.options?.temperature ?? 0.7,
-        stream: false,
-      },
-      { signal: abortSignal },
-    );
-
-    const content = response.choices[0]?.message?.content || "";
-    callbacks.onComplete?.({
-      content,
-      finishReason: response.choices[0]?.finish_reason,
-    });
+    await callOpenAINonStream(client, request, callbacks, abortSignal);
   }
 }
 

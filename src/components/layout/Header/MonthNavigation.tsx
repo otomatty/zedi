@@ -25,7 +25,7 @@ function parseMonthParam(search: string): string | null {
   const params = new URLSearchParams(search);
   const month = params.get("month");
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return null;
-  const [y, m] = month.split("-").map(Number);
+  const [, m] = month.split("-").map(Number);
   if (m < 1 || m > 12) return null;
   return month;
 }

@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { Editor } from "@tiptap/react";
 import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
 import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
-import { debugGroupEnd } from "@/lib/debugUtils";
 
 interface UseWikiLinkStatusSyncOptions {
   editor: Editor | null;
@@ -79,8 +78,6 @@ export function useWikiLinkStatusSync({
         const json = JSON.stringify(editor.getJSON());
         onChange(json);
       }
-
-      debugGroupEnd();
     };
 
     // コンテンツ反映を待ってから実行

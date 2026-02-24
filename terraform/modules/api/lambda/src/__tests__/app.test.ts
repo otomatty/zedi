@@ -111,12 +111,6 @@ describe("Hono Unified API", () => {
   // ── Auth required routes ──────────────────────────────────────────────────
   describe("Auth enforcement", () => {
     it("GET /api/users/:id should require auth (401 without token)", async () => {
-      const mockEvent = {
-        requestContext: {
-          http: { method: "GET", path: "/api/users/test-id" },
-        },
-      };
-
       const res = await app.request("/api/users/test-id", {
         method: "GET",
       });

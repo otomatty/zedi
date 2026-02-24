@@ -28,12 +28,9 @@ app.get("/:id/content", authRequired, async (c) => {
     .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
     .limit(1);
 
-  if (!page.length) {
-    throw new HTTPException(404, { message: "Page not found" });
-  }
-  if (page[0]!.ownerId !== userId) {
-    throw new HTTPException(403, { message: "Forbidden" });
-  }
+  const pageRow = page[0];
+  if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
+  if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
   // コンテンツ取得
   const content = await db
@@ -42,12 +39,8 @@ app.get("/:id/content", authRequired, async (c) => {
     .where(eq(pageContents.pageId, pageId))
     .limit(1);
 
-  if (!content.length) {
-    return c.json({ content: null, version: 0 });
-  }
-
-  // ydoc_state を base64 で返す
-  const row = content[0]!;
+  const row = content[0];
+  if (!row) throw new HTTPException(404, { message: "Page content not found" });
   const ydocBase64 =
     row.ydocState instanceof Buffer
       ? row.ydocState.toString("base64")
@@ -56,7 +49,7 @@ app.get("/:id/content", authRequired, async (c) => {
         : Buffer.from(row.ydocState as unknown as ArrayBufferLike).toString("base64");
 
   return c.json({
-    content: ydocBase64,
+    ydoc_state: ydocBase64,
     version: row.version,
     content_text: row.contentText,
     updated_at: row.updatedAt?.toISOString(),
@@ -70,14 +63,14 @@ app.put("/:id/content", authRequired, async (c) => {
   const db = c.get("db");
 
   const body = await c.req.json<{
-    content: string; // base64-encoded Y.Doc
+    ydoc_state: string; // base64-encoded Y.Doc state
     expected_version?: number;
     content_text?: string;
     title?: string;
   }>();
 
-  if (!body.content) {
-    throw new HTTPException(400, { message: "content is required" });
+  if (!body.ydoc_state) {
+    throw new HTTPException(400, { message: "ydoc_state is required" });
   }
 
   // ページ所有者確認
@@ -87,14 +80,11 @@ app.put("/:id/content", authRequired, async (c) => {
     .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
     .limit(1);
 
-  if (!page.length) {
-    throw new HTTPException(404, { message: "Page not found" });
-  }
-  if (page[0]!.ownerId !== userId) {
-    throw new HTTPException(403, { message: "Forbidden" });
-  }
+  const pageRow = page[0];
+  if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
+  if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
-  const ydocBuffer = Buffer.from(body.content, "base64");
+  const ydocBuffer = Buffer.from(body.ydoc_state, "base64");
 
   // UPSERT page_contents with optimistic locking
   if (body.expected_version != null) {
@@ -123,7 +113,9 @@ app.put("/:id/content", authRequired, async (c) => {
       });
     }
 
-    // ページタイトルを更新
+    const updatedRow = updated[0];
+    if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
+
     if (body.title !== undefined) {
       await db
         .update(pages)
@@ -131,7 +123,7 @@ app.put("/:id/content", authRequired, async (c) => {
         .where(eq(pages.id, pageId));
     }
 
-    return c.json({ version: updated[0]!.version });
+    return c.json({ version: updatedRow.version ?? 0 });
   }
 
   // No optimistic locking: UPSERT
@@ -161,7 +153,9 @@ app.put("/:id/content", authRequired, async (c) => {
       .where(eq(pages.id, pageId));
   }
 
-  return c.json({ version: result[0]!.version });
+  const resultRow = result[0];
+  if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
+  return c.json({ version: resultRow.version });
 });
 
 // ── POST /pages ─────────────────────────────────────────────────────────────
@@ -171,8 +165,10 @@ app.post("/", authRequired, async (c) => {
 
   const body = await c.req.json<{
     title?: string;
+    content_preview?: string;
     source_page_id?: string;
     source_url?: string;
+    thumbnail_url?: string | null;
   }>();
 
   const result = await db
@@ -180,12 +176,15 @@ app.post("/", authRequired, async (c) => {
     .values({
       ownerId: userId,
       title: body.title ?? null,
+      contentPreview: body.content_preview ?? null,
       sourcePageId: body.source_page_id ?? null,
       sourceUrl: body.source_url ?? null,
+      thumbnailUrl: body.thumbnail_url ?? null,
     })
     .returning();
 
-  const row = result[0]!;
+  const row = result[0];
+  if (!row) throw new HTTPException(500, { message: "Insert failed" });
   return c.json(
     {
       id: row.id,
@@ -215,12 +214,9 @@ app.delete("/:id", authRequired, async (c) => {
     .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
     .limit(1);
 
-  if (!page.length) {
-    throw new HTTPException(404, { message: "Page not found" });
-  }
-  if (page[0]!.ownerId !== userId) {
-    throw new HTTPException(403, { message: "Forbidden" });
-  }
+  const pageRow = page[0];
+  if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
+  if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
   await db
     .update(pages)

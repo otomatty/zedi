@@ -46,8 +46,11 @@ export async function execute<T = Record<string, unknown>>(
   params: Record<string, unknown> = {},
   env?: EnvConfig,
 ): Promise<T[]> {
-  const resourceArn = env?.AURORA_CLUSTER_ARN ?? process.env.AURORA_CLUSTER_ARN!;
-  const secretArn = env?.DB_CREDENTIALS_SECRET ?? process.env.DB_CREDENTIALS_SECRET!;
+  const resourceArn = env?.AURORA_CLUSTER_ARN ?? process.env.AURORA_CLUSTER_ARN;
+  const secretArn = env?.DB_CREDENTIALS_SECRET ?? process.env.DB_CREDENTIALS_SECRET;
+  if (!resourceArn || !secretArn) {
+    throw new Error("AURORA_CLUSTER_ARN and DB_CREDENTIALS_SECRET are required");
+  }
   const database = env?.AURORA_DATABASE_NAME ?? process.env.AURORA_DATABASE_NAME ?? "zedi";
 
   const parameters = Object.entries(params).map(([name, value]) => toParameter(name, value));

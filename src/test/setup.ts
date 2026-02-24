@@ -27,7 +27,6 @@ global.ResizeObserver = class ResizeObserver {
   observe = vi.fn();
   unobserve = vi.fn();
   disconnect = vi.fn();
-  constructor(_callback: ResizeObserverCallback) {}
 };
 
 // Mock IntersectionObserver (constructor として new されるため class で定義)
@@ -39,5 +38,4 @@ global.IntersectionObserver = class IntersectionObserver {
   unobserve = vi.fn();
   disconnect = vi.fn();
   takeRecords = vi.fn().mockReturnValue([]);
-  constructor(_callback: IntersectionObserverCallback) {}
 };

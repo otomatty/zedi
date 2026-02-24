@@ -86,7 +86,9 @@ export async function* streamOpenAI(
     throw new Error(`OpenAI API failed: ${res.status} - ${text}`);
   }
 
-  yield* parseSSEStream(res.body!, (raw) => {
+  const streamBody = res.body;
+  if (!streamBody) throw new Error("OpenAI API response has no body");
+  yield* parseSSEStream(streamBody, (raw) => {
     const data = JSON.parse(raw) as {
       choices: Array<{ delta: { content?: string }; finish_reason?: string | null }>;
     };
@@ -187,7 +189,9 @@ export async function* streamAnthropic(
     throw new Error(`Anthropic API failed: ${res.status} - ${text}`);
   }
 
-  yield* parseSSEStream(res.body!, (raw) => {
+  const streamBody = res.body;
+  if (!streamBody) throw new Error("Anthropic API response has no body");
+  yield* parseSSEStream(streamBody, (raw) => {
     const event = JSON.parse(raw) as {
       type: string;
       delta?: { text?: string; stop_reason?: string };
@@ -326,7 +330,9 @@ export async function* streamGoogle(
     throw new Error(`Google AI API failed: ${res.status} - ${text}`);
   }
 
-  yield* parseSSEStream(res.body!, (raw) => {
+  const streamBody = res.body;
+  if (!streamBody) throw new Error("Google AI API response has no body");
+  yield* parseSSEStream(streamBody, (raw) => {
     const data = JSON.parse(raw) as {
       candidates?: Array<{
         content?: { parts?: Array<{ text?: string }> };
@@ -346,6 +352,17 @@ export async function* streamGoogle(
 }
 
 // ── SSE ストリームパーサー (共通) ───────────────────────────────────────────
+
+function tryParseSSELine<T>(line: string, parse: (raw: string) => T | null): T | null {
+  if (!line.startsWith("data:")) return null;
+  const payload = line.slice(5).trim();
+  if (!payload || payload === "[DONE]") return null;
+  try {
+    return parse(payload);
+  } catch {
+    return null;
+  }
+}
 
 async function* parseSSEStream<T>(
   body: ReadableStream<Uint8Array>,
@@ -367,17 +384,9 @@ async function* parseSSEStream<T>(
         const line = buffer.slice(0, newlineIndex).trim();
         buffer = buffer.slice(newlineIndex + 1);
 
-        if (line.startsWith("data:")) {
-          const payload = line.slice(5).trim();
-          if (payload && payload !== "[DONE]") {
-            try {
-              const result = parse(payload);
-              if (result) yield result;
-            } catch {
-              // skip invalid JSON
-            }
-          }
-        }
+        const result = tryParseSSELine(line, parse);
+        if (result) yield result;
+
         newlineIndex = buffer.indexOf("\n");
       }
     }

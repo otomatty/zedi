@@ -36,7 +36,6 @@ test.describe("Page Editor", () => {
       await page.waitForTimeout(1500);
 
       // Verify title persists after reload
-      const currentUrl = page.url();
       await page.reload();
       await page.waitForLoadState("networkidle");
 

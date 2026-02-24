@@ -523,7 +523,6 @@ async function fetchPageContents(
   const out: PageContentRow[] = [];
   for (let i = 0; i < pageIds.length; i += BATCH_PAGE_CONTENTS) {
     const batch = pageIds.slice(i, i + BATCH_PAGE_CONTENTS);
-    const placeholders = batch.map((_, j) => `:id${j}`).join(",");
     const params: Record<string, unknown> = {};
     batch.forEach((id, j) => (params[`id${j}`] = id));
     const sql = `SELECT page_id, ydoc_state, version, content_text, updated_at FROM page_contents WHERE page_id IN (${batch.map((_, j) => `CAST(:id${j} AS uuid)`).join(",")})`;
@@ -908,8 +907,6 @@ async function runDirection(
   config: MappingConfig,
   options: SyncOptions,
 ): Promise<void> {
-  const sourceRole = direction === "prod-to-dev" ? "prod" : "dev";
-  const targetRole = direction === "prod-to-dev" ? "dev" : "prod";
   const sourceConn = direction === "prod-to-dev" ? prodConn : devConn;
   const targetConn = direction === "prod-to-dev" ? devConn : prodConn;
 
@@ -1046,14 +1043,14 @@ async function main(): Promise<void> {
       console.error("❌ Prod and dev connections required for prod-to-dev.");
       process.exit(1);
     }
-    await runDirection("prod-to-dev", prodConn!, devConn!, config, options);
+    await runDirection("prod-to-dev", prodConn, devConn, config, options);
   }
   if (options.direction === "dev-to-prod" || options.direction === "bidirectional") {
     if (!prodConn || !devConn) {
       console.error("❌ Prod and dev connections required for dev-to-prod.");
       process.exit(1);
     }
-    await runDirection("dev-to-prod", prodConn!, devConn!, config, options);
+    await runDirection("dev-to-prod", prodConn, devConn, config, options);
   }
 
   console.log(`

@@ -59,13 +59,11 @@ export type BillingInterval = "monthly" | "yearly";
 
 /**
  * Open Polar checkout for the Pro plan.
- * Creates a Checkout Session via the backend API, which sets
- * customerExternalId to the Cognito userId for webhook reconciliation.
+ * Creates a Checkout Session via the backend API. The backend derives
+ * customerExternalId from the authenticated user's JWT (Authorization header)
+ * for webhook reconciliation; the client does not pass a userId.
  */
-export async function openProCheckout(
-  userId: string,
-  billingInterval: BillingInterval,
-): Promise<void> {
+export async function openProCheckout(billingInterval: BillingInterval): Promise<void> {
   const apiBaseUrl = getAIAPIBaseUrl();
   if (!apiBaseUrl) {
     console.error("API base URL not configured");
@@ -104,7 +102,7 @@ export async function openProCheckout(
   }
 
   const { url } = (await response.json()) as { url: string };
-  window.open(url, "_blank");
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 /**
@@ -139,5 +137,5 @@ export async function openCustomerPortal(): Promise<void> {
   }
 
   const { url } = (await response.json()) as { url: string };
-  window.open(url, "_blank");
+  window.open(url, "_blank", "noopener,noreferrer");
 }

@@ -8,11 +8,7 @@ import React, {
 } from "react";
 import type { Editor } from "@tiptap/core";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
-import {
-  slashCommandItems,
-  filterSlashCommandItems,
-  type SlashCommandItem,
-} from "./slashCommandItems";
+import { slashCommandItems, filterSlashCommandItems } from "./slashCommandItems";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import {
@@ -188,7 +184,7 @@ export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
   suggestionRef,
   onClose,
 }) => {
-  if (!suggestionState?.active || !position || !editor) return null;
+  if (!suggestionState?.active || !suggestionState.range || !position || !editor) return null;
 
   return (
     <div
@@ -202,7 +198,7 @@ export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
         ref={suggestionRef}
         editor={editor}
         query={suggestionState.query}
-        range={suggestionState.range!}
+        range={suggestionState.range}
         onClose={onClose}
       />
     </div>

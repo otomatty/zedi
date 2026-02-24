@@ -6,7 +6,6 @@
 export type StorageProviderType =
   | "gyazo"
   | "s3" // Zedi standard storage (AWS thumbnail-api commit)
-  | "cloudflare-r2"
   | "github"
   | "google-drive";
 
@@ -23,14 +22,6 @@ export interface StorageProviderConfig {
 
   // Gyazo（Access Tokenのみ）
   gyazoAccessToken?: string;
-
-  // Cloudflare R2（S3互換）
-  r2Bucket?: string;
-  r2AccessKeyId?: string;
-  r2SecretAccessKey?: string;
-  r2Endpoint?: string;
-  r2AccountId?: string;
-  r2PublicUrl?: string; // 公開URLのベース（カスタムドメインまたはr2.dev）
 
   // GitHub（Personal Access Token）
   githubRepository?: string; // "owner/repo"形式
@@ -82,14 +73,6 @@ export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
     helpUrl: "https://gyazo.com/oauth/applications",
     setupDifficulty: "easy",
     freeTier: "無料プランあり",
-  },
-  {
-    id: "cloudflare-r2",
-    name: "Cloudflare R2",
-    description: "S3互換ストレージ、10GB/月無料",
-    helpUrl: "https://dash.cloudflare.com/",
-    setupDifficulty: "medium",
-    freeTier: "10GB/月無料",
   },
   {
     id: "github",

@@ -196,7 +196,6 @@ type UseNoteOptions = { allowRemote?: boolean };
 
 export function useNote(noteId: string, _options?: UseNoteOptions) {
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
-  const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: noteKeys.detail(noteId, userId, userEmail),
@@ -236,7 +235,7 @@ export function useNotePages(
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  const { api, isLoaded, userId } = useNoteApi();
+  const { api, isLoaded } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.pageList(noteId),

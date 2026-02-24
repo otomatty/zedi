@@ -1,5 +1,4 @@
 import type { MutableRefObject } from "react";
-import type { Editor } from "@tiptap/react";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ChatMessage, ChatAction } from "../../types/aiChat";
 import { AIChatMessage } from "./AIChatMessage";
 import { AIChatWelcome } from "./AIChatWelcome";

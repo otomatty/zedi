@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchPages, type SearchResult } from "./useGlobalSearch";
+import { searchPages } from "./useGlobalSearch";
 import type { Page } from "@/types/page";
 import { createPlainTextContent } from "@/test/testDatabase";
 
@@ -8,6 +8,7 @@ function createTestPage(id: string, title: string, content: string, options?: Pa
   const now = Date.now();
   return {
     id,
+    ownerUserId: "test-user",
     title,
     content,
     createdAt: now,

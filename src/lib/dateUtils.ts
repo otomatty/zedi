@@ -1,12 +1,4 @@
-import {
-  format,
-  isToday,
-  isYesterday,
-  startOfDay,
-  parseISO,
-  startOfMonth,
-  endOfMonth,
-} from "date-fns";
+import { format, isToday, isYesterday, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import type { Page, DateGroup } from "@/types/page";
 
@@ -73,11 +65,14 @@ export function groupPagesByDate(pages: Page[]): DateGroup[] {
 
   sortedKeys.forEach((dateKey) => {
     const date = parseISO(dateKey);
-    result.push({
-      date: dateKey,
-      label: formatDateLabel(date),
-      pages: groups.get(dateKey)!,
-    });
+    const pages = groups.get(dateKey);
+    if (pages) {
+      result.push({
+        date: dateKey,
+        label: formatDateLabel(date),
+        pages,
+      });
+    }
   });
 
   return result;

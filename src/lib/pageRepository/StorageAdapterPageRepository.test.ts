@@ -69,7 +69,7 @@ describe("StorageAdapterPageRepository", () => {
   beforeEach(() => {
     adapter = createMockAdapter();
     api = createMockApi();
-    repo = new StorageAdapterPageRepository(adapter, api, LOCAL_USER_ID);
+    repo = new StorageAdapterPageRepository(adapter, api);
   });
 
   describe("createPage", () => {
@@ -98,7 +98,7 @@ describe("StorageAdapterPageRepository", () => {
         is_deleted: false,
       });
 
-      const authRepo = new StorageAdapterPageRepository(adapter, api, AUTH_USER_ID);
+      const authRepo = new StorageAdapterPageRepository(adapter, api);
       const page = await authRepo.createPage(AUTH_USER_ID, "API Page", "body");
 
       expect(api.createPage).toHaveBeenCalledOnce();
@@ -126,8 +126,10 @@ describe("StorageAdapterPageRepository", () => {
 
       const page = await repo.getPage(LOCAL_USER_ID, "page-1");
       expect(page).not.toBeNull();
-      expect(page!.id).toBe("page-1");
-      expect(page!.title).toBe("Hello");
+      if (page) {
+        expect(page.id).toBe("page-1");
+        expect(page.title).toBe("Hello");
+      }
     });
 
     it("returns null when page not found", async () => {
@@ -210,7 +212,7 @@ describe("StorageAdapterPageRepository", () => {
     });
 
     it("deletes from adapter and API for authenticated user", async () => {
-      const authRepo = new StorageAdapterPageRepository(adapter, api, AUTH_USER_ID);
+      const authRepo = new StorageAdapterPageRepository(adapter, api);
       await authRepo.deletePage(AUTH_USER_ID, "page-1");
 
       expect(adapter.deletePage).toHaveBeenCalledWith("page-1");
@@ -308,7 +310,7 @@ describe("StorageAdapterPageRepository", () => {
       (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(pages);
       const dup = await repo.checkDuplicateTitle(LOCAL_USER_ID, "Unique Title");
       expect(dup).not.toBeNull();
-      expect(dup!.id).toBe("p1");
+      if (dup) expect(dup.id).toBe("p1");
     });
 
     it("excludes current page from duplicate check", async () => {

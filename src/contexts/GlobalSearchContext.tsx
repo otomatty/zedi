@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext } from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
 import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
@@ -13,13 +13,20 @@ interface GlobalSearchContextValue {
   handleSearchSubmit: () => void;
   /** ⌘K でヘッダー検索バーにフォーカス */
   focusSearchInput: () => void;
+  /** グローバル検索ダイアログの開閉状態（GlobalSearch CommandDialog 用） */
+  isOpen: boolean;
+  open: () => void;
+  close: () => void;
 }
 
 const GlobalSearchContext = createContext<GlobalSearchContextValue | null>(null);
 
-export function GlobalSearchProvider({ children }: { children: React.ReactNode }) {
+export function GlobalSearchProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { query, setQuery, searchResults, hasQuery } = useGlobalSearch();
+  const [isOpen, setOpen] = useState(false);
+  const open = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
 
   const handleSelect = useCallback(
     (pageId: string, noteId?: string) => {
@@ -55,6 +62,9 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
     handleSelect,
     handleSearchSubmit,
     focusSearchInput,
+    isOpen,
+    open,
+    close,
   };
 
   return <GlobalSearchContext.Provider value={value}>{children}</GlobalSearchContext.Provider>;

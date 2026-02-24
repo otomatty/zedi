@@ -26,37 +26,31 @@ let googleMock: {
 
 // OpenAI SDKのモック
 vi.mock("openai", () => ({
-  default: class OpenAI {
-    constructor() {
-      if (!openAIMock) {
-        throw new Error("OpenAI mock is not configured");
-      }
-      return openAIMock;
+  default: function OpenAI() {
+    if (!openAIMock) {
+      throw new Error("OpenAI mock is not configured");
     }
+    return openAIMock;
   },
 }));
 
 // Anthropic SDKのモック
 vi.mock("@anthropic-ai/sdk", () => ({
-  default: class Anthropic {
-    constructor() {
-      if (!anthropicMock) {
-        throw new Error("Anthropic mock is not configured");
-      }
-      return anthropicMock;
+  default: function Anthropic() {
+    if (!anthropicMock) {
+      throw new Error("Anthropic mock is not configured");
     }
+    return anthropicMock;
   },
 }));
 
 // Google GenAI SDKのモック
 vi.mock("@google/genai", () => ({
-  GoogleGenAI: class GoogleGenAI {
-    constructor() {
-      if (!googleMock) {
-        throw new Error("GoogleGenAI mock is not configured");
-      }
-      return googleMock;
+  GoogleGenAI: function GoogleGenAI() {
+    if (!googleMock) {
+      throw new Error("GoogleGenAI mock is not configured");
     }
+    return googleMock;
   },
 }));
 
@@ -76,6 +70,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
       expect(getEffectiveAPIMode(settings)).toBe("user_api_key");
@@ -86,6 +81,7 @@ describe("aiService - 回帰テスト", () => {
         provider: "openai",
         apiKey: "test-key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
       expect(getEffectiveAPIMode(settings)).toBe("user_api_key");
@@ -96,6 +92,7 @@ describe("aiService - 回帰テスト", () => {
         provider: "openai",
         apiKey: "",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
       expect(getEffectiveAPIMode(settings)).toBe("api_server");
@@ -106,6 +103,7 @@ describe("aiService - 回帰テスト", () => {
         provider: "openai",
         apiKey: "   ",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
       expect(getEffectiveAPIMode(settings)).toBe("api_server");
@@ -119,6 +117,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
       expect(shouldUseUserAPIKey(settings)).toBe(true);
@@ -130,6 +129,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "",
         apiMode: "api_server",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
       expect(shouldUseUserAPIKey(settings)).toBe(false);
@@ -150,6 +150,12 @@ describe("aiService - 回帰テスト", () => {
           : provider === "anthropic"
             ? "claude-3-5-sonnet-20241022"
             : "gemini-2.5-flash",
+      modelId:
+        provider === "openai"
+          ? "openai:gpt-4o"
+          : provider === "anthropic"
+            ? "anthropic:claude-3-5-sonnet-20241022"
+            : "google:gemini-2.5-flash",
       isConfigured: true,
     });
 
@@ -605,6 +611,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "",
         apiMode: "api_server",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
 

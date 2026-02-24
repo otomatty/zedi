@@ -6,8 +6,8 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, gt, sql, inArray } from "drizzle-orm";
-import { pages, links, ghostLinks, pageContents } from "../schema";
+import { eq, and, gt, inArray } from "drizzle-orm";
+import { pages, links, ghostLinks } from "../schema";
 import { authRequired } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -136,23 +136,26 @@ app.post("/", authRequired, async (c) => {
         updatedAt: clientTime,
       });
       results.push({ id: p.id, action: "created" });
-    } else if (clientTime > existing[0]!.updatedAt) {
-      // クライアント側が新しい: 更新
-      await db
-        .update(pages)
-        .set({
-          title: p.title ?? null,
-          contentPreview: p.content_preview ?? null,
-          thumbnailUrl: p.thumbnail_url ?? null,
-          sourceUrl: p.source_url ?? null,
-          sourcePageId: p.source_page_id ?? null,
-          isDeleted: p.is_deleted ?? false,
-          updatedAt: clientTime,
-        })
-        .where(eq(pages.id, p.id));
-      results.push({ id: p.id, action: "updated" });
     } else {
-      results.push({ id: p.id, action: "skipped" });
+      const existingRow = existing[0];
+      if (existingRow && clientTime > existingRow.updatedAt) {
+        // クライアント側が新しい: 更新
+        await db
+          .update(pages)
+          .set({
+            title: p.title ?? null,
+            contentPreview: p.content_preview ?? null,
+            thumbnailUrl: p.thumbnail_url ?? null,
+            sourceUrl: p.source_url ?? null,
+            sourcePageId: p.source_page_id ?? null,
+            isDeleted: p.is_deleted ?? false,
+            updatedAt: clientTime,
+          })
+          .where(eq(pages.id, p.id));
+        results.push({ id: p.id, action: "updated" });
+      } else {
+        results.push({ id: p.id, action: "skipped" });
+      }
     }
   }
 

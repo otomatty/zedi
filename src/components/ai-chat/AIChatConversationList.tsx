@@ -1,4 +1,3 @@
-import React from "react";
 import { Trash2, MessageSquare } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Conversation } from "../../types/aiChat";

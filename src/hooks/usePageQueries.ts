@@ -67,7 +67,6 @@ export function useSync() {
 
     setIsSyncing(true);
     try {
-      console.log("[Sync] Manual sync requested", { userId });
       // Manual sync: reset failure counter and force past the auto-retry guard
       resetSyncFailures();
       await runAuroraSync(userId, getToken, { force: true });
@@ -141,7 +140,6 @@ export function useRepository() {
 
     (async () => {
       try {
-        console.log("[Sync] Initial sync requested", { userId });
         // Ensure user row exists in Aurora (POST /api/users/upsert) before first sync
         const api = apiRef.current;
         if (api) {
@@ -162,7 +160,6 @@ export function useRepository() {
         // 503 (DB resuming) での失敗時は遅延リトライ
         // apiClient の自動リトライ (4×10s) でも復帰しなかった場合のフォールバック
         if (error instanceof ApiError && error.code === "DATABASE_RESUMING") {
-          console.log("[Sync] DB was resuming, scheduling delayed retry in 15s");
           initialSyncRequestedForUser.delete(userId);
           setTimeout(() => {
             initialSyncRequestedForUser.delete(userId);
@@ -181,8 +178,8 @@ export function useRepository() {
     const adapter = adapterRef.current;
     const api = apiRef.current;
     if (!adapter || !api) throw new Error("Repository not ready");
-    return new StorageAdapterPageRepository(adapter, api, effectiveUserId);
-  }, [effectiveUserId]);
+    return new StorageAdapterPageRepository(adapter, api);
+  }, []);
 
   return {
     getRepository,
@@ -277,14 +274,9 @@ export function useSearchPages(query: string) {
     queryKey: pageKeys.search(userId, query),
     queryFn: async () => {
       if (!query.trim()) return [];
-      console.debug("[searchPages] Fetching", { query, userId });
       try {
         const repo = await getRepository();
         const results = await repo.searchPages(userId, query);
-        console.debug("[searchPages] Success", {
-          query,
-          resultCount: results.length,
-        });
         return results;
       } catch (error) {
         console.error("[searchPages] Failed", {
@@ -308,14 +300,9 @@ export function useSearchSharedNotes(query: string) {
   return useQuery({
     queryKey: pageKeys.searchShared(query),
     queryFn: async () => {
-      console.debug("[searchSharedNotes] Fetching", { query });
       try {
         const api = createApiClient({ getToken });
         const result = await api.searchSharedNotes(query);
-        console.debug("[searchSharedNotes] Success", {
-          query,
-          resultCount: result.results?.length ?? 0,
-        });
         return result;
       } catch (error) {
         console.error("[searchSharedNotes] Failed", {
@@ -358,7 +345,6 @@ export function useCreatePage() {
       });
     },
     onSuccess: (newPage) => {
-      console.log("=== createPage success ===", newPage.id);
       // Invalidate and refetch pages list
       queryClient.invalidateQueries({ queryKey: pageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: pageKeys.summaries() });

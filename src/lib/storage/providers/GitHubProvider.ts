@@ -10,17 +10,6 @@ import {
 } from "../types";
 
 /**
- * GitHub API レスポンス
- */
-interface GitHubContentResponse {
-  content: {
-    sha: string;
-    download_url: string;
-    html_url: string;
-  };
-}
-
-/**
  * GitHub ストレージプロバイダー
  *
  * 設定方法:
@@ -84,7 +73,7 @@ export class GitHubProvider implements StorageProviderInterface {
       );
     }
 
-    const data: GitHubContentResponse = await response.json();
+    await response.json();
 
     // raw.githubusercontent.com の直接リンクを返す
     const [owner, repo] = this.repository.split("/");

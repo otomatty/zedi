@@ -16,7 +16,6 @@ import {
   getAuthorizeUrl,
   getIdToken,
   getStoredState,
-  setTokens,
   clearStorage,
   getLogoutUrl,
   parseIdToken,
@@ -85,7 +84,7 @@ function getInitialAuthState(): ReturnType<typeof getStoredState> {
 const REFRESH_CHECK_INTERVAL_MS = 60 * 1000;
 
 export function CognitoAuthProvider({ children }: CognitoAuthProviderProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [, setIsLoaded] = useState(false);
   const [state, setState] = useState<ReturnType<typeof getStoredState>>(() =>
     getInitialAuthState(),
   );
