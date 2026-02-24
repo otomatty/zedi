@@ -1,6 +1,6 @@
 {
   "title": "Image storage settings",
-  "description": "By default, images are saved to the default storage. Toggle to use external storage such as Gyazo or Cloudflare R2.",
+  "description": "By default, images are saved to the default storage. Toggle to use external storage such as Gyazo or Google Drive.",
   "storageDestination": "Where to save images",
   "saveToDefault": "Save to default storage",
   "saveToExternal": "Save to external storage",
@@ -37,11 +37,6 @@
       "description": "Easy setup with Access Token",
       "freeTier": "Free plan available"
     },
-    "cloudflare-r2": {
-      "name": "Cloudflare R2",
-      "description": "S3-compatible storage, 10GB/month free",
-      "freeTier": "10GB/month free"
-    },
     "github": {
       "name": "GitHub",
       "description": "Save images to a GitHub repository",
@@ -70,19 +65,6 @@
     "branchPlaceholder": "main",
     "path": "Storage path",
     "pathPlaceholder": "images"
-  },
-  "r2": {
-    "bucket": "Bucket name",
-    "bucketPlaceholder": "my-bucket",
-    "accountId": "Account ID",
-    "accountIdPlaceholder": "Cloudflare Account ID",
-    "accessKeyId": "Access Key ID",
-    "accessKeyIdPlaceholder": "Access Key ID",
-    "secretAccessKey": "Secret Access Key",
-    "secretAccessKeyPlaceholder": "Secret Access Key",
-    "publicUrl": "Public URL (optional)",
-    "publicUrlPlaceholder": "https://your-domain.com",
-    "publicUrlHelp": "Enter if using a custom domain"
   },
   "googleDrive": {
     "oauthAlertTitle": "⚠️ OAuth2 authentication required",

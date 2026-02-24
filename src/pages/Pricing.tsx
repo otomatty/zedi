@@ -280,7 +280,7 @@ function PricingPlanCards({
 }
 
 const Pricing: React.FC = () => {
-  const { userId, isSignedIn } = useAuth();
+  const { isSignedIn } = useAuth();
   const { plan: currentPlan, isProUser, usage, isLoading, refetch } = useSubscription();
 
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
@@ -297,7 +297,7 @@ const Pricing: React.FC = () => {
     : null;
 
   const handleSelectPro = async () => {
-    if (!userId) return;
+    if (!isSignedIn) return;
     await openProCheckout(billingInterval);
     // User may return from checkout in same tab; refetch after a short delay
     setTimeout(() => refetch(), 5000);

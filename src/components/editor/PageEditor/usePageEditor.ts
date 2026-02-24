@@ -37,7 +37,7 @@ function buildLayoutProps(
     onOpenDuplicatePage: () => void;
     onCancelWiki: () => void;
     onContentChange: (content: string) => void;
-    onContentError: (error: unknown) => void;
+    onContentError: (error: ContentError | null) => void;
     onTitleChange: (title: string) => void;
     onPendingInitialContentClear: () => void;
     onDeleteConfirmOpenChange: (open: boolean) => void;

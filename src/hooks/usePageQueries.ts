@@ -179,7 +179,7 @@ export function useRepository() {
     const api = apiRef.current;
     if (!adapter || !api) throw new Error("Repository not ready");
     return new StorageAdapterPageRepository(adapter, api);
-  }, [effectiveUserId]);
+  }, []);
 
   return {
     getRepository,
