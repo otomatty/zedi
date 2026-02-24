@@ -24,7 +24,6 @@ export class CloudflareR2Provider implements StorageProviderInterface {
   private readonly bucket: string;
   private readonly accountId: string;
   private readonly accessKeyId: string;
-  private readonly secretAccessKey: string;
   private readonly publicUrl?: string;
 
   constructor(config: {
@@ -40,7 +39,6 @@ export class CloudflareR2Provider implements StorageProviderInterface {
     this.bucket = config.bucket;
     this.accountId = config.accountId;
     this.accessKeyId = config.accessKeyId;
-    this.secretAccessKey = config.secretAccessKey;
     this.publicUrl = config.publicUrl;
   }
 

@@ -101,7 +101,7 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
       new Plugin({
         key: new PluginKey("wikiLinkClick"),
         props: {
-          handleClick: (view, pos, event) => {
+          handleClick: (_view, _pos, event) => {
             if (!onLinkClick) return false;
 
             const target = event.target as HTMLElement;

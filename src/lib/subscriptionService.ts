@@ -62,10 +62,7 @@ export type BillingInterval = "monthly" | "yearly";
  * Creates a Checkout Session via the backend API, which sets
  * customerExternalId to the Cognito userId for webhook reconciliation.
  */
-export async function openProCheckout(
-  userId: string,
-  billingInterval: BillingInterval,
-): Promise<void> {
+export async function openProCheckout(billingInterval: BillingInterval): Promise<void> {
   const apiBaseUrl = getAIAPIBaseUrl();
   if (!apiBaseUrl) {
     console.error("API base URL not configured");

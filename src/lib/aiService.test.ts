@@ -70,6 +70,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
       expect(getEffectiveAPIMode(settings)).toBe("user_api_key");
@@ -80,6 +81,7 @@ describe("aiService - 回帰テスト", () => {
         provider: "openai",
         apiKey: "test-key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
       expect(getEffectiveAPIMode(settings)).toBe("user_api_key");
@@ -90,6 +92,7 @@ describe("aiService - 回帰テスト", () => {
         provider: "openai",
         apiKey: "",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
       expect(getEffectiveAPIMode(settings)).toBe("api_server");
@@ -100,6 +103,7 @@ describe("aiService - 回帰テスト", () => {
         provider: "openai",
         apiKey: "   ",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
       expect(getEffectiveAPIMode(settings)).toBe("api_server");
@@ -113,6 +117,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
       expect(shouldUseUserAPIKey(settings)).toBe(true);
@@ -124,6 +129,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "",
         apiMode: "api_server",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
       expect(shouldUseUserAPIKey(settings)).toBe(false);
@@ -144,6 +150,12 @@ describe("aiService - 回帰テスト", () => {
           : provider === "anthropic"
             ? "claude-3-5-sonnet-20241022"
             : "gemini-2.5-flash",
+      modelId:
+        provider === "openai"
+          ? "openai:gpt-4o"
+          : provider === "anthropic"
+            ? "anthropic:claude-3-5-sonnet-20241022"
+            : "google:gemini-2.5-flash",
       isConfigured: true,
     });
 
@@ -599,6 +611,7 @@ describe("aiService - 回帰テスト", () => {
         apiKey: "",
         apiMode: "api_server",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
 

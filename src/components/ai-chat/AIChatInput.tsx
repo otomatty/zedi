@@ -1,4 +1,3 @@
-import React from "react";
 import { Send, Square, FileText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ReferencedPage } from "../../types/aiChat";

@@ -13,7 +13,7 @@ describe("S3Provider", () => {
     vi.restoreAllMocks();
     getToken = vi.fn().mockResolvedValue("test-jwt-token");
     const ctx: S3ProviderContext = {
-      getToken,
+      getToken: getToken as unknown as () => Promise<string | null>,
       baseUrl: "https://api.example.com",
     };
     provider = new S3Provider({}, ctx);

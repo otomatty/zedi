@@ -46,7 +46,6 @@ export class StorageAdapterPageRepository {
   constructor(
     private adapter: StorageAdapter,
     private api: ApiClient,
-    private userId: string,
   ) {}
 
   async createPage(
@@ -113,7 +112,7 @@ export class StorageAdapterPageRepository {
     return metadataToPage(meta);
   }
 
-  async getPage(userId: string, pageId: string): Promise<Page | null> {
+  async getPage(_userId: string, pageId: string): Promise<Page | null> {
     const m = await this.adapter.getPage(pageId);
     return m ? metadataToPage(m) : null;
   }
@@ -144,7 +143,7 @@ export class StorageAdapterPageRepository {
   }
 
   async checkDuplicateTitle(
-    userId: string,
+    _userId: string,
     title: string,
     excludePageId?: string,
   ): Promise<Page | null> {
@@ -158,7 +157,7 @@ export class StorageAdapterPageRepository {
   }
 
   async updatePage(
-    userId: string,
+    _userId: string,
     pageId: string,
     updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>,
   ): Promise<void> {
@@ -194,7 +193,7 @@ export class StorageAdapterPageRepository {
     }
   }
 
-  async searchPages(userId: string, query: string): Promise<Page[]> {
+  async searchPages(_userId: string, query: string): Promise<Page[]> {
     const results = await this.adapter.searchPages(query);
     const pages: Page[] = [];
     for (const r of results) {

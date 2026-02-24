@@ -2,6 +2,7 @@ import { usePageEditorStateAndSync } from "./usePageEditorStateAndSync";
 import { usePageEditorHandlers } from "./usePageEditorHandlers";
 import type { PageEditorLayoutProps } from "./PageEditorLayout";
 import type { WikiGeneratorStatus } from "./types";
+import type { ContentError } from "../TiptapEditor/useContentSanitizer";
 
 function buildLayoutProps(
   state: {
@@ -21,7 +22,7 @@ function buildLayoutProps(
       typeof import("@/hooks/useTitleValidation").useTitleValidation
     >["duplicatePage"];
     errorMessage: string | null;
-    contentError: unknown;
+    contentError: ContentError | null;
     pendingInitialContent: string | null;
     deleteConfirmOpen: boolean;
     deleteReason: string;

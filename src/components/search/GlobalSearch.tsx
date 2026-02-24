@@ -1,4 +1,3 @@
-import React from "react";
 import { FileText, Link as LinkIcon } from "lucide-react";
 import {
   CommandDialog,

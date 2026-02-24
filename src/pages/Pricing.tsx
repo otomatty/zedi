@@ -298,7 +298,7 @@ const Pricing: React.FC = () => {
 
   const handleSelectPro = async () => {
     if (!userId) return;
-    await openProCheckout(userId, billingInterval);
+    await openProCheckout(billingInterval);
     // User may return from checkout in same tab; refetch after a short delay
     setTimeout(() => refetch(), 5000);
   };

@@ -1,4 +1,3 @@
-import React from "react";
 import { Sparkles, ClipboardList, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAIChatStore } from "../../stores/aiChatStore";

@@ -6,14 +6,14 @@ describe("createStorageAdapter", () => {
   let originalTauriInternals: unknown;
 
   beforeEach(() => {
-    originalTauriInternals = (window as Record<string, unknown>).__TAURI_INTERNALS__;
+    originalTauriInternals = (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
   });
 
   afterEach(() => {
     if (originalTauriInternals === undefined) {
-      delete (window as Record<string, unknown>).__TAURI_INTERNALS__;
+      delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
     } else {
-      (window as Record<string, unknown>).__TAURI_INTERNALS__ = originalTauriInternals;
+      (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = originalTauriInternals;
     }
   });
 
@@ -24,7 +24,7 @@ describe("createStorageAdapter", () => {
   });
 
   it("throws error when in Tauri environment", () => {
-    (window as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
     expect(() => createStorageAdapter()).toThrow(
       "TauriStorageAdapter is not implemented yet (Phase D).",
     );
