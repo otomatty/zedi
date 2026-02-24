@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "@tiptap/core";
-import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { StorageSettings } from "@/types/storage";
+import {
+  runSingleUpload,
+  filterImageFiles,
+  updateUploadNodeAttributesImpl,
+  replaceUploadNodeWithImageImpl,
+  removeUploadNodeImpl,
+} from "./useImageUploadManagerHelpers";
 
 type ToastFn = ReturnType<typeof useToast>["toast"];
 
@@ -19,6 +25,7 @@ interface UseImageUploadManagerParams {
   lastSelectionRef?: MutableRefObject<{ from: number; to: number } | null>;
 }
 
+/* eslint-disable max-lines-per-function -- Issue #72 Phase 3: runSingleUpload + editor ops extracted; further hook split deferred */
 export function useImageUploadManager({
   editorRef,
   onChange,
@@ -53,163 +60,47 @@ export function useImageUploadManager({
   }, []);
 
   const updateUploadNodeAttributes = useCallback(
-    (uploadId: string, attrs: Record<string, unknown>) => {
-      const activeEditor = editorRef.current;
-      if (!activeEditor) return;
-
-      const { state, view } = activeEditor;
-      let tr = state.tr;
-      let updated = false;
-
-      state.doc.descendants((node, pos) => {
-        if (node.type.name === "imageUpload" && node.attrs.uploadId === uploadId) {
-          tr = tr.setNodeMarkup(pos, undefined, {
-            ...node.attrs,
-            ...attrs,
-          });
-          updated = true;
-          return false;
-        }
-        return true;
-      });
-
-      if (updated) {
-        view.dispatch(tr);
-      }
-    },
+    (uploadId: string, attrs: Record<string, unknown>) =>
+      updateUploadNodeAttributesImpl(editorRef.current, uploadId, attrs),
     [editorRef],
   );
 
   const replaceUploadNodeWithImage = useCallback(
-    (uploadId: string, attrs: Record<string, unknown>) => {
-      const activeEditor = editorRef.current;
-      if (!activeEditor) return;
-
-      const { state, view } = activeEditor;
-      const imageType = state.schema.nodes.image;
-      if (!imageType) return;
-
-      let tr = state.tr;
-      let replaced = false;
-
-      state.doc.descendants((node, pos) => {
-        if (node.type.name === "imageUpload" && node.attrs.uploadId === uploadId) {
-          tr = tr.delete(pos, pos + node.nodeSize).insert(pos, imageType.create(attrs));
-          replaced = true;
-          return false;
-        }
-        return true;
-      });
-
-      if (replaced) {
-        view.dispatch(tr);
-        const json = JSON.stringify(activeEditor.getJSON());
-        onChange(json);
-      }
-      cleanupUploadResources(uploadId);
-    },
+    (uploadId: string, attrs: Record<string, unknown>) =>
+      replaceUploadNodeWithImageImpl(
+        editorRef.current,
+        uploadId,
+        attrs,
+        onChange,
+        cleanupUploadResources,
+      ),
     [cleanupUploadResources, editorRef, onChange],
   );
 
   const removeUploadNode = useCallback(
-    (uploadId: string) => {
-      const activeEditor = editorRef.current;
-      if (!activeEditor) return;
-
-      const { state, view } = activeEditor;
-      let tr = state.tr;
-      let removed = false;
-
-      state.doc.descendants((node, pos) => {
-        if (node.type.name === "imageUpload" && node.attrs.uploadId === uploadId) {
-          tr = tr.delete(pos, pos + node.nodeSize);
-          removed = true;
-          return false;
-        }
-        return true;
-      });
-
-      if (removed) {
-        view.dispatch(tr);
-      }
-      cleanupUploadResources(uploadId);
-    },
+    (uploadId: string) => removeUploadNodeImpl(editorRef.current, uploadId, cleanupUploadResources),
     [cleanupUploadResources, editorRef],
   );
 
   const startUpload = useCallback(
     async (uploadId: string, file: File) => {
-      if (!isStorageConfigured) {
-        updateUploadNodeAttributes(uploadId, {
-          status: "error",
-          errorMessage: "ストレージ設定が完了していません",
-        });
-        return;
-      }
-
-      const uploadSettings = getSettingsForUpload(storageSettings);
-      let provider: ReturnType<typeof getStorageProvider>;
-      try {
-        provider = getStorageProvider(uploadSettings, { getToken });
-      } catch (error) {
-        toast({
-          title: "ストレージ設定エラー",
-          description: error instanceof Error ? error.message : "設定内容を確認してください",
-          variant: "destructive",
-        });
-        throw error;
-      }
-      let hasRealProgress = false;
-      let simulatedProgress = 0;
-
-      updateUploadNodeAttributes(uploadId, {
-        status: "uploading",
-        progress: 0,
-        errorMessage: null,
-        fileName: file.name,
-        providerId: uploadSettings.provider,
+      await runSingleUpload({
+        uploadId,
+        file,
+        isStorageConfigured,
+        storageSettings,
+        getToken,
+        uploadFilesRef,
+        uploadTimersRef,
+        onStorageError: (message) =>
+          toast({
+            title: "ストレージ設定エラー",
+            description: message,
+            variant: "destructive",
+          }),
+        updateUploadNodeAttributes,
+        replaceUploadNodeWithImage,
       });
-      uploadFilesRef.current.set(uploadId, file);
-
-      const timerId = window.setInterval(() => {
-        if (hasRealProgress) return;
-        simulatedProgress = Math.min(90, simulatedProgress + Math.floor(Math.random() * 8) + 4);
-        updateUploadNodeAttributes(uploadId, {
-          progress: simulatedProgress,
-        });
-      }, 500);
-      uploadTimersRef.current.set(uploadId, timerId);
-
-      try {
-        const url = await provider.uploadImage(file, {
-          onProgress: (progress) => {
-            hasRealProgress = true;
-            updateUploadNodeAttributes(uploadId, {
-              progress: Math.round(progress.percentage),
-            });
-          },
-        });
-
-        updateUploadNodeAttributes(uploadId, { progress: 100 });
-        replaceUploadNodeWithImage(uploadId, {
-          src: url,
-          alt: file.name,
-          title: file.name,
-          storageProviderId: uploadSettings.provider,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "画像のアップロードに失敗しました";
-        updateUploadNodeAttributes(uploadId, {
-          status: "error",
-          errorMessage: message,
-        });
-      } finally {
-        const activeTimer = uploadTimersRef.current.get(uploadId);
-        if (activeTimer) {
-          window.clearInterval(activeTimer);
-          uploadTimersRef.current.delete(uploadId);
-        }
-      }
     },
     [
       isStorageConfigured,
@@ -319,25 +210,15 @@ export function useImageUploadManager({
     [startUpload],
   );
 
-  const handleImageUpload = useCallback(
-    (files: FileList | File[]) => {
-      const activeEditor = editorRef.current;
-      if (!activeEditor) return;
-      if (isReadOnly) return;
-      if (pendingRetryUploadId) {
-        setPendingRetryUploadId(null);
-      }
-
+  const processImageUpload = useCallback(
+    (files: FileList | File[], insertAtStart: boolean) => {
+      if (!editorRef.current || isReadOnly) return;
+      if (pendingRetryUploadId) setPendingRetryUploadId(null);
       if (isStorageLoading) {
-        toast({
-          title: "読み込み中",
-          description: "ストレージ設定を読み込み中です",
-        });
+        toast({ title: "読み込み中", description: "ストレージ設定を読み込み中です" });
         return;
       }
-
-      const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
-
+      const imageFiles = filterImageFiles(files);
       if (imageFiles.length === 0) {
         toast({
           title: "画像ファイルのみ対応",
@@ -346,21 +227,17 @@ export function useImageUploadManager({
         });
         return;
       }
-
       if (!isStorageConfigured) {
         onRequestStorageSetup();
         return;
       }
-
       restoreSelectionIfNeeded();
-
       const uploadItems = createUploadItems(imageFiles);
-      insertUploadItems(uploadItems, false);
+      insertUploadItems(uploadItems, insertAtStart);
       startUploads(uploadItems);
     },
     [
       createUploadItems,
-      editorRef,
       isReadOnly,
       isStorageConfigured,
       isStorageLoading,
@@ -373,55 +250,14 @@ export function useImageUploadManager({
     ],
   );
 
+  const handleImageUpload = useCallback(
+    (files: FileList | File[]) => processImageUpload(files, false),
+    [processImageUpload],
+  );
+
   const handleImageUploadAtStart = useCallback(
-    (files: FileList | File[]) => {
-      const activeEditor = editorRef.current;
-      if (!activeEditor) return;
-      if (isReadOnly) return;
-      if (pendingRetryUploadId) {
-        setPendingRetryUploadId(null);
-      }
-
-      if (isStorageLoading) {
-        toast({
-          title: "読み込み中",
-          description: "ストレージ設定を読み込み中です",
-        });
-        return;
-      }
-
-      const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
-
-      if (imageFiles.length === 0) {
-        toast({
-          title: "画像ファイルのみ対応",
-          description: "画像ファイルを選択してください",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!isStorageConfigured) {
-        onRequestStorageSetup();
-        return;
-      }
-
-      const uploadItems = createUploadItems(imageFiles);
-      insertUploadItems(uploadItems, true);
-      startUploads(uploadItems);
-    },
-    [
-      createUploadItems,
-      editorRef,
-      insertUploadItems,
-      isReadOnly,
-      isStorageConfigured,
-      isStorageLoading,
-      onRequestStorageSetup,
-      pendingRetryUploadId,
-      startUploads,
-      toast,
-    ],
+    (files: FileList | File[]) => processImageUpload(files, true),
+    [processImageUpload],
   );
 
   const handleRetryWithFile = useCallback(
