@@ -19,13 +19,14 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useAddPageToNote,
   useNote,
+  useNoteApi,
   useNotePages,
   useRemovePageFromNote,
 } from "@/hooks/useNoteQueries";
-import { useNoteApi } from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
+import type { PageSummary } from "@/types/page";
 
 function getNoteViewPermissions(
   access: { canEdit?: boolean; canAddPage?: boolean; canManageMembers?: boolean } | undefined,
@@ -49,17 +50,14 @@ function NoteViewLoadingOrDenied({ children }: { children: React.ReactNode }) {
   );
 }
 
-interface PageSummary {
-  id: string;
-  title?: string | null;
-}
+type NotePageSummary = PageSummary & { addedByUserId?: string | null };
 
 interface NoteViewAddPageDialogContentProps {
   newPageTitle: string;
   setNewPageTitle: (v: string) => void;
   pageFilter: string;
   setPageFilter: (v: string) => void;
-  filteredPages: PageSummary[];
+  filteredPages: NotePageSummary[];
   canEdit: boolean;
   onAddByTitle: () => Promise<void>;
   onAddByPageId: (pageId: string) => Promise<void>;
@@ -120,6 +118,7 @@ function NoteViewAddPageDialogContent({
                   filteredPages.map((page) => (
                     <button
                       key={page.id}
+                      type="button"
                       onClick={() => onAddByPageId(page.id)}
                       className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border"
                     >
@@ -133,7 +132,7 @@ function NoteViewAddPageDialogContent({
         )}
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>
+        <Button type="button" variant="outline" onClick={onClose}>
           {t("notes.close")}
         </Button>
       </DialogFooter>
@@ -143,7 +142,7 @@ function NoteViewAddPageDialogContent({
 
 interface NoteViewPageGridProps {
   noteId: string;
-  notePages: Array<{ id: string; addedByUserId?: string | null }>;
+  notePages: NotePageSummary[];
   canDeletePage: (addedByUserId: string | null | undefined) => boolean;
   onRemovePage: (pageId: string) => Promise<void>;
 }
@@ -188,7 +187,7 @@ interface NoteViewHeaderActionsProps {
   setNewPageTitle: (v: string) => void;
   pageFilter: string;
   setPageFilter: (v: string) => void;
-  filteredPages: PageSummary[];
+  filteredPages: NotePageSummary[];
   canEdit: boolean;
   onAddByTitle: () => Promise<void>;
   onAddByPageId: (pageId: string) => Promise<void>;
@@ -259,7 +258,7 @@ function NoteViewHeaderActions({
 
 interface NoteViewMainContentProps {
   noteId: string;
-  notePages: Array<{ id: string; addedByUserId?: string | null }>;
+  notePages: NotePageSummary[];
   isPagesLoading: boolean;
   canDeletePage: (addedByUserId: string | null | undefined) => boolean;
   onRemovePage: (pageId: string) => Promise<void>;

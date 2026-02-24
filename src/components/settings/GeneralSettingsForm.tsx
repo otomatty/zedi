@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ interface GeneralSettingsProfileCardProps {
   avatarUrl: string | undefined;
   displayName: string | undefined;
   updateProfileAndSave: (updates: { displayName?: string; avatarUrl?: string }) => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement>;
   onAvatarFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -57,7 +57,7 @@ function GeneralSettingsProfileCard({
           <Label htmlFor="displayName">{t("generalSettings.profile.displayName")}</Label>
           <Input
             id="displayName"
-            value={profile.displayName}
+            value={profile.displayName ?? ""}
             onChange={(e) => updateProfileAndSave({ displayName: e.target.value })}
             placeholder={t("generalSettings.profile.displayNamePlaceholder")}
             maxLength={100}
@@ -230,6 +230,7 @@ export const GeneralSettingsForm: React.FC = () => {
   const navigate = useNavigate();
   const { isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarObjectUrlRef = useRef<string | null>(null);
 
   const handleRunTourAgain = useCallback(() => {
     navigate("/home", { state: { startTour: true } });
@@ -257,13 +258,28 @@ export const GeneralSettingsForm: React.FC = () => {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // ローカルプレビュー用に Object URL を使用
-      // 実際の運用ではストレージにアップロードして URL を取得する
+      if (profile.avatarUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(profile.avatarUrl);
+      }
+      if (avatarObjectUrlRef.current) {
+        URL.revokeObjectURL(avatarObjectUrlRef.current);
+        avatarObjectUrlRef.current = null;
+      }
       const objectUrl = URL.createObjectURL(file);
+      avatarObjectUrlRef.current = objectUrl;
       updateProfileAndSave({ avatarUrl: objectUrl });
     },
-    [updateProfileAndSave],
+    [updateProfileAndSave, profile.avatarUrl],
   );
+
+  useEffect(() => {
+    return () => {
+      if (avatarObjectUrlRef.current) {
+        URL.revokeObjectURL(avatarObjectUrlRef.current);
+        avatarObjectUrlRef.current = null;
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (

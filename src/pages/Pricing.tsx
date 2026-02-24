@@ -17,7 +17,11 @@ import { cn } from "@/lib/utils";
 import { UsageBar } from "@/components/ai/UsageBar";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
-import { openProCheckout, openCustomerPortal } from "@/lib/subscriptionService";
+import {
+  openProCheckout,
+  openCustomerPortal,
+  type BillingInterval,
+} from "@/lib/subscriptionService";
 import type { AIUsage } from "@/types/ai";
 
 interface PlanFeature {
@@ -112,8 +116,6 @@ const PlanCard: React.FC<PlanCardProps> = ({
     </Card>
   );
 };
-
-type BillingInterval = "monthly" | "yearly";
 
 function PricingAiInfo() {
   return (
@@ -270,7 +272,7 @@ function PricingPlanCards({
               : "Pro 月額で契約"
         }
         onSelect={isProUser ? onManageSubscription : onSelectPro}
-        current={isProUser}
+        current={false}
         disabled={!isSignedIn}
       />
     </div>

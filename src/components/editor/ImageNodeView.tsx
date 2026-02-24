@@ -40,7 +40,7 @@ function ImageNodeErrorState({
           <RefreshCcw className="mr-1 h-4 w-4" />
           再読み込み
         </Button>
-        <Button size="sm" variant="outline" onClick={onCopyUrl}>
+        <Button size="sm" variant="outline" onClick={onCopyUrl} disabled={!src}>
           <Copy className="mr-1 h-4 w-4" />
           URLをコピー
         </Button>
@@ -115,7 +115,10 @@ function ImageNodeToolbar({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
-            <AlertDialogAction onClick={onDeleteFromStorage} disabled={isDeleting}>
+            <AlertDialogAction
+              onClick={onDeleteFromStorage}
+              disabled={!canDeleteFromStorage || isDeleting}
+            >
               削除する
             </AlertDialogAction>
           </AlertDialogFooter>

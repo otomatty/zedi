@@ -82,9 +82,9 @@ function NoteMembersManageSection({
             <SelectValue placeholder={t("notes.role")} />
           </SelectTrigger>
           <SelectContent>
-            {(Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => (
-              <SelectItem key={value} value={value}>
-                {t(memberRoleKeys[value])}
+            {roleOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>

@@ -23,30 +23,25 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isEditing =
-        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-      if (isEditing) return;
-
       const mod = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
       const shortcuts: Array<{ match: boolean; handle: () => void }> = [
         {
-          match: mod && e.key === "n",
+          match: mod && key === "n",
           handle: () => {
             e.preventDefault();
             if (!isCreatingRef.current) createNewPage();
           },
         },
         {
-          match: mod && e.key === "h",
+          match: mod && key === "h",
           handle: () => {
             e.preventDefault();
             if (location.pathname !== "/") navigate("/");
           },
         },
         {
-          match: mod && e.key === "/",
+          match: mod && key === "/",
           handle: () => {
             e.preventDefault();
             onShowShortcuts?.();

@@ -12,11 +12,12 @@ import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 import { useAIChatContext } from "@/contexts/AIChatContext";
 
 function canEditPage(
-  access: { canEdit?: boolean } | undefined,
+  access: { canEdit?: boolean; canView?: boolean } | undefined,
   userId: string | undefined,
   page: { ownerUserId?: string } | null | undefined,
 ): boolean {
-  if (access?.canEdit) return true;
+  if (!access?.canView) return false;
+  if (access.canEdit) return true;
   return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
 }
 

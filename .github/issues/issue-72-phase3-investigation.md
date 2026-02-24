@@ -40,22 +40,22 @@
 
 #### src/components
 
-| ファイル                                                         | 行    | ルール                 | 内容                           |
-| ---------------------------------------------------------------- | ----- | ---------------------- | ------------------------------ | ----------------------------------- |
-| `src/components/ai-chat/AIChatInput.tsx`                         | 42:8  | max-lines              | `AIChatInput` 373 行           |
-| `src/components/editor/ImageNodeView.tsx`                        | 25:55 | max-lines              | Arrow 166 行                   |
-| `src/components/editor/MermaidGeneratorDialog.tsx`               | 31:78 | max-lines              | Arrow 193 行                   |
-| `src/components/editor/PageEditor/PageEditorContent.tsx`         | 41:68 | complexity             | Arrow complexity 29            | ✅ getCollaborationState 抽出で解消 |
-| `src/components/editor/TiptapEditor.tsx`                         | 41:51 | max-lines              | Arrow 199 行                   |
-| `src/components/editor/TiptapEditor/EditorBubbleMenu.tsx`        | 34:66 | max-lines              | Arrow 173 行                   |
-| `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx` | 30:80 | max-lines              | Arrow 282 行                   |
-| `src/components/editor/TiptapEditor/useImageUploadManager.ts`    | 22:8  | max-lines              | `useImageUploadManager` 464 行 |
-| `src/components/layout/Header/HeaderSearchBar.tsx`               | 13:8  | max-lines              | `HeaderSearchBar` 204 行       |
-| `src/components/layout/ImageCreateDialog.tsx`                    | 33:68 | max-lines              | Arrow 267 行                   |
-| `src/components/page/PageCard.tsx`                               | 35:43 | max-lines              | Arrow 188 行                   |
-| `src/components/settings/AISettingsForm.tsx`                     | 57:41 | max-lines + complexity | Arrow 356 行, complexity 25    |
-| `src/components/settings/GeneralSettingsForm.tsx`                | 31:46 | max-lines              | Arrow 206 行                   |
-| `src/components/settings/StorageSettingsForm.tsx`                | 57:46 | max-lines + complexity | Arrow 293 行, complexity 46    |
+| ファイル                                                         | 行    | ルール                 | 内容                           | 対応                                                  |
+| ---------------------------------------------------------------- | ----- | ---------------------- | ------------------------------ | ----------------------------------------------------- |
+| `src/components/ai-chat/AIChatInput.tsx`                         | 42:8  | max-lines              | `AIChatInput` 373 行           |                                                       |
+| `src/components/editor/ImageNodeView.tsx`                        | 25:55 | max-lines              | Arrow 166 行                   | ✅ ImageNodeErrorState/ImageNodeToolbar 抽出で解消    |
+| `src/components/editor/MermaidGeneratorDialog.tsx`               | 31:78 | max-lines              | Arrow 193 行                   |                                                       |
+| `src/components/editor/PageEditor/PageEditorContent.tsx`         | 41:68 | complexity             | Arrow complexity 29            | ✅ getCollaborationState 抽出で解消                   |
+| `src/components/editor/TiptapEditor.tsx`                         | 41:51 | max-lines              | Arrow 199 行                   |                                                       |
+| `src/components/editor/TiptapEditor/EditorBubbleMenu.tsx`        | 34:66 | max-lines              | Arrow 173 行                   |                                                       |
+| `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx` | 30:80 | max-lines              | Arrow 282 行                   |                                                       |
+| `src/components/editor/TiptapEditor/useImageUploadManager.ts`    | 22:8  | max-lines              | `useImageUploadManager` 464 行 |                                                       |
+| `src/components/layout/Header/HeaderSearchBar.tsx`               | 13:8  | max-lines              | `HeaderSearchBar` 204 行       |                                                       |
+| `src/components/layout/ImageCreateDialog.tsx`                    | 33:68 | max-lines              | Arrow 267 行                   |                                                       |
+| `src/components/page/PageCard.tsx`                               | 35:43 | max-lines              | Arrow 188 行                   |                                                       |
+| `src/components/settings/AISettingsForm.tsx`                     | 57:41 | max-lines + complexity | Arrow 356 行, complexity 25    |                                                       |
+| `src/components/settings/GeneralSettingsForm.tsx`                | 31:46 | max-lines              | Arrow 206 行                   | ✅ GeneralSettingsProfileCard/DisplayCards 抽出で解消 |
+| `src/components/settings/StorageSettingsForm.tsx`                | 57:46 | max-lines + complexity | Arrow 293 行, complexity 46    |                                                       |
 
 #### src/hooks
 
@@ -80,16 +80,16 @@
 
 #### src/pages
 
-| ファイル                      | 行     | ルール                 | 内容                        |
-| ----------------------------- | ------ | ---------------------- | --------------------------- | ------------------------------------- |
-| `src/pages/NoteMembers.tsx`   | 31:31  | max-lines              | Arrow 179 行                |
-| `src/pages/NotePageView.tsx`  | 14:32  | complexity             | Arrow 23                    | ✅ canEditPage 抽出・条件変数化で解消 |
-| `src/pages/NoteSettings.tsx`  | 52:32  | max-lines              | Arrow 224 行                |
-| `src/pages/NoteView.tsx`      | 30:28  | max-lines + complexity | Arrow 228 行, complexity 29 |
-| `src/pages/Notes.tsx`         | 50:25  | max-lines              | Arrow 152 行                | ✅ CreateNoteDialogContent 抽出で解消 |
-| `src/pages/Onboarding.tsx`    | 30:30  | max-lines              | Arrow 229 行                |
-| `src/pages/Pricing.tsx`       | 118:27 | max-lines              | Arrow 172 行                |
-| `src/pages/SearchResults.tsx` | 34:16  | max-lines              | `SearchResults` 199 行      |
+| ファイル                      | 行     | ルール                 | 内容                        | 対応                                                            |
+| ----------------------------- | ------ | ---------------------- | --------------------------- | --------------------------------------------------------------- |
+| `src/pages/NoteMembers.tsx`   | 31:31  | max-lines              | Arrow 179 行                | ✅ NoteMembersLoadingOrDenied/ManageSection 抽出で解消          |
+| `src/pages/NotePageView.tsx`  | 14:32  | complexity             | Arrow 23                    | ✅ canEditPage 抽出・条件変数化で解消                           |
+| `src/pages/NoteSettings.tsx`  | 52:32  | max-lines              | Arrow 224 行                |                                                                 |
+| `src/pages/NoteView.tsx`      | 30:28  | max-lines + complexity | Arrow 228 行, complexity 29 | ✅ 分割・getNoteViewPermissions 抽出で解消                      |
+| `src/pages/Notes.tsx`         | 50:25  | max-lines              | Arrow 152 行                | ✅ CreateNoteDialogContent 抽出で解消                           |
+| `src/pages/Onboarding.tsx`    | 30:30  | max-lines              | Arrow 229 行                |                                                                 |
+| `src/pages/Pricing.tsx`       | 118:27 | max-lines              | Arrow 172 行                | ✅ PricingAiInfo/Faq/BillingIntervalToggle/PlanCards 抽出で解消 |
+| `src/pages/SearchResults.tsx` | 34:16  | max-lines              | `SearchResults` 199 行      |                                                                 |
 
 #### src テスト（_.test.ts / _.test.tsx）
 
