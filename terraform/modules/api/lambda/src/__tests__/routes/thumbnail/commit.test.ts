@@ -23,23 +23,25 @@ vi.mock("../../../middleware/rateLimiter", () => ({
   },
 }));
 
+const defaultEnv = {
+  CORS_ORIGIN: "*",
+  MEDIA_BUCKET: "b",
+  AI_SECRETS_ARN: "a",
+  RATE_LIMIT_TABLE: "r",
+  THUMBNAIL_SECRETS_ARN: "a",
+  THUMBNAIL_BUCKET: "test-thumbnail-bucket",
+  THUMBNAIL_CLOUDFRONT_URL: "https://thumbnails.test.example.com",
+  ENVIRONMENT: "test",
+  POLAR_SECRET_ARN: "a",
+  COGNITO_USER_POOL_ID: "p",
+  COGNITO_REGION: "us-east-1",
+  AURORA_CLUSTER_ARN: "a",
+  DB_CREDENTIALS_SECRET: "a",
+  AURORA_DATABASE_NAME: "zedi",
+};
+
 vi.mock("../../../env", () => ({
-  getEnvConfig: vi.fn(() => ({
-    CORS_ORIGIN: "*",
-    MEDIA_BUCKET: "b",
-    AI_SECRETS_ARN: "a",
-    RATE_LIMIT_TABLE: "r",
-    THUMBNAIL_SECRETS_ARN: "a",
-    THUMBNAIL_BUCKET: "test-thumbnail-bucket",
-    THUMBNAIL_CLOUDFRONT_URL: "https://thumbnails.test.example.com",
-    ENVIRONMENT: "test",
-    POLAR_SECRET_ARN: "a",
-    COGNITO_USER_POOL_ID: "p",
-    COGNITO_REGION: "us-east-1",
-    AURORA_CLUSTER_ARN: "a",
-    DB_CREDENTIALS_SECRET: "a",
-    AURORA_DATABASE_NAME: "zedi",
-  })),
+  getEnvConfig: vi.fn(() => defaultEnv),
   resetEnvCache: vi.fn(),
 }));
 
@@ -47,6 +49,7 @@ vi.mock("../../../services/commitService", () => ({
   commitImage: mockCommitImage,
 }));
 
+import { getEnvConfig } from "../../../env";
 import commitRoutes from "../../../routes/thumbnail/commit";
 
 describe("Thumbnail Commit API", () => {
@@ -55,6 +58,8 @@ describe("Thumbnail Commit API", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getEnvConfig).mockReturnValue(defaultEnv);
+
     mockDb = createMockDb();
     app = new Hono<AppEnv>();
     app.use("*", async (c, next) => {
@@ -96,5 +101,47 @@ describe("Thumbnail Commit API", () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+
+  it("returns 503 when THUMBNAIL_BUCKET is not set", async () => {
+    vi.mocked(getEnvConfig).mockReturnValue({
+      ...defaultEnv,
+      THUMBNAIL_BUCKET: "",
+    });
+
+    const res = await jsonRequest(app, "POST", "/", {
+      sourceUrl: "https://example.com/image.jpg",
+    });
+
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error ?? body.message).toContain("保存先が設定されていません");
+    expect(mockCommitImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 when storage quota exceeded", async () => {
+    mockCommitImage.mockRejectedValueOnce(new Error("STORAGE_QUOTA_EXCEEDED"));
+
+    const res = await jsonRequest(app, "POST", "/", {
+      sourceUrl: "https://example.com/image.jpg",
+    });
+
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error ?? body.message).toContain("容量制限");
+    expect(mockCommitImage).toHaveBeenCalled();
+  });
+
+  it("returns 502 when commitImage throws other error", async () => {
+    mockCommitImage.mockRejectedValueOnce(new Error("S3 upload failed"));
+
+    const res = await jsonRequest(app, "POST", "/", {
+      sourceUrl: "https://example.com/image.jpg",
+    });
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error ?? body.message).toContain("サムネイルの保存に失敗しました");
+    expect(mockCommitImage).toHaveBeenCalled();
   });
 });
