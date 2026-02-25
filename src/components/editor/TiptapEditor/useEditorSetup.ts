@@ -64,6 +64,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
   } = options;
 
   const isEditorInitializedRef = useRef(false);
+  const lastReportedContentRef = useRef<string | null>(null);
 
   const initialParsedContent = useMemo(() => {
     if (!content) return undefined;
@@ -76,14 +77,15 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
   }, [content]);
 
   useEffect(() => {
-    if (content && initialParsedContent === undefined) {
-      onContentError?.({
-        message: "コンテンツの解析に失敗しました。データが破損している可能性があります。",
-        removedNodeTypes: [],
-        removedMarkTypes: [],
-        wasSanitized: false,
-      });
-    }
+    if (!content || initialParsedContent !== undefined) return;
+    if (lastReportedContentRef.current === content) return;
+    lastReportedContentRef.current = content;
+    onContentError?.({
+      message: "コンテンツの解析に失敗しました。データが破損している可能性があります。",
+      removedNodeTypes: [],
+      removedMarkTypes: [],
+      wasSanitized: false,
+    });
   }, [content, initialParsedContent, onContentError]);
 
   const useCollaborationMode = Boolean(

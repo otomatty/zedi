@@ -328,6 +328,7 @@ async function consumeSSEStream(
         continue;
       }
       if (processSSEDataLine(payload, state, callbacks)) {
+        await reader.cancel();
         return true;
       }
 
@@ -394,6 +395,8 @@ async function handleAIChatHttpResponse(
         finishReason: state.finishReason,
         usage: state.lastUsage,
       });
+    } else if (!streamCompleted && !state.fullContent) {
+      callbacks.onError?.(new Error("ストリーミングレスポンスが空のまま切断されました"));
     }
     return;
   }
