@@ -68,7 +68,7 @@ jobs:
           TF_VAR_thumbnail_google_custom_search_engine_id: ${{ secrets.TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_ENGINE_ID }}
 
       - name: Comment on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
