@@ -3,9 +3,10 @@
 -- Apply to dev Aurora: see db/aurora/README.md
 
 -- =============================================================================
--- Extensions (run first; pg_bigm for Japanese full-text search)
+-- Extensions (run first; pg_bigm for Japanese full-text search, pgcrypto for gen_random_uuid)
 -- =============================================================================
 CREATE EXTENSION IF NOT EXISTS pg_bigm;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- =============================================================================
 -- 1. users

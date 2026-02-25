@@ -177,6 +177,7 @@ try {
         console.log("FAILED");
         console.error(`    ${result.error.slice(0, 300)}`);
         fail++;
+        break;
       }
     }
 

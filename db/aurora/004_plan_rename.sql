@@ -3,10 +3,10 @@
 
 -- =============================================================================
 -- subscriptions: plan 'paid' -> 'pro'
+-- DROP first so UPDATE does not violate the old check constraint
 -- =============================================================================
-UPDATE subscriptions SET plan = 'pro' WHERE plan = 'paid';
-
 ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS subscriptions_plan_check;
+UPDATE subscriptions SET plan = 'pro' WHERE plan = 'paid';
 ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_plan_check CHECK (plan IN ('free', 'pro'));
 
 -- =============================================================================
