@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
@@ -64,25 +64,38 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
   } = options;
 
   const isEditorInitializedRef = useRef(false);
+  const lastReportedContentRef = useRef<string | null>(null);
 
-  let initialParsedContent: unknown = undefined;
-  if (content) {
+  const initialParsedContent = useMemo(() => {
+    if (!content) return undefined;
     try {
-      initialParsedContent = JSON.parse(content);
+      return JSON.parse(content);
     } catch (e) {
       console.error("Failed to parse content:", e);
-      onContentError?.({
-        message: "コンテンツの解析に失敗しました。データが破損している可能性があります。",
-        removedNodeTypes: [],
-        removedMarkTypes: [],
-        wasSanitized: false,
-      });
+      return undefined;
     }
-  }
+  }, [content]);
+
+  useEffect(() => {
+    if (!content || initialParsedContent !== undefined) return;
+    if (lastReportedContentRef.current === content) return;
+    lastReportedContentRef.current = content;
+    onContentError?.({
+      message: "コンテンツの解析に失敗しました。データが破損している可能性があります。",
+      removedNodeTypes: [],
+      removedMarkTypes: [],
+      wasSanitized: false,
+    });
+  }, [content, initialParsedContent, onContentError]);
 
   const useCollaborationMode = Boolean(
     collaborationConfig?.xmlFragment && collaborationConfig?.user,
   );
+
+  const slashStateRef = useRef(slashState);
+  slashStateRef.current = slashState;
+  const suggestionStateRef = useRef(suggestionState);
+  suggestionStateRef.current = suggestionState;
 
   const editor = useEditor(
     {
@@ -132,8 +145,9 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
       editorProps: {
         ...defaultEditorProps,
         handleKeyDown: (_view, event) => {
-          if (slashState?.active && slashRef.current) return slashRef.current.onKeyDown(event);
-          if (suggestionState?.active && suggestionRef.current)
+          if (slashStateRef.current?.active && slashRef.current)
+            return slashRef.current.onKeyDown(event);
+          if (suggestionStateRef.current?.active && suggestionRef.current)
             return suggestionRef.current.onKeyDown(event);
           return false;
         },

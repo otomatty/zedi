@@ -5,7 +5,7 @@
  */
 
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
-import type { PageMetadata, Link, GhostLink } from "@/lib/storageAdapter/types";
+import type { PageMetadata, GhostLink } from "@/lib/storageAdapter/types";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { SyncPageItem, SyncLinkItem, SyncGhostLinkItem } from "@/lib/api/types";
 
@@ -185,6 +185,28 @@ function computeSince(
   return lastSync ? new Date(lastSync).toISOString() : undefined;
 }
 
+/** links/ghost_links を source ごとにグループ化し、pulledPageIds を含む全 source に対して保存する（stale クリア含む） */
+async function applyRelatedItems<T, U>(
+  items: T[],
+  pulledPageIds: Set<string>,
+  getSourceId: (item: T) => string,
+  mapToLocal: (items: T[]) => U[],
+  saveFn: (sourceId: string, localItems: U[]) => Promise<void>,
+): Promise<void> {
+  const bySource = new Map<string, T[]>();
+  for (const item of items) {
+    const sid = getSourceId(item);
+    const list = bySource.get(sid) ?? [];
+    list.push(item);
+    bySource.set(sid, list);
+  }
+  const allSourceIds = new Set([...pulledPageIds, ...bySource.keys()]);
+  for (const sourceId of allSourceIds) {
+    const sourceItems = bySource.get(sourceId) ?? [];
+    await saveFn(sourceId, mapToLocal(sourceItems));
+  }
+}
+
 async function applyPull(
   adapter: StorageAdapter,
   res: {
@@ -193,42 +215,44 @@ async function applyPull(
     ghost_links: SyncGhostLinkItem[];
   },
 ): Promise<void> {
+  const pulledPageIds = new Set(res.pages.map((p) => p.id));
+
   for (const row of res.pages) {
     const meta = syncPageToMetadata(row);
     const local = await adapter.getPage(meta.id);
     if (local && local.updatedAt > meta.updatedAt) continue;
     await adapter.upsertPage(meta);
   }
-  const linkBySource = new Map<string, SyncLinkItem[]>();
-  for (const l of res.links) {
-    const list = linkBySource.get(l.source_id) ?? [];
-    list.push(l);
-    linkBySource.set(l.source_id, list);
-  }
-  for (const [sourceId, items] of linkBySource) {
-    const links: Link[] = items.map((l) => ({
-      sourceId: l.source_id,
-      targetId: l.target_id,
-      createdAt: typeof l.created_at === "string" ? new Date(l.created_at).getTime() : l.created_at,
-    }));
-    await adapter.saveLinks(sourceId, links);
-  }
-  const ghostBySource = new Map<string, SyncGhostLinkItem[]>();
-  for (const g of res.ghost_links) {
-    const list = ghostBySource.get(g.source_page_id) ?? [];
-    list.push(g);
-    ghostBySource.set(g.source_page_id, list);
-  }
-  for (const [sourcePageId, items] of ghostBySource) {
-    const ghostLinks: GhostLink[] = items.map((g) => ({
-      linkText: g.link_text,
-      sourcePageId: g.source_page_id,
-      createdAt: typeof g.created_at === "string" ? new Date(g.created_at).getTime() : g.created_at,
-      originalTargetPageId: g.original_target_page_id ?? null,
-      originalNoteId: g.original_note_id ?? null,
-    }));
-    await adapter.saveGhostLinks(sourcePageId, ghostLinks);
-  }
+
+  await applyRelatedItems(
+    res.links,
+    pulledPageIds,
+    (l) => l.source_id,
+    (items) =>
+      items.map((l) => ({
+        sourceId: l.source_id,
+        targetId: l.target_id,
+        createdAt:
+          typeof l.created_at === "string" ? new Date(l.created_at).getTime() : l.created_at,
+      })),
+    (sourceId, links) => adapter.saveLinks(sourceId, links),
+  );
+
+  await applyRelatedItems(
+    res.ghost_links,
+    pulledPageIds,
+    (g) => g.source_page_id,
+    (items) =>
+      items.map((g) => ({
+        linkText: g.link_text,
+        sourcePageId: g.source_page_id,
+        createdAt:
+          typeof g.created_at === "string" ? new Date(g.created_at).getTime() : g.created_at,
+        originalTargetPageId: g.original_target_page_id ?? null,
+        originalNoteId: g.original_note_id ?? null,
+      })),
+    (sourcePageId, ghostLinks) => adapter.saveGhostLinks(sourcePageId, ghostLinks),
+  );
 }
 
 function getPagesForPush(
@@ -278,13 +302,13 @@ async function pushPagesToApi(
   if (pushPages.length > PAGE_PUSH_CHUNK_SIZE) {
     for (let i = 0; i < pushPages.length; i += PAGE_PUSH_CHUNK_SIZE) {
       const chunk = pushPages.slice(i, i + PAGE_PUSH_CHUNK_SIZE);
-      await api.postSyncPages({ pages: chunk });
+      const isLastChunk = i + PAGE_PUSH_CHUNK_SIZE >= pushPages.length;
+      await api.postSyncPages({
+        pages: chunk,
+        links: isLastChunk ? pushLinks : undefined,
+        ghost_links: isLastChunk ? pushGhostLinks : undefined,
+      });
     }
-    await api.postSyncPages({
-      pages: [],
-      links: pushLinks,
-      ghost_links: pushGhostLinks,
-    });
   } else {
     await api.postSyncPages({
       pages: pushPages,

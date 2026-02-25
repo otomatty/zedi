@@ -186,7 +186,14 @@ try {
     }
 
     const safeFile = file.replace(/'/g, "''");
-    runSql(`INSERT INTO _schema_migrations (filename) VALUES ('${safeFile}');`, tmpDir);
+    const recorded = runSql(
+      `INSERT INTO _schema_migrations (filename) VALUES ('${safeFile}') ON CONFLICT DO NOTHING;`,
+      tmpDir,
+    );
+    if (!recorded.ok) {
+      console.error(`\n${file}: failed to record in _schema_migrations: ${recorded.error}`);
+      process.exit(1);
+    }
     console.log(`${file}: ${ok} statement(s) applied.`);
   }
 
