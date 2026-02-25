@@ -1,4 +1,4 @@
-# Deploy dev infrastructure on push to develop.
+# Deploy dev infrastructure when a PR is merged into develop.
 # Applies Terraform (dev workspace), runs DB migrations, and deploys Hocuspocus.
 # Frontend is NOT deployed — use localhost against dev cloud resources.
 #
@@ -11,7 +11,8 @@
 name: Deploy Dev
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [develop]
   workflow_dispatch:
 
@@ -22,6 +23,7 @@ concurrency:
 jobs:
   terraform:
     name: Terraform Apply (dev)
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: dev
     outputs:
@@ -32,6 +34,8 @@ jobs:
       ecs_service: ${{ steps.outputs.outputs.ecs_service }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -98,6 +102,8 @@ jobs:
     environment: dev
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -119,6 +125,8 @@ jobs:
     environment: dev
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:

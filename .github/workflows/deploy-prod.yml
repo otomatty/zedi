@@ -1,4 +1,4 @@
-# Deploy everything to production on push to main.
+# Deploy everything to production when a PR is merged into main.
 # Applies Terraform (prod workspace), runs DB migrations, deploys frontend
 # to S3/CloudFront, and updates the Hocuspocus ECS service.
 #
@@ -14,7 +14,8 @@
 name: Deploy Prod
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [main]
   workflow_dispatch:
 
@@ -28,6 +29,7 @@ jobs:
   # ============================================================
   terraform:
     name: Terraform Apply (prod)
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: prod
     outputs:
@@ -40,6 +42,8 @@ jobs:
       ecs_service: ${{ steps.outputs.outputs.ecs_service }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -111,6 +115,8 @@ jobs:
     environment: prod
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -136,6 +142,8 @@ jobs:
     environment: prod
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -180,6 +188,8 @@ jobs:
     environment: prod
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
