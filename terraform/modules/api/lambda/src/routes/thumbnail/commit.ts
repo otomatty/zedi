@@ -50,10 +50,7 @@ app.post("/", authRequired, rateLimiter, async (c) => {
     }
     console.error("Thumbnail commit failed:", err);
     throw new HTTPException(502, {
-      message:
-        err instanceof Error
-          ? `サムネイルの保存に失敗しました: ${err.message}`
-          : "サムネイルの保存に失敗しました",
+      message: "サムネイルの保存に失敗しました。しばらくしてからもう一度お試しください。",
     });
   }
 });

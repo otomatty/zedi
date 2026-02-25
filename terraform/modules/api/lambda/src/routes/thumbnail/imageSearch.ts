@@ -48,8 +48,7 @@ app.get("/", authRequired, rateLimiter, async (c) => {
   } catch (err) {
     console.error("Image search failed:", err);
     throw new HTTPException(502, {
-      message:
-        err instanceof Error ? `画像検索に失敗しました: ${err.message}` : "画像検索に失敗しました",
+      message: "画像検索に失敗しました。しばらくしてからもう一度お試しください。",
     });
   }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 
 const { mockSearchImages, mockGetThumbnailSecrets, mockGetRequired } = vi.hoisted(() => ({
   mockSearchImages: vi.fn(),
@@ -22,23 +23,25 @@ vi.mock("../../../middleware/rateLimiter", () => ({
   },
 }));
 
+const defaultEnv = {
+  CORS_ORIGIN: "*",
+  MEDIA_BUCKET: "b",
+  AI_SECRETS_ARN: "a",
+  RATE_LIMIT_TABLE: "r",
+  THUMBNAIL_SECRETS_ARN: "arn:aws:secretsmanager:test:thumbnail",
+  THUMBNAIL_BUCKET: "b",
+  THUMBNAIL_CLOUDFRONT_URL: "https://t",
+  ENVIRONMENT: "test",
+  POLAR_SECRET_ARN: "a",
+  COGNITO_USER_POOL_ID: "p",
+  COGNITO_REGION: "us-east-1",
+  AURORA_CLUSTER_ARN: "a",
+  DB_CREDENTIALS_SECRET: "a",
+  AURORA_DATABASE_NAME: "zedi",
+};
+
 vi.mock("../../../env", () => ({
-  getEnvConfig: vi.fn(() => ({
-    CORS_ORIGIN: "*",
-    MEDIA_BUCKET: "b",
-    AI_SECRETS_ARN: "a",
-    RATE_LIMIT_TABLE: "r",
-    THUMBNAIL_SECRETS_ARN: "arn:aws:secretsmanager:test:thumbnail",
-    THUMBNAIL_BUCKET: "b",
-    THUMBNAIL_CLOUDFRONT_URL: "https://t",
-    ENVIRONMENT: "test",
-    POLAR_SECRET_ARN: "a",
-    COGNITO_USER_POOL_ID: "p",
-    COGNITO_REGION: "us-east-1",
-    AURORA_CLUSTER_ARN: "a",
-    DB_CREDENTIALS_SECRET: "a",
-    AURORA_DATABASE_NAME: "zedi",
-  })),
+  getEnvConfig: vi.fn(() => defaultEnv),
   resetEnvCache: vi.fn(),
 }));
 
@@ -51,6 +54,7 @@ vi.mock("../../../services/imageSearch", () => ({
   searchImages: mockSearchImages,
 }));
 
+import { getEnvConfig } from "../../../env";
 import imageSearchRoutes from "../../../routes/thumbnail/imageSearch";
 
 describe("Thumbnail Image Search API", () => {
@@ -58,8 +62,16 @@ describe("Thumbnail Image Search API", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getEnvConfig).mockReturnValue(defaultEnv);
+
     app = new Hono();
     app.route("/", imageSearchRoutes);
+    app.onError((err, c) => {
+      if (err instanceof HTTPException) {
+        return c.json({ error: err.message }, err.status);
+      }
+      return c.json({ error: "Internal server error" }, 500);
+    });
 
     mockGetThumbnailSecrets.mockResolvedValue({
       GOOGLE_CUSTOM_SEARCH_API_KEY: "test-api-key",
@@ -132,5 +144,40 @@ describe("Thumbnail Image Search API", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { nextCursor: string | undefined };
     expect(body.nextCursor).toBe("2");
+  });
+
+  it("returns 503 when THUMBNAIL_SECRETS_ARN is not set", async () => {
+    vi.mocked(getEnvConfig).mockReturnValue({
+      ...defaultEnv,
+      THUMBNAIL_SECRETS_ARN: "",
+    });
+
+    const res = await app.request("/?query=test");
+
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error ?? body.message).toContain("API キーが未設定");
+    expect(mockSearchImages).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when getThumbnailSecrets throws", async () => {
+    mockGetThumbnailSecrets.mockRejectedValueOnce(new Error("secrets fetch failed"));
+
+    const res = await app.request("/?query=test");
+
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error ?? body.message).toContain("API キーの取得に失敗");
+    expect(mockSearchImages).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 when searchImages throws", async () => {
+    mockSearchImages.mockRejectedValueOnce(new Error("Google API error"));
+
+    const res = await app.request("/?query=test");
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error ?? body.message).toContain("画像検索に失敗しました");
   });
 });
