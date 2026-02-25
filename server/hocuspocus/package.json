@@ -17,7 +17,7 @@
     "yjs": "^13.6.29"
   },
   "devDependencies": {
-    "@types/node": "^20.17.0",
+    "@types/node": "^25.3.0",
     "@types/pg": "^8.16.0",
     "@types/ws": "^8.18.1",
     "tsx": "^4.19.0",
