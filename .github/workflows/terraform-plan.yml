@@ -25,7 +25,7 @@ jobs:
       TF_WORKSPACE: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
       TF_VARS_FILE: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: hashicorp/setup-terraform@v3
         with:
