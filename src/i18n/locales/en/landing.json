@@ -1,0 +1,20 @@
+{
+  "startFree": "Get started for free",
+  "openApp": "Open app",
+  "heroTitle1": "Connect your thoughts",
+  "heroTitle2": "Personal knowledge base",
+  "heroDescription": "Zedi links your ideas and notes with bidirectional links to build a network of knowledge.",
+  "featuresHeading": "Features",
+  "feature1Title": "Simple notes",
+  "feature1Description": "Record your thoughts quickly with a Markdown-capable rich editor.",
+  "feature2Title": "Bidirectional links",
+  "feature2Description": "Link easily with [[page name]]. Connect ideas and build a knowledge graph.",
+  "feature3Title": "Fast search",
+  "feature3Description": "Full-text search finds your notes instantly from anywhere.",
+  "feature4Title": "Cloud sync",
+  "feature4Description": "Local-first design. Works offline and syncs to the cloud automatically.",
+  "feature5Title": "AI support",
+  "feature5Description": "AI helps organize notes and generate diagrams. Get more from your knowledge.",
+  "ctaTitle": "Get started now",
+  "ctaDescription": "Create a free account and build your knowledge base."
+}

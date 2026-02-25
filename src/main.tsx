@@ -1,43 +1,34 @@
 import { StrictMode, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { ClerkProvider } from "@clerk/clerk-react";
-import { MockClerkProvider } from "./components/auth/MockClerkProvider";
+import { CognitoAuthProvider } from "./components/auth/CognitoAuthProvider";
+import { MockAuthProvider } from "./components/auth/MockAuthProvider";
 import App from "./App.tsx";
 import "./index.css";
+import "./i18n"; // i18n 初期化
 
-// Check if we're in E2E test mode
 const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
-if (!PUBLISHABLE_KEY && !isE2EMode) {
-  throw new Error("Missing Clerk Publishable Key");
-}
-
-// Clerk automatically determines the correct Frontend API URL from the publishableKey
-// No need to explicitly set clerkJSUrl - Clerk will handle it automatically
-
-/**
- * Auth provider wrapper that uses MockClerkProvider in E2E test mode
- * and real ClerkProvider in production.
- */
 function AuthProvider({ children }: { children: ReactNode }) {
   if (isE2EMode) {
-    console.log("[E2E Mode] Using MockClerkProvider");
-    return <MockClerkProvider>{children}</MockClerkProvider>;
+    return <MockAuthProvider>{children}</MockAuthProvider>;
   }
-
-  return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY!} afterSignOutUrl="/">
-      {children}
-    </ClerkProvider>
-  );
+  return <CognitoAuthProvider>{children}</CognitoAuthProvider>;
 }
 
-createRoot(document.getElementById("root")!).render(
+// Require Cognito config when not E2E (no build-time throw; fails at first auth use if missing)
+if (!isE2EMode && !import.meta.env.VITE_COGNITO_DOMAIN) {
+  console.warn("[Auth] VITE_COGNITO_DOMAIN is not set; sign-in will fail.");
+}
+if (!isE2EMode && !import.meta.env.VITE_COGNITO_CLIENT_ID) {
+  console.warn("[Auth] VITE_COGNITO_CLIENT_ID is not set; sign-in will fail.");
+}
+
+const rootEl = document.getElementById("root");
+if (!rootEl) throw new Error("Root element #root not found");
+createRoot(rootEl).render(
   <StrictMode>
     <AuthProvider>
       <App />
     </AuthProvider>
-  </StrictMode>
+  </StrictMode>,
 );

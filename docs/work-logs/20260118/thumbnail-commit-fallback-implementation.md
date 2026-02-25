@@ -10,7 +10,8 @@
 
 **問題**: `POST /api/thumbnail/commit`エンドポイントで、外部画像URL（`sourceUrl`）から画像を取得する際に403エラーが発生し、Gyazoへのアップロードが失敗していた。
 
-**解決策**: 
+**解決策**:
+
 1. `previewUrl`を`fallbackUrl`として利用可能に
 2. `sourceUrl`が失敗した場合に`fallbackUrl`を試行するフォールバック機能を実装
 3. 画像取得時に適切なHTTPヘッダー（User-Agent, Accept, Accept-Language, Referer）を追加
@@ -54,6 +55,7 @@ const fetchImage = async (url: string) => {
 ```
 
 **実装理由**:
+
 - `User-Agent`: クライアント識別のため（多くのAPIで必須）
 - `Accept`: コンテンツタイプの交渉
 - `Accept-Language`: 言語設定
@@ -68,10 +70,11 @@ export async function uploadToGyazo(
   sourceUrl: string,
   accessToken: string,
   title?: string,
-  fallbackUrl?: string // 追加
+  fallbackUrl?: string, // 追加
 ): Promise<{ imageUrl: string; permalinkUrl?: string }> {
   let response = await fetchImage(sourceUrl);
-  if (!response.ok && fallbackUrl) { // フォールバック処理
+  if (!response.ok && fallbackUrl) {
+    // フォールバック処理
     response = await fetchImage(fallbackUrl);
   }
   if (!response.ok) {
@@ -82,6 +85,7 @@ export async function uploadToGyazo(
 ```
 
 **動作**:
+
 1. まず`sourceUrl`から画像を取得を試行
 2. 失敗（403等）かつ`fallbackUrl`が存在する場合、`fallbackUrl`から取得を試行
 3. どちらも失敗した場合はエラーをスロー
@@ -100,7 +104,7 @@ route.post("/thumbnail/commit", async (c) => {
       body.sourceUrl,
       accessToken,
       body.title,
-      body.fallbackUrl // 追加
+      body.fallbackUrl, // 追加
     );
     // ...
   } catch (error) {
@@ -118,11 +122,14 @@ route.post("/thumbnail/commit", async (c) => {
 候補画像選択時に`previewUrl`を`onSelectThumbnail`コールバックに渡すように更新。
 
 ```typescript
-const handleSelectCandidate = useCallback((candidate: ThumbnailCandidate) => {
-  onSelectThumbnail(candidate.imageUrl, candidate.alt, candidate.previewUrl); // previewUrlを追加
-  setMode("actions");
-  setErrorMessage(null);
-}, [onSelectThumbnail]);
+const handleSelectCandidate = useCallback(
+  (candidate: ThumbnailCandidate) => {
+    onSelectThumbnail(candidate.imageUrl, candidate.alt, candidate.previewUrl); // previewUrlを追加
+    setMode("actions");
+    setErrorMessage(null);
+  },
+  [onSelectThumbnail],
+);
 ```
 
 #### 4.2 TiptapEditorコンポーネント
@@ -133,30 +140,30 @@ const handleSelectCandidate = useCallback((candidate: ThumbnailCandidate) => {
 
 ```typescript
 const handleInsertThumbnailImage = useCallback(
-  async (imageUrl: string, alt: string, previewUrl?: string) => { // previewUrlパラメータを追加
+  async (imageUrl: string, alt: string, previewUrl?: string) => {
+    // previewUrlパラメータを追加
     // ... バリデーション処理
     try {
-      const response = await fetch(
-        `${THUMBNAIL_API_BASE_URL}/api/thumbnail/commit`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Gyazo-Access-Token": accessToken,
-          },
-          body: JSON.stringify({
-            sourceUrl: imageUrl,
-            fallbackUrl: previewUrl, // 追加
-            title: altText,
-          }),
-        }
-      );
+      const response = await fetch(`${THUMBNAIL_API_BASE_URL}/api/thumbnail/commit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Gyazo-Access-Token": accessToken,
+        },
+        body: JSON.stringify({
+          sourceUrl: imageUrl,
+          fallbackUrl: previewUrl, // 追加
+          title: altText,
+        }),
+      });
       // ... エラーハンドリングと画像挿入処理
     } catch (error) {
       // ...
     }
   },
-  [/* dependencies */]
+  [
+    /* dependencies */
+  ],
 );
 ```
 
@@ -216,14 +223,14 @@ const handleInsertThumbnailImage = useCallback(
 
 ## コード変更統計
 
-| ファイル | 変更行数 | 追加 | 削除 |
-|---------|---------|------|------|
-| `workers/thumbnail-api/src/types/api.ts` | +1 | 1 | 0 |
-| `workers/thumbnail-api/src/services/gyazo.ts` | +25 | 25 | 0 |
-| `workers/thumbnail-api/src/routes/thumbnail-commit.ts` | +1 | 1 | 0 |
-| `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx` | +1 | 1 | 0 |
-| `src/components/editor/TiptapEditor.tsx` | +2 | 2 | 0 |
-| **合計** | **+30** | **30** | **0** |
+| ファイル                                                         | 変更行数 | 追加   | 削除  |
+| ---------------------------------------------------------------- | -------- | ------ | ----- |
+| `workers/thumbnail-api/src/types/api.ts`                         | +1       | 1      | 0     |
+| `workers/thumbnail-api/src/services/gyazo.ts`                    | +25      | 25     | 0     |
+| `workers/thumbnail-api/src/routes/thumbnail-commit.ts`           | +1       | 1      | 0     |
+| `src/components/editor/TiptapEditor/EditorRecommendationBar.tsx` | +1       | 1      | 0     |
+| `src/components/editor/TiptapEditor.tsx`                         | +2       | 2      | 0     |
+| **合計**                                                         | **+30**  | **30** | **0** |
 
 ## 学んだこと・気づき
 

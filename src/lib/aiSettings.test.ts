@@ -17,7 +17,6 @@ vi.mock("./encryption", () => ({
 
 // encryptとdecryptをvi.mockedで使えるようにする
 const mockedEncrypt = vi.mocked(encrypt);
-const mockedDecrypt = vi.mocked(decrypt);
 
 describe("aiSettings - 回帰テスト", () => {
   beforeEach(() => {
@@ -36,6 +35,7 @@ describe("aiSettings - 回帰テスト", () => {
         apiKey: "test-api-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
 
@@ -45,6 +45,7 @@ describe("aiSettings - 回帰テスト", () => {
       expect(loaded).toEqual({
         ...settings,
         apiKey: "test-api-key", // 復号化された値
+        modelId: "openai:gpt-4o", // loadAISettingsで付与される
       });
       expect(encrypt).toHaveBeenCalledWith("test-api-key");
       expect(decrypt).toHaveBeenCalledWith("encrypted:test-api-key");
@@ -57,6 +58,7 @@ describe("aiSettings - 回帰テスト", () => {
         apiMode: "api_server",
         model: "gpt-4o",
         isConfigured: false,
+        modelId: "openai:gpt-4o",
       };
 
       await saveAISettings(settings);
@@ -128,6 +130,7 @@ describe("aiSettings - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "api_server", // 既に設定されている
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
 
@@ -145,6 +148,7 @@ describe("aiSettings - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
 
@@ -163,6 +167,7 @@ describe("aiSettings - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
 
@@ -173,11 +178,13 @@ describe("aiSettings - 回帰テスト", () => {
     });
 
     it("設定が無効な場合はfalseを返す", async () => {
+      // user_api_keyでapiKeyが空の場合は未設定扱いでfalse
       const settings: AISettings = {
         provider: "openai",
         apiKey: "",
-        apiMode: "api_server",
+        apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: false,
       };
 
@@ -187,9 +194,9 @@ describe("aiSettings - 回帰テスト", () => {
       expect(result).toBe(false);
     });
 
-    it("設定が存在しない場合はfalseを返す", async () => {
+    it("設定が存在しない場合はデフォルトでtrueを返す（api_server利用可能）", async () => {
       const result = await isAIConfigured();
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
   });
 
@@ -236,12 +243,11 @@ describe("aiSettings - 回帰テスト", () => {
         apiKey: "test-key",
         apiMode: "user_api_key",
         model: "gpt-4o",
+        modelId: "openai:gpt-4o",
         isConfigured: true,
       };
 
-      await expect(saveAISettings(settings)).rejects.toThrow(
-        "AI設定の保存に失敗しました"
-      );
+      await expect(saveAISettings(settings)).rejects.toThrow("AI設定の保存に失敗しました");
     });
   });
 });

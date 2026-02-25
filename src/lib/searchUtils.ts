@@ -19,7 +19,7 @@ export function escapeRegExp(string: string): string {
 export function extractSmartSnippet(
   text: string,
   keywords: string[],
-  maxLength: number = 120
+  maxLength: number = 120,
 ): string {
   if (!text || keywords.length === 0) {
     return text.slice(0, maxLength) + (text.length > maxLength ? "..." : "");
@@ -60,10 +60,7 @@ export function extractSmartSnippet(
 
     if (index !== -1) {
       const start = Math.max(0, index - 40);
-      const end = Math.min(
-        bestSentence.length,
-        index + firstKeyword.length + 60
-      );
+      const end = Math.min(bestSentence.length, index + firstKeyword.length + 60);
       let snippet = bestSentence.slice(start, end);
 
       if (start > 0) snippet = "..." + snippet;
@@ -103,7 +100,7 @@ export function determineMatchType(
   title: string,
   content: string,
   keywords: string[],
-  originalQuery: string
+  originalQuery: string,
 ): MatchType {
   const titleLower = title.toLowerCase();
   const contentLower = content.toLowerCase();
@@ -116,12 +113,8 @@ export function determineMatchType(
   }
 
   // 各キーワードのマッチを確認
-  const titleMatchAll = keywords.every((k) =>
-    titleLower.includes(k.toLowerCase())
-  );
-  const contentMatchAll = keywords.every((k) =>
-    contentLower.includes(k.toLowerCase())
-  );
+  const titleMatchAll = keywords.every((k) => titleLower.includes(k.toLowerCase()));
+  const contentMatchAll = keywords.every((k) => contentLower.includes(k.toLowerCase()));
 
   if (titleMatchAll && contentMatchAll) {
     return "both";
@@ -138,7 +131,7 @@ export function determineMatchType(
 export function calculateEnhancedScore(
   page: Page,
   keywords: string[],
-  matchType: MatchType
+  matchType: MatchType,
 ): number {
   let score = 0;
 

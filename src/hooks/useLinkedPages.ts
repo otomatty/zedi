@@ -1,9 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRepository, usePage, pageKeys } from "./usePageQueries";
-import {
-  extractWikiLinksFromContent,
-  getUniqueWikiLinkTitles,
-} from "@/lib/wikiLinkUtils";
+import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
 import { getContentPreview } from "@/lib/contentUtils";
 import type { Page, PageSummary } from "@/types/page";
 
@@ -89,9 +86,7 @@ export function summaryToCard(summary: PageSummary): PageCard {
  * Pure function to calculate linked pages data
  * This is extracted for easier testing
  */
-export function calculateLinkedPages(
-  input: CalculateLinkedPagesInput
-): LinkedPagesData {
+export function calculateLinkedPages(input: CalculateLinkedPagesInput): LinkedPagesData {
   const { currentPage, pageId, allPages, backlinkIds } = input;
 
   // 1. Extract WikiLinks from current page content
@@ -99,9 +94,7 @@ export function calculateLinkedPages(
   const linkTitles = getUniqueWikiLinkTitles(wikiLinks);
 
   // 2. Create page mappings
-  const pageByTitle = new Map(
-    allPages.map((p) => [p.title.toLowerCase().trim(), p])
-  );
+  const pageByTitle = new Map(allPages.map((p) => [p.title.toLowerCase().trim(), p]));
   const pageById = new Map(allPages.map((p) => [p.id, p]));
 
   // 3. Outgoing Links (existing pages only)
@@ -142,11 +135,7 @@ export function calculateLinkedPages(
 
     for (const link of secondaryLinks) {
       const targetPage = pageByTitle.get(link.title.toLowerCase().trim());
-      if (
-        targetPage &&
-        targetPage.id !== pageId &&
-        !outgoingIds.has(targetPage.id)
-      ) {
+      if (targetPage && targetPage.id !== pageId && !outgoingIds.has(targetPage.id)) {
         // Add to children for this source
         const alreadyInChildren = children.some((c) => c.id === targetPage.id);
         if (!alreadyInChildren) {
@@ -185,25 +174,16 @@ export function calculateLinkedPages(
  * Uses summary for title matching and fetches content only for necessary pages
  */
 export function calculateLinkedPagesOptimized(
-  input: CalculateLinkedPagesOptimizedInput
+  input: CalculateLinkedPagesOptimizedInput,
 ): LinkedPagesData {
-  const {
-    currentPage,
-    pageId,
-    allPagesSummary,
-    outgoingPages,
-    backlinkPages,
-    backlinkIds,
-  } = input;
+  const { currentPage, pageId, allPagesSummary, outgoingPages, backlinkPages, backlinkIds } = input;
 
   // 1. Extract WikiLinks from current page content
   const wikiLinks = extractWikiLinksFromContent(currentPage.content);
   const linkTitles = getUniqueWikiLinkTitles(wikiLinks);
 
   // 2. Create mappings
-  const summaryByTitle = new Map(
-    allPagesSummary.map((p) => [p.title.toLowerCase().trim(), p])
-  );
+  const summaryByTitle = new Map(allPagesSummary.map((p) => [p.title.toLowerCase().trim(), p]));
   const summaryById = new Map(allPagesSummary.map((p) => [p.id, p]));
   const pageById = new Map(outgoingPages.map((p) => [p.id, p]));
   const backlinkPageById = new Map(backlinkPages.map((p) => [p.id, p]));
@@ -261,15 +241,9 @@ export function calculateLinkedPagesOptimized(
 
     for (const link of secondaryLinks) {
       const targetSummary = summaryByTitle.get(link.title.toLowerCase().trim());
-      if (
-        targetSummary &&
-        targetSummary.id !== pageId &&
-        !outgoingIds.has(targetSummary.id)
-      ) {
+      if (targetSummary && targetSummary.id !== pageId && !outgoingIds.has(targetSummary.id)) {
         // Add to children for this source
-        const alreadyInChildren = children.some(
-          (c) => c.id === targetSummary.id
-        );
+        const alreadyInChildren = children.some((c) => c.id === targetSummary.id);
         if (!alreadyInChildren) {
           const fullPage = pageById.get(targetSummary.id);
           if (fullPage) {
@@ -349,9 +323,7 @@ export function useLinkedPages(pageId: string) {
       const linkTitles = getUniqueWikiLinkTitles(wikiLinks);
 
       // Map titles to page IDs
-      const summaryByTitle = new Map(
-        allPagesSummary.map((p) => [p.title.toLowerCase().trim(), p])
-      );
+      const summaryByTitle = new Map(allPagesSummary.map((p) => [p.title.toLowerCase().trim(), p]));
 
       // Identify outgoing page IDs (need content for 2-hop calculation)
       const outgoingPageIds: string[] = [];

@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  AlertTriangle,
-  ExternalLink,
-  AlertCircle,
-  Loader2,
-  X,
-} from "lucide-react";
+import { AlertTriangle, ExternalLink, AlertCircle, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Container from "@/components/layout/Container";
@@ -16,15 +10,13 @@ interface PageEditorAlertsProps {
   // Title validation
   duplicatePage: Page | null;
   errorMessage: string | null;
-  isTitleEmpty: boolean;
   title: string;
-  isNewPage: boolean;
   onOpenDuplicatePage: () => void;
-  
+
   // Wiki generating
   isWikiGenerating: boolean;
   onCancelWiki: () => void;
-  
+
   // Content error
   contentError: ContentError | null;
 }
@@ -36,15 +28,13 @@ interface PageEditorAlertsProps {
 export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
   duplicatePage,
   errorMessage,
-  isTitleEmpty,
   title,
-  isNewPage,
   onOpenDuplicatePage,
   isWikiGenerating,
   onCancelWiki,
   contentError,
 }) => {
-  const showTitleAlerts = duplicatePage || (!isNewPage && isTitleEmpty && title === "");
+  const showTitleAlerts = !!duplicatePage;
 
   return (
     <>
@@ -54,10 +44,7 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
           <Container>
             {/* タイトル重複警告 */}
             {duplicatePage && (
-              <Alert
-                variant="destructive"
-                className="border-0 bg-transparent py-3"
-              >
+              <Alert variant="destructive" className="border-0 bg-transparent py-3">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="flex items-center justify-between gap-2">
                   <span className="text-sm">{errorMessage}</span>
@@ -67,21 +54,9 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
                     onClick={onOpenDuplicatePage}
                     className="shrink-0"
                   >
-                    <ExternalLink className="h-3 w-3 mr-1" />
+                    <ExternalLink className="mr-1 h-3 w-3" />
                     開く
                   </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-            {/* 既存ページで空タイトル警告 */}
-            {!isNewPage && isTitleEmpty && title === "" && !duplicatePage && (
-              <Alert
-                variant="destructive"
-                className="border-0 bg-transparent py-3"
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  タイトルを入力してください
                 </AlertDescription>
               </Alert>
             )}
@@ -96,16 +71,9 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
             <div className="flex items-center justify-between py-3">
               <div className="flex items-center gap-3">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="text-sm">
-                  「{title}」について解説を生成しています...
-                </span>
+                <span className="text-sm">「{title}」について解説を生成しています...</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onCancelWiki}
-                className="gap-1.5"
-              >
+              <Button variant="outline" size="sm" onClick={onCancelWiki} className="gap-1.5">
                 <X className="h-4 w-4" />
                 キャンセル
               </Button>
@@ -122,9 +90,7 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
               <AlertCircle className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-sm">
                 <div className="flex flex-col gap-1">
-                  <span className="font-medium text-amber-800">
-                    {contentError.message}
-                  </span>
+                  <span className="font-medium text-amber-800">{contentError.message}</span>
                   {contentError.removedNodeTypes.length > 0 && (
                     <span className="text-xs text-amber-700">
                       削除されたノード: {contentError.removedNodeTypes.join(", ")}
@@ -136,7 +102,7 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
                     </span>
                   )}
                   {contentError.wasSanitized && (
-                    <span className="text-xs text-amber-600 mt-1">
+                    <span className="mt-1 text-xs text-amber-600">
                       ※ コンテンツは自動的に修正されました。保存すると修正後のデータが保存されます。
                     </span>
                   )}

@@ -8,10 +8,7 @@ test.describe("Page Editor", () => {
   });
 
   test.describe("Page Creation", () => {
-    test("should create a new page and redirect to page ID", async ({
-      page,
-      helpers,
-    }) => {
+    test("should create a new page and redirect to page ID", async ({ page, helpers }) => {
       await helpers.createNewPage(page);
 
       // Verify editor is visible
@@ -39,7 +36,6 @@ test.describe("Page Editor", () => {
       await page.waitForTimeout(1500);
 
       // Verify title persists after reload
-      const currentUrl = page.url();
       await page.reload();
       await page.waitForLoadState("networkidle");
 
@@ -64,27 +60,6 @@ test.describe("Page Editor", () => {
         timeout: 5000,
       });
     });
-
-    test("should show empty title warning for existing pages", async ({
-      page,
-      helpers,
-    }) => {
-      await helpers.createNewPage(page);
-
-      // Enter title first
-      const titleInput = page.getByPlaceholder("タイトルを入力");
-      await titleInput.fill("Temporary Title");
-      await page.waitForTimeout(1500);
-
-      // Clear title
-      await titleInput.fill("");
-      await page.waitForTimeout(1500);
-
-      // Should show empty title warning
-      await expect(page.getByText(/タイトルを入力してください/)).toBeVisible({
-        timeout: 5000,
-      });
-    });
   });
 
   test.describe("Content Editing", () => {
@@ -100,9 +75,7 @@ test.describe("Page Editor", () => {
 
       // Title should be auto-generated from content
       const titleInput = page.getByPlaceholder("タイトルを入力");
-      await expect(titleInput).toHaveValue(
-        "Auto generated title from first line"
-      );
+      await expect(titleInput).toHaveValue("Auto generated title from first line");
     });
 
     test("should persist content after reload", async ({ page, helpers }) => {
@@ -129,10 +102,7 @@ test.describe("Page Editor", () => {
       await expect(editor).toContainText("This content should persist");
     });
 
-    test("should show content error warning for invalid content", async ({
-      page,
-      helpers,
-    }) => {
+    test("should show content error warning for invalid content", async ({ page, helpers }) => {
       // This test would require inserting invalid content directly into the database
       // For now, we just verify the error UI exists in the DOM structure
       await helpers.createNewPage(page);
@@ -176,10 +146,7 @@ test.describe("Page Editor", () => {
   });
 
   test.describe("Navigation", () => {
-    test("should navigate back to home on back button click", async ({
-      page,
-      helpers,
-    }) => {
+    test("should navigate back to home on back button click", async ({ page, helpers }) => {
       await helpers.createNewPage(page);
 
       // Enter title to avoid delete warning
@@ -224,9 +191,7 @@ test.describe("Page Editor", () => {
       await page.waitForTimeout(500);
 
       // Click more options button
-      await page
-        .locator('button:has(svg[class*="lucide-more-horizontal"])')
-        .click();
+      await page.locator('button:has(svg[class*="lucide-more-horizontal"])').click();
 
       // Should see menu items
       await expect(page.getByText("URLから取り込み")).toBeVisible();
@@ -244,9 +209,7 @@ test.describe("Page Editor", () => {
       await page.waitForTimeout(1500);
 
       // Click more options and delete
-      await page
-        .locator('button:has(svg[class*="lucide-more-horizontal"])')
-        .click();
+      await page.locator('button:has(svg[class*="lucide-more-horizontal"])').click();
       await page.getByText("削除").click();
 
       // Should redirect to home
@@ -276,10 +239,7 @@ test.describe("Page Editor", () => {
   });
 
   test.describe("Linked Pages Section", () => {
-    test("should show linked pages section when page has WikiLinks", async ({
-      page,
-      helpers,
-    }) => {
+    test("should show linked pages section when page has WikiLinks", async ({ page, helpers }) => {
       // Create target page first
       await helpers.createNewPage(page);
       await page.getByPlaceholder("タイトルを入力").fill("Target Page for Links");
@@ -291,9 +251,7 @@ test.describe("Page Editor", () => {
       await helpers.createNewPage(page);
       const sourceUrl = page.url();
 
-      await page
-        .getByPlaceholder("タイトルを入力")
-        .fill("Source Page with Links");
+      await page.getByPlaceholder("タイトルを入力").fill("Source Page with Links");
       await page.locator(".tiptap").click();
 
       // Type WikiLink

@@ -28,81 +28,56 @@ export function tiptapToMarkdown(content: string): string {
   }
 }
 
+type NodeHandler = (node: TiptapNode) => string;
+
+const nodeHandlers: Record<string, NodeHandler> = {};
+
 function convertNode(node: TiptapNode): string {
   if (!node) return "";
-
-  switch (node.type) {
-    case "doc":
-      return convertChildren(node);
-
-    case "paragraph":
-      return convertChildren(node) + "\n\n";
-
-    case "heading": {
-      const level = (node.attrs?.level as number) || 1;
-      const prefix = "#".repeat(level);
-      return `${prefix} ${convertChildren(node)}\n\n`;
-    }
-
-    case "bulletList":
-      return convertList(node, "-") + "\n";
-
-    case "orderedList":
-      return convertOrderedList(node) + "\n";
-
-    case "listItem":
-      return convertChildren(node);
-
-    case "blockquote": {
-      const quoteContent = convertChildren(node).trim();
-      return (
-        quoteContent
-          .split("\n")
-          .map((line) => `> ${line}`)
-          .join("\n") + "\n\n"
-      );
-    }
-
-    case "codeBlock": {
-      const language = (node.attrs?.language as string) || "";
-      const code = convertChildren(node).trim();
-      return `\`\`\`${language}\n${code}\n\`\`\`\n\n`;
-    }
-
-    case "horizontalRule":
-      return "---\n\n";
-
-    case "hardBreak":
-      return "\n";
-
-    case "text":
-      return applyMarks(node.text || "", node.marks || []);
-
-    case "wikiLink": {
-      // Handle wiki links [[Link Text]]
-      const linkText = (node.attrs?.title as string) || "";
-      return `[[${linkText}]]`;
-    }
-
-    case "image": {
-      const src = (node.attrs?.src as string) || "";
-      const alt = (node.attrs?.alt as string) || "";
-      const title = (node.attrs?.title as string) || "";
-      if (title) {
-        return `![${alt}](${src} "${title}")\n\n`;
-      }
-      return `![${alt}](${src})\n\n`;
-    }
-
-    case "link":
-      // This is typically a mark, not a node type
-      return convertChildren(node);
-
-    default:
-      // For unknown node types, try to convert children
-      return convertChildren(node);
-  }
+  const handler = nodeHandlers[node.type];
+  return handler ? handler(node) : convertChildren(node);
 }
+
+Object.assign(nodeHandlers, {
+  doc: (n) => convertChildren(n),
+  paragraph: (n) => convertChildren(n) + "\n\n",
+  heading: (n) => {
+    const level = (n.attrs?.level as number) || 1;
+    const prefix = "#".repeat(level);
+    return `${prefix} ${convertChildren(n)}\n\n`;
+  },
+  bulletList: (n) => convertList(n, "-") + "\n",
+  orderedList: (n) => convertOrderedList(n) + "\n",
+  listItem: (n) => convertChildren(n),
+  blockquote: (n) => {
+    const quoteContent = convertChildren(n).trim();
+    return (
+      quoteContent
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n") + "\n\n"
+    );
+  },
+  codeBlock: (n) => {
+    const language = (n.attrs?.language as string) || "";
+    const code = convertChildren(n).trim();
+    return `\`\`\`${language}\n${code}\n\`\`\`\n\n`;
+  },
+  horizontalRule: () => "---\n\n",
+  hardBreak: () => "\n",
+  text: (n) => applyMarks(n.text || "", n.marks || []),
+  wikiLink: (n) => {
+    const linkText = (n.attrs?.title as string) || "";
+    return `[[${linkText}]]`;
+  },
+  image: (n) => {
+    const src = (n.attrs?.src as string) || "";
+    const alt = (n.attrs?.alt as string) || "";
+    const title = (n.attrs?.title as string) || "";
+    return title ? `![${alt}](${src} "${title}")\n\n` : `![${alt}](${src})\n\n`;
+  },
+  link: (n) => convertChildren(n),
+});
 
 function convertChildren(node: TiptapNode): string {
   if (!node.content) return "";
@@ -142,9 +117,7 @@ function convertListItemContent(item: TiptapNode): string {
       // Handle nested lists
       if (child.type === "bulletList" || child.type === "orderedList") {
         const nestedList =
-          child.type === "bulletList"
-            ? convertList(child, "-")
-            : convertOrderedList(child);
+          child.type === "bulletList" ? convertList(child, "-") : convertOrderedList(child);
         return (
           "\n" +
           nestedList
@@ -230,10 +203,7 @@ function sanitizeFilename(name: string): string {
 /**
  * Copy Markdown content to clipboard
  */
-export async function copyMarkdownToClipboard(
-  title: string,
-  content: string
-): Promise<void> {
+export async function copyMarkdownToClipboard(title: string, content: string): Promise<void> {
   const markdown = tiptapToMarkdown(content);
 
   // Add title as H1 if not empty

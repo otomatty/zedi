@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getOnboardingState,
-  markWelcomeSeen,
+  markSetupWizardCompleted,
   markTourCompleted,
   type OnboardingState,
 } from "@/lib/onboardingState";
@@ -13,42 +13,32 @@ import {
 export function useOnboarding() {
   const { isSignedIn } = useAuth();
   const [state, setState] = useState<OnboardingState>(getOnboardingState);
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [isTourRunning, setIsTourRunning] = useState(false);
 
-  // Check if we should show the welcome modal
-  useEffect(() => {
-    if (isSignedIn && !state.hasSeenWelcome) {
-      // Small delay to let the page render first
-      const timer = setTimeout(() => {
-        setShowWelcome(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isSignedIn, state.hasSeenWelcome]);
+  /** True when signed-in user has not completed the setup wizard */
+  const needsSetupWizard = isSignedIn && !state.hasCompletedSetupWizard;
 
-  const dismissWelcome = useCallback(() => {
-    markWelcomeSeen();
-    setShowWelcome(false);
+  const completeSetupWizard = useCallback(() => {
+    markSetupWizardCompleted();
     setState(getOnboardingState());
   }, []);
 
   const completeTour = useCallback(() => {
     markTourCompleted();
+    setIsTourRunning(false);
     setState(getOnboardingState());
   }, []);
 
   const startTour = useCallback(() => {
-    // Close welcome modal and start tour
-    markWelcomeSeen();
-    setShowWelcome(false);
+    setIsTourRunning(true);
     setState(getOnboardingState());
-    // TODO: Trigger tour start
   }, []);
 
   return {
     state,
-    showWelcome,
-    dismissWelcome,
+    needsSetupWizard,
+    isTourRunning,
+    completeSetupWizard,
     completeTour,
     startTour,
   };

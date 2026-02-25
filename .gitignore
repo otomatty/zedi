@@ -19,6 +19,13 @@ dist-ssr
 
 # Developer sync configuration (contains user ID mappings)
 scripts/sync/dev-user-mapping.json
+scripts/sync/dev-user-mapping-aurora.json
+
+# Migration export output (may contain sensitive data)
+scripts/migration/export-turso/output/
+
+# Aurora transform output (C2-2; contains UUID-mapped data)
+scripts/migration/transform-for-aurora/output/
 
 # Editor directories and files
 .vscode/*
@@ -31,6 +38,10 @@ scripts/sync/dev-user-mapping.json
 *.sln
 *.sw?
 
+# Test coverage (Vitest, etc.)
+coverage/
+*.lcov
+
 # Playwright
 playwright-report/
 test-results/
@@ -38,3 +49,26 @@ test-results/
 # Cloudflare Workers
 .wrangler/
 .dev.vars
+
+# Terraform
+terraform/.terraform/
+terraform/**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars.json
+# Terraform plan output (environment-specific, may contain sensitive resource details)
+tfplan*
+*.tfplan
+
+# Terraform - DO NOT commit these if they contain secrets
+# terraform/environments/*.tfvars  # Uncomment if tfvars contain sensitive data
+terraform/environments/dev.secret.env
+terraform/environments/prod.secret.env
+# Terraform module build artifacts (Lambda zip)
+terraform/modules/*/lambda.zip

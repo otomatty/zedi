@@ -9,8 +9,11 @@ import { useToast } from "@/hooks/use-toast";
 import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
+import { useTranslation } from "react-i18next";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const FloatingActionButton: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { createNewPage, isCreating } = useCreateNewPage();
   const createPageMutation = useCreatePage();
@@ -37,15 +40,15 @@ const FloatingActionButton: React.FC = () => {
       case "template":
         // TODO: テンプレート選択画面
         toast({
-          title: "準備中",
-          description: "テンプレート機能は近日公開予定です",
+          title: t("common.comingSoon"),
+          description: t("common.templateComingSoon"),
         });
         break;
       case "voice":
         // TODO: 音声録音画面
         toast({
-          title: "準備中",
-          description: "音声入力機能は近日公開予定です",
+          title: t("common.comingSoon"),
+          description: t("common.voiceComingSoon"),
         });
         break;
     }
@@ -56,21 +59,20 @@ const FloatingActionButton: React.FC = () => {
     title: string,
     content: string,
     sourceUrl: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
   ) => {
     try {
-      // 新しいページを作成
       const newPage = await createPageMutation.mutateAsync({
         title,
         content,
+        sourceUrl,
+        thumbnailUrl,
       });
 
-      // sourceUrl と thumbnailUrl を含む更新は PageEditor で行われる
-      // ここでは基本的なページ作成後にナビゲート
+      // 取得した本文は API では保持されないため、初期表示用に state で渡してエディタで Y.Doc に反映する
       navigate(`/page/${newPage.id}`, {
         state: {
-          sourceUrl,
-          thumbnailUrl,
+          initialContent: content,
         },
       });
     } catch (error) {
@@ -86,7 +88,7 @@ const FloatingActionButton: React.FC = () => {
   const handleImageCreated = async (
     imageUrl: string,
     extractedText?: string,
-    description?: string
+    description?: string,
   ) => {
     try {
       // コンテンツを構築
@@ -105,9 +107,7 @@ const FloatingActionButton: React.FC = () => {
           },
           {
             type: "paragraph",
-            content: extractedText
-              ? [{ type: "text", text: extractedText }]
-              : [],
+            content: extractedText ? [{ type: "text", text: extractedText }] : [],
           },
         ],
       };
@@ -131,23 +131,27 @@ const FloatingActionButton: React.FC = () => {
 
   // メインFABボタン
   const fabButton = (
-    <Button
-      onClick={() => setIsMenuOpen(!isMenuOpen)}
-      disabled={isCreating}
-      size="icon"
-      className={cn(
-        "h-14 w-14 rounded-full",
-        "shadow-elevated hover:shadow-glow",
-        "transition-all duration-300",
-        isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground/90"
-      )}
-    >
-      {isMenuOpen ? (
-        <X className="h-6 w-6" />
-      ) : (
-        <Plus className="h-6 w-6" />
-      )}
-    </Button>
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            data-tour-id="tour-fab"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            disabled={isCreating}
+            className={cn(
+              "h-16 w-16 rounded-full",
+              "shadow-elevated",
+              "transition-all duration-300 ease-in-out",
+              "hover:scale-105 hover:bg-primary",
+              isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground",
+            )}
+          >
+            {isMenuOpen ? <X className="h-7 w-7" /> : <Plus className="h-7 w-7" />}
+          </Button>
+        </TooltipTrigger>
+        {!isMenuOpen && <TooltipContent side="left">{t("common.createPageAction")}</TooltipContent>}
+      </Tooltip>
+    </TooltipProvider>
   );
 
   return (

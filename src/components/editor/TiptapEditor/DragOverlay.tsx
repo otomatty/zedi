@@ -9,9 +9,9 @@ export const DragOverlay: React.FC<DragOverlayProps> = ({ isVisible }) => {
   if (!isVisible) return null;
 
   return (
-    <div className="absolute inset-0 bg-primary/10 flex items-center justify-center pointer-events-none z-40">
-      <div className="bg-background border-2 border-dashed border-primary rounded-lg p-4 text-center">
-        <ImageIcon className="h-8 w-8 mx-auto mb-2 text-primary" />
+    <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-primary/10">
+      <div className="rounded-lg border-2 border-dashed border-primary bg-background p-4 text-center">
+        <ImageIcon className="mx-auto mb-2 h-8 w-8 text-primary" />
         <p className="text-sm text-muted-foreground">画像をドロップしてアップロード</p>
       </div>
     </div>

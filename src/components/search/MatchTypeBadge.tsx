@@ -5,10 +5,7 @@ interface MatchTypeBadgeProps {
   type: MatchType;
 }
 
-const config: Record<
-  MatchType,
-  { label: string; className: string }
-> = {
+const config: Record<MatchType, { label: string; className: string }> = {
   exact_title: {
     label: "完全一致",
     className: "bg-green-100 text-green-800 font-semibold",
@@ -30,14 +27,5 @@ const config: Record<
 export function MatchTypeBadge({ type }: MatchTypeBadgeProps) {
   const { label, className } = config[type];
 
-  return (
-    <span
-      className={cn(
-        "text-xs px-1.5 py-0.5 rounded shrink-0",
-        className
-      )}
-    >
-      {label}
-    </span>
-  );
+  return <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-xs", className)}>{label}</span>;
 }

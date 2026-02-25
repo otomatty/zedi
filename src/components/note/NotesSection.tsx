@@ -5,10 +5,23 @@ import { useNotes, useCreateNote, useNoteRepository } from "@/hooks/useNoteQueri
 import type { NoteVisibility } from "@/types/note";
 import { NoteCard } from "./NoteCard";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 const visibilityOptions: Array<{ value: NoteVisibility; label: string }> = [
@@ -29,10 +42,7 @@ export const NotesSection: React.FC = () => {
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<NoteVisibility>("private");
 
-  const sortedNotes = useMemo(
-    () => [...notes].sort((a, b) => b.updatedAt - a.updatedAt),
-    [notes]
-  );
+  const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes]);
 
   const handleCreate = async () => {
     if (!title.trim()) {
@@ -67,7 +77,7 @@ export const NotesSection: React.FC = () => {
 
   return (
     <section className="mb-8">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">公開ノート</h2>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -110,11 +120,7 @@ export const NotesSection: React.FC = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                onClick={handleCreate}
-                disabled={createNoteMutation.isPending}
-              >
+              <Button type="button" onClick={handleCreate} disabled={createNoteMutation.isPending}>
                 {createNoteMutation.isPending ? "作成中..." : "作成"}
               </Button>
             </DialogFooter>
@@ -125,11 +131,9 @@ export const NotesSection: React.FC = () => {
       {isLoading ? (
         <p className="text-sm text-muted-foreground">読み込み中...</p>
       ) : sortedNotes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          公開ノートはまだありません。
-        </p>
+        <p className="text-sm text-muted-foreground">公開ノートはまだありません。</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sortedNotes.map((note, index) => (
             <NoteCard key={note.id} note={note} index={index} />
           ))}

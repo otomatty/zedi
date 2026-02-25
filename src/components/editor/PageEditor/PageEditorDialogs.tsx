@@ -33,7 +33,6 @@ interface PageEditorDialogsProps {
   wikiErrorMessage: string | null;
   onResetWiki: () => void;
   onGoToAISettings: () => void;
-
 }
 
 /**
@@ -66,9 +65,7 @@ export const PageEditorDialogs: React.FC<PageEditorDialogsProps> = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={onCancelDelete}>
-              キャンセル
-            </AlertDialogCancel>
+            <AlertDialogCancel onClick={onCancelDelete}>キャンセル</AlertDialogCancel>
             <AlertDialogAction
               onClick={onConfirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

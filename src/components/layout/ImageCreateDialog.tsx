@@ -22,17 +22,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageUpload } from "@/hooks/useImageUpload";
 
-type ImageSource = "camera" | "gallery" | "clipboard";
 type ProcessingMode = "ocr" | "describe" | "none";
 
 interface ImageCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (
-    imageUrl: string,
-    extractedText?: string,
-    description?: string
-  ) => void;
+  onCreated: (imageUrl: string, extractedText?: string, description?: string) => void;
 }
 
 export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
@@ -71,17 +66,9 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
     }
 
     // 画像形式チェック
-    const validTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "image/heic",
-    ];
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
     if (!validTypes.includes(file.type)) {
-      setError(
-        "この画像形式には対応していません（JPEG, PNG, GIF, WebPをお使いください）"
-      );
+      setError("この画像形式には対応していません（JPEG, PNG, GIF, WebPをお使いください）");
       return;
     }
 
@@ -101,7 +88,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
       // 同じファイルを再選択できるようにリセット
       e.target.value = "";
     },
-    [handleImageSelect]
+    [handleImageSelect],
   );
 
   // クリップボードから
@@ -136,9 +123,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
     try {
       // ストレージ設定確認
       if (!isConfigured) {
-        setError(
-          "ストレージが設定されていません。設定画面でストレージを設定してください。"
-        );
+        setError("ストレージが設定されていません。設定画面でストレージを設定してください。");
         setIsProcessing(false);
         return;
       }
@@ -165,20 +150,11 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
       handleClose();
     } catch (err) {
       console.error("Failed to create page from image:", err);
-      setError(
-        err instanceof Error ? err.message : "画像の処理に失敗しました"
-      );
+      setError(err instanceof Error ? err.message : "画像の処理に失敗しました");
     } finally {
       setIsProcessing(false);
     }
-  }, [
-    selectedImage,
-    processingMode,
-    isConfigured,
-    uploadImage,
-    onCreated,
-    handleClose,
-  ]);
+  }, [selectedImage, processingMode, isConfigured, uploadImage, onCreated, handleClose]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -188,9 +164,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
             <ImageIcon className="h-5 w-5" />
             画像から作成
           </DialogTitle>
-          <DialogDescription>
-            画像を選択してページを作成します。
-          </DialogDescription>
+          <DialogDescription>画像を選択してページを作成します。</DialogDescription>
         </DialogHeader>
 
         {/* ソース選択ステップ */}
@@ -206,9 +180,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                 <Camera className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">カメラで撮影</div>
-                  <div className="text-sm text-muted-foreground">
-                    その場で写真を撮る
-                  </div>
+                  <div className="text-sm text-muted-foreground">その場で写真を撮る</div>
                 </div>
               </Button>
               <input
@@ -229,9 +201,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                 <ImageIcon className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">ギャラリーから選択</div>
-                  <div className="text-sm text-muted-foreground">
-                    保存済みの画像を選ぶ
-                  </div>
+                  <div className="text-sm text-muted-foreground">保存済みの画像を選ぶ</div>
                 </div>
               </Button>
               <input
@@ -251,9 +221,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                 <Clipboard className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">クリップボードから</div>
-                  <div className="text-sm text-muted-foreground">
-                    コピーした画像を貼り付け
-                  </div>
+                  <div className="text-sm text-muted-foreground">コピーした画像を貼り付け</div>
                 </div>
               </Button>
             </div>
@@ -271,11 +239,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
           <div className="space-y-4 py-4">
             {/* 画像プレビュー */}
             <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
-              <img
-                src={previewUrl}
-                alt="Selected"
-                className="h-full w-full object-contain"
-              />
+              <img src={previewUrl} alt="Selected" className="h-full w-full object-contain" />
             </div>
 
             {/* 処理モード選択 */}
@@ -283,9 +247,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
               <Label className="text-sm font-medium">処理方法</Label>
               <RadioGroup
                 value={processingMode}
-                onValueChange={(value) =>
-                  setProcessingMode(value as ProcessingMode)
-                }
+                onValueChange={(value) => setProcessingMode(value as ProcessingMode)}
                 className="space-y-2"
               >
                 <div className="flex items-center space-x-3 rounded-lg border p-3">
@@ -308,9 +270,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                       <MessageSquare className="h-4 w-4" />
                       <span>画像の説明を生成</span>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      AIが画像の内容を文章で説明
-                    </div>
+                    <div className="text-sm text-muted-foreground">AIが画像の内容を文章で説明</div>
                   </Label>
                 </div>
 
@@ -364,10 +324,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
             キャンセル
           </Button>
           {step === "preview" && (
-            <Button
-              onClick={handleCreate}
-              disabled={isProcessing || !isConfigured}
-            >
+            <Button onClick={handleCreate} disabled={isProcessing || !isConfigured}>
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -1,28 +1,43 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Edit3 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@/components/ui/button";
 import { useNote, useNotePage } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
+import { useCollaboration } from "@/hooks/useCollaboration";
+import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
+import { useAIChatContext } from "@/contexts/AIChatContext";
+
+function canEditPage(
+  access: { canEdit?: boolean; canView?: boolean } | undefined,
+  userId: string | undefined,
+  page: { ownerUserId?: string } | null | undefined,
+): boolean {
+  if (!access?.canView) return false;
+  if (access.canEdit) return true;
+  return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
+}
 
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
-  const { userId } = useAuth();
+  const { isSignedIn, userId } = useAuth();
 
-  const { note, access, source, isLoading: isNoteLoading } = useNote(
-    noteId ?? "",
-    { allowRemote: true }
-  );
+  const {
+    note,
+    access,
+    source,
+    isLoading: isNoteLoading,
+  } = useNote(noteId ?? "", { allowRemote: true });
 
   const { data: page, isLoading: isPageLoading } = useNotePage(
     noteId ?? "",
     pageId ?? "",
     source,
-    Boolean(access?.canView)
+    Boolean(access?.canView),
   );
 
   const handleBack = useCallback(() => {
@@ -33,7 +48,32 @@ const NotePageView: React.FC = () => {
     }
   }, [navigate, noteId]);
 
-  if (isNoteLoading || isPageLoading) {
+  const canEdit = canEditPage(access, userId, page);
+  const collaborationPageId = page?.id ?? "";
+  const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
+  const collaboration = useCollaboration({
+    pageId: collaborationPageId,
+    enabled: isCollaborationEnabled,
+    mode: "collaborative",
+  });
+
+  // canEdit時のみAIチャットにページコンテキストを設定
+  const { setPageContext } = useAIChatContext();
+  useEffect(() => {
+    if (canEdit && page) {
+      setPageContext({
+        type: "editor",
+        pageId: page.id,
+        pageTitle: page.title,
+        pageContent: page.content?.slice(0, 3000) ?? "",
+      });
+    }
+    return () => setPageContext(null);
+  }, [canEdit, page, setPageContext]);
+
+  const isLoading = isNoteLoading || isPageLoading;
+  const isNotFound = !note || !access?.canView || !page;
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -45,8 +85,7 @@ const NotePageView: React.FC = () => {
       </div>
     );
   }
-
-  if (!note || !access?.canView || !page) {
+  if (isNotFound) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -61,53 +100,52 @@ const NotePageView: React.FC = () => {
     );
   }
 
-  const canEdit = Boolean(page.ownerUserId && page.ownerUserId === userId);
-
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <div className="border-b border-border/60">
-        <Container className="flex items-center justify-between py-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" onClick={handleBack}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground truncate">
-                {note.title || "無題のノート"}
-              </p>
-              <h1 className="text-lg font-semibold truncate">
-                {page.title || "無題のページ"}
-              </h1>
-            </div>
-          </div>
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/page/${page.id}`)}
-            >
-              <Edit3 className="mr-2 h-4 w-4" />
-              編集
-            </Button>
-          )}
+        <Container className="flex h-10 items-center justify-between">
+          <Button variant="ghost" size="icon" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          {!canEdit && <span className="text-xs text-muted-foreground">閲覧専用</span>}
         </Container>
       </div>
 
-      <PageEditorContent
-        content={page.content}
-        title={page.title}
-        sourceUrl={page.sourceUrl}
-        currentPageId={page.id}
-        pageId={page.id}
-        isNewPage={false}
-        isWikiGenerating={false}
-        isReadOnly
-        showLinkedPages={false}
-        showToolbar={false}
-        onContentChange={() => undefined}
-        onContentError={() => undefined}
-      />
+      {canEdit ? (
+        <ContentWithAIChat>
+          <PageEditorContent
+            content={page.content}
+            title={page.title}
+            sourceUrl={page.sourceUrl}
+            currentPageId={page.id}
+            pageId={page.id}
+            isNewPage={false}
+            isWikiGenerating={false}
+            isReadOnly={!canEdit}
+            showLinkedPages={false}
+            showToolbar={canEdit}
+            onContentChange={() => undefined}
+            onContentError={() => undefined}
+            collaboration={isCollaborationEnabled ? collaboration : undefined}
+          />
+        </ContentWithAIChat>
+      ) : (
+        <PageEditorContent
+          content={page.content}
+          title={page.title}
+          sourceUrl={page.sourceUrl}
+          currentPageId={page.id}
+          pageId={page.id}
+          isNewPage={false}
+          isWikiGenerating={false}
+          isReadOnly={true}
+          showLinkedPages={false}
+          showToolbar={false}
+          onContentChange={() => undefined}
+          onContentError={() => undefined}
+        />
+      )}
     </div>
   );
 };

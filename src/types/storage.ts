@@ -5,7 +5,7 @@
  */
 export type StorageProviderType =
   | "gyazo"
-  | "cloudflare-r2"
+  | "s3" // Zedi standard storage (AWS thumbnail-api commit)
   | "github"
   | "google-drive";
 
@@ -23,14 +23,6 @@ export interface StorageProviderConfig {
   // Gyazo（Access Tokenのみ）
   gyazoAccessToken?: string;
 
-  // Cloudflare R2（S3互換）
-  r2Bucket?: string;
-  r2AccessKeyId?: string;
-  r2SecretAccessKey?: string;
-  r2Endpoint?: string;
-  r2AccountId?: string;
-  r2PublicUrl?: string; // 公開URLのベース（カスタムドメインまたはr2.dev）
-
   // GitHub（Personal Access Token）
   githubRepository?: string; // "owner/repo"形式
   githubToken?: string;
@@ -42,6 +34,8 @@ export interface StorageProviderConfig {
  * ストレージ設定
  */
 export interface StorageSettings {
+  /** true: デフォルトストレージに保存, false: 外部ストレージに保存 */
+  preferDefaultStorage?: boolean;
   provider: StorageProviderType;
   config: StorageProviderConfig;
   isConfigured: boolean;
@@ -65,20 +59,20 @@ export interface StorageProviderInfo {
  */
 export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
   {
+    id: "s3",
+    name: "デフォルトストレージ",
+    description: "ログインで利用可能",
+    helpUrl: "",
+    setupDifficulty: "easy",
+    freeTier: "無料枠あり",
+  },
+  {
     id: "gyazo",
     name: "Gyazo",
     description: "Access Tokenで簡単セットアップ",
     helpUrl: "https://gyazo.com/oauth/applications",
     setupDifficulty: "easy",
     freeTier: "無料プランあり",
-  },
-  {
-    id: "cloudflare-r2",
-    name: "Cloudflare R2",
-    description: "S3互換ストレージ、10GB/月無料",
-    helpUrl: "https://dash.cloudflare.com/",
-    setupDifficulty: "medium",
-    freeTier: "10GB/月無料",
   },
   {
     id: "github",
@@ -102,16 +96,18 @@ export const STORAGE_PROVIDERS: StorageProviderInfo[] = [
  * デフォルトのストレージ設定
  */
 export const DEFAULT_STORAGE_SETTINGS: StorageSettings = {
-  provider: "gyazo",
+  preferDefaultStorage: true,
+  provider: "s3",
   config: {},
-  isConfigured: false,
+  isConfigured: true,
 };
+
+/** 外部ストレージのみ（Select で使用） */
+export const EXTERNAL_STORAGE_PROVIDERS = STORAGE_PROVIDERS.filter((p) => p.id !== "s3");
 
 /**
  * プロバイダーIDから情報を取得
  */
-export function getStorageProviderById(
-  id: StorageProviderType
-): StorageProviderInfo | undefined {
+export function getStorageProviderById(id: StorageProviderType): StorageProviderInfo | undefined {
   return STORAGE_PROVIDERS.find((p) => p.id === id);
 }

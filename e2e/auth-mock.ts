@@ -2,7 +2,7 @@
  * E2E Test Helpers with Custom Fixtures
  *
  * Authentication is handled by VITE_E2E_TEST environment variable
- * which causes the app to use MockClerkProvider.
+ * which causes the app to use MockAuthProvider.
  */
 import { test as base, expect, Page } from "@playwright/test";
 

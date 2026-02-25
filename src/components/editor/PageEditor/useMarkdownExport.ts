@@ -1,8 +1,5 @@
 import { useCallback } from "react";
-import {
-  downloadMarkdown,
-  copyMarkdownToClipboard,
-} from "@/lib/markdownExport";
+import { downloadMarkdown, copyMarkdownToClipboard } from "@/lib/markdownExport";
 import { useToast } from "@/hooks/use-toast";
 
 interface UseMarkdownExportReturn {
@@ -13,10 +10,7 @@ interface UseMarkdownExportReturn {
 /**
  * Hook for markdown export functionality
  */
-export function useMarkdownExport(
-  title: string,
-  content: string
-): UseMarkdownExportReturn {
+export function useMarkdownExport(title: string, content: string): UseMarkdownExportReturn {
   const { toast } = useToast();
 
   const handleExportMarkdown = useCallback(() => {
@@ -32,7 +26,7 @@ export function useMarkdownExport(
       toast({
         title: "Markdownをクリップボードにコピーしました",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "コピーに失敗しました",
         variant: "destructive",

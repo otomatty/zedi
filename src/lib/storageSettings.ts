@@ -2,6 +2,7 @@
 
 import { encrypt, decrypt } from "./encryption";
 import { StorageSettings, DEFAULT_STORAGE_SETTINGS } from "@/types/storage";
+import { isStorageConfiguredForUpload } from "@/lib/storage";
 
 const STORAGE_KEY = "zedi-storage-settings";
 
@@ -22,9 +23,7 @@ const SENSITIVE_FIELDS = [
  * ストレージ設定を保存する
  * 認証情報は暗号化して保存
  */
-export async function saveStorageSettings(
-  settings: StorageSettings
-): Promise<void> {
+export async function saveStorageSettings(settings: StorageSettings): Promise<void> {
   try {
     // 認証情報を暗号化したコピーを作成
     const configToStore = { ...settings.config };
@@ -60,7 +59,7 @@ export async function loadStorageSettings(): Promise<StorageSettings | null> {
     const parsed = JSON.parse(stored) as StorageSettings;
 
     // 認証情報を復号化
-    const config = { ...parsed.config };
+    let config: typeof parsed.config = { ...parsed.config };
 
     for (const field of SENSITIVE_FIELDS) {
       const value = config[field as keyof typeof config];
@@ -70,14 +69,26 @@ export async function loadStorageSettings(): Promise<StorageSettings | null> {
         } catch {
           // 復号化に失敗した場合はフィールドをクリア
           console.warn(`Failed to decrypt field: ${field}`);
-          delete (config as Record<string, unknown>)[field];
+          const { [field]: _, ...rest } = config as Record<string, unknown>;
+          config = rest as typeof config;
         }
       }
     }
 
+    const preferDefaultStorage = parsed.preferDefaultStorage !== false;
+    const provider = !preferDefaultStorage && parsed.provider === "s3" ? "gyazo" : parsed.provider;
+
     return {
       ...parsed,
       config,
+      preferDefaultStorage,
+      provider,
+      isConfigured: isStorageConfiguredForUpload({
+        ...parsed,
+        config,
+        preferDefaultStorage,
+        provider,
+      }),
     };
   } catch (error) {
     console.error("Failed to load storage settings:", error);
@@ -95,11 +106,11 @@ export function clearStorageSettings(): void {
 }
 
 /**
- * ストレージ設定が有効かどうかを確認する
+ * ストレージ設定が有効かどうかを確認する（アップロード可能か）
  */
 export async function isStorageConfigured(): Promise<boolean> {
   const settings = await loadStorageSettings();
-  return settings?.isConfigured ?? false;
+  return settings ? isStorageConfiguredForUpload(settings) : false;
 }
 
 /**

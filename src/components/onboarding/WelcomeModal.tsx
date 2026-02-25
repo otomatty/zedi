@@ -15,17 +15,13 @@ interface FeatureItemProps {
   description: string;
 }
 
-const FeatureItem: React.FC<FeatureItemProps> = ({
-  icon,
-  title,
-  description,
-}) => (
-  <div className="flex flex-col items-center text-center p-4 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors">
-    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, description }) => (
+  <div className="flex flex-col items-center rounded-lg bg-muted/50 p-4 text-center transition-colors hover:bg-muted/80">
+    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
       {icon}
     </div>
-    <h3 className="font-medium text-sm mb-1">{title}</h3>
-    <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+    <h3 className="mb-1 text-sm font-medium">{title}</h3>
+    <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
   </div>
 );
 
@@ -35,11 +31,7 @@ interface WelcomeModalProps {
   onStartTour?: () => void;
 }
 
-export const WelcomeModal: React.FC<WelcomeModalProps> = ({
-  open,
-  onClose,
-  onStartTour,
-}) => {
+export const WelcomeModal: React.FC<WelcomeModalProps> = ({ open, onClose, onStartTour }) => {
   const features = [
     {
       icon: <FileText className="h-5 w-5 text-primary" />,
@@ -81,8 +73,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <DialogHeader className="text-center pb-2">
-          <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+        <DialogHeader className="pb-2 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5">
             <span className="text-3xl">🎉</span>
           </div>
           <DialogTitle className="text-xl">Zediへようこそ！</DialogTitle>
@@ -104,13 +96,10 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
         </div>
 
         {/* Quick Tips */}
-        <div className="bg-muted/30 rounded-lg p-4 space-y-2">
-          <h4 className="text-sm font-medium mb-3">💡 クイックヒント</h4>
+        <div className="space-y-2 rounded-lg bg-muted/30 p-4">
+          <h4 className="mb-3 text-sm font-medium">💡 クイックヒント</h4>
           {tips.map((tip, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-2 text-sm text-muted-foreground"
-            >
+            <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="text-primary">{tip.icon}</span>
               <span>{tip.text}</span>
             </div>

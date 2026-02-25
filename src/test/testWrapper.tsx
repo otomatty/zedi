@@ -29,11 +29,7 @@ interface TestWrapperProps {
 /**
  * Test wrapper with QueryClient and MemoryRouter
  */
-export function TestWrapper({
-  children,
-  queryClient,
-  initialEntries = ["/"],
-}: TestWrapperProps) {
+export function TestWrapper({ children, queryClient, initialEntries = ["/"] }: TestWrapperProps) {
   const client = queryClient || createTestQueryClient();
 
   return (
@@ -52,10 +48,7 @@ export function createHookWrapper(options?: {
 }) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <TestWrapper
-        queryClient={options?.queryClient}
-        initialEntries={options?.initialEntries}
-      >
+      <TestWrapper queryClient={options?.queryClient} initialEntries={options?.initialEntries}>
         {children}
       </TestWrapper>
     );

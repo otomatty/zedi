@@ -2,7 +2,13 @@
 
 import { useState, useCallback } from "react";
 import { useStorageSettings } from "./useStorageSettings";
-import { getStorageProvider, UploadProgress } from "@/lib/storage";
+import { useAuth } from "./useAuth";
+import {
+  getStorageProvider,
+  getSettingsForUpload,
+  isStorageConfiguredForUpload,
+  UploadProgress,
+} from "@/lib/storage";
 
 interface ImageUploadState {
   isUploading: boolean;
@@ -22,13 +28,14 @@ interface UseImageUploadReturn {
 
 export function useImageUpload(): UseImageUploadReturn {
   const { settings, isLoading } = useStorageSettings();
+  const { getToken } = useAuth();
   const [state, setState] = useState<ImageUploadState>({
     isUploading: false,
     progress: null,
     error: null,
   });
 
-  const isConfigured = !isLoading && settings.isConfigured;
+  const isConfigured = !isLoading && isStorageConfiguredForUpload(settings);
 
   /**
    * 単一の画像をアップロード
@@ -36,10 +43,8 @@ export function useImageUpload(): UseImageUploadReturn {
   const uploadImage = useCallback(
     async (file: File): Promise<string> => {
       // ストレージ設定の確認
-      if (!settings.isConfigured) {
-        throw new Error(
-          "ストレージが設定されていません。設定画面でストレージを設定してください。"
-        );
+      if (!isStorageConfiguredForUpload(settings)) {
+        throw new Error("ストレージが設定されていません。設定画面でストレージを設定してください。");
       }
 
       // 画像ファイルの検証
@@ -55,8 +60,10 @@ export function useImageUpload(): UseImageUploadReturn {
       }));
 
       try {
-        // プロバイダーを取得
-        const provider = getStorageProvider(settings);
+        // プロバイダーを取得（S3 の場合は getToken を渡す）
+        const provider = getStorageProvider(getSettingsForUpload(settings), {
+          getToken,
+        });
 
         // アップロード実行
         const url = await provider.uploadImage(file, {
@@ -73,8 +80,7 @@ export function useImageUpload(): UseImageUploadReturn {
 
         return url;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "アップロードに失敗しました";
+        const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
         setState((prev) => ({
           ...prev,
           isUploading: false,
@@ -83,7 +89,7 @@ export function useImageUpload(): UseImageUploadReturn {
         throw error;
       }
     },
-    [settings]
+    [settings, getToken],
   );
 
   /**
@@ -106,16 +112,13 @@ export function useImageUpload(): UseImageUploadReturn {
 
       try {
         // 並列でアップロード
-        const urls = await Promise.all(
-          imageFiles.map((file) => uploadImage(file))
-        );
+        const urls = await Promise.all(imageFiles.map((file) => uploadImage(file)));
 
         setState((prev) => ({ ...prev, isUploading: false }));
 
         return urls;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "アップロードに失敗しました";
+        const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
         setState((prev) => ({
           ...prev,
           isUploading: false,
@@ -124,7 +127,7 @@ export function useImageUpload(): UseImageUploadReturn {
         throw error;
       }
     },
-    [uploadImage]
+    [uploadImage],
   );
 
   /**

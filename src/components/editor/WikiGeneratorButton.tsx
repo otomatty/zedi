@@ -2,11 +2,7 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -37,8 +33,7 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [showNotConfiguredDialog, setShowNotConfiguredDialog] =
-    React.useState(false);
+  const [showNotConfiguredDialog, setShowNotConfiguredDialog] = React.useState(false);
 
   // タイトルがない、または本文がある場合はボタンを非表示
   const shouldShowButton = title.trim() !== "" && !hasContent;
@@ -92,10 +87,7 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
       </Tooltip>
 
       {/* AI未設定ダイアログ */}
-      <Dialog
-        open={showNotConfiguredDialog}
-        onOpenChange={setShowNotConfiguredDialog}
-      >
+      <Dialog open={showNotConfiguredDialog} onOpenChange={setShowNotConfiguredDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -107,10 +99,7 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowNotConfiguredDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowNotConfiguredDialog(false)}>
               キャンセル
             </Button>
             <Button onClick={handleGoToSettings}>設定画面へ</Button>

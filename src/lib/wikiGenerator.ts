@@ -130,10 +130,25 @@ export interface WikiGeneratorCallbacks {
 
 /**
  * AI設定を取得し、設定されているか確認
+ * api_serverモードではシステムプロバイダーが利用可能なため常にOK
  */
 export async function getAISettingsOrThrow(): Promise<AISettings> {
   const settings = await loadAISettings();
-  if (!settings || !settings.isConfigured || !settings.apiKey) {
+
+  // 設定がない場合はデフォルト(api_server)を使用
+  if (!settings) {
+    const { DEFAULT_AI_SETTINGS } = await import("@/types/ai");
+    return { ...DEFAULT_AI_SETTINGS, isConfigured: true };
+  }
+
+  // api_serverモードならAPIキー不要
+  const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+  if (effectiveMode === "api_server") {
+    return { ...settings, isConfigured: true };
+  }
+
+  // user_api_keyモードではAPIキーが必要
+  if (!settings.isConfigured || !settings.apiKey) {
     throw new Error("AI_NOT_CONFIGURED");
   }
   return settings;
@@ -159,7 +174,7 @@ async function generateWithOpenAI(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new OpenAI({
     apiKey: settings.apiKey,
@@ -172,9 +187,7 @@ async function generateWithOpenAI(
   const isSearchModel = settings.model.includes("search");
 
   // Web検索対応モデルの場合、web_search_optionsを追加
-  const webSearchOptions = isSearchModel
-    ? { search_context_size: "medium" as const }
-    : undefined;
+  const webSearchOptions = isSearchModel ? { search_context_size: "medium" as const } : undefined;
 
   const stream = await client.chat.completions.create(
     {
@@ -185,7 +198,7 @@ async function generateWithOpenAI(
       stream: true,
       web_search_options: webSearchOptions,
     },
-    { signal: abortSignal }
+    { signal: abortSignal },
   );
 
   let fullContent = "";
@@ -220,9 +233,7 @@ function isClaudeWebSearchSupported(model: string): boolean {
     "claude-haiku-3.5",
     "claude-3-5-haiku",
   ];
-  return supportedPatterns.some((pattern) =>
-    model.toLowerCase().includes(pattern.toLowerCase())
-  );
+  return supportedPatterns.some((pattern) => model.toLowerCase().includes(pattern.toLowerCase()));
 }
 
 /**
@@ -232,7 +243,7 @@ async function generateWithAnthropic(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new Anthropic({
     apiKey: settings.apiKey,
@@ -270,10 +281,7 @@ async function generateWithAnthropic(
       throw new Error("ABORTED");
     }
 
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
       const content = event.delta.text;
       fullContent += content;
       callbacks.onChunk(content);
@@ -292,7 +300,7 @@ async function generateWithGoogle(
   settings: AISettings,
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   // 新しい @google/genai SDK を使用
   const client = new GoogleGenAI({ apiKey: settings.apiKey });
@@ -336,15 +344,57 @@ async function generateWithGoogle(
 
 /**
  * Wikiコンテンツをストリーミング生成
+ * api_serverモード: callAIService経由でサーバーに委譲
+ * user_api_keyモード: 直接SDKで呼び出し（既存動作）
  */
 export async function generateWikiContentStream(
   title: string,
   callbacks: WikiGeneratorCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   try {
     const settings = await getAISettingsOrThrow();
+    const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
+    // api_serverモード: 統一されたcallAIService経由
+    if (effectiveMode === "api_server") {
+      const { callAIService } = await import("@/lib/aiService");
+      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
+
+      let fullContent = "";
+
+      await callAIService(
+        settings,
+        {
+          provider: settings.provider,
+          model: settings.model,
+          messages: [{ role: "user", content: prompt }],
+          options: {
+            maxTokens: 4000,
+            temperature: 0.7,
+            stream: true,
+            feature: "wiki_generation",
+          },
+        },
+        {
+          onChunk: (chunk) => {
+            fullContent += chunk;
+            callbacks.onChunk(chunk);
+          },
+          onComplete: () => {
+            const wikiLinks = extractWikiLinks(fullContent);
+            callbacks.onComplete({ content: fullContent, wikiLinks });
+          },
+          onError: (error) => {
+            callbacks.onError(error);
+          },
+        },
+        abortSignal,
+      );
+      return;
+    }
+
+    // user_api_keyモード: 既存の直接SDK呼び出し
     switch (settings.provider) {
       case "openai":
         await generateWithOpenAI(settings, title, callbacks, abortSignal);

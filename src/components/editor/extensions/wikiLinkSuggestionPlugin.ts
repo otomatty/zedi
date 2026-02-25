@@ -1,7 +1,7 @@
-import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import type { EditorView } from '@tiptap/pm/view';
+import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import type { EditorView } from "@tiptap/pm/view";
 
 export interface WikiLinkSuggestionState {
   active: boolean;
@@ -10,14 +10,16 @@ export interface WikiLinkSuggestionState {
   decorations: DecorationSet;
 }
 
-export const wikiLinkSuggestionPluginKey = new PluginKey<WikiLinkSuggestionState>('wikiLinkSuggestion');
+export const wikiLinkSuggestionPluginKey = new PluginKey<WikiLinkSuggestionState>(
+  "wikiLinkSuggestion",
+);
 
 export interface WikiLinkSuggestionOptions {
   onStateChange?: (state: WikiLinkSuggestionState) => void;
 }
 
 export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptions>({
-  name: 'wikiLinkSuggestion',
+  name: "wikiLinkSuggestion",
 
   addOptions() {
     return {
@@ -36,7 +38,7 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
           init() {
             return {
               active: false,
-              query: '',
+              query: "",
               range: null,
               decorations: DecorationSet.empty,
             };
@@ -44,12 +46,12 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
 
           apply(tr, prev, _oldState, newState) {
             const meta = tr.getMeta(wikiLinkSuggestionPluginKey);
-            
+
             // Handle explicit close
             if (meta?.close) {
               const nextState = {
                 active: false,
-                query: '',
+                query: "",
                 range: null,
                 decorations: DecorationSet.empty,
               };
@@ -60,13 +62,13 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
             // Check for [[ pattern
             const { selection } = newState;
             const { $from } = selection;
-            
+
             // Get text before cursor
-            const textBefore = $from.parent.textBetween(0, $from.parentOffset, null, '\ufffc');
-            
+            const textBefore = $from.parent.textBetween(0, $from.parentOffset, null, "\ufffc");
+
             // Find [[ pattern
             const match = textBefore.match(/\[\[([^\]]*?)$/);
-            
+
             if (match) {
               const query = match[1];
               const from = $from.pos - match[0].length;
@@ -74,7 +76,7 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
 
               const decorations = DecorationSet.create(newState.doc, [
                 Decoration.inline(from, to, {
-                  class: 'wiki-link-typing',
+                  class: "wiki-link-typing",
                 }),
               ]);
 
@@ -84,7 +86,7 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
                 range: { from, to },
                 decorations,
               };
-              
+
               onStateChange?.(nextState);
               return nextState;
             }
@@ -93,7 +95,7 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
             if (prev.active) {
               const nextState = {
                 active: false,
-                query: '',
+                query: "",
                 range: null,
                 decorations: DecorationSet.empty,
               };
@@ -112,16 +114,14 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
 
           handleKeyDown(view: EditorView, event: KeyboardEvent) {
             const pluginState = wikiLinkSuggestionPluginKey.getState(view.state);
-            
+
             if (!pluginState?.active) {
               return false;
             }
 
             // Close on Escape
-            if (event.key === 'Escape') {
-              view.dispatch(
-                view.state.tr.setMeta(wikiLinkSuggestionPluginKey, { close: true })
-              );
+            if (event.key === "Escape") {
+              view.dispatch(view.state.tr.setMeta(wikiLinkSuggestionPluginKey, { close: true }));
               return true;
             }
 

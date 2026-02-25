@@ -1,0 +1,45 @@
+{
+  "tour": {
+    "title": "クイックツアー",
+    "description": "アプリの使い方を短いガイドで案内します。",
+    "runAgain": "クイックツアーをもう一度見る"
+  },
+  "display": {
+    "title": "表示",
+    "description": "テーマとフォントサイズを設定します"
+  },
+  "theme": {
+    "label": "テーマ",
+    "system": "システムに従う",
+    "light": "ライト",
+    "dark": "ダーク"
+  },
+  "fontSize": {
+    "label": "エディタのフォントサイズ",
+    "normal": "標準",
+    "large": "やや大きめ",
+    "x-large": "大きめ"
+  },
+  "language": {
+    "title": "言語",
+    "description": "UIの表示言語を設定します",
+    "label": "表示言語"
+  },
+  "profile": {
+    "title": "プロフィール",
+    "description": "アカウント名とサムネイルを設定します",
+    "displayName": "アカウント名",
+    "displayNamePlaceholder": "表示する名前を入力",
+    "displayNameHelp": "空欄の場合はサインイン時の名前が使用されます",
+    "avatar": "サムネイル",
+    "avatarUrl": "画像URL",
+    "avatarUrlPlaceholder": "https://example.com/avatar.png",
+    "avatarUpload": "画像をアップロード",
+    "avatarRemove": "サムネイルを削除",
+    "avatarHelp": "URLを入力するか、画像をアップロードしてください"
+  },
+  "saved": "一般設定を保存しました",
+  "saveFailed": "一般設定の保存に失敗しました",
+  "profileSaved": "プロフィールを保存しました",
+  "profileSaveFailed": "プロフィールの保存に失敗しました"
+}

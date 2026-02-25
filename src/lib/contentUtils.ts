@@ -1,29 +1,45 @@
 // Supported node types in zedi's Tiptap schema
 const SUPPORTED_NODE_TYPES = new Set([
-  'doc',
-  'paragraph',
-  'text',
-  'heading',
-  'blockquote',
-  'bulletList',
-  'orderedList',
-  'listItem',
-  'codeBlock',
-  'horizontalRule',
-  'hardBreak',
-  'mermaid',
-  'image', // 画像挿入機能のサポート
-  'imageUpload', // 画像アップロード中のプレースホルダー
+  "doc",
+  "paragraph",
+  "text",
+  "heading",
+  "blockquote",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "codeBlock",
+  "horizontalRule",
+  "hardBreak",
+  "mermaid",
+  "image", // 画像挿入機能のサポート
+  "imageUpload", // 画像アップロード中のプレースホルダー
+  // Phase 1: タスクリスト
+  "taskList",
+  "taskItem",
+  // Phase 2: テーブル
+  "table",
+  "tableRow",
+  "tableCell",
+  "tableHeader",
+  // Phase 4: 数式
+  "math",
+  "mathBlock",
 ]);
 
 // Supported mark types in zedi's Tiptap schema
 const SUPPORTED_MARK_TYPES = new Set([
-  'bold',
-  'italic',
-  'strike',
-  'code',
-  'link',
-  'wikiLink',
+  "bold",
+  "italic",
+  "strike",
+  "code",
+  "link",
+  "wikiLink",
+  // Phase 1: ハイライト・下線
+  "highlight",
+  "underline",
+  // Phase 3: 文字色
+  "textStyle",
 ]);
 
 export interface SanitizeResult {
@@ -40,7 +56,7 @@ export interface SanitizeResult {
 export function sanitizeTiptapContent(content: string): SanitizeResult {
   if (!content) {
     return {
-      content: '',
+      content: "",
       hadErrors: false,
       removedNodeTypes: [],
       removedMarkTypes: [],
@@ -62,12 +78,12 @@ export function sanitizeTiptapContent(content: string): SanitizeResult {
     };
   } catch (e) {
     // If JSON parsing fails, return empty content with error
-    console.error('Failed to parse Tiptap content:', e);
+    console.error("Failed to parse Tiptap content:", e);
     return {
-      content: JSON.stringify({ type: 'doc', content: [] }),
+      content: JSON.stringify({ type: "doc", content: [] }),
       hadErrors: true,
       removedNodeTypes: [],
-      removedMarkTypes: ['JSON parse error'],
+      removedMarkTypes: ["JSON parse error"],
     };
   }
 }
@@ -78,9 +94,9 @@ export function sanitizeTiptapContent(content: string): SanitizeResult {
 function sanitizeNode(
   node: Record<string, unknown>,
   removedNodeTypes: Set<string>,
-  removedMarkTypes: Set<string>
+  removedMarkTypes: Set<string>,
 ): Record<string, unknown> | null {
-  if (!node || typeof node !== 'object') {
+  if (!node || typeof node !== "object") {
     return null;
   }
 
@@ -96,17 +112,17 @@ function sanitizeNode(
       const textContent = extractTextFromUnsupportedNode(node);
       if (textContent) {
         return {
-          type: 'paragraph',
-          content: [{ type: 'text', text: `[${nodeType}] ${textContent}` }],
+          type: "paragraph",
+          content: [{ type: "text", text: `[${nodeType}] ${textContent}` }],
         };
       }
     }
 
     // If there's text directly in the node (shouldn't happen but just in case)
-    if (node.text && typeof node.text === 'string') {
+    if (node.text && typeof node.text === "string") {
       return {
-        type: 'paragraph',
-        content: [{ type: 'text', text: `[${nodeType}] ${node.text}` }],
+        type: "paragraph",
+        content: [{ type: "text", text: `[${nodeType}] ${node.text}` }],
       };
     }
 
@@ -119,16 +135,14 @@ function sanitizeNode(
 
   // Sanitize marks if present
   if (node.marks && Array.isArray(node.marks)) {
-    const sanitizedMarks = (node.marks as Array<Record<string, unknown>>).filter(
-      (mark) => {
-        const markType = mark.type as string;
-        if (!SUPPORTED_MARK_TYPES.has(markType)) {
-          removedMarkTypes.add(markType);
-          return false;
-        }
-        return true;
+    const sanitizedMarks = (node.marks as Array<Record<string, unknown>>).filter((mark) => {
+      const markType = mark.type as string;
+      if (!SUPPORTED_MARK_TYPES.has(markType)) {
+        removedMarkTypes.add(markType);
+        return false;
       }
-    );
+      return true;
+    });
 
     if (sanitizedMarks.length > 0) {
       sanitizedNode.marks = sanitizedMarks;
@@ -153,7 +167,7 @@ function sanitizeNode(
  * Extract text from an unsupported node for preservation
  */
 function extractTextFromUnsupportedNode(node: Record<string, unknown>): string {
-  if (node.text && typeof node.text === 'string') {
+  if (node.text && typeof node.text === "string") {
     return node.text;
   }
 
@@ -161,10 +175,10 @@ function extractTextFromUnsupportedNode(node: Record<string, unknown>): string {
     return (node.content as Array<Record<string, unknown>>)
       .map((child) => extractTextFromUnsupportedNode(child))
       .filter(Boolean)
-      .join(' ');
+      .join(" ");
   }
 
-  return '';
+  return "";
 }
 
 /**
@@ -194,7 +208,7 @@ export function validateTiptapContent(content: string): {
  * Recursively validate a node
  */
 function validateNode(node: Record<string, unknown>, errors: string[]): void {
-  if (!node || typeof node !== 'object') return;
+  if (!node || typeof node !== "object") return;
 
   const nodeType = node.type as string;
 
@@ -220,8 +234,8 @@ function validateNode(node: Record<string, unknown>, errors: string[]): void {
 
 // Extract plain text from Tiptap JSON content
 export function extractPlainText(content: string): string {
-  if (!content) return '';
-  
+  if (!content) return "";
+
   try {
     const doc = JSON.parse(content);
     return extractTextFromNode(doc);
@@ -256,11 +270,11 @@ export const PAGE_LIST_PREVIEW_LENGTH = 120;
 // Get a preview snippet of the content
 export function getContentPreview(content: string, maxLength: number = 100): string {
   const plainText = extractPlainText(content);
-  const trimmed = plainText.trim().replace(/\s+/g, ' ');
-  
+  const trimmed = plainText.trim().replace(/\s+/g, " ");
+
   if (trimmed.length <= maxLength) return trimmed;
-  
-  return trimmed.slice(0, maxLength).trim() + '...';
+
+  return trimmed.slice(0, maxLength).trim() + "...";
 }
 
 // Standard preview for page list UI
@@ -271,7 +285,7 @@ export function getPageListPreview(content: string): string {
 // Extract first image URL from Tiptap content
 export function extractFirstImage(content: string): string | null {
   if (!content) return null;
-  
+
   try {
     const doc = JSON.parse(content);
     return findFirstImage(doc);
@@ -309,23 +323,23 @@ function findFirstImage(node: unknown): string | null {
 export function extractWikiLinks(content: string): string[] {
   const plainText = extractPlainText(content);
   const matches = plainText.match(/\[\[([^\]]+)\]\]/g);
-  
+
   if (!matches) return [];
-  
+
   return matches.map((match) => match.slice(2, -2).trim());
 }
 
 // Generate auto title from content
 export function generateAutoTitle(content: string): string {
   const plainText = extractPlainText(content);
-  const firstLine = plainText.split('\n')[0]?.trim() || '';
-  
-  if (!firstLine) return '無題のページ';
-  
+  const firstLine = plainText.split("\n")[0]?.trim() || "";
+
+  if (!firstLine) return "無題のページ";
+
   // Use first 40 characters of the first line
   if (firstLine.length <= 40) return firstLine;
-  
-  return firstLine.slice(0, 40).trim() + '...';
+
+  return firstLine.slice(0, 40).trim() + "...";
 }
 
 /**
@@ -359,14 +373,12 @@ export function isContentNotEmpty(contentJson: string): boolean {
     // doc.contentが空または空の段落のみかチェック
     if (!parsed.content || parsed.content.length === 0) return false;
     // 空の段落のみの場合もfalse
-    const hasRealContent = parsed.content.some(
-      (node: { type: string; content?: unknown[] }) => {
-        if (node.type === "paragraph") {
-          return node.content && node.content.length > 0;
-        }
-        return true; // 段落以外のノード（見出しなど）があればtrue
+    const hasRealContent = parsed.content.some((node: { type: string; content?: unknown[] }) => {
+      if (node.type === "paragraph") {
+        return node.content && node.content.length > 0;
       }
-    );
+      return true; // 段落以外のノード（見出しなど）があればtrue
+    });
     return hasRealContent;
   } catch {
     return contentJson.trim().length > 0;

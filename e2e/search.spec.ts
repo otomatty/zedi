@@ -7,9 +7,7 @@ test.describe("Global Search - UI Tests", () => {
     await helpers.goToHome(page);
   });
 
-  test("should open search dialog with keyboard shortcut Cmd+K", async ({
-    page,
-  }) => {
+  test("should open search dialog with keyboard shortcut Cmd+K", async ({ page }) => {
     // Press Cmd+K
     await page.keyboard.press("Meta+k");
     await page.waitForTimeout(300);
@@ -103,38 +101,38 @@ test.describe("Global Search - Data Tests", () => {
   });
 
   test.skip("should search and find page by title (requires data persistence)", async ({
-    page,
+    page: _page,
   }) => {
     // This test is skipped because it requires proper data synchronization
     // between page creation and the search query cache
   });
 
   test.skip("should search and find page by content (requires data persistence)", async ({
-    page,
+    page: _page,
   }) => {
     // This test is skipped because it requires proper data synchronization
   });
 
   test.skip("should support multiple keyword AND search (requires data persistence)", async ({
-    page,
+    page: _page,
   }) => {
     // This test is skipped because it requires proper data synchronization
   });
 
   test.skip("should highlight keywords in search results (requires data persistence)", async ({
-    page,
+    page: _page,
   }) => {
     // This test is skipped because it requires proper data synchronization
   });
 
   test.skip("should navigate to page when search result is selected (requires data persistence)", async ({
-    page,
+    page: _page,
   }) => {
     // This test is skipped because it requires proper data synchronization
   });
 
   test.skip("should show search results count (requires data persistence)", async ({
-    page,
+    page: _page,
   }) => {
     // This test is skipped because it requires proper data synchronization
   });

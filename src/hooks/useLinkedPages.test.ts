@@ -1,25 +1,14 @@
 import { describe, it, expect } from "vitest";
-import {
-  calculateLinkedPages,
-  pageToCard,
-  type LinkedPagesData,
-} from "./useLinkedPages";
-import type { Page } from "@/types/page";
-import {
-  createWikiLinkContent,
-  createPlainTextContent,
-} from "@/test/testDatabase";
+import { calculateLinkedPages, calculateLinkedPagesOptimized, pageToCard } from "./useLinkedPages";
+import type { Page, PageSummary } from "@/types/page";
+import { createWikiLinkContent, createPlainTextContent } from "@/test/testDatabase";
 
 // Helper to create a test page
-function createTestPage(
-  id: string,
-  title: string,
-  content: string,
-  options?: Partial<Page>
-): Page {
+function createTestPage(id: string, title: string, content: string, options?: Partial<Page>): Page {
   const now = Date.now();
   return {
     id,
+    ownerUserId: "test-user-id",
     title,
     content,
     createdAt: now,
@@ -34,7 +23,7 @@ describe("pageToCard", () => {
     const page = createTestPage(
       "page-1",
       "Test Page",
-      createPlainTextContent("This is test content")
+      createPlainTextContent("This is test content"),
     );
 
     const card = pageToCard(page);
@@ -51,7 +40,7 @@ describe("pageToCard", () => {
       "page-1",
       "Web Article",
       createPlainTextContent("Article content"),
-      { sourceUrl: "https://example.com/article" }
+      { sourceUrl: "https://example.com/article" },
     );
 
     const card = pageToCard(page);
@@ -61,11 +50,7 @@ describe("pageToCard", () => {
 
   it("should truncate long preview text", () => {
     const longText = "A".repeat(100);
-    const page = createTestPage(
-      "page-1",
-      "Long Content",
-      createPlainTextContent(longText)
-    );
+    const page = createTestPage("page-1", "Long Content", createPlainTextContent(longText));
 
     const card = pageToCard(page);
 
@@ -79,20 +64,12 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A", "Page B"])
+        createWikiLinkContent(["Page A", "Page B"]),
       );
 
       // Pages without children go to outgoingLinks
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createPlainTextContent("Content A")
-      );
-      const pageB = createTestPage(
-        "page-b",
-        "Page B",
-        createPlainTextContent("Content B")
-      );
+      const pageA = createTestPage("page-a", "Page A", createPlainTextContent("Content A"));
+      const pageB = createTestPage("page-b", "Page B", createPlainTextContent("Content B"));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -112,14 +89,10 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Current Page", "Page A"])
+        createWikiLinkContent(["Current Page", "Page A"]),
       );
 
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createPlainTextContent("Content A")
-      );
+      const pageA = createTestPage("page-a", "Page A", createPlainTextContent("Content A"));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -136,19 +109,11 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["PAGE A", "page b"])
+        createWikiLinkContent(["PAGE A", "page b"]),
       );
 
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createPlainTextContent("Content A")
-      );
-      const pageB = createTestPage(
-        "page-b",
-        "Page B",
-        createPlainTextContent("Content B")
-      );
+      const pageA = createTestPage("page-a", "Page A", createPlainTextContent("Content A"));
+      const pageB = createTestPage("page-b", "Page B", createPlainTextContent("Content B"));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -162,16 +127,12 @@ describe("calculateLinkedPages", () => {
 
     it("should limit outgoing links without children to 10", () => {
       const links = Array.from({ length: 15 }, (_, i) => `Page ${i}`);
-      const currentPage = createTestPage(
-        "current",
-        "Current Page",
-        createWikiLinkContent(links)
-      );
+      const currentPage = createTestPage("current", "Current Page", createWikiLinkContent(links));
 
       const allPages = [
         currentPage,
         ...links.map((title, i) =>
-          createTestPage(`page-${i}`, title, createPlainTextContent(`Content ${i}`))
+          createTestPage(`page-${i}`, title, createPlainTextContent(`Content ${i}`)),
         ),
       ];
 
@@ -191,13 +152,13 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Existing Page", "Non Existing Page"])
+        createWikiLinkContent(["Existing Page", "Non Existing Page"]),
       );
 
       const existingPage = createTestPage(
         "existing",
         "Existing Page",
-        createPlainTextContent("Content")
+        createPlainTextContent("Content"),
       );
 
       const result = calculateLinkedPages({
@@ -214,11 +175,7 @@ describe("calculateLinkedPages", () => {
 
     it("should limit ghost links to 5", () => {
       const links = Array.from({ length: 10 }, (_, i) => `Ghost ${i}`);
-      const currentPage = createTestPage(
-        "current",
-        "Current Page",
-        createWikiLinkContent(links)
-      );
+      const currentPage = createTestPage("current", "Current Page", createWikiLinkContent(links));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -236,18 +193,18 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createPlainTextContent("Content")
+        createPlainTextContent("Content"),
       );
 
       const backlinkPage1 = createTestPage(
         "backlink-1",
         "Backlink Page 1",
-        createPlainTextContent("Content 1")
+        createPlainTextContent("Content 1"),
       );
       const backlinkPage2 = createTestPage(
         "backlink-2",
         "Backlink Page 2",
-        createPlainTextContent("Content 2")
+        createPlainTextContent("Content 2"),
       );
 
       const result = calculateLinkedPages({
@@ -266,19 +223,19 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createPlainTextContent("Content")
+        createPlainTextContent("Content"),
       );
 
       const activePage = createTestPage(
         "active",
         "Active Page",
-        createPlainTextContent("Active content")
+        createPlainTextContent("Active content"),
       );
       const deletedPage = createTestPage(
         "deleted",
         "Deleted Page",
         createPlainTextContent("Deleted content"),
-        { isDeleted: true }
+        { isDeleted: true },
       );
 
       const result = calculateLinkedPages({
@@ -296,11 +253,11 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createPlainTextContent("Content")
+        createPlainTextContent("Content"),
       );
 
       const backlinkPages = Array.from({ length: 15 }, (_, i) =>
-        createTestPage(`backlink-${i}`, `Backlink ${i}`, createPlainTextContent(`Content ${i}`))
+        createTestPage(`backlink-${i}`, `Backlink ${i}`, createPlainTextContent(`Content ${i}`)),
       );
 
       const result = calculateLinkedPages({
@@ -320,20 +277,12 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A"])
+        createWikiLinkContent(["Page A"]),
       );
 
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createWikiLinkContent(["Page B"])
-      );
+      const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(["Page B"]));
 
-      const pageB = createTestPage(
-        "page-b",
-        "Page B",
-        createPlainTextContent("Content B")
-      );
+      const pageB = createTestPage("page-b", "Page B", createPlainTextContent("Content B"));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -359,14 +308,10 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A"])
+        createWikiLinkContent(["Page A"]),
       );
 
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createWikiLinkContent(["Current Page"])
-      );
+      const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(["Current Page"]));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -387,20 +332,12 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A", "Page B"])
+        createWikiLinkContent(["Page A", "Page B"]),
       );
 
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createWikiLinkContent(["Page B"])
-      );
+      const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(["Page B"]));
 
-      const pageB = createTestPage(
-        "page-b",
-        "Page B",
-        createPlainTextContent("Content B")
-      );
+      const pageB = createTestPage("page-b", "Page B", createPlainTextContent("Content B"));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -423,26 +360,14 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A", "Page B"])
+        createWikiLinkContent(["Page A", "Page B"]),
       );
 
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createWikiLinkContent(["Page C"])
-      );
+      const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(["Page C"]));
 
-      const pageB = createTestPage(
-        "page-b",
-        "Page B",
-        createWikiLinkContent(["Page C"])
-      );
+      const pageB = createTestPage("page-b", "Page B", createWikiLinkContent(["Page C"]));
 
-      const pageC = createTestPage(
-        "page-c",
-        "Page C",
-        createPlainTextContent("Content C")
-      );
+      const pageC = createTestPage("page-c", "Page C", createPlainTextContent("Content C"));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -465,18 +390,14 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A"])
+        createWikiLinkContent(["Page A"]),
       );
 
       const childTitles = Array.from({ length: 10 }, (_, i) => `Child ${i}`);
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createWikiLinkContent(childTitles)
-      );
+      const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(childTitles));
 
       const childPages = childTitles.map((title, i) =>
-        createTestPage(`child-${i}`, title, createPlainTextContent(`Content ${i}`))
+        createTestPage(`child-${i}`, title, createPlainTextContent(`Content ${i}`)),
       );
 
       const result = calculateLinkedPages({
@@ -494,18 +415,14 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A"])
+        createWikiLinkContent(["Page A"]),
       );
 
       const twoHopTitles = Array.from({ length: 15 }, (_, i) => `TwoHop ${i}`);
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createWikiLinkContent(twoHopTitles)
-      );
+      const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(twoHopTitles));
 
       const twoHopPages = twoHopTitles.map((title, i) =>
-        createTestPage(`twohop-${i}`, title, createPlainTextContent(`Content ${i}`))
+        createTestPage(`twohop-${i}`, title, createPlainTextContent(`Content ${i}`)),
       );
 
       const result = calculateLinkedPages({
@@ -524,7 +441,7 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createPlainTextContent("No links here")
+        createPlainTextContent("No links here"),
       );
 
       const result = calculateLinkedPages({
@@ -561,20 +478,12 @@ describe("calculateLinkedPages", () => {
       const currentPage = createTestPage(
         "current",
         "Current Page",
-        createWikiLinkContent(["Page A"])
+        createWikiLinkContent(["Page A"]),
       );
 
-      const pageA = createTestPage(
-        "page-a",
-        "Page A",
-        createWikiLinkContent(["Page B"])
-      );
+      const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(["Page B"]));
 
-      const pageB = createTestPage(
-        "page-b",
-        "Page B",
-        createWikiLinkContent(["Current Page"])
-      );
+      const pageB = createTestPage("page-b", "Page B", createWikiLinkContent(["Current Page"]));
 
       const result = calculateLinkedPages({
         currentPage,
@@ -592,5 +501,206 @@ describe("calculateLinkedPages", () => {
       expect(result.twoHopLinks[0].id).toBe("page-b");
       // Current page should not appear in 2-hop (Page B -> Current is excluded)
     });
+  });
+});
+
+// --- calculateLinkedPagesOptimized (PageSummary + optional full Page for 2-hop) ---
+function createTestSummary(id: string, title: string, options?: Partial<PageSummary>): PageSummary {
+  const now = Date.now();
+  return {
+    id,
+    ownerUserId: "user-1",
+    title,
+    contentPreview: undefined,
+    thumbnailUrl: undefined,
+    sourceUrl: undefined,
+    createdAt: now,
+    updatedAt: now,
+    isDeleted: false,
+    ...options,
+  };
+}
+
+describe("calculateLinkedPagesOptimized", () => {
+  it("should extract outgoing links and use pageToCard when outgoingPages has content", () => {
+    const currentPage = createTestPage(
+      "current",
+      "Current Page",
+      createWikiLinkContent(["Page A", "Page B"]),
+    );
+    const pageA = createTestPage("page-a", "Page A", createPlainTextContent("Content A"));
+    const pageB = createTestPage("page-b", "Page B", createPlainTextContent("Content B"));
+    const summaries: PageSummary[] = [
+      createTestSummary("current", "Current Page"),
+      createTestSummary("page-a", "Page A"),
+      createTestSummary("page-b", "Page B"),
+    ];
+
+    const result = calculateLinkedPagesOptimized({
+      currentPage,
+      pageId: "current",
+      allPagesSummary: summaries,
+      outgoingPages: [pageA, pageB],
+      backlinkPages: [],
+      backlinkIds: [],
+    });
+
+    expect(result.outgoingLinks).toHaveLength(2);
+    expect(result.outgoingLinks.map((l) => l.id)).toContain("page-a");
+    expect(result.outgoingLinks.map((l) => l.id)).toContain("page-b");
+    expect(result.outgoingLinks[0].preview).toBe("Content A");
+    expect(result.outgoingLinks[1].preview).toBe("Content B");
+    expect(result.outgoingLinksWithChildren).toHaveLength(0);
+  });
+
+  it("should fallback to summaryToCard when outgoing page has no content in outgoingPages (preview empty)", () => {
+    const currentPage = createTestPage(
+      "current",
+      "Current Page",
+      createWikiLinkContent(["Page A", "Page B"]),
+    );
+    const pageA = createTestPage("page-a", "Page A", createPlainTextContent("Content A"));
+    // Page B is in summary but not in outgoingPages (no content fetched)
+    const summaries: PageSummary[] = [
+      createTestSummary("current", "Current Page"),
+      createTestSummary("page-a", "Page A"),
+      createTestSummary("page-b", "Page B"),
+    ];
+
+    const result = calculateLinkedPagesOptimized({
+      currentPage,
+      pageId: "current",
+      allPagesSummary: summaries,
+      outgoingPages: [pageA], // Page B は含めない → summaryToCard フォールバック
+      backlinkPages: [],
+      backlinkIds: [],
+    });
+
+    expect(result.outgoingLinks).toHaveLength(2);
+    const cardA = result.outgoingLinks.find((c) => c.id === "page-a");
+    const cardB = result.outgoingLinks.find((c) => c.id === "page-b");
+    expect(cardA?.preview).toBe("Content A");
+    expect(cardB?.preview).toBe(""); // summary のみなので preview は空
+    expect(cardB?.title).toBe("Page B");
+  });
+
+  it("should identify ghost links and exclude self-links", () => {
+    const currentPage = createTestPage(
+      "current",
+      "Current Page",
+      createWikiLinkContent(["Existing Page", "Ghost Page", "Current Page"]),
+    );
+    const existingPage = createTestPage(
+      "existing",
+      "Existing Page",
+      createPlainTextContent("Content"),
+    );
+    const summaries: PageSummary[] = [
+      createTestSummary("current", "Current Page"),
+      createTestSummary("existing", "Existing Page"),
+    ];
+
+    const result = calculateLinkedPagesOptimized({
+      currentPage,
+      pageId: "current",
+      allPagesSummary: summaries,
+      outgoingPages: [existingPage],
+      backlinkPages: [],
+      backlinkIds: [],
+    });
+
+    expect(result.outgoingLinks).toHaveLength(1);
+    expect(result.outgoingLinks[0].id).toBe("existing");
+    expect(result.ghostLinks).toHaveLength(1);
+    expect(result.ghostLinks[0]).toBe("Ghost Page");
+  });
+
+  it("should return backlinks from backlinkIds using backlinkPages or summary fallback", () => {
+    const currentPage = createTestPage(
+      "current",
+      "Current Page",
+      createPlainTextContent("Content"),
+    );
+    const backlinkFull = createTestPage(
+      "back-1",
+      "Backlink One",
+      createPlainTextContent("Content 1"),
+    );
+    const summaries: PageSummary[] = [
+      createTestSummary("current", "Current Page"),
+      createTestSummary("back-1", "Backlink One"),
+      createTestSummary("back-2", "Backlink Two"), // full Page なし
+    ];
+
+    const result = calculateLinkedPagesOptimized({
+      currentPage,
+      pageId: "current",
+      allPagesSummary: summaries,
+      outgoingPages: [],
+      backlinkPages: [backlinkFull], // back-1 のみ content あり
+      backlinkIds: ["back-1", "back-2"],
+    });
+
+    expect(result.backlinks).toHaveLength(2);
+    expect(result.backlinks.find((c) => c.id === "back-1")?.preview).toBe("Content 1");
+    expect(result.backlinks.find((c) => c.id === "back-2")?.preview).toBe("");
+  });
+
+  it("should group 2-hop links and use outgoingLinksWithChildren", () => {
+    const currentPage = createTestPage(
+      "current",
+      "Current Page",
+      createWikiLinkContent(["Page A"]),
+    );
+    const pageA = createTestPage("page-a", "Page A", createWikiLinkContent(["Page B"]));
+    const pageB = createTestPage("page-b", "Page B", createPlainTextContent("Content B"));
+    const summaries: PageSummary[] = [
+      createTestSummary("current", "Current Page"),
+      createTestSummary("page-a", "Page A"),
+      createTestSummary("page-b", "Page B"),
+    ];
+
+    const result = calculateLinkedPagesOptimized({
+      currentPage,
+      pageId: "current",
+      allPagesSummary: summaries,
+      outgoingPages: [pageA, pageB],
+      backlinkPages: [],
+      backlinkIds: [],
+    });
+
+    expect(result.outgoingLinks).toHaveLength(0);
+    expect(result.outgoingLinksWithChildren).toHaveLength(1);
+    expect(result.outgoingLinksWithChildren[0].source.id).toBe("page-a");
+    expect(result.outgoingLinksWithChildren[0].children).toHaveLength(1);
+    expect(result.outgoingLinksWithChildren[0].children[0].id).toBe("page-b");
+    expect(result.twoHopLinks).toHaveLength(1);
+    expect(result.twoHopLinks[0].id).toBe("page-b");
+  });
+
+  it("should handle case-insensitive title matching", () => {
+    const currentPage = createTestPage(
+      "current",
+      "Current Page",
+      createWikiLinkContent(["PAGE A", "page b"]),
+    );
+    const pageA = createTestPage("page-a", "Page A", createPlainTextContent("A"));
+    const pageB = createTestPage("page-b", "Page B", createPlainTextContent("B"));
+    const summaries: PageSummary[] = [
+      createTestSummary("current", "Current Page"),
+      createTestSummary("page-a", "Page A"),
+      createTestSummary("page-b", "Page B"),
+    ];
+
+    const result = calculateLinkedPagesOptimized({
+      currentPage,
+      pageId: "current",
+      allPagesSummary: summaries,
+      outgoingPages: [pageA, pageB],
+      backlinkPages: [],
+      backlinkIds: [],
+    });
+
+    expect(result.outgoingLinks).toHaveLength(2);
   });
 });

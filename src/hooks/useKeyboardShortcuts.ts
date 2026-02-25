@@ -1,6 +1,8 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCreateNewPage } from "./useCreateNewPage";
+import { useAIChatStore } from "../stores/aiChatStore";
+import { useAIChatContext } from "../contexts/AIChatContext";
 
 interface KeyboardShortcutsOptions {
   onShowShortcuts?: () => void;
@@ -14,48 +16,53 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
   const location = useLocation();
   const { onShowShortcuts } = options;
   const { createNewPage, isCreating } = useCreateNewPage();
+  const { togglePanel } = useAIChatStore();
+  const { aiChatAvailable } = useAIChatContext();
   const isCreatingRef = useRef(isCreating);
   isCreatingRef.current = isCreating;
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Skip if user is typing in an input/textarea (except for specific shortcuts)
-      const target = e.target as HTMLElement;
-      const isEditing =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
-
-      // Cmd+N / Ctrl+N - New page (always works)
-      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
-        e.preventDefault();
-        if (!isCreatingRef.current) {
-          createNewPage();
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+      const shortcuts: Array<{ match: boolean; handle: () => void }> = [
+        {
+          match: mod && key === "n",
+          handle: () => {
+            e.preventDefault();
+            if (!isCreatingRef.current) createNewPage();
+          },
+        },
+        {
+          match: mod && key === "h",
+          handle: () => {
+            e.preventDefault();
+            if (location.pathname !== "/") navigate("/");
+          },
+        },
+        {
+          match: mod && key === "/",
+          handle: () => {
+            e.preventDefault();
+            onShowShortcuts?.();
+          },
+        },
+        {
+          match: Boolean(mod && e.shiftKey && key === "a" && aiChatAvailable),
+          handle: () => {
+            e.preventDefault();
+            togglePanel();
+          },
+        },
+      ];
+      for (const s of shortcuts) {
+        if (s.match) {
+          s.handle();
+          return;
         }
-        return;
       }
-
-      // Cmd+H / Ctrl+H - Go home (always works)
-      if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        e.preventDefault();
-        // Only navigate if not already on home
-        if (location.pathname !== "/") {
-          navigate("/");
-        }
-        return;
-      }
-
-      // Cmd+/ or Ctrl+/ - Show shortcuts (always works)
-      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
-        e.preventDefault();
-        onShowShortcuts?.();
-        return;
-      }
-
-      // Skip other shortcuts if editing
-      if (isEditing) return;
     },
-    [navigate, location.pathname, onShowShortcuts]
+    [navigate, location.pathname, createNewPage, onShowShortcuts, togglePanel, aiChatAvailable],
   );
 
   useEffect(() => {
@@ -86,6 +93,9 @@ export const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
 
   // Editor
   { key: "[[", description: "WikiLink を挿入", category: "editor" },
+
+  // AI
+  { key: "⌘⇧A", description: "AIチャットを開く", category: "ai" },
   { key: "# ", description: "見出し H1", category: "editor" },
   { key: "## ", description: "見出し H2", category: "editor" },
   { key: "### ", description: "見出し H3", category: "editor" },

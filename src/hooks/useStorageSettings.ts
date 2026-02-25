@@ -1,11 +1,7 @@
 // ストレージ設定を管理するカスタムフック
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  StorageSettings,
-  StorageProviderType,
-  DEFAULT_STORAGE_SETTINGS,
-} from "@/types/storage";
+import { StorageSettings } from "@/types/storage";
 import {
   loadStorageSettings,
   saveStorageSettings,
@@ -14,9 +10,10 @@ import {
 } from "@/lib/storageSettings";
 import {
   getStorageProvider,
-  isProviderConfigured,
+  isStorageConfiguredForUpload,
   ConnectionTestResult,
 } from "@/lib/storage";
+import { useAuth } from "./useAuth";
 
 interface UseStorageSettingsReturn {
   settings: StorageSettings;
@@ -25,24 +22,19 @@ interface UseStorageSettingsReturn {
   isTesting: boolean;
   testResult: ConnectionTestResult | null;
   updateSettings: (updates: Partial<StorageSettings>) => void;
-  updateConfig: (
-    updates: Partial<StorageSettings["config"]>
-  ) => void;
+  updateConfig: (updates: Partial<StorageSettings["config"]>) => void;
   save: () => Promise<boolean>;
   test: () => Promise<ConnectionTestResult>;
   reset: () => void;
 }
 
 export function useStorageSettings(): UseStorageSettingsReturn {
-  const [settings, setSettings] = useState<StorageSettings>(
-    getDefaultStorageSettings()
-  );
+  const { getToken, isSignedIn } = useAuth();
+  const [settings, setSettings] = useState<StorageSettings>(getDefaultStorageSettings());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(
-    null
-  );
+  const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
 
   // 初期読み込み
   useEffect(() => {
@@ -66,8 +58,14 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     setSettings((prev) => {
       const newSettings = { ...prev, ...updates };
 
+      // 外部ストレージに切り替えたときに provider が s3 のままなら外部の先頭に合わせる
+      if (updates.preferDefaultStorage === false && prev.provider === "s3") {
+        newSettings.provider = "gyazo";
+        newSettings.config = {};
+        newSettings.isConfigured = false;
+      }
       // プロバイダーが変更された場合、設定をリセット
-      if (updates.provider && updates.provider !== prev.provider) {
+      else if (updates.provider && updates.provider !== prev.provider) {
         newSettings.config = {};
         newSettings.isConfigured = false;
       }
@@ -79,17 +77,14 @@ export function useStorageSettings(): UseStorageSettingsReturn {
   }, []);
 
   // 設定のconfigを更新する
-  const updateConfig = useCallback(
-    (updates: Partial<StorageSettings["config"]>) => {
-      setSettings((prev) => ({
-        ...prev,
-        config: { ...prev.config, ...updates },
-      }));
-      // 設定変更時はテスト結果をリセット
-      setTestResult(null);
-    },
-    []
-  );
+  const updateConfig = useCallback((updates: Partial<StorageSettings["config"]>) => {
+    setSettings((prev) => ({
+      ...prev,
+      config: { ...prev.config, ...updates },
+    }));
+    // 設定変更時はテスト結果をリセット
+    setTestResult(null);
+  }, []);
 
   // 設定を保存する
   const save = useCallback(async (): Promise<boolean> => {
@@ -97,7 +92,7 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     try {
       const settingsToSave: StorageSettings = {
         ...settings,
-        isConfigured: isProviderConfigured(settings.provider, settings.config),
+        isConfigured: isStorageConfiguredForUpload(settings),
       };
       await saveStorageSettings(settingsToSave);
       setSettings(settingsToSave);
@@ -110,14 +105,26 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     }
   }, [settings]);
 
-  // 接続テストを実行する
+  // 接続テストを実行する（デフォルト優先のときはデフォルトストレージ、外部のときは選択中の外部プロバイダー）
   const test = useCallback(async (): Promise<ConnectionTestResult> => {
+    if (!isSignedIn && settings.preferDefaultStorage !== false) {
+      const noAuthResult: ConnectionTestResult = {
+        success: false,
+        message: "デフォルトストレージのテストにはサインインが必要です",
+      };
+      setTestResult(noAuthResult);
+      return noAuthResult;
+    }
+
     setIsTesting(true);
     setTestResult(null);
 
     try {
-      // 現在の設定でプロバイダーを作成
-      const provider = getStorageProvider(settings);
+      const settingsToTest =
+        settings.preferDefaultStorage !== false
+          ? { ...settings, provider: "s3" as const, config: {} }
+          : settings;
+      const provider = getStorageProvider(settingsToTest, { getToken });
       const result = await provider.testConnection();
       setTestResult(result);
       return result;
@@ -132,7 +139,7 @@ export function useStorageSettings(): UseStorageSettingsReturn {
     } finally {
       setIsTesting(false);
     }
-  }, [settings]);
+  }, [settings, getToken, isSignedIn]);
 
   // 設定をリセットする
   const reset = useCallback(() => {

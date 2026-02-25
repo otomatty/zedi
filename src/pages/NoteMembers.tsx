@@ -21,13 +21,124 @@ import {
   useUpdateNoteMemberRole,
 } from "@/hooks/useNoteQueries";
 import type { NoteMemberRole } from "@/types/note";
+import { useTranslation } from "react-i18next";
 
-const memberRoleOptions: Array<{ value: NoteMemberRole; label: string }> = [
-  { value: "viewer", label: "閲覧のみ" },
-  { value: "editor", label: "編集可能" },
-];
+const memberRoleKeys: Record<NoteMemberRole, string> = {
+  viewer: "notes.roleViewer",
+  editor: "notes.roleEditor",
+};
+
+function NoteMembersLoadingOrDenied({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="py-10">
+        <Container>{children}</Container>
+      </main>
+    </div>
+  );
+}
+
+interface NoteMembersManageSectionProps {
+  members: Array<{ memberEmail: string; role: NoteMemberRole }>;
+  isMembersLoading: boolean;
+  memberEmail: string;
+  setMemberEmail: (v: string) => void;
+  memberRole: NoteMemberRole;
+  setMemberRole: (v: NoteMemberRole) => void;
+  roleOptions: Array<{ value: NoteMemberRole; label: string }>;
+  onAddMember: () => Promise<void>;
+  onUpdateRole: (email: string, role: NoteMemberRole) => Promise<void>;
+  onRemoveMember: (email: string) => Promise<void>;
+}
+
+function NoteMembersManageSection({
+  members,
+  isMembersLoading,
+  memberEmail,
+  setMemberEmail,
+  memberRole,
+  setMemberRole,
+  roleOptions,
+  onAddMember,
+  onUpdateRole,
+  onRemoveMember,
+}: NoteMembersManageSectionProps) {
+  const { t } = useTranslation();
+  return (
+    <section className="mt-6 rounded-lg border border-border/60 p-4">
+      <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
+      <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
+        <Input
+          value={memberEmail}
+          onChange={(event) => setMemberEmail(event.target.value)}
+          placeholder={t("notes.emailPlaceholder")}
+        />
+        <Select
+          value={memberRole}
+          onValueChange={(value) => setMemberRole(value as NoteMemberRole)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t("notes.role")} />
+          </SelectTrigger>
+          <SelectContent>
+            {roleOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button onClick={onAddMember}>{t("notes.add")}</Button>
+      </div>
+      <div className="mt-4 space-y-3">
+        {isMembersLoading ? (
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("notes.noMembersYet")}</p>
+        ) : (
+          members.map((member) => (
+            <div
+              key={member.memberEmail}
+              className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-2"
+            >
+              <div className="text-sm">{member.memberEmail}</div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={member.role}
+                  onValueChange={(value) =>
+                    onUpdateRole(member.memberEmail, value as NoteMemberRole)
+                  }
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveMember(member.memberEmail)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
 
 const NoteMembers: React.FC = () => {
+  const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
   const { toast } = useToast();
 
@@ -41,7 +152,7 @@ const NoteMembers: React.FC = () => {
   const canManageMembers = Boolean(access?.canManageMembers && source === "local");
   const { data: members = [], isLoading: isMembersLoading } = useNoteMembers(
     noteId ?? "",
-    canManageMembers
+    canManageMembers,
   );
 
   const addMemberMutation = useAddNoteMember();
@@ -50,6 +161,10 @@ const NoteMembers: React.FC = () => {
 
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<NoteMemberRole>("viewer");
+  const memberRoleOptions = (Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => ({
+    value,
+    label: t(memberRoleKeys[value]),
+  }));
 
   const handleAddMember = async () => {
     if (!noteId || !memberEmail.trim()) return;
@@ -61,17 +176,14 @@ const NoteMembers: React.FC = () => {
       });
       setMemberEmail("");
       setMemberRole("viewer");
-      toast({ title: "メンバーを追加しました" });
+      toast({ title: t("notes.memberAdded") });
     } catch (error) {
       console.error("Failed to add member:", error);
-      toast({ title: "メンバー追加に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.memberAddFailed"), variant: "destructive" });
     }
   };
 
-  const handleUpdateMemberRole = async (
-    email: string,
-    role: NoteMemberRole
-  ) => {
+  const handleUpdateMemberRole = async (email: string, role: NoteMemberRole) => {
     if (!noteId) return;
     try {
       await updateMemberRoleMutation.mutateAsync({
@@ -79,10 +191,10 @@ const NoteMembers: React.FC = () => {
         memberEmail: email,
         role,
       });
-      toast({ title: "権限を更新しました" });
+      toast({ title: t("notes.roleUpdated") });
     } catch (error) {
       console.error("Failed to update member role:", error);
-      toast({ title: "権限更新に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.roleUpdateFailed"), variant: "destructive" });
     }
   };
 
@@ -90,38 +202,25 @@ const NoteMembers: React.FC = () => {
     if (!noteId) return;
     try {
       await removeMemberMutation.mutateAsync({ noteId, memberEmail: email });
-      toast({ title: "メンバーを削除しました" });
+      toast({ title: t("notes.memberRemoved") });
     } catch (error) {
       console.error("Failed to remove member:", error);
-      toast({ title: "メンバー削除に失敗しました", variant: "destructive" });
+      toast({ title: t("notes.memberRemoveFailed"), variant: "destructive" });
     }
   };
 
   if (isNoteLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="py-10">
-          <Container>
-            <p className="text-sm text-muted-foreground">読み込み中...</p>
-          </Container>
-        </main>
-      </div>
+      <NoteMembersLoadingOrDenied>
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      </NoteMembersLoadingOrDenied>
     );
   }
-
   if (!note || !access?.canView) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="py-10">
-          <Container>
-            <p className="text-sm text-muted-foreground">
-              ノートが見つからないか、閲覧権限がありません。
-            </p>
-          </Container>
-        </main>
-      </div>
+      <NoteMembersLoadingOrDenied>
+        <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
+      </NoteMembersLoadingOrDenied>
     );
   }
 
@@ -132,100 +231,33 @@ const NoteMembers: React.FC = () => {
         <Container>
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold truncate">メンバー</h1>
-              <p className="mt-1 text-sm text-muted-foreground truncate">
-                {note.title || "無題のノート"}
+              <h1 className="truncate text-xl font-semibold">{t("notes.members")}</h1>
+              <p className="mt-1 truncate text-sm text-muted-foreground">
+                {note.title || t("notes.untitledNote")}
               </p>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link to={`/note/${note.id}`}>ノートへ戻る</Link>
+              <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
             </Button>
           </div>
 
           {!canManageMembers ? (
             <p className="mt-6 text-sm text-muted-foreground">
-              メンバーを管理する権限がありません。
+              {t("notes.noPermissionToManageMembers")}
             </p>
           ) : (
-            <section className="mt-6 rounded-lg border border-border/60 p-4">
-              <h2 className="text-sm font-semibold mb-4">招待メンバー</h2>
-              <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
-                <Input
-                  value={memberEmail}
-                  onChange={(event) => setMemberEmail(event.target.value)}
-                  placeholder="招待するメールアドレス"
-                />
-                <Select
-                  value={memberRole}
-                  onValueChange={(value) =>
-                    setMemberRole(value as NoteMemberRole)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="権限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {memberRoleOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAddMember}>追加</Button>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {isMembersLoading ? (
-                  <p className="text-sm text-muted-foreground">読み込み中...</p>
-                ) : members.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    まだ招待メンバーがいません。
-                  </p>
-                ) : (
-                  members.map((member) => (
-                    <div
-                      key={member.memberEmail}
-                      className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-2"
-                    >
-                      <div className="text-sm">{member.memberEmail}</div>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={member.role}
-                          onValueChange={(value) =>
-                            handleUpdateMemberRole(
-                              member.memberEmail,
-                              value as NoteMemberRole
-                            )
-                          }
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {memberRoleOptions.map((option) => (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value}
-                              >
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveMember(member.memberEmail)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
+            <NoteMembersManageSection
+              members={members}
+              isMembersLoading={isMembersLoading}
+              memberEmail={memberEmail}
+              setMemberEmail={setMemberEmail}
+              memberRole={memberRole}
+              setMemberRole={setMemberRole}
+              roleOptions={memberRoleOptions}
+              onAddMember={handleAddMember}
+              onUpdateRole={handleUpdateMemberRole}
+              onRemoveMember={handleRemoveMember}
+            />
           )}
         </Container>
       </main>

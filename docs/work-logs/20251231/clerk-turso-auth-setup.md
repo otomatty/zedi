@@ -15,6 +15,7 @@ bun add @clerk/clerk-react@latest @libsql/client
 ```
 
 インストールされたバージョン:
+
 - `@clerk/clerk-react@5.59.2`
 - `@libsql/client@0.15.15`
 
@@ -38,14 +39,14 @@ VITE_TURSO_AUTH_TOKEN=...
 
 ### 3. 変更・作成したファイル一覧
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `src/main.tsx` | `ClerkProvider`でアプリ全体をラップ |
-| `src/vite-env.d.ts` | 環境変数の型定義を追加 |
-| `src/components/layout/Header.tsx` | サインインボタン・UserButtonを追加 |
-| `src/lib/turso.ts` | Tursoクライアント設定（新規作成） |
-| `src/hooks/useTurso.ts` | Clerk JWTを使用したTurso認証フック（新規作成） |
-| `src/components/auth/ProtectedRoute.tsx` | 認証保護ルートコンポーネント（新規作成） |
+| ファイル                                 | 変更内容                                       |
+| ---------------------------------------- | ---------------------------------------------- |
+| `src/main.tsx`                           | `ClerkProvider`でアプリ全体をラップ            |
+| `src/vite-env.d.ts`                      | 環境変数の型定義を追加                         |
+| `src/components/layout/Header.tsx`       | サインインボタン・UserButtonを追加             |
+| `src/lib/turso.ts`                       | Tursoクライアント設定（新規作成）              |
+| `src/hooks/useTurso.ts`                  | Clerk JWTを使用したTurso認証フック（新規作成） |
+| `src/components/auth/ProtectedRoute.tsx` | 認証保護ルートコンポーネント（新規作成）       |
 
 ---
 
@@ -71,13 +72,14 @@ createRoot(document.getElementById("root")!).render(
     <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
       <App />
     </ClerkProvider>
-  </StrictMode>
+  </StrictMode>,
 );
 ```
 
 #### 4.2 `src/lib/turso.ts`
 
 Tursoクライアントを作成するユーティリティ関数:
+
 - `createTursoClient()` - 基本的なTursoクライアント
 - `createAuthenticatedTursoClient(jwtToken)` - Clerk JWTを使用した認証付きクライアント
 - `getTursoClient()` - シングルトンクライアント
@@ -85,6 +87,7 @@ Tursoクライアントを作成するユーティリティ関数:
 #### 4.3 `src/hooks/useTurso.ts`
 
 カスタムフック:
+
 - `useTurso()` - 認証状態に応じたTursoクライアントを取得
 - `useUserId()` - 現在のユーザーIDを取得
 
@@ -96,6 +99,7 @@ Tursoクライアントを作成するユーティリティ関数:
 #### 4.5 `src/components/layout/Header.tsx`
 
 Clerkの認証UIコンポーネントを追加:
+
 - `<SignedOut>` + `<SignInButton>` - 未認証時にサインインボタンを表示
 - `<SignedIn>` + `<UserButton>` - 認証済み時にユーザーアバターを表示
 

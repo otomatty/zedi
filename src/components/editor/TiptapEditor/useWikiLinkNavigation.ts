@@ -1,9 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  usePageByTitle,
-  useCreatePage,
-} from "@/hooks/usePageQueries";
+import { usePageByTitle, useCreatePage } from "@/hooks/usePageQueries";
 
 interface UseWikiLinkNavigationReturn {
   handleLinkClick: (title: string, exists: boolean) => void;
@@ -32,20 +29,15 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
   // Create page confirmation dialog state
   const [createPageDialogOpen, setCreatePageDialogOpen] = useState(false);
-  const [pendingCreatePageTitle, setPendingCreatePageTitle] = useState<
-    string | null
-  >(null);
+  const [pendingCreatePageTitle, setPendingCreatePageTitle] = useState<string | null>(null);
 
   // Handle link click - navigate to page or create new
   // WikiLinkクリック時は常に既存ページの存在をチェック
-  const handleLinkClick = useCallback(
-    async (title: string, _exists: boolean) => {
-      // まず既存ページを検索（タイトルの完全一致）
-      pendingLinkActionRef.current = { title, exists: true };
-      setLinkTitleToFind(title);
-    },
-    []
-  );
+  const handleLinkClick = useCallback(async (title: string, _exists: boolean) => {
+    // まず既存ページを検索（タイトルの完全一致）
+    pendingLinkActionRef.current = { title, exists: true };
+    setLinkTitleToFind(title);
+  }, []);
 
   // Navigate when found page changes
   useEffect(() => {

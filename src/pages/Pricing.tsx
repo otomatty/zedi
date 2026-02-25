@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Check, Sparkles, Cloud, Zap } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { ArrowLeft, Check, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +14,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
+import { UsageBar } from "@/components/ai/UsageBar";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  openProCheckout,
+  openCustomerPortal,
+  type BillingInterval,
+} from "@/lib/subscriptionService";
+import type { AIUsage } from "@/types/ai";
 
 interface PlanFeature {
   text: string;
@@ -32,6 +42,7 @@ interface PlanCardProps {
   onSelect?: () => void;
   disabled?: boolean;
   current?: boolean;
+  extraContent?: React.ReactNode;
 }
 
 const PlanCard: React.FC<PlanCardProps> = ({
@@ -47,17 +58,14 @@ const PlanCard: React.FC<PlanCardProps> = ({
   onSelect,
   disabled,
   current,
+  extraContent,
 }) => {
+  const { t } = useTranslation();
   return (
-    <Card
-      className={cn(
-        "relative flex flex-col",
-        popular && "border-primary shadow-lg"
-      )}
-    >
+    <Card className={cn("relative flex flex-col", popular && "border-primary shadow-lg")}>
       {popular && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-          おすすめ
+          {t("pricing.recommended")}
         </Badge>
       )}
       <CardHeader>
@@ -74,32 +82,26 @@ const PlanCard: React.FC<PlanCardProps> = ({
       <CardContent className="flex-1">
         <div className="mb-6">
           <span className="text-3xl font-bold">{price}</span>
-          {priceNote && (
-            <span className="text-sm text-muted-foreground ml-2">
-              {priceNote}
-            </span>
-          )}
+          {priceNote && <span className="ml-2 text-sm text-muted-foreground">{priceNote}</span>}
         </div>
         <ul className="space-y-3">
           {features.map((feature, index) => (
             <li key={index} className="flex items-start gap-2">
               <Check
                 className={cn(
-                  "h-4 w-4 mt-0.5 shrink-0",
-                  feature.included ? "text-primary" : "text-muted-foreground/30"
+                  "mt-0.5 h-4 w-4 shrink-0",
+                  feature.included ? "text-primary" : "text-muted-foreground/30",
                 )}
               />
               <span
-                className={cn(
-                  "text-sm",
-                  !feature.included && "text-muted-foreground line-through"
-                )}
+                className={cn("text-sm", !feature.included && "text-muted-foreground line-through")}
               >
                 {feature.text}
               </span>
             </li>
           ))}
         </ul>
+        {extraContent && <div className="mt-4">{extraContent}</div>}
       </CardContent>
       <CardFooter>
         <Button
@@ -115,28 +117,198 @@ const PlanCard: React.FC<PlanCardProps> = ({
   );
 };
 
-type PlanType = "free" | "pro";
+function PricingAiInfo() {
+  return (
+    <div className="mx-auto mt-12 max-w-3xl">
+      <h3 className="mb-4 text-center text-lg font-semibold">AI機能について</h3>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-2 flex items-center gap-2 font-medium">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Free プラン
+          </h4>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>- 基本モデル（GPT-4o Mini, Gemini Flash 等）</li>
+            <li>- 月間使用量の制限あり</li>
+            <li>- Wiki生成、Mermaid図 生成</li>
+          </ul>
+        </div>
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <h4 className="mb-2 flex items-center gap-2 font-medium">
+            <Zap className="h-4 w-4 text-primary" />
+            Pro プラン
+          </h4>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>- 高性能モデル（GPT-4o, Claude Sonnet 4, Gemini Pro 等）</li>
+            <li>- 月間使用量が大幅に拡大</li>
+            <li>- 今後追加されるAI機能も利用可能</li>
+          </ul>
+        </div>
+      </div>
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。
+      </p>
+    </div>
+  );
+}
+
+function PricingFaq() {
+  return (
+    <div className="mx-auto mt-12 max-w-3xl">
+      <h3 className="mb-4 text-center text-lg font-semibold">よくある質問</h3>
+      <div className="space-y-4">
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-1 font-medium">Proプランの使用量はどう計算されますか？</h4>
+          <p className="text-sm text-muted-foreground">
+            利用するモデルとトークン消費量に応じたコストユニットで計算されます。
+            軽量モデルなら月に数百回の生成が可能です。 設定画面で現在の使用率を確認できます。
+          </p>
+        </div>
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-1 font-medium">自分のAPIキーとサブスクの違いは？</h4>
+          <p className="text-sm text-muted-foreground">
+            サブスクではZediのAI基盤を通じて簡単にAI機能を使えます。
+            自分のAPIキーを設定すると使用量制限なく利用できますが、
+            各プロバイダーとの個別契約と料金が必要です。
+          </p>
+        </div>
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-1 font-medium">返金ポリシーはありますか？</h4>
+          <p className="text-sm text-muted-foreground">
+            購入後14日以内であれば全額返金いたします。 お問い合わせフォームからご連絡ください。
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingIntervalToggle({
+  value,
+  onChange,
+}: {
+  value: BillingInterval;
+  onChange: (v: BillingInterval) => void;
+}) {
+  return (
+    <div className="mb-6 flex justify-center gap-2">
+      <Button
+        variant={value === "monthly" ? "default" : "outline"}
+        size="sm"
+        onClick={() => onChange("monthly")}
+      >
+        月額
+      </Button>
+      <Button
+        variant={value === "yearly" ? "default" : "outline"}
+        size="sm"
+        onClick={() => onChange("yearly")}
+      >
+        年額（2ヶ月分お得）
+      </Button>
+    </div>
+  );
+}
+
+interface PricingPlanCardsProps {
+  billingInterval: BillingInterval;
+  isProUser: boolean;
+  isSignedIn: boolean;
+  usageForBar: AIUsage | null;
+  onSelectPro: () => Promise<void>;
+  onManageSubscription: () => Promise<void>;
+}
+
+function PricingPlanCards({
+  billingInterval,
+  isProUser,
+  isSignedIn,
+  usageForBar,
+  onSelectPro,
+  onManageSubscription,
+}: PricingPlanCardsProps) {
+  return (
+    <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+      <PlanCard
+        name="Free"
+        description="基本機能を無料で"
+        price="¥0"
+        icon={<Sparkles className="h-5 w-5" />}
+        features={[
+          { text: "100ページまで", included: true },
+          { text: "クラウド同期", included: true },
+          { text: "Wiki リンク", included: true },
+          { text: "基本AIモデル（制限付き）", included: true },
+          { text: "無制限ページ", included: false },
+          { text: "高性能AIモデル", included: false },
+        ]}
+        buttonText="現在のプラン"
+        buttonVariant="outline"
+        current={!isProUser}
+        extraContent={
+          isSignedIn && usageForBar && <UsageBar usage={usageForBar} autoRefresh={false} />
+        }
+      />
+      <PlanCard
+        name="Pro"
+        description="無制限＋フルAI"
+        price={billingInterval === "yearly" ? "$100" : "$10"}
+        priceNote={billingInterval === "yearly" ? "/ 年" : "/ 月"}
+        icon={<Zap className="h-5 w-5" />}
+        popular
+        features={[
+          { text: "無制限ページ", included: true },
+          { text: "クラウド同期", included: true },
+          { text: "Wiki リンク", included: true },
+          { text: "全AIモデル（GPT-4o, Claude, Gemini Pro等）", included: true },
+          { text: "月間AI使用量 拡大", included: true },
+          { text: "自分のAPIキーも使用可", included: true },
+        ]}
+        buttonText={
+          isProUser
+            ? "サブスク管理"
+            : billingInterval === "yearly"
+              ? "Pro 年額で契約"
+              : "Pro 月額で契約"
+        }
+        onSelect={isProUser ? onManageSubscription : onSelectPro}
+        current={false}
+        disabled={!isSignedIn}
+      />
+    </div>
+  );
+}
 
 const Pricing: React.FC = () => {
-  // TODO: 実際のライセンス状態を取得する
-  const [currentPlan] = useState<PlanType>("free");
-  const [hasSyncSubscription] = useState(false);
-  const [trialActive] = useState(false);
-  const [trialDaysLeft] = useState(0);
+  const { isSignedIn } = useAuth();
+  const { plan: currentPlan, isProUser, usage, isLoading, refetch } = useSubscription();
 
-  const handleSelectPro = () => {
-    // TODO: LemonSqueezy チェックアウトを開く
-    console.log("Pro プラン購入");
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
+
+  const usageForBar: AIUsage | null = usage
+    ? {
+        usagePercent: usage.usagePercent,
+        consumedUnits: usage.consumedUnits,
+        budgetUnits: usage.budgetUnits,
+        remaining: Math.max(0, usage.budgetUnits - usage.consumedUnits),
+        tier: currentPlan === "pro" ? "paid" : "free",
+        yearMonth: new Date().toISOString().slice(0, 7),
+      }
+    : null;
+
+  const handleSelectPro = async () => {
+    if (!isSignedIn) return;
+    await openProCheckout(billingInterval);
+    // User may return from checkout in same tab; refetch after a short delay
+    setTimeout(() => refetch(), 5000);
   };
 
-  const handleSelectSync = () => {
-    // TODO: LemonSqueezy Sync サブスク開始
-    console.log("Sync サブスク開始");
+  const handleManageSubscription = async () => {
+    await openCustomerPortal();
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Container className="flex h-16 items-center gap-4">
           <Link to="/home">
@@ -148,181 +320,32 @@ const Pricing: React.FC = () => {
         </Container>
       </header>
 
-      {/* Content */}
       <main className="py-8">
         <Container>
-          {/* トライアル通知 */}
-          {trialActive && (
-              <div className="mb-8 p-4 rounded-lg bg-primary/10 border border-primary/20 text-center">
-                <p className="text-sm font-medium">
-                  🎉 無料トライアル中 - 残り{trialDaysLeft}日
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Pro機能とクラウド同期をお試しいただけます
-                </p>
-              </div>
-            )}
+          <div className="mb-10 text-center">
+            <h2 className="mb-2 text-2xl font-bold">シンプルな料金プラン</h2>
+            <p className="text-muted-foreground">
+              Free で基本機能とクラウド同期。Pro で無制限ページとフルAI機能。
+            </p>
+          </div>
 
-            {/* 見出し */}
-            <div className="text-center mb-10">
-              <h2 className="text-2xl font-bold mb-2">
-                シンプルな料金プラン
-              </h2>
-              <p className="text-muted-foreground">
-                買い切りで永続利用。長く使うほどお得です。
-              </p>
-            </div>
+          <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
 
-            {/* プランカード */}
-            <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
-              {/* Free プラン */}
-              <PlanCard
-                name="Free"
-                description="基本機能を無料で"
-                price="¥0"
-                icon={<Sparkles className="h-5 w-5" />}
-                features={[
-                  { text: "100ページまで", included: true },
-                  { text: "ローカル保存", included: true },
-                  { text: "Wiki リンク", included: true },
-                  { text: "AI Wiki生成（自分のAPIキー）", included: true },
-                  { text: "無制限ページ", included: false },
-                  { text: "クラウド同期", included: false },
-                ]}
-                buttonText="現在のプラン"
-                buttonVariant="outline"
-                current={currentPlan === "free"}
-              />
+          <PricingPlanCards
+            billingInterval={billingInterval}
+            isProUser={isProUser}
+            isSignedIn={isSignedIn}
+            usageForBar={usageForBar}
+            onSelectPro={handleSelectPro}
+            onManageSubscription={handleManageSubscription}
+          />
 
-              {/* Pro プラン */}
-              <PlanCard
-                name="Pro"
-                description="買い切りで永続利用"
-                price="¥4,980"
-                priceNote="買い切り"
-                icon={<Zap className="h-5 w-5" />}
-                popular
-                features={[
-                  { text: "無制限ページ", included: true },
-                  { text: "ローカル保存", included: true },
-                  { text: "Wiki リンク", included: true },
-                  { text: "AI Wiki生成（自分のAPIキー）", included: true },
-                  { text: "現行バージョン永続利用", included: true },
-                  { text: "クラウド同期（別途契約）", included: true },
-                ]}
-                buttonText="Pro を購入"
-                onSelect={handleSelectPro}
-                current={currentPlan === "pro"}
-              />
+          {isLoading && (
+            <p className="mt-4 text-center text-sm text-muted-foreground">プラン情報を取得中...</p>
+          )}
 
-              {/* Sync アドオン */}
-              <PlanCard
-                name="Sync"
-                description="Proユーザー向けオプション"
-                price="¥2,980"
-                priceNote="/ 年"
-                icon={<Cloud className="h-5 w-5" />}
-                features={[
-                  { text: "クラウド同期", included: true },
-                  { text: "マルチデバイス対応", included: true },
-                  { text: "自動バックアップ", included: true },
-                  { text: "オフライン対応", included: true },
-                  { text: "月額プラン: ¥400/月", included: true },
-                  { text: "Pro購入が必要", included: true },
-                ]}
-                buttonText="Sync を契約"
-                buttonVariant="outline"
-                onSelect={handleSelectSync}
-                disabled={currentPlan !== "pro"}
-                current={hasSyncSubscription}
-              />
-            </div>
-
-            {/* 補足情報 */}
-            <div className="mt-12 max-w-3xl mx-auto">
-              <h3 className="text-lg font-semibold mb-4 text-center">
-                よくある質問
-              </h3>
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg border">
-                  <h4 className="font-medium mb-1">
-                    メジャーアップデート時はどうなりますか？
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    現行バージョンは引き続き利用できます。新バージョンへのアップグレードは任意で、
-                    既存ユーザーは割引価格（¥3,480）でアップグレードできます。
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg border">
-                  <h4 className="font-medium mb-1">
-                    AI Wiki生成機能は有料ですか？
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    いいえ。AIウィキ生成は全プランで利用可能です。
-                    お手持ちのOpenAI/Anthropic等のAPIキーを設定してご利用ください。
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg border">
-                  <h4 className="font-medium mb-1">
-                    返金ポリシーはありますか？
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    購入後14日以内であれば全額返金いたします。
-                    お問い合わせフォームからご連絡ください。
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 価格比較 */}
-            <div className="mt-12 max-w-3xl mx-auto">
-              <h3 className="text-lg font-semibold mb-4 text-center">
-                他サービスとの比較（2年間利用時）
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4">サービス</th>
-                      <th className="text-right py-3 px-4">1年目</th>
-                      <th className="text-right py-3 px-4">2年目</th>
-                      <th className="text-right py-3 px-4">合計</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b bg-primary/5">
-                      <td className="py-3 px-4 font-medium">Zedi Pro + Sync</td>
-                      <td className="text-right py-3 px-4">¥7,960</td>
-                      <td className="text-right py-3 px-4">¥2,980</td>
-                      <td className="text-right py-3 px-4 font-bold text-primary">
-                        ¥10,940
-                      </td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3 px-4">Obsidian + Sync</td>
-                      <td className="text-right py-3 px-4">¥14,400</td>
-                      <td className="text-right py-3 px-4">¥14,400</td>
-                      <td className="text-right py-3 px-4">¥28,800</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3 px-4">Notion Pro</td>
-                      <td className="text-right py-3 px-4">¥14,400</td>
-                      <td className="text-right py-3 px-4">¥14,400</td>
-                      <td className="text-right py-3 px-4">¥28,800</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3 px-4">Craft</td>
-                      <td className="text-right py-3 px-4">¥9,000</td>
-                      <td className="text-right py-3 px-4">¥9,000</td>
-                      <td className="text-right py-3 px-4">¥18,000</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-muted-foreground text-center mt-3">
-                ※ 為替レート 1ドル = 150円 で計算
-              </p>
-            </div>
+          <PricingAiInfo />
+          <PricingFaq />
         </Container>
       </main>
     </div>

@@ -107,10 +107,7 @@ describe("sanitizeTiptapContent", () => {
             {
               type: "text",
               text: "Bold and unsupported",
-              marks: [
-                { type: "bold" },
-                { type: "unsupportedMark" },
-              ],
+              marks: [{ type: "bold" }, { type: "unsupportedMark" }],
             },
           ],
         },
@@ -188,9 +185,28 @@ describe("sanitizeTiptapContent", () => {
       content: [
         { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Heading" }] },
         { type: "paragraph", content: [{ type: "text", text: "Paragraph" }] },
-        { type: "blockquote", content: [{ type: "paragraph", content: [{ type: "text", text: "Quote" }] }] },
-        { type: "bulletList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }] }] },
-        { type: "orderedList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }] }] },
+        {
+          type: "blockquote",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "Quote" }] }],
+        },
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }],
+            },
+          ],
+        },
+        {
+          type: "orderedList",
+          content: [
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Item" }] }],
+            },
+          ],
+        },
         { type: "codeBlock", content: [{ type: "text", text: "code" }] },
         { type: "horizontalRule" },
         { type: "mermaid", attrs: { code: "graph TD" } },
@@ -198,6 +214,82 @@ describe("sanitizeTiptapContent", () => {
     });
 
     const result = sanitizeTiptapContent(contentWithAllNodes);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+  });
+
+  it("should support task list nodes", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "taskList",
+          content: [
+            {
+              type: "taskItem",
+              attrs: { checked: false },
+              content: [{ type: "paragraph", content: [{ type: "text", text: "TODO" }] }],
+            },
+            {
+              type: "taskItem",
+              attrs: { checked: true },
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Done" }] }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+  });
+
+  it("should support table nodes", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableHeader",
+                  content: [{ type: "paragraph", content: [{ type: "text", text: "Header" }] }],
+                },
+              ],
+            },
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableCell",
+                  content: [{ type: "paragraph", content: [{ type: "text", text: "Cell" }] }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+  });
+
+  it("should support math nodes", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "math", attrs: { latex: "E = mc^2" } }] },
+        { type: "mathBlock", attrs: { latex: "\\sum_{i=1}^n x_i" } },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
     expect(result.hadErrors).toBe(false);
     expect(result.removedNodeTypes).toEqual([]);
   });
@@ -213,14 +305,63 @@ describe("sanitizeTiptapContent", () => {
             { type: "text", text: "italic", marks: [{ type: "italic" }] },
             { type: "text", text: "strike", marks: [{ type: "strike" }] },
             { type: "text", text: "code", marks: [{ type: "code" }] },
-            { type: "text", text: "link", marks: [{ type: "link", attrs: { href: "https://example.com" } }] },
-            { type: "text", text: "wikiLink", marks: [{ type: "wikiLink", attrs: { title: "Page" } }] },
+            {
+              type: "text",
+              text: "link",
+              marks: [{ type: "link", attrs: { href: "https://example.com" } }],
+            },
+            {
+              type: "text",
+              text: "wikiLink",
+              marks: [{ type: "wikiLink", attrs: { title: "Page" } }],
+            },
           ],
         },
       ],
     });
 
     const result = sanitizeTiptapContent(contentWithAllMarks);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedMarkTypes).toEqual([]);
+  });
+
+  it("should support highlight and underline marks", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "highlighted", marks: [{ type: "highlight" }] },
+            { type: "text", text: "underlined", marks: [{ type: "underline" }] },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedMarkTypes).toEqual([]);
+  });
+
+  it("should support textStyle mark for text color", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "colored",
+              marks: [{ type: "textStyle", attrs: { color: "#dc2626" } }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
     expect(result.hadErrors).toBe(false);
     expect(result.removedMarkTypes).toEqual([]);
   });
@@ -250,9 +391,7 @@ describe("validateTiptapContent", () => {
       content: [
         {
           type: "paragraph",
-          content: [
-            { type: "text", text: "test", marks: [{ type: "customMark" }] },
-          ],
+          content: [{ type: "text", text: "test", marks: [{ type: "customMark" }] }],
         },
       ],
     });
@@ -309,9 +448,7 @@ describe("getContentPreview", () => {
   it("should return trimmed preview", () => {
     const content = JSON.stringify({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: "Short text" }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Short text" }] }],
     });
 
     expect(getContentPreview(content)).toBe("Short text");
@@ -321,9 +458,7 @@ describe("getContentPreview", () => {
     const longText = "A".repeat(200);
     const content = JSON.stringify({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: longText }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: longText }] }],
     });
 
     const preview = getContentPreview(content, 50);
@@ -354,9 +489,7 @@ describe("generateAutoTitle", () => {
     const longText = "A".repeat(100);
     const content = JSON.stringify({
       type: "doc",
-      content: [
-        { type: "paragraph", content: [{ type: "text", text: longText }] },
-      ],
+      content: [{ type: "paragraph", content: [{ type: "text", text: longText }] }],
     });
 
     const title = generateAutoTitle(content);

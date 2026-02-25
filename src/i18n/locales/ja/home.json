@@ -1,0 +1,14 @@
+{
+  "period": {
+    "all": "全期間",
+    "selectMonth": "表示期間を選択"
+  },
+  "monthFilter": {
+    "empty": "この月に更新されたページはありません",
+    "showAll": "全期間を表示"
+  },
+  "pagination": {
+    "previous": "前へ",
+    "next": "次へ"
+  }
+}

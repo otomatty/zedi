@@ -2,12 +2,12 @@
 
 ## 概要
 
-| 項目       | 内容                                                                                 |
-| :--------- | :----------------------------------------------------------------------------------- |
-| **機能名** | Tauri 2.0 Migration（Web App → Desktop App）                                         |
-| **目的**   | Rustバックエンドによる高速化、オフライン対応、ネイティブ機能の活用                   |
-| **優先度** | 🔴 必須（Phase 6 のコア作業）                                                        |
-| **前提条件** | Phase 1-5 の機能が安定していること                                                  |
+| 項目         | 内容                                                               |
+| :----------- | :----------------------------------------------------------------- |
+| **機能名**   | Tauri 2.0 Migration（Web App → Desktop App）                       |
+| **目的**     | Rustバックエンドによる高速化、オフライン対応、ネイティブ機能の活用 |
+| **優先度**   | 🔴 必須（Phase 6 のコア作業）                                      |
+| **前提条件** | Phase 1-5 の機能が安定していること                                 |
 
 ---
 
@@ -296,10 +296,10 @@ pub async fn get_pages(
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, user_id, title, content, thumbnail_url, source_url, 
-                    created_at, updated_at, is_deleted 
-             FROM pages 
-             WHERE user_id = ? AND is_deleted = 0 
+            "SELECT id, user_id, title, content, thumbnail_url, source_url,
+                    created_at, updated_at, is_deleted
+             FROM pages
+             WHERE user_id = ? AND is_deleted = 0
              ORDER BY created_at DESC"
         )
         .await
@@ -342,7 +342,7 @@ pub async fn create_page(
     let now = chrono::Utc::now().timestamp_millis();
 
     conn.execute(
-        "INSERT INTO pages (id, user_id, title, content, created_at, updated_at, is_deleted) 
+        "INSERT INTO pages (id, user_id, title, content, created_at, updated_at, is_deleted)
          VALUES (?, ?, ?, ?, ?, ?, 0)",
         [&id, user_id, title, content, &now.to_string(), &now.to_string()],
     )
@@ -376,7 +376,7 @@ pub async fn update_page(
     let now = chrono::Utc::now().timestamp_millis();
 
     conn.execute(
-        "UPDATE pages SET title = ?, content = ?, updated_at = ? 
+        "UPDATE pages SET title = ?, content = ?, updated_at = ?
          WHERE id = ? AND user_id = ?",
         [title, content, &now.to_string(), page_id, user_id],
     )
@@ -398,7 +398,7 @@ pub async fn delete_page(
     let now = chrono::Utc::now().timestamp_millis();
 
     conn.execute(
-        "UPDATE pages SET is_deleted = 1, updated_at = ? 
+        "UPDATE pages SET is_deleted = 1, updated_at = ?
          WHERE id = ? AND user_id = ?",
         [&now.to_string(), page_id, user_id],
     )
@@ -434,7 +434,7 @@ export class TauriPageRepository {
 
   async updatePage(
     pageId: string,
-    updates: Partial<Pick<Page, "title" | "content">>
+    updates: Partial<Pick<Page, "title" | "content">>,
   ): Promise<void> {
     await invoke("update_page", {
       userId: this.userId,
@@ -496,7 +496,7 @@ fn main() {
         .setup(|app| {
             // グローバルホットキー: Alt+Space
             let window = app.get_window("main").unwrap();
-            
+
             app.global_shortcut_manager()
                 .register("Alt+Space", move || {
                     if window.is_visible().unwrap() {
@@ -521,7 +521,7 @@ fn main() {
 // src-tauri/src/tray.rs
 
 use tauri::{
-    AppHandle, CustomMenuItem, SystemTray, SystemTrayEvent, 
+    AppHandle, CustomMenuItem, SystemTray, SystemTrayEvent,
     SystemTrayMenu, SystemTrayMenuItem,
 };
 
@@ -583,9 +583,9 @@ const SERVICE_NAME: &str = "com.zedi.app";
 pub fn store_api_key(provider: &str, key: &str) -> Result<(), String> {
     let entry = Entry::new(SERVICE_NAME, provider)
         .map_err(|e| e.to_string())?;
-    
+
     entry.set_password(key).map_err(|e| e.to_string())?;
-    
+
     Ok(())
 }
 
@@ -593,7 +593,7 @@ pub fn store_api_key(provider: &str, key: &str) -> Result<(), String> {
 pub fn get_api_key(provider: &str) -> Result<Option<String>, String> {
     let entry = Entry::new(SERVICE_NAME, provider)
         .map_err(|e| e.to_string())?;
-    
+
     match entry.get_password() {
         Ok(password) => Ok(Some(password)),
         Err(keyring::Error::NoEntry) => Ok(None),
@@ -605,9 +605,9 @@ pub fn get_api_key(provider: &str) -> Result<Option<String>, String> {
 pub fn delete_api_key(provider: &str) -> Result<(), String> {
     let entry = Entry::new(SERVICE_NAME, provider)
         .map_err(|e| e.to_string())?;
-    
+
     entry.delete_credential().map_err(|e| e.to_string())?;
-    
+
     Ok(())
 }
 ```
@@ -637,32 +637,32 @@ pub struct SearchEngine {
 impl SearchEngine {
     pub fn new(index_path: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         let mut schema_builder = Schema::builder();
-        
+
         schema_builder.add_text_field("id", STORED);
         schema_builder.add_text_field("title", TEXT | STORED);
         schema_builder.add_text_field("content", TEXT);
-        
+
         let schema = schema_builder.build();
         let index = Index::create_in_dir(&index_path, schema.clone())?;
-        
+
         Ok(Self { index, schema })
     }
 
     pub fn index_page(&self, id: &str, title: &str, content: &str) -> Result<(), Box<dyn std::error::Error>> {
         let mut index_writer = self.index.writer(50_000_000)?;
-        
+
         let id_field = self.schema.get_field("id").unwrap();
         let title_field = self.schema.get_field("title").unwrap();
         let content_field = self.schema.get_field("content").unwrap();
-        
+
         let mut doc = Document::new();
         doc.add_text(id_field, id);
         doc.add_text(title_field, title);
         doc.add_text(content_field, content);
-        
+
         index_writer.add_document(doc)?;
         index_writer.commit()?;
-        
+
         Ok(())
     }
 
@@ -671,19 +671,19 @@ impl SearchEngine {
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommit)
             .try_into()?;
-        
+
         let searcher = reader.searcher();
-        
+
         let title_field = self.schema.get_field("title").unwrap();
         let content_field = self.schema.get_field("content").unwrap();
-        
+
         let query_parser = QueryParser::for_index(&self.index, vec![title_field, content_field]);
         let query = query_parser.parse_query(query)?;
-        
+
         let top_docs = searcher.search(&query, &TopDocs::with_limit(limit))?;
-        
+
         let id_field = self.schema.get_field("id").unwrap();
-        
+
         let mut results = Vec::new();
         for (score, doc_address) in top_docs {
             let doc = searcher.doc(doc_address)?;
@@ -691,7 +691,7 @@ impl SearchEngine {
             let title = doc.get_first(title_field).unwrap().as_text().unwrap().to_string();
             results.push((id, title, score));
         }
-        
+
         Ok(results)
     }
 }
@@ -703,9 +703,9 @@ pub async fn search_pages(
     state: State<'_, SearchEngineState>,
 ) -> Result<Vec<SearchResult>, String> {
     let engine = state.engine.lock().map_err(|e| e.to_string())?;
-    
+
     let results = engine.search(query, limit).map_err(|e| e.to_string())?;
-    
+
     Ok(results.into_iter().map(|(id, title, score)| {
         SearchResult { id, title, score }
     }).collect())
@@ -839,75 +839,75 @@ custom-protocol = ["tauri/custom-protocol"]
 
 ### Phase 1: 基盤構築
 
-| タスク | 状態 | 見積もり |
-| :--- | :--- | :--- |
-| Tauri 2.0 プロジェクト初期化 | ⏳ | 2時間 |
-| 開発環境の設定（vite.config.ts 等） | ⏳ | 1時間 |
-| アプリアイコンの作成 | ⏳ | 1時間 |
-| 動作確認（既存 React コードの起動） | ⏳ | 1時間 |
+| タスク                              | 状態 | 見積もり |
+| :---------------------------------- | :--- | :------- |
+| Tauri 2.0 プロジェクト初期化        | ⏳   | 2時間    |
+| 開発環境の設定（vite.config.ts 等） | ⏳   | 1時間    |
+| アプリアイコンの作成                | ⏳   | 1時間    |
+| 動作確認（既存 React コードの起動） | ⏳   | 1時間    |
 
 ### Phase 2: データベース移行
 
-| タスク | 状態 | 見積もり |
-| :--- | :--- | :--- |
-| libSQL Rust クレート統合 | ⏳ | 2時間 |
-| DB 初期化とマイグレーション | ⏳ | 2時間 |
-| Tauri コマンド実装（CRUD） | ⏳ | 4時間 |
-| TauriPageRepository 実装 | ⏳ | 2時間 |
-| useRepository の環境切り替え | ⏳ | 1時間 |
-| 動作確認（DB 操作） | ⏳ | 2時間 |
+| タスク                       | 状態 | 見積もり |
+| :--------------------------- | :--- | :------- |
+| libSQL Rust クレート統合     | ⏳   | 2時間    |
+| DB 初期化とマイグレーション  | ⏳   | 2時間    |
+| Tauri コマンド実装（CRUD）   | ⏳   | 4時間    |
+| TauriPageRepository 実装     | ⏳   | 2時間    |
+| useRepository の環境切り替え | ⏳   | 1時間    |
+| 動作確認（DB 操作）          | ⏳   | 2時間    |
 
 ### Phase 3: ネイティブ機能
 
-| タスク | 状態 | 見積もり |
-| :--- | :--- | :--- |
-| グローバルホットキー実装 | ⏳ | 2時間 |
-| システムトレイ実装 | ⏳ | 2時間 |
-| keyring によるAPIキー保存 | ⏳ | 2時間 |
-| フロントエンドとの連携 | ⏳ | 1時間 |
+| タスク                    | 状態 | 見積もり |
+| :------------------------ | :--- | :------- |
+| グローバルホットキー実装  | ⏳   | 2時間    |
+| システムトレイ実装        | ⏳   | 2時間    |
+| keyring によるAPIキー保存 | ⏳   | 2時間    |
+| フロントエンドとの連携    | ⏳   | 1時間    |
 
 ### Phase 4: 高速検索エンジン
 
-| タスク | 状態 | 見積もり |
-| :--- | :--- | :--- |
-| Tantivy インデックス構築 | ⏳ | 3時間 |
-| 検索コマンド実装 | ⏳ | 2時間 |
-| Aho-Corasick リンク検出 | ⏳ | 2時間 |
-| フロントエンドとの統合 | ⏳ | 2時間 |
+| タスク                   | 状態 | 見積もり |
+| :----------------------- | :--- | :------- |
+| Tantivy インデックス構築 | ⏳   | 3時間    |
+| 検索コマンド実装         | ⏳   | 2時間    |
+| Aho-Corasick リンク検出  | ⏳   | 2時間    |
+| フロントエンドとの統合   | ⏳   | 2時間    |
 
 ### Phase 5: ビルド & 配布
 
-| タスク | 状態 | 見積もり |
-| :--- | :--- | :--- |
-| macOS ビルド設定 | ⏳ | 1時間 |
-| Windows ビルド設定 | ⏳ | 1時間 |
-| Linux ビルド設定 | ⏳ | 1時間 |
-| 自動アップデート設定 | ⏳ | 2時間 |
-| コード署名 | ⏳ | 2時間 |
+| タスク               | 状態 | 見積もり |
+| :------------------- | :--- | :------- |
+| macOS ビルド設定     | ⏳   | 1時間    |
+| Windows ビルド設定   | ⏳   | 1時間    |
+| Linux ビルド設定     | ⏳   | 1時間    |
+| 自動アップデート設定 | ⏳   | 2時間    |
+| コード署名           | ⏳   | 2時間    |
 
 ---
 
 ## 見積もり合計
 
-| Phase | 見積もり |
-| :--- | :--- |
-| Phase 1: 基盤構築 | 5時間 |
-| Phase 2: データベース移行 | 13時間 |
-| Phase 3: ネイティブ機能 | 7時間 |
-| Phase 4: 高速検索エンジン | 9時間 |
-| Phase 5: ビルド & 配布 | 7時間 |
-| **合計** | **約41時間** |
+| Phase                     | 見積もり     |
+| :------------------------ | :----------- |
+| Phase 1: 基盤構築         | 5時間        |
+| Phase 2: データベース移行 | 13時間       |
+| Phase 3: ネイティブ機能   | 7時間        |
+| Phase 4: 高速検索エンジン | 9時間        |
+| Phase 5: ビルド & 配布    | 7時間        |
+| **合計**                  | **約41時間** |
 
 ---
 
 ## リスクと対策
 
-| リスク | 対策 |
-| :--- | :--- |
-| Rust 習熟度が不足 | 段階的に実装、Tauri サンプルを参考に |
-| libSQL の Rust バインディングの制限 | turso-rs 公式ドキュメントを参照 |
-| クロスプラットフォームビルドの複雑さ | GitHub Actions で CI/CD を構築 |
-| 既存コードとの互換性問題 | 環境検出で条件分岐、段階的移行 |
+| リスク                               | 対策                                 |
+| :----------------------------------- | :----------------------------------- |
+| Rust 習熟度が不足                    | 段階的に実装、Tauri サンプルを参考に |
+| libSQL の Rust バインディングの制限  | turso-rs 公式ドキュメントを参照      |
+| クロスプラットフォームビルドの複雑さ | GitHub Actions で CI/CD を構築       |
+| 既存コードとの互換性問題             | 環境検出で条件分岐、段階的移行       |
 
 ---
 

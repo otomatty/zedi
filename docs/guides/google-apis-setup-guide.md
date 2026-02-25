@@ -58,16 +58,19 @@
 **重要**: Cloudflare WorkersからGoogle APIを呼び出す場合、HTTPリファラーが設定されないため、**「なし」を選択することを推奨します**。
 
 **開発・テスト段階**:
+
 1. 「アプリケーションの制限」セクションで、**「なし」**を選択
    - これにより、curlコマンドやCloudflare Workersからのリクエストが正常に動作します
 
 **本番環境（セキュリティ重視の場合）**:
+
 1. 「アプリケーションの制限」セクションで、**「IPアドレス」**を選択
    - Cloudflare WorkersのIPアドレスを制限することは難しいため、この方法は推奨しません
 
 2. または、**「なし」**のままにして、APIの制限のみで保護することを推奨します
 
-**注意**: 
+**注意**:
+
 - 「ウェブサイト」制限を設定すると、Cloudflare Workersからのリクエストがブロックされる可能性があります
 - セキュリティは「APIの制限」で十分に保護できます
 
@@ -87,7 +90,8 @@
 1. 画面下部の「保存」または「制限」ボタンをクリック
 2. 確認メッセージが表示されたら「OK」をクリック
 
-**注意**: 
+**注意**:
+
 - 制限を設定すると、指定したドメイン以外からはAPIが使用できなくなります
 - 開発中に問題が発生した場合は、一時的に制限を緩和してテストできます
 - 本番環境では必ず制限を設定してください
@@ -167,7 +171,8 @@ GOOGLE_GEMINI_API_KEY=your-gemini-api-key
 CORS_ORIGIN=http://localhost:30000
 ```
 
-**注意**: 
+**注意**:
+
 - `your-custom-search-api-key`: 1.3で取得したCustom Search APIキー
 - `your-search-engine-id`: 1.4で取得した検索エンジンID
 - `your-gemini-api-key`: 2.1で取得したGemini APIキー
@@ -261,11 +266,13 @@ curl "http://localhost:8787/api/image-search?query=sunset&limit=10"
 ```
 
 **期待される結果**:
+
 - HTTPステータス: `200 OK`
 - JSONレスポンスに`items`配列が含まれる
 - 各アイテムに`previewUrl`、`imageUrl`、`alt`等が含まれる
 
 **エラーの場合**:
+
 - `400 Bad Request`: クエリパラメータが不正
 - `500 Internal Server Error`: 環境変数が設定されていない、またはAPIキーが無効
 
@@ -278,10 +285,12 @@ curl -X POST "http://localhost:8787/api/image-generate" \
 ```
 
 **期待される結果**:
+
 - HTTPステータス: `200 OK`
 - JSONレスポンスに`imageUrl`（base64データURI）と`mimeType`が含まれる
 
 **エラーの場合**:
+
 - `400 Bad Request`: リクエストボディが不正（`prompt`が欠如）
 - `500 Internal Server Error`: 環境変数が設定されていない、またはAPIキーが無効
 
@@ -320,6 +329,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 **原因**: 環境変数が設定されていない
 
 **解決方法**:
+
 1. `.dev.vars`ファイル（ローカル）またはCloudflare Dashboard（本番）で環境変数を確認
 2. 変数名のタイポがないか確認
 3. Workersを再起動
@@ -329,6 +339,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 **原因**: APIキーまたは検索エンジンIDが無効
 
 **解決方法**:
+
 1. APIキーが正しくコピーされているか確認
 2. 検索エンジンIDが正しくコピーされているか確認
 3. Custom Search APIが有効化されているか確認
@@ -342,6 +353,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 エラーメッセージに `API_KEY_HTTP_REFERRER_BLOCKED` が含まれる場合:
 
 **解決方法**:
+
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials)にアクセス
 2. 該当するAPIキーの「編集」をクリック
 3. 「アプリケーションの制限」セクションで**「なし」**を選択
@@ -353,6 +365,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 **よくある原因2: クォータ超過**
 
 **解決方法**:
+
 1. Google Cloud Consoleでクォータを確認
 2. 無料枠（1日100リクエスト）を超過していないか確認
 3. 超過している場合は、翌日まで待つか、有料プランに切り替える
@@ -362,6 +375,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 **原因**: 環境変数が設定されていない
 
 **解決方法**:
+
 1. `.dev.vars`ファイル（ローカル）またはCloudflare Dashboard（本番）で環境変数を確認
 2. 変数名のタイポがないか確認
 3. Workersを再起動
@@ -371,6 +385,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 **原因**: APIキーが無効または期限切れ
 
 **解決方法**:
+
 1. Google AI StudioでAPIキーが有効か確認
 2. APIキーを再生成して環境変数を更新
 
@@ -379,6 +394,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 **原因**: レート制限超過
 
 **解決方法**:
+
 1. リクエスト頻度を下げる
 2. しばらく待ってから再試行
 
@@ -387,6 +403,7 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 **原因**: Gemini APIのレスポンス形式が期待と異なる
 
 **解決方法**:
+
 1. APIのレスポンスをログで確認
 2. モデル名が正しいか確認（`imagen-4.0-fast-generate-001`）
 3. プロンプトが適切か確認（不適切な内容はフィルタリングされる可能性）
@@ -396,12 +413,14 @@ curl -X POST "https://your-worker.workers.dev/api/image-generate" \
 #### ログの確認
 
 ローカル環境:
+
 ```bash
 # Workersのログを確認
 wrangler dev
 ```
 
 本番環境:
+
 1. Cloudflare Dashboard → Workers & Pages → プロジェクト選択
 2. 「Logs」タブを選択
 3. エラーログを確認
@@ -409,12 +428,14 @@ wrangler dev
 #### 環境変数の確認
 
 ローカル環境:
+
 ```bash
 # .dev.varsファイルの内容を確認（機密情報に注意）
 cat workers/thumbnail-api/.dev.vars
 ```
 
 本番環境:
+
 1. Cloudflare Dashboard → Workers & Pages → プロジェクト選択
 2. 「Settings」タブ → 「Variables」セクション
 3. 環境変数が正しく設定されているか確認
@@ -423,13 +444,15 @@ cat workers/thumbnail-api/.dev.vars
 
 #### Q: APIキーはどこで確認できますか？
 
-**A**: 
+**A**:
+
 - Custom Search APIキー: [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 - Gemini APIキー: [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 #### Q: 無料枠はどのくらいですか？
 
 **A**:
+
 - Custom Search API: 1日100リクエスト（月約3,000リクエスト）
 - Gemini API (Imagen): 無料枠なし（$0.02/画像）
 
@@ -439,14 +462,16 @@ cat workers/thumbnail-api/.dev.vars
 
 #### Q: 画像検索が動作しない
 
-**A**: 
+**A**:
+
 1. 検索エンジンの「画像検索を有効にする」がONになっているか確認
 2. APIキーの制限設定を確認
 3. クォータを確認
 
 #### Q: 画像生成が遅い
 
-**A**: 
+**A**:
+
 - Imagen 4 Fastモデルを使用している場合、通常10-30秒程度かかります
 - より高速なモデルはありませんが、タイムアウト設定を確認してください
 

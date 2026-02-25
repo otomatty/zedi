@@ -1,32 +1,35 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { nanoid } from 'nanoid';
-import type { Page, Link, GhostLink } from '@/types/page';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { v4 as uuidv4 } from "uuid";
+import type { Page, Link, GhostLink } from "@/types/page";
 
 interface PageStore {
   pages: Page[];
   links: Link[];
   ghostLinks: GhostLink[];
-  
+
   // Page CRUD
   createPage: (title?: string, content?: string) => Page;
-  updatePage: (id: string, updates: Partial<Pick<Page, 'title' | 'content' | 'thumbnailUrl'>>) => void;
+  updatePage: (
+    id: string,
+    updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl">>,
+  ) => void;
   deletePage: (id: string) => void;
   getPage: (id: string) => Page | undefined;
   getPageByTitle: (title: string) => Page | undefined;
-  
+
   // Link operations
   addLink: (sourceId: string, targetId: string) => void;
   removeLink: (sourceId: string, targetId: string) => void;
   getOutgoingLinks: (pageId: string) => string[];
   getBacklinks: (pageId: string) => string[];
-  
+
   // Ghost link operations
   addGhostLink: (linkText: string, sourcePageId: string) => void;
   removeGhostLink: (linkText: string, sourcePageId: string) => void;
   getGhostLinkSources: (linkText: string) => string[];
   promoteGhostLink: (linkText: string) => Page | null;
-  
+
   // Search
   searchPages: (query: string) => Page[];
 }
@@ -38,42 +41,37 @@ export const usePageStore = create<PageStore>()(
       links: [],
       ghostLinks: [],
 
-      createPage: (title = '', content = '') => {
+      createPage: (title = "", content = "") => {
         const now = Date.now();
         const newPage: Page = {
-          id: nanoid(),
+          id: uuidv4(),
+          ownerUserId: "local-user",
           title,
           content,
           createdAt: now,
           updatedAt: now,
           isDeleted: false,
         };
-        
+
         set((state) => ({
           pages: [newPage, ...state.pages],
         }));
-        
+
         return newPage;
       },
 
       updatePage: (id, updates) => {
         set((state) => ({
           pages: state.pages.map((page) =>
-            page.id === id
-              ? { ...page, ...updates, updatedAt: Date.now() }
-              : page
+            page.id === id ? { ...page, ...updates, updatedAt: Date.now() } : page,
           ),
         }));
       },
 
       deletePage: (id) => {
         set((state) => ({
-          pages: state.pages.map((page) =>
-            page.id === id ? { ...page, isDeleted: true } : page
-          ),
-          links: state.links.filter(
-            (link) => link.sourceId !== id && link.targetId !== id
-          ),
+          pages: state.pages.map((page) => (page.id === id ? { ...page, isDeleted: true } : page)),
+          links: state.links.filter((link) => link.sourceId !== id && link.targetId !== id),
         }));
       },
 
@@ -84,15 +82,13 @@ export const usePageStore = create<PageStore>()(
       getPageByTitle: (title) => {
         const normalizedTitle = title.toLowerCase().trim();
         return get().pages.find(
-          (page) => 
-            page.title.toLowerCase().trim() === normalizedTitle && 
-            !page.isDeleted
+          (page) => page.title.toLowerCase().trim() === normalizedTitle && !page.isDeleted,
         );
       },
 
       addLink: (sourceId, targetId) => {
         const exists = get().links.some(
-          (link) => link.sourceId === sourceId && link.targetId === targetId
+          (link) => link.sourceId === sourceId && link.targetId === targetId,
         );
         if (!exists) {
           set((state) => ({
@@ -104,7 +100,7 @@ export const usePageStore = create<PageStore>()(
       removeLink: (sourceId, targetId) => {
         set((state) => ({
           links: state.links.filter(
-            (link) => !(link.sourceId === sourceId && link.targetId === targetId)
+            (link) => !(link.sourceId === sourceId && link.targetId === targetId),
           ),
         }));
       },
@@ -123,7 +119,7 @@ export const usePageStore = create<PageStore>()(
 
       addGhostLink: (linkText, sourcePageId) => {
         const exists = get().ghostLinks.some(
-          (gl) => gl.linkText === linkText && gl.sourcePageId === sourcePageId
+          (gl) => gl.linkText === linkText && gl.sourcePageId === sourcePageId,
         );
         if (!exists) {
           set((state) => ({
@@ -135,7 +131,7 @@ export const usePageStore = create<PageStore>()(
       removeGhostLink: (linkText, sourcePageId) => {
         set((state) => ({
           ghostLinks: state.ghostLinks.filter(
-            (gl) => !(gl.linkText === linkText && gl.sourcePageId === sourcePageId)
+            (gl) => !(gl.linkText === linkText && gl.sourcePageId === sourcePageId),
           ),
         }));
       },
@@ -151,17 +147,17 @@ export const usePageStore = create<PageStore>()(
         if (sources.length >= 2) {
           // Create a new page from the ghost link
           const newPage = get().createPage(linkText);
-          
+
           // Convert ghost links to real links
           sources.forEach((sourceId) => {
             get().addLink(sourceId, newPage.id);
           });
-          
+
           // Remove ghost links
           set((state) => ({
             ghostLinks: state.ghostLinks.filter((gl) => gl.linkText !== linkText),
           }));
-          
+
           return newPage;
         }
         return null;
@@ -170,19 +166,19 @@ export const usePageStore = create<PageStore>()(
       searchPages: (query) => {
         const normalizedQuery = query.toLowerCase().trim();
         if (!normalizedQuery) return [];
-        
+
         return get().pages.filter((page) => {
           if (page.isDeleted) return false;
-          
+
           const titleMatch = page.title.toLowerCase().includes(normalizedQuery);
           const contentMatch = page.content.toLowerCase().includes(normalizedQuery);
-          
+
           return titleMatch || contentMatch;
         });
       },
     }),
     {
-      name: 'zedi-pages',
-    }
-  )
+      name: "zedi-pages",
+    },
+  ),
 );

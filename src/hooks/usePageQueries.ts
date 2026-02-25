@@ -2,20 +2,30 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useEffect, useState, useRef } from "react";
 import {
-  getLocalClient,
-  saveLocalDatabase,
-  syncWithRemote,
-  triggerSync,
+  runAuroraSync,
   getSyncStatus,
   subscribeSyncStatus,
+  resetSyncFailures,
   type SyncStatus,
-} from "@/lib/turso";
-import { PageRepository } from "@/lib/pageRepository";
+} from "@/lib/sync";
+import { createStorageAdapter } from "@/lib/storageAdapter";
+import { createApiClient, ApiError } from "@/lib/api";
+import { StorageAdapterPageRepository } from "@/lib/pageRepository/StorageAdapterPageRepository";
+import type { IPageRepository } from "@/lib/pageRepository";
+import { syncLinksWithRepo } from "@/lib/syncWikiLinks";
 import { getPageListPreview } from "@/lib/contentUtils";
 import type { Page, PageSummary } from "@/types/page";
 
 // Local user ID for unauthenticated users
 const LOCAL_USER_ID = "local-user";
+
+/**
+ * Track which userIds have already requested initial sync this session.
+ * useRepository() is used by many components (PageGrid, FAB, GlobalSearch, etc.);
+ * each hook instance has its own ref, so without this we'd trigger N sync
+ * requests and N "[Sync] Initial sync requested" logs (and 2N under Strict Mode).
+ */
+const initialSyncRequestedForUser = new Set<string>();
 
 // Query keys
 export const pageKeys = {
@@ -25,10 +35,9 @@ export const pageKeys = {
   summaries: () => [...pageKeys.all, "summary"] as const,
   summary: (userId: string) => [...pageKeys.summaries(), userId] as const,
   details: () => [...pageKeys.all, "detail"] as const,
-  detail: (userId: string, pageId: string) =>
-    [...pageKeys.details(), userId, pageId] as const,
-  search: (userId: string, query: string) =>
-    [...pageKeys.all, "search", userId, query] as const,
+  detail: (userId: string, pageId: string) => [...pageKeys.details(), userId, pageId] as const,
+  search: (userId: string, query: string) => [...pageKeys.all, "search", userId, query] as const,
+  searchShared: (query: string) => [...pageKeys.all, "searchShared", query] as const,
 };
 
 /**
@@ -46,7 +55,7 @@ export function useSyncStatus(): SyncStatus {
 }
 
 /**
- * Hook to manually trigger sync (Delta sync - only changes since last sync)
+ * Hook to manually trigger sync (C3-7: API + StorageAdapter)
  */
 export function useSync() {
   const { getToken, userId, isSignedIn } = useAuth();
@@ -58,15 +67,10 @@ export function useSync() {
 
     setIsSyncing(true);
     try {
-      console.log("[Sync] Manual sync requested", { userId });
-      const token = await getToken({ template: "turso" });
-      if (token) {
-        await triggerSync(token, userId);
-        // Invalidate queries to refetch with updated local data
-        queryClient.invalidateQueries({ queryKey: pageKeys.all });
-      } else {
-        console.warn("[Sync] Manual sync skipped: missing token");
-      }
+      // Manual sync: reset failure counter and force past the auto-retry guard
+      resetSyncFailures();
+      await runAuroraSync(userId, getToken, { force: true });
+      queryClient.invalidateQueries({ queryKey: pageKeys.all });
     } catch (error) {
       console.error("Sync failed:", error);
     } finally {
@@ -78,66 +82,110 @@ export function useSync() {
 }
 
 /**
- * Hook to get the appropriate repository based on auth state
+ * Hook to get the appropriate repository based on auth state (C3-7: StorageAdapter + API)
  *
- * LOCAL-FIRST ARCHITECTURE:
- * - All reads/writes go to local WASM database (Rows Read = 0)
- * - Sync only on: 1) Initial page load, 2) Manual sync button
- * - Delta sync: Only fetches changes since last sync time
- * - Data persisted to IndexedDB for offline support
+ * LOCAL-FIRST:
+ * - Reads/writes go to StorageAdapter (IndexedDB). Sync via runAuroraSync (GET/POST /api/sync/pages).
+ * - Initial sync on load; manual sync via useSync().
  */
 export function useRepository() {
   const { getToken, isSignedIn, userId, isLoaded } = useAuth();
-  const [isLocalDbReady, setIsLocalDbReady] = useState(false);
-  const initialSyncDone = useRef(false);
+  const queryClient = useQueryClient();
+  const [isAdapterReady, setIsAdapterReady] = useState(false);
+  const adapterRef = useRef<ReturnType<typeof createStorageAdapter> | null>(null);
+  const apiRef = useRef<ReturnType<typeof createApiClient> | null>(null);
 
   const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
 
-  // Initialize local database
+  // Create adapter + api and initialize adapter for current user
   useEffect(() => {
-    getLocalClient(effectiveUserId)
-      .then(() => {
-        setIsLocalDbReady(true);
-      })
-      .catch((error) => {
-        console.error("Failed to initialize local database:", error);
-        setIsLocalDbReady(true); // Still mark as ready to avoid blocking
+    setIsAdapterReady(false);
+    const adapter = createStorageAdapter();
+    const api = createApiClient({ getToken });
+    adapterRef.current = adapter;
+    apiRef.current = api;
+    adapter
+      .initialize(effectiveUserId)
+      .then(() => setIsAdapterReady(true))
+      .catch((err) => {
+        console.error("Failed to initialize storage adapter:", err);
+        setIsAdapterReady(true);
       });
-  }, [effectiveUserId]);
+    return () => {
+      // NOTE:
+      // IndexedDBStorageAdapter currently keeps its DB handle at module scope.
+      // Closing it from each hook instance cleanup can tear down active sync
+      // running in another instance (e.g. StrictMode double-mount), causing:
+      // "IndexedDBStorageAdapter: not initialized".
+      // Keep the adapter alive and let initialize(userId) handle user switches.
+      adapterRef.current = null;
+      apiRef.current = null;
+    };
+  }, [effectiveUserId, getToken]);
 
-  // Initial sync on page load for authenticated users (once per session)
+  // Clear initial-sync flags when user signs out
   useEffect(() => {
-    if (isSignedIn && userId && isLocalDbReady && !initialSyncDone.current) {
-      initialSyncDone.current = true;
-
-      // Trigger delta sync on initial page load
-      (async () => {
-        try {
-          console.log("[Sync] Initial sync requested", { userId });
-          const token = await getToken({ template: "turso" });
-          if (token) {
-            await syncWithRemote(token, userId);
-          } else {
-            console.warn("[Sync] Initial sync skipped: missing token");
-          }
-        } catch (error) {
-          console.error("Initial sync failed:", error);
-        }
-      })();
+    if (!isSignedIn) {
+      initialSyncRequestedForUser.clear();
     }
-  }, [isSignedIn, userId, isLocalDbReady, getToken]);
+  }, [isSignedIn]);
 
-  const getRepository = useCallback(async (): Promise<PageRepository> => {
-    // Always use local database (Local-First)
-    const client = await getLocalClient(effectiveUserId);
-    return new PageRepository(client, { onMutate: saveLocalDatabase });
-  }, [effectiveUserId]);
+  // Initial sync for authenticated users (once per userId per session).
+  // On failure the guard is NOT removed — this prevents infinite retry loops.
+  // The user can manually retry via the SyncIndicator button.
+  useEffect(() => {
+    if (!isSignedIn || !userId || !isAdapterReady) return;
+    if (initialSyncRequestedForUser.has(userId)) return;
+    initialSyncRequestedForUser.add(userId);
+
+    (async () => {
+      try {
+        // Ensure user row exists in Aurora (POST /api/users/upsert) before first sync
+        const api = apiRef.current;
+        if (api) {
+          try {
+            await api.upsertMe();
+          } catch (e) {
+            console.warn("[Sync] upsertMe failed (will still try sync):", e);
+          }
+        }
+        await runAuroraSync(userId, getToken);
+        // Refetch page list so UI shows data pulled into IndexedDB (avoids stuck loading/empty)
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      } catch (error) {
+        console.error("Initial sync failed:", error);
+        // Refetch so UI reflects current IndexedDB state (e.g. partial pull)
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
+
+        // 503 (DB resuming) での失敗時は遅延リトライ
+        // apiClient の自動リトライ (4×10s) でも復帰しなかった場合のフォールバック
+        if (error instanceof ApiError && error.code === "DATABASE_RESUMING") {
+          initialSyncRequestedForUser.delete(userId);
+          setTimeout(() => {
+            initialSyncRequestedForUser.delete(userId);
+            queryClient.invalidateQueries({ queryKey: pageKeys.all });
+          }, 15_000);
+        }
+        // NOTE: Do NOT delete from initialSyncRequestedForUser here for other errors.
+        // Removing the guard on failure previously caused infinite retry loops
+        // when the API was unreachable (CORS, network error, invalid JSON, etc.).
+        // Manual retry via useSync() or page reload will re-attempt.
+      }
+    })();
+  }, [isSignedIn, userId, isAdapterReady, getToken, queryClient]);
+
+  const getRepository = useCallback(async (): Promise<IPageRepository> => {
+    const adapter = adapterRef.current;
+    const api = apiRef.current;
+    if (!adapter || !api) throw new Error("Repository not ready");
+    return new StorageAdapterPageRepository(adapter, api);
+  }, []);
 
   return {
     getRepository,
     userId: effectiveUserId,
     isSignedIn: isSignedIn ?? false,
-    isLoaded: isLoaded && isLocalDbReady,
+    isLoaded: isLoaded && isAdapterReady,
   };
 }
 
@@ -167,7 +215,7 @@ export function usePages() {
 
 /**
  * Hook to fetch page summaries for the current user (without content)
- * Use this for list views to minimize data transfer and reduce Turso Rows Read
+ * Use this for list views to minimize data transfer
  */
 export function usePagesSummary() {
   const { getRepository, userId, isLoaded } = useRepository();
@@ -217,7 +265,7 @@ export function usePage(pageId: string, options?: UsePageOptions) {
 }
 
 /**
- * Hook to search pages
+ * Hook to search pages (personal; StorageAdapter)
  */
 export function useSearchPages(query: string) {
   const { getRepository, userId, isLoaded } = useRepository();
@@ -226,10 +274,48 @@ export function useSearchPages(query: string) {
     queryKey: pageKeys.search(userId, query),
     queryFn: async () => {
       if (!query.trim()) return [];
-      const repo = await getRepository();
-      return repo.searchPages(userId, query);
+      try {
+        const repo = await getRepository();
+        const results = await repo.searchPages(userId, query);
+        return results;
+      } catch (error) {
+        console.error("[searchPages] Failed", {
+          query,
+          error,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
     },
-    enabled: isLoaded && query.trim().length > 0,
+    enabled: isLoaded && query.trim().length >= 3,
+  });
+}
+
+/**
+ * Hook to search shared notes (API: GET /api/search?q=&scope=shared). C3-8.
+ */
+export function useSearchSharedNotes(query: string) {
+  const { getToken, isSignedIn } = useAuth();
+
+  return useQuery({
+    queryKey: pageKeys.searchShared(query),
+    queryFn: async () => {
+      try {
+        const api = createApiClient({ getToken });
+        const result = await api.searchSharedNotes(query);
+        return result;
+      } catch (error) {
+        console.error("[searchSharedNotes] Failed", {
+          query,
+          error,
+          message: error instanceof Error ? error.message : String(error),
+          status: (error as { status?: number }).status,
+        });
+        throw error;
+      }
+    },
+    enabled: isSignedIn && query.trim().length >= 3,
+    retry: false, // サーバーが 500 を返す場合リトライしない
   });
 }
 
@@ -244,32 +330,32 @@ export function useCreatePage() {
     mutationFn: async ({
       title = "",
       content = "",
+      sourceUrl,
+      thumbnailUrl,
     }: {
       title?: string;
       content?: string;
+      sourceUrl?: string | null;
+      thumbnailUrl?: string | null;
     }) => {
-      // デバッグ: スタックトレースを出力
-      console.log("=== createPage called ===");
-      console.log("title:", title);
-      console.log("Stack trace:", new Error().stack);
       const repo = await getRepository();
-      return repo.createPage(userId, title, content);
+      return repo.createPage(userId, title, content, {
+        sourceUrl: sourceUrl ?? undefined,
+        thumbnailUrl: thumbnailUrl ?? undefined,
+      });
     },
     onSuccess: (newPage) => {
-      console.log("=== createPage success ===", newPage.id);
       // Invalidate and refetch pages list
       queryClient.invalidateQueries({ queryKey: pageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: pageKeys.summaries() });
 
       // Optimistically update the cache
-      queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [
-        newPage,
-        ...old,
-      ]);
+      queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [newPage, ...old]);
 
       // Also update summary cache
       const newSummary: PageSummary = {
         id: newPage.id,
+        ownerUserId: newPage.ownerUserId,
         title: newPage.title,
         contentPreview: newPage.contentPreview,
         thumbnailUrl: newPage.thumbnailUrl,
@@ -278,10 +364,10 @@ export function useCreatePage() {
         updatedAt: newPage.updatedAt,
         isDeleted: newPage.isDeleted,
       };
-      queryClient.setQueryData<PageSummary[]>(
-        pageKeys.summary(userId),
-        (old = []) => [newSummary, ...old]
-      );
+      queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) => [
+        newSummary,
+        ...old,
+      ]);
     },
   });
 }
@@ -299,16 +385,10 @@ export function useUpdatePage() {
       updates,
     }: {
       pageId: string;
-      updates: Partial<
-        Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">
-      >;
+      updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>;
     }) => {
-      const getCachedPage = (
-        targetPageId: string
-      ): Page | PageSummary | null => {
-        const detail = queryClient.getQueryData<Page | null>(
-          pageKeys.detail(userId, targetPageId)
-        );
+      const getCachedPage = (targetPageId: string): Page | PageSummary | null => {
+        const detail = queryClient.getQueryData<Page | null>(pageKeys.detail(userId, targetPageId));
         if (detail) return detail;
 
         const list = queryClient.getQueryData<Page[]>(pageKeys.list(userId));
@@ -317,9 +397,7 @@ export function useUpdatePage() {
           if (found) return found;
         }
 
-        const summaries = queryClient.getQueryData<PageSummary[]>(
-          pageKeys.summary(userId)
-        );
+        const summaries = queryClient.getQueryData<PageSummary[]>(pageKeys.summary(userId));
         if (summaries) {
           const found = summaries.find((page) => page.id === targetPageId);
           if (found) return found;
@@ -329,12 +407,10 @@ export function useUpdatePage() {
       };
 
       const existing = getCachedPage(pageId);
-      const existingContent =
-        existing && "content" in existing ? existing.content : undefined;
+      const existingContent = existing && "content" in existing ? existing.content : undefined;
 
-      const actualUpdates: Partial<
-        Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">
-      > = {};
+      const actualUpdates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">> =
+        {};
 
       if (updates.title !== undefined) {
         if (!existing || existing.title !== updates.title) {
@@ -369,22 +445,18 @@ export function useUpdatePage() {
       if (skipped) return;
       const now = Date.now();
       const contentPreview =
-        updates.content !== undefined
-          ? getPageListPreview(updates.content)
-          : undefined;
+        updates.content !== undefined ? getPageListPreview(updates.content) : undefined;
 
       // Update the specific page in cache
-      queryClient.setQueryData<Page | null>(
-        pageKeys.detail(userId, pageId),
-        (old) =>
-          old
-            ? {
-                ...old,
-                ...updates,
-                ...(contentPreview !== undefined ? { contentPreview } : {}),
-                updatedAt: now,
-              }
-            : null
+      queryClient.setQueryData<Page | null>(pageKeys.detail(userId, pageId), (old) =>
+        old
+          ? {
+              ...old,
+              ...updates,
+              ...(contentPreview !== undefined ? { contentPreview } : {}),
+              updatedAt: now,
+            }
+          : null,
       );
 
       // Update the page in the list cache
@@ -397,26 +469,19 @@ export function useUpdatePage() {
                 ...(contentPreview !== undefined ? { contentPreview } : {}),
                 updatedAt: now,
               }
-            : page
-        )
+            : page,
+        ),
       );
 
       // Update the page in the summary cache (only title, thumbnailUrl, sourceUrl)
       const summaryUpdates: Partial<PageSummary> = { updatedAt: now };
       if (updates.title !== undefined) summaryUpdates.title = updates.title;
-      if (updates.thumbnailUrl !== undefined)
-        summaryUpdates.thumbnailUrl = updates.thumbnailUrl;
-      if (updates.sourceUrl !== undefined)
-        summaryUpdates.sourceUrl = updates.sourceUrl;
-      if (contentPreview !== undefined)
-        summaryUpdates.contentPreview = contentPreview;
+      if (updates.thumbnailUrl !== undefined) summaryUpdates.thumbnailUrl = updates.thumbnailUrl;
+      if (updates.sourceUrl !== undefined) summaryUpdates.sourceUrl = updates.sourceUrl;
+      if (contentPreview !== undefined) summaryUpdates.contentPreview = contentPreview;
 
-      queryClient.setQueryData<PageSummary[]>(
-        pageKeys.summary(userId),
-        (old = []) =>
-          old.map((page) =>
-            page.id === pageId ? { ...page, ...summaryUpdates } : page
-          )
+      queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) =>
+        old.map((page) => (page.id === pageId ? { ...page, ...summaryUpdates } : page)),
       );
     },
   });
@@ -438,13 +503,12 @@ export function useDeletePage() {
     onSuccess: (pageId) => {
       // Remove from list cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) =>
-        old.filter((page) => page.id !== pageId)
+        old.filter((page) => page.id !== pageId),
       );
 
       // Remove from summary cache
-      queryClient.setQueryData<PageSummary[]>(
-        pageKeys.summary(userId),
-        (old = []) => old.filter((page) => page.id !== pageId)
+      queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) =>
+        old.filter((page) => page.id !== pageId),
       );
 
       // Invalidate detail query
@@ -482,13 +546,7 @@ export function useAddLink() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      sourceId,
-      targetId,
-    }: {
-      sourceId: string;
-      targetId: string;
-    }) => {
+    mutationFn: async ({ sourceId, targetId }: { sourceId: string; targetId: string }) => {
       const repo = await getRepository();
       await repo.addLink(sourceId, targetId);
     },
@@ -506,13 +564,7 @@ export function useRemoveLink() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      sourceId,
-      targetId,
-    }: {
-      sourceId: string;
-      targetId: string;
-    }) => {
+    mutationFn: async ({ sourceId, targetId }: { sourceId: string; targetId: string }) => {
       const repo = await getRepository();
       await repo.removeLink(sourceId, targetId);
     },
@@ -536,16 +588,14 @@ export function useCheckGhostLinkReferenced() {
         const repo = await getRepository();
         const sources = await repo.getGhostLinkSources(linkText);
         // Referenced if at least one OTHER page has this ghost link
-        const otherSources = currentPageId
-          ? sources.filter((id) => id !== currentPageId)
-          : sources;
+        const otherSources = currentPageId ? sources.filter((id) => id !== currentPageId) : sources;
         return otherSources.length > 0;
       } catch (error) {
         console.error("Error checking ghost link:", error);
         return false;
       }
     },
-    [getRepository]
+    [getRepository],
   );
 
   return { checkReferenced };
@@ -568,7 +618,7 @@ export function useCheckDuplicateTitle() {
         return null;
       }
     },
-    [getRepository, userId, isLoaded]
+    [getRepository, userId, isLoaded],
   );
 
   return { checkDuplicate, isLoaded };
@@ -581,13 +631,7 @@ export function useAddGhostLink() {
   const { getRepository } = useRepository();
 
   return useMutation({
-    mutationFn: async ({
-      linkText,
-      sourcePageId,
-    }: {
-      linkText: string;
-      sourcePageId: string;
-    }) => {
+    mutationFn: async ({ linkText, sourcePageId }: { linkText: string; sourcePageId: string }) => {
       const repo = await getRepository();
       await repo.addGhostLink(linkText, sourcePageId);
     },
@@ -613,12 +657,12 @@ export function usePromoteGhostLink() {
 }
 
 /**
- * Hook to sync WikiLinks when saving a page
- * - Updates links table for existing pages
- * - Updates ghost_links table for non-existing pages
- * - Promotes ghost links if referenced from 2+ pages
+ * Hook to sync WikiLinks when saving a page (delta update).
+ * - Removes links/ghost_links that are no longer in content.
+ * - Adds or updates links for current content (existing pages → links, others → ghost_links).
  *
- * OPTIMIZED: Uses getPagesSummary() instead of getPages() to reduce Rows Read
+ * Only touches the saved page; no full-scan of all pages.
+ * OPTIMIZED: Uses getPagesSummary() for title↔id resolution (no content).
  */
 export function useSyncWikiLinks() {
   const { getRepository, userId } = useRepository();
@@ -626,38 +670,12 @@ export function useSyncWikiLinks() {
   const syncLinks = useCallback(
     async (
       sourcePageId: string,
-      wikiLinks: Array<{ title: string; exists: boolean }>
+      wikiLinks: Array<{ title: string; exists: boolean }>,
     ): Promise<void> => {
       const repo = await getRepository();
-
-      // OPTIMIZED: Use summary (no content) to check which links are valid
-      const pages = await repo.getPagesSummary(userId);
-      const pageTitleToId = new Map(
-        pages.map((p) => [p.title.toLowerCase().trim(), p.id])
-      );
-
-      // Process each WikiLink
-      for (const link of wikiLinks) {
-        const normalizedTitle = link.title.toLowerCase().trim();
-        const targetPageId = pageTitleToId.get(normalizedTitle);
-
-        if (targetPageId && targetPageId !== sourcePageId) {
-          // Existing page - add to links table
-          await repo.addLink(sourcePageId, targetPageId);
-          // Remove from ghost_links if it was there
-          await repo.removeGhostLink(link.title, sourcePageId);
-        } else if (!targetPageId) {
-          // Non-existing page - add to ghost_links
-          await repo.addGhostLink(link.title, sourcePageId);
-        }
-      }
-
-      // Note: Ghost links referenced from multiple pages will have their
-      // "referenced" attribute set to true for styling purposes, but
-      // pages are NOT automatically created. Users must explicitly create
-      // pages by clicking on the link.
+      await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks);
     },
-    [getRepository, userId]
+    [getRepository, userId],
   );
 
   return { syncLinks };
@@ -675,7 +693,7 @@ export function useWikiLinkExistsChecker() {
   const checkExistence = useCallback(
     async (
       titles: string[],
-      currentPageId?: string
+      currentPageId?: string,
     ): Promise<{
       pageTitles: Set<string>;
       referencedTitles: Set<string>;
@@ -688,9 +706,7 @@ export function useWikiLinkExistsChecker() {
 
       // OPTIMIZED: Use summary (no content) to check existence
       const pages = await repo.getPagesSummary(userId);
-      const pageTitles = new Set(
-        pages.map((p) => p.title.toLowerCase().trim())
-      );
+      const pageTitles = new Set(pages.map((p) => p.title.toLowerCase().trim()));
 
       // Get ghost links to check referenced status
       const ghostLinks = await repo.getGhostLinks(userId);
@@ -709,9 +725,7 @@ export function useWikiLinkExistsChecker() {
       for (const title of titles) {
         const normalized = title.toLowerCase().trim();
         const sources = ghostLinksByText.get(normalized) || [];
-        const otherSources = currentPageId
-          ? sources.filter((id) => id !== currentPageId)
-          : sources;
+        const otherSources = currentPageId ? sources.filter((id) => id !== currentPageId) : sources;
         if (otherSources.length > 0) {
           referencedTitles.add(normalized);
         }
@@ -719,7 +733,7 @@ export function useWikiLinkExistsChecker() {
 
       return { pageTitles, referencedTitles };
     },
-    [getRepository, userId, isLoaded]
+    [getRepository, userId, isLoaded],
   );
 
   return { checkExistence, isLoaded };

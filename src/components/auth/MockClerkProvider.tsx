@@ -48,11 +48,7 @@ export function MockClerkProvider({ children }: MockClerkProviderProps) {
     },
   };
 
-  return (
-    <MockAuthContext.Provider value={mockAuthValue}>
-      {children}
-    </MockAuthContext.Provider>
-  );
+  return <MockAuthContext.Provider value={mockAuthValue}>{children}</MockAuthContext.Provider>;
 }
 
 /**

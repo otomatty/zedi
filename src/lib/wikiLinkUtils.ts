@@ -71,7 +71,7 @@ export function extractWikiLinksFromContent(content: string): WikiLinkInfo[] {
 export function updateWikiLinkAttributes(
   content: string,
   pageTitles: Set<string>,
-  referencedTitles: Set<string>
+  referencedTitles: Set<string>,
 ): { content: string; hasChanges: boolean } {
   if (!content) return { content, hasChanges: false };
 
@@ -96,17 +96,12 @@ export function updateWikiLinkAttributes(
               | Record<string, unknown>
               | undefined;
             if (attrs?.title) {
-              const normalizedTitle = (attrs.title as string)
-                .toLowerCase()
-                .trim();
+              const normalizedTitle = (attrs.title as string).toLowerCase().trim();
               const newExists = pageTitles.has(normalizedTitle);
               const newReferenced = referencedTitles.has(normalizedTitle);
 
               // 状態が変わった場合のみ更新
-              if (
-                attrs.exists !== newExists ||
-                attrs.referenced !== newReferenced
-              ) {
+              if (attrs.exists !== newExists || attrs.referenced !== newReferenced) {
                 hasChanges = true;
                 return {
                   ...mark,

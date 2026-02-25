@@ -83,9 +83,7 @@ const verbose = args.includes("--verbose");
 const force = args.includes("--force");
 const envArg = args.find((_, i) => args[i - 1] === "--env");
 const batchSizeArg = args.find((_, i) => args[i - 1] === "--batch-size");
-const BATCH_SIZE = batchSizeArg
-  ? parseInt(batchSizeArg, 10)
-  : 100;
+const BATCH_SIZE = batchSizeArg ? parseInt(batchSizeArg, 10) : 100;
 
 function log(message: string, level: "info" | "verbose" | "error" = "info") {
   if (level === "verbose" && !verbose) return;
@@ -165,11 +163,7 @@ Please ensure it contains:
   return createLibsqlClient({ url, authToken: token });
 }
 
-async function hasColumn(
-  client: Client,
-  tableName: string,
-  columnName: string
-): Promise<boolean> {
+async function hasColumn(client: Client, tableName: string, columnName: string): Promise<boolean> {
   const result = await client.execute({
     sql: `PRAGMA table_info(${tableName})`,
   });
@@ -177,7 +171,9 @@ async function hasColumn(
   return result.rows.some((row) => row.name === columnName);
 }
 
-async function addContentPreviewColumn(client: Client): Promise<{ added: boolean; exists: boolean }> {
+async function addContentPreviewColumn(
+  client: Client,
+): Promise<{ added: boolean; exists: boolean }> {
   const exists = await hasColumn(client, "pages", "content_preview");
   if (exists) {
     log(`✓ content_preview column already exists`, "info");
@@ -209,7 +205,7 @@ interface PageRow {
 async function backfillPreviews(
   client: Client,
   force: boolean,
-  columnExists: boolean
+  columnExists: boolean,
 ): Promise<number> {
   log(`🔄 Starting preview backfill...`, "info");
 
@@ -258,10 +254,7 @@ async function backfillPreviews(
       break;
     }
 
-    log(
-      `  Processing batch: ${offset + 1}-${offset + rows.length} of ${totalCount}`,
-      "verbose"
-    );
+    log(`  Processing batch: ${offset + 1}-${offset + rows.length} of ${totalCount}`, "verbose");
 
     // Process each page
     for (const row of rows) {
@@ -286,7 +279,7 @@ async function backfillPreviews(
         if (dryRun) {
           log(
             `  [DRY RUN] Would update page ${row.id}: "${preview.substring(0, 50)}..."`,
-            "verbose"
+            "verbose",
           );
         } else {
           await client.execute({
@@ -298,10 +291,7 @@ async function backfillPreviews(
         updated++;
         processed++;
       } catch (error) {
-        log(
-          `  Error processing page ${row.id}: ${error}`,
-          "error"
-        );
+        log(`  Error processing page ${row.id}: ${error}`, "error");
         errors++;
         processed++;
       }
@@ -310,7 +300,10 @@ async function backfillPreviews(
     offset += rows.length;
 
     if (rows.length > 0) {
-      log(`  Progress: ${processed}/${totalCount} processed, ${updated} updated, ${errors} errors`, "info");
+      log(
+        `  Progress: ${processed}/${totalCount} processed, ${updated} updated, ${errors} errors`,
+        "info",
+      );
     }
   }
 

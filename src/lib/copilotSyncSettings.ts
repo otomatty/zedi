@@ -30,8 +30,7 @@ export interface CopilotSyncSettings {
 }
 
 const STORAGE_KEY = "zedi-copilot-sync-settings";
-const DEFAULT_VS_CODE_SESSION_DIR =
-  "~/Library/Application Support/Code/User/workspaceStorage";
+const DEFAULT_VS_CODE_SESSION_DIR = "~/Library/Application Support/Code/User/workspaceStorage";
 
 export const DEFAULT_COPILOT_SYNC_SETTINGS: CopilotSyncSettings = {
   enabled: false,
@@ -48,9 +47,7 @@ export const DEFAULT_COPILOT_SYNC_SETTINGS: CopilotSyncSettings = {
 /**
  * 同期設定を保存
  */
-export function saveCopilotSyncSettings(
-  settings: CopilotSyncSettings,
-): void {
+export function saveCopilotSyncSettings(settings: CopilotSyncSettings): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch (error) {
@@ -89,10 +86,7 @@ export function clearCopilotSyncSettings(): void {
 /**
  * 最後に同期したタイムスタンプを更新
  */
-export function updateLastSyncedTimestamp(
-  sessionId: string,
-  timestamp: number,
-): void {
+export function updateLastSyncedTimestamp(sessionId: string, timestamp: number): void {
   const settings = loadCopilotSyncSettings();
   settings.lastSyncedTimestamps[sessionId] = timestamp;
   saveCopilotSyncSettings(settings);

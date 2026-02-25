@@ -3,12 +3,7 @@ import { NodeViewWrapper, NodeViewProps } from "@tiptap/react";
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, Check, X, Maximize2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Dynamic import for mermaid to avoid initialization issues
 let mermaidInstance: typeof import("mermaid").default | null = null;
@@ -56,7 +51,7 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
 
       try {
         const mermaid = await getMermaid();
-        
+
         // コードを検証
         await mermaid.parse(code);
         setError(null);
@@ -90,11 +85,9 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
   if (isEditing) {
     return (
       <NodeViewWrapper className="mermaid-node">
-        <div className="border rounded-lg p-4 bg-muted/30">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-muted-foreground">
-              Mermaidコードを編集
-            </span>
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">Mermaidコードを編集</span>
             <div className="flex gap-1">
               <Button size="sm" variant="ghost" onClick={handleCancel}>
                 <X className="h-4 w-4" />
@@ -107,7 +100,7 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
           <Textarea
             value={editCode}
             onChange={(e) => setEditCode(e.target.value)}
-            className="font-mono text-sm min-h-[200px]"
+            className="min-h-[200px] font-mono text-sm"
             placeholder="graph TD&#10;    A[Start] --> B[End]"
           />
         </div>
@@ -118,26 +111,16 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
   return (
     <NodeViewWrapper className="mermaid-node">
       <div
-        className={`border rounded-lg p-4 bg-white dark:bg-gray-900 relative group ${
+        className={`group relative rounded-lg border bg-white p-4 dark:bg-gray-900 ${
           selected ? "ring-2 ring-primary" : ""
         }`}
       >
         {/* ツールバー */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setIsFullscreen(true)}
-            title="拡大表示"
-          >
+        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button size="sm" variant="ghost" onClick={() => setIsFullscreen(true)} title="拡大表示">
             <Maximize2 className="h-4 w-4" />
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setIsEditing(true)}
-            title="編集"
-          >
+          <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)} title="編集">
             <Pencil className="h-4 w-4" />
           </Button>
           <Button
@@ -153,15 +136,10 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
 
         {/* ダイアグラム表示 */}
         {error ? (
-          <div className="text-destructive text-sm p-4 bg-destructive/10 rounded">
-            <p className="font-medium mb-1">Mermaidエラー</p>
-            <pre className="text-xs whitespace-pre-wrap">{error}</pre>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsEditing(true)}
-              className="mt-2"
-            >
+          <div className="rounded bg-destructive/10 p-4 text-sm text-destructive">
+            <p className="mb-1 font-medium">Mermaidエラー</p>
+            <pre className="whitespace-pre-wrap text-xs">{error}</pre>
+            <Button size="sm" variant="outline" onClick={() => setIsEditing(true)} className="mt-2">
               コードを修正
             </Button>
           </div>
@@ -172,14 +150,14 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
             dangerouslySetInnerHTML={{ __html: svgContent }}
           />
         ) : (
-          <div className="flex items-center justify-center h-32 text-muted-foreground">
+          <div className="flex h-32 items-center justify-center text-muted-foreground">
             読み込み中...
           </div>
         )}
 
         {/* フルスクリーンダイアログ */}
         <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-          <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-auto">
+          <DialogContent className="max-h-[90vh] max-w-[90vw] overflow-auto">
             <DialogHeader>
               <DialogTitle>ダイアグラム</DialogTitle>
             </DialogHeader>

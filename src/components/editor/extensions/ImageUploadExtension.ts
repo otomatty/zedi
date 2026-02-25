@@ -53,10 +53,8 @@ export const ImageUpload = Node.create<ImageUploadOptions>({
       },
       status: {
         default: "uploading",
-        parseHTML: (element) =>
-          element.getAttribute("data-status") || "uploading",
-        renderHTML: (attributes) =>
-          attributes.status ? { "data-status": attributes.status } : {},
+        parseHTML: (element) => element.getAttribute("data-status") || "uploading",
+        renderHTML: (attributes) => (attributes.status ? { "data-status": attributes.status } : {}),
       },
       progress: {
         default: 0,
@@ -65,17 +63,13 @@ export const ImageUpload = Node.create<ImageUploadOptions>({
           return value ? Number(value) : 0;
         },
         renderHTML: (attributes) =>
-          typeof attributes.progress === "number"
-            ? { "data-progress": attributes.progress }
-            : {},
+          typeof attributes.progress === "number" ? { "data-progress": attributes.progress } : {},
       },
       previewUrl: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-preview-url"),
         renderHTML: (attributes) =>
-          attributes.previewUrl
-            ? { "data-preview-url": attributes.previewUrl }
-            : {},
+          attributes.previewUrl ? { "data-preview-url": attributes.previewUrl } : {},
       },
       fileName: {
         default: null,
@@ -87,17 +81,13 @@ export const ImageUpload = Node.create<ImageUploadOptions>({
         default: null,
         parseHTML: (element) => element.getAttribute("data-error-message"),
         renderHTML: (attributes) =>
-          attributes.errorMessage
-            ? { "data-error-message": attributes.errorMessage }
-            : {},
+          attributes.errorMessage ? { "data-error-message": attributes.errorMessage } : {},
       },
       providerId: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-provider-id"),
         renderHTML: (attributes) =>
-          attributes.providerId
-            ? { "data-provider-id": attributes.providerId }
-            : {},
+          attributes.providerId ? { "data-provider-id": attributes.providerId } : {},
       },
     };
   },

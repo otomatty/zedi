@@ -11,15 +11,11 @@ import type { Page } from "@/types/page";
 import { createPlainTextContent } from "@/test/testDatabase";
 
 // Helper to create a test page
-function createTestPage(
-  id: string,
-  title: string,
-  content: string,
-  options?: Partial<Page>
-): Page {
+function createTestPage(id: string, title: string, content: string, options?: Partial<Page>): Page {
   const now = Date.now();
   return {
     id,
+    ownerUserId: "test-user",
     title,
     content,
     createdAt: now,
@@ -114,7 +110,8 @@ describe("extractSmartSnippet", () => {
   });
 
   it("should truncate long sentences around keyword", () => {
-    const text = "これは非常に長い文章でありまして、機械学習という単語がこの文章の中に含まれていますが、文章自体がとても長いので省略されるべきです。";
+    const text =
+      "これは非常に長い文章でありまして、機械学習という単語がこの文章の中に含まれていますが、文章自体がとても長いので省略されるべきです。";
     const result = extractSmartSnippet(text, ["機械学習"], 60);
     expect(result.length).toBeLessThanOrEqual(66); // 60 + ellipsis margin
     expect(result).toContain("機械学習");
@@ -128,7 +125,10 @@ describe("highlightKeywords", () => {
   });
 
   it("should highlight multiple keywords", () => {
-    const result = highlightKeywords("機械学習とニューラルネットワーク", ["機械学習", "ニューラル"]);
+    const result = highlightKeywords("機械学習とニューラルネットワーク", [
+      "機械学習",
+      "ニューラル",
+    ]);
     expect(result).toBe("【機械学習】と【ニューラル】ネットワーク");
   });
 
@@ -169,18 +169,13 @@ describe("determineMatchType", () => {
       "機械学習入門",
       "これは機械学習についてです",
       ["機械学習"],
-      "機械学習"
+      "機械学習",
     );
     expect(result).toBe("both");
   });
 
   it("should return content for content-only match", () => {
-    const result = determineMatchType(
-      "入門書",
-      "機械学習について学ぶ",
-      ["機械学習"],
-      "機械学習"
-    );
+    const result = determineMatchType("入門書", "機械学習について学ぶ", ["機械学習"], "機械学習");
     expect(result).toBe("content");
   });
 
@@ -189,7 +184,7 @@ describe("determineMatchType", () => {
       "機械学習とニューラルネットワーク",
       "別のコンテンツ",
       ["機械学習", "ニューラル"],
-      "機械学習 ニューラル"
+      "機械学習 ニューラル",
     );
     expect(result).toBe("title");
   });
@@ -222,9 +217,7 @@ describe("calculateEnhancedScore", () => {
   });
 
   it("should add bonus for keyword occurrences in content", () => {
-    const contentWithOccurrences = createPlainTextContent(
-      "機械学習 機械学習 機械学習"
-    );
+    const contentWithOccurrences = createPlainTextContent("機械学習 機械学習 機械学習");
     const page = createTestPage("1", "Title", contentWithOccurrences);
     const score = calculateEnhancedScore(page, ["機械学習"], "content");
     // Should have occurrence bonus

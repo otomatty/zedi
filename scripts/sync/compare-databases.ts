@@ -174,10 +174,7 @@ Please ensure .env.development contains:
   return { prod, dev };
 }
 
-async function fetchPages(
-  client: Client,
-  userId: string
-): Promise<PageRow[]> {
+async function fetchPages(client: Client, userId: string): Promise<PageRow[]> {
   const result = await client.execute({
     sql: `SELECT * FROM pages WHERE user_id = ?`,
     args: [userId],
@@ -223,10 +220,7 @@ async function fetchLinks(client: Client, pageIds: string[]): Promise<LinkRow[]>
   return links;
 }
 
-async function fetchGhostLinks(
-  client: Client,
-  pageIds: string[]
-): Promise<GhostLinkRow[]> {
+async function fetchGhostLinks(client: Client, pageIds: string[]): Promise<GhostLinkRow[]> {
   if (pageIds.length === 0) return [];
 
   const ghostLinks: GhostLinkRow[] = [];
@@ -254,7 +248,7 @@ async function fetchGhostLinks(
 
 function comparePages(
   prodPages: PageRow[],
-  devPages: PageRow[]
+  devPages: PageRow[],
 ): {
   onlyInProd: PageRow[];
   onlyInDev: PageRow[];
@@ -290,10 +284,14 @@ function comparePages(
         differences.push(`title: "${prodPage.title}" vs "${devPage.title}"`);
       }
       if (prodPage.content !== devPage.content) {
-        differences.push(`content: different (length ${prodPage.content?.length || 0} vs ${devPage.content?.length || 0})`);
+        differences.push(
+          `content: different (length ${prodPage.content?.length || 0} vs ${devPage.content?.length || 0})`,
+        );
       }
       if (prodPage.thumbnail_url !== devPage.thumbnail_url) {
-        differences.push(`thumbnail_url: "${prodPage.thumbnail_url}" vs "${devPage.thumbnail_url}"`);
+        differences.push(
+          `thumbnail_url: "${prodPage.thumbnail_url}" vs "${devPage.thumbnail_url}"`,
+        );
       }
       if (prodPage.source_url !== devPage.source_url) {
         differences.push(`source_url: "${prodPage.source_url}" vs "${devPage.source_url}"`);
@@ -333,55 +331,41 @@ function comparePages(
 
 function compareLinks(
   prodLinks: LinkRow[],
-  devLinks: LinkRow[]
+  devLinks: LinkRow[],
 ): {
   onlyInProd: LinkRow[];
   onlyInDev: LinkRow[];
   identical: LinkRow[];
 } {
-  const prodSet = new Set(
-    prodLinks.map((l) => `${l.source_id}:${l.target_id}`)
-  );
-  const devSet = new Set(
-    devLinks.map((l) => `${l.source_id}:${l.target_id}`)
-  );
+  const prodSet = new Set(prodLinks.map((l) => `${l.source_id}:${l.target_id}`));
+  const devSet = new Set(devLinks.map((l) => `${l.source_id}:${l.target_id}`));
 
-  const onlyInProd = prodLinks.filter(
-    (l) => !devSet.has(`${l.source_id}:${l.target_id}`)
-  );
-  const onlyInDev = devLinks.filter(
-    (l) => !prodSet.has(`${l.source_id}:${l.target_id}`)
-  );
-  const identical = prodLinks.filter((l) =>
-    devSet.has(`${l.source_id}:${l.target_id}`)
-  );
+  const onlyInProd = prodLinks.filter((l) => !devSet.has(`${l.source_id}:${l.target_id}`));
+  const onlyInDev = devLinks.filter((l) => !prodSet.has(`${l.source_id}:${l.target_id}`));
+  const identical = prodLinks.filter((l) => devSet.has(`${l.source_id}:${l.target_id}`));
 
   return { onlyInProd, onlyInDev, identical };
 }
 
 function compareGhostLinks(
   prodGhostLinks: GhostLinkRow[],
-  devGhostLinks: GhostLinkRow[]
+  devGhostLinks: GhostLinkRow[],
 ): {
   onlyInProd: GhostLinkRow[];
   onlyInDev: GhostLinkRow[];
   identical: GhostLinkRow[];
 } {
-  const prodSet = new Set(
-    prodGhostLinks.map((gl) => `${gl.link_text}:${gl.source_page_id}`)
-  );
-  const devSet = new Set(
-    devGhostLinks.map((gl) => `${gl.link_text}:${gl.source_page_id}`)
-  );
+  const prodSet = new Set(prodGhostLinks.map((gl) => `${gl.link_text}:${gl.source_page_id}`));
+  const devSet = new Set(devGhostLinks.map((gl) => `${gl.link_text}:${gl.source_page_id}`));
 
   const onlyInProd = prodGhostLinks.filter(
-    (gl) => !devSet.has(`${gl.link_text}:${gl.source_page_id}`)
+    (gl) => !devSet.has(`${gl.link_text}:${gl.source_page_id}`),
   );
   const onlyInDev = devGhostLinks.filter(
-    (gl) => !prodSet.has(`${gl.link_text}:${gl.source_page_id}`)
+    (gl) => !prodSet.has(`${gl.link_text}:${gl.source_page_id}`),
   );
   const identical = prodGhostLinks.filter((gl) =>
-    devSet.has(`${gl.link_text}:${gl.source_page_id}`)
+    devSet.has(`${gl.link_text}:${gl.source_page_id}`),
   );
 
   return { onlyInProd, onlyInDev, identical };
@@ -390,7 +374,7 @@ function compareGhostLinks(
 async function compareDeveloper(
   prodClient: Client,
   devClient: Client,
-  mapping: DeveloperMapping
+  mapping: DeveloperMapping,
 ): Promise<void> {
   const { productionUserId, developmentUserId, email, description } = mapping;
 
@@ -460,7 +444,10 @@ async function compareDeveloper(
   log(`    ➕ Only in Production: ${linkComparison.onlyInProd.length}`);
   log(`    ➕ Only in Development: ${linkComparison.onlyInDev.length}`);
 
-  if (!summaryOnly && (linkComparison.onlyInProd.length > 0 || linkComparison.onlyInDev.length > 0)) {
+  if (
+    !summaryOnly &&
+    (linkComparison.onlyInProd.length > 0 || linkComparison.onlyInDev.length > 0)
+  ) {
     if (linkComparison.onlyInProd.length > 0) {
       log(`\n    Links only in Production:`, "verbose");
       for (const link of linkComparison.onlyInProd) {
@@ -491,7 +478,10 @@ async function compareDeveloper(
   log(`    ➕ Only in Production: ${ghostLinkComparison.onlyInProd.length}`);
   log(`    ➕ Only in Development: ${ghostLinkComparison.onlyInDev.length}`);
 
-  if (!summaryOnly && (ghostLinkComparison.onlyInProd.length > 0 || ghostLinkComparison.onlyInDev.length > 0)) {
+  if (
+    !summaryOnly &&
+    (ghostLinkComparison.onlyInProd.length > 0 || ghostLinkComparison.onlyInDev.length > 0)
+  ) {
     if (ghostLinkComparison.onlyInProd.length > 0) {
       log(`\n    Ghost links only in Production:`, "verbose");
       for (const gl of ghostLinkComparison.onlyInProd) {

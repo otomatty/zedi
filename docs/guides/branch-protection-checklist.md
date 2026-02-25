@@ -14,7 +14,7 @@
 - [ ] **Require status checks to pass before merging**
   - [ ] Require branches to be up to date before merging
   - [ ] 必須チェックを選択:
-    - [ ] `lint-and-test`
+    - [ ] `lint-and-test` (lint + format:check + test + build)
     - [ ] `e2e-tests`
 
 - [ ] **Require conversation resolution before merging**

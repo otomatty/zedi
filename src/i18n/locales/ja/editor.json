@@ -1,0 +1,81 @@
+{
+  "slashMenuAriaLabel": "スラッシュコマンドメニュー",
+  "slashNoResults": "一致する項目がありません",
+  "slash": {
+    "paragraph": {
+      "title": "段落",
+      "description": "本文テキスト",
+      "aliases": "段落,paragraph,p,text"
+    },
+    "heading1": {
+      "title": "見出し1",
+      "description": "大見出し",
+      "aliases": "見出し1,h1,大見出し,heading"
+    },
+    "heading2": {
+      "title": "見出し2",
+      "description": "中見出し",
+      "aliases": "見出し2,h2,中見出し,heading"
+    },
+    "heading3": {
+      "title": "見出し3",
+      "description": "小見出し",
+      "aliases": "見出し3,h3,小見出し,heading"
+    },
+    "bulletList": {
+      "title": "箇条書き",
+      "description": "箇条書きリスト",
+      "aliases": "箇条書き,ul,リスト,bullet,list"
+    },
+    "orderedList": {
+      "title": "番号付きリスト",
+      "description": "番号付きの順序リスト",
+      "aliases": "番号,ol,順序付き,ordered,number"
+    },
+    "taskList": {
+      "title": "タスクリスト",
+      "description": "チェックボックス付きリスト",
+      "aliases": "タスク,todo,チェック,task,checkbox"
+    },
+    "blockquote": {
+      "title": "引用",
+      "description": "引用ブロック",
+      "aliases": "引用,blockquote,quote"
+    },
+    "codeBlock": {
+      "title": "コードブロック",
+      "description": "シンタックスハイライト付きコード",
+      "aliases": "コード,code,pre,プログラム"
+    },
+    "horizontalRule": {
+      "title": "水平線",
+      "description": "区切り線",
+      "aliases": "区切り線,hr,水平,divider,separator"
+    },
+    "table": {
+      "title": "テーブル",
+      "description": "3×3 のテーブルを挿入",
+      "aliases": "テーブル,表,table"
+    },
+    "image": {
+      "title": "画像",
+      "description": "画像をアップロード",
+      "aliases": "画像,image,img,写真"
+    },
+    "mermaid": {
+      "title": "ダイアグラム",
+      "description": "Mermaid でフローチャートや図を作成",
+      "aliases": "ダイアグラム,mermaid,図,diagram,flowchart"
+    },
+    "mathInline": {
+      "title": "数式（インライン）",
+      "description": "インライン数式を挿入",
+      "aliases": "数式,math,インライン,latex"
+    },
+    "mathBlock": {
+      "title": "数式（ブロック）",
+      "description": "ブロック数式を挿入",
+      "aliases": "数式ブロック,block math,ブロック数式,equation"
+    }
+  }
+}

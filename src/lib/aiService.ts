@@ -4,10 +4,11 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { AISettings, AIProviderType, APIMode } from "@/types/ai";
-import { createAIClient, OllamaClient } from "./aiClient";
+import { AISettings, AIProviderType, APIMode, AIResponseUsage, UserTier } from "@/types/ai";
 
-const getAIAPIBaseUrl = () => import.meta.env.VITE_AI_API_BASE_URL || "";
+/** Uses same base URL as REST API (VITE_ZEDI_API_BASE_URL). */
+const getAIAPIBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+const getAIWSUrl = () => (import.meta.env.VITE_AI_WS_URL as string) ?? "";
 
 export interface AIServiceRequest {
   provider: AIProviderType;
@@ -17,6 +18,7 @@ export interface AIServiceRequest {
     temperature?: number;
     maxTokens?: number;
     stream?: boolean;
+    feature?: string; // "wiki_generation" | "mermaid_generation" | "chat"
     // OpenAI固有のオプション
     webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
     // Anthropic固有のオプション
@@ -29,12 +31,14 @@ export interface AIServiceRequest {
 export interface AIServiceResponse {
   content: string;
   finishReason?: string;
+  usage?: AIResponseUsage; // サーバーモード時のみ
 }
 
 export interface AIServiceCallbacks {
   onChunk?: (chunk: string) => void;
   onComplete?: (response: AIServiceResponse) => void;
   onError?: (error: Error) => void;
+  onUsageUpdate?: (usage: AIResponseUsage) => void;
 }
 
 /**
@@ -63,7 +67,7 @@ export async function callAIService(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const apiMode = getEffectiveAPIMode(settings);
 
@@ -83,7 +87,7 @@ async function callAIWithUserKey(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   try {
     switch (settings.provider) {
@@ -96,148 +100,394 @@ async function callAIWithUserKey(
       case "google":
         await callGoogle(settings, request, callbacks, abortSignal);
         break;
-      case "ollama":
-        await callOllama(settings, request, callbacks, abortSignal);
-        break;
       default:
         throw new Error(`Unknown provider: ${settings.provider}`);
     }
   } catch (error) {
-    callbacks.onError?.(
-      error instanceof Error ? error : new Error("AI API呼び出しエラー")
-    );
+    callbacks.onError?.(error instanceof Error ? error : new Error("AI API呼び出しエラー"));
   }
 }
 
-async function getClerkToken(): Promise<string | null> {
+async function getAuthToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
-  const clerk = (window as Window & {
-    Clerk?: { session?: { getToken?: (options?: { template?: string }) => Promise<string | null> } };
-  }).Clerk;
-  if (!clerk?.session?.getToken) return null;
-  return await clerk.session.getToken({ template: "turso" });
+  if (import.meta.env.VITE_E2E_TEST === "true") {
+    return "mock_e2e_token_for_testing";
+  }
+  const { getIdToken } = await import("@/lib/auth");
+  return getIdToken();
 }
 
 /**
- * APIサーバー経由で呼び出し
+ * APIサーバー経由で呼び出し（WebSocket API Gateway経由のストリーミング）
  */
 async function callAIWithServer(
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const wsUrl = getAIWSUrl();
+
+  // WebSocket URL が設定されている場合はWebSocket経由でストリーミング
+  if (wsUrl) {
+    return callAIWithServerWS(wsUrl, request, callbacks, abortSignal);
+  }
+
+  // フォールバック: HTTP API経由（非ストリーミング）
+  return callAIWithServerHTTP(request, callbacks, abortSignal);
+}
+
+/**
+ * WebSocket API Gateway経由のストリーミングチャット
+ */
+async function callAIWithServerWS(
+  wsUrl: string,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    let fullContent = "";
+    let finishReason: string | undefined;
+    let lastUsage: AIResponseUsage | undefined;
+    let completed = false;
+
+    const complete = () => {
+      if (completed) return;
+      completed = true;
+      callbacks.onComplete?.({
+        content: fullContent,
+        finishReason,
+        usage: lastUsage,
+      });
+      resolve();
+    };
+
+    const fail = (err: Error) => {
+      if (completed) return;
+      completed = true;
+      callbacks.onError?.(err);
+      reject(err);
+    };
+
+    // Connect with token in query string for $connect auth
+    const url = `${wsUrl}?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(url);
+
+    if (abortSignal) {
+      const onAbort = () => {
+        ws.close();
+        fail(new Error("ABORTED"));
+      };
+      abortSignal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    ws.onopen = () => {
+      // Send chat request with token for userId extraction
+      ws.send(
+        JSON.stringify({
+          action: "chat",
+          token,
+          provider: request.provider,
+          model: request.model,
+          messages: request.messages,
+          options: { ...request.options, stream: true },
+        }),
+      );
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string) as {
+          content?: string;
+          done?: boolean;
+          finishReason?: string;
+          error?: string;
+          usage?: AIResponseUsage;
+        };
+
+        if (data.error) {
+          fail(new Error(data.error));
+          ws.close();
+          return;
+        }
+
+        if (data.content) {
+          fullContent += data.content;
+          callbacks.onChunk?.(data.content);
+        }
+
+        if (data.usage) {
+          lastUsage = data.usage;
+          callbacks.onUsageUpdate?.(data.usage);
+        }
+
+        if (data.finishReason) {
+          finishReason = data.finishReason;
+        }
+
+        // Final done message with usage → complete
+        if (data.done && data.usage) {
+          complete();
+          ws.close();
+        }
+      } catch (err) {
+        fail(err instanceof Error ? err : new Error("Parse error"));
+        ws.close();
+      }
+    };
+
+    ws.onerror = () => {
+      fail(new Error("WebSocket接続エラー"));
+    };
+
+    ws.onclose = () => {
+      if (!completed) {
+        if (fullContent) {
+          // Connection closed after receiving content but before final done
+          complete();
+        } else {
+          fail(new Error("WebSocket接続が予期せず切断されました"));
+        }
+      }
+    };
+  });
+}
+
+/** SSE 1行（data: ペイロード）を処理し、ストリーム完了なら true を返す */
+function processSSEDataLine(
+  payload: string,
+  state: { fullContent: string; finishReason?: string; lastUsage?: AIResponseUsage },
+  callbacks: AIServiceCallbacks,
+): boolean {
+  const data = JSON.parse(payload) as {
+    content?: string;
+    done?: boolean;
+    finishReason?: string;
+    error?: string;
+    usage?: AIResponseUsage;
+  };
+  if (data.error) {
+    throw new Error(data.error);
+  }
+  if (data.content) {
+    state.fullContent += data.content;
+    callbacks.onChunk?.(data.content);
+  }
+  if (data.usage) {
+    state.lastUsage = data.usage;
+    callbacks.onUsageUpdate?.(data.usage);
+  }
+  if (data.done) {
+    state.finishReason = data.finishReason;
+    callbacks.onComplete?.({
+      content: state.fullContent,
+      finishReason: state.finishReason,
+      usage: state.lastUsage,
+    });
+    return true;
+  }
+  return false;
+}
+
+/** HTTP ストリーミングレスポンスを SSE として読み、onComplete まで処理する。正常完了時は true を返す。 */
+async function consumeSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  state: { fullContent: string; finishReason?: string; lastUsage?: AIResponseUsage },
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<boolean> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    if (abortSignal?.aborted) {
+      throw new Error("ABORTED");
+    }
+
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+
+      if (!line.startsWith("data:")) {
+        newlineIndex = buffer.indexOf("\n");
+        continue;
+      }
+      const payload = line.slice(5).trim();
+      if (!payload) {
+        newlineIndex = buffer.indexOf("\n");
+        continue;
+      }
+      if (processSSEDataLine(payload, state, callbacks)) {
+        await reader.cancel();
+        return true;
+      }
+
+      newlineIndex = buffer.indexOf("\n");
+    }
+  }
+  return false;
+}
+
+async function fetchAIChatResponse(
+  request: AIServiceRequest,
+  abortSignal?: AbortSignal,
+): Promise<Response> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    throw new Error("AI APIサーバーのURLが設定されていません");
+  }
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+  const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      provider: request.provider,
+      model: request.model,
+      messages: request.messages,
+      options: request.options,
+    }),
+    signal: abortSignal,
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    const message = errorBody?.error || response.statusText || "AI API呼び出しエラー";
+    throw new Error(message);
+  }
+  return response;
+}
+
+async function handleAIChatHttpResponse(
+  response: Response,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  if (request.options?.stream) {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("ストリーミングレスポンスが取得できません");
+    }
+    const state = {
+      fullContent: "",
+      finishReason: undefined as string | undefined,
+      lastUsage: undefined as AIResponseUsage | undefined,
+    };
+    const streamCompleted = await consumeSSEStream(reader, state, callbacks, abortSignal);
+    if (!streamCompleted && state.fullContent) {
+      callbacks.onComplete?.({
+        content: state.fullContent,
+        finishReason: state.finishReason,
+        usage: state.lastUsage,
+      });
+    } else if (!streamCompleted && !state.fullContent) {
+      callbacks.onError?.(new Error("ストリーミングレスポンスが空のまま切断されました"));
+    }
+    return;
+  }
+  const data = (await response.json()) as AIServiceResponse;
+  if (data.usage) {
+    callbacks.onUsageUpdate?.(data.usage);
+  }
+  callbacks.onComplete?.({
+    content: data.content ?? "",
+    finishReason: data.finishReason,
+    usage: data.usage,
+  });
+}
+
+/**
+ * HTTP API経由の呼び出し（フォールバック、非ストリーミング）
+ */
+async function callAIWithServerHTTP(
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   try {
-    const apiBaseUrl = getAIAPIBaseUrl();
-    if (!apiBaseUrl) {
-      throw new Error("AI APIサーバーのURLが設定されていません");
-    }
-
-    if (request.provider === "ollama") {
-      throw new Error("OllamaはAPIサーバー経由モードでは利用できません");
-    }
-
-    const token = await getClerkToken();
-    if (!token) {
-      throw new Error("AUTH_REQUIRED");
-    }
-
-    const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        provider: request.provider,
-        model: request.model,
-        messages: request.messages,
-        options: request.options,
-      }),
-      signal: abortSignal,
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => null);
-      const message =
-        errorBody?.error || response.statusText || "AI API呼び出しエラー";
-      throw new Error(message);
-    }
-
-    if (request.options?.stream) {
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("ストリーミングレスポンスが取得できません");
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullContent = "";
-      let finishReason: string | undefined;
-
-      while (true) {
-        if (abortSignal?.aborted) {
-          throw new Error("ABORTED");
-        }
-
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        let newlineIndex = buffer.indexOf("\n");
-        while (newlineIndex !== -1) {
-          const line = buffer.slice(0, newlineIndex).trim();
-          buffer = buffer.slice(newlineIndex + 1);
-
-          if (line.startsWith("data:")) {
-            const payload = line.slice(5).trim();
-            if (!payload) {
-              newlineIndex = buffer.indexOf("\n");
-              continue;
-            }
-
-            const data = JSON.parse(payload) as {
-              content?: string;
-              done?: boolean;
-              finishReason?: string;
-              error?: string;
-            };
-
-            if (data.error) {
-              throw new Error(data.error);
-            }
-
-            if (data.content) {
-              fullContent += data.content;
-              callbacks.onChunk?.(data.content);
-            }
-
-            if (data.done) {
-              finishReason = data.finishReason;
-              callbacks.onComplete?.({ content: fullContent, finishReason });
-              return;
-            }
-          }
-
-          newlineIndex = buffer.indexOf("\n");
-        }
-      }
-
-      if (fullContent) {
-        callbacks.onComplete?.({ content: fullContent, finishReason });
-      }
-      return;
-    }
-
-    const data = (await response.json()) as AIServiceResponse;
-    callbacks.onComplete?.({
-      content: data.content ?? "",
-      finishReason: data.finishReason,
-    });
+    const response = await fetchAIChatResponse(request, abortSignal);
+    await handleAIChatHttpResponse(response, request, callbacks, abortSignal);
   } catch (error) {
-    callbacks.onError?.(
-      error instanceof Error ? error : new Error("AI API呼び出しエラー")
-    );
+    callbacks.onError?.(error instanceof Error ? error : new Error("AI API呼び出しエラー"));
   }
+}
+
+async function callOpenAIStream(
+  client: OpenAI,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const stream = await client.chat.completions.create(
+    {
+      model: request.model,
+      messages: request.messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      max_tokens: request.options?.maxTokens ?? 4000,
+      temperature: request.options?.temperature ?? 0.7,
+      stream: true,
+      web_search_options: request.options?.webSearchOptions,
+    },
+    { signal: abortSignal },
+  );
+  let fullContent = "";
+  for await (const chunk of stream) {
+    if (abortSignal?.aborted) {
+      throw new Error("ABORTED");
+    }
+    const content = chunk.choices[0]?.delta?.content || "";
+    if (content) {
+      fullContent += content;
+      callbacks.onChunk?.(content);
+    }
+  }
+  callbacks.onComplete?.({
+    content: fullContent,
+    finishReason: "stop",
+  });
+}
+
+async function callOpenAINonStream(
+  client: OpenAI,
+  request: AIServiceRequest,
+  callbacks: AIServiceCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const response = await client.chat.completions.create(
+    {
+      model: request.model,
+      messages: request.messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      max_tokens: request.options?.maxTokens ?? 4000,
+      temperature: request.options?.temperature ?? 0.7,
+      stream: false,
+    },
+    { signal: abortSignal },
+  );
+  const content = response.choices[0]?.message?.content || "";
+  callbacks.onComplete?.({
+    content,
+    finishReason: response.choices[0]?.finish_reason,
+  });
 }
 
 /**
@@ -247,69 +497,16 @@ async function callOpenAI(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new OpenAI({
     apiKey: settings.apiKey,
     dangerouslyAllowBrowser: true,
   });
-
   if (request.options?.stream) {
-    // ストリーミング処理
-    const stream = await client.chat.completions.create(
-      {
-        model: request.model,
-        messages: request.messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        max_tokens: request.options.maxTokens ?? 4000,
-        temperature: request.options.temperature ?? 0.7,
-        stream: true,
-        web_search_options: request.options.webSearchOptions,
-      },
-      { signal: abortSignal }
-    );
-
-    let fullContent = "";
-
-    for await (const chunk of stream) {
-      if (abortSignal?.aborted) {
-        throw new Error("ABORTED");
-      }
-
-      const content = chunk.choices[0]?.delta?.content || "";
-      if (content) {
-        fullContent += content;
-        callbacks.onChunk?.(content);
-      }
-    }
-
-    callbacks.onComplete?.({
-      content: fullContent,
-      finishReason: "stop",
-    });
+    await callOpenAIStream(client, request, callbacks, abortSignal);
   } else {
-    // 非ストリーミング処理
-    const response = await client.chat.completions.create(
-      {
-        model: request.model,
-        messages: request.messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        max_tokens: request.options?.maxTokens ?? 4000,
-        temperature: request.options?.temperature ?? 0.7,
-        stream: false,
-      },
-      { signal: abortSignal }
-    );
-
-    const content = response.choices[0]?.message?.content || "";
-    callbacks.onComplete?.({
-      content,
-      finishReason: response.choices[0]?.finish_reason,
-    });
+    await callOpenAINonStream(client, request, callbacks, abortSignal);
   }
 }
 
@@ -320,7 +517,7 @@ async function callAnthropic(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new Anthropic({
     apiKey: settings.apiKey,
@@ -337,13 +534,10 @@ async function callAnthropic(
       "claude-haiku-3.5",
       "claude-3-5-haiku",
     ];
-    return supportedPatterns.some((pattern) =>
-      model.toLowerCase().includes(pattern.toLowerCase())
-    );
+    return supportedPatterns.some((pattern) => model.toLowerCase().includes(pattern.toLowerCase()));
   };
 
-  const useWebSearch =
-    request.options?.useWebSearch ?? isClaudeWebSearchSupported(request.model);
+  const useWebSearch = request.options?.useWebSearch ?? isClaudeWebSearchSupported(request.model);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestParams: any = {
@@ -377,10 +571,7 @@ async function callAnthropic(
         throw new Error("ABORTED");
       }
 
-      if (
-        event.type === "content_block_delta" &&
-        event.delta.type === "text_delta"
-      ) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
         const content = event.delta.text;
         fullContent += content;
         callbacks.onChunk?.(content);
@@ -398,8 +589,7 @@ async function callAnthropic(
     });
 
     const textBlock = response.content.find((block) => block.type === "text");
-    const content =
-      textBlock && textBlock.type === "text" ? textBlock.text : "";
+    const content = textBlock && textBlock.type === "text" ? textBlock.text : "";
 
     callbacks.onComplete?.({
       content,
@@ -415,7 +605,7 @@ async function callGoogle(
   settings: AISettings,
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new GoogleGenAI({ apiKey: settings.apiKey });
 
@@ -479,30 +669,112 @@ async function callGoogle(
   }
 }
 
+// =============================================================================
+// Server API functions (models, usage)
+// =============================================================================
+
+import type { AIModel, AIUsage, CachedServerModels } from "@/types/ai";
+
+const SERVER_MODELS_CACHE_KEY = "zedi-ai-server-models";
+const SERVER_MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 /**
- * Ollama API呼び出し
+ * サーバーから利用可能なモデル一覧を取得（キャッシュあり）
  */
-async function callOllama(
-  settings: AISettings,
-  request: AIServiceRequest,
-  callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal
-): Promise<void> {
-  const client = new OllamaClient(settings.ollamaEndpoint);
-
-  // Ollamaは常にストリーミング（stream: falseでも内部的にはストリーミング）
-  const response = await client.chat(
-    request.model,
-    request.messages,
-    {
-      temperature: request.options?.temperature ?? 0.7,
-      maxTokens: request.options?.maxTokens ?? 2048,
+export async function fetchServerModels(forceRefresh = false): Promise<{
+  models: AIModel[];
+  tier: string;
+}> {
+  // Check cache first
+  if (!forceRefresh) {
+    try {
+      const cached = localStorage.getItem(SERVER_MODELS_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as CachedServerModels;
+        if (Date.now() - parsed.cachedAt < SERVER_MODELS_CACHE_TTL) {
+          return { models: parsed.models, tier: parsed.tier };
+        }
+      }
+    } catch {
+      // Cache read failed, continue to fetch
     }
-  );
+  }
 
-  // Ollamaは非ストリーミングAPIなので、一度に結果を返す
-  callbacks.onComplete?.({
-    content: response,
-    finishReason: "stop",
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    return { models: [], tier: "free" };
+  }
+
+  let headers: Record<string, string> = { "Content-Type": "application/json" };
+  try {
+    const token = await getAuthToken();
+    if (token) {
+      headers = { ...headers, Authorization: `Bearer ${token}` };
+    }
+  } catch {
+    // Unauthenticated — will return free-tier models only
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/models`, {
+    method: "GET",
+    headers,
   });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch models");
+  }
+
+  const data = (await response.json()) as { models: AIModel[]; tier: UserTier };
+
+  // Cache the result
+  try {
+    localStorage.setItem(
+      SERVER_MODELS_CACHE_KEY,
+      JSON.stringify({
+        models: data.models,
+        tier: data.tier,
+        cachedAt: Date.now(),
+      } satisfies CachedServerModels),
+    );
+  } catch {
+    // localStorage write failed, ignore
+  }
+
+  return data;
+}
+
+/**
+ * サーバーから現在の使用量を取得
+ */
+export async function fetchUsage(): Promise<AIUsage> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) {
+    return {
+      usagePercent: 0,
+      consumedUnits: 0,
+      budgetUnits: 0,
+      remaining: 0,
+      tier: "free",
+      yearMonth: "",
+    };
+  }
+
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/ai/usage`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch usage");
+  }
+
+  return (await response.json()) as AIUsage;
 }

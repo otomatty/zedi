@@ -1,0 +1,86 @@
+{
+  "title": "Image storage settings",
+  "description": "By default, images are saved to the default storage. Toggle to use external storage such as Gyazo or Google Drive.",
+  "storageDestination": "Where to save images",
+  "saveToDefault": "Save to default storage",
+  "saveToExternal": "Save to external storage",
+  "defaultStorageAlertTitle": "About default storage",
+  "defaultStorageAlertDescription": "No extra setup needed when signed in. Images are saved to the default storage.",
+  "externalStorageLabel": "External storage to use",
+  "selectStorage": "Select storage",
+  "difficultyLabel": "Difficulty",
+  "difficulty": {
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Advanced"
+  },
+  "setupGuideTitle": "💡 Setup guide",
+  "setupGuideLink": "How to set up {{name}}",
+  "resetConfirmTitle": "Reset settings?",
+  "resetConfirmDescription": "Your saved credentials and all settings will be deleted. This cannot be undone.",
+  "testConnection": "Test connection",
+  "connectionSuccess": "Connection successful",
+  "connectionFailed": "Connection failed",
+  "savedToast": "Saved",
+  "savedToastDescription": "Storage settings saved successfully",
+  "saveFailedToastDescription": "Failed to save storage settings",
+  "resetToast": "Reset complete",
+  "resetToastDescription": "Storage settings have been reset",
+  "providers": {
+    "s3": {
+      "name": "Default storage",
+      "description": "Available when signed in",
+      "freeTier": "Free tier available"
+    },
+    "gyazo": {
+      "name": "Gyazo",
+      "description": "Easy setup with Access Token",
+      "freeTier": "Free plan available"
+    },
+    "github": {
+      "name": "GitHub",
+      "description": "Save images to a GitHub repository",
+      "freeTier": "Free (public repo recommended)"
+    },
+    "google-drive": {
+      "name": "Google Drive",
+      "description": "Save to Google Drive with OAuth2",
+      "freeTier": "15GB free"
+    }
+  },
+  "gyazo": {
+    "accessTokenLabel": "Access Token",
+    "accessTokenPlaceholder": "Gyazo Access Token",
+    "getTokenHelp": "to get your Access Token",
+    "callbackUrlTitle": "💡 About Callback URL",
+    "callbackUrlDescription": "If asked for a Callback URL when creating the OAuth app, enter one of the following (not actually used):"
+  },
+  "github": {
+    "repository": "Repository",
+    "repositoryPlaceholder": "username/repo-name",
+    "repositoryHelp": "Enter the repository in \"owner/repo\" format for storing images",
+    "personalAccessToken": "Personal Access Token",
+    "tokenPlaceholder": "ghp_...",
+    "branch": "Branch",
+    "branchPlaceholder": "main",
+    "path": "Storage path",
+    "pathPlaceholder": "images"
+  },
+  "googleDrive": {
+    "oauthAlertTitle": "⚠️ OAuth2 authentication required",
+    "oauthAlertDescription": "Google Drive requires OAuth2 setup. Enable the API and get credentials in",
+    "oauthAlertLink": "Google Cloud Console",
+    "oauthAlertSuffix": ".",
+    "clientId": "Client ID",
+    "clientSecret": "Client Secret",
+    "accessToken": "Access Token",
+    "refreshToken": "Refresh Token",
+    "folderId": "Folder ID (optional)",
+    "clientIdPlaceholder": "Client ID",
+    "clientSecretPlaceholder": "Client Secret",
+    "accessTokenPlaceholder": "Access Token",
+    "refreshTokenPlaceholder": "Refresh Token",
+    "folderIdPlaceholder": "Target folder ID",
+    "folderIdHelp": "Enter to save to a specific folder"
+  }
+}

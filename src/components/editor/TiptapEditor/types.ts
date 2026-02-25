@@ -1,4 +1,19 @@
-import type { Editor } from "@tiptap/react";
+import type { MutableRefObject } from "react";
+import type * as Y from "yjs";
+import type { Awareness } from "y-protocols/awareness";
+
+/**
+ * リアルタイムコラボレーション用の設定（useCollaboration の戻り値から渡す）
+ */
+export interface CollaborationConfig {
+  ydoc: Y.Doc;
+  xmlFragment: Y.XmlFragment;
+  /** Awareness instance. Required for collaborative mode; undefined in local mode (no WebSocket). */
+  awareness?: Awareness;
+  user: { name: string; color: string };
+  updateCursor: (anchor: number, head: number) => void;
+  updateSelection: (from: number, to: number) => void;
+}
 
 /**
  * Props for TiptapEditor component
@@ -17,6 +32,14 @@ export interface TiptapEditorProps {
   showToolbar?: boolean;
   /** コンテンツエラーのコールバック */
   onContentError?: (error: ContentError | null) => void;
+  /** リアルタイムコラボレーション（Y.js）有効時のみ渡す。渡すと content は Y.Doc から取得 */
+  collaborationConfig?: CollaborationConfig;
+  /** 親がコンテンツにフォーカスするためのコールバック。editor 準備後に ref.current に focus() を代入 */
+  focusContentRef?: MutableRefObject<(() => void) | null>;
+  /** URL から作成時など、Y.Doc が空のときに一度だけ反映する Tiptap JSON 文字列 */
+  initialContent?: string;
+  /** initialContent をエディタに反映したあとに呼ぶ */
+  onInitialContentApplied?: () => void;
 }
 
 /**

@@ -1,0 +1,32 @@
+{
+  "step1": {
+    "title": "Page grid",
+    "content": "Your pages appear here. Write one idea per page."
+  },
+  "step2": {
+    "title": "Apps menu",
+    "content": "Switch between Home, Notes, and other apps from here."
+  },
+  "step3": {
+    "title": "Search",
+    "content": "Press Ctrl+K (Cmd+K on Mac) to search anytime."
+  },
+  "step4": {
+    "title": "New page",
+    "content": "Create a new page from the + button below. You can create a blank page, from a URL, or from an image."
+  },
+  "step5": {
+    "title": "Page links",
+    "content": "Type [[ in a page to link to other pages."
+  },
+  "step6": {
+    "title": "You're all set",
+    "content": "You're ready. Try creating your first page."
+  },
+  "buttons": {
+    "skip": "Skip",
+    "next": "Next",
+    "back": "Back",
+    "complete": "Done"
+  }
+}

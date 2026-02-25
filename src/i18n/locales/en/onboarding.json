@@ -1,0 +1,28 @@
+{
+  "title": "Initial setup",
+  "step": {
+    "profile": "Profile",
+    "language": "Language",
+    "tour": "Guide tour"
+  },
+  "profile": {
+    "heading": "Your profile",
+    "description": "Set your display name. Profile image is optional.",
+    "displayNameRequired": "Please enter your display name"
+  },
+  "language": {
+    "heading": "Language",
+    "description": "Choose the display language for the UI"
+  },
+  "tour": {
+    "heading": "Quick tour",
+    "description": "We'll show you how to use the app. You can skip and check settings later.",
+    "startTour": "Start quick tour",
+    "skip": "Skip and get started"
+  },
+  "action": {
+    "next": "Next",
+    "back": "Back",
+    "complete": "Complete setup and go to Home"
+  }
+}

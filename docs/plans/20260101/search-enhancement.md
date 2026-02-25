@@ -2,12 +2,12 @@
 
 ## 概要
 
-| 項目       | 内容                                                                   |
-| :--------- | :--------------------------------------------------------------------- |
-| **機能名** | Search Enhancement（検索機能の強化）                                   |
-| **目的**   | 検索機能の精度向上とユーザー体験の改善                                 |
-| **優先度** | 🟢 改善（既存機能の強化）                                              |
-| **依存**   | Global Search（✅ 実装済み）                                           |
+| 項目       | 内容                                   |
+| :--------- | :------------------------------------- |
+| **機能名** | Search Enhancement（検索機能の強化）   |
+| **目的**   | 検索機能の精度向上とユーザー体験の改善 |
+| **優先度** | 🟢 改善（既存機能の強化）              |
+| **依存**   | Global Search（✅ 実装済み）           |
 
 ---
 
@@ -30,13 +30,13 @@ return titleMatch || contentMatch;
 
 ### 改善の余地
 
-| 項目                   | 現状                               | 改善案                                     |
-| :--------------------- | :--------------------------------- | :----------------------------------------- |
-| **ハイライト表示**     | スニペット内のマッチ箇所が不明瞭   | キーワードをハイライト表示                 |
-| **スコアリング**       | 基本的なスコアリング               | より精度の高い関連度計算                   |
-| **検索対象の明示**     | タイトル/コンテンツの区別なし     | どこでマッチしたか明示                     |
-| **複数キーワード**     | 未対応                             | AND/OR 検索のサポート                      |
-| **検索結果のプレビュー** | 固定長スニペット                  | 文脈を考慮したスマートスニペット           |
+| 項目                     | 現状                             | 改善案                           |
+| :----------------------- | :------------------------------- | :------------------------------- |
+| **ハイライト表示**       | スニペット内のマッチ箇所が不明瞭 | キーワードをハイライト表示       |
+| **スコアリング**         | 基本的なスコアリング             | より精度の高い関連度計算         |
+| **検索対象の明示**       | タイトル/コンテンツの区別なし    | どこでマッチしたか明示           |
+| **複数キーワード**       | 未対応                           | AND/OR 検索のサポート            |
+| **検索結果のプレビュー** | 固定長スニペット                 | 文脈を考慮したスマートスニペット |
 
 ---
 
@@ -51,13 +51,13 @@ return titleMatch || contentMatch;
 
 ### 検索仕様（強化版）
 
-| 項目               | 現状                     | 強化後                                         |
-| :----------------- | :----------------------- | :--------------------------------------------- |
-| **検索対象**       | タイトル + コンテンツ    | 変更なし                                       |
-| **複数キーワード** | 未対応                   | スペース区切りで AND 検索                      |
-| **ハイライト**     | なし                     | `<mark>` タグでハイライト                      |
-| **スニペット**     | キーワード前後 40 文字   | 文単位で 100 文字程度                          |
-| **マッチ表示**     | 区別なし                 | 「タイトル一致」「本文一致」のバッジ表示       |
+| 項目               | 現状                   | 強化後                                   |
+| :----------------- | :--------------------- | :--------------------------------------- |
+| **検索対象**       | タイトル + コンテンツ  | 変更なし                                 |
+| **複数キーワード** | 未対応                 | スペース区切りで AND 検索                |
+| **ハイライト**     | なし                   | `<mark>` タグでハイライト                |
+| **スニペット**     | キーワード前後 40 文字 | 文単位で 100 文字程度                    |
+| **マッチ表示**     | 区別なし               | 「タイトル一致」「本文一致」のバッジ表示 |
 
 ---
 
@@ -95,11 +95,11 @@ return titleMatch || contentMatch;
 
 ### マッチタイプバッジ
 
-| バッジ           | 意味                           | スタイル                 |
-| :--------------- | :----------------------------- | :----------------------- |
-| `[タイトル一致]` | タイトルにキーワードが含まれる | 緑色バッジ               |
-| `[本文一致]`     | 本文にキーワードが含まれる     | 灰色バッジ               |
-| `[完全一致]`     | タイトルが完全一致             | 緑色バッジ + 太字        |
+| バッジ           | 意味                           | スタイル          |
+| :--------------- | :----------------------------- | :---------------- |
+| `[タイトル一致]` | タイトルにキーワードが含まれる | 緑色バッジ        |
+| `[本文一致]`     | 本文にキーワードが含まれる     | 灰色バッジ        |
+| `[完全一致]`     | タイトルが完全一致             | 緑色バッジ + 太字 |
 
 ---
 
@@ -113,12 +113,12 @@ return titleMatch || contentMatch;
 export interface SearchResult {
   page: Page;
   matchedText: string;
-  highlightedText: string;    // 追加: ハイライト付きテキスト
-  matchType: MatchType;       // 追加: マッチタイプ
+  highlightedText: string; // 追加: ハイライト付きテキスト
+  matchType: MatchType; // 追加: マッチタイプ
   score: number;
 }
 
-export type MatchType = 'exact_title' | 'title' | 'content' | 'both';
+export type MatchType = "exact_title" | "title" | "content" | "both";
 
 /**
  * 複数キーワードをサポートする検索
@@ -131,7 +131,7 @@ function searchPages(pages: Page[], query: string): SearchResult[] {
     .toLowerCase()
     .trim()
     .split(/\s+/)
-    .filter(k => k.length > 0);
+    .filter((k) => k.length > 0);
 
   if (keywords.length === 0) return [];
 
@@ -143,9 +143,7 @@ function searchPages(pages: Page[], query: string): SearchResult[] {
       const content = extractPlainText(page.content).toLowerCase();
 
       // すべてのキーワードがタイトルまたはコンテンツに含まれる（AND検索）
-      return keywords.every(
-        keyword => title.includes(keyword) || content.includes(keyword)
-      );
+      return keywords.every((keyword) => title.includes(keyword) || content.includes(keyword));
     })
     .map((page) => {
       const title = page.title.toLowerCase();
@@ -153,19 +151,19 @@ function searchPages(pages: Page[], query: string): SearchResult[] {
       const contentLower = content.toLowerCase();
 
       // マッチタイプを判定
-      const titleMatchAll = keywords.every(k => title.includes(k));
-      const contentMatchAll = keywords.every(k => contentLower.includes(k));
+      const titleMatchAll = keywords.every((k) => title.includes(k));
+      const contentMatchAll = keywords.every((k) => contentLower.includes(k));
       const isExactTitle = title === query.toLowerCase().trim();
 
       let matchType: MatchType;
       if (isExactTitle) {
-        matchType = 'exact_title';
+        matchType = "exact_title";
       } else if (titleMatchAll && contentMatchAll) {
-        matchType = 'both';
+        matchType = "both";
       } else if (titleMatchAll) {
-        matchType = 'title';
+        matchType = "title";
       } else {
-        matchType = 'content';
+        matchType = "content";
       }
 
       // スコア計算
@@ -193,12 +191,12 @@ function searchPages(pages: Page[], query: string): SearchResult[] {
 export function extractSmartSnippet(
   text: string,
   keywords: string[],
-  maxLength: number = 120
+  maxLength: number = 120,
 ): string {
-  const sentences = text.split(/[。.!?！？\n]+/).filter(s => s.trim());
+  const sentences = text.split(/[。.!?！？\n]+/).filter((s) => s.trim());
 
   // キーワードを最も多く含む文を探す
-  let bestSentence = '';
+  let bestSentence = "";
   let bestScore = 0;
 
   for (const sentence of sentences) {
@@ -223,8 +221,8 @@ export function extractSmartSnippet(
       const end = Math.min(bestSentence.length, index + firstKeyword.length + 60);
       let snippet = bestSentence.slice(start, end);
 
-      if (start > 0) snippet = '...' + snippet;
-      if (end < bestSentence.length) snippet = snippet + '...';
+      if (start > 0) snippet = "..." + snippet;
+      if (end < bestSentence.length) snippet = snippet + "...";
 
       return snippet;
     }
@@ -235,7 +233,7 @@ export function extractSmartSnippet(
     return bestSentence;
   }
 
-  return bestSentence.slice(0, maxLength) + '...';
+  return bestSentence.slice(0, maxLength) + "...";
 }
 
 /**
@@ -246,15 +244,15 @@ export function highlightKeywords(text: string, keywords: string[]): string {
 
   for (const keyword of keywords) {
     // 大文字小文字を保持しながら置換
-    const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi');
-    result = result.replace(regex, '【$1】');
+    const regex = new RegExp(`(${escapeRegExp(keyword)})`, "gi");
+    result = result.replace(regex, "【$1】");
   }
 
   return result;
 }
 
 function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 ```
 
@@ -266,22 +264,22 @@ function escapeRegExp(string: string): string {
 export function calculateEnhancedScore(
   page: Page,
   keywords: string[],
-  matchType: MatchType
+  matchType: MatchType,
 ): number {
   let score = 0;
 
   // マッチタイプによる基本スコア
   switch (matchType) {
-    case 'exact_title':
+    case "exact_title":
       score += 200;
       break;
-    case 'title':
+    case "title":
       score += 100;
       break;
-    case 'both':
+    case "both":
       score += 80;
       break;
-    case 'content':
+    case "content":
       score += 30;
       break;
   }
@@ -295,7 +293,7 @@ export function calculateEnhancedScore(
   // キーワード出現回数ボーナス（コンテンツ内）
   const content = extractPlainText(page.content).toLowerCase();
   for (const keyword of keywords) {
-    const occurrences = (content.match(new RegExp(keyword, 'g')) || []).length;
+    const occurrences = (content.match(new RegExp(keyword, "g")) || []).length;
     score += Math.min(occurrences, 5) * 2;
   }
 
@@ -401,16 +399,16 @@ src/
 
 ## 実装ステップ
 
-| Step | 内容                                        | 見積もり |
-| :--- | :------------------------------------------ | :------- |
+| Step | 内容                                            | 見積もり |
+| :--- | :---------------------------------------------- | :------- |
 | 1    | searchUtils.ts の作成（スニペット、ハイライト） | 1.5 時間 |
-| 2    | 複数キーワード対応の実装                    | 1 時間   |
-| 3    | 強化版スコアリングの実装                    | 1 時間   |
-| 4    | MatchTypeBadge コンポーネントの作成         | 30 分    |
-| 5    | HighlightedSnippet コンポーネントの作成     | 30 分    |
-| 6    | GlobalSearch の UI 更新                     | 1 時間   |
-| 7    | useGlobalSearch の更新                      | 1 時間   |
-| 8    | テストと調整                                | 1 時間   |
+| 2    | 複数キーワード対応の実装                        | 1 時間   |
+| 3    | 強化版スコアリングの実装                        | 1 時間   |
+| 4    | MatchTypeBadge コンポーネントの作成             | 30 分    |
+| 5    | HighlightedSnippet コンポーネントの作成         | 30 分    |
+| 6    | GlobalSearch の UI 更新                         | 1 時間   |
+| 7    | useGlobalSearch の更新                          | 1 時間   |
+| 8    | テストと調整                                    | 1 時間   |
 
 **合計見積もり: 約 7.5 時間**
 
@@ -418,11 +416,11 @@ src/
 
 ## パフォーマンス考慮
 
-| 懸念事項                       | 対策                                           |
-| :----------------------------- | :--------------------------------------------- |
-| 複数キーワードでの処理負荷増加 | デバウンス（100ms）で対応                      |
-| ハイライト処理のコスト         | 結果表示時のみ実行（検索時は行わない）         |
-| 正規表現の安全性               | escapeRegExp でユーザー入力をエスケープ        |
+| 懸念事項                       | 対策                                    |
+| :----------------------------- | :-------------------------------------- |
+| 複数キーワードでの処理負荷増加 | デバウンス（100ms）で対応               |
+| ハイライト処理のコスト         | 結果表示時のみ実行（検索時は行わない）  |
+| 正規表現の安全性               | escapeRegExp でユーザー入力をエスケープ |
 
 ---
 

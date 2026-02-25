@@ -1,0 +1,63 @@
+{
+  "title": "AI",
+  "actions": {
+    "close": "閉じる",
+    "newConversation": "新規会話",
+    "conversationList": "会話一覧",
+    "send": "送信",
+    "stop": "停止",
+    "createPage": "作成する",
+    "editAndCreate": "編集してから作成",
+    "appendToPage": "追記する",
+    "createMultiple": "まとめて作成",
+    "addLink": "リンクを追加"
+  },
+  "placeholders": {
+    "default": "メッセージを入力...",
+    "withContext": "このページについて質問..."
+  },
+  "context": {
+    "referencing": "「{{title}}」を参照中"
+  },
+  "welcome": {
+    "editor": {
+      "title": "何でもお手伝いします",
+      "summarize": "📝 このページの内容を要約して",
+      "suggestLinks": "🔗 関連するキーワードを提案して",
+      "translate": "🌐 英語に翻訳して",
+      "deepDive": "💡 この内容を深掘りしたい"
+    },
+    "default": {
+      "title": "何でも聞いてください。\\n会話からページを作成できます。",
+      "organize": "🧠 最近学んだことを整理したい",
+      "explain": "📖 ○○について教えて",
+      "brainstorm": "🗂️ アイデアをまとめたい",
+      "draft": "✍️ ブログ記事の下書きを作りたい"
+    }
+  },
+  "suggestions": {
+    "createPage": "📄 「{{title}}」として新しいページを作成",
+    "createMultiplePages": "📄 生成候補:",
+    "appendToPage": "📄 「{{title}}」として独立ページ化",
+    "suggestWikiLinks": "🔗 元ページに [[{{title}}]] リンクを追加"
+  },
+  "empty": {
+    "messages": "メッセージ一覧がここに表示されます",
+    "pageConversations": "このページの会話履歴はまだありません"
+  },
+  "modelSelector": {
+    "select": "モデルを選択",
+    "tooltip": "AIモデルを切り替え"
+  },
+  "referencedPages": {
+    "added": "「{{title}}」を参照に追加しました",
+    "alreadyAdded": "「{{title}}」は既に参照に追加されています",
+    "limitReached": "参照ページは最大{{max}}件までです",
+    "dragHint": "ページをドラッグして\nAIの参照に追加",
+    "dropHint": "ここにドロップして参照に追加",
+    "welcomeHint": "💡 ページカードをドラッグ&ドロップ、または @ でページを参照できます",
+    "addToChat": "AIチャットに追加",
+    "mentionHint": "@ でページを検索",
+    "noResults": "該当するページがありません"
+  }
+}

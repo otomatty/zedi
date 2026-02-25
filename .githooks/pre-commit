@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-commit: format Terraform files so CI fmt check passes.
+# Requires: git config core.hooksPath .githooks (run once per clone)
+
+set -e
+if ! command -v terraform >/dev/null 2>&1; then
+  exit 0
+fi
+if [ ! -d terraform ]; then
+  exit 0
+fi
+
+cd terraform
+terraform fmt -recursive
+# Re-stage any files that were reformatted (paths relative to repo root from git's view)
+ROOT="$(git rev-parse --show-toplevel)"
+git add -u .
+cd "$ROOT"
+exit 0

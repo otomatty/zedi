@@ -29,8 +29,7 @@ export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
     id: "flowchart",
     name: "フローチャート",
     description: "処理の流れや手順を表現",
-    example:
-      "flowchart TD\n    A[開始] --> B{条件}\n    B -->|Yes| C[処理]\n    B -->|No| D[終了]",
+    example: "flowchart TD\n    A[開始] --> B{条件}\n    B -->|Yes| C[処理]\n    B -->|No| D[終了]",
   },
   {
     id: "sequence",
@@ -71,8 +70,7 @@ export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
     id: "pie",
     name: "円グラフ",
     description: "割合や構成比を表現",
-    example:
-      'pie title 構成比\n    "項目A" : 40\n    "項目B" : 30\n    "項目C" : 30',
+    example: 'pie title 構成比\n    "項目A" : 40\n    "項目B" : 30\n    "項目C" : 30',
   },
   {
     id: "mindmap",
@@ -115,10 +113,25 @@ export interface MermaidGeneratorCallbacks {
 
 /**
  * AI設定を取得し、設定されているか確認
+ * api_serverモードではシステムプロバイダーが利用可能なため常にOK
  */
 export async function getAISettingsOrThrow(): Promise<AISettings> {
   const settings = await loadAISettings();
-  if (!settings || !settings.isConfigured || !settings.apiKey) {
+
+  // 設定がない場合はデフォルト(api_server)を使用
+  if (!settings) {
+    const { DEFAULT_AI_SETTINGS } = await import("@/types/ai");
+    return { ...DEFAULT_AI_SETTINGS, isConfigured: true };
+  }
+
+  // api_serverモードならAPIキー不要
+  const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+  if (effectiveMode === "api_server") {
+    return { ...settings, isConfigured: true };
+  }
+
+  // user_api_keyモードではAPIキーが必要
+  if (!settings.isConfigured || !settings.apiKey) {
     throw new Error("AI_NOT_CONFIGURED");
   }
   return settings;
@@ -131,7 +144,7 @@ async function generateWithOpenAI(
   settings: AISettings,
   text: string,
   diagramTypes: MermaidDiagramType[],
-  callbacks: MermaidGeneratorCallbacks
+  callbacks: MermaidGeneratorCallbacks,
 ): Promise<void> {
   const client = new OpenAI({
     apiKey: settings.apiKey,
@@ -146,10 +159,10 @@ async function generateWithOpenAI(
     .filter(Boolean)
     .join("\n");
 
-  const prompt = MERMAID_GENERATOR_PROMPT.replace(
-    "{{diagramTypes}}",
-    diagramTypesInfo
-  ).replace("{{text}}", text);
+  const prompt = MERMAID_GENERATOR_PROMPT.replace("{{diagramTypes}}", diagramTypesInfo).replace(
+    "{{text}}",
+    text,
+  );
 
   try {
     const response = await client.chat.completions.create({
@@ -168,9 +181,7 @@ async function generateWithOpenAI(
       diagramType: detectedType,
     });
   } catch (error) {
-    callbacks.onError(
-      error instanceof Error ? error : new Error("OpenAI API error")
-    );
+    callbacks.onError(error instanceof Error ? error : new Error("OpenAI API error"));
   }
 }
 
@@ -181,7 +192,7 @@ async function generateWithAnthropic(
   settings: AISettings,
   text: string,
   diagramTypes: MermaidDiagramType[],
-  callbacks: MermaidGeneratorCallbacks
+  callbacks: MermaidGeneratorCallbacks,
 ): Promise<void> {
   const client = new Anthropic({
     apiKey: settings.apiKey,
@@ -195,10 +206,10 @@ async function generateWithAnthropic(
     .filter(Boolean)
     .join("\n");
 
-  const prompt = MERMAID_GENERATOR_PROMPT.replace(
-    "{{diagramTypes}}",
-    diagramTypesInfo
-  ).replace("{{text}}", text);
+  const prompt = MERMAID_GENERATOR_PROMPT.replace("{{diagramTypes}}", diagramTypesInfo).replace(
+    "{{text}}",
+    text,
+  );
 
   try {
     const response = await client.messages.create({
@@ -208,8 +219,7 @@ async function generateWithAnthropic(
     });
 
     const textBlock = response.content.find((block) => block.type === "text");
-    const code =
-      textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+    const code = textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
 
     const detectedType = detectDiagramType(code, diagramTypes);
 
@@ -218,9 +228,7 @@ async function generateWithAnthropic(
       diagramType: detectedType,
     });
   } catch (error) {
-    callbacks.onError(
-      error instanceof Error ? error : new Error("Anthropic API error")
-    );
+    callbacks.onError(error instanceof Error ? error : new Error("Anthropic API error"));
   }
 }
 
@@ -231,7 +239,7 @@ async function generateWithGoogle(
   settings: AISettings,
   text: string,
   diagramTypes: MermaidDiagramType[],
-  callbacks: MermaidGeneratorCallbacks
+  callbacks: MermaidGeneratorCallbacks,
 ): Promise<void> {
   const client = new GoogleGenAI({ apiKey: settings.apiKey });
 
@@ -243,10 +251,10 @@ async function generateWithGoogle(
     .filter(Boolean)
     .join("\n");
 
-  const prompt = MERMAID_GENERATOR_PROMPT.replace(
-    "{{diagramTypes}}",
-    diagramTypesInfo
-  ).replace("{{text}}", text);
+  const prompt = MERMAID_GENERATOR_PROMPT.replace("{{diagramTypes}}", diagramTypesInfo).replace(
+    "{{text}}",
+    text,
+  );
 
   try {
     const response = await client.models.generateContent({
@@ -266,19 +274,14 @@ async function generateWithGoogle(
       diagramType: detectedType,
     });
   } catch (error) {
-    callbacks.onError(
-      error instanceof Error ? error : new Error("Google AI API error")
-    );
+    callbacks.onError(error instanceof Error ? error : new Error("Google AI API error"));
   }
 }
 
 /**
  * 生成されたコードからダイアグラムタイプを検出
  */
-function detectDiagramType(
-  code: string,
-  requestedTypes: MermaidDiagramType[]
-): MermaidDiagramType {
+function detectDiagramType(code: string, requestedTypes: MermaidDiagramType[]): MermaidDiagramType {
   const lowerCode = code.toLowerCase();
 
   if (lowerCode.startsWith("flowchart") || lowerCode.startsWith("graph")) {
@@ -312,14 +315,58 @@ function detectDiagramType(
 
 /**
  * Mermaidダイアグラムを生成
+ * api_serverモード: callAIService経由でサーバーに委譲
+ * user_api_keyモード: 直接SDKで呼び出し（既存動作）
  */
 export async function generateMermaidDiagram(
   text: string,
   diagramTypes: MermaidDiagramType[],
-  callbacks: MermaidGeneratorCallbacks
+  callbacks: MermaidGeneratorCallbacks,
 ): Promise<void> {
   const settings = await getAISettingsOrThrow();
+  const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
+  // api_serverモード: 統一されたcallAIService経由
+  if (effectiveMode === "api_server") {
+    try {
+      const { callAIService } = await import("@/lib/aiService");
+      const diagramTypeStr = diagramTypes.join(", ");
+      const prompt = MERMAID_GENERATOR_PROMPT.replace("{{text}}", text).replace(
+        "{{diagramTypes}}",
+        diagramTypeStr,
+      );
+
+      await callAIService(
+        settings,
+        {
+          provider: settings.provider,
+          model: settings.model,
+          messages: [{ role: "user", content: prompt }],
+          options: {
+            maxTokens: 2000,
+            temperature: 0.3,
+            stream: false,
+            feature: "mermaid_generation",
+          },
+        },
+        {
+          onComplete: (response) => {
+            const code = response.content.trim();
+            const detectedType = detectDiagramType(code, diagramTypes);
+            callbacks.onComplete({ code, diagramType: detectedType });
+          },
+          onError: (error) => {
+            callbacks.onError(error);
+          },
+        },
+      );
+    } catch (error) {
+      callbacks.onError(error instanceof Error ? error : new Error("Unknown error"));
+    }
+    return;
+  }
+
+  // user_api_keyモード: 既存の直接SDK呼び出し
   switch (settings.provider) {
     case "openai":
       return generateWithOpenAI(settings, text, diagramTypes, callbacks);

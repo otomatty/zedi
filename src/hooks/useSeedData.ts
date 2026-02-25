@@ -40,9 +40,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "1つのページには1つのアイデアだけ" },
-                  ],
+                  content: [{ type: "text", text: "1つのページには1つのアイデアだけ" }],
                 },
               ],
             },
@@ -65,9 +63,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "整理は後回し。まずは書き留める" },
-                  ],
+                  content: [{ type: "text", text: "整理は後回し。まずは書き留める" }],
                 },
               ],
             },
@@ -103,9 +99,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "内部リンク: 既存のページへの接続" },
-                  ],
+                  content: [{ type: "text", text: "内部リンク: 既存のページへの接続" }],
                 },
               ],
             },
@@ -192,9 +186,7 @@ const TUTORIAL_PAGES = [
               content: [
                 {
                   type: "paragraph",
-                  content: [
-                    { type: "text", text: "完璧を目指さず、まずは書き留める" },
-                  ],
+                  content: [{ type: "text", text: "完璧を目指さず、まずは書き留める" }],
                 },
               ],
             },
@@ -244,7 +236,6 @@ export function useSeedData() {
     if (pages.length === 0) {
       hasSeededRef.current = true;
       setIsSeeding(true);
-      console.log("Seeding tutorial pages...");
 
       // Create tutorial pages sequentially
       const seedPages = async () => {
@@ -254,7 +245,6 @@ export function useSeedData() {
               title: tutorialPage.title,
               content: tutorialPage.content,
             });
-            console.log("Created tutorial page:", tutorialPage.title);
             // Small delay to ensure proper ordering
             await new Promise((resolve) => setTimeout(resolve, 50));
           } catch (error) {
@@ -262,7 +252,6 @@ export function useSeedData() {
           }
         }
         localStorage.setItem(SEED_KEY, "true");
-        console.log("Tutorial pages seeded successfully");
       };
 
       seedPages().finally(() => setIsSeeding(false));

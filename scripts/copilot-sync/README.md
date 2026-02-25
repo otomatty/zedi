@@ -22,10 +22,10 @@ Zedi → Turso（クラウド同期）
 
 **すべての処理はローカルで完結します。外部ネットワークへのデータ送信は一切行いません。**
 
-| スクリプト | ネットワーク | 説明 |
-|-----------|-------------|------|
-| `watch-copilot.sh` | ❌ 不要 | ファイル監視・Markdown変換のみ |
-| `sync-with-summary.ts` | ⚠️ localhost のみ | Ollamaローカルサーバーに接続 |
+| スクリプト             | ネットワーク      | 説明                           |
+| ---------------------- | ----------------- | ------------------------------ |
+| `watch-copilot.sh`     | ❌ 不要           | ファイル監視・Markdown変換のみ |
+| `sync-with-summary.ts` | ⚠️ localhost のみ | Ollamaローカルサーバーに接続   |
 
 社内のセキュリティポリシーに準拠した形で使用できます。
 
@@ -34,11 +34,13 @@ Zedi → Turso（クラウド同期）
 ## 必要条件
 
 ### 最小要件（AI要約なし）
+
 - macOS
 - VS Code + GitHub Copilot Chat 拡張機能
 - jq (`brew install jq`)
 
 ### AI要約を使用する場合（推奨）
+
 - [Ollama](https://ollama.ai) + 任意のモデル
 - Node.js 18+ または Bun
 - ※ 完全ローカル処理、外部APIは使用しません
@@ -105,12 +107,12 @@ npx tsx sync-with-summary.ts watch
 
 ### 環境変数
 
-| 変数 | デフォルト値 | 説明 |
-|------|-------------|------|
-| `ZEDI_OUTPUT_DIR` | `~/zedi-copilot-logs` | 出力ディレクトリ |
-| `POLL_INTERVAL` | `5` | ファイル監視の間隔（秒） |
-| `OLLAMA_ENDPOINT` | `http://localhost:11434` | Ollamaサーバーの URL |
-| `OLLAMA_MODEL` | `qwen2.5:7b` | 使用するOllamaモデル |
+| 変数              | デフォルト値             | 説明                     |
+| ----------------- | ------------------------ | ------------------------ |
+| `ZEDI_OUTPUT_DIR` | `~/zedi-copilot-logs`    | 出力ディレクトリ         |
+| `POLL_INTERVAL`   | `5`                      | ファイル監視の間隔（秒） |
+| `OLLAMA_ENDPOINT` | `http://localhost:11434` | Ollamaサーバーの URL     |
+| `OLLAMA_MODEL`    | `qwen2.5:7b`             | 使用するOllamaモデル     |
 
 ### カスタマイズ例
 
@@ -193,14 +195,14 @@ ZEDI_OUTPUT_DIR=~/Documents/worklogs npx tsx sync-with-summary.ts sync
 
 ## PCスペックに応じたモデル選択
 
-| カテゴリ | モデル | RAM | 特徴 |
-|---------|--------|-----|------|
-| 軽量 | `llama3.2:3b` | 4-6GB | 高速、基本的な要約 |
-| 軽量 | `qwen2.5:3b` | 4-6GB | 日本語対応良好 |
-| バランス | `qwen2.5:7b` | 8-16GB | **推奨**、日本語性能高い |
-| バランス | `gemma2:9b` | 8-16GB | 高品質な出力 |
-| 高性能 | `qwen2.5:32b` | 24-32GB | 詳細な要約 |
-| 高性能 | `llama3.3:70b` | 48-64GB | 最高性能 |
+| カテゴリ | モデル         | RAM     | 特徴                     |
+| -------- | -------------- | ------- | ------------------------ |
+| 軽量     | `llama3.2:3b`  | 4-6GB   | 高速、基本的な要約       |
+| 軽量     | `qwen2.5:3b`   | 4-6GB   | 日本語対応良好           |
+| バランス | `qwen2.5:7b`   | 8-16GB  | **推奨**、日本語性能高い |
+| バランス | `gemma2:9b`    | 8-16GB  | 高品質な出力             |
+| 高性能   | `qwen2.5:32b`  | 24-32GB | 詳細な要約               |
+| 高性能   | `llama3.3:70b` | 48-64GB | 最高性能                 |
 
 ```bash
 # モデルのダウンロード例
@@ -256,11 +258,11 @@ find ~/Library/Application\ Support/Code/User/workspaceStorage \
 
 ## スクリプト一覧
 
-| スクリプト | 用途 | AI必要 |
-|-----------|------|--------|
-| `watch-copilot.sh` | 会話ログの収集・Markdown変換 | ❌ |
-| `sync-with-summary.ts` | AI要約付き同期（推奨） | ✅ |
-| `setup.sh` | インストール/アンインストール | ❌ |
+| スクリプト             | 用途                          | AI必要 |
+| ---------------------- | ----------------------------- | ------ |
+| `watch-copilot.sh`     | 会話ログの収集・Markdown変換  | ❌     |
+| `sync-with-summary.ts` | AI要約付き同期（推奨）        | ✅     |
+| `setup.sh`             | インストール/アンインストール | ❌     |
 
 ---
 

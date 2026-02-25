@@ -9,11 +9,13 @@ for-all-learnersから移行したコンテンツに未対応のノード/マー
 ## 問題の詳細
 
 ### 症状
+
 - 移行データを含むページを開くとエディターが完全に空白になる
 - テキストのみのコンテンツは正常に表示される
 - 画像やカスタムマークを含むコンテンツで問題が発生
 
 ### コンソールエラー
+
 ```
 [tiptap warn]: Duplicate extension names found: ['link']
 
@@ -22,6 +24,7 @@ Error: RangeError: There is no mark type unilink in this schema
 ```
 
 ### 原因
+
 1. 移行データに`unilink`などの未対応マークタイプが含まれていた
 2. zediのTiptapスキーマにはこれらのマークが登録されていない
 3. Tiptapは未知のノード/マークタイプを処理できずエラーをスロー
@@ -38,15 +41,22 @@ Error: RangeError: There is no mark type unilink in this schema
 ```typescript
 // サポートされているノードタイプ
 const SUPPORTED_NODE_TYPES = new Set([
-  'doc', 'paragraph', 'text', 'heading', 'blockquote',
-  'bulletList', 'orderedList', 'listItem', 'codeBlock',
-  'horizontalRule', 'hardBreak', 'mermaid',
+  "doc",
+  "paragraph",
+  "text",
+  "heading",
+  "blockquote",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "codeBlock",
+  "horizontalRule",
+  "hardBreak",
+  "mermaid",
 ]);
 
 // サポートされているマークタイプ
-const SUPPORTED_MARK_TYPES = new Set([
-  'bold', 'italic', 'strike', 'code', 'link', 'wikiLink',
-]);
+const SUPPORTED_MARK_TYPES = new Set(["bold", "italic", "strike", "code", "link", "wikiLink"]);
 
 // サニタイズ結果の型
 interface SanitizeResult {
@@ -57,10 +67,11 @@ interface SanitizeResult {
 }
 
 // メイン関数
-function sanitizeTiptapContent(content: string): SanitizeResult
+function sanitizeTiptapContent(content: string): SanitizeResult;
 ```
 
 **機能**:
+
 - 未対応ノードタイプを検出し、テキスト内容を保持しながら削除
 - 未対応マークタイプを検出し削除（テキストはそのまま維持）
 - 削除されたタイプのリストを返却
@@ -86,6 +97,7 @@ interface TiptapEditorProps {
 ```
 
 **変更点**:
+
 - コンテンツ読み込み時に`sanitizeTiptapContent()`を実行
 - エラー発生時に`onContentError`コールバックで親コンポーネントに通知
 - サニタイズ後のコンテンツを表示
@@ -95,47 +107,49 @@ interface TiptapEditorProps {
 **ファイル**: `src/components/editor/PageEditorView.tsx`
 
 ```tsx
-{/* コンテンツエラー警告 */}
-{contentError && (
-  <div className="border-b border-border bg-amber-500/10">
-    <Container>
-      <Alert className="border-0 bg-transparent py-3">
-        <AlertCircle className="h-4 w-4 text-amber-600" />
-        <AlertDescription className="text-sm">
-          <div className="flex flex-col gap-1">
-            <span className="font-medium text-amber-800">
-              {contentError.message}
-            </span>
-            {contentError.removedNodeTypes.length > 0 && (
-              <span className="text-xs text-amber-700">
-                削除されたノード: {contentError.removedNodeTypes.join(", ")}
-              </span>
-            )}
-            {contentError.removedMarkTypes.length > 0 && (
-              <span className="text-xs text-amber-700">
-                削除されたマーク: {contentError.removedMarkTypes.join(", ")}
-              </span>
-            )}
-            {contentError.wasSanitized && (
-              <span className="text-xs text-amber-600 mt-1">
-                ※ コンテンツは自動的に修正されました。保存すると修正後のデータが保存されます。
-              </span>
-            )}
-          </div>
-        </AlertDescription>
-      </Alert>
-    </Container>
-  </div>
-)}
+{
+  /* コンテンツエラー警告 */
+}
+{
+  contentError && (
+    <div className="border-b border-border bg-amber-500/10">
+      <Container>
+        <Alert className="border-0 bg-transparent py-3">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-sm">
+            <div className="flex flex-col gap-1">
+              <span className="font-medium text-amber-800">{contentError.message}</span>
+              {contentError.removedNodeTypes.length > 0 && (
+                <span className="text-xs text-amber-700">
+                  削除されたノード: {contentError.removedNodeTypes.join(", ")}
+                </span>
+              )}
+              {contentError.removedMarkTypes.length > 0 && (
+                <span className="text-xs text-amber-700">
+                  削除されたマーク: {contentError.removedMarkTypes.join(", ")}
+                </span>
+              )}
+              {contentError.wasSanitized && (
+                <span className="mt-1 text-xs text-amber-600">
+                  ※ コンテンツは自動的に修正されました。保存すると修正後のデータが保存されます。
+                </span>
+              )}
+            </div>
+          </AlertDescription>
+        </Alert>
+      </Container>
+    </div>
+  );
+}
 ```
 
 ## 変更ファイル一覧
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `src/lib/contentUtils.ts` | サニタイズユーティリティ追加（+218行） |
-| `src/components/editor/TiptapEditor.tsx` | エラーハンドリングロジック追加 |
-| `src/components/editor/PageEditorView.tsx` | エラー表示UI追加 |
+| ファイル                                   | 変更内容                               |
+| ------------------------------------------ | -------------------------------------- |
+| `src/lib/contentUtils.ts`                  | サニタイズユーティリティ追加（+218行） |
+| `src/components/editor/TiptapEditor.tsx`   | エラーハンドリングロジック追加         |
+| `src/components/editor/PageEditorView.tsx` | エラー表示UI追加                       |
 
 ## 動作フロー
 

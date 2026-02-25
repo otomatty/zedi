@@ -61,9 +61,7 @@ export interface PageEditorHeaderProps {
  */
 export interface PageEditorAlertsProps {
   duplicatePage: Page | null;
-  isTitleEmpty: boolean;
   title: string;
-  isNewPage: boolean;
   contentError: ContentError | null;
   onDismissContentError: () => void;
   onNavigateToDuplicate: (pageId: string) => void;
@@ -79,11 +77,11 @@ export interface PageEditorDialogsProps {
   onDeleteReasonChange: (reason: string) => void;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
-  
+
   // Wiki generator error dialog
   wikiError: string | null;
   onDismissWikiError: () => void;
-  
+
   // Web clipper dialog
   webClipperOpen: boolean;
   onWebClipperOpenChange: (open: boolean) => void;
@@ -91,6 +89,6 @@ export interface PageEditorDialogsProps {
     title: string,
     content: string,
     sourceUrl: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
   ) => void;
 }

@@ -18,7 +18,10 @@ export interface NoteRepositoryOptions {
 export class NoteRepository {
   private onMutate?: () => void | Promise<void>;
 
-  constructor(private client: Client, options?: NoteRepositoryOptions) {
+  constructor(
+    private client: Client,
+    options?: NoteRepositoryOptions,
+  ) {
     this.onMutate = options?.onMutate;
   }
 
@@ -40,10 +43,7 @@ export class NoteRepository {
     };
   }
 
-  private rowToNoteSummary(
-    row: Record<string, unknown>,
-    role: NoteAccessRole
-  ): NoteSummary {
+  private rowToNoteSummary(row: Record<string, unknown>, role: NoteAccessRole): NoteSummary {
     return {
       ...this.rowToNote(row),
       role,
@@ -81,10 +81,7 @@ export class NoteRepository {
     };
   }
 
-  private async getMemberRole(
-    noteId: string,
-    userEmail?: string
-  ): Promise<NoteMemberRole | null> {
+  private async getMemberRole(noteId: string, userEmail?: string): Promise<NoteMemberRole | null> {
     if (!userEmail) return null;
 
     const result = await this.client.execute({
@@ -103,11 +100,7 @@ export class NoteRepository {
     return result.rows[0].role as NoteMemberRole;
   }
 
-  private buildAccess(
-    note: Note,
-    userId?: string,
-    memberRole?: NoteMemberRole | null
-  ): NoteAccess {
+  private buildAccess(note: Note, userId?: string, memberRole?: NoteMemberRole | null): NoteAccess {
     const isOwner = Boolean(userId && note.ownerUserId === userId);
     const isPublic = note.visibility === "public";
     const isUnlisted = note.visibility === "unlisted";
@@ -148,7 +141,7 @@ export class NoteRepository {
     ownerUserId: string,
     title: string,
     visibility: NoteVisibility,
-    ownerEmail?: string
+    ownerEmail?: string,
   ): Promise<Note> {
     const id = nanoid();
     const now = Date.now();
@@ -188,7 +181,7 @@ export class NoteRepository {
   async ensureOwnerMember(
     noteId: string,
     ownerUserId: string,
-    ownerEmail?: string
+    ownerEmail?: string,
   ): Promise<boolean> {
     if (!ownerEmail) return false;
 
@@ -201,10 +194,7 @@ export class NoteRepository {
       args: [noteId, ownerEmail],
     });
 
-    if (
-      existing.rows.length > 0 &&
-      Number(existing.rows[0]?.is_deleted ?? 0) === 0
-    ) {
+    if (existing.rows.length > 0 && Number(existing.rows[0]?.is_deleted ?? 0) === 0) {
       return false;
     }
 
@@ -227,7 +217,7 @@ export class NoteRepository {
     ownerUserId: string,
     noteId: string,
     updates: Partial<Pick<Note, "title" | "visibility">>,
-    ownerEmail?: string
+    ownerEmail?: string,
   ): Promise<void> {
     const setClauses: string[] = ["updated_at = ?"];
     const args: (string | number)[] = [Date.now()];
@@ -315,7 +305,7 @@ export class NoteRepository {
   async getNoteWithAccess(
     noteId: string,
     userId?: string,
-    userEmail?: string
+    userEmail?: string,
   ): Promise<{ note: Note; access: NoteAccess } | null> {
     const note = await this.getNote(noteId);
     if (!note) return null;
@@ -330,10 +320,7 @@ export class NoteRepository {
     return { note, access };
   }
 
-  async getNotesSummary(
-    userId: string,
-    userEmail?: string
-  ): Promise<NoteSummary[]> {
+  async getNotesSummary(userId: string, userEmail?: string): Promise<NoteSummary[]> {
     const args: Array<string | number> = [];
     const joinClause = userEmail
       ? `LEFT JOIN note_members nm
@@ -446,11 +433,7 @@ export class NoteRepository {
     return this.rowToPage(result.rows[0]);
   }
 
-  async addPageToNote(
-    noteId: string,
-    pageId: string,
-    addedByUserId: string
-  ): Promise<void> {
+  async addPageToNote(noteId: string, pageId: string, addedByUserId: string): Promise<void> {
     const now = Date.now();
 
     await this.client.execute({
@@ -509,7 +492,7 @@ export class NoteRepository {
     noteId: string,
     memberEmail: string,
     role: NoteMemberRole,
-    invitedByUserId: string
+    invitedByUserId: string,
   ): Promise<void> {
     const now = Date.now();
 
@@ -532,7 +515,7 @@ export class NoteRepository {
   async updateNoteMemberRole(
     noteId: string,
     memberEmail: string,
-    role: NoteMemberRole
+    role: NoteMemberRole,
   ): Promise<void> {
     await this.client.execute({
       sql: `

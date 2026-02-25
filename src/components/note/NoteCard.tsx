@@ -4,6 +4,8 @@ import { Users, FileText } from "lucide-react";
 import type { NoteSummary } from "@/types/note";
 import { cn } from "@/lib/utils";
 import { NoteVisibilityBadge } from "./NoteVisibilityBadge";
+import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
 
 interface NoteCardProps {
   note: NoteSummary;
@@ -20,6 +22,7 @@ const roleLabel: Record<NoteSummary["role"], string> = {
 
 export const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleClick = () => {
     navigate(`/note/${note.id}`);
@@ -29,10 +32,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
     <button
       onClick={handleClick}
       className={cn(
-        "w-full text-left rounded-lg border border-border/50 bg-card",
-        "p-4 hover:border-border transition-all duration-200",
+        "w-full rounded-lg border border-border/50 bg-card text-left",
+        "p-4 transition-all duration-200 hover:border-border",
         "animate-fade-in opacity-0",
-        index <= 5 && `stagger-${Math.min(index + 1, 5)}`
+        index <= 5 && `stagger-${Math.min(index + 1, 5)}`,
       )}
       style={{
         animationFillMode: "forwards",
@@ -41,14 +44,15 @@ export const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-medium text-sm text-foreground truncate">
+          <h3 className="truncate text-sm font-medium text-foreground">
             {note.title || "無題のノート"}
           </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {roleLabel[note.role]}
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{roleLabel[note.role]}</p>
         </div>
-        <NoteVisibilityBadge visibility={note.visibility} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}
+          <NoteVisibilityBadge visibility={note.visibility} />
+        </div>
       </div>
 
       <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">

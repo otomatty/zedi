@@ -1,0 +1,15 @@
+{
+  "title": "Settings",
+  "general": {
+    "title": "General",
+    "description": "Theme, font size, language, profile"
+  },
+  "ai": {
+    "title": "AI Settings",
+    "description": "LLM API key configuration, provider selection"
+  },
+  "storage": {
+    "title": "Image Storage",
+    "description": "Image upload storage configuration"
+  }
+}

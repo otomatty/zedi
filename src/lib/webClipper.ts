@@ -4,10 +4,7 @@
 import { Readability } from "@mozilla/readability";
 
 // CORSプロキシ（複数のフォールバックを用意）
-const CORS_PROXIES = [
-  "https://api.allorigins.win/raw?url=",
-  "https://corsproxy.io/?",
-];
+const CORS_PROXIES = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?"];
 
 export interface ClippedContent {
   title: string;
@@ -40,7 +37,7 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * CORSプロキシ経由でHTMLを取得
+ * CORSプロキシ経由でHTMLを取得（APIが使えない場合のフォールバック）
  */
 async function fetchWithProxy(url: string): Promise<string> {
   let lastError: Error | null = null;
@@ -49,8 +46,7 @@ async function fetchWithProxy(url: string): Promise<string> {
     try {
       const response = await fetch(proxy + encodeURIComponent(url), {
         headers: {
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
       });
 
@@ -69,6 +65,8 @@ async function fetchWithProxy(url: string): Promise<string> {
   throw lastError || new Error("すべてのプロキシでページの取得に失敗しました");
 }
 
+export type FetchHtmlFn = (url: string) => Promise<string>;
+
 /**
  * HTMLからOGP情報を抽出
  */
@@ -82,8 +80,7 @@ export function extractOGPData(doc: Document): OGPData {
 
   return {
     title: getMetaContent("og:title"),
-    description:
-      getMetaContent("og:description") || getMetaContent("description"),
+    description: getMetaContent("og:description") || getMetaContent("description"),
     image: getMetaContent("og:image"),
     siteName: getMetaContent("og:site_name"),
   };
@@ -148,14 +145,26 @@ function sanitizeHtml(html: string): string {
 
 /**
  * WebページをクリップしてコンテンツをBatch抽出
+ * @param url - 取得するURL
+ * @param fetchHtml - 未指定時はCORSプロキシを使用。指定時はサーバー側取得APIなどでHTMLを取得
  */
-export async function clipWebPage(url: string): Promise<ClippedContent> {
+export async function clipWebPage(url: string, fetchHtmlFn?: FetchHtmlFn): Promise<ClippedContent> {
   if (!isValidUrl(url)) {
     throw new Error("有効なURLを入力してください");
   }
 
-  // 1. HTMLを取得
-  const html = await fetchWithProxy(url);
+  // 1. HTMLを取得（API経由を優先、失敗時はプロキシにフォールバック）
+  let html: string;
+  if (fetchHtmlFn) {
+    try {
+      html = await fetchHtmlFn(url);
+    } catch (apiError) {
+      console.warn("Clip API failed, falling back to CORS proxy:", apiError);
+      html = await fetchWithProxy(url);
+    }
+  } else {
+    html = await fetchWithProxy(url);
+  }
 
   // 2. DOMをパース
   const parser = new DOMParser();
@@ -176,9 +185,7 @@ export async function clipWebPage(url: string): Promise<ClippedContent> {
   const article = reader.parse();
 
   if (!article) {
-    throw new Error(
-      "本文の抽出に失敗しました。このページは対応していない可能性があります。"
-    );
+    throw new Error("本文の抽出に失敗しました。このページは対応していない可能性があります。");
   }
 
   // サニタイズされたコンテンツ
@@ -204,16 +211,16 @@ export function getClipErrorMessage(error: unknown): string {
     if (error.message.includes("有効なURL")) {
       return "有効なURLを入力してください。";
     }
-    if (
-      error.message.includes("Failed to fetch") ||
-      error.message.includes("NetworkError")
-    ) {
+    if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
       return "ネットワークエラーが発生しました。接続を確認してください。";
+    }
+    if (error.message.includes("Request timed out") || error.message.includes("TIMEOUT")) {
+      return "取得がタイムアウトしました。しばらくしてから再試行してください。";
     }
     if (error.message.includes("本文の抽出")) {
       return "本文の抽出に失敗しました。このページは対応していない可能性があります。";
     }
-    if (error.message.includes("プロキシ")) {
+    if (error.message.includes("プロキシ") || error.message.includes("FETCH_FAILED")) {
       return "ページの取得に失敗しました。URLを確認してください。";
     }
     return error.message;

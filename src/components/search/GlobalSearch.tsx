@@ -1,5 +1,3 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
 import { FileText, Link as LinkIcon } from "lucide-react";
 import {
   CommandDialog,
@@ -9,97 +7,49 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
-import { formatTimeAgo } from "@/lib/dateUtils";
 import { MatchTypeBadge } from "./MatchTypeBadge";
 import { HighlightedSnippet } from "./HighlightedSnippet";
 
 export function GlobalSearch() {
-  const navigate = useNavigate();
-  const {
-    query,
-    setQuery,
-    isOpen,
-    open,
-    close,
-    searchResults,
-    recentPages,
-    hasQuery,
-  } = useGlobalSearch();
+  const { query, setQuery, isOpen, open, close, searchResults, hasQuery, handleSelect } =
+    useGlobalSearchContext();
 
-  // Register keyboard shortcut
   useGlobalSearchShortcut(open);
-
-  const handleSelect = (pageId: string) => {
-    navigate(`/page/${pageId}`);
-    close();
-  };
 
   return (
     <CommandDialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <CommandInput
-        placeholder="ページを検索..."
-        value={query}
-        onValueChange={setQuery}
-      />
+      <CommandInput placeholder="ページを検索..." value={query} onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>ページが見つかりません</CommandEmpty>
 
-        {/* Recent Pages (shown when no query) */}
-        {!hasQuery && recentPages.length > 0 && (
-          <CommandGroup heading="最近のページ">
-            {recentPages.map((page) => (
-              <CommandItem
-                key={page.id}
-                value={`recent-${page.id}`}
-                onSelect={() => handleSelect(page.id)}
-                className="flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  {page.sourceUrl ? (
-                    <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="truncate">
-                    {page.title || "無題のページ"}
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                  {formatTimeAgo(page.updatedAt)}
-                </span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        {/* Search Results */}
+        {/* Search Results (personal + shared merged, C3-8) */}
         {hasQuery && searchResults.length > 0 && (
           <CommandGroup heading={`検索結果 (${searchResults.length}件)`}>
-            {searchResults.map(({ page, highlightedText, matchType }) => (
-              <CommandItem
-                key={page.id}
-                value={`search-${page.id}-${page.title}`}
-                onSelect={() => handleSelect(page.id)}
-                className="flex flex-col items-start gap-1 py-3"
-              >
-                <div className="flex items-center gap-2 w-full">
-                  {page.sourceUrl ? (
-                    <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="font-medium truncate flex-1">
-                    {page.title || "無題のページ"}
-                  </span>
-                  <MatchTypeBadge type={matchType} />
-                </div>
-                <div className="pl-6 w-full">
-                  <HighlightedSnippet text={highlightedText} />
-                </div>
-              </CommandItem>
-            ))}
+            {searchResults.map(
+              ({ pageId, noteId, title, highlightedText, matchType, sourceUrl }) => (
+                <CommandItem
+                  key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`}
+                  value={`search-${pageId}-${title}`}
+                  onSelect={() => handleSelect(pageId, noteId)}
+                  className="flex flex-col items-start gap-1 py-3"
+                >
+                  <div className="flex w-full items-center gap-2">
+                    {sourceUrl ? (
+                      <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="flex-1 truncate font-medium">{title}</span>
+                    <MatchTypeBadge type={matchType} />
+                  </div>
+                  <div className="w-full pl-6">
+                    <HighlightedSnippet text={highlightedText} />
+                  </div>
+                </CommandItem>
+              ),
+            )}
           </CommandGroup>
         )}
       </CommandList>
