@@ -2,6 +2,7 @@
  * GET /api/thumbnail/image-search — サムネイル画像検索
  */
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../../middleware/auth";
 import { rateLimiter } from "../../middleware/rateLimiter";
 import { getEnvConfig } from "../../env";
@@ -22,11 +23,35 @@ app.get("/", authRequired, rateLimiter, async (c) => {
     return c.json({ items: [], nextCursor: undefined } satisfies ImageSearchResponse);
   }
 
-  const secrets = await getThumbnailSecrets(env.THUMBNAIL_SECRETS_ARN);
-  const apiKey = getRequired(secrets, "GOOGLE_CUSTOM_SEARCH_API_KEY");
-  const engineId = getRequired(secrets, "GOOGLE_CUSTOM_SEARCH_ENGINE_ID");
+  if (!env.THUMBNAIL_SECRETS_ARN) {
+    throw new HTTPException(503, {
+      message: "画像検索は現在利用できません（API キーが未設定です）",
+    });
+  }
 
-  const items = await searchImages(query, apiKey, engineId, cursor, limit);
+  let apiKey: string;
+  let engineId: string;
+  try {
+    const secrets = await getThumbnailSecrets(env.THUMBNAIL_SECRETS_ARN);
+    apiKey = getRequired(secrets, "GOOGLE_CUSTOM_SEARCH_API_KEY");
+    engineId = getRequired(secrets, "GOOGLE_CUSTOM_SEARCH_ENGINE_ID");
+  } catch (err) {
+    console.error("Failed to load thumbnail secrets:", err);
+    throw new HTTPException(503, {
+      message: "画像検索は現在利用できません（API キーの取得に失敗しました）",
+    });
+  }
+
+  let items: Awaited<ReturnType<typeof searchImages>>;
+  try {
+    items = await searchImages(query, apiKey, engineId, cursor, limit);
+  } catch (err) {
+    console.error("Image search failed:", err);
+    throw new HTTPException(502, {
+      message:
+        err instanceof Error ? `画像検索に失敗しました: ${err.message}` : "画像検索に失敗しました",
+    });
+  }
 
   // 重複除去
   const seen = new Set<string>();

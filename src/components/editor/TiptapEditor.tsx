@@ -171,7 +171,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     isEditorInitializedRef,
   });
 
-  const { handleInsertThumbnailImage } = useThumbnailCommit({ editorRef, pageTitle });
+  const { handleInsertThumbnailImage } = useThumbnailCommit({
+    editorRef,
+    pageTitle,
+    storageSettings,
+  });
 
   const handleGoToStorageSettings = useCallback(() => {
     const returnTo = `${location.pathname}${location.search}`;
