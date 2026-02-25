@@ -11,7 +11,7 @@
     "@hocuspocus/extension-redis": "^3.4.4",
     "@hocuspocus/server": "^3.4.4",
     "aws-jwt-verify": "^5.1.1",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.9.3",
     "pg": "^8.18.0",
     "ws": "^8.19.0",
     "yjs": "^13.6.29"
