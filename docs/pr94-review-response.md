@@ -143,8 +143,10 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 ## 5. 別 Issue とする項目
 
-- migrate.mjs: execSync のシェルクォート問題（execFileSync への書き換え）
-- migrate.mjs: トランザクション対応
-- 002_ai_platform.sql: 冪等性の強化
-- 005_thumbnail_storage.sql: user_id の FK 追加
-- 003: gpt-5.2 モデル ID の検証（運用で対応）
+| 項目                                                                    | Issue                                             |
+| ----------------------------------------------------------------------- | ------------------------------------------------- |
+| migrate.mjs: execSync のシェルクォート問題（execFileSync への書き換え） | [#95](https://github.com/otomatty/zedi/issues/95) |
+| migrate.mjs: トランザクション対応                                       | [#96](https://github.com/otomatty/zedi/issues/96) |
+| 002_ai_platform.sql: 冪等性の強化                                       | [#97](https://github.com/otomatty/zedi/issues/97) |
+| 005_thumbnail_storage.sql: user_id の FK 追加                           | [#98](https://github.com/otomatty/zedi/issues/98) |
+| 003: gpt-5.2 モデル ID の公式検証                                       | [#99](https://github.com/otomatty/zedi/issues/99) |
