@@ -282,11 +282,6 @@ export function getPageListPreview(content: string): string {
   return getContentPreview(content, PAGE_LIST_PREVIEW_LENGTH);
 }
 
-// Standard preview for page list UI
-export function getPageListPreview(content: string): string {
-  return getContentPreview(content, PAGE_LIST_PREVIEW_LENGTH);
-}
-
 // Extract first image URL from Tiptap content
 export function extractFirstImage(content: string): string | null {
   if (!content) return null;
