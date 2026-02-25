@@ -186,6 +186,34 @@ describe("syncWithApi", () => {
     );
   });
 
+  it("clears stale local links when pulled page has 0 links", async () => {
+    const serverPage = {
+      id: "p1",
+      owner_id: TEST_USER_ID,
+      source_page_id: null,
+      title: "Page",
+      content_preview: null,
+      thumbnail_url: null,
+      source_url: null,
+      created_at: "2025-01-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+      is_deleted: false,
+    };
+    const adapter = createMockAdapter();
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [serverPage],
+        links: [],
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    expect(adapter.saveLinks).toHaveBeenCalledWith("p1", []);
+  });
+
   // ── PUSH ──────────────────────────────────────────────────────────────
 
   it("pushes locally modified pages to server", async () => {
@@ -211,6 +239,59 @@ describe("syncWithApi", () => {
     await syncWithApi(adapter, api, TEST_USER_ID);
 
     expect(api.postSyncPages).toHaveBeenCalled();
+  });
+
+  it("sends links and ghost_links only in last chunk when pushing >100 pages", async () => {
+    const PAGE_PUSH_CHUNK_SIZE = 100;
+    const manyPages: PageMetadata[] = Array.from({ length: PAGE_PUSH_CHUNK_SIZE + 1 }, (_, i) => ({
+      id: `page-${i}`,
+      ownerId: TEST_USER_ID,
+      sourcePageId: null,
+      title: `Page ${i}`,
+      contentPreview: null,
+      thumbnailUrl: null,
+      sourceUrl: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now() + i,
+      isDeleted: false,
+    }));
+
+    const adapter = createMockAdapter({
+      getLastSyncTime: vi.fn().mockResolvedValue(0),
+      getAllPages: vi.fn().mockResolvedValue(manyPages),
+      getLinks: vi
+        .fn()
+        .mockImplementation((pageId: string) =>
+          pageId === "page-0"
+            ? Promise.resolve([{ sourceId: "page-0", targetId: "page-1", createdAt: Date.now() }])
+            : Promise.resolve([]),
+        ),
+      getGhostLinks: vi.fn().mockResolvedValue([]),
+    });
+    const postSyncPages = vi.fn().mockResolvedValue({
+      server_time: new Date().toISOString(),
+      conflicts: [],
+    });
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [],
+        links: [],
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+      postSyncPages,
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    expect(postSyncPages).toHaveBeenCalledTimes(2);
+    const [firstCall, secondCall] = postSyncPages.mock.calls;
+    expect(firstCall[0].pages).toHaveLength(PAGE_PUSH_CHUNK_SIZE);
+    expect(firstCall[0].links).toBeUndefined();
+    expect(firstCall[0].ghost_links).toBeUndefined();
+    expect(secondCall[0].pages).toHaveLength(1);
+    expect(secondCall[0].links).toBeDefined();
+    expect(secondCall[0].ghost_links).toBeDefined();
   });
 
   it("skips push on initial sync when local was empty", async () => {
