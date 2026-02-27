@@ -26,23 +26,25 @@ jobs:
     name: Deploy API
     needs: migrate
     runs-on: ubuntu-latest
+    container: ghcr.io/railwayapp/cli:latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - uses: railwayapp/cli-action@v1
-        with:
-          token: ${{ secrets.RAILWAY_TOKEN }}
-          command: up --service api --environment production -d
+      - name: Deploy API to Railway
+        run: railway up ./server/api --service api --environment production -d
 
   deploy-hocuspocus:
     name: Deploy Hocuspocus
     needs: migrate
     runs-on: ubuntu-latest
+    container: ghcr.io/railwayapp/cli:latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - uses: railwayapp/cli-action@v1
-        with:
-          token: ${{ secrets.RAILWAY_TOKEN }}
-          command: up --service hocuspocus --environment production -d
+      - name: Deploy Hocuspocus to Railway
+        run: railway up ./server/hocuspocus --service hocuspocus --environment production -d
 
   deploy-frontend:
     name: Deploy Frontend
