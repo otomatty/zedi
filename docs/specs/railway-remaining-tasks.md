@@ -138,10 +138,10 @@ npm run dev
 
 **作成後:**
 4. 「Credentials」タブで以下の値を確認しておく:
-- `ENDPOINT` — S3 エンドポイント　https://t3.storageapi.dev
-- `ACCESS_KEY_ID` — S3 アクセスキー tid_kOalq_HAGDVWtdQkDftmRuXQsYGENItZtm_GIrGLbeJNeBUjYs
-- `SECRET_ACCESS_KEY` — S3 シークレットキー　tsec_AAUL9-rIV6Fs1K5IIBg3+NlqNKBrFNC9oFQpcGA-dwWtH76mrVdJhHK1nwhj4b3bOupRxf
-- `BUCKET` — バケット名　media-ulndzwgkqbkz0c5adcx
+- `ENDPOINT` — S3 エンドポイント（例: `https://t3.storageapi.dev`）
+- `ACCESS_KEY_ID` — S3 アクセスキー
+- `SECRET_ACCESS_KEY` — S3 シークレットキー
+- `BUCKET` — バケット名
 
 ### 2.5 API サービスの作成
 

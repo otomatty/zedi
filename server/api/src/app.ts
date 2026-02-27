@@ -27,18 +27,23 @@ import checkoutRoutes from "./routes/checkout.js";
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
+  const rawCorsOrigin = process.env.CORS_ORIGIN?.trim() || "";
+  const isWildcard = !rawCorsOrigin || rawCorsOrigin === "*";
+
   app.use(
     "*",
     cors({
       origin: (origin) => {
-        const corsOrigin = process.env.CORS_ORIGIN || "*";
-        if (corsOrigin === "*") return origin;
-        const allowed = corsOrigin.split(",").map((s) => s.trim());
-        return allowed.includes(origin) ? origin : allowed[0] || "*";
+        if (isWildcard) return "*";
+        const allowed = rawCorsOrigin
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return origin && allowed.includes(origin) ? origin : allowed[0];
       },
       allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
-      credentials: true,
+      credentials: !isWildcard,
       maxAge: 86400,
     }),
   );

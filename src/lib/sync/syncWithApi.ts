@@ -399,12 +399,6 @@ export async function syncWithApi(
   }
 }
 
-/**
- * Run sync using createStorageAdapter() and createApiClient(getToken).
- * @deprecated Use runApiSync instead.
- */
-export const runAuroraSync = runApiSync;
-
 export async function runApiSync(
   userId: string,
   getToken: () => Promise<string | null>,
@@ -416,3 +410,8 @@ export async function runApiSync(
   const api = createApiClient({ getToken });
   await syncWithApi(adapter, api, userId, options);
 }
+
+/**
+ * @deprecated Use runApiSync instead.
+ */
+export const runAuroraSync = runApiSync;

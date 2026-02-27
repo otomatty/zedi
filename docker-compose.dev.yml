@@ -7,6 +7,11 @@ services:
       POSTGRES_DB: zedi
       POSTGRES_USER: zedi
       POSTGRES_PASSWORD: zedi_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zedi -d zedi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/initdb.d:/docker-entrypoint-initdb.d
@@ -15,6 +20,11 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     volumes:
       - redis_data:/data
 
@@ -32,8 +42,10 @@ services:
       BETTER_AUTH_URL: http://localhost:3000
       CORS_ORIGIN: http://localhost:5173
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   hocuspocus:
     build:
@@ -47,9 +59,12 @@ services:
       REDIS_URL: redis://redis:6379
       API_INTERNAL_URL: http://api:3000
     depends_on:
-      - postgres
-      - redis
-      - api
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
 
 volumes:
   postgres_data:

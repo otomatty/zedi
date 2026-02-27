@@ -114,9 +114,9 @@ app.post("/", authRequired, async (c) => {
   // ページごとに LWW (Last Write Wins) 同期
   for (const p of body.pages) {
     const existing = await db
-      .select({ id: pages.id, updatedAt: pages.updatedAt })
+      .select({ id: pages.id, updatedAt: pages.updatedAt, ownerId: pages.ownerId })
       .from(pages)
-      .where(eq(pages.id, p.id))
+      .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId)))
       .limit(1);
 
     const clientTime = new Date(p.updated_at);
@@ -151,7 +151,7 @@ app.post("/", authRequired, async (c) => {
             isDeleted: p.is_deleted ?? false,
             updatedAt: clientTime,
           })
-          .where(eq(pages.id, p.id));
+          .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId)));
         results.push({ id: p.id, action: "updated" });
       } else {
         results.push({ id: p.id, action: "skipped" });
@@ -161,9 +161,14 @@ app.post("/", authRequired, async (c) => {
 
   // リンク同期
   if (body.links?.length) {
-    // 対象ソースページのリンクをすべて削除してから INSERT
     const sourceIds = [...new Set(body.links.map((l) => l.source_id))];
+    const ownedPages = await db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.ownerId, userId), inArray(pages.id, sourceIds)));
+    const ownedIds = new Set(ownedPages.map((r) => r.id));
     for (const sourceId of sourceIds) {
+      if (!ownedIds.has(sourceId)) continue;
       await db.delete(links).where(eq(links.sourceId, sourceId));
     }
     for (const link of body.links) {
@@ -181,7 +186,13 @@ app.post("/", authRequired, async (c) => {
   // ゴーストリンク同期
   if (body.ghost_links?.length) {
     const sourceIds = [...new Set(body.ghost_links.map((g) => g.source_page_id))];
+    const ownedGhostPages = await db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.ownerId, userId), inArray(pages.id, sourceIds)));
+    const ownedGhostIds = new Set(ownedGhostPages.map((r) => r.id));
     for (const sourceId of sourceIds) {
+      if (!ownedGhostIds.has(sourceId)) continue;
       await db.delete(ghostLinks).where(eq(ghostLinks.sourcePageId, sourceId));
     }
     for (const gl of body.ghost_links) {

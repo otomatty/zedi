@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock import.meta.env before importing the module
-vi.stubEnv("VITE_ZEDI_API_BASE_URL", "https://api.test.example.com");
+vi.stubEnv("VITE_API_BASE_URL", "https://api.test.example.com");
 
 import { createApiClient, ApiError } from "./apiClient";
 

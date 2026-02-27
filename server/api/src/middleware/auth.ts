@@ -4,7 +4,12 @@ import { auth } from "../auth.js";
 import type { AppEnv } from "../types/index.js";
 
 export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  let session: Awaited<ReturnType<typeof auth.api.getSession>> | null = null;
+  try {
+    session = await auth.api.getSession({ headers: c.req.raw.headers });
+  } catch {
+    session = null;
+  }
   if (!session) {
     throw new HTTPException(401, { message: "Unauthorized" });
   }

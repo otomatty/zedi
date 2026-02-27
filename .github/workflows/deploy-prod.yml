@@ -46,6 +46,9 @@ jobs:
 
   deploy-frontend:
     name: Deploy Frontend
+    needs:
+      - deploy-api
+      - deploy-hocuspocus
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

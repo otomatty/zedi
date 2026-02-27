@@ -23,7 +23,15 @@ app.get("/:id", authRequired, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
 
-  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      image: users.image,
+    })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
   if (!result.length) {
     throw new HTTPException(404, { message: "User not found" });
   }

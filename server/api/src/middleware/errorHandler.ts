@@ -1,4 +1,5 @@
 import type { ErrorHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../types/index.js";
 
@@ -22,5 +23,5 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
   const status = statusMap[message] ?? 500;
 
   console.error(`[api] ${c.req.method} ${c.req.path} → ${status}`, err);
-  return c.json({ error: message }, status as 401);
+  return c.json({ error: message }, status as ContentfulStatusCode);
 };

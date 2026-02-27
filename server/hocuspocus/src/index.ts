@@ -48,9 +48,13 @@ async function verifySession(
 ): Promise<{ userId: string; email?: string; name?: string } | null> {
   if (!API_INTERNAL_URL) return null;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(`${API_INTERNAL_URL}/api/auth/get-session`, {
       headers: { cookie: `better-auth.session_token=${token}` },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!response.ok) return null;
     const data = (await response.json()) as {
       user?: { id: string; email?: string; name?: string };
@@ -227,32 +231,35 @@ const hocuspocus = new Hocuspocus({
   async onAuthenticate({ token, documentName }) {
     console.log(`[Auth] Document: ${documentName}, Token: ${token ? "provided" : "none"}`);
 
-    if (API_INTERNAL_URL) {
-      if (!token) {
-        throw new Error("Authentication required");
+    if (!API_INTERNAL_URL) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("API_INTERNAL_URL must be set in production");
       }
-
-      const sessionData = await verifySession(token);
-      if (!sessionData) {
-        throw new Error("Invalid session");
-      }
-
-      const pageId = parsePageId(documentName);
-      if (!pageId) {
-        throw new Error("Invalid document name");
-      }
-
-      await assertEditPermission(pageId, sessionData.userId);
-
-      const user: AuthenticatedUser = {
-        id: sessionData.userId,
-        name: sessionData.name || sessionData.userId,
-        email: sessionData.email,
-      };
-      return { user };
+      return { user: { id: "dev-user", name: "Developer" } };
     }
 
-    return { user: { id: "dev-user", name: "Developer" } };
+    if (!token) {
+      throw new Error("Authentication required");
+    }
+
+    const sessionData = await verifySession(token);
+    if (!sessionData) {
+      throw new Error("Invalid session");
+    }
+
+    const pageId = parsePageId(documentName);
+    if (!pageId) {
+      throw new Error("Invalid document name");
+    }
+
+    await assertEditPermission(pageId, sessionData.userId);
+
+    const user: AuthenticatedUser = {
+      id: sessionData.userId,
+      name: sessionData.name || sessionData.userId,
+      email: sessionData.email,
+    };
+    return { user };
   },
 
   async onConnect({ documentName }) {

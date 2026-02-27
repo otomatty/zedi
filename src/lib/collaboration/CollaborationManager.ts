@@ -74,11 +74,7 @@ export class CollaborationManager {
    */
   private async fetchAndMergeFromApi(): Promise<void> {
     try {
-      if (this.destroyed) {
-        this.updateState({ status: "connected", isSynced: true });
-        this.startLocalObserver();
-        return;
-      }
+      if (this.destroyed) return;
 
       const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
       const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");

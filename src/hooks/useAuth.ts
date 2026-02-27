@@ -10,12 +10,7 @@ import {
 
 const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 
-export function useAuth() {
-  if (isE2EMode) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useMockAuth();
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+function useBetterAuth() {
   const { data: session, isPending } = useSession();
 
   return {
@@ -40,6 +35,12 @@ export function useAuth() {
   };
 }
 
+const useAuthImpl = isE2EMode ? useMockAuth : useBetterAuth;
+
+export function useAuth() {
+  return useAuthImpl();
+}
+
 const mockUser = {
   id: MOCK_USER_ID,
   primaryEmailAddress: {
@@ -53,15 +54,15 @@ const mockUser = {
   username: "e2e_test_user",
 };
 
-export function useUser() {
-  if (isE2EMode) {
-    return {
-      isLoaded: true,
-      isSignedIn: true,
-      user: mockUser,
-    };
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+function useMockUser() {
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    user: mockUser,
+  };
+}
+
+function useBetterUser() {
   const { data: session, isPending } = useSession();
 
   const user = session
@@ -82,6 +83,12 @@ export function useUser() {
     isSignedIn: !!session,
     user,
   };
+}
+
+const useUserImpl = isE2EMode ? useMockUser : useBetterUser;
+
+export function useUser() {
+  return useUserImpl();
 }
 
 function BetterAuthSignedIn({ children }: { children: React.ReactNode }) {

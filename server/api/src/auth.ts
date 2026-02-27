@@ -5,8 +5,8 @@ import { getEnv } from "./lib/env.js";
 
 export const auth = betterAuth({
   database: drizzleAdapter(getDb(), { provider: "pg" }),
-  baseURL: process.env.BETTER_AUTH_URL,
-  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: getEnv("BETTER_AUTH_URL"),
+  secret: getEnv("BETTER_AUTH_SECRET"),
 
   emailAndPassword: {
     enabled: false,
@@ -32,5 +32,7 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [getEnv("CORS_ORIGIN")],
+  trustedOrigins: getEnv("CORS_ORIGIN")
+    .split(",")
+    .map((origin) => origin.trim()),
 });

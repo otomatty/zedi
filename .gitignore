@@ -16,6 +16,7 @@ dist-ssr
 .env.development
 .env.production
 .env
+server/.dev.vars
 
 # Server build artifacts
 server/api/dist/
