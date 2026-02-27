@@ -14,6 +14,19 @@ updates:
     open-pull-requests-limit: 10
     labels: [dependencies]
 
+  # API server
+  - package-ecosystem: npm
+    directory: /server/api
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+
   # Hocuspocus server
   - package-ecosystem: npm
     directory: /server/hocuspocus
