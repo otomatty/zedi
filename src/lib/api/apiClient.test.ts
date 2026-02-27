@@ -170,7 +170,7 @@ describe("apiClient", () => {
     });
   });
 
-  // ── 503 Auto-retry (Aurora resuming) ─────────────────────────────────
+  // ── 503 Auto-retry ─────────────────────────────────────────────────
 
   describe("503 DATABASE_RESUMING auto-retry", () => {
     it("retries on 503 with Retry-After header", async () => {

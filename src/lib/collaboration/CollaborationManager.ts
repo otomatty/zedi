@@ -1,7 +1,7 @@
 /**
  * CollaborationManager
  * Y.jsドキュメントの管理、IndexedDB永続化を担当。
- * mode='local': 個人ページ。y-indexeddb + Aurora API で Y.Doc を同期。WebSocket なし。
+ * mode='local': 個人ページ。y-indexeddb + REST API で Y.Doc を同期。WebSocket なし。
  * mode='collaborative': 共有ノート内ページ。Hocuspocus WebSocket 経由でリアルタイム同期。
  */
 
@@ -14,8 +14,8 @@ import { getUserColor } from "./types";
 
 export type CollaborationManagerMode = "local" | "collaborative";
 
-/** Debounce timer for saving Y.Doc to Aurora in local mode. */
-const AURORA_SAVE_DEBOUNCE_MS = 2000;
+/** Debounce timer for saving Y.Doc to API in local mode. */
+const API_SAVE_DEBOUNCE_MS = 2000;
 
 export class CollaborationManager {
   private ydoc: Y.Doc;
@@ -29,10 +29,10 @@ export class CollaborationManager {
   private listeners: Set<(state: CollaborationState) => void> = new Set();
   private state: CollaborationState;
   private destroyed = false;
-  /** Timer for debounced Aurora save (local mode only). */
-  private auroraSaveTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Whether initial Aurora fetch has completed (local mode). */
-  private auroraFetched = false;
+  /** Timer for debounced API save (local mode only). */
+  private apiSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Whether initial API fetch has completed (local mode). */
+  private apiFetched = false;
 
   constructor(
     pageId: string,
@@ -60,8 +60,8 @@ export class CollaborationManager {
 
     this.idbProvider.on("synced", () => {
       if (this.mode === "local") {
-        // 個人ページ: IndexedDB synced 後に Aurora から最新 Y.Doc を fetch してマージ
-        this.fetchAndMergeFromAurora();
+        // 個人ページ: IndexedDB synced 後に API から最新 Y.Doc を fetch してマージ
+        this.fetchAndMergeFromApi();
       } else {
         this.connectWebSocket();
       }
@@ -69,24 +69,23 @@ export class CollaborationManager {
   }
 
   /**
-   * Aurora API から Y.Doc を取得してローカル Y.Doc にマージする（local モード用）。
+   * REST API から Y.Doc を取得してローカル Y.Doc にマージする（local モード用）。
    * マージ後、Y.Doc の変更監視を開始する。
    */
-  private async fetchAndMergeFromAurora(): Promise<void> {
+  private async fetchAndMergeFromApi(): Promise<void> {
     try {
-      const token = await this.getAuthToken();
-      if (!token || this.destroyed) {
+      if (this.destroyed) {
         this.updateState({ status: "connected", isSynced: true });
         this.startLocalObserver();
         return;
       }
 
-      const baseUrl = (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
       const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
       });
 
       if (this.destroyed) return;
@@ -105,59 +104,58 @@ export class CollaborationManager {
             Y.applyUpdate(this.ydoc, binary);
           }
         }
+      } else if (res.status === 401) {
+        // 未認証の場合はローカルのみで続行
       } else if (res.status === 404) {
         // コンテンツ未保存のページでは 404 は想定内。エラー扱いしない。
       } else {
-        console.warn(`[Collab] Aurora content fetch failed: ${res.status}`);
+        console.warn(`[Collab] API content fetch failed: ${res.status}`);
       }
     } catch (err) {
-      console.warn("[Collab] Aurora content fetch error:", err);
+      console.warn("[Collab] API content fetch error:", err);
     }
 
-    this.auroraFetched = true;
+    this.apiFetched = true;
     this.updateState({ status: "connected", isSynced: true });
     this.startLocalObserver();
   }
 
   /**
-   * Y.Doc の変更を監視し、debounce して Aurora へ保存する（local モード用）。
+   * Y.Doc の変更を監視し、debounce して API へ保存する（local モード用）。
    */
   private startLocalObserver(): void {
     this.ydoc.on("update", () => {
       if (this.destroyed || this.mode !== "local") return;
-      this.scheduleSaveToAurora();
+      this.scheduleSaveToApi();
     });
   }
 
   /**
-   * Debounced save to Aurora via PUT /api/pages/:id/content.
+   * Debounced save via PUT /api/pages/:id/content.
    */
-  private scheduleSaveToAurora(): void {
-    if (this.auroraSaveTimer) clearTimeout(this.auroraSaveTimer);
-    this.auroraSaveTimer = setTimeout(() => {
-      this.saveToAurora();
-    }, AURORA_SAVE_DEBOUNCE_MS);
+  private scheduleSaveToApi(): void {
+    if (this.apiSaveTimer) clearTimeout(this.apiSaveTimer);
+    this.apiSaveTimer = setTimeout(() => {
+      this.saveToApi();
+    }, API_SAVE_DEBOUNCE_MS);
   }
 
   /**
-   * Cancel debounce and save to Aurora immediately (e.g. after applying URL-clip initial content).
+   * Cancel debounce and save immediately (e.g. after applying URL-clip initial content).
    * No-op in collaborative mode or when destroyed.
    */
   flushSave(): void {
     if (this.destroyed || this.mode !== "local") return;
-    if (this.auroraSaveTimer) {
-      clearTimeout(this.auroraSaveTimer);
-      this.auroraSaveTimer = null;
+    if (this.apiSaveTimer) {
+      clearTimeout(this.apiSaveTimer);
+      this.apiSaveTimer = null;
     }
-    void this.saveToAurora();
+    void this.saveToApi();
   }
 
-  private async saveToAurora(): Promise<void> {
+  private async saveToApi(): Promise<void> {
     if (this.destroyed) return;
     try {
-      const token = await this.getAuthToken();
-      if (!token || this.destroyed) return;
-
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length <= 2) return; // empty Y.Doc
 
@@ -173,7 +171,7 @@ export class CollaborationManager {
       const fragment = this.ydoc.getXmlFragment("default");
       const contentText = fragment.toJSON() ? this.extractText(fragment) : "";
 
-      const baseUrl = (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
       const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
@@ -181,8 +179,8 @@ export class CollaborationManager {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({
           ydoc_state: b64,
           content_text: contentText,
@@ -191,10 +189,10 @@ export class CollaborationManager {
 
       if (this.destroyed) return;
       if (!res.ok) {
-        console.warn(`[Collab] Aurora save failed: ${res.status}`);
+        console.warn(`[Collab] API save failed: ${res.status}`);
       }
     } catch (err) {
-      console.warn("[Collab] Aurora save error:", err);
+      console.warn("[Collab] API save error:", err);
     }
   }
 
@@ -377,14 +375,14 @@ export class CollaborationManager {
   destroy() {
     this.destroyed = true;
 
-    // Aurora save タイマーをキャンセル
-    if (this.auroraSaveTimer) {
-      clearTimeout(this.auroraSaveTimer);
-      this.auroraSaveTimer = null;
+    // API save タイマーをキャンセル
+    if (this.apiSaveTimer) {
+      clearTimeout(this.apiSaveTimer);
+      this.apiSaveTimer = null;
     }
 
     // 最終保存: ydoc 破棄前に同期的にステートをエンコードし、非同期で送信
-    if (this.mode === "local" && this.auroraFetched) {
+    if (this.mode === "local" && this.apiFetched) {
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length > 2) {
         const contentText = this.extractText(this.ydoc.getXmlFragment("default"));
@@ -410,36 +408,30 @@ export class CollaborationManager {
    * keepalive: true でページ離脱後もリクエストが完了するようにする。
    */
   private fireAndForgetSave(state: Uint8Array, contentText: string): void {
-    this.getAuthToken()
-      .then((token) => {
-        if (!token) return;
+    let b64 = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < state.length; i += chunkSize) {
+      b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
+    }
+    b64 = btoa(b64);
 
-        let b64 = "";
-        const chunkSize = 8192;
-        for (let i = 0; i < state.length; i += chunkSize) {
-          b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
-        }
-        b64 = btoa(b64);
+    const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+    const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
-        const baseUrl = (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
-        const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
-        const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
-
-        return fetch(url, {
-          method: "PUT",
-          keepalive: true,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ydoc_state: b64,
-            content_text: contentText,
-          }),
-        });
-      })
-      .catch(() => {
-        // 最終保存の失敗は無視（ページ離脱中のため処理不能）
-      });
+    fetch(url, {
+      method: "PUT",
+      keepalive: true,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        ydoc_state: b64,
+        content_text: contentText,
+      }),
+    }).catch(() => {
+      // 最終保存の失敗は無視（ページ離脱中のため処理不能）
+    });
   }
 }

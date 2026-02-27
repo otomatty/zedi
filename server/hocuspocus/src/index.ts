@@ -1,44 +1,25 @@
 import { Hocuspocus } from "@hocuspocus/server";
 import { createServer, IncomingMessage, ServerResponse } from "http";
 import { WebSocketServer } from "ws";
-import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { Redis } from "@hocuspocus/extension-redis";
 import { Pool, PoolClient } from "pg";
 import * as Y from "yjs";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
-const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
 const DATABASE_URL = process.env.DATABASE_URL;
-const DB_CREDENTIALS_JSON = process.env.DB_CREDENTIALS_JSON;
+const API_INTERNAL_URL = process.env.API_INTERNAL_URL;
 
 type AuthenticatedUser = {
   id: string;
   name: string;
   email?: string;
-  cognitoSub?: string;
 };
 
 type DbUser = {
   id: string;
   email: string;
 };
-
-type DbCredentialPayload = {
-  username?: string;
-  password?: string;
-  host?: string;
-  port?: number | string;
-  dbname?: string;
-};
-
-const cognitoVerifier = COGNITO_USER_POOL_ID
-  ? CognitoJwtVerifier.create({
-      userPoolId: COGNITO_USER_POOL_ID,
-      tokenUse: "id",
-      clientId: null, // 署名・有効期限のみ検証（clientId は未チェック）
-    })
-  : null;
 
 let pgPool: Pool | null = null;
 const documentConnectionCounts = new Map<string, number>();
@@ -49,55 +30,43 @@ function parsePageId(documentName: string): string | null {
   return pageId.length > 0 ? pageId : null;
 }
 
-function parseDbCredentialsFromSecret(): string | null {
-  if (!DB_CREDENTIALS_JSON) return null;
-  try {
-    const payload = JSON.parse(DB_CREDENTIALS_JSON) as DbCredentialPayload;
-    if (!payload.host || !payload.username || !payload.password || !payload.dbname) {
-      return null;
-    }
-    const port = Number(payload.port || 5432);
-    const user = encodeURIComponent(payload.username);
-    const pass = encodeURIComponent(payload.password);
-    const db = encodeURIComponent(payload.dbname);
-    return `postgresql://${user}:${pass}@${payload.host}:${port}/${db}`;
-  } catch (error) {
-    console.error("[DB] Failed to parse DB_CREDENTIALS_JSON:", error);
-    return null;
-  }
-}
-
-function resolveDatabaseUrl(): string | null {
-  if (DATABASE_URL && DATABASE_URL.includes("://")) {
-    return DATABASE_URL;
-  }
-  return parseDbCredentialsFromSecret();
-}
-
 function getPool(): Pool {
   if (pgPool) return pgPool;
-  const connectionString = resolveDatabaseUrl();
-  if (!connectionString) {
-    throw new Error(
-      "Database connection is not configured. Set DATABASE_URL (postgres URL) or DB_CREDENTIALS_JSON (Secrets Manager JSON).",
-    );
+  if (!DATABASE_URL) {
+    throw new Error("DATABASE_URL must be set");
   }
   pgPool = new Pool({
-    connectionString,
+    connectionString: DATABASE_URL,
     max: 10,
     idleTimeoutMillis: 30000,
   });
   return pgPool;
 }
 
-/**
- * Resolve Cognito sub to users.id and email (pg driver).
- * Same contract as packages/zedi-auth-db resolveUser: DB user identifier must be users.id.
- */
-async function getCurrentUserBySub(client: PoolClient, cognitoSub: string): Promise<DbUser | null> {
+async function verifySession(
+  token: string,
+): Promise<{ userId: string; email?: string; name?: string } | null> {
+  if (!API_INTERNAL_URL) return null;
+  try {
+    const response = await fetch(`${API_INTERNAL_URL}/api/auth/get-session`, {
+      headers: { cookie: `better-auth.session_token=${token}` },
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      user?: { id: string; email?: string; name?: string };
+    };
+    if (!data.user?.id) return null;
+    return { userId: data.user.id, email: data.user.email, name: data.user.name };
+  } catch (err) {
+    console.error("[Auth] Session verification failed:", err);
+    return null;
+  }
+}
+
+async function getCurrentUserById(client: PoolClient, userId: string): Promise<DbUser | null> {
   const result = await client.query<{ id: string; email: string }>(
-    "SELECT id, email FROM users WHERE cognito_sub = $1 LIMIT 1",
-    [cognitoSub],
+    'SELECT id, email FROM "user" WHERE id = $1 LIMIT 1',
+    [userId],
   );
   const row = result.rows[0];
   if (!row?.id || !row?.email) return null;
@@ -153,10 +122,10 @@ async function isPersonalPageOwner(
   return result.rows.length > 0;
 }
 
-async function assertEditPermission(pageId: string, cognitoSub: string): Promise<void> {
+async function assertEditPermission(pageId: string, userId: string): Promise<void> {
   const client = await getPool().connect();
   try {
-    const currentUser = await getCurrentUserBySub(client, cognitoSub);
+    const currentUser = await getCurrentUserById(client, userId);
     if (!currentUser) {
       throw new Error("User not found");
     }
@@ -258,36 +227,31 @@ const hocuspocus = new Hocuspocus({
   async onAuthenticate({ token, documentName }) {
     console.log(`[Auth] Document: ${documentName}, Token: ${token ? "provided" : "none"}`);
 
-    if (cognitoVerifier) {
+    if (API_INTERNAL_URL) {
       if (!token) {
         throw new Error("Authentication required");
       }
-      let payload: Record<string, unknown>;
-      try {
-        payload = (await cognitoVerifier.verify(token)) as Record<string, unknown>;
-      } catch (err) {
-        console.warn("[Auth] Cognito JWT verification failed:", err);
-        throw new Error("Invalid token");
+
+      const sessionData = await verifySession(token);
+      if (!sessionData) {
+        throw new Error("Invalid session");
       }
 
-      const sub = payload.sub as string;
-      const name = (payload.name as string) || (payload["cognito:username"] as string) || sub;
       const pageId = parsePageId(documentName);
       if (!pageId) {
         throw new Error("Invalid document name");
       }
-      await assertEditPermission(pageId, sub);
-      const email = typeof payload.email === "string" ? payload.email : undefined;
+
+      await assertEditPermission(pageId, sessionData.userId);
+
       const user: AuthenticatedUser = {
-        id: sub,
-        name,
-        email,
-        cognitoSub: sub,
+        id: sessionData.userId,
+        name: sessionData.name || sessionData.userId,
+        email: sessionData.email,
       };
       return { user };
     }
 
-    // 開発用: Cognito 未設定時は全許可
     return { user: { id: "dev-user", name: "Developer" } };
   },
 

@@ -1,5 +1,6 @@
 export {
   syncWithApi,
+  runApiSync,
   runAuroraSync,
   isSyncInProgress,
   isSyncDisabledByErrors,

@@ -1,10 +1,9 @@
 import { StrictMode, ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { CognitoAuthProvider } from "./components/auth/CognitoAuthProvider";
 import { MockAuthProvider } from "./components/auth/MockAuthProvider";
 import App from "./App.tsx";
 import "./index.css";
-import "./i18n"; // i18n 初期化
+import "./i18n";
 
 const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 
@@ -12,15 +11,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   if (isE2EMode) {
     return <MockAuthProvider>{children}</MockAuthProvider>;
   }
-  return <CognitoAuthProvider>{children}</CognitoAuthProvider>;
-}
-
-// Require Cognito config when not E2E (no build-time throw; fails at first auth use if missing)
-if (!isE2EMode && !import.meta.env.VITE_COGNITO_DOMAIN) {
-  console.warn("[Auth] VITE_COGNITO_DOMAIN is not set; sign-in will fail.");
-}
-if (!isE2EMode && !import.meta.env.VITE_COGNITO_CLIENT_ID) {
-  console.warn("[Auth] VITE_COGNITO_CLIENT_ID is not set; sign-in will fail.");
+  return <>{children}</>;
 }
 
 const rootEl = document.getElementById("root");

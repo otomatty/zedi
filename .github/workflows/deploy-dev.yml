@@ -1,155 +1,39 @@
-# Deploy dev infrastructure when a PR is merged into develop.
-# Applies Terraform (dev workspace), runs DB migrations, and deploys Hocuspocus.
-# Frontend is NOT deployed — use localhost against dev cloud resources.
-#
-# Required GitHub Environment: "dev" with the following secrets:
-#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-#   TF_VAR_GOOGLE_OAUTH_CLIENT_SECRET, TF_VAR_GITHUB_OAUTH_CLIENT_SECRET
-#   TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_API_KEY (optional)
-#   TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_ENGINE_ID (optional)
-
-name: Deploy Dev
+name: Deploy Development
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [develop]
-  workflow_dispatch:
-
-concurrency:
-  group: deploy-dev
-  cancel-in-progress: false
 
 jobs:
-  terraform:
-    name: Terraform Apply (dev)
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+  migrate:
+    name: Run Database Migrations
     runs-on: ubuntu-latest
-    environment: dev
-    outputs:
-      cluster_arn: ${{ steps.outputs.outputs.cluster_arn }}
-      secret_arn: ${{ steps.outputs.outputs.secret_arn }}
-      ecr_url: ${{ steps.outputs.outputs.ecr_url }}
-      ecs_cluster: ${{ steps.outputs.outputs.ecs_cluster }}
-      ecs_service: ${{ steps.outputs.outputs.ecs_service }}
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-
-      - uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_wrapper: false
-
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-
-      - name: Build api Lambda
-        run: npm ci && npm run build
-        working-directory: terraform/modules/api/lambda
-
-      - name: Build ai-api Lambda
-        run: npm ci && npm run build
-        working-directory: terraform/modules/ai-api/lambda
-
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init
-
-      - name: Select workspace
-        working-directory: terraform
-        run: terraform workspace select dev
-
-      - name: Terraform Plan
-        working-directory: terraform
-        run: |
-          terraform plan \
-            -var-file=environments/dev.tfvars \
-            -out=tfplan \
-            -no-color 2>&1 | tee plan.txt
-
-          echo "### Terraform Plan (dev)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -5 plan.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          node-version: "22"
+      - working-directory: server/api
+        run: npm ci && npx drizzle-kit migrate
         env:
-          TF_VAR_google_oauth_client_secret: ${{ secrets.TF_VAR_GOOGLE_OAUTH_CLIENT_SECRET }}
-          TF_VAR_github_oauth_client_secret: ${{ secrets.TF_VAR_GITHUB_OAUTH_CLIENT_SECRET }}
-          TF_VAR_thumbnail_google_custom_search_api_key: ${{ secrets.TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_API_KEY }}
-          TF_VAR_thumbnail_google_custom_search_engine_id: ${{ secrets.TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_ENGINE_ID }}
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
 
-      - name: Terraform Apply
-        working-directory: terraform
-        run: terraform apply tfplan
-
-      - name: Get outputs
-        id: outputs
-        working-directory: terraform
-        run: |
-          echo "cluster_arn=$(terraform output -raw aurora_cluster_arn)" >> $GITHUB_OUTPUT
-          echo "secret_arn=$(terraform output -raw db_credentials_secret_arn)" >> $GITHUB_OUTPUT
-          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
-          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
-          echo "ecs_service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
-
-  db-migration:
-    name: DB Migration (dev)
-    needs: terraform
+  deploy-api:
+    needs: migrate
     runs-on: ubuntu-latest
-    environment: dev
     steps:
       - uses: actions/checkout@v6
+      - uses: railwayapp/cli-action@v1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          token: ${{ secrets.RAILWAY_TOKEN }}
+          command: up --service api --environment development -d
 
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-
-      - name: Run pending migrations
-        working-directory: db/aurora
-        run: node migrate.mjs
-        env:
-          CLUSTER_ARN: ${{ needs.terraform.outputs.cluster_arn }}
-          SECRET_ARN: ${{ needs.terraform.outputs.secret_arn }}
-
-  hocuspocus:
-    name: Hocuspocus Deploy (dev)
-    needs: terraform
+  deploy-hocuspocus:
+    needs: migrate
     runs-on: ubuntu-latest
-    environment: dev
     steps:
       - uses: actions/checkout@v6
+      - uses: railwayapp/cli-action@v1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region ap-northeast-1 | \
-            docker login --username AWS --password-stdin \
-            "$(echo '${{ needs.terraform.outputs.ecr_url }}' | cut -d/ -f1)"
-
-      - name: Build and push
-        working-directory: server/hocuspocus
-        run: |
-          docker build -t hocuspocus .
-          docker tag hocuspocus:latest "${{ needs.terraform.outputs.ecr_url }}:latest"
-          docker push "${{ needs.terraform.outputs.ecr_url }}:latest"
-
-      - name: Force ECS redeployment
-        run: |
-          aws ecs update-service \
-            --cluster "${{ needs.terraform.outputs.ecs_cluster }}" \
-            --service "${{ needs.terraform.outputs.ecs_service }}" \
-            --force-new-deployment
+          token: ${{ secrets.RAILWAY_TOKEN }}
+          command: up --service hocuspocus --environment development -d

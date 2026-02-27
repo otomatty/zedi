@@ -72,7 +72,7 @@ export function getSyncStatus(): SyncStatus {
   return syncStatus;
 }
 
-/** True until the first sync attempt (runAuroraSync/syncWithApi) has completed (success or error). C3-11. */
+/** True until the first sync attempt (runApiSync/syncWithApi) has completed (success or error). */
 export function hasNeverSynced(): boolean {
   return !hasCompletedFirstSync;
 }
@@ -401,9 +401,11 @@ export async function syncWithApi(
 
 /**
  * Run sync using createStorageAdapter() and createApiClient(getToken).
- * Call this when the app uses StorageAdapter as the data source (after C3-7).
+ * @deprecated Use runApiSync instead.
  */
-export async function runAuroraSync(
+export const runAuroraSync = runApiSync;
+
+export async function runApiSync(
   userId: string,
   getToken: () => Promise<string | null>,
   options?: SyncWithApiOptions & { force?: boolean },

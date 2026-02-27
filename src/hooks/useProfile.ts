@@ -1,7 +1,6 @@
-// プロフィール取得・更新フック（バックエンド API 連携）
+// プロフィール取得・更新フック（Better Auth セッション + バックエンド API 連携）
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { createApiClient } from "@/lib/api";
 import { useAuth, useUser } from "@/hooks/useAuth";
 
 interface ProfileData {
@@ -10,9 +9,9 @@ interface ProfileData {
 }
 
 interface UseProfileReturn {
-  /** バックエンド優先、Cognito フォールバックの表示用名前 */
+  /** バックエンド優先、IdP フォールバックの表示用名前 */
   displayName: string;
-  /** バックエンド優先、Cognito フォールバックのアバター URL */
+  /** バックエンド優先、IdP フォールバックのアバター URL */
   avatarUrl: string;
   /** バックエンドのプロフィール（編集用） */
   profile: ProfileData;
@@ -46,8 +45,13 @@ function saveCachedProfile(profile: ProfileData): void {
   }
 }
 
+function getApiBaseUrl(): string {
+  const base = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+  return base.replace(/\/$/, "") || (typeof window !== "undefined" ? window.location.origin : "");
+}
+
 export function useProfile(): UseProfileReturn {
-  const { getToken, isSignedIn } = useAuth();
+  const { isSignedIn } = useAuth();
   const { user } = useUser();
 
   const [profile, setProfile] = useState<ProfileData>(() => {
@@ -57,7 +61,6 @@ export function useProfile(): UseProfileReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // バックエンドからプロフィールを取得（upsert レスポンスを利用）
   useEffect(() => {
     if (!isSignedIn) {
       setIsLoading(false);
@@ -65,13 +68,15 @@ export function useProfile(): UseProfileReturn {
     }
     const fetchProfile = async () => {
       try {
-        const api = createApiClient({ getToken });
-        // upsert を body なしで呼ぶと現在のユーザー情報が返る想定
-        const result = (await api.upsertMe({})) as Record<string, unknown> | null;
-        if (result && typeof result === "object") {
-          const rawDisplayName = (result.display_name as string) ?? "";
-          const rawAvatarUrl = (result.avatar_url as string) ?? "";
-          // バックエンドが空のときは IdP（Google/GitHub）の名前で初期化
+        const res = await fetch(`${getApiBaseUrl()}/api/users/me`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = (await res.json()) as {
+            user?: { name?: string; image?: string };
+          };
+          const rawDisplayName = data?.user?.name ?? "";
+          const rawAvatarUrl = data?.user?.image ?? "";
           const displayName =
             rawDisplayName.trim() !== ""
               ? rawDisplayName
@@ -85,13 +90,12 @@ export function useProfile(): UseProfileReturn {
         }
       } catch (error) {
         console.warn("Failed to fetch profile:", error);
-        // キャッシュまたは空のまま
       } finally {
         setIsLoading(false);
       }
     };
     fetchProfile();
-  }, [isSignedIn, getToken, user?.fullName, user?.username]);
+  }, [isSignedIn, user?.fullName, user?.username]);
 
   const updateProfile = useCallback((updates: Partial<ProfileData>) => {
     setProfile((prev) => ({ ...prev, ...updates }));
@@ -100,11 +104,16 @@ export function useProfile(): UseProfileReturn {
   const save = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     try {
-      const api = createApiClient({ getToken });
-      await api.upsertMe({
-        display_name: profile.displayName || undefined,
-        avatar_url: profile.avatarUrl || undefined,
+      const res = await fetch(`${getApiBaseUrl()}/api/auth/update-user`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: profile.displayName || undefined,
+          image: profile.avatarUrl || undefined,
+        }),
       });
+      if (!res.ok) throw new Error(`Failed to update profile: ${res.status}`);
       saveCachedProfile(profile);
       return true;
     } catch (error) {
@@ -113,9 +122,9 @@ export function useProfile(): UseProfileReturn {
     } finally {
       setIsSaving(false);
     }
-  }, [getToken, profile]);
+  }, [profile]);
 
-  // バックエンド優先、Cognito フォールバック
+  // バックエンド優先、IdP フォールバック
   const displayName = useMemo(() => {
     if (profile.displayName) return profile.displayName;
     return user?.fullName ?? user?.username ?? "";

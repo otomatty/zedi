@@ -1,218 +1,67 @@
-# Deploy everything to production when a PR is merged into main.
-# Applies Terraform (prod workspace), runs DB migrations, deploys frontend
-# to S3/CloudFront, and updates the Hocuspocus ECS service.
-#
-# Required GitHub Environment: "prod" with the following secrets:
-#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-#   TF_VAR_GOOGLE_OAUTH_CLIENT_SECRET, TF_VAR_GITHUB_OAUTH_CLIENT_SECRET
-#   TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_API_KEY (optional)
-#   TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_ENGINE_ID (optional)
-#   VITE_COGNITO_DOMAIN, VITE_COGNITO_CLIENT_ID
-#   VITE_COGNITO_REDIRECT_URI, VITE_COGNITO_LOGOUT_REDIRECT_URI
-#   VITE_ZEDI_API_BASE_URL (REST: Zedi / AI / Thumbnail 共通), VITE_AI_WS_URL, VITE_REALTIME_URL
-
-name: Deploy Prod
+name: Deploy Production
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
-  workflow_dispatch:
-
-concurrency:
-  group: deploy-prod
-  cancel-in-progress: false
 
 jobs:
-  # ============================================================
-  # 1. Terraform Apply — infrastructure + Lambda functions
-  # ============================================================
-  terraform:
-    name: Terraform Apply (prod)
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+  migrate:
+    name: Run Database Migrations
     runs-on: ubuntu-latest
-    environment: prod
-    outputs:
-      cluster_arn: ${{ steps.outputs.outputs.cluster_arn }}
-      secret_arn: ${{ steps.outputs.outputs.secret_arn }}
-      s3_bucket: ${{ steps.outputs.outputs.s3_bucket }}
-      cf_dist_id: ${{ steps.outputs.outputs.cf_dist_id }}
-      ecr_url: ${{ steps.outputs.outputs.ecr_url }}
-      ecs_cluster: ${{ steps.outputs.outputs.ecs_cluster }}
-      ecs_service: ${{ steps.outputs.outputs.ecs_service }}
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          node-version: "22"
+      - name: Install dependencies
+        working-directory: server/api
+        run: npm ci
+      - name: Run migrations
+        working-directory: server/api
+        run: npx drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
 
-      - uses: hashicorp/setup-terraform@v4
+  deploy-api:
+    name: Deploy API
+    needs: migrate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: railwayapp/cli-action@v1
         with:
-          terraform_wrapper: false
+          token: ${{ secrets.RAILWAY_TOKEN }}
+          command: up --service api --environment production -d
 
-      - uses: aws-actions/configure-aws-credentials@v6
+  deploy-hocuspocus:
+    name: Deploy Hocuspocus
+    needs: migrate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: railwayapp/cli-action@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
+          token: ${{ secrets.RAILWAY_TOKEN }}
+          command: up --service hocuspocus --environment production -d
 
-      - name: Build api Lambda
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install & Build
         run: npm ci && npm run build
-        working-directory: terraform/modules/api/lambda
-
-      - name: Build ai-api Lambda
-        run: npm ci && npm run build
-        working-directory: terraform/modules/ai-api/lambda
-
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init
-
-      - name: Select workspace
-        working-directory: terraform
-        run: terraform workspace select prod
-
-      - name: Terraform Plan
-        working-directory: terraform
-        run: |
-          terraform plan \
-            -var-file=environments/prod.tfvars \
-            -out=tfplan \
-            -no-color 2>&1 | tee plan.txt
-
-          echo "### Terraform Plan (prod)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -5 plan.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
         env:
-          TF_VAR_google_oauth_client_secret: ${{ secrets.TF_VAR_GOOGLE_OAUTH_CLIENT_SECRET }}
-          TF_VAR_github_oauth_client_secret: ${{ secrets.TF_VAR_GITHUB_OAUTH_CLIENT_SECRET }}
-          TF_VAR_thumbnail_google_custom_search_api_key: ${{ secrets.TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_API_KEY }}
-          TF_VAR_thumbnail_google_custom_search_engine_id: ${{ secrets.TF_VAR_THUMBNAIL_GOOGLE_CUSTOM_SEARCH_ENGINE_ID }}
-
-      - name: Terraform Apply
-        working-directory: terraform
-        run: terraform apply tfplan
-
-      - name: Get outputs
-        id: outputs
-        working-directory: terraform
-        run: |
-          echo "cluster_arn=$(terraform output -raw aurora_cluster_arn)" >> $GITHUB_OUTPUT
-          echo "secret_arn=$(terraform output -raw db_credentials_secret_arn)" >> $GITHUB_OUTPUT
-          echo "s3_bucket=$(terraform output -raw frontend_s3_bucket)" >> $GITHUB_OUTPUT
-          echo "cf_dist_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
-          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
-          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
-          echo "ecs_service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
-
-  # ============================================================
-  # 2. DB Migration (runs after Terraform)
-  # ============================================================
-  db-migration:
-    name: DB Migration (prod)
-    needs: terraform
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - uses: actions/checkout@v6
+          VITE_API_BASE_URL: ${{ vars.PROD_API_BASE_URL }}
+          VITE_REALTIME_URL: ${{ vars.PROD_REALTIME_URL }}
+          VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
+          VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-
-      - name: Run pending migrations
-        working-directory: db/aurora
-        run: node migrate.mjs
-        env:
-          CLUSTER_ARN: ${{ needs.terraform.outputs.cluster_arn }}
-          SECRET_ARN: ${{ needs.terraform.outputs.secret_arn }}
-
-  # ============================================================
-  # 3. Frontend Deploy — build + S3 sync + CloudFront invalidation
-  #    (runs in parallel with DB migration and Hocuspocus)
-  # ============================================================
-  frontend:
-    name: Frontend Deploy
-    needs: terraform
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-
-      - run: bun install --frozen-lockfile
-
-      - name: Build (production)
-        run: bun run build
-        env:
-          VITE_COGNITO_DOMAIN: ${{ secrets.VITE_COGNITO_DOMAIN }}
-          VITE_COGNITO_CLIENT_ID: ${{ secrets.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REDIRECT_URI: ${{ secrets.VITE_COGNITO_REDIRECT_URI }}
-          VITE_COGNITO_LOGOUT_REDIRECT_URI: ${{ secrets.VITE_COGNITO_LOGOUT_REDIRECT_URI }}
-          VITE_ZEDI_API_BASE_URL: ${{ secrets.VITE_ZEDI_API_BASE_URL }}
-          VITE_AI_WS_URL: ${{ secrets.VITE_AI_WS_URL }}
-          VITE_REALTIME_URL: ${{ secrets.VITE_REALTIME_URL }}
-
-      - name: Sync to S3
-        run: aws s3 sync dist/ "s3://${{ needs.terraform.outputs.s3_bucket }}/" --delete
-
-      - name: Invalidate CloudFront
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id "${{ needs.terraform.outputs.cf_dist_id }}" \
-            --paths "/*"
-
-  # ============================================================
-  # 4. Hocuspocus — Docker build + ECR push + ECS force-deploy
-  #    (runs in parallel with DB migration and frontend)
-  # ============================================================
-  hocuspocus:
-    name: Hocuspocus Deploy (prod)
-    needs: terraform
-    runs-on: ubuntu-latest
-    environment: prod
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-
-      - uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region ap-northeast-1 | \
-            docker login --username AWS --password-stdin \
-            "$(echo '${{ needs.terraform.outputs.ecr_url }}' | cut -d/ -f1)"
-
-      - name: Build and push
-        working-directory: server/hocuspocus
-        run: |
-          docker build -t hocuspocus .
-          docker tag hocuspocus:latest "${{ needs.terraform.outputs.ecr_url }}:latest"
-          docker push "${{ needs.terraform.outputs.ecr_url }}:latest"
-
-      - name: Force ECS redeployment
-        run: |
-          aws ecs update-service \
-            --cluster "${{ needs.terraform.outputs.ecs_cluster }}" \
-            --service "${{ needs.terraform.outputs.ecs_service }}" \
-            --force-new-deployment
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=zedi

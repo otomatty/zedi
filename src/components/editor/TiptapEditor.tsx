@@ -26,7 +26,6 @@ import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { useImageUploadManager } from "./TiptapEditor/useImageUploadManager";
 import { useStorageActions } from "./TiptapEditor/useStorageActions";
 import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
-import { useAuth } from "@/hooks/useAuth";
 import { extractFirstImage } from "@/lib/contentUtils";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useEditorSetup } from "./TiptapEditor/useEditorSetup";
@@ -59,7 +58,6 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const editorRef = useRef<Editor | null>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
   const { toast } = useToast();
-  const { getToken } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -134,7 +132,6 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     canDeleteFromStorage,
     handleDeleteFromStorage,
     handleCopyImageUrl,
-    getToken,
     suggestionState,
     slashState,
     suggestionRef,

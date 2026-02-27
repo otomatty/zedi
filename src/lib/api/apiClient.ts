@@ -1,6 +1,6 @@
 /**
- * REST API client for Zedi backend (C1-4, C1-5, C1-6, C1-7).
- * All /api/* routes require Cognito JWT.
+ * REST API client for Zedi backend.
+ * Uses cookie-based auth (Better Auth) — credentials: "include" on all requests.
  */
 
 import type {
@@ -21,10 +21,10 @@ import type {
 export type { NoteListItem };
 
 export interface ApiClientOptions {
-  /** Base URL for API (e.g. https://xxx.execute-api.region.amazonaws.com or "" for same-origin). */
+  /** Base URL for API (e.g. https://api.zedi-note.app or "" for same-origin). */
   baseUrl?: string;
-  /** Returns current Cognito id_token for Authorization header. */
-  getToken: () => Promise<string | null>;
+  /** @deprecated No longer used — auth is cookie-based. Kept for backward compatibility. */
+  getToken?: () => Promise<string | null>;
 }
 
 /** API error with status and optional code from body. */
@@ -46,13 +46,11 @@ type ApiEnvelope<T> = {
 };
 
 function getDefaultBaseUrl(): string {
-  return (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+  return (import.meta.env.VITE_API_BASE_URL as string) ?? "";
 }
 
-/** Maximum retries when server returns 503 (DATABASE_RESUMING). */
-const MAX_DB_RESUMING_RETRIES = 4;
-/** Default wait time (ms) when Retry-After header is absent. */
-const DEFAULT_RETRY_AFTER_MS = 10_000;
+const MAX_RETRIES = 3;
+const DEFAULT_RETRY_AFTER_MS = 2_000;
 
 function parseResponseText(text: string, status: number): unknown {
   try {
@@ -92,7 +90,6 @@ function unwrapEnvelope<T>(data: unknown): T {
 async function request<T>(
   method: string,
   path: string,
-  getToken: () => Promise<string | null>,
   baseUrl: string,
   options: { body?: unknown; query?: Record<string, string> } = {},
 ): Promise<T> {
@@ -104,20 +101,15 @@ async function request<T>(
   if (options.query) {
     Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const token = await getToken();
-  if (!token) {
-    throw new ApiError("Not authenticated", 401);
-  }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
   };
-  const init: RequestInit = { method, headers };
+  const init: RequestInit = { method, headers, credentials: "include" };
   if (options.body !== undefined) {
     init.body = JSON.stringify(options.body);
   }
 
-  for (let attempt = 0; attempt <= MAX_DB_RESUMING_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     let res: Response;
     try {
       res = await fetch(url.toString(), init);
@@ -129,16 +121,9 @@ async function request<T>(
       );
     }
 
-    if (res.status === 503 && attempt < MAX_DB_RESUMING_RETRIES) {
+    if (res.status === 503 && attempt < MAX_RETRIES) {
       const retryAfterSec = parseInt(res.headers.get("Retry-After") ?? "", 10);
       const waitMs = retryAfterSec > 0 ? retryAfterSec * 1000 : DEFAULT_RETRY_AFTER_MS;
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("zedi:db-resuming", {
-            detail: { attempt: attempt + 1, retryAfterMs: waitMs },
-          }),
-        );
-      }
       await new Promise((resolve) => setTimeout(resolve, waitMs));
       continue;
     }
@@ -151,13 +136,12 @@ async function request<T>(
     return unwrapEnvelope<T>(data);
   }
 
-  throw new ApiError("Database is still resuming after retries", 503, "DATABASE_RESUMING");
+  throw new ApiError("Service unavailable after retries", 503, "SERVICE_UNAVAILABLE");
 }
 
 async function requestOptionalAuth<T>(
   method: string,
   path: string,
-  getToken: () => Promise<string | null>,
   baseUrl: string,
   options: { body?: unknown; query?: Record<string, string> } = {},
 ): Promise<T> {
@@ -169,10 +153,8 @@ async function requestOptionalAuth<T>(
   if (options.query) {
     Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const token = await getToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const init: RequestInit = { method, headers };
+  const init: RequestInit = { method, headers, credentials: "include" };
   if (options.body !== undefined) {
     init.body = JSON.stringify(options.body);
   }
@@ -195,27 +177,21 @@ async function requestOptionalAuth<T>(
 }
 
 export function createApiClient(options?: Partial<ApiClientOptions>) {
-  const getToken = options?.getToken ?? (() => Promise.resolve(null));
   const baseUrl = options?.baseUrl ?? getDefaultBaseUrl();
 
   const req = <T>(
     method: string,
     path: string,
     opts: { body?: unknown; query?: Record<string, string> } = {},
-  ) => request<T>(method, path, getToken, baseUrl, opts);
+  ) => request<T>(method, path, baseUrl, opts);
 
   const reqOptionalAuth = <T>(
     method: string,
     path: string,
     opts: { body?: unknown; query?: Record<string, string> } = {},
-  ) => requestOptionalAuth<T>(method, path, getToken, baseUrl, opts);
+  ) => requestOptionalAuth<T>(method, path, baseUrl, opts);
 
   return {
-    /** POST /api/users/upsert — ensure current user exists in DB (Cognito sub/email from JWT). Call before first sync. */
-    async upsertMe(body?: { display_name?: string; avatar_url?: string }): Promise<unknown> {
-      return req("POST", "/api/users/upsert", { body: body ?? {} });
-    },
-
     /** GET /api/sync/pages?since= (ISO8601). Omit since for full pull. */
     async getSyncPages(since?: string): Promise<SyncPagesResponse> {
       const query: Record<string, string> = {};
