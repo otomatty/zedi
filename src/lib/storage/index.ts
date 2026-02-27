@@ -8,7 +8,7 @@ import { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
 import { S3Provider, type S3ProviderContext } from "./providers/S3Provider";
 
 /**
- * S3 プロバイダー用のコンテキスト（getToken 必須。baseUrl は省略時は VITE_ZEDI_API_BASE_URL）
+ * S3 プロバイダー用のコンテキスト（getToken 必須。baseUrl は省略時は VITE_API_BASE_URL）
  */
 export type StorageProviderContext = S3ProviderContext;
 

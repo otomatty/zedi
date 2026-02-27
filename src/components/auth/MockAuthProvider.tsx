@@ -2,7 +2,7 @@
  * Mock auth provider for E2E testing.
  *
  * Provides a fake authentication context so E2E tests can run without
- * real Cognito/IdP. useAuth() switches to useMockAuth() when VITE_E2E_TEST=true.
+ * real Better Auth. useAuth() switches to useMockAuth() when VITE_E2E_TEST=true.
  */
 import { createContext, useContext, ReactNode } from "react";
 

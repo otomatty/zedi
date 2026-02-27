@@ -4,8 +4,8 @@ import Container from "@/components/layout/Container";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
-/** Uses same base URL as REST API (VITE_ZEDI_API_BASE_URL). */
-const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+/** Uses same base URL as REST API (VITE_API_BASE_URL). */
+const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
 
 interface ThumbnailCandidate {
   id: string;
@@ -33,7 +33,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
   hasThumbnail,
   onSelectThumbnail,
 }) => {
-  const { getToken } = useAuth();
+  const { isSignedIn } = useAuth();
   const [mode, setMode] = useState<RecommendationMode>("actions");
   const [candidates, setCandidates] = useState<ThumbnailCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,8 +66,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
       setErrorMessage(null);
 
       try {
-        const token = await getToken();
-        if (!token) {
+        if (!isSignedIn) {
           setErrorMessage("ログインが必要です");
           return;
         }
@@ -81,9 +80,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
         const response = await fetch(
           `${thumbnailApiBaseUrl}/api/thumbnail/image-search?${params.toString()}`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            credentials: "include",
           },
         );
 
@@ -105,7 +102,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
         setIsLoading(false);
       }
     },
-    [getToken, thumbnailApiBaseUrl, trimmedTitle],
+    [isSignedIn, thumbnailApiBaseUrl, trimmedTitle],
   );
 
   const handleOpenThumbnailPicker = useCallback(() => {
@@ -150,8 +147,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
     setMode("generating");
 
     try {
-      const token = await getToken();
-      if (!token) {
+      if (!isSignedIn) {
         setErrorMessage("ログインが必要です");
         setMode("actions");
         return;
@@ -160,8 +156,8 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({
           prompt: trimmedTitle,
           aspectRatio: "16:9",
@@ -188,7 +184,7 @@ export const EditorRecommendationBar: React.FC<EditorRecommendationBarProps> = (
     } finally {
       setIsLoading(false);
     }
-  }, [getToken, thumbnailApiBaseUrl, trimmedTitle, onSelectThumbnail]);
+  }, [isSignedIn, thumbnailApiBaseUrl, trimmedTitle, onSelectThumbnail]);
 
   const headerLabel = useMemo(() => {
     if (mode === "generating") return "画像を生成中";

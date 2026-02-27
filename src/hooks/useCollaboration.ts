@@ -1,7 +1,7 @@
 /**
  * useCollaboration hook
  * CollaborationManagerをReactで使用するためのカスタムフック
- * 未ログイン時は local-user で IndexedDB のみ使用（Aurora 同期なし）。
+ * 未ログイン時は local-user で IndexedDB のみ使用（API 同期なし）。
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -109,7 +109,7 @@ export function useCollaboration({
     managerRef.current?.reconnect();
   }, []);
 
-  // URL 取り込みなどで initialContent 適用後に即時 Aurora 保存する
+  // URL 取り込みなどで initialContent 適用後に即時 API 保存する
   const flushSave = useCallback(() => {
     managerRef.current?.flushSave();
   }, []);

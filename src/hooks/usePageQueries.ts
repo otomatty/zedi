@@ -2,14 +2,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useCallback, useEffect, useState, useRef } from "react";
 import {
-  runAuroraSync,
+  runApiSync,
   getSyncStatus,
   subscribeSyncStatus,
   resetSyncFailures,
   type SyncStatus,
 } from "@/lib/sync";
 import { createStorageAdapter } from "@/lib/storageAdapter";
-import { createApiClient, ApiError } from "@/lib/api";
+import { createApiClient } from "@/lib/api";
 import { StorageAdapterPageRepository } from "@/lib/pageRepository/StorageAdapterPageRepository";
 import type { IPageRepository } from "@/lib/pageRepository";
 import { syncLinksWithRepo } from "@/lib/syncWikiLinks";
@@ -69,7 +69,7 @@ export function useSync() {
     try {
       // Manual sync: reset failure counter and force past the auto-retry guard
       resetSyncFailures();
-      await runAuroraSync(userId, getToken, { force: true });
+      await runApiSync(userId, getToken, { force: true });
       queryClient.invalidateQueries({ queryKey: pageKeys.all });
     } catch (error) {
       console.error("Sync failed:", error);
@@ -85,7 +85,7 @@ export function useSync() {
  * Hook to get the appropriate repository based on auth state (C3-7: StorageAdapter + API)
  *
  * LOCAL-FIRST:
- * - Reads/writes go to StorageAdapter (IndexedDB). Sync via runAuroraSync (GET/POST /api/sync/pages).
+ * - Reads/writes go to StorageAdapter (IndexedDB). Sync via runApiSync (GET/POST /api/sync/pages).
  * - Initial sync on load; manual sync via useSync().
  */
 export function useRepository() {
@@ -140,16 +140,7 @@ export function useRepository() {
 
     (async () => {
       try {
-        // Ensure user row exists in Aurora (POST /api/users/upsert) before first sync
-        const api = apiRef.current;
-        if (api) {
-          try {
-            await api.upsertMe();
-          } catch (e) {
-            console.warn("[Sync] upsertMe failed (will still try sync):", e);
-          }
-        }
-        await runAuroraSync(userId, getToken);
+        await runApiSync(userId, getToken);
         // Refetch page list so UI shows data pulled into IndexedDB (avoids stuck loading/empty)
         queryClient.invalidateQueries({ queryKey: pageKeys.all });
       } catch (error) {
@@ -157,18 +148,9 @@ export function useRepository() {
         // Refetch so UI reflects current IndexedDB state (e.g. partial pull)
         queryClient.invalidateQueries({ queryKey: pageKeys.all });
 
-        // 503 (DB resuming) での失敗時は遅延リトライ
-        // apiClient の自動リトライ (4×10s) でも復帰しなかった場合のフォールバック
-        if (error instanceof ApiError && error.code === "DATABASE_RESUMING") {
-          initialSyncRequestedForUser.delete(userId);
-          setTimeout(() => {
-            initialSyncRequestedForUser.delete(userId);
-            queryClient.invalidateQueries({ queryKey: pageKeys.all });
-          }, 15_000);
-        }
-        // NOTE: Do NOT delete from initialSyncRequestedForUser here for other errors.
-        // Removing the guard on failure previously caused infinite retry loops
-        // when the API was unreachable (CORS, network error, invalid JSON, etc.).
+        // NOTE: Do NOT delete from initialSyncRequestedForUser here on failure.
+        // Removing the guard on failure can cause infinite retry loops
+        // when the API is unreachable (CORS, network error, invalid JSON, etc.).
         // Manual retry via useSync() or page reload will re-attempt.
       }
     })();

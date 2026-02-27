@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { vi } from "vitest";
 
 /**
- * Mock the useAuth hook (Cognito/auth layer). Use in unit tests that need auth.
+ * Mock the useAuth hook (Better Auth layer). Use in unit tests that need auth.
  */
 export function mockAuth(options?: { isSignedIn?: boolean }) {
   const isSignedIn = options?.isSignedIn ?? false;

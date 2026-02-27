@@ -16,8 +16,8 @@ export interface SubscriptionState {
   };
 }
 
-/** Uses same base URL as REST API (VITE_ZEDI_API_BASE_URL). */
-const getAIAPIBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+/** Uses same base URL as REST API (VITE_API_BASE_URL). */
+const getAIAPIBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
 
 /**
  * Fetch current subscription state from the AI API (requires auth).
@@ -34,19 +34,17 @@ export async function fetchSubscription(): Promise<SubscriptionState> {
     };
   }
 
-  const { getIdToken } = await import("@/lib/auth");
-  const token = await getIdToken();
-  if (!token) {
-    throw new Error("AUTH_REQUIRED");
-  }
-
   const response = await fetch(`${apiBaseUrl}/api/ai/subscription`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
   });
+
+  if (response.status === 401) {
+    throw new Error("AUTH_REQUIRED");
+  }
 
   if (!response.ok) {
     throw new Error("Failed to fetch subscription");
@@ -80,21 +78,19 @@ export async function openProCheckout(billingInterval: BillingInterval): Promise
     return;
   }
 
-  const { getIdToken } = await import("@/lib/auth");
-  const token = await getIdToken();
-  if (!token) {
-    console.error("Auth token not available");
-    return;
-  }
-
   const response = await fetch(`${apiBaseUrl}/api/checkout`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
     body: JSON.stringify({ productId }),
   });
+
+  if (response.status === 401) {
+    console.error("Auth token not available");
+    return;
+  }
 
   if (!response.ok) {
     console.error("Failed to create checkout session");
@@ -116,20 +112,18 @@ export async function openCustomerPortal(): Promise<void> {
     return;
   }
 
-  const { getIdToken } = await import("@/lib/auth");
-  const token = await getIdToken();
-  if (!token) {
-    console.error("Auth token not available");
-    return;
-  }
-
   const response = await fetch(`${apiBaseUrl}/api/customer-portal`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
   });
+
+  if (response.status === 401) {
+    console.error("Auth token not available");
+    return;
+  }
 
   if (!response.ok) {
     console.error("Failed to get customer portal URL");

@@ -1,9 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useProfile } from "./useProfile";
-
-const mockGetToken = vi.fn().mockResolvedValue("test-token");
-const mockUpsertMe = vi.fn();
 
 let mockUser: {
   id: string;
@@ -27,22 +24,15 @@ let mockUser: {
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
-    getToken: mockGetToken,
+    getToken: vi.fn().mockResolvedValue("test-token"),
     isSignedIn: true,
   }),
   useUser: () => ({ user: mockUser }),
 }));
 
-vi.mock("@/lib/api", () => ({
-  createApiClient: () => ({
-    upsertMe: mockUpsertMe,
-  }),
-}));
-
 describe("useProfile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetToken.mockResolvedValue("test-token");
     mockUser = {
       id: "user-1",
       fullName: "Google User",
@@ -56,8 +46,14 @@ describe("useProfile", () => {
     localStorage.removeItem("zedi-profile-cache");
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("seeds profile.displayName from user.fullName when API returns empty display_name", async () => {
-    mockUpsertMe.mockResolvedValue({ display_name: null, avatar_url: null });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ user: { name: "", image: "" } }), { status: 200 }),
+    );
 
     const { result } = renderHook(() => useProfile());
 
@@ -80,7 +76,10 @@ describe("useProfile", () => {
       profileImageUrl: "",
       primaryEmailAddress: null,
     };
-    mockUpsertMe.mockResolvedValue({ display_name: "", avatar_url: "" });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ user: { name: "", image: "" } }), { status: 200 }),
+    );
 
     const { result } = renderHook(() => useProfile());
 
@@ -92,10 +91,14 @@ describe("useProfile", () => {
   });
 
   it("does not overwrite profile.displayName when API returns existing display_name", async () => {
-    mockUpsertMe.mockResolvedValue({
-      display_name: "Saved Name",
-      avatar_url: "https://example.com/avatar.png",
-    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          user: { name: "Saved Name", image: "https://example.com/avatar.png" },
+        }),
+        { status: 200 },
+      ),
+    );
 
     const { result } = renderHook(() => useProfile());
 

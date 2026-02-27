@@ -91,31 +91,20 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Total: $TOTAL**" >> $GITHUB_STEP_SUMMARY
 
-  terraform-validate:
-    name: Terraform Validate
+  api-typecheck:
+    name: API Type Check
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform
     steps:
       - uses: actions/checkout@v6
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
-      # Lambda modules use file() in Terraform; dist must exist before validate/plan
-      - name: Build api Lambda
-        run: npm ci && npm run build
-        working-directory: terraform/modules/api/lambda
+      - name: Install API dependencies
+        working-directory: server/api
+        run: npm ci
 
-      - name: Build ai-api Lambda
-        run: npm ci && npm run build
-        working-directory: terraform/modules/ai-api/lambda
-
-      - name: Terraform Init (no backend)
-        run: terraform init -backend=false
-
-      - name: Validate configuration
-        run: terraform validate
-
-      - name: Check formatting
-        run: terraform fmt -check -recursive
+      - name: Type check
+        working-directory: server/api
+        run: npx tsc --noEmit
