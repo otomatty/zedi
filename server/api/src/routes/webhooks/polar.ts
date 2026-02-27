@@ -27,7 +27,7 @@ app.post("/", async (c) => {
     };
   } catch (error: unknown) {
     if (error instanceof WebhookVerificationError) {
-      console.error("[polar-webhook] Signature verification failed:", error.message);
+      console.error("[polar-webhook] Signature verification failed:", (error as Error).message);
       throw new HTTPException(403, { message: "Invalid webhook signature" });
     }
     throw error;

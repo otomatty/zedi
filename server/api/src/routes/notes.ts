@@ -231,8 +231,8 @@ app.get("/discover", authRequired, async (c) => {
       ? await db
           .select({
             id: users.id,
-            displayName: users.displayName,
-            avatarUrl: users.avatarUrl,
+            displayName: users.name,
+            avatarUrl: users.image,
           })
           .from(users)
           .where(inArray(users.id, ownerIds))
