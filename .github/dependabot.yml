@@ -4,6 +4,7 @@ updates:
   # Frontend + root dependencies (Bun/npm)
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -16,6 +17,7 @@ updates:
   # Hocuspocus server
   - package-ecosystem: npm
     directory: /server/hocuspocus
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -25,17 +27,10 @@ updates:
     open-pull-requests-limit: 5
     labels: [dependencies]
 
-  # Terraform providers
-  - package-ecosystem: terraform
-    directory: /terraform
-    schedule:
-      interval: weekly
-      day: monday
-    labels: [dependencies, terraform]
-
   # GitHub Actions
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday

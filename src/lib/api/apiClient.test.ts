@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock import.meta.env before importing the module
-vi.stubEnv("VITE_ZEDI_API_BASE_URL", "https://api.test.example.com");
+vi.stubEnv("VITE_API_BASE_URL", "https://api.test.example.com");
 
 import { createApiClient, ApiError } from "./apiClient";
 
@@ -18,17 +18,10 @@ describe("apiClient", () => {
     vi.unstubAllGlobals();
   });
 
-  // ── Authentication ──────────────────────────────────────────────────
+  // ── Authentication (cookie-based) ──────────────────────────────────
 
   describe("authentication", () => {
-    it("throws ApiError(401) when token is null", async () => {
-      const client = createApiClient({ getToken: () => Promise.resolve(null) });
-
-      await expect(client.getSyncPages()).rejects.toThrow(ApiError);
-      await expect(client.getSyncPages()).rejects.toMatchObject({ status: 401 });
-    });
-
-    it("includes Authorization header with Bearer token", async () => {
+    it("uses credentials: include for cookie-based auth", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
@@ -37,12 +30,29 @@ describe("apiClient", () => {
       });
       vi.stubGlobal("fetch", mockFetch);
 
-      const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
       await client.searchSharedNotes("test");
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      const headers = init.headers as Record<string, string>;
-      expect(headers.Authorization).toBe(`Bearer ${mockToken}`);
+      expect(init.credentials).toBe("include");
+    });
+
+    it("throws ApiError when server returns 401", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 401,
+          statusText: "Unauthorized",
+          text: () => Promise.resolve(JSON.stringify({ message: "Unauthorized" })),
+          headers: new Headers(),
+        }),
+      );
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+
+      await expect(client.getSyncPages()).rejects.toThrow(ApiError);
+      await expect(client.getSyncPages()).rejects.toMatchObject({ status: 401 });
     });
   });
 
@@ -170,7 +180,7 @@ describe("apiClient", () => {
     });
   });
 
-  // ── 503 Auto-retry (Aurora resuming) ─────────────────────────────────
+  // ── 503 Auto-retry ─────────────────────────────────────────────────
 
   describe("503 DATABASE_RESUMING auto-retry", () => {
     it("retries on 503 with Retry-After header", async () => {
@@ -200,7 +210,7 @@ describe("apiClient", () => {
       expect(result.results).toEqual([]);
     });
 
-    it("gives up after MAX_DB_RESUMING_RETRIES (4) attempts", async () => {
+    it("gives up after MAX_RETRIES (3) attempts", async () => {
       vi.useFakeTimers();
       const fetchMock = vi.fn().mockResolvedValue({
         ok: false,
@@ -217,8 +227,7 @@ describe("apiClient", () => {
       });
       vi.stubGlobal("fetch", fetchMock);
 
-      const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
-      // Catch rejection immediately to prevent unhandled rejection errors
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
       const resultPromise = client.searchSharedNotes("test").catch((e: unknown) => e);
 
       for (let i = 0; i < 10; i++) {
@@ -228,38 +237,7 @@ describe("apiClient", () => {
       const err = await resultPromise;
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).status).toBe(503);
-      expect(fetchMock).toHaveBeenCalledTimes(5);
-      vi.useRealTimers();
-    });
-
-    it("dispatches zedi:db-resuming event on 503", async () => {
-      vi.useFakeTimers();
-      const eventListener = vi.fn();
-      window.addEventListener("zedi:db-resuming", eventListener);
-
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 503,
-          text: () => Promise.resolve(JSON.stringify({})),
-          headers: new Headers({ "Retry-After": "1" }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          text: () => Promise.resolve(JSON.stringify({})),
-          headers: new Headers(),
-        });
-      vi.stubGlobal("fetch", fetchMock);
-
-      const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
-      const promise = client.searchSharedNotes("test");
-      await vi.advanceTimersByTimeAsync(1500);
-      await promise;
-
-      expect(eventListener).toHaveBeenCalled();
-      window.removeEventListener("zedi:db-resuming", eventListener);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
       vi.useRealTimers();
     });
   });

@@ -1,16 +1,1 @@
-export {
-  getAuthorizeUrl,
-  exchangeCodeForTokens,
-  refreshTokens,
-  getIdToken,
-  getStoredState,
-  setTokens,
-  clearStorage,
-  getLogoutUrl,
-  parseIdToken,
-  type CognitoIdP,
-  type CognitoConfig,
-  type CognitoTokens,
-  type CognitoAuthState,
-  type CognitoUserFromToken,
-} from "./cognitoAuth";
+export { authClient, signIn, signOut, signUp, useSession } from "./authClient";

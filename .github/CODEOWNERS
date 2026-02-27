@@ -7,7 +7,6 @@
 
 # Infrastructure & CI
 /.github/ @otomatty
-/workers/ @otomatty
 /docker-compose*.yml @otomatty
 /Dockerfile* @otomatty
 

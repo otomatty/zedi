@@ -1,22 +1,19 @@
 /**
- * OAuth callback: exchange code for tokens, then redirect to /home.
- * Tracks codes already submitted so React Strict Mode (double effect) doesn't
- * exchange the same code twice and trigger Cognito invalid_grant.
+ * OAuth callback page.
+ * Better Auth handles the code exchange server-side; this page simply waits
+ * for the session to become available and then redirects to /home.
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { exchangeCodeForTokens, setTokens } from "@/lib/auth";
-
-const exchangedCodes = new Set<string>();
-const MAX_TRACKED_CODES = 20;
+import { useSession } from "@/lib/auth/authClient";
 
 export default function AuthCallback() {
   const { t } = useTranslation();
+  const { data: session, isPending } = useSession();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
     const errorParam = params.get("error");
     const errorDescription = params.get("error_description");
 
@@ -25,40 +22,10 @@ export default function AuthCallback() {
       return;
     }
 
-    if (!code) {
-      // コールバックに code が無い場合（GCP のリダイレクト URI 不一致などで Google が戻ってこない）
-      const qs = window.location.search;
-      const msg = qs
-        ? `No authorization code in URL. Query: ${qs}`
-        : 'No authorization code received. If you clicked "Sign in with Google", check that GCP has the Cognito redirect URI (see docs/guides/troubleshooting-cognito-google-callback.md).';
-      setError(msg);
-      return;
+    if (!isPending && session) {
+      window.location.assign("/home");
     }
-
-    if (exchangedCodes.has(code)) {
-      return;
-    }
-    exchangedCodes.add(code);
-    if (exchangedCodes.size > MAX_TRACKED_CODES) {
-      const first = exchangedCodes.values().next().value;
-      if (first !== undefined) exchangedCodes.delete(first);
-    }
-
-    let cancelled = false;
-    exchangeCodeForTokens(code)
-      .then((tokens) => {
-        setTokens(tokens);
-        window.location.assign("/home");
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Sign-in failed");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [session, isPending]);
 
   if (error) {
     return (

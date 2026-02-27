@@ -1,9 +1,5 @@
-/**
- * Auth hooks: Cognito (Google/GitHub OAuth) in production, Mock in E2E.
- * Same interface as former Clerk useAuth/useUser for drop-in replacement.
- */
 import React from "react";
-import { useCognitoAuth, useCognitoUser } from "@/components/auth/CognitoAuthProvider";
+import { useSession, signOut, getSession } from "@/lib/auth/authClient";
 import {
   useMockAuth,
   MOCK_USER_ID,
@@ -14,13 +10,35 @@ import {
 
 const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 
+function useBetterAuth() {
+  const { data: session, isPending } = useSession();
+
+  return {
+    isLoaded: !isPending,
+    isSignedIn: !!session,
+    userId: session?.user?.id ?? null,
+    sessionId: session?.session?.id ?? null,
+    orgId: null,
+    orgRole: null,
+    orgSlug: null,
+    getToken: async () => {
+      try {
+        const s = await getSession();
+        return s.data?.session?.token ?? null;
+      } catch {
+        return null;
+      }
+    },
+    signOut: async () => {
+      await signOut();
+    },
+  };
+}
+
+const useAuthImpl = isE2EMode ? useMockAuth : useBetterAuth;
+
 export function useAuth() {
-  if (isE2EMode) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useMockAuth();
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useCognitoAuth();
+  return useAuthImpl();
 }
 
 const mockUser = {
@@ -36,28 +54,53 @@ const mockUser = {
   username: "e2e_test_user",
 };
 
-export function useUser() {
-  if (isE2EMode) {
-    return {
-      isLoaded: true,
-      isSignedIn: true,
-      user: mockUser,
-    };
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  return useCognitoUser();
+function useMockUser() {
+  return {
+    isLoaded: true,
+    isSignedIn: true,
+    user: mockUser,
+  };
 }
 
-function CognitoSignedIn({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded } = useCognitoAuth();
+function useBetterUser() {
+  const { data: session, isPending } = useSession();
+
+  const user = session
+    ? {
+        id: session.user.id,
+        fullName: session.user.name,
+        firstName: session.user.name?.split(" ")[0] ?? null,
+        lastName: session.user.name?.split(" ").slice(1).join(" ") || null,
+        imageUrl: session.user.image ?? "",
+        profileImageUrl: session.user.image ?? "",
+        primaryEmailAddress: session.user.email ? { emailAddress: session.user.email } : null,
+        username: session.user.name ?? null,
+      }
+    : null;
+
+  return {
+    isLoaded: !isPending,
+    isSignedIn: !!session,
+    user,
+  };
+}
+
+const useUserImpl = isE2EMode ? useMockUser : useBetterUser;
+
+export function useUser() {
+  return useUserImpl();
+}
+
+function BetterAuthSignedIn({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, isLoaded } = useAuth();
   if (!isLoaded || !isSignedIn) return null;
   return React.createElement(React.Fragment, null, children);
 }
-function CognitoSignedOut({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded } = useCognitoAuth();
+function BetterAuthSignedOut({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, isLoaded } = useAuth();
   if (!isLoaded || isSignedIn) return null;
   return React.createElement(React.Fragment, null, children);
 }
 
-export const SignedIn = isE2EMode ? MockSignedIn : CognitoSignedIn;
-export const SignedOut = isE2EMode ? MockSignedOut : CognitoSignedOut;
+export const SignedIn = isE2EMode ? MockSignedIn : BetterAuthSignedIn;
+export const SignedOut = isE2EMode ? MockSignedOut : BetterAuthSignedOut;

@@ -28,7 +28,6 @@ interface UseEditorSetupOptions {
   canDeleteFromStorage: (src: string) => boolean;
   handleDeleteFromStorage: (src: string) => Promise<void>;
   handleCopyImageUrl: (src: string) => void;
-  getToken: () => Promise<string | null>;
   suggestionState: WikiLinkSuggestionState | null;
   slashState: SlashSuggestionState | null;
   suggestionRef: React.RefObject<WikiLinkSuggestionHandle | null>;
@@ -56,7 +55,6 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     canDeleteFromStorage,
     handleDeleteFromStorage,
     handleCopyImageUrl,
-    getToken,
     suggestionState,
     slashState,
     suggestionRef,
@@ -115,11 +113,9 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
           onDeleteFromStorage: handleDeleteFromStorage,
           onCopyUrl: handleCopyImageUrl,
           getAuthenticatedImageUrl: async (url: string) => {
-            const token = await getToken();
-            if (!token) return null;
             try {
               const r = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}` },
+                credentials: "include",
               });
               if (!r.ok) return null;
               return URL.createObjectURL(await r.blob());

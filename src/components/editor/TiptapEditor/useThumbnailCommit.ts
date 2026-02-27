@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
 import type { StorageSettings } from "@/types/storage";
 
-const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
+const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
 
 interface UseThumbnailCommitOptions {
   editorRef: React.RefObject<Editor | null>;
@@ -37,15 +37,14 @@ async function commitViaServerS3(
   imageUrl: string,
   altText: string,
   previewUrl: string | undefined,
-  token: string,
   baseUrl: string,
 ): Promise<{ imageUrl: string; provider: string }> {
   const response = await fetch(`${baseUrl}/api/thumbnail/commit`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
     body: JSON.stringify({
       sourceUrl: imageUrl,
       fallbackUrl: previewUrl,
@@ -53,6 +52,9 @@ async function commitViaServerS3(
     }),
   });
 
+  if (response.status === 401) {
+    throw new Error("ログインが必要です");
+  }
   if (!response.ok) {
     let message = `画像の保存に失敗しました: ${response.status}`;
     try {
@@ -75,7 +77,7 @@ export function useThumbnailCommit({
   pageTitle,
   storageSettings,
 }: UseThumbnailCommitOptions) {
-  const { getToken } = useAuth();
+  const { isSignedIn } = useAuth();
   const { toast } = useToast();
   const thumbnailApiBaseUrl = getThumbnailApiBaseUrl();
 
@@ -83,8 +85,7 @@ export function useThumbnailCommit({
     async (imageUrl: string, alt: string, previewUrl?: string) => {
       const editor = editorRef.current;
       if (!editor) return;
-      const token = await getToken();
-      if (!token) {
+      if (!isSignedIn) {
         toast({
           title: "ログインが必要です",
           description: "画像の保存にはログインしてください",
@@ -109,14 +110,15 @@ export function useThumbnailCommit({
             imageUrl,
             altText,
             previewUrl,
-            token,
             thumbnailApiBaseUrl,
           );
           finalUrl = result.imageUrl;
           providerId = result.provider;
         } else {
           const file = await fetchImageAsFile(imageUrl, previewUrl);
-          const provider = getStorageProvider(uploadSettings, { getToken });
+          const provider = getStorageProvider(uploadSettings, {
+            getToken: async () => null,
+          });
           finalUrl = await provider.uploadImage(file, { fileName: file.name });
           providerId = uploadSettings.provider;
         }
@@ -148,7 +150,7 @@ export function useThumbnailCommit({
         });
       }
     },
-    [editorRef, getToken, thumbnailApiBaseUrl, pageTitle, toast, storageSettings],
+    [editorRef, isSignedIn, thumbnailApiBaseUrl, pageTitle, toast, storageSettings],
   );
 
   return { handleInsertThumbnailImage };

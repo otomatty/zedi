@@ -1,16 +1,16 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { getAuthorizeUrl } from "@/lib/auth";
+import { signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 const SignIn: React.FC = () => {
   const { t } = useTranslation();
   const handleGoogle = () => {
-    window.location.href = getAuthorizeUrl("Google");
+    signIn.social({ provider: "google", callbackURL: "/home" });
   };
   const handleGitHub = () => {
-    window.location.href = getAuthorizeUrl("GitHub");
+    signIn.social({ provider: "github", callbackURL: "/home" });
   };
 
   return (

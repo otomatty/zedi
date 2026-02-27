@@ -85,7 +85,7 @@ export interface UseCollaborationReturn extends CollaborationState {
   updateSelection: (from: number, to: number) => void;
   /** 手動再接続 */
   reconnect: () => void;
-  /** 保留中の保存をキャンセルし、直ちに Aurora へ保存する（local モード・URL 取り込み後の即時保存用） */
+  /** 保留中の保存をキャンセルし、直ちに API へ保存する（local モード・URL 取り込み後の即時保存用） */
   flushSave: () => void;
 }
 

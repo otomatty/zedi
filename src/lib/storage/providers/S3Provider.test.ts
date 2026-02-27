@@ -56,8 +56,10 @@ describe("S3Provider", () => {
       expect(url).toBe("https://api.example.com/api/media/media-123");
     });
 
-    it("throws when not authenticated (getToken returns null)", async () => {
-      getToken.mockResolvedValue(null);
+    it("throws when not authenticated (server returns 401)", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("Unauthorized", { status: 401 }),
+      );
 
       await expect(provider.uploadImage(createTestFile())).rejects.toThrow(/ログインしていません/);
     });
@@ -114,11 +116,13 @@ describe("S3Provider", () => {
     });
 
     it("returns failure when not authenticated", async () => {
-      getToken.mockResolvedValue(null);
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("Unauthorized", { status: 401 }),
+      );
 
       const result = await provider.testConnection();
       expect(result.success).toBe(false);
-      expect(result.message).toContain("ログインしていません");
+      expect(result.message).toContain("デフォルトストレージへの接続に失敗しました");
     });
   });
 });

@@ -6,9 +6,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { AISettings, AIProviderType, APIMode, AIResponseUsage, UserTier } from "@/types/ai";
 
-/** Uses same base URL as REST API (VITE_ZEDI_API_BASE_URL). */
-const getAIAPIBaseUrl = () => (import.meta.env.VITE_ZEDI_API_BASE_URL as string) ?? "";
-const getAIWSUrl = () => (import.meta.env.VITE_AI_WS_URL as string) ?? "";
+/** Uses same base URL as REST API (VITE_API_BASE_URL). */
+const getAIAPIBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
 
 export interface AIServiceRequest {
   provider: AIProviderType;
@@ -108,154 +107,15 @@ async function callAIWithUserKey(
   }
 }
 
-async function getAuthToken(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
-  if (import.meta.env.VITE_E2E_TEST === "true") {
-    return "mock_e2e_token_for_testing";
-  }
-  const { getIdToken } = await import("@/lib/auth");
-  return getIdToken();
-}
-
 /**
- * APIサーバー経由で呼び出し（WebSocket API Gateway経由のストリーミング）
+ * APIサーバー経由で呼び出し（SSE ストリーミング via POST /api/ai/chat）
  */
 async function callAIWithServer(
   request: AIServiceRequest,
   callbacks: AIServiceCallbacks,
   abortSignal?: AbortSignal,
 ): Promise<void> {
-  const wsUrl = getAIWSUrl();
-
-  // WebSocket URL が設定されている場合はWebSocket経由でストリーミング
-  if (wsUrl) {
-    return callAIWithServerWS(wsUrl, request, callbacks, abortSignal);
-  }
-
-  // フォールバック: HTTP API経由（非ストリーミング）
   return callAIWithServerHTTP(request, callbacks, abortSignal);
-}
-
-/**
- * WebSocket API Gateway経由のストリーミングチャット
- */
-async function callAIWithServerWS(
-  wsUrl: string,
-  request: AIServiceRequest,
-  callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal,
-): Promise<void> {
-  const token = await getAuthToken();
-  if (!token) {
-    throw new Error("AUTH_REQUIRED");
-  }
-
-  return new Promise<void>((resolve, reject) => {
-    let fullContent = "";
-    let finishReason: string | undefined;
-    let lastUsage: AIResponseUsage | undefined;
-    let completed = false;
-
-    const complete = () => {
-      if (completed) return;
-      completed = true;
-      callbacks.onComplete?.({
-        content: fullContent,
-        finishReason,
-        usage: lastUsage,
-      });
-      resolve();
-    };
-
-    const fail = (err: Error) => {
-      if (completed) return;
-      completed = true;
-      callbacks.onError?.(err);
-      reject(err);
-    };
-
-    // Connect with token in query string for $connect auth
-    const url = `${wsUrl}?token=${encodeURIComponent(token)}`;
-    const ws = new WebSocket(url);
-
-    if (abortSignal) {
-      const onAbort = () => {
-        ws.close();
-        fail(new Error("ABORTED"));
-      };
-      abortSignal.addEventListener("abort", onAbort, { once: true });
-    }
-
-    ws.onopen = () => {
-      // Send chat request with token for userId extraction
-      ws.send(
-        JSON.stringify({
-          action: "chat",
-          token,
-          provider: request.provider,
-          model: request.model,
-          messages: request.messages,
-          options: { ...request.options, stream: true },
-        }),
-      );
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data as string) as {
-          content?: string;
-          done?: boolean;
-          finishReason?: string;
-          error?: string;
-          usage?: AIResponseUsage;
-        };
-
-        if (data.error) {
-          fail(new Error(data.error));
-          ws.close();
-          return;
-        }
-
-        if (data.content) {
-          fullContent += data.content;
-          callbacks.onChunk?.(data.content);
-        }
-
-        if (data.usage) {
-          lastUsage = data.usage;
-          callbacks.onUsageUpdate?.(data.usage);
-        }
-
-        if (data.finishReason) {
-          finishReason = data.finishReason;
-        }
-
-        // Final done message with usage → complete
-        if (data.done && data.usage) {
-          complete();
-          ws.close();
-        }
-      } catch (err) {
-        fail(err instanceof Error ? err : new Error("Parse error"));
-        ws.close();
-      }
-    };
-
-    ws.onerror = () => {
-      fail(new Error("WebSocket接続エラー"));
-    };
-
-    ws.onclose = () => {
-      if (!completed) {
-        if (fullContent) {
-          // Connection closed after receiving content but before final done
-          complete();
-        } else {
-          fail(new Error("WebSocket接続が予期せず切断されました"));
-        }
-      }
-    };
-  });
 }
 
 /** SSE 1行（data: ペイロード）を処理し、ストリーム完了なら true を返す */
@@ -346,15 +206,10 @@ async function fetchAIChatResponse(
   if (!apiBaseUrl) {
     throw new Error("AI APIサーバーのURLが設定されていません");
   }
-  const token = await getAuthToken();
-  if (!token) {
-    throw new Error("AUTH_REQUIRED");
-  }
   const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       provider: request.provider,
@@ -362,8 +217,12 @@ async function fetchAIChatResponse(
       messages: request.messages,
       options: request.options,
     }),
+    credentials: "include",
     signal: abortSignal,
   });
+  if (response.status === 401) {
+    throw new Error("AUTH_REQUIRED");
+  }
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
     const message = errorBody?.error || response.statusText || "AI API呼び出しエラー";
@@ -705,19 +564,10 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
     return { models: [], tier: "free" };
   }
 
-  let headers: Record<string, string> = { "Content-Type": "application/json" };
-  try {
-    const token = await getAuthToken();
-    if (token) {
-      headers = { ...headers, Authorization: `Bearer ${token}` };
-    }
-  } catch {
-    // Unauthenticated — will return free-tier models only
-  }
-
   const response = await fetch(`${apiBaseUrl}/api/ai/models`, {
     method: "GET",
-    headers,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -759,18 +609,17 @@ export async function fetchUsage(): Promise<AIUsage> {
     };
   }
 
-  const token = await getAuthToken();
-  if (!token) {
-    throw new Error("AUTH_REQUIRED");
-  }
-
   const response = await fetch(`${apiBaseUrl}/api/ai/usage`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
   });
+
+  if (response.status === 401) {
+    throw new Error("AUTH_REQUIRED");
+  }
 
   if (!response.ok) {
     throw new Error("Failed to fetch usage");
