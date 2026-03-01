@@ -103,6 +103,12 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # Bun workspaces are not used due to Railway build constraints.
+      # Consider migrating to workspaces if Railway adds Bun workspace support.
+      - name: Install API dependencies
+        working-directory: server/api
+        run: bun install --frozen-lockfile
+
       - name: Type check
         working-directory: server/api
         run: bunx tsc --noEmit
