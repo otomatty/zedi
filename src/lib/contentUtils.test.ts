@@ -550,3 +550,226 @@ describe("buildContentErrorMessage", () => {
     expect(message).toContain("移行データに問題があります");
   });
 });
+
+describe("sanitizeTiptapContent - wikiLink promotion", () => {
+  it("should convert plain text [[Title]] to wikiLink marks", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "See [[My Page]] for details." }],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0]).toEqual({ type: "text", text: "See " });
+    expect(nodes[1].text).toBe("[[My Page]]");
+    expect(nodes[1].marks).toHaveLength(1);
+    expect(nodes[1].marks[0].type).toBe("wikiLink");
+    expect(nodes[1].marks[0].attrs.title).toBe("My Page");
+    expect(nodes[2]).toEqual({ type: "text", text: " for details." });
+  });
+
+  it("should convert multiple [[]] patterns in the same text node", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Link [[A]] and [[B]] here." }],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(5);
+    expect(nodes[0].text).toBe("Link ");
+    expect(nodes[1].text).toBe("[[A]]");
+    expect(nodes[1].marks[0].attrs.title).toBe("A");
+    expect(nodes[2].text).toBe(" and ");
+    expect(nodes[3].text).toBe("[[B]]");
+    expect(nodes[3].marks[0].attrs.title).toBe("B");
+    expect(nodes[4].text).toBe(" here.");
+  });
+
+  it("should not double-convert text that already has wikiLink marks", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "[[Existing]]",
+              marks: [
+                {
+                  type: "wikiLink",
+                  attrs: { title: "Existing", exists: true, referenced: false },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].marks).toHaveLength(1);
+    expect(nodes[0].marks[0].type).toBe("wikiLink");
+  });
+
+  it("should preserve existing marks (e.g. bold) alongside new wikiLink marks", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "bold [[Link]]",
+              marks: [{ type: "bold" }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0].text).toBe("bold ");
+    expect(nodes[0].marks).toEqual([{ type: "bold" }]);
+    expect(nodes[1].text).toBe("[[Link]]");
+    expect(nodes[1].marks).toHaveLength(2);
+    expect(nodes[1].marks[0].type).toBe("bold");
+    expect(nodes[1].marks[1].type).toBe("wikiLink");
+  });
+
+  it("should handle text with no [[]] patterns unchanged", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "No wiki links here." }],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].text).toBe("No wiki links here.");
+    expect(nodes[0].marks).toBeUndefined();
+  });
+
+  it("should handle [[]] at the start and end of text", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "[[Start]]" }],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].text).toBe("[[Start]]");
+    expect(nodes[0].marks[0].type).toBe("wikiLink");
+    expect(nodes[0].marks[0].attrs.title).toBe("Start");
+  });
+
+  it("should NOT convert [[]] inside codeBlock nodes", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          attrs: { language: "javascript" },
+          content: [{ type: "text", text: "const arr = [[1, 2]];" }],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const codeNode = parsed.content[0];
+
+    expect(codeNode.content).toHaveLength(1);
+    expect(codeNode.content[0].text).toBe("const arr = [[1, 2]];");
+    expect(codeNode.content[0].marks).toBeUndefined();
+  });
+
+  it("should keep [[ ]] (empty title) as plain text, not wikiLink", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Empty [[ ]] brackets." }],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0].text).toBe("Empty ");
+    expect(nodes[1].text).toBe("[[ ]]");
+    expect(nodes[1].marks).toBeUndefined();
+    expect(nodes[2].text).toBe(" brackets.");
+  });
+
+  it("should NOT convert [[]] in inline code (code mark)", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "[[not a link]]",
+              marks: [{ type: "code" }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].text).toBe("[[not a link]]");
+    expect(nodes[0].marks).toHaveLength(1);
+    expect(nodes[0].marks[0].type).toBe("code");
+  });
+});

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Page } from "@/types/page";
 
 interface UsePageEditorStateReturn {
@@ -57,11 +57,12 @@ export function usePageEditorState({
   const [isInitialized, setIsInitialized] = useState(false);
   const [originalTitle, setOriginalTitle] = useState<string>("");
   const [contentError, setContentError] = useState<ContentError | null>(null);
+  const prevPageIdRef = useRef<string>(pageId ?? "");
 
-  // ページIDが変わった時に状態をリセット
+  // ページIDが変わった時に即座に状態をリセット（リンクから作成後の遷移で前ページの内容が残る問題を防ぐ）
   useEffect(() => {
-    // 別のページに遷移した場合、状態をリセットして再読み込みを促す
-    if (currentPageId && currentPageId !== pageId && !isNewPage) {
+    if (prevPageIdRef.current !== pageId && !isNewPage) {
+      prevPageIdRef.current = pageId;
       setIsInitialized(false);
       setCurrentPageId(null);
       setTitle("");
@@ -71,7 +72,7 @@ export function usePageEditorState({
       setOriginalTitle("");
       setContentError(null);
     }
-  }, [pageId, currentPageId, isNewPage]);
+  }, [pageId, isNewPage]);
 
   const initialize = useCallback(
     (page: Page) => {

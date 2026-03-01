@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { useSession, signOut, getSession } from "@/lib/auth/authClient";
 import {
   useMockAuth,
@@ -13,6 +13,19 @@ const isE2EMode = import.meta.env.VITE_E2E_TEST === "true";
 function useBetterAuth() {
   const { data: session, isPending } = useSession();
 
+  const getTokenStable = useCallback(async () => {
+    try {
+      const s = await getSession();
+      return s.data?.session?.token ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const signOutStable = useCallback(async () => {
+    await signOut();
+  }, []);
+
   return {
     isLoaded: !isPending,
     isSignedIn: !!session,
@@ -21,17 +34,8 @@ function useBetterAuth() {
     orgId: null,
     orgRole: null,
     orgSlug: null,
-    getToken: async () => {
-      try {
-        const s = await getSession();
-        return s.data?.session?.token ?? null;
-      } catch {
-        return null;
-      }
-    },
-    signOut: async () => {
-      await signOut();
-    },
+    getToken: getTokenStable,
+    signOut: signOutStable,
   };
 }
 

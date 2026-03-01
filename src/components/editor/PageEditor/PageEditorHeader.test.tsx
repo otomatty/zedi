@@ -3,24 +3,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PageEditorHeader } from "./PageEditorHeader";
 
-vi.mock("../WikiGeneratorButton", () => ({
-  WikiGeneratorButton: ({
-    title,
-    hasContent,
-    onGenerate,
-    status,
-  }: {
-    title: string;
-    hasContent: boolean;
-    onGenerate: () => void;
-    status: string;
-  }) => (
-    <button type="button" onClick={onGenerate} data-testid="wiki-generator-btn">
-      wiki {title} {String(hasContent)} {status}
-    </button>
-  ),
-}));
-
 vi.mock("../ConnectionIndicator", () => ({
   ConnectionIndicator: ({ onReconnect }: { onReconnect: () => void }) => (
     <button type="button" onClick={onReconnect} data-testid="connection-indicator">
@@ -50,15 +32,11 @@ vi.mock("@/contexts/GlobalSearchContext", () => ({
 }));
 
 const defaultProps = {
-  title: "テストページ",
   lastSaved: null as number | null,
-  hasContent: false,
-  wikiStatus: "idle" as const,
   onBack: vi.fn(),
   onDelete: vi.fn(),
   onExportMarkdown: vi.fn(),
   onCopyMarkdown: vi.fn(),
-  onGenerateWiki: vi.fn(),
 };
 
 function renderHeader(overrides = {}) {
@@ -116,14 +94,6 @@ describe("PageEditorHeader", () => {
       const backButton = buttons[0];
       await user.click(backButton);
       expect(onBack).toHaveBeenCalledTimes(1);
-    });
-
-    it("Wiki Generator ボタンをクリックすると onGenerateWiki が呼ばれる", async () => {
-      const user = userEvent.setup();
-      const onGenerateWiki = vi.fn();
-      renderHeader({ onGenerateWiki });
-      await user.click(screen.getByTestId("wiki-generator-btn"));
-      expect(onGenerateWiki).toHaveBeenCalledTimes(1);
     });
 
     it("ドロップダウンを開き Markdownでエクスポート をクリックすると onExportMarkdown が呼ばれる", async () => {

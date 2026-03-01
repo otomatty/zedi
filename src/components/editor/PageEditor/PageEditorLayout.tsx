@@ -4,7 +4,6 @@ import { PageEditorAlerts } from "./PageEditorAlerts";
 import { PageEditorContent } from "./PageEditorContent";
 import { PageEditorDialogs } from "./PageEditorDialogs";
 import { ContentWithAIChat } from "../../ai-chat/ContentWithAIChat";
-import { isContentNotEmpty } from "@/lib/contentUtils";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
 import type { Page } from "@/types/page";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
@@ -90,15 +89,11 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <PageEditorHeader
-        title={title}
         lastSaved={displayLastSaved}
-        hasContent={isContentNotEmpty(content)}
-        wikiStatus={wikiStatus}
         onBack={onBack}
         onDelete={onDelete}
         onExportMarkdown={onExportMarkdown}
         onCopyMarkdown={onCopyMarkdown}
-        onGenerateWiki={onGenerateWiki}
         collaboration={undefined}
       />
 
@@ -127,6 +122,8 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
           onTitleChange={onTitleChange}
           errorMessage={errorMessage}
           collaboration={isLocalDocEnabled ? collaboration : undefined}
+          wikiStatus={wikiStatus}
+          onGenerateWiki={onGenerateWiki}
           initialContent={pendingInitialContent ?? undefined}
           onInitialContentApplied={() => {
             collaboration?.flushSave?.();

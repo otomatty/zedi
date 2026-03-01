@@ -38,7 +38,8 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        {/* v7_startTransition を無効化: リンククリック後のページ切り替えで表示が即時更新されない問題を防ぐ */}
+        <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: true }}>
           <AIChatProvider>
             <GlobalShortcutsProvider>
               <GlobalSearchProvider>

@@ -52,6 +52,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   focusContentRef,
   initialContent,
   onInitialContentApplied,
+  isWikiGenerating = false,
 }) => {
   const { editorFontSizePx } = useGeneralSettings();
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -160,6 +161,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     onContentError,
     isReadOnly,
     pageId: pageId ?? "",
+    isWikiGenerating,
     collaborationConfig,
     focusContentRef,
     initialContent,

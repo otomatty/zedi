@@ -40,6 +40,8 @@ export interface TiptapEditorProps {
   initialContent?: string;
   /** initialContent をエディタに反映したあとに呼ぶ */
   onInitialContentApplied?: () => void;
+  /** Wiki生成中（この間はリンク判定をスキップしてちらつきを防ぐ） */
+  isWikiGenerating?: boolean;
 }
 
 /**
