@@ -36,6 +36,7 @@ export function useSubscription(): UseSubscriptionResult {
     queryFn: fetchSubscription,
     enabled: isSignedIn === true,
     staleTime: 60 * 1000, // 1 minute
+    refetchOnWindowFocus: true, // ポータル/チェックアウトから戻ったときに表示を更新
   });
 
   const fallback: SubscriptionState = {

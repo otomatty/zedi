@@ -24,8 +24,10 @@
   "pro": {
     "name": "Pro",
     "description": "Unlimited + Full AI",
-    "priceMonthly": "/ month",
-    "priceYearly": "/ year",
+    "priceMonthlyDisplay": "$22",
+    "priceYearlyDisplay": "$220",
+    "priceMonthlyNote": "/ month (incl. tax)",
+    "priceYearlyNote": "/ year (incl. tax)",
     "features": {
       "unlimitedPages": "Unlimited pages",
       "cloudSync": "Cloud sync",

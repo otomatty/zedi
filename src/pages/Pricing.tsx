@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Check, Sparkles, Zap } from "lucide-react";
@@ -251,11 +251,15 @@ function PricingPlanCards({
       <PlanCard
         name={t("pricing.pro.name")}
         description={t("pricing.pro.description")}
-        price={billingInterval === "yearly" ? "$200" : "$20"}
+        price={
+          billingInterval === "yearly"
+            ? t("pricing.pro.priceYearlyDisplay")
+            : t("pricing.pro.priceMonthlyDisplay")
+        }
         priceNote={
           billingInterval === "yearly"
-            ? t("pricing.pro.priceYearly")
-            : t("pricing.pro.priceMonthly")
+            ? t("pricing.pro.priceYearlyNote")
+            : t("pricing.pro.priceMonthlyNote")
         }
         icon={<Zap className="h-5 w-5" />}
         popular
@@ -288,6 +292,11 @@ const Pricing: React.FC = () => {
   const { plan: currentPlan, isProUser, usage, isLoading, refetch } = useSubscription();
 
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
+
+  // プランページを開いたときにサブスクリプションを再取得し、契約済みユーザーの表示を最新にする
+  useEffect(() => {
+    if (isSignedIn) refetch();
+  }, [isSignedIn, refetch]);
 
   const usageForBar: AIUsage | null = usage
     ? {

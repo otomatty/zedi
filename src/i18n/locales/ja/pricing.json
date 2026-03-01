@@ -24,8 +24,10 @@
   "pro": {
     "name": "Pro",
     "description": "無制限＋フルAI",
-    "priceMonthly": "/ 月",
-    "priceYearly": "/ 年",
+    "priceMonthlyDisplay": "$22",
+    "priceYearlyDisplay": "$220",
+    "priceMonthlyNote": "/ 月（税込）",
+    "priceYearlyNote": "/ 年（税込）",
     "features": {
       "unlimitedPages": "無制限ページ",
       "cloudSync": "クラウド同期",

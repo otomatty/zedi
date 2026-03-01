@@ -50,7 +50,34 @@ export async function fetchSubscription(): Promise<SubscriptionState> {
     throw new Error("Failed to fetch subscription");
   }
 
-  return (await response.json()) as SubscriptionState;
+  const raw = (await response.json()) as {
+    plan: "free" | "pro";
+    subscription?: {
+      status?: string;
+      billingInterval?: "monthly" | "yearly" | null;
+      currentPeriodEnd?: string | null;
+      billing_interval?: string | null;
+      current_period_end?: string | null;
+    } | null;
+    usage?: SubscriptionState["usage"];
+  };
+
+  const sub = raw.subscription;
+  const currentPeriodEnd = sub?.currentPeriodEnd ?? sub?.current_period_end ?? null;
+
+  return {
+    plan: raw.plan,
+    status: sub?.status ?? "active",
+    billingInterval: (sub?.billingInterval ??
+      sub?.billing_interval ??
+      null) as SubscriptionState["billingInterval"],
+    currentPeriodEnd: currentPeriodEnd != null ? String(currentPeriodEnd) : null,
+    usage: raw.usage ?? {
+      consumedUnits: 0,
+      budgetUnits: 1500,
+      usagePercent: 0,
+    },
+  };
 }
 
 export type BillingInterval = "monthly" | "yearly";
