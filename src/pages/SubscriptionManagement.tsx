@@ -52,15 +52,19 @@ const SubscriptionManagement: React.FC = () => {
   const { isSignedIn } = useAuth();
   const navigate = useNavigate();
   const [details, setDetails] = useState<SubscriptionDetails | null>(null);
+  const [fetchError, setFetchError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
   const loadDetails = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await fetchSubscriptionDetails();
       setDetails(data);
-    } catch {
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      setFetchError(err);
       setDetails(null);
     } finally {
       setLoading(false);
@@ -164,12 +168,26 @@ const SubscriptionManagement: React.FC = () => {
             <div className="flex justify-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : !isSignedIn || !details ? (
+          ) : !isSignedIn ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <p className="text-muted-foreground">{t("pricing.signInPrompt")}</p>
               </CardContent>
             </Card>
+          ) : fetchError ? (
+            <Card>
+              <CardContent className="space-y-4 py-12 text-center">
+                <p className="text-muted-foreground">{t("pricing.subscription.actionFailed")}</p>
+                <Button onClick={loadDetails} variant="outline">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {t("common.retry")}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : !details ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
           ) : !isProUser ? (
             <Card>
               <CardContent className="space-y-4 py-12 text-center">
@@ -209,7 +227,9 @@ const SubscriptionManagement: React.FC = () => {
                       <p className="font-medium">
                         {details.billingInterval === "yearly"
                           ? t("pricing.subscription.yearly")
-                          : t("pricing.subscription.monthly")}
+                          : details.billingInterval === "monthly"
+                            ? t("pricing.subscription.monthly")
+                            : "—"}
                       </p>
                     </div>
                     <div>

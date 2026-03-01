@@ -28,9 +28,8 @@ export function getSonnetBaseline(models: AIModel[]): number {
 export function formatCostMultiplierLabel(inputCostUnits: number, baseline: number): string {
   if (inputCostUnits <= 0 || baseline <= 0) return "1x";
   const ratio = inputCostUnits / baseline;
-  if (ratio >= 1) {
-    return `${Math.round(ratio)}x`;
-  }
+  if (ratio >= 10) return `${Math.round(ratio)}x`;
+  if (ratio >= 1) return `${ratio.toFixed(1)}x`;
   if (ratio >= 0.1) return `${ratio.toFixed(1)}x`;
   if (ratio >= 0.01) return `${ratio.toFixed(2)}x`;
   return ratio < 0.001 ? "<0.01x" : `${ratio.toFixed(2)}x`;

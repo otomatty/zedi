@@ -240,9 +240,9 @@ function DataManagementCard() {
       // Re-initialize and trigger a full sync
       await adapter.initialize(userId);
       resetSyncFailures();
-      toast.success(t("generalSettings.dataManagement.resetSuccess"));
       await runApiSync(userId, getToken, { force: true, forceFullSyncWhenLocalEmpty: true });
       queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      toast.success(t("generalSettings.dataManagement.resetSuccess"));
     } catch (error) {
       console.error("Failed to reset database:", error);
       toast.error(t("generalSettings.dataManagement.resetFailed"));
