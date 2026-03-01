@@ -58,7 +58,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
       if (foundPage) {
         // 既存ページが見つかった場合はそのページに移動
-        // flushSync で即時反映（v7_startTransition による遅延でフォーカスしないと表示が更新されない問題を防ぐ）
+        // flushSync でルーティング変更を即時反映し、WikiLink クリック直後に画面遷移が行われるようにする
         navigate(`/page/${foundPage.id}`, { replace: false, flushSync: true });
       } else {
         // ページが見つからなかった場合は確認ダイアログを表示
@@ -85,7 +85,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
       });
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
-      // flushSync で即時反映（v7_startTransition による遅延でフォーカスしないと表示が更新されない問題を防ぐ）
+      // flushSync でルーティング変更を即時反映し、作成直後に画面遷移が行われるようにする
       navigate(`/page/${newPage.id}`, { replace: false, flushSync: true });
     } catch (error) {
       console.error("Failed to create page:", error);

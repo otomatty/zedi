@@ -126,9 +126,18 @@ function splitTextNodeByWikiLinks(textNode: Record<string, unknown>): Record<str
     }
 
     const title = match[1].trim();
+    if (!title) {
+      result.push({
+        type: "text",
+        text: match[0],
+        ...(existingMarks.length > 0 ? { marks: existingMarks } : {}),
+      });
+      lastIndex = regex.lastIndex;
+      continue;
+    }
     const wikiLinkMark: Record<string, unknown> = {
       type: "wikiLink",
-      attrs: { title, exists: true, referenced: false },
+      attrs: { title, exists: false, referenced: false },
     };
     result.push({
       type: "text",

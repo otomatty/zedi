@@ -35,7 +35,7 @@ interface PageEditorHeaderProps {
 
 /**
  * Header component for PageEditor
- * Contains title input, action buttons, and dropdown menu
+ * Contains search bar, action buttons, and dropdown menu
  */
 export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   lastSaved,

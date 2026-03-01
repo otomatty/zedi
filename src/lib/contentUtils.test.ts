@@ -724,6 +724,28 @@ describe("sanitizeTiptapContent - wikiLink promotion", () => {
     expect(codeNode.content[0].marks).toBeUndefined();
   });
 
+  it("should keep [[ ]] (empty title) as plain text, not wikiLink", () => {
+    const input = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Empty [[ ]] brackets." }],
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(input);
+    const parsed = JSON.parse(result.content);
+    const nodes = parsed.content[0].content;
+
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0].text).toBe("Empty ");
+    expect(nodes[1].text).toBe("[[ ]]");
+    expect(nodes[1].marks).toBeUndefined();
+    expect(nodes[2].text).toBe(" brackets.");
+  });
+
   it("should NOT convert [[]] in inline code (code mark)", () => {
     const input = JSON.stringify({
       type: "doc",

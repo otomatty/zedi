@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import TiptapEditor from "../TiptapEditor";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
@@ -90,6 +90,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   onGenerateWiki,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
+  const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
 
   const contentFocusRef = useRef<(() => void) | null>(null);
   const focusContent = useCallback(() => {
@@ -115,10 +116,10 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
             />
           </div>
           {wikiStatus && onGenerateWiki && (
-            <div className="shrink-0 pt-6">
+            <div className="shrink-0">
               <WikiGeneratorButton
                 title={title}
-                hasContent={isContentNotEmpty(content)}
+                hasContent={hasContent}
                 onGenerate={onGenerateWiki}
                 status={wikiStatus}
               />
