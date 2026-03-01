@@ -59,7 +59,6 @@ app.get("/details", authRequired, async (c) => {
     billingInterval: subscription.billingInterval,
     currentPeriodStart: subscription.currentPeriodStart,
     currentPeriodEnd: subscription.currentPeriodEnd,
-    externalId: subscription.externalId,
     usage: {
       budgetUnits: usage.budgetUnits,
       consumedUnits: usage.consumedUnits,
@@ -89,8 +88,8 @@ app.post("/cancel", authRequired, async (c) => {
     });
     return c.json({ success: true, message: "Subscription will be canceled at period end" });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to cancel subscription";
-    return c.json({ error: message }, 500);
+    console.error("[subscriptionManage] cancel failed:", err);
+    return c.json({ error: "Failed to cancel subscription" }, 500);
   }
 });
 
@@ -114,8 +113,8 @@ app.post("/reactivate", authRequired, async (c) => {
     });
     return c.json({ success: true, message: "Subscription reactivated" });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to reactivate subscription";
-    return c.json({ error: message }, 500);
+    console.error("[subscriptionManage] reactivate failed:", err);
+    return c.json({ error: "Failed to reactivate subscription" }, 500);
   }
 });
 
@@ -125,9 +124,18 @@ app.post("/reactivate", authRequired, async (c) => {
 app.post("/change-plan", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
-  const { billingInterval } = await c.req.json<{ billingInterval: "monthly" | "yearly" }>();
+  let billingInterval: "monthly" | "yearly" | undefined;
+  try {
+    const body = await c.req.json<{ billingInterval?: unknown }>();
+    billingInterval =
+      body.billingInterval === "monthly" || body.billingInterval === "yearly"
+        ? body.billingInterval
+        : undefined;
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
 
-  if (!billingInterval || !["monthly", "yearly"].includes(billingInterval)) {
+  if (!billingInterval) {
     return c.json({ error: "billingInterval must be 'monthly' or 'yearly'" }, 400);
   }
 
@@ -153,8 +161,8 @@ app.post("/change-plan", authRequired, async (c) => {
     });
     return c.json({ success: true, message: `Switched to ${billingInterval} billing` });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to change plan";
-    return c.json({ error: message }, 500);
+    console.error("[subscriptionManage] change-plan failed:", err);
+    return c.json({ error: "Failed to change plan" }, 500);
   }
 });
 

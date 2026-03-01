@@ -13,7 +13,12 @@ export function getSonnetBaseline(models: AIModel[]): number {
       m.id.toLowerCase().includes("sonnet") ||
       (m.displayName ?? "").toLowerCase().includes("sonnet"),
   );
-  return sonnet?.inputCostUnits ?? SONNET_BASELINE_FALLBACK;
+  if (sonnet?.inputCostUnits && sonnet.inputCostUnits > 0) {
+    return sonnet.inputCostUnits;
+  }
+  const positiveCosts = models.map((m) => m.inputCostUnits).filter((v) => v > 0);
+  if (positiveCosts.length === 0) return SONNET_BASELINE_FALLBACK;
+  return Math.min(...positiveCosts);
 }
 
 /**

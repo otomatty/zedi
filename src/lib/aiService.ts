@@ -633,7 +633,7 @@ async function fetchModelsFromApi(
   }
 
   const models = data.models.map((m) => normalizeToAIModel((m as Record<string, unknown>) ?? {}));
-  const tier: UserTier = data.tier === "pro" || data.tier === "free" ? data.tier : "free";
+  const tier: UserTier = data.tier === "pro" ? "pro" : "free";
   return { models, tier };
 }
 

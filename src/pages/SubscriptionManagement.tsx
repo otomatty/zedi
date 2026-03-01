@@ -188,7 +188,7 @@ const SubscriptionManagement: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Zap className="h-5 w-5 text-primary" />
-                      <CardTitle>Pro</CardTitle>
+                      <CardTitle>{t("pricing.status.proPlan")}</CardTitle>
                     </div>
                     <Badge variant={statusVariant}>{statusLabel}</Badge>
                   </div>
@@ -316,7 +316,13 @@ const SubscriptionManagement: React.FC = () => {
                   <Button
                     variant="outline"
                     className="w-full justify-start"
-                    onClick={() => openCustomerPortal()}
+                    onClick={async () => {
+                      try {
+                        await openCustomerPortal();
+                      } catch {
+                        toast.error(t("pricing.subscription.actionFailed"));
+                      }
+                    }}
                     disabled={actionLoading}
                   >
                     <CreditCard className="mr-2 h-4 w-4" />

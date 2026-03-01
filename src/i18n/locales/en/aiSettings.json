@@ -5,7 +5,7 @@
   "loadingModels": "Loading models...",
   "selectModel": "Select model",
   "pro": "Pro",
-  "serverModeHelp": "Uses Zedi's AI server. Some models are only available on paid plans.",
+  "serverModeHelp": "Uses Zedi's AI server. Some models are only available on Pro plans.",
   "useOwnKey": "Use my own API key",
   "useOwnKeyDescription": "Set your own API key to use all models without limits.",
   "apiKey": "API Key",

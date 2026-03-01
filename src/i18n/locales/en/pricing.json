@@ -97,7 +97,7 @@
     "title": "FAQ",
     "whatAreCostUnits": {
       "question": "What are Cost Units?",
-      "answer": "Cost Units (CU) are a relative measure proportional to each model's API cost. Lightweight models like Flash use fewer CU per request, while advanced models like Opus or GPT-5 Pro consume more. This lets you choose the best trade-off between performance and budget."
+      "answer": "Cost Units (CU) are a relative measure proportional to each model's API cost. Lightweight models like Flash use fewer CU per request, while advanced models like GPT-4o or Claude Sonnet consume more. This lets you choose the best trade-off between performance and budget."
     },
     "usageCalculation": {
       "question": "How is Pro plan usage calculated?",

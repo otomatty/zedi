@@ -175,12 +175,16 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
       const { text, refs } = getEditorContent();
       if (!text) return;
       onSendMessage(text, refs);
-      if (editorRef.current) editorRef.current.innerHTML = "";
+      if (editorRef.current) {
+        editorRef.current.innerHTML = "";
+        checkEmpty();
+      } else {
+        setIsEmpty(true);
+      }
       setPendingRefs([]);
-      setIsEmpty(true);
       setMentionQuery(null);
     },
-    [isStreaming, getEditorContent, onSendMessage, setPendingRefs, setIsEmpty],
+    [isStreaming, getEditorContent, onSendMessage, setPendingRefs, setIsEmpty, checkEmpty],
   );
 
   const handleKeyDown = useCallback(
