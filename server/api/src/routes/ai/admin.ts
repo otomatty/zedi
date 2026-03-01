@@ -10,8 +10,8 @@ import type { AppEnv } from "../../types/index.js";
 const SYNC_SECRET = process.env.SYNC_AI_MODELS_SECRET ?? "";
 
 function secureCompare(a: string, b: string): boolean {
-  const aHash = crypto.createHmac("sha256", "sync-secret").update(a).digest();
-  const bHash = crypto.createHmac("sha256", "sync-secret").update(b).digest();
+  const aHash = crypto.createHmac("sha256", SYNC_SECRET).update(a).digest();
+  const bHash = crypto.createHmac("sha256", SYNC_SECRET).update(b).digest();
   return crypto.timingSafeEqual(aHash, bHash);
 }
 
