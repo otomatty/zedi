@@ -133,6 +133,61 @@ export class S3Provider implements StorageProviderInterface {
     }
   }
 
+  /**
+   * デフォルトストレージ上の画像を削除（/api/media/:id または /api/thumbnail/serve/:id）
+   * 自分の画像のみ削除可能（API側で所有者チェック）
+   */
+  async deleteImage(url: string): Promise<void> {
+    const base =
+      this.baseUrl.replace(/\/$/, "") ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    const origin = url.startsWith("http") ? new URL(url).origin : base;
+
+    // /api/media/:id 形式
+    const mediaMatch = url.match(/\/api\/media\/([^/?#]+)/);
+    if (mediaMatch) {
+      const mediaId = mediaMatch[1];
+      const res = await fetch(`${origin}/api/media/${mediaId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(
+          res.status === 403
+            ? "自分の画像のみ削除できます"
+            : res.status === 404
+              ? "画像が見つかりません"
+              : (err as { message?: string }).message || `削除に失敗しました: ${res.status}`,
+        );
+      }
+      return;
+    }
+
+    // /api/thumbnail/serve/:id 形式
+    const thumbMatch = url.match(/\/api\/thumbnail\/serve\/([^/?#]+)/);
+    if (thumbMatch) {
+      const objectId = thumbMatch[1];
+      const res = await fetch(`${origin}/api/thumbnail/serve/${objectId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(
+          res.status === 404
+            ? "画像が見つかりません"
+            : (err as { message?: string }).message || `削除に失敗しました: ${res.status}`,
+        );
+      }
+      return;
+    }
+
+    throw new Error(
+      "このURLは削除対象ではありません（/api/media/ または /api/thumbnail/serve/ の画像のみ）",
+    );
+  }
+
   async testConnection(): Promise<ConnectionTestResult> {
     try {
       // 最小のテスト画像でアップロードを試行

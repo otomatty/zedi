@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq } from "drizzle-orm";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { media } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
@@ -101,6 +106,31 @@ app.get("/:id", authRequired, async (c) => {
   );
 
   return c.redirect(signedUrl, 302);
+});
+
+app.delete("/:id", authRequired, async (c) => {
+  const mediaId = c.req.param("id");
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  const result = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
+
+  const row = result[0];
+  if (!row) throw new HTTPException(404, { message: "Media not found" });
+  if (row.ownerId !== userId) {
+    throw new HTTPException(403, { message: "You can only delete your own media" });
+  }
+
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: BUCKET,
+      Key: row.s3Key,
+    }),
+  );
+
+  await db.delete(media).where(eq(media.id, mediaId));
+
+  return c.json({ success: true });
 });
 
 export default app;

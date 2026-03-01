@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
 import {
@@ -15,6 +15,8 @@ interface UseStorageActionsParams {
   isStorageConfigured: boolean;
   currentStorageProvider?: StorageProviderInfo;
   toast: ToastFn;
+  /** S3（デフォルトストレージ）用。渡さない場合、デフォルトストレージの削除は無効 */
+  getToken?: () => Promise<string | null>;
 }
 
 export function useStorageActions({
@@ -22,8 +24,14 @@ export function useStorageActions({
   isStorageConfigured,
   currentStorageProvider,
   toast,
+  getToken,
 }: UseStorageActionsParams) {
   const effectiveProvider = getSettingsForUpload(storageSettings).provider;
+
+  const storageContext = useMemo(
+    () => (effectiveProvider === "s3" && getToken ? { getToken } : undefined),
+    [effectiveProvider, getToken],
+  );
 
   const getProviderLabel = useCallback(
     (providerId?: string | null) => {
@@ -56,13 +64,13 @@ export function useStorageActions({
       if (!isStorageConfigured) return false;
       if (providerId && providerId !== effectiveProvider) return false;
       try {
-        const provider = getStorageProvider(getSettingsForUpload(storageSettings));
+        const provider = getStorageProvider(getSettingsForUpload(storageSettings), storageContext);
         return typeof provider.deleteImage === "function";
       } catch {
         return false;
       }
     },
-    [isStorageConfigured, storageSettings, effectiveProvider],
+    [isStorageConfigured, storageSettings, effectiveProvider, storageContext],
   );
 
   const handleDeleteFromStorage = useCallback(
@@ -86,7 +94,7 @@ export function useStorageActions({
 
       let provider: ReturnType<typeof getStorageProvider>;
       try {
-        provider = getStorageProvider(getSettingsForUpload(storageSettings));
+        provider = getStorageProvider(getSettingsForUpload(storageSettings), storageContext);
       } catch (error) {
         toast({
           title: "ストレージ設定エラー",
@@ -104,10 +112,19 @@ export function useStorageActions({
         throw new Error("Delete not supported");
       }
 
-      await provider.deleteImage(url);
-      toast({ title: "ストレージから削除しました" });
+      try {
+        await provider.deleteImage(url);
+        toast({ title: "ストレージから削除しました" });
+      } catch (error) {
+        toast({
+          title: "削除に失敗しました",
+          description: error instanceof Error ? error.message : "しばらくしてからお試しください",
+          variant: "destructive",
+        });
+        throw error;
+      }
     },
-    [isStorageConfigured, storageSettings, toast],
+    [isStorageConfigured, storageSettings, toast, storageContext],
   );
 
   return {

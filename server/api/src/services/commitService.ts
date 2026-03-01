@@ -126,6 +126,7 @@ export async function commitImage(
     sizeBytes,
   });
 
-  const endpoint = process.env.STORAGE_ENDPOINT?.replace(/\/$/, "") ?? "";
-  return { imageUrl: `${endpoint}/${bucketName}/${s3Key}` };
+  // バケット非公開のため、presigned URL を返す API 経由の URL を返す
+  const baseUrl = process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
+  return { imageUrl: `${baseUrl}/api/thumbnail/serve/${objectId}` };
 }
