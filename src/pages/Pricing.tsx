@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Check, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,9 +12,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import Container from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
-import { UsageBar } from "@/components/ai/UsageBar";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -22,7 +22,6 @@ import {
   openCustomerPortal,
   type BillingInterval,
 } from "@/lib/subscriptionService";
-import type { AIUsage } from "@/types/ai";
 
 interface PlanFeature {
   text: string;
@@ -43,6 +42,10 @@ interface PlanCardProps {
   disabled?: boolean;
   current?: boolean;
   extraContent?: React.ReactNode;
+  /** ボタンに表示するアイコン（例: 外部リンク） */
+  buttonIcon?: React.ReactNode;
+  /** false のときフッターのボタンを表示しない（Free プラン用） */
+  showButton?: boolean;
 }
 
 const PlanCard: React.FC<PlanCardProps> = ({
@@ -59,6 +62,8 @@ const PlanCard: React.FC<PlanCardProps> = ({
   disabled,
   current,
   extraContent,
+  buttonIcon,
+  showButton = true,
 }) => {
   const { t } = useTranslation();
   return (
@@ -66,6 +71,11 @@ const PlanCard: React.FC<PlanCardProps> = ({
       {popular && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
           {t("pricing.recommended")}
+        </Badge>
+      )}
+      {current && (
+        <Badge variant="secondary" className="absolute right-3 top-3">
+          {t("pricing.currentPlan")}
         </Badge>
       )}
       <CardHeader>
@@ -103,19 +113,106 @@ const PlanCard: React.FC<PlanCardProps> = ({
         </ul>
         {extraContent && <div className="mt-4">{extraContent}</div>}
       </CardContent>
-      <CardFooter>
-        <Button
-          className="w-full"
-          variant={buttonVariant}
-          onClick={onSelect}
-          disabled={disabled || current}
-        >
-          {current ? t("pricing.currentPlan") : buttonText}
-        </Button>
-      </CardFooter>
+      {showButton && (
+        <CardFooter>
+          <Button className="w-full" variant={buttonVariant} onClick={onSelect} disabled={disabled}>
+            <span className="flex items-center justify-center gap-2">
+              {buttonText}
+              {buttonIcon ?? null}
+            </span>
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 };
+
+interface CurrentPlanStatusProps {
+  isSignedIn: boolean;
+  isProUser: boolean;
+  usage: { consumedUnits: number; budgetUnits: number; usagePercent: number } | null;
+}
+
+function CurrentPlanStatus({ isSignedIn, isProUser, usage }: CurrentPlanStatusProps) {
+  const { t } = useTranslation();
+
+  if (!isSignedIn) {
+    return (
+      <div className="mb-10 text-center">
+        <p className="text-muted-foreground">{t("pricing.signInPrompt")}</p>
+      </div>
+    );
+  }
+
+  const percent = usage ? Math.min(usage.usagePercent, 100) : 0;
+  const isWarning = percent >= 80;
+  const isDanger = percent >= 95;
+  const consumed = usage?.consumedUnits ?? 0;
+  const budget = usage?.budgetUnits ?? 0;
+  const yearMonth = new Date().toISOString().slice(0, 7);
+
+  return (
+    <div className="mx-auto mb-10">
+      <h2 className="mb-2 text-xl font-bold">{t("pricing.heading")}</h2>
+      <Card>
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {isProUser ? (
+                <Zap className="h-5 w-5 text-primary" />
+              ) : (
+                <Sparkles className="h-5 w-5 text-muted-foreground" />
+              )}
+              <span className="text-lg font-semibold">
+                {isProUser ? t("pricing.status.proPlan") : t("pricing.status.freePlan")}
+              </span>
+            </div>
+            <span className="text-sm text-muted-foreground">{yearMonth}</span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t("pricing.status.aiUsage")}</span>
+              <span
+                className={cn(
+                  "font-medium tabular-nums",
+                  isDanger
+                    ? "text-destructive"
+                    : isWarning
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : "text-foreground",
+                )}
+              >
+                {percent.toFixed(1)}%
+              </span>
+            </div>
+            <Progress
+              value={percent}
+              className={cn(
+                "h-2.5",
+                isDanger && "[&>div]:bg-destructive",
+                isWarning && !isDanger && "[&>div]:bg-yellow-500",
+              )}
+            />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {consumed.toLocaleString()} / {budget.toLocaleString()}{" "}
+                {t("pricing.status.costUnits")}
+              </span>
+              <span>
+                {t("pricing.status.remaining")}: {Math.max(0, budget - consumed).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {isDanger && (
+            <p className="text-xs text-destructive">{t("pricing.status.dangerWarning")}</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function PricingAiInfo() {
   const { t } = useTranslation();
@@ -212,7 +309,6 @@ interface PricingPlanCardsProps {
   billingInterval: BillingInterval;
   isProUser: boolean;
   isSignedIn: boolean;
-  usageForBar: AIUsage | null;
   onSelectPro: () => Promise<void>;
   onManageSubscription: () => Promise<void>;
 }
@@ -221,7 +317,6 @@ function PricingPlanCards({
   billingInterval,
   isProUser,
   isSignedIn,
-  usageForBar,
   onSelectPro,
   onManageSubscription,
 }: PricingPlanCardsProps) {
@@ -244,9 +339,7 @@ function PricingPlanCards({
         buttonText={t("pricing.free.buttonText")}
         buttonVariant="outline"
         current={!isProUser}
-        extraContent={
-          isSignedIn && usageForBar && <UsageBar usage={usageForBar} autoRefresh={false} />
-        }
+        showButton={false}
       />
       <PlanCard
         name={t("pricing.pro.name")}
@@ -278,8 +371,9 @@ function PricingPlanCards({
               ? t("pricing.pro.subscribeYearly")
               : t("pricing.pro.subscribeMonthly")
         }
+        buttonIcon={isProUser ? <ExternalLink className="h-4 w-4" /> : undefined}
         onSelect={isProUser ? onManageSubscription : onSelectPro}
-        current={false}
+        current={isProUser}
         disabled={!isSignedIn}
       />
     </div>
@@ -289,25 +383,13 @@ function PricingPlanCards({
 const Pricing: React.FC = () => {
   const { t } = useTranslation();
   const { isSignedIn } = useAuth();
-  const { plan: currentPlan, isProUser, usage, isLoading, refetch } = useSubscription();
+  const { isProUser, usage, isLoading, refetch } = useSubscription();
 
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
 
-  // プランページを開いたときにサブスクリプションを再取得し、契約済みユーザーの表示を最新にする
   useEffect(() => {
     if (isSignedIn) refetch();
   }, [isSignedIn, refetch]);
-
-  const usageForBar: AIUsage | null = usage
-    ? {
-        usagePercent: usage.usagePercent,
-        consumedUnits: usage.consumedUnits,
-        budgetUnits: usage.budgetUnits,
-        remaining: Math.max(0, usage.budgetUnits - usage.consumedUnits),
-        tier: currentPlan === "pro" ? "pro" : "free",
-        yearMonth: new Date().toISOString().slice(0, 7),
-      }
-    : null;
 
   const handleSelectPro = async () => {
     if (!isSignedIn) return;
@@ -334,10 +416,7 @@ const Pricing: React.FC = () => {
 
       <main className="py-8">
         <Container>
-          <div className="mb-10 text-center">
-            <h2 className="mb-2 text-2xl font-bold">{t("pricing.heading")}</h2>
-            <p className="text-muted-foreground">{t("pricing.subheading")}</p>
-          </div>
+          <CurrentPlanStatus isSignedIn={isSignedIn} isProUser={isProUser} usage={usage} />
 
           <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
 
@@ -345,7 +424,6 @@ const Pricing: React.FC = () => {
             billingInterval={billingInterval}
             isProUser={isProUser}
             isSignedIn={isSignedIn}
-            usageForBar={usageForBar}
             onSelectPro={handleSelectPro}
             onManageSubscription={handleManageSubscription}
           />

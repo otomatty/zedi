@@ -22,6 +22,9 @@ server/.dev.vars
 server/api/dist/
 server/hocuspocus/dist/
 
+# Windows reserved device names (can be created accidentally)
+nul
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

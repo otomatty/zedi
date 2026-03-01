@@ -1,10 +1,18 @@
 {
   "recommended": "おすすめ",
   "pageTitle": "プラン",
-  "heading": "シンプルな料金プラン",
-  "subheading": "Free で基本機能とクラウド同期。Pro で無制限ページとフルAI機能。",
+  "heading": "現在のプラン",
   "currentPlan": "現在のプラン",
   "loadingPlan": "プラン情報を取得中...",
+  "signInPrompt": "ログインするとプランと使用量が表示されます",
+  "status": {
+    "freePlan": "Free プラン",
+    "proPlan": "Pro プラン",
+    "aiUsage": "AI 使用量",
+    "costUnits": "Cost Units",
+    "remaining": "残り",
+    "dangerWarning": "使用量の上限に近づいています。プランのアップグレードをご検討ください。"
+  },
   "billingMonthly": "月額",
   "billingYearly": "年額（2ヶ月分お得）",
   "free": {

@@ -1,10 +1,18 @@
 {
   "recommended": "Recommended",
   "pageTitle": "Plans",
-  "heading": "Simple Pricing",
-  "subheading": "Free for core features and cloud sync. Pro for unlimited pages and full AI.",
+  "heading": "Current Plan",
   "currentPlan": "Current Plan",
   "loadingPlan": "Loading plan info...",
+  "signInPrompt": "Sign in to view your plan and usage",
+  "status": {
+    "freePlan": "Free Plan",
+    "proPlan": "Pro Plan",
+    "aiUsage": "AI Usage",
+    "costUnits": "Cost Units",
+    "remaining": "Remaining",
+    "dangerWarning": "You're approaching your usage limit. Consider upgrading your plan."
+  },
   "billingMonthly": "Monthly",
   "billingYearly": "Yearly (Save 2 months)",
   "free": {
