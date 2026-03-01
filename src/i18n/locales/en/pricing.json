@@ -1,3 +1,119 @@
 {
-  "recommended": "Recommended"
+  "recommended": "Recommended",
+  "pageTitle": "Plans",
+  "heading": "Current Plan",
+  "currentPlan": "Current Plan",
+  "loadingPlan": "Loading plan info...",
+  "signInPrompt": "Sign in to view your plan and usage",
+  "status": {
+    "freePlan": "Free Plan",
+    "proPlan": "Pro Plan",
+    "aiUsage": "AI Usage",
+    "costUnits": "Cost Units",
+    "remaining": "Remaining",
+    "dangerWarning": "You're approaching your usage limit. Consider upgrading your plan."
+  },
+  "billingMonthly": "Monthly",
+  "billingYearly": "Yearly (Save 2 months)",
+  "free": {
+    "name": "Free",
+    "description": "Core features for free",
+    "price": "$0",
+    "features": {
+      "pages": "Up to 100 pages",
+      "cloudSync": "Cloud sync",
+      "wikiLinks": "Wiki links",
+      "basicAI": "Basic AI models (limited)",
+      "unlimitedPages": "Unlimited pages",
+      "advancedAI": "Advanced AI models"
+    },
+    "buttonText": "Current Plan"
+  },
+  "pro": {
+    "name": "Pro",
+    "description": "Unlimited + Full AI",
+    "priceMonthlyDisplay": "$22",
+    "priceYearlyDisplay": "$220",
+    "priceMonthlyNote": "/ month (incl. tax)",
+    "priceYearlyNote": "/ year (incl. tax)",
+    "features": {
+      "unlimitedPages": "Unlimited pages",
+      "cloudSync": "Cloud sync",
+      "wikiLinks": "Wiki links",
+      "allAIModels": "All AI models (GPT-4o, Claude, Gemini Pro, etc.)",
+      "expandedUsage": "Expanded monthly AI usage",
+      "ownApiKey": "Use your own API key too"
+    },
+    "manageSubscription": "Manage Subscription",
+    "subscribeYearly": "Subscribe Pro Yearly",
+    "subscribeMonthly": "Subscribe Pro Monthly"
+  },
+  "aiInfo": {
+    "title": "About AI Features",
+    "freeTitle": "Free Plan",
+    "freeFeatures": {
+      "models": "Basic models (GPT-4o Mini, Gemini Flash, etc.)",
+      "limit": "Monthly usage limits apply",
+      "features": "Wiki generation, Mermaid diagram generation"
+    },
+    "proTitle": "Pro Plan",
+    "proFeatures": {
+      "models": "Advanced models (GPT-4o, Claude Sonnet 4, Gemini Pro, etc.)",
+      "limit": "Greatly expanded monthly usage",
+      "features": "Access to future AI features"
+    },
+    "ownApiKeyNote": "Set your own API key to use all models without plan limits."
+  },
+  "subscription": {
+    "title": "Subscription Management",
+    "backToPricing": "Back to Plans",
+    "planLabel": "Plan",
+    "statusLabel": "Status",
+    "billingLabel": "Billing",
+    "nextBillingLabel": "Next billing date",
+    "statusActive": "Active",
+    "statusCanceled": "Canceled",
+    "statusCanceledNote": "Access remains until {{date}}",
+    "statusPastDue": "Past due",
+    "statusTrialing": "Trial",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "cancelSubscription": "Cancel Subscription",
+    "cancelConfirmTitle": "Cancel your subscription?",
+    "cancelConfirmDescription": "Your subscription will remain active until the end of the current billing period. You can reactivate anytime before then.",
+    "reactivateSubscription": "Reactivate Subscription",
+    "switchToYearly": "Switch to Yearly (Save 2 months)",
+    "switchToMonthly": "Switch to Monthly",
+    "changePlanConfirmTitle": "Change billing interval?",
+    "changePlanConfirmDescription": "Your billing will switch to {{interval}} at the next renewal.",
+    "paymentInfo": "Payment Information",
+    "paymentInfoDescription": "Manage payment methods on Polar",
+    "noSubscription": "You're on the Free plan. Upgrade to Pro to manage your subscription.",
+    "upgradeToPro": "Upgrade to Pro",
+    "actionSuccess": "Done",
+    "actionFailed": "Operation failed"
+  },
+  "faq": {
+    "title": "FAQ",
+    "whatAreCostUnits": {
+      "question": "What are Cost Units?",
+      "answer": "Cost Units (CU) are a relative measure proportional to each model's API cost. Lightweight models like Flash use fewer CU per request, while advanced models like GPT-4o or Claude Sonnet consume more. This lets you choose the best trade-off between performance and budget."
+    },
+    "usageCalculation": {
+      "question": "How is Pro plan usage calculated?",
+      "answer": "Usage is calculated in cost units based on the model and token consumption. With lightweight models, you can generate hundreds of times per month. Check your current usage rate in Settings."
+    },
+    "budgetExceeded": {
+      "question": "What happens when I reach the monthly limit?",
+      "answer": "When your monthly Cost Units are used up, AI requests will be declined until the next billing cycle. You can upgrade to Pro for a significantly higher limit, or set your own API key to bypass limits entirely."
+    },
+    "apiKeyDifference": {
+      "question": "What's the difference between own API key and subscription?",
+      "answer": "With a subscription, you can easily use AI features through Zedi's AI infrastructure. Setting your own API key removes usage limits, but requires a separate contract and billing with each provider."
+    },
+    "refundPolicy": {
+      "question": "Is there a refund policy?",
+      "answer": "We offer a full refund within 14 days of purchase. Please contact us through the support form."
+    }
+  }
 }

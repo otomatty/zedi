@@ -1,10 +1,12 @@
 /**
  * 各LLMプロバイダー（OpenAI / Anthropic / Google）からモデル一覧を取得し、
  * ai_models テーブルを更新する。
+ * OpenRouter API から料金を取得してモデル別 Cost Units を自動設定する（OPENROUTER_API_KEY 設定時）。
  *
  * 実行: npm run sync:ai-models (要 DATABASE_URL と各プロバイダーの API キー)
  *
  * 環境変数（任意）:
+ *   OPENROUTER_API_KEY OpenRouter の API キー（未設定時は全モデル DEFAULT_COST_UNITS）
  *   OPENAI_MODEL_IDS  カンマ区切りで登録するモデルIDのみ（未設定なら取得した全件を登録）
  *   GOOGLE_MODEL_IDS  同上（例: gemini-2.0-flash,gemini-1.5-pro）
  *
@@ -19,6 +21,62 @@ import { aiModels } from "../schema/index.js";
 
 const DEFAULT_COST_UNITS = 1;
 const FETCH_TIMEOUT_MS = 15000;
+
+/** OpenRouter API の料金オブジェクト（USD per token, string） */
+interface OpenRouterPricing {
+  prompt: string;
+  completion: string;
+}
+
+/** OpenRouter /api/v1/models のモデルエントリ */
+interface OpenRouterModel {
+  id: string;
+  pricing: OpenRouterPricing;
+}
+
+/**
+ * OpenRouter API から全モデルの料金データを取得する。
+ * OPENROUTER_API_KEY が未設定の場合は空の Map を返す。
+ */
+async function fetchOpenRouterPricing(): Promise<Map<string, OpenRouterPricing>> {
+  const apiKey = getOptionalEnv("OPENROUTER_API_KEY");
+  if (!apiKey) {
+    console.warn(
+      "[syncAiModels] OPENROUTER_API_KEY not set; all models will use DEFAULT_COST_UNITS.",
+    );
+    return new Map();
+  }
+
+  try {
+    const res = await fetchWithTimeout("https://openrouter.ai/api/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) {
+      console.warn(
+        `[syncAiModels] OpenRouter API failed: ${res.status}; using DEFAULT_COST_UNITS.`,
+      );
+      return new Map();
+    }
+
+    const data = (await res.json()) as { data?: OpenRouterModel[] };
+    const list = data.data ?? [];
+    const map = new Map<string, OpenRouterPricing>();
+    for (const m of list) {
+      if (m.id && m.pricing) {
+        map.set(m.id, m.pricing);
+      }
+    }
+    return map;
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    console.warn(
+      "[syncAiModels] OpenRouter fetch error:",
+      err.message,
+      "; using DEFAULT_COST_UNITS.",
+    );
+    return new Map();
+  }
+}
 
 const OPENAI_TEXT_CHAT_EXCLUDE_PATTERNS = [
   "image",
@@ -134,6 +192,98 @@ function assignTier(provider: AIProviderType, modelId: string): "free" | "pro" {
   }
 
   return "free";
+}
+
+/**
+ * プロバイダー API のモデル ID を OpenRouter のキー形式の候補リストに変換する。
+ * Anthropic API は "claude-sonnet-4-6" を返すが、OpenRouter は "claude-sonnet-4.6" を使うため、
+ * 末尾のバージョン番号パターン（X-Y）をドット区切り（X.Y）に変換した候補も生成する。
+ */
+function lookupOpenRouterKeys(provider: AIProviderType, modelId: string): string[] {
+  const providerPrefix = provider === "google" ? "google" : provider;
+  const primary = `${providerPrefix}/${modelId}`;
+  const keys = [primary];
+
+  // "claude-sonnet-4-6" → "claude-sonnet-4.6" のように末尾 X-Y を X.Y に変換
+  const versionMatch = modelId.match(/^(.+)-(\d+)-(\d+(?:-\d+)*)$/);
+  if (versionMatch && versionMatch[1] && versionMatch[2] && versionMatch[3]) {
+    const dotVersion = `${versionMatch[1]}-${versionMatch[2]}.${versionMatch[3].replace(/-/g, ".")}`;
+    keys.push(`${providerPrefix}/${dotVersion}`);
+  }
+
+  return keys;
+}
+
+/**
+ * OpenRouter の pricingMap からモデルの料金を検索する。
+ * 複数の候補キーで完全一致を試み、見つからなければプレフィックス一致にフォールバックする。
+ */
+function findPricing(
+  pricingMap: Map<string, OpenRouterPricing>,
+  candidateKeys: string[],
+): OpenRouterPricing | undefined {
+  for (const key of candidateKeys) {
+    const exact = pricingMap.get(key);
+    if (exact) return exact;
+  }
+
+  for (const key of candidateKeys) {
+    for (const [mapKey, pricing] of pricingMap) {
+      if (mapKey.startsWith(key + "-") || mapKey.startsWith(key + "/")) return pricing;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 基準モデル（Claude Sonnet 4.6）の input 料金を参照価格として返す。
+ * Cursor と同様に、中堅モデルを基準にすることで倍率の差を圧縮する。
+ * 基準モデルが見つからない場合は OpenRouter 全モデルの中央値にフォールバックする。
+ */
+const REFERENCE_MODEL_KEYS = [
+  "anthropic/claude-sonnet-4.6",
+  "anthropic/claude-4.6-sonnet",
+  "anthropic/claude-sonnet-4-6",
+];
+const REFERENCE_CU = 100;
+
+function findReferencePricePerToken(pricingMap: Map<string, OpenRouterPricing>): number {
+  for (const key of REFERENCE_MODEL_KEYS) {
+    const pricing = pricingMap.get(key);
+    if (pricing) {
+      const p = parseFloat(pricing.prompt);
+      if (Number.isFinite(p) && p > 0) return p;
+    }
+  }
+
+  const prices: number[] = [];
+  for (const [, pricing] of pricingMap) {
+    const p = parseFloat(pricing.prompt);
+    if (Number.isFinite(p) && p > 0) prices.push(p);
+  }
+  if (prices.length === 0) return 0;
+  prices.sort((a, b) => a - b);
+  return prices[Math.floor(prices.length / 2)] ?? 0;
+}
+
+/**
+ * 料金（USD per token）から相対的な Cost Units を計算する。
+ * 基準: Claude Sonnet 4.6 = REFERENCE_CU (100)。
+ * 安いモデルは 100 未満（例: Flash 系 = 10〜30）、高いモデルは 100 超（例: Opus = 167）。
+ */
+function calculateCostUnits(
+  pricing: OpenRouterPricing,
+  referencePricePerToken: number,
+): { input: number; output: number } {
+  const inputPrice = parseFloat(pricing.prompt) || 0;
+  const outputPrice = parseFloat(pricing.completion) || 0;
+
+  if (referencePricePerToken <= 0) return { input: DEFAULT_COST_UNITS, output: DEFAULT_COST_UNITS };
+
+  return {
+    input: Math.max(1, Math.round((inputPrice / referencePricePerToken) * REFERENCE_CU)),
+    output: Math.max(1, Math.round((outputPrice / referencePricePerToken) * REFERENCE_CU)),
+  };
 }
 
 /** カンマ区切り環境変数を ID の Set に（空 or 未設定なら null = 全件対象） */
@@ -286,17 +436,29 @@ async function fetchGoogleModels(apiKey: string): Promise<Row[]> {
     });
 }
 
+export interface SyncedModelInfo {
+  id: string;
+  modelId: string;
+  inputCostUnits: number;
+  outputCostUnits: number;
+}
+
 export interface SyncResult {
   provider: AIProviderType;
   fetched: number;
   upserted: number;
   filtered?: number;
   deactivated?: number;
+  pricingSource?: "openrouter" | "default";
+  models?: SyncedModelInfo[];
   error?: string;
   debug?: string;
 }
 
 export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncResult[]> {
+  const pricingMap = await fetchOpenRouterPricing();
+  const basePricePerToken = findReferencePricePerToken(pricingMap);
+
   const results: SyncResult[] = [];
   const providers: AIProviderType[] = ["openai", "anthropic", "google"];
 
@@ -343,6 +505,19 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
       }
       if (provider === "google" && googleAllowlist) {
         rows = rows.filter((r) => googleAllowlist.has(r.modelId));
+      }
+
+      // OpenRouter 料金からモデル別 Cost Units を適用
+      if (pricingMap.size > 0 && basePricePerToken > 0) {
+        for (const row of rows) {
+          const keys = lookupOpenRouterKeys(provider, row.modelId);
+          const pricing = findPricing(pricingMap, keys);
+          if (pricing) {
+            const cu = calculateCostUnits(pricing, basePricePerToken);
+            row.inputCostUnits = cu.input;
+            row.outputCostUnits = cu.output;
+          }
+        }
       }
 
       let upserted = 0;
@@ -392,12 +567,20 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
         deactivated = result.rowCount ?? 0;
       }
 
+      const hasPricing = pricingMap.size > 0 && basePricePerToken > 0;
       results.push({
         provider,
         fetched: fetchedTotal,
         filtered: fetchedTotal - rows.length,
         upserted,
         deactivated,
+        pricingSource: hasPricing ? "openrouter" : "default",
+        models: rows.map((r) => ({
+          id: r.id,
+          modelId: r.modelId,
+          inputCostUnits: r.inputCostUnits,
+          outputCostUnits: r.outputCostUnits,
+        })),
         debug,
       });
     } catch (e) {

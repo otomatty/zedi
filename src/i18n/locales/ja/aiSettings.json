@@ -4,7 +4,7 @@
   "aiModel": "AIモデル",
   "loadingModels": "モデルを読み込み中...",
   "selectModel": "モデルを選択",
-  "paid": "有料",
+  "pro": "Pro",
   "serverModeHelp": "ZediのAIサーバー経由で利用します。無料プランでは一部モデルのみ利用可能です。",
   "useOwnKey": "自分のAPIキーを使う",
   "useOwnKeyDescription": "自分のAPIキーを設定すると、制限なくすべてのモデルを利用できます。",
@@ -24,5 +24,7 @@
   "resetToastDescription": "AI設定が初期化されました",
   "modelsLoadFailed": "モデル一覧の取得に失敗しました",
   "retryLoadModels": "再試行",
-  "modelsEmpty": "API は応答しましたがモデルが0件です。VITE_API_BASE_URL の先のデータベースに ai_models が登録されているか確認してください。"
+  "modelsEmpty": "API は応答しましたがモデルが0件です。VITE_API_BASE_URL の先のデータベースに ai_models が登録されているか確認してください。",
+  "costLabel": "{{multiplier}}x コスト",
+  "cheapest": "最安"
 }

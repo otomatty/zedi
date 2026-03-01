@@ -4,7 +4,7 @@ export type AIProviderType = "openai" | "anthropic" | "google";
 
 export type APIMode = "user_api_key" | "api_server";
 
-export type UserTier = "free" | "paid";
+export type UserTier = "free" | "pro";
 
 export interface AISettings {
   provider: AIProviderType;
@@ -34,6 +34,8 @@ export interface AIModel {
   displayName: string;
   tierRequired: UserTier;
   available: boolean; // ユーザーのティアでアクセス可能か
+  inputCostUnits: number;
+  outputCostUnits: number;
 }
 
 // AI使用量情報

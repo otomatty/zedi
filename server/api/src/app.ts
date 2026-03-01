@@ -24,6 +24,7 @@ import thumbGenerateRoutes from "./routes/thumbnail/imageGenerate.js";
 import thumbCommitRoutes from "./routes/thumbnail/commit.js";
 import webhookPolarRoutes from "./routes/webhooks/polar.js";
 import checkoutRoutes from "./routes/checkout.js";
+import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
@@ -98,6 +99,9 @@ export function createApp(): Hono<AppEnv> {
   app.route("/api/ai/usage", aiUsageRoutes);
   app.route("/api/ai/subscription", aiSubscriptionRoutes);
   app.route("/api/ai/admin", aiAdminRoutes);
+
+  // Subscription management
+  app.route("/api/subscription", subscriptionManageRoutes);
 
   // Thumbnail
   app.route("/api/thumbnail/image-search", thumbSearchRoutes);

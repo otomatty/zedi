@@ -20,7 +20,7 @@ export async function checkUsage(
     .where(eq(aiTierBudgets.tier, tier))
     .limit(1);
 
-  const budgetUnits = budgetRow[0]?.monthlyBudgetUnits ?? (tier === "pro" ? 100000 : 10000);
+  const budgetUnits = budgetRow[0]?.monthlyBudgetUnits ?? (tier === "pro" ? 15000 : 1500);
 
   const usageRow = await db
     .select({ totalCostUnits: aiMonthlyUsage.totalCostUnits })

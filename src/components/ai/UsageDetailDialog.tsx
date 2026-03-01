@@ -133,7 +133,7 @@ export const UsageDetailDialog: React.FC<UsageDetailDialogProps> = ({ children }
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">
-                    {usage.tier === "paid" ? "有料プラン" : "無料プラン"}
+                    {usage.tier === "pro" ? "Pro プラン" : "Free プラン"}
                   </p>
                   <p className="text-xs text-muted-foreground">{usage.yearMonth}</p>
                 </div>

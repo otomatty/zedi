@@ -3,6 +3,7 @@ import { ChevronDown, Check, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { fetchServerModels } from "../../lib/aiService";
+import { getSonnetBaseline, formatCostMultiplierLabel } from "../../lib/aiCostUtils";
 import { loadAISettings } from "../../lib/aiSettings";
 import type { AIModel } from "../../types/ai";
 import { cn } from "../../lib/utils";
@@ -36,6 +37,8 @@ export function AIChatModelSelector() {
             provider: initial.provider,
             model: initial.modelId,
             displayName: initial.displayName,
+            inputCostUnits: initial.inputCostUnits,
+            outputCostUnits: initial.outputCostUnits,
           });
         }
       }
@@ -69,6 +72,8 @@ export function AIChatModelSelector() {
         provider: model.provider,
         model: model.modelId,
         displayName: model.displayName,
+        inputCostUnits: model.inputCostUnits,
+        outputCostUnits: model.outputCostUnits,
       });
       setOpen(false);
     },
@@ -76,6 +81,10 @@ export function AIChatModelSelector() {
   );
 
   const displayLabel = selectedModel?.displayName ?? t("aiChat.modelSelector.select");
+
+  const sonnetBaseline = getSonnetBaseline(models);
+  const getCostLabel = (model: AIModel) =>
+    formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
 
   return (
     <div ref={containerRef} className="relative">
@@ -102,9 +111,11 @@ export function AIChatModelSelector() {
       </button>
 
       {open && models.length > 0 && (
-        <div className="absolute bottom-full left-0 z-50 mb-1 max-h-[280px] min-w-[200px] max-w-[280px] overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+        <div className="absolute bottom-full left-0 z-50 mb-1 max-h-[280px] min-w-[240px] max-w-[320px] overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
           {models.map((model) => {
             const isSelected = selectedModel?.id === model.id;
+            const costLabel = getCostLabel(model);
+            const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
             return (
               <button
                 key={model.id}
@@ -116,7 +127,19 @@ export function AIChatModelSelector() {
                 onClick={() => handleSelect(model)}
               >
                 <span className="truncate">{model.displayName}</span>
-                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "rounded px-1 py-0.5 text-[10px] tabular-nums",
+                      isCheaperOrBaseline
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {costLabel}
+                  </span>
+                  {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                </span>
               </button>
             );
           })}

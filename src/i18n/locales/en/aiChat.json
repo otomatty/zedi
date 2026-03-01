@@ -47,7 +47,10 @@
   },
   "modelSelector": {
     "select": "Select model",
-    "tooltip": "Switch AI model"
+    "tooltip": "Switch AI model",
+    "costLabel": "{{multiplier}}x",
+    "cheapest": "1x",
+    "estimatedCost": "~{{cost}} CU"
   },
   "referencedPages": {
     "added": "Added \"{{title}}\" as reference",

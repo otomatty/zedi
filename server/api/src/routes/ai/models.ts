@@ -30,13 +30,15 @@ app.get("/", authOptional, async (c) => {
       tierRequired: aiModels.tierRequired,
       isActive: aiModels.isActive,
       sortOrder: aiModels.sortOrder,
+      inputCostUnits: aiModels.inputCostUnits,
+      outputCostUnits: aiModels.outputCostUnits,
     })
     .from(aiModels)
     .where(eq(aiModels.isActive, true))
     .orderBy(asc(aiModels.sortOrder));
 
-  const toClientTier = (v: string | undefined): "free" | "paid" =>
-    v === "pro" || v === "paid" ? "paid" : "free";
+  const toClientTier = (v: string | undefined): "free" | "pro" =>
+    v === "pro" || v === "paid" ? "pro" : "free";
 
   const clientTier = toClientTier(tier);
   const models = rows.map((m) => {
@@ -47,7 +49,9 @@ app.get("/", authOptional, async (c) => {
       modelId: m.modelId,
       displayName: m.displayName,
       tierRequired,
-      available: clientTier === "paid" || tierRequired === "free",
+      available: clientTier === "pro" || tierRequired === "free",
+      inputCostUnits: m.inputCostUnits,
+      outputCostUnits: m.outputCostUnits,
     };
   });
 

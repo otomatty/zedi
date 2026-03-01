@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "@/components/ui/sonner";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
+import { getSonnetBaseline, formatCostMultiplierLabel } from "@/lib/aiCostUtils";
 import { useTranslation } from "react-i18next";
 
 export const AISettingsForm: React.FC = () => {
@@ -213,6 +214,10 @@ export const AISettingsForm: React.FC = () => {
   const availableServerModels = serverModels.filter((m) => m.available);
   const lockedServerModels = serverModels.filter((m) => !m.available);
 
+  const sonnetBaseline = getSonnetBaseline(serverModels);
+  const getCostLabel = (model: AIModel) =>
+    formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
+
   return (
     <Card>
       <CardHeader>
@@ -265,31 +270,47 @@ export const AISettingsForm: React.FC = () => {
                   <SelectContent>
                     {availableServerModels.length > 0 && (
                       <>
-                        {availableServerModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{model.displayName}</span>
-                              <Badge variant="secondary" className="px-1 py-0 text-[10px]">
-                                {model.provider}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {availableServerModels.map((model) => {
+                          const costLabel = getCostLabel(model);
+                          const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
+                          return (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{model.displayName}</span>
+                                <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+                                  {model.provider}
+                                </Badge>
+                                <Badge
+                                  variant={isCheaperOrBaseline ? "default" : "outline"}
+                                  className="px-1 py-0 text-[10px]"
+                                >
+                                  {costLabel}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </>
                     )}
                     {lockedServerModels.length > 0 && (
                       <>
-                        {lockedServerModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id} disabled>
-                            <div className="flex items-center gap-2">
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">{model.displayName}</span>
-                              <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                                {t("aiSettings.paid")}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {lockedServerModels.map((model) => {
+                          const costLabel = getCostLabel(model);
+                          return (
+                            <SelectItem key={model.id} value={model.id} disabled>
+                              <div className="flex items-center gap-2">
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-muted-foreground">{model.displayName}</span>
+                                <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                                  {t("aiSettings.pro")}
+                                </Badge>
+                                <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                                  {costLabel}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </>
                     )}
                   </SelectContent>

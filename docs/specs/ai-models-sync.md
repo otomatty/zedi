@@ -14,20 +14,23 @@ npm run sync:ai-models
   - `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY`
   - `GOOGLE_AI_API_KEY`
+- **OPENROUTER_API_KEY**（任意）を設定すると、OpenRouter の `/api/v1/models` から料金を取得し、モデル別の Cost Units（`input_cost_units` / `output_cost_units`）を自動設定します。未設定の場合は全モデルがデフォルト値（1）になります。キーは [openrouter.ai/keys](https://openrouter.ai/keys) で無料取得できます。
 
 ローカルで `.env` に設定している場合は、同じディレクトリで上記コマンドを実行すれば読み込まれます（環境に応じて `.env` の読み込み方法は異なります）。Railway ではデプロイ時に設定した変数がそのまま使われます。
 
 ## Railway で実行する場合（推奨）
 
-`railway run npm run sync:ai-models` は**ローカル**で実行されるため、Railway の DB ホスト（`postgres.railway.internal`）に接続できません。**API の管理エンドポイント**から同期する方法を使います。
+`railway run npm run sync:ai-models` は**ローカル**で実行されるため、Railway の DB ホスト（`postgres.railway.internal`）に接続できません。**API の管理エンドポイント**から同期します。
 
-1. **秘密文字列を作成し、Railway の環境変数に登録**（手順は下記「秘密文字列の作成と登録」を参照）。
+**運用の流れ: 必ずデプロイ後に同期だけ実行する。**
 
-2. **API をデプロイ**（上記を追加したうえで再デプロイ）。
+1. **秘密文字列を作成し、Railway の環境変数に登録**（手順は下記「秘密文字列の作成と登録」を参照）。モデル別 Cost Units を使う場合は **OPENROUTER_API_KEY** も設定する。
+
+2. **API をデプロイ**（コード・環境変数を反映したうえで再デプロイ）。
    - **推奨（Git 連携）:** 該当ブランチへ `git push` すると自動で再デプロイされます。
    - **CLI でデプロイする場合:** Root Directory は **`server/api`** のままにし、**リポジトリルート**で `railway up`（パスなし）を実行してください。手順は下記「CLI でデプロイする（Root Directory の設定）」を参照。
 
-3. **同期を実行**（API が Railway 上で動いているため、同じネットワーク内の DB に接続できます）:
+3. **デプロイ完了後、同期だけ実行する**（API が Railway 上で動いているため、同じネットワーク内の DB に接続できます）:
 
    ```bash
    curl -X POST "https://api-development-b126.up.railway.app/api/ai/admin/sync-models" \
@@ -37,6 +40,8 @@ npm run sync:ai-models
    本番の場合は URL を `https://api.zedi-note.app` などに変更してください。
 
 4. 成功時は `{"ok":true,"results":[...]}` が返ります。`results` に各プロバイダーの取得件数・エラーが入ります。
+
+**Cost Units の確認:** `OPENROUTER_API_KEY` を設定して同期した場合、DB の `ai_models` で `input_cost_units` / `output_cost_units` がモデルごとに異なる値になっていることを確認してください（未設定時はすべて 1）。
 
 ローカルで `npm run sync:ai-models` を使う場合は、**公開用の DATABASE_URL**（Railway ダッシュボードで確認できる、外部から接続可能な URL）を設定してから実行してください。
 
@@ -129,7 +134,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
   - **Google:** `GET https://generativelanguage.googleapis.com/v1beta/models`
 - 取得したモデルを `ai_models` に **upsert**（存在すれば更新、なければ挿入）します。
 - `id` は `{provider}:{model_id}` 形式（例: `openai:gpt-4o`, `anthropic:claude-sonnet-4-6`, `google:gemini-1.5-flash`）です。
-- 料金単位（`input_cost_units` / `output_cost_units`）は現状デフォルト値です。必要に応じて DB や別処理で更新してください。
+- 料金単位（`input_cost_units` / `output_cost_units`）は、**OPENROUTER_API_KEY** 設定時は OpenRouter の料金に基づいて自動計算されます。未設定時はデフォルト値（1）です。
 
 ## 特定モデルのみ登録する（OpenAI / Google）
 
@@ -142,6 +147,15 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 - Anthropic には allowlist はありません（一覧が少ないため）。必要ならコードでフィルタを追加可能。
 - Railway の環境変数に上記を設定したうえで、同期エンドポイント（POST /api/ai/admin/sync-models）を再度呼び出すと、指定したモデルのみが upsert されます。既存の他モデルは DB から削除はされませんが、そのプロバイダーに対する allowlist 外のモデルは `isActive=false` に更新されるため、一覧からは表示されなくなります。
+
+## ai_tier_budgets の初期データ（任意）
+
+月間 Cost Units の上限を DB で管理する場合、`server/api/drizzle/0002_seed_ai_tier_budgets.sql` を実行して Free / Pro のバジェットを投入できます。未投入の場合は `usageService` のフォールバック値（Free: 1500、Pro: 15000）が使われます。
+
+```bash
+cd server/api
+psql "$DATABASE_URL" -f drizzle/0002_seed_ai_tier_budgets.sql
+```
 
 ## 定期実行（任意）
 
