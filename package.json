@@ -177,7 +177,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.16.5",
     "@types/pg": "^8.18.0",
-    "@types/react": "^18.3.23",
+    "@types/react": "^19.2.14",
     "@types/react-dom": "^18.3.7",
     "@types/sql.js": "^1.4.9",
     "@types/uuid": "^11.0.0",
