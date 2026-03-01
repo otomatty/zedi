@@ -2,11 +2,18 @@
  * AI 管理用エンドポイント（モデル一覧の同期など）
  * Railway 上で実行するため、内部 DB (postgres.railway.internal) に接続できる。
  */
+import crypto from "crypto";
 import { Hono } from "hono";
 import { syncAiModels } from "../../services/syncAiModels.js";
 import type { AppEnv } from "../../types/index.js";
 
 const SYNC_SECRET = process.env.SYNC_AI_MODELS_SECRET ?? "";
+
+function secureCompare(a: string, b: string): boolean {
+  const aHash = crypto.createHmac("sha256", "sync-secret").update(a).digest();
+  const bHash = crypto.createHmac("sha256", "sync-secret").update(b).digest();
+  return crypto.timingSafeEqual(aHash, bHash);
+}
 
 const app = new Hono<AppEnv>();
 
@@ -47,7 +54,7 @@ app.post("/sync-models", async (c) => {
       401,
     );
   }
-  if (headerSecret !== SYNC_SECRET) {
+  if (!secureCompare(headerSecret, SYNC_SECRET)) {
     return c.json(
       {
         error: "Invalid secret",

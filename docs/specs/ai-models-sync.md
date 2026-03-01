@@ -25,7 +25,7 @@ npm run sync:ai-models
 
 2. **API をデプロイ**（上記を追加したうえで再デプロイ）。
    - **推奨（Git 連携）:** 該当ブランチへ `git push` すると自動で再デプロイされます。
-   - **CLI でデプロイする場合:** 必ず先に「Root Directory を空にする」を行ってから、**server/api 内**で `railway up` を実行してください。手順は下記「CLI でデプロイする（Root Directory の設定）」を参照。
+   - **CLI でデプロイする場合:** Root Directory は **`server/api`** のままにし、**リポジトリルート**で `railway up`（パスなし）を実行してください。手順は下記「CLI でデプロイする（Root Directory の設定）」を参照。
 
 3. **同期を実行**（API が Railway 上で動いているため、同じネットワーク内の DB に接続できます）:
 
@@ -115,7 +115,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
 2. 変数を追加する（`<生成した秘密文字列>` を実際の値に置き換える）:
    ```bash
-   railway variables set SYNC_AI_MODELS_SECRET="<生成した秘密文字列>"
+   railway variable set SYNC_AI_MODELS_SECRET="<生成した秘密文字列>"
    ```
 3. 再デプロイが必要な場合は、デプロイを実行する。
 
@@ -141,7 +141,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | **GOOGLE_MODEL_IDS** | `gemini-2.0-flash,gemini-1.5-pro` | 登録する Google モデル ID をカンマ区切りで指定。未設定なら全件。 |
 
 - Anthropic には allowlist はありません（一覧が少ないため）。必要ならコードでフィルタを追加可能。
-- Railway の環境変数に上記を設定したうえで、同期エンドポイント（POST /api/ai/admin/sync-models）を再度呼び出すと、指定したモデルのみが upsert されます。既存の他モデルは DB に残ったままです（削除はしない）。
+- Railway の環境変数に上記を設定したうえで、同期エンドポイント（POST /api/ai/admin/sync-models）を再度呼び出すと、指定したモデルのみが upsert されます。既存の他モデルは DB から削除はされませんが、そのプロバイダーに対する allowlist 外のモデルは `isActive=false` に更新されるため、一覧からは表示されなくなります。
 
 ## 定期実行（任意）
 

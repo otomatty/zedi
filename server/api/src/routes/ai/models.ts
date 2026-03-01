@@ -35,16 +35,23 @@ app.get("/", authOptional, async (c) => {
     .where(eq(aiModels.isActive, true))
     .orderBy(asc(aiModels.sortOrder));
 
-  const models = rows.map((m) => ({
-    id: m.id,
-    provider: m.provider,
-    modelId: m.modelId,
-    displayName: m.displayName,
-    tierRequired: m.tierRequired,
-    available: tier === "pro" || m.tierRequired === "free",
-  }));
+  const toClientTier = (v: string | undefined): "free" | "paid" =>
+    v === "pro" || v === "paid" ? "paid" : "free";
 
-  return c.json({ models, tier });
+  const clientTier = toClientTier(tier);
+  const models = rows.map((m) => {
+    const tierRequired = toClientTier(m.tierRequired);
+    return {
+      id: m.id,
+      provider: m.provider,
+      modelId: m.modelId,
+      displayName: m.displayName,
+      tierRequired,
+      available: clientTier === "paid" || tierRequired === "free",
+    };
+  });
+
+  return c.json({ models, tier: clientTier });
 });
 
 export default app;

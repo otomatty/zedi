@@ -48,19 +48,21 @@ async function main() {
     process.exit(0);
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
+  const isLocal = /localhost|127\.0\.0\.1/.test(databaseUrl);
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    ssl: isLocal ? false : { rejectUnauthorized: false },
+  });
 
   try {
     // Verify target user exists
-    const userCheck = await pool.query('SELECT id, name, email FROM "user" WHERE id = $1', [
-      data.targetUserId,
-    ]);
+    const userCheck = await pool.query('SELECT id FROM "user" WHERE id = $1', [data.targetUserId]);
     if (userCheck.rows.length === 0) {
       console.error(`Target user not found: ${data.targetUserId}`);
       console.error("The user must exist in the PostgreSQL 'user' table before importing.");
       process.exit(1);
     }
-    console.log(`\nTarget user verified: ${userCheck.rows[0].name} (${userCheck.rows[0].email})`);
+    console.log(`\nTarget user verified: ${userCheck.rows[0].id}`);
 
     let insertedPages = 0;
     let insertedContents = 0;
