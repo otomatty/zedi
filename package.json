@@ -180,7 +180,7 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@types/sql.js": "^1.4.9",
-    "@types/uuid": "^10.0.0",
+    "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^5.1.2",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "@vitest/coverage-v8": "^4.0.18",
