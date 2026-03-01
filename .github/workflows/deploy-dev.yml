@@ -46,3 +46,28 @@ jobs:
         run: cp bun.lock server/hocuspocus/
       - name: Deploy Hocuspocus to Railway
         run: railway up ./server/hocuspocus --service hocuspocus --environment development -d
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs:
+      - deploy-api
+      - deploy-hocuspocus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2"
+      - name: Install & Build
+        run: bun install --frozen-lockfile && bun run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.DEV_API_BASE_URL }}
+          VITE_REALTIME_URL: ${{ vars.DEV_REALTIME_URL }}
+          VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
+          VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=zedi-dev
