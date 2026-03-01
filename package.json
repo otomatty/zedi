@@ -22,8 +22,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "dev:api": "cd server/api && npm run dev",
-    "dev:hocuspocus": "cd server/hocuspocus && npm run dev",
+    "dev:api": "cd server/api && bun run dev",
+    "dev:hocuspocus": "cd server/hocuspocus && bun run dev",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -41,8 +41,6 @@
     "docker:down": "docker-compose -f docker-compose.dev.yml down",
     "docker:logs": "docker-compose -f docker-compose.dev.yml logs -f",
     "docker:clean": "docker-compose -f docker-compose.dev.yml down -v && docker image prune -f",
-    "sync:lockfiles": "cp bun.lock server/api/ && cp bun.lock server/hocuspocus/",
-    "postinstall": "bun run sync:lockfiles",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -58,10 +56,6 @@
       "prettier --write"
     ]
   },
-  "workspaces": [
-    "server/api",
-    "server/hocuspocus"
-  ],
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"

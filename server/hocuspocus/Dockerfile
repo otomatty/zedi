@@ -5,7 +5,7 @@ FROM oven/bun:1.3.6-alpine AS builder
 WORKDIR /app
 
 COPY package.json bun.lock ./
-RUN bun install
+RUN bun install --frozen-lockfile
 
 COPY tsconfig.json ./
 COPY src/ ./src/
@@ -16,7 +16,7 @@ FROM oven/bun:1.3.6-alpine AS deps
 WORKDIR /app
 
 COPY package.json bun.lock ./
-RUN bun install --production
+RUN bun install --frozen-lockfile --production
 
 FROM node:22-alpine
 
