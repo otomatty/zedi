@@ -13,12 +13,16 @@ app.get("/", authRequired, async (c) => {
   const tier = await getUserTier(userId, db);
   const usage = await checkUsage(userId, tier, db);
 
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   return c.json({
     tier,
-    budget_units: usage.budgetUnits,
-    consumed_units: usage.consumedUnits,
-    remaining_units: usage.remaining,
-    usage_percent: usage.usagePercent,
+    budgetUnits: usage.budgetUnits,
+    consumedUnits: usage.consumedUnits,
+    remaining: usage.remaining,
+    usagePercent: usage.usagePercent,
+    yearMonth,
   });
 });
 

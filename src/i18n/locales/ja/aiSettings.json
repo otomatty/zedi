@@ -4,7 +4,7 @@
   "aiModel": "AIモデル",
   "loadingModels": "モデルを読み込み中...",
   "selectModel": "モデルを選択",
-  "paid": "有料",
+  "pro": "Pro",
   "serverModeHelp": "ZediのAIサーバー経由で利用します。無料プランでは一部モデルのみ利用可能です。",
   "useOwnKey": "自分のAPIキーを使う",
   "useOwnKeyDescription": "自分のAPIキーを設定すると、制限なくすべてのモデルを利用できます。",

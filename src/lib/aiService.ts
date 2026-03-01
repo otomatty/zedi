@@ -537,10 +537,10 @@ import type { AIModel, AIUsage, CachedServerModels } from "@/types/ai";
 const SERVER_MODELS_CACHE_KEY = "zedi-ai-server-models";
 const SERVER_MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-/** API/cache の snake_case または camelCase を AIModel に正規化。サーバー側 tier "pro" をフロント側 "paid" にマッピング */
+/** API/cache の snake_case または camelCase を AIModel に正規化 */
 function normalizeToAIModel(raw: Record<string, unknown>): AIModel {
   const rawTier = (raw.tierRequired ?? raw.tier_required) as string | undefined;
-  const tierRequired: UserTier = rawTier === "pro" || rawTier === "paid" ? "paid" : "free";
+  const tierRequired: UserTier = rawTier === "pro" ? "pro" : "free";
   return {
     id: (raw.id as string) ?? "",
     provider: (raw.provider as AIModel["provider"]) ?? "google",
@@ -631,7 +631,7 @@ async function fetchModelsFromApi(
   }
 
   const models = data.models.map((m) => normalizeToAIModel((m as Record<string, unknown>) ?? {}));
-  const tier: UserTier = data.tier === "paid" || data.tier === "free" ? data.tier : "free";
+  const tier: UserTier = data.tier === "pro" || data.tier === "free" ? data.tier : "free";
   return { models, tier };
 }
 
@@ -653,7 +653,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
             normalizeToAIModel(m as unknown as Record<string, unknown>),
           );
           const rawTier = parsed.tier as string;
-          const cachedTier: string = rawTier === "paid" || rawTier === "pro" ? "paid" : "free";
+          const cachedTier: string = rawTier === "pro" ? "pro" : "free";
           console.debug("[fetchServerModels] cache hit", {
             count: models.length,
             tier: cachedTier,

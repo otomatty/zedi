@@ -1,3 +1,72 @@
 {
-  "recommended": "おすすめ"
+  "recommended": "おすすめ",
+  "pageTitle": "プラン",
+  "heading": "シンプルな料金プラン",
+  "subheading": "Free で基本機能とクラウド同期。Pro で無制限ページとフルAI機能。",
+  "currentPlan": "現在のプラン",
+  "loadingPlan": "プラン情報を取得中...",
+  "billingMonthly": "月額",
+  "billingYearly": "年額（2ヶ月分お得）",
+  "free": {
+    "name": "Free",
+    "description": "基本機能を無料で",
+    "price": "¥0",
+    "features": {
+      "pages": "100ページまで",
+      "cloudSync": "クラウド同期",
+      "wikiLinks": "Wiki リンク",
+      "basicAI": "基本AIモデル（制限付き）",
+      "unlimitedPages": "無制限ページ",
+      "advancedAI": "高性能AIモデル"
+    },
+    "buttonText": "現在のプラン"
+  },
+  "pro": {
+    "name": "Pro",
+    "description": "無制限＋フルAI",
+    "priceMonthly": "/ 月",
+    "priceYearly": "/ 年",
+    "features": {
+      "unlimitedPages": "無制限ページ",
+      "cloudSync": "クラウド同期",
+      "wikiLinks": "Wiki リンク",
+      "allAIModels": "全AIモデル（GPT-4o, Claude, Gemini Pro等）",
+      "expandedUsage": "月間AI使用量 拡大",
+      "ownApiKey": "自分のAPIキーも使用可"
+    },
+    "manageSubscription": "サブスク管理",
+    "subscribeYearly": "Pro 年額で契約",
+    "subscribeMonthly": "Pro 月額で契約"
+  },
+  "aiInfo": {
+    "title": "AI機能について",
+    "freeTitle": "Free プラン",
+    "freeFeatures": {
+      "models": "基本モデル（GPT-4o Mini, Gemini Flash 等）",
+      "limit": "月間使用量の制限あり",
+      "features": "Wiki生成、Mermaid図 生成"
+    },
+    "proTitle": "Pro プラン",
+    "proFeatures": {
+      "models": "高性能モデル（GPT-4o, Claude Sonnet 4, Gemini Pro 等）",
+      "limit": "月間使用量が大幅に拡大",
+      "features": "今後追加されるAI機能も利用可能"
+    },
+    "ownApiKeyNote": "自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。"
+  },
+  "faq": {
+    "title": "よくある質問",
+    "usageCalculation": {
+      "question": "Proプランの使用量はどう計算されますか？",
+      "answer": "利用するモデルとトークン消費量に応じたコストユニットで計算されます。軽量モデルなら月に数百回の生成が可能です。 設定画面で現在の使用率を確認できます。"
+    },
+    "apiKeyDifference": {
+      "question": "自分のAPIキーとサブスクの違いは？",
+      "answer": "サブスクではZediのAI基盤を通じて簡単にAI機能を使えます。自分のAPIキーを設定すると使用量制限なく利用できますが、各プロバイダーとの個別契約と料金が必要です。"
+    },
+    "refundPolicy": {
+      "question": "返金ポリシーはありますか？",
+      "answer": "購入後14日以内であれば全額返金いたします。 お問い合わせフォームからご連絡ください。"
+    }
+  }
 }

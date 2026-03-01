@@ -110,7 +110,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
           onClick={onSelect}
           disabled={disabled || current}
         >
-          {current ? "現在のプラン" : buttonText}
+          {current ? t("pricing.currentPlan") : buttonText}
         </Button>
       </CardFooter>
     </Card>
@@ -118,65 +118,62 @@ const PlanCard: React.FC<PlanCardProps> = ({
 };
 
 function PricingAiInfo() {
+  const { t } = useTranslation();
   return (
     <div className="mx-auto mt-12 max-w-3xl">
-      <h3 className="mb-4 text-center text-lg font-semibold">AI機能について</h3>
+      <h3 className="mb-4 text-center text-lg font-semibold">{t("pricing.aiInfo.title")}</h3>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 flex items-center gap-2 font-medium">
             <Sparkles className="h-4 w-4 text-primary" />
-            Free プラン
+            {t("pricing.aiInfo.freeTitle")}
           </h4>
           <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>- 基本モデル（GPT-4o Mini, Gemini Flash 等）</li>
-            <li>- 月間使用量の制限あり</li>
-            <li>- Wiki生成、Mermaid図 生成</li>
+            <li>- {t("pricing.aiInfo.freeFeatures.models")}</li>
+            <li>- {t("pricing.aiInfo.freeFeatures.limit")}</li>
+            <li>- {t("pricing.aiInfo.freeFeatures.features")}</li>
           </ul>
         </div>
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
           <h4 className="mb-2 flex items-center gap-2 font-medium">
             <Zap className="h-4 w-4 text-primary" />
-            Pro プラン
+            {t("pricing.aiInfo.proTitle")}
           </h4>
           <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>- 高性能モデル（GPT-4o, Claude Sonnet 4, Gemini Pro 等）</li>
-            <li>- 月間使用量が大幅に拡大</li>
-            <li>- 今後追加されるAI機能も利用可能</li>
+            <li>- {t("pricing.aiInfo.proFeatures.models")}</li>
+            <li>- {t("pricing.aiInfo.proFeatures.limit")}</li>
+            <li>- {t("pricing.aiInfo.proFeatures.features")}</li>
           </ul>
         </div>
       </div>
       <p className="mt-4 text-center text-xs text-muted-foreground">
-        自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。
+        {t("pricing.aiInfo.ownApiKeyNote")}
       </p>
     </div>
   );
 }
 
 function PricingFaq() {
+  const { t } = useTranslation();
   return (
     <div className="mx-auto mt-12 max-w-3xl">
-      <h3 className="mb-4 text-center text-lg font-semibold">よくある質問</h3>
+      <h3 className="mb-4 text-center text-lg font-semibold">{t("pricing.faq.title")}</h3>
       <div className="space-y-4">
         <div className="rounded-lg border p-4">
-          <h4 className="mb-1 font-medium">Proプランの使用量はどう計算されますか？</h4>
+          <h4 className="mb-1 font-medium">{t("pricing.faq.usageCalculation.question")}</h4>
           <p className="text-sm text-muted-foreground">
-            利用するモデルとトークン消費量に応じたコストユニットで計算されます。
-            軽量モデルなら月に数百回の生成が可能です。 設定画面で現在の使用率を確認できます。
+            {t("pricing.faq.usageCalculation.answer")}
           </p>
         </div>
         <div className="rounded-lg border p-4">
-          <h4 className="mb-1 font-medium">自分のAPIキーとサブスクの違いは？</h4>
+          <h4 className="mb-1 font-medium">{t("pricing.faq.apiKeyDifference.question")}</h4>
           <p className="text-sm text-muted-foreground">
-            サブスクではZediのAI基盤を通じて簡単にAI機能を使えます。
-            自分のAPIキーを設定すると使用量制限なく利用できますが、
-            各プロバイダーとの個別契約と料金が必要です。
+            {t("pricing.faq.apiKeyDifference.answer")}
           </p>
         </div>
         <div className="rounded-lg border p-4">
-          <h4 className="mb-1 font-medium">返金ポリシーはありますか？</h4>
-          <p className="text-sm text-muted-foreground">
-            購入後14日以内であれば全額返金いたします。 お問い合わせフォームからご連絡ください。
-          </p>
+          <h4 className="mb-1 font-medium">{t("pricing.faq.refundPolicy.question")}</h4>
+          <p className="text-sm text-muted-foreground">{t("pricing.faq.refundPolicy.answer")}</p>
         </div>
       </div>
     </div>
@@ -190,6 +187,7 @@ function BillingIntervalToggle({
   value: BillingInterval;
   onChange: (v: BillingInterval) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="mb-6 flex justify-center gap-2">
       <Button
@@ -197,14 +195,14 @@ function BillingIntervalToggle({
         size="sm"
         onClick={() => onChange("monthly")}
       >
-        月額
+        {t("pricing.billingMonthly")}
       </Button>
       <Button
         variant={value === "yearly" ? "default" : "outline"}
         size="sm"
         onClick={() => onChange("yearly")}
       >
-        年額（2ヶ月分お得）
+        {t("pricing.billingYearly")}
       </Button>
     </div>
   );
@@ -227,22 +225,23 @@ function PricingPlanCards({
   onSelectPro,
   onManageSubscription,
 }: PricingPlanCardsProps) {
+  const { t } = useTranslation();
   return (
     <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
       <PlanCard
-        name="Free"
-        description="基本機能を無料で"
-        price="¥0"
+        name={t("pricing.free.name")}
+        description={t("pricing.free.description")}
+        price={t("pricing.free.price")}
         icon={<Sparkles className="h-5 w-5" />}
         features={[
-          { text: "100ページまで", included: true },
-          { text: "クラウド同期", included: true },
-          { text: "Wiki リンク", included: true },
-          { text: "基本AIモデル（制限付き）", included: true },
-          { text: "無制限ページ", included: false },
-          { text: "高性能AIモデル", included: false },
+          { text: t("pricing.free.features.pages"), included: true },
+          { text: t("pricing.free.features.cloudSync"), included: true },
+          { text: t("pricing.free.features.wikiLinks"), included: true },
+          { text: t("pricing.free.features.basicAI"), included: true },
+          { text: t("pricing.free.features.unlimitedPages"), included: false },
+          { text: t("pricing.free.features.advancedAI"), included: false },
         ]}
-        buttonText="現在のプラン"
+        buttonText={t("pricing.free.buttonText")}
         buttonVariant="outline"
         current={!isProUser}
         extraContent={
@@ -250,26 +249,30 @@ function PricingPlanCards({
         }
       />
       <PlanCard
-        name="Pro"
-        description="無制限＋フルAI"
-        price={billingInterval === "yearly" ? "$100" : "$10"}
-        priceNote={billingInterval === "yearly" ? "/ 年" : "/ 月"}
+        name={t("pricing.pro.name")}
+        description={t("pricing.pro.description")}
+        price={billingInterval === "yearly" ? "$200" : "$20"}
+        priceNote={
+          billingInterval === "yearly"
+            ? t("pricing.pro.priceYearly")
+            : t("pricing.pro.priceMonthly")
+        }
         icon={<Zap className="h-5 w-5" />}
         popular
         features={[
-          { text: "無制限ページ", included: true },
-          { text: "クラウド同期", included: true },
-          { text: "Wiki リンク", included: true },
-          { text: "全AIモデル（GPT-4o, Claude, Gemini Pro等）", included: true },
-          { text: "月間AI使用量 拡大", included: true },
-          { text: "自分のAPIキーも使用可", included: true },
+          { text: t("pricing.pro.features.unlimitedPages"), included: true },
+          { text: t("pricing.pro.features.cloudSync"), included: true },
+          { text: t("pricing.pro.features.wikiLinks"), included: true },
+          { text: t("pricing.pro.features.allAIModels"), included: true },
+          { text: t("pricing.pro.features.expandedUsage"), included: true },
+          { text: t("pricing.pro.features.ownApiKey"), included: true },
         ]}
         buttonText={
           isProUser
-            ? "サブスク管理"
+            ? t("pricing.pro.manageSubscription")
             : billingInterval === "yearly"
-              ? "Pro 年額で契約"
-              : "Pro 月額で契約"
+              ? t("pricing.pro.subscribeYearly")
+              : t("pricing.pro.subscribeMonthly")
         }
         onSelect={isProUser ? onManageSubscription : onSelectPro}
         current={false}
@@ -280,6 +283,7 @@ function PricingPlanCards({
 }
 
 const Pricing: React.FC = () => {
+  const { t } = useTranslation();
   const { isSignedIn } = useAuth();
   const { plan: currentPlan, isProUser, usage, isLoading, refetch } = useSubscription();
 
@@ -291,7 +295,7 @@ const Pricing: React.FC = () => {
         consumedUnits: usage.consumedUnits,
         budgetUnits: usage.budgetUnits,
         remaining: Math.max(0, usage.budgetUnits - usage.consumedUnits),
-        tier: currentPlan === "pro" ? "paid" : "free",
+        tier: currentPlan === "pro" ? "pro" : "free",
         yearMonth: new Date().toISOString().slice(0, 7),
       }
     : null;
@@ -299,7 +303,6 @@ const Pricing: React.FC = () => {
   const handleSelectPro = async () => {
     if (!isSignedIn) return;
     await openProCheckout(billingInterval);
-    // User may return from checkout in same tab; refetch after a short delay
     setTimeout(() => refetch(), 5000);
   };
 
@@ -316,17 +319,15 @@ const Pricing: React.FC = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-semibold">プラン</h1>
+          <h1 className="text-xl font-semibold">{t("pricing.pageTitle")}</h1>
         </Container>
       </header>
 
       <main className="py-8">
         <Container>
           <div className="mb-10 text-center">
-            <h2 className="mb-2 text-2xl font-bold">シンプルな料金プラン</h2>
-            <p className="text-muted-foreground">
-              Free で基本機能とクラウド同期。Pro で無制限ページとフルAI機能。
-            </p>
+            <h2 className="mb-2 text-2xl font-bold">{t("pricing.heading")}</h2>
+            <p className="text-muted-foreground">{t("pricing.subheading")}</p>
           </div>
 
           <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
@@ -341,7 +342,9 @@ const Pricing: React.FC = () => {
           />
 
           {isLoading && (
-            <p className="mt-4 text-center text-sm text-muted-foreground">プラン情報を取得中...</p>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
+              {t("pricing.loadingPlan")}
+            </p>
           )}
 
           <PricingAiInfo />

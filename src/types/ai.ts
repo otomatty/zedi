@@ -4,7 +4,7 @@ export type AIProviderType = "openai" | "anthropic" | "google";
 
 export type APIMode = "user_api_key" | "api_server";
 
-export type UserTier = "free" | "paid";
+export type UserTier = "free" | "pro";
 
 export interface AISettings {
   provider: AIProviderType;

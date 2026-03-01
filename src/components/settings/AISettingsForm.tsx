@@ -285,7 +285,7 @@ export const AISettingsForm: React.FC = () => {
                               <Lock className="h-3 w-3 text-muted-foreground" />
                               <span className="text-muted-foreground">{model.displayName}</span>
                               <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                                {t("aiSettings.paid")}
+                                {t("aiSettings.pro")}
                               </Badge>
                             </div>
                           </SelectItem>

@@ -120,7 +120,7 @@ export const UsageBar: React.FC<UsageBarProps> = ({
         />
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{usage.tier === "paid" ? "有料プラン" : "無料プラン"}</span>
+        <span>{usage.tier === "pro" ? "Pro プラン" : "Free プラン"}</span>
         <span>{usage.yearMonth}</span>
       </div>
       {isDanger && (
