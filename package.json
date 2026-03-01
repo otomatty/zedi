@@ -56,6 +56,10 @@
       "prettier --write"
     ]
   },
+  "workspaces": [
+    "server/api",
+    "server/hocuspocus"
+  ],
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"
@@ -141,7 +145,7 @@
     "openai": "^6.15.0",
     "react": "^19.2.4",
     "react-day-picker": "^8.10.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.2.4",
     "react-hook-form": "^7.61.1",
     "react-i18next": "^16.5.4",
     "react-joyride": "^2.9.3",
@@ -172,13 +176,14 @@
     "@libsql/client": "^0.17.0",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.16.5",
     "@types/pg": "^8.18.0",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^18.3.7",
+    "@types/react-dom": "^19.2.3",
     "@types/sql.js": "^1.4.9",
     "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^5.1.2",
