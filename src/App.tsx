@@ -16,6 +16,7 @@ import AISettings from "./pages/AISettings";
 import StorageSettings from "./pages/StorageSettings";
 import GeneralSettings from "./pages/GeneralSettings";
 import Pricing from "./pages/Pricing";
+import SubscriptionManagement from "./pages/SubscriptionManagement";
 import Donate from "./pages/Donate";
 import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
@@ -71,6 +72,7 @@ const App = () => (
                   <Route path="/settings/storage" element={<StorageSettings />} />
                   <Route path="/settings/general" element={<GeneralSettings />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/subscription" element={<SubscriptionManagement />} />
                   <Route path="/donate" element={<Donate />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

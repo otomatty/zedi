@@ -236,36 +236,53 @@ function findPricing(
 }
 
 /**
- * 全モデルの中で最安の input 料金（USD per token）を返す。
- * 0 や無効な値は除外し、正の最小値を使う。見つからなければ 0 を返す。
+ * 基準モデル（Claude Sonnet 4.6）の input 料金を参照価格として返す。
+ * Cursor と同様に、中堅モデルを基準にすることで倍率の差を圧縮する。
+ * 基準モデルが見つからない場合は OpenRouter 全モデルの中央値にフォールバックする。
  */
-function findBasePricePerToken(pricingMap: Map<string, OpenRouterPricing>): number {
-  let min = 0;
-  for (const [, pricing] of pricingMap) {
-    const p = parseFloat(pricing.prompt);
-    if (Number.isFinite(p) && p > 0) {
-      min = min === 0 ? p : Math.min(min, p);
+const REFERENCE_MODEL_KEYS = [
+  "anthropic/claude-sonnet-4.6",
+  "anthropic/claude-4.6-sonnet",
+  "anthropic/claude-sonnet-4-6",
+];
+const REFERENCE_CU = 100;
+
+function findReferencePricePerToken(pricingMap: Map<string, OpenRouterPricing>): number {
+  for (const key of REFERENCE_MODEL_KEYS) {
+    const pricing = pricingMap.get(key);
+    if (pricing) {
+      const p = parseFloat(pricing.prompt);
+      if (Number.isFinite(p) && p > 0) return p;
     }
   }
-  return min;
+
+  const prices: number[] = [];
+  for (const [, pricing] of pricingMap) {
+    const p = parseFloat(pricing.prompt);
+    if (Number.isFinite(p) && p > 0) prices.push(p);
+  }
+  if (prices.length === 0) return 0;
+  prices.sort((a, b) => a - b);
+  return prices[Math.floor(prices.length / 2)] ?? 0;
 }
 
 /**
  * 料金（USD per token）から相対的な Cost Units を計算する。
- * 基準: basePricePerToken = 1 CU あたりの料金。最安モデルの input 料金を基準にすると相対比率が保たれる。
+ * 基準: Claude Sonnet 4.6 = REFERENCE_CU (100)。
+ * 安いモデルは 100 未満（例: Flash 系 = 10〜30）、高いモデルは 100 超（例: Opus = 167）。
  */
 function calculateCostUnits(
   pricing: OpenRouterPricing,
-  basePricePerToken: number,
+  referencePricePerToken: number,
 ): { input: number; output: number } {
   const inputPrice = parseFloat(pricing.prompt) || 0;
   const outputPrice = parseFloat(pricing.completion) || 0;
 
-  if (basePricePerToken <= 0) return { input: DEFAULT_COST_UNITS, output: DEFAULT_COST_UNITS };
+  if (referencePricePerToken <= 0) return { input: DEFAULT_COST_UNITS, output: DEFAULT_COST_UNITS };
 
   return {
-    input: Math.max(1, Math.round(inputPrice / basePricePerToken)),
-    output: Math.max(1, Math.round(outputPrice / basePricePerToken)),
+    input: Math.max(1, Math.round((inputPrice / referencePricePerToken) * REFERENCE_CU)),
+    output: Math.max(1, Math.round((outputPrice / referencePricePerToken) * REFERENCE_CU)),
   };
 }
 
@@ -440,7 +457,7 @@ export interface SyncResult {
 
 export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncResult[]> {
   const pricingMap = await fetchOpenRouterPricing();
-  const basePricePerToken = findBasePricePerToken(pricingMap);
+  const basePricePerToken = findReferencePricePerToken(pricingMap);
 
   const results: SyncResult[] = [];
   const providers: AIProviderType[] = ["openai", "anthropic", "google"];

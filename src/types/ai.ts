@@ -34,6 +34,8 @@ export interface AIModel {
   displayName: string;
   tierRequired: UserTier;
   available: boolean; // ユーザーのティアでアクセス可能か
+  inputCostUnits: number;
+  outputCostUnits: number;
 }
 
 // AI使用量情報

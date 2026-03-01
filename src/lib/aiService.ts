@@ -548,6 +548,8 @@ function normalizeToAIModel(raw: Record<string, unknown>): AIModel {
     displayName: (raw.displayName as string) ?? (raw.display_name as string) ?? "",
     tierRequired,
     available: (raw.available as boolean) ?? false,
+    inputCostUnits: (raw.inputCostUnits as number) ?? (raw.input_cost_units as number) ?? 0,
+    outputCostUnits: (raw.outputCostUnits as number) ?? (raw.output_cost_units as number) ?? 0,
   };
 }
 

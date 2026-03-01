@@ -24,5 +24,7 @@
   "resetToastDescription": "AI settings have been reset",
   "modelsLoadFailed": "Failed to load model list",
   "retryLoadModels": "Retry",
-  "modelsEmpty": "The API responded but returned no models. Check that ai_models are registered in the database behind VITE_API_BASE_URL."
+  "modelsEmpty": "The API responded but returned no models. Check that ai_models are registered in the database behind VITE_API_BASE_URL.",
+  "costLabel": "{{multiplier}}x cost",
+  "cheapest": "cheapest"
 }

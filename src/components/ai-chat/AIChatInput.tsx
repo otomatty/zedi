@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Send, Square, FileText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ReferencedPage } from "../../types/aiChat";
+import { useAIChatStore } from "../../stores/aiChatStore";
 import { AIChatModelSelector } from "./AIChatModelSelector";
 import { useAIChatInput } from "./useAIChatInput";
 import { cn } from "../../lib/utils";
@@ -16,6 +18,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     editorRef,
     dropdownRef,
     isEmpty,
+    textLength,
     isStreaming,
     isDraggingOver,
     placeholder,
@@ -32,6 +35,13 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     handleDragLeave,
     handleDrop,
   } = useAIChatInput({ onSendMessage });
+
+  const { selectedModel } = useAIChatStore();
+  const estimatedCU = useMemo(() => {
+    if (!selectedModel?.inputCostUnits || textLength === 0) return null;
+    const estimatedTokens = Math.ceil(textLength / 4);
+    return Math.max(1, Math.round((estimatedTokens / 1000) * selectedModel.inputCostUnits));
+  }, [textLength, selectedModel?.inputCostUnits]);
 
   return (
     <div className="relative">
@@ -92,7 +102,14 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
         </div>
 
         <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-1">
-          <AIChatModelSelector />
+          <div className="flex items-center gap-2">
+            <AIChatModelSelector />
+            {estimatedCU !== null && (
+              <span className="text-[10px] tabular-nums text-muted-foreground">
+                {t("aiChat.modelSelector.estimatedCost", { cost: estimatedCU })}
+              </span>
+            )}
+          </div>
           {isStreaming ? (
             <button
               type="button"

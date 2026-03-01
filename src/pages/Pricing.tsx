@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Check, ExternalLink, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,11 +17,7 @@ import Container from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  openProCheckout,
-  openCustomerPortal,
-  type BillingInterval,
-} from "@/lib/subscriptionService";
+import { openProCheckout, type BillingInterval } from "@/lib/subscriptionService";
 
 interface PlanFeature {
   text: string;
@@ -252,26 +248,23 @@ function PricingAiInfo() {
 
 function PricingFaq() {
   const { t } = useTranslation();
+  const faqItems = [
+    "whatAreCostUnits",
+    "usageCalculation",
+    "budgetExceeded",
+    "apiKeyDifference",
+    "refundPolicy",
+  ] as const;
   return (
     <div className="mx-auto mt-12 max-w-3xl">
       <h3 className="mb-4 text-center text-lg font-semibold">{t("pricing.faq.title")}</h3>
       <div className="space-y-4">
-        <div className="rounded-lg border p-4">
-          <h4 className="mb-1 font-medium">{t("pricing.faq.usageCalculation.question")}</h4>
-          <p className="text-sm text-muted-foreground">
-            {t("pricing.faq.usageCalculation.answer")}
-          </p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <h4 className="mb-1 font-medium">{t("pricing.faq.apiKeyDifference.question")}</h4>
-          <p className="text-sm text-muted-foreground">
-            {t("pricing.faq.apiKeyDifference.answer")}
-          </p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <h4 className="mb-1 font-medium">{t("pricing.faq.refundPolicy.question")}</h4>
-          <p className="text-sm text-muted-foreground">{t("pricing.faq.refundPolicy.answer")}</p>
-        </div>
+        {faqItems.map((key) => (
+          <div key={key} className="rounded-lg border p-4">
+            <h4 className="mb-1 font-medium">{t(`pricing.faq.${key}.question`)}</h4>
+            <p className="text-sm text-muted-foreground">{t(`pricing.faq.${key}.answer`)}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -371,7 +364,6 @@ function PricingPlanCards({
               ? t("pricing.pro.subscribeYearly")
               : t("pricing.pro.subscribeMonthly")
         }
-        buttonIcon={isProUser ? <ExternalLink className="h-4 w-4" /> : undefined}
         onSelect={isProUser ? onManageSubscription : onSelectPro}
         current={isProUser}
         disabled={!isSignedIn}
@@ -384,6 +376,7 @@ const Pricing: React.FC = () => {
   const { t } = useTranslation();
   const { isSignedIn } = useAuth();
   const { isProUser, usage, isLoading, refetch } = useSubscription();
+  const navigate = useNavigate();
 
   const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
 
@@ -398,7 +391,7 @@ const Pricing: React.FC = () => {
   };
 
   const handleManageSubscription = async () => {
-    await openCustomerPortal();
+    navigate("/subscription");
   };
 
   return (

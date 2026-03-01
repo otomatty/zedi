@@ -213,6 +213,15 @@ export const AISettingsForm: React.FC = () => {
   const availableServerModels = serverModels.filter((m) => m.available);
   const lockedServerModels = serverModels.filter((m) => !m.available);
 
+  const minCostUnits = Math.max(
+    1,
+    Math.min(...serverModels.map((m) => m.inputCostUnits).filter((v) => v > 0)),
+  );
+  const getCostMultiplier = (model: AIModel) => {
+    if (model.inputCostUnits <= 0) return 1;
+    return Math.round(model.inputCostUnits / minCostUnits);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -265,31 +274,50 @@ export const AISettingsForm: React.FC = () => {
                   <SelectContent>
                     {availableServerModels.length > 0 && (
                       <>
-                        {availableServerModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{model.displayName}</span>
-                              <Badge variant="secondary" className="px-1 py-0 text-[10px]">
-                                {model.provider}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {availableServerModels.map((model) => {
+                          const multiplier = getCostMultiplier(model);
+                          return (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{model.displayName}</span>
+                                <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+                                  {model.provider}
+                                </Badge>
+                                <Badge
+                                  variant={multiplier <= 1 ? "default" : "outline"}
+                                  className="px-1 py-0 text-[10px]"
+                                >
+                                  {multiplier <= 1
+                                    ? t("aiSettings.cheapest")
+                                    : t("aiSettings.costLabel", { multiplier })}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </>
                     )}
                     {lockedServerModels.length > 0 && (
                       <>
-                        {lockedServerModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id} disabled>
-                            <div className="flex items-center gap-2">
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">{model.displayName}</span>
-                              <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                                {t("aiSettings.pro")}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {lockedServerModels.map((model) => {
+                          const multiplier = getCostMultiplier(model);
+                          return (
+                            <SelectItem key={model.id} value={model.id} disabled>
+                              <div className="flex items-center gap-2">
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-muted-foreground">{model.displayName}</span>
+                                <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                                  {t("aiSettings.pro")}
+                                </Badge>
+                                <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                                  {multiplier <= 1
+                                    ? t("aiSettings.cheapest")
+                                    : t("aiSettings.costLabel", { multiplier })}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </>
                     )}
                   </SelectContent>

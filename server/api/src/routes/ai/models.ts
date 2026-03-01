@@ -30,6 +30,8 @@ app.get("/", authOptional, async (c) => {
       tierRequired: aiModels.tierRequired,
       isActive: aiModels.isActive,
       sortOrder: aiModels.sortOrder,
+      inputCostUnits: aiModels.inputCostUnits,
+      outputCostUnits: aiModels.outputCostUnits,
     })
     .from(aiModels)
     .where(eq(aiModels.isActive, true))
@@ -48,6 +50,8 @@ app.get("/", authOptional, async (c) => {
       displayName: m.displayName,
       tierRequired,
       available: clientTier === "paid" || tierRequired === "free",
+      inputCostUnits: m.inputCostUnits,
+      outputCostUnits: m.outputCostUnits,
     };
   });
 

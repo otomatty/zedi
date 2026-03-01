@@ -64,11 +64,48 @@
     },
     "ownApiKeyNote": "Set your own API key to use all models without plan limits."
   },
+  "subscription": {
+    "title": "Subscription Management",
+    "backToPricing": "Back to Plans",
+    "planLabel": "Plan",
+    "statusLabel": "Status",
+    "billingLabel": "Billing",
+    "nextBillingLabel": "Next billing date",
+    "statusActive": "Active",
+    "statusCanceled": "Canceled",
+    "statusCanceledNote": "Access remains until {{date}}",
+    "statusPastDue": "Past due",
+    "statusTrialing": "Trial",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "cancelSubscription": "Cancel Subscription",
+    "cancelConfirmTitle": "Cancel your subscription?",
+    "cancelConfirmDescription": "Your subscription will remain active until the end of the current billing period. You can reactivate anytime before then.",
+    "reactivateSubscription": "Reactivate Subscription",
+    "switchToYearly": "Switch to Yearly (Save 2 months)",
+    "switchToMonthly": "Switch to Monthly",
+    "changePlanConfirmTitle": "Change billing interval?",
+    "changePlanConfirmDescription": "Your billing will switch to {{interval}} at the next renewal.",
+    "paymentInfo": "Payment Information",
+    "paymentInfoDescription": "Manage payment methods on Polar",
+    "noSubscription": "You're on the Free plan. Upgrade to Pro to manage your subscription.",
+    "upgradeToPro": "Upgrade to Pro",
+    "actionSuccess": "Done",
+    "actionFailed": "Operation failed"
+  },
   "faq": {
     "title": "FAQ",
+    "whatAreCostUnits": {
+      "question": "What are Cost Units?",
+      "answer": "Cost Units (CU) are a relative measure proportional to each model's API cost. Lightweight models like Flash use fewer CU per request, while advanced models like Opus or GPT-5 Pro consume more. This lets you choose the best trade-off between performance and budget."
+    },
     "usageCalculation": {
       "question": "How is Pro plan usage calculated?",
       "answer": "Usage is calculated in cost units based on the model and token consumption. With lightweight models, you can generate hundreds of times per month. Check your current usage rate in Settings."
+    },
+    "budgetExceeded": {
+      "question": "What happens when I reach the monthly limit?",
+      "answer": "When your monthly Cost Units are used up, AI requests will be declined until the next billing cycle. You can upgrade to Pro for a significantly higher limit, or set your own API key to bypass limits entirely."
     },
     "apiKeyDifference": {
       "question": "What's the difference between own API key and subscription?",

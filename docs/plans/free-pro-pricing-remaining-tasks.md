@@ -1,88 +1,163 @@
-# Free / Pro 料金プラン — 残タスク一覧
+# Free/Pro プランの残りタスク
 
-Free / Pro 2プラン統合の実装はコード上は完了している。本ドキュメントは**デプロイと運用に必要な残作業**および**任意の改善タスク**をまとめたもの。
+## 概要
 
----
+Issue #143（Polar Pro プラン構築）を起点とした一連の実装のうち、バックエンドのモデル別 Cost Units 自動取得・ティアバジェット設定は完了した。
+このドキュメントでは、フロントエンド UI とサブスクリプション管理に関する残りタスクをまとめる。
 
-## 1. 必須タスク（デプロイ前）
-
-### 1.1 DB マイグレーションの適用
-
-- **ファイル**: `db/aurora/004_plan_rename.sql`
-- **内容**:
-  - `subscriptions.plan`: `paid` → `pro`、CHECK 制約を `('free','pro')` に変更
-  - `ai_tier_budgets.tier`: `paid` → `pro`
-  - `ai_models.tier_required`: `paid` → `pro`、CHECK 制約更新
-  - `subscriptions.billing_interval` カラム追加
-- **手順**: Aurora（本番/ステージング）に対してマイグレーションを実行する。
-  - 例: `db/aurora/apply.sh` や RDS Data API 用スクリプトで `004_plan_rename.sql` を適用。
-
-### 1.2 LemonSqueezy 商品・Webhook 設定
-
-| 項目        | 内容                                                                                |
-| ----------- | ----------------------------------------------------------------------------------- |
-| 月額商品    | $10/月 のサブスクリプション商品を作成し、Product ID を取得                          |
-| 年額商品    | $100/年 のサブスクリプション商品を作成し、Product ID を取得                         |
-| Webhook URL | `https://<API Gateway ドメイン>/api/webhooks/lemonsqueezy` を登録（既存設定の確認） |
-| 署名検証    | Webhook Secret を Secrets Manager（`zedi-<env>-lemonsqueezy`）に設定                |
-
-### 1.3 環境変数の設定
-
-フロントエンド（Vite）で以下を設定する。
-
-- `VITE_LEMONSQUEEZY_STORE_ID` — ストア ID
-- `VITE_LEMONSQUEEZY_AI_MONTHLY_PRODUCT_ID` — 月額 $10 の Product ID
-- `VITE_LEMONSQUEEZY_AI_YEARLY_PRODUCT_ID` — 年額 $100 の Product ID
-- （任意）`VITE_LEMONSQUEEZY_PORTAL_URL` — 顧客がサブスクを管理するポータル URL
-
-`.env.example` に上記の説明を記載済み。
-
-### 1.4 インフラのデプロイ
-
-- **Terraform**: `terraform apply` により以下が反映される。
-  - AI API Lambda（`GET /api/ai/subscription` ルート含む）
-  - Subscription Webhook Lambda（`plan='pro'`, `billing_interval` 対応）
-- **Lambda デプロイ**: AI API モジュールのビルド成果物（`lambda.zip`）が Terraform でデプロイされることを確認。
+関連 Issue: [#143](https://github.com/otomatty/zedi/issues/143) / [#148](https://github.com/otomatty/zedi/issues/148) / [#149](https://github.com/otomatty/zedi/issues/149)
 
 ---
 
-## 2. 推奨タスク（運用・UX）
+## 完了済みタスク
 
-### 2.1 チェックアウト後のプラン反映
-
-- **現状**: Pricing ページで「Pro を契約」後に `setTimeout(refetch, 2000)` で一度だけ再取得している。
-- **推奨**: 同一タブでチェックアウトから戻った場合に、`window.addEventListener('focus')` やポーリングで `useSubscription.refetch()` を実行するなど、確実に最新プランを表示する。
-
-### 2.2 新規ユーザー用の subscriptions 行
-
-- **現状**: `getSubscription` は `subscriptions` に行が無いユーザーを「Free」として扱う。行は LemonSqueezy の Webhook で初回契約時に作成される。
-- **任意**: 初回サインアップ時に `plan='free'`, `status='active'` の行を挿入し、全ユーザーが `subscriptions` に存在する形にすると、分析や将来の無料トライアル実装がしやすい。
-
-### 2.3 ページ数制限（100ページ）の強制
-
-- **設計**: Free は「100ページまで」としているが、バックエンドでのページ数チェック実装有無は未確認。
-- **推奨**: ページ作成・インポート時に `plan === 'free'` なら現在ページ数を取得し、100 を超える場合は作成を拒否する（またはアップセル案内を表示する）ロジックを追加する。
-
-### 2.4 クラウド同期の「全ユーザー開放」の確認
-
-- **設計**: クラウド同期は Free / Pro 両方で利用可能。
-- **推奨**: 同期機能の認可・表示条件に、Pro 限定だった古いフラグが残っていないか確認し、必要なら「全ユーザー」に統一する。
+| タスク                                                             | ファイル                                                      | 状態      |
+| ------------------------------------------------------------------ | ------------------------------------------------------------- | --------- |
+| Polar Pro プラン価格設定・i18n・API レスポンス統一                 | 複数ファイル                                                  | ✅ (#143) |
+| 契約済みユーザーの Pricing ページ更新                              | `Pricing.tsx`, `subscriptionService.ts`, `useSubscription.ts` | ✅        |
+| CurrentPlanStatus コンポーネント実装                               | `Pricing.tsx`                                                 | ✅        |
+| OpenRouter API によるモデル別 Cost Units 自動取得                  | `syncAiModels.ts`                                             | ✅        |
+| `usageService.ts` フォールバック値更新 (Free: 1,500 / Pro: 15,000) | `usageService.ts`                                             | ✅        |
+| `ai_tier_budgets` 初期データ投入 (Free: 1,500 / Pro: 15,000)       | DB 適用済み                                                   | ✅        |
+| `OPENROUTER_API_KEY` Railway 環境変数設定                          | Railway development                                           | ✅        |
+| 全モデルの Cost Units 設定確認                                     | Railway sync 実行済み                                         | ✅        |
 
 ---
 
-## 3. 任意タスク（将来の拡張）
+## 残りタスク
 
-- **Pro レート制限の緩和**: 現状は Free と同様 120 req/h。Pro は 200 や 300 などに引き上げる検討。
-- **無料トライアル**: `status='trialing'` は既に DB と判定ロジックで考慮済み。LemonSqueezy でトライアル付き商品にし、Webhook で `trialing` が送られてくるようにする即可。
-- **請求履歴・領収書**: LemonSqueezy の顧客ポータル（`VITE_LEMONSQUEEZY_PORTAL_URL`）で完結させるか、自前で「請求履歴」画面を用意するか検討。
-- **プラン変更（月額↔年額）**: LemonSqueezy 側でプラン変更を扱い、Webhook で `billing_interval` を更新するか、または顧客ポータルで変更してもらう運用で対応可能。
+### 1. フロントエンド: モデル選択 UI にコスト表示を追加
+
+**目的:** ユーザーがモデルを選ぶときに、相対的なコストを把握できるようにする。
+
+**対象ファイル:**
+
+- `src/components/settings/AISettingsForm.tsx` — モデル選択ドロップダウン
+- `server/api/src/routes/ai/models.ts` — API レスポンスに `inputCostUnits` / `outputCostUnits` を追加
+
+**仕様:**
+
+- モデル一覧 API (`GET /api/ai/models`) のレスポンスに `inputCostUnits` と `outputCostUnits` を含める。
+- フロントエンドのモデル選択 UI で、最安モデルを基準にした倍率ラベル（例: `1x`, `5x`, `25x`）を表示する。
+- 最安モデル（CU が最小）を `1x` とし、他のモデルは `inputCostUnits / 最小値` で計算する。
+- コスト表示は i18n 対応する。
+
+**参考: 現在の Cost Units（2026-03 同期結果）**
+
+| モデル            | Input CU | 倍率目安 |
+| ----------------- | -------- | -------- |
+| gpt-5-nano        | 5        | 1x       |
+| gemini-2.0-flash  | 7        | 1x       |
+| gpt-5-mini        | 25       | 5x       |
+| gemini-2.5-flash  | 30       | 6x       |
+| gpt-5             | 125      | 25x      |
+| claude-sonnet-4-6 | 300      | 60x      |
+| claude-opus-4-6   | 500      | 100x     |
+| gpt-5-pro         | 1,500    | 300x     |
 
 ---
 
-## 4. 参照
+### 2. フロントエンド: チャット送信時のコスト見積もり表示
 
-- **設計・実装計画**: `.cursor/plans/free_pro_pricing_plan_86d18b36.plan.md`（または同内容のプランファイル）
-- **マイグレーション**: `db/aurora/004_plan_rename.sql`
-- **フロント**: `src/pages/Pricing.tsx`, `src/hooks/useSubscription.ts`, `src/lib/subscriptionService.ts`
-- **バックエンド**: `terraform/modules/ai-api/lambda/src/routes/subscription.ts`, `services/subscriptionService.ts`, `services/usageService.ts`
-- **Webhook**: `terraform/modules/subscription/lambda/index.mjs`
+**目的:** チャット送信前後に消費される Cost Units をユーザーに示す。
+
+**対象ファイル:**
+
+- `src/components/ai-chat/` 配下のチャット入力コンポーネント
+
+**仕様:**
+
+- 送信ボタン付近に「このリクエストで消費されるおおよその CU」を表示する。
+  - 入力テキストの文字数から推定 input tokens を計算（`文字数 / 4`）。
+  - 選択中モデルの `inputCostUnits` を使って `(推定tokens / 1000) * inputCostUnits` で見積もり。
+- 送信後は、API レスポンスに含まれる `usage.costUnits` を表示する（既にレスポンスに含まれている）。
+
+---
+
+### 3. Cost Units の仕組みをユーザー向けヘルプに記載
+
+**目的:** ユーザーが Cost Units の意味を理解できるようにする。
+
+**対象:**
+
+- Pricing ページ内のヘルプテキスト or FAQ セクション
+- `pricing.json` (ja/en) に追加
+
+**内容案:**
+
+- Cost Units はモデルの API 料金に比例した相対的な単位
+- 安いモデル（Flash 系）は少ない CU で利用でき、高性能モデル（Opus, GPT-5 Pro）は多くの CU を消費する
+- 月間上限に達した場合の挙動（リクエストが拒否される）
+
+---
+
+### 4. 独自サブスクリプション管理 UI（Issue #148）
+
+**目的:** Polar ポータルに遷移せず、アプリ内でサブスク管理を完結させる。
+
+#### 4-1. バックエンド: Customer Portal API プロキシルート
+
+**対象ファイル（新規）:**
+
+- `server/api/src/routes/subscription/details.ts` — `GET /api/subscription/details`
+- `server/api/src/routes/subscription/cancel.ts` — `POST /api/subscription/cancel`
+- `server/api/src/routes/subscription/reactivate.ts` — `POST /api/subscription/reactivate`
+- `server/api/src/routes/subscription/change-plan.ts` — `POST /api/subscription/change-plan`
+
+**仕様:**
+
+- Polar の Customer Portal API（REST）を呼び出すプロキシ。
+- 認証済みユーザーの Polar customer ID を使ってリクエストを転送する。
+- レスポンスはフロントエンドで扱いやすい形にマッピングする。
+
+#### 4-2. フロントエンド: サブスク管理ページ
+
+**対象ファイル（新規）:**
+
+- `src/pages/SubscriptionManagement.tsx`
+- `src/lib/subscriptionService.ts` — 新しい API エンドポイントの呼び出し関数追加
+
+**仕様:**
+
+- 現在のプラン情報（プラン名、ステータス、次回請求日、請求額）を表示。
+- プラン変更（月額 ↔ 年額）ボタン。
+- サブスクリプション解約・再開ボタン。
+- 「お支払い情報の変更」リンクは引き続き Polar ポータルへ（ExternalLink アイコン付き）。
+
+#### 4-3. Pricing ページの「サブスク管理」ボタンを独自ページへのリンクに変更
+
+**対象ファイル:**
+
+- `src/pages/Pricing.tsx`
+
+**仕様:**
+
+- 現在 Polar ポータルへ遷移するボタンを、独自の `/subscription` ページへのリンクに変更。
+- ExternalLink アイコンを削除し、通常のページ遷移にする。
+
+---
+
+## 優先度の提案
+
+| 優先度 | タスク                            | 理由                          |
+| ------ | --------------------------------- | ----------------------------- |
+| **高** | 1. モデル選択 UI にコスト表示     | ユーザーのコスト意識に直結    |
+| **中** | 3. ヘルプに CU の説明追加         | UX 向上                       |
+| **中** | 2. チャット送信時のコスト見積もり | UX 向上だが必須ではない       |
+| **低** | 4. 独自サブスク管理 UI            | 現状 Polar ポータルで代替可能 |
+
+---
+
+## 現在の DB 状態（development 環境）
+
+### ai_tier_budgets
+
+| tier | monthly_budget_units | description                                                |
+| ---- | -------------------- | ---------------------------------------------------------- |
+| free | 1,500                | Free tier: ~60 GPT-5 calls or ~1000 Flash calls per month  |
+| pro  | 15,000               | Pro tier: ~600 GPT-5 calls or ~10000 Flash calls per month |
+
+### ai_models（Cost Units 設定済み、pricingSource: openrouter）
+
+全 23 モデルがアクティブ。モデル別 Cost Units は OpenRouter API 料金に基づいて自動計算済み。
+`npm run sync:ai-models` または管理エンドポイントで再同期すると最新料金に追従する。

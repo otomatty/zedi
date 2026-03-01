@@ -64,11 +64,48 @@
     },
     "ownApiKeyNote": "自分のAPIキーを設定すると、プラン制限なく全モデルを利用できます。"
   },
+  "subscription": {
+    "title": "サブスクリプション管理",
+    "backToPricing": "プランに戻る",
+    "planLabel": "プラン",
+    "statusLabel": "ステータス",
+    "billingLabel": "請求",
+    "nextBillingLabel": "次回請求日",
+    "statusActive": "有効",
+    "statusCanceled": "解約済み",
+    "statusCanceledNote": "{{date}} まで利用可能",
+    "statusPastDue": "支払い遅延",
+    "statusTrialing": "トライアル",
+    "monthly": "月額",
+    "yearly": "年額",
+    "cancelSubscription": "サブスクリプションを解約",
+    "cancelConfirmTitle": "サブスクリプションを解約しますか？",
+    "cancelConfirmDescription": "現在の請求期間の終了までサブスクリプションは有効です。それまでにいつでも再開できます。",
+    "reactivateSubscription": "サブスクリプションを再開",
+    "switchToYearly": "年額に切り替え（2ヶ月分お得）",
+    "switchToMonthly": "月額に切り替え",
+    "changePlanConfirmTitle": "請求間隔を変更しますか？",
+    "changePlanConfirmDescription": "次回更新時に{{interval}}に切り替わります。",
+    "paymentInfo": "お支払い情報",
+    "paymentInfoDescription": "Polarでお支払い方法を管理",
+    "noSubscription": "現在Freeプランです。Proにアップグレードしてサブスクリプションを管理しましょう。",
+    "upgradeToPro": "Proにアップグレード",
+    "actionSuccess": "完了しました",
+    "actionFailed": "操作に失敗しました"
+  },
   "faq": {
     "title": "よくある質問",
+    "whatAreCostUnits": {
+      "question": "Cost Units とは？",
+      "answer": "Cost Units（CU）は各AIモデルのAPI料金に比例した相対的な単位です。Flash等の軽量モデルは少ないCUで利用でき、OpusやGPT-5 Pro等の高性能モデルはより多くのCUを消費します。性能と予算のバランスを考えてモデルを選択できます。"
+    },
     "usageCalculation": {
       "question": "Proプランの使用量はどう計算されますか？",
       "answer": "利用するモデルとトークン消費量に応じたコストユニットで計算されます。軽量モデルなら月に数百回の生成が可能です。 設定画面で現在の使用率を確認できます。"
+    },
+    "budgetExceeded": {
+      "question": "月間上限に達するとどうなりますか？",
+      "answer": "月間のCost Unitsを使い切ると、次の請求サイクルまでAIリクエストが拒否されます。Proプランにアップグレードすると上限が大幅に拡大します。また、自分のAPIキーを設定すれば制限なく利用できます。"
     },
     "apiKeyDifference": {
       "question": "自分のAPIキーとサブスクの違いは？",

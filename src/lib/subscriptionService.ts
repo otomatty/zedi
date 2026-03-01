@@ -160,3 +160,63 @@ export async function openCustomerPortal(): Promise<void> {
   const { url } = (await response.json()) as { url: string };
   window.open(url, "_blank", "noopener,noreferrer");
 }
+
+// ---------------------------------------------------------------------------
+// Subscription management API (in-app management)
+// ---------------------------------------------------------------------------
+
+export interface SubscriptionDetails {
+  plan: "free" | "pro";
+  status: string;
+  billingInterval: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  externalId?: string;
+  usage: {
+    budgetUnits: number;
+    consumedUnits: number;
+    remainingUnits: number;
+    usagePercent: number;
+  };
+}
+
+async function subscriptionApiCall<T>(
+  path: string,
+  method: "GET" | "POST" = "GET",
+  body?: Record<string, unknown>,
+): Promise<T> {
+  const apiBaseUrl = getAIAPIBaseUrl();
+  if (!apiBaseUrl) throw new Error("API base URL not configured");
+
+  const response = await fetch(`${apiBaseUrl}/api/subscription${path}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  if (response.status === 401) throw new Error("AUTH_REQUIRED");
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "Request failed");
+  }
+  return (await response.json()) as T;
+}
+
+export async function fetchSubscriptionDetails(): Promise<SubscriptionDetails> {
+  return subscriptionApiCall<SubscriptionDetails>("/details");
+}
+
+export async function cancelSubscription(): Promise<{ success: boolean; message: string }> {
+  return subscriptionApiCall("/cancel", "POST");
+}
+
+export async function reactivateSubscription(): Promise<{ success: boolean; message: string }> {
+  return subscriptionApiCall("/reactivate", "POST");
+}
+
+export async function changeBillingInterval(
+  billingInterval: BillingInterval,
+): Promise<{ success: boolean; message: string }> {
+  return subscriptionApiCall("/change-plan", "POST", { billingInterval });
+}

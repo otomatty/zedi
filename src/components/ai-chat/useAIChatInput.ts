@@ -36,12 +36,15 @@ function useAIChatInputChips() {
     });
   }, []);
 
+  const [textLength, setTextLength] = useState(0);
+
   const checkEmpty = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    const hasContent =
-      (editor.textContent?.trim() ?? "") !== "" || editor.querySelector("[data-page-id]") !== null;
+    const text = editor.textContent?.trim() ?? "";
+    const hasContent = text !== "" || editor.querySelector("[data-page-id]") !== null;
     setIsEmpty(!hasContent);
+    setTextLength(text.length);
   }, []);
 
   const insertChipAtCursor = useCallback(
@@ -74,6 +77,7 @@ function useAIChatInputChips() {
     setPendingRefs,
     isEmpty,
     setIsEmpty,
+    textLength,
     editorRef,
     syncRefsFromDOM,
     checkEmpty,
@@ -89,6 +93,7 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
   const {
     pendingRefs,
     isEmpty,
+    textLength,
     editorRef,
     syncRefsFromDOM,
     checkEmpty,
@@ -264,6 +269,7 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
     editorRef,
     dropdownRef,
     isEmpty,
+    textLength,
     isStreaming,
     isDraggingOver,
     placeholder,
