@@ -77,7 +77,7 @@ app.post("/sync-models", async (c) => {
       {
         error: "Sync failed",
         code: "SYNC_ERROR",
-        message: err.message,
+        message: isDev ? err.message : "An internal error occurred while syncing models.",
         ...(isDev && err.stack ? { detail: err.stack } : {}),
       },
       500,
