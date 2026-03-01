@@ -1,9 +1,9 @@
 # Build context: repo root (docker-compose) or server/api (Railway with Root Directory).
 # When context is server/api, bun.lock is copied there by CI or committed in repo.
-FROM oven/bun:1-alpine AS builder
+FROM oven/bun:1.3.6-alpine AS builder
 WORKDIR /app
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install
 COPY tsconfig.json ./
 COPY src/ ./src/
 RUN bun run build
