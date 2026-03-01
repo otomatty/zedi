@@ -11,9 +11,7 @@ import {
 import Container from "@/components/layout/Container";
 import { HeaderSearchBar } from "@/components/layout/Header/HeaderSearchBar";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
-import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { formatTimeAgo } from "@/lib/dateUtils";
-import type { WikiGeneratorStatus } from "./types";
 import { ConnectionIndicator } from "../ConnectionIndicator";
 import { UserAvatars } from "../UserAvatars";
 import type { ConnectionStatus } from "@/lib/collaboration/types";
@@ -21,16 +19,11 @@ import type { UserPresence } from "@/lib/collaboration/types";
 import { AIChatButton } from "@/components/layout/Header/AIChatButton";
 
 interface PageEditorHeaderProps {
-  /** Wiki Generator ボタン用（タイトル表示は PageTitleBlock で行う） */
-  title: string;
   lastSaved: number | null;
-  hasContent: boolean;
-  wikiStatus: WikiGeneratorStatus;
   onBack: () => void;
   onDelete: () => void;
   onExportMarkdown: () => void;
   onCopyMarkdown: () => void;
-  onGenerateWiki: () => void;
   /** リアルタイムコラボレーション状態（有効時のみ渡す） */
   collaboration?: {
     status: ConnectionStatus;
@@ -45,15 +38,11 @@ interface PageEditorHeaderProps {
  * Contains title input, action buttons, and dropdown menu
  */
 export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
-  title,
   lastSaved,
-  hasContent,
-  wikiStatus,
   onBack,
   onDelete,
   onExportMarkdown,
   onCopyMarkdown,
-  onGenerateWiki,
   collaboration,
 }) => {
   const searchContext = useGlobalSearchContextOptional();
@@ -89,13 +78,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
             </>
           )}
           <AIChatButton />
-          {/* Wiki Generator Button - タイトルがあり本文が空の場合のみ表示 */}
-          <WikiGeneratorButton
-            title={title}
-            hasContent={hasContent}
-            onGenerate={onGenerateWiki}
-            status={wikiStatus}
-          />
           {lastSaved && (
             <span className="hidden text-xs text-muted-foreground sm:inline">
               {formatTimeAgo(lastSaved)}に保存

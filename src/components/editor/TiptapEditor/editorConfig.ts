@@ -116,6 +116,8 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       link: false,
       // CodeBlockLowlight を使うため StarterKit の codeBlock は無効
       codeBlock: false,
+      // 下で個別に Underline を追加するため StarterKit の underline は無効
+      underline: false,
     }),
     // Typography for smart quotes and dashes
     Typography,

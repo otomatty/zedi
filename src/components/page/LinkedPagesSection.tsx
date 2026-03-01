@@ -57,7 +57,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
     // Create a new page with the ghost link title
     try {
       const newPage = await createPageMutation.mutateAsync({ title });
-      navigate(`/page/${newPage.id}`);
+      navigate(`/page/${newPage.id}`, { flushSync: true });
     } catch (error) {
       console.error("Failed to create page:", error);
     }

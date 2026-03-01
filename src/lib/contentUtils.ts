@@ -70,8 +70,11 @@ export function sanitizeTiptapContent(content: string): SanitizeResult {
 
     const sanitizedDoc = sanitizeNode(doc, removedNodeTypes, removedMarkTypes);
 
+    // Promote plain-text [[...]] patterns to wikiLink marks
+    const promotedDoc = sanitizedDoc ? promoteWikiLinksInNode(sanitizedDoc) : sanitizedDoc;
+
     return {
-      content: JSON.stringify(sanitizedDoc),
+      content: JSON.stringify(promotedDoc),
       hadErrors: removedNodeTypes.size > 0 || removedMarkTypes.size > 0,
       removedNodeTypes: Array.from(removedNodeTypes),
       removedMarkTypes: Array.from(removedMarkTypes),
@@ -86,6 +89,95 @@ export function sanitizeTiptapContent(content: string): SanitizeResult {
       removedMarkTypes: ["JSON parse error"],
     };
   }
+}
+
+/**
+ * Split a text node's text by [[...]] patterns and produce an array of text nodes,
+ * applying wikiLink marks to the matched segments.
+ * Existing marks on the original node are preserved on all resulting segments.
+ */
+function splitTextNodeByWikiLinks(textNode: Record<string, unknown>): Record<string, unknown>[] {
+  const text = textNode.text as string;
+  if (!text) return [textNode];
+
+  const existingMarks = (textNode.marks as Array<Record<string, unknown>>) || [];
+
+  const hasWikiLinkMark = existingMarks.some(
+    (m) => (m as Record<string, unknown>).type === "wikiLink",
+  );
+  if (hasWikiLinkMark) return [textNode];
+
+  // Skip text nodes with inline code marks
+  const hasCodeMark = existingMarks.some((m) => (m as Record<string, unknown>).type === "code");
+  if (hasCodeMark) return [textNode];
+
+  const regex = /\[\[([^\]]+)\]\]/g;
+  let match: RegExpExecArray | null;
+  const result: Record<string, unknown>[] = [];
+  let lastIndex = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      result.push({
+        type: "text",
+        text: text.slice(lastIndex, match.index),
+        ...(existingMarks.length > 0 ? { marks: existingMarks } : {}),
+      });
+    }
+
+    const title = match[1].trim();
+    const wikiLinkMark: Record<string, unknown> = {
+      type: "wikiLink",
+      attrs: { title, exists: true, referenced: false },
+    };
+    result.push({
+      type: "text",
+      text: match[0],
+      marks: [...existingMarks, wikiLinkMark],
+    });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (result.length === 0) return [textNode];
+
+  if (lastIndex < text.length) {
+    result.push({
+      type: "text",
+      text: text.slice(lastIndex),
+      ...(existingMarks.length > 0 ? { marks: existingMarks } : {}),
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Recursively promote plain-text [[...]] patterns to wikiLink marks.
+ * Returns a new node tree (does not mutate in place).
+ */
+const SKIP_WIKILINK_PROMOTION_NODES = new Set(["codeBlock", "code_block"]);
+
+function promoteWikiLinksInNode(node: Record<string, unknown>): Record<string, unknown> {
+  if (!node || typeof node !== "object") return node;
+
+  // Don't promote inside code blocks
+  if (SKIP_WIKILINK_PROMOTION_NODES.has(node.type as string)) return node;
+
+  const result: Record<string, unknown> = { ...node };
+
+  if (Array.isArray(node.content)) {
+    const newContent: Record<string, unknown>[] = [];
+    for (const child of node.content as Array<Record<string, unknown>>) {
+      if (child.type === "text" && typeof child.text === "string") {
+        newContent.push(...splitTextNodeByWikiLinks(child));
+      } else {
+        newContent.push(promoteWikiLinksInNode(child));
+      }
+    }
+    result.content = newContent;
+  }
+
+  return result;
 }
 
 /**

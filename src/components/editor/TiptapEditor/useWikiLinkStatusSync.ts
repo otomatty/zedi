@@ -8,6 +8,8 @@ interface UseWikiLinkStatusSyncOptions {
   content: string;
   pageId: string | undefined;
   onChange: (content: string) => void;
+  /** true の間は同期をスキップ（Wiki生成中のリンクスタイルちらつき防止） */
+  skipSync?: boolean;
 }
 
 /**
@@ -22,6 +24,7 @@ export function useWikiLinkStatusSync({
   content,
   pageId,
   onChange,
+  skipSync = false,
 }: UseWikiLinkStatusSyncOptions): void {
   const { checkExistence } = useWikiLinkExistsChecker();
 
@@ -32,7 +35,9 @@ export function useWikiLinkStatusSync({
   }>({ pageId: null, wikiLinkCount: 0 });
 
   useEffect(() => {
-    if (!editor || !content || !pageId) return;
+    if (skipSync || !editor || !content || !pageId) {
+      return;
+    }
 
     // 現在のWikiLink数を取得
     const currentWikiLinks = extractWikiLinksFromContent(content);
@@ -83,7 +88,7 @@ export function useWikiLinkStatusSync({
     // コンテンツ反映を待ってから実行
     const timer = setTimeout(updateWikiLinkStatus, 150);
     return () => clearTimeout(timer);
-  }, [editor, content, checkExistence, pageId, onChange]);
+  }, [skipSync, editor, content, checkExistence, pageId, onChange]);
 }
 
 // --- ヘルパー関数 ---
