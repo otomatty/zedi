@@ -52,8 +52,12 @@ export function createApp(): Hono<AppEnv> {
   app.use("*", redisMiddleware);
   app.onError(errorHandler);
 
-  // Better Auth handler
-  app.on(["POST", "GET"], "/api/auth/**", (c) => {
+  // Better Auth handler — use :path{.+} to match multi-segment paths (e.g. /api/auth/sign-in/social).
+  // Hono's * only matches a single segment, so ** would not match sign-in/social.
+  app.on(["POST", "GET"], "/api/auth/:path{.+}", (c) => {
+    return auth.handler(c.req.raw);
+  });
+  app.on(["POST", "GET"], "/api/auth", (c) => {
     return auth.handler(c.req.raw);
   });
 
