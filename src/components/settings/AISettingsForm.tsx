@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "@/components/ui/sonner";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
+import { getSonnetBaseline, formatCostMultiplierLabel } from "@/lib/aiCostUtils";
 import { useTranslation } from "react-i18next";
 
 export const AISettingsForm: React.FC = () => {
@@ -213,14 +214,9 @@ export const AISettingsForm: React.FC = () => {
   const availableServerModels = serverModels.filter((m) => m.available);
   const lockedServerModels = serverModels.filter((m) => !m.available);
 
-  const minCostUnits = Math.max(
-    1,
-    Math.min(...serverModels.map((m) => m.inputCostUnits).filter((v) => v > 0)),
-  );
-  const getCostMultiplier = (model: AIModel) => {
-    if (model.inputCostUnits <= 0) return 1;
-    return Math.round(model.inputCostUnits / minCostUnits);
-  };
+  const sonnetBaseline = getSonnetBaseline(serverModels);
+  const getCostLabel = (model: AIModel) =>
+    formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
 
   return (
     <Card>
@@ -275,7 +271,8 @@ export const AISettingsForm: React.FC = () => {
                     {availableServerModels.length > 0 && (
                       <>
                         {availableServerModels.map((model) => {
-                          const multiplier = getCostMultiplier(model);
+                          const costLabel = getCostLabel(model);
+                          const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
                           return (
                             <SelectItem key={model.id} value={model.id}>
                               <div className="flex items-center gap-2">
@@ -284,12 +281,10 @@ export const AISettingsForm: React.FC = () => {
                                   {model.provider}
                                 </Badge>
                                 <Badge
-                                  variant={multiplier <= 1 ? "default" : "outline"}
+                                  variant={isCheaperOrBaseline ? "default" : "outline"}
                                   className="px-1 py-0 text-[10px]"
                                 >
-                                  {multiplier <= 1
-                                    ? t("aiSettings.cheapest")
-                                    : t("aiSettings.costLabel", { multiplier })}
+                                  {costLabel}
                                 </Badge>
                               </div>
                             </SelectItem>
@@ -300,7 +295,7 @@ export const AISettingsForm: React.FC = () => {
                     {lockedServerModels.length > 0 && (
                       <>
                         {lockedServerModels.map((model) => {
-                          const multiplier = getCostMultiplier(model);
+                          const costLabel = getCostLabel(model);
                           return (
                             <SelectItem key={model.id} value={model.id} disabled>
                               <div className="flex items-center gap-2">
@@ -310,9 +305,7 @@ export const AISettingsForm: React.FC = () => {
                                   {t("aiSettings.pro")}
                                 </Badge>
                                 <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                                  {multiplier <= 1
-                                    ? t("aiSettings.cheapest")
-                                    : t("aiSettings.costLabel", { multiplier })}
+                                  {costLabel}
                                 </Badge>
                               </div>
                             </SelectItem>

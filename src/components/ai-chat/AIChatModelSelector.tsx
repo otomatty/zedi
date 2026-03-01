@@ -3,6 +3,7 @@ import { ChevronDown, Check, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { fetchServerModels } from "../../lib/aiService";
+import { getSonnetBaseline, formatCostMultiplierLabel } from "../../lib/aiCostUtils";
 import { loadAISettings } from "../../lib/aiSettings";
 import type { AIModel } from "../../types/ai";
 import { cn } from "../../lib/utils";
@@ -81,14 +82,9 @@ export function AIChatModelSelector() {
 
   const displayLabel = selectedModel?.displayName ?? t("aiChat.modelSelector.select");
 
-  const minCostUnits = Math.max(
-    1,
-    Math.min(...models.map((m) => m.inputCostUnits).filter((v) => v > 0)),
-  );
-  const getCostMultiplier = (model: AIModel) => {
-    if (model.inputCostUnits <= 0) return 1;
-    return Math.round(model.inputCostUnits / minCostUnits);
-  };
+  const sonnetBaseline = getSonnetBaseline(models);
+  const getCostLabel = (model: AIModel) =>
+    formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
 
   return (
     <div ref={containerRef} className="relative">
@@ -118,7 +114,8 @@ export function AIChatModelSelector() {
         <div className="absolute bottom-full left-0 z-50 mb-1 max-h-[280px] min-w-[240px] max-w-[320px] overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
           {models.map((model) => {
             const isSelected = selectedModel?.id === model.id;
-            const multiplier = getCostMultiplier(model);
+            const costLabel = getCostLabel(model);
+            const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
             return (
               <button
                 key={model.id}
@@ -134,14 +131,12 @@ export function AIChatModelSelector() {
                   <span
                     className={cn(
                       "rounded px-1 py-0.5 text-[10px] tabular-nums",
-                      multiplier <= 1
+                      isCheaperOrBaseline
                         ? "bg-primary/10 text-primary"
                         : "bg-muted text-muted-foreground",
                     )}
                   >
-                    {multiplier <= 1
-                      ? t("aiChat.modelSelector.cheapest")
-                      : t("aiChat.modelSelector.costLabel", { multiplier })}
+                    {costLabel}
                   </span>
                   {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
                 </span>
