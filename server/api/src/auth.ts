@@ -37,10 +37,12 @@ export const auth = betterAuth({
   },
 
   advanced: {
-    defaultCookieAttributes: {
-      sameSite: "none",
-      secure: true,
-    },
+    defaultCookieAttributes: (() => {
+      const isProduction = process.env.NODE_ENV === "production";
+      return isProduction
+        ? { sameSite: "none" as const, secure: true }
+        : { sameSite: "lax" as const, secure: false };
+    })(),
   },
 
   trustedOrigins: getEnv("CORS_ORIGIN")

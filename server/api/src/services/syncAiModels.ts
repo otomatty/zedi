@@ -18,6 +18,47 @@ import { getDb } from "../db/client.js";
 import { aiModels } from "../schema/index.js";
 
 const DEFAULT_COST_UNITS = 1;
+const FETCH_TIMEOUT_MS = 15000;
+
+const OPENAI_TEXT_CHAT_EXCLUDE_PATTERNS = [
+  "image",
+  "tts",
+  "audio",
+  "realtime",
+  "transcribe",
+  "instruct",
+  "codex",
+  "search",
+];
+const GOOGLE_TEXT_CHAT_EXCLUDE_PATTERNS = [
+  "imagen",
+  "veo",
+  "embedding",
+  "tts",
+  "audio",
+  "image",
+  "aqa",
+  "robotics",
+  "computer-use",
+  "deep-research",
+  "gemma",
+  "nano-banana",
+];
+
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(`Request timeout after ${FETCH_TIMEOUT_MS}ms: ${url}`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * テキストチャット用途のモデルかどうかを判定する。
@@ -27,35 +68,10 @@ function isTextChatModel(provider: AIProviderType, modelId: string): boolean {
   const id = modelId.toLowerCase();
 
   if (provider === "openai") {
-    const excludePatterns = [
-      "image", // gpt-image-1, gpt-image-1-mini, gpt-image-1.5
-      "tts", // gpt-4o-mini-tts
-      "audio", // gpt-4o-audio-preview, gpt-audio-*
-      "realtime", // gpt-realtime-*
-      "transcribe", // gpt-4o-transcribe, gpt-4o-mini-transcribe
-      "instruct", // gpt-3.5-turbo-instruct (completion-only)
-      "codex", // gpt-5-codex, gpt-5.1-codex (code execution API)
-      "search", // gpt-4o-search-preview, gpt-5-search-api
-    ];
-    return !excludePatterns.some((p) => id.includes(p));
+    return !OPENAI_TEXT_CHAT_EXCLUDE_PATTERNS.some((p) => id.includes(p));
   }
-
   if (provider === "google") {
-    const excludePatterns = [
-      "imagen", // imagen-4.0-*
-      "veo", // veo-2.0-*, veo-3.0-*
-      "embedding", // gemini-embedding-001
-      "tts", // gemini-*-tts
-      "audio", // gemini-*-native-audio-*
-      "image", // gemini-*-image-*, nano-banana
-      "aqa", // aqa (Attributed Question Answering)
-      "robotics", // gemini-robotics-*
-      "computer-use", // gemini-*-computer-use-*
-      "deep-research", // deep-research-*
-      "gemma", // gemma-* (small open-weight, not API chat)
-      "nano-banana", // alias for image models
-    ];
-    return !excludePatterns.some((p) => id.includes(p));
+    return !GOOGLE_TEXT_CHAT_EXCLUDE_PATTERNS.some((p) => id.includes(p));
   }
 
   return true;
@@ -144,7 +160,7 @@ type Row = {
 };
 
 async function fetchOpenAIModels(apiKey: string): Promise<Row[]> {
-  const res = await fetch("https://api.openai.com/v1/models", {
+  const res = await fetchWithTimeout("https://api.openai.com/v1/models", {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) {
@@ -186,7 +202,7 @@ async function fetchAnthropicModels(apiKey: string): Promise<AnthropicFetchResul
     const url = new URL("https://api.anthropic.com/v1/models");
     url.searchParams.set("limit", "100");
     if (afterId) url.searchParams.set("after_id", afterId);
-    const res = await fetch(url.toString(), {
+    const res = await fetchWithTimeout(url.toString(), {
       headers: {
         "anthropic-version": "2023-06-01",
         "x-api-key": apiKey,
@@ -213,6 +229,7 @@ async function fetchAnthropicModels(apiKey: string): Promise<AnthropicFetchResul
     }
 
     const list = body.data ?? [];
+    const baseSortOrder = all.length;
     list.forEach((m, i) => {
       all.push({
         id: `anthropic:${m.id}`,
@@ -223,7 +240,7 @@ async function fetchAnthropicModels(apiKey: string): Promise<AnthropicFetchResul
         inputCostUnits: DEFAULT_COST_UNITS,
         outputCostUnits: DEFAULT_COST_UNITS,
         isActive: true,
-        sortOrder: all.length + i,
+        sortOrder: baseSortOrder + i,
       });
     });
     if (!body.has_more || list.length === 0) break;
@@ -243,7 +260,7 @@ async function fetchAnthropicModels(apiKey: string): Promise<AnthropicFetchResul
 
 async function fetchGoogleModels(apiKey: string): Promise<Row[]> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   if (!res.ok) {
     throw new Error(`Google models list failed: ${res.status} ${await res.text()}`);
   }

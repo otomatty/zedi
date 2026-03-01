@@ -248,18 +248,28 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
       const req = indexedDB.deleteDatabase(DB_NAME_PREFIX + userId);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
-      req.onblocked = () => resolve();
+      req.onblocked = () =>
+        reject(
+          new Error(
+            "IndexedDBStorageAdapter: deleteDatabase for main DB is blocked (database is still open in another tab or context).",
+          ),
+        );
     });
 
     // Delete per-page Y.Doc databases (y-indexeddb creates one per page)
     await Promise.allSettled(
       pageIds.map(
         (pageId) =>
-          new Promise<void>((resolve) => {
+          new Promise<void>((resolve, reject) => {
             const req = indexedDB.deleteDatabase(YDOC_NAME_PREFIX + pageId);
             req.onsuccess = () => resolve();
-            req.onerror = () => resolve();
-            req.onblocked = () => resolve();
+            req.onerror = () => reject(req.error);
+            req.onblocked = () =>
+              reject(
+                new Error(
+                  `IndexedDBStorageAdapter: deleteDatabase for Y.Doc DB "${YDOC_NAME_PREFIX + pageId}" is blocked (database is still open in another tab or context).`,
+                ),
+              );
           }),
       ),
     );

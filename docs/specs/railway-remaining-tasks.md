@@ -14,7 +14,7 @@
 
 ## 全体フロー
 
-```
+```text
 Step 1: ローカル動作確認
   ↓
 Step 2: Railway サービス作成 (development 環境) ← CLI で自動化
@@ -460,7 +460,7 @@ railway logs --service hocuspocus --lines 20
    - **Root directory**: `/`
 5. 環境変数 (Production):
 
-```
+```dotenv
 VITE_API_BASE_URL=https://api.zedi-note.app
 VITE_REALTIME_URL=wss://realtime.zedi-note.app
 VITE_POLAR_PRO_MONTHLY_PRODUCT_ID=<Polar から取得>
@@ -498,11 +498,11 @@ railway add -d redis
 # Storage Bucket → ダッシュボードで作成（Step 2.4 と同手順）
 
 # API サービス
-railway add --repo otomatty/zedi --service api
+railway add --repo otomatty/zedi --service api-prod
 # → ダッシュボードで Root Directory を /server/api に設定
 
 # Hocuspocus サービス
-railway add --repo otomatty/zedi --service hocuspocus
+railway add --repo otomatty/zedi --service hocuspocus-prod
 # → ダッシュボードで Root Directory を /server/hocuspocus に設定
 ```
 
@@ -511,15 +511,15 @@ railway add --repo otomatty/zedi --service hocuspocus
 **Railway 自動ドメイン:**
 
 ```bash
-railway domain --service api --port 3000
-railway domain --service hocuspocus --port 1234
+railway domain --service api-prod --port 3000
+railway domain --service hocuspocus-prod --port 1234
 ```
 
 **カスタムドメイン:**
 
 ```bash
-railway domain api.zedi-note.app --service api --port 3000
-railway domain realtime.zedi-note.app --service hocuspocus --port 1234
+railway domain api.zedi-note.app --service api-prod --port 3000
+railway domain realtime.zedi-note.app --service hocuspocus-prod --port 1234
 ```
 
 > カスタムドメインを設定すると、必要な DNS レコード（CNAME）が表示される。Cloudflare DNS にそのレコードを追加する。
@@ -543,7 +543,7 @@ railway variable set \
   "BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET_PROD}" \
   "BETTER_AUTH_URL=https://api.zedi-note.app" \
   "CORS_ORIGIN=https://zedi-note.app" \
-  --service api \
+  --service api-prod \
   --skip-deploys
 ```
 
@@ -561,7 +561,7 @@ railway variable set \
   "GOOGLE_CUSTOM_SEARCH_ENGINE_ID=<値>" \
   "POLAR_ACCESS_TOKEN=<値>" \
   "POLAR_WEBHOOK_SECRET=<値>" \
-  --service api \
+  --service api-prod \
   --skip-deploys
 ```
 
@@ -572,7 +572,7 @@ railway variable set \
   "DATABASE_URL=\${{Postgres.DATABASE_URL}}" \
   "REDIS_URL=\${{Redis.REDIS_URL}}" \
   "API_INTERNAL_URL=http://api.railway.internal:3000" \
-  --service hocuspocus \
+  --service hocuspocus-prod \
   --skip-deploys
 ```
 
@@ -640,12 +640,12 @@ CREATE INDEX IF NOT EXISTS idx_pages_title_trgm
 ### 6.8 デプロイ & 確認
 
 ```bash
-railway up --service api --detach
-railway up --service hocuspocus --detach
+railway up --service api-prod --detach
+railway up --service hocuspocus-prod --detach
 
 # ビルドログ確認
-railway logs --service api --build --lines 50
-railway logs --service hocuspocus --build --lines 50
+railway logs --service api-prod --build --lines 50
+railway logs --service hocuspocus-prod --build --lines 50
 
 # ヘルスチェック
 curl https://api.zedi-note.app/api/health
@@ -798,8 +798,8 @@ Step 4.3 のチェックリストを production 環境で再実施する。
 ```bash
 railway link -p Zedi -e production
 railway service status
-railway logs --service api --lines 20 --filter "@level:error"
-railway logs --service hocuspocus --lines 20 --filter "@level:error"
+railway logs --service api-prod --lines 20 --filter "@level:error"
+railway logs --service hocuspocus-prod --lines 20 --filter "@level:error"
 ```
 
 ---
@@ -819,8 +819,8 @@ Railway のメトリクス・ログ監視を設定:
 
 ```bash
 # エラーログの監視
-railway logs --service api --filter "@level:error" --since 1h
-railway logs --service hocuspocus --filter "@level:error" --since 1h
+railway logs --service api-prod --filter "@level:error" --since 1h
+railway logs --service hocuspocus-prod --filter "@level:error" --since 1h
 ```
 
 ### 9.3 AWS リソースの段階的削除

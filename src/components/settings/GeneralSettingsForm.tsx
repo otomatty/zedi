@@ -230,7 +230,7 @@ function DataManagementCard() {
   const [isResetting, setIsResetting] = useState(false);
 
   const handleResetDatabase = useCallback(async () => {
-    if (!userId || !isSignedIn) return;
+    if (isResetting || !userId || !isSignedIn) return;
     setIsResetting(true);
     try {
       const adapter = createStorageAdapter();
@@ -240,17 +240,16 @@ function DataManagementCard() {
       // Re-initialize and trigger a full sync
       await adapter.initialize(userId);
       resetSyncFailures();
-      toast.success(t("generalSettings.dataManagement.resetSuccess"));
-
       await runApiSync(userId, getToken, { force: true, forceFullSyncWhenLocalEmpty: true });
       queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      toast.success(t("generalSettings.dataManagement.resetSuccess"));
     } catch (error) {
       console.error("Failed to reset database:", error);
       toast.error(t("generalSettings.dataManagement.resetFailed"));
     } finally {
       setIsResetting(false);
     }
-  }, [userId, isSignedIn, getToken, queryClient, t]);
+  }, [isResetting, userId, isSignedIn, getToken, queryClient, t]);
 
   return (
     <Card>
@@ -288,7 +287,7 @@ function DataManagementCard() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleResetDatabase}>
+                  <AlertDialogAction onClick={handleResetDatabase} disabled={isResetting}>
                     {t("generalSettings.dataManagement.resetButton")}
                   </AlertDialogAction>
                 </AlertDialogFooter>

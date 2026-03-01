@@ -91,8 +91,7 @@ export const AISettingsForm: React.FC = () => {
         console.warn("[AISettingsForm] fetchServerModels resolved", { count: models?.length ?? 0 });
         setServerModels(models ?? []);
         if (!models?.length) {
-          const msg =
-            "API は応答しましたがモデルが0件です。VITE_API_BASE_URL の先のデータベースに ai_models が登録されているか確認してください。";
+          const msg = t("aiSettings.modelsEmpty");
           setServerModelsError(msg);
           console.warn("[AISettingsForm]", msg);
         }
@@ -110,7 +109,7 @@ export const AISettingsForm: React.FC = () => {
         setServerModelsLoading(false);
       }
     },
-    [isServerMode],
+    [isServerMode, t],
   );
 
   useEffect(() => {

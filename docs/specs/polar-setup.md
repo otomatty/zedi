@@ -200,7 +200,7 @@ railway variable set "POLAR_WEBHOOK_SECRET=<コピーしたシークレット>" 
 
 ### 4.3 フロントエンドの `.env` に設定
 
-```
+```dotenv
 VITE_POLAR_PRO_MONTHLY_PRODUCT_ID=<月額プロダクトのID>
 VITE_POLAR_PRO_YEARLY_PRODUCT_ID=<年額プロダクトのID>
 ```

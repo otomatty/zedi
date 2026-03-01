@@ -258,7 +258,9 @@ async function main() {
 
   if (errors.length > 0) {
     console.log(`\n  Conversion errors (${errors.length}):`);
-    errors.slice(0, 10).forEach((e) => console.log(`    - ${e.title}: ${e.error}`));
+    errors.slice(0, 10).forEach((e) => {
+      console.log(`    - ${e.title}: ${e.error}`);
+    });
     if (errors.length > 10) console.log(`    ... and ${errors.length - 10} more`);
   }
 

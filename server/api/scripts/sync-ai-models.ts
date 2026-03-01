@@ -18,12 +18,20 @@ async function main() {
   console.log("Syncing AI models from providers...");
   const db = getDb();
   const results = await syncAiModels(db);
+  const hardErrors: string[] = [];
   for (const r of results) {
     if (r.error) {
       console.warn(`  ${r.provider}: ${r.error}`);
+      if (!r.error.endsWith(" not set")) {
+        hardErrors.push(`${r.provider}: ${r.error}`);
+      }
     } else {
       console.log(`  ${r.provider}: fetched ${r.fetched}, upserted ${r.upserted}`);
     }
+  }
+  if (hardErrors.length > 0) {
+    console.error("Sync completed with provider errors:", hardErrors);
+    process.exit(1);
   }
   console.log("Done.");
   process.exit(0);

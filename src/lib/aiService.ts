@@ -537,14 +537,16 @@ import type { AIModel, AIUsage, CachedServerModels } from "@/types/ai";
 const SERVER_MODELS_CACHE_KEY = "zedi-ai-server-models";
 const SERVER_MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-/** API/cache の snake_case または camelCase を AIModel に正規化 */
+/** API/cache の snake_case または camelCase を AIModel に正規化。サーバー側 tier "pro" をフロント側 "paid" にマッピング */
 function normalizeToAIModel(raw: Record<string, unknown>): AIModel {
+  const rawTier = (raw.tierRequired ?? raw.tier_required) as string | undefined;
+  const tierRequired: UserTier = rawTier === "pro" || rawTier === "paid" ? "paid" : "free";
   return {
     id: (raw.id as string) ?? "",
     provider: (raw.provider as AIModel["provider"]) ?? "google",
     modelId: (raw.modelId as string) ?? (raw.model_id as string) ?? "",
     displayName: (raw.displayName as string) ?? (raw.display_name as string) ?? "",
-    tierRequired: ((raw.tierRequired ?? raw.tier_required) as UserTier) ?? "free",
+    tierRequired,
     available: (raw.available as boolean) ?? false,
   };
 }
@@ -553,7 +555,7 @@ function normalizeToAIModel(raw: Record<string, unknown>): AIModel {
 export class FetchServerModelsError extends Error {
   constructor(
     message: string,
-    public readonly code: "NO_BASE_URL" | "NETWORK" | "HTTP" | "INVALID_RESPONSE" | "CACHE_PARSE",
+    public readonly code: "NO_BASE_URL" | "NETWORK" | "HTTP" | "INVALID_RESPONSE",
     public readonly details?: { status?: number; statusText?: string; body?: string },
   ) {
     super(message);
@@ -596,12 +598,16 @@ async function fetchModelsFromApi(
   }
 
   if (!response.ok) {
-    const err = new FetchServerModelsError(
-      `API エラー: ${response.status} ${response.statusText}。${bodyText ? `レスポンス: ${bodyText.slice(0, 200)}` : ""}`,
-      "HTTP",
-      { status: response.status, statusText: response.statusText, body: bodyText.slice(0, 500) },
-    );
-    console.error("[fetchServerModels]", err.message);
+    const err = new FetchServerModelsError("API エラーが発生しました", "HTTP", {
+      status: response.status,
+      statusText: response.statusText,
+      body: bodyText.slice(0, 500),
+    });
+    console.error("[fetchServerModels]", {
+      status: response.status,
+      statusText: response.statusText,
+      body: bodyText.slice(0, 500),
+    });
     throw err;
   }
 
@@ -609,27 +615,24 @@ async function fetchModelsFromApi(
   try {
     data = JSON.parse(bodyText) as { models?: unknown[]; tier?: UserTier };
   } catch (_e) {
-    const err = new FetchServerModelsError(
-      `レスポンスが JSON ではありません: ${bodyText.slice(0, 100)}`,
-      "INVALID_RESPONSE",
-      { body: bodyText.slice(0, 500) },
-    );
-    console.error("[fetchServerModels]", err.message);
+    const err = new FetchServerModelsError("レスポンスが JSON ではありません", "INVALID_RESPONSE", {
+      body: bodyText.slice(0, 500),
+    });
+    console.error("[fetchServerModels]", { body: bodyText.slice(0, 500) });
     throw err;
   }
 
   if (!Array.isArray(data.models)) {
-    const err = new FetchServerModelsError(
-      `API のレスポンス形式が不正です（models が配列ではありません）: ${JSON.stringify(data).slice(0, 200)}`,
-      "INVALID_RESPONSE",
-      { body: bodyText.slice(0, 500) },
-    );
-    console.error("[fetchServerModels]", err.message);
+    const err = new FetchServerModelsError("API のレスポンス形式が不正です", "INVALID_RESPONSE", {
+      body: bodyText.slice(0, 500),
+    });
+    console.error("[fetchServerModels]", { body: bodyText.slice(0, 500) });
     throw err;
   }
 
   const models = data.models.map((m) => normalizeToAIModel((m as Record<string, unknown>) ?? {}));
-  return { models, tier: data.tier ?? "free" };
+  const tier: UserTier = data.tier === "paid" || data.tier === "free" ? data.tier : "free";
+  return { models, tier };
 }
 
 /**
@@ -649,7 +652,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
           const models = (parsed.models ?? []).map((m) =>
             normalizeToAIModel(m as unknown as Record<string, unknown>),
           );
-          console.warn("[fetchServerModels] cache hit", {
+          console.debug("[fetchServerModels] cache hit", {
             count: models.length,
             tier: parsed.tier,
           });
@@ -662,7 +665,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
   }
 
   const apiBaseUrl = getAIAPIBaseUrl();
-  console.warn("[fetchServerModels] fetching from API", {
+  console.debug("[fetchServerModels] fetching from API", {
     apiBaseUrl: apiBaseUrl || "(empty)",
     url: apiBaseUrl ? `${apiBaseUrl}/api/ai/models` : "(none)",
   });
@@ -676,7 +679,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
   }
 
   const result = await fetchModelsFromApi(apiBaseUrl);
-  console.warn("[fetchServerModels] API response", {
+  console.debug("[fetchServerModels] API response", {
     count: result.models.length,
     tier: result.tier,
   });

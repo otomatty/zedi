@@ -2,6 +2,7 @@
  * AI 管理用エンドポイント（モデル一覧の同期など）
  * Railway 上で実行するため、内部 DB (postgres.railway.internal) に接続できる。
  */
+import crypto from "crypto";
 import { Hono } from "hono";
 import { syncAiModels } from "../../services/syncAiModels.js";
 import type { AppEnv } from "../../types/index.js";
@@ -47,7 +48,12 @@ app.post("/sync-models", async (c) => {
       401,
     );
   }
-  if (headerSecret !== SYNC_SECRET) {
+  const providedBuffer = Buffer.from(headerSecret, "utf8");
+  const expectedBuffer = Buffer.from(SYNC_SECRET, "utf8");
+  if (
+    providedBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
+  ) {
     return c.json(
       {
         error: "Invalid secret",
