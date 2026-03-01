@@ -1,44 +1,40 @@
-# Build stage
-FROM node:22-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci
+COPY package.json ./
+RUN bun install
 
-# Copy source and build
 COPY tsconfig.json ./
 COPY src/ ./src/
-RUN npm run build
+RUN bun run build
 
-# Production stage
+FROM oven/bun:1-alpine AS deps
+
+WORKDIR /app
+
+COPY package.json ./
+RUN bun install --production
+
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Install curl for health checks
 RUN apk add --no-cache curl
 
-# Copy package files and install production dependencies only
-COPY package*.json ./
-RUN npm ci --only=production
-
-# Copy built files from builder
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY package.json ./
 
-# Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S hocuspocus -u 1001
 USER hocuspocus
 
-# Environment
 ENV NODE_ENV=production
 ENV PORT=1234
 
 EXPOSE 1234
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:1234/health || exit 1
 

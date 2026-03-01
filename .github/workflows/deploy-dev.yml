@@ -10,12 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Run migrations
         working-directory: server/api
-        run: npm ci && npx drizzle-kit migrate
+        run: bunx drizzle-kit migrate
         env:
           DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
 
