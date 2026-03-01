@@ -257,7 +257,7 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
 
     // Delete per-page Y.Doc databases (y-indexeddb creates one per page)
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       pageIds.map(
         (pageId) =>
           new Promise<void>((resolve, reject) => {
@@ -273,6 +273,13 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
           }),
       ),
     );
+    const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures.map((f) => f.reason),
+        `Failed to delete ${failures.length}/${pageIds.length} Y.Doc database(s)`,
+      );
+    }
   }
 
   // ── メタデータ ──

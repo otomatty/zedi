@@ -35,9 +35,12 @@ app.get("/", authOptional, async (c) => {
     .where(eq(aiModels.isActive, true))
     .orderBy(asc(aiModels.sortOrder));
 
-  const clientTier = tier === "pro" ? "paid" : "free";
+  const toClientTier = (v: string | undefined): "free" | "paid" =>
+    v === "pro" || v === "paid" ? "paid" : "free";
+
+  const clientTier = toClientTier(tier);
   const models = rows.map((m) => {
-    const tierRequired = m.tierRequired === "pro" ? "paid" : "free";
+    const tierRequired = toClientTier(m.tierRequired);
     return {
       id: m.id,
       provider: m.provider,

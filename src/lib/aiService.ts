@@ -652,11 +652,13 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
           const models = (parsed.models ?? []).map((m) =>
             normalizeToAIModel(m as unknown as Record<string, unknown>),
           );
+          const rawTier = parsed.tier as string;
+          const cachedTier: string = rawTier === "paid" || rawTier === "pro" ? "paid" : "free";
           console.debug("[fetchServerModels] cache hit", {
             count: models.length,
-            tier: parsed.tier,
+            tier: cachedTier,
           });
-          return { models, tier: parsed.tier };
+          return { models, tier: cachedTier };
         }
       }
     } catch (e) {

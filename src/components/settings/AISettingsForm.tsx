@@ -83,17 +83,19 @@ export const AISettingsForm: React.FC = () => {
   // Load server models when in server mode
   const loadServerModels = useCallback(
     async (forceRefresh = false) => {
-      console.warn("[AISettingsForm] loadServerModels called", { forceRefresh, isServerMode });
+      console.debug("[AISettingsForm] loadServerModels called", { forceRefresh, isServerMode });
       setServerModelsError(null);
       setServerModelsLoading(true);
       try {
         const { models } = await fetchServerModels(forceRefresh);
-        console.warn("[AISettingsForm] fetchServerModels resolved", { count: models?.length ?? 0 });
+        console.debug("[AISettingsForm] fetchServerModels resolved", {
+          count: models?.length ?? 0,
+        });
         setServerModels(models ?? []);
         if (!models?.length) {
           const msg = t("aiSettings.modelsEmpty");
           setServerModelsError(msg);
-          console.warn("[AISettingsForm]", msg);
+          console.debug("[AISettingsForm]", msg);
         }
       } catch (e) {
         const message =
@@ -109,12 +111,12 @@ export const AISettingsForm: React.FC = () => {
         setServerModelsLoading(false);
       }
     },
-    [isServerMode, t],
+    [t],
   );
 
   useEffect(() => {
     if (isServerMode) {
-      console.warn("[AISettingsForm] isServerMode=true, loading server models");
+      console.debug("[AISettingsForm] isServerMode=true, loading server models");
       loadServerModels();
     }
   }, [isServerMode, loadServerModels]);

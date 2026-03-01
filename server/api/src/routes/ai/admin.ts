@@ -9,6 +9,12 @@ import type { AppEnv } from "../../types/index.js";
 
 const SYNC_SECRET = process.env.SYNC_AI_MODELS_SECRET ?? "";
 
+function secureCompare(a: string, b: string): boolean {
+  const aHash = crypto.createHmac("sha256", "sync-secret").update(a).digest();
+  const bHash = crypto.createHmac("sha256", "sync-secret").update(b).digest();
+  return crypto.timingSafeEqual(aHash, bHash);
+}
+
 const app = new Hono<AppEnv>();
 
 /** GET で叩かれた場合はメソッド案内を返す */
@@ -48,12 +54,7 @@ app.post("/sync-models", async (c) => {
       401,
     );
   }
-  const providedBuffer = Buffer.from(headerSecret, "utf8");
-  const expectedBuffer = Buffer.from(SYNC_SECRET, "utf8");
-  if (
-    providedBuffer.length !== expectedBuffer.length ||
-    !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
-  ) {
+  if (!secureCompare(headerSecret, SYNC_SECRET)) {
     return c.json(
       {
         error: "Invalid secret",
