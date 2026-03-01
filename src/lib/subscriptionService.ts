@@ -131,12 +131,12 @@ export async function openProCheckout(billingInterval: BillingInterval): Promise
 /**
  * Open the Polar customer portal for managing subscriptions.
  * Requests a portal URL from the backend API.
+ * @throws on non-OK response so callers can show error feedback
  */
 export async function openCustomerPortal(): Promise<void> {
   const apiBaseUrl = getAIAPIBaseUrl();
   if (!apiBaseUrl) {
-    console.error("API base URL not configured");
-    return;
+    throw new Error("API base URL not configured");
   }
 
   const response = await fetch(`${apiBaseUrl}/api/customer-portal`, {
@@ -148,13 +148,12 @@ export async function openCustomerPortal(): Promise<void> {
   });
 
   if (response.status === 401) {
-    console.error("Auth token not available");
-    return;
+    throw new Error("Auth token not available");
   }
 
   if (!response.ok) {
-    console.error("Failed to get customer portal URL");
-    return;
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "Failed to get customer portal URL");
   }
 
   const { url } = (await response.json()) as { url: string };

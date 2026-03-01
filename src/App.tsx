@@ -73,7 +73,14 @@ const App = () => (
                   <Route path="/settings/storage" element={<StorageSettings />} />
                   <Route path="/settings/general" element={<GeneralSettings />} />
                   <Route path="/pricing" element={<Pricing />} />
-                  <Route path="/subscription" element={<SubscriptionManagement />} />
+                  <Route
+                    path="/subscription"
+                    element={
+                      <ProtectedRoute>
+                        <SubscriptionManagement />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/donate" element={<Donate />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

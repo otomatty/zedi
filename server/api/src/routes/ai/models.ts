@@ -40,9 +40,12 @@ app.get("/", authOptional, async (c) => {
   const toClientTier = (v: string | undefined): "free" | "pro" =>
     v === "pro" || v === "paid" ? "pro" : "free";
 
+  /** Unknown tierRequired defaults to "pro" (fail-closed: restrict paid models) */
+  const toModelTier = (v: string | undefined): "free" | "pro" => (v === "free" ? "free" : "pro");
+
   const clientTier = toClientTier(tier);
   const models = rows.map((m) => {
-    const tierRequired = toClientTier(m.tierRequired);
+    const tierRequired = toModelTier(m.tierRequired);
     return {
       id: m.id,
       provider: m.provider,
