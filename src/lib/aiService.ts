@@ -75,8 +75,12 @@ export async function callAIService(
     return await callAIWithUserKey(settings, request, callbacks, abortSignal);
   }
 
-  // APIサーバー経由
-  return await callAIWithServer(request, callbacks, abortSignal);
+  // APIサーバー経由: バックエンドは aiModels.id（DB主キー）で検索するため、modelId を送る
+  return await callAIWithServer(
+    { ...request, model: settings.modelId ?? request.model },
+    callbacks,
+    abortSignal,
+  );
 }
 
 /**
