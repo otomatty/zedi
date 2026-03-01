@@ -1,6 +1,6 @@
-import React, { useRef, useCallback, useEffect } from "react";
+import React, { useRef, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Compass } from "lucide-react";
+import { Loader2, Compass, DatabaseZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useProfile } from "@/hooks/useProfile";
@@ -27,6 +38,10 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { useTranslation } from "react-i18next";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
+import { createStorageAdapter } from "@/lib/storageAdapter";
+import { runApiSync, resetSyncFailures } from "@/lib/sync";
+import { useQueryClient } from "@tanstack/react-query";
+import { pageKeys } from "@/hooks/usePageQueries";
 
 interface GeneralSettingsProfileCardProps {
   profile: { displayName?: string; avatarUrl?: string };
@@ -208,6 +223,84 @@ function GeneralSettingsDisplayCards({
   );
 }
 
+function DataManagementCard() {
+  const { t } = useTranslation();
+  const { userId, getToken, isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleResetDatabase = useCallback(async () => {
+    if (!userId || !isSignedIn) return;
+    setIsResetting(true);
+    try {
+      const adapter = createStorageAdapter();
+      await adapter.initialize(userId);
+      await adapter.resetDatabase();
+
+      // Re-initialize and trigger a full sync
+      await adapter.initialize(userId);
+      resetSyncFailures();
+      toast.success(t("generalSettings.dataManagement.resetSuccess"));
+
+      await runApiSync(userId, getToken, { force: true, forceFullSyncWhenLocalEmpty: true });
+      queryClient.invalidateQueries({ queryKey: pageKeys.all });
+    } catch (error) {
+      console.error("Failed to reset database:", error);
+      toast.error(t("generalSettings.dataManagement.resetFailed"));
+    } finally {
+      setIsResetting(false);
+    }
+  }, [userId, isSignedIn, getToken, queryClient, t]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <DatabaseZap className="h-5 w-5" />
+          {t("generalSettings.dataManagement.title")}
+        </CardTitle>
+        <CardDescription>{t("generalSettings.dataManagement.description")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-lg border border-destructive/40 p-4">
+          <h3 className="text-sm font-semibold">
+            {t("generalSettings.dataManagement.resetTitle")}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("generalSettings.dataManagement.resetDescription")}
+          </p>
+          <div className="mt-4 flex justify-end">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isResetting}>
+                  {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {t("generalSettings.dataManagement.resetButton")}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {t("generalSettings.dataManagement.resetConfirmTitle")}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t("generalSettings.dataManagement.resetConfirmDescription")}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleResetDatabase}>
+                    {t("generalSettings.dataManagement.resetButton")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export const GeneralSettingsForm: React.FC = () => {
   const {
     settings,
@@ -309,6 +402,8 @@ export const GeneralSettingsForm: React.FC = () => {
         updateLocale={updateLocale}
         onRunTourAgain={handleRunTourAgain}
       />
+
+      {isSignedIn && <DataManagementCard />}
     </div>
   );
 };

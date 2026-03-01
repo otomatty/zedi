@@ -537,60 +537,164 @@ import type { AIModel, AIUsage, CachedServerModels } from "@/types/ai";
 const SERVER_MODELS_CACHE_KEY = "zedi-ai-server-models";
 const SERVER_MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
+/** API/cache の snake_case または camelCase を AIModel に正規化 */
+function normalizeToAIModel(raw: Record<string, unknown>): AIModel {
+  return {
+    id: (raw.id as string) ?? "",
+    provider: (raw.provider as AIModel["provider"]) ?? "google",
+    modelId: (raw.modelId as string) ?? (raw.model_id as string) ?? "",
+    displayName: (raw.displayName as string) ?? (raw.display_name as string) ?? "",
+    tierRequired: ((raw.tierRequired ?? raw.tier_required) as UserTier) ?? "free",
+    available: (raw.available as boolean) ?? false,
+  };
+}
+
+/** モデル一覧取得失敗時の詳細付きエラー */
+export class FetchServerModelsError extends Error {
+  constructor(
+    message: string,
+    public readonly code: "NO_BASE_URL" | "NETWORK" | "HTTP" | "INVALID_RESPONSE" | "CACHE_PARSE",
+    public readonly details?: { status?: number; statusText?: string; body?: string },
+  ) {
+    super(message);
+    this.name = "FetchServerModelsError";
+  }
+}
+
+async function fetchModelsFromApi(
+  apiBaseUrl: string,
+): Promise<{ models: AIModel[]; tier: string }> {
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/api/ai/models`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+  } catch (e) {
+    const message =
+      e instanceof TypeError && e.message.includes("fetch")
+        ? `ネットワークエラー: ${apiBaseUrl} に接続できません。CORS または URL を確認してください。`
+        : `リクエスト失敗: ${e instanceof Error ? e.message : String(e)}`;
+    const err = new FetchServerModelsError(message, "NETWORK", {
+      body: e instanceof Error ? e.message : String(e),
+    });
+    console.error("[fetchServerModels]", message, e);
+    throw err;
+  }
+
+  let bodyText: string;
+  try {
+    bodyText = await response.text();
+  } catch (e) {
+    const err = new FetchServerModelsError(
+      `レスポンスの読み取りに失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      "NETWORK",
+    );
+    console.error("[fetchServerModels]", err.message, e);
+    throw err;
+  }
+
+  if (!response.ok) {
+    const err = new FetchServerModelsError(
+      `API エラー: ${response.status} ${response.statusText}。${bodyText ? `レスポンス: ${bodyText.slice(0, 200)}` : ""}`,
+      "HTTP",
+      { status: response.status, statusText: response.statusText, body: bodyText.slice(0, 500) },
+    );
+    console.error("[fetchServerModels]", err.message);
+    throw err;
+  }
+
+  let data: { models?: unknown[]; tier?: UserTier };
+  try {
+    data = JSON.parse(bodyText) as { models?: unknown[]; tier?: UserTier };
+  } catch (_e) {
+    const err = new FetchServerModelsError(
+      `レスポンスが JSON ではありません: ${bodyText.slice(0, 100)}`,
+      "INVALID_RESPONSE",
+      { body: bodyText.slice(0, 500) },
+    );
+    console.error("[fetchServerModels]", err.message);
+    throw err;
+  }
+
+  if (!Array.isArray(data.models)) {
+    const err = new FetchServerModelsError(
+      `API のレスポンス形式が不正です（models が配列ではありません）: ${JSON.stringify(data).slice(0, 200)}`,
+      "INVALID_RESPONSE",
+      { body: bodyText.slice(0, 500) },
+    );
+    console.error("[fetchServerModels]", err.message);
+    throw err;
+  }
+
+  const models = data.models.map((m) => normalizeToAIModel((m as Record<string, unknown>) ?? {}));
+  return { models, tier: data.tier ?? "free" };
+}
+
 /**
  * サーバーから利用可能なモデル一覧を取得（キャッシュあり）
+ * @throws {FetchServerModelsError} 取得失敗時（URL未設定・ネットワーク・HTTPエラー・不正レスポンス）
  */
 export async function fetchServerModels(forceRefresh = false): Promise<{
   models: AIModel[];
   tier: string;
 }> {
-  // Check cache first
   if (!forceRefresh) {
     try {
       const cached = localStorage.getItem(SERVER_MODELS_CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached) as CachedServerModels;
         if (Date.now() - parsed.cachedAt < SERVER_MODELS_CACHE_TTL) {
-          return { models: parsed.models, tier: parsed.tier };
+          const models = (parsed.models ?? []).map((m) =>
+            normalizeToAIModel(m as unknown as Record<string, unknown>),
+          );
+          console.warn("[fetchServerModels] cache hit", {
+            count: models.length,
+            tier: parsed.tier,
+          });
+          return { models, tier: parsed.tier };
         }
       }
-    } catch {
-      // Cache read failed, continue to fetch
+    } catch (e) {
+      console.warn("[fetchServerModels] Cache read/parse failed, fetching from API", e);
     }
   }
 
   const apiBaseUrl = getAIAPIBaseUrl();
+  console.warn("[fetchServerModels] fetching from API", {
+    apiBaseUrl: apiBaseUrl || "(empty)",
+    url: apiBaseUrl ? `${apiBaseUrl}/api/ai/models` : "(none)",
+  });
   if (!apiBaseUrl) {
-    return { models: [], tier: "free" };
+    const err = new FetchServerModelsError(
+      "VITE_API_BASE_URL が設定されていません。.env に API サーバーの URL を設定してください。",
+      "NO_BASE_URL",
+    );
+    console.error("[fetchServerModels]", err.message);
+    throw err;
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/ai/models`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
+  const result = await fetchModelsFromApi(apiBaseUrl);
+  console.warn("[fetchServerModels] API response", {
+    count: result.models.length,
+    tier: result.tier,
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch models");
-  }
-
-  const data = (await response.json()) as { models: AIModel[]; tier: UserTier };
-
-  // Cache the result
   try {
     localStorage.setItem(
       SERVER_MODELS_CACHE_KEY,
       JSON.stringify({
-        models: data.models,
-        tier: data.tier,
+        models: result.models,
+        tier: result.tier as UserTier,
         cachedAt: Date.now(),
       } satisfies CachedServerModels),
     );
   } catch {
-    // localStorage write failed, ignore
+    // ignore
   }
 
-  return data;
+  return result;
 }
 
 /**

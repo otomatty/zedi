@@ -38,6 +38,17 @@
     "avatarRemove": "Remove Avatar",
     "avatarHelp": "Enter a URL or upload an image"
   },
+  "dataManagement": {
+    "title": "Data Management",
+    "description": "Manage your local database",
+    "resetTitle": "Reset Local Database",
+    "resetDescription": "Delete locally cached data and re-sync from the server. This does not affect your data on the server.",
+    "resetButton": "Reset Local Data",
+    "resetConfirmTitle": "Reset local database?",
+    "resetConfirmDescription": "All locally cached data will be deleted. The latest data will be re-synced from the server. This does not affect your data on the server.",
+    "resetSuccess": "Local database reset. Re-syncing...",
+    "resetFailed": "Failed to reset local database"
+  },
   "saved": "General settings saved",
   "saveFailed": "Failed to save general settings",
   "profileSaved": "Profile saved",

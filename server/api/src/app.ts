@@ -18,6 +18,7 @@ import aiChatRoutes from "./routes/ai/chat.js";
 import aiModelsRoutes from "./routes/ai/models.js";
 import aiUsageRoutes from "./routes/ai/usage.js";
 import aiSubscriptionRoutes from "./routes/ai/subscription.js";
+import aiAdminRoutes from "./routes/ai/admin.js";
 import thumbSearchRoutes from "./routes/thumbnail/imageSearch.js";
 import thumbGenerateRoutes from "./routes/thumbnail/imageGenerate.js";
 import thumbCommitRoutes from "./routes/thumbnail/commit.js";
@@ -96,14 +97,15 @@ export function createApp(): Hono<AppEnv> {
   app.route("/api/ai/models", aiModelsRoutes);
   app.route("/api/ai/usage", aiUsageRoutes);
   app.route("/api/ai/subscription", aiSubscriptionRoutes);
+  app.route("/api/ai/admin", aiAdminRoutes);
 
   // Thumbnail
   app.route("/api/thumbnail/image-search", thumbSearchRoutes);
   app.route("/api/thumbnail/image-generate", thumbGenerateRoutes);
   app.route("/api/thumbnail/commit", thumbCommitRoutes);
 
-  // 404 fallback
-  app.all("*", (c) => c.json({ error: "Not found" }, 404));
+  // 404 fallback（要求パスを返してデバッグしやすくする）
+  app.all("*", (c) => c.json({ error: "Not found", path: c.req.path, method: c.req.method }, 404));
 
   return app;
 }

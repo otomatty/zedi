@@ -21,5 +21,7 @@
   "savedToastDescription": "AI設定が正常に保存されました",
   "saveFailedToastDescription": "AI設定の保存に失敗しました",
   "resetToast": "リセットしました",
-  "resetToastDescription": "AI設定が初期化されました"
+  "resetToastDescription": "AI設定が初期化されました",
+  "modelsLoadFailed": "モデル一覧の取得に失敗しました",
+  "retryLoadModels": "再試行"
 }

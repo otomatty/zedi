@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 const SignIn: React.FC = () => {
   const { t } = useTranslation();
   const handleGoogle = () => {
-    signIn.social({ provider: "google", callbackURL: "/home" });
+    signIn.social({ provider: "google", callbackURL: `${window.location.origin}/home` });
   };
   const handleGitHub = () => {
-    signIn.social({ provider: "github", callbackURL: "/home" });
+    signIn.social({ provider: "github", callbackURL: `${window.location.origin}/home` });
   };
 
   return (
