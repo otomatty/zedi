@@ -218,7 +218,9 @@ describe("LinkedPagesSection", () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id");
+      expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id", {
+        flushSync: true,
+      });
     });
   });
 
