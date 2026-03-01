@@ -41,6 +41,7 @@
     "docker:down": "docker-compose -f docker-compose.dev.yml down",
     "docker:logs": "docker-compose -f docker-compose.dev.yml logs -f",
     "docker:clean": "docker-compose -f docker-compose.dev.yml down -v && docker image prune -f",
+    "sync:lockfiles": "cp bun.lock server/api/ && cp bun.lock server/hocuspocus/",
     "prepare": "husky"
   },
   "lint-staged": {

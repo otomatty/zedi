@@ -1,3 +1,5 @@
+# Build context: repo root (docker-compose) or server/hocuspocus (Railway with Root Directory).
+# When context is server/hocuspocus, bun.lock is copied there by CI or committed in repo.
 FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
