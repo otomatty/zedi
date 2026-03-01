@@ -222,6 +222,49 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     }
   }
 
+  async resetDatabase(): Promise<void> {
+    const userId = adapterUserId;
+    if (!userId) throw new Error("IndexedDBStorageAdapter: not initialized.");
+
+    // Collect page IDs before closing so we can delete per-page Y.Doc databases
+    let pageIds: string[] = [];
+    try {
+      const db = await ensureDb();
+      pageIds = await new Promise<string[]>((resolve, reject) => {
+        const tx = db.transaction("my_pages", "readonly");
+        const req = tx.objectStore("my_pages").getAllKeys();
+        req.onsuccess = () => resolve((req.result as string[]) || []);
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      // If we can't read pages, continue with main DB deletion
+    }
+
+    // Close the main database connection
+    await this.close();
+
+    // Delete the main storage database
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase(DB_NAME_PREFIX + userId);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => resolve();
+    });
+
+    // Delete per-page Y.Doc databases (y-indexeddb creates one per page)
+    await Promise.allSettled(
+      pageIds.map(
+        (pageId) =>
+          new Promise<void>((resolve) => {
+            const req = indexedDB.deleteDatabase(YDOC_NAME_PREFIX + pageId);
+            req.onsuccess = () => resolve();
+            req.onerror = () => resolve();
+            req.onblocked = () => resolve();
+          }),
+      ),
+    );
+  }
+
   // ── メタデータ ──
   async getAllPages(): Promise<PageMetadata[]> {
     const db = await ensureDb();

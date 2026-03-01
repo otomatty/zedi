@@ -36,4 +36,10 @@ export interface StorageAdapter {
   // ── 初期化・クリーンアップ ──
   initialize(userId: string): Promise<void>;
   close(): Promise<void>;
+
+  /**
+   * Delete all local data (IndexedDB) for the current user and reset sync state.
+   * After calling this, initialize() must be called again before any other operation.
+   */
+  resetDatabase(): Promise<void>;
 }

@@ -21,26 +21,30 @@ app.get("/", authOptional, async (c) => {
     tier = await getUserTier(userId, db);
   }
 
-  const models = await db
+  const rows = await db
     .select({
       id: aiModels.id,
       provider: aiModels.provider,
-      model_id: aiModels.modelId,
-      display_name: aiModels.displayName,
-      tier_required: aiModels.tierRequired,
-      is_active: aiModels.isActive,
-      sort_order: aiModels.sortOrder,
+      modelId: aiModels.modelId,
+      displayName: aiModels.displayName,
+      tierRequired: aiModels.tierRequired,
+      isActive: aiModels.isActive,
+      sortOrder: aiModels.sortOrder,
     })
     .from(aiModels)
     .where(eq(aiModels.isActive, true))
     .orderBy(asc(aiModels.sortOrder));
 
-  const filtered = models.map((m) => ({
-    ...m,
-    available: tier === "pro" || m.tier_required === "free",
+  const models = rows.map((m) => ({
+    id: m.id,
+    provider: m.provider,
+    modelId: m.modelId,
+    displayName: m.displayName,
+    tierRequired: m.tierRequired,
+    available: tier === "pro" || m.tierRequired === "free",
   }));
 
-  return c.json({ models: filtered, tier });
+  return c.json({ models, tier });
 });
 
 export default app;
