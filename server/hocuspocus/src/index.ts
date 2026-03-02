@@ -193,17 +193,18 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
 
 function parseRedisOptions(redisUrl: string): Record<string, unknown> {
   const parsed = new URL(redisUrl);
-  const options: Record<string, unknown> = {
-    host: parsed.hostname,
-    port: parsed.port ? Number(parsed.port) : 6379,
-  };
+  const ioredisOptions: Record<string, unknown> = {};
   if (parsed.password) {
-    options.password = decodeURIComponent(parsed.password);
+    ioredisOptions.password = decodeURIComponent(parsed.password);
   }
   if (parsed.protocol === "rediss:") {
-    options.tls = {};
+    ioredisOptions.tls = {};
   }
-  return options;
+  return {
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 6379,
+    options: ioredisOptions,
+  };
 }
 
 const extensions = [];
