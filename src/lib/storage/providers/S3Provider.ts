@@ -136,18 +136,27 @@ export class S3Provider implements StorageProviderInterface {
   /**
    * デフォルトストレージ上の画像を削除（/api/media/:id または /api/thumbnail/serve/:id）
    * 自分の画像のみ削除可能（API側で所有者チェック）
+   * クロスオリジン対策: baseUrl 由来の origin のみ使用
    */
   async deleteImage(url: string): Promise<void> {
     const base =
       this.baseUrl.replace(/\/$/, "") ||
       (typeof window !== "undefined" ? window.location.origin : "");
-    const origin = url.startsWith("http") ? new URL(url).origin : base;
+    if (!base) {
+      throw new Error("API base URL is not configured");
+    }
+
+    const baseOrigin = new URL(base).origin;
+    const parsed = new URL(url, baseOrigin);
+    if (parsed.origin !== baseOrigin) {
+      throw new Error("異なるオリジンのURLは削除できません");
+    }
 
     // /api/media/:id 形式
-    const mediaMatch = url.match(/\/api\/media\/([^/?#]+)/);
+    const mediaMatch = parsed.pathname.match(/^\/api\/media\/([^/?#]+)$/);
     if (mediaMatch) {
       const mediaId = mediaMatch[1];
-      const res = await fetch(`${origin}/api/media/${mediaId}`, {
+      const res = await fetch(`${baseOrigin}/api/media/${mediaId}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -165,10 +174,10 @@ export class S3Provider implements StorageProviderInterface {
     }
 
     // /api/thumbnail/serve/:id 形式
-    const thumbMatch = url.match(/\/api\/thumbnail\/serve\/([^/?#]+)/);
+    const thumbMatch = parsed.pathname.match(/^\/api\/thumbnail\/serve\/([^/?#]+)$/);
     if (thumbMatch) {
       const objectId = thumbMatch[1];
-      const res = await fetch(`${origin}/api/thumbnail/serve/${objectId}`, {
+      const res = await fetch(`${baseOrigin}/api/thumbnail/serve/${objectId}`, {
         method: "DELETE",
         credentials: "include",
       });

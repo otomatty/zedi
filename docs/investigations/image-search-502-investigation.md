@@ -15,7 +15,7 @@ railway logs --service api --lines 300 --json
 
 ### 1.2 取得したエラーログ
 
-```
+```text
 Image search failed: Error: Google Custom Search failed: 400 - {
   "error": {
     "code": 400,
@@ -34,14 +34,14 @@ Image search failed: Error: Google Custom Search failed: 400 - {
 
 スタックトレース:
 
-```
+```text
 at searchImages (file:///app/dist/services/imageSearch.js:28:15)
 at async file:///app/dist/routes/thumbnail/imageSearch.js:23:17
 ```
 
 最終レスポンス:
 
-```
+```text
 [api] GET /api/thumbnail/image-search → 502 画像検索に失敗しました。しばらくしてからもう一度お試しください。
 ```
 
@@ -101,7 +101,7 @@ at async file:///app/dist/routes/thumbnail/imageSearch.js:23:17
    - 「ウェブ全体を検索」が有効か
    - 「画像検索」が有効か（searchType=image の場合）
 
-### 3.3 クエリのサニタイズ（必要に応じて）
+### 3.4 クエリのサニタイズ（必要に応じて）
 
 日本語や記号を含むクエリで問題が続く場合、事前にサニタイズする:
 
@@ -109,7 +109,7 @@ at async file:///app/dist/routes/thumbnail/imageSearch.js:23:17
 - 長すぎるクエリの切り詰め
 - 不正文字の除去
 
-### 3.4 エラーログの詳細化
+### 3.5 エラーログの詳細化
 
 開発環境では、Google API の生のエラー本文をログに出力すると原因特定が容易になる。
 

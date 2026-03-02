@@ -124,7 +124,7 @@ export function useStorageActions({
         throw error;
       }
     },
-    [isStorageConfigured, storageSettings, toast, storageContext],
+    [isStorageConfigured, storageSettings, toast, storageContext, effectiveProvider],
   );
 
   return {

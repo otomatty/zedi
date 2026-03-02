@@ -14,7 +14,7 @@ import { getEnv } from "../lib/env.js";
 import type { AppEnv } from "../types/index.js";
 
 const s3 = new S3Client({
-  endpoint: process.env.STORAGE_ENDPOINT,
+  endpoint: getEnv("STORAGE_ENDPOINT"),
   region: "auto",
   credentials: {
     accessKeyId: getEnv("STORAGE_ACCESS_KEY"),
@@ -92,12 +92,16 @@ app.post("/confirm", authRequired, async (c) => {
 
 app.get("/:id", authRequired, async (c) => {
   const mediaId = c.req.param("id");
+  const userId = c.get("userId");
   const db = c.get("db");
 
   const result = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
 
   const row = result[0];
   if (!row) throw new HTTPException(404, { message: "Media not found" });
+  if (row.ownerId !== userId) {
+    throw new HTTPException(403, { message: "You can only access your own media" });
+  }
 
   const signedUrl = await getSignedUrl(
     s3,
@@ -121,14 +125,19 @@ app.delete("/:id", authRequired, async (c) => {
     throw new HTTPException(403, { message: "You can only delete your own media" });
   }
 
-  await s3.send(
-    new DeleteObjectCommand({
-      Bucket: BUCKET,
-      Key: row.s3Key,
-    }),
-  );
-
   await db.delete(media).where(eq(media.id, mediaId));
+
+  try {
+    await s3.send(
+      new DeleteObjectCommand({
+        Bucket: BUCKET,
+        Key: row.s3Key,
+      }),
+    );
+  } catch (err) {
+    console.error("[media] S3 DeleteObject failed:", err);
+    throw new HTTPException(502, { message: "Failed to delete object from storage" });
+  }
 
   return c.json({ success: true });
 });

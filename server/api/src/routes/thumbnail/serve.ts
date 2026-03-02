@@ -8,7 +8,7 @@ import { getEnv } from "../../lib/env.js";
 import type { AppEnv } from "../../types/index.js";
 
 const s3 = new S3Client({
-  endpoint: process.env.STORAGE_ENDPOINT,
+  endpoint: getEnv("STORAGE_ENDPOINT"),
   region: "auto",
   credentials: {
     accessKeyId: getEnv("STORAGE_ACCESS_KEY"),
@@ -18,6 +18,15 @@ const s3 = new S3Client({
 });
 
 const BUCKET = getEnv("STORAGE_BUCKET_NAME");
+
+/** SVG は XSS リスクがあるためサムネイル配信では許可しない */
+const MIME_TYPES: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
 
 const app = new Hono<AppEnv>();
 
@@ -43,17 +52,23 @@ app.get("/:id", authRequired, async (c) => {
   }
 
   const ext = row.s3Key.split(".").pop()?.toLowerCase() || "jpg";
-  const mimeTypes: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-  };
-  const contentType = mimeTypes[ext] ?? "image/jpeg";
+  const contentType = MIME_TYPES[ext] ?? "image/jpeg";
 
-  const response = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }));
+  let response;
+  try {
+    response = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }));
+  } catch (err) {
+    const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
+      ?.$metadata;
+    const code = meta?.httpStatusCode;
+    const name = (err as { name?: string }).name;
+    if (name === "NoSuchKey" || code === 404) {
+      return c.json({ error: "Object not found" }, 404);
+    }
+    console.error("[thumbnail/serve] S3 GetObject failed:", err);
+    return c.json({ error: "Failed to retrieve object" }, 502);
+  }
+
   const body = response.Body;
   if (!body) return c.json({ error: "Object not found" }, 404);
 
@@ -63,6 +78,7 @@ app.get("/:id", authRequired, async (c) => {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "private, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 });
@@ -83,14 +99,19 @@ app.delete("/:id", authRequired, async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  await s3.send(
-    new DeleteObjectCommand({
-      Bucket: BUCKET,
-      Key: row.s3Key,
-    }),
-  );
-
   await db.delete(thumbnailObjects).where(eq(thumbnailObjects.id, objectId));
+
+  try {
+    await s3.send(
+      new DeleteObjectCommand({
+        Bucket: BUCKET,
+        Key: row.s3Key,
+      }),
+    );
+  } catch (err) {
+    console.error("[thumbnail/serve] S3 DeleteObject failed:", err);
+    return c.json({ error: "Failed to delete object from storage" }, 502);
+  }
 
   return c.json({ success: true });
 });
