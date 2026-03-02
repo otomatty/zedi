@@ -16,6 +16,17 @@ jobs:
           bun-version: "1.2"
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Debug database connection (masked)
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            echo "DATABASE_URL is set"
+            echo "DB user: $(echo "$DATABASE_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')"
+            echo "DB host: $(echo "$DATABASE_URL" | sed -E 's|postgresql://[^@]+@([^:/]+).*|\1|')"
+          else
+            echo "DATABASE_URL is not set"
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Run migrations
         working-directory: server/api
         run: bunx drizzle-kit migrate
