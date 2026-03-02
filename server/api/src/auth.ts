@@ -2,9 +2,13 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDb } from "./db/client.js";
 import { getEnv } from "./lib/env.js";
+import { users, session, account, verification } from "./schema/index.js";
 
 export const auth = betterAuth({
-  database: drizzleAdapter(getDb(), { provider: "pg" }),
+  database: drizzleAdapter(getDb(), {
+    provider: "pg",
+    schema: { user: users, session, account, verification },
+  }),
   baseURL: getEnv("BETTER_AUTH_URL"),
   secret: getEnv("BETTER_AUTH_SECRET"),
 
@@ -30,6 +34,15 @@ export const auth = betterAuth({
       enabled: true,
       maxAge: 60 * 5,
     },
+  },
+
+  advanced: {
+    defaultCookieAttributes: (() => {
+      const isProduction = process.env.NODE_ENV === "production";
+      return isProduction
+        ? { sameSite: "none" as const, secure: true }
+        : { sameSite: "lax" as const, secure: false };
+    })(),
   },
 
   trustedOrigins: getEnv("CORS_ORIGIN")

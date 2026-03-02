@@ -18,10 +18,10 @@ app.get("/", authRequired, async (c) => {
     plan: tier,
     subscription,
     usage: {
-      budget_units: usage.budgetUnits,
-      consumed_units: usage.consumedUnits,
-      remaining_units: usage.remaining,
-      usage_percent: usage.usagePercent,
+      budgetUnits: usage.budgetUnits,
+      consumedUnits: usage.consumedUnits,
+      remainingUnits: usage.remaining,
+      usagePercent: usage.usagePercent,
     },
   });
 });

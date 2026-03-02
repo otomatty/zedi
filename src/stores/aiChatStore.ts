@@ -8,6 +8,8 @@ interface SelectedModel {
   provider: AIProviderType;
   model: string; // API model ID e.g. "gpt-4o-mini"
   displayName: string;
+  inputCostUnits?: number;
+  outputCostUnits?: number;
 }
 
 interface AIChatUIState {

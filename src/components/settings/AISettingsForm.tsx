@@ -51,7 +51,8 @@ import type { AISettings } from "@/types/ai";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "@/components/ui/sonner";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
-import { fetchServerModels } from "@/lib/aiService";
+import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
+import { getSonnetBaseline, formatCostMultiplierLabel } from "@/lib/aiCostUtils";
 import { useTranslation } from "react-i18next";
 
 export const AISettingsForm: React.FC = () => {
@@ -75,25 +76,48 @@ export const AISettingsForm: React.FC = () => {
   const [useOwnKey, setUseOwnKey] = useState(false);
   const [serverModels, setServerModels] = useState<AIModel[]>([]);
   const [serverModelsLoading, setServerModelsLoading] = useState(false);
+  const [serverModelsError, setServerModelsError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const isServerMode = settings.apiMode === "api_server" && !useOwnKey;
 
   // Load server models when in server mode
-  const loadServerModels = useCallback(async () => {
-    setServerModelsLoading(true);
-    try {
-      const { models } = await fetchServerModels();
-      setServerModels(models);
-    } catch {
-      // Failed to load; will show empty list
-    } finally {
-      setServerModelsLoading(false);
-    }
-  }, []);
+  const loadServerModels = useCallback(
+    async (forceRefresh = false) => {
+      console.debug("[AISettingsForm] loadServerModels called", { forceRefresh, isServerMode });
+      setServerModelsError(null);
+      setServerModelsLoading(true);
+      try {
+        const { models } = await fetchServerModels(forceRefresh);
+        console.debug("[AISettingsForm] fetchServerModels resolved", {
+          count: models?.length ?? 0,
+        });
+        setServerModels(models ?? []);
+        if (!models?.length) {
+          const msg = t("aiSettings.modelsEmpty");
+          setServerModelsError(msg);
+          console.debug("[AISettingsForm]", msg);
+        }
+      } catch (e) {
+        const message =
+          e instanceof FetchServerModelsError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : String(e);
+        console.error("[AISettingsForm] loadServerModels failed", message, e);
+        setServerModelsError(message);
+        setServerModels([]);
+      } finally {
+        setServerModelsLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (isServerMode) {
+      console.debug("[AISettingsForm] isServerMode=true, loading server models");
       loadServerModels();
     }
   }, [isServerMode, loadServerModels]);
@@ -190,6 +214,10 @@ export const AISettingsForm: React.FC = () => {
   const availableServerModels = serverModels.filter((m) => m.available);
   const lockedServerModels = serverModels.filter((m) => !m.available);
 
+  const sonnetBaseline = getSonnetBaseline(serverModels);
+  const getCostLabel = (model: AIModel) =>
+    formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
+
   return (
     <Card>
       <CardHeader>
@@ -208,12 +236,29 @@ export const AISettingsForm: React.FC = () => {
                 <Label>{t("aiSettings.aiModel")}</Label>
               </div>
 
+              {serverModelsError && (
+                <Alert variant="destructive" className="flex flex-col gap-2">
+                  <AlertTitle>{t("aiSettings.modelsLoadFailed")}</AlertTitle>
+                  <AlertDescription className="whitespace-pre-wrap font-mono text-xs">
+                    {serverModelsError}
+                  </AlertDescription>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    onClick={() => loadServerModels(true)}
+                  >
+                    {t("aiSettings.retryLoadModels")}
+                  </Button>
+                </Alert>
+              )}
               {serverModelsLoading ? (
                 <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   {t("aiSettings.loadingModels")}
                 </div>
-              ) : (
+              ) : !serverModelsError ? (
                 <Select
                   value={settings.modelId || `${settings.provider}:${settings.model}`}
                   onValueChange={handleServerModelSelect}
@@ -225,36 +270,52 @@ export const AISettingsForm: React.FC = () => {
                   <SelectContent>
                     {availableServerModels.length > 0 && (
                       <>
-                        {availableServerModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{model.displayName}</span>
-                              <Badge variant="secondary" className="px-1 py-0 text-[10px]">
-                                {model.provider}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {availableServerModels.map((model) => {
+                          const costLabel = getCostLabel(model);
+                          const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
+                          return (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{model.displayName}</span>
+                                <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+                                  {model.provider}
+                                </Badge>
+                                <Badge
+                                  variant={isCheaperOrBaseline ? "default" : "outline"}
+                                  className="px-1 py-0 text-[10px]"
+                                >
+                                  {costLabel}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </>
                     )}
                     {lockedServerModels.length > 0 && (
                       <>
-                        {lockedServerModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id} disabled>
-                            <div className="flex items-center gap-2">
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-muted-foreground">{model.displayName}</span>
-                              <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                                {t("aiSettings.paid")}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {lockedServerModels.map((model) => {
+                          const costLabel = getCostLabel(model);
+                          return (
+                            <SelectItem key={model.id} value={model.id} disabled>
+                              <div className="flex items-center gap-2">
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-muted-foreground">{model.displayName}</span>
+                                <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                                  {t("aiSettings.pro")}
+                                </Badge>
+                                <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                                  {costLabel}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </>
                     )}
                   </SelectContent>
                 </Select>
-              )}
+              ) : null}
               <p className="text-xs text-muted-foreground">{t("aiSettings.serverModeHelp")}</p>
             </div>
           </>

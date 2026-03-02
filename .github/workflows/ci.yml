@@ -16,7 +16,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
 
       - run: bun install --frozen-lockfile
 
@@ -34,7 +34,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
 
       - run: bun install --frozen-lockfile
 
@@ -48,7 +48,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
 
       - run: bun install --frozen-lockfile
 
@@ -56,7 +56,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
@@ -70,7 +70,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
 
       - run: bun install --frozen-lockfile
 
@@ -97,14 +97,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
+          bun-version: "1.2"
 
+      - run: bun install --frozen-lockfile
+
+      # Bun workspaces are not used due to Railway build constraints.
+      # Consider migrating to workspaces if Railway adds Bun workspace support.
       - name: Install API dependencies
         working-directory: server/api
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Type check
         working-directory: server/api
-        run: npx tsc --noEmit
+        run: bunx tsc --noEmit

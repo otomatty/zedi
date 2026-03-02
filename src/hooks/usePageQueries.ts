@@ -331,6 +331,9 @@ export function useCreatePage() {
       queryClient.invalidateQueries({ queryKey: pageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: pageKeys.summaries() });
 
+      // 作成したページの detail キャッシュを即時設定（リンクから作成後すぐの遷移でタイトル・コンテンツが正しく表示されるようにする）
+      queryClient.setQueryData<Page | null>(pageKeys.detail(userId, newPage.id), newPage);
+
       // Optimistically update the cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [newPage, ...old]);
 

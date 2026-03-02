@@ -4,8 +4,8 @@
   "aiModel": "AI Model",
   "loadingModels": "Loading models...",
   "selectModel": "Select model",
-  "paid": "Paid",
-  "serverModeHelp": "Uses Zedi's AI server. Some models are only available on paid plans.",
+  "pro": "Pro",
+  "serverModeHelp": "Uses Zedi's AI server. Some models are only available on Pro plans.",
   "useOwnKey": "Use my own API key",
   "useOwnKeyDescription": "Set your own API key to use all models without limits.",
   "apiKey": "API Key",
@@ -21,5 +21,10 @@
   "savedToastDescription": "AI settings saved successfully",
   "saveFailedToastDescription": "Failed to save AI settings",
   "resetToast": "Reset complete",
-  "resetToastDescription": "AI settings have been reset"
+  "resetToastDescription": "AI settings have been reset",
+  "modelsLoadFailed": "Failed to load model list",
+  "retryLoadModels": "Retry",
+  "modelsEmpty": "The API responded but returned no models. Check that ai_models are registered in the database behind VITE_API_BASE_URL.",
+  "costLabel": "{{multiplier}}x cost",
+  "cheapest": "cheapest"
 }

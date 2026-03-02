@@ -12,6 +12,7 @@ interface UseEditorLifecycleOptions {
   onContentError: TiptapEditorProps["onContentError"];
   isReadOnly: boolean;
   pageId: string;
+  isWikiGenerating?: boolean;
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
   focusContentRef: TiptapEditorProps["focusContentRef"];
   initialContent: TiptapEditorProps["initialContent"];
@@ -27,6 +28,7 @@ export function useEditorLifecycle({
   onContentError,
   isReadOnly,
   pageId,
+  isWikiGenerating = false,
   collaborationConfig,
   focusContentRef,
   initialContent,
@@ -85,5 +87,6 @@ export function useEditorLifecycle({
     content,
     pageId: pageId || undefined,
     onChange,
+    skipSync: isWikiGenerating,
   });
 }

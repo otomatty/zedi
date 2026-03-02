@@ -1,12 +1,15 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import TiptapEditor from "../TiptapEditor";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
 import type { CollaborationConfig } from "../TiptapEditor/types";
 import { SourceUrlBadge } from "../SourceUrlBadge";
+import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
 import Container from "@/components/layout/Container";
+import { isContentNotEmpty } from "@/lib/contentUtils";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
+import type { WikiGeneratorStatus } from "./types";
 import { PageTitleBlock } from "./PageTitleBlock";
 
 function getCollaborationState(collaboration: UseCollaborationReturn | undefined): {
@@ -54,6 +57,10 @@ interface PageEditorContentProps {
   initialContent?: string;
   /** initialContent をエディタに反映したあとに呼ぶ */
   onInitialContentApplied?: () => void;
+  /** Wiki 生成ステータス */
+  wikiStatus?: WikiGeneratorStatus;
+  /** Wiki 生成コールバック */
+  onGenerateWiki?: () => void;
 }
 
 /**
@@ -79,8 +86,11 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   collaboration,
   initialContent,
   onInitialContentApplied,
+  wikiStatus,
+  onGenerateWiki,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
+  const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
 
   const contentFocusRef = useRef<(() => void) | null>(null);
   const focusContent = useCallback(() => {
@@ -94,14 +104,29 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   return (
     <main className="flex-1 pb-32 pt-6">
       <Container>
-        {/* ページタイトル（コンテンツ上部） */}
-        <PageTitleBlock
-          title={title}
-          onTitleChange={onTitleChange}
-          isReadOnly={isEditorReadOnly}
-          errorMessage={errorMessage}
-          onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
-        />
+        {/* ページタイトルと Wiki 生成ボタン（同一行） */}
+        <div className="flex items-start gap-3 pb-2 pt-6">
+          <div className="min-w-0 flex-1">
+            <PageTitleBlock
+              title={title}
+              onTitleChange={onTitleChange}
+              isReadOnly={isEditorReadOnly}
+              errorMessage={errorMessage}
+              onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
+            />
+          </div>
+          {wikiStatus && onGenerateWiki && (
+            <div className="shrink-0">
+              <WikiGeneratorButton
+                title={title}
+                hasContent={hasContent}
+                onGenerate={onGenerateWiki}
+                status={wikiStatus}
+              />
+            </div>
+          )}
+        </div>
+
         {/* Source URL Badge - クリップしたページの場合に表示 */}
         {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
 
@@ -115,9 +140,6 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
           )}
           {showEditor && (
             <>
-              {isWikiGenerating && (
-                <div className="pointer-events-none absolute inset-0 z-10 rounded-md bg-background/30" />
-              )}
               <TiptapEditor
                 content={content}
                 onChange={onContentChange}
@@ -126,6 +148,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 pageId={currentPageId || pageId || undefined}
                 pageTitle={title}
                 isReadOnly={isEditorReadOnly}
+                isWikiGenerating={isWikiGenerating}
                 showToolbar={showToolbar}
                 onContentError={onContentError}
                 collaborationConfig={collaborationConfig}

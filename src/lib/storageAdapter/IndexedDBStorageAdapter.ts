@@ -222,6 +222,66 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     }
   }
 
+  async resetDatabase(): Promise<void> {
+    const userId = adapterUserId;
+    if (!userId) throw new Error("IndexedDBStorageAdapter: not initialized.");
+
+    // Collect page IDs before closing so we can delete per-page Y.Doc databases
+    let pageIds: string[] = [];
+    try {
+      const db = await ensureDb();
+      pageIds = await new Promise<string[]>((resolve, reject) => {
+        const tx = db.transaction("my_pages", "readonly");
+        const req = tx.objectStore("my_pages").getAllKeys();
+        req.onsuccess = () => resolve((req.result as string[]) || []);
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      // If we can't read pages, continue with main DB deletion
+    }
+
+    // Close the main database connection
+    await this.close();
+
+    // Delete the main storage database
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase(DB_NAME_PREFIX + userId);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+      req.onblocked = () =>
+        reject(
+          new Error(
+            "IndexedDBStorageAdapter: deleteDatabase for main DB is blocked (database is still open in another tab or context).",
+          ),
+        );
+    });
+
+    // Delete per-page Y.Doc databases (y-indexeddb creates one per page)
+    const results = await Promise.allSettled(
+      pageIds.map(
+        (pageId) =>
+          new Promise<void>((resolve, reject) => {
+            const req = indexedDB.deleteDatabase(YDOC_NAME_PREFIX + pageId);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+            req.onblocked = () =>
+              reject(
+                new Error(
+                  `IndexedDBStorageAdapter: deleteDatabase for Y.Doc DB "${YDOC_NAME_PREFIX + pageId}" is blocked (database is still open in another tab or context).`,
+                ),
+              );
+          }),
+      ),
+    );
+    const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures.map((f) => f.reason),
+        `Failed to delete ${failures.length}/${pageIds.length} Y.Doc database(s)`,
+      );
+    }
+  }
+
   // ── メタデータ ──
   async getAllPages(): Promise<PageMetadata[]> {
     const db = await ensureDb();
