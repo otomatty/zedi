@@ -153,11 +153,11 @@ railway variable set SYNC_AI_MODELS_SECRET=<ランダム文字列> --service api
 
 GitHub リポジトリ Settings > Environments > `production` で以下を設定:
 
-| Secret 名               | 値                                                                        | 用途                            |
-| ----------------------- | ------------------------------------------------------------------------- | ------------------------------- |
-| `DATABASE_URL`          | `postgresql://postgres:BlasJbZ...@shortline.proxy.rlwy.net:13399/railway` | マイグレーション実行 (外部 URL) |
-| `CLOUDFLARE_API_TOKEN`  | Cloudflare API トークン                                                   | Pages デプロイ                  |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare アカウント ID                                                  | Pages デプロイ                  |
+| Secret 名               | 値                                                        | 用途                            |
+| ----------------------- | --------------------------------------------------------- | ------------------------------- |
+| `DATABASE_URL`          | `postgresql://<user>:<password>@<host>:<port>/<database>` | マイグレーション実行 (外部 URL) |
+| `CLOUDFLARE_API_TOKEN`  | Cloudflare API トークン                                   | Pages デプロイ                  |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare アカウント ID                                  | Pages デプロイ                  |
 
 > `DATABASE_URL` にはRailway の **Public URL** (`DATABASE_PUBLIC_URL`) を使用すること。
 > 内部 URL (`*.railway.internal`) は GitHub Actions からはアクセスできない。
@@ -290,7 +290,7 @@ railway logs --service hocuspocus-prod --lines 50
 
 ## アーキテクチャ図
 
-```
+```text
                           ┌─────────────────────────────────────┐
                           │        GitHub (otomatty/zedi)       │
                           │                                     │
