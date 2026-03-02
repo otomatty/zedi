@@ -15,6 +15,13 @@ variable "zone_domain" {
   default     = "zedi-note.app"
 }
 
+# Pages dev frontend custom subdomain (e.g. dev.zedi-note.app)
+variable "pages_dev_subdomain" {
+  type        = string
+  description = "Subdomain for dev frontend (Pages zedi-dev), e.g. dev -> dev.zedi-note.app"
+  default     = "dev"
+}
+
 # Railway API subdomain CNAME targets (from Railway custom domain)
 variable "api_cname_target" {
   type        = string

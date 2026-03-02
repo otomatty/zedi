@@ -6,7 +6,7 @@ import { getEnv } from "../lib/env.js";
 import type { Database } from "../types/index.js";
 
 const s3 = new S3Client({
-  endpoint: process.env.STORAGE_ENDPOINT,
+  endpoint: getEnv("STORAGE_ENDPOINT"),
   region: "auto",
   credentials: {
     accessKeyId: getEnv("STORAGE_ACCESS_KEY"),
@@ -126,6 +126,7 @@ export async function commitImage(
     sizeBytes,
   });
 
-  const endpoint = process.env.STORAGE_ENDPOINT?.replace(/\/$/, "") ?? "";
-  return { imageUrl: `${endpoint}/${bucketName}/${s3Key}` };
+  // バケット非公開のため、API 経由でプロキシストリーミングする URL を返す
+  const baseUrl = process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
+  return { imageUrl: `${baseUrl}/api/thumbnail/serve/${objectId}` };
 }
