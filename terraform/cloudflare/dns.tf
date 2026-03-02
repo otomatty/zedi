@@ -39,3 +39,13 @@ resource "cloudflare_record" "realtime_railway_verify" {
   content = var.realtime_railway_verify_txt
   ttl     = 1
 }
+
+# dev.zedi-note.app -> Cloudflare Pages (zedi-dev); proxied for SSL
+resource "cloudflare_record" "pages_dev_cname" {
+  zone_id = data.cloudflare_zone.zedi.id
+  name    = var.pages_dev_subdomain
+  type    = "CNAME"
+  content = "${cloudflare_pages_project.zedi_dev.name}.pages.dev"
+  proxied = true
+  ttl     = 1
+}
