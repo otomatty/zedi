@@ -194,11 +194,18 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
 function parseRedisOptions(redisUrl: string): Record<string, unknown> {
   const parsed = new URL(redisUrl);
   const ioredisOptions: Record<string, unknown> = {};
+  if (parsed.username) {
+    ioredisOptions.username = decodeURIComponent(parsed.username);
+  }
   if (parsed.password) {
     ioredisOptions.password = decodeURIComponent(parsed.password);
   }
   if (parsed.protocol === "rediss:") {
     ioredisOptions.tls = {};
+  }
+  const dbMatch = parsed.pathname?.match(/^\/(\d+)$/);
+  if (dbMatch) {
+    ioredisOptions.db = Number(dbMatch[1]);
   }
   return {
     host: parsed.hostname,

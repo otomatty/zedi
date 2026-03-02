@@ -9,40 +9,40 @@
 
 ### 完了済み
 
-| 項目                         | 状態                                       |
-| ---------------------------- | ------------------------------------------ |
-| Railway プロジェクト「Zedi」 | 作成済み                                   |
-| production 環境              | 作成済み                                   |
-| api-prod サービス            | 稼働中 (SUCCESS)                           |
-| hocuspocus-prod サービス     | 稼働中 (SUCCESS)                           |
-| Postgres-p3L9                | 稼働中 (PostgreSQL 17)                     |
-| Redis-GLIh                   | 稼働中 (本日追加)                          |
-| REDIS_URL 接続               | api-prod, hocuspocus-prod 共に設定済み     |
-| カスタムドメイン             | api.zedi-note.app / realtime.zedi-note.app |
-| Cloudflare DNS               | Terraform 管理済み                         |
-| Cloudflare Pages             | zedi (prod) / zedi-dev (dev) 作成済み      |
-| CI ワークフロー              | ci.yml 正常動作                            |
+| 項目                         | 状態                                                               |
+| ---------------------------- | ------------------------------------------------------------------ |
+| Railway プロジェクト「Zedi」 | 作成済み                                                           |
+| production 環境              | 作成済み                                                           |
+| api-prod サービス            | 稼働中 (SUCCESS)                                                   |
+| hocuspocus-prod サービス     | 稼働中 (SUCCESS)                                                   |
+| Postgres-p3L9                | 稼働中 (PostgreSQL 17)                                             |
+| Redis-GLIh                   | 稼働中 (本日追加)                                                  |
+| REDIS_URL 接続               | api-prod, hocuspocus-prod 共に設定済み                             |
+| カスタムドメイン             | api.zedi-note.app / realtime.zedi-note.app                         |
+| Cloudflare DNS               | Terraform 管理済み                                                 |
+| Cloudflare Pages             | zedi (prod) / zedi-dev (dev) 作成済み                              |
+| CI ワークフロー              | ci.yml 正常動作                                                    |
+| NODE_ENV=production          | 完了（api-prod / hocuspocus-prod に設定済み）                      |
+| hocuspocus Redis 修正        | 完了（PR #173 作成済み。develop マージ後 main へマージで恒久反映） |
 
 ### 未完了・要対応
 
-| 優先度 | 項目                                     | 影響                                                               |
-| ------ | ---------------------------------------- | ------------------------------------------------------------------ |
-| **P0** | `NODE_ENV=production` 未設定             | 認証 cookie、Polar 課金、セキュリティ設定が全て development モード |
-| **P0** | hocuspocus Redis 修正のコミット/プッシュ | ローカル修正のみ。main に反映必要                                  |
-| **P1** | OAuth 認証情報 (placeholder)             | GitHub/Google ログイン不可                                         |
-| **P1** | ストレージ認証情報 (placeholder)         | メディアアップロード不可                                           |
-| **P1** | Polar 課金設定 未設定                    | Pro プラン購入不可                                                 |
-| **P2** | AI API キー 未設定                       | AI 機能（要約・検索等）利用不可                                    |
-| **P2** | GitHub Actions production 環境設定確認   | デプロイ自動化が正常動作するか確認                                 |
-| **P3** | Railway GitHub 連携設定確認              | main ブランチへのプッシュで自動デプロイされるか確認                |
+| 優先度 | 項目                                   | 影響                                                |
+| ------ | -------------------------------------- | --------------------------------------------------- |
+| **P1** | OAuth 認証情報 (placeholder)           | GitHub/Google ログイン不可                          |
+| **P1** | ストレージ認証情報 (placeholder)       | メディアアップロード不可                            |
+| **P1** | Polar 課金設定 未設定                  | Pro プラン購入不可                                  |
+| **P2** | AI API キー 未設定                     | AI 機能（要約・検索等）利用不可                     |
+| **P2** | GitHub Actions production 環境設定確認 | デプロイ自動化が正常動作するか確認                  |
+| **P3** | Railway GitHub 連携設定確認            | main ブランチへのプッシュで自動デプロイされるか確認 |
 
 ---
 
-## Phase 1: 緊急修正 (NODE_ENV + コード修正)
+## Phase 1: 緊急修正 (NODE_ENV + コード修正) — 完了
 
-### 1-1. NODE_ENV=production の設定
+### 1-1. NODE_ENV=production の設定 — 完了
 
-`NODE_ENV` が未設定のため、以下の重大な問題が発生中:
+`NODE_ENV` が未設定のため、以下の重大な問題が発生していました（対応済み）:
 
 - **認証**: Cookie が `sameSite: lax, secure: false` で設定され、クロスドメイン認証が失敗する
 - **課金**: Polar が sandbox モードで動作し、本番決済ができない
@@ -56,11 +56,12 @@ railway variable set NODE_ENV=production --service api-prod
 railway variable set NODE_ENV=production --service hocuspocus-prod
 ```
 
-> 設定後、両サービスが自動再デプロイされる。ログで `Environment: production` を確認すること。
+> 設定後、両サービスが自動再デプロイされる。ログで `Environment: production` を確認すること。  
+> **確認済み**: api-prod / hocuspocus-prod ともに `Environment: production` を表示。
 
-### 1-2. hocuspocus Redis 修正のコミット
+### 1-2. hocuspocus Redis 修正のコミット — 完了
 
-`server/hocuspocus/src/index.ts` の `parseRedisOptions` 関数を修正済み（ローカル）。
+`server/hocuspocus/src/index.ts` の `parseRedisOptions` 関数を修正済み。
 `@hocuspocus/extension-redis` が `password` を `options` プロパティ内で受け取る仕様に合わせた。
 
 ```bash
@@ -69,7 +70,8 @@ git commit -m "fix: pass Redis password in options for @hocuspocus/extension-red
 git push origin main
 ```
 
-> Railway の GitHub 連携が有効なら自動デプロイされる。
+> Railway の GitHub 連携が有効なら自動デプロイされる。  
+> **実施済み**: ブランチ保護のため `fix/hocuspocus-redis-auth` で PR #173 を作成。develop マージ後、main へマージすると恒久反映。
 
 ---
 
@@ -151,11 +153,11 @@ railway variable set SYNC_AI_MODELS_SECRET=<ランダム文字列> --service api
 
 GitHub リポジトリ Settings > Environments > `production` で以下を設定:
 
-| Secret 名               | 値                                                                        | 用途                            |
-| ----------------------- | ------------------------------------------------------------------------- | ------------------------------- |
-| `DATABASE_URL`          | `postgresql://postgres:BlasJbZ...@shortline.proxy.rlwy.net:13399/railway` | マイグレーション実行 (外部 URL) |
-| `CLOUDFLARE_API_TOKEN`  | Cloudflare API トークン                                                   | Pages デプロイ                  |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare アカウント ID                                                  | Pages デプロイ                  |
+| Secret 名               | 値                                                        | 用途                            |
+| ----------------------- | --------------------------------------------------------- | ------------------------------- |
+| `DATABASE_URL`          | `postgresql://<user>:<password>@<host>:<port>/<database>` | マイグレーション実行 (外部 URL) |
+| `CLOUDFLARE_API_TOKEN`  | Cloudflare API トークン                                   | Pages デプロイ                  |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare アカウント ID                                  | Pages デプロイ                  |
 
 > `DATABASE_URL` にはRailway の **Public URL** (`DATABASE_PUBLIC_URL`) を使用すること。
 > 内部 URL (`*.railway.internal`) は GitHub Actions からはアクセスできない。
@@ -256,7 +258,7 @@ railway logs --service hocuspocus-prod --lines 50
 | `BETTER_AUTH_URL`                | 設定済み | 設定済み    | OK         |
 | `CORS_ORIGIN`                    | 設定済み | 設定済み    | OK         |
 | `PORT`                           | 3000     | 3000        | OK         |
-| `NODE_ENV`                       | (未設定) | **未設定**  | **要設定** |
+| `NODE_ENV`                       | (未設定) | 設定済み    | 完了       |
 | `GITHUB_CLIENT_ID`               | 設定済み | placeholder | **要設定** |
 | `GITHUB_CLIENT_SECRET`           | 設定済み | placeholder | **要設定** |
 | `GOOGLE_CLIENT_ID`               | 設定済み | placeholder | **要設定** |
@@ -288,7 +290,7 @@ railway logs --service hocuspocus-prod --lines 50
 
 ## アーキテクチャ図
 
-```
+```text
                           ┌─────────────────────────────────────┐
                           │        GitHub (otomatty/zedi)       │
                           │                                     │
