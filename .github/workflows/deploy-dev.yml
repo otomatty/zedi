@@ -8,6 +8,7 @@ jobs:
   migrate:
     name: Run Database Migrations
     runs-on: ubuntu-latest
+    environment: development
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
@@ -19,40 +20,15 @@ jobs:
         working-directory: server/api
         run: bunx drizzle-kit migrate
         env:
-          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  deploy-api:
-    needs: migrate
-    runs-on: ubuntu-latest
-    container: ghcr.io/railwayapp/cli:latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Copy lockfile for API build
-        run: cp bun.lock server/api/
-      - name: Deploy API to Railway
-        run: railway up ./server/api --service api --environment development -d
-
-  deploy-hocuspocus:
-    needs: migrate
-    runs-on: ubuntu-latest
-    container: ghcr.io/railwayapp/cli:latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Copy lockfile for Hocuspocus build
-        run: cp bun.lock server/hocuspocus/
-      - name: Deploy Hocuspocus to Railway
-        run: railway up ./server/hocuspocus --service hocuspocus --environment development -d
-
+  # Railway deploys api and hocuspocus via GitHub integration (configure in Railway Dashboard)
   deploy-frontend:
     name: Deploy Frontend
     needs:
-      - deploy-api
-      - deploy-hocuspocus
+      - migrate
     runs-on: ubuntu-latest
+    environment: development
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
@@ -61,8 +37,8 @@ jobs:
       - name: Install & Build
         run: bun install --frozen-lockfile && bun run build
         env:
-          VITE_API_BASE_URL: ${{ vars.DEV_API_BASE_URL }}
-          VITE_REALTIME_URL: ${{ vars.DEV_REALTIME_URL }}
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_REALTIME_URL: ${{ vars.REALTIME_URL }}
           VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
           VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
       - name: Deploy to Cloudflare Pages

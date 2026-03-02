@@ -46,3 +46,11 @@ test-results/
 
 # Drizzle migrations (generated)
 server/api/drizzle/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
