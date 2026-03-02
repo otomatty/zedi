@@ -22,6 +22,7 @@ import aiAdminRoutes from "./routes/ai/admin.js";
 import thumbSearchRoutes from "./routes/thumbnail/imageSearch.js";
 import thumbGenerateRoutes from "./routes/thumbnail/imageGenerate.js";
 import thumbCommitRoutes from "./routes/thumbnail/commit.js";
+import thumbServeRoutes from "./routes/thumbnail/serve.js";
 import webhookPolarRoutes from "./routes/webhooks/polar.js";
 import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
@@ -107,6 +108,7 @@ export function createApp(): Hono<AppEnv> {
   app.route("/api/thumbnail/image-search", thumbSearchRoutes);
   app.route("/api/thumbnail/image-generate", thumbGenerateRoutes);
   app.route("/api/thumbnail/commit", thumbCommitRoutes);
+  app.route("/api/thumbnail/serve", thumbServeRoutes);
 
   // 404 fallback（要求パスを返してデバッグしやすくする）
   app.all("*", (c) => c.json({ error: "Not found", path: c.req.path, method: c.req.method }, 404));
