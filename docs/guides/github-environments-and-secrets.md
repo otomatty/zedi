@@ -1,4 +1,15 @@
-# GitHub Environments とシークレット設定（dev / prod）
+# GitHub Environments とシークレット設定
+
+> **注意（2026-03）:** Railway + Cloudflare 移行後は、ワークフロー用に **`development`** と **`production`** の Environment を使用します。最新の設定手順は以下を参照してください。
+>
+> - **作業計画:** `docs/plans/20260302/develop-cicd-parity-work-plan.md` §5
+> - **Environment 監査・方針:** `docs/plans/20260302/environment-audit-report.md`
+
+---
+
+## （旧）dev / prod（AWS/Terraform 時代の設定）
+
+以下の内容は AWS → Railway 移行前の設定です。参考用に残しています。
 
 `deploy-dev.yml` と `deploy-prod.yml` が動作するには、GitHub の **Environments** に **dev** と **prod** を作成し、各 Environment に必要な **Environment secrets** を登録する必要があります。
 

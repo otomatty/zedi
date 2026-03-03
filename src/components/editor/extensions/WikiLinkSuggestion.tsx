@@ -63,7 +63,7 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
 
     // Reset selection when items change
     useEffect(() => {
-      setSelectedIndex(0);
+      queueMicrotask(() => setSelectedIndex(0));
     }, [query]);
 
     const selectItem = useCallback(

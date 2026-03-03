@@ -18,6 +18,7 @@ export default tseslint.config(
     ignores: [
       "dist",
       "dist-ssr",
+      "**/dist",
       "node_modules",
       "coverage",
       "playwright-report",

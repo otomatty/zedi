@@ -235,7 +235,7 @@ export function useSeedData() {
     // Only seed if no pages exist (pages is guaranteed to be defined when isSuccess is true)
     if (pages.length === 0) {
       hasSeededRef.current = true;
-      setIsSeeding(true);
+      queueMicrotask(() => setIsSeeding(true));
 
       // Create tutorial pages sequentially
       const seedPages = async () => {
