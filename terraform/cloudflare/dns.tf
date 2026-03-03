@@ -2,7 +2,8 @@ data "cloudflare_zone" "zedi" {
   name = var.zone_domain
 }
 
-# api.zedi-note.app -> Railway API (DNS only; proxied = false for Railway SSL)
+# api.zedi-note.app -> Railway API
+# DNS-only by design (proxied=false). We do not use Cloudflare proxy here; Railway issues and serves SSL at origin.
 resource "cloudflare_record" "api_cname" {
   zone_id         = data.cloudflare_zone.zedi.id
   name            = "api"
@@ -21,7 +22,8 @@ resource "cloudflare_record" "api_railway_verify" {
   ttl     = 1
 }
 
-# realtime.zedi-note.app -> Railway Hocuspocus (DNS only)
+# realtime.zedi-note.app -> Railway Hocuspocus
+# DNS-only by design (proxied=false). We do not use Cloudflare proxy here; Railway issues and serves SSL at origin.
 resource "cloudflare_record" "realtime_cname" {
   zone_id         = data.cloudflare_zone.zedi.id
   name            = "realtime"
