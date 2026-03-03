@@ -73,9 +73,11 @@ const NoteSettings: React.FC = () => {
 
   useEffect(() => {
     if (note) {
-      setTitle(note.title);
-      setVisibility(note.visibility);
-      setEditPermission(note.editPermission);
+      queueMicrotask(() => {
+        setTitle(note.title);
+        setVisibility(note.visibility);
+        setEditPermission(note.editPermission);
+      });
     }
   }, [note]);
 

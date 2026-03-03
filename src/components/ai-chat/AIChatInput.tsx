@@ -41,7 +41,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     if (!selectedModel?.inputCostUnits || textLength === 0) return null;
     const estimatedTokens = Math.ceil(textLength / 4);
     return Math.max(1, Math.round((estimatedTokens / 1000) * selectedModel.inputCostUnits));
-  }, [textLength, selectedModel?.inputCostUnits]);
+  }, [textLength, selectedModel]);
 
   return (
     <div className="relative">

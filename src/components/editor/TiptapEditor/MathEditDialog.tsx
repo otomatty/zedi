@@ -29,7 +29,7 @@ export const MathEditDialog: React.FC<MathEditDialogProps> = ({
 
   useEffect(() => {
     if (open) {
-      setLatex(initialLatex);
+      queueMicrotask(() => setLatex(initialLatex));
       // Focus textarea after dialog opens
       requestAnimationFrame(() => {
         textareaRef.current?.focus();

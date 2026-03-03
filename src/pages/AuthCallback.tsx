@@ -18,7 +18,7 @@ export default function AuthCallback() {
     const errorDescription = params.get("error_description");
 
     if (errorParam) {
-      setError(errorDescription || errorParam);
+      queueMicrotask(() => setError(errorDescription || errorParam));
       return;
     }
 

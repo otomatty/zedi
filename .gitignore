@@ -44,5 +44,12 @@ coverage/
 playwright-report/
 test-results/
 
-# Drizzle migrations (generated)
-server/api/drizzle/
+# Drizzle: migration files in server/api/drizzle/ are committed so CI and other envs can run migrate
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl

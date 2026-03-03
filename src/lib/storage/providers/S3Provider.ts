@@ -133,6 +133,70 @@ export class S3Provider implements StorageProviderInterface {
     }
   }
 
+  /**
+   * デフォルトストレージ上の画像を削除（/api/media/:id または /api/thumbnail/serve/:id）
+   * 自分の画像のみ削除可能（API側で所有者チェック）
+   * クロスオリジン対策: baseUrl 由来の origin のみ使用
+   */
+  async deleteImage(url: string): Promise<void> {
+    const base =
+      this.baseUrl.replace(/\/$/, "") ||
+      (typeof window !== "undefined" ? window.location.origin : "");
+    if (!base) {
+      throw new Error("API base URL is not configured");
+    }
+
+    const baseOrigin = new URL(base).origin;
+    const parsed = new URL(url, baseOrigin);
+    if (parsed.origin !== baseOrigin) {
+      throw new Error("異なるオリジンのURLは削除できません");
+    }
+
+    // /api/media/:id 形式
+    const mediaMatch = parsed.pathname.match(/^\/api\/media\/([^/?#]+)$/);
+    if (mediaMatch) {
+      const mediaId = mediaMatch[1];
+      const res = await fetch(`${baseOrigin}/api/media/${mediaId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(
+          res.status === 403
+            ? "自分の画像のみ削除できます"
+            : res.status === 404
+              ? "画像が見つかりません"
+              : (err as { message?: string }).message || `削除に失敗しました: ${res.status}`,
+        );
+      }
+      return;
+    }
+
+    // /api/thumbnail/serve/:id 形式
+    const thumbMatch = parsed.pathname.match(/^\/api\/thumbnail\/serve\/([^/?#]+)$/);
+    if (thumbMatch) {
+      const objectId = thumbMatch[1];
+      const res = await fetch(`${baseOrigin}/api/thumbnail/serve/${objectId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(
+          res.status === 404
+            ? "画像が見つかりません"
+            : (err as { message?: string }).message || `削除に失敗しました: ${res.status}`,
+        );
+      }
+      return;
+    }
+
+    throw new Error(
+      "このURLは削除対象ではありません（/api/media/ または /api/thumbnail/serve/ の画像のみ）",
+    );
+  }
+
   async testConnection(): Promise<ConnectionTestResult> {
     try {
       // 最小のテスト画像でアップロードを試行

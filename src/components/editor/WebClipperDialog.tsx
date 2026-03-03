@@ -49,8 +49,10 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   // ダイアログを閉じたときにリセット
   useEffect(() => {
     if (!open) {
-      setUrl("");
-      setUrlError(null);
+      queueMicrotask(() => {
+        setUrl("");
+        setUrlError(null);
+      });
       reset();
     }
   }, [open, reset]);

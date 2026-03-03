@@ -47,8 +47,10 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     if (open) {
       checkAIConfigured();
       reset();
-      setPreviewSvg("");
-      setPreviewError(null);
+      queueMicrotask(() => {
+        setPreviewSvg("");
+        setPreviewError(null);
+      });
     }
   }, [open, checkAIConfigured, reset]);
 
