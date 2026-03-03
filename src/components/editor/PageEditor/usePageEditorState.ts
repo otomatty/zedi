@@ -63,14 +63,16 @@ export function usePageEditorState({
   useEffect(() => {
     if (prevPageIdRef.current !== pageId && !isNewPage) {
       prevPageIdRef.current = pageId;
-      setIsInitialized(false);
-      setCurrentPageId(null);
-      setTitle("");
-      setContent("");
-      setSourceUrl(undefined);
-      setLastSaved(null);
-      setOriginalTitle("");
-      setContentError(null);
+      queueMicrotask(() => {
+        setIsInitialized(false);
+        setCurrentPageId(null);
+        setTitle("");
+        setContent("");
+        setSourceUrl(undefined);
+        setLastSaved(null);
+        setOriginalTitle("");
+        setContentError(null);
+      });
     }
   }, [pageId, isNewPage]);
 

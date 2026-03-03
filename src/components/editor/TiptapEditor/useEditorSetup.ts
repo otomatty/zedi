@@ -91,9 +91,11 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
   );
 
   const slashStateRef = useRef(slashState);
-  slashStateRef.current = slashState;
   const suggestionStateRef = useRef(suggestionState);
-  suggestionStateRef.current = suggestionState;
+  useEffect(() => {
+    slashStateRef.current = slashState;
+    suggestionStateRef.current = suggestionState;
+  });
 
   const editor = useEditor(
     {

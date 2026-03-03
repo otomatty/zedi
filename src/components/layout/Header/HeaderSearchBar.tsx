@@ -100,11 +100,11 @@ export function HeaderSearchBar() {
   const totalItems = hasQuery ? itemCount + 1 : itemCount;
 
   useEffect(() => {
-    if (hasQuery) setDropdownOpen(true);
+    if (hasQuery) queueMicrotask(() => setDropdownOpen(true));
   }, [hasQuery]);
 
   useEffect(() => {
-    setActiveIndex(-1);
+    queueMicrotask(() => setActiveIndex(-1));
   }, [query]);
 
   useEffect(() => {

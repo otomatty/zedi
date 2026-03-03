@@ -99,7 +99,7 @@ export function useRepository() {
 
   // Create adapter + api and initialize adapter for current user
   useEffect(() => {
-    setIsAdapterReady(false);
+    queueMicrotask(() => setIsAdapterReady(false));
     const adapter = createStorageAdapter();
     const api = createApiClient({ getToken });
     adapterRef.current = adapter;
