@@ -9,7 +9,7 @@ resource "cloudflare_record" "api_cname" {
   type            = "CNAME"
   content         = var.api_cname_target
   proxied         = false
-  ttl             = 1 # 1 = auto
+  ttl             = 1    # 1 = auto
   allow_overwrite = true # adopt existing record if present
 }
 
@@ -37,6 +37,16 @@ resource "cloudflare_record" "realtime_railway_verify" {
   name    = "_railway-verify.realtime"
   type    = "TXT"
   content = var.realtime_railway_verify_txt
+  ttl     = 1
+}
+
+# zedi-note.app -> Cloudflare Pages (zedi); proxied for SSL
+resource "cloudflare_record" "pages_prod_cname" {
+  zone_id = data.cloudflare_zone.zedi.id
+  name    = "@"
+  type    = "CNAME"
+  content = "${cloudflare_pages_project.zedi.name}.pages.dev"
+  proxied = true
   ttl     = 1
 }
 
