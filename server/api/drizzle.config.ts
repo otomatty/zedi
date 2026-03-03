@@ -45,30 +45,14 @@ function loadEnvProduction() {
 loadEnv();
 loadEnvProduction();
 
-/**
- * Railway の TCP Proxy (proxy.rlwy.net) への外部接続では SSL が必須。
- * URL に sslmode が未指定の場合に付加する。
- */
-function ensureSslForRailway(url: string): string {
-  if (!url || !url.includes("proxy.rlwy.net")) return url;
-  try {
-    const u = new URL(url);
-    if (u.searchParams.has("sslmode")) return url;
-    u.searchParams.set("sslmode", "require");
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
-
-const rawUrl = process.env.DATABASE_URL ?? "";
-const url = ensureSslForRailway(rawUrl);
+const dbUrl = process.env.DATABASE_URL ?? "";
 
 export default defineConfig({
   schema: "./src/schema/index.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url,
+    url: dbUrl,
+    ssl: dbUrl.includes("proxy.rlwy.net") ? { rejectUnauthorized: false } : false,
   },
 });
