@@ -44,13 +44,16 @@
 3. **development** または **production** 環境を選択
 4. **Postgres** サービス（または PostgreSQL データベース）をクリック
 5. **Variables** タブを開く
-6. `DATABASE_URL` の値をコピー
+6. **GitHub Actions から接続する場合は `DATABASE_PUBLIC_URL` を使用**（`DATABASE_URL` は Railway 内部用のため外部からは接続不可）
+7. **Settings** → **Networking** → **TCP Proxy** が有効であることを確認
 
-- または **Connect** タブ → **Public Networking** が有効な場合、`DATABASE_PUBLIC_URL` をコピー（TCP Proxy の URL が表示される）
+**形式例:** `postgresql://user:PASSWORD@host.proxy.rlwy.net:PORT/dbname`
 
-7. **Settings** → **Networking** → **TCP Proxy** が有効なら、その接続文字列を使用
+**GitHub Secrets 登録時の注意:**
 
-**形式例:** `postgresql://postgres:PASSWORD@HOST:PORT/railway`
+- パスワードに `$`, `@`, `#`, `&` などの特殊文字が含まれる場合、GitHub Actions で誤解釈されることがあります
+- パスワード部分を URL エンコードしてから登録すると回避できます（例: `$` → `%24`, `@` → `%40`）
+- コピー時に前後の空白・改行が入らないように注意
 
 **注意:** development と production では**別のデータベース**の URL を使用する。環境を間違えないこと。
 
