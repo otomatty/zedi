@@ -11,6 +11,7 @@ import { useWikiLinkNavigation } from "./TiptapEditor/useWikiLinkNavigation";
 import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";
 import { getStorageProviderById } from "@/types/storage";
+import { useAuth } from "@/hooks/useAuth";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
 import { isStorageConfiguredForUpload, getSettingsForUpload } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +78,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const handleStateChange = useCallback((s: WikiLinkSuggestionState) => setSuggestionState(s), []);
   const handleSlashStateChange = useCallback((s: SlashSuggestionState) => setSlashState(s), []);
 
+  const { getToken } = useAuth();
   const { settings: storageSettings, isLoading: isStorageLoading } = useStorageSettings();
   const isStorageConfigured = !isStorageLoading && isStorageConfiguredForUpload(storageSettings);
   const currentStorageProvider = getStorageProviderById(
@@ -87,7 +89,13 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const hasThumbnail = useMemo(() => Boolean(extractFirstImage(content)), [content]);
 
   const { getProviderLabel, handleCopyImageUrl, canDeleteFromStorage, handleDeleteFromStorage } =
-    useStorageActions({ storageSettings, isStorageConfigured, currentStorageProvider, toast });
+    useStorageActions({
+      storageSettings,
+      isStorageConfigured,
+      currentStorageProvider,
+      toast,
+      getToken,
+    });
   const openStorageSetupDialog = useCallback(() => setStorageSetupDialogOpen(true), []);
 
   const {
