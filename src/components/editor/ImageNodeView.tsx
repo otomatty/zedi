@@ -153,7 +153,8 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
   const [authenticatedSrc, setAuthenticatedSrc] = useState<string | null>(null);
   const blobUrlRef = useRef<string | null>(null);
 
-  const isAuthRequiredUrl = src != null && src.includes("/api/media/");
+  const isAuthRequiredUrl =
+    src != null && (src.includes("/api/media/") || src.includes("/api/thumbnail/serve/"));
   const getAuthenticatedImageUrl = options.getAuthenticatedImageUrl;
 
   useEffect(() => {

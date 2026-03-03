@@ -3,7 +3,7 @@ import { ReactNodeViewRenderer } from "@tiptap/react";
 import { InputRule } from "@tiptap/core";
 import { ImageNodeView } from "../ImageNodeView.tsx";
 
-/** Returns a displayable URL (e.g. blob URL) for auth-required URLs like /api/media/:id */
+/** Returns a displayable URL (e.g. blob URL) for auth-required URLs like /api/media/:id, /api/thumbnail/serve/:id */
 export type GetAuthenticatedImageUrl = (url: string) => Promise<string | null>;
 
 export interface StorageImageOptions extends ImageOptions {
@@ -12,7 +12,7 @@ export interface StorageImageOptions extends ImageOptions {
   onDeleteFromStorage?: (url: string, providerId?: string | null) => Promise<void>;
   onCopyUrl?: (url: string) => void;
   onOpenUrl?: (url: string) => void;
-  /** For /api/media/ URLs: fetch with auth and return blob URL so img can display after reload */
+  /** For /api/media/, /api/thumbnail/ URLs: fetch with auth and return blob URL so img can display after reload */
   getAuthenticatedImageUrl?: GetAuthenticatedImageUrl;
 }
 
