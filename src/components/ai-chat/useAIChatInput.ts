@@ -159,7 +159,7 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
         setMentionQuery(null);
       });
     },
-    [syncRefsFromDOM, checkEmpty],
+    [syncRefsFromDOM, checkEmpty, editorRef],
   );
 
   const handleEditorInput = useCallback(() => {
@@ -184,7 +184,15 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
       setPendingRefs([]);
       setMentionQuery(null);
     },
-    [isStreaming, getEditorContent, onSendMessage, setPendingRefs, setIsEmpty, checkEmpty],
+    [
+      isStreaming,
+      getEditorContent,
+      onSendMessage,
+      setPendingRefs,
+      setIsEmpty,
+      checkEmpty,
+      editorRef,
+    ],
   );
 
   const handleKeyDown = useCallback(
@@ -261,7 +269,7 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
         // ignore
       }
     },
-    [insertChipAtCursor],
+    [insertChipAtCursor, editorRef],
   );
 
   const placeholder =

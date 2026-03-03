@@ -20,6 +20,7 @@ export function useDebouncedCallback<T extends (...args: unknown[]) => void>(
   }, []);
 
   return useCallback(
+    // eslint-disable-next-line react-hooks/use-memo -- generic debounce wrapper requires cast to T
     ((...args: Parameters<T>) => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {

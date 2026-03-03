@@ -247,6 +247,7 @@ export function useImageUploadManager({
       restoreSelectionIfNeeded,
       startUploads,
       toast,
+      editorRef,
     ],
   );
 
