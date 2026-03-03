@@ -45,30 +45,32 @@ function loadEnvProduction() {
 loadEnv();
 loadEnvProduction();
 
-/**
- * Railway の TCP Proxy (proxy.rlwy.net) への外部接続では SSL が必須。
- * URL に sslmode が未指定の場合に付加する。
- */
-function ensureSslForRailway(url: string): string {
-  if (!url || !url.includes("proxy.rlwy.net")) return url;
-  try {
-    const u = new URL(url);
-    if (u.searchParams.has("sslmode")) return url;
-    u.searchParams.set("sslmode", "require");
-    return u.toString();
-  } catch {
-    return url;
-  }
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  throw new Error(
+    "DATABASE_URL environment variable is not set. Configure DATABASE_URL in your environment or .env/.env.production before running drizzle-kit.",
+  );
 }
 
-const rawUrl = process.env.DATABASE_URL ?? "";
-const url = ensureSslForRailway(rawUrl);
+/** Railway TCP Proxy (proxy.rlwy.net) は自己署名証明書のため、接続時にのみ検証を緩和する。hostname で判定しユーザー名/パスワード内の誤マッチを防ぐ。 */
+function isRailwayProxyHost(url: string): boolean {
+  const parts = url.split("@");
+  if (parts.length < 2) return false;
+  const afterAt = parts[parts.length - 1];
+  const hostPart = afterAt.split("/")[0];
+  const host = hostPart.split(":")[0];
+  return host.endsWith(".proxy.rlwy.net");
+}
+
+/** Railway 経由時のみ ssl を指定。それ以外は指定しないので DATABASE_URL やドライバのデフォルトに委ねる。 */
+const sslOption = isRailwayProxyHost(dbUrl) ? { rejectUnauthorized: false } : undefined;
 
 export default defineConfig({
   schema: "./src/schema/index.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url,
+    url: dbUrl,
+    ...(sslOption && { ssl: sslOption }),
   },
 });
