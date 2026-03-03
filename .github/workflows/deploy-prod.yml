@@ -8,6 +8,7 @@ jobs:
   migrate:
     name: Run Database Migrations
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
@@ -15,46 +16,67 @@ jobs:
           bun-version: "1.2"
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Debug - workflow context
+        run: |
+          echo "::group::Workflow context"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Job: migrate (environment: production)"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "::endgroup::"
+      - name: Debug - DATABASE_URL inspection (masked)
+        run: |
+          echo "::group::DATABASE_URL inspection"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: DATABASE_URL is not set"
+            exit 1
+          fi
+          echo "DATABASE_URL length: ${#DATABASE_URL}"
+          echo "DB user: $(echo "$DATABASE_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')"
+          echo "DB host: $(echo "$DATABASE_URL" | sed -E 's|postgresql://[^@]+@([^:/]+).*|\1|')"
+          echo "DB port: $(echo "$DATABASE_URL" | sed -E 's|postgresql://[^@]+@[^:]+:([0-9]+)/.*|\1|')"
+          echo "DB name: $(echo "$DATABASE_URL" | sed -E 's|postgresql://[^/]+/([^?]*).*|\1|')"
+          if echo "$DATABASE_URL" | grep -q '?'; then
+            echo "Query string: $(echo "$DATABASE_URL" | sed -E 's|.*\?([^#]*).*|\1|')"
+          else
+            echo "Query string: (none)"
+          fi
+          # パスワード長の確認（空・欠損でないか）
+          PWLEN=$(echo "$DATABASE_URL" | sed -E 's|postgresql://[^:]+:([^@]+)@.*|\1|' | wc -c)
+          echo "Password length (chars): $((PWLEN - 1))"
+          echo "::endgroup::"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Debug - raw connection test (pg)
+        working-directory: server/api
+        run: |
+          echo "::group::Connection test with pg"
+          bun -e "
+            const { Client } = require('pg');
+            const url = process.env.DATABASE_URL;
+            if (!url) { console.error('DATABASE_URL not set'); process.exit(0); }
+            const client = new Client({ connectionString: url });
+            client.connect()
+              .then(() => { console.log('SUCCESS: Connection established'); return client.end(); })
+              .then(() => process.exit(0))
+              .catch(e => { console.error('FAILED:', e.message); process.exit(0); });
+          " || true
+          echo "::endgroup::"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Run migrations
         working-directory: server/api
         run: bunx drizzle-kit migrate
         env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  deploy-api:
-    name: Deploy API
-    needs: migrate
-    runs-on: ubuntu-latest
-    container: ghcr.io/railwayapp/cli:latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Copy lockfile for API build
-        run: cp bun.lock server/api/
-      - name: Deploy API to Railway
-        run: railway up ./server/api --service api --environment production -d
-
-  deploy-hocuspocus:
-    name: Deploy Hocuspocus
-    needs: migrate
-    runs-on: ubuntu-latest
-    container: ghcr.io/railwayapp/cli:latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Copy lockfile for Hocuspocus build
-        run: cp bun.lock server/hocuspocus/
-      - name: Deploy Hocuspocus to Railway
-        run: railway up ./server/hocuspocus --service hocuspocus --environment production -d
-
+  # Railway deploys api and hocuspocus via GitHub integration (configure in Railway Dashboard)
   deploy-frontend:
     name: Deploy Frontend
     needs:
-      - deploy-api
-      - deploy-hocuspocus
+      - migrate
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
@@ -63,8 +85,8 @@ jobs:
       - name: Install & Build
         run: bun install --frozen-lockfile && bun run build
         env:
-          VITE_API_BASE_URL: ${{ vars.PROD_API_BASE_URL }}
-          VITE_REALTIME_URL: ${{ vars.PROD_REALTIME_URL }}
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_REALTIME_URL: ${{ vars.REALTIME_URL }}
           VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
           VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
       - name: Deploy to Cloudflare Pages
