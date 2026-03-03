@@ -192,7 +192,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.5.2",
     "eslint-plugin-unused-imports": "^4.4.1",
-    "globals": "^15.15.0",
+    "globals": "^17.4.0",
     "happy-dom": "^20.0.11",
     "husky": "^9.1.7",
     "jsdom": "^27.4.0",
