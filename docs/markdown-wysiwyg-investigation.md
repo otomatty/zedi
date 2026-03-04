@@ -2,7 +2,7 @@
 
 ## 調査日
 
-2025年3月4日
+2026年3月4日
 
 ## 概要
 
@@ -33,25 +33,27 @@
 
 - `@tiptap/extension-bold`: `**text**` 用の `markInputRule`, `markPasteRule` を実装
 - `@tiptap/extension-italic`: 同様の入力・ペーストルールを実装
-- `@tiptap/extension-heading`: `# `, `## `, `### ` 用の `textblockTypeInputRule` を実装
+- `@tiptap/extension-heading`: `#`+スペース、`##`+スペース、`###`+スペース 用の `textblockTypeInputRule` を実装
 
 **想定される制約:**
 
 - Boldの入力ルール正規表現: `/(?:^|\s)(\*\*(?!\s+\*\*)((?:[^*]+))\*\*(?!\s+\*\*))$/`
-  - 行頭または**直前にスペースが必要**（例: ` **bold**` は可、`hello**bold**` は不可）
+  - 行頭または**直前にスペースが必要**（例: スペース+`**bold**` は可、`hello**bold**` は不可）
 
 #### 2.2 Markdown文字列としてコンテンツを「設定」する場合
 
-**現状:**
+**調査時点の状況（2026年3月4日時点）:**
 
-- `@tiptap/markdown` 拡張が **未導入**（package.json に含まれていない）
-- `setContent(markdownString, { contentType: 'markdown' })` のような指定ができない
+- `@tiptap/markdown` 拡張が **未導入**（当時、package.json に含まれていない）
+- `setContent(markdownString, { contentType: 'markdown' })` のような指定ができない（当時）
 - マークダウン文字列をそのまま渡すと、HTMLとして解釈されるか、そのままテキストになる
 
 **影響:**
 
 - クリップボードから「Markdownテキスト」を貼り付けても、`contentType: 'markdown'` が使えない
 - Wiki生成時は `convertMarkdownToTiptapContent` で自前変換しているため、ここでは変換される
+
+> **追記:** 現在は `@tiptap/markdown` を導入済みで、GFM 設定も有効化済み。`setContent(markdownString, { contentType: 'markdown' })` を利用した Markdown → Tiptap 変換が可能になっている。
 
 ### 3. 変換が関わる主要ファイル
 

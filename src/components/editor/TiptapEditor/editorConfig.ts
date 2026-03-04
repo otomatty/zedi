@@ -136,6 +136,8 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
         target: "_blank",
         rel: "noopener noreferrer",
       },
+      // XSS対策: javascript: 等の危険なプロトコルを拒否
+      isAllowedUri: (url) => /^(https?|mailto|tel):/i.test(url ?? ""),
     }),
     // --- Phase 1: TaskList, Highlight, Underline ---
     TaskList,
