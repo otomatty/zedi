@@ -1,4 +1,5 @@
 import StarterKit from "@tiptap/starter-kit";
+import { Markdown } from "@tiptap/markdown";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
@@ -118,6 +119,9 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       codeBlock: false,
       // 下で個別に Underline を追加するため StarterKit の underline は無効
       underline: false,
+    }),
+    Markdown.configure({
+      markedOptions: { gfm: true },
     }),
     // Typography for smart quotes and dashes
     Typography,
