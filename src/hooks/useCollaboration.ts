@@ -55,7 +55,15 @@ export function useCollaboration({
   // Manager初期化（ゲスト時も local モードで IndexedDB のみ有効）
   useEffect(() => {
     if (!enabled || !pageId) {
-      queueMicrotask(() => setState((prev) => ({ ...prev, status: "disconnected" })));
+      queueMicrotask(() => {
+        setState({
+          status: "disconnected",
+          isSynced: false,
+          onlineUsers: [],
+          pendingChanges: 0,
+        });
+        setManagerSnapshot({ ydoc: undefined, xmlFragment: undefined, awareness: undefined });
+      });
       return;
     }
 
