@@ -19,7 +19,9 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
   const { togglePanel } = useAIChatStore();
   const { aiChatAvailable } = useAIChatContext();
   const isCreatingRef = useRef(isCreating);
-  isCreatingRef.current = isCreating;
+  useEffect(() => {
+    isCreatingRef.current = isCreating;
+  }, [isCreating]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

@@ -23,6 +23,16 @@ const initialState: CollaborationState = {
   pendingChanges: 0,
 };
 
+const emptyManagerSnapshot: {
+  ydoc: UseCollaborationReturn["ydoc"];
+  xmlFragment: UseCollaborationReturn["xmlFragment"];
+  awareness: UseCollaborationReturn["awareness"];
+} = {
+  ydoc: undefined,
+  xmlFragment: undefined,
+  awareness: undefined,
+};
+
 /**
  * リアルタイムコラボレーション機能を提供するフック
  * 未ログイン時は effectiveUserId = local-user で Y.Doc + IndexedDB のみ使用。
@@ -43,6 +53,7 @@ export function useCollaboration({
   const { userId, getToken, isSignedIn } = useAuth();
   const { user } = useUser();
   const [state, setState] = useState<CollaborationState>(initialState);
+  const [managerSnapshot, setManagerSnapshot] = useState(emptyManagerSnapshot);
   const managerRef = useRef<CollaborationManager | null>(null);
 
   const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
@@ -50,7 +61,10 @@ export function useCollaboration({
   // Manager初期化（ゲスト時も local モードで IndexedDB のみ有効）
   useEffect(() => {
     if (!enabled || !pageId) {
-      setState((prev) => ({ ...prev, status: "disconnected" }));
+      queueMicrotask(() => {
+        setState({ ...initialState, status: "disconnected" });
+        setManagerSnapshot(emptyManagerSnapshot);
+      });
       return;
     }
 
@@ -73,15 +87,35 @@ export function useCollaboration({
     );
 
     managerRef.current = manager;
+    queueMicrotask(() =>
+      setManagerSnapshot({
+        ydoc: manager.document,
+        xmlFragment: manager.xmlFragment,
+        awareness: manager.getAwareness() ?? undefined,
+      }),
+    );
 
     const unsubscribe = manager.subscribe((newState) => {
       setState(newState);
+      const nextAwareness = manager.getAwareness() ?? undefined;
+      setManagerSnapshot((prev) =>
+        prev.ydoc === manager.document &&
+        prev.xmlFragment === manager.xmlFragment &&
+        prev.awareness === nextAwareness
+          ? prev
+          : {
+              ydoc: manager.document,
+              xmlFragment: manager.xmlFragment,
+              awareness: nextAwareness,
+            },
+      );
     });
 
     return () => {
       unsubscribe();
       manager.destroy();
       managerRef.current = null;
+      setManagerSnapshot(emptyManagerSnapshot);
     };
   }, [
     pageId,
@@ -124,9 +158,9 @@ export function useCollaboration({
 
   return {
     ...state,
-    ydoc: managerRef.current?.document,
-    xmlFragment: managerRef.current?.xmlFragment,
-    awareness: managerRef.current?.getAwareness() ?? undefined,
+    ydoc: managerSnapshot.ydoc,
+    xmlFragment: managerSnapshot.xmlFragment,
+    awareness: managerSnapshot.awareness,
     collaborationUser,
     updateCursor,
     updateSelection,

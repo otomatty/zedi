@@ -77,7 +77,7 @@ const SlashSuggestionMenu = forwardRef<
 
   // Reset selection when query changes
   useEffect(() => {
-    setSelectedIndex(0);
+    queueMicrotask(() => setSelectedIndex(0));
   }, [query]);
 
   const selectItem = useCallback(

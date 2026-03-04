@@ -41,7 +41,7 @@ function useIsSmallScreen() {
       setIsSmall(window.innerWidth < SM_BREAKPOINT);
     };
     mql.addEventListener("change", onChange);
-    setIsSmall(window.innerWidth < SM_BREAKPOINT);
+    queueMicrotask(() => setIsSmall(window.innerWidth < SM_BREAKPOINT));
     return () => mql.removeEventListener("change", onChange);
   }, []);
 

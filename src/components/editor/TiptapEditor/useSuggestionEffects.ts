@@ -34,33 +34,37 @@ export function useSuggestionEffects({
 
   useEffect(() => {
     if (!editor || !suggestionState?.active || !suggestionState.range) {
-      setSuggestionPos(null);
+      queueMicrotask(() => setSuggestionPos(null));
       return;
     }
     const { from } = suggestionState.range;
     const coords = editor.view.coordsAtPos(from);
     const containerRect = editorContainerRef.current?.getBoundingClientRect();
     if (containerRect) {
-      setSuggestionPos({
-        top: coords.bottom - containerRect.top + 4,
-        left: coords.left - containerRect.left,
-      });
+      queueMicrotask(() =>
+        setSuggestionPos({
+          top: coords.bottom - containerRect.top + 4,
+          left: coords.left - containerRect.left,
+        }),
+      );
     }
   }, [editor, suggestionState, editorContainerRef]);
 
   useEffect(() => {
     if (!editor || !slashState?.active || !slashState.range) {
-      setSlashPos(null);
+      queueMicrotask(() => setSlashPos(null));
       return;
     }
     const { from } = slashState.range;
     const coords = editor.view.coordsAtPos(from);
     const containerRect = editorContainerRef.current?.getBoundingClientRect();
     if (containerRect) {
-      setSlashPos({
-        top: coords.bottom - containerRect.top + 4,
-        left: coords.left - containerRect.left,
-      });
+      queueMicrotask(() =>
+        setSlashPos({
+          top: coords.bottom - containerRect.top + 4,
+          left: coords.left - containerRect.left,
+        }),
+      );
     }
   }, [editor, slashState, editorContainerRef]);
 
