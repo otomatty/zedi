@@ -95,7 +95,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
   useEffect(() => {
     slashStateRef.current = slashState;
     suggestionStateRef.current = suggestionState;
-  });
+  }, [slashState, suggestionState]);
 
   const editor = useEditor(
     {

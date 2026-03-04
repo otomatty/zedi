@@ -88,6 +88,18 @@ export function useCollaboration({
 
     const unsubscribe = manager.subscribe((newState) => {
       setState(newState);
+      const nextAwareness = manager.getAwareness() ?? undefined;
+      setManagerSnapshot((prev) =>
+        prev.ydoc === manager.document &&
+        prev.xmlFragment === manager.xmlFragment &&
+        prev.awareness === nextAwareness
+          ? prev
+          : {
+              ydoc: manager.document,
+              xmlFragment: manager.xmlFragment,
+              awareness: nextAwareness,
+            },
+      );
     });
 
     return () => {
