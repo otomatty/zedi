@@ -1,4 +1,5 @@
 import StarterKit from "@tiptap/starter-kit";
+import { Markdown } from "@tiptap/markdown";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Typography from "@tiptap/extension-typography";
@@ -119,6 +120,9 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       // 下で個別に Underline を追加するため StarterKit の underline は無効
       underline: false,
     }),
+    Markdown.configure({
+      markedOptions: { gfm: true },
+    }),
     // Typography for smart quotes and dashes
     Typography,
     Placeholder.configure({
@@ -131,6 +135,17 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
         class: "external-link text-blue-600 hover:underline cursor-pointer",
         target: "_blank",
         rel: "noopener noreferrer",
+      },
+      // XSS対策: javascript: 等の危険なプロトコルを拒否
+      isAllowedUri: (url) => {
+        const value = (url ?? "").trim();
+        if (!value) return false;
+        // 相対URL・アンカー（プロトコルなし）を許可
+        if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return true;
+        // http(s) は :// を必須にし、http:example.com 形式を拒否
+        if (/^https?:\/\//i.test(value)) return true;
+        if (/^(mailto|tel):/i.test(value)) return true;
+        return false;
       },
     }),
     // --- Phase 1: TaskList, Highlight, Underline ---
