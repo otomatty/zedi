@@ -23,6 +23,16 @@ const initialState: CollaborationState = {
   pendingChanges: 0,
 };
 
+const emptyManagerSnapshot: {
+  ydoc: UseCollaborationReturn["ydoc"];
+  xmlFragment: UseCollaborationReturn["xmlFragment"];
+  awareness: UseCollaborationReturn["awareness"];
+} = {
+  ydoc: undefined,
+  xmlFragment: undefined,
+  awareness: undefined,
+};
+
 /**
  * リアルタイムコラボレーション機能を提供するフック
  * 未ログイン時は effectiveUserId = local-user で Y.Doc + IndexedDB のみ使用。
@@ -43,11 +53,7 @@ export function useCollaboration({
   const { userId, getToken, isSignedIn } = useAuth();
   const { user } = useUser();
   const [state, setState] = useState<CollaborationState>(initialState);
-  const [managerSnapshot, setManagerSnapshot] = useState<{
-    ydoc: UseCollaborationReturn["ydoc"];
-    xmlFragment: UseCollaborationReturn["xmlFragment"];
-    awareness: UseCollaborationReturn["awareness"];
-  }>({ ydoc: undefined, xmlFragment: undefined, awareness: undefined });
+  const [managerSnapshot, setManagerSnapshot] = useState(emptyManagerSnapshot);
   const managerRef = useRef<CollaborationManager | null>(null);
 
   const effectiveUserId = isSignedIn && userId ? userId : LOCAL_USER_ID;
@@ -56,13 +62,8 @@ export function useCollaboration({
   useEffect(() => {
     if (!enabled || !pageId) {
       queueMicrotask(() => {
-        setState({
-          status: "disconnected",
-          isSynced: false,
-          onlineUsers: [],
-          pendingChanges: 0,
-        });
-        setManagerSnapshot({ ydoc: undefined, xmlFragment: undefined, awareness: undefined });
+        setState({ ...initialState, status: "disconnected" });
+        setManagerSnapshot(emptyManagerSnapshot);
       });
       return;
     }
@@ -114,7 +115,7 @@ export function useCollaboration({
       unsubscribe();
       manager.destroy();
       managerRef.current = null;
-      setManagerSnapshot({ ydoc: undefined, xmlFragment: undefined, awareness: undefined });
+      setManagerSnapshot(emptyManagerSnapshot);
     };
   }, [
     pageId,
