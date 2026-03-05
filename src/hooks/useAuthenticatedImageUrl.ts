@@ -1,9 +1,25 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 const AUTH_URL_PATTERNS = ["/api/thumbnail/serve/", "/api/media/"];
 
-function requiresAuth(url: string): boolean {
-  return AUTH_URL_PATTERNS.some((pattern) => url.includes(pattern));
+export function requiresAuth(url: string): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url, window.location.origin);
+  } catch {
+    return false;
+  }
+
+  if (parsedUrl.origin !== window.location.origin) {
+    return false;
+  }
+
+  const { pathname } = parsedUrl;
+  return AUTH_URL_PATTERNS.some((pattern) => pathname.startsWith(pattern));
 }
 
 type FetchState = { status: "loading" } | { status: "resolved"; url: string } | { status: "error" };
@@ -18,17 +34,20 @@ export function useAuthenticatedImageUrl(src: string | undefined): {
   hasError: boolean;
 } {
   const [fetchState, setFetchState] = useState<FetchState | null>(null);
-  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!src || !requiresAuth(src)) {
+      // Intentional: clear stale state when src is no longer auth-required
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- avoid showing previous blob URL
+      setFetchState(null);
       return;
     }
 
     let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) setFetchState({ status: "loading" });
-    });
+    let currentBlobUrl: string | null = null;
+    // Intentional: show loading immediately when src changes to avoid stale blob URL flicker
+
+    setFetchState({ status: "loading" });
 
     fetch(src, { credentials: "include" })
       .then(async (res) => {
@@ -39,9 +58,8 @@ export function useAuthenticatedImageUrl(src: string | undefined): {
         }
         const blob = await res.blob();
         if (cancelled) return;
-        const blobUrl = URL.createObjectURL(blob);
-        blobUrlRef.current = blobUrl;
-        setFetchState({ status: "resolved", url: blobUrl });
+        currentBlobUrl = URL.createObjectURL(blob);
+        setFetchState({ status: "resolved", url: currentBlobUrl });
       })
       .catch(() => {
         if (!cancelled) setFetchState({ status: "error" });
@@ -49,9 +67,8 @@ export function useAuthenticatedImageUrl(src: string | undefined): {
 
     return () => {
       cancelled = true;
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
       }
     };
   }, [src]);
