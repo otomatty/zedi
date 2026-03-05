@@ -40,10 +40,12 @@ argument-hint: "PR の URL（例: https://github.com/owner/repo/pull/123）"
    ```
 
 4. **返信の投稿**
-   各コメントに `gh api` で返信を投稿する：
+   各コメントに `gh api` で返信を投稿する。**レビューコメントへの返信**は「新規コメント作成」ではなく **replies エンドポイント**を使う：
 
    ```
-   gh api repos/<owner>/<repo>/pulls/<番号>/comments/<comment_id>/replies \
+   - `<comment_id>` はコメント一覧の各要素の `id`（数値。例: `2890156516`）。`in_reply_to` は使わない。
+   - 改行を含む返信は `-f body="1行目\n2行目"` のように `\n` で渡す。
+   gh api -X POST repos/<owner>/<repo>/pulls/<番号>/comments/<comment_id>/replies \
      -f body="返信内容"
    ```
 
