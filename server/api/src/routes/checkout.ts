@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { Polar } from "@polar-sh/sdk";
+import { getAllowedOrigins } from "../lib/cors.js";
 import { authRequired } from "../middleware/auth.js";
 import { getEnv } from "../lib/env.js";
 import type { AppEnv } from "../types/index.js";
@@ -19,9 +20,15 @@ app.post("/checkout", authRequired, async (c) => {
     server: process.env.NODE_ENV === "production" ? "production" : "sandbox",
   });
 
-  const corsOrigin = process.env.CORS_ORIGIN;
-  const successUrl =
-    corsOrigin && corsOrigin !== "*" ? `${corsOrigin}/pricing?checkout=success` : undefined;
+  const allowedOrigins = getAllowedOrigins();
+  const origin = c.req.header("Origin");
+  let baseUrl: string | undefined;
+  if (origin && allowedOrigins.includes(origin)) {
+    baseUrl = origin;
+  } else if (!origin && allowedOrigins.length > 0) {
+    baseUrl = allowedOrigins[0];
+  }
+  const successUrl = baseUrl ? `${baseUrl}/pricing?checkout=success` : undefined;
 
   const checkout = await polar.checkouts.create({
     products: [productId],
