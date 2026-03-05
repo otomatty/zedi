@@ -3,6 +3,7 @@ import { HighlightedSnippet } from "@/components/search/HighlightedSnippet";
 import { MatchTypeBadge } from "@/components/search/MatchTypeBadge";
 import type { MatchType } from "@/lib/searchUtils";
 import { cn } from "@/lib/utils";
+import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 
 export interface SearchResultCardItem {
   pageId: string;
@@ -31,6 +32,10 @@ interface SearchResultCardProps {
 }
 
 export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
+  const { resolvedUrl: thumbnailSrc, hasError: thumbnailError } = useAuthenticatedImageUrl(
+    item.thumbnailUrl,
+  );
+
   return (
     <button
       type="button"
@@ -42,10 +47,10 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
       )}
     >
       <div className="flex gap-4">
-        {item.thumbnailUrl && (
+        {thumbnailSrc && !thumbnailError && (
           <div className="shrink-0">
             <img
-              src={item.thumbnailUrl}
+              src={thumbnailSrc}
               alt=""
               className="h-20 w-28 rounded bg-muted object-cover"
               loading="lazy"

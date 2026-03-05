@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAIChatStore } from "@/stores/aiChatStore";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTranslation } from "react-i18next";
+import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -46,7 +47,9 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const { openPanel, setPendingPageToAdd } = useAIChatStore();
 
   const preview = page.contentPreview ?? "";
-  const thumbnail = page.thumbnailUrl;
+  const { resolvedUrl: thumbnail, hasError: thumbnailError } = useAuthenticatedImageUrl(
+    page.thumbnailUrl,
+  );
   const isClipped = !!page.sourceUrl;
 
   const handleClick = () => {
@@ -169,7 +172,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
 
             {/* Thumbnail or Preview - Bottom */}
             <div className="min-h-0 flex-1 overflow-hidden">
-              {thumbnail ? (
+              {thumbnail && !thumbnailError ? (
                 <div className="flex h-full w-full items-center justify-center px-3 pb-3 pt-0">
                   <img
                     src={thumbnail}
