@@ -29,17 +29,21 @@ app.post("/:noteId/members", authRequired, async (c) => {
     role?: string;
   }>();
 
-  if (!body.member_email) {
+  const memberEmail = body.member_email?.trim().toLowerCase();
+  if (!memberEmail) {
     throw new HTTPException(400, { message: "member_email is required" });
   }
 
-  const memberRole = (body.role as NoteMemberRole) ?? "viewer";
+  if (body.role !== undefined && body.role !== "viewer" && body.role !== "editor") {
+    throw new HTTPException(400, { message: "role must be 'viewer' or 'editor'" });
+  }
+  const memberRole: NoteMemberRole = (body.role as NoteMemberRole) ?? "viewer";
 
   await db
     .insert(noteMembers)
     .values({
       noteId,
-      memberEmail: body.member_email,
+      memberEmail,
       role: memberRole,
       invitedByUserId: userId,
     })
@@ -58,7 +62,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
 // ── DELETE /:noteId/members/:memberEmail ─────────────────────────────────────
 app.delete("/:noteId/members/:memberEmail", authRequired, async (c) => {
   const noteId = c.req.param("noteId");
-  const memberEmail = decodeURIComponent(c.req.param("memberEmail"));
+  const memberEmail = decodeURIComponent(c.req.param("memberEmail")).trim().toLowerCase();
   const userId = c.get("userId");
   const db = c.get("db");
 
@@ -81,7 +85,9 @@ app.get("/:noteId/members", authRequired, async (c) => {
 
   const { role, note } = await getNoteRole(noteId, userId, userEmail, db);
   if (!note) throw new HTTPException(404, { message: "Note not found" });
-  if (!role) throw new HTTPException(403, { message: "Forbidden" });
+  if (!role || role === "guest") {
+    throw new HTTPException(403, { message: "Forbidden" });
+  }
 
   const result = await db
     .select({

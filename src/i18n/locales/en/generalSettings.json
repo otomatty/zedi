@@ -21,7 +21,8 @@
     "large": "Large",
     "custom": "Custom",
     "preview": "Preview",
-    "customPx": "Size (px)"
+    "customPx": "Size (px)",
+    "sample": "The quick brown fox Aa 123"
   },
   "language": {
     "title": "Language",

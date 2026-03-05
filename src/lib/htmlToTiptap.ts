@@ -52,7 +52,8 @@ export function htmlToTiptapJSON(html: string): JSONContent {
 /**
  * HTMLをクリーンアップ
  * <pre> 内の改行・インデントは保持する（プレースホルダーで退避してから空白整理）
- * DOMParser を使用して XSS を防ぐ（スクリプト・イベントハンドラは実行されない）
+ * DOMParser を使用して安全にパースする（パース中にスクリプト等は実行されないが、
+ * XSS対策のための完全なサニタイズは呼び出し元で別途行う必要がある）
  */
 function cleanupHtml(html: string): string {
   const parser = new DOMParser();
@@ -62,8 +63,8 @@ function cleanupHtml(html: string): string {
   // <pre> 内の内容を退避（空白整理で崩れないように）
   const preElements = Array.from(div.querySelectorAll("pre"));
   const prePlaceholders = new Map<string, string>();
-  preElements.forEach((pre, i) => {
-    const placeholder = `__PRE_PLACEHOLDER_${i}__`;
+  preElements.forEach((pre) => {
+    const placeholder = `__PRE_${crypto.randomUUID()}__`;
     prePlaceholders.set(placeholder, pre.outerHTML);
     pre.insertAdjacentHTML("beforebegin", placeholder);
     pre.remove();
@@ -164,7 +165,14 @@ export function formatClippedContentAsTiptap(
 ): JSONContent {
   const mainContent = htmlToTiptapJSON(content);
 
-  const sourceText = siteName ? `${siteName}` : new URL(sourceUrl).hostname;
+  let sourceText = siteName ?? sourceUrl;
+  if (!siteName) {
+    try {
+      sourceText = new URL(sourceUrl).hostname;
+    } catch {
+      sourceText = sourceUrl;
+    }
+  }
 
   const sourceInfo: JSONContent = {
     type: "paragraph",

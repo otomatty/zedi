@@ -78,11 +78,14 @@ describe("POST /api/notes", () => {
     const insertCalls = chains.filter((c) => c.startMethod === "insert");
     expect(insertCalls.length).toBeGreaterThanOrEqual(2);
 
-    const memberInsert = insertCalls[1];
-    if (!memberInsert) throw new Error("expected at least 2 insert calls");
+    expect(insertCalls[1]).toBeDefined();
+    const memberInsert = insertCalls[1] as (typeof insertCalls)[number];
     const valuesCall = memberInsert.ops.find((op) => op.method === "values");
-    if (!valuesCall) throw new Error("expected values call");
-    const valuesArg = (valuesCall.args[0] ?? {}) as Record<string, unknown>;
+    expect(valuesCall).toBeDefined();
+    const valuesArg = ((valuesCall as NonNullable<typeof valuesCall>).args[0] ?? {}) as Record<
+      string,
+      unknown
+    >;
     expect(valuesArg).toMatchObject({
       noteId: mockNote.id,
       memberEmail: TEST_USER_EMAIL,
@@ -348,8 +351,8 @@ describe("GET /api/notes", () => {
     expect(Array.isArray(body)).toBe(true);
     expect(body).toHaveLength(2);
 
-    const first = body[0];
-    if (!first) throw new Error("expected at least one note");
+    expect(body[0]).toBeDefined();
+    const first = body[0] as Record<string, unknown>;
     expect(first).toHaveProperty("role", "owner");
     expect(first).toHaveProperty("page_count");
     expect(typeof first.page_count).toBe("number");
@@ -423,7 +426,7 @@ describe("GET /api/notes/discover", () => {
     const body = (await res.json()) as { official: unknown[]; notes: Record<string, unknown>[] };
 
     const item = body.notes[0];
-    if (!item) throw new Error("expected one discover item");
+    expect(item).toBeDefined();
     expect(item).toHaveProperty("owner_display_name", "Author");
     expect(item).toHaveProperty("owner_avatar_url", "https://example.com/avatar.png");
     expect(item).toHaveProperty("page_count", 5);

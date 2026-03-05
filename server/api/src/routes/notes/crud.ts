@@ -33,6 +33,29 @@ import {
   getActiveMemberCounts,
 } from "./helpers.js";
 
+const ALLOWED_VISIBILITY = new Set<NoteVisibility>(["private", "public", "unlisted", "restricted"]);
+const ALLOWED_EDIT_PERMISSION = new Set<NoteEditPermission>([
+  "owner_only",
+  "members_editors",
+  "any_logged_in",
+]);
+
+function validateVisibility(value: string | undefined): NoteVisibility {
+  if (value === undefined) return "private";
+  if (!ALLOWED_VISIBILITY.has(value as NoteVisibility)) {
+    throw new HTTPException(400, { message: "Invalid visibility" });
+  }
+  return value as NoteVisibility;
+}
+
+function validateEditPermission(value: string | undefined): NoteEditPermission {
+  if (value === undefined) return "owner_only";
+  if (!ALLOWED_EDIT_PERMISSION.has(value as NoteEditPermission)) {
+    throw new HTTPException(400, { message: "Invalid edit_permission" });
+  }
+  return value as NoteEditPermission;
+}
+
 const app = new Hono<AppEnv>();
 
 // ── POST / ──────────────────────────────────────────────────────────────────
@@ -48,13 +71,16 @@ app.post("/", authRequired, async (c) => {
     is_official?: boolean;
   }>();
 
+  const visibility = validateVisibility(body.visibility);
+  const editPermission = validateEditPermission(body.edit_permission);
+
   const result = await db
     .insert(notes)
     .values({
       ownerId: userId,
       title: body.title ?? null,
-      visibility: (body.visibility as NoteVisibility) ?? "private",
-      editPermission: (body.edit_permission as NoteEditPermission) ?? "owner_only",
+      visibility,
+      editPermission,
       isOfficial: body.is_official ?? false,
     })
     .returning();
@@ -99,14 +125,17 @@ app.put("/:noteId", authRequired, async (c) => {
     is_official?: boolean;
   }>();
 
+  const visibility =
+    body.visibility !== undefined ? validateVisibility(body.visibility) : undefined;
+  const editPermission =
+    body.edit_permission !== undefined ? validateEditPermission(body.edit_permission) : undefined;
+
   const updated = await db
     .update(notes)
     .set({
       title: body.title !== undefined ? body.title : undefined,
-      visibility: body.visibility ? (body.visibility as NoteVisibility) : undefined,
-      editPermission: body.edit_permission
-        ? (body.edit_permission as NoteEditPermission)
-        : undefined,
+      visibility,
+      editPermission,
       isOfficial: body.is_official !== undefined ? body.is_official : undefined,
       updatedAt: new Date(),
     })
@@ -139,8 +168,12 @@ app.delete("/:noteId", authRequired, async (c) => {
 app.get("/discover", authOptional, async (c) => {
   const db = c.get("db");
 
-  const limit = Math.min(Math.max(Number(c.req.query("limit") || 20), 1), 100);
-  const offset = Math.max(Number(c.req.query("offset") || 0), 0);
+  const parseIntOr = (raw: string | undefined, fallback: number) => {
+    const parsed = Number.parseInt(raw ?? "", 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const limit = Math.min(Math.max(parseIntOr(c.req.query("limit"), 20), 1), 100);
+  const offset = Math.max(parseIntOr(c.req.query("offset"), 0), 0);
 
   const result = await db
     .select({
@@ -335,7 +368,7 @@ app.get("/", authRequired, async (c) => {
         member_count: memberCountMap.get(n.id) ?? 0,
       }),
     ),
-  ];
+  ].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
   return c.json(result);
 });

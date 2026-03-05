@@ -21,7 +21,8 @@
     "large": "大",
     "custom": "カスタム",
     "preview": "プレビュー",
-    "customPx": "サイズ（px）"
+    "customPx": "サイズ（px）",
+    "sample": "あいうえお Aa 123"
   },
   "language": {
     "title": "言語",
