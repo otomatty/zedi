@@ -176,31 +176,32 @@
     @apply ring-2 ring-primary/20 ring-offset-2 ring-offset-background;
   }
 
-  /* Tiptap editor styles */
+  /* Tiptap editor styles (Zenn-like spacing) */
   .tiptap-editor {
     @apply min-h-[200px] outline-none;
-    font-size: var(--editor-font-size, 14px);
+
+    font-size: var(--editor-font-size, 16px);
   }
 
   .tiptap-editor p {
-    @apply mb-3 leading-relaxed;
+    @apply mb-4 leading-[1.8];
   }
 
   .tiptap-editor h1 {
-    @apply mb-4 mt-6 text-2xl font-bold first:mt-0;
+    @apply mb-5 mt-10 text-2xl font-bold first:mt-0;
   }
 
   .tiptap-editor h2 {
-    @apply mb-3 mt-5 text-xl font-semibold first:mt-0;
+    @apply mb-4 mt-8 text-xl font-semibold first:mt-0;
   }
 
   .tiptap-editor h3 {
-    @apply mb-2 mt-4 text-lg font-medium first:mt-0;
+    @apply mb-3 mt-6 text-lg font-medium first:mt-0;
   }
 
   .tiptap-editor ul,
   .tiptap-editor ol {
-    @apply mb-3 pl-6;
+    @apply mb-4 pl-6;
   }
 
   .tiptap-editor ul {
@@ -212,11 +213,11 @@
   }
 
   .tiptap-editor li {
-    @apply mb-1;
+    @apply mb-2;
   }
 
   .tiptap-editor blockquote {
-    @apply mb-3 border-l-2 border-primary/40 pl-4 italic text-muted-foreground;
+    @apply mb-4 border-l-2 border-primary/40 pl-4 italic text-muted-foreground;
   }
 
   .tiptap-editor code {
@@ -224,7 +225,7 @@
   }
 
   .tiptap-editor pre {
-    @apply mb-3 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm;
+    @apply mb-4 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm;
   }
 
   .tiptap-editor pre code {
@@ -233,11 +234,11 @@
 
   /* Task list styles */
   .tiptap-editor ul[data-type="taskList"] {
-    @apply mb-3 list-none pl-0;
+    @apply mb-4 list-none pl-0;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] {
-    @apply mb-1 flex items-start gap-2;
+    @apply mb-2 flex items-start gap-2;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > label {
@@ -268,7 +269,7 @@
 
   /* Table styles */
   .tiptap-editor .tableWrapper {
-    @apply mb-3 overflow-x-auto;
+    @apply mb-4 overflow-x-auto;
   }
 
   .tiptap-editor table {

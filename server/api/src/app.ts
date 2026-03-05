@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { getAllowedOrigins, isWildcardCors } from "./lib/cors.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { dbMiddleware } from "./middleware/db.js";
 import { redisMiddleware } from "./middleware/redis.js";
@@ -10,7 +11,7 @@ import healthRoutes from "./routes/health.js";
 import userRoutes from "./routes/users.js";
 import pageRoutes from "./routes/pages.js";
 import syncPageRoutes from "./routes/syncPages.js";
-import noteRoutes from "./routes/notes.js";
+import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
@@ -30,23 +31,19 @@ import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
-  const rawCorsOrigin = process.env.CORS_ORIGIN?.trim() || "";
-  const isWildcard = !rawCorsOrigin || rawCorsOrigin === "*";
+  const wildcard = isWildcardCors();
+  const allowedOrigins = getAllowedOrigins();
 
   app.use(
     "*",
     cors({
       origin: (origin) => {
-        if (isWildcard) return "*";
-        const allowed = rawCorsOrigin
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        return origin && allowed.includes(origin) ? origin : allowed[0];
+        if (wildcard) return "*";
+        return origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
       },
       allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
-      credentials: !isWildcard,
+      credentials: !wildcard,
       maxAge: 86400,
     }),
   );

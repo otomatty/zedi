@@ -16,9 +16,13 @@
   },
   "fontSize": {
     "label": "エディタのフォントサイズ",
-    "normal": "標準",
-    "large": "やや大きめ",
-    "x-large": "大きめ"
+    "small": "小",
+    "medium": "中",
+    "large": "大",
+    "custom": "カスタム",
+    "preview": "プレビュー",
+    "customPx": "サイズ（px）",
+    "sample": "あいうえお Aa 123"
   },
   "language": {
     "title": "言語",
