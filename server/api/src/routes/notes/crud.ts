@@ -368,7 +368,7 @@ app.get("/", authRequired, async (c) => {
         member_count: memberCountMap.get(n.id) ?? 0,
       }),
     ),
-  ].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  ].sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime());
 
   return c.json(result);
 });
