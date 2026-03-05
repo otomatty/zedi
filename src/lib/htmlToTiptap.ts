@@ -4,6 +4,10 @@
 import { generateJSON } from "@tiptap/html";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { common, createLowlight } from "lowlight";
+
+const lowlight = createLowlight(common);
 
 // Tiptap の拡張機能（TiptapEditorと同じ構成にする）
 const extensions = [
@@ -11,9 +15,14 @@ const extensions = [
     heading: {
       levels: [1, 2, 3],
     },
+    codeBlock: false,
   }),
   Link.configure({
     openOnClick: false,
+  }),
+  CodeBlockLowlight.configure({
+    lowlight,
+    defaultLanguage: null,
   }),
 ];
 
@@ -49,10 +58,21 @@ export function htmlToTiptapJSON(html: string): object {
 
 /**
  * HTMLをクリーンアップ
+ * <pre> 内の改行・インデントは保持する（プレースホルダーで退避してから空白整理）
  */
 function cleanupHtml(html: string): string {
   const div = document.createElement("div");
   div.innerHTML = html;
+
+  // <pre> 内の内容を退避（空白整理で崩れないように）
+  const preElements = Array.from(div.querySelectorAll("pre"));
+  const prePlaceholders = new Map<string, string>();
+  preElements.forEach((pre, i) => {
+    const placeholder = `__PRE_PLACEHOLDER_${i}__`;
+    prePlaceholders.set(placeholder, pre.outerHTML);
+    pre.insertAdjacentHTML("beforebegin", placeholder);
+    pre.remove();
+  });
 
   // 不要な要素を削除
   const unwantedSelectors = [
@@ -93,8 +113,14 @@ function cleanupHtml(html: string): string {
   // 空の要素を削除
   removeEmptyElements(div);
 
-  // 連続する空白を整理
-  return div.innerHTML.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
+  // 連続する空白を整理（<pre> は退避済みなのでコードの改行は保持される）
+  let result = div.innerHTML.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
+
+  // <pre> 内容を復元
+  for (const [placeholder, originalHtml] of prePlaceholders) {
+    result = result.replace(placeholder, originalHtml);
+  }
+  return result;
 }
 
 /**

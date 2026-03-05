@@ -16,9 +16,12 @@
   },
   "fontSize": {
     "label": "エディタのフォントサイズ",
-    "normal": "標準",
-    "large": "やや大きめ",
-    "x-large": "大きめ"
+    "small": "小",
+    "medium": "中",
+    "large": "大",
+    "custom": "カスタム",
+    "preview": "プレビュー",
+    "customPx": "サイズ（px）"
   },
   "language": {
     "title": "言語",

@@ -24,7 +24,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, or, desc, asc, sql, inArray } from "drizzle-orm";
 import { notes, notePages, noteMembers, pages, users } from "../schema/index.js";
-import { authRequired } from "../middleware/auth.js";
+import { authRequired, authOptional } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -34,11 +34,30 @@ const app = new Hono<AppEnv>();
 type NoteRole = "owner" | "editor" | "viewer" | "guest" | null;
 
 /**
+ * camelCase オブジェクトキーを snake_case に変換
+ */
+function toSnakeCaseKeys(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+    result[snakeKey] = value;
+  }
+  return result;
+}
+
+/**
+ * Drizzle ノート行を snake_case API レスポンスに変換
+ */
+function noteToApiResponse(note: typeof notes.$inferSelect) {
+  return toSnakeCaseKeys(note as unknown as Record<string, unknown>);
+}
+
+/**
  * ノートに対するユーザーの役割を判定
  */
 async function getNoteRole(
   noteId: string,
-  userId: string,
+  userId: string | undefined,
   userEmail: string | undefined,
   db: import("../types/index.js").Database,
 ): Promise<{ role: NoteRole; note: typeof notes.$inferSelect | null }> {
@@ -52,7 +71,7 @@ async function getNoteRole(
   if (!note) return { role: null, note: null };
 
   // オーナーチェック
-  if (note.ownerId === userId) return { role: "owner", note };
+  if (userId && note.ownerId === userId) return { role: "owner", note };
 
   // メンバーチェック
   if (userEmail) {
@@ -101,6 +120,7 @@ function canEdit(role: NoteRole, note: typeof notes.$inferSelect): boolean {
 // ── POST /notes ─────────────────────────────────────────────────────────────
 app.post("/", authRequired, async (c) => {
   const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
   const db = c.get("db");
 
   const body = await c.req.json<{
@@ -124,7 +144,30 @@ app.post("/", authRequired, async (c) => {
     })
     .returning();
 
-  return c.json({ note: result[0] }, 201);
+  const created = result[0];
+  if (!created) throw new HTTPException(500, { message: "Failed to create note" });
+
+  // 作成者を note_members に自動追加
+  if (userEmail) {
+    await db
+      .insert(noteMembers)
+      .values({
+        noteId: created.id,
+        memberEmail: userEmail,
+        role: "editor" as const,
+        invitedByUserId: userId,
+      })
+      .onConflictDoUpdate({
+        target: [noteMembers.noteId, noteMembers.memberEmail],
+        set: {
+          role: "editor" as const,
+          isDeleted: false,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  return c.json(noteToApiResponse(created), 201);
 });
 
 // ── PUT /notes/:noteId ──────────────────────────────────────────────────────
@@ -167,7 +210,9 @@ app.put("/:noteId", authRequired, async (c) => {
     .where(eq(notes.id, noteId))
     .returning();
 
-  return c.json({ note: updated[0] });
+  const updatedNote = updated[0];
+  if (!updatedNote) throw new HTTPException(500, { message: "Failed to update note" });
+  return c.json(noteToApiResponse(updatedNote));
 });
 
 // ── DELETE /notes/:noteId ───────────────────────────────────────────────────
@@ -196,7 +241,7 @@ app.delete("/:noteId", authRequired, async (c) => {
 
 // ── GET /notes/discover ─────────────────────────────────────────────────────
 // discover を :noteId より前に定義（パスマッチ順序）
-app.get("/discover", authRequired, async (c) => {
+app.get("/discover", authOptional, async (c) => {
   const db = c.get("db");
 
   const limit = Math.min(Math.max(Number(c.req.query("limit") || 20), 1), 100);
@@ -242,14 +287,14 @@ app.get("/discover", authRequired, async (c) => {
 
   return c.json({
     notes: result.map((n) => ({
-      ...n,
+      ...toSnakeCaseKeys(n as unknown as Record<string, unknown>),
       owner: ownerMap.get(n.ownerId) ?? null,
     })),
   });
 });
 
 // ── GET /notes/:noteId ──────────────────────────────────────────────────────
-app.get("/:noteId", authRequired, async (c) => {
+app.get("/:noteId", authOptional, async (c) => {
   const noteId = c.req.param("noteId");
   const userId = c.get("userId");
   const userEmail = c.get("userEmail");
@@ -268,7 +313,35 @@ app.get("/:noteId", authRequired, async (c) => {
       .where(eq(notes.id, noteId));
   }
 
-  return c.json({ note, role });
+  // ページ情報を取得
+  const pagesResult = await db
+    .select({
+      id: pages.id,
+      ownerId: pages.ownerId,
+      sourcePageId: pages.sourcePageId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      thumbnailUrl: pages.thumbnailUrl,
+      sourceUrl: pages.sourceUrl,
+      createdAt: pages.createdAt,
+      updatedAt: pages.updatedAt,
+      isDeleted: pages.isDeleted,
+      sortOrder: notePages.sortOrder,
+      addedByUserId: notePages.addedByUserId,
+      addedAt: notePages.createdAt,
+    })
+    .from(notePages)
+    .innerJoin(pages, eq(notePages.pageId, pages.id))
+    .where(
+      and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false), eq(pages.isDeleted, false)),
+    )
+    .orderBy(asc(notePages.sortOrder));
+
+  return c.json({
+    ...noteToApiResponse(note),
+    current_user_role: role,
+    pages: pagesResult.map((p) => toSnakeCaseKeys(p as unknown as Record<string, unknown>)),
+  });
 });
 
 // ── GET /notes ──────────────────────────────────────────────────────────────
@@ -285,22 +358,28 @@ app.get("/", authRequired, async (c) => {
     .orderBy(desc(notes.updatedAt));
 
   // メンバーとして参加しているノート
-  let memberNotes: (typeof notes.$inferSelect)[] = [];
+  let sharedNotes: (typeof notes.$inferSelect)[] = [];
+  const memberRoles = new Map<string, string>();
+
   if (userEmail) {
-    const memberNoteIds = await db
-      .select({ noteId: noteMembers.noteId })
+    const memberData = await db
+      .select({ noteId: noteMembers.noteId, role: noteMembers.role })
       .from(noteMembers)
       .where(and(eq(noteMembers.memberEmail, userEmail), eq(noteMembers.isDeleted, false)));
 
-    if (memberNoteIds.length > 0) {
-      memberNotes = await db
+    if (memberData.length > 0) {
+      for (const m of memberData) {
+        memberRoles.set(m.noteId, m.role);
+      }
+
+      sharedNotes = await db
         .select()
         .from(notes)
         .where(
           and(
             inArray(
               notes.id,
-              memberNoteIds.map((m) => m.noteId),
+              memberData.map((m) => m.noteId),
             ),
             eq(notes.isDeleted, false),
           ),
@@ -309,7 +388,51 @@ app.get("/", authRequired, async (c) => {
     }
   }
 
-  return c.json({ own: ownNotes, shared: memberNotes });
+  // ページ数・メンバー数を一括取得
+  const allNoteIds = [...ownNotes, ...sharedNotes].map((n) => n.id);
+  let pageCountMap = new Map<string, number>();
+  let memberCountMap = new Map<string, number>();
+
+  if (allNoteIds.length > 0) {
+    const pageCounts = await db
+      .select({
+        noteId: notePages.noteId,
+        count: sql<number>`cast(count(*) as integer)`,
+      })
+      .from(notePages)
+      .where(and(inArray(notePages.noteId, allNoteIds), eq(notePages.isDeleted, false)))
+      .groupBy(notePages.noteId);
+
+    const memberCounts = await db
+      .select({
+        noteId: noteMembers.noteId,
+        count: sql<number>`cast(count(*) as integer)`,
+      })
+      .from(noteMembers)
+      .where(and(inArray(noteMembers.noteId, allNoteIds), eq(noteMembers.isDeleted, false)))
+      .groupBy(noteMembers.noteId);
+
+    pageCountMap = new Map(pageCounts.map((p) => [p.noteId, p.count]));
+    memberCountMap = new Map(memberCounts.map((m) => [m.noteId, m.count]));
+  }
+
+  // own と shared を統合してフラット配列で返却
+  const result = [
+    ...ownNotes.map((n) => ({
+      ...noteToApiResponse(n),
+      role: "owner" as const,
+      page_count: pageCountMap.get(n.id) ?? 0,
+      member_count: memberCountMap.get(n.id) ?? 0,
+    })),
+    ...sharedNotes.map((n) => ({
+      ...noteToApiResponse(n),
+      role: (memberRoles.get(n.id) ?? "viewer") as "editor" | "viewer",
+      page_count: pageCountMap.get(n.id) ?? 0,
+      member_count: memberCountMap.get(n.id) ?? 0,
+    })),
+  ];
+
+  return c.json(result);
 });
 
 // ── POST /notes/:noteId/pages ───────────────────────────────────────────────

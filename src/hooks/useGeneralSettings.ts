@@ -18,6 +18,7 @@ interface UseGeneralSettingsReturn {
   isSaving: boolean;
   updateTheme: (theme: ThemeMode) => void;
   updateEditorFontSize: (fontSize: EditorFontSize) => void;
+  updateCustomFontSizePx: (px: number) => void;
   updateLocale: (locale: UILocale) => void;
   save: () => Promise<boolean>;
   /** エディタ用のフォントサイズ px 値 */
@@ -60,6 +61,15 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
     });
   }, []);
 
+  const updateCustomFontSizePx = useCallback((px: number) => {
+    const clamped = Math.min(24, Math.max(12, px));
+    setSettings((prev) => {
+      const next = { ...prev, customFontSizePx: clamped };
+      saveGeneralSettings(next);
+      return next;
+    });
+  }, []);
+
   const updateLocale = useCallback(
     (locale: UILocale) => {
       setSettings((prev) => {
@@ -85,8 +95,11 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
     }
   }, [settings]);
 
-  const editorFontSizePx =
-    FONT_SIZE_OPTIONS.find((o) => o.value === settings.editorFontSize)?.px ?? 14;
+  const resolvedPx =
+    settings.editorFontSize === "custom"
+      ? (settings.customFontSizePx ?? 16)
+      : (FONT_SIZE_OPTIONS.find((o) => o.value === settings.editorFontSize)?.px ?? 16);
+  const editorFontSizePx = typeof resolvedPx === "number" ? resolvedPx : 16;
 
   return {
     settings,
@@ -94,6 +107,7 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
     isSaving,
     updateTheme,
     updateEditorFontSize,
+    updateCustomFontSizePx,
     updateLocale,
     save,
     editorFontSizePx,
