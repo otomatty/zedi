@@ -3,6 +3,7 @@ name: Deploy Development
 on:
   push:
     branches: [develop]
+  workflow_dispatch:
 
 jobs:
   migrate:
@@ -46,4 +47,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: bun
           command: pages deploy dist --project-name=zedi-dev

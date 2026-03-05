@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Link2 } from "lucide-react";
 import type { PageSummary } from "@/types/page";
 import { cn } from "@/lib/utils";
+import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 
 interface NotePageCardProps {
   noteId: string;
@@ -13,7 +14,9 @@ export const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
   const navigate = useNavigate();
 
   const preview = page.contentPreview ?? "";
-  const thumbnail = page.thumbnailUrl;
+  const { resolvedUrl: thumbnail, hasError: thumbnailError } = useAuthenticatedImageUrl(
+    page.thumbnailUrl,
+  );
   const isClipped = !!page.sourceUrl;
 
   const handleClick = () => {
@@ -40,7 +43,7 @@ export const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {thumbnail ? (
+        {thumbnail && !thumbnailError ? (
           <div className="flex h-full w-full items-center justify-center px-3 pb-3 pt-0">
             <img
               src={thumbnail}
