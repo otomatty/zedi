@@ -437,6 +437,7 @@ describe("Notes API Routes", () => {
       const { app } = createTestApp([
         [publicNote], // notes query
         [mockOwner], // users query
+        [], // page counts query (discover)
       ]);
 
       // No auth headers
@@ -444,6 +445,15 @@ describe("Notes API Routes", () => {
 
       expect(res.status).not.toBe(401);
       expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { official: unknown[]; notes: unknown[] };
+      expect(body).toHaveProperty("official");
+      expect(body).toHaveProperty("notes");
+      expect(Array.isArray(body.official)).toBe(true);
+      expect(Array.isArray(body.notes)).toBe(true);
+      // publicNote is official → in official array
+      expect(body.official).toHaveLength(1);
+      expect(body.notes).toHaveLength(0);
     });
   });
 });
