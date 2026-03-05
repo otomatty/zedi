@@ -19,23 +19,23 @@
 
 ### 環境変数の状態（Polar まで ✅ 設定済み）
 
-| 変数                     | 状態                                    |
-| ------------------------ | --------------------------------------- |
-| `DATABASE_URL`           | ✅ 設定済み（Railway 参照）             |
-| `REDIS_URL`              | ✅ 設定済み（Railway 参照）             |
-| `BETTER_AUTH_SECRET`     | ✅ 設定済み                             |
-| `BETTER_AUTH_URL`        | ✅ 設定済み                             |
-| `CORS_ORIGIN`            | ✅ 設定済み（`http://localhost:30000`） |
-| `PORT`                   | ✅ `3000`                               |
-| `STORAGE_*`              | ✅ 設定済み                             |
-| `GOOGLE_CLIENT_*`        | ✅ 設定済み                             |
-| `GITHUB_CLIENT_*`        | ✅ 設定済み                             |
-| `OPENAI_API_KEY`         | ✅ 設定済み                             |
-| `ANTHROPIC_API_KEY`      | ✅ 設定済み                             |
-| `GOOGLE_AI_API_KEY`      | ✅ 設定済み                             |
-| `GOOGLE_CUSTOM_SEARCH_*` | ✅ 設定済み                             |
-| `POLAR_ACCESS_TOKEN`     | ✅ 設定済み                             |
-| `POLAR_WEBHOOK_SECRET`   | ✅ 設定済み                             |
+| 変数                     | 状態                                                              |
+| ------------------------ | ----------------------------------------------------------------- |
+| `DATABASE_URL`           | ✅ 設定済み（Railway 参照）                                       |
+| `REDIS_URL`              | ✅ 設定済み（Railway 参照）                                       |
+| `BETTER_AUTH_SECRET`     | ✅ 設定済み                                                       |
+| `BETTER_AUTH_URL`        | ✅ 設定済み                                                       |
+| `CORS_ORIGIN`            | ✅ 設定済み（`https://dev.zedi-note.app,http://localhost:30000`） |
+| `PORT`                   | ✅ `3000`                                                         |
+| `STORAGE_*`              | ✅ 設定済み                                                       |
+| `GOOGLE_CLIENT_*`        | ✅ 設定済み                                                       |
+| `GITHUB_CLIENT_*`        | ✅ 設定済み                                                       |
+| `OPENAI_API_KEY`         | ✅ 設定済み                                                       |
+| `ANTHROPIC_API_KEY`      | ✅ 設定済み                                                       |
+| `GOOGLE_AI_API_KEY`      | ✅ 設定済み                                                       |
+| `GOOGLE_CUSTOM_SEARCH_*` | ✅ 設定済み                                                       |
+| `POLAR_ACCESS_TOKEN`     | ✅ 設定済み                                                       |
+| `POLAR_WEBHOOK_SECRET`   | ✅ 設定済み                                                       |
 
 ### 完了済みタスク（タスク 0〜7）
 
@@ -164,13 +164,33 @@ npm run dev
 
 ### タスク 0: CORS_ORIGIN の修正
 
-現在 `http://localhost:5173` が設定されているが、フロントエンドの開発サーバーはポート `30000` で起動する（`vite.config.ts` のデフォルト値）。
+開発環境では **Cloudflare Pages（dev.zedi-note.app）** と **ローカル開発（localhost:30000）** の両方から API にアクセスできるように、`CORS_ORIGIN` をカンマ区切りで指定する。
+
+**方法 A: CLI で設定**
 
 ```bash
 railway link -p Zedi -e development
 
-railway variable set "CORS_ORIGIN=http://localhost:30000" --service api
+railway variable set "CORS_ORIGIN=https://dev.zedi-note.app,http://localhost:30000" --service api
 ```
+
+**方法 B: CLI が使えない場合（ダッシュボードで設定）**
+
+CLI で `railway variable set` を実行しても出力がなく終了する場合は、Railway ダッシュボードから設定する。
+
+1. ブラウザで [railway.com](https://railway.com) にログインする。
+2. プロジェクト **Zedi** を開く。
+3. 左上の環境切り替えで **development** を選択する。
+4. キャンバス上で **api** サービスをクリックする。
+5. 上部タブの **Variables** を開く。
+6. 既存の `CORS_ORIGIN` がある場合は行の右側の **⋯** → **Edit** で値を変更する。ない場合は **New Variable** をクリックする。
+7. 変数名: `CORS_ORIGIN`  
+   値: `https://dev.zedi-note.app,http://localhost:30000`  
+   （カンマ区切り、スペースは入れてもよい）
+8. **Add** または **Update** で保存する。
+9. 画面に表示される **Staged changes** を確認し、**Deploy**（または **Redeploy**）を実行する。変数変更後は自動で再デプロイされる場合もある。
+
+これで `https://dev.zedi-note.app` と `http://localhost:30000` の両方から API にアクセスできる。
 
 ---
 
@@ -337,26 +357,26 @@ railway variable set \
 
 タスク 0〜7 完了後、`api` サービスの環境変数は以下の状態になっている:
 
-| 変数                             | 値の種別                                      |
-| -------------------------------- | --------------------------------------------- |
-| `PORT`                           | `3000`                                        |
-| `DATABASE_URL`                   | Railway 内部参照（自動）                      |
-| `REDIS_URL`                      | Railway 内部参照（自動）                      |
-| `BETTER_AUTH_SECRET`             | ランダム文字列（設定済み）                    |
-| `BETTER_AUTH_URL`                | `https://api-development-b126.up.railway.app` |
-| `CORS_ORIGIN`                    | `http://localhost:30000`                      |
-| `STORAGE_ENDPOINT`               | Storage Bucket のエンドポイント               |
-| `STORAGE_ACCESS_KEY`             | Storage Bucket のアクセスキー                 |
-| `STORAGE_SECRET_KEY`             | Storage Bucket のシークレットキー             |
-| `STORAGE_BUCKET_NAME`            | Storage Bucket のバケット名                   |
-| `GOOGLE_CLIENT_ID`               | Google OAuth Client ID                        |
-| `GOOGLE_CLIENT_SECRET`           | Google OAuth Client Secret                    |
-| `GITHUB_CLIENT_ID`               | GitHub OAuth Client ID                        |
-| `GITHUB_CLIENT_SECRET`           | GitHub OAuth Client Secret                    |
-| `OPENAI_API_KEY`                 | OpenAI API キー                               |
-| `ANTHROPIC_API_KEY`              | Anthropic API キー                            |
-| `GOOGLE_AI_API_KEY`              | Google AI API キー                            |
-| `GOOGLE_CUSTOM_SEARCH_API_KEY`   | Google Custom Search API キー                 |
-| `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | Google Custom Search Engine ID                |
-| `POLAR_ACCESS_TOKEN`             | Polar アクセストークン                        |
-| `POLAR_WEBHOOK_SECRET`           | Polar Webhook シークレット                    |
+| 変数                             | 値の種別                                           |
+| -------------------------------- | -------------------------------------------------- |
+| `PORT`                           | `3000`                                             |
+| `DATABASE_URL`                   | Railway 内部参照（自動）                           |
+| `REDIS_URL`                      | Railway 内部参照（自動）                           |
+| `BETTER_AUTH_SECRET`             | ランダム文字列（設定済み）                         |
+| `BETTER_AUTH_URL`                | `https://api-development-b126.up.railway.app`      |
+| `CORS_ORIGIN`                    | `https://dev.zedi-note.app,http://localhost:30000` |
+| `STORAGE_ENDPOINT`               | Storage Bucket のエンドポイント                    |
+| `STORAGE_ACCESS_KEY`             | Storage Bucket のアクセスキー                      |
+| `STORAGE_SECRET_KEY`             | Storage Bucket のシークレットキー                  |
+| `STORAGE_BUCKET_NAME`            | Storage Bucket のバケット名                        |
+| `GOOGLE_CLIENT_ID`               | Google OAuth Client ID                             |
+| `GOOGLE_CLIENT_SECRET`           | Google OAuth Client Secret                         |
+| `GITHUB_CLIENT_ID`               | GitHub OAuth Client ID                             |
+| `GITHUB_CLIENT_SECRET`           | GitHub OAuth Client Secret                         |
+| `OPENAI_API_KEY`                 | OpenAI API キー                                    |
+| `ANTHROPIC_API_KEY`              | Anthropic API キー                                 |
+| `GOOGLE_AI_API_KEY`              | Google AI API キー                                 |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY`   | Google Custom Search API キー                      |
+| `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | Google Custom Search Engine ID                     |
+| `POLAR_ACCESS_TOKEN`             | Polar アクセストークン                             |
+| `POLAR_WEBHOOK_SECRET`           | Polar Webhook シークレット                         |

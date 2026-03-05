@@ -19,9 +19,17 @@ app.post("/checkout", authRequired, async (c) => {
     server: process.env.NODE_ENV === "production" ? "production" : "sandbox",
   });
 
-  const corsOrigin = process.env.CORS_ORIGIN;
-  const successUrl =
-    corsOrigin && corsOrigin !== "*" ? `${corsOrigin}/pricing?checkout=success` : undefined;
+  const rawCors = process.env.CORS_ORIGIN?.trim() || "";
+  const allowedOrigins =
+    rawCors && rawCors !== "*"
+      ? rawCors
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+  const origin = c.req.header("Origin");
+  const baseUrl = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  const successUrl = baseUrl ? `${baseUrl}/pricing?checkout=success` : undefined;
 
   const checkout = await polar.checkouts.create({
     products: [productId],
