@@ -38,8 +38,7 @@ export const auth = betterAuth({
 
   advanced: {
     defaultCookieAttributes: (() => {
-      const isHttps = getEnv("BETTER_AUTH_URL").startsWith("https://");
-      return isHttps
+      return new URL(getEnv("BETTER_AUTH_URL")).protocol === "https:"
         ? { sameSite: "none" as const, secure: true }
         : { sameSite: "lax" as const, secure: false };
     })(),
