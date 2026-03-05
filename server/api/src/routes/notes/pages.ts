@@ -39,12 +39,14 @@ app.post("/:noteId/pages", authRequired, async (c) => {
   }
 
   const page = await db
-    .select({ id: pages.id })
+    .select({ id: pages.id, ownerId: pages.ownerId })
     .from(pages)
     .where(and(eq(pages.id, body.page_id), eq(pages.isDeleted, false)))
     .limit(1);
 
-  if (!page.length) throw new HTTPException(404, { message: "Page not found" });
+  const firstPage = page[0];
+  if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
+  if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
 
   const maxOrder = await db
     .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })

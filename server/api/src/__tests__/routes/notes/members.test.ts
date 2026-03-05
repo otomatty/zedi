@@ -56,8 +56,9 @@ describe("POST /api/notes/:noteId/members", () => {
     expect(body).toEqual({ added: true });
 
     const insertCall = chains.find((c) => c.startMethod === "insert");
-    if (!insertCall) throw new Error("expected insert call");
-    const valuesOp = insertCall.ops.find((op) => op.method === "values");
+    expect(insertCall).toBeDefined();
+    const insert = insertCall as NonNullable<typeof insertCall>;
+    const valuesOp = insert.ops.find((op) => op.method === "values");
     const valuesArg = (valuesOp?.args[0] ?? {}) as Record<string, unknown>;
     expect(valuesArg).toMatchObject({
       noteId: NOTE_ID,
@@ -78,8 +79,9 @@ describe("POST /api/notes/:noteId/members", () => {
     });
 
     const insertCall = chains.find((c) => c.startMethod === "insert");
-    if (!insertCall) throw new Error("expected insert call");
-    const valuesOp = insertCall.ops.find((op) => op.method === "values");
+    expect(insertCall).toBeDefined();
+    const insert = insertCall as NonNullable<typeof insertCall>;
+    const valuesOp = insert.ops.find((op) => op.method === "values");
     const valuesArg = (valuesOp?.args[0] ?? {}) as Record<string, unknown>;
     expect(valuesArg.role).toBe("viewer");
   });
@@ -200,7 +202,7 @@ describe("GET /api/notes/:noteId/members", () => {
     expect(body.members).toHaveLength(2);
 
     const first = body.members[0];
-    if (!first) throw new Error("expected at least one member");
+    expect(first).toBeDefined();
     expect(first).toHaveProperty("member_email", OTHER_USER_EMAIL);
     expect(first).toHaveProperty("role", "editor");
     expect(first).toHaveProperty("invited_by");

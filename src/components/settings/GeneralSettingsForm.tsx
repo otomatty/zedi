@@ -200,7 +200,9 @@ function GeneralSettingsDisplayCards({
                       max={24}
                       value={customPxInput}
                       onChange={(e) => {
-                        const n = Number(e.target.value);
+                        const value = e.target.value;
+                        if (value === "") return;
+                        const n = Number(value);
                         if (!Number.isNaN(n)) updateCustomFontSizePx(n);
                       }}
                       className="h-9 w-20"
@@ -216,7 +218,7 @@ function GeneralSettingsDisplayCards({
                 style={{ fontSize: editorFontSizePx }}
               >
                 <span className="text-muted-foreground">
-                  {t("generalSettings.fontSize.preview")}: あいうえお Aa 123
+                  {t("generalSettings.fontSize.preview")}: {t("generalSettings.fontSize.sample")}
                 </span>
               </div>
             </div>

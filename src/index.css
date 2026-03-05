@@ -179,6 +179,7 @@
   /* Tiptap editor styles (Zenn-like spacing) */
   .tiptap-editor {
     @apply min-h-[200px] outline-none;
+
     font-size: var(--editor-font-size, 16px);
   }
 
