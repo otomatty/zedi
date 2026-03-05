@@ -11,7 +11,7 @@ argument-hint: "イシュー番号または .github/issues/ のファイル名"
 ## 手順
 
 1. **イシューの確認**
-   - `.github/issues/` ディレクトリまたは `gh issue view` でイシュー内容を取得
+   - `gh issue view` でイシュー内容を取得
    - 再現手順、期待動作、実際の動作を把握する
 
 2. **コードの調査**
