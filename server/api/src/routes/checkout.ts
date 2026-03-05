@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { Polar } from "@polar-sh/sdk";
+import { getAllowedOrigins } from "../lib/cors.js";
 import { authRequired } from "../middleware/auth.js";
 import { getEnv } from "../lib/env.js";
 import type { AppEnv } from "../types/index.js";
@@ -19,16 +20,14 @@ app.post("/checkout", authRequired, async (c) => {
     server: process.env.NODE_ENV === "production" ? "production" : "sandbox",
   });
 
-  const rawCors = process.env.CORS_ORIGIN?.trim() || "";
-  const allowedOrigins =
-    rawCors && rawCors !== "*"
-      ? rawCors
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [];
+  const allowedOrigins = getAllowedOrigins();
   const origin = c.req.header("Origin");
-  const baseUrl = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  let baseUrl: string | undefined;
+  if (origin && allowedOrigins.includes(origin)) {
+    baseUrl = origin;
+  } else if (!origin && allowedOrigins.length > 0) {
+    baseUrl = allowedOrigins[0];
+  }
   const successUrl = baseUrl ? `${baseUrl}/pricing?checkout=success` : undefined;
 
   const checkout = await polar.checkouts.create({
