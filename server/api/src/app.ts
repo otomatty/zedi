@@ -10,7 +10,7 @@ import healthRoutes from "./routes/health.js";
 import userRoutes from "./routes/users.js";
 import pageRoutes from "./routes/pages.js";
 import syncPageRoutes from "./routes/syncPages.js";
-import noteRoutes from "./routes/notes.js";
+import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";

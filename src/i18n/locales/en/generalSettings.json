@@ -16,9 +16,12 @@
   },
   "fontSize": {
     "label": "Editor Font Size",
-    "normal": "Normal",
+    "small": "Small",
+    "medium": "Medium",
     "large": "Large",
-    "x-large": "Extra Large"
+    "custom": "Custom",
+    "preview": "Preview",
+    "customPx": "Size (px)"
   },
   "language": {
     "title": "Language",

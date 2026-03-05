@@ -2,19 +2,21 @@
 
 export type ThemeMode = "system" | "light" | "dark";
 
-export type EditorFontSize = "normal" | "large" | "x-large";
+export type EditorFontSize = "small" | "medium" | "large" | "custom";
 
 export type UILocale = "ja" | "en";
 
 export interface GeneralSettings {
   theme: ThemeMode;
   editorFontSize: EditorFontSize;
+  /** カスタムフォントサイズ（editorFontSize が "custom" のときのみ使用） */
+  customFontSizePx?: number;
   locale: UILocale;
 }
 
 export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   theme: "system",
-  editorFontSize: "normal",
+  editorFontSize: "medium",
   locale: "ja",
 };
 
@@ -25,16 +27,17 @@ export const THEME_OPTIONS: { value: ThemeMode; label: string; labelEn: string }
   { value: "dark", label: "ダーク", labelEn: "Dark" },
 ];
 
-/** フォントサイズの表示名と対応 px */
+/** フォントサイズの表示名と対応 px（custom は px: null） */
 export const FONT_SIZE_OPTIONS: {
   value: EditorFontSize;
   label: string;
   labelEn: string;
-  px: number;
+  px: number | null;
 }[] = [
-  { value: "normal", label: "標準", labelEn: "Normal", px: 14 },
-  { value: "large", label: "やや大きめ", labelEn: "Large", px: 16 },
-  { value: "x-large", label: "大きめ", labelEn: "Extra Large", px: 18 },
+  { value: "small", label: "小", labelEn: "Small", px: 14 },
+  { value: "medium", label: "中", labelEn: "Medium", px: 16 },
+  { value: "large", label: "大", labelEn: "Large", px: 18 },
+  { value: "custom", label: "カスタム", labelEn: "Custom", px: null },
 ];
 
 /** 言語の表示名 */

@@ -2,8 +2,13 @@
  * HTML を Tiptap JSON 形式に変換
  */
 import { generateJSON } from "@tiptap/html";
+import type { JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { common, createLowlight } from "lowlight";
+
+const lowlight = createLowlight(common);
 
 // Tiptap の拡張機能（TiptapEditorと同じ構成にする）
 const extensions = [
@@ -11,36 +16,33 @@ const extensions = [
     heading: {
       levels: [1, 2, 3],
     },
+    codeBlock: false,
   }),
   Link.configure({
     openOnClick: false,
+  }),
+  CodeBlockLowlight.configure({
+    lowlight,
+    defaultLanguage: null,
   }),
 ];
 
 /**
  * HTMLをTiptap JSON形式に変換
  */
-export function htmlToTiptapJSON(html: string): object {
-  // 不要なタグを除去
+export function htmlToTiptapJSON(html: string): JSONContent {
   const cleanHtml = cleanupHtml(html);
 
-  // Tiptap JSON に変換
   try {
-    return generateJSON(cleanHtml, extensions);
+    return generateJSON(cleanHtml, extensions) as JSONContent;
   } catch (error) {
     console.error("Failed to convert HTML to Tiptap JSON:", error);
-    // フォールバック: プレーンテキストとして処理
     return {
       type: "doc",
       content: [
         {
           type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: stripHtml(html),
-            },
-          ],
+          content: [{ type: "text", text: stripHtml(html) }],
         },
       ],
     };
@@ -49,10 +51,23 @@ export function htmlToTiptapJSON(html: string): object {
 
 /**
  * HTMLをクリーンアップ
+ * <pre> 内の改行・インデントは保持する（プレースホルダーで退避してから空白整理）
+ * DOMParser を使用して XSS を防ぐ（スクリプト・イベントハンドラは実行されない）
  */
 function cleanupHtml(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const div = doc.body;
+
+  // <pre> 内の内容を退避（空白整理で崩れないように）
+  const preElements = Array.from(div.querySelectorAll("pre"));
+  const prePlaceholders = new Map<string, string>();
+  preElements.forEach((pre, i) => {
+    const placeholder = `__PRE_PLACEHOLDER_${i}__`;
+    prePlaceholders.set(placeholder, pre.outerHTML);
+    pre.insertAdjacentHTML("beforebegin", placeholder);
+    pre.remove();
+  });
 
   // 不要な要素を削除
   const unwantedSelectors = [
@@ -93,8 +108,14 @@ function cleanupHtml(html: string): string {
   // 空の要素を削除
   removeEmptyElements(div);
 
-  // 連続する空白を整理
-  return div.innerHTML.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
+  // 連続する空白を整理（<pre> は退避済みなのでコードの改行は保持される）
+  let result = div.innerHTML.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
+
+  // <pre> 内容を復元
+  for (const [placeholder, originalHtml] of prePlaceholders) {
+    result = result.replace(placeholder, originalHtml);
+  }
+  return result;
 }
 
 /**
@@ -117,42 +138,38 @@ function removeEmptyElements(element: Element): void {
 
 /**
  * HTMLタグを除去してプレーンテキストを取得
+ * DOMParser を使用して XSS を防ぐ
  */
 function stripHtml(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent || "";
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  return doc.body.textContent || "";
 }
 
 /**
  * Tiptap JSONを文字列に変換
  */
-export function tiptapJSONToString(json: object): string {
+export function tiptapJSONToString(json: JSONContent): string {
   return JSON.stringify(json);
 }
 
 /**
  * クリップしたコンテンツをTiptap JSONとして整形
- * - 引用元情報を含めたフォーマット
+ * 引用元情報を含めたフォーマット
  */
 export function formatClippedContentAsTiptap(
   content: string,
   sourceUrl: string,
   siteName?: string | null,
-): object {
+): JSONContent {
   const mainContent = htmlToTiptapJSON(content);
 
-  // 引用元の表示用テキスト
   const sourceText = siteName ? `${siteName}` : new URL(sourceUrl).hostname;
 
-  // 引用元情報を先頭に追加
-  const sourceInfo = {
+  const sourceInfo: JSONContent = {
     type: "paragraph",
     content: [
-      {
-        type: "text",
-        text: "📎 引用元: ",
-      },
+      { type: "text", text: "📎 引用元: " },
       {
         type: "text",
         marks: [
@@ -171,17 +188,10 @@ export function formatClippedContentAsTiptap(
     ],
   };
 
-  // 区切り線
-  const horizontalRule = {
-    type: "horizontalRule",
-  };
-
-  // コンテンツを結合
-  const docContent = mainContent as { type: string; content?: unknown[] };
-  const existingContent = docContent.content || [];
+  const horizontalRule: JSONContent = { type: "horizontalRule" };
 
   return {
     type: "doc",
-    content: [sourceInfo, horizontalRule, ...existingContent],
+    content: [sourceInfo, horizontalRule, ...(mainContent.content ?? [])],
   };
 }

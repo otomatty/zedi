@@ -124,21 +124,32 @@ function GeneralSettingsProfileCard({
 }
 
 interface GeneralSettingsDisplayCardsProps {
-  settings: { theme: ThemeMode; editorFontSize: EditorFontSize; locale: UILocale };
+  settings: {
+    theme: ThemeMode;
+    editorFontSize: EditorFontSize;
+    customFontSizePx?: number;
+    locale: UILocale;
+  };
+  editorFontSizePx: number;
   updateTheme: (v: ThemeMode) => void;
   updateEditorFontSize: (v: EditorFontSize) => void;
+  updateCustomFontSizePx: (px: number) => void;
   updateLocale: (v: UILocale) => void;
   onRunTourAgain: () => void;
 }
 
 function GeneralSettingsDisplayCards({
   settings,
+  editorFontSizePx,
   updateTheme,
   updateEditorFontSize,
+  updateCustomFontSizePx,
   updateLocale,
   onRunTourAgain,
 }: GeneralSettingsDisplayCardsProps) {
   const { t } = useTranslation();
+  const customPxInput =
+    settings.editorFontSize === "custom" ? (settings.customFontSizePx ?? 16) : 16;
   return (
     <>
       <Card>
@@ -164,21 +175,51 @@ function GeneralSettingsDisplayCards({
           </div>
           <div className="space-y-2">
             <Label htmlFor="fontSize">{t("generalSettings.fontSize.label")}</Label>
-            <Select
-              value={settings.editorFontSize}
-              onValueChange={(v) => updateEditorFontSize(v as EditorFontSize)}
-            >
-              <SelectTrigger id="fontSize" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_SIZE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {t(`generalSettings.fontSize.${opt.value}`)} ({opt.px}px)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+              <div className="flex flex-col gap-2 sm:min-w-[140px]">
+                <Select
+                  value={settings.editorFontSize}
+                  onValueChange={(v) => updateEditorFontSize(v as EditorFontSize)}
+                >
+                  <SelectTrigger id="fontSize" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_SIZE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {t(`generalSettings.fontSize.${opt.value}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {settings.editorFontSize === "custom" && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={12}
+                      max={24}
+                      value={customPxInput}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isNaN(n)) updateCustomFontSizePx(n);
+                      }}
+                      className="h-9 w-20"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {t("generalSettings.fontSize.customPx")}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div
+                className="flex min-h-[52px] flex-1 items-center rounded-md border border-border bg-muted/30 px-3 py-2"
+                style={{ fontSize: editorFontSizePx }}
+              >
+                <span className="text-muted-foreground">
+                  {t("generalSettings.fontSize.preview")}: あいうえお Aa 123
+                </span>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -306,7 +347,9 @@ export const GeneralSettingsForm: React.FC = () => {
     isLoading: isGeneralLoading,
     updateTheme,
     updateEditorFontSize,
+    updateCustomFontSizePx,
     updateLocale,
+    editorFontSizePx,
   } = useGeneralSettings();
 
   const {
@@ -396,8 +439,10 @@ export const GeneralSettingsForm: React.FC = () => {
 
       <GeneralSettingsDisplayCards
         settings={settings}
+        editorFontSizePx={editorFontSizePx}
         updateTheme={updateTheme}
         updateEditorFontSize={updateEditorFontSize}
+        updateCustomFontSizePx={updateCustomFontSizePx}
         updateLocale={updateLocale}
         onRunTourAgain={handleRunTourAgain}
       />
