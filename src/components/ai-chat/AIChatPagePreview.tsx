@@ -22,7 +22,7 @@ export function AIChatPagePreview({ action, onConfirm, onEdit, onCancel }: AICha
 
       {/* Content Preview */}
       <div className="max-h-48 overflow-y-auto px-4 py-3">
-        <div className="prose prose-sm dark:prose-invert max-w-none">
+        <div className="prose prose-sm max-w-none dark:prose-invert">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{action.content}</ReactMarkdown>
         </div>
       </div>
@@ -46,7 +46,7 @@ export function AIChatPagePreview({ action, onConfirm, onEdit, onCancel }: AICha
           onClick={onCancel}
           className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-accent"
         >
-          キャンセル
+          {t("aiChat.actions.close")}
         </button>
         <button
           onClick={onEdit}

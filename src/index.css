@@ -423,6 +423,104 @@
     background: hsl(var(--primary) / 0.15);
     border-radius: 2px;
   }
+
+  /* AI Chat: Markdown in message bubbles – readable, compact */
+  .ai-chat-markdown {
+    @apply max-w-none break-words text-sm;
+    line-height: 1.65;
+  }
+
+  .ai-chat-markdown > * + * {
+    @apply mt-3;
+  }
+
+  .ai-chat-markdown p:first-child {
+    @apply mt-0;
+  }
+
+  .ai-chat-markdown p:last-child {
+    @apply mb-0;
+  }
+
+  .ai-chat-markdown h1 {
+    @apply mb-2 mt-4 text-base font-bold first:mt-0;
+  }
+
+  .ai-chat-markdown h2 {
+    @apply mb-2 mt-3 text-[15px] font-semibold first:mt-0;
+  }
+
+  .ai-chat-markdown h3 {
+    @apply mb-1.5 mt-2.5 text-sm font-semibold first:mt-0;
+  }
+
+  .ai-chat-markdown ul,
+  .ai-chat-markdown ol {
+    @apply my-2 pl-5;
+  }
+
+  .ai-chat-markdown ul {
+    @apply list-disc;
+  }
+
+  .ai-chat-markdown ol {
+    @apply list-decimal;
+  }
+
+  .ai-chat-markdown li {
+    @apply my-0.5;
+  }
+
+  .ai-chat-markdown li > p {
+    @apply my-0;
+  }
+
+  .ai-chat-markdown blockquote {
+    @apply my-2 border-l-2 border-primary/40 pl-3 italic text-muted-foreground;
+  }
+
+  .ai-chat-markdown code {
+    @apply rounded bg-muted/80 px-1.5 py-0.5 font-mono text-[13px];
+  }
+
+  .ai-chat-markdown pre {
+    @apply my-2 overflow-x-auto rounded-lg bg-muted/80 p-3 text-[13px];
+  }
+
+  .ai-chat-markdown pre code {
+    @apply bg-transparent p-0;
+  }
+
+  .ai-chat-markdown pre code.hljs {
+    background: transparent;
+    padding: 0;
+  }
+
+  .ai-chat-markdown a {
+    @apply font-medium underline underline-offset-2 transition-colors;
+    color: hsl(var(--link-color));
+  }
+
+  .ai-chat-markdown a:hover {
+    @apply opacity-90;
+  }
+
+  .ai-chat-markdown strong {
+    @apply font-semibold;
+  }
+
+  .ai-chat-markdown table {
+    @apply my-2 w-full border-collapse text-left;
+  }
+
+  .ai-chat-markdown th,
+  .ai-chat-markdown td {
+    @apply border border-border px-2 py-1.5 text-left align-top;
+  }
+
+  .ai-chat-markdown th {
+    @apply bg-muted/50 font-semibold;
+  }
 }
 
 @layer utilities {

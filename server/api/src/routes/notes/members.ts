@@ -2,6 +2,7 @@
  * ノートメンバー管理ルート
  *
  * POST   /:noteId/members                 — メンバー追加
+ * PUT    /:noteId/members/:memberEmail     — メンバーロール更新
  * DELETE /:noteId/members/:memberEmail     — メンバー削除
  * GET    /:noteId/members                  — メンバー一覧
  */
@@ -15,6 +16,14 @@ import type { NoteMemberRole } from "./types.js";
 import { requireNoteOwner, getNoteRole } from "./helpers.js";
 
 const app = new Hono<AppEnv>();
+
+function validateMemberRole(role: string | undefined): NoteMemberRole {
+  if (role === undefined) return "viewer";
+  if (role !== "viewer" && role !== "editor") {
+    throw new HTTPException(400, { message: "role must be 'viewer' or 'editor'" });
+  }
+  return role;
+}
 
 // ── POST /:noteId/members ───────────────────────────────────────────────────
 app.post("/:noteId/members", authRequired, async (c) => {
@@ -34,12 +43,9 @@ app.post("/:noteId/members", authRequired, async (c) => {
     throw new HTTPException(400, { message: "member_email is required" });
   }
 
-  if (body.role !== undefined && body.role !== "viewer" && body.role !== "editor") {
-    throw new HTTPException(400, { message: "role must be 'viewer' or 'editor'" });
-  }
-  const memberRole: NoteMemberRole = (body.role as NoteMemberRole) ?? "viewer";
+  const memberRole = validateMemberRole(body.role);
 
-  await db
+  const [member] = await db
     .insert(noteMembers)
     .values({
       noteId,
@@ -54,9 +60,72 @@ app.post("/:noteId/members", authRequired, async (c) => {
         isDeleted: false,
         updatedAt: new Date(),
       },
+    })
+    .returning({
+      noteId: noteMembers.noteId,
+      memberEmail: noteMembers.memberEmail,
+      role: noteMembers.role,
+      invitedByUserId: noteMembers.invitedByUserId,
+      createdAt: noteMembers.createdAt,
+      updatedAt: noteMembers.updatedAt,
     });
+  if (!member) {
+    throw new HTTPException(500, { message: "Failed to retrieve added member" });
+  }
+  return c.json({
+    note_id: member.noteId,
+    member_email: member.memberEmail,
+    role: member.role,
+    invited_by_user_id: member.invitedByUserId,
+    created_at: member.createdAt,
+    updated_at: member.updatedAt,
+  });
+});
 
-  return c.json({ added: true });
+// ── PUT /:noteId/members/:memberEmail ───────────────────────────────────────
+app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
+  const noteId = c.req.param("noteId");
+  const memberEmail = decodeURIComponent(c.req.param("memberEmail")).trim().toLowerCase();
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  await requireNoteOwner(db, noteId, userId, "Only the owner can update members");
+
+  const body = await c.req.json<{ role?: string }>();
+  if (body.role === undefined || body.role === null) {
+    throw new HTTPException(400, { message: "role is required" });
+  }
+  const memberRole = validateMemberRole(body.role);
+
+  const [updated] = await db
+    .update(noteMembers)
+    .set({ role: memberRole, updatedAt: new Date() })
+    .where(
+      and(
+        eq(noteMembers.noteId, noteId),
+        eq(noteMembers.memberEmail, memberEmail),
+        eq(noteMembers.isDeleted, false),
+      ),
+    )
+    .returning({
+      noteId: noteMembers.noteId,
+      memberEmail: noteMembers.memberEmail,
+      role: noteMembers.role,
+      invitedByUserId: noteMembers.invitedByUserId,
+      createdAt: noteMembers.createdAt,
+      updatedAt: noteMembers.updatedAt,
+    });
+  if (!updated) {
+    throw new HTTPException(404, { message: "Member not found" });
+  }
+  return c.json({
+    note_id: updated.noteId,
+    member_email: updated.memberEmail,
+    role: updated.role,
+    invited_by_user_id: updated.invitedByUserId,
+    created_at: updated.createdAt,
+    updated_at: updated.updatedAt,
+  });
 });
 
 // ── DELETE /:noteId/members/:memberEmail ─────────────────────────────────────
@@ -91,16 +160,27 @@ app.get("/:noteId/members", authRequired, async (c) => {
 
   const result = await db
     .select({
-      member_email: noteMembers.memberEmail,
+      noteId: noteMembers.noteId,
+      memberEmail: noteMembers.memberEmail,
       role: noteMembers.role,
-      invited_by: noteMembers.invitedByUserId,
-      created_at: noteMembers.createdAt,
+      invitedByUserId: noteMembers.invitedByUserId,
+      createdAt: noteMembers.createdAt,
+      updatedAt: noteMembers.updatedAt,
     })
     .from(noteMembers)
     .where(and(eq(noteMembers.noteId, noteId), eq(noteMembers.isDeleted, false)))
     .orderBy(asc(noteMembers.createdAt));
 
-  return c.json({ members: result });
+  return c.json(
+    result.map((m) => ({
+      note_id: m.noteId,
+      member_email: m.memberEmail,
+      role: m.role,
+      invited_by_user_id: m.invitedByUserId,
+      created_at: m.createdAt,
+      updated_at: m.updatedAt,
+    })),
+  );
 });
 
 export default app;

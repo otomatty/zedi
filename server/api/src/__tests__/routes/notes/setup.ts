@@ -65,12 +65,15 @@ export function createMockPageListRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Mock row shape matches DB select (camelCase). Route maps to snake_case in response. */
 export function createMockMember(overrides: Record<string, unknown> = {}) {
   return {
-    member_email: OTHER_USER_EMAIL,
+    noteId: "note-test-001",
+    memberEmail: OTHER_USER_EMAIL,
     role: "viewer",
-    invited_by: TEST_USER_ID,
-    created_at: new Date("2026-01-01T00:00:00Z"),
+    invitedByUserId: TEST_USER_ID,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }
@@ -120,6 +123,9 @@ export function createMockDb(results: unknown[]) {
 
   const db = new Proxy({} as Record<string, (...args: unknown[]) => unknown>, {
     get(_, prop: string) {
+      if (prop === "transaction") {
+        return (fn: (tx: typeof db) => Promise<unknown>) => fn(db);
+      }
       return (...args: unknown[]) => {
         const idx = chainIndex++;
         const ops: { method: string; args: unknown[] }[] = [];

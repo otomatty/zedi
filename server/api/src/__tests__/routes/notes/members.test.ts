@@ -38,11 +38,16 @@ const NOTE_ID = "note-test-001";
 // ── POST /api/notes/:noteId/members ─────────────────────────────────────────
 
 describe("POST /api/notes/:noteId/members", () => {
-  it("should add a member and return { added: true }", async () => {
+  it("should add a member and return the added member (NoteMemberItem)", async () => {
     const mockNote = createMockNote();
+    const addedMember = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: OTHER_USER_EMAIL,
+      role: "editor",
+    });
     const { app, chains } = createTestApp([
       [mockNote], // requireNoteOwner → findActiveNoteById (owner)
-      [], // insert noteMembers
+      [addedMember], // insert noteMembers with .returning()
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/members`, {
@@ -53,7 +58,14 @@ describe("POST /api/notes/:noteId/members", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body).toEqual({ added: true });
+    expect(body).toMatchObject({
+      note_id: NOTE_ID,
+      member_email: OTHER_USER_EMAIL,
+      role: "editor",
+      invited_by_user_id: TEST_USER_ID,
+    });
+    expect(body).toHaveProperty("created_at");
+    expect(body).toHaveProperty("updated_at");
 
     const insertCall = chains.find((c) => c.startMethod === "insert");
     expect(insertCall).toBeDefined();
@@ -70,7 +82,8 @@ describe("POST /api/notes/:noteId/members", () => {
 
   it("should default role to 'viewer' when not specified", async () => {
     const mockNote = createMockNote();
-    const { app, chains } = createTestApp([[mockNote], []]);
+    const addedMember = createMockMember({ role: "viewer" });
+    const { app, chains } = createTestApp([[mockNote], [addedMember]]);
 
     await app.request(`/api/notes/${NOTE_ID}/members`, {
       method: "POST",
@@ -178,13 +191,107 @@ describe("DELETE /api/notes/:noteId/members/:memberEmail", () => {
   });
 });
 
+// ── PUT /api/notes/:noteId/members/:memberEmail ─────────────────────────────
+
+describe("PUT /api/notes/:noteId/members/:memberEmail", () => {
+  it("should update member role and return updated NoteMemberItem", async () => {
+    const mockNote = createMockNote();
+    const updatedRow = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: OTHER_USER_EMAIL,
+      role: "editor",
+    });
+    const { app, chains } = createTestApp([
+      [mockNote], // requireNoteOwner
+      [updatedRow], // update noteMembers with .returning()
+    ]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "editor" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      note_id: NOTE_ID,
+      member_email: OTHER_USER_EMAIL,
+      role: "editor",
+      invited_by_user_id: TEST_USER_ID,
+    });
+    expect(body).toHaveProperty("created_at");
+    expect(body).toHaveProperty("updated_at");
+
+    const updateCall = chains.find((c) => c.startMethod === "update");
+    expect(updateCall).toBeDefined();
+    const setOp = updateCall?.ops.find((op) => op.method === "set");
+    expect((setOp?.args[0] as Record<string, unknown>)?.role).toBe("editor");
+  });
+
+  it("should return 400 when role is missing", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("should return 403 when non-owner tries to update", async () => {
+    const mockNote = createMockNote({ ownerId: OTHER_USER_ID });
+    const { app } = createTestApp([
+      [mockNote], // requireNoteOwner (owner mismatch)
+    ]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "editor" }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should return 400 for invalid role", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([
+      [mockNote], // requireNoteOwner
+    ]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "admin" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+});
+
 // ── GET /api/notes/:noteId/members ──────────────────────────────────────────
 
 describe("GET /api/notes/:noteId/members", () => {
-  it("should return members in { members: [...] } format", async () => {
+  it("should return a flat array of NoteMemberItem with snake_case keys", async () => {
     const mockNote = createMockNote();
-    const member1 = createMockMember({ member_email: OTHER_USER_EMAIL, role: "editor" });
-    const member2 = createMockMember({ member_email: "third@example.com", role: "viewer" });
+    const member1 = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: OTHER_USER_EMAIL,
+      role: "editor",
+    });
+    const member2 = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: "third@example.com",
+      role: "viewer",
+    });
 
     const { app } = createTestApp([
       [mockNote], // getNoteRole (owner)
@@ -196,17 +303,29 @@ describe("GET /api/notes/:noteId/members", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { members: Record<string, unknown>[] };
+    const body = (await res.json()) as Record<string, unknown>[];
 
-    expect(body).toHaveProperty("members");
-    expect(body.members).toHaveLength(2);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(2);
 
-    const first = body.members[0];
+    const first = body[0];
     expect(first).toBeDefined();
-    expect(first).toHaveProperty("member_email", OTHER_USER_EMAIL);
-    expect(first).toHaveProperty("role", "editor");
-    expect(first).toHaveProperty("invited_by");
+    expect(first).toMatchObject({
+      note_id: NOTE_ID,
+      member_email: OTHER_USER_EMAIL,
+      role: "editor",
+      invited_by_user_id: TEST_USER_ID,
+    });
     expect(first).toHaveProperty("created_at");
+    expect(first).toHaveProperty("updated_at");
+    expect(first).not.toHaveProperty("members");
+
+    const second = body[1];
+    expect(second).toMatchObject({
+      note_id: NOTE_ID,
+      member_email: "third@example.com",
+      role: "viewer",
+    });
   });
 
   it("should return empty array when note has no members", async () => {
@@ -220,8 +339,9 @@ describe("GET /api/notes/:noteId/members", () => {
       headers: authHeaders(),
     });
 
-    const body = (await res.json()) as { members: unknown[] };
-    expect(body.members).toHaveLength(0);
+    const body = (await res.json()) as unknown[];
+    expect(Array.isArray(body)).toBe(true);
+    expect(body).toHaveLength(0);
   });
 
   it("should return 403 for private note accessed by non-member", async () => {
