@@ -9,14 +9,23 @@
 cd admin && npm install
 
 # 起動（ポート 30001、API は ZEDI_API_PROXY_TARGET でプロキシ）
-bun run dev
+npm run dev
 ```
 
 ルートから:
 
 ```bash
-bun run dev:admin
+npm run dev:admin
 ```
+
+## ローカル動作確認
+
+バックエンド（`docker-compose -f docker-compose.dev.yml up --build`）起動後、管理画面を起動し、以下を確認する。
+
+- [ ] `http://localhost:30001` で管理画面が表示される
+- [ ] ログイン（Google/GitHub）後、管理者ユーザーなら AI モデル一覧が表示される
+- [ ] 非管理者なら「管理者権限がありません」等の案内が出る
+- [ ] モデルのトグル・ティア変更・同期が動作する
 
 ## ビルド
 
