@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AiModelAdmin, SyncResultItem } from "@/api/admin";
-import {
-  getAiModels,
-  patchAiModel,
-  syncAiModels as syncAiModelsApi,
-} from "@/api/admin";
+import { getAiModels, patchAiModel, syncAiModels as syncAiModelsApi } from "@/api/admin";
 
 export default function AiModels() {
   const [models, setModels] = useState<AiModelAdmin[]>([]);
@@ -13,8 +9,8 @@ export default function AiModels() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResultItem[] | null>(null);
 
-  const load = () => {
-    setLoading(true);
+  const load = (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError(null);
     getAiModels()
       .then(setModels)
@@ -23,20 +19,33 @@ export default function AiModels() {
   };
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    getAiModels()
+      .then((nextModels) => {
+        if (cancelled) return;
+        setModels(nextModels);
+        setError(null);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleToggleActive = async (m: AiModelAdmin) => {
     const next = !m.isActive;
-    setModels((prev) =>
-      prev.map((x) => (x.id === m.id ? { ...x, isActive: next } : x)),
-    );
+    setModels((prev) => prev.map((x) => (x.id === m.id ? { ...x, isActive: next } : x)));
     try {
       await patchAiModel(m.id, { isActive: next });
     } catch (e) {
-      setModels((prev) =>
-        prev.map((x) => (x.id === m.id ? { ...x, isActive: m.isActive } : x)),
-      );
+      setModels((prev) => prev.map((x) => (x.id === m.id ? { ...x, isActive: m.isActive } : x)));
       setError(e instanceof Error ? e.message : String(e));
     }
   };
@@ -45,17 +54,13 @@ export default function AiModels() {
     if (m.tierRequired === tier) return;
     const prev = m.tierRequired;
     setModels((prevModels) =>
-      prevModels.map((x) =>
-        x.id === m.id ? { ...x, tierRequired: tier } : x,
-      ),
+      prevModels.map((x) => (x.id === m.id ? { ...x, tierRequired: tier } : x)),
     );
     try {
       await patchAiModel(m.id, { tierRequired: tier });
     } catch (e) {
       setModels((prevModels) =>
-        prevModels.map((x) =>
-          x.id === m.id ? { ...x, tierRequired: prev } : x,
-        ),
+        prevModels.map((x) => (x.id === m.id ? { ...x, tierRequired: prev } : x)),
       );
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -97,9 +102,7 @@ export default function AiModels() {
       </div>
 
       {error && (
-        <div className="mt-2 rounded bg-red-900/30 px-3 py-2 text-sm text-red-200">
-          {error}
-        </div>
+        <div className="mt-2 rounded bg-red-900/30 px-3 py-2 text-sm text-red-200">{error}</div>
       )}
 
       {syncResult && (
@@ -129,9 +132,7 @@ export default function AiModels() {
             {models.map((m) => (
               <tr
                 key={m.id}
-                className={`border-b border-slate-700/70 ${
-                  !m.isActive ? "opacity-60" : ""
-                }`}
+                className={`border-b border-slate-700/70 ${!m.isActive ? "opacity-60" : ""}`}
               >
                 <td className="px-3 py-2 text-slate-300">{m.provider}</td>
                 <td className="px-3 py-2 font-mono text-slate-400">{m.modelId}</td>
@@ -139,9 +140,7 @@ export default function AiModels() {
                 <td className="px-3 py-2">
                   <select
                     value={m.tierRequired}
-                    onChange={(e) =>
-                      handleTierChange(m, e.target.value as "free" | "pro")
-                    }
+                    onChange={(e) => handleTierChange(m, e.target.value as "free" | "pro")}
                     className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200"
                   >
                     <option value="free">FREE</option>
@@ -153,9 +152,7 @@ export default function AiModels() {
                     type="button"
                     onClick={() => handleToggleActive(m)}
                     className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      m.isActive
-                        ? "bg-teal-900/50 text-teal-200"
-                        : "bg-slate-700 text-slate-400"
+                      m.isActive ? "bg-teal-900/50 text-teal-200" : "bg-slate-700 text-slate-400"
                     }`}
                   >
                     {m.isActive ? "ON" : "OFF"}
