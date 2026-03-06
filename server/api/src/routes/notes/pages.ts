@@ -30,23 +30,46 @@ app.post("/:noteId/pages", authRequired, async (c) => {
   }
 
   const body = await c.req.json<{
-    page_id: string;
+    page_id?: string;
+    pageId?: string;
+    title?: string;
     sort_order?: number;
   }>();
 
-  if (!body.page_id) {
-    throw new HTTPException(400, { message: "page_id is required" });
+  const rawPageId = body.page_id ?? body.pageId;
+  const pageId =
+    typeof rawPageId === "string" && rawPageId.trim() !== "" ? rawPageId.trim() : undefined;
+
+  if (!pageId && !body.title) {
+    throw new HTTPException(400, { message: "page_id or title is required" });
   }
 
-  const page = await db
-    .select({ id: pages.id, ownerId: pages.ownerId })
-    .from(pages)
-    .where(and(eq(pages.id, body.page_id), eq(pages.isDeleted, false)))
-    .limit(1);
+  let targetPageId: string;
 
-  const firstPage = page[0];
-  if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
-  if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  if (pageId) {
+    const page = await db
+      .select({ id: pages.id, ownerId: pages.ownerId })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+      .limit(1);
+
+    const firstPage = page[0];
+    if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
+    if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+    targetPageId = firstPage.id;
+  } else {
+    const created = await db
+      .insert(pages)
+      .values({
+        ownerId: userId,
+        title: body.title ?? null,
+      })
+      .returning();
+
+    const newPage = created[0];
+    if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
+    targetPageId = newPage.id;
+  }
 
   const maxOrder = await db
     .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
@@ -59,7 +82,7 @@ app.post("/:noteId/pages", authRequired, async (c) => {
     .insert(notePages)
     .values({
       noteId,
-      pageId: body.page_id,
+      pageId: targetPageId,
       addedByUserId: userId,
       sortOrder,
     })
