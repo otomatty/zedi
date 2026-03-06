@@ -67,6 +67,30 @@ describe("requiresAuth", () => {
     const url = `${window.location.origin}/api/thumbnail/serve/abc-123`;
     expect(requiresAuth(url)).toBe(true);
   });
+
+  describe("when VITE_API_BASE_URL is set (cross-origin API)", () => {
+    const API_ORIGIN = "https://api.zedi-note.app";
+
+    beforeEach(() => {
+      vi.stubEnv("VITE_API_BASE_URL", API_ORIGIN);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("returns true for cross-origin thumbnail URL matching API base", () => {
+      expect(requiresAuth(`${API_ORIGIN}/api/thumbnail/serve/abc-123`)).toBe(true);
+    });
+
+    it("returns true for cross-origin media URL matching API base", () => {
+      expect(requiresAuth(`${API_ORIGIN}/api/media/xyz`)).toBe(true);
+    });
+
+    it("returns false for other origin even with auth path", () => {
+      expect(requiresAuth("https://evil.com/api/thumbnail/serve/abc")).toBe(false);
+    });
+  });
 });
 
 describe("useAuthenticatedImageUrl", () => {
@@ -172,6 +196,27 @@ describe("useAuthenticatedImageUrl", () => {
     await waitFor(() => {
       expect(result.current.resolvedUrl).toBe(blobUrl2);
     });
+  });
+
+  it("fetches cross-origin API thumbnail URL with credentials when VITE_API_BASE_URL matches", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.zedi-note.app");
+    mockFetchSuccess();
+    const src = "https://api.zedi-note.app/api/thumbnail/serve/cross-origin-id";
+
+    const { result } = renderHook(() => useAuthenticatedImageUrl(src));
+
+    expect(result.current.isLoading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.hasError).toBe(false);
+    expect(global.fetch).toHaveBeenCalledWith(src, { credentials: "include" });
+    expect(mockCreateObjectURL).toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
   });
 
   it("cancels in-flight fetch when src changes before completion", async () => {
