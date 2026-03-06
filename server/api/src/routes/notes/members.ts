@@ -45,7 +45,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
 
   const memberRole = validateMemberRole(body.role);
 
-  await db
+  const [member] = await db
     .insert(noteMembers)
     .values({
       noteId,
@@ -60,26 +60,15 @@ app.post("/:noteId/members", authRequired, async (c) => {
         isDeleted: false,
         updatedAt: new Date(),
       },
-    });
-
-  const [member] = await db
-    .select({
+    })
+    .returning({
       noteId: noteMembers.noteId,
       memberEmail: noteMembers.memberEmail,
       role: noteMembers.role,
       invitedByUserId: noteMembers.invitedByUserId,
       createdAt: noteMembers.createdAt,
       updatedAt: noteMembers.updatedAt,
-    })
-    .from(noteMembers)
-    .where(
-      and(
-        eq(noteMembers.noteId, noteId),
-        eq(noteMembers.memberEmail, memberEmail),
-        eq(noteMembers.isDeleted, false),
-      ),
-    )
-    .limit(1);
+    });
   if (!member) {
     throw new HTTPException(500, { message: "Failed to retrieve added member" });
   }

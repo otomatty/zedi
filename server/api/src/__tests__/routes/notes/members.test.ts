@@ -47,8 +47,7 @@ describe("POST /api/notes/:noteId/members", () => {
     });
     const { app, chains } = createTestApp([
       [mockNote], // requireNoteOwner → findActiveNoteById (owner)
-      [], // insert noteMembers
-      [addedMember], // select added member
+      [addedMember], // insert noteMembers with .returning()
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/members`, {
@@ -84,7 +83,7 @@ describe("POST /api/notes/:noteId/members", () => {
   it("should default role to 'viewer' when not specified", async () => {
     const mockNote = createMockNote();
     const addedMember = createMockMember({ role: "viewer" });
-    const { app, chains } = createTestApp([[mockNote], [], [addedMember]]);
+    const { app, chains } = createTestApp([[mockNote], [addedMember]]);
 
     await app.request(`/api/notes/${NOTE_ID}/members`, {
       method: "POST",

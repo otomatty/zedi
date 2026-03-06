@@ -145,6 +145,51 @@ describe("POST /api/notes/:noteId/pages", () => {
     expect(res.status).toBe(400);
   });
 
+  it("should return 400 when title is empty string", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "" }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("title must be a non-empty string");
+  });
+
+  it("should return 400 when title is whitespace-only", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "   " }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("title must be a non-empty string");
+  });
+
+  it("should return 400 when title is not a string", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: 123 }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("title must be a non-empty string");
+  });
+
   it("should return 404 when page does not exist", async () => {
     const mockNote = createMockNote();
     const { app } = createTestApp([

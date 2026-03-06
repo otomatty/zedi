@@ -53,42 +53,46 @@ app.post("/:noteId/pages", authRequired, async (c) => {
   let sortOrder: number;
 
   if (pageId) {
-    const page = await db
-      .select({ id: pages.id, ownerId: pages.ownerId })
-      .from(pages)
-      .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const page = await tx
+        .select({ id: pages.id, ownerId: pages.ownerId })
+        .from(pages)
+        .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+        .limit(1);
 
-    const firstPage = page[0];
-    if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
-    if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
-    targetPageId = firstPage.id;
+      const firstPage = page[0];
+      if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
+      if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+      const resolvedPageId = firstPage.id;
 
-    const maxOrder = await db
-      .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
-      .from(notePages)
-      .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
+      const maxOrder = await tx
+        .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
+        .from(notePages)
+        .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
 
-    sortOrder = body.sort_order ?? (maxOrder[0]?.max ?? 0) + 1;
+      const order = body.sort_order ?? (maxOrder[0]?.max ?? 0) + 1;
 
-    await db
-      .insert(notePages)
-      .values({
-        noteId,
-        pageId: targetPageId,
-        addedByUserId: userId,
-        sortOrder,
-      })
-      .onConflictDoUpdate({
-        target: [notePages.noteId, notePages.pageId],
-        set: {
-          isDeleted: false,
-          sortOrder,
-          updatedAt: new Date(),
-        },
-      });
+      await tx
+        .insert(notePages)
+        .values({
+          noteId,
+          pageId: resolvedPageId,
+          addedByUserId: userId,
+          sortOrder: order,
+        })
+        .onConflictDoUpdate({
+          target: [notePages.noteId, notePages.pageId],
+          set: {
+            isDeleted: false,
+            sortOrder: order,
+            updatedAt: new Date(),
+          },
+        });
 
-    await db.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+      await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+      return { sortOrder: order };
+    });
+    sortOrder = result.sortOrder;
   } else {
     const result = await db.transaction(async (tx) => {
       const created = await tx
