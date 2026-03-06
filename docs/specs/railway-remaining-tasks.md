@@ -576,11 +576,12 @@ railway variable set \
   --skip-deploys
 ```
 
-| 変数                 | development                                        | production                  |
-| -------------------- | -------------------------------------------------- | --------------------------- |
-| `BETTER_AUTH_URL`    | `https://<dev-api-ドメイン>`                       | `https://api.zedi-note.app` |
-| `CORS_ORIGIN`        | `https://dev.zedi-note.app,http://localhost:30000` | `https://zedi-note.app`     |
-| `BETTER_AUTH_SECRET` | 開発用の値                                         | **別のランダム値**          |
+| 変数              | development                                        | production                  |
+| ----------------- | -------------------------------------------------- | --------------------------- |
+| `BETTER_AUTH_URL` | `https://<dev-api-ドメイン>`                       | `https://api.zedi-note.app` |
+| `CORS_ORIGIN`     | `https://dev.zedi-note.app,http://localhost:30000` | `https://zedi-note.app`     |
+
+| `BETTER_AUTH_SECRET` | 開発用の値 | **別のランダム値** |
 
 ### 6.5 OAuth コールバック URL の追加
 
