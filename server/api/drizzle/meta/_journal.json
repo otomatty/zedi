@@ -8,6 +8,13 @@
       "when": 1772178414124,
       "tag": "0000_kind_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1741280400000,
+      "tag": "0003_add_user_role",
+      "breakpoints": true
     }
   ]
 }
