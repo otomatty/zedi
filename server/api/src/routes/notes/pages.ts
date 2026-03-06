@@ -36,7 +36,9 @@ app.post("/:noteId/pages", authRequired, async (c) => {
     sort_order?: number;
   }>();
 
-  const pageId = body.page_id ?? body.pageId;
+  const rawPageId = body.page_id ?? body.pageId;
+  const pageId =
+    typeof rawPageId === "string" && rawPageId.trim() !== "" ? rawPageId.trim() : undefined;
 
   if (!pageId && !body.title) {
     throw new HTTPException(400, { message: "page_id or title is required" });

@@ -65,6 +65,7 @@ export function createMockPageListRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Mock row shape matches DB select (camelCase). Route maps to snake_case in response. */
 export function createMockMember(overrides: Record<string, unknown> = {}) {
   return {
     noteId: "note-test-001",
@@ -73,7 +74,6 @@ export function createMockMember(overrides: Record<string, unknown> = {}) {
     invitedByUserId: TEST_USER_ID,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
-    member_email: OTHER_USER_EMAIL,
     ...overrides,
   };
 }
