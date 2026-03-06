@@ -62,36 +62,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
       },
     });
 
-  return c.json({ added: true });
-});
-
-// ── PUT /:noteId/members/:memberEmail ───────────────────────────────────────
-app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
-  const noteId = c.req.param("noteId");
-  const memberEmail = decodeURIComponent(c.req.param("memberEmail")).trim().toLowerCase();
-  const userId = c.get("userId");
-  const db = c.get("db");
-
-  await requireNoteOwner(db, noteId, userId, "Only the owner can update members");
-
-  const body = await c.req.json<{ role?: string }>();
-  if (body.role === undefined || body.role === null) {
-    throw new HTTPException(400, { message: "role is required" });
-  }
-  const memberRole = validateMemberRole(body.role);
-
-  await db
-    .update(noteMembers)
-    .set({ role: memberRole, updatedAt: new Date() })
-    .where(
-      and(
-        eq(noteMembers.noteId, noteId),
-        eq(noteMembers.memberEmail, memberEmail),
-        eq(noteMembers.isDeleted, false),
-      ),
-    );
-
-  const [updated] = await db
+  const [member] = await db
     .select({
       noteId: noteMembers.noteId,
       memberEmail: noteMembers.memberEmail,
@@ -109,6 +80,52 @@ app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
       ),
     )
     .limit(1);
+  if (!member) {
+    throw new HTTPException(500, { message: "Failed to retrieve added member" });
+  }
+  return c.json({
+    note_id: member.noteId,
+    member_email: member.memberEmail,
+    role: member.role,
+    invited_by_user_id: member.invitedByUserId,
+    created_at: member.createdAt,
+    updated_at: member.updatedAt,
+  });
+});
+
+// ── PUT /:noteId/members/:memberEmail ───────────────────────────────────────
+app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
+  const noteId = c.req.param("noteId");
+  const memberEmail = decodeURIComponent(c.req.param("memberEmail")).trim().toLowerCase();
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  await requireNoteOwner(db, noteId, userId, "Only the owner can update members");
+
+  const body = await c.req.json<{ role?: string }>();
+  if (body.role === undefined || body.role === null) {
+    throw new HTTPException(400, { message: "role is required" });
+  }
+  const memberRole = validateMemberRole(body.role);
+
+  const [updated] = await db
+    .update(noteMembers)
+    .set({ role: memberRole, updatedAt: new Date() })
+    .where(
+      and(
+        eq(noteMembers.noteId, noteId),
+        eq(noteMembers.memberEmail, memberEmail),
+        eq(noteMembers.isDeleted, false),
+      ),
+    )
+    .returning({
+      noteId: noteMembers.noteId,
+      memberEmail: noteMembers.memberEmail,
+      role: noteMembers.role,
+      invitedByUserId: noteMembers.invitedByUserId,
+      createdAt: noteMembers.createdAt,
+      updatedAt: noteMembers.updatedAt,
+    });
   if (!updated) {
     throw new HTTPException(404, { message: "Member not found" });
   }

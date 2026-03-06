@@ -39,12 +39,18 @@ app.post("/:noteId/pages", authRequired, async (c) => {
   const rawPageId = body.page_id ?? body.pageId;
   const pageId =
     typeof rawPageId === "string" && rawPageId.trim() !== "" ? rawPageId.trim() : undefined;
+  const title =
+    typeof body.title === "string" && body.title.trim() !== "" ? body.title.trim() : undefined;
 
-  if (!pageId && !body.title) {
+  if (!pageId && body.title !== undefined && title === undefined) {
+    throw new HTTPException(400, { message: "title must be a non-empty string" });
+  }
+  if (!pageId && !title) {
     throw new HTTPException(400, { message: "page_id or title is required" });
   }
 
   let targetPageId: string;
+  let sortOrder: number;
 
   if (pageId) {
     const page = await db
@@ -57,45 +63,75 @@ app.post("/:noteId/pages", authRequired, async (c) => {
     if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
     if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
     targetPageId = firstPage.id;
-  } else {
-    const created = await db
-      .insert(pages)
+
+    const maxOrder = await db
+      .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
+      .from(notePages)
+      .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
+
+    sortOrder = body.sort_order ?? (maxOrder[0]?.max ?? 0) + 1;
+
+    await db
+      .insert(notePages)
       .values({
-        ownerId: userId,
-        title: body.title ?? null,
-      })
-      .returning();
-
-    const newPage = created[0];
-    if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
-    targetPageId = newPage.id;
-  }
-
-  const maxOrder = await db
-    .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
-    .from(notePages)
-    .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
-
-  const sortOrder = body.sort_order ?? (maxOrder[0]?.max ?? 0) + 1;
-
-  await db
-    .insert(notePages)
-    .values({
-      noteId,
-      pageId: targetPageId,
-      addedByUserId: userId,
-      sortOrder,
-    })
-    .onConflictDoUpdate({
-      target: [notePages.noteId, notePages.pageId],
-      set: {
-        isDeleted: false,
+        noteId,
+        pageId: targetPageId,
+        addedByUserId: userId,
         sortOrder,
-        updatedAt: new Date(),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [notePages.noteId, notePages.pageId],
+        set: {
+          isDeleted: false,
+          sortOrder,
+          updatedAt: new Date(),
+        },
+      });
 
-  await db.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+    await db.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+  } else {
+    const result = await db.transaction(async (tx) => {
+      const created = await tx
+        .insert(pages)
+        .values({
+          ownerId: userId,
+          title: title ?? null,
+        })
+        .returning();
+
+      const newPage = created[0];
+      if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
+      const newPageId = newPage.id;
+
+      const maxOrder = await tx
+        .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
+        .from(notePages)
+        .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
+
+      const order = body.sort_order ?? (maxOrder[0]?.max ?? 0) + 1;
+
+      await tx
+        .insert(notePages)
+        .values({
+          noteId,
+          pageId: newPageId,
+          addedByUserId: userId,
+          sortOrder: order,
+        })
+        .onConflictDoUpdate({
+          target: [notePages.noteId, notePages.pageId],
+          set: {
+            isDeleted: false,
+            sortOrder: order,
+            updatedAt: new Date(),
+          },
+        });
+
+      await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+      return { sortOrder: order };
+    });
+    sortOrder = result.sortOrder;
+  }
 
   return c.json({ added: true, sort_order: sortOrder });
 });
