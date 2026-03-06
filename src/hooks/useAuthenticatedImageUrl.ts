@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 
 const AUTH_URL_PATTERNS = ["/api/thumbnail/serve/", "/api/media/"];
 
+function getApiOrigin(): string | null {
+  const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (!base) return null;
+  try {
+    return new URL(base).origin;
+  } catch {
+    return null;
+  }
+}
+
 export function requiresAuth(url: string): boolean {
   if (typeof window === "undefined") {
     return false;
@@ -14,9 +24,12 @@ export function requiresAuth(url: string): boolean {
     return false;
   }
 
-  if (parsedUrl.origin !== window.location.origin) {
-    return false;
-  }
+  const apiOrigin = getApiOrigin();
+  const isKnownOrigin =
+    parsedUrl.origin === window.location.origin ||
+    (apiOrigin != null && parsedUrl.origin === apiOrigin);
+
+  if (!isKnownOrigin) return false;
 
   const { pathname } = parsedUrl;
   return AUTH_URL_PATTERNS.some((pattern) => pathname.startsWith(pattern));
