@@ -101,12 +101,12 @@ describe("POST /api/notes/:noteId/pages", () => {
 
   it("should create a new page when title is provided without page_id", async () => {
     const mockNote = createMockNote();
-    const { app } = createTestApp([
+    const { app, chains } = createTestApp([
       [mockNote], // getNoteRole
-      [{ id: "pg-created" }], // insert pages → returning
-      [{ max: 0 }], // maxOrder query
-      [], // insert notePages
-      [], // update notes.updatedAt
+      [{ id: "pg-created" }], // insert pages → returning (inside transaction)
+      [{ max: 0 }], // maxOrder query (inside transaction)
+      [], // insert notePages (inside transaction)
+      [], // update notes.updatedAt (inside transaction)
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
@@ -118,6 +118,16 @@ describe("POST /api/notes/:noteId/pages", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toHaveProperty("added", true);
+    expect(body).toHaveProperty("sort_order");
+
+    const insertCalls = chains.filter((c) => c.startMethod === "insert");
+    const pageInsert = insertCalls[0];
+    expect(pageInsert).toBeDefined();
+    const valuesOp = pageInsert?.ops.find((op) => op.method === "values");
+    expect(valuesOp?.args[0]).toMatchObject({
+      ownerId: TEST_USER_ID,
+      title: "New Page",
+    });
   });
 
   it("should return 400 when neither page_id nor title is provided", async () => {
@@ -133,6 +143,51 @@ describe("POST /api/notes/:noteId/pages", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("should return 400 when title is empty string", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "" }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("title must be a non-empty string");
+  });
+
+  it("should return 400 when title is whitespace-only", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "   " }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("title must be a non-empty string");
+  });
+
+  it("should return 400 when title is not a string", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: 123 }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("title must be a non-empty string");
   });
 
   it("should return 404 when page does not exist", async () => {

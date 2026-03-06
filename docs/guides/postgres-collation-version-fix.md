@@ -6,7 +6,7 @@
 
 ログに以下のような警告が出る場合:
 
-```
+```text
 WARNING:  database "zedi" has a collation version mismatch
 DETAIL:  The database was created using collation version 2.41, but the operating system provides version 2.36.
 HINT:  Rebuild all objects in this database that use the default collation and run ALTER DATABASE zedi REFRESH COLLATION VERSION, or build PostgreSQL with the right library version.

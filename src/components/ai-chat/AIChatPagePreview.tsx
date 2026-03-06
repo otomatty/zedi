@@ -46,7 +46,7 @@ export function AIChatPagePreview({ action, onConfirm, onEdit, onCancel }: AICha
           onClick={onCancel}
           className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-accent"
         >
-          キャンセル
+          {t("aiChat.actions.close")}
         </button>
         <button
           onClick={onEdit}

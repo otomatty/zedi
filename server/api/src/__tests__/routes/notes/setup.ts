@@ -123,6 +123,9 @@ export function createMockDb(results: unknown[]) {
 
   const db = new Proxy({} as Record<string, (...args: unknown[]) => unknown>, {
     get(_, prop: string) {
+      if (prop === "transaction") {
+        return (fn: (tx: typeof db) => Promise<unknown>) => fn(db);
+      }
       return (...args: unknown[]) => {
         const idx = chainIndex++;
         const ops: { method: string; args: unknown[] }[] = [];

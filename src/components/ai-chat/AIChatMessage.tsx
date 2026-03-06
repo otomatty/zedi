@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Sparkles, User, FileText, Copy, Check } from "lucide-react";
 import { ChatMessage, ChatAction, ReferencedPage } from "../../types/aiChat";
 import { getDisplayContent } from "../../lib/aiChatActions";
@@ -48,14 +48,23 @@ function renderUserContent(content: string, referencedPages?: ReferencedPage[]) 
 function CodeBlockWithCopy({ children }: { children?: React.ReactNode }) {
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    [],
+  );
 
   const handleCopy = async () => {
     const text = preRef.current?.textContent ?? "";
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore
     }

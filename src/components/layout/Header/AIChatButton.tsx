@@ -33,7 +33,10 @@ export function AIChatButton() {
   return (
     <div className={`rounded-md bg-gradient-to-r ${AI_BUTTON_GRADIENT} p-[2px]`}>
       <button
+        type="button"
         onClick={handleClick}
+        aria-label={t("aiChat.title")}
+        aria-pressed={isOpen}
         className={`group relative flex items-center gap-1.5 rounded-sm px-3 py-2 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
           isOpen
             ? `bg-gradient-to-r ${AI_BUTTON_GRADIENT} text-white shadow-sm`

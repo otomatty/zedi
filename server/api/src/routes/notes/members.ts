@@ -45,7 +45,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
 
   const memberRole = validateMemberRole(body.role);
 
-  await db
+  const [member] = await db
     .insert(noteMembers)
     .values({
       noteId,
@@ -60,9 +60,26 @@ app.post("/:noteId/members", authRequired, async (c) => {
         isDeleted: false,
         updatedAt: new Date(),
       },
+    })
+    .returning({
+      noteId: noteMembers.noteId,
+      memberEmail: noteMembers.memberEmail,
+      role: noteMembers.role,
+      invitedByUserId: noteMembers.invitedByUserId,
+      createdAt: noteMembers.createdAt,
+      updatedAt: noteMembers.updatedAt,
     });
-
-  return c.json({ added: true });
+  if (!member) {
+    throw new HTTPException(500, { message: "Failed to retrieve added member" });
+  }
+  return c.json({
+    note_id: member.noteId,
+    member_email: member.memberEmail,
+    role: member.role,
+    invited_by_user_id: member.invitedByUserId,
+    created_at: member.createdAt,
+    updated_at: member.updatedAt,
+  });
 });
 
 // ── PUT /:noteId/members/:memberEmail ───────────────────────────────────────
@@ -80,7 +97,7 @@ app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
   }
   const memberRole = validateMemberRole(body.role);
 
-  await db
+  const [updated] = await db
     .update(noteMembers)
     .set({ role: memberRole, updatedAt: new Date() })
     .where(
@@ -89,26 +106,15 @@ app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
         eq(noteMembers.memberEmail, memberEmail),
         eq(noteMembers.isDeleted, false),
       ),
-    );
-
-  const [updated] = await db
-    .select({
+    )
+    .returning({
       noteId: noteMembers.noteId,
       memberEmail: noteMembers.memberEmail,
       role: noteMembers.role,
       invitedByUserId: noteMembers.invitedByUserId,
       createdAt: noteMembers.createdAt,
       updatedAt: noteMembers.updatedAt,
-    })
-    .from(noteMembers)
-    .where(
-      and(
-        eq(noteMembers.noteId, noteId),
-        eq(noteMembers.memberEmail, memberEmail),
-        eq(noteMembers.isDeleted, false),
-      ),
-    )
-    .limit(1);
+    });
   if (!updated) {
     throw new HTTPException(404, { message: "Member not found" });
   }
