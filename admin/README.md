@@ -30,15 +30,15 @@ npm run dev:admin
 ## ビルド
 
 ```bash
-cd admin && bun run build
+cd admin && npm install && npm run build
 ```
 
-出力は `admin/dist`。Cloudflare Pages ではビルドコマンドを `cd admin && npm ci && npm run build`、出力ディレクトリを `admin/dist` に設定する。
+出力は `admin/dist`。本番は Terraform で管理する Cloudflare Pages プロジェクト `zedi-admin` に対して、GitHub Actions `deploy-prod.yml` から自動デプロイする。
 
 ## 環境変数
 
 - **開発:** `.env` に `ZEDI_API_PROXY_TARGET=http://localhost:3000` を設定すると `/api` がその API にプロキシされる。
-- **本番:** Cloudflare で `VITE_API_BASE_URL=https://api.zedi-note.app` を設定。
+- **本番:** GitHub Actions の production environment から `VITE_API_BASE_URL=https://api.zedi-note.app` を渡してビルドする。`VITE_MAIN_APP_URL` は `https://zedi-note.app` を使用する。
 
 ## 仕様
 

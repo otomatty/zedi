@@ -58,19 +58,20 @@ const unsubscribe = manager.subscribe((newState) => {
 
 ### 1.3 docs/pr-191-review-response.md のポリシー明示（CodeRabbit）
 
-**指摘:** 「案 B（変数化）」を推奨している一方、`docs/pr-191-investigation-cloudflare-railway.md` では恒常的 DNS-only（`proxied=false`）を正としている。どちらが正か分かりにくい。
+**指摘:** 「案 B（変数化）」を推奨している一方、`docs/pr-191-investigation-cloudflare-railway.md` では通常運用の proxy 方針が読み取りづらい。どちらが正か分かりにくい。
 
-**対応:** 案 B の見出しを「参考: 案 B（代替案）」にし、採用方針を冒頭で明示する。
+**対応:** 案 B の見出しを「参考: 案 B（代替案）」にし、採用方針を冒頭で明示する。現在は production 実態に合わせて、通常 `proxied = true`、必要時のみ一時的に `false` とする。
 
 ```markdown
 ## 参考: 案 B（代替案）
 
 > 現在の採用方針は `docs/pr-191-investigation-cloudflare-railway.md` を正とし、
-> api/realtime は恒常的に `proxied = false`（DNS-only）とする。
+> api/realtime は通常 `proxied = true` とする。
+> 証明書更新時などに限り、一時的に `proxied = false` にする。
 > 以下は証明書更新時などに proxy を一時的に切り替える場合の代替案である。
 ```
 
-**理由:** 運用の正は「恒常 DNS-only」としつつ、案 B は「必要なときの手順」として残す形にすると、ドキュメント間で一貫する。
+**理由:** 運用の正を「通常 proxied=true」としつつ、案 B は「必要なときだけ false に切り替える手順」として残す形にすると、ドキュメント間で一貫する。
 
 ---
 

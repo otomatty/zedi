@@ -8,6 +8,8 @@ cloudflare_account_id = "your-cloudflare-account-id"
 
 # Optional: override zone or Railway targets if different from defaults
 # zone_domain         = "zedi-note.app"
+# pages_dev_subdomain = "dev"
+# pages_admin_subdomain = "admin"
 # api_cname_target    = "2yg7k4yt.up.railway.app"
 # realtime_cname_target = "nnkek1wf.up.railway.app"
 

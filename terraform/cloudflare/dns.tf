@@ -3,13 +3,14 @@ data "cloudflare_zone" "zedi" {
 }
 
 # api.zedi-note.app -> Railway API
-# DNS-only by design (proxied=false). We do not use Cloudflare proxy here; Railway issues and serves SSL at origin.
+# Proxied by Cloudflare in normal operation (proxied=true).
+# If Railway certificate issuance ever needs direct validation, temporarily set proxied=false, apply, then revert to true.
 resource "cloudflare_record" "api_cname" {
   zone_id         = data.cloudflare_zone.zedi.id
   name            = "api"
   type            = "CNAME"
   content         = var.api_cname_target
-  proxied         = false
+  proxied         = true
   ttl             = 1    # 1 = auto
   allow_overwrite = true # adopt existing record if present
 }
@@ -23,13 +24,14 @@ resource "cloudflare_record" "api_railway_verify" {
 }
 
 # realtime.zedi-note.app -> Railway Hocuspocus
-# DNS-only by design (proxied=false). We do not use Cloudflare proxy here; Railway issues and serves SSL at origin.
+# Proxied by Cloudflare in normal operation (proxied=true).
+# If Railway certificate issuance ever needs direct validation, temporarily set proxied=false, apply, then revert to true.
 resource "cloudflare_record" "realtime_cname" {
   zone_id         = data.cloudflare_zone.zedi.id
   name            = "realtime"
   type            = "CNAME"
   content         = var.realtime_cname_target
-  proxied         = false
+  proxied         = true
   ttl             = 1
   allow_overwrite = true # adopt existing record if present
 }
@@ -58,6 +60,16 @@ resource "cloudflare_record" "pages_dev_cname" {
   name    = var.pages_dev_subdomain
   type    = "CNAME"
   content = "${cloudflare_pages_project.zedi_dev.name}.pages.dev"
+  proxied = true
+  ttl     = 1
+}
+
+# admin.zedi-note.app -> Cloudflare Pages (zedi-admin); proxied for SSL
+resource "cloudflare_record" "pages_admin_cname" {
+  zone_id = data.cloudflare_zone.zedi.id
+  name    = var.pages_admin_subdomain
+  type    = "CNAME"
+  content = "${cloudflare_pages_project.zedi_admin.name}.pages.dev"
   proxied = true
   ttl     = 1
 }

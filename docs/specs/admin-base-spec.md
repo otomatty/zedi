@@ -15,23 +15,20 @@
 
 ## 2. デプロイ（Cloudflare Pages）
 
-**推奨: 管理者用に別の Cloudflare Pages プロジェクトを作成する。**
+**推奨: 管理者用に別の Cloudflare Pages プロジェクトを作成し、Terraform で管理、GitHub Actions からデプロイする。**
 
-| 観点 | 説明 |
-|------|------|
-| ビルド | 通常アプリは `npm run build`（ルート）、管理者は `admin/` で別ビルド。出力ディレクトリが異なるため、同一プロジェクトで両方を配信するには設定が複雑になる。 |
-| サブドメイン | `admin.zedi-note.app` を別プロジェクトにマッピングするだけでよい。 |
-| 権限・監査 | 管理者用プロジェクトのデプロイ権限を本番アプリと分離しやすい。 |
-| 環境変数 | 管理者用の `VITE_API_BASE_URL` 等を本番 API 向けにだけ設定すればよい。 |
+| 観点         | 説明                                                                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ビルド       | 通常アプリは `npm run build`（ルート）、管理者は `admin/` で別ビルド。出力ディレクトリが異なるため、同一プロジェクトで両方を配信するには設定が複雑になる。 |
+| サブドメイン | `admin.zedi-note.app` を別プロジェクトにマッピングするだけでよい。                                                                                         |
+| 権限・監査   | 管理者用プロジェクトのデプロイ権限を本番アプリと分離しやすい。                                                                                             |
+| 環境変数     | 管理者用の `VITE_API_BASE_URL` 等を本番 API 向けにだけ設定すればよい。                                                                                     |
 
-**手順イメージ:**
+**実装イメージ:**
 
-1. Cloudflare Dashboard で新規 Pages プロジェクト作成（例: `zedi-admin`）。
-2. 接続リポジトリは同じ `otomatty/zedi`、ビルド設定例:
-   - **Build command:** `cd admin && npm ci && npm run build`
-   - **Build output directory:** `admin/dist`
-   - **Root directory:** （空でリポジトリルート）
-3. カスタムドメインで `admin.zedi-note.app` を追加。
+1. `terraform/cloudflare/` に `cloudflare_pages_project` / `cloudflare_pages_domain` / DNS レコードを追加し、`zedi-admin` と `admin.zedi-note.app` を Terraform 管理に置く。
+2. GitHub Actions の production デプロイで、先に `terraform/cloudflare/` を apply して `zedi-admin` と `admin.zedi-note.app` を同期し、その後 `cd admin && npm install && npm run build` を実行して `admin/dist` を `wrangler pages deploy --project-name=zedi-admin` でデプロイする。
+3. GitHub Actions の environment variables / secrets は既存の Cloudflare 用設定を再利用し、Terraform Cloud 認証用に `TF_API_TOKEN` を追加、`VITE_API_BASE_URL` には本番 API を渡す。
 
 ---
 
@@ -123,13 +120,13 @@ admin/
 
 ## 6. API ルート構成（管理者）
 
-| パス | 認可 | 用途 |
-|------|------|------|
-| `GET /api/admin/me` | セッション + admin | 管理者情報・ロール確認 |
-| `GET /api/ai/admin/models` | セッション + admin | 全モデル一覧（#141） |
-| `PATCH /api/ai/admin/models/:id` | セッション + admin | モデル個別更新（#141） |
-| `PATCH /api/ai/admin/models/bulk` | セッション + admin | 一括更新（#141） |
-| `POST /api/ai/admin/sync-models` | セッション+admin **または** X-Sync-Secret | 同期（#141・CI 兼用） |
+| パス                              | 認可                                      | 用途                   |
+| --------------------------------- | ----------------------------------------- | ---------------------- |
+| `GET /api/admin/me`               | セッション + admin                        | 管理者情報・ロール確認 |
+| `GET /api/ai/admin/models`        | セッション + admin                        | 全モデル一覧（#141）   |
+| `PATCH /api/ai/admin/models/:id`  | セッション + admin                        | モデル個別更新（#141） |
+| `PATCH /api/ai/admin/models/bulk` | セッション + admin                        | 一括更新（#141）       |
+| `POST /api/ai/admin/sync-models`  | セッション+admin **または** X-Sync-Secret | 同期（#141・CI 兼用）  |
 
 既存の `POST /api/ai/admin/sync-models` はそのまま残し、新たに「admin ロールでセッションあり」でも実行可能にするとよい。
 
@@ -143,13 +140,13 @@ admin/
 
 ## 8. 環境変数（整理）
 
-| 対象 | 変数 | 説明 |
-|------|------|------|
-| API（本番） | `CORS_ORIGIN` | `https://zedi-note.app,https://admin.zedi-note.app` のように管理者オリジンを追加 |
-| API（本番） | `BETTER_AUTH_URL` | 本番 API の URL（Cookie のドメインは API ではなくフロントのドメインと協調） |
-| Better Auth | `trustedOrigins` | 本番では `zedi-note.app` と `admin.zedi-note.app` を含める |
-| Admin（Cloudflare） | `VITE_API_BASE_URL` | 本番 API の URL（例: `https://api.zedi-note.app`） |
-| Admin（ローカル） | `VITE_API_BASE_URL` または proxy | ローカル API または `ZEDI_API_PROXY_TARGET` 相当でプロキシ |
+| 対象                | 変数                             | 説明                                                                             |
+| ------------------- | -------------------------------- | -------------------------------------------------------------------------------- |
+| API（本番）         | `CORS_ORIGIN`                    | `https://zedi-note.app,https://admin.zedi-note.app` のように管理者オリジンを追加 |
+| API（本番）         | `BETTER_AUTH_URL`                | 本番 API の URL（Cookie のドメインは API ではなくフロントのドメインと協調）      |
+| Better Auth         | `trustedOrigins`                 | 本番では `zedi-note.app` と `admin.zedi-note.app` を含める                       |
+| Admin（Cloudflare） | `VITE_API_BASE_URL`              | 本番 API の URL（例: `https://api.zedi-note.app`）                               |
+| Admin（ローカル）   | `VITE_API_BASE_URL` または proxy | ローカル API または `ZEDI_API_PROXY_TARGET` 相当でプロキシ                       |
 
 ---
 

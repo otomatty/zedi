@@ -4,38 +4,38 @@
 
 **Gemini Code Assist** と **GitHub Copilot** の両方から、同じ内容が指摘されています。
 
-| 指摘内容                                                                                                                                     |
-| -------------------------------------------------------------------------------------------------------------------------------------------- |
-| コメントでは「一時的に `proxied=false` にして、その後 `true` に戻す」と書いているが、コードでは `proxied = false` がハードコードされている。 |
-| そのため Terraform は常に DNS-only を強制し、「true に戻す」状態をコードで表現できていない。                                                 |
-| 手動で Cloudflare 上を `proxied = true` にしても、次回 `terraform apply` で上書きされてしまう。                                              |
-| **IaC の状態とコメントで説明している運用が一致しておらず、混乱を招く。**                                                                     |
+| 指摘内容                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------- |
+| コメントでは「一時的に `proxied=false` にして、その後 `true` に戻す」と書いているが、コードでは通常状態が明確でない。 |
+| production の実運用は `proxied = true` なので、Terraform も「通常は true、必要時のみ false」に揃えるべき。            |
+| 手動で Cloudflare 上を変更すると IaC とずれるため、通常状態も一時切替も Terraform で表現した方がよい。                |
+| **IaC の状態とコメントで説明している運用が一致しておらず、混乱を招く。**                                              |
 
 ---
 
 ## 対応方針の選択肢
 
-### 案 A: コメントを現状のコードに合わせる（最小変更）
+### 案 A: 通常状態を `proxied = true` に合わせる（推奨）
 
 **やること**
 
-- 「Toggle Trick」の文言をやめ、**現在のコードの状態（常に `proxied = false`）** を説明するコメントに変更する。
-- 運用で「証明書発行後に Cloudflare 経由に戻したい場合」は、**Terraform の値を `true` に変更して apply する**旨をコメントに書く。
+- `api_cname` / `realtime_cname` の `proxied` を **通常状態の `true`** に変更する。
+- コメントを「通常は Cloudflare proxy を有効にし、証明書発行や再検証が必要なときだけ一時的に `false` にする」説明に変更する。
 
 **メリット**
 
-- 変更が少ない（`dns.tf` のコメントのみ）。
+- production の実運用と Terraform が一致する。
 - 変数や tfvars を増やさない。
 
 **デメリット**
 
-- 「トグル」は Terraform の値を書き換えて apply する手順になり、コメントで「手動で Cloudflare をいじる」と誤解されないように書く必要がある。
+- 一時的に `false` にする場合は、その都度 Terraform を変更して apply する運用になる。
 
 **コメント例（案 A）**
 
 ```hcl
 # api.zedi-note.app -> Railway API
-# DNS-only (proxied=false) for Railway-origin SSL. To use Cloudflare proxy, set proxied=true here and terraform apply.
+# Proxied by Cloudflare in normal operation (proxied=true). If Railway cert issuance needs direct validation, temporarily set proxied=false and apply.
 ```
 
 ---
@@ -43,7 +43,7 @@
 ### 参考: 案 B（代替案）
 
 > 現在の採用方針は `docs/pr-191-investigation-cloudflare-railway.md` を正とし、
-> api/realtime は恒常的に `proxied = false`（DNS-only）とする。
+> api/realtime は通常 `proxied = true` で運用し、必要時のみ一時的に `proxied = false` にする。
 > 以下は証明書更新時などに proxy を一時的に切り替える場合の代替案である。
 
 ---
@@ -79,8 +79,8 @@
 
 ## 採用方針
 
-- **現在の採用方針**は `docs/pr-191-investigation-cloudflare-railway.md` を正とし、api/realtime は**恒常的に DNS-only（`proxied = false`）**とする。
-- 案 A に従い、コメントを現状のコードに合わせて修正する。
+- **現在の採用方針**は `docs/pr-191-investigation-cloudflare-railway.md` を正とし、api/realtime は**通常 `proxied = true`** とする。
+- 案 A に従い、コードとコメントを production の実態に合わせて修正する。
 - 案 B は証明書更新時などに proxy を一時的に切り替える場合の**参考用の代替案**として残す。
 
 ---
@@ -105,4 +105,4 @@ variable "railway_subdomains_proxied" {
    - 変数のデフォルトを一時的に `false` にするか、`terraform.tfvars` や CI の変数で `railway_subdomains_proxied = false` を渡す。
    - 証明書発行が終わったら `true` に戻す。
 
-案 A を採用する場合、`dns.tf` のコメントを案 A の例に従って修正し、レビューへの対応として「調査ドキュメントに基づき恒常 DNS-only を正とし、コメントを実装に合わせて修正した」と返信する形がおすすめです。
+案 A を採用する場合、`dns.tf` の `proxied` とコメントを案 A の例に従って修正し、レビューへの対応として「production の通常運用を `proxied = true` に揃え、必要時のみ一時的に `false` へ切り替える方針に整理した」と返信する形がおすすめです。

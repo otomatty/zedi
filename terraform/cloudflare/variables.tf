@@ -22,6 +22,13 @@ variable "pages_dev_subdomain" {
   default     = "dev"
 }
 
+# Pages admin frontend custom subdomain (e.g. admin.zedi-note.app)
+variable "pages_admin_subdomain" {
+  type        = string
+  description = "Subdomain for admin frontend (Pages zedi-admin), e.g. admin -> admin.zedi-note.app"
+  default     = "admin"
+}
+
 # Railway API subdomain CNAME targets (from Railway custom domain)
 variable "api_cname_target" {
   type        = string

@@ -57,6 +57,7 @@ Account ID は Terraform Cloud の変数 `CLOUDFLARE_ACCOUNT_ID` または `terr
 # 形式: terraform import 'cloudflare_pages_project.<resource_label>' <account_id>/<project_name>
 terraform import 'cloudflare_pages_project.zedi' "<ACCOUNT_ID>/zedi"
 terraform import 'cloudflare_pages_project.zedi_dev' "<ACCOUNT_ID>/zedi-dev"
+terraform import 'cloudflare_pages_project.zedi_admin' "<ACCOUNT_ID>/zedi-admin"
 ```
 
 ---
