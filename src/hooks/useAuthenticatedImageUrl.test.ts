@@ -76,7 +76,7 @@ describe("requiresAuth", () => {
     });
 
     afterEach(() => {
-      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
     });
 
     it("returns true for cross-origin thumbnail URL matching API base", () => {
@@ -200,23 +200,25 @@ describe("useAuthenticatedImageUrl", () => {
 
   it("fetches cross-origin API thumbnail URL with credentials when VITE_API_BASE_URL matches", async () => {
     vi.stubEnv("VITE_API_BASE_URL", "https://api.zedi-note.app");
-    mockFetchSuccess();
-    const src = "https://api.zedi-note.app/api/thumbnail/serve/cross-origin-id";
+    try {
+      mockFetchSuccess();
+      const src = "https://api.zedi-note.app/api/thumbnail/serve/cross-origin-id";
 
-    const { result } = renderHook(() => useAuthenticatedImageUrl(src));
+      const { result } = renderHook(() => useAuthenticatedImageUrl(src));
 
-    expect(result.current.isLoading).toBe(true);
+      expect(result.current.isLoading).toBe(true);
 
-    await waitFor(() => {
-      expect(result.current.resolvedUrl).toBe(FAKE_BLOB_URL);
-    });
+      await waitFor(() => {
+        expect(result.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+      });
 
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.hasError).toBe(false);
-    expect(global.fetch).toHaveBeenCalledWith(src, { credentials: "include" });
-    expect(mockCreateObjectURL).toHaveBeenCalled();
-
-    vi.unstubAllGlobals();
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.hasError).toBe(false);
+      expect(global.fetch).toHaveBeenCalledWith(src, { credentials: "include" });
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("cancels in-flight fetch when src changes before completion", async () => {

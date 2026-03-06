@@ -16,7 +16,7 @@ HINT:  Rebuild all objects in this database that use the default collation and r
 
 1. Railway ダッシュボードで PostgreSQL サービスを開く。
 2. **Connect** または **Variables** から `DATABASE_URL` を確認する（接続文字列）。
-3. ローカルまたは Railway CLI から該当 DB に接続し、以下を実行する:
+3. ローカルまたは Railway CLI から該当 DB に接続し、以下を実行する。DB 名が `zedi` でない場合は、接続中の DB 名（`SELECT current_database();` で確認可能）に置き換えてください。
 
 ```sql
 ALTER DATABASE zedi REFRESH COLLATION VERSION;
