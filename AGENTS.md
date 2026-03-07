@@ -65,7 +65,8 @@ gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ### 3. 再レビュー依頼
 
 ```bash
-gh pr comment {number} --body "@claude /review
+gh pr comment {number} --body "レビューコメントへの対応をコミットしました。最新の変更に対する再レビューをお願いします。
+
 @coderabbitai review
 @copilot 再レビューをお願いします。"
 ```
