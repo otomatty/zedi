@@ -53,3 +53,6 @@ test-results/
 *.tfvars
 !*.tfvars.example
 .terraform.lock.hcl
+
+# TypeScript build info
+*.tsbuildinfo
