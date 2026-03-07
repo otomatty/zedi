@@ -104,9 +104,7 @@ git push origin HEAD
 
 gh pr comment {number} --body "レビューコメントへの対応をコミットしました（{SHA}）。最新の変更に対する再レビューをお願いします。
 
-@claude /review
 @coderabbitai review
-@copilot 再レビューをお願いします。"
 ```
 
 ## セッション内コンテキスト再利用

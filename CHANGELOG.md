@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
-
-
 **Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.2.0...zedi-v0.2.1
 
 ## [0.2.0](https://github.com/otomatty/zedi/compare/zedi-v0.1.0...zedi-v0.2.0) (2026-03-07)
