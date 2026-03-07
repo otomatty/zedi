@@ -1,6 +1,6 @@
 # Terraform で Cloudflare を管理するために Cloudflare 側で必要な作業
 
-**目的:** [terraform/cloudflare/](../../terraform/cloudflare/) を利用する前に、Cloudflare ダッシュボードで行う作業をまとめる。
+**目的:** [terraform/cloudflare/](../../terraform/cloudflare/) の **shared / dev / prod** 各スタックを利用する前に、Cloudflare ダッシュボードで行う作業をまとめる。
 
 **関連:** [terraform-cloud-setup.md](terraform-cloud-setup.md)（Terraform Cloud の設定）、[terraform-cloudflare-import.md](terraform-cloudflare-import.md)（import 手順）、[environment-secrets-variables-setup.md](environment-secrets-variables-setup.md)（GitHub 用 Secret の取得）
 
@@ -40,7 +40,7 @@ Terraform Provider が Cloudflare API を呼ぶために使用する。**GitHub 
    - **Zone** → **DNS** → **Edit**
 6. **Zone Resources** で **Include** → **Specific zone** → **zedi-note.app** を選択
 7. **Continue to summary** → **Create Token**
-8. **表示されたトークンをコピー**し、Terraform Cloud の Environment Variable `CLOUDFLARE_API_TOKEN`（Sensitive）に設定する
+8. **表示されたトークンをコピー**し、Terraform Cloud の各 Workspace の Terraform 変数 `cloudflare_api_token`（Sensitive）、または GitHub の Environment secret `CLOUDFLARE_API_TOKEN` に設定する
 
 **参考:** [Create API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
 
@@ -59,7 +59,7 @@ Terraform の変数 `cloudflare_account_id` および Pages の import（`<accou
 
 **形式:** 32 文字の英数字。
 
-取得した値を Terraform Cloud の変数 `CLOUDFLARE_ACCOUNT_ID` または `terraform.tfvars` の `cloudflare_account_id` に設定する。
+取得した値を Terraform Cloud の各 Workspace の変数 `cloudflare_account_id`、または各スタックの `terraform.tfvars`／GitHub secret `CLOUDFLARE_ACCOUNT_ID` に設定する。
 
 ---
 

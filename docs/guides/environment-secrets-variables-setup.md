@@ -121,8 +121,8 @@
 **用途補足:**
 
 - GitHub Actions では `TF_TOKEN_app_terraform_io` 環境変数として渡す
-- Cloudflare Provider 用の `cloudflare_api_token` / `cloudflare_account_id` は Terraform Cloud workspace 側で管理する想定
-- `deploy-prod.yml` の Cloudflare apply と `terraform-cloudflare.yml` の plan で使用する
+- Cloudflare Provider 用には、同一の `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` を **TF_VAR_cloudflare_api_token** / **TF_VAR_cloudflare_account_id** として各 Terraform workflow（shared / dev / prod）で渡している
+- `deploy-prod.yml` の Apply Cloudflare (Prod)、`deploy-dev.yml` の Apply Cloudflare (Dev)、および `terraform-cloudflare-*.yml` の plan/apply で使用する
 
 ---
 
