@@ -67,7 +67,7 @@ gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ```bash
 gh pr comment {number} --body "@claude /review
 @coderabbitai review
-@github-copilot 再レビューをお願いします。"
+@copilot 再レビューをお願いします。"
 ```
 
 ## ディレクトリ構成

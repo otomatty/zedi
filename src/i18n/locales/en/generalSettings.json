@@ -56,5 +56,11 @@
   "saved": "General settings saved",
   "saveFailed": "Failed to save general settings",
   "profileSaved": "Profile saved",
-  "profileSaveFailed": "Failed to save profile"
+  "profileSaveFailed": "Failed to save profile",
+  "about": {
+    "title": "About",
+    "description": "Zedi version and release information",
+    "version": "Version",
+    "releaseNotes": "View release notes"
+  }
 }

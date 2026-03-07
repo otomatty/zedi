@@ -56,5 +56,11 @@
   "saved": "一般設定を保存しました",
   "saveFailed": "一般設定の保存に失敗しました",
   "profileSaved": "プロフィールを保存しました",
-  "profileSaveFailed": "プロフィールの保存に失敗しました"
+  "profileSaveFailed": "プロフィールの保存に失敗しました",
+  "about": {
+    "title": "アプリについて",
+    "description": "Zedi のバージョンとリリース情報",
+    "version": "バージョン",
+    "releaseNotes": "リリースノートを見る"
+  }
 }

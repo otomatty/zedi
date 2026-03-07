@@ -1,0 +1,30 @@
+# Release Please: main へのマージ内容に応じてリリース PR を作成し、
+# その PR マージ時にタグ・GitHub Release を自動作成します。
+# Conventional Commits (feat:, fix:, BREAKING CHANGE:) に応じて
+# メジャー / マイナー / パッチが自動判定されます。
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Release Please
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
