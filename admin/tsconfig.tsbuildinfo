@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/api/admin.ts","./src/api/client.ts","./src/components/adminguard.tsx","./src/pages/layout.tsx","./src/pages/login.tsx","./src/pages/ai-models/index.tsx","./vite.config.ts"],"version":"5.9.3"}
