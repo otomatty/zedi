@@ -8,15 +8,16 @@
 
 ## 1. 一覧
 
-### 1.1 Environment Secrets（development / production 共通）
+### 1.1 Environment Secrets（development / production 共通 + Terraform 用）
 
 | Secret                  | 取得元     | セクション                        |
 | ----------------------- | ---------- | --------------------------------- |
 | `DATABASE_URL`          | Railway    | [§2.1](#21-database_url)          |
 | `CLOUDFLARE_API_TOKEN`  | Cloudflare | [§2.2](#22-cloudflare_api_token)  |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare | [§2.3](#23-cloudflare_account_id) |
+| `TF_API_TOKEN`          | Terraform  | [§2.4](#24-tf_api_token)          |
 
-**注:** `RAILWAY_TOKEN` は不要（Railway の GitHub 連携でデプロイするため）
+**注:** `RAILWAY_TOKEN` は不要（Railway の GitHub 連携でデプロイするため）。`TF_API_TOKEN` は Terraform Cloud を GitHub Actions から実行する environment に登録する。
 
 ### 1.2 Environment Variables（development / production 共通）
 
@@ -99,6 +100,29 @@
 **形式:** 32 文字の英数字（例: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6`）
 
 **注意:** 同一 Cloudflare アカウント内なら、development と production で同じ Account ID を使用する。
+
+---
+
+### 2.4 TF_API_TOKEN
+
+**用途:** GitHub Actions から Terraform Cloud（HCP Terraform）に対して `terraform init` / `plan` / `apply` を実行する際の認証。
+
+**取得元:** Terraform Cloud
+
+**手順:**
+
+1. [Terraform Cloud](https://app.terraform.io/) にログイン
+2. 右上のユーザーメニュー → **User settings**
+3. **Tokens** を開く
+4. **Create an API token** をクリック
+5. 分かりやすい名前を付けて発行し、表示されたトークンをコピーする
+6. GitHub の Terraform を実行する各 Environment secret（`development` と `production`）に `TF_API_TOKEN` の名前で登録する
+
+**用途補足:**
+
+- GitHub Actions では `TF_TOKEN_app_terraform_io` 環境変数として渡す
+- Cloudflare Provider 用には、同一の `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` を **TF_VAR_cloudflare_api_token** / **TF_VAR_cloudflare_account_id** として各 Terraform workflow（shared / dev / prod）で渡している
+- `deploy-prod.yml` の Apply Cloudflare (Prod)、`deploy-dev.yml` の Apply Cloudflare (Dev)、および `terraform-cloudflare-*.yml` の plan/apply で使用する
 
 ---
 

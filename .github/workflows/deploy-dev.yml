@@ -23,11 +23,36 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+  apply-cloudflare-dev:
+    name: Apply Cloudflare Terraform (Dev)
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Terraform Init
+        working-directory: terraform/cloudflare/dev
+        run: terraform init -input=false
+        env:
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Terraform Apply
+        working-directory: terraform/cloudflare/dev
+        run: terraform apply -auto-approve -input=false
+        env:
+          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
   # Railway deploys api and hocuspocus via GitHub integration (configure in Railway Dashboard)
   deploy-frontend:
     name: Deploy Frontend
     needs:
       - migrate
+      - apply-cloudflare-dev
     runs-on: ubuntu-latest
     environment: development
     steps:
