@@ -6,6 +6,20 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const port = parseInt(env.VITE_PORT || "30001", 10);
   const apiTarget = env.ZEDI_API_PROXY_TARGET || "";
+  const apiTargetIsLocal = (() => {
+    if (!apiTarget) return false;
+    try {
+      const { hostname, protocol } = new URL(apiTarget);
+      return (
+        protocol === "http:" ||
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1"
+      );
+    } catch {
+      return false;
+    }
+  })();
 
   return {
     server: {
@@ -18,7 +32,7 @@ export default defineConfig(({ mode }) => {
               "/api": {
                 target: apiTarget,
                 changeOrigin: true,
-                secure: true,
+                secure: !apiTargetIsLocal,
               },
             },
           }

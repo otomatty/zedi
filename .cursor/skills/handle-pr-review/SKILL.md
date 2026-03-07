@@ -74,7 +74,7 @@ gh api repos/{owner}/{repo}/pulls/{number}/comments \
 2. 修正を実装
 3. `bun run lint` でエラーがないか確認
 4. 全修正をまとめて 1 コミット:
-   ```
+   ```text
    fix: address PR #{number} review comments
    ```
 

@@ -8,10 +8,17 @@
 
 **terraform/cloudflare/scripts/import-existing.sh** で、DNS レコード ID の取得と 3 スタック分の import を一括実行できる。
 
+実行前に次を満たしておく:
+
+- `terraform login` 済み、または `TF_TOKEN_app_terraform_io` を設定済み
+- `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `ZONE_ID` を取得済み
+
 ```bash
-# 事前に Cloudflare のトークンと Account ID を環境変数に設定
+# 事前に Terraform Cloud と Cloudflare の認証情報を環境変数に設定
+export TF_TOKEN_app_terraform_io="あなたのTerraform Cloudトークン"
 export CLOUDFLARE_API_TOKEN="あなたのAPIトークン"
 export CLOUDFLARE_ACCOUNT_ID="あなたのAccount ID（32文字）"
+export ZONE_ID="zedi-note.app の zone_id"
 
 # terraform/cloudflare ディレクトリから実行
 cd terraform/cloudflare

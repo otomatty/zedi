@@ -4,10 +4,13 @@
 # 出力を確認してから import コマンドで使用する。
 
 set -euo pipefail
-ZONE_ID="${ZONE_ID:-6022417d0607fbaf4b7914b39ac61fe5}"
 
 if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
   echo "Error: CLOUDFLARE_API_TOKEN is not set. Export it first." >&2
+  exit 1
+fi
+if [ -z "${ZONE_ID:-}" ]; then
+  echo "Error: ZONE_ID is not set. Export it first." >&2
   exit 1
 fi
 

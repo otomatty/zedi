@@ -3,15 +3,19 @@
 # 事前に export CLOUDFLARE_API_TOKEN=... と CLOUDFLARE_ACCOUNT_ID=... を設定すること。
 # 実行: bash scripts/import-existing.sh（terraform/cloudflare から）
 
-set -e
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ROOT_DIR = terraform/cloudflare（scripts の1つ上）
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ZONE_ID="${ZONE_ID:-6022417d0607fbaf4b7914b39ac61fe5}"
+ZONE_ID="${ZONE_ID:-}"
 ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}"
 
-if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
   echo "Error: CLOUDFLARE_API_TOKEN is not set. Export it first." >&2
+  exit 1
+fi
+if [ -z "${ZONE_ID}" ]; then
+  echo "Error: ZONE_ID is not set. Export it first." >&2
   exit 1
 fi
 if [ -z "${ACCOUNT_ID}" ]; then
@@ -23,7 +27,7 @@ export TF_VAR_cloudflare_api_token="${CLOUDFLARE_API_TOKEN}"
 export TF_VAR_cloudflare_account_id="${ACCOUNT_ID}"
 
 echo "Fetching DNS record IDs from Cloudflare..."
-RECORDS_JSON=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+RECORDS_JSON=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records")
 
 # JSON から name/type に一致するレコードの id を取得（Node.js を使用。Bun でも可）
@@ -42,7 +46,7 @@ get_id() {
     " "$name" "$type"
   elif command -v bun >/dev/null 2>&1; then
     echo "$RECORDS_JSON" | bun -e "
-      const d = JSON.parse(await new Response(process.stdin).text());
+      const d = JSON.parse(await Bun.stdin.text());
       const n = process.argv[2], t = process.argv[3];
       const r = d.result && d.result.find(x => x.name === n && x.type === t);
       if (r) console.log(r.id);
@@ -65,6 +69,7 @@ ID_ADMIN_CNAME=$(get_id "admin.zedi-note.app" "CNAME")
 import_shared() {
   echo "--- shared ---"
   cd "$ROOT_DIR/shared"
+  terraform init -input=false
   if [ -n "$ID_API_CNAME" ]; then
     terraform import -input=false 'cloudflare_record.api_cname' "$ZONE_ID/$ID_API_CNAME" || true
   else
@@ -90,6 +95,7 @@ import_shared() {
 import_dev() {
   echo "--- dev ---"
   cd "$ROOT_DIR/dev"
+  terraform init -input=false
   terraform import -input=false 'cloudflare_pages_project.zedi_dev' "$ACCOUNT_ID/zedi-dev" || echo "Skip zedi-dev Pages project (not found or already imported)"
   if [ -n "$ID_DEV_CNAME" ]; then
     terraform import -input=false 'cloudflare_record.pages_dev_cname' "$ZONE_ID/$ID_DEV_CNAME" || true
@@ -103,6 +109,7 @@ import_dev() {
 import_prod() {
   echo "--- prod ---"
   cd "$ROOT_DIR/prod"
+  terraform init -input=false
   terraform import -input=false 'cloudflare_pages_project.zedi' "$ACCOUNT_ID/zedi" || echo "Skip zedi Pages project (not found or already imported)"
   terraform import -input=false 'cloudflare_pages_project.zedi_admin' "$ACCOUNT_ID/zedi-admin" || echo "Skip zedi-admin Pages project (not found or already imported)"
   if [ -n "$ID_APEX_CNAME" ]; then

@@ -168,7 +168,7 @@
 2. 対象環境を選択
 3. **hocuspocus** サービスをクリック
 4. **Settings** → **Networking** → **Public Networking** のドメインを確認
-5. プロトコルは `**wss://`\*\*（HTTPS の場合は `wss`、HTTP の場合は `ws`）
+5. プロトコルは **`wss://`**（HTTPS の場合は `wss`、HTTP の場合は `ws`）
 
 **注意:** Hocuspocus は HTTP で動いていても、フロントが HTTPS で配信される場合は `wss://` が必要。Railway のデフォルトドメインは HTTPS なので `wss://` を使用する。
 

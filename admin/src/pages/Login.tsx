@@ -3,7 +3,7 @@
  * メインアプリでサインイン後、このドメインに戻るとセッションが有効になる。
  */
 export default function Login() {
-  const mainAppUrl = import.meta.env.VITE_MAIN_APP_URL ?? "https://zedi-note.app";
+  const mainAppUrl = import.meta.env.VITE_MAIN_APP_URL || "https://zedi-note.app";
   const signInUrl = `${mainAppUrl}/sign-in`;
 
   return (

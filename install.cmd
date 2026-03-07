@@ -37,6 +37,8 @@ set "DOWNLOAD_DIR=%USERPROFILE%\.claude\downloads"
 REM Use native ARM64 binary on ARM64 Windows, x64 otherwise
 if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
     set "PLATFORM=win32-arm64"
+) else if /i "%PROCESSOR_ARCHITEW6432%"=="ARM64" (
+    set "PLATFORM=win32-arm64"
 ) else (
     set "PLATFORM=win32-x64"
 )
@@ -141,21 +143,25 @@ set "EXPECTED_CHECKSUM="
 REM Use findstr to find platform section, then look for checksum
 set "FOUND_PLATFORM="
 set "IN_PLATFORM_SECTION="
+set "BRACE_DEPTH=0"
+set "PLATFORM_NEEDLE=\"%PLATFORM_NAME%\":"
+set "CHECKSUM_NEEDLE=\"checksum\":"
 
 REM Read the manifest line by line
 for /f "usebackq tokens=*" %%i in ("!MANIFEST_PATH!") do (
     set "LINE=%%i"
     
     REM Check if this line contains our platform
-    echo !LINE! | findstr /c:"\"%PLATFORM_NAME%\":" >nul
-    if !ERRORLEVEL! equ 0 (
+    if not "!LINE!"=="!LINE:%PLATFORM_NEEDLE%=!" (
         set "IN_PLATFORM_SECTION=1"
+        set "BRACE_DEPTH=0"
     )
     
     REM If we're in the platform section, look for checksum
     if defined IN_PLATFORM_SECTION (
-        echo !LINE! | findstr /c:"\"checksum\":" >nul
-        if !ERRORLEVEL! equ 0 (
+        if not "!LINE!"=="!LINE:{=!" set /a BRACE_DEPTH+=1
+
+        if not "!LINE!"=="!LINE:%CHECKSUM_NEEDLE%=!" (
             REM Extract checksum value
             for /f "tokens=2 delims=:" %%j in ("!LINE!") do (
                 set "CHECKSUM_PART=%%j"
@@ -174,10 +180,12 @@ for /f "usebackq tokens=*" %%i in ("!MANIFEST_PATH!") do (
                 )
             )
         )
-        
-        REM Check if we've left the platform section (closing brace)
-        echo !LINE! | findstr /c:"}" >nul
-        if !ERRORLEVEL! equ 0 set "IN_PLATFORM_SECTION="
+
+        if not "!LINE!"=="!LINE:}=!" set /a BRACE_DEPTH-=1
+        if !BRACE_DEPTH! leq 0 (
+            set "IN_PLATFORM_SECTION="
+            set "BRACE_DEPTH=0"
+        )
     )
 )
 
@@ -207,8 +215,8 @@ set "EXPECTED=%~2"
 for /f "skip=1 tokens=*" %%i in ('certutil -hashfile "!FILE_PATH!" SHA256') do (
     set "ACTUAL=%%i"
     set "ACTUAL=!ACTUAL: =!"
-    if "!ACTUAL!"=="CertUtil:Thecommandcompletedsuccessfully." goto :verify_done
     if "!ACTUAL!" neq "" (
+        if /i "!ACTUAL:~0,9!"=="CertUtil:" goto :verify_done
         if /i "!ACTUAL!"=="!EXPECTED!" (
             exit /b 0
         ) else (

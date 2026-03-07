@@ -136,7 +136,7 @@ admin/
 
 - 本番 API の `CORS_ORIGIN` に管理者オリジンを追加する必要がある。
 - 例: `CORS_ORIGIN=https://zedi-note.app,https://admin.zedi-note.app`
-- Better Auth の `trustedOrigins` は現在 `CORS_ORIGIN` から読みているため、上記に含めれば管理者ドメインも信頼される。
+- Better Auth の `trustedOrigins` は現在 `CORS_ORIGIN` から読み取っているため、上記に含めれば管理者ドメインも信頼される。
 
 ## 8. 環境変数（整理）
 
