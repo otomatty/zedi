@@ -34,7 +34,8 @@ while IFS= read -r branch; do
     echo "Skip (default): $branch"
     continue
   fi
-  if git branch -d "$branch" 2>/dev/null; then
+  # Use -D: we already filtered by --merged "$default_remote"; -d uses upstream/HEAD and can disagree
+  if git branch -D "$branch" 2>/dev/null; then
     ((deleted++)) || true
   else
     echo "Skip (not fully merged or error): $branch"
