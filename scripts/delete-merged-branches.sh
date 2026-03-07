@@ -8,8 +8,13 @@ echo "Fetching and pruning remote refs..."
 git fetch origin --prune
 
 # リモートのデフォルトブランチ（例: main）
-default_remote="origin/$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
-default_branch="${default_remote#origin/}"
+default_branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
+if [ -z "$default_branch" ]; then
+  echo "Error: Could not determine the default branch for remote 'origin'." >&2
+  echo "Please ensure 'origin/HEAD' is set correctly on your remote." >&2
+  exit 1
+fi
+default_remote="origin/$default_branch"
 current="$(git branch --show-current)"
 
 echo "Default branch: $default_branch (merged into $default_remote)"

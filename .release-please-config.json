@@ -1,5 +1,8 @@
 {
   "release-type": "node",
+  "packages": {
+    ".": {}
+  },
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },

@@ -4,13 +4,13 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { readFileSync } from "fs";
 import { componentTagger } from "lovable-tagger";
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
 
 const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf-8")) as {
   version: string;
 };
 const appVersion = packageJson.version ?? "0.0.0";
-import wasm from "vite-plugin-wasm";
-import topLevelAwait from "vite-plugin-top-level-await";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {

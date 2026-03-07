@@ -16,7 +16,7 @@
 | `feat:`                                          | マイナー (0.1.0 → 0.2.0)                       | `feat: add dark mode`                             |
 | `fix:`                                           | パッチ (0.1.0 → 0.1.1)                         | `fix: resolve login redirect`                     |
 | `BREAKING CHANGE:` または `feat!:` / `fix!:`     | メジャー (0.1.0 → 1.0.0)                       | 本文に `BREAKING CHANGE:` を記載、または `feat!:` |
-| `docs:`, `chore:`, `style:`, `test:`, `ci:` など | リリースノートには含めるがバージョンは上げない | 他の feat/fix とまとめてリリース                  |
+| `docs:`, `chore:`, `style:`, `test:`, `ci:` など | リリースノートには含めず、バージョンも上げない | 他の feat/fix とまとめてリリース                  |
 
 既存の **commitlint**（`@commitlint/config-conventional`）のルールに合わせてコミットメッセージを書けば、そのまま Release Please の判定に使われる。
 
@@ -34,7 +34,8 @@
 
 ## 関連ファイル
 
-- `.release-please-config.json` — Release Please の設定（release-type: node、changelog セクションなど）
+- `.release-please-config.json` — Release Please の設定（release-type: node、packages、changelog セクションなど）
+- `.release-please-manifest.json` — 現在のリリース済みバージョンを管理する manifest
 - `.github/workflows/release-please.yml` — main への push で Release Please を実行
 - `package.json` — ルートの `version` が Release Please により更新される
 - `CHANGELOG.md` — Release Please が自動生成・更新（初回は手動で作成してもよい）
@@ -43,7 +44,8 @@
 ## 初回セットアップ（未作成の場合）
 
 - `CHANGELOG.md` が無い場合、Release Please が初回の Release PR で作成する。既存の `CHANGELOG.md` がある場合はその形式に合わせて追記される。
-- 既存の `package.json` の `version`（例: `0.1.0`）がそのまま次のリリースのベースになる。
+- `.release-please-manifest.json` に現在のリリース済みバージョン（例: `0.1.0`）を記録しておく。
+- `package.json` の `version` は Release PR 作成時に Release Please により更新される。
 
 ## 参考
 
