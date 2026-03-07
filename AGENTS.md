@@ -81,6 +81,10 @@ terraform/        # インフラ定義
 docs/             # ドキュメント
 ```
 
+## マージ方法
+
+- **main → develop** の同期 PR は必ず **Create a merge commit** でマージする（Squash だと develop → main の PR でコンフリクトが再発する）。詳細は [docs/guides/branch-strategy.md](docs/guides/branch-strategy.md#マージ方法のルール) を参照。
+
 ## その他
 
 - 変更が大きい場合は小さな PR に分ける。
