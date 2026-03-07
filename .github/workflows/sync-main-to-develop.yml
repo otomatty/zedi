@@ -23,14 +23,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
           git fetch origin develop
 
-          if git diff --quiet origin/main origin/develop; then
-            echo "main and develop are already in sync"
+          COMMITS_TO_SYNC=$(git rev-list --count origin/develop..origin/main)
+          if [ "$COMMITS_TO_SYNC" -eq 0 ]; then
+            echo "No commits in main to sync to develop"
             exit 0
           fi
 
-          EXISTING=$(gh pr list --head main --base develop --state open --json number --jq '.[0].number')
+          EXISTING=$(gh pr list --head main --base develop --state open --json number --jq '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
             echo "Sync PR #$EXISTING already exists"
             exit 0
