@@ -4,6 +4,24 @@
 
 ---
 
+## 一括 import スクリプト（推奨）
+
+**terraform/cloudflare/scripts/import-existing.sh** で、DNS レコード ID の取得と 3 スタック分の import を一括実行できる。
+
+```bash
+# 事前に Cloudflare のトークンと Account ID を環境変数に設定
+export CLOUDFLARE_API_TOKEN="あなたのAPIトークン"
+export CLOUDFLARE_ACCOUNT_ID="あなたのAccount ID（32文字）"
+
+# terraform/cloudflare ディレクトリから実行
+cd terraform/cloudflare
+bash scripts/import-existing.sh
+```
+
+実行後、各スタックで `terraform plan` を実行し、差分がなければ import 完了。手動で import する場合は以下を参照。
+
+---
+
 ## 前提
 
 - Terraform Cloud に 3 つの Workspace（`cloudflare-shared` / `cloudflare-dev` / `cloudflare-prod`）を作成済み

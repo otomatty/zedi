@@ -16,11 +16,17 @@ resource "cloudflare_record" "api_cname" {
 }
 
 resource "cloudflare_record" "api_railway_verify" {
-  zone_id = data.cloudflare_zone.zedi.id
-  name    = "_railway-verify.api"
-  type    = "TXT"
-  content = var.api_railway_verify_txt
-  ttl     = 1
+  zone_id         = data.cloudflare_zone.zedi.id
+  name            = "_railway-verify.api"
+  type            = "TXT"
+  content         = var.api_railway_verify_txt
+  ttl             = 1
+  allow_overwrite = true
+
+  lifecycle {
+    # 既存 TXT の in-place 更新でプロバイダが replace し競合するため、import 後の drift は無視
+    ignore_changes = [ttl, content, tags]
+  }
 }
 
 # realtime.zedi-note.app -> Railway Hocuspocus
@@ -35,9 +41,15 @@ resource "cloudflare_record" "realtime_cname" {
 }
 
 resource "cloudflare_record" "realtime_railway_verify" {
-  zone_id = data.cloudflare_zone.zedi.id
-  name    = "_railway-verify.realtime"
-  type    = "TXT"
-  content = var.realtime_railway_verify_txt
-  ttl     = 1
+  zone_id         = data.cloudflare_zone.zedi.id
+  name            = "_railway-verify.realtime"
+  type            = "TXT"
+  content         = var.realtime_railway_verify_txt
+  ttl             = 1
+  allow_overwrite = true
+
+  lifecycle {
+    # 既存 TXT の in-place 更新でプロバイダが replace し競合するため、import 後の drift は無視
+    ignore_changes = [ttl, content, tags]
+  }
 }

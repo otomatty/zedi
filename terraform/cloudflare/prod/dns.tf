@@ -2,10 +2,10 @@ data "cloudflare_zone" "zedi" {
   name = var.zone_domain
 }
 
-# zedi-note.app (apex) -> Cloudflare Pages (zedi)
+# zedi-note.app (apex) -> Cloudflare Pages (zedi). name は API と一致させるため zone のドメインを指定（"@" でも同等だが import 済み state は zedi-note.app）
 resource "cloudflare_record" "pages_prod_cname" {
   zone_id         = data.cloudflare_zone.zedi.id
-  name            = "@"
+  name            = var.zone_domain
   type            = "CNAME"
   content         = "${cloudflare_pages_project.zedi.name}.pages.dev"
   proxied         = true
