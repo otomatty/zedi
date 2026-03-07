@@ -5,13 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1](https://github.com/otomatty/zedi/compare/zedi-v0.2.0...zedi-v0.2.1) (2026-03-07)
+## 0.2.1 (2026-03-07)
 
-### Maintenance & Infrastructure
+<!-- Release notes generated using configuration in .github/release.yml at main -->
 
-- CI/CD ワークフローと node-version ファイルの更新（Node.js 24）
-- Release Please 設定（changelog-type: github）と CHANGELOG の整理
-- admin の `@types/node` 追加、`.gitignore` に `*.tsbuildinfo`、Terraform lockfile の追跡
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.2.0...zedi-v0.2.1
 
 ## [0.2.0](https://github.com/otomatty/zedi/compare/zedi-v0.1.0...zedi-v0.2.0) (2026-03-07)
 
