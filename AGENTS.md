@@ -42,15 +42,16 @@ bun run test:run       # Vitest 単体テスト
 
 レビューコメントへの対応は以下の手順で行う。
 
-### 1. 新規コメントの取得
+### 1. 未対応コメントの取得
 
-既に対応済みのコメントを除外し、新しいコメントのみ取得する:
+返信済みコメントを除外し、未対応のものだけ取得する（新規セッションでも動作する）:
 
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/comments \
-  --method GET \
-  -f since="{ISO8601タイムスタンプ}" \
-  --jq '[.[] | select(.in_reply_to_id == null)] | .[] | {id, path, line, body: (.body | .[0:200]), user: .user.login}'
+  --jq '
+    [.[] | select(.in_reply_to_id != null) | .in_reply_to_id] as $replied |
+    [.[] | select(.in_reply_to_id == null and (.id | IN($replied[]) | not))]
+    | .[] | {id, path, line, body: (.body | .[0:300]), user: .user.login}'
 ```
 
 ### 2. PR の自動検出
