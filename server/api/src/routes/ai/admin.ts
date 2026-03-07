@@ -9,7 +9,7 @@ import { eq, asc } from "drizzle-orm";
 import { auth } from "../../auth.js";
 import { authRequired } from "../../middleware/auth.js";
 import { adminRequired } from "../../middleware/adminAuth.js";
-import { aiModels } from "../../schema/index.js";
+import { aiModels, type NewAiModel } from "../../schema/index.js";
 import { users } from "../../schema/users.js";
 import { syncAiModels } from "../../services/syncAiModels.js";
 import type { AppEnv } from "../../types/index.js";
@@ -33,10 +33,7 @@ adminApp.use("*", adminRequired);
 /** GET /api/ai/admin/models — 全モデル一覧（非アクティブ含む） */
 adminApp.get("/models", async (c) => {
   const db = c.get("db");
-  const rows = await db
-    .select()
-    .from(aiModels)
-    .orderBy(asc(aiModels.sortOrder), asc(aiModels.id));
+  const rows = await db.select().from(aiModels).orderBy(asc(aiModels.sortOrder), asc(aiModels.id));
   return c.json({
     models: rows.map((m) => ({
       id: m.id,
@@ -84,11 +81,7 @@ adminApp.patch("/models/:id", async (c) => {
     if (!row) throw c.json({ error: "Not found", id }, 404);
     return c.json({ model: row });
   }
-  const result = await db
-    .update(aiModels)
-    .set(updates)
-    .where(eq(aiModels.id, id))
-    .returning();
+  const result = await db.update(aiModels).set(updates).where(eq(aiModels.id, id)).returning();
   if (result.length === 0) return c.json({ error: "Not found", id }, 404);
   return c.json({ model: result[0] });
 });
@@ -104,21 +97,20 @@ adminApp.patch("/models/bulk", async (c) => {
       sortOrder?: number;
     }>;
   }>();
+  type BulkUpdateSet = Partial<
+    Pick<NewAiModel, "displayName" | "tierRequired" | "isActive" | "sortOrder">
+  >;
   const db = c.get("db");
   const updated: unknown[] = [];
   for (const u of body.updates ?? []) {
     if (!u.id) continue;
-    const set: Record<string, unknown> = {};
+    const set: BulkUpdateSet = {};
     if (u.displayName !== undefined) set.displayName = u.displayName;
     if (u.tierRequired !== undefined) set.tierRequired = u.tierRequired;
     if (u.isActive !== undefined) set.isActive = u.isActive;
     if (u.sortOrder !== undefined) set.sortOrder = u.sortOrder;
     if (Object.keys(set).length === 0) continue;
-    const result = await db
-      .update(aiModels)
-      .set(set as Parameters<typeof db.update>[1]["set"])
-      .where(eq(aiModels.id, u.id))
-      .returning();
+    const result = await db.update(aiModels).set(set).where(eq(aiModels.id, u.id)).returning();
     if (result.length > 0) updated.push(result[0]);
   }
   return c.json({ updated: updated.length, models: updated });
@@ -143,7 +135,12 @@ app.post("/sync-models", async (c) => {
   let allowed = false;
 
   const headerSecret = c.req.header("X-Sync-Secret");
-  if (SYNC_SECRET && headerSecret !== undefined && headerSecret !== "" && secureCompare(headerSecret, SYNC_SECRET)) {
+  if (
+    SYNC_SECRET &&
+    headerSecret !== undefined &&
+    headerSecret !== "" &&
+    secureCompare(headerSecret, SYNC_SECRET)
+  ) {
     allowed = true;
   }
 
@@ -152,12 +149,20 @@ app.post("/sync-models", async (c) => {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
       if (!session?.user?.id) {
         return c.json(
-          { error: "Unauthorized", code: "UNAUTHORIZED", message: "Sign in or provide X-Sync-Secret." },
+          {
+            error: "Unauthorized",
+            code: "UNAUTHORIZED",
+            message: "Sign in or provide X-Sync-Secret.",
+          },
           401,
         );
       }
       const db = c.get("db");
-      const [row] = await db.select({ role: users.role }).from(users).where(eq(users.id, session.user.id)).limit(1);
+      const [row] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, session.user.id))
+        .limit(1);
       if (row?.role !== "admin") {
         return c.json(
           { error: "Forbidden", code: "FORBIDDEN", message: "Admin role required." },
@@ -167,7 +172,11 @@ app.post("/sync-models", async (c) => {
       allowed = true;
     } catch {
       return c.json(
-        { error: "Unauthorized", code: "UNAUTHORIZED", message: "Sign in or provide X-Sync-Secret." },
+        {
+          error: "Unauthorized",
+          code: "UNAUTHORIZED",
+          message: "Sign in or provide X-Sync-Secret.",
+        },
         401,
       );
     }
