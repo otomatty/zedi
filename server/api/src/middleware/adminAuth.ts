@@ -11,7 +11,11 @@ import type { AppEnv } from "../types/index.js";
 export const adminRequired = createMiddleware<AppEnv>(async (c, next) => {
   const userId = c.get("userId");
   const db = c.get("db");
-  const row = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+  const row = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   const role = row[0]?.role ?? null;
   if (role !== "admin") {
     throw new HTTPException(403, { message: "Forbidden: admin access required" });

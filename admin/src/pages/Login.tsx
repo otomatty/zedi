@@ -7,10 +7,10 @@ export default function Login() {
   const signInUrl = `${mainAppUrl}/sign-in?redirect=${encodeURIComponent(window.location.origin)}`;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100">
-      <div className="text-center max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-slate-900 text-slate-100">
+      <div className="max-w-sm text-center">
         <h1 className="text-xl font-semibold">Zedi 管理画面</h1>
-        <p className="mt-4 text-slate-400 text-sm">
+        <p className="mt-4 text-sm text-slate-400">
           管理者としてログインするには、まずメインアプリでサインインしてください。
         </p>
         <a
@@ -19,7 +19,7 @@ export default function Login() {
         >
           サインインして続ける
         </a>
-        <p className="mt-4 text-slate-500 text-xs">
+        <p className="mt-4 text-xs text-slate-500">
           サインイン後、このページに戻ってきてください。
         </p>
       </div>

@@ -10,10 +10,7 @@ function getApiUrl(path: string): string {
   return baseUrl ? `${baseUrl.replace(/\/$/, "")}${normalized}` : normalized;
 }
 
-export async function adminFetch(
-  path: string,
-  options: RequestInit = {},
-): Promise<Response> {
+export async function adminFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const url = getApiUrl(path);
   return fetch(url, {
     ...options,

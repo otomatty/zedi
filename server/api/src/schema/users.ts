@@ -12,7 +12,9 @@ export const users = pgTable(
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
     /** Role: 'user' (default) or 'admin'. Admins can use admin.zedi-note.app and /api/admin/*. */
-    role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
+    role: text("role", { enum: ["user", "admin"] })
+      .notNull()
+      .default("user"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

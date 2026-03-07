@@ -34,7 +34,17 @@ export async function getAiModels(): Promise<AiModelAdmin[]> {
 
 export async function patchAiModel(
   id: string,
-  body: Partial<Pick<AiModelAdmin, "displayName" | "tierRequired" | "inputCostUnits" | "outputCostUnits" | "isActive" | "sortOrder">>,
+  body: Partial<
+    Pick<
+      AiModelAdmin,
+      | "displayName"
+      | "tierRequired"
+      | "inputCostUnits"
+      | "outputCostUnits"
+      | "isActive"
+      | "sortOrder"
+    >
+  >,
 ): Promise<AiModelAdmin> {
   const res = await adminFetch(`/api/ai/admin/models/${encodeURIComponent(id)}`, {
     method: "PATCH",
