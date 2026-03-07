@@ -53,14 +53,7 @@ adminApp.get("/models", async (c) => {
 /** PATCH /api/ai/admin/models/:id — モデル個別更新 */
 adminApp.patch("/models/:id", async (c) => {
   const id = c.req.param("id");
-  const body = await c.req.json<{
-    displayName?: string;
-    tierRequired?: "free" | "pro";
-    inputCostUnits?: number;
-    outputCostUnits?: number;
-    isActive?: boolean;
-    sortOrder?: number;
-  }>();
+  const body = await c.req.json<Record<string, unknown>>();
   const db = c.get("db");
   const updates: Partial<{
     displayName: string;
@@ -70,12 +63,38 @@ adminApp.patch("/models/:id", async (c) => {
     isActive: boolean;
     sortOrder: number;
   }> = {};
-  if (body.displayName !== undefined) updates.displayName = body.displayName;
-  if (body.tierRequired !== undefined) updates.tierRequired = body.tierRequired;
-  if (body.inputCostUnits !== undefined) updates.inputCostUnits = body.inputCostUnits;
-  if (body.outputCostUnits !== undefined) updates.outputCostUnits = body.outputCostUnits;
-  if (body.isActive !== undefined) updates.isActive = body.isActive;
-  if (body.sortOrder !== undefined) updates.sortOrder = body.sortOrder;
+
+  if (body.displayName !== undefined) {
+    if (typeof body.displayName !== "string")
+      return c.json({ error: "displayName must be a string" }, 400);
+    updates.displayName = body.displayName;
+  }
+  if (body.tierRequired !== undefined) {
+    if (body.tierRequired !== "free" && body.tierRequired !== "pro")
+      return c.json({ error: "tierRequired must be 'free' or 'pro'" }, 400);
+    updates.tierRequired = body.tierRequired;
+  }
+  if (body.inputCostUnits !== undefined) {
+    if (typeof body.inputCostUnits !== "number")
+      return c.json({ error: "inputCostUnits must be a number" }, 400);
+    updates.inputCostUnits = body.inputCostUnits;
+  }
+  if (body.outputCostUnits !== undefined) {
+    if (typeof body.outputCostUnits !== "number")
+      return c.json({ error: "outputCostUnits must be a number" }, 400);
+    updates.outputCostUnits = body.outputCostUnits;
+  }
+  if (body.isActive !== undefined) {
+    if (typeof body.isActive !== "boolean")
+      return c.json({ error: "isActive must be a boolean" }, 400);
+    updates.isActive = body.isActive;
+  }
+  if (body.sortOrder !== undefined) {
+    if (typeof body.sortOrder !== "number")
+      return c.json({ error: "sortOrder must be a number" }, 400);
+    updates.sortOrder = body.sortOrder;
+  }
+
   if (Object.keys(updates).length === 0) {
     const [row] = await db.select().from(aiModels).where(eq(aiModels.id, id)).limit(1);
     if (!row) return c.json({ error: "Not found", id }, 404);
@@ -88,28 +107,37 @@ adminApp.patch("/models/:id", async (c) => {
 
 /** PATCH /api/ai/admin/models/bulk — 一括更新（isActive, tierRequired, sortOrder, displayName） */
 adminApp.patch("/models/bulk", async (c) => {
-  const body = await c.req.json<{
-    updates: Array<{
-      id: string;
-      displayName?: string;
-      tierRequired?: "free" | "pro";
-      isActive?: boolean;
-      sortOrder?: number;
-    }>;
-  }>();
+  const body = await c.req.json<Record<string, unknown>>();
+
+  if (!Array.isArray(body.updates)) {
+    return c.json({ error: "updates must be an array" }, 400);
+  }
+
   type BulkUpdateSet = Partial<
     Pick<NewAiModel, "displayName" | "tierRequired" | "isActive" | "sortOrder">
   >;
   const db = c.get("db");
   const updatedModels = await db.transaction(async (tx) => {
     const updated: unknown[] = [];
-    for (const u of body.updates ?? []) {
-      if (!u.id) continue;
+    for (const u of body.updates as Array<Record<string, unknown>>) {
+      if (!u.id || typeof u.id !== "string") continue;
       const set: BulkUpdateSet = {};
-      if (u.displayName !== undefined) set.displayName = u.displayName;
-      if (u.tierRequired !== undefined) set.tierRequired = u.tierRequired;
-      if (u.isActive !== undefined) set.isActive = u.isActive;
-      if (u.sortOrder !== undefined) set.sortOrder = u.sortOrder;
+      if (u.displayName !== undefined) {
+        if (typeof u.displayName !== "string") continue;
+        set.displayName = u.displayName;
+      }
+      if (u.tierRequired !== undefined) {
+        if (u.tierRequired !== "free" && u.tierRequired !== "pro") continue;
+        set.tierRequired = u.tierRequired;
+      }
+      if (u.isActive !== undefined) {
+        if (typeof u.isActive !== "boolean") continue;
+        set.isActive = u.isActive;
+      }
+      if (u.sortOrder !== undefined) {
+        if (typeof u.sortOrder !== "number") continue;
+        set.sortOrder = u.sortOrder;
+      }
       if (Object.keys(set).length === 0) continue;
       const result = await tx.update(aiModels).set(set).where(eq(aiModels.id, u.id)).returning();
       if (result.length > 0) updated.push(result[0]);
@@ -183,13 +211,6 @@ app.post("/sync-models", async (c) => {
         401,
       );
     }
-  }
-
-  if (!allowed) {
-    return c.json(
-      { error: "Unauthorized", code: "UNAUTHORIZED", message: "Sign in or provide X-Sync-Secret." },
-      401,
-    );
   }
 
   try {

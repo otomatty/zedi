@@ -39,7 +39,7 @@ POST ハンドラで `insert/onConflictDoUpdate` のあと、該当行を `db.se
 **指摘内容:** `setTimeout(() => setCopied(false), 2000)` のタイマーをアンマウント時にクリアしておらず、会話切り替えなどでアンマウント後も setState が走りうる。
 
 **判断:** **対応する**  
-**理由:** React のベストプラクティスとして、コンポーネントのクリーンアップでタイマーを clear するのは一般的。未クリアだと「Can't perform a React state update on an unmounted component」の警告やメモリリークの原因になりうる。
+**理由:** React のベストプラクティスとして、コンポーネントのクリーンアップでタイマーを clear するのは一般的。未クリアだとアンマウント後に不要な state 更新予約が残り、意図しない非同期処理や UI 状態遷移の原因になりうる。
 
 **対応案:**  
 `useRef` で `timeoutId` を保持し、`setTimeout` の戻り値を保存。`useEffect` の cleanup で `clearTimeout(timeoutId.current)` を実行する。または、`setTimeout` の id を ref に格納し、`handleCopy` 内で前回のタイマーを clear してから新しいタイマーをセットし、コンポーネントに `useEffect(() => () => clearTimeout(ref.current), [])` を追加する。
@@ -81,10 +81,10 @@ POST ハンドラで `insert/onConflictDoUpdate` のあと、該当行を `db.se
 **指摘内容:** 「キャンセル」ボタンがハードコードで、他ボタンは `t()` を使用している。多言語対応の一貫性のため i18n にすべき。
 
 **判断:** **対応する**  
-**理由:** 同コンポーネントの「編集してから作成」「作成する」は `t("aiChat.actions.editAndCreate")` 等を使用している。`aiChat.actions.close` が en/ja 両方に存在し（"Close" / "閉じる"）、キャンセル・閉じるは文脈的に近いため、このボタンには `t("aiChat.actions.close")` を使うのが適切。
+**理由:** 同コンポーネントの「編集してから作成」「作成する」は `t("aiChat.actions.editAndCreate")` 等を使用している。「閉じる」と「キャンセル」は意味が異なるため、専用の `aiChat.actions.cancel` キーを追加すべき。
 
 **対応案:**  
-`キャンセル` を `{t("aiChat.actions.close")}` に置き換える。
+`aiChat.actions.cancel` を en（"Cancel"）/ ja（"キャンセル"）に追加し、`キャンセル` を `{t("aiChat.actions.cancel")}` に置き換える。
 
 ---
 
@@ -111,7 +111,7 @@ POST ハンドラで `insert/onConflictDoUpdate` のあと、該当行を `db.se
 **理由:** アクセシビリティの観点で妥当。`title` はあるが、スクリーンリーダー向けのラベルとトグル状態の明示は WCAG 的にも推奨される。`aiChat.title` は既に i18n で定義されている。
 
 **対応案:**  
-該当 `<button>` に `aria-label={t("aiChat.title")}` と `aria-pressed={isOpen}` を追加する。パネル開閉が「押下状態」なので `aria-pressed` が適切。のちに `aria-controls` を付ける場合は `aria-expanded={isOpen}` に変更してもよい。
+該当 `<button>` に `aria-label={t("aiChat.title")}` と `aria-expanded={isOpen}` を追加する。パネル開閉は Disclosure パターンのため `aria-expanded` が適切。可能であればパネル要素の id を `aria-controls` で関連付ける。
 
 ---
 

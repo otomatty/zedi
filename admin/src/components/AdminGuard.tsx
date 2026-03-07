@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { getAdminMe } from "@/api/admin";
 
-type Props = { children: React.ReactNode };
+type Props = { children: ReactNode };
 
 /**
  * 管理者ログイン済みか確認し、未認証なら /login へリダイレクトする。

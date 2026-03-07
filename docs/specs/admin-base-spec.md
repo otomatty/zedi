@@ -89,7 +89,7 @@
 
 ## 5. ディレクトリ構造（admin/）
 
-```
+```text
 admin/
 ├── package.json
 ├── vite.config.ts

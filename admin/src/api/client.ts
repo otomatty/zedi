@@ -12,12 +12,15 @@ function getApiUrl(path: string): string {
 
 export async function adminFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const url = getApiUrl(path);
+  const headers = new Headers(options.headers);
+
+  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
   return fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
 }

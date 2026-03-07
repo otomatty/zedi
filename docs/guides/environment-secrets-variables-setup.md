@@ -116,7 +116,7 @@
 3. **Tokens** を開く
 4. **Create an API token** をクリック
 5. 分かりやすい名前を付けて発行し、表示されたトークンをコピーする
-6. GitHub の `production` Environment secret として `TF_API_TOKEN` の名前で登録する
+6. GitHub の Terraform を実行する各 Environment secret（`development` と `production`）に `TF_API_TOKEN` の名前で登録する
 
 **用途補足:**
 

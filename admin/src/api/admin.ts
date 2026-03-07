@@ -21,7 +21,11 @@ export interface AiModelAdmin {
 
 export async function getAdminMe(): Promise<AdminMe | null> {
   const res = await adminFetch("/api/admin/me");
-  if (!res.ok) return null;
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) return null;
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((err as { message?: string }).message ?? "Failed to fetch admin info");
+  }
   return res.json();
 }
 

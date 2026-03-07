@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: terraform-cloudflare-prod
+  cancel-in-progress: false
+
 jobs:
   migrate:
     name: Run Database Migrations

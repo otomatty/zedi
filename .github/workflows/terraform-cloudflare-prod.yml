@@ -11,6 +11,10 @@ on:
       - "terraform/cloudflare/prod/**"
   workflow_dispatch:
 
+concurrency:
+  group: terraform-cloudflare-prod
+  cancel-in-progress: false
+
 env:
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
   TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -21,7 +25,10 @@ jobs:
     name: Plan Prod
     runs-on: ubuntu-latest
     environment: production
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
       - uses: hashicorp/setup-terraform@v3
@@ -44,7 +51,10 @@ jobs:
     name: Apply Prod
     runs-on: ubuntu-latest
     environment: production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: [plan]
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
       - uses: hashicorp/setup-terraform@v3

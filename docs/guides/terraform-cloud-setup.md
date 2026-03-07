@@ -35,7 +35,7 @@ plan/apply では **Terraform 変数のかわりに**、GitHub Environment の S
 2. **Sign up** でアカウントを作成（GitHub 連携も可能）
 3. ログイン後、**Create an organization** を選択（未作成の場合）
 
-**Organization 名:** 各スタックの `main.tf` の `backend "remote"` に書く名前（このリポジトリでは `Saedgewell`）。英小文字・数字・ハイフンのみ。
+**Organization 名:** 各スタックの `main.tf` の `backend "remote"` に書く名前（このリポジトリでは `Saedgewell`）。英数字・ハイフン・アンダースコアが使用可能。
 
 ---
 
