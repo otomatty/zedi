@@ -1,2 +1,12 @@
 #!/usr/bin/env sh
+set -e
+
+# Block commits when staged files are not Prettier-compliant without being affected
+# by unrelated formatting drift elsewhere in the repository.
+STAGED_FILES="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if [ -n "$STAGED_FILES" ]; then
+  printf '%s' "$STAGED_FILES" | tr '\n' '\0' | xargs -0 bunx prettier --check --ignore-unknown
+fi
+
 bunx lint-staged

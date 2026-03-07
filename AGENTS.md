@@ -65,7 +65,8 @@ gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ### 3. 再レビュー依頼
 
 ```bash
-gh pr comment {number} --body "@claude /review
+gh pr comment {number} --body "レビューコメントへの対応をコミットしました。最新の変更に対する再レビューをお願いします。
+
 @coderabbitai review
 @copilot 再レビューをお願いします。"
 ```
@@ -80,6 +81,10 @@ server/hocuspocus/ # リアルタイムサーバー
 terraform/        # インフラ定義
 docs/             # ドキュメント
 ```
+
+## マージ方法
+
+- **main → develop** の同期 PR は必ず **Create a merge commit** でマージする（Squash だと develop → main の PR でコンフリクトが再発する）。詳細は [docs/guides/branch-strategy.md](docs/guides/branch-strategy.md#マージ方法のルール) を参照。
 
 ## その他
 
