@@ -4,7 +4,7 @@
  */
 export default function Login() {
   const mainAppUrl = import.meta.env.VITE_MAIN_APP_URL ?? "https://zedi-note.app";
-  const signInUrl = `${mainAppUrl}/sign-in?redirect=${encodeURIComponent(window.location.origin)}`;
+  const signInUrl = `${mainAppUrl}/sign-in`;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-900 text-slate-100">

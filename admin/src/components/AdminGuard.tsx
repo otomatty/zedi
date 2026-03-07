@@ -13,10 +13,15 @@ export function AdminGuard({ children }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    getAdminMe().then((me) => {
-      if (cancelled) return;
-      setStatus(me ? "ok" : "unauthorized");
-    });
+    getAdminMe()
+      .then((me) => {
+        if (cancelled) return;
+        setStatus(me ? "ok" : "unauthorized");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStatus("unauthorized");
+      });
     return () => {
       cancelled = true;
     };

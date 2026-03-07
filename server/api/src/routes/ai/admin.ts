@@ -78,7 +78,7 @@ adminApp.patch("/models/:id", async (c) => {
   if (body.sortOrder !== undefined) updates.sortOrder = body.sortOrder;
   if (Object.keys(updates).length === 0) {
     const [row] = await db.select().from(aiModels).where(eq(aiModels.id, id)).limit(1);
-    if (!row) throw c.json({ error: "Not found", id }, 404);
+    if (!row) return c.json({ error: "Not found", id }, 404);
     return c.json({ model: row });
   }
   const result = await db.update(aiModels).set(updates).where(eq(aiModels.id, id)).returning();
@@ -101,19 +101,22 @@ adminApp.patch("/models/bulk", async (c) => {
     Pick<NewAiModel, "displayName" | "tierRequired" | "isActive" | "sortOrder">
   >;
   const db = c.get("db");
-  const updated: unknown[] = [];
-  for (const u of body.updates ?? []) {
-    if (!u.id) continue;
-    const set: BulkUpdateSet = {};
-    if (u.displayName !== undefined) set.displayName = u.displayName;
-    if (u.tierRequired !== undefined) set.tierRequired = u.tierRequired;
-    if (u.isActive !== undefined) set.isActive = u.isActive;
-    if (u.sortOrder !== undefined) set.sortOrder = u.sortOrder;
-    if (Object.keys(set).length === 0) continue;
-    const result = await db.update(aiModels).set(set).where(eq(aiModels.id, u.id)).returning();
-    if (result.length > 0) updated.push(result[0]);
-  }
-  return c.json({ updated: updated.length, models: updated });
+  const updatedModels = await db.transaction(async (tx) => {
+    const updated: unknown[] = [];
+    for (const u of body.updates ?? []) {
+      if (!u.id) continue;
+      const set: BulkUpdateSet = {};
+      if (u.displayName !== undefined) set.displayName = u.displayName;
+      if (u.tierRequired !== undefined) set.tierRequired = u.tierRequired;
+      if (u.isActive !== undefined) set.isActive = u.isActive;
+      if (u.sortOrder !== undefined) set.sortOrder = u.sortOrder;
+      if (Object.keys(set).length === 0) continue;
+      const result = await tx.update(aiModels).set(set).where(eq(aiModels.id, u.id)).returning();
+      if (result.length > 0) updated.push(result[0]);
+    }
+    return updated;
+  });
+  return c.json({ updated: updatedModels.length, models: updatedModels });
 });
 
 app.route("/", adminApp);

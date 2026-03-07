@@ -27,7 +27,10 @@ export async function getAdminMe(): Promise<AdminMe | null> {
 
 export async function getAiModels(): Promise<AiModelAdmin[]> {
   const res = await adminFetch("/api/ai/admin/models");
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((err as { message?: string }).message ?? "Failed to fetch AI models");
+  }
   const data = await res.json();
   return data.models ?? [];
 }
@@ -50,7 +53,10 @@ export async function patchAiModel(
     method: "PATCH",
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((err as { message?: string }).message ?? "Failed to update AI model");
+  }
   const data = await res.json();
   return data.model;
 }
@@ -68,7 +74,10 @@ export async function patchAiModelsBulk(
     method: "PATCH",
     body: JSON.stringify({ updates }),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((err as { message?: string }).message ?? "Failed to bulk update AI models");
+  }
   return res.json();
 }
 
