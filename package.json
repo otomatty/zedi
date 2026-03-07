@@ -22,6 +22,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "dev:admin": "cd admin && npm run dev",
     "dev:api": "cd server/api && bun run dev",
     "dev:hocuspocus": "cd server/hocuspocus && bun run dev",
     "lint": "eslint .",

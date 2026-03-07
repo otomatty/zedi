@@ -1,9 +1,10 @@
-# PR #191 調査: Cloudflare proxy と Railway SSL（実装は正・コメント修正）
+# PR #191 調査: Cloudflare proxy と Railway SSL（現行方針は proxied = true）
 
 ## 結論
 
-- **実装（`proxied = false`）は正しい。** api / realtime は **恒常的に DNS-only（グレークラウド）** とする設計で問題ない。
-- **コメントが誤っている。** 「一時的に false にしてあとで true に戻す」は Railway の「Toggle Trick」手順の説明であり、**このリポジトリの意図（恒常的に false）と一致していない。** コメントを「DNS-only が意図した恒常状態」と分かるように修正する。
+- **現行の本番運用は `proxied = true` が正しい。** `api` / `realtime` は Cloudflare を前段に置いた状態で運用されている。
+- **Railway の「Toggle Trick」** は、証明書発行や再検証が必要な場面で **一時的に `proxied = false` に切り替えるための手順** として扱う。
+- **Terraform / docs / 本番実態を一致させる。** 通常運用は `proxied = true`、必要時のみ一時的に `false` にして apply し、完了後に `true` に戻す。
 
 ---
 
@@ -29,19 +30,20 @@
 
 ---
 
-## 3. 恒常的に DNS-only（proxied = false）が正しいケース
+## 3. 通常運用を Proxied（proxied = true）にするケース
 
-Railway の「Toggle Trick」は「一時的に OFF にしてから ON に戻す」手順だが、**恒常的にプロキシ OFF のままにしておく構成も有効**です。
+Railway の「Toggle Trick」は「一時的に OFF にしてから ON に戻す」手順であり、**通常運用で Cloudflare プロキシを有効にしておく構成とも両立**する。
 
-- **DNS-only を恒常にする利点**
-  - Railway がオリジンで Let's Encrypt 証明書を発行・保持し、クライアントは **Railway と直接 TLS 通信** する。
-  - Cloudflare の SSL モード（Full / Full Strict）や証明書更新タイミングを気にしなくてよい。
-  - API や WebSocket（realtime）のようにキャッシュや CDN が不要なサブドメインでは、プロキシを挟まない方がシンプルなことが多い。
+- **Proxied を恒常にする利点**
+  - Cloudflare が前段に入るため、WAF・DDoS 緩和・Firewall Rules などの保護を利用できる。
+  - オリジンの Railway ドメインを直接見せず、公開経路を Cloudflare 側に集約できる。
+  - 実際の production の DNS は `api` / `realtime` ともに Cloudflare proxy ON で運用されている。
 
-- **Cloudflare の公式的な使い分け**
-  - グレークラウドは「API やオリジン直アクセスが必要なサービス」「プロキシを挟むと都合が悪い場合」に使う、と説明されている。
+- **注意点**
+  - Cloudflare を経由するため、SSL/TLS・WebSocket・実クライアント IP の取り扱いは Cloudflare 前提で考える必要がある。
+  - 証明書発行や再検証で Railway 側への直接到達が必要な場合は、Cloudflare proxy を一時的に OFF にする手順が有効。
 
-したがって、**api.zedi-note.app / realtime.zedi-note.app を恒常的に `proxied = false` にする実装は、Cloudflare の設定として正しい。**
+したがって、**api.zedi-note.app / realtime.zedi-note.app を通常 `proxied = true` で運用し、必要時だけ一時的に `false` にする**方針は、Cloudflare / Railway の両方の運用に整合する。
 
 ---
 
@@ -54,14 +56,14 @@ Railway の「Toggle Trick」は「一時的に OFF にしてから ON に戻す
 ```
 
 - これは **Railway の「Toggle Trick」手順**（一時的に OFF → 発行 → ON に戻す）を説明している。
-- 一方、**この Terraform では `proxied = false` が固定** であり、「true に戻す」状態はコードに存在しない。
-- つまり **「then switch back to true」がこのリポジトリの意図と一致していない** ＝ コメントが実装と食い違っている。
+- 一方、production の実運用は **通常 `proxied = true`** であり、当時の Terraform が `false` 固定だったため、本番実態と IaC が食い違っていた。
+- つまり **「通常は true / 必要時のみ false」という運用意図をコードで表現できていなかった** ことが問題だった。
 
-実装の意図が「恒常的に DNS-only」であれば、コメントは **「恒常的に proxied=false」** である理由を説明すべき。
+通常運用の意図が `proxied = true` であれば、コメントは **「通常は true、必要時のみ一時的に false」** を説明すべき。
 
 ---
 
-## 5. コメント修正案（実装＝恒常 DNS-only に合わせる）
+## 5. コメント修正案（実装＝通常 proxied = true に合わせる）
 
 **api / realtime の CNAME 用に、次のいずれか（または組み合わせ）で置き換える。**
 
@@ -69,39 +71,39 @@ Railway の「Toggle Trick」は「一時的に OFF にしてから ON に戻す
 
 ```hcl
 # api.zedi-note.app -> Railway API
-# DNS-only (proxied=false): traffic goes directly to Railway; Railway provides SSL at origin.
+# Proxied by Cloudflare in normal operation (proxied=true).
 ```
 
 ```hcl
 # realtime.zedi-note.app -> Railway Hocuspocus
-# DNS-only (proxied=false): traffic goes directly to Railway; Railway provides SSL at origin.
+# Proxied by Cloudflare in normal operation (proxied=true).
 ```
 
 ### 案 2: 理由を少し補足
 
 ```hcl
 # api.zedi-note.app -> Railway API
-# DNS-only by design. We do not use Cloudflare proxy here; Railway issues and serves SSL.
+# Proxied by Cloudflare by design. Temporarily set proxied=false only when Railway cert issuance requires direct validation.
 ```
 
 ```hcl
 # realtime.zedi-note.app -> Railway Hocuspocus
-# DNS-only by design. We do not use Cloudflare proxy here; Railway issues and serves SSL.
+# Proxied by Cloudflare by design. Temporarily set proxied=false only when Railway cert issuance requires direct validation.
 ```
 
 ### 案 3: 将来の運用者向けに「Toggle Trick」に言及する場合
 
 ```hcl
 # api.zedi-note.app -> Railway API
-# DNS-only (proxied=false). Railway provides SSL at origin. Intentional permanent state; not using Cloudflare proxy for this subdomain.
+# Normal state is proxied=true. For Railway custom-domain troubleshooting, temporarily set proxied=false, apply, then revert to true.
 ```
 
-- 「Intentional permanent state」で「true に戻す想定ではない」ことを明示できる。
+- 「通常は true / 一時的に false」をコメントで明示できる。
 
 ---
 
 ## 6. 推奨
 
-- **実装はそのまま**（`proxied = false` のまま）。
-- **コメントのみ修正**し、「恒常的に DNS-only」であることと、Railway がオリジンで SSL を提供していることを書く。
-- 上記のうち **案 1 または 案 2** を採用すると、レビュー指摘（「コメントとコードの矛盾」）も解消できる。
+- **実装は `proxied = true` を通常状態として揃える。**
+- **コメントも更新**し、「通常は Cloudflare proxy を有効にし、必要時のみ一時的に false にする」ことを書く。
+- 上記のうち **案 2 または 案 3** を採用すると、運用意図と実装の両方が分かりやすい。

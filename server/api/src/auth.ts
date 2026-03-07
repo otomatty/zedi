@@ -12,6 +12,16 @@ export const auth = betterAuth({
   baseURL: getEnv("BETTER_AUTH_URL"),
   secret: getEnv("BETTER_AUTH_SECRET"),
 
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        input: false, // only set via DB / backend
+      },
+    },
+  },
+
   emailAndPassword: {
     enabled: false,
   },
