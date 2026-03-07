@@ -1,0 +1,43 @@
+# main へのプッシュ後に main → develop の同期 PR を自動作成します。
+# Release Please によるバージョン更新等が develop に反映され、競合を防ぎます。
+name: Sync main to develop
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Create sync PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check diff and create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin develop
+
+          if git diff --quiet origin/main origin/develop; then
+            echo "main and develop are already in sync"
+            exit 0
+          fi
+
+          EXISTING=$(gh pr list --head main --base develop --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            echo "Sync PR #$EXISTING already exists"
+            exit 0
+          fi
+
+          gh pr create --base develop --head main \
+            --title "chore: sync main to develop" \
+            --body "main ブランチの変更（Release Please によるバージョン更新等）を develop に同期します。
+
+          このPRは自動生成されています。競合がなければそのままマージしてください。"

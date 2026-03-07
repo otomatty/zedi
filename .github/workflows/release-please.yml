@@ -1,12 +1,12 @@
-# Release Please: develop へのマージ内容に応じてリリース PR を develop 向けに作成し、
+# Release Please: main へのマージ内容に応じてリリース PR を作成し、
 # その PR マージ時にタグ・GitHub Release を自動作成します。
-# develop を main にマージする際、バージョン更新はすでに develop に含まれるため main と競合しません。
+# main → develop の同期は sync-main-to-develop.yml で自動化されています。
 # Conventional Commits (feat:, fix:, BREAKING CHANGE:) に応じてメジャー / マイナー / パッチが自動判定されます。
 name: Release Please
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
 
 permissions:
   contents: write
@@ -28,4 +28,3 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
-          target-branch: develop
