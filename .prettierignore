@@ -1,3 +1,6 @@
+# Release Please が自動生成するため、Prettier の対象外にして競合を防ぐ
+CHANGELOG.md
+
 dist/
 dist-ssr/
 node_modules/
