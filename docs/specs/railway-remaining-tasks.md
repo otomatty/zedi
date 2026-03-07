@@ -542,7 +542,7 @@ railway variable set \
   "STORAGE_BUCKET_NAME=\${{media.BUCKET}}" \
   "BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET_PROD}" \
   "BETTER_AUTH_URL=https://api.zedi-note.app" \
-  "CORS_ORIGIN=https://zedi-note.app" \
+  "CORS_ORIGIN=https://zedi-note.app,https://admin.zedi-note.app" \
   --service api-prod \
   --skip-deploys
 ```
@@ -576,11 +576,16 @@ railway variable set \
   --skip-deploys
 ```
 
-| 変数                 | development                                        | production                  |
-| -------------------- | -------------------------------------------------- | --------------------------- |
-| `BETTER_AUTH_URL`    | `https://<dev-api-ドメイン>`                       | `https://api.zedi-note.app` |
-| `CORS_ORIGIN`        | `https://dev.zedi-note.app,http://localhost:30000` | `https://zedi-note.app`     |
-| `BETTER_AUTH_SECRET` | 開発用の値                                         | **別のランダム値**          |
+| 変数                 | development                                        | production                                          |
+| -------------------- | -------------------------------------------------- | --------------------------------------------------- |
+| `BETTER_AUTH_URL`    | `https://<dev-api-ドメイン>`                       | `https://api.zedi-note.app`                         |
+| `CORS_ORIGIN`        | `https://dev.zedi-note.app,http://localhost:30000` | `https://zedi-note.app,https://admin.zedi-note.app` |
+| `API_INTERNAL_URL`   | `http://api.railway.internal:3000`                 | `http://api-prod.railway.internal:3000`             |
+| `BETTER_AUTH_SECRET` | 開発用の値                                         | **別のランダム値**                                  |
+
+### 6.4.1 管理画面用 CORS（本番）
+
+本番 API の `CORS_ORIGIN` には管理者ドメイン `https://admin.zedi-note.app` を必ず含める。上記 6.4 の設定例のとおり `https://zedi-note.app,https://admin.zedi-note.app` とする。
 
 ### 6.5 OAuth コールバック URL の追加
 

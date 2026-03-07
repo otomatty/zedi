@@ -20,6 +20,7 @@ import aiModelsRoutes from "./routes/ai/models.js";
 import aiUsageRoutes from "./routes/ai/usage.js";
 import aiSubscriptionRoutes from "./routes/ai/subscription.js";
 import aiAdminRoutes from "./routes/ai/admin.js";
+import adminRoutes from "./routes/admin/index.js";
 import thumbSearchRoutes from "./routes/thumbnail/imageSearch.js";
 import thumbGenerateRoutes from "./routes/thumbnail/imageGenerate.js";
 import thumbCommitRoutes from "./routes/thumbnail/commit.js";
@@ -97,6 +98,7 @@ export function createApp(): Hono<AppEnv> {
   app.route("/api/ai/usage", aiUsageRoutes);
   app.route("/api/ai/subscription", aiSubscriptionRoutes);
   app.route("/api/ai/admin", aiAdminRoutes);
+  app.route("/api/admin", adminRoutes);
 
   // Subscription management
   app.route("/api/subscription", subscriptionManageRoutes);

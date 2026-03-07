@@ -8,17 +8,14 @@ terraform {
     }
   }
 
-  # Replace organization and workspace with your Terraform Cloud settings
   backend "remote" {
     organization = "Saedgewell"
-
     workspaces {
-      name = "cloudflare"
+      name = "cloudflare-shared"
     }
   }
 }
 
-# API token: set in Terraform Cloud as Terraform variable cloudflare_api_token (sensitive)
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }

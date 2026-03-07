@@ -1,5 +1,8 @@
 import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 
+/** User role for access control. 'admin' can access /api/admin/* and admin UI. */
+export type UserRole = "user" | "admin";
+
 export const users = pgTable(
   "user",
   {
@@ -8,6 +11,10 @@ export const users = pgTable(
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
+    /** Role: 'user' (default) or 'admin'. Admins can use admin.zedi-note.app and /api/admin/*. */
+    role: text("role", { enum: ["user", "admin"] })
+      .notNull()
+      .default("user"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
