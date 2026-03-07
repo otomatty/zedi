@@ -2,7 +2,13 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { readFileSync } from "fs";
 import { componentTagger } from "lovable-tagger";
+
+const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf-8")) as {
+  version: string;
+};
+const appVersion = packageJson.version ?? "0.0.0";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
@@ -40,6 +46,9 @@ export default defineConfig(({ mode }) => {
     // Enable top-level await for sql.js
     build: {
       target: "esnext",
+    },
+    define: {
+      "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
     },
     optimizeDeps: {
       esbuildOptions: {
