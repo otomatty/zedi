@@ -21,7 +21,7 @@ echo "Default branch: $default_branch (merged into $default_remote)"
 echo "Current branch: $current"
 echo ""
 
-merged_list="$(git branch --merged "$default_remote" | sed 's/^[* ]*//' | grep -v '^$')"
+merged_list="$(git branch --merged "$default_remote" | sed -e 's/^[* ]*//' -e '/^$/d')"
 deleted=0
 
 while IFS= read -r branch; do
