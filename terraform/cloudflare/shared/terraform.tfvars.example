@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and fill in (terraform.tfvars is gitignored).
+# Or set in Terraform Cloud workspace as Terraform variables, or in CI as TF_VAR_*.
+
+# Required (sensitive in TFC)
+# cloudflare_api_token   = "your-api-token"
+# cloudflare_account_id  = "your-cloudflare-account-id"
+
+# Optional overrides
+# zone_domain            = "zedi-note.app"
+# api_cname_target       = "2yg7k4yt.up.railway.app"
+# realtime_cname_target  = "nnkek1wf.up.railway.app"
+# api_railway_verify_txt     = "railway-verify=..."
+# realtime_railway_verify_txt = "railway-verify=..."

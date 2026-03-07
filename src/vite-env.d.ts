@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_E2E_TEST?: string;
   readonly VITE_POLAR_PRO_MONTHLY_PRODUCT_ID?: string;
   readonly VITE_POLAR_PRO_YEARLY_PRODUCT_ID?: string;
+  /** ビルド時に package.json の version から注入（Release Please で更新） */
+  readonly VITE_APP_VERSION?: string;
 }
 
 interface ImportMeta {

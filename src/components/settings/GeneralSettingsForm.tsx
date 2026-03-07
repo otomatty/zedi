@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Compass, DatabaseZap } from "lucide-react";
+import { Loader2, Compass, DatabaseZap, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -450,6 +450,31 @@ export const GeneralSettingsForm: React.FC = () => {
       />
 
       {isSignedIn && <DataManagementCard />}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("generalSettings.about.title")}</CardTitle>
+          <CardDescription>{t("generalSettings.about.description")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <p className="text-sm text-muted-foreground">
+            {t("generalSettings.about.version")}:{" "}
+            <span className="font-mono font-medium text-foreground">
+              {import.meta.env.VITE_APP_VERSION ?? "—"}
+            </span>
+          </p>
+          <Button variant="outline" size="sm" asChild className="w-fit">
+            <a
+              href="https://github.com/otomatty/zedi/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              {t("generalSettings.about.releaseNotes")}
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 };

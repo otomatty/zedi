@@ -1,4 +1,12 @@
-export { users, session, account, verification, type User, type NewUser } from "./users.js";
+export {
+  users,
+  session,
+  account,
+  verification,
+  type User,
+  type NewUser,
+  type UserRole,
+} from "./users.js";
 export { pages, type Page, type NewPage } from "./pages.js";
 export {
   notes,

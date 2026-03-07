@@ -1,6 +1,6 @@
 variable "cloudflare_api_token" {
   type        = string
-  description = "Cloudflare API token. In Terraform Cloud: set as Terraform variable (sensitive). Locally: -var or TF_VAR_cloudflare_api_token"
+  description = "Cloudflare API token. In CI: TF_VAR_cloudflare_api_token from secrets. Locally: -var or TF_VAR_cloudflare_api_token"
   sensitive   = true
 }
 
@@ -15,14 +15,6 @@ variable "zone_domain" {
   default     = "zedi-note.app"
 }
 
-# Pages dev frontend custom subdomain (e.g. dev.zedi-note.app)
-variable "pages_dev_subdomain" {
-  type        = string
-  description = "Subdomain for dev frontend (Pages zedi-dev), e.g. dev -> dev.zedi-note.app"
-  default     = "dev"
-}
-
-# Railway API subdomain CNAME targets (from Railway custom domain)
 variable "api_cname_target" {
   type        = string
   description = "CNAME target for api.zedi-note.app (Railway API service)"

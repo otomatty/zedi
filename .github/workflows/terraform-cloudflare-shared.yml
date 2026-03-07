@@ -1,0 +1,54 @@
+name: Terraform Cloudflare (Shared)
+
+on:
+  pull_request:
+    paths:
+      - "terraform/cloudflare/shared/**"
+      - ".github/workflows/terraform-cloudflare-shared.yml"
+  workflow_dispatch:
+
+env:
+  TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+  TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  plan:
+    name: Plan Shared
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Terraform Format Check
+        working-directory: terraform/cloudflare/shared
+        run: terraform fmt -check -recursive
+      - name: Terraform Init
+        working-directory: terraform/cloudflare/shared
+        run: terraform init -input=false
+      - name: Terraform Validate
+        working-directory: terraform/cloudflare/shared
+        run: terraform validate
+      - name: Terraform Plan
+        working-directory: terraform/cloudflare/shared
+        run: terraform plan -input=false -no-color
+
+  apply:
+    name: Apply Shared
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'workflow_dispatch'
+    needs: [plan]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Terraform Init
+        working-directory: terraform/cloudflare/shared
+        run: terraform init -input=false
+      - name: Terraform Apply
+        working-directory: terraform/cloudflare/shared
+        run: terraform apply -auto-approve -input=false

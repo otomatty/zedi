@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
 jobs:
   migrate:
     name: Run Database Migrations
@@ -48,3 +52,28 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: bun
           command: pages deploy dist --project-name=zedi
+
+  deploy-admin:
+    name: Deploy Admin
+    needs:
+      - migrate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2"
+      - name: Install & Build Admin
+        working-directory: admin
+        run: bun install && bun run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL || 'https://zedi-note.app' }}
+      - name: Deploy Admin to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: bun
+          command: pages deploy admin/dist --project-name=zedi-admin
