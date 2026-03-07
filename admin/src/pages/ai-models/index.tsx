@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AiModelAdmin, SyncResultItem } from "@/api/admin";
 import { getAiModels, patchAiModel, syncAiModels as syncAiModelsApi } from "@/api/admin";
 
@@ -8,63 +8,67 @@ export default function AiModels() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResultItem[] | null>(null);
+  const isMountedRef = useRef(true);
 
-  const load = (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setError(null);
-    getAiModels()
-      .then(setModels)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    getAiModels()
-      .then((nextModels) => {
-        if (cancelled) return;
-        setModels(nextModels);
-        setError(null);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(async (showLoading = true) => {
+    if (showLoading && isMountedRef.current) setLoading(true);
+    if (isMountedRef.current) setError(null);
+    try {
+      const nextModels = await getAiModels();
+      if (!isMountedRef.current) return;
+      setModels(nextModels);
+      setError(null);
+    } catch (e) {
+      if (!isMountedRef.current) return;
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (isMountedRef.current) setLoading(false);
+    }
   }, []);
 
-  const handleToggleActive = async (m: AiModelAdmin) => {
-    const next = !m.isActive;
-    setModels((prev) => prev.map((x) => (x.id === m.id ? { ...x, isActive: next } : x)));
+  const handleModelUpdate = async (
+    model: AiModelAdmin,
+    updates: Partial<
+      Pick<
+        AiModelAdmin,
+        | "displayName"
+        | "tierRequired"
+        | "inputCostUnits"
+        | "outputCostUnits"
+        | "isActive"
+        | "sortOrder"
+      >
+    >,
+  ) => {
+    const originalModel = { ...model };
+    setError(null);
+    setModels((prevModels) =>
+      prevModels.map((x) => (x.id === model.id ? { ...x, ...updates } : x)),
+    );
     try {
-      await patchAiModel(m.id, { isActive: next });
+      await patchAiModel(model.id, updates);
     } catch (e) {
-      setModels((prev) => prev.map((x) => (x.id === m.id ? { ...x, isActive: m.isActive } : x)));
+      setModels((prevModels) => prevModels.map((x) => (x.id === model.id ? originalModel : x)));
       setError(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  const handleToggleActive = async (m: AiModelAdmin) => {
+    await handleModelUpdate(m, { isActive: !m.isActive });
   };
 
   const handleTierChange = async (m: AiModelAdmin, tier: "free" | "pro") => {
     if (m.tierRequired === tier) return;
-    const prev = m.tierRequired;
-    setModels((prevModels) =>
-      prevModels.map((x) => (x.id === m.id ? { ...x, tierRequired: tier } : x)),
-    );
-    try {
-      await patchAiModel(m.id, { tierRequired: tier });
-    } catch (e) {
-      setModels((prevModels) =>
-        prevModels.map((x) => (x.id === m.id ? { ...x, tierRequired: prev } : x)),
-      );
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    await handleModelUpdate(m, { tierRequired: tier });
   };
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    void load();
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [load]);
 
   const handleSync = () => {
     setSyncing(true);
@@ -72,7 +76,7 @@ export default function AiModels() {
     syncAiModelsApi()
       .then((results) => {
         setSyncResult(results);
-        load();
+        void load(false);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setSyncing(false));
@@ -139,6 +143,7 @@ export default function AiModels() {
                 <td className="px-3 py-2 text-slate-200">{m.displayName}</td>
                 <td className="px-3 py-2">
                   <select
+                    aria-label={`${m.displayName} のティア`}
                     value={m.tierRequired}
                     onChange={(e) => handleTierChange(m, e.target.value as "free" | "pro")}
                     className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200"

@@ -9,7 +9,12 @@ on:
     branches: [develop]
     paths:
       - "terraform/cloudflare/dev/**"
+      - ".github/workflows/terraform-cloudflare-dev.yml"
   workflow_dispatch:
+
+concurrency:
+  group: terraform-cloudflare-dev
+  cancel-in-progress: false
 
 env:
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
@@ -21,10 +26,6 @@ jobs:
     name: Plan Dev
     runs-on: ubuntu-latest
     environment: development
-    if: >-
-      github.event_name == 'pull_request' ||
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
       - uses: hashicorp/setup-terraform@v3

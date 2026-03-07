@@ -10,6 +10,9 @@ import type { AppEnv } from "../types/index.js";
  */
 export const adminRequired = createMiddleware<AppEnv>(async (c, next) => {
   const userId = c.get("userId");
+  if (!userId) {
+    throw new HTTPException(401, { message: "Unauthorized: authentication required" });
+  }
   const db = c.get("db");
   const row = await db
     .select({ role: users.role })

@@ -24,8 +24,8 @@ resource "cloudflare_record" "api_railway_verify" {
   allow_overwrite = true
 
   lifecycle {
-    # 既存 TXT の in-place 更新でプロバイダが replace し競合するため、import 後の drift は無視
-    ignore_changes = [ttl, content, tags]
+    # provider が自動調整する属性のみ無視し、TXT の検証トークン更新は Terraform で反映する
+    ignore_changes = [ttl, tags]
   }
 }
 
@@ -49,7 +49,7 @@ resource "cloudflare_record" "realtime_railway_verify" {
   allow_overwrite = true
 
   lifecycle {
-    # 既存 TXT の in-place 更新でプロバイダが replace し競合するため、import 後の drift は無視
-    ignore_changes = [ttl, content, tags]
+    # provider が自動調整する属性のみ無視し、TXT の検証トークン更新は Terraform で反映する
+    ignore_changes = [ttl, tags]
   }
 }

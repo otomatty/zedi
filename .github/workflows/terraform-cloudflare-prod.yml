@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - "terraform/cloudflare/prod/**"
+      - ".github/workflows/terraform-cloudflare-prod.yml"
   workflow_dispatch:
 
 concurrency:
@@ -25,10 +26,6 @@ jobs:
     name: Plan Prod
     runs-on: ubuntu-latest
     environment: production
-    if: >-
-      github.event_name == 'pull_request' ||
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
       - uses: hashicorp/setup-terraform@v3

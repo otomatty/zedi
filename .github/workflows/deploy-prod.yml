@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: terraform-cloudflare-prod
+  group: deploy-prod
   cancel-in-progress: false
 
 jobs:
@@ -25,30 +25,6 @@ jobs:
         run: bunx drizzle-kit migrate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-  apply-cloudflare-prod:
-    name: Apply Cloudflare Terraform (Prod)
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v6
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-      - name: Terraform Init
-        working-directory: terraform/cloudflare/prod
-        run: terraform init -input=false
-        env:
-          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
-          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Terraform Apply
-        working-directory: terraform/cloudflare/prod
-        run: terraform apply -auto-approve -input=false
-        env:
-          TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
-          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   # Railway deploys api and hocuspocus via GitHub integration (configure in Railway Dashboard)
   deploy-frontend:
@@ -81,23 +57,23 @@ jobs:
     name: Deploy Admin
     needs:
       - migrate
-      - apply-cloudflare-prod
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
+          bun-version: "1.2"
       - name: Install & Build Admin
         working-directory: admin
-        run: npm install && npm run build
+        run: bun install --frozen-lockfile && bun run build
         env:
           VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
-          VITE_MAIN_APP_URL: https://zedi-note.app
+          VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL }}
       - name: Deploy Admin to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: bun
           command: pages deploy admin/dist --project-name=zedi-admin

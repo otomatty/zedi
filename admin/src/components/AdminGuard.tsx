@@ -26,7 +26,7 @@ export function AdminGuard({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [location.pathname]);
 
   if (status === "loading") {
     return (

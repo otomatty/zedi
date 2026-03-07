@@ -19,12 +19,16 @@ export interface AiModelAdmin {
   createdAt: string;
 }
 
+async function getErrorMessage(res: Response, fallback: string): Promise<string> {
+  const err = await res.json().catch(() => ({ message: res.statusText }));
+  return (err as { message?: string }).message ?? fallback;
+}
+
 export async function getAdminMe(): Promise<AdminMe | null> {
   const res = await adminFetch("/api/admin/me");
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) return null;
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message ?? "Failed to fetch admin info");
+    throw new Error(await getErrorMessage(res, "Failed to fetch admin info"));
   }
   return res.json();
 }
@@ -32,8 +36,7 @@ export async function getAdminMe(): Promise<AdminMe | null> {
 export async function getAiModels(): Promise<AiModelAdmin[]> {
   const res = await adminFetch("/api/ai/admin/models");
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message ?? "Failed to fetch AI models");
+    throw new Error(await getErrorMessage(res, "Failed to fetch AI models"));
   }
   const data = await res.json();
   return data.models ?? [];
@@ -58,8 +61,7 @@ export async function patchAiModel(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message ?? "Failed to update AI model");
+    throw new Error(await getErrorMessage(res, "Failed to update AI model"));
   }
   const data = await res.json();
   return data.model;
@@ -79,8 +81,7 @@ export async function patchAiModelsBulk(
     body: JSON.stringify({ updates }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message ?? "Failed to bulk update AI models");
+    throw new Error(await getErrorMessage(res, "Failed to bulk update AI models"));
   }
   return res.json();
 }
@@ -98,8 +99,7 @@ export interface SyncResultItem {
 export async function syncAiModels(): Promise<SyncResultItem[]> {
   const res = await adminFetch("/api/ai/admin/sync-models", { method: "POST" });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message ?? "Sync failed");
+    throw new Error(await getErrorMessage(res, "Sync failed"));
   }
   const data = await res.json();
   return data.results ?? [];
