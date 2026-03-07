@@ -251,7 +251,7 @@ railway variable set \
   "PORT=1234" \
   "DATABASE_URL=\${{Postgres.DATABASE_URL}}" \
   "REDIS_URL=\${{Redis.REDIS_URL}}" \
-  "API_INTERNAL_URL=http://api.railway.internal:3000" \
+  "API_INTERNAL_URL=http://api-prod.railway.internal:3000" \
   --service hocuspocus \
   --skip-deploys
 ```
