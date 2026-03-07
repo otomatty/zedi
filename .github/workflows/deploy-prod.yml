@@ -69,7 +69,7 @@ jobs:
         run: bun install --frozen-lockfile && bun run build
         env:
           VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
-          VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL }}
+          VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL || 'https://zedi-note.app' }}
       - name: Deploy Admin to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

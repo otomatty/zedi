@@ -40,7 +40,11 @@ export default function AiModels() {
       >
     >,
   ) => {
-    const originalModel = { ...model };
+    const rollbackUpdates = Object.fromEntries(
+      Object.keys(updates).map((key) => [key, model[key as keyof typeof updates]]),
+    ) as typeof updates;
+
+    if (!isMountedRef.current) return;
     setError(null);
     setModels((prevModels) =>
       prevModels.map((x) => (x.id === model.id ? { ...x, ...updates } : x)),
@@ -48,7 +52,10 @@ export default function AiModels() {
     try {
       await patchAiModel(model.id, updates);
     } catch (e) {
-      setModels((prevModels) => prevModels.map((x) => (x.id === model.id ? originalModel : x)));
+      if (!isMountedRef.current) return;
+      setModels((prevModels) =>
+        prevModels.map((x) => (x.id === model.id ? { ...x, ...rollbackUpdates } : x)),
+      );
       setError(e instanceof Error ? e.message : String(e));
     }
   };

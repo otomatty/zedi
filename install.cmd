@@ -144,25 +144,24 @@ REM Use findstr to find platform section, then look for checksum
 set "FOUND_PLATFORM="
 set "IN_PLATFORM_SECTION="
 set "BRACE_DEPTH=0"
+set "PLATFORM_NEEDLE=\"%PLATFORM_NAME%\":"
+set "CHECKSUM_NEEDLE=\"checksum\":"
 
 REM Read the manifest line by line
 for /f "usebackq tokens=*" %%i in ("!MANIFEST_PATH!") do (
     set "LINE=%%i"
     
     REM Check if this line contains our platform
-    echo !LINE! | findstr /c:"\"%PLATFORM_NAME%\":" >nul
-    if !ERRORLEVEL! equ 0 (
+    if not "!LINE!"=="!LINE:%PLATFORM_NEEDLE%=!" (
         set "IN_PLATFORM_SECTION=1"
         set "BRACE_DEPTH=0"
     )
     
     REM If we're in the platform section, look for checksum
     if defined IN_PLATFORM_SECTION (
-        echo !LINE! | findstr /c:"{" >nul
-        if !ERRORLEVEL! equ 0 set /a BRACE_DEPTH+=1
+        if not "!LINE!"=="!LINE:{=!" set /a BRACE_DEPTH+=1
 
-        echo !LINE! | findstr /c:"\"checksum\":" >nul
-        if !ERRORLEVEL! equ 0 (
+        if not "!LINE!"=="!LINE:%CHECKSUM_NEEDLE%=!" (
             REM Extract checksum value
             for /f "tokens=2 delims=:" %%j in ("!LINE!") do (
                 set "CHECKSUM_PART=%%j"
@@ -182,8 +181,7 @@ for /f "usebackq tokens=*" %%i in ("!MANIFEST_PATH!") do (
             )
         )
 
-        echo !LINE! | findstr /c:"}" >nul
-        if !ERRORLEVEL! equ 0 set /a BRACE_DEPTH-=1
+        if not "!LINE!"=="!LINE:}=!" set /a BRACE_DEPTH-=1
         if !BRACE_DEPTH! leq 0 (
             set "IN_PLATFORM_SECTION="
             set "BRACE_DEPTH=0"
