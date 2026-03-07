@@ -5,7 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - Unreleased
+## [0.2.0](https://github.com/otomatty/zedi/compare/zedi-v0.1.0...zedi-v0.2.0) (2026-03-07)
+
+### Highlights
+
+- **管理画面**: 管理者向けダッシュボード（`admin/`）を新規追加。AI モデル管理などの管理機能を提供
+- **Release Please**: Conventional Commits に基づく自動バージョニング・リリースフローを導入
+- **Railway 移行**: インフラを AWS から Railway へ移行し、デプロイ・運用を簡素化
+- **Cloudflare DNS**: Terraform による Cloudflare DNS 管理を追加
+
+### Features
+
+- 管理画面の基盤実装（認証・レイアウト・AI モデル管理）
+- Release Please によるバージョニングと設定画面でのバージョン表示
+- Railway 向け CI/CD ワークフロー（dev / prod）
+- Terraform による Cloudflare DNS レコード管理
+- ヘッダー AI ボタンのグラデーションスタイル改善
+
+### Bug Fixes
+
+- dev 環境の OAuth state mismatch を解消
+- クロスオリジン API のサムネイル 401 エラーを修正
+- ノート API の members/pages エンドポイント不一致を修正
+- Cloudflare Wrangler Action の依存関係エラーを修正
+
+### Infrastructure
+
+- Node.js バージョンを 24 に更新
+- Cloudflare Terraform（dev / prod / shared）ワークフロー追加
+- GitHub ブランチ保護ルールの設定
+
+## [0.1.0](https://github.com/otomatty/zedi/releases/tag/zedi-v0.1.0) (2026-02-23)
 
 Zedi の初回リリース（Phase A Web App）。ナレッジをリンクで繋ぎ、AI で足場を生成するノート／ウィキアプリのコア機能を提供します。
 
