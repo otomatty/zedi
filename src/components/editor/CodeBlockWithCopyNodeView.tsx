@@ -22,19 +22,16 @@ export const CodeBlockWithCopyNodeView: React.FC<NodeViewProps> = ({ node }) => 
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setCopied(true);
       timeoutRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("Failed to copy code to clipboard:", err);
     }
   };
 
   const language = (node.attrs.language as string) ?? "";
 
   return (
-    <NodeViewWrapper as="div" className="group/code relative mb-4">
-      <pre
-        ref={preRef}
-        className="overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm"
-      >
+    <NodeViewWrapper as="div" className="group/code relative">
+      <pre ref={preRef} className="overflow-x-auto">
         <NodeViewContent as="code" className={language ? `language-${language}` : ""} />
       </pre>
       <button
@@ -42,7 +39,7 @@ export const CodeBlockWithCopyNodeView: React.FC<NodeViewProps> = ({ node }) => 
         contentEditable={false}
         onClick={handleCopy}
         aria-label={copied ? "Copied" : "Copy code"}
-        className="absolute right-2 top-2 rounded border border-border/60 bg-muted/90 px-2 py-1 text-[11px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 focus:outline-none group-hover/code:opacity-100"
+        className="absolute right-2 top-2 rounded border border-border/60 bg-muted/90 px-2 py-1 text-[11px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover/code:opacity-100"
       >
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
       </button>
