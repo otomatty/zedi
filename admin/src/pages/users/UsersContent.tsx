@@ -132,7 +132,7 @@ export function UsersContent({
           </div>
 
           <p className="mt-2 text-xs text-slate-500">
-            {rangeStart}-{rangeEnd} 件を表示 / 合計 {total} 件
+            {total > 0 ? `${rangeStart}-${rangeEnd}` : "0"} 件を表示 / 合計 {total} 件
           </p>
 
           {total > pageSize && (

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useRef, useContext, useState, type ReactNode } from "react";
 import { PageContext } from "../types/aiChat";
 
 interface AIChatContextValue {
@@ -7,6 +7,8 @@ interface AIChatContextValue {
   /** 現在のページでAIチャットが利用可能かどうか（ContentWithAIChatがマウントされているか） */
   aiChatAvailable: boolean;
   setAIChatAvailable: (available: boolean) => void;
+  /** AI追記後にエディタ内容を同期するハンドラ ref */
+  contentAppendHandlerRef: React.MutableRefObject<((nextContent: string) => void) | null>;
 }
 
 const AIChatContext = createContext<AIChatContextValue | undefined>(undefined);
@@ -14,10 +16,17 @@ const AIChatContext = createContext<AIChatContextValue | undefined>(undefined);
 export function AIChatProvider({ children }: { children: ReactNode }) {
   const [pageContext, setPageContext] = useState<PageContext | null>(null);
   const [aiChatAvailable, setAIChatAvailable] = useState(false);
+  const contentAppendHandlerRef = useRef<ContentAppendHandler | null>(null);
 
   return (
     <AIChatContext.Provider
-      value={{ pageContext, setPageContext, aiChatAvailable, setAIChatAvailable }}
+      value={{
+        pageContext,
+        setPageContext,
+        aiChatAvailable,
+        setAIChatAvailable,
+        contentAppendHandlerRef,
+      }}
     >
       {children}
     </AIChatContext.Provider>

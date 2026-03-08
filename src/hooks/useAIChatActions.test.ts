@@ -1,6 +1,8 @@
+import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAIChatActions } from "./useAIChatActions";
+import { AIChatProvider } from "@/contexts/AIChatContext";
 import { createHookWrapper } from "@/test/testWrapper";
 
 const mockToast = vi.fn();
@@ -40,6 +42,13 @@ vi.mock("@/hooks/usePageQueries", () => ({
   }),
 }));
 
+const createWrapper = () => {
+  const Base = createHookWrapper();
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return React.createElement(Base, null, React.createElement(AIChatProvider, null, children));
+  };
+};
+
 describe("useAIChatActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,14 +59,14 @@ describe("useAIChatActions", () => {
 
   it("returns handleExecuteAction", () => {
     const { result } = renderHook(() => useAIChatActions({ pageContext: null }), {
-      wrapper: createHookWrapper(),
+      wrapper: createWrapper(),
     });
     expect(typeof result.current.handleExecuteAction).toBe("function");
   });
 
   it("create-page action calls createPageMutation.mutateAsync and navigate", async () => {
     const { result } = renderHook(() => useAIChatActions({ pageContext: null }), {
-      wrapper: createHookWrapper(),
+      wrapper: createWrapper(),
     });
 
     await act(async () => {
@@ -79,7 +88,7 @@ describe("useAIChatActions", () => {
 
   it("append-to-page without pageContext shows pageContextRequired toast", async () => {
     const { result } = renderHook(() => useAIChatActions({ pageContext: null }), {
-      wrapper: createHookWrapper(),
+      wrapper: createWrapper(),
     });
 
     await act(async () => {
@@ -100,7 +109,7 @@ describe("useAIChatActions", () => {
 
   it("suggest-wiki-links without pageContext shows pageContextRequired toast", async () => {
     const { result } = renderHook(() => useAIChatActions({ pageContext: null }), {
-      wrapper: createHookWrapper(),
+      wrapper: createWrapper(),
     });
 
     await act(async () => {

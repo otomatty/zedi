@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendMarkdownToTiptapContent,
   buildSuggestedWikiLinksMarkdown,
+  convertMarkdownToTiptapContent,
   getMissingSuggestedWikiLinkTitles,
   resolveReferencedPagesFromContent,
 } from "./aiChatActionHelpers";
@@ -99,5 +100,31 @@ describe("buildSuggestedWikiLinksMarkdown", () => {
     expect(buildSuggestedWikiLinksMarkdown(["Page A", "Page B"])).toBe(
       "- [[Page A]]\n- [[Page B]]",
     );
+  });
+});
+
+describe("convertMarkdownToTiptapContent (URL sanitization)", () => {
+  it("strips javascript: links to prevent XSS", () => {
+    const result = convertMarkdownToTiptapContent("[Click me](javascript:alert(1))");
+    const parsed = JSON.parse(result) as { content: Array<Record<string, unknown>> };
+    const paragraph = parsed.content[0] as {
+      content?: Array<{ type: string; text?: string; marks?: unknown[] }>;
+    };
+    expect(paragraph.content?.[0]).toMatchObject({
+      type: "text",
+      text: "Click me",
+    });
+    expect(paragraph.content?.[0]).not.toHaveProperty("marks");
+  });
+
+  it("allows https links", () => {
+    const result = convertMarkdownToTiptapContent("[Safe](https://example.com)");
+    const parsed = JSON.parse(result) as { content: Array<Record<string, unknown>> };
+    const paragraph = parsed.content[0] as {
+      content?: Array<{ marks?: Array<{ attrs?: { href?: string } }> }>;
+    };
+    expect(paragraph.content?.[0]?.marks?.[0]?.attrs).toMatchObject({
+      href: "https://example.com",
+    });
   });
 });

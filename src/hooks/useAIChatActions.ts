@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@zedi/ui";
 import { useNavigate } from "react-router-dom";
+import { useAIChatContext } from "@/contexts/AIChatContext";
 import type {
   ChatAction,
   CreatePageAction,
@@ -27,6 +28,7 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { contentAppendHandlerRef } = useAIChatContext();
   const createPageMutation = useCreatePage();
   const updatePageMutation = useUpdatePage();
   const { syncLinks } = useSyncWikiLinks();
@@ -49,9 +51,10 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
       });
       await syncLinks(currentPageId, extractWikiLinksFromContent(nextContent));
       latestPageContentRef.current = nextContent;
+      contentAppendHandlerRef.current?.(nextContent);
       return true;
     },
-    [pageContext?.pageId, syncLinks, updatePageMutation],
+    [pageContext?.pageId, syncLinks, updatePageMutation, contentAppendHandlerRef],
   );
 
   const handleExecuteAction = useCallback(
