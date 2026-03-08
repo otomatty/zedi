@@ -12,7 +12,7 @@
  *
  * Anthropic: https://docs.anthropic.com/en/api/models-list の data 配列を使用
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { AIProviderType } from "../types/index.js";
 import { getProviderApiKeyName } from "./aiProviders.js";
 import { getOptionalEnv } from "../lib/env.js";
@@ -480,8 +480,6 @@ export interface SyncPreviewResult {
 export async function previewSyncAiModels(
   db: ReturnType<typeof getDb>,
 ): Promise<SyncPreviewResult[]> {
-  const pricingMap = await fetchOpenRouterPricing();
-  const basePricePerToken = findReferencePricePerToken(pricingMap);
   const results: SyncPreviewResult[] = [];
   const providers: AIProviderType[] = ["openai", "anthropic", "google"];
 
@@ -522,18 +520,6 @@ export async function previewSyncAiModels(
       }
       if (provider === "google" && googleAllowlist) {
         rows = rows.filter((r) => googleAllowlist.has(r.modelId));
-      }
-
-      if (pricingMap.size > 0 && basePricePerToken > 0) {
-        for (const row of rows) {
-          const keys = lookupOpenRouterKeys(provider, row.modelId);
-          const pricing = findPricing(pricingMap, keys);
-          if (pricing) {
-            const cu = calculateCostUnits(pricing, basePricePerToken);
-            row.inputCostUnits = cu.input;
-            row.outputCostUnits = cu.output;
-          }
-        }
       }
 
       const existingRows = await db
@@ -637,6 +623,12 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
         .where(eq(aiModels.provider, provider));
       const existingIds = new Set(existingRows.map((r) => r.id));
 
+      // 新規追加分は既存の並びを壊さないよう、末尾に付ける
+      const [maxRow] = await db
+        .select({ maxOrder: sql<number>`coalesce(max(${aiModels.sortOrder}), 0)` })
+        .from(aiModels);
+      let nextSortOrder = Number(maxRow?.maxOrder ?? 0) + 1;
+
       let upserted = 0;
       for (const row of rows) {
         if (existingIds.has(row.id)) continue;
@@ -644,18 +636,25 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
         // Sonnet 系はコストが高いためデフォルト非アクティブ
         const isActive = isSonnetModel(row.provider, row.modelId) ? false : row.isActive;
 
-        await db.insert(aiModels).values({
-          id: row.id,
-          provider: row.provider,
-          modelId: row.modelId,
-          displayName: row.displayName,
-          tierRequired: row.tierRequired,
-          inputCostUnits: row.inputCostUnits,
-          outputCostUnits: row.outputCostUnits,
-          isActive,
-          sortOrder: row.sortOrder,
-        });
-        upserted += 1;
+        const inserted = await db
+          .insert(aiModels)
+          .values({
+            id: row.id,
+            provider: row.provider,
+            modelId: row.modelId,
+            displayName: row.displayName,
+            tierRequired: row.tierRequired,
+            inputCostUnits: row.inputCostUnits,
+            outputCostUnits: row.outputCostUnits,
+            isActive,
+            sortOrder: nextSortOrder,
+          })
+          .onConflictDoNothing({ target: aiModels.id })
+          .returning({ id: aiModels.id });
+        if (inserted.length > 0) {
+          upserted += 1;
+          nextSortOrder += 1;
+        }
       }
 
       const hasPricing = pricingMap.size > 0 && basePricePerToken > 0;
@@ -683,4 +682,3 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
 
   return results;
 }
-

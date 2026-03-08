@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  AiModelAdmin,
-  SyncPreviewResult,
-  SyncResultItem,
-} from "@/api/admin";
+import type { AiModelAdmin, SyncPreviewResult, SyncResultItem } from "@/api/admin";
 import {
   getAiModels,
   patchAiModel,
@@ -24,6 +20,7 @@ export default function AiModels() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+  const originalModelsRef = useRef<AiModelAdmin[]>([]);
 
   const load = useCallback(async (showLoading = true) => {
     if (showLoading && isMountedRef.current) setLoading(true);
@@ -32,6 +29,7 @@ export default function AiModels() {
       const nextModels = await getAiModels();
       if (!isMountedRef.current) return;
       setModels(nextModels);
+      originalModelsRef.current = nextModels;
       setError(null);
     } catch (e) {
       if (!isMountedRef.current) return;
@@ -66,6 +64,9 @@ export default function AiModels() {
     );
     try {
       await patchAiModel(model.id, updates);
+      originalModelsRef.current = originalModelsRef.current.map((x) =>
+        x.id === model.id ? { ...x, ...updates } : x,
+      );
     } catch (e) {
       if (!isMountedRef.current) return;
       setModels((prevModels) =>
@@ -89,7 +90,8 @@ export default function AiModels() {
       if (fromIndex === toIndex) return;
       const reordered = [...models];
       const [removed] = reordered.splice(fromIndex, 1);
-      reordered.splice(toIndex, 0, removed!);
+      if (!removed) return;
+      reordered.splice(toIndex, 0, removed);
       const updates = reordered.map((m, i) => ({ id: m.id, sortOrder: i }));
       setError(null);
       setModels(reordered.map((m, i) => ({ ...m, sortOrder: i })));
@@ -180,8 +182,7 @@ export default function AiModels() {
       .finally(() => setSyncing(false));
   };
 
-  const totalToAdd =
-    previewData?.reduce((sum, r) => sum + (r.toAdd?.length ?? 0), 0) ?? 0;
+  const totalToAdd = previewData?.reduce((sum, r) => sum + (r.toAdd?.length ?? 0), 0) ?? 0;
   const hasPreviewErrors = previewData?.some((r) => r.error) ?? false;
 
   if (loading && models.length === 0) {
@@ -208,9 +209,7 @@ export default function AiModels() {
       </div>
 
       {error && (
-        <div className="mt-2 rounded bg-red-900/30 px-3 py-2 text-sm text-red-200">
-          {error}
-        </div>
+        <div className="mt-2 rounded bg-red-900/30 px-3 py-2 text-sm text-red-200">{error}</div>
       )}
 
       {syncResult && (
@@ -237,7 +236,8 @@ export default function AiModels() {
               同期プレビュー
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              以下のモデルが追加されます（既存モデルは上書きされません。Sonnet 系は非アクティブで追加）。
+              以下のモデルが追加されます（既存モデルは上書きされません。Sonnet
+              系は非アクティブで追加）。
             </p>
             {previewLoading ? (
               <p className="mt-4 text-slate-400">読み込み中...</p>
@@ -248,9 +248,7 @@ export default function AiModels() {
                     <div key={r.provider} className="rounded border border-slate-600 p-2">
                       <div className="font-medium text-slate-300">
                         {r.provider}
-                        {r.error && (
-                          <span className="ml-2 text-red-400">({r.error})</span>
-                        )}
+                        {r.error && <span className="ml-2 text-red-400">({r.error})</span>}
                       </div>
                       {r.toAdd && r.toAdd.length > 0 ? (
                         <ul className="mt-1 list-inside list-disc text-sm text-slate-400">
@@ -265,33 +263,37 @@ export default function AiModels() {
                         </ul>
                       ) : (
                         !r.error && (
-                          <p className="mt-1 text-sm text-slate-500">
-                            追加なし（既に登録済み）
-                          </p>
+                          <p className="mt-1 text-sm text-slate-500">追加なし（既に登録済み）</p>
                         )
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreviewOpen(false);
-                      setPreviewData(null);
-                    }}
-                    className="rounded bg-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-500"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSyncConfirm}
-                    disabled={hasPreviewErrors}
-                    className="rounded bg-teal-700 px-3 py-1.5 text-sm font-medium text-teal-100 hover:bg-teal-600 disabled:opacity-50"
-                  >
-                    同期実行（{totalToAdd} 件追加）
-                  </button>
+                <div className="mt-4 flex flex-col gap-2">
+                  {hasPreviewErrors && (
+                    <p className="text-sm text-amber-400">
+                      一部プロバイダーでエラーが発生しています。エラーのあるプロバイダーは同期されません。
+                    </p>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewOpen(false);
+                        setPreviewData(null);
+                      }}
+                      className="rounded bg-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-500"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSyncConfirm}
+                      className="rounded bg-teal-700 px-3 py-1.5 text-sm font-medium text-teal-100 hover:bg-teal-600 disabled:opacity-50"
+                    >
+                      同期実行（{totalToAdd} 件追加）
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -326,9 +328,7 @@ export default function AiModels() {
                   draggedId === m.id ? "opacity-50" : ""
                 } ${dragOverId === m.id ? "bg-slate-700/50" : ""}`}
               >
-                <td className="cursor-grab px-1 py-2 text-slate-500 active:cursor-grabbing">
-                  ⋮⋮
-                </td>
+                <td className="cursor-grab px-1 py-2 text-slate-500 active:cursor-grabbing">⋮⋮</td>
                 <td className="px-3 py-2 text-slate-300">{m.provider}</td>
                 <td className="px-3 py-2 font-mono text-slate-400">{m.modelId}</td>
                 <td className="px-3 py-2">
@@ -344,7 +344,10 @@ export default function AiModels() {
                     }
                     onBlur={(e) => {
                       const v = e.target.value.trim();
-                      if (v !== m.displayName) void handleModelUpdate(m, { displayName: v });
+                      const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
+                      if (originalModel && v !== originalModel.displayName) {
+                        void handleModelUpdate(originalModel, { displayName: v });
+                      }
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -371,9 +374,7 @@ export default function AiModels() {
                     type="button"
                     onClick={() => handleToggleActive(m)}
                     className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      m.isActive
-                        ? "bg-teal-900/50 text-teal-200"
-                        : "bg-slate-700 text-slate-400"
+                      m.isActive ? "bg-teal-900/50 text-teal-200" : "bg-slate-700 text-slate-400"
                     }`}
                   >
                     {m.isActive ? "ON" : "OFF"}
@@ -386,8 +387,7 @@ export default function AiModels() {
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        {models.length} 件（有効: {models.filter((m) => m.isActive).length}）
-        ドラッグで並び替え
+        {models.length} 件（有効: {models.filter((m) => m.isActive).length}） ドラッグで並び替え
       </p>
     </div>
   );
