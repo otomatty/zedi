@@ -58,7 +58,6 @@ export default function AiModels() {
   }, [load]);
 
   const handlePreviewClick = useCallback(async () => {
-    setPreviewOpen(true);
     setPreviewData(null);
     setPreviewLoading(true);
     setError(null);
@@ -66,9 +65,11 @@ export default function AiModels() {
       const results = await previewSyncAiModels();
       if (!isMountedRef.current) return;
       setPreviewData(results);
+      setPreviewOpen(true);
     } catch (e) {
       if (!isMountedRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
+      setPreviewOpen(false);
     } finally {
       if (isMountedRef.current) setPreviewLoading(false);
     }

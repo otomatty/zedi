@@ -127,6 +127,11 @@ export function AiModelsContent({
                   )
                 }
                 onDisplayNameBlur={(v) => {
+                  if (v !== m.displayName) {
+                    setModels((prev) =>
+                      prev.map((x) => (x.id === m.id ? { ...x, displayName: v } : x)),
+                    );
+                  }
                   const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
                   if (originalModel && v !== originalModel.displayName) {
                     void onModelUpdate(originalModel, { displayName: v });

@@ -147,7 +147,7 @@ adminApp.patch("/models/bulk", async (c) => {
   return c.json({ updated: updatedModels.length, models: updatedModels });
 });
 
-/** POST /api/ai/admin/sync-models/preview — 同期プレビュー（追加されるモデルのみ返す） */
+/** POST /api/ai/admin/sync-models/preview — 同期プレビュー（追加予定・無効化予定のモデルを返す） */
 adminApp.post("/sync-models/preview", async (c) => {
   try {
     const db = c.get("db");

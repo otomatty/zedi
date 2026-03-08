@@ -24,10 +24,11 @@ gh auth status                      # GitHub CLI authenticated
 ## Step 1: Decide whether to reuse the current branch or create a new one
 
 1. **If current branch is `develop`**
-   - Run `git pull origin develop`.
+   - If the working tree is dirty, ask the user to commit or stash first, or create the new branch from the current state explicitly.
+   - Run `git pull --ff-only origin develop`.
    - Determine the new branch name: from user (e.g. `feature/add-login`) or issue number (e.g. `123` → `feature/123`). If missing, ask: "ブランチ名（例: feature/add-login）またはイシュー番号（例: 123）を教えてください."
    - Create the branch: `git checkout -b <ブランチ名>`.
-   - If working tree is dirty, commit with an appropriate message (Conventional Commits recommended).
+   - If the new branch is dirty after creation, commit with an appropriate message (Conventional Commits recommended).
 
 2. **If current branch is not `develop`**
    - If `git log develop..HEAD --oneline` is non-empty, keep using the current branch (reuse for PR create/update).

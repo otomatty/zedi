@@ -33,7 +33,7 @@ bun run test:run       # Vitest 単体テスト
 
 ## ブランチ・PR の命名規則
 
-- **ブランチ**: `feature/説明` または `fix/説明`（例: `feature/ai-models-ui`, `fix/search-crash`）。Issue 番号から作る場合は `feature/123` のようにする。
+- **ブランチ**: `feature/説明`、`fix/説明`、`hotfix/説明`、`chore/説明` など（例: `feature/ai-models-ui`, `fix/search-crash`, `hotfix/security-patch`）。Issue 番号から作る場合は `feature/123` のようにする。詳細は [branch-strategy.md](docs/guides/branch-strategy.md) を参照。
 - **PR タイトル**: コミットメッセージに合わせる。単一トピックの PR は代表的なコミットをそのまま使う。Conventional Commits 形式（例: `feat(admin): AIモデル管理UI拡張 (#218)`）。変更内容を正しく表すタイトルにし、「Config argument parsing」のように無関係な文言にしない。
 - **Cursor Cloud Agent で PR を作る場合**: リポジトリのルール（本ファイルや `.cursor/rules/`）はエージェントが参照する場合があるが、Cloud Agent 起動時に「PR を作成するときはタイトルを Conventional Commits 形式にし、変更内容を表す文言にすること」とプロンプトに含めると確実。API で起動する場合は `target.branchName` でブランチ名を指定できる（[Cloud Agents API](https://cursor.com/docs/background-agent/api/overview)）。PR タイトルを直接指定する API パラメータは 2026 年現在ないため、プロンプトで指示するか、作成後に手動で修正する。
 

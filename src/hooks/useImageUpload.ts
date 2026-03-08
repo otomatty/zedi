@@ -66,8 +66,9 @@ export function useImageUpload(): UseImageUploadReturn {
           getToken,
         });
 
-        // ストレージ節約のため WebP に変換してからアップロード
-        const fileToUpload = await convertToWebP(file);
+        // JPEG/PNG のみ WebP に変換（GIF はそのまま。APNG は MIME が image/png のため現状は変換対象）
+        const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
+        const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
 
         // アップロード実行
         const url = await provider.uploadImage(fileToUpload, {

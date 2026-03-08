@@ -1,8 +1,8 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./auth-mock";
+import { MOCK_USER_ID } from "../src/components/auth/MockAuthProvider";
 
 const GHOST_TITLE = "生産手段";
-const E2E_USER_ID = "e2e_test_user_123";
 const COMPLETED_ONBOARDING_STATE = {
   hasCompletedSetupWizard: true,
   hasCompletedTour: false,
@@ -75,7 +75,7 @@ async function seedBlankPage(page: Page, title: string) {
 
       db.close();
     },
-    { userId: E2E_USER_ID, pageId, title, now },
+    { userId: MOCK_USER_ID, pageId, title, now },
   );
 
   return pageId;
@@ -181,7 +181,7 @@ test.describe("WikiLink create-page dialog", () => {
         contentType: "application/json",
         body: JSON.stringify({
           id: crypto.randomUUID(),
-          owner_id: E2E_USER_ID,
+          owner_id: MOCK_USER_ID,
           source_page_id: requestBody.source_page_id ?? null,
           title: requestBody.title ?? null,
           content_preview: requestBody.content_preview ?? null,

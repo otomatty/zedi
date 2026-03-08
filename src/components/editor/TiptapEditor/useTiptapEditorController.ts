@@ -83,9 +83,9 @@ function useEditorControllers(args: {
   handleSlashStateChange: (state: SlashSuggestionState) => void;
   handleRetryUpload: (nodeId: string) => void;
   handleRemoveUpload: (nodeId: string) => void;
-  getProviderLabel: () => string;
-  canDeleteFromStorage: (src: string) => boolean;
-  handleDeleteFromStorage: (src: string) => Promise<void>;
+  getProviderLabel: (providerId?: string | null) => string;
+  canDeleteFromStorage: (providerId?: string | null) => boolean;
+  handleDeleteFromStorage: (url: string, providerId?: string | null) => Promise<void>;
   handleCopyImageUrl: (src: string) => void;
   suggestionState: WikiLinkSuggestionState | null;
   slashState: SlashSuggestionState | null;

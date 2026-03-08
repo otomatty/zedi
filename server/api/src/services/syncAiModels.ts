@@ -76,18 +76,16 @@ async function fetchAndFilterRows(
   }
 
   const totalBeforeFilter = rows.length;
-  rows = rows.filter(
-    (r) => isTextChatModel(r.provider, r.modelId) && isLatestGeneration(r.provider, r.modelId),
-  );
-
   const openaiAllowlist = parseAllowlist(getOptionalEnv("OPENAI_MODEL_IDS"));
   const googleAllowlist = parseAllowlist(getOptionalEnv("GOOGLE_MODEL_IDS"));
-  if (provider === "openai" && openaiAllowlist !== null) {
-    rows = rows.filter((r) => openaiAllowlist.has(r.modelId));
-  }
-  if (provider === "google" && googleAllowlist !== null) {
-    rows = rows.filter((r) => googleAllowlist.has(r.modelId));
-  }
+  const allowlist =
+    provider === "openai" ? openaiAllowlist : provider === "google" ? googleAllowlist : null;
+
+  rows = rows.filter((r) =>
+    allowlist
+      ? allowlist.has(r.modelId)
+      : isTextChatModel(r.provider, r.modelId) && isLatestGeneration(r.provider, r.modelId),
+  );
 
   return { rows, totalBeforeFilter, debug };
 }
@@ -189,9 +187,9 @@ async function syncOneProvider(
   const existingIds = new Set(existingRows.map((r) => r.id));
 
   const [maxRow] = await db
-    .select({ maxOrder: sql<number>`coalesce(max(${aiModels.sortOrder}), 0)` })
+    .select({ maxOrder: sql<number>`coalesce(max(${aiModels.sortOrder}), -1)` })
     .from(aiModels);
-  let nextSortOrder = Number(maxRow?.maxOrder ?? 0) + 1;
+  let nextSortOrder = Number(maxRow?.maxOrder ?? -1) + 1;
 
   let upserted = 0;
   for (const row of rows) {
@@ -222,18 +220,17 @@ async function syncOneProvider(
 
   const fetchedIds = rows.map((row) => row.id);
   let deactivated = 0;
-  // Skip mass deactivation when no models were fetched (API outage / empty response would otherwise deactivate all).
-  if (fetchedIds.length > 0) {
-    const result = await db
-      .update(aiModels)
-      .set({ isActive: false })
-      .where(
-        and(
-          eq(aiModels.provider, provider),
-          eq(aiModels.isActive, true),
-          notInArray(aiModels.id, fetchedIds),
-        ),
-      );
+  // Use totalBeforeFilter (fetch success + raw count) so preview and sync agree when allowlist filters to 0.
+  if (totalBeforeFilter > 0) {
+    const whereClause =
+      fetchedIds.length > 0
+        ? and(
+            eq(aiModels.provider, provider),
+            eq(aiModels.isActive, true),
+            notInArray(aiModels.id, fetchedIds),
+          )
+        : and(eq(aiModels.provider, provider), eq(aiModels.isActive, true));
+    const result = await db.update(aiModels).set({ isActive: false }).where(whereClause);
     deactivated = result.rowCount ?? 0;
   }
 

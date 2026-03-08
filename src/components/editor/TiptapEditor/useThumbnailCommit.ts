@@ -116,7 +116,9 @@ export function useThumbnailCommit({
           providerId = result.provider;
         } else {
           const file = await fetchImageAsFile(imageUrl, previewUrl);
-          const fileToUpload = await convertToWebP(file);
+          // JPEG/PNG のみ WebP に変換（GIF はそのまま。APNG は MIME が image/png のため現状は変換対象）
+          const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
+          const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
           const provider = getStorageProvider(uploadSettings, {
             getToken: async () => null,
           });
