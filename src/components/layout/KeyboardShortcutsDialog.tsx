@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@zedi/ui";
 import {
   KEYBOARD_SHORTCUTS,
   formatShortcutKey,

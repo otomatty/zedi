@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Image as ImageIcon, Loader2, Sparkles, Wand2 } from "lucide-react";
 import Container from "@/components/layout/Container";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import { useAuth } from "@/hooks/useAuth";
 
 /** Uses same base URL as REST API (VITE_API_BASE_URL). */

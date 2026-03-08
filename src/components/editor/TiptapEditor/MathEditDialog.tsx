@@ -1,13 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@zedi/ui";
+import { Button } from "@zedi/ui";
+import { Textarea } from "@zedi/ui";
 
 interface MathEditDialogProps {
   open: boolean;

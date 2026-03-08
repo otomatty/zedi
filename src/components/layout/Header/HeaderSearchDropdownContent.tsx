@@ -1,6 +1,6 @@
 import { FileText, Link as LinkIcon, ArrowRight } from "lucide-react";
-import { PopoverContent } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { PopoverContent } from "@zedi/ui";
+import { cn } from "@zedi/ui";
 
 const EMPTY_MESSAGE = "ページが見つかりません";
 

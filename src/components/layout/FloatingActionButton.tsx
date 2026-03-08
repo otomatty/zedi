@@ -1,16 +1,16 @@
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@zedi/ui";
+import { cn } from "@zedi/ui";
 import { useCreateNewPage } from "@/hooks/useCreateNewPage";
 import { useCreatePage } from "@/hooks/usePageQueries";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
 
 const FloatingActionButton: React.FC = () => {
   const { t } = useTranslation();

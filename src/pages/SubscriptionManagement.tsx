@@ -10,10 +10,10 @@ import {
   CreditCard,
   RefreshCw,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@zedi/ui";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
+import { Badge } from "@zedi/ui";
+import { Progress } from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,11 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@zedi/ui";
 import Container from "@/components/layout/Container";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "@zedi/ui/components/sonner";
 import {
   fetchSubscriptionDetails,
   cancelSubscription,

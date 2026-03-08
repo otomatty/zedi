@@ -13,20 +13,16 @@ import {
   Check,
   DatabaseZap,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@zedi/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@zedi/ui";
+import { Sheet, SheetContent, SheetTitle } from "@zedi/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 
 const SM_BREAKPOINT = 640;
 

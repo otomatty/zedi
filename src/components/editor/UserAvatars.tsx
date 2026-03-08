@@ -3,10 +3,10 @@
  * オンラインユーザーのアバターを表示するコンポーネント
  */
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Avatar, AvatarFallback } from "@zedi/ui";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@zedi/ui";
 import type { UserPresence } from "@/lib/collaboration/types";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 
 interface UserAvatarsProps {
   /** オンラインユーザー一覧 */

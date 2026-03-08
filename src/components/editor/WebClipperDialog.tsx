@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Link2, Loader2, AlertCircle, Check, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@zedi/ui";
+import { Input } from "@zedi/ui";
 import {
   Dialog,
   DialogContent,
@@ -9,8 +9,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+} from "@zedi/ui";
+import { Alert, AlertDescription } from "@zedi/ui";
 import { useWebClipper, type WebClipperStatus } from "@/hooks/useWebClipper";
 import { isValidUrl } from "@/lib/webClipper";
 import { useAuth } from "@/hooks/useAuth";

@@ -9,7 +9,7 @@ import React, {
 import type { Editor } from "@tiptap/core";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
 import { slashCommandItems, filterSlashCommandItems } from "./slashCommandItems";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import {
   Pilcrow,

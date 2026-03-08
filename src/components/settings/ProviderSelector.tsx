@@ -1,7 +1,7 @@
 import React from "react";
 import { AI_PROVIDERS, AIProviderType } from "@/types/ai";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@zedi/ui";
+import { Label } from "@zedi/ui";
 
 interface ProviderSelectorProps {
   value: AIProviderType;

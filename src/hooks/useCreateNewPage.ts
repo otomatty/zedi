@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreatePage } from "./usePageQueries";
-import { useToast } from "./use-toast";
+import { useToast } from "@zedi/ui";
 
 /**
  * Hook to create a new page and navigate to it

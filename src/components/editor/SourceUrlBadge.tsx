@@ -1,6 +1,6 @@
 import React from "react";
 import { Link2, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 
 interface SourceUrlBadgeProps {
   sourceUrl: string;

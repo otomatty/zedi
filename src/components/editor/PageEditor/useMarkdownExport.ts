@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { downloadMarkdown, copyMarkdownToClipboard } from "@/lib/markdownExport";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 
 interface UseMarkdownExportReturn {
   handleExportMarkdown: () => void;

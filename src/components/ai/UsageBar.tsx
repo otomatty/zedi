@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Loader2, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 import { fetchUsage } from "@/lib/aiService";
 import type { AIUsage } from "@/types/ai";
 

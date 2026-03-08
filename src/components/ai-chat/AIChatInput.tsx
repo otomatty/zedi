@@ -5,7 +5,7 @@ import type { ReferencedPage } from "../../types/aiChat";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { AIChatModelSelector } from "./AIChatModelSelector";
 import { useAIChatInput } from "./useAIChatInput";
-import { cn } from "../../lib/utils";
+import { cn } from "@zedi/ui";
 
 interface AIChatInputProps {
   onSendMessage: (message: string, referencedPages: ReferencedPage[]) => void;

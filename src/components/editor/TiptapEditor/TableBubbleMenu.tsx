@@ -1,7 +1,7 @@
 import React from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 import {
   ArrowUpFromLine,
   ArrowDownFromLine,

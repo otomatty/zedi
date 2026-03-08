@@ -1,17 +1,11 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Compass, DatabaseZap, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@zedi/ui";
+import { Input } from "@zedi/ui";
+import { Label } from "@zedi/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,8 +16,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "@zedi/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,7 +29,7 @@ import {
   type EditorFontSize,
   type UILocale,
 } from "@/types/generalSettings";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "@zedi/ui/components/sonner";
 import { useTranslation } from "react-i18next";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { createStorageAdapter } from "@/lib/storageAdapter";

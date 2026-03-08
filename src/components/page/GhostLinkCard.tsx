@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@zedi/ui";
 import { FilePlus } from "lucide-react";
 
 interface GhostLinkCardProps {

@@ -5,7 +5,7 @@ import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import { NotePageCard } from "@/components/note/NotePageCard";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+} from "@zedi/ui";
+import { Input } from "@zedi/ui";
+import { useToast } from "@zedi/ui";
 import {
   useAddPageToNote,
   useNote,
@@ -25,7 +25,7 @@ import {
 } from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@zedi/ui";
 import type { PageSummary } from "@/types/page";
 
 function getNoteViewPermissions(
