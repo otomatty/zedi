@@ -41,19 +41,20 @@ export function SyncPreviewModal({
           onClose();
         }
       }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="sync-preview-title"
+      role="presentation"
     >
       <div
         ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sync-preview-title"
         className="max-h-[80vh] w-full max-w-lg overflow-auto rounded bg-slate-800 p-4 shadow-xl"
       >
         <h2 id="sync-preview-title" className="text-lg font-semibold text-slate-200">
           同期プレビュー
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          新規モデルは追加され、プロバイダーから外れた既存モデルは非アクティブ化されます。
+          新規モデルは追加され、同期対象から外れた既存モデルは非アクティブ化されます。
           既存モデルの表示名や料金は上書きされません。Sonnet 系は非アクティブで追加されます。
         </p>
         {loading ? (

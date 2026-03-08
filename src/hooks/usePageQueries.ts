@@ -37,7 +37,7 @@ export const pageKeys = {
   details: () => [...pageKeys.all, "detail"] as const,
   detail: (userId: string, pageId: string) => [...pageKeys.details(), userId, pageId] as const,
   byTitles: (userId: string) => [...pageKeys.all, "byTitle", userId] as const,
-  byTitle: (userId: string, title: string) => [...pageKeys.byTitles(userId), title] as const,
+  byTitle: (userId: string, title: string) => [...pageKeys.byTitles(userId), title.trim()] as const,
   search: (userId: string, query: string) => [...pageKeys.all, "search", userId, query] as const,
   searchShared: (query: string) => [...pageKeys.all, "searchShared", query] as const,
 };
@@ -336,7 +336,10 @@ export function useCreatePage() {
 
       // 作成したページの detail キャッシュを即時設定（リンクから作成後すぐの遷移でタイトル・コンテンツが正しく表示されるようにする）
       queryClient.setQueryData<Page | null>(pageKeys.detail(userId, newPage.id), newPage);
-      queryClient.setQueryData<Page | null>(pageKeys.byTitle(userId, newPage.title), newPage);
+      queryClient.setQueryData<Page | null>(
+        pageKeys.byTitle(userId, newPage.title.trim()),
+        newPage,
+      );
 
       // Optimistically update the cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [newPage, ...old]);

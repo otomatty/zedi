@@ -33,7 +33,8 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
   // WikiLinkクリック時は常に既存ページの存在をチェック
   const handleLinkClick = useCallback(
     (title: string) => {
-      const createdPageId = createdPageIdsRef.current.get(title);
+      const key = title.trim();
+      const createdPageId = createdPageIdsRef.current.get(key);
       if (createdPageId) {
         navigate(`/page/${createdPageId}`, { replace: false, flushSync: true });
         return;
@@ -87,7 +88,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
         title: pendingCreatePageTitle,
         content: "",
       });
-      createdPageIdsRef.current.set(pendingCreatePageTitle, newPage.id);
+      createdPageIdsRef.current.set(pendingCreatePageTitle.trim(), newPage.id);
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
       navigate(`/page/${newPage.id}`, { replace: false, flushSync: true });

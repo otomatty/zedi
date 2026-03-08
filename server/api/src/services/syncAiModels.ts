@@ -222,6 +222,7 @@ async function syncOneProvider(
 
   const fetchedIds = rows.map((row) => row.id);
   let deactivated = 0;
+  // Skip mass deactivation when no models were fetched (API outage / empty response would otherwise deactivate all).
   if (fetchedIds.length > 0) {
     const result = await db
       .update(aiModels)
@@ -233,12 +234,6 @@ async function syncOneProvider(
           notInArray(aiModels.id, fetchedIds),
         ),
       );
-    deactivated = result.rowCount ?? 0;
-  } else {
-    const result = await db
-      .update(aiModels)
-      .set({ isActive: false })
-      .where(and(eq(aiModels.provider, provider), eq(aiModels.isActive, true)));
     deactivated = result.rowCount ?? 0;
   }
 
