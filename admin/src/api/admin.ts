@@ -96,6 +96,30 @@ export interface SyncResultItem {
   error?: string;
 }
 
+export interface SyncPreviewItem {
+  id: string;
+  provider: string;
+  modelId: string;
+  displayName: string;
+  tierRequired: "free" | "pro";
+  isActive: boolean;
+}
+
+export interface SyncPreviewResult {
+  provider: string;
+  toAdd: SyncPreviewItem[];
+  error?: string;
+}
+
+export async function previewSyncAiModels(): Promise<SyncPreviewResult[]> {
+  const res = await adminFetch("/api/ai/admin/sync-models/preview", { method: "POST" });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Preview failed"));
+  }
+  const data = await res.json();
+  return data.results ?? [];
+}
+
 export async function syncAiModels(): Promise<SyncResultItem[]> {
   const res = await adminFetch("/api/ai/admin/sync-models", { method: "POST" });
   if (!res.ok) {

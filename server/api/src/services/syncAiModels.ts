@@ -12,7 +12,7 @@
  *
  * Anthropic: https://docs.anthropic.com/en/api/models-list の data 配列を使用
  */
-import { eq, and, notInArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { AIProviderType } from "../types/index.js";
 import { getProviderApiKeyName } from "./aiProviders.js";
 import { getOptionalEnv } from "../lib/env.js";
@@ -167,6 +167,13 @@ function isLatestGeneration(provider: AIProviderType, modelId: string): boolean 
   }
 
   return true;
+}
+
+/**
+ * Sonnet 系モデルかどうか（コストが高いため同期時はデフォルト非アクティブ）。
+ */
+function isSonnetModel(_provider: AIProviderType, modelId: string): boolean {
+  return modelId.toLowerCase().includes("sonnet");
 }
 
 /**
@@ -455,6 +462,109 @@ export interface SyncResult {
   debug?: string;
 }
 
+export interface SyncPreviewItem {
+  id: string;
+  provider: AIProviderType;
+  modelId: string;
+  displayName: string;
+  tierRequired: "free" | "pro";
+  isActive: boolean;
+}
+
+export interface SyncPreviewResult {
+  provider: AIProviderType;
+  toAdd: SyncPreviewItem[];
+  error?: string;
+}
+
+export async function previewSyncAiModels(
+  db: ReturnType<typeof getDb>,
+): Promise<SyncPreviewResult[]> {
+  const pricingMap = await fetchOpenRouterPricing();
+  const basePricePerToken = findReferencePricePerToken(pricingMap);
+  const results: SyncPreviewResult[] = [];
+  const providers: AIProviderType[] = ["openai", "anthropic", "google"];
+
+  for (const provider of providers) {
+    const keyName = getProviderApiKeyName(provider);
+    const apiKey = getOptionalEnv(keyName);
+    if (!apiKey) {
+      results.push({ provider, toAdd: [], error: `${keyName} not set` });
+      continue;
+    }
+
+    try {
+      let rows: Row[];
+      switch (provider) {
+        case "openai":
+          rows = await fetchOpenAIModels(apiKey);
+          break;
+        case "anthropic": {
+          const result = await fetchAnthropicModels(apiKey);
+          rows = result.rows;
+          break;
+        }
+        case "google":
+          rows = await fetchGoogleModels(apiKey);
+          break;
+        default:
+          rows = [];
+      }
+
+      rows = rows.filter(
+        (r) => isTextChatModel(r.provider, r.modelId) && isLatestGeneration(r.provider, r.modelId),
+      );
+
+      const openaiAllowlist = parseAllowlist(getOptionalEnv("OPENAI_MODEL_IDS"));
+      const googleAllowlist = parseAllowlist(getOptionalEnv("GOOGLE_MODEL_IDS"));
+      if (provider === "openai" && openaiAllowlist) {
+        rows = rows.filter((r) => openaiAllowlist.has(r.modelId));
+      }
+      if (provider === "google" && googleAllowlist) {
+        rows = rows.filter((r) => googleAllowlist.has(r.modelId));
+      }
+
+      if (pricingMap.size > 0 && basePricePerToken > 0) {
+        for (const row of rows) {
+          const keys = lookupOpenRouterKeys(provider, row.modelId);
+          const pricing = findPricing(pricingMap, keys);
+          if (pricing) {
+            const cu = calculateCostUnits(pricing, basePricePerToken);
+            row.inputCostUnits = cu.input;
+            row.outputCostUnits = cu.output;
+          }
+        }
+      }
+
+      const existingRows = await db
+        .select({ id: aiModels.id })
+        .from(aiModels)
+        .where(eq(aiModels.provider, provider));
+      const existingIds = new Set(existingRows.map((r) => r.id));
+
+      const toAdd: SyncPreviewItem[] = [];
+      for (const row of rows) {
+        if (existingIds.has(row.id)) continue;
+        const isActive = isSonnetModel(row.provider, row.modelId) ? false : row.isActive;
+        toAdd.push({
+          id: row.id,
+          provider: row.provider,
+          modelId: row.modelId,
+          displayName: row.displayName,
+          tierRequired: row.tierRequired,
+          isActive,
+        });
+      }
+      results.push({ provider, toAdd });
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      const message = err.message + (err.cause ? ` (cause: ${String(err.cause)})` : "");
+      results.push({ provider, toAdd: [], error: message });
+    }
+  }
+  return results;
+}
+
 export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncResult[]> {
   const pricingMap = await fetchOpenRouterPricing();
   const basePricePerToken = findReferencePricePerToken(pricingMap);
@@ -520,51 +630,32 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
         }
       }
 
+      // 既存モデルIDを取得（追加のみ: 既存は上書きしない）
+      const existingRows = await db
+        .select({ id: aiModels.id })
+        .from(aiModels)
+        .where(eq(aiModels.provider, provider));
+      const existingIds = new Set(existingRows.map((r) => r.id));
+
       let upserted = 0;
       for (const row of rows) {
-        await db
-          .insert(aiModels)
-          .values({
-            id: row.id,
-            provider: row.provider,
-            modelId: row.modelId,
-            displayName: row.displayName,
-            tierRequired: row.tierRequired,
-            inputCostUnits: row.inputCostUnits,
-            outputCostUnits: row.outputCostUnits,
-            isActive: row.isActive,
-            sortOrder: row.sortOrder,
-          })
-          .onConflictDoUpdate({
-            target: aiModels.id,
-            set: {
-              modelId: row.modelId,
-              displayName: row.displayName,
-              tierRequired: row.tierRequired,
-              inputCostUnits: row.inputCostUnits,
-              outputCostUnits: row.outputCostUnits,
-              isActive: row.isActive,
-              sortOrder: row.sortOrder,
-            },
-          });
-        upserted += 1;
-      }
+        if (existingIds.has(row.id)) continue;
 
-      // 今回 upsert 対象外のモデルを非アクティブ化
-      const activeIds = rows.map((r) => r.id);
-      let deactivated = 0;
-      if (activeIds.length > 0) {
-        const result = await db
-          .update(aiModels)
-          .set({ isActive: false })
-          .where(and(eq(aiModels.provider, provider), notInArray(aiModels.id, activeIds)));
-        deactivated = result.rowCount ?? 0;
-      } else {
-        const result = await db
-          .update(aiModels)
-          .set({ isActive: false })
-          .where(eq(aiModels.provider, provider));
-        deactivated = result.rowCount ?? 0;
+        // Sonnet 系はコストが高いためデフォルト非アクティブ
+        const isActive = isSonnetModel(row.provider, row.modelId) ? false : row.isActive;
+
+        await db.insert(aiModels).values({
+          id: row.id,
+          provider: row.provider,
+          modelId: row.modelId,
+          displayName: row.displayName,
+          tierRequired: row.tierRequired,
+          inputCostUnits: row.inputCostUnits,
+          outputCostUnits: row.outputCostUnits,
+          isActive,
+          sortOrder: row.sortOrder,
+        });
+        upserted += 1;
       }
 
       const hasPricing = pricingMap.size > 0 && basePricePerToken > 0;
@@ -573,7 +664,6 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
         fetched: fetchedTotal,
         filtered: fetchedTotal - rows.length,
         upserted,
-        deactivated,
         pricingSource: hasPricing ? "openrouter" : "default",
         models: rows.map((r) => ({
           id: r.id,
@@ -593,3 +683,4 @@ export async function syncAiModels(db: ReturnType<typeof getDb>): Promise<SyncRe
 
   return results;
 }
+
