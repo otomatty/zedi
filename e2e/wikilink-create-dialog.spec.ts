@@ -102,11 +102,16 @@ async function createPageWithGhostWikiLink(page: Page, sourceTitle: string) {
     timeout: 5000,
   });
 
-  // Wait for autosave, then reload to ensure click behavior is tested against persisted content.
-  await page.waitForTimeout(2000);
+  // Wait for autosave (PUT /api/pages/:id/content), then reload to test against persisted content.
+  await page.waitForResponse(
+    (res) =>
+      res.url().includes("/api/pages/") &&
+      res.url().includes("/content") &&
+      res.request().method() === "PUT",
+    { timeout: 10000 },
+  );
   await page.goto(sourceUrl);
   await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(1000);
 
   return { sourceUrl };
 }
@@ -152,14 +157,24 @@ test.describe("WikiLink create-page dialog", () => {
     const { sourceUrl } = await createPageWithGhostWikiLink(page, "Ghost Link Create Test");
 
     await page.route("**/api/pages", async (route) => {
-      const now = new Date().toISOString();
-      const requestBody = route.request().postDataJSON() as {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      let requestBody: {
         title?: string;
         content_preview?: string | null;
         source_page_id?: string | null;
         thumbnail_url?: string | null;
         source_url?: string | null;
       };
+      try {
+        requestBody = route.request().postDataJSON() ?? {};
+      } catch {
+        await route.fallback();
+        return;
+      }
+      const now = new Date().toISOString();
 
       await route.fulfill({
         status: 200,

@@ -22,10 +22,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
   const { data: foundPage, isFetched } = usePageByTitle(linkTitleToFind || "");
 
   // Pending link action
-  const pendingLinkActionRef = useRef<{
-    title: string;
-    exists: boolean;
-  } | null>(null);
+  const pendingLinkActionRef = useRef<{ title: string } | null>(null);
 
   // Create page confirmation dialog state
   const [createPageDialogOpen, setCreatePageDialogOpen] = useState(false);
@@ -34,7 +31,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
   // Handle link click - navigate to page or create new
   // WikiLinkクリック時は常に既存ページの存在をチェック
   const handleLinkClick = useCallback((title: string) => {
-    pendingLinkActionRef.current = { title, exists: true };
+    pendingLinkActionRef.current = { title };
     setLinkTitleToFind(title);
   }, []);
 

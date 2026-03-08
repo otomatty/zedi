@@ -32,10 +32,12 @@ export function useDialogFocusTrap({
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const previouslyFocused = document.activeElement as HTMLElement | null;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         onClose();
         return;
       }
@@ -61,12 +63,18 @@ export function useDialogFocusTrap({
 
     window.addEventListener("keydown", handleKeyDown);
     requestAnimationFrame(() => {
-      initialFocusRef.current?.focus();
+      if (initialFocusRef.current) {
+        initialFocusRef.current.focus();
+      } else if (dialogRef.current) {
+        const focusable = getFocusableElements(dialogRef.current);
+        focusable[0]?.focus();
+      }
     });
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
     };
   }, [open, onClose, dialogRef, initialFocusRef]);
 }
