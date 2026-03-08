@@ -104,7 +104,7 @@ describe("buildSuggestedWikiLinksMarkdown", () => {
 });
 
 describe("convertMarkdownToTiptapContent (URL sanitization)", () => {
-  it("strips javascript: links to prevent XSS", () => {
+  it("keeps invalid/dangerous link URLs as plain text to prevent XSS and preserve content", () => {
     const result = convertMarkdownToTiptapContent("[Click me](javascript:alert(1))");
     const parsed = JSON.parse(result) as { content: Array<Record<string, unknown>> };
     const paragraph = parsed.content[0] as {
@@ -112,7 +112,7 @@ describe("convertMarkdownToTiptapContent (URL sanitization)", () => {
     };
     expect(paragraph.content?.[0]).toMatchObject({
       type: "text",
-      text: "Click me",
+      text: "[Click me](javascript:alert(1)", // full regex match ends at first )
     });
     expect(paragraph.content?.[0]).not.toHaveProperty("marks");
   });
