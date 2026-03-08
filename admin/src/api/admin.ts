@@ -108,6 +108,7 @@ export interface SyncPreviewItem {
 export interface SyncPreviewResult {
   provider: string;
   toAdd: SyncPreviewItem[];
+  toDeactivate: SyncPreviewItem[];
   error?: string;
 }
 

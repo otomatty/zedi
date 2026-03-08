@@ -23,6 +23,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
   // Pending link action
   const pendingLinkActionRef = useRef<{ title: string } | null>(null);
+  const createdPageIdsRef = useRef(new Map<string, string>());
 
   // Create page confirmation dialog state
   const [createPageDialogOpen, setCreatePageDialogOpen] = useState(false);
@@ -30,10 +31,18 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
   // Handle link click - navigate to page or create new
   // WikiLinkクリック時は常に既存ページの存在をチェック
-  const handleLinkClick = useCallback((title: string) => {
-    pendingLinkActionRef.current = { title };
-    setLinkTitleToFind(title);
-  }, []);
+  const handleLinkClick = useCallback(
+    (title: string) => {
+      const createdPageId = createdPageIdsRef.current.get(title);
+      if (createdPageId) {
+        navigate(`/page/${createdPageId}`, { replace: false, flushSync: true });
+        return;
+      }
+      pendingLinkActionRef.current = { title };
+      setLinkTitleToFind(title);
+    },
+    [navigate],
+  );
 
   // Navigate when found page changes
   useEffect(() => {
@@ -78,6 +87,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
         title: pendingCreatePageTitle,
         content: "",
       });
+      createdPageIdsRef.current.set(pendingCreatePageTitle, newPage.id);
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
       navigate(`/page/${newPage.id}`, { replace: false, flushSync: true });

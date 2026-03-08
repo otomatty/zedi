@@ -46,6 +46,7 @@ export interface SyncPreviewItem {
 export interface SyncPreviewResult {
   provider: AIProviderType;
   toAdd: SyncPreviewItem[];
+  toDeactivate: SyncPreviewItem[];
   error?: string;
 }
 
