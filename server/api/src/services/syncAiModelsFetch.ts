@@ -105,7 +105,10 @@ export async function fetchAnthropicModels(apiKey: string): Promise<AnthropicFet
     if (!body.has_more || list.length === 0) break;
     afterId = body.last_id ?? list[list.length - 1]?.id;
     pageIndex++;
-    if (pageIndex > 20) break;
+    if (pageIndex > 20) {
+      console.warn("[syncAiModels] Anthropic fetch stopped after 20 pages. More models may exist.");
+      break;
+    }
   }
 
   return {

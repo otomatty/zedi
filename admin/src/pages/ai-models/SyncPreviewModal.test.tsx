@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SyncPreviewModal } from "./SyncPreviewModal";
@@ -6,6 +6,11 @@ import { SyncPreviewModal } from "./SyncPreviewModal";
 describe("SyncPreviewModal", () => {
   const onClose = vi.fn();
   const onConfirm = vi.fn();
+
+  beforeEach(() => {
+    onClose.mockClear();
+    onConfirm.mockClear();
+  });
 
   it("open が false のとき何も描画しない", () => {
     render(

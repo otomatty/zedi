@@ -51,17 +51,21 @@ export function useAiModelActions({
 
   const handleToggleActive = useCallback(
     async (m: AiModelAdmin) => {
-      await handleModelUpdate(m, { isActive: !m.isActive });
+      const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
+      if (!originalModel) return;
+      await handleModelUpdate(originalModel, { isActive: !m.isActive });
     },
-    [handleModelUpdate],
+    [handleModelUpdate, originalModelsRef],
   );
 
   const handleTierChange = useCallback(
     async (m: AiModelAdmin, tier: "free" | "pro") => {
       if (m.tierRequired === tier) return;
-      await handleModelUpdate(m, { tierRequired: tier });
+      const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
+      if (!originalModel) return;
+      await handleModelUpdate(originalModel, { tierRequired: tier });
     },
-    [handleModelUpdate],
+    [handleModelUpdate, originalModelsRef],
   );
 
   return { handleModelUpdate, handleToggleActive, handleTierChange };

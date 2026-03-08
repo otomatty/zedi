@@ -54,7 +54,7 @@ export type {
 async function fetchAndFilterRows(
   provider: AIProviderType,
   apiKey: string,
-): Promise<{ rows: Row[]; debug?: string }> {
+): Promise<{ rows: Row[]; totalBeforeFilter: number; debug?: string }> {
   let rows: Row[];
   let debug: string | undefined;
 
@@ -75,6 +75,7 @@ async function fetchAndFilterRows(
       rows = [];
   }
 
+  const totalBeforeFilter = rows.length;
   rows = rows.filter(
     (r) => isTextChatModel(r.provider, r.modelId) && isLatestGeneration(r.provider, r.modelId),
   );
@@ -88,7 +89,7 @@ async function fetchAndFilterRows(
     rows = rows.filter((r) => googleAllowlist.has(r.modelId));
   }
 
-  return { rows, debug };
+  return { rows, totalBeforeFilter, debug };
 }
 
 export async function previewSyncAiModels(
@@ -147,8 +148,8 @@ async function syncOneProvider(
   pricingMap: Map<string, OpenRouterPricing>,
   basePricePerToken: number,
 ): Promise<SyncResult> {
-  const { rows, debug } = await fetchAndFilterRows(provider, apiKey);
-  const fetchedTotal = rows.length;
+  const { rows, totalBeforeFilter, debug } = await fetchAndFilterRows(provider, apiKey);
+  const fetchedTotal = totalBeforeFilter;
 
   // OpenRouter 料金から Cost Units を適用
   if (pricingMap.size > 0 && basePricePerToken > 0) {
