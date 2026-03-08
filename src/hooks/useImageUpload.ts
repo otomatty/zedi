@@ -66,7 +66,7 @@ export function useImageUpload(): UseImageUploadReturn {
           getToken,
         });
 
-        // 静止画のみ WebP に変換（GIF/APNG 等のアニメーション画像はそのまま）
+        // JPEG/PNG のみ WebP に変換（GIF はそのまま。APNG は MIME が image/png のため現状は変換対象）
         const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
         const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
 

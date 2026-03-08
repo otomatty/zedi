@@ -143,6 +143,7 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
   uploadTimersRef.current.set(uploadId, timerId);
 
   try {
+    // JPEG/PNG のみ WebP に変換（GIF はそのまま。APNG は MIME が image/png のため現状は変換対象）
     const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
     const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
     const url = await provider.uploadImage(fileToUpload, {
