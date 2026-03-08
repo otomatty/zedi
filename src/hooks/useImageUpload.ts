@@ -7,6 +7,7 @@ import {
   getStorageProvider,
   getSettingsForUpload,
   isStorageConfiguredForUpload,
+  convertToWebP,
   UploadProgress,
 } from "@/lib/storage";
 
@@ -65,8 +66,11 @@ export function useImageUpload(): UseImageUploadReturn {
           getToken,
         });
 
+        // ストレージ節約のため WebP に変換してからアップロード
+        const fileToUpload = await convertToWebP(file);
+
         // アップロード実行
-        const url = await provider.uploadImage(file, {
+        const url = await provider.uploadImage(fileToUpload, {
           onProgress: (progress) => {
             setState((prev) => ({ ...prev, progress }));
           },
@@ -75,7 +79,7 @@ export function useImageUpload(): UseImageUploadReturn {
         setState((prev) => ({
           ...prev,
           isUploading: false,
-          progress: { loaded: file.size, total: file.size, percentage: 100 },
+          progress: { loaded: fileToUpload.size, total: fileToUpload.size, percentage: 100 },
         }));
 
         return url;
