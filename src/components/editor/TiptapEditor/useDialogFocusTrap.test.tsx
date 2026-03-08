@@ -62,6 +62,9 @@ describe("useDialogFocusTrap", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  // JSDOM では getFocusableElements が offsetParent により [] を返すため、
+  // フォールバックで first focusable に focus() が呼ばれることは検証できない。
+  // ここではフックが throw せず body overflow が設定されることを確認する。
   it("runs without error when initialFocusRef is null (fallback to first focusable)", () => {
     expect(() => {
       render(<TestDialog open={true} onClose={onClose} useInitialFocusRef={false} />);

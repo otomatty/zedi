@@ -15,19 +15,21 @@ description: >
 ## Step 0: 対象の特定
 
 ユーザーがベースブランチを指定しない場合は `develop` を使う。
+共通祖先（merge-base）を基準にし、**コミット済み＋ステージ済み＋未ステージ**の変更をまとめて対象にする。
 
 ```bash
 BASE_BRANCH="develop"
 CURRENT=$(git branch --show-current)
+MERGE_BASE=$(git merge-base ${BASE_BRANCH} HEAD)
 
 # ステージ済み + 未ステージの変更があるか確認
 git status --short
 
-# ベースからの差分ファイル一覧
-git diff ${BASE_BRANCH}..HEAD --name-only
+# 変更ファイル一覧（merge-base からの差分＝コミット済み＋index＋working tree）
+git diff --name-only ${MERGE_BASE}
 
-# コミット一覧
-git log ${BASE_BRANCH}..HEAD --format="%h %s" --reverse
+# コミット一覧（このブランチで追加されたコミット）
+git log ${MERGE_BASE}..HEAD --format="%h %s" --reverse
 ```
 
 差分がない場合はユーザーに報告して終了する。
@@ -39,7 +41,8 @@ git log ${BASE_BRANCH}..HEAD --format="%h %s" --reverse
 ### 1a. 変更ファイル本体
 
 ```bash
-git diff ${BASE_BRANCH}..HEAD -- <file>
+# merge-base から現在（index + working tree）までの差分
+git diff ${MERGE_BASE} -- <file>
 ```
 
 ### 1b. 関連テストファイル
@@ -118,7 +121,9 @@ rg "from ['\"].*/<changed-module>['\"]" --type ts --type tsx -l
 
 レビュー結果を `docs/reviews/` に以下の形式で出力する。
 
-**ファイル名**: `review-<branch-name>-<YYYYMMDD-num>.md`
+**ファイル名**: `review-<branch-slug>-<YYYYMMDD-num>.md`
+
+- **branch-slug**: ブランチ名をファイル名に使う場合は、`/` などパス区切りやファイルシステムで問題になる文字を置換した slug にする（例: `/` → `-`）。例: `feature/wiki-link-create-dialog-and-tests` → `feature-wiki-link-create-dialog-and-tests`
 
 ### レポートテンプレート
 
