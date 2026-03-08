@@ -1,3 +1,17 @@
+import {
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@zedi/ui";
 import type { UserAdmin, UserRole } from "@/api/admin";
 import { UserCard } from "./UserCard";
 
@@ -38,12 +52,12 @@ export function UsersContent({
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold">ユーザー管理</h1>
-        <input
+        <Input
           type="search"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="メールで検索"
-          className="w-full max-w-xs rounded border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none"
+          className="w-full max-w-xs"
           aria-label="メールで検索"
         />
       </div>
@@ -57,42 +71,50 @@ export function UsersContent({
       ) : (
         <>
           {/* デスクトップ: テーブル */}
-          <div className="mt-4 hidden overflow-x-auto rounded border border-slate-700 md:block">
-            <table className="w-full min-w-[480px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-700 bg-slate-800/50">
-                  <th className="px-3 py-2 font-medium text-slate-300">メール</th>
-                  <th className="px-3 py-2 font-medium text-slate-300">名前</th>
-                  <th className="px-3 py-2 font-medium text-slate-300">ロール</th>
-                  <th className="px-3 py-2 font-medium text-slate-300">作成日</th>
-                  <th className="px-3 py-2 font-medium text-slate-300">操作</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="mt-4 hidden md:block">
+            <Table className="min-w-[480px] rounded border border-border">
+              <TableHeader>
+                <TableRow className="border-border bg-muted/50 hover:bg-transparent">
+                  <TableHead className="px-3 py-2">メール</TableHead>
+                  <TableHead className="px-3 py-2">名前</TableHead>
+                  <TableHead className="px-3 py-2">ロール</TableHead>
+                  <TableHead className="px-3 py-2">作成日</TableHead>
+                  <TableHead className="px-3 py-2">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-slate-700/70">
-                    <td className="px-3 py-2 text-slate-300">{u.email}</td>
-                    <td className="px-3 py-2 text-slate-300">{u.name || "—"}</td>
-                    <td className="px-3 py-2">
-                      <select
-                        aria-label={`${u.email} のロール`}
+                  <TableRow key={u.id} className="border-border">
+                    <TableCell className="px-3 py-2">{u.email}</TableCell>
+                    <TableCell className="px-3 py-2">{u.name || "—"}</TableCell>
+                    <TableCell className="px-3 py-2">
+                      <Select
                         value={u.role}
-                        onChange={(e) => onRoleChange(u, e.target.value as UserRole)}
+                        onValueChange={(v) => onRoleChange(u, v as UserRole)}
                         disabled={savingId === u.id}
-                        className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 disabled:opacity-50"
                       >
-                        <option value="user">user</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2 text-slate-400">{formatDate(u.createdAt)}</td>
-                    <td className="px-3 py-2 text-slate-500">
+                        <SelectTrigger
+                          className="h-8 min-w-[100px]"
+                          aria-label={`${u.email} のロール`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">user</SelectItem>
+                          <SelectItem value="admin">admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-muted-foreground">
+                      {formatDate(u.createdAt)}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-muted-foreground">
                       {savingId === u.id ? "保存中..." : ""}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {/* モバイル: リスト */}

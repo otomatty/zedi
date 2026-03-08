@@ -1,3 +1,4 @@
+import { Button, Table, TableBody, TableHead, TableHeader, TableRow } from "@zedi/ui";
 import type { AiModelAdmin, SyncPreviewResult, SyncResultItem } from "@/api/admin";
 import { AiModelCard } from "./AiModelCard";
 import { AiModelRow } from "./AiModelRow";
@@ -69,14 +70,15 @@ export function AiModelsContent({
     <div>
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-lg font-semibold">AI モデル管理</h1>
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={onPreviewClick}
           disabled={syncing}
-          className="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-600 disabled:opacity-50"
         >
           {syncing ? "同期中..." : "プロバイダーと同期"}
-        </button>
+        </Button>
       </div>
 
       {error && (
@@ -103,20 +105,20 @@ export function AiModelsContent({
       />
 
       {/* デスクトップ: テーブル */}
-      <div className="mt-4 hidden overflow-x-auto rounded border border-slate-700 md:block">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-700 bg-slate-800/50">
-              <th className="w-8 px-1 py-2" aria-label="並び替え" />
-              <th className="px-3 py-2 font-medium text-slate-300">プロバイダー</th>
-              <th className="px-3 py-2 font-medium text-slate-300">モデルID</th>
-              <th className="px-3 py-2 font-medium text-slate-300">表示名</th>
-              <th className="px-3 py-2 font-medium text-slate-300">ティア</th>
-              <th className="px-3 py-2 font-medium text-slate-300">有効</th>
-              <th className="px-3 py-2 font-medium text-slate-300">並び順</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="mt-4 hidden md:block">
+        <Table className="min-w-[640px] rounded border border-border">
+          <TableHeader>
+            <TableRow className="border-border bg-muted/50 hover:bg-transparent">
+              <TableHead className="w-8 px-1 py-2" aria-label="並び替え" />
+              <TableHead className="px-3 py-2">プロバイダー</TableHead>
+              <TableHead className="px-3 py-2">モデルID</TableHead>
+              <TableHead className="px-3 py-2">表示名</TableHead>
+              <TableHead className="px-3 py-2">ティア</TableHead>
+              <TableHead className="px-3 py-2">有効</TableHead>
+              <TableHead className="px-3 py-2">並び順</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {models.map((m) => (
               <AiModelRow
                 key={m.id}
@@ -148,8 +150,8 @@ export function AiModelsContent({
                 onDragEnd={onDragEnd}
               />
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {/* モバイル: リスト（カード） */}
