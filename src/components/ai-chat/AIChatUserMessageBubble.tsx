@@ -22,7 +22,8 @@ export function renderUserContent(content: string, referencedPages?: ReferencedP
   const sortedPages = [...referencedPages].sort((a, b) => b.title.length - a.title.length);
   const titleToPage = new Map(sortedPages.map((p) => [`@${p.title}`, p]));
   const escapedTitles = sortedPages.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pattern = new RegExp(`(@(?:${escapedTitles.join("|")}))(?=\\s|$)`, "g");
+  // Allow boundary after @Title: whitespace, end, or punctuation (e.g. @AI Chat, @ページ。)
+  const pattern = new RegExp(`(@(?:${escapedTitles.join("|")}))(?=[\\s\\p{P}\\p{S}]|$)`, "gu");
   const parts = content.split(pattern);
 
   return (
@@ -105,6 +106,13 @@ export function UserMessageBubble({
     }
   }, []);
 
+  const handlePointerCancel = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (!canEdit) return;
@@ -179,6 +187,10 @@ export function UserMessageBubble({
                 e.preventDefault();
                 startEdit();
               }
+              if (e.key === " ") {
+                e.preventDefault();
+                startEdit();
+              }
             }
           : undefined
       }
@@ -186,6 +198,7 @@ export function UserMessageBubble({
       onPointerDown={canEdit ? handlePointerDown : undefined}
       onPointerUp={canEdit ? handlePointerUp : undefined}
       onPointerLeave={canEdit ? handlePointerUp : undefined}
+      onPointerCancel={canEdit ? handlePointerCancel : undefined}
     >
       {renderUserContent(content, referencedPages)}
     </div>
