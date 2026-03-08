@@ -1,0 +1,11 @@
+---
+description: PR とブランチの命名規則。PR 作成・ブランチ作成時に従う。
+globs: ".github/PULL_REQUEST_TEMPLATE.md,**/PULL_REQUEST*"
+alwaysApply: false
+---
+
+# ブランチ・PR 命名規則
+
+- **ブランチ名**: `feature/説明` または `fix/説明`（例: `feature/ai-models-ui`, `fix/search-crash`）。Issue ベースなら `feature/123`。Cursor Cloud Agent が自動作成する場合は `cursor/` プレフィックスが付くことがあるが、手動で PR を作る際は上記形式を推奨。
+- **PR タイトル**: 変更内容を正しく表すこと。Conventional Commits 形式（例: `feat(admin): AIモデル管理UI拡張 (#218)`）。単一トピックなら代表コミットメッセージをそのまま使用。日本語・英語はコミットの多数に合わせる。
+- タイトルに「Config argument parsing」のように、実際の変更と無関係な文言を付けないこと。
