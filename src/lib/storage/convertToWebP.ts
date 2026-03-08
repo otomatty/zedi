@@ -48,14 +48,14 @@ export async function convertToWebP(file: File): Promise<File> {
       canvas.toBlob(resolve, "image/webp", WEBP_QUALITY);
     });
 
-    if (!blob) {
+    if (!blob || blob.type !== "image/webp") {
       return file;
     }
 
     const baseName = file.name.replace(/\.[^.]+$/, "") || "image";
     return new File([blob], `${baseName}.webp`, {
-      type: "image/webp",
-      lastModified: Date.now(),
+      type: blob.type,
+      lastModified: file.lastModified,
     });
   } catch {
     return file;

@@ -108,6 +108,39 @@ describe("convertToWebP", () => {
     expect(result.type).toBe("image/png");
   });
 
+  it("returns original file when toBlob falls back to PNG", async () => {
+    const pngFile = createPngFile();
+    const fallbackBlob = new Blob(["png"], { type: "image/png" });
+
+    const OriginalImage = globalThis.Image;
+    vi.stubGlobal(
+      "Image",
+      class MockImage extends OriginalImage {
+        constructor() {
+          super();
+          queueMicrotask(() => {
+            Object.defineProperty(this, "naturalWidth", { value: 1 });
+            Object.defineProperty(this, "naturalHeight", { value: 1 });
+            this.onload?.();
+          });
+        }
+      },
+    );
+
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+      callback?.(fallbackBlob);
+    });
+
+    const result = await convertToWebP(pngFile);
+
+    expect(result).toBe(pngFile);
+    expect(result.name).toBe("test.png");
+    expect(result.type).toBe("image/png");
+  });
+
   it("preserves base filename when converting", async () => {
     const pngFile = new File([createPngFile()], "my-photo-2024.png", {
       type: "image/png",
