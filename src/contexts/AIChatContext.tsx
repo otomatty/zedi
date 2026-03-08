@@ -16,7 +16,7 @@ const AIChatContext = createContext<AIChatContextValue | undefined>(undefined);
 export function AIChatProvider({ children }: { children: ReactNode }) {
   const [pageContext, setPageContext] = useState<PageContext | null>(null);
   const [aiChatAvailable, setAIChatAvailable] = useState(false);
-  const contentAppendHandlerRef = useRef<ContentAppendHandler | null>(null);
+  const contentAppendHandlerRef = useRef<((nextContent: string) => void) | null>(null);
 
   return (
     <AIChatContext.Provider

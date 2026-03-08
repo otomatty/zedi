@@ -50,7 +50,7 @@ const mockUser: UserAdmin = {
   id: "user-1",
   email: "user@example.com",
   name: "Test User",
-  role: "viewer",
+  role: "user",
   createdAt: "2026-01-01T00:00:00Z",
 };
 

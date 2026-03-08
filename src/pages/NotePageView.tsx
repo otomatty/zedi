@@ -44,8 +44,11 @@ function NotePageEditorEditable({
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-    return () => setPageContext(null);
   }, [page.id, page.title, editorContent, setPageContext]);
+
+  useEffect(() => {
+    return () => setPageContext(null);
+  }, [setPageContext]);
 
   useEffect(() => {
     contentAppendHandlerRef.current = setEditorContent;
