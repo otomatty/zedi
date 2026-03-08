@@ -11,31 +11,28 @@ description: >
 
 # Create Pull Request
 
-This skill is intended to be run **on the develop branch**. It **always creates a new branch** from develop, then creates (or updates) a PR. Obtain the branch name from the user (e.g. `feature/add-login`) or derive it from an issue number (e.g. `123` → `feature/123`). If neither is provided, ask the user.
+This skill uses `develop` as the default base branch. If the current branch already contains the intended commits, reuse that branch and create or update the PR from it. When creating a new branch (from `develop`), obtain the branch name from the user (e.g. `feature/add-login`) or derive it from an issue number (e.g. `123` → `feature/123`). If neither is provided, ask the user.
 
 ## Preflight
 
 ```bash
 git status                          # current state
-git branch --show-current           # must be develop (or will switch in Step 1)
+git branch --show-current           # develop → new branch; other → reuse if has commits
 gh auth status                      # GitHub CLI authenticated
 ```
 
-## Step 1: Prepare develop and create the feature branch
+## Step 1: Decide whether to reuse the current branch or create a new one
 
-1. **Ensure we're on develop and up to date**
-   - If current branch is not `develop`: `git checkout develop` (uncommitted changes will carry over).
+1. **If current branch is `develop`**
    - Run `git pull origin develop`.
+   - Determine the new branch name: from user (e.g. `feature/add-login`) or issue number (e.g. `123` → `feature/123`). If missing, ask: "ブランチ名（例: feature/add-login）またはイシュー番号（例: 123）を教えてください."
+   - Create the branch: `git checkout -b <ブランチ名>`.
+   - If working tree is dirty, commit with an appropriate message (Conventional Commits recommended).
 
-2. **Determine the new branch name**
-   - From user: e.g. `feature/add-login` or issue-only `123` → use `feature/123`.
-   - If missing, ask: "ブランチ名（例: feature/add-login）またはイシュー番号（例: 123）を教えてください。"
-
-3. **Create the branch**
-   - `git checkout -b <ブランチ名>` so all current (including uncommitted) work is on the new branch.
-
-4. **Commit if working tree is dirty**
-   - Commit with an appropriate message (Conventional Commits recommended). If the user already described the change, use that for the message; otherwise derive from changed files.
+2. **If current branch is not `develop`**
+   - If `git log develop..HEAD --oneline` is non-empty, keep using the current branch (reuse for PR create/update).
+   - If the working tree is dirty, do not switch to `develop` and pull with carried-over changes; ask the user to commit or stash first, or to branch from the current state explicitly.
+   - If the current branch has no commits ahead of develop, you may switch to `develop` after a clean state, then follow the "If current branch is develop" path.
 
 ## Step 2: Investigation workflow
 
@@ -177,7 +174,7 @@ EOF
 
 ### Existing PR (update description only)
 
-If Phase 1-1g found an existing PR for this branch, update its body instead of creating a new one:
+If Phase 1-1g found an existing PR for the current branch, update its body instead of creating a new branch and PR:
 
 ```bash
 gh pr edit <NUMBER> --body "$(cat <<'EOF'
@@ -197,15 +194,16 @@ Derive the PR title from commit messages:
 
 ## Decision points
 
-| Situation                    | Action                                             |
-| ---------------------------- | -------------------------------------------------- |
-| Not on develop               | Checkout develop, pull, then create the new branch |
-| Branch name / issue missing  | Ask user for branch name or issue number           |
-| Working tree dirty on branch | Commit on the new branch before investigation      |
-| Existing PR found            | Update that PR's body instead of creating a new PR |
-| Base branch not specified    | Default to `develop`                               |
-| PR is very large (>50 files) | Suggest splitting, but proceed if user confirms    |
-| Lint/format/test fail        | Fix, commit, then re-run Step 3 before pushing     |
+| Situation                    | Action                                                                 |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| Not on develop (has commits) | Reuse current branch; create or update PR from it                      |
+| On develop                   | Pull, create new branch (get name from user), then create or update PR |
+| Branch name / issue missing  | Ask user for branch name or issue number                               |
+| Working tree dirty on branch | Commit on the new branch before investigation                          |
+| Existing PR found            | Update that PR's body instead of creating a new PR                     |
+| Base branch not specified    | Default to `develop`                                                   |
+| PR is very large (>50 files) | Suggest splitting, but proceed if user confirms                        |
+| Lint/format/test fail        | Fix, commit, then re-run Step 3 before pushing                         |
 
 ## Response format
 
