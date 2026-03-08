@@ -68,8 +68,7 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
   if (initialMessages !== undefined) {
     setMessages([...initialMessages, userMessage, assistantMessage]);
   } else {
-    setMessages((prev) => [...prev, userMessage]);
-    setMessages((prev) => [...prev, assistantMessage]);
+    setMessages((prev) => [...prev, userMessage, assistantMessage]);
   }
 
   setStreaming(true);

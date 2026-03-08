@@ -12,7 +12,9 @@
     "editAndCreate": "Edit & Create",
     "appendToPage": "Append",
     "createMultiple": "Create All",
-    "addLink": "Add Link"
+    "addLink": "Add Link",
+    "copyCode": "Copy code",
+    "copiedCode": "Copied"
   },
   "placeholders": {
     "default": "Type a message...",

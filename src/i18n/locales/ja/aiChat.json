@@ -12,7 +12,9 @@
     "editAndCreate": "編集してから作成",
     "appendToPage": "追記する",
     "createMultiple": "まとめて作成",
-    "addLink": "リンクを追加"
+    "addLink": "リンクを追加",
+    "copyCode": "コードをコピー",
+    "copiedCode": "コピーしました"
   },
   "placeholders": {
     "default": "メッセージを入力...",

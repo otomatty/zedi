@@ -64,11 +64,17 @@ export function AIChatMessage({
                   pre: CodeBlockWithCopy,
                   a: ({ href, children }) => {
                     if (href?.startsWith("wiki:")) {
-                      const title = decodeURIComponent(href.slice(5));
+                      let title: string;
+                      try {
+                        title = decodeURIComponent(href.slice(5));
+                      } catch {
+                        title = href.slice(5);
+                      }
                       return <AIChatWikiLink title={title} />;
                     }
+                    const safeHref = href && /^(https?|mailto|tel):/i.test(href) ? href : undefined;
                     return (
-                      <a href={href} target="_blank" rel="noopener noreferrer">
+                      <a href={safeHref} target="_blank" rel="noopener noreferrer">
                         {children}
                       </a>
                     );

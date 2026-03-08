@@ -19,6 +19,7 @@ export function renderUserContent(content: string, referencedPages?: ReferencedP
     return <div className="whitespace-pre-wrap break-words">{content}</div>;
   }
 
+  const titleToPage = new Map(referencedPages.map((p) => [`@${p.title}`, p]));
   const escapedTitles = referencedPages.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const pattern = new RegExp(`(@(?:${escapedTitles.join("|")}))(?=\\s|$)`, "g");
   const parts = content.split(pattern);
@@ -26,7 +27,7 @@ export function renderUserContent(content: string, referencedPages?: ReferencedP
   return (
     <div className="whitespace-pre-wrap break-words">
       {parts.map((part, i) => {
-        const matchedRef = referencedPages.find((p) => part === `@${p.title}`);
+        const matchedRef = titleToPage.get(part);
         if (matchedRef) {
           return (
             <span
