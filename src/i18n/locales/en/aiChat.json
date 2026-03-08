@@ -4,13 +4,17 @@
     "close": "Close",
     "newConversation": "New Conversation",
     "conversationList": "Conversations",
+    "cancel": "Cancel",
+    "resend": "Resend",
     "send": "Send",
     "stop": "Stop",
     "createPage": "Create",
     "editAndCreate": "Edit & Create",
     "appendToPage": "Append",
     "createMultiple": "Create All",
-    "addLink": "Add Link"
+    "addLink": "Add Link",
+    "copyCode": "Copy code",
+    "copiedCode": "Copied"
   },
   "placeholders": {
     "default": "Type a message...",
