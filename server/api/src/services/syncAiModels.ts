@@ -136,11 +136,11 @@ export async function previewSyncAiModels(
           isActive,
         });
       }
-      const toDeactivate = existingRows
+      const toDeactivate: SyncPreviewItem[] = existingRows
         .filter((row) => row.isActive && !fetchedIds.has(row.id))
         .map((row) => ({
           id: row.id,
-          provider: row.provider,
+          provider: row.provider as AIProviderType,
           modelId: row.modelId,
           displayName: row.displayName,
           tierRequired: row.tierRequired,
