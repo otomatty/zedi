@@ -64,9 +64,9 @@ Zedi はナレッジネットワークツールで、ユーザーの思考を[[W
 {"type":"create-page","title":"ページタイトル","content":"Markdown内容...","suggestedLinks":["関連キーワード"],"reason":"提案理由"}
 <!-- /zedi-action -->
 
-(2) 既存ページへの追記提案（pageIdは既存ページのID）:
+(2) 既存ページへの追記提案（pageTitleで指定。上記タイトル一覧と一致させる）:
 <!-- zedi-action:append-to-page -->
-{"type":"append-to-page","pageId":"既存ページID","pageTitle":"ページタイトル","content":"追記するMarkdown","reason":"提案理由"}
+{"type":"append-to-page","pageTitle":"ページタイトル","content":"追記するMarkdown","reason":"提案理由"}
 <!-- /zedi-action -->
 
 (3) 複数ページの一括作成提案:
@@ -74,9 +74,9 @@ Zedi はナレッジネットワークツールで、ユーザーの思考を[[W
 {"type":"create-multiple-pages","pages":[{"title":"タイトル1","content":"内容1","suggestedLinks":[]},{"title":"タイトル2","content":"内容2","suggestedLinks":[]}],"linkStructure":[{"from":"タイトル1","to":"タイトル2"}],"reason":"提案理由"}
 <!-- /zedi-action -->
 
-(4) 既存ページへのWikiLink提案:
+(4) 既存ページへのWikiLink提案（existingPageTitleで指定。上記タイトル一覧と一致させる）:
 <!-- zedi-action:suggest-wiki-links -->
-{"type":"suggest-wiki-links","links":[{"keyword":"キーワード","existingPageId":"既存の場合はID","existingPageTitle":"既存の場合はタイトル"}],"reason":"提案理由"}
+{"type":"suggest-wiki-links","links":[{"keyword":"キーワード","existingPageTitle":"既存ページのタイトル"}],"reason":"提案理由"}
 <!-- /zedi-action -->
 
 提案のタイミング:

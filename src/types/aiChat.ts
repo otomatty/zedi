@@ -39,8 +39,8 @@ export interface CreatePageAction {
 
 export interface AppendToPageAction {
   type: "append-to-page";
-  pageId: string;
-  pageTitle: string;
+  pageTitle: string; // クライアントでタイトル→ID解決する
+  pageId?: string; // 既存解決時は省略可
   content: string;
   reason: string;
 }

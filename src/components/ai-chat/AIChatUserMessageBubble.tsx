@@ -19,8 +19,9 @@ export function renderUserContent(content: string, referencedPages?: ReferencedP
     return <div className="whitespace-pre-wrap break-words">{content}</div>;
   }
 
-  const titleToPage = new Map(referencedPages.map((p) => [`@${p.title}`, p]));
-  const escapedTitles = referencedPages.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const sortedPages = [...referencedPages].sort((a, b) => b.title.length - a.title.length);
+  const titleToPage = new Map(sortedPages.map((p) => [`@${p.title}`, p]));
+  const escapedTitles = sortedPages.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const pattern = new RegExp(`(@(?:${escapedTitles.join("|")}))(?=\\s|$)`, "g");
   const parts = content.split(pattern);
 
@@ -74,11 +75,14 @@ export function UserMessageBubble({
 
   const submitEdit = useCallback(() => {
     const trimmed = editValue.trim();
-    if (trimmed) {
-      onEditMessage(messageId, trimmed);
+    if (!trimmed) return;
+    if (trimmed === content.trim()) {
       setIsEditing(false);
+      return;
     }
-  }, [editValue, messageId, onEditMessage]);
+    onEditMessage(messageId, trimmed);
+    setIsEditing(false);
+  }, [content, editValue, messageId, onEditMessage]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
