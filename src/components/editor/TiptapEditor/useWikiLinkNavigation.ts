@@ -29,7 +29,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
   const [pendingCreatePageTitle, setPendingCreatePageTitle] = useState<string | null>(null);
 
   // Handle link click - navigate to page or create new
-  // WikiLinkクリック時は常に既存ページの存在をチェック
+  // WikiLinkクリック時は常に既存ページの存在をチェック（byTitle キャッシュに依存、createdPageIdsRef は廃止）
   const handleLinkClick = useCallback((title: string) => {
     pendingLinkActionRef.current = { title };
     setLinkTitleToFind(title);

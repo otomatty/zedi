@@ -167,6 +167,7 @@ describe("previewSyncAiModels", () => {
       {
         provider: "openai",
         toAdd: [{ id: "openai:gpt-5", displayName: "GPT-5", tierRequired: "pro", isActive: true }],
+        toDeactivate: [],
         error: undefined,
       },
     ];

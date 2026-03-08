@@ -12,7 +12,7 @@
  *
  * Anthropic: https://docs.anthropic.com/en/api/models-list の data 配列を使用
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import type { AIProviderType } from "../types/index.js";
 import { getProviderApiKeyName } from "./aiProviders.js";
 import { getOptionalEnv } from "../lib/env.js";
@@ -102,7 +102,7 @@ export async function previewSyncAiModels(
     const keyName = getProviderApiKeyName(provider);
     const apiKey = getOptionalEnv(keyName);
     if (!apiKey) {
-      results.push({ provider, toAdd: [], error: `${keyName} not set` });
+      results.push({ provider, toAdd: [], toDeactivate: [], error: `${keyName} not set` });
       continue;
     }
 
@@ -110,10 +110,18 @@ export async function previewSyncAiModels(
       const { rows } = await fetchAndFilterRows(provider, apiKey);
 
       const existingRows = await db
-        .select({ id: aiModels.id })
+        .select({
+          id: aiModels.id,
+          provider: aiModels.provider,
+          modelId: aiModels.modelId,
+          displayName: aiModels.displayName,
+          tierRequired: aiModels.tierRequired,
+          isActive: aiModels.isActive,
+        })
         .from(aiModels)
         .where(eq(aiModels.provider, provider));
       const existingIds = new Set(existingRows.map((r) => r.id));
+      const fetchedIds = new Set(rows.map((row) => row.id));
 
       const toAdd: SyncPreviewItem[] = [];
       for (const row of rows) {
@@ -128,11 +136,21 @@ export async function previewSyncAiModels(
           isActive,
         });
       }
-      results.push({ provider, toAdd });
+      const toDeactivate: SyncPreviewItem[] = existingRows
+        .filter((row) => row.isActive && !fetchedIds.has(row.id))
+        .map((row) => ({
+          id: row.id,
+          provider: row.provider as AIProviderType,
+          modelId: row.modelId,
+          displayName: row.displayName,
+          tierRequired: row.tierRequired,
+          isActive: false,
+        }));
+      results.push({ provider, toAdd, toDeactivate });
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
       const message = err.message + (err.cause ? ` (cause: ${String(err.cause)})` : "");
-      results.push({ provider, toAdd: [], error: message });
+      results.push({ provider, toAdd: [], toDeactivate: [], error: message });
     }
   }
   return results;
@@ -202,12 +220,30 @@ async function syncOneProvider(
     }
   }
 
+  const fetchedIds = rows.map((row) => row.id);
+  let deactivated = 0;
+  // Skip mass deactivation when no models were fetched (API outage / empty response would otherwise deactivate all).
+  if (fetchedIds.length > 0) {
+    const result = await db
+      .update(aiModels)
+      .set({ isActive: false })
+      .where(
+        and(
+          eq(aiModels.provider, provider),
+          eq(aiModels.isActive, true),
+          notInArray(aiModels.id, fetchedIds),
+        ),
+      );
+    deactivated = result.rowCount ?? 0;
+  }
+
   const hasPricing = pricingMap.size > 0 && basePricePerToken > 0;
   return {
     provider,
     fetched: fetchedTotal,
     filtered: fetchedTotal - rows.length,
     upserted,
+    deactivated,
     pricingSource: hasPricing ? "openrouter" : "default",
     models: rows.map((r) => ({
       id: r.id,

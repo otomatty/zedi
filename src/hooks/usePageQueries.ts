@@ -36,6 +36,8 @@ export const pageKeys = {
   summary: (userId: string) => [...pageKeys.summaries(), userId] as const,
   details: () => [...pageKeys.all, "detail"] as const,
   detail: (userId: string, pageId: string) => [...pageKeys.details(), userId, pageId] as const,
+  byTitles: (userId: string) => [...pageKeys.all, "byTitle", userId] as const,
+  byTitle: (userId: string, title: string) => [...pageKeys.byTitles(userId), title.trim()] as const,
   search: (userId: string, query: string) => [...pageKeys.all, "search", userId, query] as const,
   searchShared: (query: string) => [...pageKeys.all, "searchShared", query] as const,
 };
@@ -330,9 +332,14 @@ export function useCreatePage() {
       // Invalidate and refetch pages list
       queryClient.invalidateQueries({ queryKey: pageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: pageKeys.summaries() });
+      queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
 
       // 作成したページの detail キャッシュを即時設定（リンクから作成後すぐの遷移でタイトル・コンテンツが正しく表示されるようにする）
       queryClient.setQueryData<Page | null>(pageKeys.detail(userId, newPage.id), newPage);
+      queryClient.setQueryData<Page | null>(
+        pageKeys.byTitle(userId, newPage.title.trim()),
+        newPage,
+      );
 
       // Optimistically update the cache
       queryClient.setQueryData<Page[]>(pageKeys.list(userId), (old = []) => [newPage, ...old]);
@@ -468,6 +475,8 @@ export function useUpdatePage() {
       queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) =>
         old.map((page) => (page.id === pageId ? { ...page, ...summaryUpdates } : page)),
       );
+
+      queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
     },
   });
 }
@@ -496,10 +505,11 @@ export function useDeletePage() {
         old.filter((page) => page.id !== pageId),
       );
 
-      // Invalidate detail query
+      // Invalidate detail and byTitle caches
       queryClient.invalidateQueries({
         queryKey: pageKeys.detail(userId, pageId),
       });
+      queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
     },
   });
 }
@@ -511,11 +521,12 @@ export function usePageByTitle(title: string) {
   const { getRepository, userId, isLoaded } = useRepository();
 
   return useQuery({
-    queryKey: [...pageKeys.all, "byTitle", userId, title],
+    queryKey: pageKeys.byTitle(userId, title),
     queryFn: async () => {
-      if (!title.trim()) return null;
+      const normalized = title.trim();
+      if (!normalized) return null;
       const repo = await getRepository();
-      return repo.getPageByTitle(userId, title);
+      return repo.getPageByTitle(userId, normalized);
     },
     enabled: isLoaded && title.trim().length > 0,
   });

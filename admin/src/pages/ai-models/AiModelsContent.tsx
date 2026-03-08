@@ -87,7 +87,7 @@ export function AiModelsContent({
           <span className="font-medium">同期結果:</span>{" "}
           {syncResult.map((r) => (
             <span key={r.provider} className="mr-3">
-              {r.provider}: {r.error ?? `追加 ${r.upserted}`}
+              {r.provider}: {r.error ?? `追加 ${r.upserted} / 無効化 ${r.deactivated ?? 0}`}
             </span>
           ))}
         </div>
