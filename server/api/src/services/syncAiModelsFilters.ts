@@ -110,7 +110,7 @@ export function assignTier(provider: AIProviderType, modelId: string): "free" | 
 }
 
 /** カンマ区切り環境変数を ID の Set に（空 or 未設定なら null = 全件対象） */
-export function parseAllowlist(envValue: string): Set<string> | null {
+export function parseAllowlist(envValue: string | undefined): Set<string> | null {
   const s = envValue?.trim();
   if (!s) return null;
   const ids = s

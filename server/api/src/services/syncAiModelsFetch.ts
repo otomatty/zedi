@@ -121,8 +121,10 @@ export async function fetchAnthropicModels(apiKey: string): Promise<AnthropicFet
 }
 
 export async function fetchGoogleModels(apiKey: string): Promise<Row[]> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetchWithTimeout(url);
+  const url = "https://generativelanguage.googleapis.com/v1beta/models";
+  const res = await fetchWithTimeout(url, {
+    headers: { "x-goog-api-key": apiKey },
+  });
   if (!res.ok) {
     throw new Error(`Google models list failed: ${res.status} ${await res.text()}`);
   }
