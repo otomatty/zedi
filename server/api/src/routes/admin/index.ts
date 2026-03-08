@@ -55,10 +55,12 @@ app.get("/users", async (c) => {
     .limit(limit)
     .offset(offset);
 
-  const [{ count }] = await db
+  const [countRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(users)
     .where(whereClause);
+
+  const total = countRow?.count ?? 0;
 
   return c.json({
     users: rows.map((u) => ({
@@ -68,7 +70,7 @@ app.get("/users", async (c) => {
       role: u.role,
       createdAt: u.createdAt,
     })),
-    total: count,
+    total,
   });
 });
 
