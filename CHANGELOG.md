@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 (2026-03-08)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### ✨ Features
+* feat: 画像アップロード時にクライアント側で WebP 変換 (fix #256) by @otomatty in https://github.com/otomatty/zedi/pull/257
+* feat(admin): AIモデル管理UI拡張 (#218) by @otomatty in https://github.com/otomatty/zedi/pull/255
+### 🐛 Bug Fixes
+* feat(editor): wiki link 作成ダイアログの差し替え・無限ループ修正・単体/E2E テスト追加 by @otomatty in https://github.com/otomatty/zedi/pull/254
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.2.2...zedi-v0.3.0
+
 ## 0.2.2 (2026-03-07)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
