@@ -13,7 +13,7 @@ type MatchInfo = {
   index: number;
   length: number;
   text: string;
-  type: "wikiLink" | "link" | "bold" | "italic";
+  type: "wikiLink" | "link" | "bold" | "italic" | "boldItalic";
   url?: string;
 };
 
@@ -70,6 +70,16 @@ export function parseInlineContent(text: string): TiptapTextNode[] {
       text: match[1],
       url: match[2],
       type: "link",
+    });
+  }
+
+  const tripleRegex = /\*\*\*([^*]+)\*\*\*/g;
+  while ((match = tripleRegex.exec(text)) !== null) {
+    matches.push({
+      index: match.index,
+      length: match[0].length,
+      text: match[1],
+      type: "boldItalic",
     });
   }
 
@@ -154,6 +164,12 @@ export function parseInlineContent(text: string): TiptapTextNode[] {
         type: "text",
         text: item.text,
         marks: [{ type: "italic" }],
+      });
+    } else if (item.type === "boldItalic") {
+      content.push({
+        type: "text",
+        text: item.text,
+        marks: [{ type: "bold" }, { type: "italic" }],
       });
     }
 

@@ -64,6 +64,15 @@ describe("parseInlineContent", () => {
     expect(italicNode?.text).toBe("italic");
   });
 
+  it("parses bold+italic (***...***)", () => {
+    const result = parseInlineContent("***bold italic*** text");
+    const node = result.find(
+      (n) => n.marks?.some((m) => m.type === "bold") && n.marks?.some((m) => m.type === "italic"),
+    );
+    expect(node).toBeDefined();
+    expect(node?.text).toBe("bold italic");
+  });
+
   it("parses markdown link and sanitizes href", () => {
     const result = parseInlineContent("[Link](https://example.com)");
     const linkNode = result.find((n) => n.marks?.some((m) => m.type === "link"));

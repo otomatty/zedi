@@ -61,7 +61,6 @@ function isClaudeWebSearchSupported(model: string): boolean {
     "claude-opus-4",
     "claude-sonnet-4",
     "claude-sonnet-3.7",
-    "claude-sonnet-3-5-sonnet",
     "claude-3-5-sonnet",
     "claude-haiku-3.5",
     "claude-3-5-haiku",
