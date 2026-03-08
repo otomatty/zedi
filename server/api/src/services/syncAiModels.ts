@@ -220,18 +220,17 @@ async function syncOneProvider(
 
   const fetchedIds = rows.map((row) => row.id);
   let deactivated = 0;
-  // Skip mass deactivation when no models were fetched (API outage / empty response would otherwise deactivate all).
-  if (fetchedIds.length > 0) {
-    const result = await db
-      .update(aiModels)
-      .set({ isActive: false })
-      .where(
-        and(
-          eq(aiModels.provider, provider),
-          eq(aiModels.isActive, true),
-          notInArray(aiModels.id, fetchedIds),
-        ),
-      );
+  // Use totalBeforeFilter (fetch success + raw count) so preview and sync agree when allowlist filters to 0.
+  if (totalBeforeFilter > 0) {
+    const whereClause =
+      fetchedIds.length > 0
+        ? and(
+            eq(aiModels.provider, provider),
+            eq(aiModels.isActive, true),
+            notInArray(aiModels.id, fetchedIds),
+          )
+        : and(eq(aiModels.provider, provider), eq(aiModels.isActive, true));
+    const result = await db.update(aiModels).set({ isActive: false }).where(whereClause);
     deactivated = result.rowCount ?? 0;
   }
 
