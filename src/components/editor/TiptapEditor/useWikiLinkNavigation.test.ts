@@ -160,10 +160,11 @@ describe("useWikiLinkNavigation", () => {
 
   it("re-clicking a just-created title navigates immediately without reopening dialog", async () => {
     mockMutateAsync.mockResolvedValue({ id: "new-page-id" });
+    const byTitleCache: Record<string, { id: string } | undefined> = {};
     vi.mocked(usePageByTitle).mockImplementation(
       (title: string) =>
         ({
-          data: undefined,
+          data: byTitleCache[title] ?? undefined,
           isFetched: title !== "",
         }) as ReturnType<typeof usePageByTitle>,
     );
@@ -184,15 +185,19 @@ describe("useWikiLinkNavigation", () => {
       await result.current.handleConfirmCreate();
     });
 
+    // Simulate useCreatePage onSuccess: byTitle cache is now populated
+    byTitleCache["Fresh Page"] = { id: "new-page-id" };
     mockNavigate.mockClear();
 
     act(() => {
       result.current.handleLinkClick("Fresh Page");
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id", {
-      replace: false,
-      flushSync: true,
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id", {
+        replace: false,
+        flushSync: true,
+      });
     });
     expect(result.current.createPageDialogOpen).toBe(false);
   });

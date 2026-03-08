@@ -475,6 +475,8 @@ export function useUpdatePage() {
       queryClient.setQueryData<PageSummary[]>(pageKeys.summary(userId), (old = []) =>
         old.map((page) => (page.id === pageId ? { ...page, ...summaryUpdates } : page)),
       );
+
+      queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
     },
   });
 }
@@ -503,10 +505,11 @@ export function useDeletePage() {
         old.filter((page) => page.id !== pageId),
       );
 
-      // Invalidate detail query
+      // Invalidate detail and byTitle caches
       queryClient.invalidateQueries({
         queryKey: pageKeys.detail(userId, pageId),
       });
+      queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
     },
   });
 }
@@ -520,9 +523,10 @@ export function usePageByTitle(title: string) {
   return useQuery({
     queryKey: pageKeys.byTitle(userId, title),
     queryFn: async () => {
-      if (!title.trim()) return null;
+      const normalized = title.trim();
+      if (!normalized) return null;
       const repo = await getRepository();
-      return repo.getPageByTitle(userId, title);
+      return repo.getPageByTitle(userId, normalized);
     },
     enabled: isLoaded && title.trim().length > 0,
   });

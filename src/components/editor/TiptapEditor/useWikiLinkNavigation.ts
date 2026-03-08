@@ -23,27 +23,17 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
   // Pending link action
   const pendingLinkActionRef = useRef<{ title: string } | null>(null);
-  const createdPageIdsRef = useRef(new Map<string, string>());
 
   // Create page confirmation dialog state
   const [createPageDialogOpen, setCreatePageDialogOpen] = useState(false);
   const [pendingCreatePageTitle, setPendingCreatePageTitle] = useState<string | null>(null);
 
   // Handle link click - navigate to page or create new
-  // WikiLinkクリック時は常に既存ページの存在をチェック
-  const handleLinkClick = useCallback(
-    (title: string) => {
-      const key = title.trim();
-      const createdPageId = createdPageIdsRef.current.get(key);
-      if (createdPageId) {
-        navigate(`/page/${createdPageId}`, { replace: false, flushSync: true });
-        return;
-      }
-      pendingLinkActionRef.current = { title };
-      setLinkTitleToFind(title);
-    },
-    [navigate],
-  );
+  // WikiLinkクリック時は常に既存ページの存在をチェック（byTitle キャッシュに依存、createdPageIdsRef は廃止）
+  const handleLinkClick = useCallback((title: string) => {
+    pendingLinkActionRef.current = { title };
+    setLinkTitleToFind(title);
+  }, []);
 
   // Navigate when found page changes
   useEffect(() => {
@@ -88,7 +78,6 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
         title: pendingCreatePageTitle,
         content: "",
       });
-      createdPageIdsRef.current.set(pendingCreatePageTitle.trim(), newPage.id);
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
       navigate(`/page/${newPage.id}`, { replace: false, flushSync: true });
