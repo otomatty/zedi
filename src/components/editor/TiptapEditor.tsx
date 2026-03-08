@@ -33,6 +33,10 @@ import { useEditorSetup } from "./TiptapEditor/useEditorSetup";
 import { useEditorLifecycle } from "./TiptapEditor/useEditorLifecycle";
 import { useSuggestionEffects } from "./TiptapEditor/useSuggestionEffects";
 import { useThumbnailCommit } from "./TiptapEditor/useThumbnailCommit";
+import {
+  isSameSlashSuggestionState,
+  isSameWikiLinkSuggestionState,
+} from "./TiptapEditor/suggestionStateUtils";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -75,8 +79,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const [slashState, setSlashState] = useState<SlashSuggestionState | null>(null);
   const suggestionRef = useRef<WikiLinkSuggestionHandle>(null);
   const slashRef = useRef<SlashSuggestionHandle>(null);
-  const handleStateChange = useCallback((s: WikiLinkSuggestionState) => setSuggestionState(s), []);
-  const handleSlashStateChange = useCallback((s: SlashSuggestionState) => setSlashState(s), []);
+  const handleStateChange = useCallback((s: WikiLinkSuggestionState) => {
+    setSuggestionState((prev) => (isSameWikiLinkSuggestionState(prev, s) ? prev : s));
+  }, []);
+  const handleSlashStateChange = useCallback((s: SlashSuggestionState) => {
+    setSlashState((prev) => (isSameSlashSuggestionState(prev, s) ? prev : s));
+  }, []);
 
   const { getToken } = useAuth();
   const { settings: storageSettings, isLoading: isStorageLoading } = useStorageSettings();
