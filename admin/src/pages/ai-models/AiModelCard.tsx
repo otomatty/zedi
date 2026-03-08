@@ -52,7 +52,12 @@ export function AiModelCard({
           />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Select value={m.tierRequired} onValueChange={(v) => onTierChange(v as "free" | "pro")}>
+          <Select
+            value={m.tierRequired}
+            onValueChange={(v) => {
+              if (v === "free" || v === "pro") onTierChange(v);
+            }}
+          >
             <SelectTrigger className="h-8 w-[100px]" aria-label={`${m.displayName} のティア`}>
               <SelectValue />
             </SelectTrigger>

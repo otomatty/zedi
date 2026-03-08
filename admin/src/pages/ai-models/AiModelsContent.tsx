@@ -66,6 +66,24 @@ export function AiModelsContent({
   onDrop,
   onDragEnd,
 }: AiModelsContentProps) {
+  function createDisplayNameHandlers(model: AiModelAdmin) {
+    return {
+      onDisplayNameChange: (value: string) =>
+        setModels((prev) =>
+          prev.map((x) => (x.id === model.id ? { ...x, displayName: value } : x)),
+        ),
+      onDisplayNameBlur: (v: string) => {
+        if (v !== model.displayName) {
+          setModels((prev) => prev.map((x) => (x.id === model.id ? { ...x, displayName: v } : x)));
+        }
+        const originalModel = originalModelsRef.current.find((om) => om.id === model.id);
+        if (originalModel && v !== originalModel.displayName) {
+          void onModelUpdate(originalModel, { displayName: v });
+        }
+      },
+    };
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between gap-4">
@@ -125,22 +143,7 @@ export function AiModelsContent({
                 model={m}
                 draggedId={draggedId}
                 dragOverId={dragOverId}
-                onDisplayNameChange={(value) =>
-                  setModels((prev) =>
-                    prev.map((x) => (x.id === m.id ? { ...x, displayName: value } : x)),
-                  )
-                }
-                onDisplayNameBlur={(v) => {
-                  if (v !== m.displayName) {
-                    setModels((prev) =>
-                      prev.map((x) => (x.id === m.id ? { ...x, displayName: v } : x)),
-                    );
-                  }
-                  const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
-                  if (originalModel && v !== originalModel.displayName) {
-                    void onModelUpdate(originalModel, { displayName: v });
-                  }
-                }}
+                {...createDisplayNameHandlers(m)}
                 onTierChange={(tier) => onTierChange(m, tier)}
                 onToggleActive={() => onToggleActive(m)}
                 onDragStart={onDragStart}
@@ -160,22 +163,7 @@ export function AiModelsContent({
           <AiModelCard
             key={m.id}
             model={m}
-            onDisplayNameChange={(value) =>
-              setModels((prev) =>
-                prev.map((x) => (x.id === m.id ? { ...x, displayName: value } : x)),
-              )
-            }
-            onDisplayNameBlur={(v) => {
-              if (v !== m.displayName) {
-                setModels((prev) =>
-                  prev.map((x) => (x.id === m.id ? { ...x, displayName: v } : x)),
-                );
-              }
-              const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
-              if (originalModel && v !== originalModel.displayName) {
-                void onModelUpdate(originalModel, { displayName: v });
-              }
-            }}
+            {...createDisplayNameHandlers(m)}
             onTierChange={(tier) => onTierChange(m, tier)}
             onToggleActive={() => onToggleActive(m)}
           />

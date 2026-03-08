@@ -126,6 +126,7 @@
     "@tiptap/react": "^3.20.0",
     "@tiptap/starter-kit": "^3.20.0",
     "@tiptap/y-tiptap": "^3.0.2",
+    "@zedi/ui": "workspace:*",
     "baseline-browser-mapping": "^2.9.19",
     "better-auth": "^1.2.0",
     "caniuse-lite": "^1.0.30001769",

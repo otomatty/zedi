@@ -36,7 +36,7 @@ app.get("/users", async (c) => {
   const offset = Number.isFinite(offsetRaw) ? Math.max(0, offsetRaw) : 0;
 
   const conditions = search
-    ? like(users.email, `%${search.replace(/[%_\\]/g, (c) => `\\${c}`)}%`)
+    ? like(users.email, `%${search.replace(/[%_\\]/g, (ch) => `\\${ch}`)}%`)
     : undefined;
 
   const whereClause = conditions ?? sql`true`;
@@ -56,7 +56,7 @@ app.get("/users", async (c) => {
     .offset(offset);
 
   const [countRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`cast(count(*) as integer)` })
     .from(users)
     .where(whereClause);
 
@@ -86,6 +86,14 @@ app.patch("/users/:id", async (c) => {
     }
   } else {
     return c.json({ error: "role is required" }, 400);
+  }
+
+  const currentUserId = c.get("userId");
+  if (id === currentUserId && body.role === "user") {
+    return c.json(
+      { error: "Cannot change your own role to user (self-demotion not allowed)" },
+      400,
+    );
   }
 
   const [updated] = await db

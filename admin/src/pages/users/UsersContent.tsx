@@ -13,19 +13,8 @@ import {
   TableRow,
 } from "@zedi/ui";
 import type { UserAdmin, UserRole } from "@/api/admin";
+import { formatDate } from "@/lib/dateUtils";
 import { UserCard } from "./UserCard";
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 interface UsersContentProps {
   users: UserAdmin[];

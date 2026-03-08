@@ -8,23 +8,12 @@ import {
   SelectValue,
 } from "@zedi/ui";
 import type { UserAdmin, UserRole } from "@/api/admin";
+import { formatDate } from "@/lib/dateUtils";
 
 interface UserCardProps {
   user: UserAdmin;
   onRoleChange: (role: UserRole) => void;
   saving: boolean;
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
 }
 
 export function UserCard({ user, onRoleChange, saving }: UserCardProps) {
