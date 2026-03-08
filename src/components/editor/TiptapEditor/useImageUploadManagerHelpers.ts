@@ -1,6 +1,6 @@
 import type { MutableRefObject } from "react";
 import type { Editor } from "@tiptap/core";
-import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
+import { getStorageProvider, getSettingsForUpload, convertToWebP } from "@/lib/storage";
 import type { StorageSettings } from "@/types/storage";
 
 export function updateUploadNodeAttributesImpl(
@@ -143,7 +143,8 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
   uploadTimersRef.current.set(uploadId, timerId);
 
   try {
-    const url = await provider.uploadImage(file, {
+    const fileToUpload = await convertToWebP(file);
+    const url = await provider.uploadImage(fileToUpload, {
       onProgress: (progress) => {
         hasRealProgress = true;
         updateUploadNodeAttributes(uploadId, {
@@ -155,8 +156,8 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
     updateUploadNodeAttributes(uploadId, { progress: 100 });
     replaceUploadNodeWithImage(uploadId, {
       src: url,
-      alt: file.name,
-      title: file.name,
+      alt: fileToUpload.name,
+      title: fileToUpload.name,
       storageProviderId: uploadSettings.provider,
     });
   } catch (error) {

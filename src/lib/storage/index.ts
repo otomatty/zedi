@@ -121,8 +121,9 @@ export function isStorageConfiguredForUpload(settings: StorageSettings): boolean
   return settings.provider !== "s3" && isProviderConfigured(settings.provider, settings.config);
 }
 
-// Re-export types
+// Re-export types and utilities
 export * from "./types";
+export { convertToWebP } from "./convertToWebP";
 export { GyazoProvider } from "./providers/GyazoProvider";
 export { GitHubProvider } from "./providers/GitHubProvider";
 export { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
