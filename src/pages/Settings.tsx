@@ -1,8 +1,8 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Bot, Image as ImageIcon, Settings2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@zedi/ui";
+import { Card, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { useTranslation } from "react-i18next";
 

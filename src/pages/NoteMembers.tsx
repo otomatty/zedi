@@ -3,16 +3,10 @@ import { Link, useParams } from "react-router-dom";
 import { Trash2 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "@zedi/ui";
+import { Input } from "@zedi/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
+import { useToast } from "@zedi/ui";
 import {
   useAddNoteMember,
   useNote,

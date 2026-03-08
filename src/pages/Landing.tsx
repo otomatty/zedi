@@ -1,8 +1,8 @@
 import React from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@zedi/ui";
+import { Card, CardContent } from "@zedi/ui";
 import { useAuth, SignedIn, SignedOut } from "@/hooks/useAuth";
 import { FileText, Link as LinkIcon, Search, Cloud, Sparkles, ArrowRight } from "lucide-react";
 

@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 interface CreatePageDialogProps {

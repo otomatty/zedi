@@ -6,7 +6,7 @@ import { fetchServerModels } from "../../lib/aiService";
 import { getSonnetBaseline, formatCostMultiplierLabel } from "../../lib/aiCostUtils";
 import { loadAISettings } from "../../lib/aiSettings";
 import type { AIModel } from "../../types/ai";
-import { cn } from "../../lib/utils";
+import { cn } from "@zedi/ui/lib/utils";
 
 export function AIChatModelSelector() {
   const { t } = useTranslation();

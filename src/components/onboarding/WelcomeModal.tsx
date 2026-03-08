@@ -1,12 +1,6 @@
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@zedi/ui";
+import { Button } from "@zedi/ui";
 import { FileText, Link as LinkIcon, Sparkles, Search, Zap } from "lucide-react";
 
 interface FeatureItemProps {

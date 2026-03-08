@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Link2, Copy, Trash2, Sparkles } from "lucide-react";
 import type { PageSummary } from "@/types/page";
 import { ZEDI_PAGE_MIME_TYPE } from "@/types/aiChat";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui/lib/utils";
 import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { useAIChatStore } from "@/stores/aiChatStore";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
 import { useTranslation } from "react-i18next";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 import {
@@ -16,7 +16,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+} from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +26,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@zedi/ui";
 
 interface PageCardProps {
   page: PageSummary;

@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import { useNote, useNotePage } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";

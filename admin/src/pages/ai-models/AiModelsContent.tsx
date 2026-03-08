@@ -1,4 +1,5 @@
 import type { AiModelAdmin, SyncPreviewResult, SyncResultItem } from "@/api/admin";
+import { AiModelCard } from "./AiModelCard";
 import { AiModelRow } from "./AiModelRow";
 import { SyncPreviewModal } from "./SyncPreviewModal";
 
@@ -101,7 +102,8 @@ export function AiModelsContent({
         onConfirm={onSyncConfirm}
       />
 
-      <div className="mt-4 overflow-x-auto rounded border border-slate-700">
+      {/* デスクトップ: テーブル */}
+      <div className="mt-4 hidden overflow-x-auto rounded border border-slate-700 md:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-700 bg-slate-800/50">
@@ -149,8 +151,38 @@ export function AiModelsContent({
           </tbody>
         </table>
       </div>
+
+      {/* モバイル: リスト（カード） */}
+      <div className="mt-4 space-y-3 md:hidden">
+        {models.map((m) => (
+          <AiModelCard
+            key={m.id}
+            model={m}
+            onDisplayNameChange={(value) =>
+              setModels((prev) =>
+                prev.map((x) => (x.id === m.id ? { ...x, displayName: value } : x)),
+              )
+            }
+            onDisplayNameBlur={(v) => {
+              if (v !== m.displayName) {
+                setModels((prev) =>
+                  prev.map((x) => (x.id === m.id ? { ...x, displayName: v } : x)),
+                );
+              }
+              const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
+              if (originalModel && v !== originalModel.displayName) {
+                void onModelUpdate(originalModel, { displayName: v });
+              }
+            }}
+            onTierChange={(tier) => onTierChange(m, tier)}
+            onToggleActive={() => onToggleActive(m)}
+          />
+        ))}
+      </div>
+
       <p className="mt-2 text-xs text-slate-500">
-        {models.length} 件（有効: {models.filter((m) => m.isActive).length}） ドラッグで並び替え
+        {models.length} 件（有効: {models.filter((m) => m.isActive).length}）
+        <span className="hidden md:inline"> ドラッグで並び替え</span>
       </p>
     </div>
   );

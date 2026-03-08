@@ -8,7 +8,7 @@ import {
   MessageSquare,
   ImageOff,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+} from "@zedi/ui";
+import { RadioGroup, RadioGroupItem } from "@zedi/ui";
+import { Label } from "@zedi/ui";
+import { Alert, AlertDescription } from "@zedi/ui";
 import { useImageUpload } from "@/hooks/useImageUpload";
 
 type ProcessingMode = "ocr" | "describe" | "none";

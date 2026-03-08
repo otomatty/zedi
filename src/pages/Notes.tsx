@@ -6,7 +6,7 @@ import { useNotes, useCreateNote } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { NoteCard } from "@/components/note/NoteCard";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import {
   Dialog,
   DialogContent,
@@ -14,17 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+} from "@zedi/ui";
+import { Input } from "@zedi/ui";
+import { Label } from "@zedi/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
+import { useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
 const visibilityKeys: Record<NoteVisibility, string> = {

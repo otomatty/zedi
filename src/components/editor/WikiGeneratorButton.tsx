@@ -1,8 +1,8 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles, Loader2, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@zedi/ui";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@zedi/ui";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@zedi/ui";
 import { WikiGeneratorStatus } from "@/hooks/useWikiGenerator";
 import { loadAISettings } from "@/lib/aiSettings";
 

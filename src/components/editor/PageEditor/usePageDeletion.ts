@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDeletePage } from "@/hooks/usePageQueries";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { isContentNotEmpty } from "@/lib/contentUtils";
 
 interface UsePageDeletionOptions {

@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Search } from "lucide-react";
-import { Popover, PopoverAnchor } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
+import { Popover, PopoverAnchor } from "@zedi/ui";
+import { Input } from "@zedi/ui";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
 import { HeaderSearchDropdownContent } from "./HeaderSearchDropdownContent";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui/lib/utils";
 
 const PLACEHOLDER = "ページを検索...";
 const SHORTCUT_HINT = "⌘K";

@@ -2,7 +2,7 @@ import { FileText, Link as LinkIcon } from "lucide-react";
 import { HighlightedSnippet } from "@/components/search/HighlightedSnippet";
 import { MatchTypeBadge } from "@/components/search/MatchTypeBadge";
 import type { MatchType } from "@/lib/searchUtils";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui/lib/utils";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 
 export interface SearchResultCardItem {

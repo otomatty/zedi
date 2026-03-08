@@ -6,7 +6,7 @@ import { getStorageProviderById } from "@/types/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
 import { isStorageConfiguredForUpload, getSettingsForUpload } from "@/lib/storage";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { extractFirstImage } from "@/lib/contentUtils";
 import { useStorageActions } from "./useStorageActions";
 import { useThumbnailCommit } from "./useThumbnailCommit";

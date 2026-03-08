@@ -7,12 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+} from "@zedi/ui";
+import { Button } from "@zedi/ui";
+import { Progress } from "@zedi/ui";
 import { fetchUsage } from "@/lib/aiService";
 import type { AIUsage } from "@/types/ai";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui/lib/utils";
 
 interface UsageDetailDialogProps {
   children?: React.ReactNode;

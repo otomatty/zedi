@@ -1,5 +1,5 @@
 import React from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@zedi/ui";
 import type { NoteVisibility } from "@/types/note";
 import { useTranslation } from "react-i18next";
 

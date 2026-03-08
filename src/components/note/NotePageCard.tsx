@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Link2 } from "lucide-react";
 import type { PageSummary } from "@/types/page";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui/lib/utils";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 
 interface NotePageCardProps {

@@ -48,7 +48,7 @@ export function SyncPreviewModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="sync-preview-title"
-        className="max-h-[80vh] w-full max-w-lg overflow-auto rounded bg-slate-800 p-4 shadow-xl"
+        className="max-h-[80vh] w-full max-w-lg overflow-auto rounded bg-slate-800 p-4 shadow-xl max-[768px]:mx-4 max-[768px]:max-w-[calc(100vw-2rem)]"
       >
         <h2 id="sync-preview-title" className="text-lg font-semibold text-slate-200">
           同期プレビュー

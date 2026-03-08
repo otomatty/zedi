@@ -4,6 +4,10 @@
   "description": "Zero-Friction Knowledge Network - AIネイティブなナレッジアプリ",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "admin"
+  ],
   "author": "Zedi Team",
   "license": "BSL-1.1",
   "repository": {

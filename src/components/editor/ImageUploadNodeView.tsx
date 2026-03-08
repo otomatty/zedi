@@ -1,8 +1,8 @@
 import React from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { AlertTriangle, Image as ImageIcon, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@zedi/ui";
+import { Progress } from "@zedi/ui";
 import type { ImageUploadOptions } from "./extensions/ImageUploadExtension";
 
 const clampProgress = (value: number) => Math.max(0, Math.min(100, value));

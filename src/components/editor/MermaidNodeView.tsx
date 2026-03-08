@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NodeViewWrapper, NodeViewProps } from "@tiptap/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import { Pencil, Trash2, Check, X, Maximize2 } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@zedi/ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@zedi/ui";
 
 // Dynamic import for mermaid to avoid initialization issues
 let mermaidInstance: typeof import("mermaid").default | null = null;

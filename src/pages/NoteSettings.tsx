@@ -4,7 +4,7 @@ import { Copy } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,17 +14,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+} from "@zedi/ui";
+import { Input } from "@zedi/ui";
+import { Label } from "@zedi/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
+import { useToast } from "@zedi/ui";
 import { useDeleteNote, useNote, useUpdateNote } from "@/hooks/useNoteQueries";
 import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { useTranslation } from "react-i18next";

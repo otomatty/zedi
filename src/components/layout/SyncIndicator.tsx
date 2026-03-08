@@ -1,9 +1,9 @@
 import { Cloud, CloudOff, Loader2, Check, DatabaseZap } from "lucide-react";
 import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
+import { Button } from "@zedi/ui";
+import { cn } from "@zedi/ui/lib/utils";
 import { useTranslation } from "react-i18next";
 
 /**

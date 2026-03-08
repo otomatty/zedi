@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { useIsMobile } from "../../hooks/use-mobile";
+import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { useAIChatContext } from "../../contexts/AIChatContext";
 import { AIChatPanel } from "./AIChatPanel";
 import { ZEDI_PAGE_MIME_TYPE } from "../../types/aiChat";
-import { Drawer, DrawerContent } from "../ui/drawer";
-import { cn } from "../../lib/utils";
+import { Drawer, DrawerContent } from "@zedi/ui";
+import { cn } from "@zedi/ui/lib/utils";
 import { useTranslation } from "react-i18next";
 
 interface ContentWithAIChatProps {

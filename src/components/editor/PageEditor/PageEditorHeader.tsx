@@ -1,13 +1,13 @@
 import React from "react";
 import { ArrowLeft, Trash2, MoreHorizontal, Download, Copy } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { HeaderSearchBar } from "@/components/layout/Header/HeaderSearchBar";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";

@@ -4,7 +4,7 @@ import { NotesLayout } from "@/components/note/NotesLayout";
 import { NoteCard } from "@/components/note/NoteCard";
 import { usePublicNotes, mapDiscoverItemToNoteSummary } from "@/hooks/useNoteQueries";
 import type { NoteSummary } from "@/types/note";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui/lib/utils";
 
 const NotesDiscover: React.FC = () => {
   const { t } = useTranslation();

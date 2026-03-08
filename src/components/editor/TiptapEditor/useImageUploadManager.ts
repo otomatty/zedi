@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { Editor } from "@tiptap/core";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { useAuth } from "@/hooks/useAuth";
 import type { StorageSettings } from "@/types/storage";
 import {
