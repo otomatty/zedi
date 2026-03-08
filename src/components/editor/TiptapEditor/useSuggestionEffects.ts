@@ -32,13 +32,18 @@ export function useSuggestionEffects({
   const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number } | null>(null);
   const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null);
 
+  // 依存はプリミティブに限定。suggestionState 自体は毎レンダーで新しい参照になるため
+  // オブジェクトを依存にすると setState → 再レンダ → effect 再実行の無限ループになる。
+  const suggestionActive = suggestionState?.active ?? false;
+  const suggestionFrom = suggestionState?.range?.from ?? null;
+  const suggestionTo = suggestionState?.range?.to ?? null;
+
   useEffect(() => {
-    if (!editor || !suggestionState?.active || !suggestionState.range) {
+    if (!editor || !suggestionActive || suggestionFrom === null) {
       queueMicrotask(() => setSuggestionPos(null));
       return;
     }
-    const { from } = suggestionState.range;
-    const coords = editor.view.coordsAtPos(from);
+    const coords = editor.view.coordsAtPos(suggestionFrom);
     const containerRect = editorContainerRef.current?.getBoundingClientRect();
     if (containerRect) {
       queueMicrotask(() =>
@@ -48,15 +53,18 @@ export function useSuggestionEffects({
         }),
       );
     }
-  }, [editor, suggestionState, editorContainerRef]);
+  }, [editor, suggestionActive, suggestionFrom, suggestionTo, editorContainerRef]);
+
+  const slashActive = slashState?.active ?? false;
+  const slashFrom = slashState?.range?.from ?? null;
+  const slashTo = slashState?.range?.to ?? null;
 
   useEffect(() => {
-    if (!editor || !slashState?.active || !slashState.range) {
+    if (!editor || !slashActive || slashFrom === null) {
       queueMicrotask(() => setSlashPos(null));
       return;
     }
-    const { from } = slashState.range;
-    const coords = editor.view.coordsAtPos(from);
+    const coords = editor.view.coordsAtPos(slashFrom);
     const containerRect = editorContainerRef.current?.getBoundingClientRect();
     if (containerRect) {
       queueMicrotask(() =>
@@ -66,7 +74,7 @@ export function useSuggestionEffects({
         }),
       );
     }
-  }, [editor, slashState, editorContainerRef]);
+  }, [editor, slashActive, slashFrom, slashTo, editorContainerRef]);
 
   useEffect(() => {
     const handler = () => handleInsertImageClick();

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { usePageByTitle, useCreatePage } from "@/hooks/usePageQueries";
 
 interface UseWikiLinkNavigationReturn {
-  handleLinkClick: (title: string, exists: boolean) => void;
+  handleLinkClick: (title: string) => void;
   createPageDialogOpen: boolean;
   pendingCreatePageTitle: string | null;
   handleConfirmCreate: () => Promise<void>;
@@ -22,10 +22,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
   const { data: foundPage, isFetched } = usePageByTitle(linkTitleToFind || "");
 
   // Pending link action
-  const pendingLinkActionRef = useRef<{
-    title: string;
-    exists: boolean;
-  } | null>(null);
+  const pendingLinkActionRef = useRef<{ title: string } | null>(null);
 
   // Create page confirmation dialog state
   const [createPageDialogOpen, setCreatePageDialogOpen] = useState(false);
@@ -33,9 +30,8 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
   // Handle link click - navigate to page or create new
   // WikiLinkクリック時は常に既存ページの存在をチェック
-  const handleLinkClick = useCallback(async (title: string, _exists: boolean) => {
-    // まず既存ページを検索（タイトルの完全一致）
-    pendingLinkActionRef.current = { title, exists: true };
+  const handleLinkClick = useCallback((title: string) => {
+    pendingLinkActionRef.current = { title };
     setLinkTitleToFind(title);
   }, []);
 
@@ -58,7 +54,6 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
       if (foundPage) {
         // 既存ページが見つかった場合はそのページに移動
-        // flushSync でルーティング変更を即時反映し、WikiLink クリック直後に画面遷移が行われるようにする
         navigate(`/page/${foundPage.id}`, { replace: false, flushSync: true });
       } else {
         // ページが見つからなかった場合は確認ダイアログを表示
@@ -85,7 +80,6 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
       });
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
-      // flushSync でルーティング変更を即時反映し、作成直後に画面遷移が行われるようにする
       navigate(`/page/${newPage.id}`, { replace: false, flushSync: true });
     } catch (error) {
       console.error("Failed to create page:", error);
