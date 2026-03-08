@@ -13,8 +13,8 @@ import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Mathematics } from "@tiptap/extension-mathematics";
-import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
+import { CodeBlockWithCopy } from "../extensions/CodeBlockWithCopyExtension";
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
@@ -157,8 +157,8 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       multicolor: false,
     }),
     Underline,
-    // --- Phase 1: Code Block with syntax highlighting ---
-    CodeBlockLowlight.configure({
+    // --- Phase 1: Code Block with syntax highlighting and copy button ---
+    CodeBlockWithCopy.configure({
       lowlight,
       defaultLanguage: null,
     }),
