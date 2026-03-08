@@ -1,18 +1,22 @@
 import { useState, useCallback, useRef } from "react";
 import { ChatMessage, PageContext, ReferencedPage } from "../types/aiChat";
+import type { PageSummary } from "@/types/page";
 import { useAIChatStore } from "../stores/aiChatStore";
+import { resolveReferencedPagesFromContent } from "@/lib/aiChatActionHelpers";
 import { executeSendMessage } from "./useAIChatExecute";
 
 interface UseAIChatOptions {
   pageContext: PageContext | null;
   contextEnabled: boolean;
   existingPageTitles?: string[];
+  availablePages?: Pick<PageSummary, "id" | "title" | "isDeleted">[];
 }
 
 export function useAIChat({
   pageContext,
   contextEnabled,
   existingPageTitles = [],
+  availablePages = [],
 }: UseAIChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -85,11 +89,11 @@ export function useAIChat({
       if (index < 0) return;
       const message = messages[index];
       if (message.role !== "user") return;
-      const refs = message.referencedPages ?? [];
+      const refs = resolveReferencedPagesFromContent(newContent, availablePages);
       const truncated = messages.slice(0, index);
       await sendMessage(newContent, refs, { initialMessages: truncated });
     },
-    [messages, sendMessage],
+    [availablePages, messages, sendMessage],
   );
 
   return {

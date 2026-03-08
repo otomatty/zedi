@@ -64,7 +64,7 @@ Zedi はナレッジネットワークツールで、ユーザーの思考を[[W
 {"type":"create-page","title":"ページタイトル","content":"Markdown内容...","suggestedLinks":["関連キーワード"],"reason":"提案理由"}
 <!-- /zedi-action -->
 
-(2) 既存ページへの追記提案（pageTitleで指定。上記タイトル一覧と一致させる）:
+(2) 現在開いているページへの追記提案（pageTitle には現在のページタイトルを入れる）:
 <!-- zedi-action:append-to-page -->
 {"type":"append-to-page","pageTitle":"ページタイトル","content":"追記するMarkdown","reason":"提案理由"}
 <!-- /zedi-action -->
@@ -74,7 +74,7 @@ Zedi はナレッジネットワークツールで、ユーザーの思考を[[W
 {"type":"create-multiple-pages","pages":[{"title":"タイトル1","content":"内容1","suggestedLinks":[]},{"title":"タイトル2","content":"内容2","suggestedLinks":[]}],"linkStructure":[{"from":"タイトル1","to":"タイトル2"}],"reason":"提案理由"}
 <!-- /zedi-action -->
 
-(4) 既存ページへのWikiLink提案（existingPageTitleで指定。上記タイトル一覧と一致させる）:
+(4) 現在開いているページに追加したいWikiLink提案（existingPageTitleで指定。上記タイトル一覧と一致させる）:
 <!-- zedi-action:suggest-wiki-links -->
 {"type":"suggest-wiki-links","links":[{"keyword":"キーワード","existingPageTitle":"既存ページのタイトル"}],"reason":"提案理由"}
 <!-- /zedi-action -->

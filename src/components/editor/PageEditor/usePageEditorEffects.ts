@@ -151,6 +151,7 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
         pageId: currentPageId || undefined,
         pageTitle: title,
         pageContent: content ? content.substring(0, 3000) : undefined,
+        pageFullContent: content || undefined,
       });
     }
     return () => setPageContext(null);

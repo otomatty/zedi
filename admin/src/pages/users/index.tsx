@@ -4,6 +4,7 @@ import { getUsers, patchUserRole } from "@/api/admin";
 import { UsersContent } from "./UsersContent";
 
 const SEARCH_DEBOUNCE_MS = 300;
+const PAGE_SIZE = 50;
 
 export default function Users() {
   const [users, setUsers] = useState<UserAdmin[]>([]);
@@ -12,6 +13,7 @@ export default function Users() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [page, setPage] = useState(0);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const isMountedRef = useRef(true);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -25,8 +27,8 @@ export default function Users() {
       try {
         const result = await getUsers({
           search: search || undefined,
-          limit: 50,
-          offset: 0,
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
         });
         if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setUsers(result.users);
@@ -41,7 +43,7 @@ export default function Users() {
         }
       }
     },
-    [search],
+    [page, search],
   );
 
   useEffect(() => {
@@ -58,6 +60,7 @@ export default function Users() {
     searchTimerRef.current = setTimeout(() => {
       searchTimerRef.current = null;
       setSearch(searchInput.trim());
+      setPage(0);
     }, SEARCH_DEBOUNCE_MS);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -90,8 +93,11 @@ export default function Users() {
     <UsersContent
       users={users}
       total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
       search={searchInput}
       onSearchChange={setSearchInput}
+      onPageChange={setPage}
       error={error}
       loading={loading}
       savingIds={savingIds}

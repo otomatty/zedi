@@ -84,6 +84,8 @@ export interface PageContext {
   pageId?: string;
   pageTitle?: string;
   pageContent?: string;
+  /** Full editor content for local actions such as AI-driven page updates. */
+  pageFullContent?: string;
   recentPageTitles?: string[];
   searchQuery?: string;
 }

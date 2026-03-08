@@ -1,4 +1,5 @@
 import {
+  Button,
   Input,
   Select,
   SelectContent,
@@ -19,8 +20,11 @@ import { UserCard } from "./UserCard";
 interface UsersContentProps {
   users: UserAdmin[];
   total: number;
+  page: number;
+  pageSize: number;
   search: string;
   onSearchChange: (value: string) => void;
+  onPageChange: (page: number) => void;
   error: string | null;
   loading: boolean;
   savingIds: Set<string>;
@@ -30,13 +34,22 @@ interface UsersContentProps {
 export function UsersContent({
   users,
   total,
+  page,
+  pageSize,
   search,
   onSearchChange,
+  onPageChange,
   error,
   loading,
   savingIds,
   onRoleChange,
 }: UsersContentProps) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const hasPreviousPage = page > 0;
+  const hasNextPage = page + 1 < pageCount;
+  const rangeStart = total === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = total === 0 ? 0 : page * pageSize + users.length;
+
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -119,8 +132,36 @@ export function UsersContent({
           </div>
 
           <p className="mt-2 text-xs text-slate-500">
-            {users.length} 件 / 合計 {total} 件
+            {rangeStart}-{rangeEnd} 件を表示 / 合計 {total} 件
           </p>
+
+          {total > pageSize && (
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-500">
+                {page + 1} / {pageCount} ページ
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange(page - 1)}
+                  disabled={!hasPreviousPage || loading}
+                >
+                  前へ
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onPageChange(page + 1)}
+                  disabled={!hasNextPage || loading}
+                >
+                  次へ
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

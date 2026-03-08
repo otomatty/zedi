@@ -66,6 +66,7 @@ const NotePageView: React.FC = () => {
         pageId: page.id,
         pageTitle: page.title,
         pageContent: page.content?.slice(0, 3000) ?? "",
+        pageFullContent: page.content ?? "",
       });
     }
     return () => setPageContext(null);
