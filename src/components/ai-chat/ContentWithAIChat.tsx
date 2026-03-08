@@ -5,7 +5,7 @@ import { useAIChatContext } from "../../contexts/AIChatContext";
 import { AIChatPanel } from "./AIChatPanel";
 import { ZEDI_PAGE_MIME_TYPE } from "../../types/aiChat";
 import { Drawer, DrawerContent } from "@zedi/ui";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
 interface ContentWithAIChatProps {

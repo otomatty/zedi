@@ -22,7 +22,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 const SM_BREAKPOINT = 640;
 

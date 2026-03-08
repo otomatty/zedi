@@ -12,12 +12,14 @@ export default function Users() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const isMountedRef = useRef(true);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestRequestRef = useRef(0);
 
   const load = useCallback(
     async (showLoading = true) => {
+      const requestId = ++latestRequestRef.current;
       if (showLoading && isMountedRef.current) setLoading(true);
       if (isMountedRef.current) setError(null);
       try {
@@ -26,15 +28,17 @@ export default function Users() {
           limit: 50,
           offset: 0,
         });
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setUsers(result.users);
         setTotal(result.total);
         setError(null);
       } catch (e) {
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setError(e instanceof Error ? e.message : String(e));
       } finally {
-        if (isMountedRef.current) setLoading(false);
+        if (isMountedRef.current && requestId === latestRequestRef.current) {
+          setLoading(false);
+        }
       }
     },
     [search],
@@ -62,7 +66,7 @@ export default function Users() {
 
   const handleRoleChange = useCallback(async (user: UserAdmin, role: UserRole) => {
     if (user.role === role) return;
-    setSavingId(user.id);
+    setSavingIds((prev) => new Set(prev).add(user.id));
     setError(null);
     try {
       const { user: updated } = await patchUserRole(user.id, role);
@@ -72,7 +76,13 @@ export default function Users() {
       if (!isMountedRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      if (isMountedRef.current) setSavingId(null);
+      if (isMountedRef.current) {
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(user.id);
+          return next;
+        });
+      }
     }
   }, []);
 
@@ -84,7 +94,7 @@ export default function Users() {
       onSearchChange={setSearchInput}
       error={error}
       loading={loading}
-      savingId={savingId}
+      savingIds={savingIds}
       onRoleChange={handleRoleChange}
     />
   );

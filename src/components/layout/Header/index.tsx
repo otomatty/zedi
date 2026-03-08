@@ -1,6 +1,6 @@
 import React from "react";
 import Container from "@/components/layout/Container";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { HeaderLogo } from "./HeaderLogo";
 import { MonthNavigation } from "./MonthNavigation";
 import { HeaderSearchBar } from "./HeaderSearchBar";

@@ -23,7 +23,7 @@ interface UsersContentProps {
   onSearchChange: (value: string) => void;
   error: string | null;
   loading: boolean;
-  savingId: string | null;
+  savingIds: Set<string>;
   onRoleChange: (user: UserAdmin, role: UserRole) => void;
 }
 
@@ -34,7 +34,7 @@ export function UsersContent({
   onSearchChange,
   error,
   loading,
-  savingId,
+  savingIds,
   onRoleChange,
 }: UsersContentProps) {
   return (
@@ -80,7 +80,7 @@ export function UsersContent({
                       <Select
                         value={u.role}
                         onValueChange={(v) => onRoleChange(u, v as UserRole)}
-                        disabled={savingId === u.id}
+                        disabled={savingIds.has(u.id)}
                       >
                         <SelectTrigger
                           className="h-8 min-w-[100px]"
@@ -98,7 +98,7 @@ export function UsersContent({
                       {formatDate(u.createdAt)}
                     </TableCell>
                     <TableCell className="px-3 py-2 text-muted-foreground">
-                      {savingId === u.id ? "保存中..." : ""}
+                      {savingIds.has(u.id) ? "保存中..." : ""}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -113,7 +113,7 @@ export function UsersContent({
                 key={u.id}
                 user={u}
                 onRoleChange={(role) => onRoleChange(u, role)}
-                saving={savingId === u.id}
+                saving={savingIds.has(u.id)}
               />
             ))}
           </div>

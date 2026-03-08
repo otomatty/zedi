@@ -12,7 +12,7 @@ import { Button } from "@zedi/ui";
 import { Progress } from "@zedi/ui";
 import { fetchUsage } from "@/lib/aiService";
 import type { AIUsage } from "@/types/ai";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 interface UsageDetailDialogProps {
   children?: React.ReactNode;

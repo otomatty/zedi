@@ -1,6 +1,6 @@
 import { NavLink as RouterNavLink, NavLinkProps } from "react-router-dom";
 import { forwardRef } from "react";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 interface NavLinkCompatProps extends Omit<NavLinkProps, "className"> {
   className?: string;

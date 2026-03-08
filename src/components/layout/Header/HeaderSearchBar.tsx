@@ -5,7 +5,7 @@ import { Input } from "@zedi/ui";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
 import { HeaderSearchDropdownContent } from "./HeaderSearchDropdownContent";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 const PLACEHOLDER = "ページを検索...";
 const SHORTCUT_HINT = "⌘K";

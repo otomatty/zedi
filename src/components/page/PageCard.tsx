@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Link2, Copy, Trash2, Sparkles } from "lucide-react";
 import type { PageSummary } from "@/types/page";
 import { ZEDI_PAGE_MIME_TYPE } from "@/types/aiChat";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
 import { useToast } from "@zedi/ui";
 import { useAIChatStore } from "@/stores/aiChatStore";

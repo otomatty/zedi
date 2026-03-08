@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
 import { Editor } from "@tiptap/core";
 import { usePageStore } from "@/stores/pageStore";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { FileText, Plus } from "lucide-react";
 
 export interface SuggestionItem {

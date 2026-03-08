@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, FileText } from "lucide-react";
 import type { NoteSummary } from "@/types/note";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { NoteVisibilityBadge } from "./NoteVisibilityBadge";
 import { Badge } from "@zedi/ui";
 import { useTranslation } from "react-i18next";

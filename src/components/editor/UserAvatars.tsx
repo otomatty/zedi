@@ -6,7 +6,7 @@
 import { Avatar, AvatarFallback } from "@zedi/ui";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@zedi/ui";
 import type { UserPresence } from "@/lib/collaboration/types";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 interface UserAvatarsProps {
   /** オンラインユーザー一覧 */

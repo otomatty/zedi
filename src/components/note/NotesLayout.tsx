@@ -4,7 +4,7 @@ import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 interface NotesLayoutProps {
   children: React.ReactNode;

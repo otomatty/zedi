@@ -7,7 +7,7 @@ import { RefreshCw, Cloud, CloudOff, WifiOff } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@zedi/ui";
 import type { ConnectionStatus } from "@/lib/collaboration/types";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 interface ConnectionIndicatorProps {
   /** 接続状態 */

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@zedi/ui";
 import { Progress } from "@zedi/ui";
 import Container from "@/components/layout/Container";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { openProCheckout, type BillingInterval } from "@/lib/subscriptionService";

@@ -1,6 +1,6 @@
 import React from "react";
 import { FileText, Link2, Image } from "lucide-react";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
 export type FABMenuOption = "blank" | "url" | "image" | "template" | "voice";

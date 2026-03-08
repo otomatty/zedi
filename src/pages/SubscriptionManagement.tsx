@@ -26,7 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@zedi/ui";
 import Container from "@/components/layout/Container";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@zedi/ui/components/sonner";
 import {

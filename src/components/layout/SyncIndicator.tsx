@@ -3,7 +3,7 @@ import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
 import { Button } from "@zedi/ui";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
 /**

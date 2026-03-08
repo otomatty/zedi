@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@zedi/ui";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 import { useCreateNewPage } from "@/hooks/useCreateNewPage";
 import { useCreatePage } from "@/hooks/usePageQueries";
 import { useToast } from "@zedi/ui";

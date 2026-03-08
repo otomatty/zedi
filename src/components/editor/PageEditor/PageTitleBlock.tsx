@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { cn } from "@zedi/ui/lib/utils";
+import { cn } from "@zedi/ui";
 
 export interface PageTitleBlockProps {
   /** 表示・編集するタイトル */
