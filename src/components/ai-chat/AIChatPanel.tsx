@@ -39,7 +39,15 @@ export function AIChatPanel() {
   // 現在のページに紐付いた会話一覧
   const pageConversations = getConversationsForPage(pageContext?.pageId, pageContext?.type);
 
-  const { messages, sendMessage, stopStreaming, clearMessages, loadMessages } = useAIChat({
+  const {
+    messages,
+    sendMessage,
+    stopStreaming,
+    clearMessages,
+    loadMessages,
+    editAndResend,
+    isStreaming,
+  } = useAIChat({
     pageContext,
     contextEnabled,
   });
@@ -112,6 +120,13 @@ export function AIChatPanel() {
     [activeConversationId, deleteConversation, setActiveConversation, clearMessages],
   );
 
+  const handleEditMessage = useCallback(
+    (messageId: string, newContent: string) => {
+      editAndResend(messageId, newContent);
+    },
+    [editAndResend],
+  );
+
   const handleExecuteAction = useCallback(
     async (action: ChatAction) => {
       try {
@@ -159,6 +174,8 @@ export function AIChatPanel() {
         messages={messages}
         onSuggestionClick={handleSendMessage}
         onExecuteAction={handleExecuteAction}
+        onEditMessage={handleEditMessage}
+        isStreaming={isStreaming}
       />
 
       <div className="border-t bg-background p-4">

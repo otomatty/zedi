@@ -4,6 +4,8 @@
     "close": "Close",
     "newConversation": "New Conversation",
     "conversationList": "Conversations",
+    "cancel": "Cancel",
+    "resend": "Resend",
     "send": "Send",
     "stop": "Stop",
     "createPage": "Create",

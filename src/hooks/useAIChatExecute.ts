@@ -18,6 +18,8 @@ export interface ExecuteSendMessageParams {
   content: string;
   messageRefs: ReferencedPage[];
   currentMessages: ChatMessage[];
+  /** 指定時はこの履歴の直後にユーザー/助手メッセージを追加（チェックポイント編集で使用） */
+  initialMessages?: ChatMessage[];
   pageContext: PageContext | null;
   contextEnabled: boolean;
   existingPageTitles: string[];
@@ -33,6 +35,7 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     content,
     messageRefs,
     currentMessages,
+    initialMessages,
     pageContext,
     contextEnabled,
     existingPageTitles,
@@ -52,7 +55,6 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     referencedPages: messageRefs.length > 0 ? messageRefs : undefined,
     timestamp: Date.now(),
   };
-  setMessages((prev) => [...prev, userMessage]);
 
   const assistantMessageId = crypto.randomUUID();
   const assistantMessage: ChatMessage = {
@@ -62,7 +64,13 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     timestamp: Date.now(),
     isStreaming: true,
   };
-  setMessages((prev) => [...prev, assistantMessage]);
+
+  if (initialMessages !== undefined) {
+    setMessages([...initialMessages, userMessage, assistantMessage]);
+  } else {
+    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, assistantMessage]);
+  }
 
   setStreaming(true);
   streamingContentRef.current = "";
@@ -96,7 +104,8 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
   const modelDisplayName = selectedModel?.displayName ?? effectiveModel;
 
   const context = contextEnabled ? pageContext : null;
-  const allRefsInConversation = [...currentMessages, userMessage].flatMap(
+  const baseMessages = initialMessages ?? currentMessages;
+  const allRefsInConversation = [...baseMessages, userMessage].flatMap(
     (m) => m.referencedPages ?? [],
   );
   const uniqueRefs = allRefsInConversation.filter(
@@ -104,7 +113,7 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
   );
   const systemPrompt = buildSystemPrompt(context, existingPageTitles, uniqueRefs);
 
-  const allMessages = [...currentMessages, userMessage];
+  const allMessages = [...baseMessages, userMessage];
   const apiMessages: AIServiceRequest["messages"] = [
     { role: "system", content: systemPrompt },
     ...allMessages.map((m) => ({ role: m.role, content: m.content })),
