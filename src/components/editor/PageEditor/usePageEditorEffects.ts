@@ -60,7 +60,7 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
     toast,
   } = options;
 
-  const { setPageContext } = useAIChatContext();
+  const { setPageContext, contentAppendHandlerRef } = useAIChatContext();
 
   // /page/new への直接アクセスはホームへリダイレクト
   useEffect(() => {
@@ -151,8 +151,20 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
         pageId: currentPageId || undefined,
         pageTitle: title,
         pageContent: content ? content.substring(0, 3000) : undefined,
+        pageFullContent: content || undefined,
       });
     }
     return () => setPageContext(null);
   }, [title, currentPageId, content, setPageContext]);
+
+  // AI追記時にエディタ内容を同期するハンドラを登録
+  useEffect(() => {
+    if (currentPageId) {
+      contentAppendHandlerRef.current = setContent;
+      return () => {
+        contentAppendHandlerRef.current = null;
+      };
+    }
+    return undefined;
+  }, [currentPageId, setContent, contentAppendHandlerRef]);
 }

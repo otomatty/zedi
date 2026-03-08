@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useMemo, useRef } from "react";
 import { AIChatHeader } from "./AIChatHeader";
 import { AIChatInput } from "./AIChatInput";
 import { AIChatMessages } from "./AIChatMessages";
@@ -7,15 +7,10 @@ import { AIChatConversationList } from "./AIChatConversationList";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { useAIChatContext } from "../../contexts/AIChatContext";
 import { useAIChat } from "../../hooks/useAIChat";
+import { useAIChatActions } from "../../hooks/useAIChatActions";
 import { useAIChatConversations } from "../../hooks/useAIChatConversations";
-import {
-  ChatAction,
-  CreatePageAction,
-  CreateMultiplePagesAction,
-  ReferencedPage,
-} from "../../types/aiChat";
-import { useCreatePage } from "../../hooks/usePageQueries";
-import { useNavigate } from "react-router-dom";
+import type { ReferencedPage } from "../../types/aiChat";
+import { usePagesSummary } from "../../hooks/usePageQueries";
 
 export function AIChatPanel() {
   const {
@@ -26,8 +21,7 @@ export function AIChatPanel() {
     showConversationList,
   } = useAIChatStore();
   const { pageContext } = useAIChatContext();
-  const navigate = useNavigate();
-  const createPageMutation = useCreatePage();
+  const { data: pages = [] } = usePagesSummary();
   const {
     createConversation,
     updateConversation,
@@ -36,8 +30,16 @@ export function AIChatPanel() {
     getConversationsForPage,
   } = useAIChatConversations();
 
-  // 現在のページに紐付いた会話一覧
   const pageConversations = getConversationsForPage(pageContext?.pageId, pageContext?.type);
+  const existingPageTitles = useMemo(
+    () =>
+      pages
+        .filter((page) => !page.isDeleted && page.title.trim().length > 0)
+        .map((page) => page.title.trim()),
+    [pages],
+  );
+
+  const { handleExecuteAction } = useAIChatActions({ pageContext });
 
   const {
     messages,
@@ -50,9 +52,10 @@ export function AIChatPanel() {
   } = useAIChat({
     pageContext,
     contextEnabled,
+    existingPageTitles,
+    availablePages: pages,
   });
 
-  // ページ切り替え検知: pageId が変わったら会話をリセットして新規チャット画面にする
   const prevPageKeyRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const currentKey = pageContext?.pageId ?? pageContext?.type ?? undefined;
@@ -63,7 +66,6 @@ export function AIChatPanel() {
     prevPageKeyRef.current = currentKey;
   }, [pageContext?.pageId, pageContext?.type, setActiveConversation, clearMessages]);
 
-  // アクティブな会話の変更時にメッセージを読み込み
   useEffect(() => {
     if (activeConversationId) {
       const conv = getConversation(activeConversationId);
@@ -75,7 +77,6 @@ export function AIChatPanel() {
     }
   }, [activeConversationId, getConversation, loadMessages, clearMessages]);
 
-  // メッセージ変更時に会話を保存
   useEffect(() => {
     if (activeConversationId && messages.length > 0) {
       updateConversation(activeConversationId, messages);
@@ -84,7 +85,6 @@ export function AIChatPanel() {
 
   const handleSendMessage = useCallback(
     (content: string, referencedPages: ReferencedPage[] = []) => {
-      // 現在の会話がない場合は新規作成
       if (!activeConversationId) {
         const newConv = createConversation(
           pageContext
@@ -125,34 +125,6 @@ export function AIChatPanel() {
       editAndResend(messageId, newContent);
     },
     [editAndResend],
-  );
-
-  const handleExecuteAction = useCallback(
-    async (action: ChatAction) => {
-      try {
-        if (action.type === "create-page") {
-          const pageAction = action as CreatePageAction;
-          const result = await createPageMutation.mutateAsync({
-            title: pageAction.title,
-            content: pageAction.content,
-          });
-          if (result?.id) {
-            navigate(`/page/${result.id}`);
-          }
-        } else if (action.type === "create-multiple-pages") {
-          const multiAction = action as CreateMultiplePagesAction;
-          for (const page of multiAction.pages) {
-            await createPageMutation.mutateAsync({
-              title: page.title,
-              content: page.content,
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to execute action:", err);
-      }
-    },
-    [createPageMutation, navigate],
   );
 
   if (!isOpen) return null;
