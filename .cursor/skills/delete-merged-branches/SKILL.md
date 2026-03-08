@@ -59,7 +59,7 @@ current_branch="$(git branch --show-current)"
 git for-each-ref refs/heads --format='%(refname:short)'
 ```
 
-対象外: 現在のブランチ、基準ブランチ（`base_branch`）と同名のブランチ。
+対象外: 現在のブランチ、基準ブランチ（`base_branch`）と同名のブランチ。加えて、`main` / `master` / `develop` および `origin/HEAD` が指すブランチ名は常に対象外とする（保護ブランチ）。
 
 ### 3. 各ブランチの削除可否を判定
 
@@ -77,15 +77,18 @@ A で削除候補にならず、`gh` が使える場合のみ実行。
 
 ```bash
 tip_sha="$(git rev-parse "<branch>")"
-gh pr list --state merged --head "<branch>" --base "$base_branch" --json number,headRefOid --limit 20
+gh pr list --state merged --head "<branch>" --base "$base_branch" --json number,headRefOid --limit 1
 ```
 
-- merged PR が 1 件以上あり、**最新の PR の `headRefOid` が `tip_sha` と一致**する場合のみ削除候補。理由は `merged PR #<number> (squash/rebase-safe)`。
+- `gh pr list` はデフォルトで更新が新しい順のため、`--limit 1` で最新の merged PR 1 件を取得する。その **`headRefOid` が `tip_sha` と一致**する場合のみ削除候補。理由は `merged PR #<number> (squash/rebase-safe)`。
 - merged PR なし、または `headRefOid` 不一致の場合は削除しない。
 
 ### 4. 削除の実行
 
-削除候補のみ `git branch -D "<branch>"` で削除する。
+削除候補一覧をユーザーに提示し、削除してよいか確認を取ったうえで、次の方針で削除する。
+
+- 理由が `merged by ancestry` のブランチ: `git branch -d "<branch>"` を使う（Git 上もマージ済みと判定されているため強制削除は不要）。
+- 理由が `merged PR #<number> (squash/rebase-safe)` のブランチ: まず `git branch -d "<branch>"` を試し、エラーになる場合のみ `git branch -D "<branch>"` を使う。
 
 ## 報告形式
 
