@@ -14,7 +14,7 @@ description: >
 
 ## 実行計画
 
-```
+```text
 Phase 0 — レビュー対象の確認（AskQuestion 1回）
   └─ committed + staged + unstaged / committed のみ / staged のみ
 
@@ -152,7 +152,6 @@ bunx tsc --noEmit --pretty 2>&1 | head -80
 
 > **変更ファイルフィルタ**: 出力が長い場合でも、Phase 3 の分析では**変更ファイルに関連するエラーのみ**を対象とする。
 > 出力に変更ファイル名が含まれないエラーは既存の問題として無視する。
-
 > **タイムアウト**: `block_until_ms: 60000`（60 秒）を設定する。
 > 60 秒以内に完了しない場合はバックグラウンドに移行するため、ターミナルファイルを確認する。
 > 120 秒経過しても完了しない場合は pid を使って kill し、型チェックをスキップとしてレポートに記載する。
@@ -161,7 +160,7 @@ bunx tsc --noEmit --pretty 2>&1 | head -80
 
 変更ファイルのベース名を OR パターンにまとめて **Glob ツールを 1 回** で呼び出す:
 
-```
+```text
 glob_pattern: "**/{basename1,basename2,...}.{test,spec}.{ts,tsx}"
 ```
 
@@ -170,7 +169,7 @@ glob_pattern: "**/{basename1,basename2,...}.{test,spec}.{ts,tsx}"
 
 `__tests__/` 配下も検索する場合は追加で 1 回:
 
-```
+```text
 glob_pattern: "**/__tests__/{basename1,basename2,...}.*"
 ```
 
@@ -180,7 +179,7 @@ glob_pattern: "**/__tests__/{basename1,basename2,...}.*"
 
 変更ファイルのモジュール名を OR で結合して **Grep ツールを 1 回** で呼び出す:
 
-```
+```text
 pattern: "from ['\"].*/(moduleA|moduleB|moduleC)['\"]"
 glob: "*.{ts,tsx}"
 output_mode: "files_with_matches"
@@ -194,7 +193,7 @@ output_mode: "files_with_matches"
 
 **E-1. セキュリティ（Critical）**:
 
-```
+```text
 pattern: "(password|secret|token|api_key)\\s*[:=]\\s*['\"][^'\"]{8,}"
 path: <変更ファイルの共通親ディレクトリ>
 glob: "*.{ts,tsx,js,jsx}"
@@ -202,7 +201,7 @@ glob: "*.{ts,tsx,js,jsx}"
 
 **E-2. コード品質（Warning + Info）**:
 
-```
+```text
 pattern: "console\\.(log|debug)|(TODO|FIXME|HACK):"
 path: <変更ファイルの共通親ディレクトリ>
 glob: "*.{ts,tsx,js,jsx}"
