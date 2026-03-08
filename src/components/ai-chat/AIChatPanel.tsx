@@ -4,38 +4,15 @@ import { AIChatInput } from "./AIChatInput";
 import { AIChatMessages } from "./AIChatMessages";
 import { AIChatContextBar } from "./AIChatContextBar";
 import { AIChatConversationList } from "./AIChatConversationList";
-import { useTranslation } from "react-i18next";
-import { useToast } from "@zedi/ui";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { useAIChatContext } from "../../contexts/AIChatContext";
 import { useAIChat } from "../../hooks/useAIChat";
+import { useAIChatActions } from "../../hooks/useAIChatActions";
 import { useAIChatConversations } from "../../hooks/useAIChatConversations";
-import {
-  AppendToPageAction,
-  ChatAction,
-  CreatePageAction,
-  CreateMultiplePagesAction,
-  ReferencedPage,
-  SuggestWikiLinksAction,
-} from "../../types/aiChat";
-import {
-  useCreatePage,
-  usePagesSummary,
-  useSyncWikiLinks,
-  useUpdatePage,
-} from "../../hooks/usePageQueries";
-import {
-  appendMarkdownToTiptapContent,
-  buildSuggestedWikiLinksMarkdown,
-  getMissingSuggestedWikiLinkTitles,
-  normalizePageTitle,
-} from "../../lib/aiChatActionHelpers";
-import { extractWikiLinksFromContent } from "../../lib/wikiLinkUtils";
-import { useNavigate } from "react-router-dom";
+import type { ReferencedPage } from "../../types/aiChat";
+import { usePagesSummary } from "../../hooks/usePageQueries";
 
 export function AIChatPanel() {
-  const { t } = useTranslation();
-  const { toast } = useToast();
   const {
     isOpen,
     activeConversationId,
@@ -44,10 +21,6 @@ export function AIChatPanel() {
     showConversationList,
   } = useAIChatStore();
   const { pageContext } = useAIChatContext();
-  const navigate = useNavigate();
-  const createPageMutation = useCreatePage();
-  const updatePageMutation = useUpdatePage();
-  const { syncLinks } = useSyncWikiLinks();
   const { data: pages = [] } = usePagesSummary();
   const {
     createConversation,
@@ -57,7 +30,6 @@ export function AIChatPanel() {
     getConversationsForPage,
   } = useAIChatConversations();
 
-  // 現在のページに紐付いた会話一覧
   const pageConversations = getConversationsForPage(pageContext?.pageId, pageContext?.type);
   const existingPageTitles = useMemo(
     () =>
@@ -66,11 +38,8 @@ export function AIChatPanel() {
         .map((page) => page.title.trim()),
     [pages],
   );
-  const latestPageContentRef = useRef(pageContext?.pageFullContent ?? "");
 
-  useEffect(() => {
-    latestPageContentRef.current = pageContext?.pageFullContent ?? "";
-  }, [pageContext?.pageFullContent]);
+  const { handleExecuteAction } = useAIChatActions({ pageContext });
 
   const {
     messages,
@@ -87,7 +56,6 @@ export function AIChatPanel() {
     availablePages: pages,
   });
 
-  // ページ切り替え検知: pageId が変わったら会話をリセットして新規チャット画面にする
   const prevPageKeyRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const currentKey = pageContext?.pageId ?? pageContext?.type ?? undefined;
@@ -98,7 +66,6 @@ export function AIChatPanel() {
     prevPageKeyRef.current = currentKey;
   }, [pageContext?.pageId, pageContext?.type, setActiveConversation, clearMessages]);
 
-  // アクティブな会話の変更時にメッセージを読み込み
   useEffect(() => {
     if (activeConversationId) {
       const conv = getConversation(activeConversationId);
@@ -110,7 +77,6 @@ export function AIChatPanel() {
     }
   }, [activeConversationId, getConversation, loadMessages, clearMessages]);
 
-  // メッセージ変更時に会話を保存
   useEffect(() => {
     if (activeConversationId && messages.length > 0) {
       updateConversation(activeConversationId, messages);
@@ -119,7 +85,6 @@ export function AIChatPanel() {
 
   const handleSendMessage = useCallback(
     (content: string, referencedPages: ReferencedPage[] = []) => {
-      // 現在の会話がない場合は新規作成
       if (!activeConversationId) {
         const newConv = createConversation(
           pageContext
@@ -160,108 +125,6 @@ export function AIChatPanel() {
       editAndResend(messageId, newContent);
     },
     [editAndResend],
-  );
-
-  const appendContentToCurrentPage = useCallback(
-    async (markdown: string) => {
-      const currentPageId = pageContext?.pageId;
-      if (!currentPageId) return false;
-
-      const nextContent = appendMarkdownToTiptapContent(latestPageContentRef.current, markdown);
-      await updatePageMutation.mutateAsync({
-        pageId: currentPageId,
-        updates: { content: nextContent },
-      });
-      await syncLinks(currentPageId, extractWikiLinksFromContent(nextContent));
-      latestPageContentRef.current = nextContent;
-      return true;
-    },
-    [pageContext, syncLinks, updatePageMutation],
-  );
-
-  const handleExecuteAction = useCallback(
-    async (action: ChatAction) => {
-      try {
-        if (action.type === "create-page") {
-          const pageAction = action as CreatePageAction;
-          const result = await createPageMutation.mutateAsync({
-            title: pageAction.title,
-            content: pageAction.content,
-          });
-          if (result?.id) {
-            navigate(`/page/${result.id}`);
-          }
-        } else if (action.type === "create-multiple-pages") {
-          const multiAction = action as CreateMultiplePagesAction;
-          for (const page of multiAction.pages) {
-            await createPageMutation.mutateAsync({
-              title: page.title,
-              content: page.content,
-            });
-          }
-        } else if (action.type === "append-to-page") {
-          const appendAction = action as AppendToPageAction;
-          const currentPageTitle = pageContext?.pageTitle ?? "";
-
-          if (!pageContext?.pageId) {
-            toast({
-              title: t("aiChat.notifications.pageContextRequired"),
-              variant: "destructive",
-            });
-            return;
-          }
-
-          if (normalizePageTitle(appendAction.pageTitle) !== normalizePageTitle(currentPageTitle)) {
-            toast({
-              title: t("aiChat.notifications.appendUnavailable"),
-              variant: "destructive",
-            });
-            return;
-          }
-
-          await appendContentToCurrentPage(appendAction.content);
-          toast({
-            title: t("aiChat.notifications.appendSuccess", { title: appendAction.pageTitle }),
-          });
-        } else if (action.type === "suggest-wiki-links") {
-          const wikiLinkAction = action as SuggestWikiLinksAction;
-
-          if (!pageContext?.pageId) {
-            toast({
-              title: t("aiChat.notifications.pageContextRequired"),
-              variant: "destructive",
-            });
-            return;
-          }
-
-          const targetTitles = wikiLinkAction.links
-            .map((link) => link.existingPageTitle ?? link.keyword)
-            .map((title) => title.trim())
-            .filter(Boolean);
-          const missingTitles = getMissingSuggestedWikiLinkTitles(
-            latestPageContentRef.current,
-            targetTitles,
-          );
-
-          if (missingTitles.length === 0) {
-            toast({ title: t("aiChat.notifications.noNewWikiLinks") });
-            return;
-          }
-
-          await appendContentToCurrentPage(buildSuggestedWikiLinksMarkdown(missingTitles));
-          toast({
-            title: t("aiChat.notifications.wikiLinksAdded", { count: missingTitles.length }),
-          });
-        }
-      } catch (err) {
-        console.error("Failed to execute action:", err);
-        toast({
-          title: t("aiChat.notifications.actionFailed"),
-          variant: "destructive",
-        });
-      }
-    },
-    [appendContentToCurrentPage, createPageMutation, navigate, pageContext, t, toast],
   );
 
   if (!isOpen) return null;
