@@ -116,7 +116,8 @@ export function useThumbnailCommit({
           providerId = result.provider;
         } else {
           const file = await fetchImageAsFile(imageUrl, previewUrl);
-          const fileToUpload = await convertToWebP(file);
+          const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
+          const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
           const provider = getStorageProvider(uploadSettings, {
             getToken: async () => null,
           });

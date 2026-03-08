@@ -76,18 +76,16 @@ async function fetchAndFilterRows(
   }
 
   const totalBeforeFilter = rows.length;
-  rows = rows.filter(
-    (r) => isTextChatModel(r.provider, r.modelId) && isLatestGeneration(r.provider, r.modelId),
-  );
-
   const openaiAllowlist = parseAllowlist(getOptionalEnv("OPENAI_MODEL_IDS"));
   const googleAllowlist = parseAllowlist(getOptionalEnv("GOOGLE_MODEL_IDS"));
-  if (provider === "openai" && openaiAllowlist !== null) {
-    rows = rows.filter((r) => openaiAllowlist.has(r.modelId));
-  }
-  if (provider === "google" && googleAllowlist !== null) {
-    rows = rows.filter((r) => googleAllowlist.has(r.modelId));
-  }
+  const allowlist =
+    provider === "openai" ? openaiAllowlist : provider === "google" ? googleAllowlist : null;
+
+  rows = rows.filter((r) =>
+    allowlist
+      ? allowlist.has(r.modelId)
+      : isTextChatModel(r.provider, r.modelId) && isLatestGeneration(r.provider, r.modelId),
+  );
 
   return { rows, totalBeforeFilter, debug };
 }
@@ -189,9 +187,9 @@ async function syncOneProvider(
   const existingIds = new Set(existingRows.map((r) => r.id));
 
   const [maxRow] = await db
-    .select({ maxOrder: sql<number>`coalesce(max(${aiModels.sortOrder}), 0)` })
+    .select({ maxOrder: sql<number>`coalesce(max(${aiModels.sortOrder}), -1)` })
     .from(aiModels);
-  let nextSortOrder = Number(maxRow?.maxOrder ?? 0) + 1;
+  let nextSortOrder = Number(maxRow?.maxOrder ?? -1) + 1;
 
   let upserted = 0;
   for (const row of rows) {

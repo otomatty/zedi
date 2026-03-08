@@ -143,7 +143,8 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
   uploadTimersRef.current.set(uploadId, timerId);
 
   try {
-    const fileToUpload = await convertToWebP(file);
+    const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
+    const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
     const url = await provider.uploadImage(fileToUpload, {
       onProgress: (progress) => {
         hasRealProgress = true;

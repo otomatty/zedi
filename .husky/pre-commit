@@ -6,7 +6,7 @@ set -e
 STAGED_FILES="$(git diff --cached --name-only --diff-filter=ACMR)"
 
 if [ -n "$STAGED_FILES" ]; then
-  printf '%s' "$STAGED_FILES" | tr '\n' '\0' | xargs -0 bunx prettier --check --ignore-unknown
+  printf '%s' "$STAGED_FILES" | tr '\n' '\0' | xargs -0 bunx prettier --check --ignore-unknown --
 fi
 
 # --no-stash: avoid "Needed a single revision" when backup stash is empty (e.g. only staged files)

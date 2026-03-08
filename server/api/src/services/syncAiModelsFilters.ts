@@ -97,7 +97,7 @@ export function assignTier(provider: AIProviderType, modelId: string): "free" | 
   }
 
   if (provider === "anthropic") {
-    if (id.includes("haiku") || id.includes("sonnet")) return "free";
+    if (id.includes("haiku")) return "free";
     return "pro";
   }
 

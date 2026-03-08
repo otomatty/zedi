@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SyncPreviewModal } from "./SyncPreviewModal";
 
@@ -10,6 +10,10 @@ describe("SyncPreviewModal", () => {
   beforeEach(() => {
     onClose.mockClear();
     onConfirm.mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("open が false のとき何も描画しない", () => {
