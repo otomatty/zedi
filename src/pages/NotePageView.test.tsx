@@ -56,7 +56,7 @@ vi.mock("@zedi/ui", () => ({
   ),
 }));
 
-function renderNotePageView(_noteId: string, _pageId: string) {
+function renderNotePageView() {
   return render(
     <MemoryRouter initialEntries={[`/note/note-1/page/page-1`]}>
       <AIChatProvider>
@@ -87,7 +87,7 @@ describe("NotePageView", () => {
       isLoading: true,
     } as never);
 
-    renderNotePageView("note-1", "page-1");
+    renderNotePageView();
 
     expect(screen.getByText("読み込み中...")).toBeInTheDocument();
   });
@@ -104,7 +104,7 @@ describe("NotePageView", () => {
       isLoading: false,
     } as never);
 
-    renderNotePageView("note-1", "page-1");
+    renderNotePageView();
 
     expect(screen.getByText(/ページが見つからないか、閲覧権限がありません/)).toBeInTheDocument();
   });
@@ -126,7 +126,7 @@ describe("NotePageView", () => {
       isLoading: false,
     } as never);
 
-    renderNotePageView("note-1", "page-1");
+    renderNotePageView();
 
     expect(screen.getByTestId("content-with-ai-chat")).toBeInTheDocument();
     expect(screen.getByTestId("page-editor")).toBeInTheDocument();

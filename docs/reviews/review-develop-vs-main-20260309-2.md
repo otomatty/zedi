@@ -63,19 +63,19 @@
 
 ## テストカバレッジ
 
-| 変更ファイル                                             | テストファイル                                      | 状態           |
-| -------------------------------------------------------- | --------------------------------------------------- | -------------- |
-| src/lib/aiChatActionHelpers.ts                           | src/lib/aiChatActionHelpers.test.ts                 | 既存テストあり |
-| src/hooks/useAIChat.ts                                   | src/hooks/useAIChat.test.ts                         | 既存テストあり |
-| src/hooks/useAIChatActions.ts                            | src/hooks/useAIChatActions.test.ts                  | 既存テストあり |
-| src/components/ai-chat/AIChatPanel.tsx                   | src/components/ai-chat/AIChatPanel.test.tsx         | 既存テストあり |
-| server/api/src/routes/admin/index.ts                     | server/api/src/**tests**/routes/admin/index.test.ts | 既存テストあり |
-| admin/src/pages/users/UsersContent.tsx                   | admin/src/pages/users/UsersContent.test.tsx         | 既存テストあり |
-| admin/src/pages/users/index.tsx                          | -                                                   | テスト未作成   |
-| src/components/editor/PageEditor/usePageEditorEffects.ts | -                                                   | テスト未作成   |
-| src/pages/NotePageView.tsx                               | -                                                   | テスト未作成   |
-| src/lib/wikiGenerator.ts                                 | -                                                   | テスト未作成   |
-| src/lib/markdownToTiptap.ts                              | -                                                   | テスト未作成   |
+| 変更ファイル                                             | テストファイル                                                    | 状態                                  |
+| -------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------- |
+| src/lib/aiChatActionHelpers.ts                           | src/lib/aiChatActionHelpers.test.ts                               | 既存テストあり                        |
+| src/hooks/useAIChat.ts                                   | src/hooks/useAIChat.test.ts                                       | 既存テストあり                        |
+| src/hooks/useAIChatActions.ts                            | src/hooks/useAIChatActions.test.ts                                | 既存テストあり                        |
+| src/components/ai-chat/AIChatPanel.tsx                   | src/components/ai-chat/AIChatPanel.test.tsx                       | 既存テストあり                        |
+| server/api/src/routes/admin/index.ts                     | server/api/src/**tests**/routes/admin/index.test.ts               | 既存テストあり                        |
+| admin/src/pages/users/UsersContent.tsx                   | admin/src/pages/users/UsersContent.test.tsx                       | 既存テストあり                        |
+| admin/src/pages/users/index.tsx                          | admin/src/pages/users/index.test.tsx                              | 新規追加（2件 skip、placeholder 1件） |
+| src/components/editor/PageEditor/usePageEditorEffects.ts | src/components/editor/PageEditor/usePageEditorEffects.test.tsx    | 新規追加                              |
+| src/pages/NotePageView.tsx                               | src/pages/NotePageView.test.tsx                                   | 新規追加                              |
+| src/lib/wikiGenerator.ts                                 | src/lib/wikiGenerator.test.ts                                     | 新規追加                              |
+| src/lib/markdownToTiptap.ts                              | src/lib/markdownToTiptap.test.ts, markdownToTiptapHelpers.test.ts | 新規追加                              |
 
 ## Lint / Format チェック
 
@@ -85,7 +85,7 @@
 ## セキュリティ・設計メモ
 
 - `server/api/src/routes/admin/index.ts`: `GET /users` の検索文字列で `[%_\ ]` をエスケープして LIKE に渡しており、ワイルドカード混入に配慮済み。`PATCH /users/:id` は self-demotion を禁止。
-- `src/lib/markdownToTiptap.ts`: リンク URL の `sanitizeLinkUrl` で `javascript:`, `data:` 等を拒否。XSS 対策として妥当。
+- `src/lib/markdownToTiptapHelpers.ts`: リンク URL の `sanitizeLinkUrl` で `javascript:`, `data:` 等を拒否。XSS 対策として妥当。
 - AI chat の `append-to-page` / `suggest-wiki-links` は `pageContext?.pageId` が存在する場合のみ実行され、他ページへの書き込みは行わない。
 
 ## 統計
