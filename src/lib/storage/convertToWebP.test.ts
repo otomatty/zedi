@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { convertToWebP } from "./convertToWebP";
 
 // 1x1 透明 PNG（S3Provider と同じ）
@@ -15,12 +15,9 @@ function createPngFile(): File {
 }
 
 describe("convertToWebP", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("returns non-image file as-is", async () => {
