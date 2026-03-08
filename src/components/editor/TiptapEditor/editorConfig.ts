@@ -91,7 +91,7 @@ export interface CollaborationExtensionsOptions {
  */
 export interface EditorExtensionsOptions {
   placeholder: string;
-  onLinkClick: (title: string, exists: boolean) => void;
+  onLinkClick: (title: string) => void;
   onStateChange: (state: WikiLinkSuggestionState) => void;
   onSlashStateChange: (state: SlashSuggestionState) => void;
   imageUploadOptions: Partial<ImageUploadOptions>;

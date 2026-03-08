@@ -19,7 +19,7 @@ interface UseEditorSetupOptions {
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
   editorRef: React.MutableRefObject<Editor | null>;
   lastSelectionRef: React.MutableRefObject<{ from: number; to: number } | null>;
-  handleLinkClick: (title: string, exists: boolean) => void;
+  handleLinkClick: (title: string) => void;
   handleStateChange: (state: WikiLinkSuggestionState) => void;
   handleSlashStateChange: (state: SlashSuggestionState) => void;
   handleRetryUpload: (nodeId: string) => void;
