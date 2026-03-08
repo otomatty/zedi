@@ -56,4 +56,4 @@ jobs:
           packageManager: bun
           # Cloudflare API truncates commit message at ~384 bytes without UTF-8 boundary check (workers-sdk#11749).
           # Use an explicit ASCII-only message to avoid "Invalid commit message" (code 8000111) when git message contains multi-byte chars.
-          command: pages deploy dist --project-name=zedi-dev --commit-message "Deploy from GitHub Actions (develop)"
+          command: pages deploy dist --project-name=zedi-dev --commit-message "Deploy from GitHub Actions (develop) ${{ github.sha }}"

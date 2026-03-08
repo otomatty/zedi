@@ -59,7 +59,7 @@ jobs:
           packageManager: bun
           # Cloudflare API truncates commit message at ~384 bytes without UTF-8 boundary check (workers-sdk#11749).
           # Use an explicit ASCII-only message to avoid "Invalid commit message" (code 8000111).
-          command: pages deploy dist --project-name=zedi --commit-message "Deploy from GitHub Actions (main)"
+          command: pages deploy dist --project-name=zedi --commit-message "Deploy from GitHub Actions (main) ${{ github.sha }}"
 
   deploy-admin:
     name: Deploy Admin
@@ -88,4 +88,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: bun
           # Avoid Cloudflare "Invalid commit message" (8000111) for long UTF-8 git messages (workers-sdk#11749).
-          command: pages deploy admin/dist --project-name=zedi-admin --commit-message "Deploy admin from GitHub Actions (main)"
+          command: pages deploy admin/dist --project-name=zedi-admin --commit-message "Deploy admin from GitHub Actions (main) ${{ github.sha }}"
