@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { Editor } from "@tiptap/core";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
+import { getStorageProvider, getSettingsForUpload, convertToWebP } from "@/lib/storage";
 import type { StorageSettings } from "@/types/storage";
 
 const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
@@ -116,10 +116,15 @@ export function useThumbnailCommit({
           providerId = result.provider;
         } else {
           const file = await fetchImageAsFile(imageUrl, previewUrl);
+          // JPEG/PNG のみ WebP に変換（GIF はそのまま。APNG は MIME が image/png のため現状は変換対象）
+          const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
+          const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
           const provider = getStorageProvider(uploadSettings, {
             getToken: async () => null,
           });
-          finalUrl = await provider.uploadImage(file, { fileName: file.name });
+          finalUrl = await provider.uploadImage(fileToUpload, {
+            fileName: fileToUpload.name,
+          });
           providerId = uploadSettings.provider;
         }
 

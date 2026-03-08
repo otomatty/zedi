@@ -3,7 +3,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>;
-  onLinkClick?: (title: string, exists: boolean) => void;
+  onLinkClick?: (title: string) => void;
 }
 
 // Link status types:
@@ -111,12 +111,11 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
             if (!wikiLinkElement) return false;
 
             const title = wikiLinkElement.getAttribute("data-title");
-            const exists = wikiLinkElement.getAttribute("data-exists") === "true";
 
             if (title) {
               event.preventDefault();
               event.stopPropagation();
-              onLinkClick(title, exists);
+              onLinkClick(title);
               return true;
             }
 

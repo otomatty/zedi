@@ -84,7 +84,8 @@
 ## Prettier
 
 - 設定は `.prettierrc` のとおり（セミコロンあり、ダブルクォート、100 文字折り返し、末尾カンマ、Tailwind プラグイン）。
-- 保存時・コミット前（lint-staged）で `prettier --write` がかかる想定です。
+- コミット前の `pre-commit` hook で、staged なファイルに対して `prettier --check --ignore-unknown` を実行します。失敗した場合は `bun run format` または対象ファイルへの `prettier --write` を実行してから再コミットしてください。
+- `lint-staged` では staged な対象ファイルに対して `eslint --fix` と `prettier --write` を実行します。
 - フォーマットのみ確認する場合は `bun run format:check` を使用してください。
 
 ---

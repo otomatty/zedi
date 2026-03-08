@@ -38,7 +38,7 @@
 - `.release-please-manifest.json` — 現在のリリース済みバージョンを管理する manifest
 - `.github/workflows/release-please.yml` — main への push で Release Please を実行
 - `package.json` — ルートの `version` が Release Please により更新される
-- `CHANGELOG.md` — Release Please が自動生成・更新（初回は手動で作成してもよい）
+- `CHANGELOG.md` — Release Please が自動生成・更新（初回は手動で作成してもよい）。Prettier との競合を防ぐため `.prettierignore` で除外している。
 - フロント: ビルド時に `VITE_APP_VERSION` として `package.json` の version を注入し、一般設定の「アプリについて」で表示
 
 ## 初回セットアップ（未作成の場合）

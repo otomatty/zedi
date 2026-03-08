@@ -11,7 +11,7 @@ import { authRequired } from "../../middleware/auth.js";
 import { adminRequired } from "../../middleware/adminAuth.js";
 import { aiModels, type NewAiModel } from "../../schema/index.js";
 import { users } from "../../schema/users.js";
-import { syncAiModels } from "../../services/syncAiModels.js";
+import { syncAiModels, previewSyncAiModels } from "../../services/syncAiModels.js";
 import type { AppEnv } from "../../types/index.js";
 
 const SYNC_SECRET = process.env.SYNC_AI_MODELS_SECRET ?? "";
@@ -145,6 +145,28 @@ adminApp.patch("/models/bulk", async (c) => {
     return updated;
   });
   return c.json({ updated: updatedModels.length, models: updatedModels });
+});
+
+/** POST /api/ai/admin/sync-models/preview — 同期プレビュー（追加予定・無効化予定のモデルを返す） */
+adminApp.post("/sync-models/preview", async (c) => {
+  try {
+    const db = c.get("db");
+    const results = await previewSyncAiModels(db);
+    return c.json({ results });
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    console.error("[api] POST /api/ai/admin/sync-models/preview failed:", err.message);
+    const isDev = process.env.NODE_ENV !== "production";
+    return c.json(
+      {
+        error: "Preview failed",
+        code: "PREVIEW_ERROR",
+        message: isDev ? err.message : "An internal error occurred.",
+        ...(isDev && err.stack ? { detail: err.stack } : {}),
+      },
+      500,
+    );
+  }
 });
 
 app.route("/", adminApp);

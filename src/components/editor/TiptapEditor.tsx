@@ -1,38 +1,17 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React from "react";
 import { EditorContent } from "@tiptap/react";
-import { useLocation, useNavigate } from "react-router-dom";
-import type { Editor } from "@tiptap/core";
 import { cn } from "@/lib/utils";
-import type { WikiLinkSuggestionState } from "./extensions/wikiLinkSuggestionPlugin";
-import type { SlashSuggestionState } from "./extensions/slashSuggestionPlugin";
-import type { WikiLinkSuggestionHandle } from "./extensions/WikiLinkSuggestion";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
-import { useWikiLinkNavigation } from "./TiptapEditor/useWikiLinkNavigation";
 import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";
-import { getStorageProviderById } from "@/types/storage";
-import { useAuth } from "@/hooks/useAuth";
-import { useStorageSettings } from "@/hooks/useStorageSettings";
-import { isStorageConfiguredForUpload, getSettingsForUpload } from "@/lib/storage";
-import { useToast } from "@/hooks/use-toast";
 import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
-import {
-  SlashSuggestionLayer,
-  type SlashSuggestionHandle,
-} from "./TiptapEditor/SlashSuggestionLayer";
+import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
-import { useImageUploadManager } from "./TiptapEditor/useImageUploadManager";
-import { useStorageActions } from "./TiptapEditor/useStorageActions";
 import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
-import { extractFirstImage } from "@/lib/contentUtils";
-import { useGeneralSettings } from "@/hooks/useGeneralSettings";
-import { useEditorSetup } from "./TiptapEditor/useEditorSetup";
-import { useEditorLifecycle } from "./TiptapEditor/useEditorLifecycle";
-import { useSuggestionEffects } from "./TiptapEditor/useSuggestionEffects";
-import { useThumbnailCommit } from "./TiptapEditor/useThumbnailCommit";
+import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -55,139 +34,52 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   onInitialContentApplied,
   isWikiGenerating = false,
 }) => {
-  const { editorFontSizePx } = useGeneralSettings();
-  const editorContainerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<Editor | null>(null);
-  const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const location = useLocation();
-
   const {
-    handleLinkClick,
+    editor,
+    editorFontSizePx,
+    editorContainerRef,
+    fileInputRef,
+    isDraggingOver,
+    handleFileInputChange,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    suggestionState,
+    suggestionPos,
+    suggestionRef,
+    handleSuggestionSelect,
+    handleSuggestionClose,
+    slashState,
+    slashPos,
+    slashRef,
+    handleSlashClose,
+    mermaidDialogOpen,
+    setMermaidDialogOpen,
+    handleInsertMermaid,
     createPageDialogOpen,
     pendingCreatePageTitle,
     handleConfirmCreate,
     handleCancelCreate,
-  } = useWikiLinkNavigation();
-
-  const [suggestionState, setSuggestionState] = useState<WikiLinkSuggestionState | null>(null);
-  const [slashState, setSlashState] = useState<SlashSuggestionState | null>(null);
-  const suggestionRef = useRef<WikiLinkSuggestionHandle>(null);
-  const slashRef = useRef<SlashSuggestionHandle>(null);
-  const handleStateChange = useCallback((s: WikiLinkSuggestionState) => setSuggestionState(s), []);
-  const handleSlashStateChange = useCallback((s: SlashSuggestionState) => setSlashState(s), []);
-
-  const { getToken } = useAuth();
-  const { settings: storageSettings, isLoading: isStorageLoading } = useStorageSettings();
-  const isStorageConfigured = !isStorageLoading && isStorageConfiguredForUpload(storageSettings);
-  const currentStorageProvider = getStorageProviderById(
-    getSettingsForUpload(storageSettings).provider,
-  );
-  const [storageSetupDialogOpen, setStorageSetupDialogOpen] = useState(false);
-  const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
-  const hasThumbnail = useMemo(() => Boolean(extractFirstImage(content)), [content]);
-
-  const { getProviderLabel, handleCopyImageUrl, canDeleteFromStorage, handleDeleteFromStorage } =
-    useStorageActions({
-      storageSettings,
-      isStorageConfigured,
-      currentStorageProvider,
-      toast,
-      getToken,
-    });
-  const openStorageSetupDialog = useCallback(() => setStorageSetupDialogOpen(true), []);
-
-  const {
-    fileInputRef,
-    isDraggingOver,
-    handleFileInputChange,
-    handleInsertImageClick,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-    handleRetryUpload,
-    handleRemoveUpload,
-    handleImageUpload,
-  } = useImageUploadManager({
-    editorRef,
-    onChange,
-    isReadOnly,
-    isStorageConfigured,
-    isStorageLoading,
-    storageSettings,
-    toast,
-    onRequestStorageSetup: openStorageSetupDialog,
-    lastSelectionRef,
-  });
-
-  const { editor, handleInsertMermaid, isEditorInitializedRef } = useEditorSetup({
+    hasThumbnail,
+    handleInsertThumbnailImage,
+    storageSetupDialogOpen,
+    setStorageSetupDialogOpen,
+    handleGoToStorageSettings,
+  } = useTiptapEditorController({
     content,
     onChange,
     placeholder,
     autoFocus,
-    pageId: pageId ?? "",
+    pageId,
+    pageTitle,
     isReadOnly,
-    onContentError,
     collaborationConfig,
-    editorRef,
-    lastSelectionRef,
-    handleLinkClick,
-    handleStateChange,
-    handleSlashStateChange,
-    handleRetryUpload,
-    handleRemoveUpload,
-    getProviderLabel,
-    canDeleteFromStorage,
-    handleDeleteFromStorage,
-    handleCopyImageUrl,
-    suggestionState,
-    slashState,
-    suggestionRef,
-    slashRef,
-  });
-
-  const {
-    suggestionPos,
-    slashPos,
-    handleSuggestionSelect,
-    handleSuggestionClose,
-    handleSlashClose,
-  } = useSuggestionEffects({
-    editor,
-    suggestionState,
-    slashState,
-    editorContainerRef,
-    pageId: pageId ?? "",
-    handleInsertImageClick,
-  });
-
-  useEditorLifecycle({
-    editor,
-    content,
-    onChange,
     onContentError,
-    isReadOnly,
-    pageId: pageId ?? "",
-    isWikiGenerating,
-    collaborationConfig,
     focusContentRef,
     initialContent,
     onInitialContentApplied,
-    handleImageUpload,
-    isEditorInitializedRef,
+    isWikiGenerating,
   });
-
-  const { handleInsertThumbnailImage } = useThumbnailCommit({
-    editorRef,
-    pageTitle,
-    storageSettings,
-  });
-
-  const handleGoToStorageSettings = useCallback(() => {
-    const returnTo = `${location.pathname}${location.search}`;
-    navigate(`/settings/storage?${new URLSearchParams({ returnTo }).toString()}`);
-  }, [navigate, location.pathname, location.search]);
 
   return (
     <div

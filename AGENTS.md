@@ -31,6 +31,12 @@ bun run test:run       # Vitest 単体テスト
 - 既存のディレクトリ構成・命名規則に合わせる。
 - Conventional Commits 形式でコミット（`feat:`, `fix:`, `docs:` 等）。
 
+## ブランチ・PR の命名規則
+
+- **ブランチ**: `feature/説明`、`fix/説明`、`hotfix/説明`、`chore/説明` など（例: `feature/ai-models-ui`, `fix/search-crash`, `hotfix/security-patch`）。Issue 番号から作る場合は `feature/123` のようにする。詳細は [branch-strategy.md](docs/guides/branch-strategy.md) を参照。
+- **PR タイトル**: コミットメッセージに合わせる。単一トピックの PR は代表的なコミットをそのまま使う。Conventional Commits 形式（例: `feat(admin): AIモデル管理UI拡張 (#218)`）。変更内容を正しく表すタイトルにし、「Config argument parsing」のように無関係な文言にしない。
+- **Cursor Cloud Agent で PR を作る場合**: リポジトリのルール（本ファイルや `.cursor/rules/`）はエージェントが参照する場合があるが、Cloud Agent 起動時に「PR を作成するときはタイトルを Conventional Commits 形式にし、変更内容を表す文言にすること」とプロンプトに含めると確実。API で起動する場合は `target.branchName` でブランチ名を指定できる（[Cloud Agents API](https://cursor.com/docs/background-agent/api/overview)）。PR タイトルを直接指定する API パラメータは 2026 年現在ないため、プロンプトで指示するか、作成後に手動で修正する。
+
 ## PR レビュー観点
 
 - セキュリティ・パフォーマンスへの影響。
@@ -65,7 +71,8 @@ gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ### 3. 再レビュー依頼
 
 ```bash
-gh pr comment {number} --body "@claude /review
+gh pr comment {number} --body "レビューコメントへの対応をコミットしました。最新の変更に対する再レビューをお願いします。
+
 @coderabbitai review
 @copilot 再レビューをお願いします。"
 ```
@@ -80,6 +87,10 @@ server/hocuspocus/ # リアルタイムサーバー
 terraform/        # インフラ定義
 docs/             # ドキュメント
 ```
+
+## マージ方法
+
+- **main → develop** の同期 PR は必ず **Create a merge commit** でマージする（Squash だと develop → main の PR でコンフリクトが再発する）。詳細は [docs/guides/branch-strategy.md](docs/guides/branch-strategy.md#マージ方法のルール) を参照。
 
 ## その他
 

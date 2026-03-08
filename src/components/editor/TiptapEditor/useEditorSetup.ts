@@ -19,14 +19,14 @@ interface UseEditorSetupOptions {
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
   editorRef: React.MutableRefObject<Editor | null>;
   lastSelectionRef: React.MutableRefObject<{ from: number; to: number } | null>;
-  handleLinkClick: (title: string, exists: boolean) => void;
+  handleLinkClick: (title: string) => void;
   handleStateChange: (state: WikiLinkSuggestionState) => void;
   handleSlashStateChange: (state: SlashSuggestionState) => void;
   handleRetryUpload: (nodeId: string) => void;
   handleRemoveUpload: (nodeId: string) => void;
-  getProviderLabel: () => string;
-  canDeleteFromStorage: (src: string) => boolean;
-  handleDeleteFromStorage: (src: string) => Promise<void>;
+  getProviderLabel: (providerId?: string | null) => string;
+  canDeleteFromStorage: (providerId?: string | null) => boolean;
+  handleDeleteFromStorage: (url: string, providerId?: string | null) => Promise<void>;
   handleCopyImageUrl: (src: string) => void;
   suggestionState: WikiLinkSuggestionState | null;
   slashState: SlashSuggestionState | null;
