@@ -138,7 +138,10 @@ export function parseInlineContent(text: string): TiptapTextNode[] {
           ],
         });
       } else {
-        content.push({ type: "text", text: item.text });
+        content.push({
+          type: "text",
+          text: text.slice(item.index, item.index + item.length),
+        });
       }
     } else if (item.type === "bold") {
       content.push({
