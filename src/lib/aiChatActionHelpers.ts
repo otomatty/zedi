@@ -26,9 +26,10 @@ function parseTiptapDoc(content: string): TiptapDoc | null {
   try {
     const parsed = JSON.parse(content) as Partial<TiptapDoc>;
     if (parsed.type !== "doc") return null;
+    if (!Array.isArray(parsed.content)) return null;
     return {
       type: "doc",
-      content: Array.isArray(parsed.content) ? parsed.content : [],
+      content: parsed.content,
     };
   } catch {
     return null;

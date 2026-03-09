@@ -18,6 +18,10 @@ export default function Users() {
   const isMountedRef = useRef(true);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRequestRef = useRef(0);
+  const pageRef = useRef(page);
+  const searchRef = useRef(search);
+  pageRef.current = page;
+  searchRef.current = search;
 
   const load = useCallback(
     async (showLoading = true) => {
@@ -26,9 +30,9 @@ export default function Users() {
       if (isMountedRef.current) setError(null);
       try {
         const result = await getUsers({
-          search: search || undefined,
+          search: searchRef.current || undefined,
           limit: PAGE_SIZE,
-          offset: page * PAGE_SIZE,
+          offset: pageRef.current * PAGE_SIZE,
         });
         if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setUsers(result.users);

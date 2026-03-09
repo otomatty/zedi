@@ -30,6 +30,8 @@ describe("wikiGeneratorPrompt", () => {
   it("WIKI_GENERATOR_PROMPT_NO_SEARCH differs from base prompt so non-search models get correct instructions", () => {
     expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).not.toBe(WIKI_GENERATOR_PROMPT);
     expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).not.toEqual(WIKI_GENERATOR_PROMPT);
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).toContain("### 4. 参考情報の扱い");
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).not.toContain("### 4. 出典・参照元");
   });
 });
 
@@ -113,10 +115,11 @@ describe("generateWikiContentStream", () => {
     expect(callAIService).toHaveBeenCalled();
     expect(onChunk).toHaveBeenCalledWith("Hello ");
     expect(onChunk).toHaveBeenCalledWith("[[World]].");
+    // response.content が明示的に "" のときは fullContent にフォールバックせず "" を渡す（?? の挙動）
     expect(onComplete).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: "Hello [[World]].",
-        wikiLinks: ["World"],
+        content: "",
+        wikiLinks: [],
       }),
     );
   });
