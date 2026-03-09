@@ -4,13 +4,17 @@
     "close": "閉じる",
     "newConversation": "新規会話",
     "conversationList": "会話一覧",
+    "cancel": "キャンセル",
+    "resend": "再送信",
     "send": "送信",
     "stop": "停止",
     "createPage": "作成する",
     "editAndCreate": "編集してから作成",
     "appendToPage": "追記する",
     "createMultiple": "まとめて作成",
-    "addLink": "リンクを追加"
+    "addLink": "リンクを追加",
+    "copyCode": "コードをコピー",
+    "copiedCode": "コピーしました"
   },
   "placeholders": {
     "default": "メッセージを入力...",
@@ -38,8 +42,16 @@
   "suggestions": {
     "createPage": "📄 「{{title}}」として新しいページを作成",
     "createMultiplePages": "📄 生成候補:",
-    "appendToPage": "📄 「{{title}}」として独立ページ化",
+    "appendToPage": "📄 「{{title}}」に追記",
     "suggestWikiLinks": "🔗 元ページに [[{{title}}]] リンクを追加"
+  },
+  "notifications": {
+    "pageContextRequired": "ページを開いた状態で実行してください",
+    "appendUnavailable": "現在開いているページへの追記のみ対応しています",
+    "appendSuccess": "「{{title}}」に追記しました",
+    "wikiLinksAdded": "{{count}}件のWikiLinkを追加しました",
+    "noNewWikiLinks": "追加できる新しいWikiLinkはありません",
+    "actionFailed": "アクションの実行に失敗しました"
   },
   "empty": {
     "messages": "メッセージ一覧がここに表示されます",

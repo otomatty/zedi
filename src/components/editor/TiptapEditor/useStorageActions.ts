@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { getStorageProvider, getSettingsForUpload } from "@/lib/storage";
 import {
   getStorageProviderById,

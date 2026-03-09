@@ -1,6 +1,6 @@
 import React from "react";
 import { EditorContent } from "@tiptap/react";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";

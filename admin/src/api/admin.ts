@@ -6,6 +6,16 @@ export interface AdminMe {
   role: "admin";
 }
 
+export type UserRole = "user" | "admin";
+
+export interface UserAdmin {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  createdAt: string;
+}
+
 export interface AiModelAdmin {
   id: string;
   provider: string;
@@ -128,4 +138,37 @@ export async function syncAiModels(): Promise<SyncResultItem[]> {
   }
   const data = await res.json();
   return data.results ?? [];
+}
+
+export interface GetUsersParams {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getUsers(params?: GetUsersParams): Promise<{
+  users: UserAdmin[];
+  total: number;
+}> {
+  const sp = new URLSearchParams();
+  if (params?.search) sp.set("search", params.search);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.offset != null) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  const res = await adminFetch(`/api/admin/users${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch users"));
+  }
+  return res.json();
+}
+
+export async function patchUserRole(id: string, role: UserRole): Promise<{ user: UserAdmin }> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to update user role"));
+  }
+  return res.json();
 }

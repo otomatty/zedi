@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Copy, ExternalLink, MoreHorizontal, RefreshCcw, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@zedi/ui";
+import { Badge } from "@zedi/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@zedi/ui";
 import type { StorageImageOptions } from "./extensions/StorageImageExtension";
 
 function ImageNodeErrorState({

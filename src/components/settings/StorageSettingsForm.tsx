@@ -10,27 +10,14 @@ import {
   Trash2,
   Image,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@zedi/ui";
+import { Input } from "@zedi/ui";
+import { Label } from "@zedi/ui";
+import { Badge } from "@zedi/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
+import { Switch } from "@zedi/ui";
+import { Alert, AlertDescription, AlertTitle } from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@zedi/ui";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
 import {
   EXTERNAL_STORAGE_PROVIDERS,
@@ -50,8 +37,8 @@ import {
   STORAGE_PROVIDERS,
 } from "@/types/storage";
 import type { StorageSettings } from "@/types/storage";
-import { useToast } from "@/hooks/use-toast";
-import { toast as sonnerToast } from "@/components/ui/sonner";
+import { useToast } from "@zedi/ui";
+import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { useTranslation } from "react-i18next";
 

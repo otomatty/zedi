@@ -9,6 +9,7 @@ export default {
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
+    "./packages/ui/src/**/*.{ts,tsx}",
   ],
   prefix: "",
   theme: {
@@ -62,6 +63,16 @@ export default {
         "ghost-link": "hsl(var(--link-ghost))",
         "surface-elevated": "hsl(var(--surface-elevated))",
         "text-subtle": "hsl(var(--text-subtle))",
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 import type { MatchType } from "@/lib/searchUtils";
 
 interface MatchTypeBadgeProps {

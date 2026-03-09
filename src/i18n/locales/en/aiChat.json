@@ -4,13 +4,17 @@
     "close": "Close",
     "newConversation": "New Conversation",
     "conversationList": "Conversations",
+    "cancel": "Cancel",
+    "resend": "Resend",
     "send": "Send",
     "stop": "Stop",
     "createPage": "Create",
     "editAndCreate": "Edit & Create",
     "appendToPage": "Append",
     "createMultiple": "Create All",
-    "addLink": "Add Link"
+    "addLink": "Add Link",
+    "copyCode": "Copy code",
+    "copiedCode": "Copied"
   },
   "placeholders": {
     "default": "Type a message...",
@@ -38,8 +42,16 @@
   "suggestions": {
     "createPage": "📄 Create new page \"{{title}}\"",
     "createMultiplePages": "📄 Generation candidates:",
-    "appendToPage": "📄 Extract as independent page \"{{title}}\"",
+    "appendToPage": "📄 Append to \"{{title}}\"",
     "suggestWikiLinks": "🔗 Add [[{{title}}]] link to original page"
+  },
+  "notifications": {
+    "pageContextRequired": "Open a page before running this action",
+    "appendUnavailable": "Only appending to the currently open page is supported",
+    "appendSuccess": "Appended to \"{{title}}\"",
+    "wikiLinksAdded": "Added {{count}} wiki links",
+    "noNewWikiLinks": "There are no new wiki links to add",
+    "actionFailed": "Failed to execute the action"
   },
   "empty": {
     "messages": "Messages will appear here",

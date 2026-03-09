@@ -1,7 +1,7 @@
 import React from "react";
 import { AlertTriangle, ExternalLink, AlertCircle, Loader2, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@zedi/ui";
+import { Alert, AlertDescription } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import type { Page } from "@/types/page";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";

@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { signIn } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 
 const SignIn: React.FC = () => {
   const { t } = useTranslation();

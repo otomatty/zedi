@@ -2,13 +2,8 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button } from "@zedi/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@zedi/ui";
 import { addMonths, subMonths } from "date-fns";
 import { formatMonthYear } from "@/lib/dateUtils";
 import { getAvailableMonthsFromPages } from "@/lib/dateUtils";

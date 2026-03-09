@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePage, useUpdatePage } from "@/hooks/usePageQueries";
 import { useTitleValidation } from "@/hooks/useTitleValidation";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { usePageEditorState } from "./usePageEditorState";

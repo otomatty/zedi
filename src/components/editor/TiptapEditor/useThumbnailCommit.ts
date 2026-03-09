@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { Editor } from "@tiptap/core";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@zedi/ui";
 import { getStorageProvider, getSettingsForUpload, convertToWebP } from "@/lib/storage";
 import type { StorageSettings } from "@/types/storage";
 

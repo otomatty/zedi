@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import { GeneralSettingsForm } from "@/components/settings/GeneralSettingsForm";
 import Container from "@/components/layout/Container";
 import { useTranslation } from "react-i18next";

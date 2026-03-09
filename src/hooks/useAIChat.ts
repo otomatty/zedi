@@ -1,18 +1,22 @@
 import { useState, useCallback, useRef } from "react";
 import { ChatMessage, PageContext, ReferencedPage } from "../types/aiChat";
+import type { PageSummary } from "@/types/page";
 import { useAIChatStore } from "../stores/aiChatStore";
+import { resolveReferencedPagesFromContent } from "@/lib/aiChatActionHelpers";
 import { executeSendMessage } from "./useAIChatExecute";
 
 interface UseAIChatOptions {
   pageContext: PageContext | null;
   contextEnabled: boolean;
   existingPageTitles?: string[];
+  availablePages?: Pick<PageSummary, "id" | "title" | "isDeleted">[];
 }
 
 export function useAIChat({
   pageContext,
   contextEnabled,
   existingPageTitles = [],
+  availablePages,
 }: UseAIChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -21,12 +25,18 @@ export function useAIChat({
   const streamingContentRef = useRef<string>("");
 
   const sendMessage = useCallback(
-    async (content: string, messageRefs: ReferencedPage[] = []) => {
+    async (
+      content: string,
+      messageRefs: ReferencedPage[] = [],
+      options?: { initialMessages?: ChatMessage[] },
+    ) => {
+      const baseMessages = options?.initialMessages ?? messages;
       try {
         await executeSendMessage({
           content,
           messageRefs,
-          currentMessages: messages,
+          currentMessages: baseMessages,
+          initialMessages: options?.initialMessages,
           pageContext,
           contextEnabled,
           existingPageTitles,
@@ -72,6 +82,23 @@ export function useAIChat({
     }
   }, [messages, sendMessage]);
 
+  /** 指定したユーザーメッセージを編集して再送信。そのメッセージ以降を破棄し、新内容でAI応答を生成する */
+  const editAndResend = useCallback(
+    async (messageId: string, newContent: string) => {
+      const index = messages.findIndex((m) => m.id === messageId);
+      if (index < 0) return;
+      const message = messages[index];
+      if (message.role !== "user") return;
+      const refs =
+        availablePages == null
+          ? (message.referencedPages ?? [])
+          : resolveReferencedPagesFromContent(newContent, availablePages);
+      const truncated = messages.slice(0, index);
+      await sendMessage(newContent, refs, { initialMessages: truncated });
+    },
+    [availablePages, messages, sendMessage],
+  );
+
   return {
     messages,
     error,
@@ -81,5 +108,6 @@ export function useAIChat({
     clearMessages,
     loadMessages,
     retryLastMessage,
+    editAndResend,
   };
 }

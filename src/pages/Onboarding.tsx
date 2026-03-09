@@ -2,17 +2,11 @@ import React, { useRef, useCallback, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@zedi/ui";
+import { Input } from "@zedi/ui";
+import { Label } from "@zedi/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useProfile } from "@/hooks/useProfile";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";

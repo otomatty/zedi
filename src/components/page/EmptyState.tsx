@@ -1,6 +1,6 @@
 import React from "react";
 import { Sparkles, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import { useCreateNewPage } from "@/hooks/useCreateNewPage";
 
 const EmptyState: React.FC = () => {

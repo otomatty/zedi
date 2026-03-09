@@ -5,10 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@zedi/ui";
 import { hasNeverSynced } from "@/lib/sync";
 import { isTimestampInMonth } from "@/lib/dateUtils";
-import { Button } from "@/components/ui/button";
+import { Button } from "@zedi/ui";
 import type { PageSummary } from "@/types/page";
 
 function parseMonthParam(search: string): string | null {

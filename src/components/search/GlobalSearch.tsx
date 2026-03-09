@@ -6,7 +6,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@zedi/ui";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
 import { MatchTypeBadge } from "./MatchTypeBadge";

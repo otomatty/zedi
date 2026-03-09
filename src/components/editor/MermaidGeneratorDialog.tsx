@@ -7,10 +7,10 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+} from "@zedi/ui";
+import { Button } from "@zedi/ui";
+import { Checkbox } from "@zedi/ui";
+import { Label } from "@zedi/ui";
 import { Loader2, Settings, AlertCircle } from "lucide-react";
 import { useMermaidGenerator } from "@/hooks/useMermaidGenerator";
 import { DIAGRAM_TYPES, MermaidDiagramType } from "@/lib/mermaidGenerator";

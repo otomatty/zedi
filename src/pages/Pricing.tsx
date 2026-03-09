@@ -2,19 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Check, Sparkles, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@zedi/ui";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
+import { Badge } from "@zedi/ui";
+import { Progress } from "@zedi/ui";
 import Container from "@/components/layout/Container";
-import { cn } from "@/lib/utils";
+import { cn } from "@zedi/ui";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { openProCheckout, type BillingInterval } from "@/lib/subscriptionService";

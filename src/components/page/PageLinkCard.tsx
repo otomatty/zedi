@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@zedi/ui";
 import { FileText, Link as LinkIcon } from "lucide-react";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import type { PageCard } from "@/hooks/useLinkedPages";

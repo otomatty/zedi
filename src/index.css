@@ -44,6 +44,15 @@
 
     --radius: 0.75rem;
 
+    --sidebar-background: 220 20% 8%;
+    --sidebar-foreground: 210 40% 91%;
+    --sidebar-primary: 175 60% 50%;
+    --sidebar-primary-foreground: 220 20% 8%;
+    --sidebar-accent: 220 15% 16%;
+    --sidebar-accent-foreground: 45 10% 92%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 175 60% 50%;
+
     /* Custom Zedi tokens */
     --glow-primary: 175 60% 50%;
     --surface-elevated: 220 18% 14%;
@@ -92,6 +101,15 @@
     --link-color: 175 60% 40%;
     --link-referenced: 200 65% 50%;
     --link-ghost: 35 70% 50%;
+
+    --sidebar-background: 45 15% 97%;
+    --sidebar-foreground: 220 25% 12%;
+    --sidebar-primary: 175 65% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 94%;
+    --sidebar-accent-foreground: 220 25% 25%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 175 65% 40%;
 
     --shadow-subtle: 0 2px 8px -2px hsl(220 20% 10% / 0.08);
     --shadow-elevated: 0 8px 24px -4px hsl(220 20% 10% / 0.12);

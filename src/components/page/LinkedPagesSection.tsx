@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Link2, FilePlus } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@zedi/ui";
 import { LinkSection } from "./LinkSection";
 import { LinkGroupRow } from "./LinkGroupRow";
 import { GhostLinkCard } from "./GhostLinkCard";
