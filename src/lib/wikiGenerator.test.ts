@@ -4,6 +4,10 @@ import {
   getAISettingsOrThrow,
   generateWikiContentStream,
 } from "@/lib/wikiGenerator";
+import {
+  WIKI_GENERATOR_PROMPT,
+  WIKI_GENERATOR_PROMPT_NO_SEARCH,
+} from "./wikiGenerator/wikiGeneratorPrompt";
 
 vi.mock("./aiSettings", () => ({
   loadAISettings: vi.fn(),
@@ -15,6 +19,25 @@ vi.mock("./aiService", () => ({
 
 import { loadAISettings } from "./aiSettings";
 import { callAIService } from "./aiService";
+import type { AISettings } from "@/types/ai";
+
+const baseSettings: AISettings = {
+  provider: "openai",
+  apiKey: "",
+  apiMode: "api_server",
+  model: "gpt-4",
+  modelId: "openai:gpt-4",
+  isConfigured: true,
+};
+
+describe("wikiGeneratorPrompt", () => {
+  it("WIKI_GENERATOR_PROMPT_NO_SEARCH differs from base prompt so non-search models get correct instructions", () => {
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).not.toBe(WIKI_GENERATOR_PROMPT);
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).not.toEqual(WIKI_GENERATOR_PROMPT);
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).toContain("### 4. 参考情報の扱い");
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).not.toContain("### 4. 出典・参照元");
+  });
+});
 
 describe("extractWikiLinks", () => {
   it("returns unique wiki link titles from content", () => {
@@ -48,23 +71,20 @@ describe("getAISettingsOrThrow", () => {
 
   it("returns settings with isConfigured when api_server mode", async () => {
     vi.mocked(loadAISettings).mockResolvedValue({
-      provider: "openai",
-      model: "gpt-4",
-      apiMode: "api_server",
+      ...baseSettings,
       isConfigured: false,
-    } as never);
+    });
     const result = await getAISettingsOrThrow();
     expect(result.isConfigured).toBe(true);
   });
 
   it("throws AI_NOT_CONFIGURED when user_api_key mode and no apiKey", async () => {
     vi.mocked(loadAISettings).mockResolvedValue({
-      provider: "openai",
-      model: "gpt-4",
+      ...baseSettings,
       apiMode: "user_api_key",
       apiKey: "",
       isConfigured: false,
-    } as never);
+    });
     await expect(getAISettingsOrThrow()).rejects.toThrow("AI_NOT_CONFIGURED");
   });
 });
@@ -76,17 +96,13 @@ describe("generateWikiContentStream", () => {
 
   it("uses callAIService in api_server mode and calls onComplete with extracted wiki links", async () => {
     vi.mocked(loadAISettings).mockResolvedValue({
-      provider: "openai",
-      model: "gpt-4",
-      apiMode: "api_server",
-      apiKey: "",
-      isConfigured: true,
-    } as never);
+      ...baseSettings,
+    });
 
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
       handlers.onChunk("Hello ");
       handlers.onChunk("[[World]].");
-      handlers.onComplete();
+      handlers.onComplete?.({ content: "" });
       return Promise.resolve();
     });
 
@@ -99,10 +115,11 @@ describe("generateWikiContentStream", () => {
     expect(callAIService).toHaveBeenCalled();
     expect(onChunk).toHaveBeenCalledWith("Hello ");
     expect(onChunk).toHaveBeenCalledWith("[[World]].");
+    // response.content が明示的に "" のときは fullContent にフォールバックせず "" を渡す（?? の挙動）
     expect(onComplete).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: "Hello [[World]].",
-        wikiLinks: ["World"],
+        content: "",
+        wikiLinks: [],
       }),
     );
   });

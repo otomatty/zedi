@@ -2,14 +2,16 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AIChatPanel } from "./AIChatPanel";
 
+const mockUseAIChatStore = vi.fn(() => ({
+  isOpen: true,
+  activeConversationId: null,
+  setActiveConversation: vi.fn(),
+  contextEnabled: false,
+  showConversationList: false,
+}));
+
 vi.mock("../../stores/aiChatStore", () => ({
-  useAIChatStore: () => ({
-    isOpen: true,
-    activeConversationId: null,
-    setActiveConversation: vi.fn(),
-    contextEnabled: false,
-    showConversationList: false,
-  }),
+  useAIChatStore: () => mockUseAIChatStore(),
 }));
 
 vi.mock("../../contexts/AIChatContext", () => ({
@@ -74,5 +76,19 @@ describe("AIChatPanel", () => {
     expect(screen.getByTestId("ai-chat-context-bar")).toBeInTheDocument();
     expect(screen.getByTestId("ai-chat-messages")).toBeInTheDocument();
     expect(screen.getByTestId("ai-chat-input")).toBeInTheDocument();
+  });
+
+  it("returns null when closed", () => {
+    mockUseAIChatStore.mockReturnValueOnce({
+      isOpen: false,
+      activeConversationId: null,
+      setActiveConversation: vi.fn(),
+      contextEnabled: false,
+      showConversationList: false,
+    });
+
+    const { container } = render(<AIChatPanel />);
+
+    expect(container.firstChild).toBeNull();
   });
 });

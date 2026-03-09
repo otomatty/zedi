@@ -127,4 +127,33 @@ describe("useAIChat", () => {
 
     expect(mockExecuteSendMessage).not.toHaveBeenCalled();
   });
+
+  it("preserves existing referenced pages when availablePages is not provided", async () => {
+    const { result } = renderHook(() =>
+      useAIChat({
+        pageContext: null,
+        contextEnabled: false,
+        existingPageTitles: [],
+      }),
+    );
+
+    act(() => {
+      result.current.loadMessages([
+        {
+          id: "u1",
+          role: "user",
+          content: "Old content",
+          referencedPages: [{ id: "p-existing", title: "Existing Page" }],
+          timestamp: 0,
+        },
+      ]);
+    });
+
+    await act(async () => {
+      await result.current.editAndResend("u1", "Updated content");
+    });
+
+    const [params] = mockExecuteSendMessage.mock.calls[0];
+    expect(params.messageRefs).toEqual([{ id: "p-existing", title: "Existing Page" }]);
+  });
 });

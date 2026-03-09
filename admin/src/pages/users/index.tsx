@@ -18,6 +18,10 @@ export default function Users() {
   const isMountedRef = useRef(true);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRequestRef = useRef(0);
+  const pageRef = useRef(page);
+  const searchRef = useRef(search);
+  pageRef.current = page;
+  searchRef.current = search;
 
   const load = useCallback(
     async (showLoading = true) => {
@@ -26,9 +30,9 @@ export default function Users() {
       if (isMountedRef.current) setError(null);
       try {
         const result = await getUsers({
-          search: search || undefined,
+          search: searchRef.current || undefined,
           limit: PAGE_SIZE,
-          offset: page * PAGE_SIZE,
+          offset: pageRef.current * PAGE_SIZE,
         });
         if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setUsers(result.users);
@@ -67,27 +71,31 @@ export default function Users() {
     };
   }, [searchInput]);
 
-  const handleRoleChange = useCallback(async (user: UserAdmin, role: UserRole) => {
-    if (user.role === role) return;
-    setSavingIds((prev) => new Set(prev).add(user.id));
-    setError(null);
-    try {
-      const { user: updated } = await patchUserRole(user.id, role);
-      if (!isMountedRef.current) return;
-      setUsers((prev) => prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u)));
-    } catch (e) {
-      if (!isMountedRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (isMountedRef.current) {
-        setSavingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(user.id);
-          return next;
-        });
+  const handleRoleChange = useCallback(
+    async (user: UserAdmin, role: UserRole) => {
+      if (user.role === role) return;
+      setSavingIds((prev) => new Set(prev).add(user.id));
+      setError(null);
+      try {
+        await patchUserRole(user.id, role);
+        if (!isMountedRef.current) return;
+        latestRequestRef.current += 1;
+        await load(false);
+      } catch (e) {
+        if (!isMountedRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (isMountedRef.current) {
+          setSavingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(user.id);
+            return next;
+          });
+        }
       }
-    }
-  }, []);
+    },
+    [load],
+  );
 
   return (
     <UsersContent

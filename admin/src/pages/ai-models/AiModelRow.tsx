@@ -64,7 +64,7 @@ export function AiModelRow({
           onChange={(e) => onDisplayNameChange(e.target.value)}
           onBlur={(e) => onDisplayNameBlur(e.target.value.trim())}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.currentTarget.blur();
             }
           }}

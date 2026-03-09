@@ -26,9 +26,10 @@ function parseTiptapDoc(content: string): TiptapDoc | null {
   try {
     const parsed = JSON.parse(content) as Partial<TiptapDoc>;
     if (parsed.type !== "doc") return null;
+    if (!Array.isArray(parsed.content)) return null;
     return {
       type: "doc",
-      content: Array.isArray(parsed.content) ? parsed.content : [],
+      content: parsed.content,
     };
   } catch {
     return null;
@@ -39,19 +40,16 @@ export function appendTiptapContent(existingContent: string, appendedContent: st
   const existingDoc = parseTiptapDoc(existingContent);
   const appendedDoc = parseTiptapDoc(appendedContent);
 
-  if (!existingDoc && !appendedDoc) {
-    return convertMarkdownToTiptapContent("");
+  if (!existingDoc) {
+    throw new Error("Invalid existing Tiptap document");
   }
-  if (!existingDoc && appendedDoc) {
-    return JSON.stringify(appendedDoc);
-  }
-  if (existingDoc && !appendedDoc) {
-    return JSON.stringify(existingDoc);
+  if (!appendedDoc) {
+    throw new Error("Invalid appended Tiptap document");
   }
 
   return JSON.stringify({
     type: "doc",
-    content: [...(existingDoc?.content ?? []), ...(appendedDoc?.content ?? [])],
+    content: [...existingDoc.content, ...appendedDoc.content],
   } satisfies TiptapDoc);
 }
 

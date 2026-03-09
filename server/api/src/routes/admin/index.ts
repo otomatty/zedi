@@ -78,7 +78,12 @@ app.get("/users", async (c) => {
 app.patch("/users/:id", async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
-  const body = await c.req.json<{ role?: string }>();
+  let body: { role?: string };
+  try {
+    body = await c.req.json<{ role?: string }>();
+  } catch {
+    return c.json({ error: "invalid JSON body" }, 400);
+  }
 
   if (body.role !== undefined) {
     if (body.role !== "user" && body.role !== "admin") {
@@ -103,7 +108,13 @@ app.patch("/users/:id", async (c) => {
       updatedAt: new Date(),
     })
     .where(eq(users.id, id))
-    .returning({ id: users.id, name: users.name, email: users.email, role: users.role });
+    .returning({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+    });
 
   if (!updated) {
     return c.json({ error: "User not found" }, 404);

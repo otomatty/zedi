@@ -16,6 +16,10 @@ describe("sanitizeLinkUrl", () => {
     expect(sanitizeLinkUrl("javascript:alert(1)")).toBeNull();
   });
 
+  it("rejects mixed-case javascript with surrounding whitespace", () => {
+    expect(sanitizeLinkUrl("  JaVaScRiPt:alert(1)")).toBeNull();
+  });
+
   it("rejects data:", () => {
     expect(sanitizeLinkUrl("data:text/html,<script>alert(1)</script>")).toBeNull();
   });
@@ -91,5 +95,48 @@ describe("parseInlineContent", () => {
     const result = parseInlineContent("[Bad](javascript:alert(1))");
     const linkNode = result.find((n) => n.marks?.some((m) => m.type === "link"));
     expect(linkNode).toBeUndefined();
+  });
+
+  it("preserves nested parentheses in markdown links", () => {
+    const result = parseInlineContent("[Link](https://example.com/docs_(v2))");
+    const linkNode = result.find((n) => n.marks?.some((m) => m.type === "link"));
+    expect(linkNode?.marks?.[0]).toMatchObject({
+      type: "link",
+      attrs: expect.objectContaining({
+        href: "https://example.com/docs_(v2)",
+      }),
+    });
+  });
+
+  it("supports nested formatting inside links", () => {
+    const result = parseInlineContent("[**Bold**](https://example.com)");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "text",
+      text: "Bold",
+      marks: [
+        { type: "bold" },
+        {
+          type: "link",
+          attrs: expect.objectContaining({ href: "https://example.com" }),
+        },
+      ],
+    });
+  });
+
+  it("supports links nested inside bold text", () => {
+    const result = parseInlineContent("**[Link](https://example.com)**");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "text",
+      text: "Link",
+      marks: [
+        {
+          type: "link",
+          attrs: expect.objectContaining({ href: "https://example.com" }),
+        },
+        { type: "bold" },
+      ],
+    });
   });
 });

@@ -77,10 +77,11 @@ export async function generateWikiContentStream(
             fullContent += chunk;
             callbacks.onChunk(chunk);
           },
-          onComplete: () => {
+          onComplete: (response) => {
+            const content = response.content ?? fullContent;
             callbacks.onComplete({
-              content: fullContent,
-              wikiLinks: extractWikiLinks(fullContent),
+              content,
+              wikiLinks: extractWikiLinks(content),
             });
           },
           onError: (error) => callbacks.onError(error),
