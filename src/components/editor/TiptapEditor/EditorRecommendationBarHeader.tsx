@@ -1,0 +1,55 @@
+import React from "react";
+import { ChevronLeft, Sparkles, X } from "lucide-react";
+import { Button } from "@zedi/ui";
+import type { RecommendationMode } from "./EditorRecommendationBarTypes";
+
+interface EditorRecommendationBarHeaderProps {
+  headerLabel: string;
+  mode: RecommendationMode;
+  nextCursor: string | null;
+  isLoading: boolean;
+  onNextPage: () => void;
+  onBackToActions: () => void;
+  onDismiss: () => void;
+}
+
+export const EditorRecommendationBarHeader: React.FC<EditorRecommendationBarHeaderProps> = ({
+  headerLabel,
+  mode,
+  nextCursor,
+  isLoading,
+  onNextPage,
+  onBackToActions,
+  onDismiss,
+}) => (
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Sparkles className="h-4 w-4" />
+      <span>{headerLabel}</span>
+    </div>
+    <div className="flex items-center gap-2">
+      {mode === "thumbnails" && (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onNextPage}
+            disabled={!nextCursor || isLoading}
+          >
+            次へ
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onBackToActions}>
+            <ChevronLeft className="mr-1 h-4 w-4" />
+            戻る
+          </Button>
+        </>
+      )}
+      {(mode === "actions" || mode === "thumbnails") && (
+        <Button type="button" size="sm" variant="ghost" onClick={onDismiss} aria-label="閉じる">
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  </div>
+);
