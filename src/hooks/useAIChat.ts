@@ -89,10 +89,9 @@ export function useAIChat({
       if (index < 0) return;
       const message = messages[index];
       if (message.role !== "user") return;
-      const refs =
-        availablePages != null && availablePages.length > 0
-          ? resolveReferencedPagesFromContent(newContent, availablePages)
-          : (message.referencedPages ?? []);
+      const refs = availablePages?.length
+        ? resolveReferencedPagesFromContent(newContent, availablePages)
+        : (message.referencedPages ?? []);
       const truncated = messages.slice(0, index);
       await sendMessage(newContent, refs, { initialMessages: truncated });
     },
