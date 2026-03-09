@@ -25,8 +25,8 @@ export function CodeBlockWithCopy({ children }: { children?: ReactNode }) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setCopied(true);
       timeoutRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("Failed to copy code to clipboard:", err);
     }
   };
 
@@ -37,7 +37,7 @@ export function CodeBlockWithCopy({ children }: { children?: ReactNode }) {
         type="button"
         onClick={handleCopy}
         aria-label={copied ? t("aiChat.actions.copiedCode") : t("aiChat.actions.copyCode")}
-        className="absolute right-2 top-2 rounded border border-border/60 bg-muted/90 px-2 py-1 text-[11px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 group-hover/code:opacity-100"
+        className="absolute right-2 top-2 rounded border border-border/60 bg-muted/90 px-2 py-1 text-[11px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted group-hover/code:opacity-100"
       >
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
       </button>

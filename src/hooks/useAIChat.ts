@@ -16,7 +16,7 @@ export function useAIChat({
   pageContext,
   contextEnabled,
   existingPageTitles = [],
-  availablePages = [],
+  availablePages,
 }: UseAIChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +89,10 @@ export function useAIChat({
       if (index < 0) return;
       const message = messages[index];
       if (message.role !== "user") return;
-      const refs = resolveReferencedPagesFromContent(newContent, availablePages);
+      const refs =
+        availablePages != null && availablePages.length > 0
+          ? resolveReferencedPagesFromContent(newContent, availablePages)
+          : (message.referencedPages ?? []);
       const truncated = messages.slice(0, index);
       await sendMessage(newContent, refs, { initialMessages: truncated });
     },

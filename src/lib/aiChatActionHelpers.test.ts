@@ -69,6 +69,12 @@ describe("appendMarkdownToTiptapContent", () => {
       ],
     });
   });
+
+  it("throws when existing content is invalid JSON", () => {
+    expect(() => appendMarkdownToTiptapContent("{invalid", "Append")).toThrow(
+      "Invalid existing Tiptap document",
+    );
+  });
 });
 
 describe("getMissingSuggestedWikiLinkTitles", () => {
@@ -112,7 +118,7 @@ describe("convertMarkdownToTiptapContent (URL sanitization)", () => {
     };
     expect(paragraph.content?.[0]).toMatchObject({
       type: "text",
-      text: "[Click me](javascript:alert(1)", // full regex match ends at first )
+      text: "[Click me](javascript:alert(1))",
     });
     expect(paragraph.content?.[0]).not.toHaveProperty("marks");
   });

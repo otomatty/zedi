@@ -91,9 +91,7 @@ describe("Users (admin)", () => {
     vi.clearAllMocks();
   });
 
-  // Note: Full render tests are skipped due to React duplicate copy in admin vitest env.
-  // Pagination/offset behavior is covered by UsersContent.test.tsx and server API tests.
-  it.skip("calls getUsers with offset 0 on mount", async () => {
+  it("calls getUsers with offset 0 on mount", async () => {
     const getUsers = vi.spyOn(adminApi, "getUsers").mockResolvedValue({
       users: mockUsers(10, 0),
       total: 100,
@@ -111,7 +109,7 @@ describe("Users (admin)", () => {
     });
   });
 
-  it.skip("calls getUsers with offset 50 when user clicks 次へ", async () => {
+  it("calls getUsers with offset 50 when user clicks 次へ", async () => {
     const getUsers = vi
       .spyOn(adminApi, "getUsers")
       .mockResolvedValueOnce({
@@ -137,10 +135,4 @@ describe("Users (admin)", () => {
     });
     expect(getUsers).toHaveBeenCalledTimes(2);
   });
-});
-
-// Full render tests are skipped due to React duplicate copy in admin Vitest environment.
-// Placeholder so this file contributes at least one executable test until the env is fixed.
-it("has a placeholder test while full render tests are disabled", () => {
-  expect(true).toBe(true);
 });

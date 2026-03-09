@@ -12,7 +12,10 @@ type TiptapBlockNode = {
 };
 
 export function convertMarkdownToTiptapContent(markdown: string): string {
-  const lines = markdown.split("\n");
+  const normalized = markdown.replace(/\r\n?/g, "\n");
+  const lines = normalized.endsWith("\n")
+    ? normalized.slice(0, -1).split("\n")
+    : normalized.split("\n");
   const doc: { type: "doc"; content: TiptapBlockNode[] } = {
     type: "doc",
     content: [],

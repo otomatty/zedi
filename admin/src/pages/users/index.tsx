@@ -67,27 +67,31 @@ export default function Users() {
     };
   }, [searchInput]);
 
-  const handleRoleChange = useCallback(async (user: UserAdmin, role: UserRole) => {
-    if (user.role === role) return;
-    setSavingIds((prev) => new Set(prev).add(user.id));
-    setError(null);
-    try {
-      const { user: updated } = await patchUserRole(user.id, role);
-      if (!isMountedRef.current) return;
-      setUsers((prev) => prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u)));
-    } catch (e) {
-      if (!isMountedRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (isMountedRef.current) {
-        setSavingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(user.id);
-          return next;
-        });
+  const handleRoleChange = useCallback(
+    async (user: UserAdmin, role: UserRole) => {
+      if (user.role === role) return;
+      setSavingIds((prev) => new Set(prev).add(user.id));
+      setError(null);
+      try {
+        latestRequestRef.current += 1;
+        await patchUserRole(user.id, role);
+        if (!isMountedRef.current) return;
+        await load(false);
+      } catch (e) {
+        if (!isMountedRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (isMountedRef.current) {
+          setSavingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(user.id);
+            return next;
+          });
+        }
       }
-    }
-  }, []);
+    },
+    [load],
+  );
 
   return (
     <UsersContent

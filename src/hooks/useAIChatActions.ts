@@ -44,14 +44,35 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
       const currentPageId = pageContext?.pageId;
       if (!currentPageId) return false;
 
+      const previousContent = latestPageContentRef.current;
       const nextContent = appendMarkdownToTiptapContent(latestPageContentRef.current, markdown);
       await updatePageMutation.mutateAsync({
         pageId: currentPageId,
         updates: { content: nextContent },
       });
-      await syncLinks(currentPageId, extractWikiLinksFromContent(nextContent));
       latestPageContentRef.current = nextContent;
       contentAppendHandlerRef.current?.(nextContent);
+      try {
+        await syncLinks(currentPageId, extractWikiLinksFromContent(nextContent));
+      } catch (err) {
+        console.error("Failed to sync wiki links after updating page content:", err);
+        try {
+          await updatePageMutation.mutateAsync({
+            pageId: currentPageId,
+            updates: { content: previousContent },
+          });
+          latestPageContentRef.current = previousContent;
+          contentAppendHandlerRef.current?.(previousContent);
+        } catch (rollbackErr) {
+          console.error(
+            "Failed to roll back page content after wiki link sync failure:",
+            rollbackErr,
+          );
+          latestPageContentRef.current = nextContent;
+          contentAppendHandlerRef.current?.(nextContent);
+        }
+        throw err;
+      }
       return true;
     },
     [pageContext?.pageId, syncLinks, updatePageMutation, contentAppendHandlerRef],

@@ -20,6 +20,32 @@ export function AIChatPanel() {
     contextEnabled,
     showConversationList,
   } = useAIChatStore();
+
+  if (!isOpen) return null;
+
+  return (
+    <AIChatPanelContent
+      activeConversationId={activeConversationId}
+      setActiveConversation={setActiveConversation}
+      contextEnabled={contextEnabled}
+      showConversationList={showConversationList}
+    />
+  );
+}
+
+interface AIChatPanelContentProps {
+  activeConversationId: string | null;
+  setActiveConversation: (id: string | null) => void;
+  contextEnabled: boolean;
+  showConversationList: boolean;
+}
+
+function AIChatPanelContent({
+  activeConversationId,
+  setActiveConversation,
+  contextEnabled,
+  showConversationList,
+}: AIChatPanelContentProps) {
   const { pageContext } = useAIChatContext();
   const { data: pages = [] } = usePagesSummary();
   const {
@@ -126,8 +152,6 @@ export function AIChatPanel() {
     },
     [editAndResend],
   );
-
-  if (!isOpen) return null;
 
   return (
     <div className="relative flex h-full flex-col border-l bg-background">

@@ -6,7 +6,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { AISettings } from "@/types/ai";
-import { WIKI_GENERATOR_PROMPT } from "./wikiGeneratorPrompt";
+import { WIKI_GENERATOR_PROMPT, WIKI_GENERATOR_PROMPT_NO_SEARCH } from "./wikiGeneratorPrompt";
 import { extractWikiLinks, type WikiGeneratorCallbacks } from "./wikiGeneratorUtils";
 
 /**
@@ -23,8 +23,9 @@ export async function generateWithOpenAI(
     dangerouslyAllowBrowser: true,
   });
 
-  const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
   const isSearchModel = settings.model.includes("search");
+  const promptTemplate = isSearchModel ? WIKI_GENERATOR_PROMPT : WIKI_GENERATOR_PROMPT_NO_SEARCH;
+  const prompt = promptTemplate.replace("{{title}}", title);
   const webSearchOptions = isSearchModel ? { search_context_size: "medium" as const } : undefined;
 
   const stream = await client.chat.completions.create(
@@ -86,8 +87,9 @@ export async function generateWithAnthropic(
   abortSignal?: AbortSignal,
 ): Promise<void> {
   const client = new Anthropic({ apiKey: settings.apiKey });
-  const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
   const useWebSearch = isClaudeWebSearchSupported(settings.model);
+  const promptTemplate = useWebSearch ? WIKI_GENERATOR_PROMPT : WIKI_GENERATOR_PROMPT_NO_SEARCH;
+  const prompt = promptTemplate.replace("{{title}}", title);
 
   const requestParams: AnthropicStreamParams = {
     model: settings.model,

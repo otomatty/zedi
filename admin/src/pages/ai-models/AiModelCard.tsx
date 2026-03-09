@@ -45,7 +45,9 @@ export function AiModelCard({
             onChange={(e) => onDisplayNameChange(e.target.value)}
             onBlur={(e) => onDisplayNameBlur(e.target.value.trim())}
             onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.currentTarget.blur();
+              }
             }}
             className="h-8 text-sm"
             aria-label={`${m.modelId} の表示名`}

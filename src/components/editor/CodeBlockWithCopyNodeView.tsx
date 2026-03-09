@@ -1,8 +1,10 @@
 import React, { useRef, useState, useEffect } from "react";
 import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react";
 import { Copy, Check } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export const CodeBlockWithCopyNodeView: React.FC<NodeViewProps> = ({ node }) => {
+  const { t } = useTranslation();
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -38,7 +40,7 @@ export const CodeBlockWithCopyNodeView: React.FC<NodeViewProps> = ({ node }) => 
         type="button"
         contentEditable={false}
         onClick={handleCopy}
-        aria-label={copied ? "Copied" : "Copy code"}
+        aria-label={copied ? t("aiChat.actions.copiedCode") : t("aiChat.actions.copyCode")}
         className="absolute right-2 top-2 rounded border border-border/60 bg-muted/90 px-2 py-1 text-[11px] text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted group-hover/code:opacity-100"
       >
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}

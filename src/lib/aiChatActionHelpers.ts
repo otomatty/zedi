@@ -39,19 +39,16 @@ export function appendTiptapContent(existingContent: string, appendedContent: st
   const existingDoc = parseTiptapDoc(existingContent);
   const appendedDoc = parseTiptapDoc(appendedContent);
 
-  if (!existingDoc && !appendedDoc) {
-    return convertMarkdownToTiptapContent("");
+  if (!existingDoc) {
+    throw new Error("Invalid existing Tiptap document");
   }
-  if (!existingDoc && appendedDoc) {
-    return JSON.stringify(appendedDoc);
-  }
-  if (existingDoc && !appendedDoc) {
-    return JSON.stringify(existingDoc);
+  if (!appendedDoc) {
+    throw new Error("Invalid appended Tiptap document");
   }
 
   return JSON.stringify({
     type: "doc",
-    content: [...(existingDoc?.content ?? []), ...(appendedDoc?.content ?? [])],
+    content: [...existingDoc.content, ...appendedDoc.content],
   } satisfies TiptapDoc);
 }
 

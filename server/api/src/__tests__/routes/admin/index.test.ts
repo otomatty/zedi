@@ -123,6 +123,7 @@ describe("PATCH /api/admin/users/:id", () => {
       id: "user-target-001",
       email: "user@example.com",
       role: "admin",
+      createdAt: updated.createdAt.toISOString(),
     });
   });
 
@@ -152,6 +153,20 @@ describe("PATCH /api/admin/users/:id", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error?: string };
     expect(body.error).toMatch(/user|admin/);
+  });
+
+  it("returns 400 when JSON body is invalid", async () => {
+    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+
+    const res = await app.request("/api/admin/users/some-id", {
+      method: "PATCH",
+      headers: adminAuthHeaders(),
+      body: "{invalid",
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("invalid JSON body");
   });
 
   it("returns 404 when user not found", async () => {
