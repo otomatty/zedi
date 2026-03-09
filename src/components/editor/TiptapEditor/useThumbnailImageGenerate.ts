@@ -11,13 +11,11 @@ export function useThumbnailImageGenerate(
 
   const generateImage = useCallback(async () => {
     if (!trimmedTitle) return "タイトルを入力してください";
+    if (!isSignedIn) return "ログインが必要です";
 
     setIsLoading(true);
 
     try {
-      if (!isSignedIn) {
-        return "ログインが必要です";
-      }
       const response = await fetch(`${thumbnailApiBaseUrl}/api/thumbnail/image-generate`, {
         method: "POST",
         headers: {

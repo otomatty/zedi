@@ -53,7 +53,7 @@ describe("useThumbnailImageGenerate", () => {
       useThumbnailImageGenerate("title", true, onSelectThumbnail),
     );
 
-    let err: string | null = undefined as unknown as string | null;
+    let err: string | null = null;
     await act(async () => {
       err = await result.current.generateImage();
     });
@@ -82,7 +82,7 @@ describe("useThumbnailImageGenerate", () => {
       useThumbnailImageGenerate("title", true, onSelectThumbnail),
     );
 
-    let err: string | null = undefined as unknown as string | null;
+    let err: string | null = null;
     await act(async () => {
       err = await result.current.generateImage();
     });

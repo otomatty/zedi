@@ -47,8 +47,8 @@ export function useEditorRecommendationBar({
     setMode("thumbnails");
     if (search.lastQueryRef.current !== trimmedTitle) {
       search.resetSearch();
-    }
-    if (search.candidates.length === 0) {
+      void search.loadCandidates();
+    } else if (search.candidates.length === 0 && !search.isLoading) {
       void search.loadCandidates();
     }
   }, [canSearch, search, trimmedTitle]);
