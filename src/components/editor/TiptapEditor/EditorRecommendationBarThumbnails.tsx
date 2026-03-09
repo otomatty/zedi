@@ -1,5 +1,6 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
+import { sanitizeLinkUrl } from "@/lib/markdownToTiptapHelpers";
 import type { ThumbnailCandidate } from "./EditorRecommendationBarTypes";
 
 interface EditorRecommendationBarThumbnailsProps {
@@ -32,28 +33,29 @@ export const EditorRecommendationBarThumbnails: React.FC<
         onWheel={onWheel}
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1"
       >
-        {candidates.map((candidate) => (
-          <button
-            key={candidate.id}
-            type="button"
-            onClick={() => onSelectCandidate(candidate)}
-            className="shrink-0 snap-start text-left"
-          >
-            <div className="flex flex-col gap-1">
-              <div className="rounded-md border bg-background p-1">
+        {candidates.map((candidate) => {
+          const safeAuthorUrl = candidate.authorUrl ? sanitizeLinkUrl(candidate.authorUrl) : null;
+          const safeSourceUrl = candidate.sourceUrl ? sanitizeLinkUrl(candidate.sourceUrl) : null;
+          return (
+            <div key={candidate.id} className="flex shrink-0 snap-start flex-col gap-1 text-left">
+              <button
+                type="button"
+                onClick={() => onSelectCandidate(candidate)}
+                className="rounded-md border bg-background p-1 text-left"
+              >
                 <img
                   src={candidate.previewUrl}
                   alt={candidate.alt}
                   className="h-16 w-auto rounded object-cover sm:h-24"
                   loading="lazy"
                 />
-              </div>
+              </button>
               <div className="text-[10px] text-muted-foreground">
                 {candidate.authorName ? (
                   <>
-                    {candidate.authorUrl ? (
+                    {safeAuthorUrl ? (
                       <a
-                        href={candidate.authorUrl}
+                        href={safeAuthorUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="underline underline-offset-2"
@@ -66,18 +68,22 @@ export const EditorRecommendationBarThumbnails: React.FC<
                     /{" "}
                   </>
                 ) : null}
-                <a
-                  href={candidate.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2"
-                >
-                  {candidate.sourceName}
-                </a>
+                {safeSourceUrl ? (
+                  <a
+                    href={safeSourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    {candidate.sourceName}
+                  </a>
+                ) : (
+                  <span>{candidate.sourceName}</span>
+                )}
               </div>
             </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
     )}
   </div>

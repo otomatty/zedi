@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useEditorRecommendationBar } from "./useEditorRecommendationBar";
 
@@ -7,8 +7,6 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 import { useAuth } from "@/hooks/useAuth";
-
-vi.stubEnv("VITE_API_BASE_URL", "https://api.test.example.com");
 
 const defaultProps = {
   pageTitle: "Test Page",
@@ -19,8 +17,21 @@ const defaultProps = {
 
 describe("useEditorRecommendationBar", () => {
   beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.test.example.com");
     vi.mocked(useAuth).mockReturnValue({ isSignedIn: true } as never);
     vi.clearAllMocks();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ items: [], nextCursor: null }),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("canSearch is false when isReadOnly", () => {

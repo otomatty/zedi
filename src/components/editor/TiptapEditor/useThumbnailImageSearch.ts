@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ThumbnailCandidate } from "./EditorRecommendationBarTypes";
 
 export function useThumbnailImageSearch(
@@ -70,14 +70,17 @@ export function useThumbnailImageSearch(
     setErrorMessage(null);
   }, []);
 
-  return {
-    candidates,
-    nextCursor,
-    isLoading,
-    errorMessage,
-    setErrorMessage,
-    lastQueryRef,
-    loadCandidates,
-    resetSearch,
-  };
+  return useMemo(
+    () => ({
+      candidates,
+      nextCursor,
+      isLoading,
+      errorMessage,
+      setErrorMessage,
+      lastQueryRef,
+      loadCandidates,
+      resetSearch,
+    }),
+    [candidates, nextCursor, isLoading, errorMessage, loadCandidates, resetSearch],
+  );
 }

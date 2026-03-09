@@ -46,17 +46,17 @@
 
 ## テストカバレッジ
 
-| 変更ファイル                          | テストファイル                   | 状態                                                        |
-| ------------------------------------- | -------------------------------- | ----------------------------------------------------------- |
-| EditorRecommendationBar.tsx           | EditorRecommendationBar.test.tsx | ✅ 既存テストあり（非表示・閉じる・検索・候補選択をカバー） |
-| EditorRecommendationBarActions.tsx    | -                                | ⚠️ テスト未作成（統合テストでカバー済みなら任意）           |
-| EditorRecommendationBarHeader.tsx     | -                                | ⚠️ テスト未作成                                             |
-| EditorRecommendationBarGenerating.tsx | -                                | ⚠️ テスト未作成                                             |
-| EditorRecommendationBarThumbnails.tsx | -                                | ⚠️ テスト未作成                                             |
-| useEditorRecommendationBar.ts         | -                                | ⚠️ テスト未作成                                             |
-| useThumbnailImageSearch.ts            | -                                | ⚠️ テスト未作成                                             |
-| useThumbnailImageGenerate.ts          | -                                | ⚠️ テスト未作成                                             |
-| thumbnailApiHelpers.ts                | -                                | ⚠️ テスト未作成                                             |
+| 変更ファイル                          | テストファイル                             | 状態                                                        |
+| ------------------------------------- | ------------------------------------------ | ----------------------------------------------------------- |
+| EditorRecommendationBar.tsx           | EditorRecommendationBar.test.tsx           | ✅ 既存テストあり（非表示・閉じる・検索・候補選択をカバー） |
+| EditorRecommendationBarActions.tsx    | EditorRecommendationBarActions.test.tsx    | ✅ テストあり（ボタン表示・クリック・disabled）             |
+| EditorRecommendationBarHeader.tsx     | EditorRecommendationBarHeader.test.tsx     | ✅ テストあり（ヘッダー・ナビ・閉じる）                     |
+| EditorRecommendationBarGenerating.tsx | EditorRecommendationBarGenerating.test.tsx | ✅ テストあり（ローディング・エラー・戻る）                 |
+| EditorRecommendationBarThumbnails.tsx | EditorRecommendationBarThumbnails.test.tsx | ✅ テストあり（ローディング・エラー・候補・選択）           |
+| useEditorRecommendationBar.ts         | useEditorRecommendationBar.test.ts         | ✅ テストあり（mode・検索・戻る・候補選択）                 |
+| useThumbnailImageSearch.ts            | useThumbnailImageSearch.test.ts            | ✅ テストあり（初期状態・エラー・候補取得・リセット）       |
+| useThumbnailImageGenerate.ts          | useThumbnailImageGenerate.test.ts          | ✅ テストあり（空タイトル・未ログイン・成功・失敗）         |
+| thumbnailApiHelpers.ts                | thumbnailApiHelpers.test.ts                | ✅ テストあり（base URL 取得・末尾スラッシュ除去）          |
 
 ## Lint / Format チェック
 

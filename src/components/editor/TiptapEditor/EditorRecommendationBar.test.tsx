@@ -53,6 +53,13 @@ describe("EditorRecommendationBar", () => {
   });
 
   it("shows 画像を検索 and 戻る after opening thumbnail picker", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ items: [], nextCursor: null }),
+      }),
+    );
     const user = userEvent.setup();
     render(<EditorRecommendationBar {...defaultProps} />);
 
@@ -60,6 +67,8 @@ describe("EditorRecommendationBar", () => {
 
     expect(screen.getByText("サムネイル候補")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "戻る" })).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
   });
 
   it("calls onSelectThumbnail when a candidate is selected", async () => {

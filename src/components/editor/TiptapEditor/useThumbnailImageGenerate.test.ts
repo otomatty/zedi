@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useThumbnailImageGenerate } from "./useThumbnailImageGenerate";
 
@@ -9,6 +9,10 @@ describe("useThumbnailImageGenerate", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("returns error when trimmedTitle is empty", async () => {

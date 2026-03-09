@@ -19,7 +19,7 @@ export const EditorRecommendationBarGenerating: React.FC<
       </div>
     )}
     {errorMessage && <div className="text-xs text-destructive">{errorMessage}</div>}
-    {!isLoading && !errorMessage && (
+    {!isLoading && (
       <div className="flex items-center gap-2">
         <Button type="button" size="sm" variant="ghost" onClick={onBackToActions}>
           <ChevronLeft className="mr-1 h-4 w-4" />

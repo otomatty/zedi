@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
 
 export function useThumbnailImageGenerate(
@@ -50,5 +50,5 @@ export function useThumbnailImageGenerate(
     }
   }, [isSignedIn, thumbnailApiBaseUrl, trimmedTitle, onSelectThumbnail]);
 
-  return { generateImage, isGenerating: isLoading };
+  return useMemo(() => ({ generateImage, isGenerating: isLoading }), [generateImage, isLoading]);
 }
