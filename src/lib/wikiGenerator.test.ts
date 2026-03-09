@@ -21,9 +21,13 @@ import { loadAISettings } from "./aiSettings";
 import { callAIService } from "./aiService";
 import type { AISettings } from "@/types/ai";
 
-const baseSettings: Partial<AISettings> = {
+const baseSettings: AISettings = {
   provider: "openai",
+  apiKey: "",
+  apiMode: "api_server",
   model: "gpt-4",
+  modelId: "openai:gpt-4",
+  isConfigured: true,
 };
 
 describe("wikiGeneratorPrompt", () => {
@@ -68,9 +72,8 @@ describe("getAISettingsOrThrow", () => {
   it("returns settings with isConfigured when api_server mode", async () => {
     vi.mocked(loadAISettings).mockResolvedValue({
       ...baseSettings,
-      apiMode: "api_server",
       isConfigured: false,
-    } as AISettings);
+    });
     const result = await getAISettingsOrThrow();
     expect(result.isConfigured).toBe(true);
   });
@@ -81,7 +84,7 @@ describe("getAISettingsOrThrow", () => {
       apiMode: "user_api_key",
       apiKey: "",
       isConfigured: false,
-    } as AISettings);
+    });
     await expect(getAISettingsOrThrow()).rejects.toThrow("AI_NOT_CONFIGURED");
   });
 });
@@ -94,10 +97,7 @@ describe("generateWikiContentStream", () => {
   it("uses callAIService in api_server mode and calls onComplete with extracted wiki links", async () => {
     vi.mocked(loadAISettings).mockResolvedValue({
       ...baseSettings,
-      apiMode: "api_server",
-      apiKey: "",
-      isConfigured: true,
-    } as AISettings);
+    });
 
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
       handlers.onChunk("Hello ");

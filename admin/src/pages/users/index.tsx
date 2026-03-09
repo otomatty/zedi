@@ -77,9 +77,9 @@ export default function Users() {
       setSavingIds((prev) => new Set(prev).add(user.id));
       setError(null);
       try {
-        latestRequestRef.current += 1;
         await patchUserRole(user.id, role);
         if (!isMountedRef.current) return;
+        latestRequestRef.current += 1;
         await load(false);
       } catch (e) {
         if (!isMountedRef.current) return;
