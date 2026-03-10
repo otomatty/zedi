@@ -68,11 +68,13 @@ export function useAISettings(): UseAISettingsReturn {
     setSettings((prev) => {
       const newSettings = { ...prev, ...updates };
 
-      // プロバイダーが変更された場合、モデル一覧とデフォルトモデルを切り替え
+      // プロバイダーが変更された場合、モデル一覧とデフォルトモデルを切り替え（明示的に model が渡されていればそれを優先）
       if (updates.provider && updates.provider !== prev.provider) {
         const models = getAvailableModels(updates.provider);
         setAvailableModels(models);
-        newSettings.model = models[0] || getDefaultModel(updates.provider);
+        if (updates.model === undefined) {
+          newSettings.model = models[0] || getDefaultModel(updates.provider);
+        }
 
         // APIキーが必要かどうかを確認
         const provider = getProviderById(updates.provider);

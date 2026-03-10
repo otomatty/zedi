@@ -25,14 +25,14 @@ export function StorageDestinationSection({
             {t("storageSettings.storageDestination")}
           </Label>
           <p className="text-sm text-muted-foreground">
-            {useExternalStorage
+            {useExternalStorageEffective
               ? t("storageSettings.saveToExternal")
               : t("storageSettings.saveToDefault")}
           </p>
         </div>
         <Switch
           id="prefer-default"
-          checked={useExternalStorage}
+          checked={useExternalStorageEffective}
           onCheckedChange={(checked) => updateSettings({ preferDefaultStorage: !checked })}
           disabled={isSaving || isTesting}
         />

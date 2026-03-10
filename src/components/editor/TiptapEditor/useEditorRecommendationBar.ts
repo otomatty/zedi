@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   EditorRecommendationBarProps,
   RecommendationMode,
@@ -15,6 +16,7 @@ export function useEditorRecommendationBar({
   hasThumbnail,
   onSelectThumbnail,
 }: EditorRecommendationBarProps) {
+  const { t } = useTranslation();
   const { isSignedIn } = useAuth();
   const [isDismissed, setIsDismissed] = useState(false);
   const [mode, setMode] = useState<RecommendationMode>("actions");
@@ -36,10 +38,15 @@ export function useEditorRecommendationBar({
   const errorMessage = mode === "generating" ? generatingErrorMessage : search.errorMessage;
 
   const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    if (!scrollRef.current) return;
+    const container = scrollRef.current;
+    if (!container) return;
     if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    scrollRef.current.scrollLeft += event.deltaY;
-    event.preventDefault();
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    const newScrollLeft = Math.min(Math.max(0, container.scrollLeft + event.deltaY), maxScrollLeft);
+    if (newScrollLeft !== container.scrollLeft) {
+      container.scrollLeft = newScrollLeft;
+      event.preventDefault();
+    }
   }, []);
 
   const handleOpenThumbnailPicker = useCallback(() => {
@@ -87,9 +94,11 @@ export function useEditorRecommendationBar({
   const dismiss = useCallback(() => setIsDismissed(true), []);
 
   const headerLabel = useMemo(() => {
-    if (mode === "generating") return "画像を生成中";
-    return mode === "actions" ? "おすすめ" : "サムネイル候補";
-  }, [mode]);
+    if (mode === "generating") return t("editor.recommendation.generating");
+    return mode === "actions"
+      ? t("editor.recommendation.labelRecommendation")
+      : t("editor.recommendation.labelThumbnails");
+  }, [mode, t]);
 
   return {
     canSearch,
