@@ -28,16 +28,16 @@ PR #299 のレビューコメント対応として、エディタおすすめバ
 
 ## テストカバレッジ
 
-| 変更ファイル | テストファイル | 状態 |
-| ------------ | -------------- | ---- |
-| EditorRecommendationBarHeader | EditorRecommendationBarHeader.test.tsx | ✅ i18n モック追加 |
-| EditorRecommendationBar | EditorRecommendationBar.test.tsx | ✅ i18n モック追加 |
-| useEditorRecommendationBar | useEditorRecommendationBar.test.ts | ✅ i18n モック追加（generating 含む） |
-| useThumbnailImageGenerate | useThumbnailImageGenerate.test.ts | 既存 |
-| useThumbnailImageSearch | useThumbnailImageSearch.test.ts | 既存 |
-| StorageSettingsForm | StorageSettingsForm.test.tsx | beforeEach インポート追加 |
-| StorageDestinationSection | StorageDestinationSection.test.tsx | 既存 |
-| Settings | Settings.test.tsx | 既存 |
+| 変更ファイル                  | テストファイル                         | 状態                                  |
+| ----------------------------- | -------------------------------------- | ------------------------------------- |
+| EditorRecommendationBarHeader | EditorRecommendationBarHeader.test.tsx | ✅ i18n モック追加                    |
+| EditorRecommendationBar       | EditorRecommendationBar.test.tsx       | ✅ i18n モック追加                    |
+| useEditorRecommendationBar    | useEditorRecommendationBar.test.ts     | ✅ i18n モック追加（generating 含む） |
+| useThumbnailImageGenerate     | useThumbnailImageGenerate.test.ts      | 既存                                  |
+| useThumbnailImageSearch       | useThumbnailImageSearch.test.ts        | 既存                                  |
+| StorageSettingsForm           | StorageSettingsForm.test.tsx           | beforeEach インポート追加             |
+| StorageDestinationSection     | StorageDestinationSection.test.tsx     | 既存                                  |
+| Settings                      | Settings.test.tsx                      | 既存                                  |
 
 ## 静的解析
 

@@ -110,8 +110,8 @@ export function useAISettings(): UseAISettingsReturn {
           ? settings.apiKey.trim() !== ""
           : true;
 
-      // modelIdが未設定の場合はprovider:modelから生成
-      const modelId = settings.modelId || `${settings.provider}:${settings.model}`;
+      // 永続化時は常に provider:model から modelId を算出し、他経路で変更された provider/model に古い modelId が残っていても保存しない
+      const modelId = `${settings.provider}:${settings.model}`;
 
       const settingsToSave = {
         ...settings,
@@ -140,10 +140,15 @@ export function useAISettings(): UseAISettingsReturn {
       // テスト成功時、取得したモデル一覧で更新
       if (result.success && result.models && result.models.length > 0) {
         setAvailableModels(result.models);
-        // 現在選択中のモデルが新しいリストにない場合、最初のモデルを選択
+        // 現在選択中のモデルが新しいリストにない場合、最初のモデルを選択（modelId も合わせて更新）
         if (!result.models.includes(settings.model)) {
           const first = result.models[0];
-          if (first) setSettings((prev) => ({ ...prev, model: first }));
+          if (first)
+            setSettings((prev) => ({
+              ...prev,
+              model: first,
+              modelId: `${prev.provider}:${first}`,
+            }));
         }
       }
 
