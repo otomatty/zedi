@@ -54,9 +54,9 @@ export function useStorageSettingsNavigation() {
   const location = useLocation();
 
   const handleGoToStorageSettings = useCallback(() => {
-    const returnTo = `${location.pathname}${location.search}`;
+    const returnTo = `${location.pathname}${location.search}${location.hash ?? ""}`;
     navigate(`/settings?${new URLSearchParams({ section: "storage", returnTo }).toString()}`);
-  }, [location.pathname, location.search, navigate]);
+  }, [location.pathname, location.search, location.hash, navigate]);
 
   return { handleGoToStorageSettings };
 }
