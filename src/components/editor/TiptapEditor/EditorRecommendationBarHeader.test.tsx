@@ -3,6 +3,24 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EditorRecommendationBarHeader } from "./EditorRecommendationBarHeader";
 
+const editorRecommendation: Record<string, string> = {
+  next: "次へ",
+  back: "戻る",
+  close: "閉じる",
+};
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      if (key.startsWith("editor.recommendation.")) {
+        const sub = key.replace("editor.recommendation.", "");
+        return editorRecommendation[sub] ?? key;
+      }
+      return key;
+    },
+    i18n: { language: "ja" },
+  }),
+}));
+
 describe("EditorRecommendationBarHeader", () => {
   const defaultProps = {
     headerLabel: "おすすめ",
