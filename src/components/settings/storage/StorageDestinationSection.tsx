@@ -25,7 +25,7 @@ export function StorageDestinationSection({
             {t("storageSettings.storageDestination")}
           </Label>
           <p className="text-sm text-muted-foreground">
-            {useExternalStorage
+            {useExternalStorageEffective
               ? t("storageSettings.saveToExternal")
               : t("storageSettings.saveToDefault")}
           </p>

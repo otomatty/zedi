@@ -82,5 +82,13 @@
       "description": "Insert block math",
       "aliases": "math block,block math,equation"
     }
+  },
+  "recommendation": {
+    "next": "Next",
+    "back": "Back",
+    "close": "Close",
+    "generating": "Generating image",
+    "labelRecommendation": "Recommendations",
+    "labelThumbnails": "Thumbnail candidates"
   }
 }

@@ -68,11 +68,13 @@ export function useAISettings(): UseAISettingsReturn {
     setSettings((prev) => {
       const newSettings = { ...prev, ...updates };
 
-      // プロバイダーが変更された場合、モデル一覧とデフォルトモデルを切り替え
+      // プロバイダーが変更された場合、モデル一覧とデフォルトモデルを切り替え（明示的に model が渡されていればそれを優先）
       if (updates.provider && updates.provider !== prev.provider) {
         const models = getAvailableModels(updates.provider);
         setAvailableModels(models);
-        newSettings.model = models[0] || getDefaultModel(updates.provider);
+        if (updates.model === undefined) {
+          newSettings.model = models[0] || getDefaultModel(updates.provider);
+        }
 
         // APIキーが必要かどうかを確認
         const provider = getProviderById(updates.provider);
@@ -80,6 +82,13 @@ export function useAISettings(): UseAISettingsReturn {
           // APIキー不要のプロバイダーの場合、キーをクリア
           newSettings.apiKey = "";
         }
+      }
+
+      // プロバイダーまたはモデルが変わった場合は、呼び出し元が明示的に modelId を渡していなければクリアする（古い modelId の永続化を防ぐ）
+      const providerChanged = updates.provider !== undefined && updates.provider !== prev.provider;
+      const modelChanged = updates.model !== undefined && updates.model !== prev.model;
+      if ((providerChanged || modelChanged) && updates.modelId === undefined) {
+        newSettings.modelId = "";
       }
 
       return newSettings;
@@ -101,8 +110,8 @@ export function useAISettings(): UseAISettingsReturn {
           ? settings.apiKey.trim() !== ""
           : true;
 
-      // modelIdが未設定の場合はprovider:modelから生成
-      const modelId = settings.modelId || `${settings.provider}:${settings.model}`;
+      // 永続化時は常に provider:model から modelId を算出し、他経路で変更された provider/model に古い modelId が残っていても保存しない
+      const modelId = `${settings.provider}:${settings.model}`;
 
       const settingsToSave = {
         ...settings,
@@ -131,10 +140,15 @@ export function useAISettings(): UseAISettingsReturn {
       // テスト成功時、取得したモデル一覧で更新
       if (result.success && result.models && result.models.length > 0) {
         setAvailableModels(result.models);
-        // 現在選択中のモデルが新しいリストにない場合、最初のモデルを選択
+        // 現在選択中のモデルが新しいリストにない場合、最初のモデルを選択（modelId も合わせて更新）
         if (!result.models.includes(settings.model)) {
           const first = result.models[0];
-          if (first) setSettings((prev) => ({ ...prev, model: first }));
+          if (first)
+            setSettings((prev) => ({
+              ...prev,
+              model: first,
+              modelId: `${prev.provider}:${first}`,
+            }));
         }
       }
 

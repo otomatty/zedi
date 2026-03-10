@@ -90,7 +90,12 @@ export function useAISettingsForm() {
 
   const updateSettings = useCallback(
     (updates: Partial<AISettings>) => {
-      updateSettingsBase(updates);
+      const normalizedUpdates =
+        (updates.provider !== undefined || updates.model !== undefined) &&
+        updates.modelId === undefined
+          ? { ...updates, modelId: "" }
+          : updates;
+      updateSettingsBase(normalizedUpdates);
       scheduleSave();
     },
     [updateSettingsBase, scheduleSave],

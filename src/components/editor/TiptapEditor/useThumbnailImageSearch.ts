@@ -52,7 +52,7 @@ export function useThumbnailImageSearch(
           nextCursor?: string;
         };
 
-        setCandidates(data.items || []);
+        setCandidates((prev) => (cursor ? [...prev, ...(data.items || [])] : data.items || []));
         setNextCursor(data.nextCursor ?? null);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "画像の取得に失敗しました");

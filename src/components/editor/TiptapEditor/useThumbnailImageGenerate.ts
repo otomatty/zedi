@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
 
 export function useThumbnailImageGenerate(
@@ -7,12 +7,15 @@ export function useThumbnailImageGenerate(
   onSelectThumbnail: (imageUrl: string, alt: string, previewUrl?: string) => void,
 ) {
   const [isLoading, setIsLoading] = useState(false);
+  const isGeneratingRef = useRef(false);
   const thumbnailApiBaseUrl = getThumbnailApiBaseUrl();
 
   const generateImage = useCallback(async () => {
     if (!trimmedTitle) return "タイトルを入力してください";
     if (!isSignedIn) return "ログインが必要です";
+    if (isGeneratingRef.current) return null;
 
+    isGeneratingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -44,6 +47,7 @@ export function useThumbnailImageGenerate(
     } catch (error) {
       return error instanceof Error ? error.message : "画像の生成に失敗しました";
     } finally {
+      isGeneratingRef.current = false;
       setIsLoading(false);
     }
   }, [isSignedIn, thumbnailApiBaseUrl, trimmedTitle, onSelectThumbnail]);
