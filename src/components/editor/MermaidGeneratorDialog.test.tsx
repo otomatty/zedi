@@ -121,6 +121,9 @@ describe("MermaidGeneratorDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "設定画面へ" }));
 
-    expect(mockNavigate).toHaveBeenCalledWith("/settings?section=ai");
+    const navigateUrl = mockNavigate.mock.calls[0][0];
+    expect(navigateUrl).toContain("/settings?");
+    expect(navigateUrl).toMatch(/section=ai/);
+    expect(navigateUrl).toMatch(/returnTo=/);
   });
 });
