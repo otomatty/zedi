@@ -18,7 +18,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
