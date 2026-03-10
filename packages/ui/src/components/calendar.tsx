@@ -45,12 +45,21 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         ...classNames,
       }}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
-        ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
-        ),
+        Chevron: ({
+          className,
+          orientation,
+          ...props
+        }: {
+          className?: string;
+          disabled?: boolean;
+          orientation?: "up" | "down" | "left" | "right";
+          size?: number;
+        }) =>
+          orientation === "right" ? (
+            <ChevronRight className={cn("h-4 w-4", className)} {...props} />
+          ) : (
+            <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
+          ),
       }}
       {...props}
     />
