@@ -16,15 +16,11 @@ const mockSummaries = {
   storage: "Default · Not tested",
 };
 
-vi.mock("./useSettingsSummaries", () => ({
-  useSettingsSummaries: () => mockSummaries,
-}));
-
 function renderWithRouter(initialEntries: string[] = ["/settings"]) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
-        <Route path="/settings" element={<SettingsOverview />} />
+        <Route path="/settings" element={<SettingsOverview summaries={mockSummaries} />} />
       </Routes>
     </MemoryRouter>,
   );

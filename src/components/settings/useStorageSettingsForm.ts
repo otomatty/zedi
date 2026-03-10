@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
@@ -24,15 +23,6 @@ export function useStorageSettingsForm() {
 
   const [showSecrets, setShowSecrets] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  const getSafeReturnTo = useCallback((): string | null => {
-    const returnTo = searchParams.get("returnTo");
-    if (!returnTo) return null;
-    if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
-    return returnTo;
-  }, [searchParams]);
 
   const runSave = useCallback(async () => {
     const success = await save();
@@ -40,14 +30,14 @@ export function useStorageSettingsForm() {
       sonnerToast.success(t("storageSettings.savedToast"), {
         description: t("storageSettings.savedToastDescription"),
       });
-      const returnTo = getSafeReturnTo();
-      if (returnTo) navigate(returnTo, { replace: true });
+      // Do not navigate(returnTo) here: on the settings hub both hooks are mounted,
+      // so auto-navigate would redirect after first save. Use the hub's back button instead.
     } else {
       sonnerToast.error(t("common.error"), {
         description: t("storageSettings.saveFailedToastDescription"),
       });
     }
-  }, [save, t, navigate, getSafeReturnTo]);
+  }, [save, t]);
 
   const scheduleSave = useDebouncedCallback(runSave, 800);
 

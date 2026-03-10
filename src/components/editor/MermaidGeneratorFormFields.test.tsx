@@ -107,7 +107,7 @@ describe("MermaidGeneratorFormFields", () => {
       />,
     );
 
-    await user.click(screen.getByLabelText("フローチャート"));
+    await user.click(screen.getByRole("checkbox", { name: /フローチャート/ }));
 
     expect(onTypeToggle).toHaveBeenCalledWith("flowchart");
   });

@@ -19,11 +19,19 @@ function isValidSection(s: string | null): s is SectionParam {
   return s !== null && VALID_SECTIONS.includes(s as SectionParam);
 }
 
+function getSafeReturnTo(searchParams: URLSearchParams): string | null {
+  const returnTo = searchParams.get("returnTo");
+  if (!returnTo || !returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
+  return returnTo;
+}
+
 const Settings: React.FC = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const section = searchParams.get("section");
   const summaries = useSettingsSummaries();
+  const returnTo = getSafeReturnTo(searchParams);
+  const backTo = returnTo ?? "/home";
 
   useEffect(() => {
     if (!isValidSection(section)) return;
@@ -37,7 +45,7 @@ const Settings: React.FC = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Container className="flex h-16 items-center gap-4">
-          <Link to="/home" aria-label={t("common.back")}>
+          <Link to={backTo} aria-label={t("common.back")}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" aria-hidden />
             </Button>
@@ -51,7 +59,7 @@ const Settings: React.FC = () => {
           <div className="mx-auto max-w-2xl space-y-10">
             <p className="text-sm text-muted-foreground">{t("settings.hubDescription")}</p>
 
-            <SettingsOverview />
+            <SettingsOverview summaries={summaries} />
 
             <SettingsSection
               id="general"

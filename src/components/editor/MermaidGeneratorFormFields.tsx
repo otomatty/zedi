@@ -33,10 +33,10 @@ export function MermaidGeneratorFormFields({
         <Label>ダイアグラムタイプを選択（複数可）</Label>
         <div className="grid grid-cols-2 gap-2">
           {DIAGRAM_TYPES.map((type) => (
-            <div
+            <label
               key={type.id}
+              htmlFor={type.id}
               className="flex cursor-pointer items-start space-x-2 rounded border p-2 hover:bg-muted/50"
-              onClick={() => onTypeToggle(type.id)}
             >
               <Checkbox
                 id={type.id}
@@ -44,12 +44,10 @@ export function MermaidGeneratorFormFields({
                 onCheckedChange={() => onTypeToggle(type.id)}
               />
               <div className="flex-1">
-                <Label htmlFor={type.id} className="cursor-pointer text-sm font-medium">
-                  {type.name}
-                </Label>
+                <span className="text-sm font-medium">{type.name}</span>
                 <p className="text-xs text-muted-foreground">{type.description}</p>
               </div>
-            </div>
+            </label>
           ))}
         </div>
       </div>

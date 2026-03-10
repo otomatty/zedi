@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
@@ -24,8 +23,6 @@ export function useAISettingsForm() {
     reset,
   } = useAISettings();
 
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [showApiKey, setShowApiKey] = useState(false);
   const [useOwnKey, setUseOwnKey] = useState(false);
   const [serverModels, setServerModels] = useState<AIModel[]>([]);
@@ -73,27 +70,21 @@ export function useAISettingsForm() {
     }
   }, [isLoading, settings.apiMode]);
 
-  const getSafeReturnTo = useCallback((): string | null => {
-    const returnTo = searchParams.get("returnTo");
-    if (!returnTo) return null;
-    if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
-    return returnTo;
-  }, [searchParams]);
-
   const runSave = useCallback(async () => {
     const success = await save();
     if (success) {
       sonnerToast.success(t("aiSettings.savedToast"), {
         description: t("aiSettings.savedToastDescription"),
       });
-      const returnTo = getSafeReturnTo();
-      if (returnTo) navigate(returnTo, { replace: true });
+      // Do not navigate(returnTo) here: on the settings hub both AI and storage
+      // hooks are mounted, so auto-navigate would redirect after first save and
+      // cross-contaminate returnTo between sections. Use the hub's back button instead.
     } else {
       sonnerToast.error(t("common.error"), {
         description: t("aiSettings.saveFailedToastDescription"),
       });
     }
-  }, [save, t, navigate, getSafeReturnTo]);
+  }, [save, t]);
 
   const scheduleSave = useDebouncedCallback(runSave, 800);
 

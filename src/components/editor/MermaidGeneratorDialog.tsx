@@ -57,6 +57,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
       if (result?.code) {
         try {
           const mermaid = await getMermaid();
+          mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
           await mermaid.parse(result.code);
           const id = `preview-${Math.random().toString(36).substr(2, 9)}`;
           const { svg } = await mermaid.render(id, result.code);

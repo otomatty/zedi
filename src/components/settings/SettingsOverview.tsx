@@ -4,7 +4,6 @@ import { Bot, Image as ImageIcon, Settings2 } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import type { SettingsSectionId as SectionId } from "./SettingsSection";
-import { useSettingsSummaries } from "./useSettingsSummaries";
 
 const SECTIONS: { id: SectionId; icon: React.ReactNode }[] = [
   { id: "general", icon: <Settings2 className="h-5 w-5" /> },
@@ -12,11 +11,15 @@ const SECTIONS: { id: SectionId; icon: React.ReactNode }[] = [
   { id: "storage", icon: <ImageIcon className="h-5 w-5" /> },
 ];
 
-export const SettingsOverview: React.FC = () => {
+export interface SettingsOverviewProps {
+  summaries: Record<SectionId, string>;
+}
+
+/** Renders overview cards using precomputed summaries (avoids duplicate useSettingsSummaries subscriptions when used from Settings hub). */
+export const SettingsOverview: React.FC<SettingsOverviewProps> = ({ summaries }) => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo");
-  const summaries = useSettingsSummaries();
 
   const buildSectionHref = (id: SectionId): string => {
     const params = new URLSearchParams();
