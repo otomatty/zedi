@@ -1,0 +1,66 @@
+import React from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Bot, Image as ImageIcon, Settings2 } from "lucide-react";
+import { Card, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
+import { useTranslation } from "react-i18next";
+import type { SettingsSectionId as SectionId } from "./SettingsSection";
+
+const SECTIONS: { id: SectionId; icon: React.ReactNode }[] = [
+  { id: "general", icon: <Settings2 className="h-5 w-5" /> },
+  { id: "ai", icon: <Bot className="h-5 w-5" /> },
+  { id: "storage", icon: <ImageIcon className="h-5 w-5" /> },
+];
+
+export interface SettingsOverviewProps {
+  summaries: Record<SectionId, string>;
+}
+
+/** Renders overview cards using precomputed summaries (avoids duplicate useSettingsSummaries subscriptions when used from Settings hub). */
+export const SettingsOverview: React.FC<SettingsOverviewProps> = ({ summaries }) => {
+  const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
+
+  const buildSectionHref = (id: SectionId): string => {
+    const params = new URLSearchParams();
+    params.set("section", id);
+    if (returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+      params.set("returnTo", returnTo);
+    }
+    return `/settings?${params.toString()}`;
+  };
+
+  const getTitle = (id: SectionId): string => t(`settings.${id}.title`);
+  const getDescription = (id: SectionId): string => t(`settings.${id}.description`);
+
+  return (
+    <div
+      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      role="navigation"
+      aria-label={t("settings.summary.jumpTo")}
+    >
+      {SECTIONS.map(({ id, icon }) => (
+        <Link
+          key={id}
+          to={buildSectionHref(id)}
+          className="rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Card className="h-full cursor-pointer transition-colors hover:bg-muted/50">
+            <CardHeader className="flex flex-row items-center gap-4 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                {icon}
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base">{getTitle(id)}</CardTitle>
+                <CardDescription className="text-sm">{getDescription(id)}</CardDescription>
+                {summaries[id] && (
+                  <p className="mt-1.5 text-xs font-medium text-foreground">{summaries[id]}</p>
+                )}
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+};

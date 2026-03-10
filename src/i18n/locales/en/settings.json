@@ -1,5 +1,6 @@
 {
   "title": "Settings",
+  "hubDescription": "View and edit app settings such as theme, AI, and storage in one place.",
   "general": {
     "title": "General",
     "description": "Theme, font size, language, profile"
@@ -11,5 +12,29 @@
   "storage": {
     "title": "Image Storage",
     "description": "Image upload storage configuration"
+  },
+  "summary": {
+    "jumpTo": "Go to this section",
+    "general": {
+      "theme": "Theme: {{value}}",
+      "fontSize": "Font: {{value}}",
+      "locale": "Language: {{value}}",
+      "profileSet": "Profile: name set",
+      "profileUnset": "Profile: not set"
+    },
+    "ai": {
+      "serverMode": "Using server",
+      "ownKeyMode": "Using own API key",
+      "model": "Model: {{value}}",
+      "configured": "Status: configured",
+      "notSet": "Not set"
+    },
+    "storage": {
+      "default": "Destination: default",
+      "external": "Destination: {{provider}}",
+      "connectionSuccess": "Status: success",
+      "connectionFailed": "Status: failed",
+      "notTested": "Status: not tested"
+    }
   }
 }

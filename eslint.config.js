@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import globals from "globals";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import unusedImports from "eslint-plugin-unused-imports";
@@ -32,6 +33,11 @@ export default tseslint.config(
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended, ...tseslint.configs.strict],
     files: ["**/*.{ts,tsx}"],
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -77,6 +83,15 @@ export default tseslint.config(
     files: ["src/**/*.{ts,tsx}"],
     rules: {
       "no-console": ["warn", { allow: ["warn", "error"] }],
+    },
+  },
+  {
+    files: ["src/components/**/*.tsx"],
+    plugins: {
+      react,
+    },
+    rules: {
+      "react/no-multi-comp": "warn",
     },
   },
   // スクリプト・e2e・サーバー: console 可、行数制限は緩め

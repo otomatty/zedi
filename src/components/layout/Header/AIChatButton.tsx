@@ -24,7 +24,7 @@ export function AIChatButton() {
     if (!settings) {
       // AI未設定時は設定ページへ遷移
       const returnTo = encodeURIComponent(location.pathname + location.search);
-      navigate(`/settings/ai?returnTo=${returnTo}`);
+      navigate(`/settings?section=ai&returnTo=${returnTo}`);
       return;
     }
     togglePanel();

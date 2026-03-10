@@ -65,7 +65,12 @@
     "mermaid": {
       "title": "Diagram",
       "description": "Create flowcharts and diagrams with Mermaid",
-      "aliases": "mermaid,diagram,flowchart"
+      "aliases": "mermaid,diagram,flowchart",
+      "notConfigured": {
+        "title": "AI configuration required",
+        "description": "AI configuration is required to generate Mermaid diagrams.",
+        "hint": "Configure your OpenAI, Anthropic, or Google API key in Settings."
+      }
     },
     "mathInline": {
       "title": "Math (inline)",

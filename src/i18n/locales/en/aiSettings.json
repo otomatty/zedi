@@ -14,6 +14,7 @@
   "connectionSuccess": "Connection successful",
   "connectionFailed": "Connection failed",
   "apiKeySources": "Where to get API keys",
+  "apiKeySourcesExpand": "Show details",
   "resetConfirmTitle": "Reset settings?",
   "resetConfirmDescription": "Your saved API key and all settings will be deleted. This cannot be undone.",
   "testConnection": "Test connection",
@@ -26,5 +27,7 @@
   "retryLoadModels": "Retry",
   "modelsEmpty": "The API responded but returned no models. Check that ai_models are registered in the database behind VITE_API_BASE_URL.",
   "costLabel": "{{multiplier}}x cost",
-  "cheapest": "cheapest"
+  "cheapest": "cheapest",
+  "showApiKey": "Show API key",
+  "hideApiKey": "Hide API key"
 }
