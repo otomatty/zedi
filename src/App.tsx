@@ -12,9 +12,6 @@ import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
 import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
-import AISettings from "./pages/AISettings";
-import StorageSettings from "./pages/StorageSettings";
-import GeneralSettings from "./pages/GeneralSettings";
 import Pricing from "./pages/Pricing";
 import SubscriptionManagement from "./pages/SubscriptionManagement";
 import Donate from "./pages/Donate";
@@ -69,9 +66,6 @@ const App = () => (
                   <Route path="/notes" element={<Notes />} />
                   <Route path="/page/:id" element={<PageEditorPage />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="/settings/ai" element={<AISettings />} />
-                  <Route path="/settings/storage" element={<StorageSettings />} />
-                  <Route path="/settings/general" element={<GeneralSettings />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route
                     path="/subscription"
