@@ -15,7 +15,7 @@ interface UsePageEditorHandlersOptions {
   saveChanges: (title: string, content: string) => void;
   generateWiki: (title: string) => void;
   resetWiki: () => void;
-  location: { pathname: string; search: string };
+  location: { pathname: string; search: string; hash?: string };
 }
 
 export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
@@ -75,10 +75,10 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
 
   const handleGoToAISettings = useCallback(() => {
     resetWiki();
-    const returnTo = `${location.pathname}${location.search}`;
-    const search = new URLSearchParams({ returnTo }).toString();
-    navigate(`/settings/ai?${search}`);
-  }, [resetWiki, navigate, location.pathname, location.search]);
+    const returnTo = `${location.pathname}${location.search}${location.hash ?? ""}`;
+    const search = new URLSearchParams({ section: "ai", returnTo }).toString();
+    navigate(`/settings?${search}`);
+  }, [resetWiki, navigate, location.pathname, location.search, location.hash]);
 
   return {
     handleContentChange,

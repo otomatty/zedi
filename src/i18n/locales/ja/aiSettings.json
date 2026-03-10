@@ -14,6 +14,7 @@
   "connectionSuccess": "接続成功",
   "connectionFailed": "接続失敗",
   "apiKeySources": "APIキーの取得先",
+  "apiKeySourcesExpand": "詳細を見る",
   "resetConfirmTitle": "設定をリセットしますか？",
   "resetConfirmDescription": "保存されているAPIキーとすべての設定が削除されます。この操作は取り消せません。",
   "testConnection": "接続テスト",
@@ -26,5 +27,7 @@
   "retryLoadModels": "再試行",
   "modelsEmpty": "API は応答しましたがモデルが0件です。VITE_API_BASE_URL の先のデータベースに ai_models が登録されているか確認してください。",
   "costLabel": "{{multiplier}}x コスト",
-  "cheapest": "最安"
+  "cheapest": "最安",
+  "showApiKey": "APIキーを表示",
+  "hideApiKey": "APIキーを隠す"
 }

@@ -15,7 +15,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
       - uses: oven-sh/setup-bun@v2
@@ -38,7 +38,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
       - uses: oven-sh/setup-bun@v2
@@ -69,7 +69,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ".nvmrc"
       - uses: oven-sh/setup-bun@v2

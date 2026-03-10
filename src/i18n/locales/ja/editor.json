@@ -65,7 +65,12 @@
     "mermaid": {
       "title": "ダイアグラム",
       "description": "Mermaid でフローチャートや図を作成",
-      "aliases": "ダイアグラム,mermaid,図,diagram,flowchart"
+      "aliases": "ダイアグラム,mermaid,図,diagram,flowchart",
+      "notConfigured": {
+        "title": "AI設定が必要です",
+        "description": "Mermaidダイアグラムを生成するには、AIの設定が必要です。",
+        "hint": "設定画面でOpenAI、Anthropic、またはGoogleのAPIキーを設定してください。"
+      }
     },
     "mathInline": {
       "title": "数式（インライン）",

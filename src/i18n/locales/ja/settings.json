@@ -1,5 +1,6 @@
 {
   "title": "設定",
+  "hubDescription": "テーマ、AI、ストレージなどアプリの設定を一覧で確認・編集できます。",
   "general": {
     "title": "一般設定",
     "description": "テーマ、フォントサイズ、言語、プロフィール"
@@ -11,5 +12,29 @@
   "storage": {
     "title": "画像ストレージ設定",
     "description": "画像アップロード先のストレージ設定"
+  },
+  "summary": {
+    "jumpTo": "このセクションへ",
+    "general": {
+      "theme": "テーマ: {{value}}",
+      "fontSize": "フォント: {{value}}",
+      "locale": "言語: {{value}}",
+      "profileSet": "プロフィール: 表示名あり",
+      "profileUnset": "プロフィール: 未入力"
+    },
+    "ai": {
+      "serverMode": "サーバー利用中",
+      "ownKeyMode": "自前APIキー利用",
+      "model": "モデル: {{value}}",
+      "configured": "接続状態: 設定済み",
+      "notSet": "未設定"
+    },
+    "storage": {
+      "default": "保存先: デフォルト",
+      "external": "保存先: {{provider}}",
+      "connectionSuccess": "接続状態: 成功",
+      "connectionFailed": "接続状態: 失敗",
+      "notTested": "接続状態: 未テスト"
+    }
   }
 }

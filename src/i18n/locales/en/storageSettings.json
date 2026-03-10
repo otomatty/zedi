@@ -26,6 +26,8 @@
   "saveFailedToastDescription": "Failed to save storage settings",
   "resetToast": "Reset complete",
   "resetToastDescription": "Storage settings have been reset",
+  "showSecrets": "Show secrets",
+  "hideSecrets": "Hide secrets",
   "providers": {
     "s3": {
       "name": "Default storage",
