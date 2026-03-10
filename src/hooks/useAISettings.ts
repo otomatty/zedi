@@ -84,6 +84,13 @@ export function useAISettings(): UseAISettingsReturn {
         }
       }
 
+      // プロバイダーまたはモデルが変わった場合は、呼び出し元が明示的に modelId を渡していなければクリアする（古い modelId の永続化を防ぐ）
+      const providerChanged = updates.provider !== undefined && updates.provider !== prev.provider;
+      const modelChanged = updates.model !== undefined && updates.model !== prev.model;
+      if ((providerChanged || modelChanged) && updates.modelId === undefined) {
+        newSettings.modelId = "";
+      }
+
       return newSettings;
     });
     // 設定変更時はテスト結果をリセット
