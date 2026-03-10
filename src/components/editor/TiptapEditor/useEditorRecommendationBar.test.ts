@@ -9,6 +9,7 @@ vi.mock("@/hooks/useAuth", () => ({
 const editorRecommendationLabels: Record<string, string> = {
   labelRecommendation: "おすすめ",
   labelThumbnails: "サムネイル候補",
+  generating: "画像を生成中",
 };
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({

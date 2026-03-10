@@ -23,7 +23,7 @@ export function AIChatButton() {
     const settings = await loadAISettings();
     if (!settings) {
       // AI未設定時は設定ページへ遷移
-      const returnTo = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
+      const returnTo = `${location.pathname}${location.search}${location.hash}`;
       navigate(`/settings?${new URLSearchParams({ section: "ai", returnTo }).toString()}`);
       return;
     }

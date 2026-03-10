@@ -32,7 +32,7 @@ export function StorageDestinationSection({
         </div>
         <Switch
           id="prefer-default"
-          checked={useExternalStorageEffective}
+          checked={useExternalStorage}
           onCheckedChange={(checked) => updateSettings({ preferDefaultStorage: !checked })}
           disabled={isSaving || isTesting}
         />

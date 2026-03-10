@@ -81,6 +81,7 @@ export function useEditorRecommendationBar({
   }, [isLoading, search]);
 
   const handleGenerateImage = useCallback(async () => {
+    if (isGenerating) return;
     setGeneratingErrorMessage(null);
     setMode("generating");
     const err = await generateImage();
@@ -89,7 +90,7 @@ export function useEditorRecommendationBar({
     } else {
       setMode("actions");
     }
-  }, [generateImage]);
+  }, [generateImage, isGenerating]);
 
   const dismiss = useCallback(() => setIsDismissed(true), []);
 
