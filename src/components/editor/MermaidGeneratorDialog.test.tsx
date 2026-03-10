@@ -36,6 +36,18 @@ vi.mock("@/hooks/useMermaidGenerator", () => ({
   useMermaidGenerator: () => mockUseMermaidGenerator,
 }));
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: "ja" } }),
+}));
+
+vi.mock("mermaid", () => ({
+  default: {
+    initialize: vi.fn(),
+    parse: vi.fn().mockResolvedValue(undefined),
+    render: vi.fn().mockResolvedValue({ svg: "<svg></svg>" }),
+  },
+}));
+
 function renderDialog(props: { open?: boolean; selectedText?: string } = {}) {
   const defaultProps = {
     open: true,
@@ -69,8 +81,10 @@ describe("MermaidGeneratorDialog", () => {
   it("renders not-configured view when isAIConfigured is false", () => {
     mockUseMermaidGenerator.isAIConfigured = false;
     renderDialog();
-    expect(screen.getByRole("heading", { name: /AI設定が必要です/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "設定画面へ" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "editor.commands.mermaid.notConfigured.title" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "common.goToSettings" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ダイアグラムを生成" })).not.toBeInTheDocument();
   });
 
@@ -96,6 +110,7 @@ describe("MermaidGeneratorDialog", () => {
     const onOpenChange = vi.fn();
     mockUseMermaidGenerator.status = "completed";
     mockUseMermaidGenerator.result = { code: "flowchart TD\n  A --> B" };
+    // mermaid module is mocked above so preview generation does not run; test only verifies insert/close
 
     render(
       <MemoryRouter>
@@ -114,12 +129,12 @@ describe("MermaidGeneratorDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("navigates to settings when 設定画面へ is clicked in not-configured view", async () => {
+  it("navigates to settings when goToSettings is clicked in not-configured view", async () => {
     const user = userEvent.setup();
     mockUseMermaidGenerator.isAIConfigured = false;
     renderDialog();
 
-    await user.click(screen.getByRole("button", { name: "設定画面へ" }));
+    await user.click(screen.getByRole("button", { name: "common.goToSettings" }));
 
     const navigateUrl = mockNavigate.mock.calls[0][0];
     expect(navigateUrl).toContain("/settings?");

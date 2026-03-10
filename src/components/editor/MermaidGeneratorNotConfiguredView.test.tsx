@@ -3,6 +3,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MermaidGeneratorNotConfiguredView } from "./MermaidGeneratorNotConfiguredView";
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "ja" },
+  }),
+}));
+
 describe("MermaidGeneratorNotConfiguredView", () => {
   it("renders title and description", () => {
     render(
@@ -13,16 +20,16 @@ describe("MermaidGeneratorNotConfiguredView", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: /AI設定が必要です/ })).toBeInTheDocument();
     expect(
-      screen.getByText(/Mermaidダイアグラムを生成するには、AIの設定が必要です。/),
+      screen.getByRole("heading", { name: "editor.commands.mermaid.notConfigured.title" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/設定画面でOpenAI、Anthropic、またはGoogleのAPIキーを設定してください。/),
+      screen.getByText("editor.commands.mermaid.notConfigured.description"),
     ).toBeInTheDocument();
+    expect(screen.getByText("editor.commands.mermaid.notConfigured.hint")).toBeInTheDocument();
   });
 
-  it("calls onOpenChange(false) when キャンセル is clicked", async () => {
+  it("calls onOpenChange(false) when cancel is clicked", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
     render(
@@ -33,12 +40,12 @@ describe("MermaidGeneratorNotConfiguredView", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "キャンセル" }));
+    await user.click(screen.getByRole("button", { name: "common.cancel" }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("calls onGoToSettings when 設定画面へ is clicked", async () => {
+  it("calls onGoToSettings when goToSettings is clicked", async () => {
     const user = userEvent.setup();
     const onGoToSettings = vi.fn();
     render(
@@ -49,7 +56,7 @@ describe("MermaidGeneratorNotConfiguredView", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "設定画面へ" }));
+    await user.click(screen.getByRole("button", { name: "common.goToSettings" }));
 
     expect(onGoToSettings).toHaveBeenCalledTimes(1);
   });

@@ -40,12 +40,12 @@ describe("MermaidGeneratorResultPreview", () => {
 
   it("renders SVG when previewSvg is provided", () => {
     const svg = '<svg data-testid="mermaid-svg"><circle /></svg>';
-    const { container } = render(
+    render(
       <MermaidGeneratorResultPreview code="flowchart TD" previewSvg={svg} previewError={null} />,
     );
 
-    const wrapper = container.querySelector(".flex.justify-center");
+    const wrapper = screen.getByTestId("preview-container");
     expect(wrapper).toBeInTheDocument();
-    expect(wrapper?.innerHTML).toContain("<svg");
+    expect(wrapper.innerHTML).toContain("<svg");
   });
 });

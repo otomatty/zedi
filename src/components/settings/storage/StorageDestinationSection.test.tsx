@@ -75,7 +75,7 @@ describe("StorageDestinationSection", () => {
     expect(updateSettings).toHaveBeenCalledWith({ preferDefaultStorage: false });
   });
 
-  it("disables switch when isSaving or isTesting", () => {
+  it("disables switch when isSaving is true", () => {
     render(
       <StorageDestinationSection
         useExternalStorage={false}
@@ -83,6 +83,20 @@ describe("StorageDestinationSection", () => {
         updateSettings={vi.fn()}
         isSaving={true}
         isTesting={false}
+      />,
+    );
+
+    expect(screen.getByRole("switch")).toBeDisabled();
+  });
+
+  it("disables switch when isTesting is true", () => {
+    render(
+      <StorageDestinationSection
+        useExternalStorage={false}
+        useExternalStorageEffective={false}
+        updateSettings={vi.fn()}
+        isSaving={false}
+        isTesting={true}
       />,
     );
 

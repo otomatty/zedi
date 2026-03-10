@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +8,7 @@ import {
 } from "@zedi/ui";
 import { Button } from "@zedi/ui";
 import { Settings, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface MermaidGeneratorNotConfiguredViewProps {
   open: boolean;
@@ -21,30 +21,31 @@ export function MermaidGeneratorNotConfiguredView({
   onOpenChange,
   onGoToSettings,
 }: MermaidGeneratorNotConfiguredViewProps) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-500" />
-            AI設定が必要です
+            {t("editor.commands.mermaid.notConfigured.title")}
           </DialogTitle>
           <DialogDescription>
-            Mermaidダイアグラムを生成するには、AIの設定が必要です。
+            {t("editor.commands.mermaid.notConfigured.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
           <p className="text-sm text-muted-foreground">
-            設定画面でOpenAI、Anthropic、またはGoogleのAPIキーを設定してください。
+            {t("editor.commands.mermaid.notConfigured.hint")}
           </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            キャンセル
+            {t("common.cancel")}
           </Button>
           <Button onClick={onGoToSettings}>
             <Settings className="mr-2 h-4 w-4" />
-            設定画面へ
+            {t("common.goToSettings")}
           </Button>
         </DialogFooter>
       </DialogContent>

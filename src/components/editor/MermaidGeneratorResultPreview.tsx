@@ -28,6 +28,7 @@ export function MermaidGeneratorResultPreview({
           </div>
         ) : previewSvg ? (
           <div
+            data-testid="preview-container"
             className="flex justify-center overflow-auto rounded-md border bg-white p-4 dark:bg-gray-900"
             dangerouslySetInnerHTML={{ __html: previewSvg }}
           />

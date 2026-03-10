@@ -88,13 +88,16 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
           <div className="flex items-center gap-3">
             <Key className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium">{t("aiSettings.useOwnKey")}</p>
+              <p id="useOwnKey-label" className="text-sm font-medium">
+                {t("aiSettings.useOwnKey")}
+              </p>
               <p className="text-xs text-muted-foreground">
                 {t("aiSettings.useOwnKeyDescription")}
               </p>
             </div>
           </div>
           <Switch
+            aria-labelledby="useOwnKey-label"
             checked={useOwnKey}
             onCheckedChange={handleToggleOwnKey}
             disabled={isSaving || isTesting}

@@ -80,6 +80,7 @@ export const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
             size="icon"
             className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
             onClick={() => setShowSecrets(!showSecrets)}
+            disabled={disabled}
             aria-label={
               showSecrets ? t("storageSettings.hideSecrets") : t("storageSettings.showSecrets")
             }
