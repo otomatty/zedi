@@ -37,7 +37,11 @@ const Settings: React.FC = () => {
     if (!isValidSection(section)) return;
     const el = document.getElementById(`section-${section}`);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
     }
   }, [section]);
 

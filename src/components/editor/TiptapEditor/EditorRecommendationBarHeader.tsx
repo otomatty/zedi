@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronLeft, Sparkles, X } from "lucide-react";
 import { Button } from "@zedi/ui";
 import type { RecommendationMode } from "./EditorRecommendationBarTypes";
@@ -21,35 +22,44 @@ export const EditorRecommendationBarHeader: React.FC<EditorRecommendationBarHead
   onNextPage,
   onBackToActions,
   onDismiss,
-}) => (
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <Sparkles className="h-4 w-4" />
-      <span>{headerLabel}</span>
-    </div>
-    <div className="flex items-center gap-2">
-      {mode === "thumbnails" && (
-        <>
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Sparkles className="h-4 w-4" />
+        <span>{headerLabel}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {mode === "thumbnails" && (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onNextPage}
+              disabled={!nextCursor || isLoading}
+            >
+              {t("editor.recommendation.next")}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={onBackToActions}>
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              {t("editor.recommendation.back")}
+            </Button>
+          </>
+        )}
+        {(mode === "actions" || mode === "thumbnails") && (
           <Button
             type="button"
             size="sm"
-            variant="outline"
-            onClick={onNextPage}
-            disabled={!nextCursor || isLoading}
+            variant="ghost"
+            onClick={onDismiss}
+            aria-label={t("editor.recommendation.close")}
           >
-            次へ
+            <X className="h-4 w-4" />
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={onBackToActions}>
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            戻る
-          </Button>
-        </>
-      )}
-      {(mode === "actions" || mode === "thumbnails") && (
-        <Button type="button" size="sm" variant="ghost" onClick={onDismiss} aria-label="閉じる">
-          <X className="h-4 w-4" />
-        </Button>
-      )}
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};

@@ -6,6 +6,24 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
+const editorRecommendationLabels: Record<string, string> = {
+  labelRecommendation: "おすすめ",
+  labelThumbnails: "サムネイル候補",
+  generating: "画像を生成中",
+};
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      if (key.startsWith("editor.recommendation.")) {
+        const sub = key.replace("editor.recommendation.", "");
+        return editorRecommendationLabels[sub] ?? key;
+      }
+      return key;
+    },
+    i18n: { language: "ja" },
+  }),
+}));
+
 import { useAuth } from "@/hooks/useAuth";
 
 const defaultProps = {

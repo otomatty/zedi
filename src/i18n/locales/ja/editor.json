@@ -82,5 +82,13 @@
       "description": "ブロック数式を挿入",
       "aliases": "数式ブロック,block math,ブロック数式,equation"
     }
+  },
+  "recommendation": {
+    "next": "次へ",
+    "back": "戻る",
+    "close": "閉じる",
+    "generating": "画像を生成中",
+    "labelRecommendation": "おすすめ",
+    "labelThumbnails": "サムネイル候補"
   }
 }
