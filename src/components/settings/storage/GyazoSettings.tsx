@@ -40,6 +40,10 @@ export const GyazoSettings: React.FC<GyazoSettingsProps> = ({
           size="icon"
           className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
           onClick={() => setShowSecrets(!showSecrets)}
+          aria-label={
+            showSecrets ? t("storageSettings.hideSecrets") : t("storageSettings.showSecrets")
+          }
+          aria-pressed={showSecrets}
         >
           {showSecrets ? (
             <EyeOff className="h-4 w-4 text-muted-foreground" />

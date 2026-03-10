@@ -68,6 +68,9 @@ export const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySection
             size="icon"
             className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
             onClick={onToggleShowApiKey}
+            disabled={isSaving || isTesting}
+            aria-label={showApiKey ? t("aiSettings.hideApiKey") : t("aiSettings.showApiKey")}
+            aria-pressed={showApiKey}
           >
             {showApiKey ? (
               <EyeOff className="h-4 w-4 text-muted-foreground" />

@@ -41,7 +41,7 @@
 
 | #   | ファイル                                     | 行    | 観点   | 指摘内容                                                                                                                                     | 推奨修正                                                                                      |
 | --- | -------------------------------------------- | ----- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 1   | src/components/settings/useAISettingsForm.ts | 74-72 | 可読性 | `useEffect` で `setUseOwnKey(settings.apiMode === "user_api_key")` を `isLoading` 依存で実行。初回ロード後に UI と設定を同期する意図は明確。 | コメントで「初回ロード後に apiMode に合わせて useOwnKey を同期」と書くと意図が伝わりやすい。  |
+| 1   | src/components/settings/useAISettingsForm.ts | 72-74 | 可読性 | `useEffect` で `setUseOwnKey(settings.apiMode === "user_api_key")` を `isLoading` 依存で実行。初回ロード後に UI と設定を同期する意図は明確。 | コメントで「初回ロード後に apiMode に合わせて useOwnKey を同期」と書くと意図が伝わりやすい。  |
 | 2   | src/pages/Settings.tsx                       | 18-20 | 可読性 | `isValidSection(s)` で URL の `section` を検証。`VALID_SECTIONS` と型で一貫している。                                                        | 特になし。必要なら `section` が不正な場合のフォールバック（例: general へ）を明示してもよい。 |
 
 ## テストカバレッジ

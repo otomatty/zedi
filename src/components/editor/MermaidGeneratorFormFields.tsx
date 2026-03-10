@@ -42,6 +42,7 @@ export function MermaidGeneratorFormFields({
                 id={type.id}
                 checked={selectedTypes.includes(type.id)}
                 onCheckedChange={() => onTypeToggle(type.id)}
+                disabled={status !== "idle"}
               />
               <div className="flex-1">
                 <span className="text-sm font-medium">{type.name}</span>

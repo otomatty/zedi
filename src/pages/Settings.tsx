@@ -45,11 +45,11 @@ const Settings: React.FC = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Container className="flex h-16 items-center gap-4">
-          <Link to={backTo} aria-label={t("common.back")}>
-            <Button variant="ghost" size="icon">
+          <Button asChild variant="ghost" size="icon">
+            <Link to={backTo} aria-label={t("common.back")}>
               <ArrowLeft className="h-5 w-5" aria-hidden />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <h1 className="text-xl font-semibold">{t("settings.title")}</h1>
         </Container>
       </header>

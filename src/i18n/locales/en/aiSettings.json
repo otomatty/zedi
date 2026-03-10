@@ -27,5 +27,7 @@
   "retryLoadModels": "Retry",
   "modelsEmpty": "The API responded but returned no models. Check that ai_models are registered in the database behind VITE_API_BASE_URL.",
   "costLabel": "{{multiplier}}x cost",
-  "cheapest": "cheapest"
+  "cheapest": "cheapest",
+  "showApiKey": "Show API key",
+  "hideApiKey": "Hide API key"
 }

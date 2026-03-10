@@ -53,7 +53,7 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
 
   const handleGoToSettings = () => {
     setShowNotConfiguredDialog(false);
-    const returnTo = `${location.pathname}${location.search}`;
+    const returnTo = `${location.pathname}${location.search}${location.hash ?? ""}`;
     const search = new URLSearchParams({ section: "ai", returnTo }).toString();
     navigate(`/settings?${search}`);
   };

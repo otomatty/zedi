@@ -58,16 +58,16 @@
 
 ## テストカバレッジ
 
-| 変更ファイル                                    | テストファイル                      | 状態            |
-| ----------------------------------------------- | ----------------------------------- | --------------- |
-| src/pages/Settings.tsx                          | -                                   | ⚠️ テスト未作成 |
-| src/components/settings/AISettingsForm.tsx      | -                                   | ⚠️ テスト未作成 |
-| src/components/settings/StorageSettingsForm.tsx | -                                   | ⚠️ テスト未作成 |
-| src/components/settings/SettingsOverview.tsx    | -                                   | ⚠️ テスト未作成 |
-| src/components/settings/SettingsSection.tsx     | -                                   | ⚠️ テスト未作成 |
-| src/components/settings/useSettingsSummaries.ts | -                                   | ⚠️ テスト未作成 |
-| src/components/settings/CollapsibleHelp.tsx     | -                                   | ⚠️ テスト未作成 |
-| src/App.tsx                                     | （ルーティングは E2E でカバー想定） | -               |
+| 変更ファイル                                    | テストファイル                                    | 状態            |
+| ----------------------------------------------- | ------------------------------------------------- | --------------- |
+| src/pages/Settings.tsx                          | -                                                 | ⚠️ テスト未作成 |
+| src/components/settings/AISettingsForm.tsx      | -                                                 | ⚠️ テスト未作成 |
+| src/components/settings/StorageSettingsForm.tsx | -                                                 | ⚠️ テスト未作成 |
+| src/components/settings/SettingsOverview.tsx    | src/components/settings/SettingsOverview.test.tsx | ✅ 追加済み     |
+| src/components/settings/SettingsSection.tsx     | -                                                 | ⚠️ テスト未作成 |
+| src/components/settings/useSettingsSummaries.ts | -                                                 | ⚠️ テスト未作成 |
+| src/components/settings/CollapsibleHelp.tsx     | -                                                 | ⚠️ テスト未作成 |
+| src/App.tsx                                     | （ルーティングは E2E でカバー想定）               | -               |
 
 ## Lint / Format チェック
 

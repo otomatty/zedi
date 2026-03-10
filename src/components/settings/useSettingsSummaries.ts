@@ -58,7 +58,8 @@ export function useSettingsSummaries(): Record<SettingsSectionId, string> {
 
   const storageSummary = (): string => {
     if (storage.isLoading) return "";
-    const useDefault = storage.settings.preferDefaultStorage !== false;
+    const isLegacyCloudflareR2 = (storage.settings.provider as string) === LEGACY_CLOUDFLARE_R2;
+    const useDefault = storage.settings.preferDefaultStorage !== false || isLegacyCloudflareR2;
     const destinationText = useDefault
       ? t("settings.summary.storage.default")
       : t("settings.summary.storage.external", {

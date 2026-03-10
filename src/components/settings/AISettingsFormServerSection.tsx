@@ -39,7 +39,7 @@ export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionPr
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Server className="h-4 w-4 text-primary" />
-        <Label>{t("aiSettings.aiModel")}</Label>
+        <Label id="ai-model-select-label">{t("aiSettings.aiModel")}</Label>
       </div>
 
       {serverModelsError && (
@@ -70,7 +70,7 @@ export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionPr
           onValueChange={onServerModelSelect}
           disabled={isSaving}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-labelledby="ai-model-select-label">
             <SelectValue placeholder={t("aiSettings.selectModel")} />
           </SelectTrigger>
           <SelectContent>

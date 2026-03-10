@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,7 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   onInsert,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { status, result, error, isAIConfigured, generate, reset, checkAIConfigured } =
     useMermaidGenerator();
 
@@ -91,7 +92,9 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
 
   const handleGoToSettings = () => {
     onOpenChange(false);
-    navigate("/settings?section=ai");
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
+    const params = new URLSearchParams({ section: "ai", returnTo });
+    navigate(`/settings?${params.toString()}`);
   };
 
   if (isAIConfigured === false) {
