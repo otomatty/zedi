@@ -76,8 +76,8 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
   const handleGoToAISettings = useCallback(() => {
     resetWiki();
     const returnTo = `${location.pathname}${location.search}`;
-    const search = new URLSearchParams({ returnTo }).toString();
-    navigate(`/settings/ai?${search}`);
+    const search = new URLSearchParams({ section: "ai", returnTo }).toString();
+    navigate(`/settings?${search}`);
   }, [resetWiki, navigate, location.pathname, location.search]);
 
   return {

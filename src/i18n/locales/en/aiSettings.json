@@ -14,6 +14,7 @@
   "connectionSuccess": "Connection successful",
   "connectionFailed": "Connection failed",
   "apiKeySources": "Where to get API keys",
+  "apiKeySourcesExpand": "Show details",
   "resetConfirmTitle": "Reset settings?",
   "resetConfirmDescription": "Your saved API key and all settings will be deleted. This cannot be undone.",
   "testConnection": "Test connection",

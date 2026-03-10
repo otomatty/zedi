@@ -9,13 +9,12 @@ import {
   DialogDescription,
 } from "@zedi/ui";
 import { Button } from "@zedi/ui";
-import { Checkbox } from "@zedi/ui";
-import { Label } from "@zedi/ui";
-import { Loader2, Settings, AlertCircle } from "lucide-react";
 import { useMermaidGenerator } from "@/hooks/useMermaidGenerator";
-import { DIAGRAM_TYPES, MermaidDiagramType } from "@/lib/mermaidGenerator";
+import { MermaidDiagramType } from "@/lib/mermaidGenerator";
+import { MermaidGeneratorNotConfiguredView } from "./MermaidGeneratorNotConfiguredView";
+import { MermaidGeneratorFormFields } from "./MermaidGeneratorFormFields";
+import { MermaidGeneratorResultPreview } from "./MermaidGeneratorResultPreview";
 
-// Dynamic import for mermaid
 async function getMermaid() {
   const { default: mermaid } = await import("mermaid");
   return mermaid;
@@ -42,7 +41,6 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   const [previewSvg, setPreviewSvg] = useState<string>("");
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  // ダイアログが開いたときにAI設定をチェック
   useEffect(() => {
     if (open) {
       checkAIConfigured();
@@ -54,7 +52,6 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     }
   }, [open, checkAIConfigured, reset]);
 
-  // 結果が来たらプレビューを生成
   useEffect(() => {
     const renderPreview = async () => {
       if (result?.code) {
@@ -71,7 +68,6 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
         }
       }
     };
-
     renderPreview();
   }, [result]);
 
@@ -94,39 +90,16 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
 
   const handleGoToSettings = () => {
     onOpenChange(false);
-    navigate("/settings/ai");
+    navigate("/settings?section=ai");
   };
 
-  // AI未設定の場合
   if (isAIConfigured === false) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-500" />
-              AI設定が必要です
-            </DialogTitle>
-            <DialogDescription>
-              Mermaidダイアグラムを生成するには、AIの設定が必要です。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              設定画面でOpenAI、Anthropic、またはGoogleのAPIキーを設定してください。
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              キャンセル
-            </Button>
-            <Button onClick={handleGoToSettings}>
-              <Settings className="mr-2 h-4 w-4" />
-              設定画面へ
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MermaidGeneratorNotConfiguredView
+        open={open}
+        onOpenChange={onOpenChange}
+        onGoToSettings={handleGoToSettings}
+      />
     );
   }
 
@@ -138,93 +111,21 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
           <DialogDescription>選択したテキストからダイアグラムを生成します。</DialogDescription>
         </DialogHeader>
 
-        {/* 選択されたテキスト */}
-        <div className="space-y-2">
-          <Label>選択されたテキスト</Label>
-          <div className="max-h-24 overflow-auto rounded-md bg-muted p-3 text-sm">
-            {selectedText}
-          </div>
-        </div>
+        <MermaidGeneratorFormFields
+          selectedText={selectedText}
+          selectedTypes={selectedTypes}
+          onTypeToggle={handleTypeToggle}
+          status={status}
+          error={error}
+          onGenerate={handleGenerate}
+        />
 
-        {/* ダイアグラムタイプ選択 */}
-        <div className="space-y-2">
-          <Label>ダイアグラムタイプを選択（複数可）</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {DIAGRAM_TYPES.map((type) => (
-              <div
-                key={type.id}
-                className="flex cursor-pointer items-start space-x-2 rounded border p-2 hover:bg-muted/50"
-                onClick={() => handleTypeToggle(type.id)}
-              >
-                <Checkbox
-                  id={type.id}
-                  checked={selectedTypes.includes(type.id)}
-                  onCheckedChange={() => handleTypeToggle(type.id)}
-                />
-                <div className="flex-1">
-                  <Label htmlFor={type.id} className="cursor-pointer text-sm font-medium">
-                    {type.name}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">{type.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 生成ボタン / 生成中表示 */}
-        {status === "idle" && (
-          <Button onClick={handleGenerate} disabled={selectedTypes.length === 0} className="w-full">
-            ダイアグラムを生成
-          </Button>
-        )}
-
-        {status === "generating" && (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-            <span>生成中...</span>
-          </div>
-        )}
-
-        {/* エラー表示 */}
-        {status === "error" && error && (
-          <div className="rounded-md bg-destructive/10 p-4 text-destructive">
-            <p className="font-medium">エラーが発生しました</p>
-            <p className="text-sm">{error.message}</p>
-            <Button variant="outline" size="sm" onClick={handleGenerate} className="mt-2">
-              再試行
-            </Button>
-          </div>
-        )}
-
-        {/* 結果プレビュー */}
         {status === "completed" && result && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>生成されたコード</Label>
-              <pre className="max-h-32 overflow-auto rounded-md bg-muted p-3 font-mono text-sm">
-                {result.code}
-              </pre>
-            </div>
-
-            <div className="space-y-2">
-              <Label>プレビュー</Label>
-              {previewError ? (
-                <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
-                  {previewError}
-                </div>
-              ) : previewSvg ? (
-                <div
-                  className="flex justify-center overflow-auto rounded-md border bg-white p-4 dark:bg-gray-900"
-                  dangerouslySetInnerHTML={{ __html: previewSvg }}
-                />
-              ) : (
-                <div className="p-4 text-center text-muted-foreground">
-                  プレビューを読み込み中...
-                </div>
-              )}
-            </div>
-          </div>
+          <MermaidGeneratorResultPreview
+            code={result.code}
+            previewSvg={previewSvg}
+            previewError={previewError}
+          />
         )}
 
         <DialogFooter>

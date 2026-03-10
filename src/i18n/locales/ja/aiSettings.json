@@ -14,6 +14,7 @@
   "connectionSuccess": "接続成功",
   "connectionFailed": "接続失敗",
   "apiKeySources": "APIキーの取得先",
+  "apiKeySourcesExpand": "詳細を見る",
   "resetConfirmTitle": "設定をリセットしますか？",
   "resetConfirmDescription": "保存されているAPIキーとすべての設定が削除されます。この操作は取り消せません。",
   "testConnection": "接続テスト",

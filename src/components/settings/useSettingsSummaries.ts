@@ -1,0 +1,83 @@
+import { useTranslation } from "react-i18next";
+import { useGeneralSettings } from "@/hooks/useGeneralSettings";
+import { useAISettings } from "@/hooks/useAISettings";
+import { useStorageSettings } from "@/hooks/useStorageSettings";
+import { useProfile } from "@/hooks/useProfile";
+import { THEME_OPTIONS, LOCALE_OPTIONS } from "@/types/generalSettings";
+import type { StorageProviderType } from "@/types/storage";
+import type { SettingsSectionId } from "./SettingsSection";
+
+/** Legacy provider id; normalized to s3 for display (no longer in StorageProviderType). */
+const LEGACY_CLOUDFLARE_R2 = "cloudflare-r2";
+
+function effectiveStorageProviderId(provider: string): StorageProviderType {
+  return provider === LEGACY_CLOUDFLARE_R2 ? "s3" : (provider as StorageProviderType);
+}
+
+export function useSettingsSummaries(): Record<SettingsSectionId, string> {
+  const { t, i18n } = useTranslation();
+  const general = useGeneralSettings();
+  const ai = useAISettings();
+  const storage = useStorageSettings();
+  const { displayName } = useProfile();
+
+  const generalSummary = (): string => {
+    if (general.isLoading) return "";
+    const themeOpt = THEME_OPTIONS.find((o) => o.value === general.settings.theme);
+    const themeText =
+      i18n.language === "ja" ? themeOpt?.label : (themeOpt?.labelEn ?? general.settings.theme);
+    const fontSizePx = general.editorFontSizePx ?? 16;
+    const localeOpt = LOCALE_OPTIONS.find((o) => o.value === general.settings.locale);
+    const localeText = localeOpt?.label ?? general.settings.locale;
+    const profileText = displayName
+      ? t("settings.summary.general.profileSet")
+      : t("settings.summary.general.profileUnset");
+    return [
+      t("settings.summary.general.theme", { value: themeText }),
+      t("settings.summary.general.fontSize", { value: `${fontSizePx}px` }),
+      t("settings.summary.general.locale", { value: localeText }),
+      profileText,
+    ].join(" · ");
+  };
+
+  const aiSummary = (): string => {
+    if (ai.isLoading) return "";
+    const useOwnKey = ai.settings.apiMode === "user_api_key";
+    const modeText = useOwnKey
+      ? t("settings.summary.ai.ownKeyMode")
+      : t("settings.summary.ai.serverMode");
+    const statusText = ai.settings.isConfigured
+      ? t("settings.summary.ai.configured")
+      : t("settings.summary.ai.notSet");
+    const parts = [modeText, statusText];
+    if (ai.settings.modelId) {
+      parts.splice(1, 0, t("settings.summary.ai.model", { value: ai.settings.modelId }));
+    }
+    return parts.join(" · ");
+  };
+
+  const storageSummary = (): string => {
+    if (storage.isLoading) return "";
+    const useDefault = storage.settings.preferDefaultStorage !== false;
+    const destinationText = useDefault
+      ? t("settings.summary.storage.default")
+      : t("settings.summary.storage.external", {
+          provider: t(
+            `storageSettings.providers.${effectiveStorageProviderId(storage.settings.provider)}.name`,
+          ),
+        });
+    let statusText = t("settings.summary.storage.notTested");
+    if (storage.testResult) {
+      statusText = storage.testResult.success
+        ? t("settings.summary.storage.connectionSuccess")
+        : t("settings.summary.storage.connectionFailed");
+    }
+    return `${destinationText} · ${statusText}`;
+  };
+
+  return {
+    general: generalSummary(),
+    ai: aiSummary(),
+    storage: storageSummary(),
+  };
+}
