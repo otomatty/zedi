@@ -110,6 +110,20 @@ test.describe("Page Editor", () => {
       // The content error banner should not be visible for normal content
       await expect(page.locator(".bg-amber-500\\/10")).not.toBeVisible();
     });
+
+    test("should apply bold via bubble menu when text is selected", async ({ page, helpers }) => {
+      await helpers.createNewPage(page);
+
+      const editor = page.locator(".tiptap");
+      await editor.click();
+      await page.keyboard.type("Bold test");
+      await page.keyboard.press("Mod+a");
+
+      await expect(page.getByRole("button", { name: "太字" })).toBeVisible({ timeout: 3000 });
+      await page.getByRole("button", { name: "太字" }).click();
+
+      await expect(editor.locator("strong")).toContainText("Bold test");
+    });
   });
 
   test.describe("Wiki Generator", () => {
