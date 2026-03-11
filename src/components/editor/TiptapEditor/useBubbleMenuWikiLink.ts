@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Editor } from "@tiptap/core";
 import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
 
@@ -10,16 +10,18 @@ export interface UseBubbleMenuWikiLinkOptions {
 export function useBubbleMenuWikiLink({ editor, pageId }: UseBubbleMenuWikiLinkOptions) {
   const { checkExistence } = useWikiLinkExistsChecker();
   const [isConverting, setIsConverting] = useState(false);
+  const convertingRef = useRef(false);
 
   const isWikiLinkSelection = editor.isActive("wikiLink");
 
   const convertToWikiLink = useCallback(async () => {
-    if (isConverting) return;
+    if (convertingRef.current) return;
 
     const { from, to } = editor.state.selection;
     const text = editor.state.doc.textBetween(from, to, null, "\ufffc").trim();
     if (!text) return;
 
+    convertingRef.current = true;
     setIsConverting(true);
     try {
       let exists = false;
@@ -55,9 +57,10 @@ export function useBubbleMenuWikiLink({ editor, pageId }: UseBubbleMenuWikiLinkO
         ])
         .run();
     } finally {
+      convertingRef.current = false;
       setIsConverting(false);
     }
-  }, [editor, pageId, checkExistence, isConverting]);
+  }, [editor, pageId, checkExistence]);
 
   const unsetWikiLink = useCallback(() => {
     editor.chain().focus().unsetWikiLink().run();

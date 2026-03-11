@@ -10,17 +10,27 @@ export interface BubbleMenuButtonProps extends Omit<
   children: React.ReactNode;
 }
 
+/** Keep editor focus when clicking the button so BubbleMenu shouldShow(hasFocus) does not hide the menu before click fires. */
+function handleMouseDown(e: React.MouseEvent<HTMLButtonElement>) {
+  e.preventDefault();
+}
+
 /** Small toolbar button for the bubble menu */
 export function BubbleMenuButton({
   onClick,
   isActive,
   children,
   className,
+  onMouseDown: onMouseDownProp,
   ...props
 }: BubbleMenuButtonProps) {
   return (
     <button
       type="button"
+      onMouseDown={(e) => {
+        handleMouseDown(e);
+        onMouseDownProp?.(e);
+      }}
       onClick={onClick}
       className={cn(
         "rounded-md p-1.5 transition-colors",

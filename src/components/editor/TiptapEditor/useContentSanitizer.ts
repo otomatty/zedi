@@ -42,6 +42,7 @@ export function useContentSanitizer({
     // コラボモード時は Y.Doc が唯一のソースのため sanitization と setContent を行わない（二重化防止・CPU 節約）
     if (isCollaborationMode) {
       if (!content && onError) onError(null);
+      onContentUpdated?.(true);
       return;
     }
 

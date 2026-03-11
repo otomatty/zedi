@@ -31,23 +31,26 @@ export function AIChatButton() {
   };
 
   return (
-    <div className={`rounded-md bg-gradient-to-r ${AI_BUTTON_GRADIENT} p-[2px]`}>
+    <div
+      className={`flex h-10 shrink-0 items-center rounded-md bg-gradient-to-r ${AI_BUTTON_GRADIENT} p-[2px] transition-shadow duration-300 hover:shadow-[0_0_12px_-2px_rgba(139,92,246,0.35)]`}
+    >
       <button
         type="button"
         onClick={handleClick}
         aria-label={t("aiChat.title")}
         aria-pressed={isOpen}
-        className={`group relative flex items-center gap-1.5 rounded-sm px-3 py-2 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
+        className={`group relative flex h-full min-h-0 w-full items-center justify-center gap-1 rounded-[calc(theme(borderRadius.md)-1px)] px-3 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
           isOpen
-            ? `bg-gradient-to-r ${AI_BUTTON_GRADIENT} text-white shadow-sm`
-            : "bg-background text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+            ? `bg-gradient-to-r ${AI_BUTTON_GRADIENT} text-white shadow-md`
+            : "bg-background text-muted-foreground hover:text-white"
         }`}
         title={`${t("aiChat.title")} (Ctrl+Shift+A)`}
       >
-        {/* ホバー時の背景グロー効果 (開いていない時のみ) */}
+        {/* ホバー時: オープン時と同じグラデーション背景を透過で重ねて滑らかに表示 */}
         {!isOpen && (
           <div
-            className={`absolute inset-0 rounded-sm bg-gradient-to-r ${AI_BUTTON_GRADIENT} opacity-0 blur transition-opacity duration-500 group-hover:opacity-10`}
+            className={`pointer-events-none absolute inset-0 rounded-[calc(theme(borderRadius.md)-1px)] bg-gradient-to-r ${AI_BUTTON_GRADIENT} opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100`}
+            aria-hidden
           />
         )}
 
@@ -85,14 +88,29 @@ export function AIChatButton() {
           </svg>
         )}
 
-        <Sparkles
-          className={`relative h-6 w-6 ${isStreaming ? "animate-pulse" : ""}`}
-          style={isOpen ? { stroke: "currentColor" } : { stroke: `url(#${gradientId})` }}
-          aria-hidden="true"
-        />
+        {isOpen ? (
+          <Sparkles
+            className={`relative h-6 w-6 ${isStreaming ? "animate-pulse" : ""}`}
+            style={{ stroke: "currentColor" }}
+            aria-hidden="true"
+          />
+        ) : (
+          <span className="relative inline-block h-6 w-6">
+            <Sparkles
+              className="h-6 w-6 opacity-100 transition-opacity duration-300 ease-out group-hover:opacity-0"
+              style={{ stroke: `url(#${gradientId})` }}
+              aria-hidden="true"
+            />
+            <Sparkles
+              className={`absolute inset-0 h-6 w-6 opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100 ${isStreaming ? "animate-pulse" : ""}`}
+              style={{ stroke: "currentColor" }}
+              aria-hidden="true"
+            />
+          </span>
+        )}
         <span
-          className={`relative text-sm font-medium ${
-            !isOpen ? `bg-gradient-to-r ${AI_BUTTON_GRADIENT} bg-clip-text text-transparent` : ""
+          className={`text-md relative bg-transparent font-medium transition-colors duration-300 ease-out ${
+            !isOpen ? "text-muted-foreground group-hover:text-white" : ""
           }`}
         >
           AI
