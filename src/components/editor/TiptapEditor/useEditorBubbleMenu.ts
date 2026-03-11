@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Editor } from "@tiptap/core";
 import { useBubbleMenuWikiLink } from "./useBubbleMenuWikiLink";
 
@@ -54,8 +54,14 @@ export function useEditorBubbleMenu(editor: Editor, pageId?: string) {
     [editor],
   );
 
-  const hasTable = !!editor.extensionManager.extensions.find((e) => e.name === "table");
-  const hasTaskList = !!editor.extensionManager.extensions.find((e) => e.name === "taskList");
+  const hasTable = useMemo(
+    () => !!editor.extensionManager.extensions.find((e) => e.name === "table"),
+    [editor.extensionManager.extensions],
+  );
+  const hasTaskList = useMemo(
+    () => !!editor.extensionManager.extensions.find((e) => e.name === "taskList"),
+    [editor.extensionManager.extensions],
+  );
 
   return {
     showColorPicker,

@@ -4,7 +4,13 @@ import { useEditorBubbleMenu } from "./useEditorBubbleMenu";
 import type { Editor } from "@tiptap/core";
 
 vi.mock("@/hooks/usePageQueries", () => ({
-  useCheckGhostLinkReferenced: () => ({ checkReferenced: vi.fn().mockResolvedValue(false) }),
+  useWikiLinkExistsChecker: () =>
+    ({
+      checkExistence: vi.fn().mockResolvedValue({
+        pageTitles: new Set(),
+        referencedTitles: new Set(),
+      }),
+    }) as unknown,
 }));
 
 function createMockEditor(): Editor & {

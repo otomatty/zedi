@@ -18,7 +18,7 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({ editor, page
       editor={editor}
       options={{ placement: "top" }}
       shouldShow={({ editor, state: menuState }) => {
-        if (menuState.selection.empty) return false;
+        if (menuState.selection.empty && !editor.isActive("wikiLink")) return false;
         if (editor.isActive("codeBlock")) return false;
         return true;
       }}

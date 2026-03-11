@@ -45,6 +45,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
     isWikiLinkSelection,
     convertToWikiLink,
     unsetWikiLink,
+    isConverting,
   } = state;
 
   return (
@@ -98,6 +99,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
         <BubbleMenuButton
           onClick={convertToWikiLink}
           isActive={false}
+          disabled={isConverting}
           aria-label="WikiLinkにする"
           title="WikiLink"
         >
@@ -173,9 +175,11 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
             <div className="grid grid-cols-4 gap-1.5">
               {BUBBLE_MENU_PRESET_COLORS.map((color) => (
                 <button
+                  type="button"
                   key={color.value || "default"}
                   onClick={() => setColor(color.value)}
                   title={color.label}
+                  aria-label={color.label}
                   className={cn(
                     "h-6 w-6 rounded-md border border-border transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring",
                     !color.value && "bg-foreground",

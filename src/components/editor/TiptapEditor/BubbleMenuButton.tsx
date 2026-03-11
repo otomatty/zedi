@@ -1,8 +1,11 @@
 import React from "react";
 import { cn } from "@zedi/ui";
 
-export interface BubbleMenuButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  onClick: () => void;
+export interface BubbleMenuButtonProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "onClick"
+> {
+  onClick: React.MouseEventHandler<HTMLButtonElement>;
   isActive: boolean;
   children: React.ReactNode;
 }

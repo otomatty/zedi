@@ -3,9 +3,9 @@ import { renderHook, act } from "@testing-library/react";
 import { useBubbleMenuWikiLink } from "./useBubbleMenuWikiLink";
 import type { Editor } from "@tiptap/core";
 
-const mockCheckReferenced = vi.fn();
+const mockCheckExistence = vi.fn();
 vi.mock("@/hooks/usePageQueries", () => ({
-  useCheckGhostLinkReferenced: () => ({ checkReferenced: mockCheckReferenced }),
+  useWikiLinkExistsChecker: () => ({ checkExistence: mockCheckExistence }),
 }));
 
 function createMockEditor(options: {
@@ -49,7 +49,7 @@ function createMockEditor(options: {
 describe("useBubbleMenuWikiLink", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCheckReferenced.mockResolvedValue(false);
+    mockCheckExistence.mockResolvedValue({ pageTitles: new Set(), referencedTitles: new Set() });
   });
 
   it("returns isWikiLinkSelection false when editor is not in wikiLink", () => {
@@ -64,6 +64,12 @@ describe("useBubbleMenuWikiLink", () => {
     expect(result.current.isWikiLinkSelection).toBe(true);
   });
 
+  it("returns isConverting false initially", () => {
+    const editor = createMockEditor({ textBetween: "Foo" });
+    const { result } = renderHook(() => useBubbleMenuWikiLink({ editor }));
+    expect(result.current.isConverting).toBe(false);
+  });
+
   it("convertToWikiLink does nothing when selection text is empty", async () => {
     const editor = createMockEditor({ textBetween: "   " });
     const { result } = renderHook(() => useBubbleMenuWikiLink({ editor }));
@@ -72,11 +78,11 @@ describe("useBubbleMenuWikiLink", () => {
       await result.current.convertToWikiLink();
     });
 
-    expect(mockCheckReferenced).not.toHaveBeenCalled();
+    expect(mockCheckExistence).not.toHaveBeenCalled();
     expect(editor.chain).not.toHaveBeenCalled();
   });
 
-  it("convertToWikiLink calls checkReferenced with title and pageId then inserts content", async () => {
+  it("convertToWikiLink calls checkExistence with titles and pageId then inserts content", async () => {
     const editor = createMockEditor({ textBetween: "New Page" });
     const { result } = renderHook(() => useBubbleMenuWikiLink({ editor, pageId: "page-1" }));
 
@@ -84,7 +90,7 @@ describe("useBubbleMenuWikiLink", () => {
       await result.current.convertToWikiLink();
     });
 
-    expect(mockCheckReferenced).toHaveBeenCalledWith("New Page", "page-1");
+    expect(mockCheckExistence).toHaveBeenCalledWith(["New Page"], "page-1");
     expect(editor.chain).toHaveBeenCalled();
     expect(editor.chainReturn.deleteRange).toHaveBeenCalledWith({ from: 0, to: 5 });
     expect(editor.chainReturn.insertContent).toHaveBeenCalledWith([
@@ -102,8 +108,37 @@ describe("useBubbleMenuWikiLink", () => {
     expect(editor.chainReturn.run).toHaveBeenCalled();
   });
 
-  it("convertToWikiLink uses referenced true when checkReferenced returns true", async () => {
-    mockCheckReferenced.mockResolvedValue(true);
+  it("convertToWikiLink uses exists and referenced from checkExistence", async () => {
+    mockCheckExistence.mockResolvedValue({
+      pageTitles: new Set(["existing page"]),
+      referencedTitles: new Set(["existing page"]),
+    });
+    const editor = createMockEditor({ textBetween: "Existing Page" });
+    const { result } = renderHook(() => useBubbleMenuWikiLink({ editor, pageId: "p1" }));
+
+    await act(async () => {
+      await result.current.convertToWikiLink();
+    });
+
+    expect(editor.chainReturn.insertContent).toHaveBeenCalledWith([
+      {
+        type: "text",
+        marks: [
+          {
+            type: "wikiLink",
+            attrs: { title: "Existing Page", exists: true, referenced: true },
+          },
+        ],
+        text: "[[Existing Page]]",
+      },
+    ]);
+  });
+
+  it("convertToWikiLink uses referenced true when only referencedTitles has the title", async () => {
+    mockCheckExistence.mockResolvedValue({
+      pageTitles: new Set(),
+      referencedTitles: new Set(["ghost"]),
+    });
     const editor = createMockEditor({ textBetween: "Ghost" });
     const { result } = renderHook(() => useBubbleMenuWikiLink({ editor, pageId: "p1" }));
 
@@ -125,7 +160,7 @@ describe("useBubbleMenuWikiLink", () => {
     ]);
   });
 
-  it("convertToWikiLink does not call checkReferenced when pageId is undefined", async () => {
+  it("convertToWikiLink does not call checkExistence when pageId is undefined", async () => {
     const editor = createMockEditor({ textBetween: "No Page" });
     const { result } = renderHook(() => useBubbleMenuWikiLink({ editor }));
 
@@ -133,7 +168,7 @@ describe("useBubbleMenuWikiLink", () => {
       await result.current.convertToWikiLink();
     });
 
-    expect(mockCheckReferenced).not.toHaveBeenCalled();
+    expect(mockCheckExistence).not.toHaveBeenCalled();
     expect(editor.chain).toHaveBeenCalled();
   });
 
