@@ -101,7 +101,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       <EditorContent editor={editor} />
       {editor && !isReadOnly && (
         <>
-          <EditorBubbleMenu editor={editor} />
+          <EditorBubbleMenu editor={editor} pageId={pageId} />
           <TableBubbleMenu editor={editor} />
         </>
       )}
