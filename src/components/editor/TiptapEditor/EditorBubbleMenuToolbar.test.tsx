@@ -24,6 +24,7 @@ function createMockState(overrides?: Partial<EditorBubbleMenuState>): EditorBubb
     isWikiLinkSelection: false,
     convertToWikiLink: vi.fn(),
     unsetWikiLink: vi.fn(),
+    isConverting: false,
     ...overrides,
   };
 }

@@ -184,7 +184,7 @@ export class CollaborationManager {
         credentials: "include",
         body: JSON.stringify({
           ydoc_state: b64,
-          content_text: contentText,
+          content_text: contentText, // 全文検索用プレーンテキスト
         }),
       });
 
@@ -215,6 +215,11 @@ export class CollaborationManager {
 
     const ratio = afterText.length / beforeText.length;
     if (ratio < DUPLICATION_RATIO_THRESHOLD) return;
+
+    const firstMatch = afterText.indexOf(beforeText);
+    const secondMatch =
+      firstMatch === -1 ? -1 : afterText.indexOf(beforeText, firstMatch + beforeText.length);
+    if (secondMatch === -1) return;
 
     console.error(
       `[Collab] Content duplication detected after ${phase} (page: ${this.pageId.slice(0, 8)})`,

@@ -6,10 +6,18 @@ import type { Editor } from "@tiptap/core";
 
 let shouldShowArgs: {
   state: { selection: { empty: boolean } };
-  editor: { isActive: (name: string) => boolean };
+  editor: {
+    isActive: (name: string) => boolean;
+    view?: { hasFocus?: () => boolean };
+    isEditable?: boolean;
+  };
 } = {
   state: { selection: { empty: false } },
-  editor: { isActive: () => false },
+  editor: {
+    isActive: () => false,
+    view: { hasFocus: () => true },
+    isEditable: true,
+  },
 };
 
 vi.mock("@tiptap/react/menus", () => ({
@@ -20,7 +28,11 @@ vi.mock("@tiptap/react/menus", () => ({
     children: React.ReactNode;
     shouldShow: (opts: {
       state: { selection: { empty: boolean } };
-      editor: { isActive: (name: string) => boolean };
+      editor: {
+        isActive: (name: string) => boolean;
+        view?: { hasFocus?: () => boolean };
+        isEditable?: boolean;
+      };
     }) => boolean;
   }) => {
     const show = shouldShow(shouldShowArgs);
@@ -69,7 +81,11 @@ describe("EditorBubbleMenu", () => {
   it("shows menu when selection is empty but cursor is on wikiLink", () => {
     shouldShowArgs = {
       state: { selection: { empty: true } },
-      editor: { isActive: (name: string) => name === "wikiLink" },
+      editor: {
+        isActive: (name: string) => name === "wikiLink",
+        view: { hasFocus: () => true },
+        isEditable: true,
+      },
     };
     const { getByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
     expect(getByTestId("bubble-menu")).toBeInTheDocument();
@@ -78,7 +94,11 @@ describe("EditorBubbleMenu", () => {
   it("hides menu when in codeBlock", () => {
     shouldShowArgs = {
       state: { selection: { empty: false } },
-      editor: { isActive: (name: string) => name === "codeBlock" },
+      editor: {
+        isActive: (name: string) => name === "codeBlock",
+        view: { hasFocus: () => true },
+        isEditable: true,
+      },
     };
     const { queryByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
     expect(queryByTestId("bubble-menu")).not.toBeInTheDocument();
@@ -87,7 +107,11 @@ describe("EditorBubbleMenu", () => {
   it("hides menu when selection is empty and not on wikiLink", () => {
     shouldShowArgs = {
       state: { selection: { empty: true } },
-      editor: { isActive: () => false },
+      editor: {
+        isActive: () => false,
+        view: { hasFocus: () => true },
+        isEditable: true,
+      },
     };
     const { queryByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
     expect(queryByTestId("bubble-menu")).not.toBeInTheDocument();
