@@ -21,6 +21,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
   return (
     <BubbleMenu
       editor={editor}
+      pluginKey="tableBubbleMenu"
       options={{ placement: "top" }}
       shouldShow={({ editor }) => {
         return editor.isActive("table");
