@@ -17,6 +17,9 @@ export type CollaborationManagerMode = "local" | "collaborative";
 /** Debounce timer for saving Y.Doc to API in local mode. */
 const API_SAVE_DEBOUNCE_MS = 2000;
 
+/** 二重化検知: マージ後テキストがこの倍率を超えて増加したら二重化とみなす */
+const DUPLICATION_RATIO_THRESHOLD = 1.5;
+
 export class CollaborationManager {
   private ydoc: Y.Doc;
   private wsProvider: HocuspocusProvider | null = null;
@@ -211,7 +214,7 @@ export class CollaborationManager {
     if (afterText.length <= beforeText.length) return;
 
     const ratio = afterText.length / beforeText.length;
-    if (ratio < 1.5) return;
+    if (ratio < DUPLICATION_RATIO_THRESHOLD) return;
 
     console.error(
       `[Collab] Content duplication detected after ${phase} (page: ${this.pageId.slice(0, 8)})`,
@@ -219,8 +222,6 @@ export class CollaborationManager {
         beforeLength: beforeText.length,
         afterLength: afterText.length,
         ratio: ratio.toFixed(2),
-        beforePreview: beforeText.slice(0, 200),
-        afterPreview: afterText.slice(0, 200),
       },
     );
   }

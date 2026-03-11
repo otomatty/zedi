@@ -37,7 +37,15 @@ export function useContentSanitizer({
   // Update editor content when prop changes (e.g., when page data is loaded)
   // This is the only place where sanitization happens to avoid duplicate calls
   useEffect(() => {
-    if (editor && content) {
+    if (!editor) return;
+
+    // コラボモード時は Y.Doc が唯一のソースのため sanitization と setContent を行わない（二重化防止・CPU 節約）
+    if (isCollaborationMode) {
+      if (!content && onError) onError(null);
+      return;
+    }
+
+    if (content) {
       // Sanitize content to remove unsupported node/mark types
       const sanitizeResult = sanitizeTiptapContent(content);
       lastSanitizeResultRef.current = sanitizeResult;
@@ -63,22 +71,8 @@ export function useContentSanitizer({
         const currentContent = JSON.stringify(editor.getJSON());
 
         if (currentContent !== sanitizeResult.content) {
-          if (isCollaborationMode) {
-            // コラボレーションモード時は setContent を呼ばない。
-            // Y.Doc が唯一のコンテンツソースであり、React state の content で
-            // 上書きすると Y.Doc に二重書き込みが発生しコンテンツが複製される。
-            console.error(
-              "[Collab] Blocked setContent in collaboration mode to prevent Y.Doc duplication",
-              {
-                currentContentLength: currentContent.length,
-                incomingContentLength: sanitizeResult.content.length,
-              },
-            );
-          } else {
-            editor.commands.setContent(parsedContent);
-          }
-
-          // Notify that content was updated
+          editor.commands.setContent(parsedContent);
+          // Notify that content was updated (only when we actually applied content)
           if (sanitizeResult.content.length > 50) {
             onContentUpdated?.(true);
           }
@@ -100,7 +94,7 @@ export function useContentSanitizer({
           });
         }
       }
-    } else if (editor && !content) {
+    } else {
       // Clear error if content is empty
       if (onError) {
         onError(null);
