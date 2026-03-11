@@ -116,4 +116,30 @@ describe("EditorBubbleMenu", () => {
     const { queryByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
     expect(queryByTestId("bubble-menu")).not.toBeInTheDocument();
   });
+
+  it("hides menu when editor has no focus", () => {
+    shouldShowArgs = {
+      state: { selection: { empty: false } },
+      editor: {
+        isActive: () => false,
+        view: { hasFocus: () => false },
+        isEditable: true,
+      },
+    };
+    const { queryByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
+    expect(queryByTestId("bubble-menu")).not.toBeInTheDocument();
+  });
+
+  it("hides menu when editor is not editable", () => {
+    shouldShowArgs = {
+      state: { selection: { empty: false } },
+      editor: {
+        isActive: () => false,
+        view: { hasFocus: () => true },
+        isEditable: false,
+      },
+    };
+    const { queryByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
+    expect(queryByTestId("bubble-menu")).not.toBeInTheDocument();
+  });
 });

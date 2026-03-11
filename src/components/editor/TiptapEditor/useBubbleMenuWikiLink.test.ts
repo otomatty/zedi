@@ -183,4 +183,39 @@ describe("useBubbleMenuWikiLink", () => {
     expect(editor.chainReturn.unsetWikiLink).toHaveBeenCalled();
     expect(editor.chainReturn.run).toHaveBeenCalled();
   });
+
+  it("convertToWikiLink ignores second call until first resolves (re-entrancy guard)", async () => {
+    const deferred: {
+      resolve: (v: { pageTitles: Set<string>; referencedTitles: Set<string> }) => void;
+    } = { resolve: () => {} };
+    const checkPromise = new Promise<{ pageTitles: Set<string>; referencedTitles: Set<string> }>(
+      (r) => {
+        deferred.resolve = r;
+      },
+    );
+    mockCheckExistence.mockReturnValue(checkPromise);
+
+    const editor = createMockEditor({ textBetween: "Foo" });
+    const { result } = renderHook(() => useBubbleMenuWikiLink({ editor, pageId: "page-1" }));
+
+    let firstCall: Promise<void> | undefined;
+    await act(async () => {
+      firstCall = result.current.convertToWikiLink();
+      result.current.convertToWikiLink();
+      result.current.convertToWikiLink();
+    });
+
+    expect(mockCheckExistence).toHaveBeenCalledTimes(1);
+    expect(editor.chain).not.toHaveBeenCalled();
+
+    if (firstCall === undefined) throw new Error("expected firstCall");
+    await act(async () => {
+      deferred.resolve({ pageTitles: new Set(), referencedTitles: new Set() });
+      await firstCall;
+    });
+
+    expect(mockCheckExistence).toHaveBeenCalledTimes(1);
+    expect(editor.chain).toHaveBeenCalledTimes(1);
+    expect(result.current.isConverting).toBe(false);
+  });
 });
