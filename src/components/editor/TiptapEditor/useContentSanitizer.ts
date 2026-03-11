@@ -18,6 +18,7 @@ interface UseContentSanitizerOptions {
   content: string;
   onError?: (error: ContentError | null) => void;
   onContentUpdated?: (initialized: boolean) => void;
+  isCollaborationMode?: boolean;
 }
 
 /**
@@ -29,6 +30,7 @@ export function useContentSanitizer({
   content,
   onError,
   onContentUpdated,
+  isCollaborationMode = false,
 }: UseContentSanitizerOptions): void {
   const lastSanitizeResultRef = useRef<SanitizeResult | null>(null);
 
@@ -61,7 +63,20 @@ export function useContentSanitizer({
         const currentContent = JSON.stringify(editor.getJSON());
 
         if (currentContent !== sanitizeResult.content) {
-          editor.commands.setContent(parsedContent);
+          if (isCollaborationMode) {
+            // コラボレーションモード時は setContent を呼ばない。
+            // Y.Doc が唯一のコンテンツソースであり、React state の content で
+            // 上書きすると Y.Doc に二重書き込みが発生しコンテンツが複製される。
+            console.error(
+              "[Collab] Blocked setContent in collaboration mode to prevent Y.Doc duplication",
+              {
+                currentContentLength: currentContent.length,
+                incomingContentLength: sanitizeResult.content.length,
+              },
+            );
+          } else {
+            editor.commands.setContent(parsedContent);
+          }
 
           // Notify that content was updated
           if (sanitizeResult.content.length > 50) {
@@ -91,5 +106,5 @@ export function useContentSanitizer({
         onError(null);
       }
     }
-  }, [editor, content, onError, onContentUpdated]);
+  }, [editor, content, onError, onContentUpdated, isCollaborationMode]);
 }

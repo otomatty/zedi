@@ -80,6 +80,8 @@ export class CollaborationManager {
       const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
+      const beforeText = this.getPlainText();
+
       const res = await fetch(url, {
         credentials: "include",
       });
@@ -98,6 +100,7 @@ export class CollaborationManager {
           const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
           if (binary.length > 2) {
             Y.applyUpdate(this.ydoc, binary);
+            this.detectContentDuplication(beforeText, "api-merge");
           }
         }
       } else if (res.status === 401) {
@@ -163,7 +166,6 @@ export class CollaborationManager {
       }
       b64 = btoa(b64);
 
-      // Extract plain text for content_text (for full-text search)
       const fragment = this.ydoc.getXmlFragment("default");
       const contentText = fragment.toJSON() ? this.extractText(fragment) : "";
 
@@ -190,6 +192,37 @@ export class CollaborationManager {
     } catch (err) {
       console.warn("[Collab] API save error:", err);
     }
+  }
+
+  /**
+   * Y.Doc のプレーンテキストを取得するヘルパー
+   */
+  private getPlainText(): string {
+    return this.extractText(this.ydoc.getXmlFragment("default"));
+  }
+
+  /**
+   * コンテンツの二重化を検知する。
+   * マージ前後のテキストを比較し、不自然な増加があれば console.error で報告する。
+   */
+  private detectContentDuplication(beforeText: string, phase: string): void {
+    const afterText = this.getPlainText();
+    if (beforeText.length < 10) return;
+    if (afterText.length <= beforeText.length) return;
+
+    const ratio = afterText.length / beforeText.length;
+    if (ratio < 1.5) return;
+
+    console.error(
+      `[Collab] Content duplication detected after ${phase} (page: ${this.pageId.slice(0, 8)})`,
+      {
+        beforeLength: beforeText.length,
+        afterLength: afterText.length,
+        ratio: ratio.toFixed(2),
+        beforePreview: beforeText.slice(0, 200),
+        afterPreview: afterText.slice(0, 200),
+      },
+    );
   }
 
   /**
