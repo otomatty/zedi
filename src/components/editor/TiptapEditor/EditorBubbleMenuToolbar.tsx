@@ -177,6 +177,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
                 <button
                   type="button"
                   key={color.value || "default"}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setColor(color.value)}
                   title={color.label}
                   aria-label={color.label}
