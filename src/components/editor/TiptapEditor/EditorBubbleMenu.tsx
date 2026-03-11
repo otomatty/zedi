@@ -2,6 +2,7 @@ import React from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
 import { EditorBubbleMenuToolbar } from "./EditorBubbleMenuToolbar";
+import { PLUGIN_KEYS } from "./pluginKeys";
 import { useEditorBubbleMenu } from "./useEditorBubbleMenu";
 
 interface EditorBubbleMenuProps {
@@ -16,7 +17,7 @@ export const EditorBubbleMenu: React.FC<EditorBubbleMenuProps> = ({ editor, page
   return (
     <BubbleMenu
       editor={editor}
-      pluginKey="editorBubbleMenu"
+      pluginKey={PLUGIN_KEYS.EDITOR_BUBBLE_MENU}
       options={{ placement: "top" }}
       shouldShow={({ editor, state: menuState }) => {
         if (menuState.selection.empty && !editor.isActive("wikiLink")) return false;

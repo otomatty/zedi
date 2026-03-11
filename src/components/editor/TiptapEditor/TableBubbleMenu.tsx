@@ -2,6 +2,7 @@ import React from "react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
 import { cn } from "@zedi/ui";
+import { PLUGIN_KEYS } from "./pluginKeys";
 import {
   ArrowUpFromLine,
   ArrowDownFromLine,
@@ -21,7 +22,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
   return (
     <BubbleMenu
       editor={editor}
-      pluginKey="tableBubbleMenu"
+      pluginKey={PLUGIN_KEYS.TABLE_BUBBLE_MENU}
       options={{ placement: "top" }}
       shouldShow={({ editor }) => {
         return editor.isActive("table");
