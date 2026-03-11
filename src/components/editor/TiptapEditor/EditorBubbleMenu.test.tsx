@@ -4,6 +4,14 @@ import { render } from "@testing-library/react";
 import { EditorBubbleMenu } from "./EditorBubbleMenu";
 import type { Editor } from "@tiptap/core";
 
+let shouldShowArgs: {
+  state: { selection: { empty: boolean } };
+  editor: { isActive: (name: string) => boolean };
+} = {
+  state: { selection: { empty: false } },
+  editor: { isActive: () => false },
+};
+
 vi.mock("@tiptap/react/menus", () => ({
   BubbleMenu: ({
     children,
@@ -15,10 +23,7 @@ vi.mock("@tiptap/react/menus", () => ({
       editor: { isActive: (name: string) => boolean };
     }) => boolean;
   }) => {
-    const show = shouldShow({
-      state: { selection: { empty: false } },
-      editor: { isActive: (name: string) => name === "codeBlock" && false },
-    });
+    const show = shouldShow(shouldShowArgs);
     if (!show) return null;
     return <div data-testid="bubble-menu">{children}</div>;
   },
@@ -59,5 +64,32 @@ describe("EditorBubbleMenu", () => {
   it("accepts optional pageId prop", () => {
     const { getByTestId } = render(<EditorBubbleMenu editor={mockEditor} pageId="page-1" />);
     expect(getByTestId("bubble-menu")).toBeInTheDocument();
+  });
+
+  it("shows menu when selection is empty but cursor is on wikiLink", () => {
+    shouldShowArgs = {
+      state: { selection: { empty: true } },
+      editor: { isActive: (name: string) => name === "wikiLink" },
+    };
+    const { getByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
+    expect(getByTestId("bubble-menu")).toBeInTheDocument();
+  });
+
+  it("hides menu when in codeBlock", () => {
+    shouldShowArgs = {
+      state: { selection: { empty: false } },
+      editor: { isActive: (name: string) => name === "codeBlock" },
+    };
+    const { queryByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
+    expect(queryByTestId("bubble-menu")).not.toBeInTheDocument();
+  });
+
+  it("hides menu when selection is empty and not on wikiLink", () => {
+    shouldShowArgs = {
+      state: { selection: { empty: true } },
+      editor: { isActive: () => false },
+    };
+    const { queryByTestId } = render(<EditorBubbleMenu editor={mockEditor} />);
+    expect(queryByTestId("bubble-menu")).not.toBeInTheDocument();
   });
 });

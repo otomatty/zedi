@@ -25,7 +25,18 @@
 - **`[[` 入力時のサジェスト**: `wikiLinkSuggestionPlugin` が `[[` を検知 → `WikiLinkSuggestion` でページ候補表示 → 選択時に `useSuggestionEffects.handleSuggestionSelect` で挿入。
 - **挿入処理**（`useSuggestionEffects.ts` 94–108 行）:
   - `deleteRange({ from, to })` で `[[` とクエリ部分を削除
-  - `insertContent([{ type: "text", marks: [{ type: "wikiLink", attrs: { title, exists, referenced } }], text: `[[${title}]]` }])` で WikiLink ノードを挿入
+  - 以下で WikiLink ノードを挿入:
+
+    ```ts
+    insertContent([
+      {
+        type: "text",
+        marks: [{ type: "wikiLink", attrs: { title, exists, referenced } }],
+        text: `[[${title}]]`,
+      },
+    ]);
+    ```
+
   - 新規ページ（`exists: false`）のときは `checkReferenced(title, pageId)` で `referenced` を取得してから挿入。
 
 ### 4. エディター構成
@@ -84,7 +95,23 @@
    - `const text = editor.state.doc.textBetween(from, to, null, "\ufffc").trim();`
    - `if (!text) return;`
    - （任意）`pageId` がある場合: `checkReferenced(text, pageId)` で `referenced` を取得。
-   - `editor.chain().focus().deleteRange({ from, to }).insertContent([{ type: "text", marks: [{ type: "wikiLink", attrs: { title: text, exists: false, referenced } }], text: `[[${text}]]` }]).run();`
+   - 挿入例:
+
+     ```ts
+     editor
+       .chain()
+       .focus()
+       .deleteRange({ from, to })
+       .insertContent([
+         {
+           type: "text",
+           marks: [{ type: "wikiLink", attrs: { title: text, exists: false, referenced } }],
+           text: `[[${text}]]`,
+         },
+       ])
+       .run();
+     ```
+
    - `referenced` を使わない場合は `referenced: false` 固定。
 
 4. **既存 WikiLink 選択時**
