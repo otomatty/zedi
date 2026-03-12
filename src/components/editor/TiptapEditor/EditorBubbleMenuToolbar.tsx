@@ -177,6 +177,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
                 <button
                   type="button"
                   key={color.value || "default"}
+                  // Keep editor focus so BubbleMenu does not close before setColor runs.
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setColor(color.value)}
                   title={color.label}
