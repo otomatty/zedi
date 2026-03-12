@@ -26,7 +26,7 @@ git fetch origin --prune
 - **--dry-run**: 削除はせず、削除候補一覧と理由だけ表示する。
 - **非対話で実行する場合**（CI やエージェントから確認なしで削除する場合）: `echo y | ./scripts/delete-merged-branches.sh` で確認プロンプトに自動で `y` を送る。
 
-スクリプトは (1) merged PR を `gh pr list --state merged --base <基準>` で一括取得し `headRefName` / `headRefOid` で照合する。(2) クローズ済み未マージ PR を `gh pr list --state closed`（**--base なし**、リポジトリ全体）から `mergedAt == null` で抽出する。ローカル候補は祖先 or merged PR の headRefOid 一致のみ。リモート専用候補は「merged PR で tip 一致」に加え、**クローズ済み未マージ PR については** origin の tip が当該 PR の `headRefOid` と一致する場合のみ（かつ `mergedAt == null`）削除候補に含め、さらに同名ブランチに open PR がある場合は削除しない。確認後にローカル削除 → リモート削除の順で実行する。
+スクリプトは (1) merged PR を `gh pr list --state merged --base <基準>` で一括取得し `headRefName` / `headRefOid` で照合する。(2) クローズ済み未マージ PR を `gh pr list --state closed`（**--base なし**、リポジトリ全体）から `mergedAt == null` かつ同一リポジトリ（fork は `isCrossRepository` で除外）で抽出する。ローカル候補は祖先 or merged PR の headRefOid 一致のみ。リモート専用候補は「merged PR で tip 一致」に加え、**クローズ済み未マージ PR については** origin の tip が当該 PR の `headRefOid` と一致する場合のみ（かつ `mergedAt == null`）削除候補に含め、さらに同名ブランチに open PR がある場合は削除しない。確認後にローカル削除 → リモート削除の順で実行する。
 
 ## 手動で行う場合（フォールバック）
 
@@ -51,7 +51,7 @@ git fetch origin --prune
    - 失敗時は上記 JSON からそのブランチ名の `headRefOid` を探し、`$(git rev-parse <branch>)` と一致する場合のみ削除可（merged PR #N）。
 
 5. **リモート専用候補**  
-   `git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||'` で一覧。保護ブランチ・ローカルに存在するブランチは除外。(a) merged PR の JSON でそのブランチの `headRefOid` が origin の tip と一致する場合。(b) 別途 `gh pr list --state closed`（--base なし）から `mergedAt == null` の PR の `headRefName` と `headRefOid` を取得し、**origin の tip が headRefOid と一致する**リモートブランチのみ対象とする。このとき、同名ブランチに open PR がある場合は削除しない（基準以外向けの sub-PR や Copilot ブランチを含む）。
+   `git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||'` で一覧。保護ブランチ・ローカルに存在するブランチは除外。(a) merged PR の JSON でそのブランチの `headRefOid` が origin の tip と一致する場合。(b) 別途 `gh pr list --state closed`（--base なし）から `mergedAt == null` かつ同一リポジトリの PR の `headRefName` と `headRefOid` を取得し、**origin の tip が headRefOid と一致する**リモートブランチのみ対象とする。このとき、同名ブランチに open PR がある場合は削除しない（基準以外向けの sub-PR や Copilot ブランチを含む）。
 
 6. **削除**  
    候補を提示し確認後、ローカルは `git branch -d`（必要なら `-D`）、リモートは `git push origin --delete <branch>`。

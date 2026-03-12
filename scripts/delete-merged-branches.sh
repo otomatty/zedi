@@ -44,20 +44,16 @@ is_protected() {
 
 merged_file=""
 closed_unmerged_file=""
-open_pr_file=""
 if command -v gh >/dev/null 2>&1; then
   merged_file="$(mktemp 2>/dev/null || echo "/tmp/merged-prs.$$")"
   closed_unmerged_file="$(mktemp 2>/dev/null || echo "/tmp/closed-unmerged-prs.$$")"
-  open_pr_file="$(mktemp 2>/dev/null || echo "/tmp/open-prs.$$")"
-  trap 'rm -f "$merged_file" "$closed_unmerged_file" "$open_pr_file"' EXIT
+  trap 'rm -f "$merged_file" "$closed_unmerged_file"' EXIT
   gh pr list --state merged --base "$BASE_BRANCH" --limit 200 --json headRefName,headRefOid,number \
     --jq '.[] | "\(.headRefName)\t\(.headRefOid)\t\(.number)"' 2>/dev/null >"$merged_file" || true
-  # クローズ済み（未マージ）PR のブランチ名・headRefOid・番号。--base は付けずリポジトリ全体から取得。
+  # クローズ済み（未マージ）PR のブランチ名・headRefOid・番号。--base は付けずリポジトリ全体から取得。同一リポジトリの PR のみ（fork を除外）。
   # origin tip と headRefOid が一致する場合のみ削除候補にする（クローズ後に push されたブランチを誤削除しないため）。
-  gh pr list --state closed --limit 500 --json headRefName,headRefOid,number,mergedAt \
-    --jq '.[] | select(.mergedAt == null) | "\(.headRefName)\t\(.headRefOid)\t\(.number)"' 2>/dev/null >"$closed_unmerged_file" || true
-  # 同名ブランチに open PR がある場合は削除しない（closed のまま別の open PR があるケースを除外）。
-  gh pr list --state open --limit 500 --json headRefName --jq '.[] | .headRefName' 2>/dev/null >"$open_pr_file" || true
+  gh pr list --state closed --limit 500 --json headRefName,headRefOid,number,mergedAt,isCrossRepository \
+    --jq '.[] | select(.mergedAt == null and (.isCrossRepository | not)) | "\(.headRefName)\t\(.headRefOid)\t\(.number)"' 2>/dev/null >"$closed_unmerged_file" || true
 fi
 
 # merged 一覧から branch の oid と number を取得（1行 "oid number" を返す）。見つからない場合は何も出力せず return 0（set -e で落ちないように）
@@ -133,11 +129,15 @@ get_closed_unmerged_oid_and_num() {
   echo "$oid $num"
 }
 
-# 指定ブランチに open PR があるか（同名の open PR があると削除しない）
+# 指定ブランチに open PR があるか（同名の open PR があると削除しない）。ブランチ単位で照会し件数上限に依存しない。
 has_open_pr() {
   local branch="$1"
-  [ -z "$open_pr_file" ] || [ ! -s "$open_pr_file" ] && return 1
-  grep -Fxq "$branch" "$open_pr_file" 2>/dev/null
+  local count
+  count="$(gh pr list --state open --head "$branch" --limit 1 --json number --jq 'length' 2>/dev/null)"
+  local r=$?
+  [ $r -ne 0 ] && return 0   # gh 失敗時は安全のため「open PR あり」とみなして削除しない
+  [ "${count:-0}" -gt 0 ] && return 0
+  return 1
 }
 while IFS= read -r ref; do
   [ -z "$ref" ] || [ "$ref" = "HEAD" ] && continue
