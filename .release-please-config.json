@@ -1,5 +1,6 @@
 {
   "release-type": "node",
+  "bootstrap-sha": "5be90c289bd1395feaad07ed5e7f8c344a5dd733",
   "packages": {
     ".": {
       "changelog-type": "github"
