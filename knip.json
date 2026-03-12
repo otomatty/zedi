@@ -8,23 +8,20 @@
   "ignoreBinaries": ["docker-compose"],
   "workspaces": {
     ".": {
-      "entry": ["src/main.tsx", "scripts/**/*.ts", "e2e/**/*.ts"],
+      "entry": ["scripts/**/*.ts", "e2e/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "e2e/**/*.{ts,tsx}"]
     },
     "admin": {
-      "entry": ["src/main.tsx"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/ui": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
     "server/api": {
-      "entry": ["src/index.ts", "scripts/**/*.ts"],
+      "entry": ["scripts/**/*.ts"],
       "project": ["src/**/*.ts", "scripts/**/*.ts"]
     },
     "server/hocuspocus": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
     }
   },
