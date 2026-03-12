@@ -458,7 +458,8 @@ export class CollaborationManager {
     const keepaliveLimit = 63 * 1024;
     const useKeepalive = bodyByteLength <= keepaliveLimit;
 
-    const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    const baseUrl = rawBaseUrl.replace(/\/$/, "");
     const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
     const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 

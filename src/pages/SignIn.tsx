@@ -9,24 +9,17 @@ const SignIn: React.FC = () => {
   const [socialError, setSocialError] = useState<string | null>(null);
 
   const callbackURL = `${window.location.origin}/home`;
-  const handleGoogle = async () => {
+  const handleSocialSignIn = (provider: "google" | "github") => async () => {
     setSocialError(null);
     try {
-      await signIn.social({ provider: "google", callbackURL });
+      await signIn.social({ provider, callbackURL });
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("auth.signIn.error");
-      setSocialError(message);
+      if (err instanceof Error) console.warn("Social sign-in failed:", err.message);
+      setSocialError(t("auth.signIn.error"));
     }
   };
-  const handleGitHub = async () => {
-    setSocialError(null);
-    try {
-      await signIn.social({ provider: "github", callbackURL });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("auth.signIn.error");
-      setSocialError(message);
-    }
-  };
+  const handleGoogle = handleSocialSignIn("google");
+  const handleGitHub = handleSocialSignIn("github");
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

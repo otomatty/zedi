@@ -5,8 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@zedi/ui";
 import { getStorageProvider, getSettingsForUpload, convertToWebP } from "@/lib/storage";
 import type { StorageSettings } from "@/types/storage";
-
-const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
 
 interface UseThumbnailCommitOptions {
   editorRef: React.RefObject<Editor | null>;
