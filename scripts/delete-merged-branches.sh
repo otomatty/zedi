@@ -133,9 +133,9 @@ get_closed_unmerged_oid_and_num() {
 has_open_pr() {
   local branch="$1"
   local count
-  count="$(gh pr list --state open --head "$branch" --limit 1 --json number --jq 'length' 2>/dev/null)"
-  local r=$?
-  [ $r -ne 0 ] && return 0   # gh 失敗時は安全のため「open PR あり」とみなして削除しない
+  if ! count="$(gh pr list --state open --head "$branch" --limit 1 --json number --jq 'length' 2>/dev/null)"; then
+    return 0   # gh 失敗時は安全のため「open PR あり」とみなして削除しない
+  fi
   [ "${count:-0}" -gt 0 ] && return 0
   return 1
 }
