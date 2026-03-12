@@ -8,7 +8,7 @@ COPY tsconfig.json ./
 COPY src/ ./src/
 RUN bun run build
 
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 RUN addgroup -g 1001 -S app && adduser -S app -u 1001
 COPY --from=builder /app/dist ./dist

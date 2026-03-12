@@ -18,6 +18,7 @@ interface UseContentSanitizerOptions {
   content: string;
   onError?: (error: ContentError | null) => void;
   onContentUpdated?: (initialized: boolean) => void;
+  isCollaborationMode?: boolean;
 }
 
 /**
@@ -29,13 +30,23 @@ export function useContentSanitizer({
   content,
   onError,
   onContentUpdated,
+  isCollaborationMode = false,
 }: UseContentSanitizerOptions): void {
   const lastSanitizeResultRef = useRef<SanitizeResult | null>(null);
 
   // Update editor content when prop changes (e.g., when page data is loaded)
   // This is the only place where sanitization happens to avoid duplicate calls
   useEffect(() => {
-    if (editor && content) {
+    if (!editor) return;
+
+    // コラボモード時は Y.Doc が唯一のソースのため sanitization と setContent を行わない（二重化防止・CPU 節約）
+    if (isCollaborationMode) {
+      if (!content && onError) onError(null);
+      onContentUpdated?.(true);
+      return;
+    }
+
+    if (content) {
       // Sanitize content to remove unsupported node/mark types
       const sanitizeResult = sanitizeTiptapContent(content);
       lastSanitizeResultRef.current = sanitizeResult;
@@ -62,8 +73,7 @@ export function useContentSanitizer({
 
         if (currentContent !== sanitizeResult.content) {
           editor.commands.setContent(parsedContent);
-
-          // Notify that content was updated
+          // Notify that content was updated (only when we actually applied content)
           if (sanitizeResult.content.length > 50) {
             onContentUpdated?.(true);
           }
@@ -85,11 +95,11 @@ export function useContentSanitizer({
           });
         }
       }
-    } else if (editor && !content) {
+    } else {
       // Clear error if content is empty
       if (onError) {
         onError(null);
       }
     }
-  }, [editor, content, onError, onContentUpdated]);
+  }, [editor, content, onError, onContentUpdated, isCollaborationMode]);
 }

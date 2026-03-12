@@ -80,6 +80,7 @@ export function useEditorLifecycle({
     onContentUpdated: (initialized) => {
       if (initialized) isEditorInitializedRef.current = true;
     },
+    isCollaborationMode: !!collaborationConfig,
   });
 
   useWikiLinkStatusSync({

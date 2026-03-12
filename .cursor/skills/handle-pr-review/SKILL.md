@@ -97,7 +97,24 @@ gh api -X POST repos/{owner}/{repo}/pulls/{number}/comments/{comment_id}/replies
 
 ## Step 5: 再レビュー依頼
 
-修正コミットを push し、再レビューを依頼:
+修正コミットを push し、再レビューを依頼する。
+
+### 対象 PR が develop → main（リリース PR）の場合
+
+**develop に直接 push できない場合は、作業ブランチを作成し develop 向け PR を出す。**
+
+1. 修正をコミットした状態で、main や develop とは別の作業ブランチを作成する:
+   ```bash
+   git checkout -b fix/pr-{number}-review-comment
+   ```
+2. そのブランチを push し、**develop** をベースに PR を作成する:
+   ```bash
+   git push -u origin fix/pr-{number}-review-comment
+   gh pr create --base develop --head fix/pr-{number}-review-comment --title "fix: address PR #{number} review comments" --body "..."
+   ```
+3. 元のリリース PR（#311 など）には「レビュー対応は別 PR で develop に出す予定です」などとコメントし、必要ならその PR の再レビュー依頼は develop にマージ後に行う。
+
+### 通常（feature ブランチなど）の場合
 
 ```bash
 git push origin HEAD
