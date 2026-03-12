@@ -55,6 +55,7 @@ jobs:
           VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
           VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
       # Retry on transient Cloudflare Pages API 5xx (e.g. 503 no healthy upstream).
+      # wrangler CLI reads CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from env (see wrangler docs).
       - name: Deploy to Cloudflare Pages
         uses: nick-fields/retry@v2
         env:
@@ -103,6 +104,7 @@ jobs:
       - name: Install root dependencies (for wrangler)
         run: bun install --frozen-lockfile
       # Retry on transient Cloudflare Pages API 5xx (e.g. 503 no healthy upstream).
+      # wrangler CLI reads CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from env (see wrangler docs).
       - name: Deploy Admin to Cloudflare Pages
         uses: nick-fields/retry@v2
         env:

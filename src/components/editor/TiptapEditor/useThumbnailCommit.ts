@@ -7,6 +7,13 @@ import { getStorageProvider, getSettingsForUpload, convertToWebP } from "@/lib/s
 import type { StorageSettings } from "@/types/storage";
 import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
 
+/** 401 時にサインインへリダイレクトするための印。catch 側で navigate("/sign-in") する。 */
+export type AuthRedirectError = Error & { redirectToSignIn: true };
+
+function isAuthRedirectError(err: unknown): err is AuthRedirectError {
+  return err instanceof Error && (err as AuthRedirectError).redirectToSignIn === true;
+}
+
 interface UseThumbnailCommitOptions {
   editorRef: React.RefObject<Editor | null>;
   pageTitle: string;
@@ -53,7 +60,7 @@ async function commitViaServerS3(
   });
 
   if (response.status === 401) {
-    const err = new Error("ログインが必要です") as Error & { redirectToSignIn?: boolean };
+    const err = new Error("ログインが必要です") as AuthRedirectError;
     err.redirectToSignIn = true;
     throw err;
   }
@@ -146,8 +153,7 @@ export function useThumbnailCommit({
           })
           .run();
       } catch (error) {
-        const err = error as Error & { redirectToSignIn?: boolean };
-        if (err.redirectToSignIn) {
+        if (isAuthRedirectError(error)) {
           toast({
             title: "ログインが必要です",
             description: "再度ログインしてください",
@@ -156,10 +162,10 @@ export function useThumbnailCommit({
           navigate("/sign-in", { replace: true });
           return;
         }
+        const err = error instanceof Error ? error : new Error(String(error));
         const isFetchError =
           error instanceof TypeError ||
-          (error instanceof Error &&
-            /Failed to fetch|CORS|NetworkError|Image fetch failed/i.test(error.message));
+          /Failed to fetch|CORS|NetworkError|Image fetch failed/i.test(err.message);
         toast({
           title: "画像の保存に失敗しました",
           description: isFetchError
