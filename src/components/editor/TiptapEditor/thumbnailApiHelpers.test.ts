@@ -17,9 +17,9 @@ describe("thumbnailApiHelpers", () => {
       expect(getThumbnailApiBaseUrl()).toBe("https://api.example.com");
     });
 
-    it("returns empty string when VITE_API_BASE_URL is undefined", () => {
+    it("falls back to window.location.origin when VITE_API_BASE_URL is undefined (browser)", () => {
       vi.stubEnv("VITE_API_BASE_URL", undefined);
-      expect(getThumbnailApiBaseUrl()).toBe("");
+      expect(getThumbnailApiBaseUrl()).toBe(window.location.origin);
     });
   });
 });

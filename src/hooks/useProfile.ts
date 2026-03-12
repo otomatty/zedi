@@ -27,6 +27,21 @@ interface UseProfileReturn {
 
 const PROFILE_CACHE_KEY = "zedi-profile-cache";
 
+/** /api/users/me のレスポンス形状。サーバーは { user: { name, image, ... } } を返す。 */
+interface ApiMeResponse {
+  user?: {
+    name?: string | null;
+    image?: string | null;
+  };
+}
+
+function parseDisplayNameAndAvatar(data: unknown): { displayName: string; avatarUrl: string } {
+  const r = data as ApiMeResponse;
+  const name = typeof r?.user?.name === "string" ? r.user.name : "";
+  const image = typeof r?.user?.image === "string" ? r.user.image : "";
+  return { displayName: name.trim(), avatarUrl: image };
+}
+
 function loadCachedProfile(): ProfileData | null {
   try {
     const cached = localStorage.getItem(PROFILE_CACHE_KEY);
@@ -72,13 +87,11 @@ export function useProfile(): UseProfileReturn {
           credentials: "include",
         });
         if (res.ok) {
-          const data = (await res.json()) as {
-            user?: { name?: string; image?: string };
-          };
-          const rawDisplayName = data?.user?.name ?? "";
-          const rawAvatarUrl = data?.user?.image ?? "";
+          const data: unknown = await res.json();
+          const { displayName: rawDisplayName, avatarUrl: rawAvatarUrl } =
+            parseDisplayNameAndAvatar(data);
           const displayName =
-            rawDisplayName.trim() !== ""
+            rawDisplayName !== ""
               ? rawDisplayName
               : (user?.fullName ?? user?.username ?? "").trim();
           const fetched: ProfileData = {
