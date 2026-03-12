@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { signIn } from "@/lib/auth";
@@ -6,11 +6,26 @@ import { Button } from "@zedi/ui";
 
 const SignIn: React.FC = () => {
   const { t } = useTranslation();
-  const handleGoogle = () => {
-    signIn.social({ provider: "google", callbackURL: `${window.location.origin}/home` });
+  const [socialError, setSocialError] = useState<string | null>(null);
+
+  const callbackURL = `${window.location.origin}/home`;
+  const handleGoogle = async () => {
+    setSocialError(null);
+    try {
+      await signIn.social({ provider: "google", callbackURL });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("auth.signIn.error");
+      setSocialError(message);
+    }
   };
-  const handleGitHub = () => {
-    signIn.social({ provider: "github", callbackURL: `${window.location.origin}/home` });
+  const handleGitHub = async () => {
+    setSocialError(null);
+    try {
+      await signIn.social({ provider: "github", callbackURL });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("auth.signIn.error");
+      setSocialError(message);
+    }
   };
 
   return (
@@ -32,6 +47,11 @@ const SignIn: React.FC = () => {
             <h1 className="mb-2 text-2xl font-bold text-foreground">{t("auth.signIn.title")}</h1>
             <p className="text-foreground/70">{t("auth.signIn.subtitle")}</p>
           </div>
+          {socialError && (
+            <p className="mb-4 text-sm text-destructive" role="alert">
+              {socialError}
+            </p>
+          )}
           <div className="space-y-3">
             <button
               type="button"

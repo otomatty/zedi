@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Editor } from "@tiptap/core";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@zedi/ui";
@@ -53,7 +54,9 @@ async function commitViaServerS3(
   });
 
   if (response.status === 401) {
-    throw new Error("ログインが必要です");
+    const err = new Error("ログインが必要です") as Error & { redirectToSignIn?: boolean };
+    err.redirectToSignIn = true;
+    throw err;
   }
   if (!response.ok) {
     let message = `画像の保存に失敗しました: ${response.status}`;
@@ -77,14 +80,16 @@ export function useThumbnailCommit({
   pageTitle,
   storageSettings,
 }: UseThumbnailCommitOptions) {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const thumbnailApiBaseUrl = getThumbnailApiBaseUrl();
 
   const handleInsertThumbnailImage = useCallback(
     async (imageUrl: string, alt: string, previewUrl?: string) => {
       const editor = editorRef.current;
       if (!editor) return;
+      if (!isLoaded) return;
       if (!isSignedIn) {
         toast({
           title: "ログインが必要です",
@@ -142,6 +147,16 @@ export function useThumbnailCommit({
           })
           .run();
       } catch (error) {
+        const err = error as Error & { redirectToSignIn?: boolean };
+        if (err.redirectToSignIn) {
+          toast({
+            title: "ログインが必要です",
+            description: "再度ログインしてください",
+            variant: "destructive",
+          });
+          navigate("/sign-in", { replace: true });
+          return;
+        }
         const isFetchError =
           error instanceof TypeError ||
           (error instanceof Error &&
@@ -155,7 +170,16 @@ export function useThumbnailCommit({
         });
       }
     },
-    [editorRef, isSignedIn, thumbnailApiBaseUrl, pageTitle, toast, storageSettings],
+    [
+      editorRef,
+      isSignedIn,
+      isLoaded,
+      thumbnailApiBaseUrl,
+      pageTitle,
+      toast,
+      storageSettings,
+      navigate,
+    ],
   );
 
   return { handleInsertThumbnailImage };
