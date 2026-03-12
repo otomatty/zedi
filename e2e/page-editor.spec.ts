@@ -296,7 +296,10 @@ test.describe("Page Editor", () => {
     }) => {
       await helpers.createNewPage(page);
       const syncPromise = page.waitForResponse(
-        (res) => res.url().includes("/api/sync/pages") && res.ok(),
+        (res) => {
+          const req = res.request();
+          return req.method() === "POST" && res.url().includes("/api/sync/pages") && res.ok();
+        },
         { timeout: 10000 },
       );
       await page.getByPlaceholder("タイトルを入力").fill("Context Menu Delete Test");
@@ -328,9 +331,7 @@ test.describe("Page Editor", () => {
 
       const fab = page.locator("[data-tour-id=tour-fab]");
       await fab.click();
-      await expect(
-        page.getByRole("button", { name: /URLから作成|新規作成|画像から作成/ }),
-      ).toBeVisible({ timeout: 3000 });
+      await expect(page.getByRole("button", { name: /新規作成/ })).toBeVisible({ timeout: 3000 });
     });
   });
 });
