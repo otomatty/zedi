@@ -1,6 +1,7 @@
 {
   "release-type": "node",
   "bootstrap-sha": "5be90c289bd1395feaad07ed5e7f8c344a5dd733",
+  "_comment": "Remove bootstrap-sha after the first release PR on develop is merged.",
   "packages": {
     ".": {
       "changelog-type": "github"

@@ -160,7 +160,7 @@ fix/* (バグ修正)
    git push origin develop
    ```
 
-   hotfix を main にマージしたあと、GitHub Release を出したい場合は、hotfix ブランチで `package.json` のバージョンを上げておく必要があります。main へのマージ時に `create-release` ワークフローがそのバージョンでタグとリリースを自動作成します。同期 PR（main → develop）でその変更を develop に取り込んでください。
+   hotfix を main にマージしたあと、GitHub Release を出したい場合は、hotfix ブランチで `package.json` のバージョンを上げ、あわせて `CHANGELOG.md` に該当バージョンの見出し（例: `## 0.6.1 (YYYY-MM-DD)`）と変更内容を手動で追記してください。main へのマージ時に `create-release` ワークフローがそのバージョンでタグとリリースを自動作成し、リリースノートには CHANGELOG の該当セクションが使われます。同期 PR（main → develop）でその変更を develop に取り込んでください。
 
 ---
 

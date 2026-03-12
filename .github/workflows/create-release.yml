@@ -38,7 +38,14 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           VERSION_ESCAPED=$(echo "$VERSION" | sed 's/\./\\./g')
-          awk "/^## $VERSION_ESCAPED[^0-9]/ { found=1 } found { if (/^## [0-9]/ && !/^## $VERSION_ESCAPED[^0-9]/) exit; print }" CHANGELOG.md > release_notes.md
+          # Match both "## 0.6.0 (date)" and "## [0.6.0](url) (date)" styles
+          awk -v ver="$VERSION_ESCAPED" '
+            $0 ~ "^## " ver "[^0-9]" || $0 ~ "^## \\[" ver "\\]" { found=1 }
+            found {
+              if (/^## [0-9]/ && $0 !~ "^## " ver "[^0-9]" && $0 !~ "^## \\[" ver "\\]") exit
+              print
+            }
+          ' CHANGELOG.md > release_notes.md
           if [ ! -s release_notes.md ]; then
             echo "Release $VERSION" > release_notes.md
           fi
