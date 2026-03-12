@@ -59,4 +59,4 @@
 ## 4. 恒久対策（実施内容）
 
 - `deploy-prod.yml` の Cloudflare デプロイに **リトライ（`nick-fields/retry@v2`、最大 3 回、待機 60 秒）** を導入。一時的な Pages API 5xx（503 no healthy upstream 等）の緩和を想定。
-- デプロイ失敗時に **wrangler ログを artifact（`wrangler-logs-frontend` / `wrangler-logs-admin`）としてアップロード** する step を追加。パスは `${{ runner.home }}/.config/.wrangler/logs/`。ログが無い場合は `continue-on-error: true` でジョブはそのまま失敗扱い。
+- デプロイ失敗時に **wrangler ログを artifact（`wrangler-logs-frontend` / `wrangler-logs-admin`）としてアップロード** する step を追加。run で `$HOME/.config/.wrangler/logs/` をワークスペースにコピーしてから upload-artifact で相対パスを指定（upload-artifact の path は `$HOME` を展開しないため）。ログが無い／アップロード失敗時も `continue-on-error: true` により当該 step はジョブを止めない。

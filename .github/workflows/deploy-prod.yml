@@ -69,10 +69,16 @@ jobs:
       - name: Upload Wrangler logs (Frontend)
         if: failure()
         continue-on-error: true
+        run: |
+          mkdir -p wrangler-logs-frontend
+          if [ -d "$HOME/.config/.wrangler/logs" ]; then cp -r "$HOME/.config/.wrangler/logs/"* wrangler-logs-frontend/ 2>/dev/null || true; fi
+      - name: Upload Wrangler logs (Frontend) artifact
+        if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: wrangler-logs-frontend
-          path: $HOME/.config/.wrangler/logs/
+          path: wrangler-logs-frontend/
 
   deploy-admin:
     name: Deploy Admin
@@ -111,7 +117,13 @@ jobs:
       - name: Upload Wrangler logs (Admin)
         if: failure()
         continue-on-error: true
+        run: |
+          mkdir -p wrangler-logs-admin
+          if [ -d "$HOME/.config/.wrangler/logs" ]; then cp -r "$HOME/.config/.wrangler/logs/"* wrangler-logs-admin/ 2>/dev/null || true; fi
+      - name: Upload Wrangler logs (Admin) artifact
+        if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: wrangler-logs-admin
-          path: $HOME/.config/.wrangler/logs/
+          path: wrangler-logs-admin/
