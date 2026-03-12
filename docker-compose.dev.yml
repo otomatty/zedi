@@ -1,12 +1,14 @@
+# Credentials: set in .env or use defaults below for local dev only.
+# Do not rely on defaults in shared or production environments.
 services:
   postgres:
     image: postgres:16-bookworm
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: zedi
-      POSTGRES_USER: zedi
-      POSTGRES_PASSWORD: zedi_dev
+      POSTGRES_DB: ${POSTGRES_DB:-zedi}
+      POSTGRES_USER: ${POSTGRES_USER:-zedi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zedi_dev}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zedi -d zedi"]
       interval: 5s
@@ -36,11 +38,11 @@ services:
       - "3000:3000"
     environment:
       PORT: "3000"
-      DATABASE_URL: postgres://zedi:zedi_dev@postgres:5432/zedi
+      DATABASE_URL: postgres://${POSTGRES_USER:-zedi}:${POSTGRES_PASSWORD:-zedi_dev}@postgres:5432/${POSTGRES_DB:-zedi}
       REDIS_URL: redis://redis:6379
-      BETTER_AUTH_SECRET: dev-secret-change-in-production
-      BETTER_AUTH_URL: http://localhost:3000
-      CORS_ORIGIN: http://localhost:5173,http://localhost:30001
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-secret-change-in-production}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:30001}
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,7 +57,7 @@ services:
       - "1234:1234"
     environment:
       PORT: "1234"
-      DATABASE_URL: postgres://zedi:zedi_dev@postgres:5432/zedi
+      DATABASE_URL: postgres://${POSTGRES_USER:-zedi}:${POSTGRES_PASSWORD:-zedi_dev}@postgres:5432/${POSTGRES_DB:-zedi}
       REDIS_URL: redis://redis:6379
       API_INTERNAL_URL: http://api:3000
     depends_on:
