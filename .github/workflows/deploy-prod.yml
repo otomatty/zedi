@@ -72,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wrangler-logs-frontend
-          path: ${{ runner.home }}/.config/.wrangler/logs/
+          path: $HOME/.config/.wrangler/logs/
 
   deploy-admin:
     name: Deploy Admin
@@ -114,4 +114,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wrangler-logs-admin
-          path: ${{ runner.home }}/.config/.wrangler/logs/
+          path: $HOME/.config/.wrangler/logs/
