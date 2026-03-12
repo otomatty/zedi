@@ -8,10 +8,16 @@ import type { StorageSettings } from "@/types/storage";
 import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
 
 /** 401 時にサインインへリダイレクトするための印。catch 側で navigate("/sign-in") する。 */
-export type AuthRedirectError = Error & { redirectToSignIn: true };
+export class AuthRedirectError extends Error {
+  readonly redirectToSignIn = true;
+  constructor(message?: string) {
+    super(message);
+    this.name = "AuthRedirectError";
+  }
+}
 
 function isAuthRedirectError(err: unknown): err is AuthRedirectError {
-  return err instanceof Error && (err as AuthRedirectError).redirectToSignIn === true;
+  return err instanceof AuthRedirectError;
 }
 
 interface UseThumbnailCommitOptions {
@@ -60,9 +66,7 @@ async function commitViaServerS3(
   });
 
   if (response.status === 401) {
-    const err = new Error("ログインが必要です") as AuthRedirectError;
-    err.redirectToSignIn = true;
-    throw err;
+    throw new AuthRedirectError("ログインが必要です");
   }
   if (!response.ok) {
     let message = `画像の保存に失敗しました: ${response.status}`;
@@ -164,7 +168,7 @@ export function useThumbnailCommit({
         }
         const err = error instanceof Error ? error : new Error(String(error));
         const isFetchError =
-          error instanceof TypeError ||
+          err instanceof TypeError ||
           /Failed to fetch|CORS|NetworkError|Image fetch failed/i.test(err.message);
         toast({
           title: "画像の保存に失敗しました",
