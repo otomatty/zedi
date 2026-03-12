@@ -79,4 +79,4 @@ Skipped:
 
 - merged PR があっても、ローカルまたはリモートの tip が `headRefOid` と一致しない場合は削除しない（merge 後に進んだ可能性あり）。
 - 主 remote が `origin` でない構成では手順を流用するかユーザーに確認する。
-- `gh` が使えない場合は、祖先で merged と判定できるローカルブランチのみ削除し、リモート削除と squash/rebase 判定は行わない。
+- `gh` が使えない場合は、祖先で merged と判定できるローカルブランチと、その同名の `origin` 上のリモートブランチを ancestry ベースでのみ削除し、PR の `headRefOid` による squash/rebase 判定は行わない。

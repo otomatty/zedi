@@ -66,18 +66,17 @@ echo "Current branch: $current_branch"
 [ "$DRY_RUN" = true ] && echo "(dry-run: no branches will be deleted)"
 echo ""
 
-deleted_local=""
 deleted_remote_only=""
-deleted_remote_with_local=""
-skipped=""
 
 # ローカル削除候補を列挙（branch:reason の行を蓄積）
 local_candidates=""
 remote_delete_names=""
 
-for branch in $(git for-each-ref refs/heads --format='%(refname:short)'); do
+while IFS= read -r branch; do
+  [ -z "$branch" ] && continue
   is_protected "$branch" && continue
   reason=""
+  oid_num=""
   if git merge-base --is-ancestor "$branch" "$base_remote" 2>/dev/null; then
     reason="merged by ancestry"
   else
@@ -94,14 +93,24 @@ for branch in $(git for-each-ref refs/heads --format='%(refname:short)'); do
   if [ -n "$reason" ]; then
     local_candidates="${local_candidates}${local_candidates:+$'\n'}${branch}:${reason}"
     if git rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
-      remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${branch}:local"
+      remote_tip="$(git rev-parse "origin/$branch" 2>/dev/null)"
+      safe_remote=false
+      if git merge-base --is-ancestor "origin/$branch" "$base_remote" 2>/dev/null; then
+        safe_remote=true
+      elif [ -n "$oid_num" ]; then
+        oid="${oid_num%% *}"
+        [ "$oid" = "$remote_tip" ] && safe_remote=true
+      fi
+      if [ "$safe_remote" = true ]; then
+        remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${branch}:local:${reason}"
+      fi
     fi
   fi
-done
+done < <(git for-each-ref refs/heads --format='%(refname:short)')
 
 # リモート専用の削除候補（ローカルに ref が無く、origin にあり、merged PR で tip 一致）
-for ref in $(git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||'); do
-  [ "$ref" = "HEAD" ] && continue
+while IFS= read -r ref; do
+  [ -z "$ref" ] || [ "$ref" = "HEAD" ] && continue
   is_protected "$ref" && continue
   git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1 && continue
   if ! git rev-parse --verify "origin/$ref" >/dev/null 2>&1; then
@@ -114,16 +123,14 @@ for ref in $(git for-each-ref refs/remotes/origin --format='%(refname:short)' | 
   num="${oid_num#* }"
   if [ "$oid" = "$tip" ]; then
     deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:merged PR #${num} (remote-only)"
-    remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only"
+    remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:merged PR #${num} (remote-only)"
   fi
-done
+done < <(git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||')
 
 # 報告用に削除予定を表示
 report_local=""
 report_remote=""
-report_skipped=""
 count_local=0
-count_remote_only=0
 
 while IFS= read -r line; do
   [ -z "$line" ] && continue
@@ -133,13 +140,20 @@ while IFS= read -r line; do
   ((count_local++)) || true
 done <<< "$local_candidates"
 
+# リモート削除候補はすべて表示（:local と :remote-only の両方）
 while IFS= read -r line; do
   [ -z "$line" ] && continue
-  branch="${line%%:*}"
-  reason="${line#*:}"
-  report_remote="${report_remote}${report_remote:+$'\n'}- \`${branch}\` - ${reason}"
-  ((count_remote_only++)) || true
-done <<< "$deleted_remote_only"
+  name="${line%%:*}"
+  rest="${line#*:}"
+  rest="${rest#*:}" # branch:local:reason or branch:remote-only:reason -> reason
+  report_remote="${report_remote}${report_remote:+$'\n'}- \`${name}\` - ${rest}"
+done <<< "$remote_delete_names"
+
+total_remote=0
+while IFS= read -r line; do
+  [ -z "$line" ] && continue
+  ((total_remote++)) || true
+done <<< "$remote_delete_names"
 
 if [ -z "$report_local" ] && [ -z "$report_remote" ]; then
   echo "No branches to delete."
@@ -148,13 +162,7 @@ fi
 
 echo "--- Candidates ---"
 [ -n "$report_local" ] && echo "Deleted (local):" && echo "$report_local" && echo ""
-[ -n "$report_remote" ] && echo "Deleted (remote only):" && echo "$report_remote" && echo ""
-
-total_remote=0
-while IFS= read -r line; do
-  [ -z "$line" ] && continue
-  ((total_remote++)) || true
-done <<< "$remote_delete_names"
+[ -n "$report_remote" ] && echo "Deleted (remote):" && echo "$report_remote" && echo ""
 
 if [ "$DRY_RUN" = true ]; then
   echo "Dry-run: would delete $count_local local branch(es) and $total_remote remote branch(es)."
