@@ -26,7 +26,8 @@ export const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   const path = c.req.path;
-  if (path.startsWith("/api/webhooks/")) {
+  const excludedPrefixes = ["/api/webhooks/"];
+  if (excludedPrefixes.some((prefix) => path.startsWith(prefix))) {
     return next();
   }
 

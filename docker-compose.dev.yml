@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-zedi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zedi_dev}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zedi -d zedi"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zedi} -d ${POSTGRES_DB:-zedi}"]
       interval: 5s
       timeout: 5s
       retries: 10
