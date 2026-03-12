@@ -42,7 +42,7 @@ jobs:
           awk -v ver="$VERSION_ESCAPED" '
             $0 ~ "^## " ver "[^0-9]" || $0 ~ "^## \\[" ver "\\]" { found=1 }
             found {
-              if (/^## [0-9]/ && $0 !~ "^## " ver "[^0-9]" && $0 !~ "^## \\[" ver "\\]") exit
+              if (($0 ~ /^## [0-9]/ || $0 ~ /^## \[/) && $0 !~ "^## " ver "[^0-9]" && $0 !~ "^## \\[" ver "\\]") exit
               print
             }
           ' CHANGELOG.md > release_notes.md
