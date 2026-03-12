@@ -26,6 +26,7 @@
     }
   },
   "ignoreDependencies": [
+    "@better-auth/drizzle-adapter",
     "tailwindcss-animate",
     "@google/generative-ai",
     "@hookform/resolvers",
