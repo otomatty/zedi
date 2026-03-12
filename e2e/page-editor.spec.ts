@@ -295,24 +295,36 @@ test.describe("Page Editor", () => {
       helpers,
     }) => {
       await helpers.createNewPage(page);
+      const syncPromise = page.waitForResponse(
+        (res) => res.url().includes("/api/sync/pages") && res.ok(),
+        { timeout: 10000 },
+      );
       await page.getByPlaceholder("タイトルを入力").fill("Context Menu Delete Test");
-      await page.waitForTimeout(1500);
+      await syncPromise;
 
       await page.goto("/home");
       await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(500);
 
-      const card = page.locator(".page-card").first();
+      const card = page.locator(".page-card", { hasText: "Context Menu Delete Test" });
       await expect(card).toBeVisible({ timeout: 10000 });
 
       await card.click({ button: "right" });
       await page.getByRole("menuitem", { name: "削除" }).click();
 
       await expect(page.getByRole("alertdialog")).toBeVisible({ timeout: 5000 });
+      const deletePromise = page.waitForResponse(
+        (res) => {
+          const req = res.request();
+          return req.method() === "DELETE" && res.url().includes("/api/pages") && res.ok();
+        },
+        { timeout: 10000 },
+      );
       await page.getByRole("alertdialog").getByRole("button", { name: "削除" }).click();
+      await deletePromise;
 
       await expect(page.getByRole("alertdialog")).not.toBeVisible({ timeout: 5000 });
       await expect(page).toHaveURL("/home");
+      await expect(card).toHaveCount(0);
 
       const fab = page.locator("[data-tour-id=tour-fab]");
       await fab.click();
