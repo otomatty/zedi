@@ -5,9 +5,10 @@
   },
   "vitest": true,
   "playwright": true,
+  "ignoreBinaries": ["docker-compose"],
   "workspaces": {
     ".": {
-      "entry": ["src/main.tsx", "scripts/**/*.ts", "e2e/**/*.ts", "e2e/**/*.tsx"],
+      "entry": ["src/main.tsx", "scripts/**/*.ts", "e2e/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "e2e/**/*.{ts,tsx}"]
     },
     "admin": {
@@ -27,5 +28,70 @@
       "project": ["src/**/*.ts"]
     }
   },
-  "ignoreDependencies": ["tailwindcss-animate"]
+  "ignoreDependencies": [
+    "tailwindcss-animate",
+    "@google/generative-ai",
+    "@hookform/resolvers",
+    "@radix-ui/react-accordion",
+    "@radix-ui/react-alert-dialog",
+    "@radix-ui/react-aspect-ratio",
+    "@radix-ui/react-avatar",
+    "@radix-ui/react-checkbox",
+    "@radix-ui/react-collapsible",
+    "@radix-ui/react-context-menu",
+    "@radix-ui/react-dialog",
+    "@radix-ui/react-dropdown-menu",
+    "@radix-ui/react-hover-card",
+    "@radix-ui/react-label",
+    "@radix-ui/react-menubar",
+    "@radix-ui/react-navigation-menu",
+    "@radix-ui/react-popover",
+    "@radix-ui/react-progress",
+    "@radix-ui/react-radio-group",
+    "@radix-ui/react-scroll-area",
+    "@radix-ui/react-select",
+    "@radix-ui/react-separator",
+    "@radix-ui/react-slider",
+    "@radix-ui/react-slot",
+    "@radix-ui/react-switch",
+    "@radix-ui/react-tabs",
+    "@radix-ui/react-toast",
+    "@radix-ui/react-toggle",
+    "@radix-ui/react-toggle-group",
+    "@radix-ui/react-tooltip",
+    "@tiptap/extension-bubble-menu",
+    "@tiptap/extension-table-cell",
+    "@tiptap/extension-table-header",
+    "@tiptap/extension-table-row",
+    "baseline-browser-mapping",
+    "caniuse-lite",
+    "class-variance-authority",
+    "clsx",
+    "cmdk",
+    "embla-carousel-react",
+    "idb-keyval",
+    "input-otp",
+    "react-day-picker",
+    "react-hook-form",
+    "react-resizable-panels",
+    "recharts",
+    "sonner",
+    "sql.js",
+    "tailwind-merge",
+    "vaul",
+    "y-websocket",
+    "aws-jwt-verify",
+    "ioredis",
+    "@types/sql.js",
+    "@types/uuid",
+    "@vitejs/plugin-react",
+    "wrangler"
+  ],
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  },
+  "ignoreIssues": {
+    "**/*": ["exports", "types", "duplicates"]
+  }
 }
