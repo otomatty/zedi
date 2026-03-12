@@ -54,15 +54,25 @@ jobs:
           VITE_REALTIME_URL: ${{ vars.REALTIME_URL }}
           VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
           VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
+      # Retry on transient Cloudflare Pages API 5xx (e.g. 503 no healthy upstream).
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: nick-fields/retry@v2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          packageManager: bun
-          # Cloudflare API truncates commit message at ~384 bytes without UTF-8 boundary check (workers-sdk#11749).
-          # Use an explicit ASCII-only message to avoid "Invalid commit message" (code 8000111).
-          command: pages deploy dist --project-name=zedi --commit-message "Deploy from GitHub Actions (main) ${{ github.sha }}"
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: >
+            bunx wrangler pages deploy dist --project-name=zedi
+            --commit-message "Deploy from GitHub Actions (main) ${{ github.sha }}"
+      - name: Upload Wrangler logs (Frontend)
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: wrangler-logs-frontend
+          path: ${{ runner.home }}/.config/.wrangler/logs/
 
   deploy-admin:
     name: Deploy Admin
@@ -84,11 +94,24 @@ jobs:
         env:
           VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
           VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL || 'https://zedi-note.app' }}
+      - name: Install root dependencies (for wrangler)
+        run: bun install --frozen-lockfile
+      # Retry on transient Cloudflare Pages API 5xx (e.g. 503 no healthy upstream).
       - name: Deploy Admin to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: nick-fields/retry@v2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          packageManager: bun
-          # Avoid Cloudflare "Invalid commit message" (8000111) for long UTF-8 git messages (workers-sdk#11749).
-          command: pages deploy admin/dist --project-name=zedi-admin --commit-message "Deploy admin from GitHub Actions (main) ${{ github.sha }}"
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: >
+            bunx wrangler pages deploy admin/dist --project-name=zedi-admin
+            --commit-message "Deploy admin from GitHub Actions (main) ${{ github.sha }}"
+      - name: Upload Wrangler logs (Admin)
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: wrangler-logs-admin
+          path: ${{ runner.home }}/.config/.wrangler/logs/
