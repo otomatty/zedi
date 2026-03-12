@@ -8,7 +8,7 @@ const SignIn: React.FC = () => {
   const { t } = useTranslation();
   const [socialError, setSocialError] = useState<string | null>(null);
 
-  const callbackURL = `${window.location.origin}/home`;
+  const callbackURL = `${window.location.origin}/auth/callback`;
   const handleSocialSignIn = (provider: "google" | "github") => async () => {
     setSocialError(null);
     try {

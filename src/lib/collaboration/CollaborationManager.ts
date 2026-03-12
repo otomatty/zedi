@@ -20,6 +20,9 @@ const API_SAVE_DEBOUNCE_MS = 2000;
 /** 二重化検知: マージ後テキストがこの倍率を超えて増加したら二重化とみなす */
 const DUPLICATION_RATIO_THRESHOLD = 1.5;
 
+/** ブラウザの keepalive ペイロード制限（64 KiB）より少し小さい安全な上限（バイト） */
+const KEEPALIVE_PAYLOAD_LIMIT = 63 * 1024;
+
 export class CollaborationManager {
   private ydoc: Y.Doc;
   private wsProvider: HocuspocusProvider | null = null;
@@ -455,8 +458,7 @@ export class CollaborationManager {
     });
     const bodyByteLength =
       typeof TextEncoder !== "undefined" ? new TextEncoder().encode(body).length : body.length * 2;
-    const keepaliveLimit = 63 * 1024;
-    const useKeepalive = bodyByteLength <= keepaliveLimit;
+    const useKeepalive = bodyByteLength <= KEEPALIVE_PAYLOAD_LIMIT;
 
     const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
     const baseUrl = rawBaseUrl.replace(/\/$/, "");
