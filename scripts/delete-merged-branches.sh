@@ -50,10 +50,10 @@ if command -v gh >/dev/null 2>&1; then
   trap 'rm -f "$merged_file" "$closed_unmerged_file"' EXIT
   gh pr list --state merged --base "$BASE_BRANCH" --limit 200 --json headRefName,headRefOid,number \
     --jq '.[] | "\(.headRefName)\t\(.headRefOid)\t\(.number)"' 2>/dev/null >"$merged_file" || true
-  # クローズ済み（未マージ）PR のブランチ名と番号。--base は付けずリポジトリ全体から取得し、
-  # 基準以外のブランチ向けにクローズされた PR（GitHub Copilot 等の sub-PR）も削除候補にする。
-  gh pr list --state closed --limit 500 --json headRefName,number,mergedAt \
-    --jq '.[] | select(.mergedAt == null) | "\(.headRefName)\t\(.number)"' 2>/dev/null >"$closed_unmerged_file" || true
+  # クローズ済み（未マージ）PR のブランチ名・headRefOid・番号。--base は付けずリポジトリ全体から取得。
+  # origin tip と headRefOid が一致する場合のみ削除候補にする（クローズ後に push されたブランチを誤削除しないため）。
+  gh pr list --state closed --limit 500 --json headRefName,headRefOid,number,mergedAt \
+    --jq '.[] | select(.mergedAt == null) | "\(.headRefName)\t\(.headRefOid)\t\(.number)"' 2>/dev/null >"$closed_unmerged_file" || true
 fi
 
 # merged 一覧から branch の oid と number を取得（1行 "oid number" を返す）。見つからない場合は何も出力せず return 0（set -e で落ちないように）
@@ -116,11 +116,17 @@ done < <(git for-each-ref refs/heads --format='%(refname:short)')
 
 # リモート専用の削除候補（ローカルに ref が無く、origin にあり）
 # (1) merged PR で tip 一致 → 削除可
-# (2) クローズ済み未マージ PR のブランチ（GitHub Copilot 等が作ってクローズしたブランチ）→ 削除可
-get_closed_unmerged_num() {
+# (2) クローズ済み未マージ PR のブランチ（GitHub Copilot 等が作ってクローズしたブランチ）→ origin tip が headRefOid と一致する場合のみ削除可
+get_closed_unmerged_oid_and_num() {
   local branch="$1"
-  [ -z "$closed_unmerged_file" ] || [ ! -s "$closed_unmerged_file" ] && return 0
-  awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $2; exit}' "$closed_unmerged_file" 2>/dev/null
+  if [ -z "$closed_unmerged_file" ] || [ ! -s "$closed_unmerged_file" ]; then
+    return 0
+  fi
+  local oid num
+  oid="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $2; exit}' "$closed_unmerged_file" 2>/dev/null)"
+  num="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $3; exit}' "$closed_unmerged_file" 2>/dev/null)"
+  [ -z "$oid" ] && return 0
+  echo "$oid $num"
 }
 while IFS= read -r ref; do
   [ -z "$ref" ] || [ "$ref" = "HEAD" ] && continue
@@ -139,10 +145,15 @@ while IFS= read -r ref; do
       remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:merged PR #${num} (remote-only)"
     fi
   else
-    closed_num="$(get_closed_unmerged_num "$ref")"
-    if [ -n "$closed_num" ]; then
-      deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:closed PR #${closed_num} (remote-only)"
-      remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:closed PR #${closed_num} (remote-only)"
+    closed_oid_num="$(get_closed_unmerged_oid_and_num "$ref")"
+    if [ -n "$closed_oid_num" ]; then
+      tip="$(git rev-parse "origin/$ref" 2>/dev/null)"
+      closed_oid="${closed_oid_num%% *}"
+      closed_num="${closed_oid_num#* }"
+      if [ "$closed_oid" = "$tip" ]; then
+        deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:closed PR #${closed_num} (remote-only)"
+        remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:closed PR #${closed_num} (remote-only)"
+      fi
     fi
   fi
 done < <(git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||')

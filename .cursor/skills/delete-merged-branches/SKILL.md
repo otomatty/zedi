@@ -51,7 +51,7 @@ git fetch origin --prune
    - 失敗時は上記 JSON からそのブランチ名の `headRefOid` を探し、`$(git rev-parse <branch>)` と一致する場合のみ削除可（merged PR #N）。
 
 5. **リモート専用候補**  
-   `git for-each-ref refs/remotes/origin` で一覧。保護ブランチ・ローカルに存在するブランチは除外。(a) merged PR の JSON でそのブランチの `headRefOid` が origin の tip と一致する場合。(b) 別途 `gh pr list --state closed`（--base なし）から `mergedAt == null` の PR の `headRefName` 一覧を取得し、その名前と一致するリモートブランチも `git push origin --delete <branch>` の対象とする（基準以外向けの sub-PR や Copilot ブランチを含む）。
+   `git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||'` で一覧。保護ブランチ・ローカルに存在するブランチは除外。(a) merged PR の JSON でそのブランチの `headRefOid` が origin の tip と一致する場合。(b) 別途 `gh pr list --state closed`（--base なし）から `mergedAt == null` の PR の `headRefName` と `headRefOid` を取得し、**origin の tip が headRefOid と一致する**リモートブランチのみ `git push origin --delete <branch>` の対象とする（基準以外向けの sub-PR や Copilot ブランチを含む）。
 
 6. **削除**  
    候補を提示し確認後、ローカルは `git branch -d`（必要なら `-D`）、リモートは `git push origin --delete <branch>`。
