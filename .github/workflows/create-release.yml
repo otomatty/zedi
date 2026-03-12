@@ -47,9 +47,10 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Escape dots inside awk so -v is not subject to awk escape processing
+          # Escape dots in version string so they match literal dots, not any char.
+          # Use gsub(/[.]/, "\\.", ver) instead of "\\&" which produces literal "&".
           awk -v ver="$VERSION" '
-            BEGIN { gsub(/\./, "\\&", ver) }
+            BEGIN { gsub(/[.]/, "\\.", ver) }
             $0 ~ "^## " ver "[^0-9]" || $0 ~ "^## \\[" ver "\\]" { found=1 }
             found {
               if ((/^## [0-9]/ || /^## \[/) && $0 !~ "^## " ver "[^0-9]" && $0 !~ "^## \\[" ver "\\]") exit
