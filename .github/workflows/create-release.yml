@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: create-release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -20,7 +24,13 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(jq -r '.version // empty' package.json)
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "::error::version field not found or empty in package.json"
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check if tag exists
         id: check
@@ -37,12 +47,12 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          VERSION_ESCAPED=$(echo "$VERSION" | sed 's/\./\\./g')
-          # Match both "## 0.6.0 (date)" and "## [0.6.0](url) (date)" styles
-          awk -v ver="$VERSION_ESCAPED" '
+          # Escape dots inside awk so -v is not subject to awk escape processing
+          awk -v ver="$VERSION" '
+            BEGIN { gsub(/\./, "\\&", ver) }
             $0 ~ "^## " ver "[^0-9]" || $0 ~ "^## \\[" ver "\\]" { found=1 }
             found {
-              if (/^## [0-9]/ && $0 !~ "^## " ver "[^0-9]" && $0 !~ "^## \\[" ver "\\]") exit
+              if ((/^## [0-9]/ || /^## \[/) && $0 !~ "^## " ver "[^0-9]" && $0 !~ "^## \\[" ver "\\]") exit
               print
             }
           ' CHANGELOG.md > release_notes.md
