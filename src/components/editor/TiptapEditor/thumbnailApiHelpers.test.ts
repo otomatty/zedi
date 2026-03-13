@@ -4,7 +4,6 @@ import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
 describe("thumbnailApiHelpers", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
   });
 
   describe("getThumbnailApiBaseUrl", () => {
@@ -18,16 +17,9 @@ describe("thumbnailApiHelpers", () => {
       expect(getThumbnailApiBaseUrl()).toBe("https://api.example.com");
     });
 
-    it("falls back to window.location.origin when VITE_API_BASE_URL is undefined (browser)", () => {
+    it("returns empty string when VITE_API_BASE_URL is undefined", () => {
       vi.stubEnv("VITE_API_BASE_URL", undefined);
-      expect(getThumbnailApiBaseUrl()).toBe(window.location.origin);
-    });
-
-    it("returns empty string when VITE_API_BASE_URL is undefined (SSR, no window)", () => {
-      vi.stubEnv("VITE_API_BASE_URL", undefined);
-      vi.stubGlobal("window", undefined);
       expect(getThumbnailApiBaseUrl()).toBe("");
-      vi.unstubAllGlobals();
     });
   });
 });

@@ -2,20 +2,15 @@
  * OAuth callback page.
  * Better Auth handles the code exchange server-side; this page simply waits
  * for the session to become available and then redirects to /home.
- * セッションが取得できない場合はタイムアウト後にエラー表示し、サインインへ戻れるようにする。
  */
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/lib/auth/authClient";
-
-const SESSION_WAIT_TIMEOUT_MS = 15_000;
 
 export default function AuthCallback() {
   const { t } = useTranslation();
   const { data: session, isPending } = useSession();
   const [error, setError] = useState<string | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasTimedOutRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -28,29 +23,9 @@ export default function AuthCallback() {
     }
 
     if (!isPending && session) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
       window.location.assign("/home");
-      return;
     }
-
-    if (!isPending && !session && !timeoutRef.current && !hasTimedOutRef.current) {
-      timeoutRef.current = setTimeout(() => {
-        timeoutRef.current = null;
-        hasTimedOutRef.current = true;
-        setError(t("auth.callbackTimeout"));
-      }, SESSION_WAIT_TIMEOUT_MS);
-    }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-  }, [session, isPending, t]);
+  }, [session, isPending]);
 
   if (error) {
     return (
