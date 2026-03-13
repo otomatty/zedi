@@ -63,6 +63,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         with:
           max_attempts: 3
+          timeout_minutes: 5
           retry_wait_seconds: 60
           command: >
             bunx wrangler pages deploy dist --project-name=zedi
@@ -112,6 +113,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         with:
           max_attempts: 3
+          timeout_minutes: 5
           retry_wait_seconds: 60
           command: >
             bunx wrangler pages deploy admin/dist --project-name=zedi-admin
