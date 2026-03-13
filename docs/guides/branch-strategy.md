@@ -146,21 +146,16 @@ fix/* (バグ修正)
    git commit -m "fix: critical bug fix"
    ```
 
-3. **mainとdevelopの両方にマージ**
+3. **main にマージ（develop 反映は同期 PR で実施）**
 
    ```bash
    # mainにマージ
    git checkout main
    git merge hotfix/critical-bug
    git push origin main
-
-   # developにもマージ
-   git checkout develop
-   git merge hotfix/critical-bug
-   git push origin develop
    ```
 
-   hotfix を main にマージすると、Release Please が main で Release PR を自動作成します。Release PR を main にマージしてタグ・リリースを作成し、最後に同期 PR（main → develop）でその変更を develop に取り込んでください。
+   hotfix を main にマージすると、Release Please が main で Release PR を自動作成します。Release PR を main にマージしてタグ・リリースを作成し、最後に同期 PR（main → develop）でその変更を develop に取り込んでください。**main → develop の同期 PR は常に Create a merge commit でマージしてください（Squash は使用しない）。** 詳細は [マージ方法のルール](#マージ方法のルール) を参照。
 
 ---
 

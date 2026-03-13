@@ -60,5 +60,6 @@ jobs:
           if gh pr merge "$PR_NUMBER" --auto --merge; then
             echo "Enabled auto-merge for PR #$PR_NUMBER"
           else
-            echo "::warning::Failed to enable auto-merge for PR #$PR_NUMBER. Check repo auto-merge setting and branch protection."
+            echo "::error::Failed to enable auto-merge for PR #$PR_NUMBER. Check repo auto-merge setting and branch protection."
+            exit 1
           fi
