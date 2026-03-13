@@ -1,5 +1,5 @@
 # main へのプッシュ後に main → develop の同期 PR を自動作成します。
-# Release Please によるバージョン更新等が develop に反映され、競合を防ぎます。
+# hotfix のマージなど、main のみにある変更を develop に取り込むために使用します。
 name: Sync main to develop
 
 on:
@@ -45,7 +45,7 @@ jobs:
           fi
 
           printf '%s\n\n%s\n' \
-            "main ブランチの変更（Release Please によるバージョン更新等）を develop に同期します。" \
+            "main ブランチの変更（hotfix 等）を develop に同期します。" \
             "このPRは自動生成されています。競合がなければそのままマージしてください。" \
             > pr_body.txt
           gh pr create --base develop --head main \

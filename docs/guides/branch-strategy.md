@@ -104,17 +104,29 @@ fix/* (バグ修正)
 
 ### リリースの流れ
 
-1. **develop ブランチが安定したら、GitHub で PR を作成してマージ**
+バージョンは develop ブランチで確定し、main へのマージ時にデプロイと GitHub Release が自動で行われます。
+
+1. **develop 上で Release Please が Release PR を作成**
+
+   develop へのプッシュ（Conventional Commits）に応じて、Release Please が **develop 向け**のリリース PR を自動作成します。`package.json` のバージョンと `CHANGELOG.md` が更新されます。
+
+2. **必要に応じてバージョンを手動上書き（任意）**
+
+   自動判定されたバージョンを変えたい場合は、Release PR 上で `package.json` や CHANGELOG を直接編集するか、コミットメッセージに `release-as: x.y.z` を指定します。
+
+3. **Release PR を develop にマージ**
+
+   Release PR をマージすると、develop 上でバージョンが確定します。
+
+4. **develop → main の PR を作成・マージ**
 
    `develop → main` の PR を GitHub 上で作成し、レビューを経て **Create a merge commit** または **Squash and merge** でマージする。
    `git merge develop` を直接実行して push するのは PR レビューやステータスチェックを迂回するため行わない。
    詳細は [マージ方法のルール](#マージ方法のルール) を参照。
 
-2. **タグを作成（オプション）**
-   ```bash
-   git tag -a v1.0.0 -m "Release version 1.0.0"
-   git push origin v1.0.0
-   ```
+5. **自動でデプロイとリリース作成**
+
+   main へのマージ後、CI/CD により本番デプロイが実行され、同時に `create-release` ワークフローがタグ（`zedi-vx.y.z`）と GitHub Release を自動作成します。手動でタグを打つ必要はありません。
 
 ### 緊急バグ修正の流れ（hotfix）
 
@@ -147,6 +159,8 @@ fix/* (バグ修正)
    git merge hotfix/critical-bug
    git push origin develop
    ```
+
+   hotfix を main にマージしたあと、GitHub Release を出したい場合は、hotfix ブランチで `package.json` のバージョンを上げ、あわせて `CHANGELOG.md` に該当バージョンの見出し（例: `## 0.6.1 (YYYY-MM-DD)`）と変更内容を手動で追記してください。main へのマージ時に `create-release` ワークフローがそのバージョンでタグとリリースを自動作成し、リリースノートには CHANGELOG の該当セクションが使われます。同期 PR（main → develop）でその変更を develop に取り込んでください。
 
 ---
 
