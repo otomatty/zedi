@@ -60,13 +60,15 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const navigate = useNavigate();
 
   // URL変更時に前回の解析結果をリセット（進行中の clip は潰さない）
+  // status を deps に含めると完了/エラー直後に自ら結果を消してしまうため、url 変更時のみ判定
   useEffect(() => {
     if (!url) {
+      lastClippedUrlRef.current = "";
       reset();
-    } else if (status === "completed" || status === "error") {
+    } else if (url !== lastClippedUrlRef.current) {
       reset();
     }
-  }, [url, status, reset]);
+  }, [url, reset]);
 
   // エラー時に lastClippedUrlRef をクリアして同一URLのリトライを可能に
   useEffect(() => {
@@ -126,6 +128,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
 
     setIsSubmitting(true);
     let committedThumbnail: string | undefined;
+    let commitAttemptedAndFailed = false;
     try {
       if (clippedContent.thumbnailUrl) {
         try {
@@ -153,10 +156,12 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
             description: "コンテンツはそのまま取り込みます。",
             variant: "destructive",
           });
-          committedThumbnail = undefined;
+          commitAttemptedAndFailed = true;
         }
       }
-      const tiptapContent = getTiptapContent(committedThumbnail);
+      const thumbnailForContent =
+        committedThumbnail ?? (commitAttemptedAndFailed ? "" : clippedContent.thumbnailUrl);
+      const tiptapContent = getTiptapContent(thumbnailForContent);
       if (tiptapContent) {
         onClipped(
           clippedContent.title,
