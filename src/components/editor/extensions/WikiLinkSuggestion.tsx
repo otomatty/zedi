@@ -107,7 +107,10 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
     }
 
     return (
-      <div className="shadow-elevated min-w-[200px] max-w-[300px] animate-fade-in overflow-hidden rounded-lg border border-border bg-popover">
+      <div
+        data-testid="wiki-link-suggestion"
+        className="shadow-elevated min-w-[200px] max-w-[300px] animate-fade-in overflow-hidden rounded-lg border border-border bg-popover"
+      >
         <div className="p-1">
           {items.map((item, index) => (
             <button
