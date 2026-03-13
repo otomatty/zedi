@@ -81,6 +81,7 @@ test.describe("Linked Pages Cards", () => {
   }) => {
     await helpers.createNewPage(page);
     await page.getByPlaceholder("タイトルを入力").fill("Closed Link Test");
+    // Wait for editor to be ready (no "save complete" UI; debounced save + editor init)
     await page.waitForTimeout(500);
 
     const editor = page.locator(".tiptap");
@@ -89,13 +90,12 @@ test.describe("Linked Pages Cards", () => {
     // Type complete link [[Page]] — suggestion may show while typing but deactivates once ]] is entered
     const linkText = "Page";
     await page.keyboard.type(`[[${linkText}]]`);
-    await page.waitForTimeout(300);
+    await expect(page.getByTestId("wiki-link-suggestion")).toHaveCount(0);
 
     // Move cursor inside the link (between [[ and ]]) using ArrowLeft (once per char in linkText)
     for (let i = 0; i < linkText.length; i++) {
       await page.keyboard.press("ArrowLeft");
     }
-    await page.waitForTimeout(500);
 
     // Suggestion popup should NOT be present when inside closed link (component not rendered)
     await expect(page.getByTestId("wiki-link-suggestion")).toHaveCount(0);
