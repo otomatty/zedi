@@ -70,14 +70,9 @@ Deleted (remote):
 
 - `feature/qux` - merged PR #124 (remote-only)
 - `sub` - closed PR #XXX (remote-only)
-
-Skipped:
-
-- `feature/baz` - current branch
-- `feature/adv` - PR merged but tip advanced after merge
 ```
 
-削除件数とスキップ理由を必ず添える。
+削除件数を必ず添える。
 
 ## 現状把握（調査時）
 

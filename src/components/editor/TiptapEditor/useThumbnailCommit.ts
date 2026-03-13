@@ -168,8 +168,7 @@ export function useThumbnailCommit({
         }
         const err = error instanceof Error ? error : new Error(String(error));
         const isFetchError =
-          err instanceof TypeError ||
-          /Failed to fetch|CORS|NetworkError|Image fetch failed/i.test(err.message);
+          err instanceof TypeError || /Failed to fetch|CORS|NetworkError/i.test(err.message);
         toast({
           title: "画像の保存に失敗しました",
           description: isFetchError

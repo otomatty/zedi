@@ -59,7 +59,9 @@ fi
 # merged 一覧から branch の oid と number を取得（1行 "oid number" を返す）。見つからない場合は何も出力せず return 0（set -e で落ちないように）
 get_merged_oid_and_num() {
   local branch="$1"
-  [ -z "$merged_file" ] || [ ! -s "$merged_file" ] && return 0
+  if [ -z "$merged_file" ] || [ ! -s "$merged_file" ]; then
+    return 0
+  fi
   local oid num
   oid="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $2; exit}' "$merged_file" 2>/dev/null)"
   num="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $3; exit}' "$merged_file" 2>/dev/null)"
@@ -107,7 +109,7 @@ while IFS= read -r branch; do
         oid="${oid_num%% *}"
         [ "$oid" = "$remote_tip" ] && safe_remote=true
       fi
-      if [ "$safe_remote" = true ]; then
+      if [ "$safe_remote" = true ] && ! has_open_pr "$branch"; then
         remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${branch}:local:${reason}"
       fi
     fi
@@ -140,7 +142,9 @@ has_open_pr() {
   return 1
 }
 while IFS= read -r ref; do
-  [ -z "$ref" ] || [ "$ref" = "HEAD" ] && continue
+  if [ -z "$ref" ] || [ "$ref" = "HEAD" ]; then
+    continue
+  fi
   is_protected "$ref" && continue
   git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1 && continue
   if ! git rev-parse --verify "origin/$ref" >/dev/null 2>&1; then
@@ -151,7 +155,7 @@ while IFS= read -r ref; do
     tip="$(git rev-parse "origin/$ref" 2>/dev/null)"
     oid="${oid_num%% *}"
     num="${oid_num#* }"
-    if [ "$oid" = "$tip" ]; then
+    if [ "$oid" = "$tip" ] && ! has_open_pr "$ref"; then
       deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:merged PR #${num} (remote-only)"
       remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:merged PR #${num} (remote-only)"
     fi
