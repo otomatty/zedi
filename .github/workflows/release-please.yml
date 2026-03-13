@@ -1,11 +1,11 @@
-# Release Please: develop へのプッシュ内容に応じてリリース PR を develop に作成します。
-# タグ・GitHub Release は main へのマージ時に create-release.yml で自動作成されます。
+# Release Please: main へのプッシュ内容に応じてリリース PR を main に作成します。
+# Release PR マージ時にタグと GitHub Release も自動作成します。
 # Conventional Commits (feat:, fix:, BREAKING CHANGE:) に応じてメジャー / マイナー / パッチが自動判定されます。
 name: Release Please
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
 
 permissions:
   contents: write
@@ -27,5 +27,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
-          target-branch: develop
-          skip-github-release: true
+          target-branch: main
