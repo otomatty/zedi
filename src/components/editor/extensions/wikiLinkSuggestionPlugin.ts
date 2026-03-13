@@ -70,6 +70,32 @@ export const WikiLinkSuggestionPlugin = Extension.create<WikiLinkSuggestionOptio
             const match = textBefore.match(/\[\[([^\]]*?)$/);
 
             if (match) {
+              // Do not activate inside closed [[...]] — check if ]] exists after cursor
+              // \ufffc = object replacement character (ProseMirror placeholder for non-text nodes)
+              const textAfter = $from.parent.textBetween(
+                $from.parentOffset,
+                $from.parent.content.size,
+                null,
+                "\ufffc",
+              );
+              const idxClose = textAfter.indexOf("]]");
+              const idxOpen = textAfter.indexOf("[[");
+              const isInsideClosedLink = idxClose >= 0 && (idxOpen < 0 || idxClose < idxOpen);
+
+              if (isInsideClosedLink) {
+                if (prev.active) {
+                  const nextState = {
+                    active: false,
+                    query: "",
+                    range: null,
+                    decorations: DecorationSet.empty,
+                  };
+                  onStateChange?.(nextState);
+                  return nextState;
+                }
+                return prev;
+              }
+
               const query = match[1];
               const from = $from.pos - match[0].length;
               const to = $from.pos;
