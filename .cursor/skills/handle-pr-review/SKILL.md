@@ -20,10 +20,12 @@ gh pr list --head "$(git branch --show-current)" --json number,url,title --jq '.
 
 セッション中に既に PR を扱っている場合は、その情報を再利用する。
 
-## Step 1: 未対応コメントのみ取得
+## Step 1: 未返信コメントの取得
 
-**返信済みのコメントを除外し、未対応のものだけを最小フィールドで取得する。**
+**返信済みのコメントを除外し、未返信のトップレベルコメントを取得する。**
 新規チャットでも前回のコンテキスト不要で正しく動作する。
+
+**注意**: この方式は「未返信」を対象とする。GitHub の `Require conversation resolution before merging` は「未解決のスレッド」をブロックするため、返信済みだが未解決のスレッドは検出されない。マージ可否の完全な判定には `gh pr view --json mergeable,reviewDecision` の確認を併用すること。コメントが 30 件超の場合は `?per_page=100` や `--paginate` でページネーションを指定すること。
 
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/comments \
@@ -37,8 +39,9 @@ gh api repos/{owner}/{repo}/pulls/{number}/comments \
 
 1. 全コメントから「返信コメント」の `in_reply_to_id` を収集 → `$replied`
 2. トップレベルコメント（`in_reply_to_id == null`）のうち、`$replied` に含まれないもの = 未返信
-3. `body` は先頭 300 文字に切り詰め、全文が必要なら個別に読む
-4. bot の自動コメント（coderabbitai の summary 等）は分析対象外
+3. 「未返信」≠「未解決」。返信済みだがスレッドが未解決の場合はこの方式では検出されない
+4. `body` は先頭 300 文字に切り詰め、全文が必要なら個別に読む
+5. bot の自動コメント（coderabbitai の summary 等）は分析対象外
 
 ## Step 2: コメント分析
 

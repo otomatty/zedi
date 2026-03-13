@@ -98,7 +98,7 @@ jobs:
           bun-version: "1.2"
       - name: Install & Build Admin
         working-directory: admin
-        run: bun install && bun run build
+        run: bun install --frozen-lockfile && bun run build
         env:
           VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
           VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL || 'https://zedi-note.app' }}

@@ -10,19 +10,23 @@ interface UseMarkdownExportReturn {
 /**
  * Hook for markdown export functionality
  */
-export function useMarkdownExport(title: string, content: string): UseMarkdownExportReturn {
+export function useMarkdownExport(
+  title: string,
+  content: string,
+  sourceUrl?: string | null,
+): UseMarkdownExportReturn {
   const { toast } = useToast();
 
   const handleExportMarkdown = useCallback(() => {
-    downloadMarkdown(title, content);
+    downloadMarkdown(title, content, sourceUrl);
     toast({
       title: "Markdownファイルをダウンロードしました",
     });
-  }, [title, content, toast]);
+  }, [title, content, sourceUrl, toast]);
 
   const handleCopyMarkdown = useCallback(async () => {
     try {
-      await copyMarkdownToClipboard(title, content);
+      await copyMarkdownToClipboard(title, content, sourceUrl);
       toast({
         title: "Markdownをクリップボードにコピーしました",
       });
@@ -32,7 +36,7 @@ export function useMarkdownExport(title: string, content: string): UseMarkdownEx
         variant: "destructive",
       });
     }
-  }, [title, content, toast]);
+  }, [title, content, sourceUrl, toast]);
 
   return {
     handleExportMarkdown,

@@ -11,6 +11,7 @@ import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
+import { useAuth } from "@/hooks/useAuth";
 
 const FloatingActionButton: React.FC = () => {
   const { t } = useTranslation();
@@ -18,6 +19,7 @@ const FloatingActionButton: React.FC = () => {
   const { createNewPage, isCreating } = useCreateNewPage();
   const createPageMutation = useCreatePage();
   const { toast } = useToast();
+  const { isSignedIn } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isWebClipperOpen, setIsWebClipperOpen] = useState(false);
@@ -161,14 +163,17 @@ const FloatingActionButton: React.FC = () => {
         onOpenChange={setIsMenuOpen}
         onSelect={handleMenuSelect}
         trigger={fabButton}
+        hiddenOptions={isSignedIn ? undefined : ["url"]}
       />
 
-      {/* URL から作成ダイアログ */}
-      <WebClipperDialog
-        open={isWebClipperOpen}
-        onOpenChange={setIsWebClipperOpen}
-        onClipped={handleWebClipped}
-      />
+      {/* URL から作成ダイアログ（ログイン時のみ） */}
+      {isSignedIn && (
+        <WebClipperDialog
+          open={isWebClipperOpen}
+          onOpenChange={setIsWebClipperOpen}
+          onClipped={handleWebClipped}
+        />
+      )}
 
       {/* 画像から作成ダイアログ */}
       <ImageCreateDialog

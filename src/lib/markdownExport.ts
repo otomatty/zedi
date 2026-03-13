@@ -168,13 +168,24 @@ function applyMarks(text: string, marks: TiptapMark[]): string {
 }
 
 /**
+ * Build source attribution block for Markdown export (optional)
+ */
+function buildSourceAttribution(sourceUrl?: string | null): string {
+  if (!sourceUrl?.trim()) return "";
+  return `> 📎 引用元: [${sourceUrl}](${sourceUrl})\n\n`;
+}
+
+/**
  * Download content as a Markdown file
  */
-export function downloadMarkdown(title: string, content: string): void {
+export function downloadMarkdown(title: string, content: string, sourceUrl?: string | null): void {
   const markdown = tiptapToMarkdown(content);
+  const attribution = buildSourceAttribution(sourceUrl);
 
-  // Add title as H1 if not empty
-  const fullContent = title ? `# ${title}\n\n${markdown}` : markdown;
+  // Add title as H1 if not empty, then attribution, then content
+  const fullContent = title
+    ? `# ${title}\n\n${attribution}${markdown}`
+    : `${attribution}${markdown}`;
 
   const blob = new Blob([fullContent], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -203,11 +214,18 @@ function sanitizeFilename(name: string): string {
 /**
  * Copy Markdown content to clipboard
  */
-export async function copyMarkdownToClipboard(title: string, content: string): Promise<void> {
+export async function copyMarkdownToClipboard(
+  title: string,
+  content: string,
+  sourceUrl?: string | null,
+): Promise<void> {
   const markdown = tiptapToMarkdown(content);
+  const attribution = buildSourceAttribution(sourceUrl);
 
-  // Add title as H1 if not empty
-  const fullContent = title ? `# ${title}\n\n${markdown}` : markdown;
+  // Add title as H1 if not empty, then attribution, then content
+  const fullContent = title
+    ? `# ${title}\n\n${attribution}${markdown}`
+    : `${attribution}${markdown}`;
 
   await navigator.clipboard.writeText(fullContent);
 }

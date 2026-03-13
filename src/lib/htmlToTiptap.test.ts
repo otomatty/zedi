@@ -43,6 +43,27 @@ describe("formatClippedContentAsTiptap", () => {
     expect(second?.type).toBe("paragraph");
   });
 
+  it("includes storageProviderId in image attrs when provided", () => {
+    const result = formatClippedContentAsTiptap(
+      "<p>Body</p>",
+      "https://example.com",
+      null,
+      "https://cdn.example.com/thumb.png",
+      "Title",
+      "s3",
+    );
+    const first = result.content?.[0];
+    expect(first?.type).toBe("image");
+    expect(first).toMatchObject({
+      type: "image",
+      attrs: {
+        src: "https://cdn.example.com/thumb.png",
+        alt: "Title",
+        storageProviderId: "s3",
+      },
+    });
+  });
+
   it("omits image when thumbnailUrl is empty string", () => {
     const result = formatClippedContentAsTiptap(
       "<p>Body</p>",
