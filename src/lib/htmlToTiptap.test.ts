@@ -30,20 +30,27 @@ describe("formatClippedContentAsTiptap", () => {
       "https://example.com",
       "Example",
       "https://cdn.example.com/thumb.png",
+      "Page Title",
     );
     expect(result.type).toBe("doc");
     const first = result.content?.[0];
     expect(first?.type).toBe("image");
     expect(first).toMatchObject({
       type: "image",
-      attrs: { src: "https://cdn.example.com/thumb.png", alt: "OGP thumbnail" },
+      attrs: { src: "https://cdn.example.com/thumb.png", alt: "Page Title" },
     });
     const second = result.content?.[1];
     expect(second?.type).toBe("paragraph");
   });
 
   it("omits image when thumbnailUrl is empty string", () => {
-    const result = formatClippedContentAsTiptap("<p>Body</p>", "https://example.com", null, "");
+    const result = formatClippedContentAsTiptap(
+      "<p>Body</p>",
+      "https://example.com",
+      null,
+      "",
+      null,
+    );
     const first = result.content?.[0];
     expect(first?.type).toBe("paragraph");
     expect(first?.type).not.toBe("image");

@@ -106,6 +106,7 @@ describe("useWebClipper", () => {
       fakeContent.sourceUrl,
       fakeContent.siteName,
       fakeContent.thumbnailUrl,
+      fakeContent.title,
     );
   });
 
@@ -124,6 +125,7 @@ describe("useWebClipper", () => {
       fakeContent.sourceUrl,
       fakeContent.siteName,
       "https://committed.com/thumb.png",
+      fakeContent.title,
     );
   });
 });

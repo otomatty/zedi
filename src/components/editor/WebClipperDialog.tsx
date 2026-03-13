@@ -11,13 +11,19 @@ import {
   DialogTitle,
 } from "@zedi/ui";
 import { Alert, AlertDescription } from "@zedi/ui";
+import { useNavigate } from "react-router-dom";
 import { useWebClipper, type WebClipperStatus } from "@/hooks/useWebClipper";
 import { isValidUrl } from "@/lib/webClipper";
 import { useAuth } from "@/hooks/useAuth";
 import { createApiClient } from "@/lib/api";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
-import { commitThumbnailFromUrl } from "@/lib/thumbnailCommit";
+import { commitThumbnailFromUrl, AuthRedirectError } from "@/lib/thumbnailCommit";
 import { getThumbnailApiBaseUrl } from "@/components/editor/TiptapEditor/thumbnailApiHelpers";
+import { useToast } from "@zedi/ui";
+
+function isAuthRedirectError(err: unknown): err is AuthRedirectError {
+  return err instanceof AuthRedirectError;
+}
 
 interface WebClipperDialogProps {
   open: boolean;
@@ -50,13 +56,24 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
   const lastClippedUrlRef = useRef<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
-  // URL変更時に前回の解析結果をリセット
+  // URL変更時に前回の解析結果をリセット（進行中の clip は潰さない）
   useEffect(() => {
-    if (url) {
+    if (!url) {
+      reset();
+    } else if (status === "completed" || status === "error") {
       reset();
     }
-  }, [url, reset]);
+  }, [url, status, reset]);
+
+  // エラー時に lastClippedUrlRef をクリアして同一URLのリトライを可能に
+  useEffect(() => {
+    if (status === "error") {
+      lastClippedUrlRef.current = "";
+    }
+  }, [status]);
 
   // 有効なURLを検知したら自動で clip を実行（debounce 500ms）
   const triggerAutoClip = useDebouncedCallback(
@@ -109,31 +126,49 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
 
     setIsSubmitting(true);
     let committedThumbnail: string | undefined;
-    if (clippedContent.thumbnailUrl) {
-      try {
-        const baseUrl = getThumbnailApiBaseUrl();
-        if (baseUrl) {
-          const result = await commitThumbnailFromUrl(clippedContent.thumbnailUrl, {
-            baseUrl,
-            title: clippedContent.title,
+    try {
+      if (clippedContent.thumbnailUrl) {
+        try {
+          const baseUrl = getThumbnailApiBaseUrl();
+          if (baseUrl) {
+            const result = await commitThumbnailFromUrl(clippedContent.thumbnailUrl, {
+              baseUrl,
+              title: clippedContent.title,
+            });
+            committedThumbnail = result.imageUrl;
+          }
+        } catch (err) {
+          if (isAuthRedirectError(err)) {
+            toast({
+              title: "ログインが必要です",
+              description: "再度ログインしてください",
+              variant: "destructive",
+            });
+            navigate("/sign-in", { replace: true });
+            return;
+          }
+          console.error("Failed to commit thumbnail:", err);
+          toast({
+            title: "サムネイルの保存に失敗しました",
+            description: "コンテンツはそのまま取り込みます。",
+            variant: "destructive",
           });
-          committedThumbnail = result.imageUrl;
+          committedThumbnail = undefined;
         }
-      } catch {
-        committedThumbnail = undefined;
       }
+      const tiptapContent = getTiptapContent(committedThumbnail);
+      if (tiptapContent) {
+        onClipped(
+          clippedContent.title,
+          tiptapContent,
+          clippedContent.sourceUrl,
+          committedThumbnail ?? undefined,
+        );
+        onOpenChange(false);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    const tiptapContent = getTiptapContent(committedThumbnail);
-    if (tiptapContent) {
-      onClipped(
-        clippedContent.title,
-        tiptapContent,
-        clippedContent.sourceUrl,
-        committedThumbnail ?? undefined,
-      );
-      onOpenChange(false);
-    }
-    setIsSubmitting(false);
   };
 
   // Enterキーで実行
@@ -173,7 +208,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
               }}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
-              disabled={isProcessing}
+              disabled={isBusy}
               className="font-mono text-sm"
               autoFocus
             />

@@ -163,17 +163,21 @@ export function formatClippedContentAsTiptap(
   sourceUrl: string,
   siteName?: string | null,
   thumbnailUrl?: string | null,
+  title?: string | null,
 ): JSONContent {
+  void sourceUrl;
+  void siteName;
+
   const mainContent = htmlToTiptapJSON(content);
   const baseContent = mainContent.content ?? [];
 
-  const imageNode: JSONContent | null =
-    thumbnailUrl && thumbnailUrl.trim()
-      ? {
-          type: "image",
-          attrs: { src: thumbnailUrl, alt: "OGP thumbnail" },
-        }
-      : null;
+  const trimmedThumbnail = thumbnailUrl?.trim();
+  const imageNode: JSONContent | null = trimmedThumbnail
+    ? {
+        type: "image",
+        attrs: { src: trimmedThumbnail, alt: title || "OGP thumbnail" },
+      }
+    : null;
 
   const contentNodes: JSONContent[] = imageNode ? [imageNode, ...baseContent] : baseContent;
 
