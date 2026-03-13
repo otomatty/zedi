@@ -70,6 +70,8 @@ Deleted (remote):
 
 - `feature/qux` - merged PR #124 (remote-only)
 - `sub` - closed PR #XXX (remote-only)
+
+削除: ローカル 2 件、リモート 2 件
 ```
 
 削除件数を必ず添える。
