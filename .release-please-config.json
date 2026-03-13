@@ -2,8 +2,7 @@
   "release-type": "node",
   "packages": {
     ".": {
-      "changelog-type": "github",
-      "component": "zedi"
+      "changelog-type": "github"
     }
   }
 }

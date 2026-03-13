@@ -1,24 +1,11 @@
 import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import type { Editor } from "@tiptap/core";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@zedi/ui";
 import { getStorageProvider, getSettingsForUpload, convertToWebP } from "@/lib/storage";
 import type { StorageSettings } from "@/types/storage";
-import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
 
-/** 401 時にサインインへリダイレクトするための印。catch 側で navigate("/sign-in") する。 */
-export class AuthRedirectError extends Error {
-  readonly redirectToSignIn = true;
-  constructor(message?: string) {
-    super(message);
-    this.name = "AuthRedirectError";
-  }
-}
-
-function isAuthRedirectError(err: unknown): err is AuthRedirectError {
-  return err instanceof AuthRedirectError;
-}
+const getThumbnailApiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
 
 interface UseThumbnailCommitOptions {
   editorRef: React.RefObject<Editor | null>;
@@ -66,7 +53,7 @@ async function commitViaServerS3(
   });
 
   if (response.status === 401) {
-    throw new AuthRedirectError("ログインが必要です");
+    throw new Error("ログインが必要です");
   }
   if (!response.ok) {
     let message = `画像の保存に失敗しました: ${response.status}`;
@@ -90,16 +77,14 @@ export function useThumbnailCommit({
   pageTitle,
   storageSettings,
 }: UseThumbnailCommitOptions) {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const thumbnailApiBaseUrl = getThumbnailApiBaseUrl();
 
   const handleInsertThumbnailImage = useCallback(
     async (imageUrl: string, alt: string, previewUrl?: string) => {
       const editor = editorRef.current;
       if (!editor) return;
-      if (!isLoaded) return;
       if (!isSignedIn) {
         toast({
           title: "ログインが必要です",
@@ -157,18 +142,10 @@ export function useThumbnailCommit({
           })
           .run();
       } catch (error) {
-        if (isAuthRedirectError(error)) {
-          toast({
-            title: "ログインが必要です",
-            description: "再度ログインしてください",
-            variant: "destructive",
-          });
-          navigate("/sign-in", { replace: true });
-          return;
-        }
-        const err = error instanceof Error ? error : new Error(String(error));
         const isFetchError =
-          err instanceof TypeError || /Failed to fetch|CORS|NetworkError/i.test(err.message);
+          error instanceof TypeError ||
+          (error instanceof Error &&
+            /Failed to fetch|CORS|NetworkError|Image fetch failed/i.test(error.message));
         toast({
           title: "画像の保存に失敗しました",
           description: isFetchError
@@ -178,16 +155,7 @@ export function useThumbnailCommit({
         });
       }
     },
-    [
-      editorRef,
-      isSignedIn,
-      isLoaded,
-      thumbnailApiBaseUrl,
-      pageTitle,
-      toast,
-      storageSettings,
-      navigate,
-    ],
+    [editorRef, isSignedIn, thumbnailApiBaseUrl, pageTitle, toast, storageSettings],
   );
 
   return { handleInsertThumbnailImage };
