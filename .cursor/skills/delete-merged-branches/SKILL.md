@@ -1,117 +1,96 @@
 ---
 name: delete-merged-branches
 description: >
-  指定した基準ブランチ（develop / main など）に取り込まれたローカルブランチを安全に削除する。
-  通常の merge commit に加え、squash merge / rebase merge は GitHub のマージ済み PR の
-  headRefOid 一致で判定する。"マージ済みブランチを削除", "delete merged branches",
-  "ローカルブランチを掃除", "ブランチ整理" などで使う。
+  指定した基準ブランチ（develop / main など）に取り込まれたローカルおよび origin 上の
+  リモートブランチを安全に削除する。通常 merge は祖先判定、squash/rebase merge は
+  GitHub のマージ済み PR の headRefOid 一致で判定。あわせて、基準ブランチ向けに
+  **リポジトリ全体**のクローズ済み（未マージ）PR のリモートブランチも削除候補にする
+  （基準以外向けの sub-PR や GitHub Copilot 等が作ってクローズしたブランチも掃除できる）。"マージ済みブランチを削除",
+  "delete merged branches", "ローカル/リモートブランチを掃除", "ブランチ整理" などで使う。
 ---
 
-# マージ済みローカルブランチの削除
+# マージ済みローカル・リモートブランチの削除
 
-`git branch --merged` は「ブランチ先頭が基準の祖先か」だけを見るため、
-squash merge / rebase merge では取り込み済みでも未マージ扱いになる。本スキルでは祖先判定に加え、GitHub の merged PR の `headRefOid` 一致で安全に削除対象を決める。
+`git branch --merged` は祖先関係のみ見るため、squash/rebase merge では未マージ扱いになる。本スキルでは祖先判定に加え、GitHub の merged PR の `headRefOid` 一致でローカル・リモート両方の削除対象を安全に決める。あわせて、**クローズされた（未マージ）PR** のブランチは**リモートのみ**削除候補とする（ローカルは対象にしない）。クローズ PR は `gh pr list --state closed` でリポジトリ全体から取得するため、基準以外のブランチ向けに作られた sub-PR（例: copilot/sub-pr-\*）も候補になる。主 remote は `origin` を前提とする。
 
-## 基本方針
+## 推奨: スクリプトで一括実行
 
-1. 基準ブランチ（例: develop）を決める。ユーザー指定がなければ、ローカルに develop があれば develop、なければ origin/HEAD。
-2. 各ローカルブランチについて、まず Git の祖先関係で判定。
-3. 祖先で判定できない場合のみ、`gh pr list --base <基準>` で merged PR を取得し、`headRefOid` がローカル tip と一致する場合だけ削除候補にする。
-4. `headRefOid` が一致しない場合は削除しない（merge 後にローカルで進んだ可能性あり）。
-
-## 事前確認
-
-本手順は push/pull の主 remote が `origin` であることを前提とする（`git fetch origin`・`origin/HEAD`・`base_remote=origin/<基準>` を利用するため）。主 remote が `upstream` など別名の場合は手順を流用するかユーザーに確認する。
+事前に `git fetch origin --prune` と `gh auth status` が通ることを確認したうえで、以下で候補列挙・確認・削除まで行う。
 
 ```bash
 git fetch origin --prune
-git branch --show-current
-gh auth status
+./scripts/delete-merged-branches.sh [基準ブランチ] [--dry-run]
 ```
 
-`gh auth status` が失敗する場合は、祖先で merged と判定できるブランチのみ削除し、それ以外はスキップする。
+- **基準ブランチ**: 省略時はローカルに `develop` があれば `develop`、なければ `origin/HEAD` の短縮名（例: main）。
+- **--dry-run**: 削除はせず、削除候補一覧と理由だけ表示する。
+- **非対話で実行する場合**（CI やエージェントから確認なしで削除する場合）: `echo y | ./scripts/delete-merged-branches.sh` で確認プロンプトに自動で `y` を送る。
 
-## 手順
+スクリプトは (1) merged PR を `gh pr list --state merged --base <基準>` で一括取得し `headRefName` / `headRefOid` で照合する。(2) クローズ済み未マージ PR を `gh pr list --state closed`（**--base なし**、リポジトリ全体）から `mergedAt == null` かつ同一リポジトリ（fork は `isCrossRepository` で除外）で抽出する。ローカル候補は祖先 or merged PR の headRefOid 一致のみ。リモート専用候補は「merged PR で tip 一致」に加え、**クローズ済み未マージ PR については** origin の tip が当該 PR の `headRefOid` と一致する場合のみ（かつ `mergedAt == null`）削除候補に含め、さらに同名ブランチに open PR がある場合は削除しない。確認後にローカル削除 → リモート削除の順で実行する。
 
-### 1. 基準ブランチの決定
+## 手動で行う場合（フォールバック）
 
-**優先順位:**
+スクリプトを使わないときは以下を参考にする。
 
-1. ユーザーが「develop にマージ済み」「main を基準に」などと指定していればそのブランチ
-2. 未指定なら: ローカルに `develop` が存在すれば `develop`
-3. それ以外: `origin/HEAD` の短縮名（`git symbolic-ref --short refs/remotes/origin/HEAD | sed 's@^origin/@@'`）
+1. **事前確認**  
+   `git fetch origin --prune` と `gh auth status`。主 remote が `origin` でない場合はユーザーに確認する。
 
-```bash
-# 例: 自動で develop を選ぶ場合
-origin_default="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
-if git rev-parse --verify develop >/dev/null 2>&1; then
-  base_branch="develop"
-else
-  base_branch="${origin_default:-main}"
-fi
-base_remote="origin/$base_branch"
-current_branch="$(git branch --show-current)"
-```
+2. **基準ブランチ**  
+   ユーザー指定 > ローカル `develop` > `origin/HEAD` の短縮名。`base_remote=origin/<基準>` が存在しない場合は中断して確認。
 
-`base_remote` が存在しない（例: リモートに develop がない）場合は中断し、ユーザーに確認する。
+3. **merged PR の一括取得**  
+   ブランチごとに `gh pr list` を叩かず、1 回だけ取得する。
 
-### 2. ローカルブランチ一覧の取得
+   ```bash
+   gh pr list --state merged --base "$base_branch" --limit 200 --json headRefName,headRefOid,number
+   ```
 
-```bash
-git for-each-ref refs/heads --format='%(refname:short)'
-```
+4. **ローカル候補**  
+   `git for-each-ref refs/heads --format='%(refname:short)'` で一覧。現在ブランチ・基準・main/master/develop・origin/HEAD 先は除外。各ブランチについて:
+   - `git merge-base --is-ancestor <branch> "$base_remote"` で成功 → 削除可（merged by ancestry）
+   - 失敗時は上記 JSON からそのブランチ名の `headRefOid` を探し、`$(git rev-parse <branch>)` と一致する場合のみ削除可（merged PR #N）。
 
-対象外: 現在のブランチ、基準ブランチ（`base_branch`）と同名のブランチ。加えて、`main` / `master` / `develop` および `origin/HEAD` が指すブランチ名は常に対象外とする（保護ブランチ）。
+5. **リモート専用候補**  
+   `git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||'` で一覧。保護ブランチ・ローカルに存在するブランチは除外。(a) merged PR の JSON でそのブランチの `headRefOid` が origin の tip と一致する場合。(b) 別途 `gh pr list --state closed`（--base なし）から `mergedAt == null` かつ同一リポジトリの PR の `headRefName` と `headRefOid` を取得し、**origin の tip が headRefOid と一致する**リモートブランチのみ対象とする。このとき、同名ブランチに open PR がある場合は削除しない（基準以外向けの sub-PR や Copilot ブランチを含む）。
 
-### 3. 各ブランチの削除可否を判定
-
-#### A. 通常 merge（祖先）の判定
-
-```bash
-git merge-base --is-ancestor "<branch>" "$base_remote"
-```
-
-成功したら削除候補。理由は `merged by ancestry`。
-
-#### B. squash merge / rebase merge の判定
-
-A で削除候補にならず、`gh` が使える場合のみ実行。
-
-```bash
-tip_sha="$(git rev-parse "<branch>")"
-gh pr list --state merged --head "<branch>" --base "$base_branch" --json number,headRefOid --limit 1
-```
-
-- `gh pr list` はデフォルトで更新が新しい順のため、`--limit 1` で最新の merged PR 1 件を取得する。その **`headRefOid` が `tip_sha` と一致**する場合のみ削除候補。理由は `merged PR #<number> (squash/rebase-safe)`。
-- merged PR なし、または `headRefOid` 不一致の場合は削除しない。
-
-### 4. 削除の実行
-
-削除候補一覧をユーザーに提示し、削除してよいか確認を取ったうえで、次の方針で削除する。
-
-- 理由が `merged by ancestry` のブランチ: `git branch -d "<branch>"` を使う（Git 上もマージ済みと判定されているため強制削除は不要）。
-- 理由が `merged PR #<number> (squash/rebase-safe)` のブランチ: まず `git branch -d "<branch>"` を試し、エラーになる場合のみ `git branch -D "<branch>"` を使う。
+6. **削除**  
+   候補を提示し確認後、ローカルは `git branch -d`（必要なら `-D`）、リモートは `git push origin --delete <branch>`。
 
 ## 報告形式
 
 ```markdown
-基準ブランチ: develop（または main 等）
+基準ブランチ: develop
 
-Deleted:
+Deleted (local):
 
 - `feature/foo` - merged by ancestry
 - `feature/bar` - merged PR #123 (squash/rebase-safe)
 
-Skipped:
+Deleted (remote):
 
-- `feature/baz` - current branch
-- `feature/qux` - PR merged but local branch advanced after merge
+- `feature/qux` - merged PR #124 (remote-only)
+- `sub` - closed PR #XXX (remote-only)
+
+削除: ローカル 2 件、リモート 2 件
 ```
 
-削除件数とスキップ理由を必ず添える。
+削除件数を必ず添える。
+
+## 現状把握（調査時）
+
+リモートブランチ一覧と PR 状態を確認する例:
+
+```bash
+git fetch origin --prune
+git for-each-ref refs/remotes/origin --format='%(refname:short)' | sed 's|^origin/||' | grep -v '^HEAD$' | sort
+# 各ブランチの PR 状態: gh pr list --state all --head <branch> --limit 1 --json state,number,mergedAt,baseRefName
+```
+
+削除候補の洗い出しには `./scripts/delete-merged-branches.sh --dry-run` が使える。
 
 ## 注意点
 
-- `git branch --merged` だけでは squash/rebase merge を拾えない。
-- merged PR があっても `headRefOid` とローカル tip が違う場合は削除しない。
-- 主 remote が `origin` でない構成では手順がそのまま使えない。その場合はユーザーに確認する。
+- merged PR があっても、ローカルまたはリモートの tip が `headRefOid` と一致しない場合は削除しない（merge 後に進んだ可能性あり）。
+- クローズ済み未マージ PR のブランチは**リモート削除のみ**対象。ローカルに同じ名前のブランチがあっても、merged でない限りローカルは削除しない（安全のため）。
+- 主 remote が `origin` でない構成では手順を流用するかユーザーに確認する。
+- `gh` が使えない場合は、祖先で merged と判定できるローカルブランチと、その同名の `origin` 上のリモートブランチを ancestry ベースでのみ削除し、PR の `headRefOid` による squash/rebase 判定およびクローズ済み PR の取得は行わない。

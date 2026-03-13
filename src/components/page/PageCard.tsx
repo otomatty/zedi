@@ -137,9 +137,15 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     });
   };
 
+  const openDeleteDialogAfterMenuClose = useCallback(() => {
+    requestAnimationFrame(() => {
+      setIsDeleteDialogOpen(true);
+    });
+  }, []);
+
   return (
     <>
-      <ContextMenu>
+      <ContextMenu modal={false}>
         <ContextMenuTrigger asChild>
           <button
             draggable={!isMobile}
@@ -205,7 +211,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
-            onClick={() => setIsDeleteDialogOpen(true)}
+            onSelect={openDeleteDialogAfterMenuClose}
             className="text-destructive focus:text-destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" />
