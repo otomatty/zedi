@@ -105,6 +105,25 @@ describe("useWebClipper", () => {
       fakeContent.content,
       fakeContent.sourceUrl,
       fakeContent.siteName,
+      fakeContent.thumbnailUrl,
+    );
+  });
+
+  it("getTiptapContent passes thumbnailUrl override when provided", async () => {
+    mockClipWebPage.mockResolvedValue(fakeContent);
+    mockFormatClippedContentAsTiptap.mockReturnValue({ type: "doc", content: [] });
+    const { result } = renderHook(() => useWebClipper());
+
+    await act(async () => {
+      await result.current.clip("https://example.com");
+    });
+
+    result.current.getTiptapContent("https://committed.com/thumb.png");
+    expect(mockFormatClippedContentAsTiptap).toHaveBeenCalledWith(
+      fakeContent.content,
+      fakeContent.sourceUrl,
+      fakeContent.siteName,
+      "https://committed.com/thumb.png",
     );
   });
 });

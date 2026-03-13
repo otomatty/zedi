@@ -156,50 +156,29 @@ export function tiptapJSONToString(json: JSONContent): string {
 
 /**
  * クリップしたコンテンツをTiptap JSONとして整形
- * 引用元情報を含めたフォーマット
+ * 引用元表示は PageEditorContent の SourceUrlBadge が担当
  */
 export function formatClippedContentAsTiptap(
   content: string,
   sourceUrl: string,
   siteName?: string | null,
+  thumbnailUrl?: string | null,
 ): JSONContent {
   const mainContent = htmlToTiptapJSON(content);
+  const baseContent = mainContent.content ?? [];
 
-  let sourceText = siteName ?? sourceUrl;
-  if (!siteName) {
-    try {
-      sourceText = new URL(sourceUrl).hostname;
-    } catch {
-      sourceText = sourceUrl;
-    }
-  }
+  const imageNode: JSONContent | null =
+    thumbnailUrl && thumbnailUrl.trim()
+      ? {
+          type: "image",
+          attrs: { src: thumbnailUrl, alt: "OGP thumbnail" },
+        }
+      : null;
 
-  const sourceInfo: JSONContent = {
-    type: "paragraph",
-    content: [
-      { type: "text", text: "📎 引用元: " },
-      {
-        type: "text",
-        marks: [
-          {
-            type: "link",
-            attrs: {
-              href: sourceUrl,
-              target: "_blank",
-              rel: "noopener noreferrer nofollow",
-              class: null,
-            },
-          },
-        ],
-        text: sourceText,
-      },
-    ],
-  };
-
-  const horizontalRule: JSONContent = { type: "horizontalRule" };
+  const contentNodes: JSONContent[] = imageNode ? [imageNode, ...baseContent] : baseContent;
 
   return {
     type: "doc",
-    content: [sourceInfo, horizontalRule, ...(mainContent.content ?? [])],
+    content: contentNodes,
   };
 }
