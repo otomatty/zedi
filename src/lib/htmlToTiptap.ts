@@ -156,50 +156,33 @@ export function tiptapJSONToString(json: JSONContent): string {
 
 /**
  * クリップしたコンテンツをTiptap JSONとして整形
- * 引用元情報を含めたフォーマット
+ * 引用元表示は PageEditorContent の SourceUrlBadge が担当
  */
 export function formatClippedContentAsTiptap(
   content: string,
   sourceUrl: string,
   siteName?: string | null,
+  thumbnailUrl?: string | null,
+  title?: string | null,
 ): JSONContent {
+  void sourceUrl;
+  void siteName;
+
   const mainContent = htmlToTiptapJSON(content);
+  const baseContent = mainContent.content ?? [];
 
-  let sourceText = siteName ?? sourceUrl;
-  if (!siteName) {
-    try {
-      sourceText = new URL(sourceUrl).hostname;
-    } catch {
-      sourceText = sourceUrl;
-    }
-  }
+  const trimmedThumbnail = thumbnailUrl?.trim();
+  const imageNode: JSONContent | null = trimmedThumbnail
+    ? {
+        type: "image",
+        attrs: { src: trimmedThumbnail, alt: title || "OGP thumbnail" },
+      }
+    : null;
 
-  const sourceInfo: JSONContent = {
-    type: "paragraph",
-    content: [
-      { type: "text", text: "📎 引用元: " },
-      {
-        type: "text",
-        marks: [
-          {
-            type: "link",
-            attrs: {
-              href: sourceUrl,
-              target: "_blank",
-              rel: "noopener noreferrer nofollow",
-              class: null,
-            },
-          },
-        ],
-        text: sourceText,
-      },
-    ],
-  };
-
-  const horizontalRule: JSONContent = { type: "horizontalRule" };
+  const contentNodes: JSONContent[] = imageNode ? [imageNode, ...baseContent] : baseContent;
 
   return {
     type: "doc",
-    content: [sourceInfo, horizontalRule, ...(mainContent.content ?? [])],
+    content: contentNodes,
   };
 }

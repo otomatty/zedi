@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link2, Loader2, AlertCircle, Check, ExternalLink } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Input } from "@zedi/ui";
@@ -11,10 +11,19 @@ import {
   DialogTitle,
 } from "@zedi/ui";
 import { Alert, AlertDescription } from "@zedi/ui";
+import { useNavigate } from "react-router-dom";
 import { useWebClipper, type WebClipperStatus } from "@/hooks/useWebClipper";
 import { isValidUrl } from "@/lib/webClipper";
 import { useAuth } from "@/hooks/useAuth";
 import { createApiClient } from "@/lib/api";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
+import { commitThumbnailFromUrl, AuthRedirectError } from "@/lib/thumbnailCommit";
+import { getThumbnailApiBaseUrl } from "@/components/editor/TiptapEditor/thumbnailApiHelpers";
+import { useToast } from "@zedi/ui";
+
+function isAuthRedirectError(err: unknown): err is AuthRedirectError {
+  return err instanceof AuthRedirectError;
+}
 
 interface WebClipperDialogProps {
   open: boolean;
@@ -45,6 +54,61 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
+  const lastClippedUrlRef = useRef<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // URL変更時に前回の解析結果をリセット（進行中の clip は潰さない）
+  // status を deps に含めると完了/エラー直後に自ら結果を消してしまうため、url 変更時のみ判定
+  useEffect(() => {
+    if (!url) {
+      lastClippedUrlRef.current = "";
+      reset();
+    } else if (url !== lastClippedUrlRef.current) {
+      reset();
+    }
+  }, [url, reset]);
+
+  // エラー時に lastClippedUrlRef をクリアして同一URLのリトライを可能に
+  useEffect(() => {
+    if (status === "error") {
+      lastClippedUrlRef.current = "";
+    }
+  }, [status]);
+
+  // 有効なURLを検知したら自動で clip を実行（debounce 500ms）
+  const triggerAutoClip = useDebouncedCallback(
+    useCallback(() => {
+      const trimmed = url.trim();
+      if (!trimmed || !isValidUrl(trimmed)) return;
+      if (trimmed === lastClippedUrlRef.current) return;
+      lastClippedUrlRef.current = trimmed;
+      clip(trimmed);
+    }, [url, clip]),
+    500,
+  );
+
+  useEffect(() => {
+    triggerAutoClip();
+  }, [url, triggerAutoClip]);
+
+  // 貼り付け時に有効なURLなら即時 clip
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const text = e.clipboardData.getData("text").trim();
+      if (text && isValidUrl(text)) {
+        e.preventDefault();
+        setUrl(text);
+        setUrlError(null);
+        if (text !== lastClippedUrlRef.current) {
+          lastClippedUrlRef.current = text;
+          clip(text);
+        }
+      }
+    },
+    [clip],
+  );
 
   // ダイアログを閉じたときにリセット
   useEffect(() => {
@@ -53,42 +117,68 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
         setUrl("");
         setUrlError(null);
       });
+      lastClippedUrlRef.current = "";
       reset();
     }
   }, [open, reset]);
 
-  // URL入力のバリデーション
-  const validateUrl = useCallback((value: string): boolean => {
-    if (!value.trim()) {
-      setUrlError("URLを入力してください");
-      return false;
-    }
-    if (!isValidUrl(value)) {
-      setUrlError("有効なURLを入力してください（http:// または https://）");
-      return false;
-    }
-    setUrlError(null);
-    return true;
-  }, []);
-
-  // 取り込み実行
+  // 取り込み実行（clippedContent をそのまま使用、再 fetch なし）
   const handleClip = async () => {
-    if (!validateUrl(url)) return;
+    if (!clippedContent) return;
 
-    const result = await clip(url);
-
-    if (result) {
-      const tiptapContent = getTiptapContent();
+    setIsSubmitting(true);
+    let committedThumbnail: string | undefined;
+    let commitAttemptedAndFailed = false;
+    try {
+      if (clippedContent.thumbnailUrl) {
+        try {
+          const baseUrl = getThumbnailApiBaseUrl();
+          if (baseUrl) {
+            const result = await commitThumbnailFromUrl(clippedContent.thumbnailUrl, {
+              baseUrl,
+              title: clippedContent.title,
+            });
+            committedThumbnail = result.imageUrl;
+          }
+        } catch (err) {
+          if (isAuthRedirectError(err)) {
+            toast({
+              title: "ログインが必要です",
+              description: "再度ログインしてください",
+              variant: "destructive",
+            });
+            navigate("/sign-in", { replace: true });
+            return;
+          }
+          console.error("Failed to commit thumbnail:", err);
+          toast({
+            title: "サムネイルの保存に失敗しました",
+            description: "コンテンツはそのまま取り込みます。",
+            variant: "destructive",
+          });
+          commitAttemptedAndFailed = true;
+        }
+      }
+      const thumbnailForContent =
+        committedThumbnail ?? (commitAttemptedAndFailed ? "" : clippedContent.thumbnailUrl);
+      const tiptapContent = getTiptapContent(thumbnailForContent);
       if (tiptapContent) {
-        onClipped(result.title, tiptapContent, result.sourceUrl, result.thumbnailUrl);
+        onClipped(
+          clippedContent.title,
+          tiptapContent,
+          clippedContent.sourceUrl,
+          committedThumbnail ?? undefined,
+        );
         onOpenChange(false);
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Enterキーで実行
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && status === "idle") {
+    if (e.key === "Enter" && clippedContent && !isSubmitting) {
       e.preventDefault();
       handleClip();
     }
@@ -96,6 +186,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
 
   const isProcessing = status === "fetching" || status === "extracting";
   const isCompleted = status === "completed";
+  const isBusy = isProcessing || isSubmitting;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,8 +211,9 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
                 setUrl(e.target.value);
                 if (urlError) setUrlError(null);
               }}
+              onPaste={handlePaste}
               onKeyDown={handleKeyDown}
-              disabled={isProcessing}
+              disabled={isBusy}
               className="font-mono text-sm"
               autoFocus
             />
@@ -166,11 +258,11 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isBusy}>
             キャンセル
           </Button>
-          <Button onClick={handleClip} disabled={isProcessing || !url.trim()}>
-            {isProcessing ? (
+          <Button onClick={handleClip} disabled={isBusy || !clippedContent}>
+            {isBusy ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 取り込み中...

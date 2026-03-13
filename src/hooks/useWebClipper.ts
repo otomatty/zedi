@@ -2,7 +2,7 @@
  * Web Clipper フック - URLからWebページを取り込む
  * api を渡すとサーバー側で HTML 取得（CORS 回避）。未指定時は CORS プロキシにフォールバック。
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/webClipper";
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
 import type { ApiClient } from "@/lib/api/apiClient";
@@ -20,11 +20,12 @@ export interface UseWebClipperReturn {
   error: string | null;
   clip: (url: string) => Promise<ClippedContent | null>;
   reset: () => void;
-  getTiptapContent: () => string | null;
+  getTiptapContent: (thumbnailUrl?: string | null) => string | null;
 }
 
 export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipperReturn {
   const { api } = options;
+  const clipIdRef = useRef(0);
   const [status, setStatus] = useState<WebClipperStatus>("idle");
   const [clippedContent, setClippedContent] = useState<ClippedContent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,9 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
 
   const clip = useCallback(
     async (url: string): Promise<ClippedContent | null> => {
+      clipIdRef.current += 1;
+      const currentId = clipIdRef.current;
+
       setStatus("fetching");
       setError(null);
       setClippedContent(null);
@@ -44,10 +48,14 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
         setStatus("extracting");
         const content = await clipWebPage(url, api ? fetchHtmlFn : undefined);
 
+        if (currentId !== clipIdRef.current) return null;
+
         setClippedContent(content);
         setStatus("completed");
         return content;
       } catch (err) {
+        if (currentId !== clipIdRef.current) return null;
+
         const errorMessage = getClipErrorMessage(err);
         setError(errorMessage);
         setStatus("error");
@@ -63,17 +71,22 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
     setError(null);
   }, []);
 
-  const getTiptapContent = useCallback((): string | null => {
-    if (!clippedContent) return null;
+  const getTiptapContent = useCallback(
+    (thumbnailUrl?: string | null): string | null => {
+      if (!clippedContent) return null;
 
-    const tiptapDoc = formatClippedContentAsTiptap(
-      clippedContent.content,
-      clippedContent.sourceUrl,
-      clippedContent.siteName,
-    );
+      const tiptapDoc = formatClippedContentAsTiptap(
+        clippedContent.content,
+        clippedContent.sourceUrl,
+        clippedContent.siteName,
+        thumbnailUrl ?? clippedContent.thumbnailUrl,
+        clippedContent.title,
+      );
 
-    return JSON.stringify(tiptapDoc);
-  }, [clippedContent]);
+      return JSON.stringify(tiptapDoc);
+    },
+    [clippedContent],
+  );
 
   return {
     status,
