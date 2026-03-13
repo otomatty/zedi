@@ -15,6 +15,7 @@ export default function AuthCallback() {
   const { data: session, isPending } = useSession();
   const [error, setError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasTimedOutRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -35,9 +36,10 @@ export default function AuthCallback() {
       return;
     }
 
-    if (!isPending && !session && !timeoutRef.current) {
+    if (!isPending && !session && !timeoutRef.current && !hasTimedOutRef.current) {
       timeoutRef.current = setTimeout(() => {
         timeoutRef.current = null;
+        hasTimedOutRef.current = true;
         setError(t("auth.callbackTimeout"));
       }, SESSION_WAIT_TIMEOUT_MS);
     }

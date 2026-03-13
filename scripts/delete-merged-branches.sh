@@ -59,12 +59,39 @@ fi
 # merged 一覧から branch の oid と number を取得（1行 "oid number" を返す）。見つからない場合は何も出力せず return 0（set -e で落ちないように）
 get_merged_oid_and_num() {
   local branch="$1"
-  [ -z "$merged_file" ] || [ ! -s "$merged_file" ] && return 0
+  if [ -z "$merged_file" ] || [ ! -s "$merged_file" ]; then
+    return 0
+  fi
   local oid num
   oid="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $2; exit}' "$merged_file" 2>/dev/null)"
   num="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $3; exit}' "$merged_file" 2>/dev/null)"
   [ -z "$oid" ] && return 0
   echo "$oid $num"
+}
+
+# リモート専用の削除候補用：branch の oid と number を取得
+get_closed_unmerged_oid_and_num() {
+  local branch="$1"
+  if [ -z "$closed_unmerged_file" ] || [ ! -s "$closed_unmerged_file" ]; then
+    return 0
+  fi
+  local oid num
+  oid="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $2; exit}' "$closed_unmerged_file" 2>/dev/null)"
+  num="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $3; exit}' "$closed_unmerged_file" 2>/dev/null)"
+  [ -z "$oid" ] && return 0
+  echo "$oid $num"
+}
+
+# 指定ブランチに open PR があるか（同名の open PR があると削除しない）。gh が使えない場合は未実行。
+has_open_pr() {
+  local branch="$1"
+  [ -z "$merged_file" ] && return 1
+  local count
+  if ! count="$(gh pr list --state open --head "$branch" --limit 1 --json number --jq 'length' 2>/dev/null)"; then
+    return 0
+  fi
+  [ "${count:-0}" -gt 0 ] && return 0
+  return 1
 }
 
 echo "Base branch: $BASE_BRANCH ($base_remote)"
@@ -108,7 +135,9 @@ while IFS= read -r branch; do
         [ "$oid" = "$remote_tip" ] && safe_remote=true
       fi
       if [ "$safe_remote" = true ]; then
-        remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${branch}:local:${reason}"
+        if [ -z "$merged_file" ] || ! has_open_pr "$branch"; then
+          remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${branch}:local:${reason}"
+        fi
       fi
     fi
   fi
@@ -117,30 +146,10 @@ done < <(git for-each-ref refs/heads --format='%(refname:short)')
 # リモート専用の削除候補（ローカルに ref が無く、origin にあり）
 # (1) merged PR で tip 一致 → 削除可
 # (2) クローズ済み未マージ PR のブランチ（GitHub Copilot 等が作ってクローズしたブランチ）→ origin tip が headRefOid と一致する場合のみ削除可
-get_closed_unmerged_oid_and_num() {
-  local branch="$1"
-  if [ -z "$closed_unmerged_file" ] || [ ! -s "$closed_unmerged_file" ]; then
-    return 0
-  fi
-  local oid num
-  oid="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $2; exit}' "$closed_unmerged_file" 2>/dev/null)"
-  num="$(awk -v b="$branch" 'BEGIN{FS="\t"} $1==b {print $3; exit}' "$closed_unmerged_file" 2>/dev/null)"
-  [ -z "$oid" ] && return 0
-  echo "$oid $num"
-}
-
-# 指定ブランチに open PR があるか（同名の open PR があると削除しない）。ブランチ単位で照会し件数上限に依存しない。
-has_open_pr() {
-  local branch="$1"
-  local count
-  if ! count="$(gh pr list --state open --head "$branch" --limit 1 --json number --jq 'length' 2>/dev/null)"; then
-    return 0   # gh 失敗時は安全のため「open PR あり」とみなして削除しない
-  fi
-  [ "${count:-0}" -gt 0 ] && return 0
-  return 1
-}
 while IFS= read -r ref; do
-  [ -z "$ref" ] || [ "$ref" = "HEAD" ] && continue
+  if [ -z "$ref" ] || [ "$ref" = "HEAD" ]; then
+    continue
+  fi
   is_protected "$ref" && continue
   git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1 && continue
   if ! git rev-parse --verify "origin/$ref" >/dev/null 2>&1; then
@@ -152,18 +161,22 @@ while IFS= read -r ref; do
     oid="${oid_num%% *}"
     num="${oid_num#* }"
     if [ "$oid" = "$tip" ]; then
-      deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:merged PR #${num} (remote-only)"
-      remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:merged PR #${num} (remote-only)"
+      if [ -z "$merged_file" ] || ! has_open_pr "$ref"; then
+        deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:merged PR #${num} (remote-only)"
+        remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:merged PR #${num} (remote-only)"
+      fi
     fi
   else
     closed_oid_num="$(get_closed_unmerged_oid_and_num "$ref")"
-    if [ -n "$closed_oid_num" ] && ! has_open_pr "$ref"; then
+    if [ -n "$closed_oid_num" ]; then
+      if [ -z "$merged_file" ] || ! has_open_pr "$ref"; then
       tip="$(git rev-parse "origin/$ref" 2>/dev/null)"
       closed_oid="${closed_oid_num%% *}"
       closed_num="${closed_oid_num#* }"
-      if [ "$closed_oid" = "$tip" ]; then
-        deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:closed PR #${closed_num} (remote-only)"
-        remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:closed PR #${closed_num} (remote-only)"
+        if [ "$closed_oid" = "$tip" ]; then
+          deleted_remote_only="${deleted_remote_only}${deleted_remote_only:+$'\n'}${ref}:closed PR #${closed_num} (remote-only)"
+          remote_delete_names="${remote_delete_names}${remote_delete_names:+$'\n'}${ref}:remote-only:closed PR #${closed_num} (remote-only)"
+        fi
       fi
     fi
   fi
