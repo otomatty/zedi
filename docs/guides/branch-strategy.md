@@ -124,9 +124,9 @@ fix/* (バグ修正)
 
    Release PR をマージすると、タグ（`zedi-vx.y.z`）と GitHub Release が自動作成されます。手動でタグを打つ必要はありません。
 
-5. **main → develop の同期 PR をマージ**
+5. **main → develop の同期 PR**
 
-   リリースコミット（`chore(main): release ...`）を含む差分を develop に戻すため、同期 PR を作成して **Create a merge commit** でマージします。
+   リリースコミット（`chore(main): release ...`）を含む差分を develop に戻すため、main への push 後に同期 PR が自動で作成されます。この PR はコンフリクトがなければ **Create a merge commit** で自動マージされます。
 
 ### 緊急バグ修正の流れ（hotfix）
 
