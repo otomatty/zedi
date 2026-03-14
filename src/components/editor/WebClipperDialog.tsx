@@ -72,11 +72,13 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     (nextOpen: boolean) => {
       if (!nextOpen) {
         submitGenerationRef.current += 1;
-        resetDialogState();
+        // resetDialogState は useEffect（open の変化監視）で一括実行する。
+        // ここで呼ぶと、親が open=false を渡したときに effect と二重実行になる。
+        // submitGenerationRef のみここで進めて、in-flight handleClip の即時 bail-out を保証する。
       }
       onOpenChange(nextOpen);
     },
-    [onOpenChange, resetDialogState],
+    [onOpenChange],
   );
 
   const handleClip = useCallback(async () => {
