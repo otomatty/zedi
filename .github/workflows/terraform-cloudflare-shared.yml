@@ -7,6 +7,9 @@ on:
       - ".github/workflows/terraform-cloudflare-shared.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
   TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
