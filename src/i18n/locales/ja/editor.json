@@ -90,5 +90,27 @@
     "generating": "画像を生成中",
     "labelRecommendation": "おすすめ",
     "labelThumbnails": "サムネイル候補"
+  },
+  "webClipper": {
+    "title": "URLから取り込み",
+    "description": "Webページの本文を抽出してページとして保存します。引用元URLは自動的に記録されます。",
+    "placeholder": "https://example.com/article",
+    "statusFetching": "ページを取得中...",
+    "statusExtracting": "本文を抽出中...",
+    "statusCompleted": "取り込み完了",
+    "loginRequired": "ログインが必要です",
+    "loginRequiredDescription": "再度ログインしてください",
+    "thumbnailSaveFailed": "サムネイルの保存に失敗しました",
+    "thumbnailSaveFailedDescription": "コンテンツはそのまま取り込みます。",
+    "tip": "💡 対応していないページもあります。著作権にご注意ください。",
+    "cancel": "キャンセル",
+    "importing": "取り込み中...",
+    "import": "取り込み"
+  },
+  "markdownExport": {
+    "sourceAttribution": "📎 引用元",
+    "downloaded": "Markdownファイルをダウンロードしました",
+    "copied": "Markdownをクリップボードにコピーしました",
+    "copyFailed": "コピーに失敗しました"
   }
 }

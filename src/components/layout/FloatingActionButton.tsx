@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@zedi/ui";
@@ -24,6 +24,12 @@ const FloatingActionButton: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isWebClipperOpen, setIsWebClipperOpen] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      queueMicrotask(() => setIsWebClipperOpen(false));
+    }
+  }, [isSignedIn]);
 
   const handleMenuSelect = async (option: FABMenuOption) => {
     switch (option) {
@@ -80,7 +86,7 @@ const FloatingActionButton: React.FC = () => {
     } catch (error) {
       console.error("Failed to create page from URL:", error);
       toast({
-        title: "ページの作成に失敗しました",
+        title: t("common.createPageFailed"),
         variant: "destructive",
       });
     }
@@ -125,7 +131,7 @@ const FloatingActionButton: React.FC = () => {
     } catch (error) {
       console.error("Failed to create page from image:", error);
       toast({
-        title: "ページの作成に失敗しました",
+        title: t("common.createPageFailed"),
         variant: "destructive",
       });
     }

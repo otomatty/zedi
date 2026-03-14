@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Link2, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@zedi/ui";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@zedi/ui";
 import { Alert, AlertDescription } from "@zedi/ui";
-import { useNavigate } from "react-router-dom";
 import { useWebClipper, type WebClipperStatus } from "@/hooks/useWebClipper";
 import { useAuth } from "@/hooks/useAuth";
 import { createApiClient } from "@/lib/api";
@@ -29,19 +29,22 @@ interface WebClipperDialogProps {
   ) => void;
 }
 
-const statusMessages: Record<WebClipperStatus, string> = {
-  idle: "",
-  fetching: "ページを取得中...",
-  extracting: "本文を抽出中...",
-  completed: "取り込み完了",
-  error: "",
-};
-
 export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   open,
   onOpenChange,
   onClipped,
 }) => {
+  const { t } = useTranslation();
+  const statusMessages: Record<WebClipperStatus, string> = useMemo(
+    () => ({
+      idle: "",
+      fetching: t("editor.webClipper.statusFetching"),
+      extracting: t("editor.webClipper.statusExtracting"),
+      completed: t("editor.webClipper.statusCompleted"),
+      error: "",
+    }),
+    [t],
+  );
   const { getToken } = useAuth();
   const api = useMemo(() => createApiClient({ getToken }), [getToken]);
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
@@ -49,7 +52,6 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     useWebClipperDialogState({ open, clip, reset });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (status === "error") {
@@ -79,24 +81,29 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
         } catch (err) {
           if (isAuthRedirectError(err)) {
             toast({
-              title: "ログインが必要です",
-              description: "再度ログインしてください",
+              title: t("editor.webClipper.loginRequired"),
+              description: t("editor.webClipper.loginRequiredDescription"),
               variant: "destructive",
             });
-            navigate("/sign-in", { replace: true });
-            return;
+            commitAttemptedAndFailed = true;
+            // Continue importing content without thumbnail; do not redirect
+          } else {
+            console.error("Failed to commit thumbnail:", err);
+            toast({
+              title: t("editor.webClipper.thumbnailSaveFailed"),
+              description: t("editor.webClipper.thumbnailSaveFailedDescription"),
+              variant: "destructive",
+            });
+            commitAttemptedAndFailed = true;
           }
-          console.error("Failed to commit thumbnail:", err);
-          toast({
-            title: "サムネイルの保存に失敗しました",
-            description: "コンテンツはそのまま取り込みます。",
-            variant: "destructive",
-          });
-          commitAttemptedAndFailed = true;
         }
       }
-      const thumbnailForContent =
-        committedThumbnail ?? (commitAttemptedAndFailed ? "" : clippedContent.thumbnailUrl);
+      let thumbnailForContent = clippedContent.thumbnailUrl;
+      if (committedThumbnail) {
+        thumbnailForContent = committedThumbnail;
+      } else if (commitAttemptedAndFailed) {
+        thumbnailForContent = "";
+      }
       const tiptapContent = getTiptapContent(thumbnailForContent, committedProvider);
       if (tiptapContent) {
         onClipped(
@@ -110,7 +117,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [clippedContent, getTiptapContent, navigate, onClipped, onOpenChange, toast]);
+  }, [clippedContent, getTiptapContent, onClipped, onOpenChange, toast, t]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -131,17 +138,15 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
-            URLから取り込み
+            {t("editor.webClipper.title")}
           </DialogTitle>
-          <DialogDescription>
-            Webページの本文を抽出してページとして保存します。 引用元URLは自動的に記録されます。
-          </DialogDescription>
+          <DialogDescription>{t("editor.webClipper.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Input
-              placeholder="https://example.com/article"
+              placeholder={t("editor.webClipper.placeholder")}
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value);
@@ -174,9 +179,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
             </Alert>
           )}
 
-          <p className="text-xs text-muted-foreground">
-            💡 対応していないページもあります。著作権にご注意ください。
-          </p>
+          <p className="text-xs text-muted-foreground">{t("editor.webClipper.tip")}</p>
         </div>
 
         <WebClipperDialogFooter

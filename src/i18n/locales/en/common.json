@@ -32,5 +32,7 @@
   "discardAndLeave": "Leave without saving",
   "guestSyncPrompt": "Log in to sync to the cloud",
   "useWithoutSignIn": "Use without signing in",
-  "startUsingApp": "Start using the app"
+  "startUsingApp": "Start using the app",
+  "createPageFailed": "Failed to create page",
+  "copyFailed": "Copy failed"
 }

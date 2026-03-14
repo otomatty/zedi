@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { isValidUrl } from "@/lib/webClipper";
+
 interface UseWebClipperDialogStateOptions {
   open: boolean;
   clip: (url: string) => Promise<unknown>;
