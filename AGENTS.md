@@ -50,7 +50,9 @@ bun run test:run       # Vitest 単体テスト
 
 ### 1. 未対応コメントの取得
 
-返信済みコメントを除外し、未対応のものだけ取得する（新規セッションでも動作する）:
+**注意**: 以下は「未返信」のトップレベルコメントを取得する方式。GitHub の `Require conversation resolution before merging` は「未解決のスレッド」をブロックするため、返信済みだが未解決のスレッドはこの方式では検出されない。マージ可否の完全な判定には、PR の `mergeable` 状態や `reviewDecision` の確認を併用すること。
+
+返信済みコメントを除外し、未返信のトップレベルコメントを取得する（新規セッションでも動作する）:
 
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/comments \
@@ -59,6 +61,8 @@ gh api repos/{owner}/{repo}/pulls/{number}/comments \
     [.[] | select(.in_reply_to_id == null and (.id | IN($replied[]) | not))]
     | .[] | {id, path, line, body: (.body | .[0:300]), user: .user.login}'
 ```
+
+コメントが 30 件を超える場合は `?per_page=100` や `--paginate` でページネーションを指定すること。
 
 ### 2. PR の自動検出
 

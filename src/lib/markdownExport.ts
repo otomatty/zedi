@@ -167,21 +167,47 @@ function applyMarks(text: string, marks: TiptapMark[]): string {
   return result;
 }
 
+export interface MarkdownExportOptions {
+  /** Default title when empty (for filename) */
+  defaultTitle?: string;
+  /** Label for source attribution block (e.g. "📎 引用元:") */
+  attributionLabel?: string;
+}
+
+/**
+ * Build source attribution block for Markdown export (optional).
+ * Uses angle-bracket autolink for URLs to avoid Markdown parsing issues with parens/brackets.
+ */
+function buildSourceAttribution(sourceUrl?: string | null, attributionLabel?: string): string {
+  if (!sourceUrl?.trim()) return "";
+  const label = attributionLabel?.trim() || "📎 Source:";
+  return `> ${label} <${sourceUrl.trim()}>\n\n`;
+}
+
 /**
  * Download content as a Markdown file
  */
-export function downloadMarkdown(title: string, content: string): void {
+export function downloadMarkdown(
+  title: string,
+  content: string,
+  sourceUrl?: string | null,
+  options?: MarkdownExportOptions,
+): void {
+  const { defaultTitle = "Untitled", attributionLabel } = options ?? {};
   const markdown = tiptapToMarkdown(content);
+  const attribution = buildSourceAttribution(sourceUrl, attributionLabel);
 
-  // Add title as H1 if not empty
-  const fullContent = title ? `# ${title}\n\n${markdown}` : markdown;
+  // Add title as H1 if not empty, then attribution, then content
+  const fullContent = title
+    ? `# ${title}\n\n${attribution}${markdown}`
+    : `${attribution}${markdown}`;
 
   const blob = new Blob([fullContent], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = sanitizeFilename(title || "無題のページ") + ".md";
+  link.download = sanitizeFilename(title || defaultTitle) + ".md";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -203,11 +229,20 @@ function sanitizeFilename(name: string): string {
 /**
  * Copy Markdown content to clipboard
  */
-export async function copyMarkdownToClipboard(title: string, content: string): Promise<void> {
+export async function copyMarkdownToClipboard(
+  title: string,
+  content: string,
+  sourceUrl?: string | null,
+  options?: MarkdownExportOptions,
+): Promise<void> {
+  const { attributionLabel } = options ?? {};
   const markdown = tiptapToMarkdown(content);
+  const attribution = buildSourceAttribution(sourceUrl, attributionLabel);
 
-  // Add title as H1 if not empty
-  const fullContent = title ? `# ${title}\n\n${markdown}` : markdown;
+  // Add title as H1 if not empty, then attribution, then content
+  const fullContent = title
+    ? `# ${title}\n\n${attribution}${markdown}`
+    : `${attribution}${markdown}`;
 
   await navigator.clipboard.writeText(fullContent);
 }

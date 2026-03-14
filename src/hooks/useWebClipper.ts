@@ -20,7 +20,10 @@ export interface UseWebClipperReturn {
   error: string | null;
   clip: (url: string) => Promise<ClippedContent | null>;
   reset: () => void;
-  getTiptapContent: (thumbnailUrl?: string | null) => string | null;
+  getTiptapContent: (
+    thumbnailUrl?: string | null,
+    storageProviderId?: string | null,
+  ) => string | null;
 }
 
 export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipperReturn {
@@ -66,13 +69,14 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
   );
 
   const reset = useCallback(() => {
+    clipIdRef.current += 1;
     setStatus("idle");
     setClippedContent(null);
     setError(null);
   }, []);
 
   const getTiptapContent = useCallback(
-    (thumbnailUrl?: string | null): string | null => {
+    (thumbnailUrl?: string | null, storageProviderId?: string | null): string | null => {
       if (!clippedContent) return null;
 
       const tiptapDoc = formatClippedContentAsTiptap(
@@ -81,6 +85,7 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
         clippedContent.siteName,
         thumbnailUrl ?? clippedContent.thumbnailUrl,
         clippedContent.title,
+        storageProviderId,
       );
 
       return JSON.stringify(tiptapDoc);

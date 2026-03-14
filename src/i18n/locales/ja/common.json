@@ -32,5 +32,7 @@
   "discardAndLeave": "保存せずに移動",
   "guestSyncPrompt": "ログインしてクラウドに同期",
   "useWithoutSignIn": "ログインせずに使う",
-  "startUsingApp": "アプリを使い始める"
+  "startUsingApp": "アプリを使い始める",
+  "createPageFailed": "ページの作成に失敗しました",
+  "copyFailed": "コピーに失敗しました"
 }

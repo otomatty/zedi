@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@zedi/ui";
@@ -11,6 +11,7 @@ import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
+import { useAuth } from "@/hooks/useAuth";
 
 const FloatingActionButton: React.FC = () => {
   const { t } = useTranslation();
@@ -18,10 +19,17 @@ const FloatingActionButton: React.FC = () => {
   const { createNewPage, isCreating } = useCreateNewPage();
   const createPageMutation = useCreatePage();
   const { toast } = useToast();
+  const { isSignedIn } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isWebClipperOpen, setIsWebClipperOpen] = useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      queueMicrotask(() => setIsWebClipperOpen(false));
+    }
+  }, [isSignedIn]);
 
   const handleMenuSelect = async (option: FABMenuOption) => {
     switch (option) {
@@ -78,7 +86,7 @@ const FloatingActionButton: React.FC = () => {
     } catch (error) {
       console.error("Failed to create page from URL:", error);
       toast({
-        title: "ページの作成に失敗しました",
+        title: t("common.createPageFailed"),
         variant: "destructive",
       });
     }
@@ -123,7 +131,7 @@ const FloatingActionButton: React.FC = () => {
     } catch (error) {
       console.error("Failed to create page from image:", error);
       toast({
-        title: "ページの作成に失敗しました",
+        title: t("common.createPageFailed"),
         variant: "destructive",
       });
     }
@@ -161,14 +169,17 @@ const FloatingActionButton: React.FC = () => {
         onOpenChange={setIsMenuOpen}
         onSelect={handleMenuSelect}
         trigger={fabButton}
+        hiddenOptions={isSignedIn ? undefined : ["url"]}
       />
 
-      {/* URL から作成ダイアログ */}
-      <WebClipperDialog
-        open={isWebClipperOpen}
-        onOpenChange={setIsWebClipperOpen}
-        onClipped={handleWebClipped}
-      />
+      {/* URL から作成ダイアログ（ログイン時のみ） */}
+      {isSignedIn && (
+        <WebClipperDialog
+          open={isWebClipperOpen}
+          onOpenChange={setIsWebClipperOpen}
+          onClipped={handleWebClipped}
+        />
+      )}
 
       {/* 画像から作成ダイアログ */}
       <ImageCreateDialog

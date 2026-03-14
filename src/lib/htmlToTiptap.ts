@@ -164,6 +164,7 @@ export function formatClippedContentAsTiptap(
   siteName?: string | null,
   thumbnailUrl?: string | null,
   title?: string | null,
+  storageProviderId?: string | null,
 ): JSONContent {
   void sourceUrl;
   void siteName;
@@ -175,7 +176,11 @@ export function formatClippedContentAsTiptap(
   const imageNode: JSONContent | null = trimmedThumbnail
     ? {
         type: "image",
-        attrs: { src: trimmedThumbnail, alt: title || "OGP thumbnail" },
+        attrs: {
+          src: trimmedThumbnail,
+          alt: title || "OGP thumbnail",
+          ...(storageProviderId && { storageProviderId }),
+        },
       }
     : null;
 

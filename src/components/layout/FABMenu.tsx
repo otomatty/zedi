@@ -56,16 +56,24 @@ interface FABMenuProps {
   onOpenChange: (open: boolean) => void;
   onSelect: (option: FABMenuOption) => void;
   trigger: React.ReactNode;
+  /** Options to hide from the menu (e.g. auth-gated features for guests) */
+  hiddenOptions?: FABMenuOption[];
 }
 
-export const FABMenu: React.FC<FABMenuProps> = ({ open, onOpenChange, onSelect, trigger }) => {
+export const FABMenu: React.FC<FABMenuProps> = ({
+  open,
+  onOpenChange,
+  onSelect,
+  trigger,
+  hiddenOptions,
+}) => {
   const { t } = useTranslation();
   const handleSelect = (option: FABMenuOption) => {
     onSelect(option);
     onOpenChange(false);
   };
 
-  const menuItems: Array<{
+  const allItems: Array<{
     icon: React.ElementType;
     label: string;
     option: FABMenuOption;
@@ -75,6 +83,10 @@ export const FABMenu: React.FC<FABMenuProps> = ({ open, onOpenChange, onSelect, 
     { icon: Link2, label: t("common.createFromUrl"), option: "url" },
     { icon: FileText, label: t("common.createNew"), option: "blank" },
   ];
+
+  const menuItems = hiddenOptions
+    ? allItems.filter((item) => !hiddenOptions.includes(item.option))
+    : allItems;
 
   return (
     <>

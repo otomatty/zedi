@@ -86,7 +86,7 @@ export function usePageEditorStateAndSync() {
     shouldBlockSave,
   });
 
-  const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(title, content);
+  const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(title, content, sourceUrl);
   usePageEditorKeyboard({ onBack: handleBack });
 
   const {
