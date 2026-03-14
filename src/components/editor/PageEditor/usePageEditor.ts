@@ -27,6 +27,7 @@ function buildLayoutProps(
     deleteConfirmOpen: boolean;
     deleteReason: string;
     wikiErrorMessage: string | null;
+    wikiContentForCollab: string | null;
   },
   handlers: {
     onBack: () => void;
@@ -45,6 +46,7 @@ function buildLayoutProps(
     onCancelDelete: () => void;
     onResetWiki: () => void;
     onGoToAISettings: () => void;
+    onWikiContentApplied: () => void;
   },
 ): PageEditorLayoutProps {
   return {
@@ -54,8 +56,17 @@ function buildLayoutProps(
   };
 }
 
+/**
+ *
+ */
 export function usePageEditor() {
+  /**
+   *
+   */
   const state = usePageEditorStateAndSync();
+  /**
+   *
+   */
   const handlers = usePageEditorHandlers({
     title: state.title,
     content: state.content,
@@ -70,9 +81,15 @@ export function usePageEditor() {
     location: state.location,
   });
 
+  /**
+   *
+   */
   const showLoading =
     (!state.isNewPage && state.isLoading) || (state.isNewPage && !state.isInitialized);
 
+  /**
+   *
+   */
   const layoutProps = buildLayoutProps(
     {
       title: state.title,
@@ -94,6 +111,7 @@ export function usePageEditor() {
       deleteConfirmOpen: state.deleteConfirmOpen,
       deleteReason: state.deleteReason,
       wikiErrorMessage: state.wikiError?.message || null,
+      wikiContentForCollab: state.wikiContentForCollab,
     },
     {
       onBack: state.handleBack,
@@ -112,6 +130,7 @@ export function usePageEditor() {
       onCancelDelete: state.handleCancelDelete,
       onResetWiki: state.resetWiki,
       onGoToAISettings: handlers.handleGoToAISettings,
+      onWikiContentApplied: state.onWikiContentApplied,
     },
   );
 

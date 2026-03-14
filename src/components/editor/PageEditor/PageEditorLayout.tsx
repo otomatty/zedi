@@ -9,6 +9,9 @@ import type { Page } from "@/types/page";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { WikiGeneratorStatus } from "./types";
 
+/**
+ *
+ */
 export interface PageEditorLayoutProps {
   title: string;
   content: string;
@@ -45,9 +48,21 @@ export interface PageEditorLayoutProps {
   wikiErrorMessage: string | null;
   onResetWiki: () => void;
   onGoToAISettings: () => void;
+  /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied でクリア */
+  wikiContentForCollab: string | null;
+  onWikiContentApplied: () => void;
 }
 
-export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
+  /**
+   *
+   */
   const {
     title,
     content,
@@ -84,6 +99,8 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
     wikiErrorMessage,
     onResetWiki,
     onGoToAISettings,
+    wikiContentForCollab,
+    onWikiContentApplied,
   } = props;
 
   return (
@@ -129,6 +146,8 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
             collaboration?.flushSave?.();
             onPendingInitialContentClear();
           }}
+          wikiContentForCollab={wikiContentForCollab}
+          onWikiContentApplied={onWikiContentApplied}
         />
       </ContentWithAIChat>
 

@@ -42,6 +42,9 @@ export interface TiptapEditorProps {
   onInitialContentApplied?: () => void;
   /** Wiki生成中（この間はリンク判定をスキップしてちらつきを防ぐ） */
   isWikiGenerating?: boolean;
+  /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied を呼ぶ */
+  wikiContentForCollab?: string | null;
+  onWikiContentApplied?: () => void;
 }
 
 /**
