@@ -34,7 +34,7 @@ interface UseWebClipperDialogStateOptions {
  * ```tsx
  * const {
  *   url, setUrl,
- *   handlePaste, resetDialogState, clearLastClippedUrl
+ *   handlePaste, resetDialogState, isCurrentUrlClipped
  * } = useWebClipperDialogState({ clip: doClip, reset: clearContent });
  * ```
  */
@@ -62,14 +62,6 @@ export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogSta
       reset();
     }
   }, [url, reset]);
-
-  /**
-   * エラー時に lastClippedUrl をリセットし、再クリップを許可する。
-   * Clears the last clipped URL so a retry is allowed (e.g. after clip failure).
-   */
-  const clearLastClippedUrl = useCallback(() => {
-    lastClippedUrlRef.current = "";
-  }, []);
 
   const resetDialogState = useCallback(() => {
     setUrl("");
@@ -110,7 +102,6 @@ export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogSta
     setUrl,
     handlePaste,
     resetDialogState,
-    clearLastClippedUrl,
     isCurrentUrlClipped,
   };
 }
