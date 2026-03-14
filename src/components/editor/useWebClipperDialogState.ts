@@ -38,10 +38,12 @@ export function useWebClipperDialogState({ open, clip, reset }: UseWebClipperDia
 
   useEffect(() => {
     if (!open) {
-      queueMicrotask(() => {
-        setUrl("");
-        setUrlError(null);
-      });
+      // Sync clear to avoid race: if we deferred (queueMicrotask), a fast reopen could
+      // let the deferred clear run after user typed, wiping their input.
+      /* eslint-disable react-hooks/set-state-in-effect -- intentional sync reset on close */
+      setUrl("");
+      setUrlError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
       lastClippedUrlRef.current = "";
       reset();
     }
