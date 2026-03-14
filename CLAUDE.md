@@ -14,6 +14,8 @@
 ## コードスタイル・レビュー観点
 
 - TypeScript を厳格に使用する。`any` は避け、型を明示する。
+- export する関数・型・インターフェースには TSDoc / JSDoc を付与する。
+- コメントやドキュメントは、原則として日本語と英語の両方を併記する。
 - 新規コンポーネント・API にはテストを追加することを推奨する。
 - `bun run lint` と `bun run format:check` が通る状態を維持する。
 - 既存のディレクトリ構成・命名規則（`server/api`, `server/hocuspocus`, `admin` など）に合わせる。
