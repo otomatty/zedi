@@ -12,6 +12,9 @@ on:
       - ".github/workflows/terraform-cloudflare-prod.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: terraform-cloudflare-prod
   cancel-in-progress: false

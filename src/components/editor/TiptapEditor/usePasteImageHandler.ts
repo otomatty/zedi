@@ -1,24 +1,95 @@
 import { useEffect } from "react";
 import type { Editor } from "@tiptap/core";
 
+const IMAGE_URL_PATTERN = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|bmp|ico)(\?[^\s]*)?/i;
+const DISALLOWED_HOSTS = new Set(["0.0.0.0", "127.0.0.1", "::1", "localhost"]);
+
 interface UsePasteImageHandlerParams {
   editor: Editor | null;
   handleImageUpload: (files: FileList | File[]) => void;
 }
 
+function isPrivateIpv4Host(hostname: string): boolean {
+  const octets = hostname.split(".");
+  if (octets.length !== 4 || octets.some((octet) => octet === "" || Number.isNaN(Number(octet)))) {
+    return false;
+  }
+
+  const [first, second] = octets.map((octet) => Number(octet));
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
+function isPrivateIpv6Host(hostname: string): boolean {
+  const normalizedHost = hostname.toLowerCase();
+  return (
+    normalizedHost === "::1" ||
+    normalizedHost.startsWith("fe80:") ||
+    normalizedHost.startsWith("fc") ||
+    normalizedHost.startsWith("fd")
+  );
+}
+
+function isEmbeddableImageUrl(url: string): boolean {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    return false;
+  }
+
+  const normalizedHost = parsedUrl.hostname.toLowerCase();
+  if (
+    DISALLOWED_HOSTS.has(normalizedHost) ||
+    normalizedHost.endsWith(".localhost") ||
+    normalizedHost.endsWith(".local")
+  ) {
+    return false;
+  }
+
+  return !isPrivateIpv4Host(normalizedHost) && !isPrivateIpv6Host(normalizedHost);
+}
+
+/**
+ *
+ */
 export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImageHandlerParams) {
   useEffect(() => {
     if (!editor) return;
 
-    const handlePaste = async (event: ClipboardEvent) => {
+    /**
+     *
+     */
+    const handlePaste = (event: ClipboardEvent) => {
+      /**
+       *
+       */
       const items = event.clipboardData?.items;
+      /**
+       *
+       */
       const text = event.clipboardData?.getData("text/plain");
 
       if (items) {
+        /**
+         *
+         */
         const imageItems = Array.from(items).filter((item) => item.type.startsWith("image/"));
 
         if (imageItems.length > 0) {
           event.preventDefault();
+          /**
+           *
+           */
           const files = imageItems
             .map((item) => item.getAsFile())
             .filter((file): file is File => file !== null);
@@ -28,40 +99,32 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
       }
 
       if (text) {
-        const imageUrlPattern =
-          /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s]*)?/i;
-        const matches = text.match(imageUrlPattern);
+        /**
+         *
+         */
+        const matches = text.match(IMAGE_URL_PATTERN);
 
         if (matches && matches[0]) {
-          event.preventDefault();
+          /**
+           *
+           */
           const imageUrl = matches[0];
-
-          try {
-            const response = await fetch(imageUrl, { method: "HEAD" });
-            const contentType = response.headers.get("content-type");
-
-            if (contentType && contentType.startsWith("image/")) {
-              editor
-                .chain()
-                .focus()
-                .setImage({
-                  src: imageUrl,
-                  alt: imageUrl.split("/").pop() || "image",
-                  title: imageUrl,
-                })
-                .run();
-              return;
-            }
-          } catch {
-            // CORS等でHEADが失敗する場合でも挿入を試みる
+          if (!isEmbeddableImageUrl(imageUrl)) {
+            return;
           }
+
+          event.preventDefault();
+          /**
+           *
+           */
+          const alt = imageUrl.split("/").pop()?.split("?")[0] || "image";
 
           editor
             .chain()
             .focus()
             .setImage({
               src: imageUrl,
-              alt: imageUrl.split("/").pop() || "image",
+              alt,
               title: imageUrl,
             })
             .run();
@@ -69,6 +132,9 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
       }
     };
 
+    /**
+     *
+     */
     const editorElement = editor.view.dom;
     editorElement.addEventListener("paste", handlePaste);
 
