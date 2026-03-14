@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link2, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@zedi/ui";
@@ -52,19 +52,13 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const { getToken } = useAuth();
   const api = useMemo(() => createApiClient({ getToken }), [getToken]);
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
-  const { url, setUrl, handlePaste, resetDialogState, clearLastClippedUrl, isCurrentUrlClipped } =
+  const { url, setUrl, handlePaste, resetDialogState, isCurrentUrlClipped } =
     useWebClipperDialogState({ clip, reset });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const { toast } = useToast();
 
   const hasFreshContent = Boolean(clippedContent) && isCurrentUrlClipped();
-
-  useEffect(() => {
-    if (status === "error") {
-      clearLastClippedUrl();
-    }
-  }, [status, clearLastClippedUrl]);
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
