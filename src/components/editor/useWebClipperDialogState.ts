@@ -40,6 +40,10 @@ interface UseWebClipperDialogStateOptions {
  */
 export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogStateOptions) {
   const [url, setUrl] = useState("");
+  // エラー時に lastClippedUrlRef をクリアしてはいけない。クリアすると debounce の残りタイマーが
+  // 500ms 後に unintended retry を行う。ユーザーは URL を編集するかダイアログを閉じて再試行する。
+  // Do not clear lastClippedUrlRef on clip error; otherwise the debounce callback would retry 500ms later.
+  // User retries by editing URL or reopening the dialog.
   const lastClippedUrlRef = useRef<string>("");
 
   const triggerAutoClip = useDebouncedCallback(

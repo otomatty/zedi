@@ -60,12 +60,6 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
 
   const hasFreshContent = Boolean(clippedContent) && isCurrentUrlClipped();
 
-  // エラー時に clearLastClippedUrl を呼ばない。呼ぶと debounce の残りタイマーが
-  // lastClippedUrlRef のクリアを検知し、500ms 後に unintended retry を行うため。
-  // Error時は ref をそのままにし、ユーザーは URL を編集するかダイアログを閉じて再試行できる。
-  // Do not call clearLastClippedUrl on error; otherwise the debounce callback
-  // would retry 500ms later (unintended). User can retry by editing URL or reopening dialog.
-
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
