@@ -1,13 +1,16 @@
 import { adminFetch } from "./client";
 
+/** 現在ログイン中の管理者情報 / Current admin user info */
 export interface AdminMe {
   id: string;
   email: string | null;
   role: "admin";
 }
 
+/** ユーザー役割 / User role */
 export type UserRole = "user" | "admin";
 
+/** 管理者画面で表示するユーザー情報 / User info for admin UI */
 export interface UserAdmin {
   id: string;
   name: string;
@@ -16,6 +19,7 @@ export interface UserAdmin {
   createdAt: string;
 }
 
+/** AI モデル管理用のモデル情報 / AI model info for admin */
 export interface AiModelAdmin {
   id: string;
   provider: string;
@@ -34,6 +38,12 @@ async function getErrorMessage(res: Response, fallback: string): Promise<string>
   return (err as { message?: string }).message ?? fallback;
 }
 
+/**
+ * 現在ログイン中の管理者情報を取得する。
+ * Fetches current admin user info.
+ *
+ * @returns 管理者情報。未認証の場合は null / AdminMe or null if unauthenticated
+ */
 export async function getAdminMe(): Promise<AdminMe | null> {
   const res = await adminFetch("/api/admin/me");
   if (!res.ok) {
@@ -43,6 +53,12 @@ export async function getAdminMe(): Promise<AdminMe | null> {
   return res.json();
 }
 
+/**
+ * AI モデル一覧を取得する。
+ * Fetches AI model list.
+ *
+ * @returns モデル配列 / Array of AiModelAdmin
+ */
 export async function getAiModels(): Promise<AiModelAdmin[]> {
   const res = await adminFetch("/api/ai/admin/models");
   if (!res.ok) {
@@ -52,6 +68,14 @@ export async function getAiModels(): Promise<AiModelAdmin[]> {
   return data.models ?? [];
 }
 
+/**
+ * AI モデルを 1 件更新する。
+ * Updates a single AI model.
+ *
+ * @param id - モデル ID / Model ID
+ * @param body - 更新するフィールド / Fields to update
+ * @returns 更新後のモデル / Updated model
+ */
 export async function patchAiModel(
   id: string,
   body: Partial<
@@ -77,6 +101,13 @@ export async function patchAiModel(
   return data.model;
 }
 
+/**
+ * AI モデルを一括更新する。
+ * Bulk updates AI models.
+ *
+ * @param updates - 更新内容の配列 / Array of updates
+ * @returns 更新件数とモデル配列 / Updated count and model array
+ */
 export async function patchAiModelsBulk(
   updates: Array<{
     id: string;
@@ -96,6 +127,7 @@ export async function patchAiModelsBulk(
   return res.json();
 }
 
+/** 同期処理 1 プロバイダ分の結果 / Sync result per provider */
 export interface SyncResultItem {
   provider: string;
   fetched: number;
@@ -106,6 +138,7 @@ export interface SyncResultItem {
   error?: string;
 }
 
+/** 同期プレビューで表示するモデル項目 / Model item in sync preview */
 export interface SyncPreviewItem {
   id: string;
   provider: string;
@@ -115,6 +148,7 @@ export interface SyncPreviewItem {
   isActive: boolean;
 }
 
+/** 同期プレビューの結果（1 プロバイダ分）/ Sync preview result per provider */
 export interface SyncPreviewResult {
   provider: string;
   toAdd: SyncPreviewItem[];
@@ -122,6 +156,12 @@ export interface SyncPreviewResult {
   error?: string;
 }
 
+/**
+ * AI モデル同期のプレビューを取得する。
+ * Previews AI model sync changes.
+ *
+ * @returns プロバイダ別のプレビュー結果 / Preview results per provider
+ */
 export async function previewSyncAiModels(): Promise<SyncPreviewResult[]> {
   const res = await adminFetch("/api/ai/admin/sync-models/preview", { method: "POST" });
   if (!res.ok) {
@@ -131,6 +171,12 @@ export async function previewSyncAiModels(): Promise<SyncPreviewResult[]> {
   return data.results ?? [];
 }
 
+/**
+ * AI モデルを外部ソースから同期する。
+ * Syncs AI models from external sources.
+ *
+ * @returns プロバイダ別の同期結果 / Sync results per provider
+ */
 export async function syncAiModels(): Promise<SyncResultItem[]> {
   const res = await adminFetch("/api/ai/admin/sync-models", { method: "POST" });
   if (!res.ok) {
@@ -140,12 +186,20 @@ export async function syncAiModels(): Promise<SyncResultItem[]> {
   return data.results ?? [];
 }
 
+/** ユーザー一覧取得のクエリパラメータ / Query params for user list */
 export interface GetUsersParams {
   search?: string;
   limit?: number;
   offset?: number;
 }
 
+/**
+ * ユーザー一覧を取得する。
+ * Fetches user list with optional search/pagination.
+ *
+ * @param params - 検索・ページネーション / Search and pagination
+ * @returns ユーザー配列と総件数 / Users array and total count
+ */
 export async function getUsers(params?: GetUsersParams): Promise<{
   users: UserAdmin[];
   total: number;
@@ -162,6 +216,14 @@ export async function getUsers(params?: GetUsersParams): Promise<{
   return res.json();
 }
 
+/**
+ * ユーザーの役割を更新する。
+ * Updates user role.
+ *
+ * @param id - ユーザー ID / User ID
+ * @param role - 新しい役割 / New role
+ * @returns 更新後のユーザー情報 / Updated user
+ */
 export async function patchUserRole(id: string, role: UserRole): Promise<{ user: UserAdmin }> {
   const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: "PATCH",
