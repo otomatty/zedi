@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { Editor } from "@tiptap/core";
 
 const IMAGE_URL_PATTERN = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|bmp|ico)(\?[^\s]*)?/i;
-const DISALLOWED_HOSTS = new Set(["0.0.0.0", "127.0.0.1", "::1", "localhost"]);
+const DISALLOWED_HOSTS = new Set(["0.0.0.0", "127.0.0.1", "::1", "[::1]", "localhost"]);
 
 interface UsePasteImageHandlerParams {
   editor: Editor | null;
@@ -26,7 +26,8 @@ function isPrivateIpv4Host(hostname: string): boolean {
 }
 
 function isPrivateIpv6Host(hostname: string): boolean {
-  const normalizedHost = hostname.toLowerCase();
+  if (!hostname.includes(":")) return false;
+  const normalizedHost = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   return (
     normalizedHost === "::1" ||
     normalizedHost.startsWith("fe80:") ||
@@ -60,7 +61,10 @@ function isEmbeddableImageUrl(url: string): boolean {
 }
 
 /**
+ * ペースト時に画像ファイルまたは画像 URL を検出して処理するフック。
+ * Hook that detects and handles pasted image files or image URLs.
  *
+ * @param params - エディタとアップロードハンドラ / Editor and upload handler
  */
 export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImageHandlerParams) {
   useEffect(() => {

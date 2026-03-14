@@ -131,7 +131,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
       if (committedThumbnail) {
         thumbnailForContent = committedThumbnail;
       } else if (commitAttemptedAndFailed) {
-        thumbnailForContent = "";
+        thumbnailForContent = null;
       }
       if (submitGeneration !== submitGenerationRef.current) return;
       const tiptapContent = getTiptapContent(thumbnailForContent, committedProvider);
