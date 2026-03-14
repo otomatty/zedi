@@ -168,7 +168,8 @@ function applyMarks(text: string, marks: TiptapMark[]): string {
 }
 
 /**
- *
+ * Markdown エクスポートのオプション。ファイル名や引用元ラベルを指定可能。
+ * Options for Markdown export. Configures filename, attribution label, etc.
  */
 export interface MarkdownExportOptions {
   /** Default title when empty (for filename) */

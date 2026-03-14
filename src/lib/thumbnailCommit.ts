@@ -74,7 +74,7 @@ export async function commitThumbnailFromUrl(
       }),
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (error && typeof error === "object" && "name" in error && error.name === "AbortError") {
       throw new Error("画像保存のリクエストがタイムアウトしました");
     }
     throw error;

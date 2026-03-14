@@ -30,19 +30,15 @@ interface WebClipperDialogProps {
 }
 
 /**
- *
+ * Web ページクリッピングダイアログ。URL を入力して Web ページのコンテンツを取り込む。
+ * Web page clipping dialog. Enter a URL to import content from a web page.
  */
-export /**
- *
- */
-const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange, onClipped }) => {
-  /**
-   *
-   */
+export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
+  open,
+  onOpenChange,
+  onClipped,
+}) => {
   const { t } = useTranslation();
-  /**
-   *
-   */
   const statusMessages: Record<WebClipperStatus, string> = useMemo(
     () => ({
       idle: "",
@@ -53,39 +49,15 @@ const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange,
     }),
     [t],
   );
-  /**
-   *
-   */
   const { getToken } = useAuth();
-  /**
-   *
-   */
   const api = useMemo(() => createApiClient({ getToken }), [getToken]);
-  /**
-   *
-   */
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
-  /**
-   *
-   */
   const { url, setUrl, handlePaste, resetDialogState, clearLastClippedUrl, isCurrentUrlClipped } =
     useWebClipperDialogState({ clip, reset });
-  /**
-   *
-   */
   const [isSubmitting, setIsSubmitting] = useState(false);
-  /**
-   *
-   */
   const isSubmittingRef = useRef(false);
-  /**
-   *
-   */
   const { toast } = useToast();
 
-  /**
-   *
-   */
   const hasFreshContent = Boolean(clippedContent) && isCurrentUrlClipped();
 
   useEffect(() => {
@@ -94,9 +66,6 @@ const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange,
     }
   }, [status, clearLastClippedUrl]);
 
-  /**
-   *
-   */
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
@@ -107,37 +76,19 @@ const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange,
     [onOpenChange, resetDialogState],
   );
 
-  /**
-   *
-   */
   const handleClip = useCallback(async () => {
     if (!clippedContent || !hasFreshContent || isSubmittingRef.current) return;
 
     isSubmittingRef.current = true;
     setIsSubmitting(true);
-    /**
-     *
-     */
     let committedThumbnail: string | undefined;
-    /**
-     *
-     */
     let committedProvider: string | undefined;
-    /**
-     *
-     */
     let commitAttemptedAndFailed = false;
     try {
       if (clippedContent.thumbnailUrl) {
         try {
-          /**
-           *
-           */
           const baseUrl = getThumbnailApiBaseUrl();
           if (baseUrl) {
-            /**
-             *
-             */
             const result = await commitThumbnailFromUrl(clippedContent.thumbnailUrl, {
               baseUrl,
               title: clippedContent.title,
@@ -164,18 +115,12 @@ const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange,
           }
         }
       }
-      /**
-       *
-       */
       let thumbnailForContent = clippedContent.thumbnailUrl;
       if (committedThumbnail) {
         thumbnailForContent = committedThumbnail;
       } else if (commitAttemptedAndFailed) {
         thumbnailForContent = "";
       }
-      /**
-       *
-       */
       const tiptapContent = getTiptapContent(thumbnailForContent, committedProvider);
       if (tiptapContent) {
         onClipped(
@@ -200,9 +145,6 @@ const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange,
     t,
   ]);
 
-  /**
-   *
-   */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && hasFreshContent && !isSubmitting) {
@@ -213,13 +155,7 @@ const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange,
     [hasFreshContent, isSubmitting, handleClip],
   );
 
-  /**
-   *
-   */
   const isProcessing = status === "fetching" || status === "extracting";
-  /**
-   *
-   */
   const isBusy = isProcessing || isSubmitting;
 
   return (
