@@ -1,3 +1,15 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
+import { isValidUrl } from "@/lib/webClipper";
+
+/** Hook のオプション / Hook options */
+interface UseWebClipperDialogStateOptions {
+  /** URL を受け取り clip 処理を行う関数 / Function that receives URL and performs clip */
+  clip: (url: string) => Promise<unknown>;
+  /** 既存コンテンツをリセットする関数 / Function to reset existing content */
+  reset: () => void;
+}
+
 /**
  * Web Clipper ダイアログの URL 入力・自動 clip・リセットを管理する hook。
  * Manages URL input, auto-clip, and reset for the Web Clipper dialog.
@@ -26,43 +38,13 @@
  * } = useWebClipperDialogState({ clip: doClip, reset: clearContent });
  * ```
  */
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
-import { isValidUrl } from "@/lib/webClipper";
-
-/** Hook のオプション / Hook options */
-interface UseWebClipperDialogStateOptions {
-  /** URL を受け取り clip 処理を行う関数 / Function that receives URL and performs clip */
-  clip: (url: string) => Promise<unknown>;
-  /** 既存コンテンツをリセットする関数 / Function to reset existing content */
-  reset: () => void;
-}
-
-/**
- *
- */
 export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogStateOptions) {
-  /**
-   *
-   */
   const [url, setUrl] = useState("");
-  /**
-   *
-   */
   const [urlError, setUrlError] = useState<string | null>(null);
-  /**
-   *
-   */
   const lastClippedUrlRef = useRef<string>("");
 
-  /**
-   *
-   */
   const triggerAutoClip = useDebouncedCallback(
     useCallback(() => {
-      /**
-       *
-       */
       const trimmed = url.trim();
       if (!trimmed || !isValidUrl(trimmed)) return;
       if (trimmed === lastClippedUrlRef.current) return;
@@ -81,9 +63,6 @@ export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogSta
     }
   }, [url, reset]);
 
-  /**
-   *
-   */
   const resetDialogState = useCallback(() => {
     setUrl("");
     setUrlError(null);
@@ -91,14 +70,8 @@ export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogSta
     reset();
   }, [reset]);
 
-  /**
-   *
-   */
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
-      /**
-       *
-       */
       const text = e.clipboardData.getData("text").trim();
       if (text && isValidUrl(text)) {
         e.preventDefault();
