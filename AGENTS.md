@@ -27,6 +27,8 @@ bun run test:run       # Vitest 単体テスト
 ## コードスタイル
 
 - TypeScript strict。`any` 禁止、型を明示する。
+- export する関数・型・インターフェースには TSDoc / JSDoc を付与する。
+- コメントやドキュメントは、原則として日本語と英語の両方を併記する。
 - `bun run lint` と `bun run format:check` が通る状態を維持する。
 - 既存のディレクトリ構成・命名規則に合わせる。
 - Conventional Commits 形式でコミット（`feat:`, `fix:`, `docs:` 等）。
