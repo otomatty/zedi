@@ -16,7 +16,10 @@
 export class AuthRedirectError extends Error {
   readonly redirectToSignIn = true;
   /**
+   * 指定メッセージで AuthRedirectError を生成する。
+   * Creates an AuthRedirectError with the given message.
    *
+   * @param message - エラーメッセージ（任意） / Error message (optional)
    */
   constructor(message?: string) {
     super(message);

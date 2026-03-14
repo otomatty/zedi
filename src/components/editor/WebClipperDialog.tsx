@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link2, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@zedi/ui";
@@ -56,13 +56,22 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     useWebClipperDialogState({ clip, reset });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const submitGenerationRef = useRef(0);
   const { toast } = useToast();
 
   const hasFreshContent = Boolean(clippedContent) && isCurrentUrlClipped();
 
+  useEffect(() => {
+    if (!open) {
+      submitGenerationRef.current += 1;
+      resetDialogState();
+    }
+  }, [open, resetDialogState]);
+
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
+        submitGenerationRef.current += 1;
         resetDialogState();
       }
       onOpenChange(nextOpen);
@@ -73,6 +82,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const handleClip = useCallback(async () => {
     if (!clippedContent || !hasFreshContent || isSubmittingRef.current) return;
 
+    const submitGeneration = submitGenerationRef.current;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     let committedThumbnail: string | undefined;
@@ -115,6 +125,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
       } else if (commitAttemptedAndFailed) {
         thumbnailForContent = "";
       }
+      if (submitGeneration !== submitGenerationRef.current) return;
       const tiptapContent = getTiptapContent(thumbnailForContent, committedProvider);
       if (tiptapContent) {
         onClipped(
