@@ -7,13 +7,22 @@ import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/web
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
 import type { ApiClient } from "@/lib/api/apiClient";
 
+/**
+ *
+ */
 export type WebClipperStatus = "idle" | "fetching" | "extracting" | "completed" | "error";
 
+/**
+ *
+ */
 export interface UseWebClipperOptions {
   /** 指定時は POST /api/clip/fetch でサーバー側取得を優先（CORS 回避） */
   api?: ApiClient | null;
 }
 
+/**
+ *
+ */
 export interface UseWebClipperReturn {
   status: WebClipperStatus;
   clippedContent: ClippedContent | null;
@@ -26,21 +35,48 @@ export interface UseWebClipperReturn {
   ) => string | null;
 }
 
+/**
+ *
+ */
 export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipperReturn {
+  /**
+   *
+   */
   const { api } = options;
+  /**
+   *
+   */
   const clipIdRef = useRef(0);
+  /**
+   *
+   */
   const [status, setStatus] = useState<WebClipperStatus>("idle");
+  /**
+   *
+   */
   const [clippedContent, setClippedContent] = useState<ClippedContent | null>(null);
+  /**
+   *
+   */
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   *
+   */
   const fetchHtmlFn = useCallback(
     (url: string) => (api ? api.clipFetchHtml(url) : Promise.reject(new Error("No API"))),
     [api],
   );
 
+  /**
+   *
+   */
   const clip = useCallback(
     async (url: string): Promise<ClippedContent | null> => {
       clipIdRef.current += 1;
+      /**
+       *
+       */
       const currentId = clipIdRef.current;
 
       setStatus("fetching");
@@ -49,6 +85,9 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
 
       try {
         setStatus("extracting");
+        /**
+         *
+         */
         const content = await clipWebPage(url, api ? fetchHtmlFn : undefined);
 
         if (currentId !== clipIdRef.current) return null;
@@ -59,6 +98,9 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
       } catch (err) {
         if (currentId !== clipIdRef.current) return null;
 
+        /**
+         *
+         */
         const errorMessage = getClipErrorMessage(err);
         setError(errorMessage);
         setStatus("error");
@@ -68,6 +110,9 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
     [api, fetchHtmlFn],
   );
 
+  /**
+   *
+   */
   const reset = useCallback(() => {
     clipIdRef.current += 1;
     setStatus("idle");
@@ -75,15 +120,21 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
     setError(null);
   }, []);
 
+  /**
+   *
+   */
   const getTiptapContent = useCallback(
     (thumbnailUrl?: string | null, storageProviderId?: string | null): string | null => {
       if (!clippedContent) return null;
 
+      /**
+       *
+       */
       const tiptapDoc = formatClippedContentAsTiptap(
         clippedContent.content,
         clippedContent.sourceUrl,
         clippedContent.siteName,
-        thumbnailUrl ?? clippedContent.thumbnailUrl,
+        thumbnailUrl === undefined ? clippedContent.thumbnailUrl : thumbnailUrl,
         clippedContent.title,
         storageProviderId,
       );

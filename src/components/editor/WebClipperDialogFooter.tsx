@@ -10,6 +10,10 @@ interface WebClipperDialogFooterProps {
   onSubmit: () => void;
 }
 
+/**
+ * Web Clipper ダイアログのフッター部分。キャンセル・取り込みボタンを表示する。
+ * Footer section of the Web Clipper dialog. Displays cancel and import buttons.
+ */
 export const WebClipperDialogFooter: React.FC<WebClipperDialogFooterProps> = ({
   isBusy,
   hasContent,

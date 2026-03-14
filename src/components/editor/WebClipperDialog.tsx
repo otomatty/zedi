@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link2, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@zedi/ui";
@@ -29,12 +29,20 @@ interface WebClipperDialogProps {
   ) => void;
 }
 
-export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
-  open,
-  onOpenChange,
-  onClipped,
-}) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const WebClipperDialog: React.FC<WebClipperDialogProps> = ({ open, onOpenChange, onClipped }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const statusMessages: Record<WebClipperStatus, string> = useMemo(
     () => ({
       idle: "",
@@ -45,20 +53,50 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     }),
     [t],
   );
+  /**
+   *
+   */
   const { getToken } = useAuth();
+  /**
+   *
+   */
   const api = useMemo(() => createApiClient({ getToken }), [getToken]);
+  /**
+   *
+   */
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
-  const { url, setUrl, urlError, setUrlError, lastClippedUrlRef, handlePaste, resetDialogState } =
+  /**
+   *
+   */
+  const { url, setUrl, handlePaste, resetDialogState, clearLastClippedUrl, isCurrentUrlClipped } =
     useWebClipperDialogState({ clip, reset });
+  /**
+   *
+   */
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /**
+   *
+   */
+  const isSubmittingRef = useRef(false);
+  /**
+   *
+   */
   const { toast } = useToast();
+
+  /**
+   *
+   */
+  const hasFreshContent = Boolean(clippedContent) && isCurrentUrlClipped();
 
   useEffect(() => {
     if (status === "error") {
-      lastClippedUrlRef.current = "";
+      clearLastClippedUrl();
     }
-  }, [status, lastClippedUrlRef]);
+  }, [status, clearLastClippedUrl]);
 
+  /**
+   *
+   */
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
@@ -69,18 +107,37 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     [onOpenChange, resetDialogState],
   );
 
+  /**
+   *
+   */
   const handleClip = useCallback(async () => {
-    if (!clippedContent) return;
+    if (!clippedContent || !hasFreshContent || isSubmittingRef.current) return;
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
+    /**
+     *
+     */
     let committedThumbnail: string | undefined;
+    /**
+     *
+     */
     let committedProvider: string | undefined;
+    /**
+     *
+     */
     let commitAttemptedAndFailed = false;
     try {
       if (clippedContent.thumbnailUrl) {
         try {
+          /**
+           *
+           */
           const baseUrl = getThumbnailApiBaseUrl();
           if (baseUrl) {
+            /**
+             *
+             */
             const result = await commitThumbnailFromUrl(clippedContent.thumbnailUrl, {
               baseUrl,
               title: clippedContent.title,
@@ -96,7 +153,6 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
               variant: "destructive",
             });
             commitAttemptedAndFailed = true;
-            // Continue importing content without thumbnail; do not redirect
           } else {
             console.error("Failed to commit thumbnail:", err);
             toast({
@@ -108,12 +164,18 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
           }
         }
       }
+      /**
+       *
+       */
       let thumbnailForContent = clippedContent.thumbnailUrl;
       if (committedThumbnail) {
         thumbnailForContent = committedThumbnail;
       } else if (commitAttemptedAndFailed) {
         thumbnailForContent = "";
       }
+      /**
+       *
+       */
       const tiptapContent = getTiptapContent(thumbnailForContent, committedProvider);
       if (tiptapContent) {
         onClipped(
@@ -125,21 +187,39 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
         handleDialogOpenChange(false);
       }
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
-  }, [clippedContent, getTiptapContent, onClipped, handleDialogOpenChange, toast, t]);
+  }, [
+    clippedContent,
+    hasFreshContent,
+    getTiptapContent,
+    onClipped,
+    handleDialogOpenChange,
+    toast,
+    t,
+  ]);
 
+  /**
+   *
+   */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && clippedContent && !isSubmitting) {
+      if (e.key === "Enter" && hasFreshContent && !isSubmitting) {
         e.preventDefault();
         handleClip();
       }
     },
-    [clippedContent, isSubmitting, handleClip],
+    [hasFreshContent, isSubmitting, handleClip],
   );
 
+  /**
+   *
+   */
   const isProcessing = status === "fetching" || status === "extracting";
+  /**
+   *
+   */
   const isBusy = isProcessing || isSubmitting;
 
   return (
@@ -158,17 +238,13 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
             <Input
               placeholder={t("editor.webClipper.placeholder")}
               value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                if (urlError) setUrlError(null);
-              }}
+              onChange={(e) => setUrl(e.target.value)}
               onPaste={handlePaste}
               onKeyDown={handleKeyDown}
               disabled={isBusy}
               className="font-mono text-sm"
               autoFocus
             />
-            {urlError && <p className="text-sm text-destructive">{urlError}</p>}
           </div>
 
           {isProcessing && (
@@ -178,7 +254,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
             </div>
           )}
 
-          {status === "completed" && clippedContent && (
+          {status === "completed" && hasFreshContent && clippedContent && (
             <WebClipperDialogPreview clippedContent={clippedContent} />
           )}
 
@@ -194,7 +270,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
 
         <WebClipperDialogFooter
           isBusy={isBusy}
-          hasContent={Boolean(clippedContent)}
+          hasContent={hasFreshContent}
           onCancel={() => handleDialogOpenChange(false)}
           onSubmit={handleClip}
         />
