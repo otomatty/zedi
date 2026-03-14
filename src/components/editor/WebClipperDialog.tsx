@@ -97,7 +97,9 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
       if (clippedContent.thumbnailUrl) {
         try {
           const baseUrl = getThumbnailApiBaseUrl();
-          if (baseUrl) {
+          if (!baseUrl) {
+            commitAttemptedAndFailed = true;
+          } else {
             const result = await commitThumbnailFromUrl(clippedContent.thumbnailUrl, {
               baseUrl,
               title: clippedContent.title,
@@ -106,6 +108,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
             committedProvider = result.provider;
           }
         } catch (err) {
+          if (submitGeneration !== submitGenerationRef.current) return;
           if (isAuthRedirectError(err)) {
             toast({
               title: t("editor.webClipper.loginRequired"),
