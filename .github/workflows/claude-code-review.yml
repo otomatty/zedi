@@ -15,13 +15,15 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: レビュー対象の PR 番号（手動実行時のみ必須）
-        required: false
+        description: レビュー対象の PR 番号（手動実行時必須）
+        required: true
         type: string
 
 jobs:
   claude-review:
     runs-on: ubuntu-latest
+    # fork からの PR では secrets が渡らず失敗するため、同一リポジトリ PR のみ実行
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
       pull-requests: write
@@ -43,7 +45,7 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
           # pull_request トリガー時は github.event.pull_request.number、
-          # 手動実行時は inputs.pr_number を使用
-          prompt: "/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || inputs.pr_number }}"
+          # 手動実行時は github.event.inputs.pr_number を使用
+          prompt: "/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
