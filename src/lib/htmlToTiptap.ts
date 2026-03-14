@@ -160,14 +160,16 @@ export function tiptapJSONToString(json: JSONContent): string {
  */
 export function formatClippedContentAsTiptap(
   content: string,
-  sourceUrl: string,
-  siteName?: string | null,
+  _sourceUrl: string,
+  _siteName?: string | null,
   thumbnailUrl?: string | null,
   title?: string | null,
   storageProviderId?: string | null,
 ): JSONContent {
-  void sourceUrl;
-  void siteName;
+  // sourceUrl / siteName は将来の拡張用に引数として残す
+  // Keep in signature for future use (e.g. attribution)
+  void _sourceUrl;
+  void _siteName;
 
   const mainContent = htmlToTiptapJSON(content);
   const baseContent = mainContent.content ?? [];

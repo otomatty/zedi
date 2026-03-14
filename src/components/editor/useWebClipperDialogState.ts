@@ -33,14 +33,13 @@ interface UseWebClipperDialogStateOptions {
  * @example
  * ```tsx
  * const {
- *   url, setUrl, urlError, setUrlError,
- *   handlePaste, resetDialogState
+ *   url, setUrl,
+ *   handlePaste, resetDialogState, clearLastClippedUrl
  * } = useWebClipperDialogState({ clip: doClip, reset: clearContent });
  * ```
  */
 export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogStateOptions) {
   const [url, setUrl] = useState("");
-  const [urlError, setUrlError] = useState<string | null>(null);
   const lastClippedUrlRef = useRef<string>("");
 
   const triggerAutoClip = useDebouncedCallback(
@@ -55,17 +54,25 @@ export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogSta
   );
 
   useEffect(() => {
-    if (!url) {
+    const normalizedUrl = url.trim();
+    if (!normalizedUrl) {
       lastClippedUrlRef.current = "";
       reset();
-    } else if (url !== lastClippedUrlRef.current) {
+    } else if (normalizedUrl !== lastClippedUrlRef.current) {
       reset();
     }
   }, [url, reset]);
 
+  /**
+   * エラー時に lastClippedUrl をリセットし、再クリップを許可する。
+   * Clears the last clipped URL so a retry is allowed (e.g. after clip failure).
+   */
+  const clearLastClippedUrl = useCallback(() => {
+    lastClippedUrlRef.current = "";
+  }, []);
+
   const resetDialogState = useCallback(() => {
     setUrl("");
-    setUrlError(null);
     lastClippedUrlRef.current = "";
     reset();
   }, [reset]);
@@ -76,7 +83,6 @@ export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogSta
       if (text && isValidUrl(text)) {
         e.preventDefault();
         setUrl(text);
-        setUrlError(null);
         if (text !== lastClippedUrlRef.current) {
           lastClippedUrlRef.current = text;
           clip(text);
@@ -90,13 +96,21 @@ export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogSta
     triggerAutoClip();
   }, [url, triggerAutoClip]);
 
+  /**
+   * 現在の URL が最後にクリップした URL と一致するか判定する。
+   * Returns whether the current URL matches the last successfully clipped URL.
+   */
+  const isCurrentUrlClipped = useCallback(() => {
+    const trimmed = url.trim();
+    return trimmed !== "" && trimmed === lastClippedUrlRef.current;
+  }, [url]);
+
   return {
     url,
     setUrl,
-    urlError,
-    setUrlError,
-    lastClippedUrlRef,
     handlePaste,
     resetDialogState,
+    clearLastClippedUrl,
+    isCurrentUrlClipped,
   };
 }

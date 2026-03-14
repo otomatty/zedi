@@ -131,6 +131,26 @@ describe("useWebClipper", () => {
     );
   });
 
+  it("getTiptapContent suppresses thumbnail when null is explicitly passed", async () => {
+    mockClipWebPage.mockResolvedValue(fakeContent);
+    mockFormatClippedContentAsTiptap.mockReturnValue({ type: "doc", content: [] });
+    const { result } = renderHook(() => useWebClipper());
+
+    await act(async () => {
+      await result.current.clip("https://example.com");
+    });
+
+    result.current.getTiptapContent(null);
+    expect(mockFormatClippedContentAsTiptap).toHaveBeenCalledWith(
+      fakeContent.content,
+      fakeContent.sourceUrl,
+      fakeContent.siteName,
+      null,
+      fakeContent.title,
+      undefined,
+    );
+  });
+
   it("getTiptapContent passes thumbnailUrl override when provided", async () => {
     mockClipWebPage.mockResolvedValue(fakeContent);
     mockFormatClippedContentAsTiptap.mockReturnValue({ type: "doc", content: [] });

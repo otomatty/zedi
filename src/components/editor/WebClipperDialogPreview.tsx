@@ -7,6 +7,10 @@ interface WebClipperDialogPreviewProps {
   clippedContent: ClippedContent;
 }
 
+/**
+ * クリップ成功時のプレビュー表示。タイトルとサイト名を表示する。
+ * Preview display on successful clip. Shows title and site name.
+ */
 export const WebClipperDialogPreview: React.FC<WebClipperDialogPreviewProps> = ({
   clippedContent,
 }) => (

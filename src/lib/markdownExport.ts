@@ -167,6 +167,10 @@ function applyMarks(text: string, marks: TiptapMark[]): string {
   return result;
 }
 
+/**
+ * Markdown エクスポートのオプション。ファイル名や引用元ラベルを指定可能。
+ * Options for Markdown export. Configures filename, attribution label, etc.
+ */
 export interface MarkdownExportOptions {
   /** Default title when empty (for filename) */
   defaultTitle?: string;
@@ -194,12 +198,12 @@ export function downloadMarkdown(
   options?: MarkdownExportOptions,
 ): void {
   const { defaultTitle = "Untitled", attributionLabel } = options ?? {};
+  const normalizedTitle = title.trim();
   const markdown = tiptapToMarkdown(content);
   const attribution = buildSourceAttribution(sourceUrl, attributionLabel);
 
-  // Add title as H1 if not empty, then attribution, then content
-  const fullContent = title
-    ? `# ${title}\n\n${attribution}${markdown}`
+  const fullContent = normalizedTitle
+    ? `# ${normalizedTitle}\n\n${attribution}${markdown}`
     : `${attribution}${markdown}`;
 
   const blob = new Blob([fullContent], { type: "text/markdown;charset=utf-8" });
@@ -207,7 +211,7 @@ export function downloadMarkdown(
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = sanitizeFilename(title || defaultTitle) + ".md";
+  link.download = sanitizeFilename(normalizedTitle || defaultTitle) + ".md";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -236,12 +240,12 @@ export async function copyMarkdownToClipboard(
   options?: MarkdownExportOptions,
 ): Promise<void> {
   const { attributionLabel } = options ?? {};
+  const normalizedTitle = title.trim();
   const markdown = tiptapToMarkdown(content);
   const attribution = buildSourceAttribution(sourceUrl, attributionLabel);
 
-  // Add title as H1 if not empty, then attribution, then content
-  const fullContent = title
-    ? `# ${title}\n\n${attribution}${markdown}`
+  const fullContent = normalizedTitle
+    ? `# ${normalizedTitle}\n\n${attribution}${markdown}`
     : `${attribution}${markdown}`;
 
   await navigator.clipboard.writeText(fullContent);

@@ -7,13 +7,25 @@ import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/web
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
 import type { ApiClient } from "@/lib/api/apiClient";
 
+/**
+ * Web Clipper のステータス。idle → fetching → extracting → completed | error の順に遷移する。
+ * Web Clipper status. Transitions: idle → fetching → extracting → completed | error.
+ */
 export type WebClipperStatus = "idle" | "fetching" | "extracting" | "completed" | "error";
 
+/**
+ * useWebClipper フックのオプション。api 指定時はサーバー側で HTML 取得を優先する。
+ * Options for useWebClipper hook. When api is provided, server-side HTML fetch is preferred.
+ */
 export interface UseWebClipperOptions {
   /** 指定時は POST /api/clip/fetch でサーバー側取得を優先（CORS 回避） */
   api?: ApiClient | null;
 }
 
+/**
+ * useWebClipper フックの戻り値。status, clippedContent, clip, reset, getTiptapContent を提供する。
+ * Return value of useWebClipper hook. Provides status, clippedContent, clip, reset, getTiptapContent.
+ */
 export interface UseWebClipperReturn {
   status: WebClipperStatus;
   clippedContent: ClippedContent | null;
@@ -26,6 +38,10 @@ export interface UseWebClipperReturn {
   ) => string | null;
 }
 
+/**
+ * Web ページクリッピング用カスタムフック。URL から Web ページを取り込み Tiptap JSON に変換する。
+ * Custom hook for web page clipping. Fetches a web page from a URL and converts it to Tiptap JSON.
+ */
 export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipperReturn {
   const { api } = options;
   const clipIdRef = useRef(0);
@@ -83,7 +99,7 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
         clippedContent.content,
         clippedContent.sourceUrl,
         clippedContent.siteName,
-        thumbnailUrl ?? clippedContent.thumbnailUrl,
+        thumbnailUrl === undefined ? clippedContent.thumbnailUrl : thumbnailUrl,
         clippedContent.title,
         storageProviderId,
       );
