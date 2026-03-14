@@ -1,3 +1,11 @@
+# Claude Code Review - main/develop 向け PR で自動実行
+#
+# 初回セットアップ時の注意:
+# OIDC 検証のため、ワークフローはデフォルトブランチ(main)に存在し同一内容である必要があります。
+# 初回の PR では Claude Code Review が失敗しますが、マージ後・develop→main リリース後に
+# 以降の PR で正常動作します。continue-on-error により初回失敗時もマージをブロックしません。
+# ref: https://github.com/anthropics/claude-code-action/issues/722
+#
 name: Claude Code Review
 
 on:
@@ -28,6 +36,7 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
+        continue-on-error: true # 初回 OIDC 失敗時もマージをブロックしない（issues/722）
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
