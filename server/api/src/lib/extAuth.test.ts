@@ -47,6 +47,7 @@ describe("extAuth", () => {
 
   describe("isRedirectUriAllowed", () => {
     const origExtensionOrigin = process.env.EXTENSION_ORIGIN;
+    const origNodeEnv = process.env.NODE_ENV;
 
     afterEach(() => {
       if (origExtensionOrigin !== undefined) {
@@ -54,17 +55,31 @@ describe("extAuth", () => {
       } else {
         delete process.env.EXTENSION_ORIGIN;
       }
+      if (origNodeEnv !== undefined) {
+        process.env.NODE_ENV = origNodeEnv;
+      } else {
+        delete process.env.NODE_ENV;
+      }
     });
 
-    it("allows *.chromiumapp.org when EXTENSION_ORIGIN is unset", () => {
+    it("allows *.chromiumapp.org when EXTENSION_ORIGIN is unset (development)", () => {
       delete process.env.EXTENSION_ORIGIN;
+      process.env.NODE_ENV = "development";
       expect(isRedirectUriAllowed("https://abcdef.chromiumapp.org/")).toBe(true);
       expect(isRedirectUriAllowed("https://xyz.chromiumapp.org")).toBe(true);
       expect(isRedirectUriAllowed("https://abc.chromiumapp.org")).toBe(true);
     });
 
+    it("rejects all when EXTENSION_ORIGIN is unset in production", () => {
+      delete process.env.EXTENSION_ORIGIN;
+      process.env.NODE_ENV = "production";
+      expect(isRedirectUriAllowed("https://abcdef.chromiumapp.org/")).toBe(false);
+      expect(isRedirectUriAllowed("https://xyz.chromiumapp.org")).toBe(false);
+    });
+
     it("rejects non-https or wrong host when EXTENSION_ORIGIN is unset", () => {
       delete process.env.EXTENSION_ORIGIN;
+      process.env.NODE_ENV = "development";
       expect(isRedirectUriAllowed("http://abc.chromiumapp.org")).toBe(false);
       expect(isRedirectUriAllowed("https://evil.com")).toBe(false);
     });

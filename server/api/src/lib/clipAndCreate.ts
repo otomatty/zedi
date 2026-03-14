@@ -3,6 +3,7 @@
  *
  * Server-side web clipping pipeline for Chrome extension.
  */
+import { Mutex } from "async-mutex";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
 import { generateJSON } from "@tiptap/html";
@@ -17,9 +18,12 @@ import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
+import { isClipUrlAllowed } from "./clipUrlPolicy.js";
 
 const lowlight = createLowlight(common);
 const YDOC_FRAGMENT = "default";
+/** Serializes globalThis.document mutation so concurrent clipAndCreate calls do not race. */
+const clipDocMutex = new Mutex();
 
 const extensions = [
   StarterKit.configure({
@@ -99,15 +103,23 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
-      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-    },
-    redirect: "follow",
-    signal: controller.signal,
-  });
-  clearTimeout(timeout);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+      },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (response.url !== url && !isClipUrlAllowed(response.url)) {
+    throw new Error("Redirect to disallowed URL");
+  }
 
   if (!response.ok) {
     throw new Error(`Fetch failed: ${response.status}`);
@@ -130,65 +142,67 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
 
   const cleanContent = cleanupHtml(article.content ?? "", document);
 
-  const prevDocument = (globalThis as { document?: Document }).document;
-  (globalThis as { document?: Document }).document = document;
-  try {
-    const mainJson = generateJSON(cleanContent, extensions) as {
-      type: string;
-      content?: Array<{ type: string; attrs?: Record<string, unknown> }>;
-    };
+  return await clipDocMutex.runExclusive(async () => {
+    const prevDocument = (globalThis as { document?: Document }).document;
+    (globalThis as { document?: Document }).document = document;
+    try {
+      const mainJson = generateJSON(cleanContent, extensions) as {
+        type: string;
+        content?: Array<{ type: string; attrs?: Record<string, unknown> }>;
+      };
 
-    const baseContent = mainJson.content ?? [];
+      const baseContent = mainJson.content ?? [];
 
-    const imageNode = thumbnailUrl
-      ? {
-          type: "image",
-          attrs: {
-            src: thumbnailUrl,
-            alt: (article.title ?? "OGP thumbnail") as string,
-          },
-        }
-      : null;
+      const imageNode = thumbnailUrl
+        ? {
+            type: "image",
+            attrs: {
+              src: thumbnailUrl,
+              alt: (article.title ?? "OGP thumbnail") as string,
+            },
+          }
+        : null;
 
-    const tiptapJson = {
-      type: "doc",
-      content: imageNode ? [imageNode, ...baseContent] : baseContent,
-    };
+      const tiptapJson = {
+        type: "doc",
+        content: imageNode ? [imageNode, ...baseContent] : baseContent,
+      };
 
-    const schema = buildSchema();
-    const ydoc = prosemirrorJSONToYDoc(schema, tiptapJson, YDOC_FRAGMENT);
-    const ydocState = Y.encodeStateAsUpdate(ydoc);
-    const ydocBase64 = Buffer.from(ydocState).toString("base64");
+      const schema = buildSchema();
+      const ydoc = prosemirrorJSONToYDoc(schema, tiptapJson, YDOC_FRAGMENT);
+      const ydocState = Y.encodeStateAsUpdate(ydoc);
+      const ydocBase64 = Buffer.from(ydocState).toString("base64");
 
-    const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
-    const title = article.title || "Untitled";
+      const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
+      const title = article.title || "Untitled";
 
-    const [page] = await db
-      .insert(pages)
-      .values({
-        ownerId: userId,
+      const [page] = await db
+        .insert(pages)
+        .values({
+          ownerId: userId,
+          title,
+          contentPreview: contentText || null,
+          sourceUrl: finalUrl,
+          thumbnailUrl: thumbnailUrl ?? null,
+        })
+        .returning({ id: pages.id });
+
+      if (!page) throw new Error("Failed to create page");
+
+      await db.insert(pageContents).values({
+        pageId: page.id,
+        ydocState: Buffer.from(ydocBase64, "base64"),
+        version: 1,
+        contentText: contentText || null,
+      });
+
+      return {
+        page_id: page.id,
         title,
-        contentPreview: contentText || null,
-        sourceUrl: finalUrl,
-        thumbnailUrl: thumbnailUrl ?? null,
-      })
-      .returning({ id: pages.id });
-
-    if (!page) throw new Error("Failed to create page");
-
-    await db.insert(pageContents).values({
-      pageId: page.id,
-      ydocState: Buffer.from(ydocBase64, "base64"),
-      version: 1,
-      contentText: contentText || null,
-    });
-
-    return {
-      page_id: page.id,
-      title,
-      thumbnail_url: thumbnailUrl ?? null,
-    };
-  } finally {
-    (globalThis as { document?: Document }).document = prevDocument;
-  }
+        thumbnail_url: thumbnailUrl ?? null,
+      };
+    } finally {
+      (globalThis as { document?: Document }).document = prevDocument;
+    }
+  });
 }

@@ -92,7 +92,11 @@ export function isRedirectUriAllowed(redirectUri: string): boolean {
     .map((s) => s.trim())
     .filter(Boolean);
   if (allowed.length === 0) {
-    // 未設定時は *.chromiumapp.org を許容（開発時用）
+    if (process.env.NODE_ENV === "production") {
+      console.error("FATAL: EXTENSION_ORIGIN is not set. Refusing to allow any redirect URI.");
+      return false;
+    }
+    // 開発時のみ *.chromiumapp.org を許容 / For development only, allow *.chromiumapp.org
     return /^https:\/\/[a-z]+\.chromiumapp\.org\/?$/i.test(redirectUri);
   }
   try {

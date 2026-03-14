@@ -97,7 +97,7 @@ const SignIn: React.FC = () => {
             </button>
           </div>
           <div className="mt-6 border-t border-border pt-6">
-            <Link to={returnTo ?? "/home"} className="block">
+            <Link to="/home" className="block">
               <Button variant="outline" className="w-full" size="lg">
                 {t("common.useWithoutSignIn")}
               </Button>

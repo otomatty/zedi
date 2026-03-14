@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Zedi Web Clipper",
+  "version": "1.0.0",
+  "description": "Save web pages to Zedi with one click",
+  "permissions": ["activeTab", "contextMenus", "scripting", "storage", "identity"],
+  "host_permissions": [
+    "https://zedi-note.app/*",
+    "https://*.zedi-note.app/*",
+    "https://api-development-b126.up.railway.app/*",
+    "http://localhost/*",
+    "https://*.chromiumapp.org/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Save to Zedi"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "save-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Save current page to Zedi"
+    }
+  }
+}
