@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link2, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@zedi/ui";
@@ -52,7 +52,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const { getToken } = useAuth();
   const api = useMemo(() => createApiClient({ getToken }), [getToken]);
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
-  const { url, setUrl, handlePaste, resetDialogState, clearLastClippedUrl, isCurrentUrlClipped } =
+  const { url, setUrl, handlePaste, resetDialogState, isCurrentUrlClipped } =
     useWebClipperDialogState({ clip, reset });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
@@ -60,11 +60,11 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
 
   const hasFreshContent = Boolean(clippedContent) && isCurrentUrlClipped();
 
-  useEffect(() => {
-    if (status === "error") {
-      clearLastClippedUrl();
-    }
-  }, [status, clearLastClippedUrl]);
+  // エラー時に clearLastClippedUrl を呼ばない。呼ぶと debounce の残りタイマーが
+  // lastClippedUrlRef のクリアを検知し、500ms 後に unintended retry を行うため。
+  // Error時は ref をそのままにし、ユーザーは URL を編集するかダイアログを閉じて再試行できる。
+  // Do not call clearLastClippedUrl on error; otherwise the debounce callback
+  // would retry 500ms later (unintended). User can retry by editing URL or reopening dialog.
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
