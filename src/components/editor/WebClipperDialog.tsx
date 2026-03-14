@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Link2, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@zedi/ui";
@@ -56,23 +56,38 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
     useWebClipperDialogState({ clip, reset });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const submitGenerationRef = useRef(0);
   const { toast } = useToast();
 
   const hasFreshContent = Boolean(clippedContent) && isCurrentUrlClipped();
 
+  useEffect(() => {
+    if (!open) {
+      submitGenerationRef.current += 1;
+      resetDialogState();
+    }
+  }, [open, resetDialogState]);
+
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
-        resetDialogState();
+        submitGenerationRef.current += 1;
+        // resetDialogState は useEffect（open の変化監視）で一括実行する。
+        // resetDialogState is executed centrally in the useEffect that watches open.
+        // ここで呼ぶと、親が open=false を渡したときに effect と二重実行になる。
+        // Calling it here would double-execute when the parent passes open=false.
+        // submitGenerationRef のみここで進めて、in-flight handleClip の即時 bail-out を保証する。
+        // Only advance submitGenerationRef here to guarantee immediate bail-out of in-flight handleClip.
       }
       onOpenChange(nextOpen);
     },
-    [onOpenChange, resetDialogState],
+    [onOpenChange],
   );
 
   const handleClip = useCallback(async () => {
     if (!clippedContent || !hasFreshContent || isSubmittingRef.current) return;
 
+    const submitGeneration = submitGenerationRef.current;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     let committedThumbnail: string | undefined;
@@ -115,6 +130,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
       } else if (commitAttemptedAndFailed) {
         thumbnailForContent = "";
       }
+      if (submitGeneration !== submitGenerationRef.current) return;
       const tiptapContent = getTiptapContent(thumbnailForContent, committedProvider);
       if (tiptapContent) {
         onClipped(
