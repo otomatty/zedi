@@ -6,12 +6,11 @@ import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { isValidUrl } from "@/lib/webClipper";
 
 interface UseWebClipperDialogStateOptions {
-  open: boolean;
   clip: (url: string) => Promise<unknown>;
   reset: () => void;
 }
 
-export function useWebClipperDialogState({ open, clip, reset }: UseWebClipperDialogStateOptions) {
+export function useWebClipperDialogState({ clip, reset }: UseWebClipperDialogStateOptions) {
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const lastClippedUrlRef = useRef<string>("");
@@ -36,18 +35,12 @@ export function useWebClipperDialogState({ open, clip, reset }: UseWebClipperDia
     }
   }, [url, reset]);
 
-  useEffect(() => {
-    if (!open) {
-      // Sync clear to avoid race: if we deferred (queueMicrotask), a fast reopen could
-      // let the deferred clear run after user typed, wiping their input.
-      /* eslint-disable react-hooks/set-state-in-effect -- intentional sync reset on close */
-      setUrl("");
-      setUrlError(null);
-      /* eslint-enable react-hooks/set-state-in-effect */
-      lastClippedUrlRef.current = "";
-      reset();
-    }
-  }, [open, reset]);
+  const resetDialogState = useCallback(() => {
+    setUrl("");
+    setUrlError(null);
+    lastClippedUrlRef.current = "";
+    reset();
+  }, [reset]);
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
@@ -76,5 +69,6 @@ export function useWebClipperDialogState({ open, clip, reset }: UseWebClipperDia
     setUrlError,
     lastClippedUrlRef,
     handlePaste,
+    resetDialogState,
   };
 }

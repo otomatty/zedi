@@ -48,8 +48,8 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const { getToken } = useAuth();
   const api = useMemo(() => createApiClient({ getToken }), [getToken]);
   const { status, clippedContent, error, clip, reset, getTiptapContent } = useWebClipper({ api });
-  const { url, setUrl, urlError, setUrlError, lastClippedUrlRef, handlePaste } =
-    useWebClipperDialogState({ open, clip, reset });
+  const { url, setUrl, urlError, setUrlError, lastClippedUrlRef, handlePaste, resetDialogState } =
+    useWebClipperDialogState({ clip, reset });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -58,6 +58,16 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
       lastClippedUrlRef.current = "";
     }
   }, [status, lastClippedUrlRef]);
+
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        resetDialogState();
+      }
+      onOpenChange(nextOpen);
+    },
+    [onOpenChange, resetDialogState],
+  );
 
   const handleClip = useCallback(async () => {
     if (!clippedContent) return;
@@ -112,12 +122,12 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
           clippedContent.sourceUrl,
           committedThumbnail ?? undefined,
         );
-        onOpenChange(false);
+        handleDialogOpenChange(false);
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [clippedContent, getTiptapContent, onClipped, onOpenChange, toast, t]);
+  }, [clippedContent, getTiptapContent, onClipped, handleDialogOpenChange, toast, t]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -133,7 +143,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
   const isBusy = isProcessing || isSubmitting;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -185,7 +195,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
         <WebClipperDialogFooter
           isBusy={isBusy}
           hasContent={Boolean(clippedContent)}
-          onCancel={() => onOpenChange(false)}
+          onCancel={() => handleDialogOpenChange(false)}
           onSubmit={handleClip}
         />
       </DialogContent>
