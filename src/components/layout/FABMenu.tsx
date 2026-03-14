@@ -3,6 +3,10 @@ import { FileText, Link2, Image } from "lucide-react";
 import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
+/**
+ * FAB メニューで選択できるオプションの種類。
+ * Option type selectable from the FAB menu.
+ */
 export type FABMenuOption = "blank" | "url" | "image" | "template" | "voice";
 
 interface FABMenuItemProps {
@@ -56,16 +60,34 @@ interface FABMenuProps {
   onOpenChange: (open: boolean) => void;
   onSelect: (option: FABMenuOption) => void;
   trigger: React.ReactNode;
+  /** Options to hide from the menu (e.g. auth-gated features for guests) */
+  hiddenOptions?: FABMenuOption[];
 }
 
-export const FABMenu: React.FC<FABMenuProps> = ({ open, onOpenChange, onSelect, trigger }) => {
+/**
+ * Floating Action Button の展開メニュー。画像・URL・新規・テンプレートなどの作成オプションを表示する。
+ * FAB expansion menu showing create options (image, URL, blank, template, etc.).
+ *
+ * @param open - メニューの開閉状態 / Menu open state
+ * @param onOpenChange - 開閉状態の変更ハンドラ / Handler for open state change
+ * @param onSelect - オプション選択時のハンドラ / Handler when option is selected
+ * @param trigger - メニューを開くトリガー要素 / Trigger element to open menu
+ * @param hiddenOptions - 非表示にするオプション（例: ゲスト向け認証制限） / Options to hide (e.g. auth-gated for guests)
+ */
+export const FABMenu: React.FC<FABMenuProps> = ({
+  open,
+  onOpenChange,
+  onSelect,
+  trigger,
+  hiddenOptions,
+}) => {
   const { t } = useTranslation();
   const handleSelect = (option: FABMenuOption) => {
     onSelect(option);
     onOpenChange(false);
   };
 
-  const menuItems: Array<{
+  const allItems: Array<{
     icon: React.ElementType;
     label: string;
     option: FABMenuOption;
@@ -75,6 +97,10 @@ export const FABMenu: React.FC<FABMenuProps> = ({ open, onOpenChange, onSelect, 
     { icon: Link2, label: t("common.createFromUrl"), option: "url" },
     { icon: FileText, label: t("common.createNew"), option: "blank" },
   ];
+
+  const menuItems = hiddenOptions
+    ? allItems.filter((item) => !hiddenOptions.includes(item.option))
+    : allItems;
 
   return (
     <>

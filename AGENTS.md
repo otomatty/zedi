@@ -27,6 +27,8 @@ bun run test:run       # Vitest 単体テスト
 ## コードスタイル
 
 - TypeScript strict。`any` 禁止、型を明示する。
+- export する関数・型・インターフェースには TSDoc / JSDoc を付与する。
+- コメントやドキュメントは、原則として日本語と英語の両方を併記する。
 - `bun run lint` と `bun run format:check` が通る状態を維持する。
 - 既存のディレクトリ構成・命名規則に合わせる。
 - Conventional Commits 形式でコミット（`feat:`, `fix:`, `docs:` 等）。
@@ -50,7 +52,9 @@ bun run test:run       # Vitest 単体テスト
 
 ### 1. 未対応コメントの取得
 
-返信済みコメントを除外し、未対応のものだけ取得する（新規セッションでも動作する）:
+**注意**: 以下は「未返信」のトップレベルコメントを取得する方式。GitHub の `Require conversation resolution before merging` は「未解決のスレッド」をブロックするため、返信済みだが未解決のスレッドはこの方式では検出されない。マージ可否の完全な判定には、PR の `mergeable` 状態や `reviewDecision` の確認を併用すること。
+
+返信済みコメントを除外し、未返信のトップレベルコメントを取得する（新規セッションでも動作する）:
 
 ```bash
 gh api repos/{owner}/{repo}/pulls/{number}/comments \
@@ -59,6 +63,8 @@ gh api repos/{owner}/{repo}/pulls/{number}/comments \
     [.[] | select(.in_reply_to_id == null and (.id | IN($replied[]) | not))]
     | .[] | {id, path, line, body: (.body | .[0:300]), user: .user.login}'
 ```
+
+コメントが 30 件を超える場合は `?per_page=100` や `--paginate` でページネーションを指定すること。
 
 ### 2. PR の自動検出
 
@@ -73,8 +79,7 @@ gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
 ```bash
 gh pr comment {number} --body "レビューコメントへの対応をコミットしました。最新の変更に対する再レビューをお願いします。
 
-@coderabbitai review
-@copilot 再レビューをお願いします。"
+@coderabbitai review"
 ```
 
 ## ディレクトリ構成

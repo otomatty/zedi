@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-prod
   cancel-in-progress: false
@@ -63,6 +66,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         with:
           max_attempts: 3
+          timeout_minutes: 5
           retry_wait_seconds: 60
           command: >
             bunx wrangler pages deploy dist --project-name=zedi
@@ -97,7 +101,7 @@ jobs:
           bun-version: "1.2"
       - name: Install & Build Admin
         working-directory: admin
-        run: bun install && bun run build
+        run: bun install --frozen-lockfile && bun run build
         env:
           VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
           VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL || 'https://zedi-note.app' }}
@@ -112,6 +116,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         with:
           max_attempts: 3
+          timeout_minutes: 5
           retry_wait_seconds: 60
           command: >
             bunx wrangler pages deploy admin/dist --project-name=zedi-admin

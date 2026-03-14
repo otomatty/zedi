@@ -90,5 +90,27 @@
     "generating": "Generating image",
     "labelRecommendation": "Recommendations",
     "labelThumbnails": "Thumbnail candidates"
+  },
+  "webClipper": {
+    "title": "Import from URL",
+    "description": "Extract and save web page content. Source URL is recorded automatically.",
+    "placeholder": "https://example.com/article",
+    "statusFetching": "Fetching page...",
+    "statusExtracting": "Extracting content...",
+    "statusCompleted": "Import ready",
+    "loginRequired": "Sign in required",
+    "loginRequiredDescription": "Please sign in again.",
+    "thumbnailSaveFailed": "Failed to save thumbnail",
+    "thumbnailSaveFailedDescription": "Content will be imported without it.",
+    "tip": "💡 Some pages may not be supported. Please respect copyright.",
+    "cancel": "Cancel",
+    "importing": "Importing...",
+    "import": "Import"
+  },
+  "markdownExport": {
+    "sourceAttribution": "📎 Source",
+    "downloaded": "Markdown file downloaded",
+    "copied": "Markdown copied to clipboard",
+    "copyFailed": "Copy failed"
   }
 }

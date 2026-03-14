@@ -2,29 +2,49 @@
  * Web Clipper フック - URLからWebページを取り込む
  * api を渡すとサーバー側で HTML 取得（CORS 回避）。未指定時は CORS プロキシにフォールバック。
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/webClipper";
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
 import type { ApiClient } from "@/lib/api/apiClient";
 
+/**
+ * Web Clipper のステータス。idle → fetching → extracting → completed | error の順に遷移する。
+ * Web Clipper status. Transitions: idle → fetching → extracting → completed | error.
+ */
 export type WebClipperStatus = "idle" | "fetching" | "extracting" | "completed" | "error";
 
+/**
+ * useWebClipper フックのオプション。api 指定時はサーバー側で HTML 取得を優先する。
+ * Options for useWebClipper hook. When api is provided, server-side HTML fetch is preferred.
+ */
 export interface UseWebClipperOptions {
   /** 指定時は POST /api/clip/fetch でサーバー側取得を優先（CORS 回避） */
   api?: ApiClient | null;
 }
 
+/**
+ * useWebClipper フックの戻り値。status, clippedContent, clip, reset, getTiptapContent を提供する。
+ * Return value of useWebClipper hook. Provides status, clippedContent, clip, reset, getTiptapContent.
+ */
 export interface UseWebClipperReturn {
   status: WebClipperStatus;
   clippedContent: ClippedContent | null;
   error: string | null;
   clip: (url: string) => Promise<ClippedContent | null>;
   reset: () => void;
-  getTiptapContent: () => string | null;
+  getTiptapContent: (
+    thumbnailUrl?: string | null,
+    storageProviderId?: string | null,
+  ) => string | null;
 }
 
+/**
+ * Web ページクリッピング用カスタムフック。URL から Web ページを取り込み Tiptap JSON に変換する。
+ * Custom hook for web page clipping. Fetches a web page from a URL and converts it to Tiptap JSON.
+ */
 export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipperReturn {
   const { api } = options;
+  const clipIdRef = useRef(0);
   const [status, setStatus] = useState<WebClipperStatus>("idle");
   const [clippedContent, setClippedContent] = useState<ClippedContent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +56,9 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
 
   const clip = useCallback(
     async (url: string): Promise<ClippedContent | null> => {
+      clipIdRef.current += 1;
+      const currentId = clipIdRef.current;
+
       setStatus("fetching");
       setError(null);
       setClippedContent(null);
@@ -44,10 +67,14 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
         setStatus("extracting");
         const content = await clipWebPage(url, api ? fetchHtmlFn : undefined);
 
+        if (currentId !== clipIdRef.current) return null;
+
         setClippedContent(content);
         setStatus("completed");
         return content;
       } catch (err) {
+        if (currentId !== clipIdRef.current) return null;
+
         const errorMessage = getClipErrorMessage(err);
         setError(errorMessage);
         setStatus("error");
@@ -58,22 +85,29 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
   );
 
   const reset = useCallback(() => {
+    clipIdRef.current += 1;
     setStatus("idle");
     setClippedContent(null);
     setError(null);
   }, []);
 
-  const getTiptapContent = useCallback((): string | null => {
-    if (!clippedContent) return null;
+  const getTiptapContent = useCallback(
+    (thumbnailUrl?: string | null, storageProviderId?: string | null): string | null => {
+      if (!clippedContent) return null;
 
-    const tiptapDoc = formatClippedContentAsTiptap(
-      clippedContent.content,
-      clippedContent.sourceUrl,
-      clippedContent.siteName,
-    );
+      const tiptapDoc = formatClippedContentAsTiptap(
+        clippedContent.content,
+        clippedContent.sourceUrl,
+        clippedContent.siteName,
+        thumbnailUrl === undefined ? clippedContent.thumbnailUrl : thumbnailUrl,
+        clippedContent.title,
+        storageProviderId,
+      );
 
-    return JSON.stringify(tiptapDoc);
-  }, [clippedContent]);
+      return JSON.stringify(tiptapDoc);
+    },
+    [clippedContent],
+  );
 
   return {
     status,

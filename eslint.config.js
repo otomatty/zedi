@@ -1,8 +1,10 @@
 import js from "@eslint/js";
 import globals from "globals";
+import jsdoc from "eslint-plugin-jsdoc";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
+import tsdoc from "eslint-plugin-tsdoc";
 import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
 
@@ -43,8 +45,10 @@ export default tseslint.config(
       globals: globals.browser,
     },
     plugins: {
+      jsdoc,
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
+      tsdoc,
       "unused-imports": unusedImports,
     },
     rules: {
@@ -71,6 +75,28 @@ export default tseslint.config(
       // --- 本番に残すべきでないもの ---
       "no-debugger": "error",
       "no-console": "off", // 下の override で src のみ有効
+
+      // --- TSDoc / JSDoc（export されたものにコメント必須、現時点は warning のみ） ---
+      "jsdoc/require-jsdoc": [
+        "warn",
+        {
+          publicOnly: true,
+          require: {
+            FunctionDeclaration: true,
+            FunctionExpression: true,
+            MethodDefinition: true,
+            ClassDeclaration: true,
+            ArrowFunctionExpression: true,
+          },
+          contexts: [
+            "TSTypeAliasDeclaration",
+            "TSInterfaceDeclaration",
+            "TSEnumDeclaration",
+            "VariableDeclaration",
+          ],
+        },
+      ],
+      "tsdoc/syntax": "warn",
 
       // --- 可読性・複雑度 ---
       complexity: ["warn", { max: 20 }],

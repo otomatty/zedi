@@ -5,16 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@zedi/ui";
 import { getStorageProvider, getSettingsForUpload, convertToWebP } from "@/lib/storage";
 import type { StorageSettings } from "@/types/storage";
+import { commitThumbnailFromUrl, AuthRedirectError } from "@/lib/thumbnailCommit";
 import { getThumbnailApiBaseUrl } from "./thumbnailApiHelpers";
-
-/** 401 時にサインインへリダイレクトするための印。catch 側で navigate("/sign-in") する。 */
-export class AuthRedirectError extends Error {
-  readonly redirectToSignIn = true;
-  constructor(message?: string) {
-    super(message);
-    this.name = "AuthRedirectError";
-  }
-}
 
 function isAuthRedirectError(err: unknown): err is AuthRedirectError {
   return err instanceof AuthRedirectError;
@@ -44,45 +36,6 @@ async function fetchImageAsFile(imageUrl: string, fallbackUrl?: string): Promise
     }
     throw err;
   }
-}
-
-async function commitViaServerS3(
-  imageUrl: string,
-  altText: string,
-  previewUrl: string | undefined,
-  baseUrl: string,
-): Promise<{ imageUrl: string; provider: string }> {
-  const response = await fetch(`${baseUrl}/api/thumbnail/commit`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify({
-      sourceUrl: imageUrl,
-      fallbackUrl: previewUrl,
-      title: altText,
-    }),
-  });
-
-  if (response.status === 401) {
-    throw new AuthRedirectError("ログインが必要です");
-  }
-  if (!response.ok) {
-    let message = `画像の保存に失敗しました: ${response.status}`;
-    try {
-      const data = (await response.json()) as { error?: string; message?: string };
-      if (data?.message) message = data.message;
-      else if (data?.error) message = data.error;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(message);
-  }
-
-  const data = (await response.json()) as { imageUrl?: string; provider?: string };
-  if (!data.imageUrl) throw new Error("画像のURLが取得できませんでした");
-  return { imageUrl: data.imageUrl, provider: data.provider ?? "s3" };
 }
 
 export function useThumbnailCommit({
@@ -121,12 +74,11 @@ export function useThumbnailCommit({
           if (!thumbnailApiBaseUrl) {
             throw new Error("APIのURLが設定されていません");
           }
-          const result = await commitViaServerS3(
-            imageUrl,
-            altText,
-            previewUrl,
-            thumbnailApiBaseUrl,
-          );
+          const result = await commitThumbnailFromUrl(imageUrl, {
+            baseUrl: thumbnailApiBaseUrl,
+            fallbackUrl: previewUrl,
+            title: altText,
+          });
           finalUrl = result.imageUrl;
           providerId = result.provider;
         } else {
