@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zedi Web Clipper</title>
+    <script src="config.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        width: 320px;
+        padding: 12px;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        font-size: 14px;
+        margin: 0;
+        color: #333;
+      }
+      .url {
+        font-size: 12px;
+        color: #666;
+        word-break: break-all;
+        margin-bottom: 12px;
+        max-height: 48px;
+        overflow: hidden;
+      }
+      .btn {
+        width: 100%;
+        padding: 10px 16px;
+        background: #14b8a6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: #0d9488;
+      }
+      .btn:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+      }
+      .error {
+        font-size: 12px;
+        color: #dc2626;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="url" id="url"></p>
+    <button class="btn" id="saveBtn" style="display: none">Zediに保存</button>
+    <button class="btn" id="connectBtn" style="display: none; background: #64748b">
+      Zediに接続
+    </button>
+    <p class="status" id="status" style="font-size: 12px; color: #666; margin-top: 8px"></p>
+    <p class="error" id="error"></p>
+    <script src="popup.js"></script>
+  </body>
+</html>

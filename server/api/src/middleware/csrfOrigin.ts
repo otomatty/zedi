@@ -19,25 +19,50 @@ function originFromReferer(referer: string): string | null {
   }
 }
 
-export const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
+export /**
+ *
+ */
+const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
+  /**
+   *
+   */
   const method = c.req.method;
   if (!MUTATION_METHODS.has(method)) {
     return next();
   }
 
+  /**
+   *
+   */
   const path = c.req.path;
-  const excludedPrefixes = ["/api/webhooks/"];
+  // Only exclude routes that use Bearer/no cookie; /api/ext/authorize-code (cookie) stays protected.
+  /**
+   *
+   */
+  const excludedPrefixes = ["/api/webhooks/", "/api/ext/session", "/api/ext/clip-and-create"];
   if (excludedPrefixes.some((prefix) => path.startsWith(prefix))) {
     return next();
   }
 
+  /**
+   *
+   */
   const allowed = getAllowedOrigins();
   if (allowed.length === 0) {
     return next();
   }
 
+  /**
+   *
+   */
   const origin = c.req.header("Origin");
+  /**
+   *
+   */
   const referer = c.req.header("Referer");
+  /**
+   *
+   */
   const candidate = origin ?? (referer ? originFromReferer(referer) : null);
 
   if (!candidate || !allowed.includes(candidate)) {

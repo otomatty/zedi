@@ -1,24 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@zedi/ui";
 import { cn } from "@zedi/ui";
 import { useCreateNewPage } from "@/hooks/useCreateNewPage";
-import { useCreatePage } from "@/hooks/usePageQueries";
-import { useToast } from "@zedi/ui";
-import { FABMenu, type FABMenuOption } from "./FABMenu";
+import { FABMenu } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
 import { useAuth } from "@/hooks/useAuth";
+import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandlers";
 
-const FloatingActionButton: React.FC = () => {
+interface FloatingActionButtonProps {
+  /** URL from clipUrl query (Chrome extension). When set, opens Web Clipper with URL prefilled. */
+  initialClipUrl?: string | null;
+  /** Called when clip dialog opened from initialClipUrl is closed (for clearing URL). */
+  onClipDialogClosedWithInitialUrl?: () => void;
+}
+
+/**
+ * ホーム用フローティングアクションボタン。新規・URL・画像作成メニューを表示する。
+ * FAB for home: shows menu for new page, URL clip, image create.
+ */
+const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
+  initialClipUrl,
+  onClipDialogClosedWithInitialUrl,
+}) => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { createNewPage, isCreating } = useCreateNewPage();
-  const createPageMutation = useCreatePage();
-  const { toast } = useToast();
   const { isSignedIn } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -31,113 +40,14 @@ const FloatingActionButton: React.FC = () => {
     }
   }, [isSignedIn]);
 
-  const handleMenuSelect = async (option: FABMenuOption) => {
-    switch (option) {
-      case "blank":
-        // 従来の動作：空白ページ作成
-        await createNewPage();
-        break;
-      case "url":
-        // URLから作成ダイアログを開く
-        setIsWebClipperOpen(true);
-        break;
-      case "image":
-        // 画像から作成ダイアログを開く
-        setIsImageDialogOpen(true);
-        break;
-      case "template":
-        // TODO: テンプレート選択画面
-        toast({
-          title: t("common.comingSoon"),
-          description: t("common.templateComingSoon"),
-        });
-        break;
-      case "voice":
-        // TODO: 音声録音画面
-        toast({
-          title: t("common.comingSoon"),
-          description: t("common.voiceComingSoon"),
-        });
-        break;
-    }
-  };
+  const isWebClipperOpenDerived = isWebClipperOpen || Boolean(initialClipUrl && isSignedIn);
 
-  // URLから作成完了時の処理
-  const handleWebClipped = async (
-    title: string,
-    content: string,
-    sourceUrl: string,
-    thumbnailUrl?: string | null,
-  ) => {
-    try {
-      const newPage = await createPageMutation.mutateAsync({
-        title,
-        content,
-        sourceUrl,
-        thumbnailUrl,
-      });
+  const handlers = useFloatingActionButtonHandlers({
+    createNewPage,
+    setIsWebClipperOpen,
+    setIsImageDialogOpen,
+  });
 
-      // 取得した本文は API では保持されないため、初期表示用に state で渡してエディタで Y.Doc に反映する
-      navigate(`/page/${newPage.id}`, {
-        state: {
-          initialContent: content,
-        },
-      });
-    } catch (error) {
-      console.error("Failed to create page from URL:", error);
-      toast({
-        title: t("common.createPageFailed"),
-        variant: "destructive",
-      });
-    }
-  };
-
-  // 画像から作成完了時の処理
-  const handleImageCreated = async (
-    imageUrl: string,
-    extractedText?: string,
-    description?: string,
-  ) => {
-    try {
-      // コンテンツを構築
-      let content = "";
-
-      // 画像を挿入
-      const imageBlock = {
-        type: "doc",
-        content: [
-          {
-            type: "image",
-            attrs: {
-              src: imageUrl,
-              alt: description || "Uploaded image",
-            },
-          },
-          {
-            type: "paragraph",
-            content: extractedText ? [{ type: "text", text: extractedText }] : [],
-          },
-        ],
-      };
-      content = JSON.stringify(imageBlock);
-
-      // ページを作成
-      const newPage = await createPageMutation.mutateAsync({
-        title: "",
-        content,
-      });
-
-      navigate(`/page/${newPage.id}`);
-    } catch (error) {
-      console.error("Failed to create page from image:", error);
-      toast({
-        title: t("common.createPageFailed"),
-        variant: "destructive",
-      });
-    }
-  };
-
-  // メインFABボタン
   const fabButton = (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
@@ -167,25 +77,29 @@ const FloatingActionButton: React.FC = () => {
       <FABMenu
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        onSelect={handleMenuSelect}
+        onSelect={handlers.handleMenuSelect}
         trigger={fabButton}
         hiddenOptions={isSignedIn ? undefined : ["url"]}
       />
 
-      {/* URL から作成ダイアログ（ログイン時のみ） */}
       {isSignedIn && (
         <WebClipperDialog
-          open={isWebClipperOpen}
-          onOpenChange={setIsWebClipperOpen}
-          onClipped={handleWebClipped}
+          open={isWebClipperOpenDerived}
+          onOpenChange={(open) => {
+            setIsWebClipperOpen(false);
+            if (!open && initialClipUrl && onClipDialogClosedWithInitialUrl) {
+              onClipDialogClosedWithInitialUrl();
+            }
+          }}
+          onClipped={handlers.handleWebClipped}
+          initialUrl={initialClipUrl ?? undefined}
         />
       )}
 
-      {/* 画像から作成ダイアログ */}
       <ImageCreateDialog
         open={isImageDialogOpen}
         onOpenChange={setIsImageDialogOpen}
-        onCreated={handleImageCreated}
+        onCreated={handlers.handleImageCreated}
       />
     </>
   );

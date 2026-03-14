@@ -1,7 +1,60 @@
 import { describe, it, expect } from "vitest";
-import { isValidUrl, extractOGPData, clipWebPage, getClipErrorMessage } from "./webClipper";
+import {
+  isValidUrl,
+  isClipUrlAllowed,
+  extractOGPData,
+  clipWebPage,
+  getClipErrorMessage,
+} from "./webClipper";
 
 describe("webClipper", () => {
+  describe("isClipUrlAllowed", () => {
+    it("returns true for http URLs", () => {
+      expect(isClipUrlAllowed("http://example.com")).toBe(true);
+    });
+
+    it("returns true for https URLs", () => {
+      expect(isClipUrlAllowed("https://example.com/article")).toBe(true);
+    });
+
+    it("returns false for chrome://", () => {
+      expect(isClipUrlAllowed("chrome://extensions")).toBe(false);
+    });
+
+    it("returns false for about:", () => {
+      expect(isClipUrlAllowed("about:blank")).toBe(false);
+    });
+
+    it("returns false for file://", () => {
+      expect(isClipUrlAllowed("file:///tmp/test.html")).toBe(false);
+    });
+
+    it("returns false for localhost", () => {
+      expect(isClipUrlAllowed("http://localhost:3000")).toBe(false);
+    });
+
+    it("returns false for 127.0.0.1", () => {
+      expect(isClipUrlAllowed("http://127.0.0.1/page")).toBe(false);
+    });
+
+    it("returns false for private IP 192.168.x.x", () => {
+      expect(isClipUrlAllowed("http://192.168.1.1/")).toBe(false);
+    });
+
+    it("returns false for private IP 10.x.x.x", () => {
+      expect(isClipUrlAllowed("https://10.0.0.1/page")).toBe(false);
+    });
+
+    it("returns false for private IP 172.16–31.x.x", () => {
+      expect(isClipUrlAllowed("http://172.16.0.1/")).toBe(false);
+    });
+
+    it("returns false for empty string", () => {
+      expect(isClipUrlAllowed("")).toBe(false);
+      expect(isClipUrlAllowed("   ")).toBe(false);
+    });
+  });
+
   describe("isValidUrl", () => {
     it("returns true for http URLs", () => {
       expect(isValidUrl("http://example.com")).toBe(true);

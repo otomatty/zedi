@@ -6,6 +6,9 @@ import { Readability } from "@mozilla/readability";
 // CORSプロキシ（複数のフォールバックを用意）
 const CORS_PROXIES = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?"];
 
+/**
+ *
+ */
 export interface ClippedContent {
   title: string;
   content: string; // HTML形式
@@ -17,6 +20,9 @@ export interface ClippedContent {
   sourceUrl: string;
 }
 
+/**
+ *
+ */
 export interface OGPData {
   title: string | null;
   description: string | null;
@@ -31,6 +37,30 @@ export function isValidUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Chrome拡張・clipUrl連携で許可するURLかどうかを検証。
+ * 許可: http/https のみ。
+ * 除外: chrome://, about:, file://, localhost, プライベートIP。
+ * Validates clipUrl from Chrome extension etc. Allows http/https only; excludes chrome://, about:, file://, localhost, private IP.
+ */
+export function isClipUrlAllowed(url: string): boolean {
+  if (!url?.trim()) return false;
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return false;
+    if (hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
+    if (/^chrome\.?|^about$|^file$/i.test(hostname)) return false;
+    // RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+    if (/^10\.|^192\.168\./.test(hostname)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(hostname)) return false;
+    return true;
   } catch {
     return false;
   }
@@ -65,6 +95,9 @@ async function fetchWithProxy(url: string): Promise<string> {
   throw lastError || new Error("すべてのプロキシでページの取得に失敗しました");
 }
 
+/**
+ *
+ */
 export type FetchHtmlFn = (url: string) => Promise<string>;
 
 /**

@@ -1,14 +1,28 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { signIn } from "@/lib/auth";
 import { Button } from "@zedi/ui";
 
+/** サインイン後の戻り先として許可するパス（先頭が / かつ // でない） */
+function getSafeReturnTo(returnTo: string | null): string | null {
+  if (!returnTo || !returnTo.startsWith("/") || returnTo.startsWith("//")) return null;
+  return returnTo;
+}
+
+/**
+ *
+ */
 const SignIn: React.FC = () => {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
   const [socialError, setSocialError] = useState<string | null>(null);
 
-  const callbackURL = `${window.location.origin}/auth/callback`;
+  const baseCallback = `${window.location.origin}/auth/callback`;
+  const callbackURL = returnTo
+    ? `${baseCallback}?returnTo=${encodeURIComponent(returnTo)}`
+    : baseCallback;
   const handleSocialSignIn = (provider: "google" | "github") => async () => {
     setSocialError(null);
     try {
@@ -83,7 +97,7 @@ const SignIn: React.FC = () => {
             </button>
           </div>
           <div className="mt-6 border-t border-border pt-6">
-            <Link to="/home" className="block">
+            <Link to={returnTo ?? "/home"} className="block">
               <Button variant="outline" className="w-full" size="lg">
                 {t("common.useWithoutSignIn")}
               </Button>
