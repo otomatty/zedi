@@ -1,9 +1,10 @@
-import React, { useRef, useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { useOnboarding } from "@/hooks/useOnboarding";
+import { useOnboardingProfileAvatar } from "@/hooks/useOnboardingProfileAvatar";
 import { useProfile } from "@/hooks/useProfile";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { ProfileFormFields } from "@/components/settings/ProfileFormFields";
@@ -11,6 +12,33 @@ import { LanguageSelectField } from "@/components/settings/LanguageSelectField";
 
 const STEPS = [1, 2, 3] as const;
 type StepNum = (typeof STEPS)[number];
+
+/** Back/Next navigation for onboarding steps 1 and 2. */
+const OnboardingStepNav: React.FC<{
+  step: StepNum;
+  onBack: () => void;
+  onNext: () => void;
+  isNextDisabled: boolean;
+}> = ({ step, onBack, onNext, isNextDisabled }) => {
+  const { t } = useTranslation();
+  if (step !== 1 && step !== 2) return null;
+  return (
+    <div className="flex gap-3 pt-4">
+      {step > 1 && (
+        <Button variant="outline" onClick={onBack} className="flex-1">
+          {t("onboarding.action.back")}
+        </Button>
+      )}
+      <Button
+        onClick={onNext}
+        className={step === 1 ? "w-full" : "flex-1"}
+        disabled={isNextDisabled}
+      >
+        {t("onboarding.action.next")}
+      </Button>
+    </div>
+  );
+};
 
 /**
  * Initial setup wizard page.
@@ -35,48 +63,10 @@ const Onboarding: React.FC = () => {
   } = useProfile();
   const { settings, isLoading: isSettingsLoading, updateLocale } = useGeneralSettings();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const avatarObjectUrlRef = useRef<string | null>(null);
-
-  const handleAvatarFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (profile.avatarUrl?.startsWith("blob:")) {
-        URL.revokeObjectURL(profile.avatarUrl);
-      }
-      if (avatarObjectUrlRef.current) {
-        URL.revokeObjectURL(avatarObjectUrlRef.current);
-        avatarObjectUrlRef.current = null;
-      }
-      const objectUrl = URL.createObjectURL(file);
-      avatarObjectUrlRef.current = objectUrl;
-      updateProfile({ avatarUrl: objectUrl });
-      e.currentTarget.value = "";
-    },
-    [updateProfile, profile.avatarUrl],
+  const { fileInputRef, handleAvatarFileChange, handleAvatarRemove } = useOnboardingProfileAvatar(
+    profile.avatarUrl,
+    updateProfile,
   );
-
-  useEffect(() => {
-    return () => {
-      if (avatarObjectUrlRef.current) {
-        URL.revokeObjectURL(avatarObjectUrlRef.current);
-        avatarObjectUrlRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleAvatarRemove = useCallback(() => {
-    if (profile.avatarUrl?.startsWith("blob:")) {
-      URL.revokeObjectURL(profile.avatarUrl);
-    }
-    if (avatarObjectUrlRef.current) {
-      URL.revokeObjectURL(avatarObjectUrlRef.current);
-      avatarObjectUrlRef.current = null;
-    }
-    updateProfile({ avatarUrl: "" });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [profile.avatarUrl, updateProfile]);
 
   const handleNext = useCallback(async () => {
     if (step === 1) {
@@ -156,6 +146,7 @@ const Onboarding: React.FC = () => {
                   displayNameInvalid ? t("onboarding.profile.displayNameRequired") : undefined
                 }
                 idPrefix="onboarding"
+                disabled={isProfileSaving}
               />
             </>
           )}
@@ -201,23 +192,12 @@ const Onboarding: React.FC = () => {
             </>
           )}
 
-          {/* Step navigation (Step 1 and 2) */}
-          {(step === 1 || step === 2) && (
-            <div className="flex gap-3 pt-4">
-              {step > 1 && (
-                <Button variant="outline" onClick={handleBack} className="flex-1">
-                  {t("onboarding.action.back")}
-                </Button>
-              )}
-              <Button
-                onClick={handleNext}
-                className={step === 1 ? "w-full" : "flex-1"}
-                disabled={step === 1 && (displayNameInvalid || isProfileSaving)}
-              >
-                {t("onboarding.action.next")}
-              </Button>
-            </div>
-          )}
+          <OnboardingStepNav
+            step={step}
+            onBack={handleBack}
+            onNext={handleNext}
+            isNextDisabled={step === 1 && (displayNameInvalid || isProfileSaving)}
+          />
         </div>
       </main>
     </div>
