@@ -6,6 +6,9 @@ import { Readability } from "@mozilla/readability";
 // CORSプロキシ（複数のフォールバックを用意）
 const CORS_PROXIES = ["https://api.allorigins.win/raw?url=", "https://corsproxy.io/?"];
 
+/**
+ *
+ */
 export interface ClippedContent {
   title: string;
   content: string; // HTML形式
@@ -17,6 +20,9 @@ export interface ClippedContent {
   sourceUrl: string;
 }
 
+/**
+ *
+ */
 export interface OGPData {
   title: string | null;
   description: string | null;
@@ -31,6 +37,41 @@ export function isValidUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Chrome拡張・clipUrl連携で許可するURLかどうかを検証。サーバー側 clipUrlPolicy と同一ルール。
+ * 許可: http/https のみ。除外: localhost, loopback, プライベートIP, link-local, .local, chrome/about/file。
+ * Validates clipUrl from Chrome extension etc. Same rules as server clipUrlPolicy. Allows http/https only; rejects localhost, loopback, private IP, link-local, .local.
+ */
+export function isClipUrlAllowed(url: string): boolean {
+  if (!url?.trim()) return false;
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    let hostname = parsed.hostname.toLowerCase();
+    if (hostname.startsWith("[") && hostname.endsWith("]")) {
+      hostname = hostname.slice(1, -1);
+    }
+    if (hostname === "localhost" || /^127\./.test(hostname) || hostname === "::1") return false;
+    if (
+      hostname === "0.0.0.0" ||
+      hostname === "::" ||
+      hostname === "0000:0000:0000:0000:0000:0000:0000:0000"
+    )
+      return false;
+    if (hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
+    if (/^(chrome|about|file)$/i.test(hostname)) return false;
+    if (/^::ffff:/i.test(hostname)) return false;
+    // RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+    if (/^10\.|^192\.168\./.test(hostname)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(hostname)) return false;
+    if (/^169\.254\./.test(hostname)) return false;
+    if (/^fe80:/i.test(hostname)) return false;
+    return true;
   } catch {
     return false;
   }
@@ -65,6 +106,9 @@ async function fetchWithProxy(url: string): Promise<string> {
   throw lastError || new Error("すべてのプロキシでページの取得に失敗しました");
 }
 
+/**
+ *
+ */
 export type FetchHtmlFn = (url: string) => Promise<string>;
 
 /**

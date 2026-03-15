@@ -47,6 +47,11 @@
     "docker:down": "docker-compose -f docker-compose.dev.yml down",
     "docker:logs": "docker-compose -f docker-compose.dev.yml logs -f",
     "docker:clean": "docker-compose -f docker-compose.dev.yml down -v && docker image prune -f",
+    "prepare:extension": "node scripts/prepare-extension.js",
+    "prepare:extension:dev": "node scripts/prepare-extension.js dev",
+    "prepare:extension:prod": "node scripts/prepare-extension.js prod",
+    "build:extension": "npm run prepare:extension:prod",
+    "build:extension:dev": "npm run prepare:extension:dev",
     "prepare": "husky"
   },
   "lint-staged": {

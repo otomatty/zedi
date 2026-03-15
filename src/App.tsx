@@ -10,6 +10,8 @@ import Notes from "./pages/Notes";
 import NotesDiscover from "./pages/NotesDiscover";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
+import ExtensionAuth from "./pages/ExtensionAuth";
+import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
 import Pricing from "./pages/Pricing";
@@ -29,6 +31,9 @@ import { AIChatProvider } from "./contexts/AIChatContext";
 
 const queryClient = new QueryClient();
 
+/**
+ *
+ */
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
     <QueryClientProvider client={queryClient}>
@@ -45,6 +50,8 @@ const App = () => (
                   <Route path="/" element={<Landing />} />
                   <Route path="/sign-in/*" element={<SignIn />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/auth/extension" element={<ExtensionAuth />} />
+                  <Route path="/auth/extension-callback" element={<ExtensionAuthCallback />} />
                   <Route path="/note/:noteId" element={<NoteView />} />
                   <Route path="/note/:noteId/settings" element={<NoteSettings />} />
                   <Route path="/note/:noteId/members" element={<NoteMembers />} />
