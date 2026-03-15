@@ -96,6 +96,7 @@ export default tseslint.config(
           ],
         },
       ],
+      "jsdoc/require-description": ["warn", { descriptionStyle: "body" }],
       "tsdoc/syntax": "warn",
 
       // --- 可読性・複雑度 ---

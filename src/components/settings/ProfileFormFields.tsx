@@ -19,7 +19,9 @@ export interface ProfileFormFieldsProps {
   onDisplayNameChange: (value: string) => void;
   onAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onAvatarRemove: () => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  /** When true, show the "Remove avatar" button (user has set a custom avatar). */
+  hasCustomAvatar: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
   /** Optional error message below display name (e.g. "Display name is required"). */
   displayNameError?: string;
   /** Optional id prefix for inputs (e.g. "onboarding" for onboarding-displayName). */
@@ -28,34 +30,24 @@ export interface ProfileFormFieldsProps {
 }
 
 /**
- *
+ * Profile form fields (display name and avatar). Shared by Onboarding and settings.
+ * プロフィール入力（表示名・アバター）。オンボーディングと設定で共有。
  */
-export /**
- *
- */
-const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
+export const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
   displayName,
   avatarDisplayUrl,
   displayNameForAvatar,
   onDisplayNameChange,
   onAvatarChange,
   onAvatarRemove,
+  hasCustomAvatar,
   fileInputRef,
   displayNameError,
   idPrefix = "profile",
   disabled = false,
 }) => {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const displayNameId = `${idPrefix}-displayName`;
-  /**
-   *
-   */
   const errorId = displayNameError ? `${idPrefix}-displayName-error` : undefined;
 
   return (
@@ -105,7 +97,7 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
             >
               {t("generalSettings.profile.avatarUpload")}
             </Button>
-            {avatarDisplayUrl && (
+            {hasCustomAvatar && (
               <Button
                 type="button"
                 variant="ghost"
@@ -119,7 +111,7 @@ const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
             )}
           </div>
           <input
-            ref={fileInputRef as React.RefObject<HTMLInputElement>}
+            ref={fileInputRef}
             type="file"
             accept="image/*"
             onChange={onAvatarChange}

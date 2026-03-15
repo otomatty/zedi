@@ -32,7 +32,8 @@ import { AIChatProvider } from "./contexts/AIChatContext";
 const queryClient = new QueryClient();
 
 /**
- *
+ * Root app component. Sets up providers and route tree.
+ * ルートアプリコンポーネント。プロバイダーとルートを構成する。
  */
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

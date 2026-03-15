@@ -27,19 +27,11 @@ interface AISettingsFormProps {
 }
 
 /**
- *
+ * AI settings form. Manages LLM provider, API key, and server model selection.
+ * AI設定フォーム。LLMプロバイダー・APIキー・サーバーモデル選択を管理する。
  */
-export /**
- *
- */
-const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false }) => {
-  /**
-   *
-   */
+export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false }) => {
   const { t } = useTranslation();
-  /**
-   *
-   */
   const {
     settings,
     availableModels,
@@ -63,18 +55,8 @@ const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false }) => 
     handleReset,
   } = useAISettingsForm();
 
-  /**
-   *
-   */
   const currentProvider = getProviderById(settings.provider);
-  /**
-   *
-   */
   const currentModelId = settings.modelId || `${settings.provider}:${settings.model}`;
-
-  /**
-   *
-   */
   const saveStatus = isSaving ? "saving" : savedAt != null ? "saved" : "idle";
 
   if (isLoading) {

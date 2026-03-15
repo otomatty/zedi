@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
@@ -9,16 +9,11 @@ import type { StorageSettings } from "@/types/storage";
 const SAVED_INDICATOR_MS = 3000;
 
 /**
- *
+ * Custom hook for storage settings form state and actions.
+ * ストレージ設定フォームの状態とアクションを管理するカスタムフック。
  */
 export function useStorageSettingsForm() {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const {
     settings,
     isLoading,
@@ -32,30 +27,18 @@ export function useStorageSettingsForm() {
     reset,
   } = useStorageSettings();
 
-  /**
-   *
-   */
   const [showSecrets, setShowSecrets] = useState(false);
-  /**
-   *
-   */
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  /**
-   *
-   */
   const savedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /**
-   *
-   */
   const { toast } = useToast();
 
-  /**
-   *
-   */
+  useEffect(() => {
+    return () => {
+      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
+    };
+  }, []);
+
   const runSave = useCallback(async () => {
-    /**
-     *
-     */
     const success = await save();
     if (success) {
       setSavedAt(Date.now());
@@ -71,14 +54,8 @@ export function useStorageSettingsForm() {
     }
   }, [save, t]);
 
-  /**
-   *
-   */
   const scheduleSave = useDebouncedCallback(runSave, 800);
 
-  /**
-   *
-   */
   const updateSettings = useCallback(
     (updates: Partial<StorageSettings>) => {
       updateSettingsBase(updates);
@@ -87,9 +64,6 @@ export function useStorageSettingsForm() {
     [updateSettingsBase, scheduleSave],
   );
 
-  /**
-   *
-   */
   const updateConfig = useCallback(
     (updates: Partial<StorageSettings["config"]>) => {
       updateConfigBase(updates);
@@ -98,13 +72,7 @@ export function useStorageSettingsForm() {
     [updateConfigBase, scheduleSave],
   );
 
-  /**
-   *
-   */
   const handleTest = useCallback(async () => {
-    /**
-     *
-     */
     const result = await test();
     if (result.success) {
       toast({
@@ -120,9 +88,6 @@ export function useStorageSettingsForm() {
     }
   }, [test, toast, t]);
 
-  /**
-   *
-   */
   const handleReset = useCallback(() => {
     reset();
     toast({

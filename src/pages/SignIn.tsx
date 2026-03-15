@@ -11,7 +11,8 @@ function getSafeReturnTo(returnTo: string | null): string | null {
 }
 
 /**
- *
+ * Sign-in page. Social login and returnTo redirect.
+ * サインインページ。ソーシャルログインとreturnToリダイレクト。
  */
 const SignIn: React.FC = () => {
   const { t } = useTranslation();

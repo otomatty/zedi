@@ -11,16 +11,11 @@ import type { AIModel } from "@/types/ai";
 const SAVED_INDICATOR_MS = 3000;
 
 /**
- *
+ * Custom hook for AI settings form state and actions.
+ * AI設定フォームの状態とアクションを管理するカスタムフック。
  */
 export function useAISettingsForm() {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const {
     settings,
     availableModels,
@@ -34,64 +29,28 @@ export function useAISettingsForm() {
     reset,
   } = useAISettings();
 
-  /**
-   *
-   */
   const [showApiKey, setShowApiKey] = useState(false);
-  /**
-   *
-   */
   const [useOwnKey, setUseOwnKey] = useState(false);
-  /**
-   *
-   */
   const [serverModels, setServerModels] = useState<AIModel[]>([]);
-  /**
-   *
-   */
   const [serverModelsLoading, setServerModelsLoading] = useState(false);
-  /**
-   *
-   */
   const [serverModelsError, setServerModelsError] = useState<string | null>(null);
-  /**
-   *
-   */
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  /**
-   *
-   */
   const savedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /**
-   *
-   */
   const { toast } = useToast();
 
-  /**
-   *
-   */
   const isServerMode = settings.apiMode === "api_server" && !useOwnKey;
 
-  /**
-   *
-   */
   const loadServerModels = useCallback(
     async (forceRefresh = false) => {
       setServerModelsError(null);
       setServerModelsLoading(true);
       try {
-        /**
-         *
-         */
         const { models } = await fetchServerModels(forceRefresh);
         setServerModels(models ?? []);
         if (!models?.length) {
           setServerModelsError(t("aiSettings.modelsEmpty"));
         }
       } catch (e) {
-        /**
-         *
-         */
         const message =
           e instanceof FetchServerModelsError
             ? e.message
@@ -119,13 +78,13 @@ export function useAISettingsForm() {
     }
   }, [isLoading, settings.apiMode]);
 
-  /**
-   *
-   */
+  useEffect(() => {
+    return () => {
+      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
+    };
+  }, []);
+
   const runSave = useCallback(async () => {
-    /**
-     *
-     */
     const success = await save();
     if (success) {
       setSavedAt(Date.now());
@@ -141,19 +100,10 @@ export function useAISettingsForm() {
     }
   }, [save, t]);
 
-  /**
-   *
-   */
   const scheduleSave = useDebouncedCallback(runSave, 800);
 
-  /**
-   *
-   */
   const updateSettings = useCallback(
     (updates: Partial<AISettings>) => {
-      /**
-       *
-       */
       const normalizedUpdates =
         (updates.provider !== undefined || updates.model !== undefined) &&
         updates.modelId === undefined
@@ -165,9 +115,6 @@ export function useAISettingsForm() {
     [updateSettingsBase, scheduleSave],
   );
 
-  /**
-   *
-   */
   const handleToggleOwnKey = useCallback(
     (checked: boolean) => {
       setUseOwnKey(checked);
@@ -178,13 +125,7 @@ export function useAISettingsForm() {
     [updateSettings],
   );
 
-  /**
-   *
-   */
   const handleTest = useCallback(async () => {
-    /**
-     *
-     */
     const result = await test();
     if (result.success) {
       toast({ title: t("aiSettings.connectionSuccess"), description: result.message });
@@ -197,9 +138,6 @@ export function useAISettingsForm() {
     }
   }, [test, toast, t]);
 
-  /**
-   *
-   */
   const handleReset = useCallback(() => {
     reset();
     setUseOwnKey(false);
@@ -209,14 +147,8 @@ export function useAISettingsForm() {
     });
   }, [reset, toast, t]);
 
-  /**
-   *
-   */
   const handleServerModelSelect = useCallback(
     (modelId: string) => {
-      /**
-       *
-       */
       const model = serverModels.find((m) => m.id === modelId);
       if (model) {
         updateSettings({

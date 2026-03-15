@@ -17,15 +17,10 @@ import { AboutCard } from "@/components/settings/AboutCard";
 const PROFILE_SAVED_INDICATOR_MS = 3000;
 
 /**
- *
+ * General settings form (profile, display, language, data, about).
+ * 一般設定フォーム（プロフィール・表示・言語・データ・About）。
  */
-export /**
- *
- */
-const GeneralSettingsForm: React.FC = () => {
-  /**
-   *
-   */
+export const GeneralSettingsForm: React.FC = () => {
   const {
     settings,
     isLoading: isGeneralLoading,
@@ -36,9 +31,6 @@ const GeneralSettingsForm: React.FC = () => {
     editorFontSizePx,
   } = useGeneralSettings();
 
-  /**
-   *
-   */
   const {
     profile,
     isLoading: isProfileLoading,
@@ -49,54 +41,21 @@ const GeneralSettingsForm: React.FC = () => {
     avatarUrl,
   } = useProfile();
 
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const { isSignedIn } = useAuth();
-  /**
-   *
-   */
   const fileInputRef = useRef<HTMLInputElement>(null);
-  /**
-   *
-   */
   const avatarObjectUrlRef = useRef<string | null>(null);
-  /**
-   *
-   */
   const [profileSavedAt, setProfileSavedAt] = useState<number | null>(null);
-  /**
-   *
-   */
   const profileSavedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /**
-   *
-   */
   const handleRunTourAgain = useCallback(() => {
     navigate("/home", { state: { startTour: true } });
   }, [navigate]);
 
-  /**
-   *
-   */
   const isLoading = isGeneralLoading || isProfileLoading;
 
-  /**
-   *
-   */
   const runProfileSave = useCallback(async () => {
-    /**
-     *
-     */
     const ok = await saveProfile();
     if (ok) {
       setProfileSavedAt(Date.now());
@@ -109,14 +68,8 @@ const GeneralSettingsForm: React.FC = () => {
       toast.error(t("generalSettings.saveFailed"));
     }
   }, [saveProfile, t]);
-  /**
-   *
-   */
   const scheduleProfileSave = useDebouncedCallback(runProfileSave, 800);
 
-  /**
-   *
-   */
   const updateProfileAndSave = useCallback(
     (updates: Parameters<typeof updateProfile>[0]) => {
       updateProfile(updates);
@@ -125,14 +78,8 @@ const GeneralSettingsForm: React.FC = () => {
     [updateProfile, scheduleProfileSave],
   );
 
-  /**
-   *
-   */
   const handleAvatarFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      /**
-       *
-       */
       const file = e.target.files?.[0];
       if (!file) return;
 
@@ -143,9 +90,6 @@ const GeneralSettingsForm: React.FC = () => {
         URL.revokeObjectURL(avatarObjectUrlRef.current);
         avatarObjectUrlRef.current = null;
       }
-      /**
-       *
-       */
       const objectUrl = URL.createObjectURL(file);
       avatarObjectUrlRef.current = objectUrl;
       updateProfileAndSave({ avatarUrl: objectUrl });
@@ -159,6 +103,10 @@ const GeneralSettingsForm: React.FC = () => {
         URL.revokeObjectURL(avatarObjectUrlRef.current);
         avatarObjectUrlRef.current = null;
       }
+      if (profileSavedAtTimeoutRef.current) {
+        clearTimeout(profileSavedAtTimeoutRef.current);
+        profileSavedAtTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -170,9 +118,6 @@ const GeneralSettingsForm: React.FC = () => {
     );
   }
 
-  /**
-   *
-   */
   const profileSaveStatus = isProfileSaving ? "saving" : profileSavedAt != null ? "saved" : "idle";
 
   return (

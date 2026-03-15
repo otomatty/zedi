@@ -15,7 +15,8 @@ import { isClipUrlAllowed } from "@/lib/webClipper";
 const HOME_PATH = "/home";
 
 /**
- *
+ * Home page: page grid, FAB, quick tour, and optional clip URL handling.
+ * ホーム画面。ページグリッド・FAB・クイックツアー・clip URL処理。
  */
 const Home: React.FC = () => {
   const location = useLocation();

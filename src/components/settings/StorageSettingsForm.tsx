@@ -25,19 +25,11 @@ interface StorageSettingsFormProps {
 }
 
 /**
- *
+ * Storage settings form. Manages image storage provider and credentials.
+ * ストレージ設定フォーム。画像ストレージプロバイダーと認証情報を管理する。
  */
-export /**
- *
- */
-const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedded = false }) => {
-  /**
-   *
-   */
+export const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedded = false }) => {
   const { t } = useTranslation();
-  /**
-   *
-   */
   const {
     settings,
     isLoading,
@@ -53,30 +45,11 @@ const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedded = fa
     handleReset,
   } = useStorageSettingsForm();
 
-  /**
-   *
-   */
   const saveStatus = isSaving ? "saving" : savedAt != null ? "saved" : "idle";
-
-  /**
-   *
-   */
   const useExternalStorage = settings.preferDefaultStorage === false;
-  /**
-   *
-   */
   const isLegacyCloudflareR2 = (settings.provider as string) === "cloudflare-r2";
-  /**
-   *
-   */
   const effectiveProvider = isLegacyCloudflareR2 ? "s3" : settings.provider;
-  /**
-   *
-   */
   const useExternalStorageEffective = useExternalStorage && !isLegacyCloudflareR2;
-  /**
-   *
-   */
   const currentProvider =
     getStorageProviderById(useExternalStorageEffective ? effectiveProvider : "s3") ??
     STORAGE_PROVIDERS[0];

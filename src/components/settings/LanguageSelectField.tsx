@@ -20,21 +20,16 @@ export interface LanguageSelectFieldProps {
 }
 
 /**
- *
+ * Language/locale select field component.
+ * 言語・ロケール選択フィールドコンポーネント。
  */
-export /**
- *
- */
-const LanguageSelectField: React.FC<LanguageSelectFieldProps> = ({
+export const LanguageSelectField: React.FC<LanguageSelectFieldProps> = ({
   value,
   onChange,
   id = "locale",
   labelId,
   disabled = false,
 }) => {
-  /**
-   *
-   */
   const { t } = useTranslation();
 
   return (

@@ -38,7 +38,6 @@ export function DataManagementCard() {
       const adapter = createStorageAdapter();
       await adapter.initialize(userId);
       await adapter.resetDatabase();
-
       await adapter.initialize(userId);
       resetSyncFailures();
       await runApiSync(userId, getToken, { force: true, forceFullSyncWhenLocalEmpty: true });

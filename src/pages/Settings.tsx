@@ -26,7 +26,8 @@ function getSafeReturnTo(searchParams: URLSearchParams): string | null {
 }
 
 /**
- *
+ * Settings hub: overview and section routing (general, AI, storage).
+ * 設定ハブ。概要とセクション（一般・AI・ストレージ）のルーティング。
  */
 const Settings: React.FC = () => {
   const { t } = useTranslation();

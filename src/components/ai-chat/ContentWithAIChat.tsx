@@ -14,36 +14,16 @@ interface ContentWithAIChatProps {
 }
 
 /**
- *
+ * Layout wrapper that provides AI chat panel and optional FAB. Used by Home and Notes.
+ * AIチャットパネルとオプションのFABを提供するレイアウト。Home・Notesで利用。
  */
 export function ContentWithAIChat({ children, floatingAction }: ContentWithAIChatProps) {
-  /**
-   *
-   */
   const isMobile = useIsMobile();
-  /**
-   *
-   */
   const { isOpen, togglePanel, openPanel } = useAIChatStore();
-  /**
-   *
-   */
   const { setAIChatAvailable } = useAIChatContext();
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const [isDraggingPage, setIsDraggingPage] = useState(false);
-  /**
-   *
-   */
   const [isHoveringHint, setIsHoveringHint] = useState(false);
-  /**
-   *
-   */
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // このコンポーネントがマウントされている間、AIチャットが利用可能であることを通知
@@ -54,25 +34,16 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
 
   // Detect page drag globally (for showing hint zone when panel is closed)
   useEffect(() => {
-    /**
-     *
-     */
     const handleGlobalDragStart = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes(ZEDI_PAGE_MIME_TYPE)) {
         setIsDraggingPage(true);
       }
     };
-    /**
-     *
-     */
     const handleGlobalDragEnd = () => {
       setIsDraggingPage(false);
       setIsHoveringHint(false);
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     };
-    /**
-     *
-     */
     const handleGlobalDrop = () => {
       setIsDraggingPage(false);
       setIsHoveringHint(false);

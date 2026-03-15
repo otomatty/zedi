@@ -3,9 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi
 import { useTranslation } from "react-i18next";
 import { ProfileFormFields } from "@/components/settings/ProfileFormFields";
 
-/**
- *
- */
+/** Props for ProfileSettingsCard. プロフィール設定カードのプロパティ。 */
 export interface ProfileSettingsCardProps {
   profile: { displayName?: string; avatarUrl?: string };
   avatarUrl: string | undefined;
@@ -42,6 +40,7 @@ export function ProfileSettingsCard({
           onDisplayNameChange={(value) => updateProfileAndSave({ displayName: value })}
           onAvatarChange={onAvatarFileChange}
           onAvatarRemove={() => updateProfileAndSave({ avatarUrl: "" })}
+          hasCustomAvatar={!!profile.avatarUrl}
           fileInputRef={fileInputRef}
           idPrefix="profile"
         />

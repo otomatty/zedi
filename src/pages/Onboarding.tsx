@@ -137,6 +137,7 @@ const Onboarding: React.FC = () => {
                 onDisplayNameChange={(value) => updateProfile({ displayName: value })}
                 onAvatarChange={handleAvatarFileChange}
                 onAvatarRemove={() => updateProfile({ avatarUrl: "" })}
+                hasCustomAvatar={!!profile.avatarUrl}
                 fileInputRef={fileInputRef}
                 displayNameError={
                   displayNameInvalid ? t("onboarding.profile.displayNameRequired") : undefined
