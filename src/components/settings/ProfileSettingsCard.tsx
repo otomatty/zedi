@@ -11,7 +11,7 @@ export interface ProfileSettingsCardProps {
   updateProfileAndSave: (updates: { displayName?: string; avatarUrl?: string }) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onAvatarFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  /** Called when user removes avatar; parent should revoke blob URL and clear ref before updating. */
+  /** Called when user removes avatar; parent should revoke blob URL and clear ref before updating. / アバター削除時。親で blob URL を revoke し ref をクリアしてから更新すること。 */
   onAvatarRemove?: () => void;
 }
 

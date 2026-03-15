@@ -52,6 +52,7 @@ const Onboarding: React.FC = () => {
       const objectUrl = URL.createObjectURL(file);
       avatarObjectUrlRef.current = objectUrl;
       updateProfile({ avatarUrl: objectUrl });
+      e.currentTarget.value = "";
     },
     [updateProfile, profile.avatarUrl],
   );
@@ -74,6 +75,7 @@ const Onboarding: React.FC = () => {
       avatarObjectUrlRef.current = null;
     }
     updateProfile({ avatarUrl: "" });
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, [profile.avatarUrl, updateProfile]);
 
   const handleNext = useCallback(async () => {

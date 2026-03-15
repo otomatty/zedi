@@ -72,6 +72,11 @@ export const GeneralSettingsForm: React.FC = () => {
 
   const updateProfileAndSave = useCallback(
     (updates: Parameters<typeof updateProfile>[0]) => {
+      if (profileSavedAtTimeoutRef.current) {
+        clearTimeout(profileSavedAtTimeoutRef.current);
+        profileSavedAtTimeoutRef.current = null;
+      }
+      setProfileSavedAt(null);
       updateProfile(updates);
       scheduleProfileSave();
     },
@@ -93,6 +98,7 @@ export const GeneralSettingsForm: React.FC = () => {
       const objectUrl = URL.createObjectURL(file);
       avatarObjectUrlRef.current = objectUrl;
       updateProfileAndSave({ avatarUrl: objectUrl });
+      e.currentTarget.value = "";
     },
     [updateProfileAndSave, profile.avatarUrl],
   );
@@ -106,6 +112,7 @@ export const GeneralSettingsForm: React.FC = () => {
       avatarObjectUrlRef.current = null;
     }
     updateProfileAndSave({ avatarUrl: "" });
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, [updateProfileAndSave, profile.avatarUrl]);
 
   useEffect(() => {

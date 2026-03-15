@@ -1,6 +1,7 @@
 {
   "pageCountLabel": "Pages",
-  "totalPages": "{{count}} pages",
+  "totalPages_one": "{{count}} page",
+  "totalPages_other": "{{count}} pages",
   "period": {
     "all": "All time",
     "selectMonth": "Select period"

@@ -16,11 +16,11 @@ const SECTIONS: { id: SectionId; icon: React.ReactNode }[] = [
  * SettingsOverviewのプロパティ。ナビゲーション専用、summariesは非推奨。
  */
 export interface SettingsOverviewProps {
-  /** No longer displayed; kept for backward compatibility. Overview is navigation-only. */
+  /** No longer displayed; kept for backward compatibility. Overview is navigation-only. / 表示されなくなりました。互換性のため残しています。概要はナビ専用です。 */
   summaries?: Record<SectionId, string>;
 }
 
-/** Renders overview cards (navigation only). Section summaries are shown in SettingsSection. */
+/** Renders overview cards (navigation only). Section summaries are shown in SettingsSection. / 概要カードを表示（ナビゲーション専用）。セクション要約は SettingsSection で表示。 */
 export const SettingsOverview: React.FC<SettingsOverviewProps> = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();

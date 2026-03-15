@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
  * About card: app version and release notes link.
  * 一般設定のAboutカード
  */
-export function AboutCard() {
+export function AboutCard(): React.JSX.Element {
   const { t } = useTranslation();
   return (
     <Card>

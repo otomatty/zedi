@@ -60,9 +60,6 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
     };
   }, []);
 
-  /**
-   *
-   */
   const handleHintDragEnter = useCallback(() => {
     hintTimerRef.current = setTimeout(() => {
       openPanel();
@@ -72,9 +69,6 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
     setIsHoveringHint(true);
   }, [openPanel]);
 
-  /**
-   *
-   */
   const handleHintDragLeave = useCallback(() => {
     if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     setIsHoveringHint(false);
@@ -85,7 +79,7 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
       <>
         {children}
         {floatingAction && (
-          <div className="fixed bottom-0 right-0 z-40 flex flex-col items-end gap-1">
+          <div className="fixed bottom-0 right-0 z-40 flex flex-col items-end gap-1 p-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
             {floatingAction}
           </div>
         )}
@@ -110,7 +104,7 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
           {children}
         </div>
         {floatingAction && (
-          <div className="absolute bottom-0 right-0 z-40 flex flex-col items-end gap-1">
+          <div className="absolute bottom-0 right-0 z-40 flex flex-col items-end gap-1 p-2">
             {floatingAction}
           </div>
         )}

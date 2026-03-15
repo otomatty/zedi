@@ -12,19 +12,19 @@ import { useTranslation } from "react-i18next";
  */
 export interface ProfileFormFieldsProps {
   displayName: string;
-  /** Avatar image URL to display (may be blob URL while editing). */
+  /** Avatar image URL to display (may be blob URL while editing). / アバター画像URL（編集中は blob URL のことがある）。 */
   avatarDisplayUrl: string;
-  /** Fallback display name for avatar initial (e.g. from IdP). */
+  /** Fallback display name for avatar initial (e.g. from IdP). / アバター頭文字用の表示名（IdP 由来など）。 */
   displayNameForAvatar?: string;
   onDisplayNameChange: (value: string) => void;
   onAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onAvatarRemove: () => void;
-  /** When true, show the "Remove avatar" button (user has set a custom avatar). */
+  /** When true, show the "Remove avatar" button (user has set a custom avatar). / true のとき「アバターを削除」ボタンを表示。 */
   hasCustomAvatar: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  /** Optional error message below display name (e.g. "Display name is required"). */
+  /** Optional error message below display name (e.g. "Display name is required"). / 表示名の下に出す任意のエラーメッセージ。 */
   displayNameError?: string;
-  /** Optional id prefix for inputs (e.g. "onboarding" for onboarding-displayName). */
+  /** Optional id prefix for inputs (e.g. "onboarding" for onboarding-displayName). / 入力要素の id プレフィックス（例: onboarding）。 */
   idPrefix?: string;
   disabled?: boolean;
 }

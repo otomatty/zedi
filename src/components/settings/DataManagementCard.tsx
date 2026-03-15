@@ -25,7 +25,7 @@ import { runApiSync, resetSyncFailures } from "@/lib/sync";
  * Data management card: reset local database and re-sync.
  * 一般設定のデータ管理カード（ローカルDBリセット）
  */
-export function DataManagementCard() {
+export function DataManagementCard(): React.JSX.Element {
   const { t } = useTranslation();
   const { userId, getToken, isSignedIn } = useAuth();
   const queryClient = useQueryClient();

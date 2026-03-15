@@ -11,7 +11,7 @@ export type SectionSaveStatusState = "idle" | "saving" | "saved";
  * Props for SectionSaveStatus. セクション保存状態表示のプロパティ。
  */
 export interface SectionSaveStatusProps {
-  /** Current save status. Renders nothing when idle. */
+  /** Current save status. Renders nothing when idle. / 現在の保存状態。idle のときは何も表示しません。 */
   status: SectionSaveStatusState;
 }
 

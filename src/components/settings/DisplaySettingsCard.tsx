@@ -97,7 +97,9 @@ export function DisplaySettingsCard({
                         const value = e.target.value;
                         if (value === "") return;
                         const n = Number(value);
-                        if (!Number.isNaN(n)) updateCustomFontSizePx(n);
+                        if (Number.isNaN(n)) return;
+                        const clamped = Math.min(24, Math.max(12, Math.round(n)));
+                        updateCustomFontSizePx(clamped);
                       }}
                       className="h-9 w-20"
                     />

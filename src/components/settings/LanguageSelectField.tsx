@@ -12,9 +12,9 @@ import { LOCALE_OPTIONS, type UILocale } from "@/types/generalSettings";
 export interface LanguageSelectFieldProps {
   value: UILocale;
   onChange: (value: UILocale) => void;
-  /** Optional id for the select trigger (e.g. "onboarding-locale"). */
+  /** Optional id for the select trigger (e.g. "onboarding-locale"). / SelectTrigger の任意 id。 */
   id?: string;
-  /** Optional id for the label (for aria-labelledby). */
+  /** Optional id for the label (for aria-labelledby). / ラベルの任意 id（aria-labelledby 用）。 */
   labelId?: string;
   disabled?: boolean;
 }
