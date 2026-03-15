@@ -12,7 +12,8 @@ const SECTIONS: { id: SectionId; icon: React.ReactNode }[] = [
 ];
 
 /**
- *
+ * Props for SettingsOverview. Navigation-only; summaries are deprecated.
+ * SettingsOverviewのプロパティ。ナビゲーション専用、summariesは非推奨。
  */
 export interface SettingsOverviewProps {
   /** No longer displayed; kept for backward compatibility. Overview is navigation-only. */

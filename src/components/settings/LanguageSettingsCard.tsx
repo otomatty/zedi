@@ -5,7 +5,7 @@ import { LanguageSelectField } from "@/components/settings/LanguageSelectField";
 import type { UILocale } from "@/types/generalSettings";
 
 /**
- *
+ * Props for LanguageSettingsCard. 言語設定カードのプロパティ。
  */
 export interface LanguageSettingsCardProps {
   locale: UILocale;

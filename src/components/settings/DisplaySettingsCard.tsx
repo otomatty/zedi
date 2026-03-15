@@ -14,7 +14,7 @@ import {
 } from "@/types/generalSettings";
 
 /**
- *
+ * Props for DisplaySettingsCard. 表示設定カードのプロパティ。
  */
 export interface DisplaySettingsCardProps {
   theme: ThemeMode;

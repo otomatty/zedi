@@ -3,12 +3,12 @@ import { Check, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 /**
- *
+ * Save status for section indicator. セクション保存状態の型。
  */
 export type SectionSaveStatusState = "idle" | "saving" | "saved";
 
 /**
- *
+ * Props for SectionSaveStatus. セクション保存状態表示のプロパティ。
  */
 export interface SectionSaveStatusProps {
   /** Current save status. Renders nothing when idle. */

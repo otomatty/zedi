@@ -97,6 +97,17 @@ export const GeneralSettingsForm: React.FC = () => {
     [updateProfileAndSave, profile.avatarUrl],
   );
 
+  const handleAvatarRemove = useCallback(() => {
+    if (profile.avatarUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(profile.avatarUrl);
+    }
+    if (avatarObjectUrlRef.current) {
+      URL.revokeObjectURL(avatarObjectUrlRef.current);
+      avatarObjectUrlRef.current = null;
+    }
+    updateProfileAndSave({ avatarUrl: "" });
+  }, [updateProfileAndSave, profile.avatarUrl]);
+
   useEffect(() => {
     return () => {
       if (avatarObjectUrlRef.current) {
@@ -133,6 +144,7 @@ export const GeneralSettingsForm: React.FC = () => {
           updateProfileAndSave={updateProfileAndSave}
           fileInputRef={fileInputRef}
           onAvatarFileChange={handleAvatarFileChange}
+          onAvatarRemove={handleAvatarRemove}
         />
       )}
 

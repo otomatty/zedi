@@ -141,6 +141,11 @@ export function useAISettingsForm() {
   const handleReset = useCallback(() => {
     reset();
     setUseOwnKey(false);
+    setSavedAt(null);
+    if (savedAtTimeoutRef.current) {
+      clearTimeout(savedAtTimeoutRef.current);
+      savedAtTimeoutRef.current = null;
+    }
     toast({
       title: t("aiSettings.resetToast"),
       description: t("aiSettings.resetToastDescription"),

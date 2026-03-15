@@ -65,6 +65,17 @@ const Onboarding: React.FC = () => {
     };
   }, []);
 
+  const handleAvatarRemove = useCallback(() => {
+    if (profile.avatarUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(profile.avatarUrl);
+    }
+    if (avatarObjectUrlRef.current) {
+      URL.revokeObjectURL(avatarObjectUrlRef.current);
+      avatarObjectUrlRef.current = null;
+    }
+    updateProfile({ avatarUrl: "" });
+  }, [profile.avatarUrl, updateProfile]);
+
   const handleNext = useCallback(async () => {
     if (step === 1) {
       await saveProfile();
@@ -136,7 +147,7 @@ const Onboarding: React.FC = () => {
                 displayNameForAvatar={displayName}
                 onDisplayNameChange={(value) => updateProfile({ displayName: value })}
                 onAvatarChange={handleAvatarFileChange}
-                onAvatarRemove={() => updateProfile({ avatarUrl: "" })}
+                onAvatarRemove={handleAvatarRemove}
                 hasCustomAvatar={!!profile.avatarUrl}
                 fileInputRef={fileInputRef}
                 displayNameError={

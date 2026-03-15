@@ -11,6 +11,8 @@ export interface ProfileSettingsCardProps {
   updateProfileAndSave: (updates: { displayName?: string; avatarUrl?: string }) => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onAvatarFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Called when user removes avatar; parent should revoke blob URL and clear ref before updating. */
+  onAvatarRemove?: () => void;
 }
 
 /**
@@ -24,8 +26,10 @@ export function ProfileSettingsCard({
   updateProfileAndSave,
   fileInputRef,
   onAvatarFileChange,
+  onAvatarRemove,
 }: ProfileSettingsCardProps) {
   const { t } = useTranslation();
+  const handleAvatarRemove = onAvatarRemove ?? (() => updateProfileAndSave({ avatarUrl: "" }));
   return (
     <Card>
       <CardHeader>
@@ -39,7 +43,7 @@ export function ProfileSettingsCard({
           displayNameForAvatar={displayName}
           onDisplayNameChange={(value) => updateProfileAndSave({ displayName: value })}
           onAvatarChange={onAvatarFileChange}
-          onAvatarRemove={() => updateProfileAndSave({ avatarUrl: "" })}
+          onAvatarRemove={handleAvatarRemove}
           hasCustomAvatar={!!profile.avatarUrl}
           fileInputRef={fileInputRef}
           idPrefix="profile"

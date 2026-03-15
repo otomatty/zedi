@@ -90,6 +90,11 @@ export function useStorageSettingsForm() {
 
   const handleReset = useCallback(() => {
     reset();
+    setSavedAt(null);
+    if (savedAtTimeoutRef.current) {
+      clearTimeout(savedAtTimeoutRef.current);
+      savedAtTimeoutRef.current = null;
+    }
     toast({
       title: t("storageSettings.resetToast"),
       description: t("storageSettings.resetToastDescription"),
