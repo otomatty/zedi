@@ -18,7 +18,8 @@ export type { ContentError } from "./TiptapEditor/useContentSanitizer";
 export type { TiptapEditorProps } from "./TiptapEditor/types";
 
 /**
- *
+ * Tiptap を用いたページエディタ UI。
+ * Page editor UI using Tiptap.
  */
 const TiptapEditor: React.FC<TiptapEditorProps> = ({
   content,

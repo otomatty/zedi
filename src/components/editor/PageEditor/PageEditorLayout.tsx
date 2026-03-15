@@ -10,7 +10,8 @@ import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { WikiGeneratorStatus } from "./types";
 
 /**
- *
+ * PageEditorLayout コンポーネントの Props。
+ * Props for the PageEditorLayout component.
  */
 export interface PageEditorLayoutProps {
   title: string;
@@ -54,15 +55,10 @@ export interface PageEditorLayoutProps {
 }
 
 /**
- *
+ * ページエディタのレイアウトコンポーネント（ヘッダー・アラート・エディタ・ダイアログを統合）。
+ * Page editor layout component integrating header, alerts, editor content, and dialogs.
  */
-export /**
- *
- */
-const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
-  /**
-   *
-   */
+export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
   const {
     title,
     content,

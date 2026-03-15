@@ -19,10 +19,10 @@ export function usePageEditorWikiCollab(
     resetWikiBase();
   }, [resetWikiBase]);
 
+  const flushSave = collaboration?.flushSave;
   const onWikiContentApplied = useCallback(() => {
     setWikiContentForCollab(null);
-    collaboration?.flushSave?.();
-  }, [collaboration]);
+  }, [flushSave]);
 
   return { wikiContentForCollab, setWikiContentForCollab, resetWiki, onWikiContentApplied };
 }

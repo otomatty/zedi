@@ -106,7 +106,8 @@ function useEditorControllers(args: {
 }
 
 /**
- *
+ * Tiptapエディタの統合コントローラ（エディタ設定・サジェスト・画像アップロード・ライフサイクルを管理）。
+ * Unified controller for the Tiptap editor: setup, suggestions, image upload, and lifecycle management.
  */
 export function useTiptapEditorController({
   content,

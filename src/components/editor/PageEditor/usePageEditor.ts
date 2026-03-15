@@ -57,16 +57,11 @@ function buildLayoutProps(
 }
 
 /**
- *
+ * ページエディタのトップレベルフック。状態・ハンドラ・レイアウト props を統合する。
+ * Top-level page editor hook combining state, handlers, and layout props.
  */
 export function usePageEditor() {
-  /**
-   *
-   */
   const state = usePageEditorStateAndSync();
-  /**
-   *
-   */
   const handlers = usePageEditorHandlers({
     title: state.title,
     content: state.content,
@@ -81,15 +76,9 @@ export function usePageEditor() {
     location: state.location,
   });
 
-  /**
-   *
-   */
   const showLoading =
     (!state.isNewPage && state.isLoading) || (state.isNewPage && !state.isInitialized);
 
-  /**
-   *
-   */
   const layoutProps = buildLayoutProps(
     {
       title: state.title,

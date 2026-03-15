@@ -37,12 +37,10 @@ interface UsePageEditorEffectsOptions {
 }
 
 /**
- *
+ * ページエディタの副作用（ナビゲーション・初期化・Wiki生成反映・AIチャットコンテキスト設定）。
+ * Page editor side effects: navigation, initialization, wiki content sync, and AI chat context setup.
  */
 export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
-  /**
-   *
-   */
   const {
     isNewPage,
     currentPageId,
@@ -68,9 +66,6 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
     toast,
   } = options;
 
-  /**
-   *
-   */
   const { setPageContext, contentAppendHandlerRef } = useAIChatContext();
 
   // /page/new への直接アクセスはホームへリダイレクト
@@ -89,9 +84,6 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
 
   // URL から作成時: state で渡された initialContent をエディタに渡す
   useEffect(() => {
-    /**
-     *
-     */
     const state = location.state as {
       sourceUrl?: string;
       thumbnailUrl?: string | null;
@@ -106,9 +98,6 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
       return;
     }
 
-    /**
-     *
-     */
     const { sourceUrl: stateSourceUrl, thumbnailUrl: stateThumbnailUrl } = state;
     if (stateSourceUrl || stateThumbnailUrl) {
       setSourceUrl(stateSourceUrl || "");
@@ -151,9 +140,6 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
   // Wiki生成完了時に保存（React state + コラボ時は Y.Doc 用に別途渡す）
   useEffect(() => {
     if (wikiStatus === "completed") {
-      /**
-       *
-       */
       const tiptapContent = getTiptapContent();
       if (tiptapContent) {
         setContent(tiptapContent);

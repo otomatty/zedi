@@ -1,7 +1,7 @@
 import type { MutableRefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import { useImageUploadManager } from "./useImageUploadManager";
-import { useTiptapEditorStorageFeatures } from "./useTiptapEditorStorage";
+import type { useTiptapEditorStorageFeatures } from "./useTiptapEditorStorage";
 import type { TiptapEditorProps } from "./types";
 
 /**

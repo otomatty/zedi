@@ -25,7 +25,8 @@ interface UseEditorLifecycleOptions {
 }
 
 /**
- *
+ * エディタのライフサイクル管理（コンテンツ同期・読み取り専用切替・画像ペースト・WikiLink 同期）。
+ * Manages editor lifecycle: content sync, read-only toggling, image paste handling, and WikiLink status sync.
  */
 export function useEditorLifecycle({
   editor,
@@ -44,9 +45,6 @@ export function useEditorLifecycle({
   handleImageUpload,
   isEditorInitializedRef,
 }: UseEditorLifecycleOptions) {
-  /**
-   *
-   */
   const initialContentAppliedRef = useRef(false);
 
   useEffect(() => {
@@ -60,19 +58,10 @@ export function useEditorLifecycle({
   useEffect(() => {
     if (!editor || !collaborationConfig || !initialContent || initialContentAppliedRef.current)
       return;
-    /**
-     *
-     */
     const timer = setTimeout(() => {
       if (initialContentAppliedRef.current) return;
       // ProseMirror empty doc (doc + one empty paragraph) has nodeSize 4, not 2
-      /**
-       *
-       */
       const doc = editor.state.doc;
-      /**
-       *
-       */
       const isEmpty =
         doc.nodeSize <= 4 || (doc.childCount === 1 && (doc.firstChild?.content.size ?? 0) === 0);
       if (!isEmpty) return;
@@ -91,17 +80,14 @@ export function useEditorLifecycle({
   useEffect(() => {
     if (!editor || !collaborationConfig || !wikiContentForCollab) return;
     try {
-      /**
-       *
-       */
       const sanitizeResult = sanitizeTiptapContent(wikiContentForCollab);
-      /**
-       *
-       */
       const parsed = JSON.parse(sanitizeResult.content);
-      editor.commands.setContent(parsed);
-      isEditorInitializedRef.current = true;
-      onWikiContentApplied?.();
+      const currentContent = JSON.stringify(editor.getJSON());
+      if (currentContent !== sanitizeResult.content) {
+        editor.commands.setContent(parsed);
+        isEditorInitializedRef.current = true;
+        onWikiContentApplied?.();
+      }
     } catch (e) {
       console.error("[Wiki] Failed to apply wiki content in collab mode", e);
       onWikiContentApplied?.();

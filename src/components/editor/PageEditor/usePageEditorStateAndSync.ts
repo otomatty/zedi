@@ -41,46 +41,20 @@ function usePageEditorDeletionAndNav(
 }
 
 /**
- *
+ * ページエディタの状態管理・自動保存・副作用を統合するフック。
+ * Integrates page editor state management, auto-save, and side effects.
  */
 export function usePageEditorStateAndSync() {
-  /**
-   *
-   */
   const { id } = useParams<{ id: string }>();
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const location = useLocation();
-  /**
-   *
-   */
   const { toast } = useToast();
-  /**
-   *
-   */
   const isNewPage = id === "new";
-  /**
-   *
-   */
   const pageId = isNewPage ? "" : id || "";
 
-  /**
-   *
-   */
   const { data: page, isLoading, isError } = usePage(pageId);
-  /**
-   *
-   */
   const updatePageMutation = useUpdatePage();
 
-  /**
-   *
-   */
   const {
     title,
     content,
@@ -103,22 +77,13 @@ export function usePageEditorStateAndSync() {
     },
   });
 
-  /**
-   *
-   */
   const isLocalDocEnabled = Boolean(currentPageId && !isNewPage);
-  /**
-   *
-   */
   const collaboration = useCollaboration({
     pageId: currentPageId ?? "",
     enabled: isLocalDocEnabled,
     mode: "local",
   });
 
-  /**
-   *
-   */
   const { duplicatePage, errorMessage, validateTitle, initializeWithTitle, shouldBlockSave } =
     useTitleValidation({
       currentPageId: currentPageId || undefined,
@@ -126,9 +91,6 @@ export function usePageEditorStateAndSync() {
       debounceMs: 300,
     });
 
-  /**
-   *
-   */
   const {
     status: wikiStatus,
     error: wikiError,
@@ -139,20 +101,11 @@ export function usePageEditorStateAndSync() {
     getTiptapContent,
   } = useWikiGenerator();
 
-  /**
-   *
-   */
   const isWikiGenerating = wikiStatus === "generating";
 
-  /**
-   *
-   */
   const { wikiContentForCollab, setWikiContentForCollab, resetWiki, onWikiContentApplied } =
     usePageEditorWikiCollab(resetWikiBase, collaboration);
 
-  /**
-   *
-   */
   const {
     deleteConfirmOpen,
     deleteReason,
@@ -165,9 +118,6 @@ export function usePageEditorStateAndSync() {
     handleCopyMarkdown,
   } = usePageEditorDeletionAndNav(currentPageId, title, content, sourceUrl, shouldBlockSave);
 
-  /**
-   *
-   */
   const {
     saveChanges,
     lastSaved: autoSaveLastSaved,
@@ -178,9 +128,6 @@ export function usePageEditorStateAndSync() {
     updateLastSaved,
   });
 
-  /**
-   *
-   */
   const { displayLastSaved, pendingInitialContent, setPendingInitialContent } =
     useDisplayLastSavedAndPending(autoSaveLastSaved, lastSaved);
 
