@@ -1,22 +1,24 @@
 import React from "react";
 
+/**
+ *
+ */
 export type SettingsSectionId = "general" | "ai" | "storage";
 
 interface SettingsSectionProps {
   id: SettingsSectionId;
   title: string;
   description: string;
-  summary?: string;
   children: React.ReactNode;
 }
 
-export const SettingsSection: React.FC<SettingsSectionProps> = ({
-  id,
-  title,
-  description,
-  summary,
-  children,
-}) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, description, children }) => {
   return (
     <section
       id={`section-${id}`}
@@ -28,9 +30,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           {title}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        {summary != null && summary !== "" && (
-          <p className="mt-1 text-sm font-medium text-foreground">{summary}</p>
-        )}
       </div>
       <div>{children}</div>
     </section>

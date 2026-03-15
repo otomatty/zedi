@@ -10,11 +10,6 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-const mockSummaries = { general: "General summary", ai: "AI summary", storage: "Storage summary" };
-vi.mock("@/components/settings/useSettingsSummaries", () => ({
-  useSettingsSummaries: () => mockSummaries,
-}));
-
 vi.mock("@/components/settings/GeneralSettingsForm", () => ({
   GeneralSettingsForm: () => <div data-testid="general-form">GeneralSettingsForm</div>,
 }));
@@ -36,16 +31,6 @@ describe("Settings", () => {
     expect(screen.getByRole("heading", { name: "settings.title" })).toBeInTheDocument();
     const backLink = screen.getByRole("link", { name: "common.back" });
     expect(backLink).toHaveAttribute("href", "/home");
-  });
-
-  it("renders hub description", () => {
-    render(
-      <MemoryRouter initialEntries={["/settings"]}>
-        <Settings />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByText("settings.hubDescription")).toBeInTheDocument();
   });
 
   it("renders header nav and default general form", () => {

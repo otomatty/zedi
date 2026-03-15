@@ -66,17 +66,15 @@ export const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedd
 
   return (
     <Card>
-      {!embedded && (
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Image className="h-5 w-5" />
-            {t("storageSettings.title")}
-          </CardTitle>
-          <CardDescription>{t("storageSettings.description")}</CardDescription>
-        </CardHeader>
-      )}
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Image className="h-5 w-5" />
+          {t("storageSettings.title")}
+        </CardTitle>
+        <CardDescription>{t("storageSettings.description")}</CardDescription>
+      </CardHeader>
 
-      <CardContent className={embedded ? "space-y-6 pt-0" : "space-y-6"}>
+      <CardContent className="space-y-6">
         {embedded && saveStatus !== "idle" && <SectionSaveStatus status={saveStatus} />}
         <StorageSettingsFormContent
           useExternalStorage={useExternalStorage}

@@ -1,5 +1,5 @@
 import React from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Info } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -13,7 +13,10 @@ export function AboutCard(): React.JSX.Element {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("generalSettings.about.title")}</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Info className="h-5 w-5" />
+          {t("generalSettings.about.title")}
+        </CardTitle>
         <CardDescription>{t("generalSettings.about.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">

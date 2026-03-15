@@ -1,4 +1,5 @@
 import React from "react";
+import { Languages } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import { LanguageSelectField } from "@/components/settings/LanguageSelectField";
@@ -21,7 +22,10 @@ export function LanguageSettingsCard({ locale, onLocaleChange }: LanguageSetting
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("generalSettings.language.title")}</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Languages className="h-5 w-5" />
+          {t("generalSettings.language.title")}
+        </CardTitle>
         <CardDescription>{t("generalSettings.language.description")}</CardDescription>
       </CardHeader>
       <CardContent>

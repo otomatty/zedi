@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, Trash2, Key } from "lucide-react";
+import { Bot, Loader2, Trash2, Key } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Switch } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
@@ -71,14 +71,15 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 
   return (
     <Card>
-      {!embedded && (
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">{t("aiSettings.title")}</CardTitle>
-          <CardDescription>{t("aiSettings.description")}</CardDescription>
-        </CardHeader>
-      )}
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bot className="h-5 w-5" />
+          {t("aiSettings.title")}
+        </CardTitle>
+        <CardDescription>{t("aiSettings.description")}</CardDescription>
+      </CardHeader>
 
-      <CardContent className={embedded ? "space-y-6 pt-0" : "space-y-6"}>
+      <CardContent className="space-y-6">
         {embedded && saveStatus !== "idle" && <SectionSaveStatus status={saveStatus} />}
         {isServerMode && (
           <AISettingsFormServerSection

@@ -58,7 +58,7 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
       <nav
         role="navigation"
         aria-label={t("settings.summary.jumpTo")}
-        className={cn("hidden items-center gap-6 sm:flex", className)}
+        className={cn("hidden items-center gap-1 sm:flex", className)}
       >
         {SECTIONS.map(({ id, icon }) => {
           const isActive = value === id;
@@ -70,10 +70,12 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
               onClick={() => onChange(id)}
               aria-current={isActive ? "true" : undefined}
               className={cn(
-                "inline-flex flex-shrink-0 items-center gap-2 text-sm font-medium",
+                "inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium",
                 "ring-offset-background transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
               )}
             >
               {icon}
@@ -108,8 +110,8 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
                     "ring-offset-background transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     isActive
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
                   )}
                 >
                   {icon}

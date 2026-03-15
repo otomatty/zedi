@@ -7,7 +7,6 @@ import Container from "@/components/layout/Container";
 import { useTranslation } from "react-i18next";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { SettingsHeaderNav } from "@/components/settings/SettingsHeaderNav";
-import { useSettingsSummaries } from "@/components/settings/useSettingsSummaries";
 import { GeneralSettingsForm } from "@/components/settings/GeneralSettingsForm";
 import { AISettingsForm } from "@/components/settings/AISettingsForm";
 import { StorageSettingsForm } from "@/components/settings/StorageSettingsForm";
@@ -34,7 +33,6 @@ const Settings: React.FC = () => {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const section = searchParams.get("section");
-  const summaries = useSettingsSummaries();
   const returnTo = getSafeReturnTo(searchParams);
   const backTo = returnTo ?? "/home";
 
@@ -65,15 +63,12 @@ const Settings: React.FC = () => {
       <main className="py-6">
         <Container>
           <div className="mx-auto max-w-2xl space-y-6">
-            <p className="text-sm text-muted-foreground">{t("settings.hubDescription")}</p>
-
             <div>
               {currentSection === "general" && (
                 <SettingsSection
                   id="general"
                   title={t("settings.general.title")}
                   description={t("settings.general.description")}
-                  summary={summaries.general || undefined}
                 >
                   <GeneralSettingsForm />
                 </SettingsSection>
@@ -83,7 +78,6 @@ const Settings: React.FC = () => {
                   id="ai"
                   title={t("settings.ai.title")}
                   description={t("settings.ai.description")}
-                  summary={summaries.ai || undefined}
                 >
                   <AISettingsForm embedded />
                 </SettingsSection>
@@ -93,7 +87,6 @@ const Settings: React.FC = () => {
                   id="storage"
                   title={t("settings.storage.title")}
                   description={t("settings.storage.description")}
-                  summary={summaries.storage || undefined}
                 >
                   <StorageSettingsForm embedded />
                 </SettingsSection>

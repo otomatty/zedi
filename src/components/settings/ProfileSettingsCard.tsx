@@ -1,4 +1,5 @@
 import React from "react";
+import { User } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import { ProfileFormFields } from "@/components/settings/ProfileFormFields";
@@ -33,7 +34,10 @@ export function ProfileSettingsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("generalSettings.profile.title")}</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <User className="h-5 w-5" />
+          {t("generalSettings.profile.title")}
+        </CardTitle>
         <CardDescription>{t("generalSettings.profile.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
