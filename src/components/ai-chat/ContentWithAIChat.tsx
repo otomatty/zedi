@@ -13,13 +13,37 @@ interface ContentWithAIChatProps {
   floatingAction?: React.ReactNode;
 }
 
+/**
+ *
+ */
 export function ContentWithAIChat({ children, floatingAction }: ContentWithAIChatProps) {
+  /**
+   *
+   */
   const isMobile = useIsMobile();
+  /**
+   *
+   */
   const { isOpen, togglePanel, openPanel } = useAIChatStore();
+  /**
+   *
+   */
   const { setAIChatAvailable } = useAIChatContext();
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const [isDraggingPage, setIsDraggingPage] = useState(false);
+  /**
+   *
+   */
   const [isHoveringHint, setIsHoveringHint] = useState(false);
+  /**
+   *
+   */
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // このコンポーネントがマウントされている間、AIチャットが利用可能であることを通知
@@ -30,16 +54,25 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
 
   // Detect page drag globally (for showing hint zone when panel is closed)
   useEffect(() => {
+    /**
+     *
+     */
     const handleGlobalDragStart = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes(ZEDI_PAGE_MIME_TYPE)) {
         setIsDraggingPage(true);
       }
     };
+    /**
+     *
+     */
     const handleGlobalDragEnd = () => {
       setIsDraggingPage(false);
       setIsHoveringHint(false);
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     };
+    /**
+     *
+     */
     const handleGlobalDrop = () => {
       setIsDraggingPage(false);
       setIsHoveringHint(false);
@@ -56,6 +89,9 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
     };
   }, []);
 
+  /**
+   *
+   */
   const handleHintDragEnter = useCallback(() => {
     hintTimerRef.current = setTimeout(() => {
       openPanel();
@@ -65,6 +101,9 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
     setIsHoveringHint(true);
   }, [openPanel]);
 
+  /**
+   *
+   */
   const handleHintDragLeave = useCallback(() => {
     if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     setIsHoveringHint(false);
@@ -74,7 +113,11 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
     return (
       <>
         {children}
-        {floatingAction && <div className="fixed bottom-6 right-6 z-40">{floatingAction}</div>}
+        {floatingAction && (
+          <div className="fixed bottom-0 right-0 z-40 flex flex-col items-end gap-1">
+            {floatingAction}
+          </div>
+        )}
         <Drawer
           open={isOpen}
           onOpenChange={(open) => {
@@ -95,7 +138,11 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
         <div className="absolute inset-0 overflow-y-auto transition-all duration-300 ease-in-out">
           {children}
         </div>
-        {floatingAction && <div className="absolute bottom-6 right-6 z-40">{floatingAction}</div>}
+        {floatingAction && (
+          <div className="absolute bottom-0 right-0 z-40 flex flex-col items-end gap-1">
+            {floatingAction}
+          </div>
+        )}
       </div>
       <div
         className={cn(
