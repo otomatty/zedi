@@ -61,6 +61,9 @@ interface PageEditorContentProps {
   wikiStatus?: WikiGeneratorStatus;
   /** Wiki 生成コールバック */
   onGenerateWiki?: () => void;
+  /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied でクリア */
+  wikiContentForCollab?: string | null;
+  onWikiContentApplied?: () => void;
 }
 
 /**
@@ -88,6 +91,8 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   onInitialContentApplied,
   wikiStatus,
   onGenerateWiki,
+  wikiContentForCollab = null,
+  onWikiContentApplied,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
   const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
@@ -155,6 +160,8 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 focusContentRef={contentFocusRef}
                 initialContent={initialContent}
                 onInitialContentApplied={onInitialContentApplied}
+                wikiContentForCollab={wikiContentForCollab ?? undefined}
+                onWikiContentApplied={onWikiContentApplied}
               />
             </>
           )}

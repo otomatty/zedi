@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Editor } from "@tiptap/core";
+import { sanitizeTiptapContent } from "@/lib/contentUtils";
 import { useContentSanitizer } from "./useContentSanitizer";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
 import { usePasteImageHandler } from "./usePasteImageHandler";
@@ -17,10 +18,16 @@ interface UseEditorLifecycleOptions {
   focusContentRef: TiptapEditorProps["focusContentRef"];
   initialContent: TiptapEditorProps["initialContent"];
   onInitialContentApplied: TiptapEditorProps["onInitialContentApplied"];
+  wikiContentForCollab: TiptapEditorProps["wikiContentForCollab"];
+  onWikiContentApplied: TiptapEditorProps["onWikiContentApplied"];
   handleImageUpload: (files: FileList | File[]) => void;
   isEditorInitializedRef: React.MutableRefObject<boolean>;
 }
 
+/**
+ * エディタのライフサイクル管理（コンテンツ同期・読み取り専用切替・画像ペースト・WikiLink 同期）。
+ * Manages editor lifecycle: content sync, read-only toggling, image paste handling, and WikiLink status sync.
+ */
 export function useEditorLifecycle({
   editor,
   content,
@@ -33,6 +40,8 @@ export function useEditorLifecycle({
   focusContentRef,
   initialContent,
   onInitialContentApplied,
+  wikiContentForCollab,
+  onWikiContentApplied,
   handleImageUpload,
   isEditorInitializedRef,
 }: UseEditorLifecycleOptions) {
@@ -66,6 +75,30 @@ export function useEditorLifecycle({
     }, 200);
     return () => clearTimeout(timer);
   }, [editor, collaborationConfig, initialContent, onInitialContentApplied]);
+
+  // コラボモード時: Wiki生成内容を Y.Doc に反映する専用経路（content prop は useContentSanitizer でスキップされるため）
+  useEffect(() => {
+    if (!editor || !collaborationConfig || !wikiContentForCollab) return;
+    try {
+      const sanitizeResult = sanitizeTiptapContent(wikiContentForCollab);
+      const parsed = JSON.parse(sanitizeResult.content);
+      const currentContent = JSON.stringify(editor.getJSON());
+      if (currentContent !== sanitizeResult.content) {
+        editor.commands.setContent(parsed);
+        isEditorInitializedRef.current = true;
+        onWikiContentApplied?.();
+      }
+    } catch (e) {
+      console.error("[Wiki] Failed to apply wiki content in collab mode", e);
+      onWikiContentApplied?.();
+    }
+  }, [
+    editor,
+    collaborationConfig,
+    wikiContentForCollab,
+    onWikiContentApplied,
+    isEditorInitializedRef,
+  ]);
 
   usePasteImageHandler({ editor, handleImageUpload });
 
