@@ -19,10 +19,11 @@ function originFromReferer(referer: string): string | null {
   }
 }
 
-export /**
- *
+/**
+ * CSRF 対策: 状態変更リクエストの Origin / Referer を検証する。CORS 許可オリジンと一致しない場合は 403 を返す。
+ * CSRF protection: validates Origin or Referer for state-changing requests; returns 403 if not in allowed origins.
  */
-const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
+export const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
   /**
    *
    */

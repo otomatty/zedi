@@ -33,17 +33,18 @@ export function verifyPKCE(codeVerifier: string, codeChallenge: string): boolean
 }
 
 /**
- * ワンタイムコードを Redis に保存する。
- * Stores one-time authorization code in Redis with userId and code_challenge.
+ * ワンタイムコードを Redis に保存する。発行時の redirect_uri も保存し、交換時に照合する。
+ * Stores one-time authorization code in Redis with userId, code_challenge, and redirect_uri for exchange-time binding.
  */
 export async function storeExtensionCode(
   redis: Redis,
   code: string,
   userId: string,
   codeChallenge: string,
+  redirectUri: string,
 ): Promise<void> {
   const key = `ext:code:${code}`;
-  const value = JSON.stringify({ userId, codeChallenge });
+  const value = JSON.stringify({ userId, codeChallenge, redirectUri });
   await redis.setex(key, CODE_TTL_SEC, value);
 }
 
@@ -54,13 +55,13 @@ const CONSUME_SCRIPT = `
 `;
 
 /**
- * ワンタイムコードを原子的に取得・削除する。
- * Atomically retrieves and consumes (deletes) one-time code from Redis.
+ * ワンタイムコードを原子的に取得・削除する。保存されていた redirect_uri も返す。
+ * Atomically retrieves and consumes (deletes) one-time code from Redis; returns stored redirect_uri for binding check.
  */
 export async function consumeExtensionCode(
   redis: Redis,
   code: string,
-): Promise<{ userId: string; codeChallenge: string } | null> {
+): Promise<{ userId: string; codeChallenge: string; redirectUri: string } | null> {
   const key = `ext:code:${code}`;
   let raw: string | null = null;
   if (typeof (redis as { getdel?: (k: string) => Promise<string | null> }).getdel === "function") {
@@ -71,12 +72,14 @@ export async function consumeExtensionCode(
   }
   if (!raw) return null;
   try {
-    const { userId, codeChallenge } = JSON.parse(raw) as {
-      userId: string;
-      codeChallenge: string;
+    const parsed = JSON.parse(raw) as {
+      userId?: string;
+      codeChallenge?: string;
+      redirectUri?: string;
     };
-    if (!userId || !codeChallenge) return null;
-    return { userId, codeChallenge };
+    const { userId, codeChallenge, redirectUri } = parsed;
+    if (!userId || !codeChallenge || typeof redirectUri !== "string") return null;
+    return { userId, codeChallenge, redirectUri };
   } catch {
     return null;
   }
@@ -169,11 +172,15 @@ export async function verifyExtensionToken(token: string): Promise<ExtensionToke
     const scope = payload.scope as string[] | undefined;
     if (!sub || typeof sub !== "string") return null;
     if (!Array.isArray(scope) || !scope.includes(EXT_SCOPE)) return null;
+    const aud = payload.aud;
+    const exp = payload.exp;
+    if (typeof aud !== "string") return null;
+    if (typeof exp !== "number") return null;
     return {
       sub,
       scope,
-      aud: payload.aud as string,
-      exp: payload.exp as number,
+      aud,
+      exp,
     };
   } catch {
     return null;

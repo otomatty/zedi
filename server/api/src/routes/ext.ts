@@ -55,6 +55,9 @@ app.post("/session", async (c) => {
   if (!data) {
     throw new HTTPException(400, { message: "Invalid or expired code" });
   }
+  if (data.redirectUri !== redirectUri) {
+    throw new HTTPException(400, { message: "redirect_uri mismatch" });
+  }
 
   if (!verifyPKCE(body.code_verifier.trim(), data.codeChallenge)) {
     throw new HTTPException(400, { message: "PKCE verification failed" });
@@ -91,7 +94,7 @@ app.get("/authorize-code", authRequired, async (c) => {
 
   const userId = c.get("userId");
   const code = randomBytes(32).toString("base64url");
-  await storeExtensionCode(redis, code, userId, codeChallenge);
+  await storeExtensionCode(redis, code, userId, codeChallenge, redirectUri);
 
   return c.json({ code, state });
 });
@@ -123,7 +126,7 @@ app.post("/authorize-code", authRequired, async (c) => {
 
   const userId = c.get("userId");
   const code = randomBytes(32).toString("base64url");
-  await storeExtensionCode(redis, code, userId, body.code_challenge.trim());
+  await storeExtensionCode(redis, code, userId, body.code_challenge.trim(), redirectUri);
 
   return c.json({
     code,
@@ -157,8 +160,10 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
       thumbnail_url: result.thumbnail_url ?? undefined,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Clip failed";
-    throw new HTTPException(502, { message });
+    console.error("clip-and-create failed", err);
+    throw new HTTPException(502, {
+      message: "Failed to clip the URL. Please try again later.",
+    });
   }
 });
 

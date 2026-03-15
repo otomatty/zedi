@@ -64,7 +64,7 @@ function cleanupHtml(html: string, doc: Document): string {
       el.remove();
     });
   }
-  return div.innerHTML.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
+  return div.innerHTML.trim();
 }
 
 function extractTextFromTiptap(node: { text?: string; content?: unknown[] } | null): string {
@@ -79,7 +79,12 @@ function extractTextFromTiptap(node: { text?: string; content?: unknown[] } | nu
 }
 
 /**
+ * クリップ作成結果。作成されたページの ID・タイトル・サムネイル URL。
+ * Clip-and-create result: created page id, title, and optional thumbnail URL.
  *
+ * @property page_id - 作成されたページの一意 ID。Created page unique ID.
+ * @property title - ページタイトル。Page title.
+ * @property thumbnail_url - サムネイル画像 URL（任意）。Optional thumbnail image URL.
  */
 export interface ClipAndCreateResult {
   page_id: string;
@@ -88,7 +93,12 @@ export interface ClipAndCreateResult {
 }
 
 /**
+ * クリップ作成の入力。URL・ユーザー ID・DB インスタンス。
+ * Clip-and-create input: source URL, requesting user ID, and database instance.
  *
+ * @property url - クリップするソース URL（http/https のみ許可）。Source URL to clip (http/https only).
+ * @property userId - リクエストユーザー ID。Requesting user ID.
+ * @property db - Drizzle NodePgDatabase インスタンス。Drizzle NodePgDatabase instance.
  */
 export interface ClipAndCreateInput {
   url: string;
@@ -97,10 +107,19 @@ export interface ClipAndCreateInput {
 }
 
 /**
- * Fetch HTML, extract content, create page and Y.Doc content.
+ * URL から HTML を取得し、Readability で本文を抽出して Tiptap JSON → Y.Doc 化し、DB にページを作成する。
+ * Fetches HTML from URL, extracts content with Readability, converts to Tiptap JSON and Y.Doc, persists page to DB.
+ *
+ * @param input - クリップ対象 URL・ユーザー ID・DB。Source URL, userId, and db.
+ * @returns 作成されたページの page_id, title, thumbnail_url。Created page metadata.
+ * @throws URL が許可されていない、fetch 失敗、本文抽出失敗、DB エラー時に throw。Throws when URL disallowed, fetch fails, extraction fails, or DB error.
  */
 export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndCreateResult> {
   const { url, userId, db } = input;
+
+  if (!isClipUrlAllowed(url)) {
+    throw new Error("URL not allowed");
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);

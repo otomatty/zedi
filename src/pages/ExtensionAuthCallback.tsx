@@ -1,8 +1,10 @@
 /**
- * Chrome 拡張用認可コールバック
+ * Chrome extension authorization callback / Chrome 拡張用認可コールバック
  *
- * Better Auth 認証完了後に遷移。セッションがあればワンタイムコードを取得し、
- * redirect_uri?code=xxx&state=xxx へリダイレクトする。
+ * After Better Auth finishes, this page exchanges the current session for a one-time code
+ * and redirects to redirect_uri with code and state.
+ * Better Auth 認証完了後、このページは現在のセッションをワンタイムコードに交換し、
+ * code と state を付与して redirect_uri へリダイレクトします。
  */
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -14,8 +16,12 @@ function getApiBase(): string {
   return "";
 }
 
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
 /**
- *
+ * Extension auth callback page component / 拡張認証コールバックページコンポーネント
  */
 const ExtensionAuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -26,7 +32,9 @@ const ExtensionAuthCallback: React.FC = () => {
   const state = searchParams.get("state") ?? "";
 
   const paramError =
-    !redirectUri || !codeChallenge ? "redirect_uri and code_challenge are required" : null;
+    !redirectUri || !codeChallenge || !state
+      ? "redirect_uri, code_challenge, and state are required"
+      : null;
   const viewError = paramError ?? error;
 
   useEffect(() => {
@@ -38,22 +46,31 @@ const ExtensionAuthCallback: React.FC = () => {
         const params = new URLSearchParams();
         params.set("redirect_uri", redirectUri);
         params.set("code_challenge", codeChallenge);
-        if (state) params.set("state", state);
+        params.set("state", state);
 
         const res = await fetch(`${base}/api/ext/authorize-code?${params.toString()}`, {
           credentials: "include",
         });
 
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data.message ?? `Request failed: ${res.status}`);
+          const data: unknown = await res.json().catch(() => ({}));
+          const message =
+            isObject(data) && typeof data.message === "string"
+              ? data.message
+              : `Request failed: ${res.status}`;
+          setError(message);
           return;
         }
 
-        const { code } = (await res.json()) as { code: string; state?: string };
+        const body: unknown = await res.json();
+        if (!isObject(body) || typeof body.code !== "string" || body.code.length === 0) {
+          setError("Invalid authorize-code response");
+          return;
+        }
+        const { code } = body as { code: string };
         const target = new URL(redirectUri);
         target.searchParams.set("code", code);
-        if (state) target.searchParams.set("state", state);
+        target.searchParams.set("state", state);
 
         window.location.replace(target.toString());
       } catch (err) {

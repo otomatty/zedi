@@ -66,10 +66,14 @@ const Home: React.FC = () => {
 
       <ContentWithAIChat
         floatingAction={
-          <FloatingActionButton
-            initialClipUrl={validClipUrl ?? undefined}
-            onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
-          />
+          validClipUrl ? (
+            <FloatingActionButton
+              initialClipUrl={validClipUrl}
+              onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
+            />
+          ) : (
+            <FloatingActionButton />
+          )
         }
       >
         <main className="py-6">

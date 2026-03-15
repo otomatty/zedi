@@ -1,6 +1,7 @@
 /**
- * Zedi Web Clipper - Popup script
+ * Zedi Web Clipper - Popup script / Zedi Web Clipper - ポップアップスクリプト
  * Phase 2: OAuth + PKCE auth, POST /api/ext/clip-and-create for one-click save.
+ * フェーズ2: OAuth + PKCE 認証と、POST /api/ext/clip-and-create によるワンクリック保存。
  */
 (function () {
   const STORAGE_KEY = "zedi_ext_token";
@@ -55,12 +56,13 @@
     await chrome.storage.local.remove(STORAGE_KEY);
   }
 
-  function genRandom(len) {
-    const arr = new Uint8Array(len);
+  function genRandomBase64Url(byteLength) {
+    const arr = new Uint8Array(byteLength);
     crypto.getRandomValues(arr);
-    return Array.from(arr, (b) => b.toString(16).padStart(2, "0"))
-      .join("")
-      .slice(0, len);
+    return btoa(String.fromCharCode(...arr))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
   }
 
   async function sha256Base64url(str) {
@@ -74,9 +76,9 @@
   }
 
   async function launchOAuth() {
-    const codeVerifier = genRandom(43);
+    const codeVerifier = genRandomBase64Url(32);
     const codeChallenge = await sha256Base64url(codeVerifier);
-    const state = genRandom(16);
+    const state = genRandomBase64Url(16);
     const redirectUri = chrome.identity.getRedirectURL();
     const base = getApiBase();
     const params = new URLSearchParams({
@@ -135,9 +137,24 @@
     });
   }
 
+  function makeError(code, message) {
+    return Object.assign(new Error(message), { code });
+  }
+
+  function toUserMessage(err, fallback) {
+    switch (err?.code) {
+      case "SESSION_EXPIRED":
+        return "セッションの有効期限が切れました。再接続してください。";
+      case "NOT_AUTHENTICATED":
+        return "接続が必要です。";
+      default:
+        return fallback;
+    }
+  }
+
   async function clipAndCreate(url) {
     const token = await getStoredToken();
-    if (!token) throw new Error("Not authenticated");
+    if (!token) throw makeError("NOT_AUTHENTICATED", "Not authenticated");
     const base = getApiBase();
     const res = await fetch(`${base}/api/ext/clip-and-create`, {
       method: "POST",
@@ -149,7 +166,7 @@
     });
     if (res.status === 401) {
       await clearStoredToken();
-      throw new Error("Session expired");
+      throw makeError("SESSION_EXPIRED", "Session expired");
     }
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -201,8 +218,8 @@
           setTimeout(() => window.close(), 800);
         } catch (e) {
           statusEl.textContent = "";
-          errorEl.textContent = e.message || "保存に失敗しました";
-          if (e.message === "Session expired") {
+          errorEl.textContent = toUserMessage(e, "保存に失敗しました");
+          if (e?.code === "SESSION_EXPIRED") {
             connectBtn.style.display = "block";
             saveBtn.style.display = "none";
           } else {
@@ -223,7 +240,7 @@
           window.location.reload();
         } catch (e) {
           statusEl.textContent = "";
-          errorEl.textContent = e.message || "接続に失敗しました";
+          errorEl.textContent = toUserMessage(e, "接続に失敗しました");
           connectBtn.disabled = false;
         }
       });

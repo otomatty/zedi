@@ -11,12 +11,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/
 import { useAuth } from "@/hooks/useAuth";
 import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandlers";
 
-interface FloatingActionButtonProps {
-  /** URL from clipUrl query (Chrome extension). When set, opens Web Clipper with URL prefilled. */
-  initialClipUrl?: string | null;
-  /** Called when clip dialog opened from initialClipUrl is closed (for clearing URL). */
-  onClipDialogClosedWithInitialUrl?: () => void;
-}
+/** When initialClipUrl is provided, onClipDialogClosedWithInitialUrl is required so the dialog can be closed and URL cleared. */
+type FloatingActionButtonProps =
+  | {
+      initialClipUrl?: null;
+      onClipDialogClosedWithInitialUrl?: never;
+    }
+  | {
+      initialClipUrl: string;
+      onClipDialogClosedWithInitialUrl: () => void;
+    };
 
 /**
  * ホーム用フローティングアクションボタン。新規・URL・画像作成メニューを表示する。

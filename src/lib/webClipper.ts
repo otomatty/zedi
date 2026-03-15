@@ -43,23 +43,34 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * Chrome拡張・clipUrl連携で許可するURLかどうかを検証。
- * 許可: http/https のみ。
- * 除外: chrome://, about:, file://, localhost, プライベートIP。
- * Validates clipUrl from Chrome extension etc. Allows http/https only; excludes chrome://, about:, file://, localhost, private IP.
+ * Chrome拡張・clipUrl連携で許可するURLかどうかを検証。サーバー側 clipUrlPolicy と同一ルール。
+ * 許可: http/https のみ。除外: localhost, loopback, プライベートIP, link-local, .local, chrome/about/file。
+ * Validates clipUrl from Chrome extension etc. Same rules as server clipUrlPolicy. Allows http/https only; rejects localhost, loopback, private IP, link-local, .local.
  */
 export function isClipUrlAllowed(url: string): boolean {
   if (!url?.trim()) return false;
   try {
     const parsed = new URL(url.trim());
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-    const hostname = parsed.hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return false;
+    let hostname = parsed.hostname.toLowerCase();
+    if (hostname.startsWith("[") && hostname.endsWith("]")) {
+      hostname = hostname.slice(1, -1);
+    }
+    if (hostname === "localhost" || /^127\./.test(hostname) || hostname === "::1") return false;
+    if (
+      hostname === "0.0.0.0" ||
+      hostname === "::" ||
+      hostname === "0000:0000:0000:0000:0000:0000:0000:0000"
+    )
+      return false;
     if (hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
     if (/^chrome\.?|^about$|^file$/i.test(hostname)) return false;
+    if (/^::ffff:/i.test(hostname)) return false;
     // RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
     if (/^10\.|^192\.168\./.test(hostname)) return false;
     if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(hostname)) return false;
+    if (/^169\.254\./.test(hostname)) return false;
+    if (/^fe80:/i.test(hostname)) return false;
     return true;
   } catch {
     return false;

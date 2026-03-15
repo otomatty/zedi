@@ -38,7 +38,7 @@ const ExtensionAuth: React.FC = () => {
     }
   };
 
-  const hasParams = redirectUri && codeChallenge;
+  const hasParams = Boolean(redirectUri && codeChallenge && state);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -58,7 +58,9 @@ const ExtensionAuth: React.FC = () => {
           {!hasParams ? (
             <div className="text-center">
               <h1 className="mb-2 text-xl font-bold text-foreground">Invalid request</h1>
-              <p className="text-muted-foreground">redirect_uri and code_challenge are required.</p>
+              <p className="text-muted-foreground">
+                redirect_uri, code_challenge, and state are required.
+              </p>
             </div>
           ) : (
             <>
