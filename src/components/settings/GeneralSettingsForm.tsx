@@ -1,5 +1,4 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "@zedi/ui/components/sonner";
 import { useTranslation } from "react-i18next";
@@ -42,16 +41,11 @@ export const GeneralSettingsForm: React.FC = () => {
   } = useProfile();
 
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarObjectUrlRef = useRef<string | null>(null);
   const [profileSavedAt, setProfileSavedAt] = useState<number | null>(null);
   const profileSavedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleRunTourAgain = useCallback(() => {
-    navigate("/home", { state: { startTour: true } });
-  }, [navigate]);
 
   const isLoading = isGeneralLoading || isProfileLoading;
 
@@ -163,7 +157,6 @@ export const GeneralSettingsForm: React.FC = () => {
         updateTheme={updateTheme}
         updateEditorFontSize={updateEditorFontSize}
         updateCustomFontSizePx={updateCustomFontSizePx}
-        onRunTourAgain={handleRunTourAgain}
       />
 
       <LanguageSettingsCard locale={settings.locale} onLocaleChange={updateLocale} />
