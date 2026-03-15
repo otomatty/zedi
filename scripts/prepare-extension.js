@@ -12,7 +12,12 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const env = process.argv[2] || "prod";
+const envArg = process.argv[2] ?? "prod";
+if (envArg !== "dev" && envArg !== "prod") {
+  console.error(`[prepare-extension] Invalid env: ${envArg}. Use "dev" or "prod".`);
+  process.exit(1);
+}
+const env = envArg;
 const prodUrl = "https://zedi-note.app";
 const devUrl = "https://dev.zedi-note.app";
 const apiBase = env === "dev" ? devUrl : prodUrl;

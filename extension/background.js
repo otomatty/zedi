@@ -44,19 +44,23 @@ async function clipAndCreate(url) {
   const token = await getStoredToken();
   if (!token) return false;
   const base = getApiBase();
-  const res = await fetch(`${base}/api/ext/clip-and-create`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ url }),
-  });
-  if (res.status === 401) {
-    clearStoredToken();
+  try {
+    const res = await fetch(`${base}/api/ext/clip-and-create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ url }),
+    });
+    if (res.status === 401) {
+      clearStoredToken();
+      return false;
+    }
+    return res.ok;
+  } catch {
     return false;
   }
-  return res.ok;
 }
 
 function openZediWithClipUrl(url) {

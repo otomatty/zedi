@@ -39,10 +39,13 @@ const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
   /**
    *
    */
-  const excludedPrefixes = ["/api/webhooks/", "/api/ext/session", "/api/ext/clip-and-create"];
-  if (excludedPrefixes.some((prefix) => path.startsWith(prefix))) {
-    return next();
-  }
+  const excludedPrefixes = ["/api/webhooks/"];
+  /**
+   *
+   */
+  const exactExcluded = ["/api/ext/session", "/api/ext/clip-and-create"];
+  if (excludedPrefixes.some((prefix) => path.startsWith(prefix))) return next();
+  if (exactExcluded.includes(path)) return next();
 
   /**
    *

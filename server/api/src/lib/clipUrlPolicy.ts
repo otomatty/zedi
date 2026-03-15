@@ -15,9 +15,17 @@ export function isClipUrlAllowed(url: string): boolean {
     if (hostname.startsWith("[") && hostname.endsWith("]")) {
       hostname = hostname.slice(1, -1);
     }
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return false;
+    if (hostname === "localhost" || /^127\./.test(hostname) || hostname === "::1") return false;
+    if (
+      hostname === "0.0.0.0" ||
+      hostname === "::" ||
+      hostname === "0000:0000:0000:0000:0000:0000:0000:0000"
+    )
+      return false;
     if (hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
     if (/^chrome\.?|^about$|^file$/i.test(hostname)) return false;
+    // IPv4-mapped IPv6 (::ffff:x.x.x.x) — reject all to prevent bypasses
+    if (/^::ffff:/i.test(hostname)) return false;
     // RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
     if (/^10\.|^192\.168\./.test(hostname)) return false;
     if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(hostname)) return false;

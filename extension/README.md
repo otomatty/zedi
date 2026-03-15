@@ -59,6 +59,11 @@ extension/
 - Zedi アカウント（https://zedi-note.app または dev.zedi-note.app）
 - 保存対象 URL は `http://` または `https://` のみ。`localhost`・`chrome://`・プライベート IP は不可。
 
+## サーバー側 CORS / Server CORS
+
+拡張から API を呼ぶには、API の `CORS_ORIGIN` に拡張の origin を明示する必要があります。Chrome の `chrome://extensions` で拡張 ID を確認し、`CORS_ORIGIN` に `chrome-extension://<そのID>` を追加してください（カンマ区切り）。  
+To allow the extension to call the API, add the extension origin to the server's `CORS_ORIGIN` (e.g. `chrome-extension://<extension-id>` from Chrome's extensions page).
+
 ## ライセンス / License
 
 本リポジトリのルート `LICENSE` に準拠。

@@ -60,7 +60,9 @@ function cleanupHtml(html: string, doc: Document): string {
 
   const unwanted = ["script", "style", "noscript", "iframe", "object", "embed", "form"];
   for (const sel of unwanted) {
-    div.querySelectorAll(sel).forEach((el) => el.remove());
+    div.querySelectorAll(sel).forEach((el) => {
+      el.remove();
+    });
   }
   return div.innerHTML.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
 }
@@ -142,7 +144,7 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
 
   const cleanContent = cleanupHtml(article.content ?? "", document);
 
-  return await clipDocMutex.runExclusive(async () => {
+  const { title, contentText, ydocBase64 } = await clipDocMutex.runExclusive(async () => {
     const prevDocument = (globalThis as { document?: Document }).document;
     (globalThis as { document?: Document }).document = document;
     try {
@@ -176,33 +178,35 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
       const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
       const title = article.title || "Untitled";
 
-      const [page] = await db
-        .insert(pages)
-        .values({
-          ownerId: userId,
-          title,
-          contentPreview: contentText || null,
-          sourceUrl: finalUrl,
-          thumbnailUrl: thumbnailUrl ?? null,
-        })
-        .returning({ id: pages.id });
-
-      if (!page) throw new Error("Failed to create page");
-
-      await db.insert(pageContents).values({
-        pageId: page.id,
-        ydocState: Buffer.from(ydocBase64, "base64"),
-        version: 1,
-        contentText: contentText || null,
-      });
-
-      return {
-        page_id: page.id,
-        title,
-        thumbnail_url: thumbnailUrl ?? null,
-      };
+      return { title, contentText, ydocBase64 };
     } finally {
       (globalThis as { document?: Document }).document = prevDocument;
     }
   });
+
+  const [page] = await db
+    .insert(pages)
+    .values({
+      ownerId: userId,
+      title,
+      contentPreview: contentText || null,
+      sourceUrl: finalUrl,
+      thumbnailUrl: thumbnailUrl ?? null,
+    })
+    .returning({ id: pages.id });
+
+  if (!page) throw new Error("Failed to create page");
+
+  await db.insert(pageContents).values({
+    pageId: page.id,
+    ydocState: Buffer.from(ydocBase64, "base64"),
+    version: 1,
+    contentText: contentText || null,
+  });
+
+  return {
+    page_id: page.id,
+    title,
+    thumbnail_url: thumbnailUrl ?? null,
+  };
 }

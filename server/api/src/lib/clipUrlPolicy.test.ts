@@ -30,9 +30,11 @@ describe("clipUrlPolicy", () => {
       expect(isClipUrlAllowed("https://localhost/path")).toBe(false);
     });
 
-    it("returns false for 127.0.0.1", () => {
+    it("returns false for 127.0.0.0/8 (loopback)", () => {
       expect(isClipUrlAllowed("http://127.0.0.1")).toBe(false);
       expect(isClipUrlAllowed("http://127.0.0.1:8080/page")).toBe(false);
+      expect(isClipUrlAllowed("http://127.0.0.2")).toBe(false);
+      expect(isClipUrlAllowed("http://127.255.255.255")).toBe(false);
     });
 
     it("returns false for ::1 (IPv6 loopback)", () => {
@@ -75,6 +77,14 @@ describe("clipUrlPolicy", () => {
     it("returns false for IPv6 link-local (fe80:)", () => {
       expect(isClipUrlAllowed("http://[fe80::1]")).toBe(false);
       expect(isClipUrlAllowed("http://[fe80::2%eth0]")).toBe(false);
+    });
+
+    it("returns false for 0.0.0.0, [::], IPv4-mapped IPv6", () => {
+      expect(isClipUrlAllowed("http://0.0.0.0")).toBe(false);
+      expect(isClipUrlAllowed("http://0.0.0.0:8080/")).toBe(false);
+      expect(isClipUrlAllowed("http://[::]/")).toBe(false);
+      expect(isClipUrlAllowed("http://[::ffff:127.0.0.1]/")).toBe(false);
+      expect(isClipUrlAllowed("http://[::ffff:10.0.0.1]/")).toBe(false);
     });
 
     it("returns false for non-http(s) protocols", () => {

@@ -54,7 +54,6 @@ export function createApp(): Hono<AppEnv> {
     cors({
       origin: (origin) => {
         if (wildcard) return "*";
-        if (origin?.startsWith("chrome-extension://")) return origin;
         return origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
       },
       allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],

@@ -139,7 +139,13 @@ export async function issueExtensionToken(userId: string): Promise<{
 }
 
 /**
+ * 拡張用 JWT のペイロード形状。
+ * Extension JWT token payload shape.
  *
+ * @property sub - 主体（ユーザー ID）。Subject (user ID).
+ * @property scope - 付与されたスコープ配列。Granted scope array (e.g. clip:create).
+ * @property aud - 想定オーディエンス（例: zedi-extension）。Intended audience.
+ * @property exp - 有効期限（UNIX 秒）。Expiration time (UNIX seconds).
  */
 export interface ExtensionTokenPayload {
   sub: string;

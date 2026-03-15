@@ -104,7 +104,7 @@ describe("extAuth", () => {
   });
 
   describe("issueExtensionToken / verifyExtensionToken", () => {
-    const secret = "test-secret-for-jwt-min-32-chars";
+    const secret = "x".repeat(48);
 
     beforeEach(() => {
       process.env.BETTER_AUTH_SECRET = secret;
