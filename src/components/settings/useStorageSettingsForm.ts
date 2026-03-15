@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
@@ -6,8 +6,19 @@ import { useStorageSettings } from "@/hooks/useStorageSettings";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import type { StorageSettings } from "@/types/storage";
 
+const SAVED_INDICATOR_MS = 3000;
+
+/**
+ *
+ */
 export function useStorageSettingsForm() {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const {
     settings,
     isLoading,
@@ -21,17 +32,38 @@ export function useStorageSettingsForm() {
     reset,
   } = useStorageSettings();
 
+  /**
+   *
+   */
   const [showSecrets, setShowSecrets] = useState(false);
+  /**
+   *
+   */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  /**
+   *
+   */
+  const savedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   *
+   */
   const { toast } = useToast();
 
+  /**
+   *
+   */
   const runSave = useCallback(async () => {
+    /**
+     *
+     */
     const success = await save();
     if (success) {
-      sonnerToast.success(t("storageSettings.savedToast"), {
-        description: t("storageSettings.savedToastDescription"),
-      });
-      // Do not navigate(returnTo) here: on the settings hub both hooks are mounted,
-      // so auto-navigate would redirect after first save. Use the hub's back button instead.
+      setSavedAt(Date.now());
+      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
+      savedAtTimeoutRef.current = setTimeout(() => {
+        setSavedAt(null);
+        savedAtTimeoutRef.current = null;
+      }, SAVED_INDICATOR_MS);
     } else {
       sonnerToast.error(t("common.error"), {
         description: t("storageSettings.saveFailedToastDescription"),
@@ -39,8 +71,14 @@ export function useStorageSettingsForm() {
     }
   }, [save, t]);
 
+  /**
+   *
+   */
   const scheduleSave = useDebouncedCallback(runSave, 800);
 
+  /**
+   *
+   */
   const updateSettings = useCallback(
     (updates: Partial<StorageSettings>) => {
       updateSettingsBase(updates);
@@ -49,6 +87,9 @@ export function useStorageSettingsForm() {
     [updateSettingsBase, scheduleSave],
   );
 
+  /**
+   *
+   */
   const updateConfig = useCallback(
     (updates: Partial<StorageSettings["config"]>) => {
       updateConfigBase(updates);
@@ -57,7 +98,13 @@ export function useStorageSettingsForm() {
     [updateConfigBase, scheduleSave],
   );
 
+  /**
+   *
+   */
   const handleTest = useCallback(async () => {
+    /**
+     *
+     */
     const result = await test();
     if (result.success) {
       toast({
@@ -73,6 +120,9 @@ export function useStorageSettingsForm() {
     }
   }, [test, toast, t]);
 
+  /**
+   *
+   */
   const handleReset = useCallback(() => {
     reset();
     toast({
@@ -87,6 +137,7 @@ export function useStorageSettingsForm() {
     isSaving,
     isTesting,
     testResult,
+    savedAt,
     showSecrets,
     setShowSecrets,
     updateSettings,

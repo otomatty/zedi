@@ -1,16 +1,13 @@
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 import { Button } from "@zedi/ui";
-import { Input } from "@zedi/ui";
-import { Label } from "@zedi/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
-import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useProfile } from "@/hooks/useProfile";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
-import { LOCALE_OPTIONS, type UILocale } from "@/types/generalSettings";
+import { ProfileFormFields } from "@/components/settings/ProfileFormFields";
+import { LanguageSelectField } from "@/components/settings/LanguageSelectField";
 
 const STEPS = [1, 2, 3] as const;
 type StepNum = (typeof STEPS)[number];
@@ -39,16 +36,34 @@ const Onboarding: React.FC = () => {
   const { settings, isLoading: isSettingsLoading, updateLocale } = useGeneralSettings();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarObjectUrlRef = useRef<string | null>(null);
 
   const handleAvatarFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (profile.avatarUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(profile.avatarUrl);
+      }
+      if (avatarObjectUrlRef.current) {
+        URL.revokeObjectURL(avatarObjectUrlRef.current);
+        avatarObjectUrlRef.current = null;
+      }
       const objectUrl = URL.createObjectURL(file);
+      avatarObjectUrlRef.current = objectUrl;
       updateProfile({ avatarUrl: objectUrl });
     },
-    [updateProfile],
+    [updateProfile, profile.avatarUrl],
   );
+
+  useEffect(() => {
+    return () => {
+      if (avatarObjectUrlRef.current) {
+        URL.revokeObjectURL(avatarObjectUrlRef.current);
+        avatarObjectUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const handleNext = useCallback(async () => {
     if (step === 1) {
@@ -115,77 +130,19 @@ const Onboarding: React.FC = () => {
                   {t("onboarding.profile.description")}
                 </p>
               </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="onboarding-displayName">
-                    {t("generalSettings.profile.displayName")}
-                  </Label>
-                  <Input
-                    id="onboarding-displayName"
-                    value={profile.displayName}
-                    onChange={(e) => updateProfile({ displayName: e.target.value })}
-                    placeholder={t("generalSettings.profile.displayNamePlaceholder")}
-                    maxLength={100}
-                    aria-invalid={displayNameInvalid}
-                    aria-describedby={
-                      displayNameInvalid ? "onboarding-displayName-error" : undefined
-                    }
-                  />
-                  {displayNameInvalid && (
-                    <p
-                      id="onboarding-displayName-error"
-                      className="text-xs text-destructive"
-                      role="alert"
-                    >
-                      {t("onboarding.profile.displayNameRequired")}
-                    </p>
-                  )}
-                  {!displayNameInvalid && (
-                    <p className="text-xs text-muted-foreground">
-                      {t("generalSettings.profile.displayNameHelp")}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("generalSettings.profile.avatar")}</Label>
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={profile.avatarUrl || avatarUrl} alt={displayName} />
-                      <AvatarFallback className="text-lg">
-                        {displayName?.charAt(0) ?? "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        {t("generalSettings.profile.avatarUpload")}
-                      </Button>
-                      {profile.avatarUrl && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          onClick={() => updateProfile({ avatarUrl: "" })}
-                        >
-                          {t("generalSettings.profile.avatarRemove")}
-                        </Button>
-                      )}
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarFileChange}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-              </div>
+              <ProfileFormFields
+                displayName={profile.displayName}
+                avatarDisplayUrl={profile.avatarUrl || avatarUrl}
+                displayNameForAvatar={displayName}
+                onDisplayNameChange={(value) => updateProfile({ displayName: value })}
+                onAvatarChange={handleAvatarFileChange}
+                onAvatarRemove={() => updateProfile({ avatarUrl: "" })}
+                fileInputRef={fileInputRef}
+                displayNameError={
+                  displayNameInvalid ? t("onboarding.profile.displayNameRequired") : undefined
+                }
+                idPrefix="onboarding"
+              />
             </>
           )}
 
@@ -198,25 +155,12 @@ const Onboarding: React.FC = () => {
                   {t("onboarding.language.description")}
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label id="onboarding-locale-label">{t("generalSettings.language.label")}</Label>
-                <Select value={settings.locale} onValueChange={(v) => updateLocale(v as UILocale)}>
-                  <SelectTrigger
-                    id="onboarding-locale"
-                    aria-labelledby="onboarding-locale-label"
-                    className="w-full"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LOCALE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <LanguageSelectField
+                value={settings.locale}
+                onChange={updateLocale}
+                id="onboarding-locale"
+                labelId="onboarding-locale-label"
+              />
             </>
           )}
 

@@ -25,6 +25,9 @@ function getSafeReturnTo(searchParams: URLSearchParams): string | null {
   return returnTo;
 }
 
+/**
+ *
+ */
 const Settings: React.FC = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -63,7 +66,7 @@ const Settings: React.FC = () => {
           <div className="mx-auto max-w-2xl space-y-10">
             <p className="text-sm text-muted-foreground">{t("settings.hubDescription")}</p>
 
-            <SettingsOverview summaries={summaries} />
+            <SettingsOverview />
 
             <SettingsSection
               id="general"

@@ -14,6 +14,7 @@ import {
   AlertDialogTrigger,
 } from "@zedi/ui";
 import { useStorageSettingsForm } from "./useStorageSettingsForm";
+import { SectionSaveStatus } from "./SectionSaveStatus";
 import { getStorageProviderById, STORAGE_PROVIDERS } from "@/types/storage";
 import { useTranslation } from "react-i18next";
 import { StorageSettingsFormContent } from "./StorageSettingsFormContent";
@@ -23,14 +24,27 @@ interface StorageSettingsFormProps {
   embedded?: boolean;
 }
 
-export const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedded = false }) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedded = false }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const {
     settings,
     isLoading,
     isSaving,
     isTesting,
     testResult,
+    savedAt,
     showSecrets,
     setShowSecrets,
     updateSettings,
@@ -39,10 +53,30 @@ export const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedd
     handleReset,
   } = useStorageSettingsForm();
 
+  /**
+   *
+   */
+  const saveStatus = isSaving ? "saving" : savedAt != null ? "saved" : "idle";
+
+  /**
+   *
+   */
   const useExternalStorage = settings.preferDefaultStorage === false;
+  /**
+   *
+   */
   const isLegacyCloudflareR2 = (settings.provider as string) === "cloudflare-r2";
+  /**
+   *
+   */
   const effectiveProvider = isLegacyCloudflareR2 ? "s3" : settings.provider;
+  /**
+   *
+   */
   const useExternalStorageEffective = useExternalStorage && !isLegacyCloudflareR2;
+  /**
+   *
+   */
   const currentProvider =
     getStorageProviderById(useExternalStorageEffective ? effectiveProvider : "s3") ??
     STORAGE_PROVIDERS[0];
@@ -70,6 +104,7 @@ export const StorageSettingsForm: React.FC<StorageSettingsFormProps> = ({ embedd
       )}
 
       <CardContent className={embedded ? "space-y-6 pt-0" : "space-y-6"}>
+        {embedded && saveStatus !== "idle" && <SectionSaveStatus status={saveStatus} />}
         <StorageSettingsFormContent
           useExternalStorage={useExternalStorage}
           useExternalStorageEffective={useExternalStorageEffective}

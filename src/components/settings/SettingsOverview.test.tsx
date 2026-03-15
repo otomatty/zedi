@@ -10,17 +10,11 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-const mockSummaries = {
-  general: "Theme · Font · Locale",
-  ai: "Server mode · Configured",
-  storage: "Default · Not tested",
-};
-
 function renderWithRouter(initialEntries: string[] = ["/settings"]) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
-        <Route path="/settings" element={<SettingsOverview summaries={mockSummaries} />} />
+        <Route path="/settings" element={<SettingsOverview />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -51,12 +45,5 @@ describe("SettingsOverview", () => {
     const generalLink = screen.getByRole("link", { name: /settings\.general\.title/ });
     expect(generalLink.getAttribute("href")).toContain("returnTo=%2Fhome");
     expect(generalLink.getAttribute("href")).toContain("section=general");
-  });
-
-  it("renders summary text for each section when provided", () => {
-    renderWithRouter();
-    expect(screen.getByText("Theme · Font · Locale")).toBeInTheDocument();
-    expect(screen.getByText("Server mode · Configured")).toBeInTheDocument();
-    expect(screen.getByText("Default · Not tested")).toBeInTheDocument();
   });
 });
