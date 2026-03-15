@@ -26,6 +26,7 @@ interface UsePageEditorEffectsOptions {
   location: ReturnType<typeof useLocation>;
   initialize: (page: Page) => void;
   setContent: (content: string) => void;
+  setWikiContentForCollab: (content: string | null) => void;
   setSourceUrl: (url: string | undefined) => void;
   setPendingInitialContent: (content: string | null) => void;
   getTiptapContent: () => string | null;
@@ -35,6 +36,10 @@ interface UsePageEditorEffectsOptions {
   toast: (opts: { title: string; variant?: "destructive" }) => void;
 }
 
+/**
+ * ページエディタの副作用（ナビゲーション・初期化・Wiki生成反映・AIチャットコンテキスト設定）。
+ * Page editor side effects: navigation, initialization, wiki content sync, and AI chat context setup.
+ */
 export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
   const {
     isNewPage,
@@ -51,6 +56,7 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
     location,
     initialize,
     setContent,
+    setWikiContentForCollab,
     setSourceUrl,
     setPendingInitialContent,
     getTiptapContent,
@@ -123,25 +129,36 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
     }
   }, [isNewPage, isError, navigate, toast]);
 
-  // Wiki生成中のコンテンツをエディターに反映
+  // Wiki生成中のコンテンツをエディターに反映（React state + コラボ時は Y.Doc 用に別途渡す）
   useEffect(() => {
     if (isWikiGenerating && throttledTiptapContent) {
       setContent(throttledTiptapContent);
+      setWikiContentForCollab(throttledTiptapContent);
     }
-  }, [isWikiGenerating, throttledTiptapContent, setContent]);
+  }, [isWikiGenerating, throttledTiptapContent, setContent, setWikiContentForCollab]);
 
-  // Wiki生成完了時に保存
+  // Wiki生成完了時に保存（React state + コラボ時は Y.Doc 用に別途渡す）
   useEffect(() => {
     if (wikiStatus === "completed") {
       const tiptapContent = getTiptapContent();
       if (tiptapContent) {
         setContent(tiptapContent);
+        setWikiContentForCollab(tiptapContent);
         saveChanges(title, tiptapContent);
         toast({ title: "Wiki記事を生成しました" });
       }
       resetWiki();
     }
-  }, [wikiStatus, getTiptapContent, title, saveChanges, resetWiki, toast, setContent]);
+  }, [
+    wikiStatus,
+    getTiptapContent,
+    title,
+    saveChanges,
+    resetWiki,
+    toast,
+    setContent,
+    setWikiContentForCollab,
+  ]);
 
   // AI Chat context: ページコンテキストを設定
   useEffect(() => {

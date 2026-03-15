@@ -27,6 +27,7 @@ function buildLayoutProps(
     deleteConfirmOpen: boolean;
     deleteReason: string;
     wikiErrorMessage: string | null;
+    wikiContentForCollab: string | null;
   },
   handlers: {
     onBack: () => void;
@@ -45,6 +46,7 @@ function buildLayoutProps(
     onCancelDelete: () => void;
     onResetWiki: () => void;
     onGoToAISettings: () => void;
+    onWikiContentApplied: () => void;
   },
 ): PageEditorLayoutProps {
   return {
@@ -54,6 +56,10 @@ function buildLayoutProps(
   };
 }
 
+/**
+ * ページエディタのトップレベルフック。状態・ハンドラ・レイアウト props を統合する。
+ * Top-level page editor hook combining state, handlers, and layout props.
+ */
 export function usePageEditor() {
   const state = usePageEditorStateAndSync();
   const handlers = usePageEditorHandlers({
@@ -94,6 +100,7 @@ export function usePageEditor() {
       deleteConfirmOpen: state.deleteConfirmOpen,
       deleteReason: state.deleteReason,
       wikiErrorMessage: state.wikiError?.message || null,
+      wikiContentForCollab: state.wikiContentForCollab,
     },
     {
       onBack: state.handleBack,
@@ -112,6 +119,7 @@ export function usePageEditor() {
       onCancelDelete: state.handleCancelDelete,
       onResetWiki: state.resetWiki,
       onGoToAISettings: handlers.handleGoToAISettings,
+      onWikiContentApplied: state.onWikiContentApplied,
     },
   );
 
