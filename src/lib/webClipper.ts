@@ -64,7 +64,7 @@ export function isClipUrlAllowed(url: string): boolean {
     )
       return false;
     if (hostname.endsWith(".localhost") || hostname.endsWith(".local")) return false;
-    if (/^chrome\.?|^about$|^file$/i.test(hostname)) return false;
+    if (/^(chrome|about|file)$/i.test(hostname)) return false;
     if (/^::ffff:/i.test(hostname)) return false;
     // RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
     if (/^10\.|^192\.168\./.test(hostname)) return false;

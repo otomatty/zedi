@@ -31,6 +31,7 @@
       if (/^fe80:/i.test(host)) return false;
       if (/^::ffff:/i.test(host)) return false;
       if (/^127\./.test(host)) return false;
+      if (/^(chrome|about|file)$/i.test(host)) return false;
       return true;
     } catch {
       return false;

@@ -163,45 +163,39 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
 
   const cleanContent = cleanupHtml(article.content ?? "", document);
 
-  const { title, contentText, ydocBase64 } = await clipDocMutex.runExclusive(async () => {
+  const mainJson = await clipDocMutex.runExclusive(async () => {
     const prevDocument = (globalThis as { document?: Document }).document;
     (globalThis as { document?: Document }).document = document;
     try {
-      const mainJson = generateJSON(cleanContent, extensions) as {
+      return generateJSON(cleanContent, extensions) as {
         type: string;
         content?: Array<{ type: string; attrs?: Record<string, unknown> }>;
       };
-
-      const baseContent = mainJson.content ?? [];
-
-      const imageNode = thumbnailUrl
-        ? {
-            type: "image",
-            attrs: {
-              src: thumbnailUrl,
-              alt: (article.title ?? "OGP thumbnail") as string,
-            },
-          }
-        : null;
-
-      const tiptapJson = {
-        type: "doc",
-        content: imageNode ? [imageNode, ...baseContent] : baseContent,
-      };
-
-      const schema = buildSchema();
-      const ydoc = prosemirrorJSONToYDoc(schema, tiptapJson, YDOC_FRAGMENT);
-      const ydocState = Y.encodeStateAsUpdate(ydoc);
-      const ydocBase64 = Buffer.from(ydocState).toString("base64");
-
-      const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
-      const title = article.title || "Untitled";
-
-      return { title, contentText, ydocBase64 };
     } finally {
       (globalThis as { document?: Document }).document = prevDocument;
     }
   });
+
+  const baseContent = mainJson.content ?? [];
+  const imageNode = thumbnailUrl
+    ? {
+        type: "image",
+        attrs: {
+          src: thumbnailUrl,
+          alt: (article.title ?? "OGP thumbnail") as string,
+        },
+      }
+    : null;
+  const tiptapJson = {
+    type: "doc",
+    content: imageNode ? [imageNode, ...baseContent] : baseContent,
+  };
+  const schema = buildSchema();
+  const ydoc = prosemirrorJSONToYDoc(schema, tiptapJson, YDOC_FRAGMENT);
+  const ydocState = Y.encodeStateAsUpdate(ydoc);
+  const ydocBase64 = Buffer.from(ydocState).toString("base64");
+  const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
+  const title = article.title || "Untitled";
 
   const [page] = await db
     .insert(pages)

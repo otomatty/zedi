@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createHash } from "node:crypto";
+import { SignJWT } from "jose";
 import {
   verifyPKCE,
   isRedirectUriAllowed,
@@ -135,10 +136,15 @@ describe("extAuth", () => {
     });
 
     it("returns null for token with wrong audience", async () => {
-      const { access_token } = await issueExtensionToken("user-1");
-      const payload = await verifyExtensionToken(access_token);
-      expect(payload?.aud).toBe("zedi-extension");
-      // Verification already enforces audience; no need to test wrong-audience token creation here
+      const key = new TextEncoder().encode(secret);
+      const token = await new SignJWT({ scope: ["clip:create"] })
+        .setProtectedHeader({ alg: "HS256" })
+        .setSubject("user-1")
+        .setAudience("not-zedi-extension")
+        .setIssuedAt()
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
+        .sign(key);
+      expect(await verifyExtensionToken(token)).toBeNull();
     });
   });
 });

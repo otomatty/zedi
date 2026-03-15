@@ -19,9 +19,18 @@ function isUrlClipAllowed(url) {
   try {
     const parsed = new URL(trimmed);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-    const host = parsed.hostname.toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1") return false;
-    if (/^10\.|^172\.(1[6-9]|2[0-9]|3[01])\.|^192\.168\./.test(host)) return false;
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith("[") && host.endsWith("]")) host = host.slice(1, -1);
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+    if (host === "0.0.0.0" || host === "::") return false;
+    if (host.endsWith(".localhost") || host.endsWith(".local")) return false;
+    if (/^10\.|^192\.168\./.test(host)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(host)) return false;
+    if (/^169\.254\./.test(host)) return false;
+    if (/^fe80:/i.test(host)) return false;
+    if (/^::ffff:/i.test(host)) return false;
+    if (/^127\./.test(host)) return false;
+    if (/^(chrome|about|file)$/i.test(host)) return false;
     return true;
   } catch {
     return false;
