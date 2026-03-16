@@ -83,8 +83,11 @@ bun run test:mutation:dry
 # 単一ファイル（CI と同じ範囲）
 bun run test:mutation -- --mutate "src/lib/dateUtils.ts"
 
-# 複数ファイルやディレクトリを指定する例
-bun run test:mutation -- --mutate "src/lib/dateUtils.ts" --mutate "src/lib/searchUtils.ts"
+# 複数ファイルをカンマ区切りで指定する例
+bun run test:mutation -- --mutate "src/lib/dateUtils.ts,src/lib/searchUtils.ts"
+
+# glob パターンでディレクトリを指定する例
+bun run test:mutation -- --mutate "src/lib/**/*.ts"
 ```
 
 レポートは `reports/mutation/mutation.html` に出力される。
@@ -113,7 +116,7 @@ bun run test:mutation -- --mutate "src/lib/dateUtils.ts" --mutate "src/lib/searc
 - **トリガー**: 毎日 04:00 UTC（手動は Actions タブから "Nightly Mutation" → "Run workflow"）
 - **対象**: `stryker.config.mjs` の全対象（`src/lib/**/*`, `src/hooks/**/*`）。PR の軽量ジョブとは別に、ここで全量の mutation score を取得する。
 - **レポート**: artifact **mutation-report-nightly**（14 日保持）。週次でスコア推移・survived mutant 件数を確認する。
-- **失敗時**: `continue-on-error` のため merge はブロックされない。regression は Issue またはチーム合意の方法で対応する。
+- **失敗時**: workflow が失敗として表示される。Nightly は PR の merge には影響しないが、失敗時は Issue 化またはチーム合意の方法でトリアージする。
 
 ---
 
