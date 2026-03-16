@@ -70,9 +70,57 @@ describe("PageEditorHeader", () => {
 
 ---
 
-## 4. 参照
+## 4. Mutation testing（テスト品質の可視化）
+
+Mutation testing は「コードを意図的に壊したときにテストが落ちるか」でテストの有効性を測る。Stryker + Vitest で導入済み。CI では PR 向けに**限定対象**で実行し、レポートを artifact で取得できる。
+
+### 4.1 ローカルで再現するコマンド
+
+```bash
+# 設定・依存の確認（mutation は実行しない）
+bun run test:mutation:dry
+
+# 単一ファイル（CI と同じ範囲）
+bun run test:mutation -- --mutate "src/lib/dateUtils.ts"
+
+# 複数ファイルやディレクトリを指定する例
+bun run test:mutation -- --mutate "src/lib/dateUtils.ts" --mutate "src/lib/searchUtils.ts"
+```
+
+レポートは `reports/mutation/mutation.html` に出力される。
+
+### 4.2 CI での対象拡張ルール（Phase 2）
+
+- **初期**: `src/lib/dateUtils.ts` のみ。所要時間を計測してから拡張する。
+- **段階拡張の順序**（1〜2週間の実績を見てから）:
+  1. `src/lib` の critical なユーティリティ（日付・検索・コンテンツ変換など）
+  2. `src/hooks` の純粋ロジック寄りの部分
+  3. 全量は別 workflow（nightly）で実行する方針
+- ジョブ時間が目標（+3〜8分）を超える場合は、`--mutate` の範囲を縮小する。
+- 閾値（`thresholds.break`）は現状 65 のまま。ノイズが減った段階で引き上げを検討する。
+
+### 4.3 初回運用後の調整
+
+- **計測**: 初回 PR で **mutation-light** ジョブの実行時間を GitHub Actions の Summary で確認し、何分だったかを記録する（目標レンジ: +3〜8分）。
+- **方針決定**: 記録した時間を基準に、次回の対象拡張や閾値変更を決める。
+  - 超過時: `--mutate` の範囲を縮小するか、全量は nightly に移す。
+  - 余裕がある場合: 4.2 の順で対象を段階拡張する。
+- 安定後: `continue-on-error` を外して merge blocking にするか検討する。
+
+### 4.4 Nightly 全量実行（Phase 3）
+
+- **workflow**: `.github/workflows/nightly-mutation.yml`
+- **トリガー**: 毎日 04:00 UTC（手動は Actions タブから "Nightly Mutation" → "Run workflow"）
+- **対象**: `stryker.config.mjs` の全対象（`src/lib/**/*`, `src/hooks/**/*`）。PR の軽量ジョブとは別に、ここで全量の mutation score を取得する。
+- **レポート**: artifact **mutation-report-nightly**（14 日保持）。週次でスコア推移・survived mutant 件数を確認する。
+- **失敗時**: `continue-on-error` のため merge はブロックされない。regression は Issue またはチーム合意の方法で対応する。
+
+---
+
+## 5. 参照
 
 - テストセットアップ: `src/test/setup.ts`
 - 共通モック: `src/test/mocks.ts`
 - ページエディタのテスト提案: `docs/plans/20260216/page-editor-testing-proposal.md`
-- 実行: `npx vitest run`（推奨）／E2E: `bun run test:e2e`
+- Mutation testing 段階導入: Issue #377
+- 実行: `npx vitest run`（推奨）／E2E: `bun run test:e2e`／Mutation: `bun run test:mutation`
