@@ -60,7 +60,7 @@ jobs:
       # Retry on transient Cloudflare Pages API 5xx (e.g. 503 no healthy upstream).
       # wrangler CLI reads CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from env (see wrangler docs).
       - name: Deploy to Cloudflare Pages
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -110,7 +110,7 @@ jobs:
       # Retry on transient Cloudflare Pages API 5xx (e.g. 503 no healthy upstream).
       # wrangler CLI reads CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID from env (see wrangler docs).
       - name: Deploy Admin to Cloudflare Pages
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
