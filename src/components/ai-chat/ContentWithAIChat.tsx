@@ -13,6 +13,10 @@ interface ContentWithAIChatProps {
   floatingAction?: React.ReactNode;
 }
 
+/**
+ * Layout wrapper that provides AI chat panel and optional FAB. Used by Home and Notes.
+ * AIチャットパネルとオプションのFABを提供するレイアウト。Home・Notesで利用。
+ */
 export function ContentWithAIChat({ children, floatingAction }: ContentWithAIChatProps) {
   const isMobile = useIsMobile();
   const { isOpen, togglePanel, openPanel } = useAIChatStore();
@@ -74,7 +78,11 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
     return (
       <>
         {children}
-        {floatingAction && <div className="fixed bottom-6 right-6 z-40">{floatingAction}</div>}
+        {floatingAction && (
+          <div className="fixed bottom-0 right-0 z-40 flex flex-col items-end gap-1 p-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
+            {floatingAction}
+          </div>
+        )}
         <Drawer
           open={isOpen}
           onOpenChange={(open) => {
@@ -95,7 +103,11 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
         <div className="absolute inset-0 overflow-y-auto transition-all duration-300 ease-in-out">
           {children}
         </div>
-        {floatingAction && <div className="absolute bottom-6 right-6 z-40">{floatingAction}</div>}
+        {floatingAction && (
+          <div className="absolute bottom-0 right-0 z-40 flex flex-col items-end gap-1 p-2">
+            {floatingAction}
+          </div>
+        )}
       </div>
       <div
         className={cn(

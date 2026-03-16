@@ -1,20 +1,26 @@
 import React from "react";
 
+/**
+ * Settings section category identifier.
+ * 設定セクションのカテゴリ識別子。
+ */
 export type SettingsSectionId = "general" | "ai" | "storage";
 
 interface SettingsSectionProps {
   id: SettingsSectionId;
   title: string;
   description: string;
-  summary?: string;
   children: React.ReactNode;
 }
 
+/**
+ * Wrapper for a settings section with title and description.
+ * タイトルと説明付きの設定セクションラッパー。
+ */
 export const SettingsSection: React.FC<SettingsSectionProps> = ({
   id,
   title,
   description,
-  summary,
   children,
 }) => {
   return (
@@ -28,9 +34,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           {title}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        {summary != null && summary !== "" && (
-          <p className="mt-1 text-sm font-medium text-foreground">{summary}</p>
-        )}
       </div>
       <div>{children}</div>
     </section>

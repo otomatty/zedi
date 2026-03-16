@@ -70,30 +70,15 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
   useEffect(() => {
     if (!editor) return;
 
-    /**
-     *
-     */
     const handlePaste = (event: ClipboardEvent) => {
-      /**
-       *
-       */
       const items = event.clipboardData?.items;
-      /**
-       *
-       */
       const text = event.clipboardData?.getData("text/plain");
 
       if (items) {
-        /**
-         *
-         */
         const imageItems = Array.from(items).filter((item) => item.type.startsWith("image/"));
 
         if (imageItems.length > 0) {
           event.preventDefault();
-          /**
-           *
-           */
           const files = imageItems
             .map((item) => item.getAsFile())
             .filter((file): file is File => file !== null);
@@ -103,24 +88,15 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
       }
 
       if (text) {
-        /**
-         *
-         */
         const matches = text.match(IMAGE_URL_PATTERN);
 
         if (matches && matches[0]) {
-          /**
-           *
-           */
           const imageUrl = matches[0];
           if (!isEmbeddableImageUrl(imageUrl)) {
             return;
           }
 
           event.preventDefault();
-          /**
-           *
-           */
           const alt = imageUrl.split("/").pop()?.split("?")[0] || "image";
 
           editor
@@ -136,9 +112,6 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
       }
     };
 
-    /**
-     *
-     */
     const editorElement = editor.view.dom;
     editorElement.addEventListener("paste", handlePaste);
 

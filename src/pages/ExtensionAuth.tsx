@@ -10,7 +10,8 @@ import { useTranslation } from "react-i18next";
 import { signIn } from "@/lib/auth";
 
 /**
- *
+ * Chrome extension auth start page. Redirects to IdP then extension callback.
+ * Chrome拡張認可開始ページ。IdP経由で拡張コールバックへ遷移する。
  */
 const ExtensionAuth: React.FC = () => {
   const { t } = useTranslation();

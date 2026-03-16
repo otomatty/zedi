@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
@@ -8,6 +8,12 @@ import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
 import type { AISettings } from "@/types/ai";
 import type { AIModel } from "@/types/ai";
 
+const SAVED_INDICATOR_MS = 3000;
+
+/**
+ * Custom hook for AI settings form state and actions.
+ * AI設定フォームの状態とアクションを管理するカスタムフック。
+ */
 export function useAISettingsForm() {
   const { t } = useTranslation();
   const {
@@ -28,6 +34,8 @@ export function useAISettingsForm() {
   const [serverModels, setServerModels] = useState<AIModel[]>([]);
   const [serverModelsLoading, setServerModelsLoading] = useState(false);
   const [serverModelsError, setServerModelsError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const savedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
   const isServerMode = settings.apiMode === "api_server" && !useOwnKey;
@@ -70,15 +78,21 @@ export function useAISettingsForm() {
     }
   }, [isLoading, settings.apiMode]);
 
+  useEffect(() => {
+    return () => {
+      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
+    };
+  }, []);
+
   const runSave = useCallback(async () => {
     const success = await save();
     if (success) {
-      sonnerToast.success(t("aiSettings.savedToast"), {
-        description: t("aiSettings.savedToastDescription"),
-      });
-      // Do not navigate(returnTo) here: on the settings hub both AI and storage
-      // hooks are mounted, so auto-navigate would redirect after first save and
-      // cross-contaminate returnTo between sections. Use the hub's back button instead.
+      setSavedAt(Date.now());
+      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
+      savedAtTimeoutRef.current = setTimeout(() => {
+        setSavedAt(null);
+        savedAtTimeoutRef.current = null;
+      }, SAVED_INDICATOR_MS);
     } else {
       sonnerToast.error(t("common.error"), {
         description: t("aiSettings.saveFailedToastDescription"),
@@ -88,8 +102,17 @@ export function useAISettingsForm() {
 
   const scheduleSave = useDebouncedCallback(runSave, 800);
 
+  const clearSavedIndicator = useCallback(() => {
+    if (savedAtTimeoutRef.current) {
+      clearTimeout(savedAtTimeoutRef.current);
+      savedAtTimeoutRef.current = null;
+    }
+    setSavedAt(null);
+  }, []);
+
   const updateSettings = useCallback(
     (updates: Partial<AISettings>) => {
+      clearSavedIndicator();
       const normalizedUpdates =
         (updates.provider !== undefined || updates.model !== undefined) &&
         updates.modelId === undefined
@@ -98,7 +121,7 @@ export function useAISettingsForm() {
       updateSettingsBase(normalizedUpdates);
       scheduleSave();
     },
-    [updateSettingsBase, scheduleSave],
+    [clearSavedIndicator, updateSettingsBase, scheduleSave],
   );
 
   const handleToggleOwnKey = useCallback(
@@ -127,11 +150,12 @@ export function useAISettingsForm() {
   const handleReset = useCallback(() => {
     reset();
     setUseOwnKey(false);
+    clearSavedIndicator();
     toast({
       title: t("aiSettings.resetToast"),
       description: t("aiSettings.resetToastDescription"),
     });
-  }, [reset, toast, t]);
+  }, [reset, clearSavedIndicator, toast, t]);
 
   const handleServerModelSelect = useCallback(
     (modelId: string) => {
@@ -154,6 +178,7 @@ export function useAISettingsForm() {
     isSaving,
     isTesting,
     testResult,
+    savedAt,
     showApiKey,
     setShowApiKey,
     useOwnKey,
