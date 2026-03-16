@@ -130,7 +130,7 @@ export const GeneralSettingsForm: React.FC = () => {
     );
   }
 
-  const profileSaveStatus = isProfileSaving ? "saving" : profileSavedAt != null ? "saved" : "idle";
+  const profileSaveStatus = isProfileSaving ? "saving" : profileSavedAt !== null ? "saved" : "idle";
 
   return (
     <div className="space-y-6">

@@ -56,20 +56,30 @@ export function useStorageSettingsForm() {
 
   const scheduleSave = useDebouncedCallback(runSave, 800);
 
+  const clearSavedIndicator = useCallback(() => {
+    if (savedAtTimeoutRef.current) {
+      clearTimeout(savedAtTimeoutRef.current);
+      savedAtTimeoutRef.current = null;
+    }
+    setSavedAt(null);
+  }, []);
+
   const updateSettings = useCallback(
     (updates: Partial<StorageSettings>) => {
+      clearSavedIndicator();
       updateSettingsBase(updates);
       scheduleSave();
     },
-    [updateSettingsBase, scheduleSave],
+    [clearSavedIndicator, updateSettingsBase, scheduleSave],
   );
 
   const updateConfig = useCallback(
     (updates: Partial<StorageSettings["config"]>) => {
+      clearSavedIndicator();
       updateConfigBase(updates);
       scheduleSave();
     },
-    [updateConfigBase, scheduleSave],
+    [clearSavedIndicator, updateConfigBase, scheduleSave],
   );
 
   const handleTest = useCallback(async () => {

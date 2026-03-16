@@ -1,7 +1,8 @@
 import React from "react";
 
 /**
- *
+ * Settings section category identifier.
+ * 設定セクションのカテゴリ識別子。
  */
 export type SettingsSectionId = "general" | "ai" | "storage";
 
@@ -13,12 +14,15 @@ interface SettingsSectionProps {
 }
 
 /**
- *
+ * Wrapper for a settings section with title and description.
+ * タイトルと説明付きの設定セクションラッパー。
  */
-export /**
- *
- */
-const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, description, children }) => {
+export const SettingsSection: React.FC<SettingsSectionProps> = ({
+  id,
+  title,
+  description,
+  children,
+}) => {
   return (
     <section
       id={`section-${id}`}

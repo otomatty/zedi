@@ -13,7 +13,7 @@ import { LanguageSelectField } from "@/components/settings/LanguageSelectField";
 const STEPS = [1, 2, 3] as const;
 type StepNum = (typeof STEPS)[number];
 
-/** Back/Next navigation for onboarding steps 1 and 2. */
+/** Back/Next navigation for onboarding steps 1 and 2. / オンボーディングステップ1・2の戻る・次へナビゲーション。 */
 const OnboardingStepNav: React.FC<{
   step: StepNum;
   onBack: () => void;

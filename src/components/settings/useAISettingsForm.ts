@@ -104,6 +104,11 @@ export function useAISettingsForm() {
 
   const updateSettings = useCallback(
     (updates: Partial<AISettings>) => {
+      if (savedAtTimeoutRef.current) {
+        clearTimeout(savedAtTimeoutRef.current);
+        savedAtTimeoutRef.current = null;
+      }
+      setSavedAt(null);
       const normalizedUpdates =
         (updates.provider !== undefined || updates.model !== undefined) &&
         updates.modelId === undefined

@@ -11,7 +11,7 @@ const SECTIONS: { id: SettingsSectionId; icon: React.ReactNode }[] = [
 ];
 
 /**
- *
+ * Props for SettingsHeaderNav. / 設定ヘッダーナビの props。
  */
 export interface SettingsHeaderNavProps {
   /** Currently selected category. / 現在選択中のカテゴリ。 */

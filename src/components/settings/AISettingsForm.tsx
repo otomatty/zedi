@@ -71,15 +71,17 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          {t("aiSettings.title")}
-        </CardTitle>
-        <CardDescription>{t("aiSettings.description")}</CardDescription>
-      </CardHeader>
+      {!embedded && (
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            {t("aiSettings.title")}
+          </CardTitle>
+          <CardDescription>{t("aiSettings.description")}</CardDescription>
+        </CardHeader>
+      )}
 
-      <CardContent className="space-y-6">
+      <CardContent className={embedded ? "space-y-6 pt-0" : "space-y-6"}>
         {embedded && saveStatus !== "idle" && <SectionSaveStatus status={saveStatus} />}
         {isServerMode && (
           <AISettingsFormServerSection
