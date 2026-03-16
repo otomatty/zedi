@@ -80,7 +80,7 @@ jobs:
       - name: Upload Wrangler logs (Frontend) artifact
         if: failure()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wrangler-logs-frontend
           path: wrangler-logs-frontend/
@@ -130,7 +130,7 @@ jobs:
       - name: Upload Wrangler logs (Admin) artifact
         if: failure()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wrangler-logs-admin
           path: wrangler-logs-admin/
