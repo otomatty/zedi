@@ -163,6 +163,9 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
+      - name: Record job start time
+        run: echo "MUTATION_START=$(date +%s)" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
@@ -185,3 +188,11 @@ jobs:
           name: mutation-report
           path: reports/mutation/
           retention-days: 7
+
+      - name: Write job duration to Summary
+        if: always()
+        run: |
+          end=$(date +%s)
+          elapsed=$((end - MUTATION_START))
+          echo "### Mutation (light)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Duration: ${elapsed}s ($((elapsed / 60))m)" >> "$GITHUB_STEP_SUMMARY"

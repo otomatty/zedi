@@ -4,7 +4,6 @@
  */
 export default {
   testRunner: "vitest",
-  coverageAnalysis: "off",
   tempDirName: ".stryker-tmp",
   mutate: [
     "src/lib/**/*.{ts,tsx}",
