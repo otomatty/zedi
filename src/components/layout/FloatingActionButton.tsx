@@ -68,7 +68,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
               isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground",
             )}
           >
-            {isMenuOpen ? <X className="h-7 w-7" /> : <Plus className="h-7 w-7" />}
+            {isMenuOpen ? <X className="h-10 w-10" /> : <Plus className="h-10 w-10" />}
           </Button>
         </TooltipTrigger>
         {!isMenuOpen && <TooltipContent side="left">{t("common.createPageAction")}</TooltipContent>}

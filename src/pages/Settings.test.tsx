@@ -10,11 +10,6 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-const mockSummaries = { general: "General summary", ai: "AI summary", storage: "Storage summary" };
-vi.mock("@/components/settings/useSettingsSummaries", () => ({
-  useSettingsSummaries: () => mockSummaries,
-}));
-
 vi.mock("@/components/settings/GeneralSettingsForm", () => ({
   GeneralSettingsForm: () => <div data-testid="general-form">GeneralSettingsForm</div>,
 }));
@@ -38,17 +33,7 @@ describe("Settings", () => {
     expect(backLink).toHaveAttribute("href", "/home");
   });
 
-  it("renders hub description", () => {
-    render(
-      <MemoryRouter initialEntries={["/settings"]}>
-        <Settings />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByText("settings.hubDescription")).toBeInTheDocument();
-  });
-
-  it("renders SettingsOverview and three sections with forms", () => {
+  it("renders header nav and default general form", () => {
     render(
       <MemoryRouter initialEntries={["/settings"]}>
         <Settings />
@@ -57,22 +42,29 @@ describe("Settings", () => {
 
     expect(screen.getByRole("navigation", { name: "settings.summary.jumpTo" })).toBeInTheDocument();
     expect(screen.getByTestId("general-form")).toBeInTheDocument();
-    expect(screen.getByTestId("ai-form")).toBeInTheDocument();
-    expect(screen.getByTestId("storage-form")).toBeInTheDocument();
   });
 
-  it("renders section headings for general, ai, storage", () => {
+  it("renders default general as current and shows general section heading", () => {
     render(
       <MemoryRouter initialEntries={["/settings"]}>
         <Settings />
       </MemoryRouter>,
     );
 
-    const generalHeadings = screen.getAllByRole("heading", { name: "settings.general.title" });
-    const aiHeadings = screen.getAllByRole("heading", { name: "settings.ai.title" });
-    const storageHeadings = screen.getAllByRole("heading", { name: "settings.storage.title" });
-    expect(generalHeadings.length).toBeGreaterThanOrEqual(1);
-    expect(aiHeadings.length).toBeGreaterThanOrEqual(1);
-    expect(storageHeadings.length).toBeGreaterThanOrEqual(1);
+    const generalButton = screen.getByRole("button", { name: /settings\.general\.title/ });
+    expect(generalButton).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("heading", { name: "settings.general.title" })).toBeInTheDocument();
+  });
+
+  it("renders ai section when section=ai in URL", () => {
+    render(
+      <MemoryRouter initialEntries={["/settings?section=ai"]}>
+        <Settings />
+      </MemoryRouter>,
+    );
+
+    const aiButton = screen.getByRole("button", { name: /settings\.ai\.title/ });
+    expect(aiButton).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("heading", { name: "settings.ai.title" })).toBeInTheDocument();
   });
 });

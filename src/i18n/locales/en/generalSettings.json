@@ -22,7 +22,8 @@
     "custom": "Custom",
     "preview": "Preview",
     "customPx": "Size (px)",
-    "sample": "The quick brown fox Aa 123"
+    "sample": "The quick brown fox Aa 123",
+    "previewText": "This is a preview of the editor font size. You can check how your notes will look when editing at the selected size. It applies to body text and headings in the editor."
   },
   "language": {
     "title": "Language",

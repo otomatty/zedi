@@ -32,21 +32,12 @@ import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 
 /**
- *
+ * Creates and configures the Hono API app (routes, CORS, etc.).
+ * Hono APIアプリを作成・設定する（ルート・CORS等）。
  */
 export function createApp(): Hono<AppEnv> {
-  /**
-   *
-   */
   const app = new Hono<AppEnv>();
-
-  /**
-   *
-   */
   const wildcard = isWildcardCors();
-  /**
-   *
-   */
   const allowedOrigins = getAllowedOrigins();
 
   app.use(

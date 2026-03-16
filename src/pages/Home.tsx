@@ -4,6 +4,7 @@ import Header from "@/components/layout/Header";
 import Container from "@/components/layout/Container";
 import PageGrid from "@/components/page/PageGrid";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
+import { HomePageCount } from "@/components/layout/HomePageCount";
 import { QuickTour } from "@/components/tour/QuickTour";
 import { useSeedData } from "@/hooks/useSeedData";
 import { useOnboarding } from "@/hooks/useOnboarding";
@@ -14,7 +15,8 @@ import { isClipUrlAllowed } from "@/lib/webClipper";
 const HOME_PATH = "/home";
 
 /**
- *
+ * Home page: page grid, FAB, quick tour, and optional clip URL handling.
+ * ホーム画面。ページグリッド・FAB・クイックツアー・clip URL処理。
  */
 const Home: React.FC = () => {
   const location = useLocation();
@@ -66,14 +68,19 @@ const Home: React.FC = () => {
 
       <ContentWithAIChat
         floatingAction={
-          validClipUrl ? (
-            <FloatingActionButton
-              initialClipUrl={validClipUrl}
-              onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
-            />
-          ) : (
-            <FloatingActionButton />
-          )
+          <>
+            <div className="mb-4 mr-4">
+              {validClipUrl ? (
+                <FloatingActionButton
+                  initialClipUrl={validClipUrl}
+                  onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
+                />
+              ) : (
+                <FloatingActionButton />
+              )}
+            </div>
+            <HomePageCount />
+          </>
         }
       >
         <main className="py-6">

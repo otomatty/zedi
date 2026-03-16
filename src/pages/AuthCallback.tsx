@@ -11,42 +11,19 @@ import { useSession } from "@/lib/auth/authClient";
 const SESSION_WAIT_TIMEOUT_MS = 15_000;
 
 /**
- *
+ * OAuth callback page component. Waits for session then redirects.
+ * OAuthコールバックページ。セッション取得後にリダイレクトする。
  */
 export default function AuthCallback() {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const { data: session, isPending } = useSession();
-  /**
-   *
-   */
   const [error, setError] = useState<string | null>(null);
-  /**
-   *
-   */
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /**
-   *
-   */
   const hasTimedOutRef = useRef(false);
 
   useEffect(() => {
-    /**
-     *
-     */
     const params = new URLSearchParams(window.location.search);
-    /**
-     *
-     */
     const errorParam = params.get("error");
-    /**
-     *
-     */
     const errorDescription = params.get("error_description");
 
     if (errorParam) {
@@ -59,13 +36,7 @@ export default function AuthCallback() {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      /**
-       *
-       */
       const returnTo = params.get("returnTo");
-      /**
-       *
-       */
       const target =
         returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/home";
       window.location.assign(target);
