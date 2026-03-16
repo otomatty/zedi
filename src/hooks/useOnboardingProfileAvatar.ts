@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import React, { useRef, useCallback, useEffect } from "react";
 
 /** Update function for profile (avatar URL). / プロフィール（アバターURL）更新用関数。 */
 export type UpdateProfileFn = (updates: { avatarUrl?: string }) => void;

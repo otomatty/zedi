@@ -100,16 +100,12 @@ export function useStorageSettingsForm() {
 
   const handleReset = useCallback(() => {
     reset();
-    setSavedAt(null);
-    if (savedAtTimeoutRef.current) {
-      clearTimeout(savedAtTimeoutRef.current);
-      savedAtTimeoutRef.current = null;
-    }
+    clearSavedIndicator();
     toast({
       title: t("storageSettings.resetToast"),
       description: t("storageSettings.resetToastDescription"),
     });
-  }, [reset, toast, t]);
+  }, [reset, clearSavedIndicator, toast, t]);
 
   return {
     settings,

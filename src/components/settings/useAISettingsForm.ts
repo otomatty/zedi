@@ -102,13 +102,17 @@ export function useAISettingsForm() {
 
   const scheduleSave = useDebouncedCallback(runSave, 800);
 
+  const clearSavedIndicator = useCallback(() => {
+    if (savedAtTimeoutRef.current) {
+      clearTimeout(savedAtTimeoutRef.current);
+      savedAtTimeoutRef.current = null;
+    }
+    setSavedAt(null);
+  }, []);
+
   const updateSettings = useCallback(
     (updates: Partial<AISettings>) => {
-      if (savedAtTimeoutRef.current) {
-        clearTimeout(savedAtTimeoutRef.current);
-        savedAtTimeoutRef.current = null;
-      }
-      setSavedAt(null);
+      clearSavedIndicator();
       const normalizedUpdates =
         (updates.provider !== undefined || updates.model !== undefined) &&
         updates.modelId === undefined
@@ -117,7 +121,7 @@ export function useAISettingsForm() {
       updateSettingsBase(normalizedUpdates);
       scheduleSave();
     },
-    [updateSettingsBase, scheduleSave],
+    [clearSavedIndicator, updateSettingsBase, scheduleSave],
   );
 
   const handleToggleOwnKey = useCallback(
@@ -146,16 +150,12 @@ export function useAISettingsForm() {
   const handleReset = useCallback(() => {
     reset();
     setUseOwnKey(false);
-    setSavedAt(null);
-    if (savedAtTimeoutRef.current) {
-      clearTimeout(savedAtTimeoutRef.current);
-      savedAtTimeoutRef.current = null;
-    }
+    clearSavedIndicator();
     toast({
       title: t("aiSettings.resetToast"),
       description: t("aiSettings.resetToastDescription"),
     });
-  }, [reset, toast, t]);
+  }, [reset, clearSavedIndicator, toast, t]);
 
   const handleServerModelSelect = useCallback(
     (modelId: string) => {

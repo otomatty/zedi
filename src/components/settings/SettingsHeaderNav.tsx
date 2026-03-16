@@ -42,7 +42,7 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
 
   return (
     <>
-      {/* Mobile: hamburger button */}
+      {/* Mobile: hamburger button / モバイル: ハンバーガーボタン */}
       <Button
         variant="ghost"
         size="icon"
@@ -54,7 +54,7 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
         <Menu className="h-5 w-5" aria-hidden />
       </Button>
 
-      {/* Desktop: normal nav menu */}
+      {/* Desktop: normal nav menu / デスクトップ: 通常ナビメニュー */}
       <nav
         role="navigation"
         aria-label={t("settings.summary.jumpTo")}
@@ -85,7 +85,7 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
         })}
       </nav>
 
-      {/* Mobile: Sheet with category list */}
+      {/* Mobile: Sheet with category list / モバイル: カテゴリ一覧を表示する Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="w-[min(100vw-2rem,20rem)]">
           <SheetHeader>
