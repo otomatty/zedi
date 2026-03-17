@@ -85,10 +85,12 @@ async function savePage(url) {
   }
 }
 
-chrome.contextMenus.create({
-  id: "zedi-save-page",
-  title: "このページをZediに保存",
-  contexts: ["page"],
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "zedi-save-page",
+    title: "このページをZediに保存",
+    contexts: ["page"],
+  });
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {

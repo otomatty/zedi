@@ -22,7 +22,7 @@ function getSafeReturnTarget(returnTo: string | null): string {
     const parsed = new URL(returnTo, "http://dummy");
     const allowedPathname = ALLOWED_RETURN_PATHS.find((p) => p === parsed.pathname);
     if (!allowedPathname) return "/home";
-    return allowedPathname + (parsed.search ?? "") + (parsed.hash ?? "");
+    return allowedPathname;
   } catch {
     return "/home";
   }
