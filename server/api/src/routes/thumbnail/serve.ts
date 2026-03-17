@@ -73,7 +73,7 @@ app.get("/:id", authRequired, async (c) => {
   if (!body) return c.json({ error: "Object not found" }, 404);
 
   const webStream = body instanceof Readable ? Readable.toWeb(body) : (body as ReadableStream);
-  return new Response(webStream, {
+  return new Response(webStream as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": contentType,

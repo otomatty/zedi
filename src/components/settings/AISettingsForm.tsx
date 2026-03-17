@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, Trash2, Key } from "lucide-react";
+import { Bot, Loader2, Trash2, Key } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Switch } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
@@ -17,6 +17,7 @@ import {
 import { useAISettingsForm } from "./useAISettingsForm";
 import { AISettingsFormServerSection } from "./AISettingsFormServerSection";
 import { AISettingsFormUserKeySection } from "./AISettingsFormUserKeySection";
+import { SectionSaveStatus } from "./SectionSaveStatus";
 import { getProviderById } from "@/types/ai";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +26,10 @@ interface AISettingsFormProps {
   embedded?: boolean;
 }
 
+/**
+ * AI settings form. Manages LLM provider, API key, and server model selection.
+ * AI設定フォーム。LLMプロバイダー・APIキー・サーバーモデル選択を管理する。
+ */
 export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false }) => {
   const { t } = useTranslation();
   const {
@@ -34,6 +39,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
     isSaving,
     isTesting,
     testResult,
+    savedAt,
     showApiKey,
     setShowApiKey,
     useOwnKey,
@@ -51,6 +57,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 
   const currentProvider = getProviderById(settings.provider);
   const currentModelId = settings.modelId || `${settings.provider}:${settings.model}`;
+  const saveStatus = isSaving ? "saving" : savedAt != null ? "saved" : "idle";
 
   if (isLoading) {
     return (
@@ -66,12 +73,16 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
     <Card>
       {!embedded && (
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">{t("aiSettings.title")}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            {t("aiSettings.title")}
+          </CardTitle>
           <CardDescription>{t("aiSettings.description")}</CardDescription>
         </CardHeader>
       )}
 
       <CardContent className={embedded ? "space-y-6 pt-0" : "space-y-6"}>
+        {embedded && saveStatus !== "idle" && <SectionSaveStatus status={saveStatus} />}
         {isServerMode && (
           <AISettingsFormServerSection
             serverModels={serverModels}

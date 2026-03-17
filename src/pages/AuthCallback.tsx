@@ -9,7 +9,29 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "@/lib/auth/authClient";
 
 const SESSION_WAIT_TIMEOUT_MS = 15_000;
+/** 認証後に許可されるリダイレクトパス（CodeQL: オープンリダイレクト防止）。Allowed post-auth redirect paths (CodeQL: avoid open redirect). */
+const ALLOWED_RETURN_PATHS = ["/home"] as const;
 
+/**
+ * returnTo を検証し、安全なリダイレクト先を返す。pathname は許可リストの定数のみ使用し CodeQL を満たす。
+ * Validates returnTo and returns a safe redirect target; pathname comes only from allowlist constant (CodeQL).
+ */
+function getSafeReturnTarget(returnTo: string | null): string {
+  if (!returnTo?.startsWith("/") || returnTo.startsWith("//")) return "/home";
+  try {
+    const parsed = new URL(returnTo, "http://dummy");
+    const allowedPathname = ALLOWED_RETURN_PATHS.find((p) => p === parsed.pathname);
+    if (!allowedPathname) return "/home";
+    return allowedPathname + (parsed.search ?? "") + (parsed.hash ?? "");
+  } catch {
+    return "/home";
+  }
+}
+
+/**
+ * OAuth callback page component. Waits for session then redirects.
+ * OAuthコールバックページ。セッション取得後にリダイレクトする。
+ */
 export default function AuthCallback() {
   const { t } = useTranslation();
   const { data: session, isPending } = useSession();
@@ -23,7 +45,9 @@ export default function AuthCallback() {
     const errorDescription = params.get("error_description");
 
     if (errorParam) {
-      queueMicrotask(() => setError(errorDescription || errorParam));
+      const raw = errorDescription || errorParam;
+      const safe = String(raw ?? "").replace(/[<>"'`]/g, "");
+      queueMicrotask(() => setError(safe || t("common.error")));
       return;
     }
 
@@ -32,7 +56,8 @@ export default function AuthCallback() {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      window.location.assign("/home");
+      const target = getSafeReturnTarget(params.get("returnTo"));
+      window.location.assign(target);
       return;
     }
 

@@ -16,6 +16,7 @@ import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
+import extRoutes from "./routes/ext.js";
 import aiChatRoutes from "./routes/ai/chat.js";
 import aiModelsRoutes from "./routes/ai/models.js";
 import aiUsageRoutes from "./routes/ai/usage.js";
@@ -30,9 +31,12 @@ import webhookPolarRoutes from "./routes/webhooks/polar.js";
 import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 
+/**
+ * Creates and configures the Hono API app (routes, CORS, etc.).
+ * Hono APIアプリを作成・設定する（ルート・CORS等）。
+ */
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
-
   const wildcard = isWildcardCors();
   const allowedOrigins = getAllowedOrigins();
 
@@ -93,6 +97,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Clip
   app.route("/api/clip", clipRoutes);
+
+  // Chrome Extension (OAuth + clip-and-create)
+  app.route("/api/ext", extRoutes);
 
   // AI
   app.route("/api/ai/chat", aiChatRoutes);

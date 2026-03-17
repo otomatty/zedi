@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { MutableRefObject, RefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
@@ -7,60 +7,13 @@ import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion"
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useWikiLinkNavigation } from "./useWikiLinkNavigation";
-import { useImageUploadManager } from "./useImageUploadManager";
 import { useEditorSetup } from "./useEditorSetup";
 import { useSuggestionEffects } from "./useSuggestionEffects";
 import { useEditorLifecycle } from "./useEditorLifecycle";
 import { useTiptapEditorStorageFeatures, useThumbnailController } from "./useTiptapEditorStorage";
-import { isSameSlashSuggestionState, isSameWikiLinkSuggestionState } from "./suggestionStateUtils";
+import { useSuggestionControllers } from "./useSuggestionControllers";
+import { useImageUploadController } from "./useImageUploadController";
 import type { TiptapEditorProps } from "./types";
-
-function useSuggestionControllers() {
-  const [suggestionState, setSuggestionState] = useState<WikiLinkSuggestionState | null>(null);
-  const [slashState, setSlashState] = useState<SlashSuggestionState | null>(null);
-  const suggestionRef = useRef<WikiLinkSuggestionHandle>(null);
-  const slashRef = useRef<SlashSuggestionHandle>(null);
-
-  const handleStateChange = useCallback((state: WikiLinkSuggestionState) => {
-    setSuggestionState((prev) => (isSameWikiLinkSuggestionState(prev, state) ? prev : state));
-  }, []);
-  const handleSlashStateChange = useCallback((state: SlashSuggestionState) => {
-    setSlashState((prev) => (isSameSlashSuggestionState(prev, state) ? prev : state));
-  }, []);
-
-  return {
-    suggestionState,
-    slashState,
-    suggestionRef,
-    slashRef,
-    handleStateChange,
-    handleSlashStateChange,
-  };
-}
-
-function useImageUploadController(args: {
-  editorRef: MutableRefObject<Editor | null>;
-  onChange: TiptapEditorProps["onChange"];
-  isReadOnly: boolean;
-  isStorageConfigured: boolean;
-  isStorageLoading: boolean;
-  storageSettings: ReturnType<typeof useTiptapEditorStorageFeatures>["storageSettings"];
-  toast: ReturnType<typeof useTiptapEditorStorageFeatures>["toast"];
-  openStorageSetupDialog: () => void;
-  lastSelectionRef: MutableRefObject<{ from: number; to: number } | null>;
-}) {
-  return useImageUploadManager({
-    editorRef: args.editorRef,
-    onChange: args.onChange,
-    isReadOnly: args.isReadOnly,
-    isStorageConfigured: args.isStorageConfigured,
-    isStorageLoading: args.isStorageLoading,
-    storageSettings: args.storageSettings,
-    toast: args.toast,
-    onRequestStorageSetup: args.openStorageSetupDialog,
-    lastSelectionRef: args.lastSelectionRef,
-  });
-}
 
 function useEditorControllers(args: {
   content: string;
@@ -75,6 +28,8 @@ function useEditorControllers(args: {
   initialContent: TiptapEditorProps["initialContent"];
   onInitialContentApplied: TiptapEditorProps["onInitialContentApplied"];
   isWikiGenerating: boolean;
+  wikiContentForCollab: TiptapEditorProps["wikiContentForCollab"];
+  onWikiContentApplied: TiptapEditorProps["onWikiContentApplied"];
   editorRef: MutableRefObject<Editor | null>;
   lastSelectionRef: MutableRefObject<{ from: number; to: number } | null>;
   editorContainerRef: RefObject<HTMLDivElement | null>;
@@ -141,6 +96,8 @@ function useEditorControllers(args: {
     focusContentRef: args.focusContentRef,
     initialContent: args.initialContent,
     onInitialContentApplied: args.onInitialContentApplied,
+    wikiContentForCollab: args.wikiContentForCollab,
+    onWikiContentApplied: args.onWikiContentApplied,
     handleImageUpload: args.handleImageUpload,
     isEditorInitializedRef,
   });
@@ -148,6 +105,10 @@ function useEditorControllers(args: {
   return { editor, handleInsertMermaid, ...suggestionUi };
 }
 
+/**
+ * Tiptapエディタの統合コントローラ（エディタ設定・サジェスト・画像アップロード・ライフサイクルを管理）。
+ * Unified controller for the Tiptap editor: setup, suggestions, image upload, and lifecycle management.
+ */
 export function useTiptapEditorController({
   content,
   onChange,
@@ -162,6 +123,8 @@ export function useTiptapEditorController({
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
+  wikiContentForCollab,
+  onWikiContentApplied,
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -215,6 +178,8 @@ export function useTiptapEditorController({
     initialContent,
     onInitialContentApplied,
     isWikiGenerating,
+    wikiContentForCollab: wikiContentForCollab ?? null,
+    onWikiContentApplied,
     editorRef,
     lastSelectionRef,
     editorContainerRef,

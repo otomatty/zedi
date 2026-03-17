@@ -9,6 +9,10 @@ import type { Page } from "@/types/page";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { WikiGeneratorStatus } from "./types";
 
+/**
+ * PageEditorLayout コンポーネントの Props。
+ * Props for the PageEditorLayout component.
+ */
 export interface PageEditorLayoutProps {
   title: string;
   content: string;
@@ -45,8 +49,15 @@ export interface PageEditorLayoutProps {
   wikiErrorMessage: string | null;
   onResetWiki: () => void;
   onGoToAISettings: () => void;
+  /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied でクリア */
+  wikiContentForCollab: string | null;
+  onWikiContentApplied: () => void;
 }
 
+/**
+ * ページエディタのレイアウトコンポーネント（ヘッダー・アラート・エディタ・ダイアログを統合）。
+ * Page editor layout component integrating header, alerts, editor content, and dialogs.
+ */
 export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
   const {
     title,
@@ -84,6 +95,8 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
     wikiErrorMessage,
     onResetWiki,
     onGoToAISettings,
+    wikiContentForCollab,
+    onWikiContentApplied,
   } = props;
 
   return (
@@ -129,6 +142,8 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
             collaboration?.flushSave?.();
             onPendingInitialContentClear();
           }}
+          wikiContentForCollab={wikiContentForCollab}
+          onWikiContentApplied={onWikiContentApplied}
         />
       </ContentWithAIChat>
 

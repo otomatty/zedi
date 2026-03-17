@@ -17,6 +17,10 @@ import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorControl
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
 export type { TiptapEditorProps } from "./TiptapEditor/types";
 
+/**
+ * Tiptap を用いたページエディタ UI。
+ * Page editor UI using Tiptap.
+ */
 const TiptapEditor: React.FC<TiptapEditorProps> = ({
   content,
   onChange,
@@ -33,6 +37,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
+  wikiContentForCollab,
+  onWikiContentApplied,
 }) => {
   const {
     editor,
@@ -79,6 +85,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     initialContent,
     onInitialContentApplied,
     isWikiGenerating,
+    wikiContentForCollab,
+    onWikiContentApplied,
   });
 
   return (

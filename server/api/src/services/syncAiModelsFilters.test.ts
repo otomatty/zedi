@@ -94,9 +94,9 @@ describe("assignTier", () => {
     expect(assignTier("openai", "gpt-4")).toBe("pro");
   });
 
-  it("anthropic: haiku/sonnet は free", () => {
+  it("anthropic: haiku は free、sonnet は pro", () => {
     expect(assignTier("anthropic", "claude-haiku-4")).toBe("free");
-    expect(assignTier("anthropic", "claude-sonnet-4")).toBe("free");
+    expect(assignTier("anthropic", "claude-sonnet-4")).toBe("pro");
   });
 
   it("anthropic: opus は pro", () => {
