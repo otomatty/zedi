@@ -48,9 +48,11 @@ function extractOgImage(doc: Document): string | null {
 function resolveUrl(base: string, relative: string | null): string | null {
   if (!relative) return null;
   try {
-    return new URL(relative, base).href;
+    const resolved = new URL(relative, base);
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return null;
+    return resolved.href;
   } catch {
-    return relative;
+    return null;
   }
 }
 
@@ -124,30 +126,54 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
 
+  const MAX_REDIRECTS = 5;
   let response: Response;
+  let currentUrl = url;
+  let html: string;
+  let finalUrl: string;
+
   try {
-    response = await fetch(url, {
-      headers: {
-        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
-        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      response = await fetch(currentUrl, {
+        headers: {
+          "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
+          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+        },
+        redirect: "manual",
+        signal: controller.signal,
+      });
+      if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+        const location = response.headers.get("Location");
+        if (!location || hop === MAX_REDIRECTS) {
+          throw new Error("Too many redirects or invalid Location");
+        }
+        try {
+          const nextUrl = new URL(location, currentUrl).href;
+          if (!isClipUrlAllowed(nextUrl)) {
+            throw new Error("Redirect to disallowed URL");
+          }
+          currentUrl = nextUrl;
+          continue;
+        } catch {
+          throw new Error("Invalid redirect Location");
+        }
+      }
+      break;
+    }
+
+    if (response.url !== currentUrl && !isClipUrlAllowed(response.url)) {
+      throw new Error("Redirect to disallowed URL");
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fetch failed: ${response.status}`);
+    }
+
+    html = await response.text();
+    finalUrl = response.url;
   } finally {
     clearTimeout(timeout);
   }
-
-  if (response.url !== url && !isClipUrlAllowed(response.url)) {
-    throw new Error("Redirect to disallowed URL");
-  }
-
-  if (!response.ok) {
-    throw new Error(`Fetch failed: ${response.status}`);
-  }
-
-  const html = await response.text();
-  const finalUrl = response.url;
   const dom = new JSDOM(html, { url: finalUrl });
   const document = dom.window.document;
 
@@ -197,29 +223,33 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
   const title = article.title || "Untitled";
 
-  const [page] = await db
-    .insert(pages)
-    .values({
-      ownerId: userId,
-      title,
-      contentPreview: contentText || null,
-      sourceUrl: finalUrl,
-      thumbnailUrl: thumbnailUrl ?? null,
-    })
-    .returning({ id: pages.id });
+  const result = await db.transaction(async (tx) => {
+    const [page] = await tx
+      .insert(pages)
+      .values({
+        ownerId: userId,
+        title,
+        contentPreview: contentText || null,
+        sourceUrl: finalUrl,
+        thumbnailUrl: thumbnailUrl ?? null,
+      })
+      .returning({ id: pages.id });
 
-  if (!page) throw new Error("Failed to create page");
+    if (!page) throw new Error("Failed to create page");
 
-  await db.insert(pageContents).values({
-    pageId: page.id,
-    ydocState: Buffer.from(ydocBase64, "base64"),
-    version: 1,
-    contentText: contentText || null,
+    await tx.insert(pageContents).values({
+      pageId: page.id,
+      ydocState: Buffer.from(ydocBase64, "base64"),
+      version: 1,
+      contentText: contentText || null,
+    });
+
+    return { page, title, thumbnailUrl };
   });
 
   return {
-    page_id: page.id,
-    title,
-    thumbnail_url: thumbnailUrl ?? null,
+    page_id: result.page.id,
+    title: result.title,
+    thumbnail_url: result.thumbnailUrl ?? null,
   };
 }

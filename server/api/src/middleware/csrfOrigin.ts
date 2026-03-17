@@ -24,49 +24,25 @@ function originFromReferer(referer: string): string | null {
  * CSRF protection: validates Origin or Referer for state-changing requests; returns 403 if not in allowed origins.
  */
 export const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
-  /**
-   *
-   */
   const method = c.req.method;
   if (!MUTATION_METHODS.has(method)) {
     return next();
   }
 
-  /**
-   *
-   */
   const path = c.req.path;
   // Only exclude routes that use Bearer/no cookie; /api/ext/authorize-code (cookie) stays protected.
-  /**
-   *
-   */
   const excludedPrefixes = ["/api/webhooks/"];
-  /**
-   *
-   */
   const exactExcluded = ["/api/ext/session", "/api/ext/clip-and-create"];
   if (excludedPrefixes.some((prefix) => path.startsWith(prefix))) return next();
   if (exactExcluded.includes(path)) return next();
 
-  /**
-   *
-   */
   const allowed = getAllowedOrigins();
   if (allowed.length === 0) {
     return next();
   }
 
-  /**
-   *
-   */
   const origin = c.req.header("Origin");
-  /**
-   *
-   */
   const referer = c.req.header("Referer");
-  /**
-   *
-   */
   const candidate = origin ?? (referer ? originFromReferer(referer) : null);
 
   if (!candidate || !allowed.includes(candidate)) {

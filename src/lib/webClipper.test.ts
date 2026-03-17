@@ -160,9 +160,9 @@ describe("webClipper", () => {
       expect(msg).toBe("予期しないエラーが発生しました。");
     });
 
-    it("returns the error message for unrecognized Error instances", () => {
+    it("returns a generic message for unrecognized Error instances (no leak)", () => {
       const msg = getClipErrorMessage(new Error("Something else"));
-      expect(msg).toBe("Something else");
+      expect(msg).toBe("エラーが発生しました。しばらくしてから再試行してください。");
     });
   });
 

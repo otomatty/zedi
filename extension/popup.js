@@ -30,6 +30,7 @@
       if (/^169\.254\./.test(host)) return false;
       if (/^fe80:/i.test(host)) return false;
       if (/^::ffff:/i.test(host)) return false;
+      if (host.includes(":") && /^f[cd]/i.test(host)) return false; // IPv6 ULA fc00::/7
       if (/^127\./.test(host)) return false;
       if (/^(chrome|about|file)$/i.test(host)) return false;
       return true;

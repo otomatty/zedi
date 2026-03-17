@@ -80,9 +80,11 @@ describe("clipUrlPolicy", () => {
       expect(isClipUrlAllowed("http://169.254.1.2/")).toBe(false);
     });
 
-    it("returns false for IPv6 link-local (fe80:)", () => {
+    it("returns false for IPv6 link-local (fe80::/10)", () => {
       expect(isClipUrlAllowed("http://[fe80::1]")).toBe(false);
       expect(isClipUrlAllowed("http://[fe80::2%eth0]")).toBe(false);
+      expect(isClipUrlAllowed("http://[fe90::1]")).toBe(false);
+      expect(isClipUrlAllowed("http://[febf::1]")).toBe(false);
     });
 
     it("returns false for IPv6 ULA (fc00::/7, RFC 4193)", () => {

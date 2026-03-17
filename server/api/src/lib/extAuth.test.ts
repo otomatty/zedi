@@ -63,16 +63,11 @@ describe("extAuth", () => {
       }
     });
 
-    it("allows *.chromiumapp.org when EXTENSION_ORIGIN is unset (development)", () => {
+    it("rejects all when EXTENSION_ORIGIN is unset (fail-closed, any env)", () => {
       delete process.env.EXTENSION_ORIGIN;
       process.env.NODE_ENV = "development";
-      expect(isRedirectUriAllowed("https://abcdef.chromiumapp.org/")).toBe(true);
-      expect(isRedirectUriAllowed("https://xyz.chromiumapp.org")).toBe(true);
-      expect(isRedirectUriAllowed("https://abc.chromiumapp.org")).toBe(true);
-    });
-
-    it("rejects all when EXTENSION_ORIGIN is unset in production", () => {
-      delete process.env.EXTENSION_ORIGIN;
+      expect(isRedirectUriAllowed("https://abcdef.chromiumapp.org/")).toBe(false);
+      expect(isRedirectUriAllowed("https://xyz.chromiumapp.org")).toBe(false);
       process.env.NODE_ENV = "production";
       expect(isRedirectUriAllowed("https://abcdef.chromiumapp.org/")).toBe(false);
       expect(isRedirectUriAllowed("https://xyz.chromiumapp.org")).toBe(false);
@@ -106,13 +101,18 @@ describe("extAuth", () => {
 
   describe("issueExtensionToken / verifyExtensionToken", () => {
     const secret = "x".repeat(48);
+    const origBetterAuthSecret = process.env.BETTER_AUTH_SECRET;
 
     beforeEach(() => {
       process.env.BETTER_AUTH_SECRET = secret;
     });
 
     afterEach(() => {
-      delete process.env.BETTER_AUTH_SECRET;
+      if (origBetterAuthSecret !== undefined) {
+        process.env.BETTER_AUTH_SECRET = origBetterAuthSecret;
+      } else {
+        delete process.env.BETTER_AUTH_SECRET;
+      }
     });
 
     it("issues a token that verifyExtensionToken accepts", async () => {

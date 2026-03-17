@@ -22,6 +22,7 @@ export function usePageEditorWikiCollab(
   const flushSave = collaboration?.flushSave;
   const onWikiContentApplied = useCallback(() => {
     setWikiContentForCollab(null);
+    flushSave?.();
   }, [flushSave]);
 
   return { wikiContentForCollab, setWikiContentForCollab, resetWiki, onWikiContentApplied };
