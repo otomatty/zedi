@@ -24,6 +24,12 @@ bun run format:check   # Prettier チェック
 bun run test:run       # Vitest 単体テスト
 ```
 
+## テスト（TDD）
+
+- **テストは実装の前に書く**（テスト駆動開発・TDD を徹底する）。新規機能・修正では、期待する振る舞いをテストで先に定義し、そのテストが通るように実装する。
+- **テスト品質の指標は Mutation スコアを優先する**。カバレッジ 80% 以上は目標とするが、Mutation スコアの閾値を満たすことを優先する。
+- 詳細は [docs/guides/testing-guidelines.md](docs/guides/testing-guidelines.md) を参照。
+
 ## コードスタイル
 
 - TypeScript strict。`any` 禁止、型を明示する。
