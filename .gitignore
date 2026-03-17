@@ -39,6 +39,8 @@ nul
 # Test coverage (Vitest, etc.)
 coverage/
 *.lcov
+.stryker-tmp/
+reports/mutation/
 
 # Playwright
 playwright-report/
