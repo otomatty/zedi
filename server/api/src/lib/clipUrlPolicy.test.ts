@@ -3,6 +3,7 @@
  * Unit tests for clip URL policy / SSRF protection.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
 
@@ -127,25 +128,29 @@ describe("clipUrlPolicy", () => {
     });
 
     it("returns true when DNS resolves to public IP only", async () => {
-      vi.mocked(lookup).mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+      const result: LookupAddress[] = [{ address: "93.184.216.34", family: 4 }];
+      vi.mocked(lookup).mockResolvedValue(result as unknown as import("node:dns").LookupAddress);
       expect(await isClipUrlAllowedAfterDns("https://example.com/path")).toBe(true);
     });
 
     it("returns false when DNS resolves to private IP", async () => {
-      vi.mocked(lookup).mockResolvedValue([{ address: "10.0.0.1", family: 4 }]);
+      const result: LookupAddress[] = [{ address: "10.0.0.1", family: 4 }];
+      vi.mocked(lookup).mockResolvedValue(result as unknown as import("node:dns").LookupAddress);
       expect(await isClipUrlAllowedAfterDns("https://internal.corp/page")).toBe(false);
     });
 
     it("returns false when DNS resolves to loopback", async () => {
-      vi.mocked(lookup).mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
+      const result: LookupAddress[] = [{ address: "127.0.0.1", family: 4 }];
+      vi.mocked(lookup).mockResolvedValue(result as unknown as import("node:dns").LookupAddress);
       expect(await isClipUrlAllowedAfterDns("https://evil.example.com/")).toBe(false);
     });
 
     it("returns false when any resolved address is private", async () => {
-      vi.mocked(lookup).mockResolvedValue([
+      const result: LookupAddress[] = [
         { address: "93.184.216.34", family: 4 },
         { address: "192.168.1.1", family: 4 },
-      ]);
+      ];
+      vi.mocked(lookup).mockResolvedValue(result as unknown as import("node:dns").LookupAddress);
       expect(await isClipUrlAllowedAfterDns("https://example.com/")).toBe(false);
     });
 

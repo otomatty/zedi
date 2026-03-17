@@ -10,6 +10,17 @@ vi.mock("../../db/client.js", () => ({
   getDb: vi.fn(() => ({})),
 }));
 
+type AuthSession = Awaited<ReturnType<typeof import("../../auth.js").auth.api.getSession>>;
+const mockSessionUser = {
+  id: "user-1",
+  email: "u@e.com",
+  name: "",
+  image: null as string | null,
+  emailVerified: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  role: null as string | null,
+};
 vi.mock("../../auth.js", () => ({
   auth: { api: { getSession: vi.fn() } },
 }));
@@ -384,7 +395,7 @@ describe("GET /api/ext/authorize-code", () => {
   });
 
   it("returns 400 when redirect_uri or code_challenge is missing", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: "user-1", email: "u@e.com" } });
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     const app = createExtApp(mockRedis, mockDb);
     const res = await app.request(
       "/api/ext/authorize-code?redirect_uri=https://x.chromiumapp.org/",
@@ -398,7 +409,7 @@ describe("GET /api/ext/authorize-code", () => {
   });
 
   it("returns 400 when redirect_uri is not allowed", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: "user-1", email: "u@e.com" } });
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     mockIsRedirectUriAllowed.mockReturnValue(false);
     const app = createExtApp(mockRedis, mockDb);
     const res = await app.request(
@@ -411,7 +422,7 @@ describe("GET /api/ext/authorize-code", () => {
   });
 
   it("returns 200 with code and state when session and params are valid", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: "user-1", email: "u@e.com" } });
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     const app = createExtApp(mockRedis, mockDb);
     const res = await app.request(
       "/api/ext/authorize-code?redirect_uri=https://x.chromiumapp.org/&code_challenge=ch&state=st",
@@ -420,7 +431,8 @@ describe("GET /api/ext/authorize-code", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { code?: string; state?: string };
     expect(typeof body.code).toBe("string");
-    expect(body.code.length).toBeGreaterThan(0);
+    expect(body.code).toBeDefined();
+    expect((body.code as string).length).toBeGreaterThan(0);
     expect(body.state).toBe("st");
   });
 });
@@ -450,7 +462,7 @@ describe("POST /api/ext/authorize-code", () => {
   });
 
   it("returns 400 when redirect_uri or code_challenge is missing", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: "user-1", email: "u@e.com" } });
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     const app = createExtApp(mockRedis, mockDb);
     const res = await app.request("/api/ext/authorize-code", {
       method: "POST",
@@ -463,7 +475,7 @@ describe("POST /api/ext/authorize-code", () => {
   });
 
   it("returns 200 with code and state when session and body are valid", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: "user-1", email: "u@e.com" } });
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     const app = createExtApp(mockRedis, mockDb);
     const res = await app.request("/api/ext/authorize-code", {
       method: "POST",
@@ -477,7 +489,8 @@ describe("POST /api/ext/authorize-code", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { code?: string; state?: string };
     expect(typeof body.code).toBe("string");
-    expect(body.code.length).toBeGreaterThan(0);
+    expect(body.code).toBeDefined();
+    expect((body.code as string).length).toBeGreaterThan(0);
     expect(body.state).toBe("st");
   });
 });
