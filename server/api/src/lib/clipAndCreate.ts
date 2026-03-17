@@ -56,6 +56,57 @@ function resolveUrl(base: string, relative: string | null): string | null {
   }
 }
 
+async function fetchHtmlWithRedirects(
+  url: string,
+  controller: AbortController,
+): Promise<{ html: string; finalUrl: string }> {
+  const MAX_REDIRECTS = 5;
+  let response!: Response;
+  let currentUrl = url;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    response = await fetch(currentUrl, {
+      headers: {
+        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+      },
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      const location = response.headers.get("Location");
+      if (!location || hop === MAX_REDIRECTS) {
+        throw new Error("Too many redirects or invalid Location");
+      }
+
+      let nextUrl: string;
+      try {
+        nextUrl = new URL(location, currentUrl).href;
+      } catch {
+        throw new Error("Invalid redirect Location");
+      }
+
+      if (!isClipUrlAllowed(nextUrl)) {
+        throw new Error("Redirect to disallowed URL");
+      }
+      currentUrl = nextUrl;
+      continue;
+    }
+    break;
+  }
+
+  if (response.url !== currentUrl && !isClipUrlAllowed(response.url)) {
+    throw new Error("Redirect to disallowed URL");
+  }
+
+  if (!response.ok) {
+    throw new Error(`Fetch failed: ${response.status}`);
+  }
+
+  const html = await response.text();
+  return { html, finalUrl: response.url };
+}
+
 function cleanupHtml(html: string, doc: Document): string {
   const div = doc.createElement("div");
   div.innerHTML = html;
@@ -125,52 +176,11 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
-
-  const MAX_REDIRECTS = 5;
-  let response: Response;
-  let currentUrl = url;
   let html: string;
   let finalUrl: string;
 
   try {
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      response = await fetch(currentUrl, {
-        headers: {
-          "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
-          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-        },
-        redirect: "manual",
-        signal: controller.signal,
-      });
-      if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
-        const location = response.headers.get("Location");
-        if (!location || hop === MAX_REDIRECTS) {
-          throw new Error("Too many redirects or invalid Location");
-        }
-        try {
-          const nextUrl = new URL(location, currentUrl).href;
-          if (!isClipUrlAllowed(nextUrl)) {
-            throw new Error("Redirect to disallowed URL");
-          }
-          currentUrl = nextUrl;
-          continue;
-        } catch {
-          throw new Error("Invalid redirect Location");
-        }
-      }
-      break;
-    }
-
-    if (response.url !== currentUrl && !isClipUrlAllowed(response.url)) {
-      throw new Error("Redirect to disallowed URL");
-    }
-
-    if (!response.ok) {
-      throw new Error(`Fetch failed: ${response.status}`);
-    }
-
-    html = await response.text();
-    finalUrl = response.url;
+    ({ html, finalUrl } = await fetchHtmlWithRedirects(url, controller));
   } finally {
     clearTimeout(timeout);
   }
