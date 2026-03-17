@@ -18,7 +18,7 @@ import {
   storeExtensionCode,
 } from "../lib/extAuth.js";
 import { clipAndCreate } from "../lib/clipAndCreate.js";
-import { isClipUrlAllowed } from "../lib/clipUrlPolicy.js";
+import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -135,6 +135,9 @@ app.post("/authorize-code", authRequired, async (c) => {
 });
 
 // ── POST /clip-and-create ──────────────────────────────────────────────────
+// 制約: isClipUrlAllowedAfterDns の DNS 検証と、後段の fetch(url) の名前解決は別タイミングのため、
+// DNS rebinding（検証時は public IP でも fetch 時に private へ再解決されうる）の TOCTOU が残る。
+// Limitation: DNS check and fetch use separate lookups; DNS rebinding (TOCTOU) is not fully mitigated.
 app.post("/clip-and-create", extAuthRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
@@ -146,6 +149,13 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
 
   const url = body.url.trim();
   if (!isClipUrlAllowed(url)) {
+    throw new HTTPException(400, {
+      message:
+        "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",
+    });
+  }
+  const allowedAfterDns = await isClipUrlAllowedAfterDns(url);
+  if (!allowedAfterDns) {
     throw new HTTPException(400, {
       message:
         "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",
