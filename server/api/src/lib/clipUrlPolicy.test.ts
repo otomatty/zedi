@@ -2,8 +2,13 @@
  * clipUrlPolicy (SSRF 対策) の単体テスト
  * Unit tests for clip URL policy / SSRF protection.
  */
-import { describe, it, expect } from "vitest";
-import { isClipUrlAllowed } from "./clipUrlPolicy.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { lookup } from "node:dns/promises";
+import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
+
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(),
+}));
 
 describe("clipUrlPolicy", () => {
   describe("isClipUrlAllowed", () => {
@@ -100,6 +105,53 @@ describe("clipUrlPolicy", () => {
     it("returns false for invalid URL strings", () => {
       expect(isClipUrlAllowed("not a url")).toBe(false);
       expect(isClipUrlAllowed("://missing-scheme")).toBe(false);
+    });
+  });
+
+  describe("isClipUrlAllowedAfterDns", () => {
+    beforeEach(() => {
+      vi.mocked(lookup).mockReset();
+    });
+
+    it("returns false when isClipUrlAllowed is false", async () => {
+      expect(await isClipUrlAllowedAfterDns("http://localhost")).toBe(false);
+      expect(await isClipUrlAllowedAfterDns("http://127.0.0.1")).toBe(false);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it("returns true when hostname is public IP and allowed", async () => {
+      // 8.8.8.8 is public; isClipUrlAllowed rejects many IPs but allows some public IPs
+      // Actually isClipUrlAllowed does not allow IPs that look like 8.8.8.8 - it only checks for private/loopback. So 8.8.8.8 passes the sync check. Then isClipUrlAllowedAfterDns sees isIP("8.8.8.8") !== 0 so it returns true without lookup.
+      expect(await isClipUrlAllowedAfterDns("http://8.8.8.8")).toBe(true);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it("returns true when DNS resolves to public IP only", async () => {
+      vi.mocked(lookup).mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+      expect(await isClipUrlAllowedAfterDns("https://example.com/path")).toBe(true);
+    });
+
+    it("returns false when DNS resolves to private IP", async () => {
+      vi.mocked(lookup).mockResolvedValue([{ address: "10.0.0.1", family: 4 }]);
+      expect(await isClipUrlAllowedAfterDns("https://internal.corp/page")).toBe(false);
+    });
+
+    it("returns false when DNS resolves to loopback", async () => {
+      vi.mocked(lookup).mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
+      expect(await isClipUrlAllowedAfterDns("https://evil.example.com/")).toBe(false);
+    });
+
+    it("returns false when any resolved address is private", async () => {
+      vi.mocked(lookup).mockResolvedValue([
+        { address: "93.184.216.34", family: 4 },
+        { address: "192.168.1.1", family: 4 },
+      ]);
+      expect(await isClipUrlAllowedAfterDns("https://example.com/")).toBe(false);
+    });
+
+    it("returns false when lookup throws", async () => {
+      vi.mocked(lookup).mockRejectedValue(new Error("ENOTFOUND"));
+      expect(await isClipUrlAllowedAfterDns("https://nonexistent.invalid.example/")).toBe(false);
     });
   });
 });

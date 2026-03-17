@@ -18,7 +18,7 @@ import {
   storeExtensionCode,
 } from "../lib/extAuth.js";
 import { clipAndCreate } from "../lib/clipAndCreate.js";
-import { isClipUrlAllowed } from "../lib/clipUrlPolicy.js";
+import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -146,6 +146,13 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
 
   const url = body.url.trim();
   if (!isClipUrlAllowed(url)) {
+    throw new HTTPException(400, {
+      message:
+        "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",
+    });
+  }
+  const allowedAfterDns = await isClipUrlAllowedAfterDns(url);
+  if (!allowedAfterDns) {
     throw new HTTPException(400, {
       message:
         "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",

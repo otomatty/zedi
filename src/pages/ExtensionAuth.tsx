@@ -58,18 +58,20 @@ const ExtensionAuth: React.FC = () => {
         <div className="w-full max-w-md">
           {!hasParams ? (
             <div className="text-center">
-              <h1 className="mb-2 text-xl font-bold text-foreground">Invalid request</h1>
+              <h1 className="mb-2 text-xl font-bold text-foreground">
+                {t("auth.extension.invalidRequest")}
+              </h1>
               <p className="text-muted-foreground">
-                redirect_uri, code_challenge, and state are required.
+                {t("auth.extension.invalidRequestDescription")}
               </p>
             </div>
           ) : (
             <>
               <div className="mb-8 text-center">
-                <h1 className="mb-2 text-2xl font-bold text-foreground">Connect to Zedi</h1>
-                <p className="text-foreground/70">
-                  Sign in to connect the Chrome extension to your Zedi account.
-                </p>
+                <h1 className="mb-2 text-2xl font-bold text-foreground">
+                  {t("auth.extension.connectTitle")}
+                </h1>
+                <p className="text-foreground/70">{t("auth.extension.connectDescription")}</p>
               </div>
               {error && (
                 <p className="mb-4 text-sm text-destructive" role="alert">
