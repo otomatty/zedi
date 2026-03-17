@@ -10,19 +10,21 @@ import { useSession } from "@/lib/auth/authClient";
 
 const SESSION_WAIT_TIMEOUT_MS = 15_000;
 /** 認証後に許可されるリダイレクトパス（CodeQL: オープンリダイレクト防止）。Allowed post-auth redirect paths (CodeQL: avoid open redirect). */
-const ALLOWED_RETURN_PATHS = ["/home"];
+const ALLOWED_RETURN_PATHS = ["/home"] as const;
 
 /**
- * returnTo が許可された pathname でありオープンリダイレクトでないか検証する。
- * Validates returnTo is an allowed pathname and not an open redirect; allows query/hash.
+ * returnTo を検証し、安全なリダイレクト先を返す。pathname は許可リストの定数のみ使用し CodeQL を満たす。
+ * Validates returnTo and returns a safe redirect target; pathname comes only from allowlist constant (CodeQL).
  */
-function isSafeReturnTo(returnTo: string): boolean {
-  if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return false;
+function getSafeReturnTarget(returnTo: string | null): string {
+  if (!returnTo?.startsWith("/") || returnTo.startsWith("//")) return "/home";
   try {
     const parsed = new URL(returnTo, "http://dummy");
-    return ALLOWED_RETURN_PATHS.includes(parsed.pathname);
+    const allowedPathname = ALLOWED_RETURN_PATHS.find((p) => p === parsed.pathname);
+    if (!allowedPathname) return "/home";
+    return allowedPathname + (parsed.search ?? "") + (parsed.hash ?? "");
   } catch {
-    return false;
+    return "/home";
   }
 }
 
@@ -43,7 +45,9 @@ export default function AuthCallback() {
     const errorDescription = params.get("error_description");
 
     if (errorParam) {
-      queueMicrotask(() => setError(errorDescription || errorParam));
+      const raw = errorDescription || errorParam;
+      const safe = String(raw ?? "").replace(/[<>"'`]/g, "");
+      queueMicrotask(() => setError(safe || t("common.error")));
       return;
     }
 
@@ -52,8 +56,7 @@ export default function AuthCallback() {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      const returnTo = params.get("returnTo");
-      const target = returnTo && isSafeReturnTo(returnTo) ? returnTo : "/home";
+      const target = getSafeReturnTarget(params.get("returnTo"));
       window.location.assign(target);
       return;
     }

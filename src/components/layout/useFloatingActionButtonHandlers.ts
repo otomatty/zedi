@@ -16,11 +16,29 @@ export interface UseFloatingActionButtonHandlersOptions {
   setIsImageDialogOpen: (open: boolean) => void;
 }
 
+/** FAB ハンドラ hook の戻り値。Return type of useFloatingActionButtonHandlers. */
+export interface UseFloatingActionButtonHandlersResult {
+  handleMenuSelect: (option: FABMenuOption) => Promise<void>;
+  handleWebClipped: (
+    title: string,
+    content: string,
+    sourceUrl: string,
+    thumbnailUrl?: string | null,
+  ) => Promise<void>;
+  handleImageCreated: (
+    imageUrl: string,
+    extractedText?: string,
+    description?: string,
+  ) => Promise<void>;
+}
+
 /**
  * FAB のオプション選択・クリップ完了・画像作成完了の処理を行う。
  * Handles FAB option selection, web clip completion, and image create completion.
  */
-export function useFloatingActionButtonHandlers(options: UseFloatingActionButtonHandlersOptions) {
+export function useFloatingActionButtonHandlers(
+  options: UseFloatingActionButtonHandlersOptions,
+): UseFloatingActionButtonHandlersResult {
   const { createNewPage, setIsWebClipperOpen, setIsImageDialogOpen } = options;
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -89,7 +107,7 @@ export function useFloatingActionButtonHandlers(options: UseFloatingActionButton
               type: "image",
               attrs: {
                 src: imageUrl,
-                alt: description || "Uploaded image",
+                alt: description || t("editor.uploadedImageAlt"),
               },
             },
             {
