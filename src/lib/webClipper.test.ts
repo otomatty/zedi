@@ -49,6 +49,17 @@ describe("webClipper", () => {
       expect(isClipUrlAllowed("http://172.16.0.1/")).toBe(false);
     });
 
+    it("returns false for IPv6 ULA including short form (fc::1, fd::1)", () => {
+      expect(isClipUrlAllowed("http://[fc::1]/")).toBe(false);
+      expect(isClipUrlAllowed("http://[fd::1]")).toBe(false);
+      expect(isClipUrlAllowed("http://[fd00::1]")).toBe(false);
+    });
+
+    it("returns true for domain starting with fc/fd (no false positive)", () => {
+      expect(isClipUrlAllowed("https://fcb.example.com")).toBe(true);
+      expect(isClipUrlAllowed("https://fd0.network")).toBe(true);
+    });
+
     it("returns false for empty string", () => {
       expect(isClipUrlAllowed("")).toBe(false);
       expect(isClipUrlAllowed("   ")).toBe(false);

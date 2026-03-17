@@ -88,6 +88,14 @@ describe("clipUrlPolicy", () => {
     it("returns false for IPv6 ULA (fc00::/7, RFC 4193)", () => {
       expect(isClipUrlAllowed("http://[fd00::1]")).toBe(false);
       expect(isClipUrlAllowed("http://[fc00::1]/")).toBe(false);
+      expect(isClipUrlAllowed("http://[fc::1]/")).toBe(false);
+      expect(isClipUrlAllowed("http://[fd::1]")).toBe(false);
+    });
+
+    it("returns true for domain starting with fc/fd (no false positive)", () => {
+      expect(isClipUrlAllowed("https://fcb.example.com")).toBe(true);
+      expect(isClipUrlAllowed("https://fcc.io/path")).toBe(true);
+      expect(isClipUrlAllowed("https://fd0.network")).toBe(true);
     });
 
     it("returns false for 0.0.0.0, [::], IPv4-mapped IPv6", () => {

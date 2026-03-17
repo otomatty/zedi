@@ -27,7 +27,7 @@ function isPrivateOrLoopbackOrLinkLocalIp(ip: string): boolean {
   // IPv6: loopback, link-local (fe80::/10), Unique Local Address (fc00::/7, RFC 4193)
   if (normalized === "::1" || normalized === "::") return true;
   if (/^fe80:/i.test(normalized)) return true;
-  if (/^f[cd][0-9a-f]/i.test(normalized)) return true; // ULA fc00::/7
+  if (/^f[cd][0-9a-f:]/i.test(normalized)) return true; // ULA fc00::/7 (colon for short form e.g. fc::1)
   if (/^::ffff:/i.test(normalized)) {
     const v4 = normalized.replace(/^::ffff:/i, "");
     return isPrivateOrLoopbackOrLinkLocalIp(v4);
@@ -66,7 +66,7 @@ export function isClipUrlAllowed(url: string): boolean {
     // link-local (169.254.0.0/16, fe80::/10), ULA (fc00::/7, RFC 4193)
     if (/^169\.254\./.test(hostname)) return false;
     if (/^fe80:/i.test(hostname)) return false;
-    if (/^f[cd][0-9a-f]/i.test(hostname)) return false; // IPv6 ULA
+    if (hostname.includes(":") && /^f[cd]/i.test(hostname)) return false; // IPv6 ULA (avoids blocking e.g. fcb.example.com)
     return true;
   } catch {
     return false;
@@ -86,8 +86,8 @@ export async function isClipUrlAllowedAfterDns(url: string): Promise<boolean> {
     if (hostname.startsWith("[") && hostname.endsWith("]")) {
       hostname = hostname.slice(1, -1);
     }
-    // ホスト名がすでに公開 IP の場合は、DNS ルックアップなしで許可する。
-    if (isIP(hostname) !== 0) return true;
+    // ホスト名がすでに IP の場合は、private/ULA でなければ許可する（ULA 短縮形 fc::1 等もここで判定）。
+    if (isIP(hostname) !== 0) return !isPrivateOrLoopbackOrLinkLocalIp(hostname);
     const result = await lookup(hostname, { all: true });
     const addresses = result.map((r) => r.address);
     if (addresses.length === 0) return false;
