@@ -10,7 +10,7 @@ import { useSession } from "@/lib/auth/authClient";
 
 const SESSION_WAIT_TIMEOUT_MS = 15_000;
 /** 認証後に許可されるリダイレクトパス（CodeQL: オープンリダイレクト防止）。Allowed post-auth redirect paths (CodeQL: avoid open redirect). */
-const ALLOWED_RETURN_PATHS = ["/home"];
+const ALLOWED_RETURN_PATHS = ["/home"] as const;
 
 /**
  * returnTo を検証し、安全なリダイレクト先を返す。pathname は許可リストの定数のみ使用し CodeQL を満たす。
@@ -22,7 +22,7 @@ function getSafeReturnTarget(returnTo: string | null): string {
     const parsed = new URL(returnTo, "http://dummy");
     const allowedPathname = ALLOWED_RETURN_PATHS.find((p) => p === parsed.pathname);
     if (!allowedPathname) return "/home";
-    return allowedPathname;
+    return allowedPathname + (parsed.search ?? "") + (parsed.hash ?? "");
   } catch {
     return "/home";
   }
@@ -46,11 +46,8 @@ export default function AuthCallback() {
 
     if (errorParam) {
       const raw = errorDescription || errorParam;
-      const safe =
-        typeof raw === "string"
-          ? raw.replace(/[<>"']/g, "")
-          : String(raw ?? "").replace(/[<>"']/g, "");
-      queueMicrotask(() => setError(safe || "Error"));
+      const safe = String(raw ?? "").replace(/[<>"'`]/g, "");
+      queueMicrotask(() => setError(safe || t("common.error")));
       return;
     }
 
