@@ -28,8 +28,9 @@
       if (/^10\.|^192\.168\./.test(host)) return false;
       if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(host)) return false;
       if (/^169\.254\./.test(host)) return false;
-      if (/^fe80:/i.test(host)) return false;
+      if (/^fe[89ab][0-9a-f]:/i.test(host)) return false; // fe80::/10 link-local / fe80::/10 リンクローカル
       if (/^::ffff:/i.test(host)) return false;
+      if (host.includes(":") && /^f[cd]/i.test(host)) return false; // IPv6 ULA fc00::/7 / IPv6 ULA fc00::/7（ユニークローカル）
       if (/^127\./.test(host)) return false;
       if (/^(chrome|about|file)$/i.test(host)) return false;
       return true;

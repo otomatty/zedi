@@ -24,7 +24,7 @@ export function getClipErrorMessage(error: unknown): string {
     if (error.message.includes("プロキシ") || error.message.includes("FETCH_FAILED")) {
       return "ページの取得に失敗しました。URLを確認してください。";
     }
-    return error.message;
+    return "エラーが発生しました。しばらくしてから再試行してください。";
   }
   return "予期しないエラーが発生しました。";
 }

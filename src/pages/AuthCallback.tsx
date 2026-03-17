@@ -9,6 +9,22 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "@/lib/auth/authClient";
 
 const SESSION_WAIT_TIMEOUT_MS = 15_000;
+/** 認証後に許可されるリダイレクトパス（CodeQL: オープンリダイレクト防止）。Allowed post-auth redirect paths (CodeQL: avoid open redirect). */
+const ALLOWED_RETURN_PATHS = ["/home"];
+
+/**
+ * returnTo が許可された pathname でありオープンリダイレクトでないか検証する。
+ * Validates returnTo is an allowed pathname and not an open redirect; allows query/hash.
+ */
+function isSafeReturnTo(returnTo: string): boolean {
+  if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return false;
+  try {
+    const parsed = new URL(returnTo, "http://dummy");
+    return ALLOWED_RETURN_PATHS.includes(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * OAuth callback page component. Waits for session then redirects.
@@ -37,8 +53,7 @@ export default function AuthCallback() {
         timeoutRef.current = null;
       }
       const returnTo = params.get("returnTo");
-      const target =
-        returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/home";
+      const target = returnTo && isSafeReturnTo(returnTo) ? returnTo : "/home";
       window.location.assign(target);
       return;
     }

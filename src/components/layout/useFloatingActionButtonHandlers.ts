@@ -9,9 +9,7 @@ import { useCreatePage } from "@/hooks/usePageQueries";
 import { useToast } from "@zedi/ui";
 import type { FABMenuOption } from "./FABMenu";
 
-/**
- *
- */
+/** FAB の作成・クリップ・画像ダイアログ制御用オプション。Options for FAB create/clip/image dialog handlers. */
 export interface UseFloatingActionButtonHandlersOptions {
   createNewPage: () => Promise<void>;
   setIsWebClipperOpen: (open: boolean) => void;

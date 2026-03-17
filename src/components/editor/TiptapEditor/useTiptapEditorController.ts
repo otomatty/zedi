@@ -126,25 +126,10 @@ export function useTiptapEditorController({
   wikiContentForCollab,
   onWikiContentApplied,
 }: TiptapEditorProps) {
-  /**
-   *
-   */
   const { editorFontSizePx } = useGeneralSettings();
-  /**
-   *
-   */
   const editorContainerRef = useRef<HTMLDivElement>(null);
-  /**
-   *
-   */
   const editorRef = useRef<Editor | null>(null);
-  /**
-   *
-   */
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
-  /**
-   *
-   */
   const {
     handleLinkClick,
     createPageDialogOpen,
@@ -152,13 +137,7 @@ export function useTiptapEditorController({
     handleConfirmCreate,
     handleCancelCreate,
   } = useWikiLinkNavigation();
-  /**
-   *
-   */
   const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
-  /**
-   *
-   */
   const {
     storageSettings,
     isStorageLoading,
@@ -174,13 +153,7 @@ export function useTiptapEditorController({
     canDeleteFromStorage,
     handleDeleteFromStorage,
   } = useTiptapEditorStorageFeatures(content);
-  /**
-   *
-   */
   const suggestionControllers = useSuggestionControllers();
-  /**
-   *
-   */
   const imageUpload = useImageUploadController({
     editorRef,
     onChange,
@@ -192,9 +165,6 @@ export function useTiptapEditorController({
     openStorageSetupDialog,
     lastSelectionRef,
   });
-  /**
-   *
-   */
   const editorControllers = useEditorControllers({
     content,
     onChange,
@@ -229,9 +199,6 @@ export function useTiptapEditorController({
     handleInsertImageClick: imageUpload.handleInsertImageClick,
     handleImageUpload: imageUpload.handleImageUpload,
   });
-  /**
-   *
-   */
   const { handleInsertThumbnailImage } = useThumbnailController(
     editorRef,
     pageTitle,

@@ -18,7 +18,7 @@ import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
-import { isClipUrlAllowed } from "./clipUrlPolicy.js";
+import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
 
 const lowlight = createLowlight(common);
 const YDOC_FRAGMENT = "default";
@@ -48,10 +48,71 @@ function extractOgImage(doc: Document): string | null {
 function resolveUrl(base: string, relative: string | null): string | null {
   if (!relative) return null;
   try {
-    return new URL(relative, base).href;
+    const resolved = new URL(relative, base);
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return null;
+    return resolved.href;
   } catch {
-    return relative;
+    return null;
   }
+}
+
+async function fetchHtmlWithRedirects(
+  url: string,
+  controller: AbortController,
+): Promise<{ html: string; finalUrl: string }> {
+  const MAX_REDIRECTS = 5;
+  let response!: Response;
+  let currentUrl = url;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    response = await fetch(currentUrl, {
+      headers: {
+        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+      },
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    const isRedirect =
+      response.type === "opaqueredirect" || [301, 302, 303, 307, 308].includes(response.status);
+    if (isRedirect) {
+      const location = response.headers.get("Location");
+      if (!location || hop === MAX_REDIRECTS) {
+        throw new Error("Too many redirects or invalid Location");
+      }
+
+      let nextUrl: string;
+      try {
+        nextUrl = new URL(location, currentUrl).href;
+      } catch {
+        throw new Error("Invalid redirect Location");
+      }
+
+      if (!isClipUrlAllowed(nextUrl)) {
+        throw new Error("Redirect to disallowed URL");
+      }
+      if (!(await isClipUrlAllowedAfterDns(nextUrl))) {
+        throw new Error("Redirect to disallowed URL");
+      }
+      currentUrl = nextUrl;
+      continue;
+    }
+    break;
+  }
+
+  if (response.url !== currentUrl && !isClipUrlAllowed(response.url)) {
+    throw new Error("Redirect to disallowed URL");
+  }
+  if (!(await isClipUrlAllowedAfterDns(response.url))) {
+    throw new Error("Redirect to disallowed URL");
+  }
+
+  if (!response.ok) {
+    throw new Error(`Fetch failed: ${response.status}`);
+  }
+
+  const html = await response.text();
+  return { html, finalUrl: response.url };
 }
 
 function cleanupHtml(html: string, doc: Document): string {
@@ -120,34 +181,20 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   if (!isClipUrlAllowed(url)) {
     throw new Error("URL not allowed");
   }
+  if (!(await isClipUrlAllowedAfterDns(url))) {
+    throw new Error("URL not allowed");
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
+  let html: string;
+  let finalUrl: string;
 
-  let response: Response;
   try {
-    response = await fetch(url, {
-      headers: {
-        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
-        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
+    ({ html, finalUrl } = await fetchHtmlWithRedirects(url, controller));
   } finally {
     clearTimeout(timeout);
   }
-
-  if (response.url !== url && !isClipUrlAllowed(response.url)) {
-    throw new Error("Redirect to disallowed URL");
-  }
-
-  if (!response.ok) {
-    throw new Error(`Fetch failed: ${response.status}`);
-  }
-
-  const html = await response.text();
-  const finalUrl = response.url;
   const dom = new JSDOM(html, { url: finalUrl });
   const document = dom.window.document;
 
@@ -197,29 +244,33 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
   const title = article.title || "Untitled";
 
-  const [page] = await db
-    .insert(pages)
-    .values({
-      ownerId: userId,
-      title,
-      contentPreview: contentText || null,
-      sourceUrl: finalUrl,
-      thumbnailUrl: thumbnailUrl ?? null,
-    })
-    .returning({ id: pages.id });
+  const result = await db.transaction(async (tx) => {
+    const [page] = await tx
+      .insert(pages)
+      .values({
+        ownerId: userId,
+        title,
+        contentPreview: contentText || null,
+        sourceUrl: finalUrl,
+        thumbnailUrl: thumbnailUrl ?? null,
+      })
+      .returning({ id: pages.id });
 
-  if (!page) throw new Error("Failed to create page");
+    if (!page) throw new Error("Failed to create page");
 
-  await db.insert(pageContents).values({
-    pageId: page.id,
-    ydocState: Buffer.from(ydocBase64, "base64"),
-    version: 1,
-    contentText: contentText || null,
+    await tx.insert(pageContents).values({
+      pageId: page.id,
+      ydocState: Buffer.from(ydocBase64, "base64"),
+      version: 1,
+      contentText: contentText || null,
+    });
+
+    return { page, title, thumbnailUrl };
   });
 
   return {
-    page_id: page.id,
-    title,
-    thumbnail_url: thumbnailUrl ?? null,
+    page_id: result.page.id,
+    title: result.title,
+    thumbnail_url: result.thumbnailUrl ?? null,
   };
 }

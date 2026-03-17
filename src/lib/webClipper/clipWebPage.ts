@@ -73,12 +73,7 @@ export async function clipWebPage(
 
   let html: string;
   if (fetchHtmlFn) {
-    try {
-      html = await fetchHtmlFn(url);
-    } catch (apiError) {
-      console.warn("Clip API failed, falling back to CORS proxy:", apiError);
-      html = await fetchWithProxy(url);
-    }
+    html = await fetchHtmlFn(url);
   } else {
     html = await fetchWithProxy(url);
   }

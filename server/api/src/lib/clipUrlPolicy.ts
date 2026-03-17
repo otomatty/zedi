@@ -24,9 +24,9 @@ function isPrivateOrLoopbackOrLinkLocalIp(ip: string): boolean {
     if (/^0\.0\.0\.0$/.test(normalized)) return true;
     return false;
   }
-  // IPv6: loopback, link-local (fe80::/10), Unique Local Address (fc00::/7, RFC 4193)
+  // IPv6: loopback, link-local (fe80::/10), Unique Local Address (fc00::/7, RFC 4193) / ループバック・リンクローカル・ULA
   if (normalized === "::1" || normalized === "::") return true;
-  if (/^fe80:/i.test(normalized)) return true;
+  if (/^fe[89ab][0-9a-f]:/i.test(normalized)) return true; // fe80::/10 link-local / fe80::/10 リンクローカル
   if (/^f[cd][0-9a-f:]/i.test(normalized)) return true; // ULA fc00::/7 (colon for short form e.g. fc::1)
   if (/^::ffff:/i.test(normalized)) {
     const v4 = normalized.replace(/^::ffff:/i, "");
@@ -65,8 +65,8 @@ export function isClipUrlAllowed(url: string): boolean {
     if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(hostname)) return false;
     // link-local (169.254.0.0/16, fe80::/10), ULA (fc00::/7, RFC 4193)
     if (/^169\.254\./.test(hostname)) return false;
-    if (/^fe80:/i.test(hostname)) return false;
-    if (hostname.includes(":") && /^f[cd]/i.test(hostname)) return false; // IPv6 ULA (avoids blocking e.g. fcb.example.com)
+    if (/^fe[89ab][0-9a-f]:/i.test(hostname)) return false; // fe80::/10 link-local / fe80::/10 リンクローカル
+    if (hostname.includes(":") && /^f[cd]/i.test(hostname)) return false; // IPv6 ULA (avoids blocking e.g. fcb.example.com) / IPv6 ULA
     return true;
   } catch {
     return false;
