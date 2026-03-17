@@ -24,9 +24,10 @@ function isPrivateOrLoopbackOrLinkLocalIp(ip: string): boolean {
     if (/^0\.0\.0\.0$/.test(normalized)) return true;
     return false;
   }
-  // IPv6
+  // IPv6: loopback, link-local (fe80::/10), Unique Local Address (fc00::/7, RFC 4193)
   if (normalized === "::1" || normalized === "::") return true;
   if (/^fe80:/i.test(normalized)) return true;
+  if (/^f[cd][0-9a-f]/i.test(normalized)) return true; // ULA fc00::/7
   if (/^::ffff:/i.test(normalized)) {
     const v4 = normalized.replace(/^::ffff:/i, "");
     return isPrivateOrLoopbackOrLinkLocalIp(v4);
@@ -35,19 +36,14 @@ function isPrivateOrLoopbackOrLinkLocalIp(ip: string): boolean {
 }
 
 /**
- *
+ * 文字列ベースで URL がクリップ許可対象かどうかを判定する（SSRF 対策）。
+ * Checks whether the given URL is allowed for clipping based on string-level hostname rules (SSRF protection).
  */
 export function isClipUrlAllowed(url: string): boolean {
   if (!url?.trim()) return false;
   try {
-    /**
-     *
-     */
     const parsed = new URL(url.trim());
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-    /**
-     *
-     */
     let hostname = parsed.hostname.toLowerCase();
     // Node returns IPv6 hostnames with brackets e.g. "[::1]", "[fe80::1]"
     if (hostname.startsWith("[") && hostname.endsWith("]")) {
@@ -67,9 +63,10 @@ export function isClipUrlAllowed(url: string): boolean {
     // RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
     if (/^10\.|^192\.168\./.test(hostname)) return false;
     if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(hostname)) return false;
-    // link-local (169.254.0.0/16, fe80::/10)
+    // link-local (169.254.0.0/16, fe80::/10), ULA (fc00::/7, RFC 4193)
     if (/^169\.254\./.test(hostname)) return false;
     if (/^fe80:/i.test(hostname)) return false;
+    if (/^f[cd][0-9a-f]/i.test(hostname)) return false; // IPv6 ULA
     return true;
   } catch {
     return false;
@@ -89,7 +86,7 @@ export async function isClipUrlAllowedAfterDns(url: string): Promise<boolean> {
     if (hostname.startsWith("[") && hostname.endsWith("]")) {
       hostname = hostname.slice(1, -1);
     }
-    // すでに IP の場合は isClipUrlAllowed で弾かれているためここには来ない（公開 IP のみ）
+    // ホスト名がすでに公開 IP の場合は、DNS ルックアップなしで許可する。
     if (isIP(hostname) !== 0) return true;
     const result = await lookup(hostname, { all: true });
     const addresses = result.map((r) => r.address);

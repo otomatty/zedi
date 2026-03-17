@@ -58,6 +58,14 @@ vi.mock("../../lib/clipAndCreate.js", () => ({
   }),
 }));
 
+vi.mock("../../lib/clipUrlPolicy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/clipUrlPolicy.js")>();
+  return {
+    ...actual,
+    isClipUrlAllowedAfterDns: vi.fn().mockResolvedValue(true),
+  };
+});
+
 import { Hono } from "hono";
 import { auth } from "../../auth.js";
 import extRoutes from "../../routes/ext.js";

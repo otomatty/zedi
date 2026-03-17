@@ -44,6 +44,7 @@ export function isClipUrlAllowed(url: string): boolean {
     if (/^172\.(1[6-9]|2\d|3[01])(\.|$)/.test(hostname)) return false;
     if (/^169\.254\./.test(hostname)) return false;
     if (/^fe80:/i.test(hostname)) return false;
+    if (/^f[cd][0-9a-f]/i.test(hostname)) return false; // IPv6 ULA (fc00::/7, RFC 4193)
     return true;
   } catch {
     return false;

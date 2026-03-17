@@ -85,6 +85,11 @@ describe("clipUrlPolicy", () => {
       expect(isClipUrlAllowed("http://[fe80::2%eth0]")).toBe(false);
     });
 
+    it("returns false for IPv6 ULA (fc00::/7, RFC 4193)", () => {
+      expect(isClipUrlAllowed("http://[fd00::1]")).toBe(false);
+      expect(isClipUrlAllowed("http://[fc00::1]/")).toBe(false);
+    });
+
     it("returns false for 0.0.0.0, [::], IPv4-mapped IPv6", () => {
       expect(isClipUrlAllowed("http://0.0.0.0")).toBe(false);
       expect(isClipUrlAllowed("http://0.0.0.0:8080/")).toBe(false);
@@ -121,8 +126,7 @@ describe("clipUrlPolicy", () => {
     });
 
     it("returns true when hostname is public IP and allowed", async () => {
-      // 8.8.8.8 is public; isClipUrlAllowed rejects many IPs but allows some public IPs
-      // Actually isClipUrlAllowed does not allow IPs that look like 8.8.8.8 - it only checks for private/loopback. So 8.8.8.8 passes the sync check. Then isClipUrlAllowedAfterDns sees isIP("8.8.8.8") !== 0 so it returns true without lookup.
+      // 8.8.8.8 is public; isClipUrlAllowed allows public IPs. So 8.8.8.8 passes the sync check. Then isClipUrlAllowedAfterDns sees isIP("8.8.8.8") !== 0 and returns true without lookup.
       expect(await isClipUrlAllowedAfterDns("http://8.8.8.8")).toBe(true);
       expect(lookup).not.toHaveBeenCalled();
     });
@@ -152,6 +156,12 @@ describe("clipUrlPolicy", () => {
       ];
       vi.mocked(lookup).mockResolvedValue(result as unknown as import("node:dns").LookupAddress);
       expect(await isClipUrlAllowedAfterDns("https://example.com/")).toBe(false);
+    });
+
+    it("returns false when DNS resolves to IPv6 ULA (fd00::/8)", async () => {
+      const result: LookupAddress[] = [{ address: "fd00::1", family: 6 }];
+      vi.mocked(lookup).mockResolvedValue(result as unknown as import("node:dns").LookupAddress);
+      expect(await isClipUrlAllowedAfterDns("https://internal6.example/page")).toBe(false);
     });
 
     it("returns false when lookup throws", async () => {
