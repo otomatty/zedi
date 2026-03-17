@@ -151,7 +151,6 @@ export function usePageEditorStateAndSync() {
     setPendingInitialContent,
     getTiptapContent,
     saveChanges,
-    resetWiki,
     resetWikiBase,
     updatePageMutation,
     toast,

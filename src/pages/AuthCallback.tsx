@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "@/lib/auth/authClient";
 
 const SESSION_WAIT_TIMEOUT_MS = 15_000;
-/** Allowed post-auth redirect paths (CodeQL: avoid open redirect). */
+/** 認証後に許可されるリダイレクトパス（CodeQL: オープンリダイレクト防止）。Allowed post-auth redirect paths (CodeQL: avoid open redirect). */
 const ALLOWED_RETURN_PATHS = ["/home"];
 
 /**

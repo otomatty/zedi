@@ -34,7 +34,7 @@ export function sanitizeHtml(html: string): string {
   });
 
   const DANGEROUS_SCHEMES = /^(javascript:|data:|vbscript:)/i;
-  const URL_ATTRS = ["href", "src", "xlink:href", "formaction"];
+  const URL_ATTRS = ["href", "src", "xlink:href", "formaction", "poster", "cite", "srcset"];
 
   /** スキーム判定用に ASCII 制御文字・空白を除去して正規化。Bypass 防止（e.g. java\\nscript:）。 */
   function normalizedScheme(value: string): string {

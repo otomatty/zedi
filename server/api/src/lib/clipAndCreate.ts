@@ -18,7 +18,7 @@ import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
-import { isClipUrlAllowed } from "./clipUrlPolicy.js";
+import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
 
 const lowlight = createLowlight(common);
 const YDOC_FRAGMENT = "default";
@@ -73,7 +73,9 @@ async function fetchHtmlWithRedirects(
       redirect: "manual",
       signal: controller.signal,
     });
-    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+    const isRedirect =
+      response.type === "opaqueredirect" || [301, 302, 303, 307, 308].includes(response.status);
+    if (isRedirect) {
       const location = response.headers.get("Location");
       if (!location || hop === MAX_REDIRECTS) {
         throw new Error("Too many redirects or invalid Location");
@@ -89,6 +91,9 @@ async function fetchHtmlWithRedirects(
       if (!isClipUrlAllowed(nextUrl)) {
         throw new Error("Redirect to disallowed URL");
       }
+      if (!(await isClipUrlAllowedAfterDns(nextUrl))) {
+        throw new Error("Redirect to disallowed URL");
+      }
       currentUrl = nextUrl;
       continue;
     }
@@ -96,6 +101,9 @@ async function fetchHtmlWithRedirects(
   }
 
   if (response.url !== currentUrl && !isClipUrlAllowed(response.url)) {
+    throw new Error("Redirect to disallowed URL");
+  }
+  if (!(await isClipUrlAllowedAfterDns(response.url))) {
     throw new Error("Redirect to disallowed URL");
   }
 
@@ -171,6 +179,9 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   const { url, userId, db } = input;
 
   if (!isClipUrlAllowed(url)) {
+    throw new Error("URL not allowed");
+  }
+  if (!(await isClipUrlAllowedAfterDns(url))) {
     throw new Error("URL not allowed");
   }
 
