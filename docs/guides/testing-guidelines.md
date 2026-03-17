@@ -1,6 +1,9 @@
 # テストガイドライン
 
-テストは実装と同時、または直後に記述する。対象は**ルートに近い画面**・**カスタムフック**・**ユーティリティ／サービス**。目的は (1) **回帰防止**（振る舞いが変わったらテストが落ちる）、(2) **仕様のLiving Documentation化**（describe/it の名前とコメントで振る舞いを残す）。**カバレッジは 80% 以上**を目指し、**必要なテストだけ**を書く。
+**テスト駆動開発（TDD）に合わせ、テストは実装の前に書くことを徹底する。** まず期待する振る舞いをテストで定義し、そのテストが通るように実装する。対象は**ルートに近い画面**・**カスタムフック**・**ユーティリティ／サービス**。目的は (1) **回帰防止**（振る舞いが変わったらテストが落ちる）、(2) **仕様の Living Documentation 化**（describe/it の名前とコメントで振る舞いを残す）。**テスト品質の指標は Mutation スコアを優先する**。カバレッジは 80% 以上を目標とするが、Mutation スコアが閾値（`stryker.config.mjs` の high/low/break）を満たすことを優先し、**必要なテストだけ**を書く。
+
+- **Test-first**: 新規機能・修正では、実装コードを書く**前に**テストを書く。既存コードに後からテストを追加する場合も、可能な限り「期待する振る舞い」を先にテストで表現してから実装を触る。
+- **Red → Green → Refactor**: テストを書いたら一度失敗（Red）を確認し、最小限の実装で通す（Green）。そのうえでリファクタする。
 
 ---
 
@@ -66,13 +69,13 @@ describe("PageEditorHeader", () => {
 - **カスタムフック**: 返り値と副作用（例: API が正しい引数で呼ばれる、状態更新）。認証と API はモックする。
 - **ユーティリティ／サービス**: 純粋なロジックと分岐。I/O を呼ぶ場合はその I/O だけモックする。
 
-カバレッジ目標は **80% 以上**。振る舞いを守る・重要なケースを残すテストだけを追加する。実装の細部だけを断言するテストは避ける。
+**品質指標の優先順位: Mutation スコア > カバレッジ。** カバレッジは **80% 以上**を目標とするが、Mutation スコアが閾値を満たしているかをまず確認する。振る舞いを守る・重要なケースを残すテストだけを追加し、実装の細部だけを断言するテストは避ける。
 
 ---
 
 ## 4. Mutation testing（テスト品質の可視化） / Mutation testing (test quality visibility)
 
-Mutation testing は「コードを意図的に壊したときにテストが落ちるか」でテストの有効性を測る。Stryker + Vitest で導入済み。CI では PR 向けに**限定対象**で実行し、レポートを artifact で取得できる。  
+**Mutation スコアをテスト品質の第一指標とする。** Mutation testing は「コードを意図的に壊したときにテストが落ちるか」でテストの有効性を測る。Stryker + Vitest で導入済み。CI では PR 向けに**限定対象**で実行し、レポートを artifact で取得できる。  
 Mutation testing measures test effectiveness by checking whether tests fail when code is intentionally broken. Stryker + Vitest are used. In CI, a **limited scope** runs per PR and reports are available as artifacts.
 
 ### 4.1 ローカルで再現するコマンド / Local commands
