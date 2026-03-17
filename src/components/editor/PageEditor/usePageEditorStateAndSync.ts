@@ -152,6 +152,7 @@ export function usePageEditorStateAndSync() {
     getTiptapContent,
     saveChanges,
     resetWiki,
+    resetWikiBase,
     updatePageMutation,
     toast,
   });

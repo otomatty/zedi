@@ -32,6 +32,8 @@ interface UsePageEditorEffectsOptions {
   getTiptapContent: () => string | null;
   saveChanges: (title: string, content: string) => void;
   resetWiki: () => void;
+  /** Wiki 完了 effect 用。setWikiContentForCollab を null にしないため resetWiki ではなくこちらを呼ぶ。 */
+  resetWikiBase: () => void;
   updatePageMutation: UpdatePageMutation;
   toast: (opts: { title: string; variant?: "destructive" }) => void;
 }
@@ -61,7 +63,8 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
     setPendingInitialContent,
     getTiptapContent,
     saveChanges,
-    resetWiki,
+    resetWiki: _resetWiki,
+    resetWikiBase,
     updatePageMutation,
     toast,
   } = options;
@@ -138,6 +141,8 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
   }, [isWikiGenerating, throttledTiptapContent, setContent, setWikiContentForCollab]);
 
   // Wiki生成完了時に保存（React state + コラボ時は Y.Doc 用に別途渡す）
+  // resetWiki ではなく resetWikiBase を呼ぶ: resetWiki は setWikiContentForCollab(null) も行うため、
+  // 同 effect 内で setWikiContentForCollab(tiptapContent) と同バッチになりコラボに内容が渡らない。
   useEffect(() => {
     if (wikiStatus === "completed") {
       const tiptapContent = getTiptapContent();
@@ -147,14 +152,14 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
         saveChanges(title, tiptapContent);
         toast({ title: "Wiki記事を生成しました" });
       }
-      resetWiki();
+      resetWikiBase();
     }
   }, [
     wikiStatus,
     getTiptapContent,
     title,
     saveChanges,
-    resetWiki,
+    resetWikiBase,
     toast,
     setContent,
     setWikiContentForCollab,
