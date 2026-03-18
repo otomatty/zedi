@@ -56,10 +56,11 @@ jobs:
           fi
 
           # Enable auto-merge with merge commit. If required checks are not green yet,
-          # GitHub will merge automatically once all required checks pass.
+          # GitHub returns "unstable status" and rejects. We don't fail the job so the
+          # sync PR is still created; maintainers can enable auto-merge manually or it
+          # can be retried later.
           if gh pr merge "$PR_NUMBER" --auto --merge; then
             echo "Enabled auto-merge for PR #$PR_NUMBER"
           else
-            echo "::error::Failed to enable auto-merge for PR #$PR_NUMBER. Check repo auto-merge setting and branch protection."
-            exit 1
+            echo "::warning::Could not enable auto-merge for PR #$PR_NUMBER (e.g. PR in unstable status until checks run). Enable manually or check repo 'Allow auto-merge' and branch protection."
           fi
