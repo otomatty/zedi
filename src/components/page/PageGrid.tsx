@@ -100,7 +100,9 @@ const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false }) => {
     !hasPages && (isLoading || syncStatus === "syncing" || isInitialSyncPending || isSeeding);
 
   const handleShowAll = () => {
-    setSearchParams({});
+    const next = new URLSearchParams(searchParams);
+    next.delete("month");
+    setSearchParams(next);
   };
 
   return (

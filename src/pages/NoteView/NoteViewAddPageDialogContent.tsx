@@ -87,8 +87,9 @@ export function NoteViewAddPageDialogContent({
                     <button
                       key={page.id}
                       type="button"
+                      disabled={isPending}
                       onClick={() => onAddByPageId(page.id)}
-                      className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border"
+                      className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border disabled:pointer-events-none disabled:opacity-50"
                     >
                       {page.title || t("notes.untitledPage")}
                     </button>

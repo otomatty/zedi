@@ -30,18 +30,19 @@ export function ContentWithAIChat({
   useLocalPanel = false,
 }: ContentWithAIChatProps) {
   const isMobile = useIsMobile();
-  const { isOpen, togglePanel, openPanel } = useAIChatStore();
+  const { isOpen, togglePanel, openPanel, closePanel } = useAIChatStore();
   const { setAIChatAvailable } = useAIChatContext();
   const { t } = useTranslation();
   const [isDraggingPage, setIsDraggingPage] = useState(false);
   const [isHoveringHint, setIsHoveringHint] = useState(false);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // このコンポーネントがマウントされている間、AIチャットが利用可能であることを通知
+  // Local panel 利用時はグローバル dock を無効化し、それ以外では利用可能にする
+  // When using a local panel, disable the global dock; otherwise mark chat as available.
   useEffect(() => {
-    setAIChatAvailable(true);
+    setAIChatAvailable(!useLocalPanel);
     return () => setAIChatAvailable(false);
-  }, [setAIChatAvailable]);
+  }, [setAIChatAvailable, useLocalPanel]);
 
   // Detect page drag globally (for showing hint zone when panel is closed)
   useEffect(() => {
@@ -98,7 +99,7 @@ export function ContentWithAIChat({
           <Drawer
             open={isOpen}
             onOpenChange={(open) => {
-              if (!open) togglePanel();
+              if (!open) closePanel();
             }}
           >
             <DrawerContent className="h-[85vh]">
@@ -119,7 +120,8 @@ export function ContentWithAIChat({
         <div
           className="fixed bottom-0 z-40 flex flex-col items-end gap-1 p-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]"
           style={{
-            right: useLocalPanel ? 0 : isOpen ? "var(--ai-chat-width)" : 0,
+            // Local / global のどちらでも開いているときはパネル幅ぶん左に寄せる
+            right: isOpen ? "var(--ai-chat-width)" : 0,
           }}
         >
           {floatingAction}

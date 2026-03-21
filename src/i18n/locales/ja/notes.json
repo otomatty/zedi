@@ -60,6 +60,8 @@
   "roleUpdateFailed": "権限更新に失敗しました",
   "memberRemoved": "メンバーを削除しました",
   "memberRemoveFailed": "メンバー削除に失敗しました",
+  "a11yRemoveMember": "メンバーを削除: {{email}}",
+  "a11yRemovePage": "ページを削除: {{title}}",
   "inviteMember": "招待メンバー",
   "emailPlaceholder": "招待するメールアドレス",
   "role": "権限",
