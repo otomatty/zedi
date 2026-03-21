@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import PageGrid from "@/components/page/PageGrid";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
@@ -61,10 +61,8 @@ const Home: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <AppLayout>
       <QuickTour run={isTourRunning} onComplete={completeTour} />
-
-      <Header />
 
       <ContentWithAIChat
         floatingAction={
@@ -91,7 +89,7 @@ const Home: React.FC = () => {
           </Container>
         </main>
       </ContentWithAIChat>
-    </div>
+    </AppLayout>
   );
 };
 

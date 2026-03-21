@@ -26,6 +26,8 @@ export default tseslint.config(
       "coverage",
       "playwright-report",
       "test-results",
+      ".stryker-tmp",
+      "**/.stryker-tmp/**",
       ".wrangler",
       "*.config.js",
       "*.config.mjs",

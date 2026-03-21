@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,10 @@ interface NotesLayoutProps {
   children: React.ReactNode;
 }
 
+/**
+ * Layout for `/notes` routes: App shell + tab navigation (my notes / discover).
+ * `/notes` 系のタブ付きレイアウト（マイノート / 発見）。
+ */
 export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
   const { t } = useTranslation();
   const location = useLocation();
@@ -27,8 +31,7 @@ export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <AppLayout>
       <main className="py-6">
         <Container>
           <div className="mb-6 flex border-b border-border">
@@ -59,6 +62,6 @@ export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
           {children}
         </Container>
       </main>
-    </div>
+    </AppLayout>
   );
 };

@@ -39,8 +39,10 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  sidebarMenuButtonVariants,
   useSidebar,
 } from "./sidebar";
+export type { SidebarContextValue } from "./sidebar";
 
 export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "./accordion";
 export { Alert, AlertTitle, AlertDescription } from "./alert";

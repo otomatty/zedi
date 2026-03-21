@@ -11,26 +11,38 @@ import { useTranslation } from "react-i18next";
 interface ContentWithAIChatProps {
   children: React.ReactNode;
   floatingAction?: React.ReactNode;
+  /**
+   * Whether to render local AI panel within this component.
+   * true: Page-local right panel / drawer (used in standalone layouts like PageEditor).
+   * false: Use global layout-level dock (AppLayout).
+   * このコンポーネント内でAIパネルを描画するかどうか。
+   */
+  useLocalPanel?: boolean;
 }
 
 /**
  * Layout wrapper that provides AI chat panel and optional FAB. Used by Home and Notes.
  * AIチャットパネルとオプションのFABを提供するレイアウト。Home・Notesで利用。
  */
-export function ContentWithAIChat({ children, floatingAction }: ContentWithAIChatProps) {
+export function ContentWithAIChat({
+  children,
+  floatingAction,
+  useLocalPanel = false,
+}: ContentWithAIChatProps) {
   const isMobile = useIsMobile();
-  const { isOpen, togglePanel, openPanel } = useAIChatStore();
+  const { isOpen, togglePanel, openPanel, closePanel } = useAIChatStore();
   const { setAIChatAvailable } = useAIChatContext();
   const { t } = useTranslation();
   const [isDraggingPage, setIsDraggingPage] = useState(false);
   const [isHoveringHint, setIsHoveringHint] = useState(false);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // このコンポーネントがマウントされている間、AIチャットが利用可能であることを通知
+  // Local panel 利用時はグローバル dock を無効化し、それ以外では利用可能にする
+  // When using a local panel, disable the global dock; otherwise mark chat as available.
   useEffect(() => {
-    setAIChatAvailable(true);
+    setAIChatAvailable(!useLocalPanel);
     return () => setAIChatAvailable(false);
-  }, [setAIChatAvailable]);
+  }, [setAIChatAvailable, useLocalPanel]);
 
   // Detect page drag globally (for showing hint zone when panel is closed)
   useEffect(() => {
@@ -83,44 +95,52 @@ export function ContentWithAIChat({ children, floatingAction }: ContentWithAICha
             {floatingAction}
           </div>
         )}
-        <Drawer
-          open={isOpen}
-          onOpenChange={(open) => {
-            if (!open) togglePanel();
-          }}
-        >
-          <DrawerContent className="h-[85vh]">
-            <AIChatPanel />
-          </DrawerContent>
-        </Drawer>
+        {useLocalPanel && (
+          <Drawer
+            open={isOpen}
+            onOpenChange={(open) => {
+              if (!open) closePanel();
+            }}
+          >
+            <DrawerContent className="h-[85vh]">
+              <AIChatPanel />
+            </DrawerContent>
+          </Drawer>
+        )}
       </>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden">
-      <div className="relative flex-1 overflow-hidden">
-        <div className="absolute inset-0 overflow-y-auto transition-all duration-300 ease-in-out">
-          {children}
+    <div className="flex h-full min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-y-auto transition-all duration-300 ease-in-out">
+        {children}
+      </div>
+      {floatingAction && (
+        <div
+          className="fixed bottom-0 z-40 flex flex-col items-end gap-1 p-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]"
+          style={{
+            // Local / global のどちらでも開いているときはパネル幅ぶん左に寄せる
+            right: isOpen ? "var(--ai-chat-width)" : 0,
+          }}
+        >
+          {floatingAction}
         </div>
-        {floatingAction && (
-          <div className="absolute bottom-0 right-0 z-40 flex flex-col items-end gap-1 p-2">
-            {floatingAction}
+      )}
+      {useLocalPanel && (
+        <div
+          className={cn(
+            "h-full flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
+            isOpen
+              ? "w-[var(--ai-chat-width,22rem)] border-l opacity-100"
+              : "w-0 border-l-0 opacity-0",
+          )}
+        >
+          <div className="h-full w-full">
+            <AIChatPanel />
           </div>
-        )}
-      </div>
-      <div
-        className={cn(
-          "sticky top-0 h-[calc(100vh-4.5rem)] flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
-          isOpen
-            ? "w-[30%] min-w-[280px] max-w-[45%] border-l opacity-100"
-            : "w-0 min-w-0 border-l-0 opacity-0",
-        )}
-      >
-        <div className="h-full w-[30vw] min-w-[280px] max-w-[45vw]">
-          <AIChatPanel />
         </div>
-      </div>
+      )}
 
       {/* Drop hint zone when panel is closed and user is dragging a page */}
       {!isOpen && isDraggingPage && (
