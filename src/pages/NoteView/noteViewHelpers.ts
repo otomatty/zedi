@@ -1,9 +1,8 @@
-import type { PageSummary } from "@/types/page";
-
 /**
- *
+ * Re-export `NotePageSummary` from note queries (single source of truth).
+ * `useNotePages` と同一の型をここからも参照できるようにする。
  */
-export type NotePageSummary = PageSummary & { addedByUserId?: string | null };
+export type { NotePageSummary } from "@/hooks/useNoteQueries";
 
 /**
  * Derives permission flags for the note view from access and note source.

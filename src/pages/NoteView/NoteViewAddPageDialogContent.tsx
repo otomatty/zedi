@@ -1,9 +1,11 @@
+import { useId } from "react";
 import { Button, DialogFooter, DialogHeader, DialogTitle, Input } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import type { NotePageSummary } from "./noteViewHelpers";
 
 /**
- *
+ * Dialog body: add page by title and optional search list (when canEdit).
+ * ページ追加ダイアログ（タイトル入力と、編集可時は検索リスト）。
  */
 export interface NoteViewAddPageDialogContentProps {
   newPageTitle: string;
@@ -19,7 +21,8 @@ export interface NoteViewAddPageDialogContentProps {
 }
 
 /**
- *
+ * Renders the add-page dialog body.
+ * @param props - Dialog state, filtered pages list, and add/close handlers
  */
 export function NoteViewAddPageDialogContent({
   newPageTitle,
@@ -33,10 +36,10 @@ export function NoteViewAddPageDialogContent({
   isPending,
   onClose,
 }: NoteViewAddPageDialogContentProps) {
-  /**
-   *
-   */
   const { t } = useTranslation();
+  const newPageTitleFieldId = useId();
+  const pageFilterFieldId = useId();
+
   return (
     <>
       <DialogHeader>
@@ -44,9 +47,12 @@ export function NoteViewAddPageDialogContent({
       </DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">{t("notes.addNewPageToNote")}</label>
+          <label className="text-sm font-medium" htmlFor={newPageTitleFieldId}>
+            {t("notes.addNewPageToNote")}
+          </label>
           <div className="flex gap-2">
             <Input
+              id={newPageTitleFieldId}
               value={newPageTitle}
               onChange={(e) => setNewPageTitle(e.target.value)}
               placeholder={t("notes.newPageTitle")}
@@ -64,8 +70,11 @@ export function NoteViewAddPageDialogContent({
         {canEdit && (
           <>
             <div className="space-y-2 border-t pt-3">
-              <label className="text-sm font-medium">{t("notes.searchByTitle")}</label>
+              <label className="text-sm font-medium" htmlFor={pageFilterFieldId}>
+                {t("notes.searchByTitle")}
+              </label>
               <Input
+                id={pageFilterFieldId}
                 value={pageFilter}
                 onChange={(event) => setPageFilter(event.target.value)}
                 placeholder={t("notes.searchByTitle")}

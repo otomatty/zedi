@@ -11,41 +11,18 @@ interface NotesLayoutProps {
 }
 
 /**
- *
+ * Layout for `/notes` routes: App shell + tab navigation (my notes / discover).
+ * `/notes` 系のタブ付きレイアウト（マイノート / 発見）。
  */
-export /**
- *
- */
-const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
-  /**
-   *
-   */
+export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
   const { t } = useTranslation();
-  /**
-   *
-   */
   const location = useLocation();
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const isSignedIn = useAuth().isSignedIn ?? false;
 
-  /**
-   *
-   */
   const isMyNotes = location.pathname === "/notes" || location.pathname === "/notes/";
-  /**
-   *
-   */
   const isDiscover = location.pathname === "/notes/discover";
 
-  /**
-   *
-   */
   const handleMyNotesClick = (e: React.MouseEvent) => {
     if (!isSignedIn) {
       e.preventDefault();

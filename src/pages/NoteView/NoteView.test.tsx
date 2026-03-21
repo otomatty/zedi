@@ -118,7 +118,7 @@ describe("NoteView", () => {
         canEdit: true,
         canAddPage: true,
         canManageMembers: true,
-        canDeletePage: true,
+        canDeletePage: vi.fn(() => true),
       },
       source: "local",
       isLoading: false,

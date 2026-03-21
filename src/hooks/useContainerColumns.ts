@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 /** コンテナ幅に応じた列数用の閾値（px）。カードをやや小さくするため多めの列数になるよう設定 */
 const WIDTH_2 = 360;
@@ -48,11 +48,6 @@ export function useContainerColumns(): {
     const ro = new ResizeObserver(updateColumns);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [updateColumns]);
-
-  useEffect(() => {
-    window.addEventListener("resize", updateColumns);
-    return () => window.removeEventListener("resize", updateColumns);
   }, [updateColumns]);
 
   return { ref, columns };

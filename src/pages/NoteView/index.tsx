@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
@@ -19,7 +19,8 @@ import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import { NoteViewMainContent } from "./NoteViewMainContent";
 
 /**
- *
+ * Note detail page: pages grid, add/remove, header actions.
+ * ノート詳細（ページ一覧・追加・削除・ヘッダーアクション）。
  */
 const NoteView: React.FC = () => {
   const { t } = useTranslation();
@@ -38,7 +39,16 @@ const NoteView: React.FC = () => {
   const { canEdit, canShowAddPage, canManageMembers } = getNoteViewPermissions(access, noteSource);
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
-  const canDeletePage = access?.canDeletePage ?? (() => false);
+
+  const canDeletePage = useCallback(
+    (addedByUserId: string | null | undefined) => {
+      if (addedByUserId == null || addedByUserId === "") return false;
+      const fn = access?.canDeletePage;
+      if (!fn) return false;
+      return fn(addedByUserId);
+    },
+    [access],
+  );
 
   const { data: notePages = [], isLoading: isPagesLoading } = useNotePages(
     noteId ?? "",

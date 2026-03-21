@@ -35,10 +35,11 @@ interface AIChatUIState {
   setSelectedModel: (model: SelectedModel | null) => void;
 }
 
-export /**
- *
+/**
+ * Global Zustand store for AI chat panel UI (open state, model, persisted prefs).
+ * AI チャットドックの UI 状態（開閉・モデル選択など）を保持するストア。
  */
-const useAIChatStore = create<AIChatUIState>()(
+export const useAIChatStore = create<AIChatUIState>()(
   persist(
     (set) => ({
       isOpen: false,
