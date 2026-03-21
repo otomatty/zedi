@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import Header from "@/components/layout/Header";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@zedi/ui";
@@ -78,6 +78,9 @@ function NotePageEditorEditable({
   );
 }
 
+/**
+ *
+ */
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
@@ -118,20 +121,18 @@ const NotePageView: React.FC = () => {
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <AppLayout>
         <main className="py-10">
           <Container>
             <p className="text-sm text-muted-foreground">読み込み中...</p>
           </Container>
         </main>
-      </div>
+      </AppLayout>
     );
   }
   if (isNotFound) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <AppLayout>
         <main className="py-10">
           <Container>
             <p className="text-sm text-muted-foreground">
@@ -139,13 +140,12 @@ const NotePageView: React.FC = () => {
             </p>
           </Container>
         </main>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <AppLayout>
       <div className="border-b border-border/60">
         <Container className="flex h-10 items-center justify-between">
           <Button variant="ghost" size="icon" onClick={handleBack}>
@@ -178,7 +178,7 @@ const NotePageView: React.FC = () => {
           onContentError={() => undefined}
         />
       )}
-    </div>
+    </AppLayout>
   );
 };
 

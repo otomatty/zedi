@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { SearchResultCard } from "@/components/search/SearchResultCard";
 import type { SearchResultCardItem } from "@/components/search/SearchResultCard";
@@ -23,33 +23,84 @@ interface SearchResultItem extends SearchResultCardItem {
   score: number;
 }
 
+/**
+ *
+ */
 export default function SearchResults() {
+  /**
+   *
+   */
   const [searchParams] = useSearchParams();
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const { setQuery } = useGlobalSearchContext();
+  /**
+   *
+   */
   const searchQuery = (searchParams.get("q") ?? "").trim();
 
   useEffect(() => {
     setQuery(searchQuery);
   }, [searchQuery, setQuery]);
 
+  /**
+   *
+   */
   const { data: personalResults = [], isLoading: isPersonalLoading } = useSearchPages(searchQuery);
+  /**
+   *
+   */
   const { data: sharedResponse, isLoading: isSharedLoading } = useSearchSharedNotes(searchQuery);
 
+  /**
+   *
+   */
   const isLoading = isPersonalLoading || isSharedLoading;
+  /**
+   *
+   */
   const keywords = useMemo(() => parseSearchQuery(searchQuery), [searchQuery]);
+  /**
+   *
+   */
   const sharedResults = useMemo(() => sharedResponse?.results ?? [], [sharedResponse]);
 
+  /**
+   *
+   */
   const results = useMemo((): SearchResultItem[] => {
     if (searchQuery.length < 3 || keywords.length === 0) return [];
 
+    /**
+     *
+     */
     const personal: SearchResultItem[] = personalResults
       .filter((page) => !page.isDeleted)
       .map((page) => {
+        /**
+         *
+         */
         const content = extractPlainText(page.content);
+        /**
+         *
+         */
         const matchType = determineMatchType(page.title, content, keywords, searchQuery);
+        /**
+         *
+         */
         const score = calculateEnhancedScore(page, keywords, matchType);
+        /**
+         *
+         */
         const snippet = extractSmartSnippet(content, keywords, 200);
+        /**
+         *
+         */
         const highlightedSnippet = highlightKeywords(snippet, keywords);
         return {
           pageId: page.id,
@@ -64,9 +115,21 @@ export default function SearchResults() {
         };
       });
 
+    /**
+     *
+     */
     const shared: SearchResultItem[] = sharedResults.map((r) => {
+      /**
+       *
+       */
       const preview = r.content_preview ?? "";
+      /**
+       *
+       */
       const snippet = extractSmartSnippet(preview, keywords, 200);
+      /**
+       *
+       */
       const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
       return {
         pageId: r.id,
@@ -85,6 +148,9 @@ export default function SearchResults() {
     return [...personal, ...shared].sort((a, b) => b.score - a.score);
   }, [personalResults, sharedResults, searchQuery, keywords]);
 
+  /**
+   *
+   */
   const handleResultClick = (item: SearchResultItem) => {
     if (item.noteId) {
       navigate(`/note/${item.noteId}/page/${item.pageId}`);
@@ -93,12 +159,14 @@ export default function SearchResults() {
     }
   };
 
+  /**
+   *
+   */
   const resultKey = (item: SearchResultItem) =>
     item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <AppLayout>
       <main className="py-6">
         <Container>
           <div className="mb-6">
@@ -148,6 +216,6 @@ export default function SearchResults() {
           )}
         </Container>
       </main>
-    </div>
+    </AppLayout>
   );
 }

@@ -35,7 +35,10 @@ interface AIChatUIState {
   setSelectedModel: (model: SelectedModel | null) => void;
 }
 
-export const useAIChatStore = create<AIChatUIState>()(
+export /**
+ *
+ */
+const useAIChatStore = create<AIChatUIState>()(
   persist(
     (set) => ({
       isOpen: false,
@@ -59,6 +62,7 @@ export const useAIChatStore = create<AIChatUIState>()(
     }),
     {
       name: "ai-chat-storage",
+      version: 1,
       partialize: (state) => ({
         isOpen: state.isOpen,
         contextEnabled: state.contextEnabled,

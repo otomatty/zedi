@@ -1,6 +1,6 @@
 import React from "react";
 import Container from "@/components/layout/Container";
-import { cn } from "@zedi/ui";
+import { cn, SidebarTrigger } from "@zedi/ui";
 import { HeaderLogo } from "./HeaderLogo";
 import { MonthNavigation } from "./MonthNavigation";
 import { HeaderSearchBar } from "./HeaderSearchBar";
@@ -14,6 +14,9 @@ interface HeaderProps {
   className?: string;
 }
 
+/**
+ *
+ */
 const Header: React.FC<HeaderProps> = ({ className }) => {
   const { isSignedIn } = useAuth();
   const { t } = useTranslation();
@@ -29,10 +32,13 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
       )}
     >
       <Container className="flex h-[4.5rem] items-center justify-between gap-4">
-        {/* Left: Logo & Month Navigation（モバイルでは非表示にして検索バー左の余白を防ぐ） */}
-        <div className="hidden min-w-0 shrink-0 items-center gap-4 sm:flex">
-          <HeaderLogo />
-          <MonthNavigation />
+        {/* Left: Sidebar trigger, then Logo & Month Navigation（モバイルではロゴ・月ナビ非表示） */}
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
+          <SidebarTrigger className="h-9 w-9" aria-label={t("nav.menu", "Menu")} />
+          <div className="hidden items-center gap-4 sm:flex">
+            <HeaderLogo />
+            <MonthNavigation />
+          </div>
         </div>
 
         {/* Center: Search bar & AI Chat button */}

@@ -110,7 +110,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
         collaboration={undefined}
       />
 
-      <ContentWithAIChat>
+      <ContentWithAIChat useLocalPanel>
         <PageEditorAlerts
           duplicatePage={duplicatePage}
           errorMessage={errorMessage}
