@@ -52,6 +52,19 @@ STRYKER_DIFF_BASE=develop bun run test:mutation:changed
 
 On Windows PowerShell: `$env:STRYKER_DIFF_BASE="develop"; bun run test:mutation:changed`
 
+### List files only (no Stryker)
+
+```bash
+bun run test:mutation:changed:list
+# or: STRYKER_DIFF_BASE=develop bun run test:mutation:changed:list
+```
+
+### Skip HTML report (JSON + terminal only; faster)
+
+```bash
+STRYKER_HTML_REPORT=0 bun run test:mutation:changed
+```
+
 ## Troubleshooting (symptom → action)
 
 | Symptom                                                  | Likely cause                                                                            | Action                                                                                                       |
@@ -72,6 +85,9 @@ On Windows PowerShell: `$env:STRYKER_DIFF_BASE="develop"; bun run test:mutation:
 bun run mutation:report:summary
 # → reports/mutation/mutation-summary.md
 ```
+
+- **Stdout only** (no file; paste-safe for chat): `bun run mutation:report:summary -- --stdout-only`
+- **Mutation + summary in one step**: `bun run test:mutation:changed:summary`
 
 Optional: `STRYKER_SUMMARY_MAX_SURVIVED=120` (default 80), `STRYKER_SUMMARY_OUT=path/to/out.md`.
 

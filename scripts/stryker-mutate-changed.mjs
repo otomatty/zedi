@@ -5,11 +5,16 @@
  *
  * Usage:
  *   node scripts/stryker-mutate-changed.mjs
+ *   node scripts/stryker-mutate-changed.mjs --list
  *   node scripts/stryker-mutate-changed.mjs --ignoreStatic
  *   node scripts/stryker-mutate-changed.mjs --dryRunOnly
  *
+ * Flags:
+ *   --list  Print mutable src/ paths that would be mutated (one per line), then exit 0. Does not run Stryker.
+ *
  * Environment:
  *   STRYKER_DIFF_BASE=develop  — compare against base branch (git diff base...HEAD) instead of working tree vs HEAD
+ *   STRYKER_HTML_REPORT=0      — omit HTML report (JSON + terminal only); see stryker.config.mjs
  *
  * Config: `stryker.config.mutation-changed.mjs` (extends `stryker.config.mjs`; `thresholds.break` disabled for partial `--mutate` runs).
  */
@@ -72,6 +77,10 @@ function isMutableSourceFile(f) {
 }
 
 const base = process.env.STRYKER_DIFF_BASE?.trim() || "";
+const argv = process.argv.slice(2);
+const listOnly = argv.includes("--list");
+const userArgs = argv.filter((a) => a !== "--list");
+
 const paths = getChangedPaths(base || undefined).filter(isMutableSourceFile);
 
 if (paths.length === 0) {
@@ -84,8 +93,14 @@ if (paths.length === 0) {
   process.exit(1);
 }
 
+if (listOnly) {
+  for (const p of paths) {
+    console.log(p);
+  }
+  process.exit(0);
+}
+
 const mutateArg = paths.join(",");
-const userArgs = process.argv.slice(2);
 
 console.error(`stryker-mutate-changed: ${paths.length} file(s) → Stryker --mutate`);
 paths.forEach((p) => console.error(`  - ${p}`));

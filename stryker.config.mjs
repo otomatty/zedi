@@ -1,7 +1,13 @@
 /**
  * Stryker configuration for frontend mutation testing.
  * フロントエンド向け mutation testing の設定。
+ *
+ * - JSON report: `reports/mutation/mutation.json` — input for `mutation:report:summary` (compact Markdown for AI).
+ * - HTML report: optional; set `STRYKER_HTML_REPORT=0` to skip (faster, smaller disk; use JSON + Markdown summary for AI).
+ * - JSON レポート: `mutation:report:summary` の入力。HTML は `STRYKER_HTML_REPORT=0` で省略可能（AI 向けは要約 MD を利用）。
  */
+const htmlReporterEnabled = process.env.STRYKER_HTML_REPORT !== "0";
+
 export default {
   testRunner: "vitest",
   tempDirName: ".stryker-tmp",
@@ -25,7 +31,10 @@ export default {
   vitest: {
     configFile: "vite.config.ts",
   },
-  reporters: ["clear-text", "progress", "html"],
+  reporters: ["clear-text", "progress", "json", ...(htmlReporterEnabled ? ["html"] : [])],
+  jsonReporter: {
+    fileName: "reports/mutation/mutation.json",
+  },
   htmlReporter: {
     fileName: "reports/mutation/mutation.html",
   },

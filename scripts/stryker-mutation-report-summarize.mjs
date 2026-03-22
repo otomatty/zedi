@@ -6,6 +6,11 @@
  * Usage:
  *   node scripts/stryker-mutation-report-summarize.mjs
  *   node scripts/stryker-mutation-report-summarize.mjs path/to/mutation.json
+ *   node scripts/stryker-mutation-report-summarize.mjs --stdout-only
+ *
+ * Flags:
+ *   --stdout-only  Print Markdown to stdout only (no file write). Low token footprint for AI chat.
+ *   --help, -h     Show usage.
  *
  * Environment:
  *   STRYKER_SUMMARY_MAX_SURVIVED — max survived mutants listed (default 80)
@@ -25,6 +30,46 @@ const maxSurvived = Math.max(
   1,
   Number.parseInt(process.env.STRYKER_SUMMARY_MAX_SURVIVED ?? "80", 10) || 80,
 );
+
+/**
+ * @param {string[]} argv
+ * @returns {{ input: string; out: string; stdoutOnly: boolean }}
+ */
+function parseArgs(argv) {
+  let stdoutOnly = false;
+  let input = defaultInput;
+  const positional = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--help" || a === "-h") {
+      console.log(`stryker-mutation-report-summarize — compact Markdown from mutation.json (AI-friendly, not HTML)
+
+Usage:
+  bun run mutation:report:summary
+  bun run mutation:report:summary -- --stdout-only
+  node scripts/stryker-mutation-report-summarize.mjs [path/to/mutation.json]
+
+Environment:
+  STRYKER_SUMMARY_OUT, STRYKER_SUMMARY_MAX_SURVIVED
+
+See also: stryker.config.mjs (jsonReporter), STRYKER_HTML_REPORT=0 to skip HTML.`);
+      process.exit(0);
+    }
+    if (a === "--stdout-only") {
+      stdoutOnly = true;
+      continue;
+    }
+    if (a.startsWith("-")) {
+      console.error(`stryker-mutation-report-summarize: unknown flag ${a} (try --help)`);
+      process.exit(1);
+    }
+    positional.push(a);
+  }
+  if (positional[0]) {
+    input = resolve(positional[0]);
+  }
+  return { input, out: defaultOut, stdoutOnly };
+}
 
 /**
  * @param {string} s
@@ -98,7 +143,7 @@ function collectSurvived(report, limit) {
 }
 
 function main() {
-  const input = resolve(process.argv[2] || defaultInput);
+  const { input, out, stdoutOnly } = parseArgs(process.argv.slice(2));
   let raw;
   try {
     raw = readFileSync(input, "utf8");
@@ -106,7 +151,7 @@ function main() {
     console.error(
       `stryker-mutation-report-summarize: cannot read ${input}\n` +
         `  Run mutation tests first (JSON reporter writes this file). Example:\n` +
-        `  bun run test:mutation:changed -- --dryRunTimeoutMinutes 30`,
+        `  STRYKER_HTML_REPORT=0 bun run test:mutation:changed -- --dryRunTimeoutMinutes 30`,
     );
     process.exit(1);
   }
@@ -221,9 +266,14 @@ function main() {
   );
   lines.push("");
 
-  mkdirSync(dirname(defaultOut), { recursive: true });
-  writeFileSync(defaultOut, lines.join("\n") + "\n", "utf8");
-  console.error(`stryker-mutation-report-summarize: wrote ${defaultOut}`);
+  const body = lines.join("\n") + "\n";
+  if (stdoutOnly) {
+    process.stdout.write(body);
+    return;
+  }
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, body, "utf8");
+  console.error(`stryker-mutation-report-summarize: wrote ${out}`);
 }
 
 main();

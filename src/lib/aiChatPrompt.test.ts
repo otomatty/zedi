@@ -75,28 +75,61 @@ describe("buildSystemPrompt", () => {
     expect(result).not.toContain("### 最近のページ:");
   });
 
-  it("search context with empty query still describes search state", () => {
-    const context: PageContext = { type: "search", searchQuery: "" };
-    const result = buildSystemPrompt(context, []);
-    expect(result).toContain("で検索を行っています");
-  });
-
   it("includes referenced pages section", () => {
     const referenced: ReferencedPage[] = [
       { id: "p1", title: "参照ページ1" },
       { id: "p2", title: "参照ページ2" },
     ];
     const result = buildSystemPrompt(null, [], referenced);
-    expect(result).toContain("参照ページ");
-    expect(result).toContain("### 参照ページ1");
-    expect(result).toContain("(ページID: p1)");
-    expect(result).toContain("### 参照ページ2");
-    expect(result).toContain("(ページID: p2)");
+    expect(result).toContain("\n## 参照ページ\n");
+    expect(result).toContain(
+      "ユーザーが以下のページをAIチャットの参照として追加しています。これらのページの情報を踏まえて回答してください。\n",
+    );
+    expect(result).toContain("\n### 参照ページ1\n(ページID: p1)\n");
+    expect(result).toContain("\n### 参照ページ2\n(ページID: p2)\n");
   });
 
   it("returns empty referenced pages section when no pages", () => {
     const result = buildSystemPrompt(null, []);
-    expect(result).not.toContain("### ");
+    expect(result).not.toContain("## 参照ページ");
     expect(result).not.toContain("ページID:");
+  });
+
+  it("uses default context copy when type is other", () => {
+    const context: PageContext = { type: "other" };
+    const result = buildSystemPrompt(context, []);
+    expect(result).toContain("## 現在のコンテキスト");
+    expect(result).toContain("特定のページコンテキストはありません。");
+  });
+
+  it("lists recent home pages with exact bullet lines", () => {
+    const context: PageContext = {
+      type: "home",
+      recentPageTitles: ["Alpha", "Beta"],
+    };
+    const result = buildSystemPrompt(context, []);
+    expect(result).toContain("### 最近のページ:\n- Alpha\n- Beta\n");
+  });
+
+  it("renders search line with empty query between quotes", () => {
+    const context: PageContext = { type: "search", searchQuery: "" };
+    const result = buildSystemPrompt(context, []);
+    expect(result).toContain("ユーザーは現在「」で検索を行っています。");
+  });
+
+  it("maps existing page titles to markdown bullets", () => {
+    const result = buildSystemPrompt(null, ["One", "Two"]);
+    expect(result).toContain("ユーザーの既存ページタイトル一覧:\n- One\n- Two");
+  });
+
+  it("does not inject placeholder text when context is null", () => {
+    const result = buildSystemPrompt(null, []);
+    expect(result).not.toMatch(/Stryker was here/);
+  });
+
+  it("uses exact referenced page title in heading line", () => {
+    const referenced: ReferencedPage[] = [{ id: "id1", title: "UniqueRefTitleZedi395" }];
+    const result = buildSystemPrompt(null, [], referenced);
+    expect(result).toContain("\n### UniqueRefTitleZedi395\n(ページID: id1)\n");
   });
 });
