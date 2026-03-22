@@ -1,6 +1,6 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §7.2
- * getNoteViewPermissions: アクセス権とノートソースからノートビュー用の権限フラグを算出する。
+ * getNoteViewPermissions: derive note view flags from access and note source (local vs remote).
+ * アクセス権とノートソースからノートビュー用の権限フラグを算出する。
  */
 import { describe, it, expect } from "vitest";
 import { getNoteViewPermissions } from "./noteViewHelpers";

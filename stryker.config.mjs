@@ -29,9 +29,10 @@ export default {
   htmlReporter: {
     fileName: "reports/mutation/mutation.html",
   },
+  // Thresholds raised 2026-03-21 — remediation: fix surviving mutants in targeted tests
   thresholds: {
-    high: 80,
-    low: 70,
-    break: 65,
+    high: 85,
+    low: 75,
+    break: 70,
   },
 };

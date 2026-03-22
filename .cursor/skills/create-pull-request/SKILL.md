@@ -124,7 +124,7 @@ Using the investigation results, fill in the PR template. Follow these rules:
 
 ### 変更点 (Changes)
 
-- Group changes by area (e.g., `admin/`, `server/api/`, `terraform/`, `docs/`).
+- Group changes by area (e.g., `admin/`, `server/api/`, `terraform/`, `journal/`).
 - Each group: 1-line heading + bullet list of key changes.
 - For large PRs (>30 files), use a table format:
 

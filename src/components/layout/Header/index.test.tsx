@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §3
+ * Header: sidebar trigger (accessible name), sticky/backdrop, search & AI actions, right menu.
  * ヘッダー: サイドバートリガー（アクセシブルラベル）、sticky/backdrop、検索・AI ボタン・右メニュー。
  */
 import React from "react";

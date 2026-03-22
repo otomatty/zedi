@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §8.2, §8.3
+ * Note settings: loading / no access / canManage shows share, visibility, delete; otherwise permission message.
  * ノート設定: 読み込み中／閲覧不可／canManage 時は共有・公開範囲・削除、!canManage 時は権限なしメッセージ。
  */
 import React from "react";

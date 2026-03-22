@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §2
+ * App shell: header, left sidebar, main, right AI dock; CSS variables; SidebarProvider defaultOpen false.
  * 共通レイアウト: ヘッダー・左サイドバー・メイン・右 AI ドック、CSS 変数、SidebarProvider defaultOpen false。
  */
 import React from "react";

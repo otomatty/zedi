@@ -16,7 +16,7 @@
 - TypeScript を厳格に使用する。`any` は避け、型を明示する。
 - export する関数・型・インターフェースには TSDoc / JSDoc を付与する。
 - コメントやドキュメントは、原則として日本語と英語の両方を併記する。
-- テスト駆動開発（TDD）を徹底する。新規コンポーネント・API は**実装の前に**テストを書き、そのテストが通るように実装する。詳細は [AGENTS.md](./AGENTS.md) および [docs/guides/testing-guidelines.md](docs/guides/testing-guidelines.md) を参照。
+- テスト駆動開発（TDD）を徹底する。新規コンポーネント・API は**実装の前に**テストを書き、そのテストが通るように実装する。品質指標・仕様の置き場は [AGENTS.md](./AGENTS.md) と [SPECIFICATION_POLICY.md](./SPECIFICATION_POLICY.md) を参照。
 - `bun run lint` と `bun run format:check` が通る状態を維持する。
 - 既存のディレクトリ構成・命名規則（`server/api`, `server/hocuspocus`, `admin` など）に合わせる。
 

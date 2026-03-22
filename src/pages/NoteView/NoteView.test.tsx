@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §7.3, §7.4
+ * Note view: loading / missing or forbidden / success with title, badge, header actions, grid.
  * ノートビュー: 読み込み中／存在しない・アクセス不可／正常（タイトル・バッジ・ヘッダーアクション・グリッド）。
  */
 import React from "react";
