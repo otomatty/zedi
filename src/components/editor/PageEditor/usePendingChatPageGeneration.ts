@@ -40,10 +40,19 @@ export function usePendingChatPageGeneration({
   const navigate = useNavigate();
   const location = useLocation();
 
+  /** Latest title / i18n for stream callbacks (effect deps omit `title` to avoid abort on edits). / タイトル編集で effect が再実行されないよう参照で渡す */
+  const titleRef = useRef(title);
+  const tRef = useRef(t);
+
+  useLayoutEffect(() => {
+    titleRef.current = title;
+    tRef.current = t;
+  }, [title, t]);
+
   /** Payload copied from router before state is cleared. / navigate で消す前に退避 */
   const pendingPayloadRef = useRef<PendingChatPageGenerationState | null>(null);
-  /** Pathname when that payload was captured (ignore if user navigates away). / 取り込み時のパス（別ルートへ移動したら破棄） */
-  const pendingCapturePathnameRef = useRef<string | null>(null);
+  /** `pathname+search+hash` when that payload was captured (ignore if user navigates away). / 取り込み時の URL（別ルートへ移動したら破棄） */
+  const pendingCaptureLocationKeyRef = useRef<string | null>(null);
   /** Prevents duplicate runs for the same outline + conversation. / 同一内容の二重生成を防ぐ */
   const startedKeyRef = useRef<string | null>(null);
   const lastPageIdRef = useRef<string | null>(null);
@@ -55,10 +64,19 @@ export function usePendingChatPageGeneration({
     const p = raw?.pendingChatPageGeneration;
     if (p) {
       pendingPayloadRef.current = p;
-      pendingCapturePathnameRef.current = location.pathname;
-      navigate(location.pathname, { replace: true, state: null });
+      pendingCaptureLocationKeyRef.current = `${location.pathname}${location.search}${location.hash}`;
+      navigate(
+        { pathname: location.pathname, search: location.search, hash: location.hash },
+        { replace: true, state: null },
+      );
     }
-  }, [location.state, location.pathname, navigate]);
+  }, [location.state, location.pathname, location.search, location.hash, navigate]);
+
+  /**
+   * True once the page has a non-empty title — generation effect depends on this instead of `title`
+   * so keystrokes do not re-run the effect. / タイトルが非空になったら真。キー入力で effect が再実行されないよう `title` 本体は依存に含めない。
+   */
+  const titleReady = Boolean(title?.trim());
 
   useEffect(() => {
     if (currentPageId && currentPageId !== lastPageIdRef.current) {
@@ -66,16 +84,17 @@ export function usePendingChatPageGeneration({
       lastPageIdRef.current = currentPageId;
     }
 
+    const locationKey = `${location.pathname}${location.search}${location.hash}`;
     if (
-      pendingCapturePathnameRef.current !== null &&
-      location.pathname !== pendingCapturePathnameRef.current
+      pendingCaptureLocationKeyRef.current !== null &&
+      locationKey !== pendingCaptureLocationKeyRef.current
     ) {
       pendingPayloadRef.current = null;
-      pendingCapturePathnameRef.current = null;
+      pendingCaptureLocationKeyRef.current = null;
     }
 
     const pending = pendingPayloadRef.current;
-    if (!pending || !currentPageId || !isInitialized || !title?.trim()) {
+    if (!pending || !currentPageId || !isInitialized || !titleReady) {
       return;
     }
 
@@ -90,14 +109,20 @@ export function usePendingChatPageGeneration({
     const ac = new AbortController();
 
     const pathnameAtStart = location.pathname;
+    const searchAtStart = location.search;
+    const hashAtStart = location.hash;
 
     const clearRouterPendingState = () => {
-      navigate(pathnameAtStart, { replace: true, state: null });
+      navigate(
+        { pathname: pathnameAtStart, search: searchAtStart, hash: hashAtStart },
+        { replace: true, state: null },
+      );
     };
 
     const flushThrottled = () => {
-      if (throttleId) clearTimeout(throttleId);
+      if (throttleId) return;
       throttleId = setTimeout(() => {
+        throttleId = null;
         const tiptap = convertMarkdownToTiptapContent(markdown);
         setContent(tiptap);
         setWikiContentForCollab(tiptap);
@@ -105,7 +130,7 @@ export function usePendingChatPageGeneration({
     };
 
     void generateWikiContentFromChatOutlineStream(
-      title,
+      titleRef.current,
       pending.outline,
       pending.conversationText,
       {
@@ -115,19 +140,21 @@ export function usePendingChatPageGeneration({
         },
         onComplete: (result) => {
           if (throttleId) clearTimeout(throttleId);
+          throttleId = null;
           const tiptap = convertMarkdownToTiptapContent(result.content);
           setContent(tiptap);
           setWikiContentForCollab(tiptap);
-          saveChanges(title, tiptap);
+          saveChanges(titleRef.current, tiptap);
           clearRouterPendingState();
-          toast({ title: t("aiChat.notifications.pageBodyGenerated") });
+          toast({ title: tRef.current("aiChat.notifications.pageBodyGenerated") });
         },
         onError: (err) => {
           if (throttleId) clearTimeout(throttleId);
+          throttleId = null;
           clearRouterPendingState();
           if (err.message !== "ABORTED") {
             toast({
-              title: t("aiChat.notifications.pageBodyGenerateFailed"),
+              title: tRef.current("aiChat.notifications.pageBodyGenerateFailed"),
               variant: "destructive",
             });
           }
@@ -142,14 +169,15 @@ export function usePendingChatPageGeneration({
     };
   }, [
     location.pathname,
+    location.search,
+    location.hash,
     currentPageId,
     isInitialized,
-    title,
+    titleReady,
     navigate,
     setContent,
     setWikiContentForCollab,
     saveChanges,
     toast,
-    t,
   ]);
 }

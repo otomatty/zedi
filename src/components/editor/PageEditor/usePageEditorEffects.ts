@@ -12,7 +12,8 @@ type UpdatePageMutation = UseMutationResult<
 >;
 
 /**
- *
+ * Dependencies and state passed into `usePageEditorEffects` (navigation, page data, mutations, editor callbacks).
+ * `usePageEditorEffects` に渡す依存関係と状態（ナビゲーション、ページデータ、ミューテーション、エディタコールバック）。
  */
 export interface UsePageEditorEffectsOptions {
   isNewPage: boolean;

@@ -85,7 +85,10 @@ async function handleCreateMultiplePages(
     });
     if (created?.id && firstCreatedId === undefined) {
       firstCreatedId = created.id;
-      firstOutline = page.content?.trim() || "";
+    }
+    if (firstCreatedId && !firstOutline) {
+      const candidate = page.content?.trim() ?? "";
+      if (candidate) firstOutline = candidate;
     }
   }
   if (firstCreatedId) {
@@ -121,7 +124,16 @@ async function handleAppendToPage(
     return;
   }
 
-  await deps.appendContentToCurrentPage(action.content);
+  const appended = await deps.appendContentToCurrentPage(action.content);
+  if (!appended) {
+    deps.toast({
+      title: deps.t("aiChat.notifications.appendFailed", {
+        title: action.pageTitle,
+      }),
+      variant: "destructive",
+    });
+    return;
+  }
   deps.toast({
     title: deps.t("aiChat.notifications.appendSuccess", {
       title: action.pageTitle,
@@ -155,7 +167,18 @@ async function handleSuggestWikiLinks(
     return;
   }
 
-  await deps.appendContentToCurrentPage(buildSuggestedWikiLinksMarkdown(missingTitles));
+  const appended = await deps.appendContentToCurrentPage(
+    buildSuggestedWikiLinksMarkdown(missingTitles),
+  );
+  if (!appended) {
+    deps.toast({
+      title: deps.t("aiChat.notifications.appendFailed", {
+        title: deps.pageContext?.pageTitle ?? "",
+      }),
+      variant: "destructive",
+    });
+    return;
+  }
   deps.toast({
     title: deps.t("aiChat.notifications.wikiLinksAdded", {
       count: missingTitles.length,
@@ -171,22 +194,30 @@ export async function runAIChatAction(
   deps: RunAIChatActionDeps,
   action: ChatAction,
 ): Promise<void> {
-  switch (action.type) {
-    case "create-page":
-      await handleCreatePage(deps, action);
-      return;
-    case "create-multiple-pages":
-      await handleCreateMultiplePages(deps, action);
-      return;
-    case "append-to-page":
-      await handleAppendToPage(deps, action);
-      return;
-    case "suggest-wiki-links":
-      await handleSuggestWikiLinks(deps, action);
-      return;
-    default: {
-      const _exhaustive: never = action;
-      void _exhaustive;
+  try {
+    switch (action.type) {
+      case "create-page":
+        await handleCreatePage(deps, action);
+        return;
+      case "create-multiple-pages":
+        await handleCreateMultiplePages(deps, action);
+        return;
+      case "append-to-page":
+        await handleAppendToPage(deps, action);
+        return;
+      case "suggest-wiki-links":
+        await handleSuggestWikiLinks(deps, action);
+        return;
+      default: {
+        const _exhaustive: never = action;
+        void _exhaustive;
+      }
     }
+  } catch (error) {
+    console.error("runAIChatAction failed", error);
+    deps.toast({
+      title: deps.t("aiChat.notifications.actionFailed"),
+      variant: "destructive",
+    });
   }
 }

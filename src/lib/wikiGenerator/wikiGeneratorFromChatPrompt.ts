@@ -2,10 +2,10 @@
  * Prompt template for generating full page Markdown from chat outline + conversation.
  * Wiki generator quality guidelines are inlined in a compact form.
  *
- * User-supplied title/outline/conversation are interpolated with template literals (not
- * chained String.replace on `{{...}}` placeholders) so malicious text cannot leave unreplaced
- * placeholders or break section boundaries.
- * ユーザー入力を `{{...}}` の連鎖 replace で埋めずテンプレート埋め込みにし、プレースホルダ汚染を防ぐ。
+ * User-supplied title/outline/conversation are wrapped in XML-like tags and interpolated with
+ * template literals (not chained String.replace on `{{...}}` placeholders) so malicious text
+ * cannot inject prompt-level headings or break the fixed 「執筆ルール」 section.
+ * ユーザー入力はタグで囲みテンプレート埋め込みにし、見出し注入や「執筆ルール」境界の破壊を防ぐ。
  */
 
 /**
@@ -23,13 +23,19 @@ export function buildChatPageWikiUserPrompt(
   return `あなたは百科事典風の解説記事を執筆する専門家です。以下の**ページタイトル**について、ユーザーが承認した**アウトライン**に沿い、**会話の文脈**を踏まえて、包括的なMarkdown記事を1本書いてください。
 
 ## ページタイトル
+<page_title>
 ${title}
+</page_title>
 
 ## ユーザーが承認したアウトライン（必ずこの構成を反映すること）
+<approved_outline>
 ${outlineBlock}
+</approved_outline>
 
 ## 会話の文脈（事実・トーン・用語の参考にする。会話文をそのまま貼り付けないこと）
+<conversation_context>
 ${conversationBlock}
+</conversation_context>
 
 ## 執筆ルール
 - 出力は**Markdownのみ**（前置きや「以下に」などのメタ文は不要）。

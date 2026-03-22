@@ -49,6 +49,7 @@
     "pageContextRequired": "Open a page before running this action",
     "appendUnavailable": "Only appending to the currently open page is supported",
     "appendSuccess": "Appended to \"{{title}}\"",
+    "appendFailed": "Could not append to \"{{title}}\"",
     "wikiLinksAdded": "Added {{count}} wiki links",
     "noNewWikiLinks": "There are no new wiki links to add",
     "actionFailed": "Failed to execute the action"

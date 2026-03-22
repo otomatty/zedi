@@ -1,7 +1,7 @@
 /**
  * /api/pages — ページ CRUD + コンテンツ管理
  *
- * GET    /api/pages/:id/content — Y.Doc コンテンツ取得
+ * GET    /api/pages/:id/content — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
  * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック)
  * POST   /api/pages             — 新規ページ作成
  * DELETE /api/pages/:id         — ページ論理削除
@@ -40,7 +40,13 @@ app.get("/:id/content", authRequired, async (c) => {
     .limit(1);
 
   const row = content[0];
-  if (!row) throw new HTTPException(404, { message: "Page content not found" });
+  if (!row) {
+    return c.json({
+      ydoc_state: "",
+      version: 0,
+      content_text: null,
+    });
+  }
   const ydocBase64 =
     row.ydocState instanceof Buffer
       ? row.ydocState.toString("base64")

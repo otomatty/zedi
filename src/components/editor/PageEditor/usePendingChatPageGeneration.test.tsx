@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, renderHook, waitFor, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { useEffect } from "react";
+import type { Location } from "react-router-dom";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePendingChatPageGeneration } from "./usePendingChatPageGeneration";
 

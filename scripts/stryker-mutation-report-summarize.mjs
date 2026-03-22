@@ -18,10 +18,26 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { cwd } from "node:process";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Prefer repo-relative paths in shared reports (avoid leaking absolute local paths).
+ * @param {string} target
+ */
+function displayPath(target) {
+  const base = cwd();
+  try {
+    const rel = relative(base, target);
+    if (rel && !rel.startsWith("..")) return rel.replace(/\\/g, "/");
+  } catch {
+    /* ignore */
+  }
+  return target;
+}
 
 const defaultInput = resolve(root, "reports/mutation/mutation.json");
 const defaultOut =
@@ -149,14 +165,23 @@ function main() {
     raw = readFileSync(input, "utf8");
   } catch {
     console.error(
-      `stryker-mutation-report-summarize: cannot read ${input}\n` +
+      `stryker-mutation-report-summarize: cannot read ${displayPath(input)}\n` +
         `  Run mutation tests first (JSON reporter writes this file). Example:\n` +
         `  STRYKER_HTML_REPORT=0 bun run test:mutation:changed -- --dryRunTimeoutMinutes 30`,
     );
     process.exit(1);
   }
 
-  const report = JSON.parse(raw);
+  let report;
+  try {
+    report = JSON.parse(raw);
+  } catch (error) {
+    console.error(
+      `stryker-mutation-report-summarize: invalid JSON in ${displayPath(input)}\n` +
+        `  ${error instanceof Error ? error.message : "Unknown parse error"}`,
+    );
+    process.exit(1);
+  }
   const agg = aggregate(report);
   const survived = collectSurvived(report, maxSurvived);
 
@@ -169,7 +194,7 @@ function main() {
     "このファイルは AI レビュー用の要約です。`mutation.html` は巨大なため添付しないでください。",
   );
   lines.push("");
-  lines.push(`- Source JSON: \`${input}\``);
+  lines.push(`- Source JSON: \`${displayPath(input)}\``);
   lines.push(`- Schema: ${report.schemaVersion ?? "?"}`);
   lines.push(`- Generated: ${new Date().toISOString()}`);
   lines.push("");
@@ -273,7 +298,7 @@ function main() {
   }
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, body, "utf8");
-  console.error(`stryker-mutation-report-summarize: wrote ${out}`);
+  console.error(`stryker-mutation-report-summarize: wrote ${displayPath(out)}`);
 }
 
 main();
