@@ -1,16 +1,17 @@
 # 仕様・ドキュメント方針（Specification policy）
 
-本リポジトリでは **仕様は常にコードのコメント（TSDoc / JSDoc）に書く**ことを徹底する。長文の仕様 Markdown を正として持たない。
+本リポジトリでは **仕様は常にコードのコメント（TSDoc / JSDoc）に書く**ことを徹底する。長文の仕様 Markdown を**リポジトリの正（source of truth）として**持たない。
 
 ## 原則
 
-| ルール                      | 内容                                                                                                                                                                                                                                                     |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Specification in source** | 公開 API・モジュール境界に、目的・受入条件の要約・契約・非目標を TSDoc で書く。                                                                                                                                                                          |
-| **Tests as contract**       | 振る舞いはテストで表現する（TDD）。                                                                                                                                                                                                                      |
-| **No `docs/` tree**         | 仕様書・運用メモ用の `docs/` 配下は置かない。陳腐化とエージェントへの誤前提配布を防ぐ。                                                                                                                                                                  |
-| **Delete obsolete prose**   | 不要になった説明ファイルは削除する（残さない）。                                                                                                                                                                                                         |
-| **AI コンテキスト**         | `.cursorignore` で `docs/` を隠すと、**ユーザーが `@` で添付しても読めない**ことがあるため使わない。代わりに **Cursor ルール**（`.cursor/rules/specification-and-docs.mdc`）で「勝手に長文 MD を読まない」「`@` で添付されたファイルは読む」を明示する。 |
+| ルール                       | 内容                                                                                                                                                                                                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Specification in source**  | 公開 API・モジュール境界に、目的・受入条件の要約・契約・非目標を TSDoc で書く。                                                                                                                                                                          |
+| **Tests as contract**        | 振る舞いはテストで表現する（TDD）。                                                                                                                                                                                                                      |
+| **No tracked `docs/` tree**  | 仕様書・運用メモ用の Markdown は **Git に追跡させない**（`.gitignore` で `docs/` およびルート `journal/` を除外）。リモートへ載せず、陳腐化した前提をチーム全体に配らない。                                                                              |
+| **Local `docs/` (optional)** | 開発者の作業用に、**ローカルだけ**に `docs/reviews/`, `docs/spec/`, `docs/plan/`, `docs/journal/` を置いてよい。下書き・一時メモであり、CI やレビューの契約にはしない。作成手順は [`AGENTS.md`](AGENTS.md)。                                             |
+| **Delete obsolete prose**    | 不要になった説明ファイルは削除する（残さない）。                                                                                                                                                                                                         |
+| **AI コンテキスト**          | `.cursorignore` で `docs/` を隠すと、**ユーザーが `@` で添付しても読めない**ことがあるため使わない。代わりに **Cursor ルール**（`.cursor/rules/specification-and-docs.mdc`）で「勝手に長文 MD を読まない」「`@` で添付されたファイルは読む」を明示する。 |
 
 ## 機能実装のステップ（仕様駆動）
 
@@ -24,7 +25,7 @@
 
 ## 日誌（Zedi への 1 日分の作業ログ）
 
-- **`journal/today.md`** に、その日の作業内容だけを追記する（**保持は概ね 1 日分**。翌日は新しい内容に置き換えてよい）。
-- **定期実行**で Zedi アプリに日誌を残す場合は、別途スケジューラ（cron / GitHub Actions 等）から `journal/today.md` を読み、Zedi の API または手動コピーで取り込む（実装は `journal/README.md` を参照）。
+- **`docs/journal/today.md`** に、その日の作業内容だけを追記する（**保持は概ね 1 日分**。翌日は新しい内容に置き換えてよい）。
+- **定期実行**で Zedi アプリに日誌を残す場合は、別途スケジューラ（cron / GitHub Actions 等）から `docs/journal/today.md` を読み、Zedi の API または手動コピーで取り込む。フォルダ作成は [`AGENTS.md`](AGENTS.md) を参照。
 
-英語併記: **Specification lives in source comments; no `docs/` prose as source of truth.**
+英語併記: **Specification lives in source comments; no tracked Markdown tree as source of truth. Optional local `docs/` is for drafts only.**
