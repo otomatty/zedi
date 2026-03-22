@@ -11,7 +11,10 @@ type UpdatePageMutation = UseMutationResult<
   unknown
 >;
 
-interface UsePageEditorEffectsOptions {
+/**
+ *
+ */
+export interface UsePageEditorEffectsOptions {
   isNewPage: boolean;
   currentPageId: string | null;
   isInitialized: boolean;
