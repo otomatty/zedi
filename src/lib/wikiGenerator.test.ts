@@ -3,6 +3,7 @@ import {
   extractWikiLinks,
   getAISettingsOrThrow,
   generateWikiContentStream,
+  generateWikiContentFromChatOutlineStream,
 } from "@/lib/wikiGenerator";
 import {
   WIKI_GENERATOR_PROMPT,
@@ -17,8 +18,13 @@ vi.mock("./aiService", () => ({
   callAIService: vi.fn(),
 }));
 
+vi.mock("./wikiGenerator/wikiGeneratorStreamFullPrompt", () => ({
+  streamWikiStyleFromFullPrompt: vi.fn(),
+}));
+
 import { loadAISettings } from "./aiSettings";
-import { callAIService } from "./aiService";
+import { callAIService, type AIServiceResponse } from "./aiService";
+import { streamWikiStyleFromFullPrompt } from "./wikiGenerator/wikiGeneratorStreamFullPrompt";
 import type { AISettings } from "@/types/ai";
 
 const baseSettings: AISettings = {
@@ -87,6 +93,18 @@ describe("getAISettingsOrThrow", () => {
     });
     await expect(getAISettingsOrThrow()).rejects.toThrow("AI_NOT_CONFIGURED");
   });
+
+  it("returns settings when user_api_key mode with api key and configured", async () => {
+    vi.mocked(loadAISettings).mockResolvedValue({
+      ...baseSettings,
+      apiMode: "user_api_key",
+      apiKey: "sk-test",
+      isConfigured: true,
+    });
+    const result = await getAISettingsOrThrow();
+    expect(result.apiKey).toBe("sk-test");
+    expect(result.apiMode).toBe("user_api_key");
+  });
 });
 
 describe("generateWikiContentStream", () => {
@@ -122,5 +140,134 @@ describe("generateWikiContentStream", () => {
         wikiLinks: [],
       }),
     );
+  });
+
+  it("uses accumulated stream when onComplete omits content", async () => {
+    vi.mocked(loadAISettings).mockResolvedValue({
+      ...baseSettings,
+    });
+
+    vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
+      handlers.onChunk("Streamed ");
+      handlers.onChunk("body");
+      handlers.onComplete?.({} as unknown as AIServiceResponse);
+      return Promise.resolve();
+    });
+
+    const onComplete = vi.fn();
+    await generateWikiContentStream("Test", { onChunk: vi.fn(), onComplete, onError: vi.fn() });
+
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "Streamed body",
+        wikiLinks: expect.any(Array),
+      }),
+    );
+  });
+});
+
+describe("generateWikiContentFromChatOutlineStream", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses callAIService in api_server mode with chat_page_generation feature", async () => {
+    vi.mocked(loadAISettings).mockResolvedValue({
+      ...baseSettings,
+      apiMode: "api_server",
+    });
+
+    vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
+      handlers.onChunk("# ");
+      handlers.onChunk("Hello");
+      handlers.onComplete?.({ content: "# Hello" });
+      return Promise.resolve();
+    });
+
+    const onChunk = vi.fn();
+    const onComplete = vi.fn();
+    const onError = vi.fn();
+
+    await generateWikiContentFromChatOutlineStream(
+      "My Title",
+      "- outline",
+      "User: hi",
+      { onChunk, onComplete, onError },
+      undefined,
+    );
+
+    expect(callAIService).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        options: expect.objectContaining({
+          feature: "chat_page_generation",
+          stream: true,
+        }),
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            content: expect.stringContaining("My Title"),
+          }),
+        ]),
+      }),
+      expect.anything(),
+      undefined,
+    );
+    expect(onChunk).toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "# Hello",
+        wikiLinks: [],
+      }),
+    );
+    expect(streamWikiStyleFromFullPrompt).not.toHaveBeenCalled();
+  });
+
+  it("calls onError when streamWikiStyleFromFullPrompt rejects", async () => {
+    vi.mocked(loadAISettings).mockResolvedValue({
+      ...baseSettings,
+      apiMode: "user_api_key",
+      apiKey: "sk-test",
+    });
+
+    vi.mocked(streamWikiStyleFromFullPrompt).mockRejectedValue(new Error("stream failed"));
+
+    const onError = vi.fn();
+    await generateWikiContentFromChatOutlineStream(
+      "T",
+      "o",
+      "c",
+      { onChunk: vi.fn(), onComplete: vi.fn(), onError },
+      undefined,
+    );
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "stream failed" }));
+  });
+
+  it("delegates to streamWikiStyleFromFullPrompt in user_api_key mode", async () => {
+    vi.mocked(loadAISettings).mockResolvedValue({
+      ...baseSettings,
+      apiMode: "user_api_key",
+      apiKey: "sk-test",
+    });
+
+    vi.mocked(streamWikiStyleFromFullPrompt).mockImplementation((_s, _req, handlers) => {
+      handlers.onChunk("x");
+      handlers.onComplete({ content: "x", wikiLinks: [] });
+      return Promise.resolve();
+    });
+
+    const onComplete = vi.fn();
+    await generateWikiContentFromChatOutlineStream(
+      "T",
+      "o",
+      "c",
+      { onChunk: vi.fn(), onComplete, onError: vi.fn() },
+      undefined,
+    );
+
+    expect(streamWikiStyleFromFullPrompt).toHaveBeenCalled();
+    expect(callAIService).not.toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalled();
   });
 });

@@ -51,6 +51,36 @@ describe("buildSystemPrompt", () => {
     expect(result).not.toContain("現在のコンテキスト");
   });
 
+  it("uses default editor title when pageTitle is missing", () => {
+    const context: PageContext = {
+      type: "editor",
+      pageContent: "本文のみ",
+    };
+    const result = buildSystemPrompt(context, []);
+    expect(result).toContain("無題のページ");
+    expect(result).toContain("本文のみ");
+  });
+
+  it("omits page body subsection when editor has no pageContent", () => {
+    const context: PageContext = { type: "editor", pageTitle: "タイトルのみ" };
+    const result = buildSystemPrompt(context, []);
+    expect(result).toContain("タイトルのみ");
+    expect(result).not.toContain("### ページ内容:");
+  });
+
+  it("does not list recent pages when home recentPageTitles is empty", () => {
+    const context: PageContext = { type: "home", recentPageTitles: [] };
+    const result = buildSystemPrompt(context, []);
+    expect(result).toContain("ホーム画面");
+    expect(result).not.toContain("### 最近のページ:");
+  });
+
+  it("search context with empty query still describes search state", () => {
+    const context: PageContext = { type: "search", searchQuery: "" };
+    const result = buildSystemPrompt(context, []);
+    expect(result).toContain("で検索を行っています");
+  });
+
   it("includes referenced pages section", () => {
     const referenced: ReferencedPage[] = [
       { id: "p1", title: "参照ページ1" },
