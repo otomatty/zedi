@@ -23,7 +23,11 @@ export interface PageEditorCoreReturnSlice {
 }
 
 /**
+ * Identity helper that narrows / preserves the core slice type for consumers.
+ * コアスライスの型をそのまま返すアイデンティティヘルパー（呼び出し側の型推論用）。
  *
+ * @param p - Core slice from the page editor hook / ページエディタフックのコア戻り値
+ * @returns Same object / 同一オブジェクト
  */
 export function pageEditorCoreReturnSlice(p: PageEditorCoreReturnSlice): PageEditorCoreReturnSlice {
   return p;
@@ -45,7 +49,11 @@ export interface PageEditorWikiReturnSlice {
 }
 
 /**
+ * Identity helper that narrows / preserves the wiki slice type for consumers.
+ * Wiki コラボ・生成まわりスライスの型をそのまま返すアイデンティティヘルパー。
  *
+ * @param p - Wiki slice from the page editor hook / ページエディタフックの Wiki 戻り値
+ * @returns Same object / 同一オブジェクト
  */
 export function pageEditorWikiReturnSlice(p: PageEditorWikiReturnSlice): PageEditorWikiReturnSlice {
   return p;
@@ -72,7 +80,11 @@ export interface PageEditorActionsReturnSlice {
 }
 
 /**
+ * Identity helper that narrows / preserves the actions slice type for consumers.
+ * 保存・削除・エクスポート等のアクションスライスの型をそのまま返すアイデンティティヘルパー。
  *
+ * @param p - Actions slice from the page editor hook / ページエディタフックのアクション戻り値
+ * @returns Same object / 同一オブジェクト
  */
 export function pageEditorActionsReturnSlice(
   p: PageEditorActionsReturnSlice,

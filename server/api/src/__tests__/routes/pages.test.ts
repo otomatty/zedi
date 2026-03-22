@@ -102,4 +102,38 @@ describe("PUT /api/pages/:id/content", () => {
     const body = (await res.json()) as { version: number };
     expect(body.version).toBe(1);
   });
+
+  it("accepts ydoc_state empty string for first save (matches GET when page_contents is missing)", async () => {
+    const app = createPagesApp([
+      [{ id: PAGE_ID, ownerId: TEST_USER_ID }],
+      [{ version: 1, pageId: PAGE_ID }],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ydoc_state: "",
+        expected_version: 0,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { version: number };
+    expect(body.version).toBe(1);
+  });
+
+  it("returns 400 when ydoc_state is omitted", async () => {
+    const app = createPagesApp([[{ id: PAGE_ID, ownerId: TEST_USER_ID }]]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        expected_version: 0,
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
 });

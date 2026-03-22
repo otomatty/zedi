@@ -38,7 +38,10 @@ export function getCreatePageOutline(action: CreatePageAction): string {
   return action.outline?.trim() ?? "";
 }
 
-/** Max characters of serialized chat sent to the page-body generation step. */
+/**
+ * Max characters of serialized chat sent to the page-body generation step.
+ * ページ本文生成ステップに送る会話シリアライズの最大文字数。
+ */
 export const MAX_CHAT_CONTEXT_CHARS = 16_000;
 
 /**
@@ -149,8 +152,8 @@ export function getMissingSuggestedWikiLinkTitles(
 }
 
 /**
- * Resolves @mentions in plain text to referenced pages (longest title match, non-overlapping).
- * プレーン文中の @言及をページに解決する（長いタイトル優先・重複範囲を除外）。
+ * Resolves at-mentions in plain text to referenced pages (longest title match, non-overlapping).
+ * プレーン文中のメンション（at + ページタイトル）を解決する（長いタイトル優先・重複範囲を除外）。
  */
 export function resolveReferencedPagesFromContent(
   content: string,
