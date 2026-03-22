@@ -20,7 +20,11 @@ function escapeRegExp(value: string): string {
 }
 
 /**
+ * Normalizes a page title for comparison (lowercase, trim).
+ * 比較用にページタイトルを正規化する（小文字化・前後空白除去）。
  *
+ * @param title - Raw title string / 生のタイトル文字列
+ * @returns Normalized title / 正規化後の文字列
  */
 export function normalizePageTitle(title: string): string {
   return title.toLowerCase().trim();
@@ -74,16 +78,15 @@ function parseTiptapDoc(content: string): TiptapDoc | null {
 }
 
 /**
+ * Appends one Tiptap JSON document's blocks to another and returns merged JSON string.
+ * 既存の Tiptap JSON に追加分のブロックを結合して JSON 文字列で返す。
  *
+ * @param existingContent - Existing editor JSON / 既存のエディタ JSON
+ * @param appendedContent - JSON to append / 追記する JSON
+ * @returns Merged Tiptap document JSON string / 結合後の JSON 文字列
  */
 export function appendTiptapContent(existingContent: string, appendedContent: string): string {
-  /**
-   *
-   */
   const existingDoc = parseTiptapDoc(existingContent);
-  /**
-   *
-   */
   const appendedDoc = parseTiptapDoc(appendedContent);
 
   if (!existingDoc) {
@@ -100,14 +103,16 @@ export function appendTiptapContent(existingContent: string, appendedContent: st
 }
 
 /**
- *
+ * Converts markdown to Tiptap JSON and appends it to existing content.
+ * Markdown を Tiptap JSON に変換し、既存コンテンツの末尾に追記する。
  */
 export function appendMarkdownToTiptapContent(existingContent: string, markdown: string): string {
   return appendTiptapContent(existingContent, convertMarkdownToTiptapContent(markdown));
 }
 
 /**
- *
+ * Builds a markdown bullet list of suggested wiki link lines (`- [[title]]`).
+ * 提案 Wiki リンクの Markdown 箇条書き（`- [[title]]`）を組み立てる。
  */
 export function buildSuggestedWikiLinksMarkdown(titles: string[]): string {
   return titles
@@ -118,30 +123,22 @@ export function buildSuggestedWikiLinksMarkdown(titles: string[]): string {
 }
 
 /**
- *
+ * Returns suggested wiki titles that are not already linked in the given content.
+ * 既存コンテンツにまだ含まれていない提案タイトルのみを返す。
  */
 export function getMissingSuggestedWikiLinkTitles(
   existingContent: string,
   suggestedTitles: string[],
 ): string[] {
-  /**
-   *
-   */
   const existingTitles = new Set(
     extractWikiLinksFromContent(existingContent).map((link) => normalizePageTitle(link.title)),
   );
-  /**
-   *
-   */
   const seen = new Set<string>();
 
   return suggestedTitles
     .map((title) => title.trim())
     .filter(Boolean)
     .filter((title) => {
-      /**
-       *
-       */
       const normalized = normalizePageTitle(title);
       if (existingTitles.has(normalized) || seen.has(normalized)) {
         return false;
@@ -152,7 +149,8 @@ export function getMissingSuggestedWikiLinkTitles(
 }
 
 /**
- *
+ * Resolves @mentions in plain text to referenced pages (longest title match, non-overlapping).
+ * プレーン文中の @言及をページに解決する（長いタイトル優先・重複範囲を除外）。
  */
 export function resolveReferencedPagesFromContent(
   content: string,
@@ -160,53 +158,23 @@ export function resolveReferencedPagesFromContent(
 ): ReferencedPage[] {
   if (!content.trim() || pages.length === 0) return [];
 
-  /**
-   *
-   */
   const candidates = [...pages]
     .filter((page) => !page.isDeleted && page.title.trim().length > 0)
     .sort((a, b) => b.title.length - a.title.length);
 
-  /**
-   *
-   */
   const takenRanges: Array<{ start: number; end: number }> = [];
-  /**
-   *
-   */
   const matches: Array<{ start: number; page: ReferencedPage }> = [];
 
-  for (/**
-   *
-   */
-  const page of candidates) {
-    /**
-     *
-     */
+  for (const page of candidates) {
     const pattern = new RegExp(
       `(^|[\\s\\u00A0])@${escapeRegExp(page.title)}(?=[\\s\\p{P}\\p{S}]|$)`,
       "giu",
     );
 
-    for (/**
-     *
-     */
-    const match of content.matchAll(pattern)) {
-      /**
-       *
-       */
+    for (const match of content.matchAll(pattern)) {
       const prefix = match[1] ?? "";
-      /**
-       *
-       */
       const matchStart = (match.index ?? 0) + prefix.length;
-      /**
-       *
-       */
       const matchEnd = matchStart + 1 + page.title.length;
-      /**
-       *
-       */
       const overlaps = takenRanges.some(
         (range) => matchStart < range.end && range.start < matchEnd,
       );
@@ -223,9 +191,6 @@ export function resolveReferencedPagesFromContent(
     }
   }
 
-  /**
-   *
-   */
   const seen = new Set<string>();
   return matches
     .sort((a, b) => a.start - b.start)

@@ -94,6 +94,35 @@ app.put("/:id/content", authRequired, async (c) => {
 
   // UPSERT page_contents with optimistic locking
   if (body.expected_version != null) {
+    // First save after GET returned version 0 with no row: insert the initial row.
+    // GET が page_contents 未作成で version:0 を返した契約に合わせ、expected_version:0 で初回 INSERT を許容する。
+    if (body.expected_version === 0) {
+      const inserted = await db
+        .insert(pageContents)
+        .values({
+          pageId,
+          ydocState: ydocBuffer,
+          version: 1,
+          contentText: body.content_text ?? null,
+        })
+        .onConflictDoNothing({ target: pageContents.pageId })
+        .returning();
+
+      if (inserted.length) {
+        const insertedRow = inserted[0];
+        if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
+
+        if (body.title !== undefined) {
+          await db
+            .update(pages)
+            .set({ title: body.title, updatedAt: new Date() })
+            .where(eq(pages.id, pageId));
+        }
+
+        return c.json({ version: insertedRow.version ?? 1 });
+      }
+    }
+
     // 楽観的ロック: expected_version と一致する場合のみ更新
     const updated = await db
       .update(pageContents)

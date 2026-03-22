@@ -80,3 +80,26 @@ describe("GET /api/pages/:id/content", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("PUT /api/pages/:id/content", () => {
+  it("creates page_contents when expected_version is 0 and no row exists (aligns with GET version 0)", async () => {
+    const ydocB64 = Buffer.from("hello").toString("base64");
+    const app = createPagesApp([
+      [{ id: PAGE_ID, ownerId: TEST_USER_ID }],
+      [{ version: 1, pageId: PAGE_ID }],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ydoc_state: ydocB64,
+        expected_version: 0,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { version: number };
+    expect(body.version).toBe(1);
+  });
+});

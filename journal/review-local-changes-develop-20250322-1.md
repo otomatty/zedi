@@ -1,14 +1,19 @@
-# セルフレビュー: develop（作業ツリー未コミット）
+# Self-review / セルフレビュー: `feature/test-mutation-roadmap-logic-395` (PR #398)
 
-**日時**: 2025-03-22（レビュー実行時）  
-**ベース**: `develop`  
-**ブランチ**: `develop`（`develop..HEAD` の追加コミットなし。変更はすべて未コミット）  
-**変更ファイル数**: 22 tracked + 5 untracked = **27 files**  
-**関連ファイル数**: レビューで精読・差分確認した主要ファイル約 **18**（上限内）
+**Date / 日時**: 2026-03-23 (metadata refresh; original capture was 2025-03-22 on local `develop` with uncommitted work / メタデータ更新。元の記録は 2025-03-22 のローカル `develop` 未コミット作業向け)  
+**Base / ベース**: `develop` (PR targets `develop` / PR は `develop` 向け)  
+**Branch / ブランチ**: `feature/test-mutation-roadmap-logic-395` (tracked in PR #398 / PR #398 で追跡)
 
-**出力先**: リポジトリ方針により `docs/reviews/` は使わず `journal/` に保存（[AGENTS.md](../AGENTS.md)）。
+**Change files (historical note) / 変更ファイル数（当時）**: 22 tracked + 5 untracked = **27 files**  
+**Related files reviewed / 関連ファイル数**: ~**18** major files (cap) / 主要ファイル約 18（上限内）
 
-## サマリー
+**Output / 出力先**: Per [AGENTS.md](../AGENTS.md), reviews live under `journal/` (not `docs/reviews/`). / レビューは `journal/` に保存（`docs/reviews/` は使わない）。
+
+## Summary / サマリー
+
+**English:** This note was originally a self-review of uncommitted AI-chat page streaming work on `develop`. PR [#398](https://github.com/otomatty/zedi/pull/398) carries the merged feature branch; keep this file as historical context or align metadata with the PR as done above.
+
+**日本語:** 本メモは当初、ローカル `develop` 上の未コミット変更（AI チャットからのページ本文ストリーミング等）のセルフレビュー記録です。実装は PR [#398](https://github.com/otomatty/zedi/pull/398) のブランチに集約されているため、履歴として残すか、上記のとおり PR と整合するメタデータに更新してください。
 
 AI チャットからの「ページ作成」を、空ページ作成後にエディタ側で **アウトライン＋会話文脈から Markdown をストリーミング生成**する流れに拡張している。`runAIChatAction` への抽出、`generateWikiContentFromChatOutlineStream` と各プロバイダ向けフルプロンプトストリーム、`usePendingChatPageGeneration` によるルータ state の受け渡しが中心。API では `GET /api/pages/:id/content` が **`page_contents` 未作成時に 404 ではなく空の ydoc を返す**ようになり、新規空ページと整合する。
 
