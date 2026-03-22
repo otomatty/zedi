@@ -13,6 +13,8 @@ import {
   generateWithAnthropic,
   generateWithGoogle,
 } from "./wikiGenerator/wikiGeneratorProviders";
+import { streamWikiStyleFromFullPrompt } from "./wikiGenerator/wikiGeneratorStreamFullPrompt";
+import { buildChatPageWikiUserPrompt } from "./wikiGenerator/wikiGeneratorFromChatPrompt";
 
 export type { WikiGeneratorResult, WikiGeneratorCallbacks };
 export { extractWikiLinks };
@@ -104,6 +106,68 @@ export async function generateWikiContentStream(
       default:
         throw new Error(`Unknown provider: ${settings.provider}`);
     }
+  } catch (error) {
+    if (error instanceof Error) {
+      callbacks.onError(error);
+    } else {
+      callbacks.onError(new Error("Unknown error occurred"));
+    }
+  }
+}
+
+/**
+ * Generate full page Markdown from chat outline + conversation (streaming).
+ * アウトラインと会話文脈からページ本文をストリーミング生成する。
+ */
+export async function generateWikiContentFromChatOutlineStream(
+  title: string,
+  outline: string,
+  conversationText: string,
+  callbacks: WikiGeneratorCallbacks,
+  abortSignal?: AbortSignal,
+): Promise<void> {
+  const userPrompt = buildChatPageWikiUserPrompt(title, outline, conversationText);
+  try {
+    const settings = await getAISettingsOrThrow();
+    const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+
+    if (effectiveMode === "api_server") {
+      const { callAIService } = await import("@/lib/aiService");
+      let fullContent = "";
+
+      await callAIService(
+        settings,
+        {
+          provider: settings.provider,
+          model: settings.model,
+          messages: [{ role: "user", content: userPrompt }],
+          options: {
+            maxTokens: 4000,
+            temperature: 0.7,
+            stream: true,
+            feature: "chat_page_generation",
+          },
+        },
+        {
+          onChunk: (chunk) => {
+            fullContent += chunk;
+            callbacks.onChunk(chunk);
+          },
+          onComplete: (response) => {
+            const content = response.content ?? fullContent;
+            callbacks.onComplete({
+              content,
+              wikiLinks: extractWikiLinks(content),
+            });
+          },
+          onError: (error) => callbacks.onError(error),
+        },
+        abortSignal,
+      );
+      return;
+    }
+
+    await streamWikiStyleFromFullPrompt(settings, userPrompt, callbacks, abortSignal);
   } catch (error) {
     if (error instanceof Error) {
       callbacks.onError(error);
