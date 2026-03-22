@@ -34,6 +34,17 @@ function mockLocation(
   return { pathname, state } as UsePageEditorEffectsOptions["location"];
 }
 
+/**
+ * Returns whether `navigate` was invoked with `path` as the first argument (any number of args).
+ * `navigate` の第1引数が `path` か（引数の個数は問わない）。
+ */
+function wasNavigateCalledWithPath(
+  navigate: { mock: { calls: unknown[][] } },
+  path: string,
+): boolean {
+  return navigate.mock.calls.some((c) => c[0] === path);
+}
+
 function createBaseOptions(
   overrides: Partial<UsePageEditorEffectsOptions> = {},
 ): UsePageEditorEffectsOptions {
@@ -77,32 +88,19 @@ describe("usePageEditorEffects", () => {
     it("navigates to /home when isNewPage is true", () => {
       renderHook(
         () =>
-          usePageEditorEffects({
-            isNewPage: true,
-            currentPageId: null,
-            isInitialized: false,
-            isError: false,
-            page: null,
-            title: "",
-            content: "",
-            isWikiGenerating: false,
-            wikiStatus: "idle",
-            throttledTiptapContent: null,
-            navigate: mockNavigate,
-            location: { pathname: "/page/new", state: null } as ReturnType<
-              (typeof import("react-router-dom"))["useLocation"]
-            >,
-            initialize: vi.fn(),
-            setContent: mockSetContent,
-            setWikiContentForCollab: vi.fn(),
-            setSourceUrl: vi.fn(),
-            setPendingInitialContent: vi.fn(),
-            getTiptapContent: () => null,
-            saveChanges: vi.fn(),
-            resetWikiBase: vi.fn(),
-            updatePageMutation: { mutate: vi.fn(), mutateAsync: vi.fn() } as never,
-            toast: mockToast,
-          }),
+          usePageEditorEffects(
+            createBaseOptions({
+              isNewPage: true,
+              currentPageId: null,
+              isInitialized: false,
+              page: null,
+              title: "",
+              navigate: mockNavigate,
+              location: mockLocation("/page/new", null),
+              setContent: mockSetContent,
+              toast: mockToast,
+            }),
+          ),
         { wrapper },
       );
 
@@ -123,7 +121,7 @@ describe("usePageEditorEffects", () => {
         { wrapper },
       );
 
-      expect(mockNavigate).not.toHaveBeenCalledWith("/home", expect.anything());
+      expect(wasNavigateCalledWithPath(mockNavigate, "/home")).toBe(false);
     });
 
     it("calls initialize when page is set and not yet initialized", () => {
@@ -132,32 +130,18 @@ describe("usePageEditorEffects", () => {
 
       renderHook(
         () =>
-          usePageEditorEffects({
-            isNewPage: false,
-            currentPageId: "page-1",
-            isInitialized: false,
-            isError: false,
-            page,
-            title: "Test",
-            content: "",
-            isWikiGenerating: false,
-            wikiStatus: "idle",
-            throttledTiptapContent: null,
-            navigate: mockNavigate,
-            location: { pathname: "/page/1", state: null } as ReturnType<
-              (typeof import("react-router-dom"))["useLocation"]
-            >,
-            initialize,
-            setContent: mockSetContent,
-            setWikiContentForCollab: vi.fn(),
-            setSourceUrl: vi.fn(),
-            setPendingInitialContent: vi.fn(),
-            getTiptapContent: () => null,
-            saveChanges: vi.fn(),
-            resetWikiBase: vi.fn(),
-            updatePageMutation: { mutate: vi.fn(), mutateAsync: vi.fn() } as never,
-            toast: mockToast,
-          }),
+          usePageEditorEffects(
+            createBaseOptions({
+              isInitialized: false,
+              page,
+              title: "Test",
+              location: mockLocation("/page/1", null),
+              initialize,
+              navigate: mockNavigate,
+              setContent: mockSetContent,
+              toast: mockToast,
+            }),
+          ),
         { wrapper },
       );
 
@@ -249,7 +233,7 @@ describe("usePageEditorEffects", () => {
         { wrapper, initialProps: { isNewPage: false } },
       );
 
-      expect(mockNavigate).not.toHaveBeenCalledWith("/home", expect.anything());
+      expect(wasNavigateCalledWithPath(mockNavigate, "/home")).toBe(false);
 
       rerender({ isNewPage: true });
 
@@ -492,7 +476,7 @@ describe("usePageEditorEffects", () => {
         { wrapper },
       );
 
-      expect(navigate).not.toHaveBeenCalledWith("/", expect.anything());
+      expect(wasNavigateCalledWithPath(navigate, "/")).toBe(false);
       expect(mockToast).not.toHaveBeenCalledWith(
         expect.objectContaining({ title: "ページが見つかりません" }),
       );
@@ -514,7 +498,7 @@ describe("usePageEditorEffects", () => {
         { wrapper, initialProps: { isError: false } },
       );
 
-      expect(navigate).not.toHaveBeenCalledWith("/", expect.anything());
+      expect(wasNavigateCalledWithPath(navigate, "/")).toBe(false);
 
       rerender({ isError: true });
 
