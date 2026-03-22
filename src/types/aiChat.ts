@@ -29,14 +29,24 @@ export type ChatAction =
   | CreateMultiplePagesAction
   | SuggestWikiLinksAction;
 
+/**
+ * Proposes creating a single new page from chat (Markdown body + optional outline for staged generation).
+ * チャットから新規ページ作成を提案するアクション（本文 Markdown・第2段階用アウトライン任意）。
+ */
 export interface CreatePageAction {
   type: "create-page";
   title: string;
   content: string; // Markdown
+  /** Bullet outline for the create-page card / second-stage body generation (preferred). / カード用箇条書き・第2段階生成用 */
+  outline?: string;
   suggestedLinks: string[]; // WikiLink 候補
   reason: string; // AI がなぜ提案したかの説明
 }
 
+/**
+ * Proposes appending Markdown to the currently open editor page (title must match context).
+ * 現在開いているエディタページへ Markdown を追記する提案（タイトルはコンテキストと一致が必要）。
+ */
 export interface AppendToPageAction {
   type: "append-to-page";
   pageTitle: string; // クライアントでタイトル→ID解決する
@@ -45,6 +55,10 @@ export interface AppendToPageAction {
   reason: string;
 }
 
+/**
+ * Proposes creating multiple linked pages at once (bulk create + optional link graph).
+ * 複数ページを一括作成し、リンク構造を指定する提案。
+ */
 export interface CreateMultiplePagesAction {
   type: "create-multiple-pages";
   pages: Array<{
@@ -56,6 +70,10 @@ export interface CreateMultiplePagesAction {
   reason: string;
 }
 
+/**
+ * Proposes inserting wiki-style links for keywords that may map to existing or new pages.
+ * キーワードに対応する Wiki リンク挿入を提案する（既存ページとの紐付け可）。
+ */
 export interface SuggestWikiLinksAction {
   type: "suggest-wiki-links";
   links: Array<{

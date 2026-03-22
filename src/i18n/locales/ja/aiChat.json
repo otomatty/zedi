@@ -49,6 +49,9 @@
     "pageContextRequired": "ページを開いた状態で実行してください",
     "appendUnavailable": "現在開いているページへの追記のみ対応しています",
     "appendSuccess": "「{{title}}」に追記しました",
+    "appendFailed": "「{{title}}」への追記に失敗しました",
+    "pageBodyGenerated": "ページ本文を生成しました",
+    "pageBodyGenerateFailed": "ページ本文の生成に失敗しました",
     "wikiLinksAdded": "{{count}}件のWikiLinkを追加しました",
     "noNewWikiLinks": "追加できる新しいWikiLinkはありません",
     "actionFailed": "アクションの実行に失敗しました"

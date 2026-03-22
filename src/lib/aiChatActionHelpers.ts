@@ -1,5 +1,10 @@
 import type { PageSummary } from "@/types/page";
-import { MAX_REFERENCED_PAGES, type ReferencedPage } from "@/types/aiChat";
+import {
+  MAX_REFERENCED_PAGES,
+  type ChatMessage,
+  type CreatePageAction,
+  type ReferencedPage,
+} from "@/types/aiChat";
 import { extractWikiLinksFromContent } from "./wikiLinkUtils";
 import { convertMarkdownToTiptapContent } from "./markdownToTiptap";
 
@@ -14,8 +19,47 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Normalizes a page title for comparison (lowercase, trim).
+ * 比較用にページタイトルを正規化する（小文字化・前後空白除去）。
+ *
+ * @param title - Raw title string / 生のタイトル文字列
+ * @returns Normalized title / 正規化後の文字列
+ */
 export function normalizePageTitle(title: string): string {
   return title.toLowerCase().trim();
+}
+
+/**
+ * Returns the outline string for create-page actions.
+ * create-page アクションのアウトライン文字列を返す。
+ */
+export function getCreatePageOutline(action: CreatePageAction): string {
+  return action.outline?.trim() ?? "";
+}
+
+/**
+ * Max characters of serialized chat sent to the page-body generation step.
+ * ページ本文生成ステップに送る会話シリアライズの最大文字数。
+ */
+export const MAX_CHAT_CONTEXT_CHARS = 16_000;
+
+/**
+ * Serializes chat messages for the second-stage page generation prompt (recent tail if too long).
+ * 第2段階プロンプト用に会話を連結（長い場合は末尾を切り詰め）。
+ */
+export function serializeChatMessagesForPageGeneration(messages: ChatMessage[]): string {
+  const lines: string[] = [];
+  for (const m of messages) {
+    if (m.role === "system") continue;
+    const roleLabel = m.role === "user" ? "User" : "Assistant";
+    lines.push(`${roleLabel}: ${m.content}`);
+  }
+  let text = lines.join("\n\n");
+  if (text.length > MAX_CHAT_CONTEXT_CHARS) {
+    text = text.slice(-MAX_CHAT_CONTEXT_CHARS);
+  }
+  return text;
 }
 
 function parseTiptapDoc(content: string): TiptapDoc | null {
@@ -36,6 +80,14 @@ function parseTiptapDoc(content: string): TiptapDoc | null {
   }
 }
 
+/**
+ * Appends one Tiptap JSON document's blocks to another and returns merged JSON string.
+ * 既存の Tiptap JSON に追加分のブロックを結合して JSON 文字列で返す。
+ *
+ * @param existingContent - Existing editor JSON / 既存のエディタ JSON
+ * @param appendedContent - JSON to append / 追記する JSON
+ * @returns Merged Tiptap document JSON string / 結合後の JSON 文字列
+ */
 export function appendTiptapContent(existingContent: string, appendedContent: string): string {
   const existingDoc = parseTiptapDoc(existingContent);
   const appendedDoc = parseTiptapDoc(appendedContent);
@@ -53,10 +105,18 @@ export function appendTiptapContent(existingContent: string, appendedContent: st
   } satisfies TiptapDoc);
 }
 
+/**
+ * Converts markdown to Tiptap JSON and appends it to existing content.
+ * Markdown を Tiptap JSON に変換し、既存コンテンツの末尾に追記する。
+ */
 export function appendMarkdownToTiptapContent(existingContent: string, markdown: string): string {
   return appendTiptapContent(existingContent, convertMarkdownToTiptapContent(markdown));
 }
 
+/**
+ * Builds a markdown bullet list of suggested wiki link lines (`- [[title]]`).
+ * 提案 Wiki リンクの Markdown 箇条書き（`- [[title]]`）を組み立てる。
+ */
 export function buildSuggestedWikiLinksMarkdown(titles: string[]): string {
   return titles
     .map((title) => title.trim())
@@ -65,6 +125,10 @@ export function buildSuggestedWikiLinksMarkdown(titles: string[]): string {
     .join("\n");
 }
 
+/**
+ * Returns suggested wiki titles that are not already linked in the given content.
+ * 既存コンテンツにまだ含まれていない提案タイトルのみを返す。
+ */
 export function getMissingSuggestedWikiLinkTitles(
   existingContent: string,
   suggestedTitles: string[],
@@ -87,6 +151,10 @@ export function getMissingSuggestedWikiLinkTitles(
     });
 }
 
+/**
+ * Resolves at-mentions in plain text to referenced pages (longest title match, non-overlapping).
+ * プレーン文中のメンション（at + ページタイトル）を解決する（長いタイトル優先・重複範囲を除外）。
+ */
 export function resolveReferencedPagesFromContent(
   content: string,
   pages: Pick<PageSummary, "id" | "title" | "isDeleted">[],
