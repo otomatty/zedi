@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §5
+ * AI chat dock: render when aiChatAvailable; desktop spacer + aside; mobile Drawer; spacer aria-hidden.
  * AI チャットドック: aiChatAvailable 時のみ描画、デスクトップはスペーサー＋aside、モバイルは Drawer、スペーサー aria-hidden。
  */
 import React from "react";

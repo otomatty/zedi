@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   escapeRegExp,
   extractSmartSnippet,
@@ -116,6 +116,14 @@ describe("extractSmartSnippet", () => {
     expect(result.length).toBeLessThanOrEqual(66); // 60 + ellipsis margin
     expect(result).toContain("機械学習");
   });
+
+  // 同スコアの文が複数あるときは先に出現した文を選ぶ（> と >= で結果が変わる mutation を検知）
+  // When two sentences tie on keyword count, prefer the earlier sentence (detects > vs >=).
+  it("prefers the first sentence when keyword counts are equal", () => {
+    const text = "First line has keyword here. Second line also has keyword here.";
+    const result = extractSmartSnippet(text, ["keyword"]);
+    expect(result.toLowerCase()).toContain("first");
+  });
 });
 
 describe("highlightKeywords", () => {
@@ -196,6 +204,10 @@ describe("determineMatchType", () => {
 });
 
 describe("calculateEnhancedScore", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("should give highest score for exact_title", () => {
     const page = createTestPage("1", "機械学習", createPlainTextContent("content"));
     const score = calculateEnhancedScore(page, ["機械学習"], "exact_title");
@@ -237,5 +249,46 @@ describe("calculateEnhancedScore", () => {
     const oldScore = calculateEnhancedScore(oldPage, ["Title"], "title");
 
     expect(newScore).toBeGreaterThan(oldScore);
+  });
+
+  // 以下は global regex・算術・min/max の誤変更を検知するため、固定時刻で期待差分を厳密に見る
+  // Tight score diffs with frozen time to catch bad edits to regex flags, arithmetic, min/max.
+  it("adds exactly 4 points for two extra keyword occurrences in plain text", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-06-10T12:00:00.000Z"));
+    const t = Date.now();
+    const oneKw = createTestPage("1", "T", createPlainTextContent("kw padding"), { updatedAt: t });
+    const threeKw = createTestPage("2", "T", createPlainTextContent("kw kw kw padding"), {
+      updatedAt: t,
+    });
+    const s1 = calculateEnhancedScore(oneKw, ["kw"], "content");
+    const s3 = calculateEnhancedScore(threeKw, ["kw"], "content");
+    expect(s3 - s1).toBe(4);
+  });
+
+  it("caps occurrence bonus so five and six hits yield the same score", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-06-10T12:00:00.000Z"));
+    const t = Date.now();
+    const fiveHits = createPlainTextContent("kw kw kw kw kw tail");
+    const sixHits = createPlainTextContent("kw kw kw kw kw kw tail");
+    const p5 = createTestPage("1", "T", fiveHits, { updatedAt: t });
+    const p6 = createTestPage("2", "T", sixHits, { updatedAt: t });
+    expect(calculateEnhancedScore(p5, ["kw"], "content")).toBe(
+      calculateEnhancedScore(p6, ["kw"], "content"),
+    );
+  });
+
+  it("applies a recency delta of exactly 10 between same-day and 15-day-old pages", () => {
+    vi.useFakeTimers();
+    const instant = new Date("2025-03-01T09:00:00.000Z").getTime();
+    vi.setSystemTime(new Date("2025-03-01T09:00:00.000Z"));
+    const recent = createTestPage("1", "T", createPlainTextContent("x"), { updatedAt: instant });
+    const old = createTestPage("2", "T", createPlainTextContent("x"), {
+      updatedAt: instant - 15 * 24 * 60 * 60 * 1000,
+    });
+    const sRecent = calculateEnhancedScore(recent, ["nomatch"], "content");
+    const sOld = calculateEnhancedScore(old, ["nomatch"], "content");
+    expect(sRecent - sOld).toBe(10);
   });
 });

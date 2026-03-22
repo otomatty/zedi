@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §9.2, §9.3
+ * Note members: loading / no access / canManageMembers shows management UI; otherwise permission message.
  * ノートメンバー: 読み込み中／閲覧不可／canManageMembers 時は管理 UI、!canManageMembers 時は権限なしメッセージ。
  */
 import React from "react";

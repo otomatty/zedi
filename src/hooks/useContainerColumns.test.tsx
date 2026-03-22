@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §10.1, §10.2
+ * Page list grid columns from container width: 2–6 columns; breakpoints 360 / 520 / 680 / 880 px.
  * ページ一覧グリッドの列数はコンテナ幅に応じて 2〜6。閾値: 360 / 520 / 680 / 880 px。
  */
 import { describe, it, expect, vi } from "vitest";

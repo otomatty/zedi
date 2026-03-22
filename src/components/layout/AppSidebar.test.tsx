@@ -1,5 +1,5 @@
 /**
- * 仕様: docs/specs/app-layout-and-note-pages-spec.md §4
+ * App sidebar: Home / Notes / Settings / Plan nav; active route match; Zedi link to /home; footer when signed in.
  * 左サイドバー: Home/Notes/Settings/Plan ナビ、アクティブは /home 厳密・他は prefix、Zedi リンク /home、フッターはサインイン時のみ。
  */
 import React from "react";

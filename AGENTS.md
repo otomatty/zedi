@@ -3,6 +3,12 @@
 プロジェクト全体の AI エージェント向け共通ガイドライン。
 Cursor, Claude Code, GitHub Copilot, Codex 等すべてのエージェントが参照する。
 
+## 仕様・ドキュメント（最重要）
+
+- **仕様はコードの TSDoc / JSDoc に書く**。長文の仕様 Markdown（旧 `docs/`）はリポジトリに置かない。詳細は [`SPECIFICATION_POLICY.md`](SPECIFICATION_POLICY.md)。
+- **不要になった説明ファイルは削除する**。エージェントに古い文面を渡さず、コンテキストを浪費しない。
+- **`docs/` を勝手に読まない**。ユーザーが `@ファイル` で添付したファイルは読む（`.cursor/rules/specification-and-docs.mdc`）。
+
 ## 技術スタック
 
 - **フロント**: React, TypeScript, Vite
@@ -26,9 +32,9 @@ bun run test:run       # Vitest 単体テスト
 
 ## テスト（TDD）
 
-- **テストは実装の前に書く**（テスト駆動開発・TDD を徹底する）。新規機能・修正では、期待する振る舞いをテストで先に定義し、そのテストが通るように実装する。
-- **テスト品質の指標は Mutation スコアを優先する**。カバレッジ 80% 以上は目標とするが、Mutation スコアの閾値を満たすことを優先する。
-- 詳細は [docs/guides/testing-guidelines.md](docs/guides/testing-guidelines.md) を参照。
+- **テストは実装の前に書く**。期待する振る舞いをテストで先に定義し、そのテストが通るように実装する。
+- **Mutation スコアを品質の第一指標**とする。カバレッジ 80% 以上を目標としつつ、Mutation の閾値を優先する。
+- CI では `mutation-light` / nightly 等のワークフローがある場合がある（`package.json` / `.github/workflows` を参照）。
 
 ## コードスタイル
 
@@ -41,9 +47,13 @@ bun run test:run       # Vitest 単体テスト
 
 ## ブランチ・PR の命名規則
 
-- **ブランチ**: `feature/説明`、`fix/説明`、`hotfix/説明`、`chore/説明` など（例: `feature/ai-models-ui`, `fix/search-crash`, `hotfix/security-patch`）。Issue 番号から作る場合は `feature/123` のようにする。詳細は [branch-strategy.md](docs/guides/branch-strategy.md) を参照。
+- **ブランチ**: `feature/説明`、`fix/説明`、`hotfix/説明`、`chore/説明` など（例: `feature/ai-models-ui`, `fix/search-crash`）。Issue 番号から作る場合は `feature/123`。
 - **PR タイトル**: コミットメッセージに合わせる。単一トピックの PR は代表的なコミットをそのまま使う。Conventional Commits 形式（例: `feat(admin): AIモデル管理UI拡張 (#218)`）。変更内容を正しく表すタイトルにし、「Config argument parsing」のように無関係な文言にしない。
-- **Cursor Cloud Agent で PR を作る場合**: リポジトリのルール（本ファイルや `.cursor/rules/`）はエージェントが参照する場合があるが、Cloud Agent 起動時に「PR を作成するときはタイトルを Conventional Commits 形式にし、変更内容を表す文言にすること」とプロンプトに含めると確実。API で起動する場合は `target.branchName` でブランチ名を指定できる（[Cloud Agents API](https://cursor.com/docs/background-agent/api/overview)）。PR タイトルを直接指定する API パラメータは 2026 年現在ないため、プロンプトで指示するか、作成後に手動で修正する。
+- **Cursor Cloud Agent で PR を作る場合**: 起動プロンプトに「PR タイトルは Conventional Commits で変更内容を表すこと」を含める。[Cloud Agents API](https://cursor.com/docs/background-agent/api/overview) の `target.branchName` でブランチ名を指定可能。
+
+## マージ方法
+
+- **main → develop** の同期 PR は必ず **Create a merge commit** でマージする（Squash だと develop → main の PR でコンフリクトが再発しやすい）。
 
 ## PR レビュー観点
 
@@ -96,12 +106,8 @@ admin/            # 管理画面アプリ
 server/api/       # API サーバー
 server/hocuspocus/ # リアルタイムサーバー
 terraform/        # インフラ定義
-docs/             # ドキュメント
+journal/          # 当日の作業メモ（today.md）。長文ドキュメントは置かない
 ```
-
-## マージ方法
-
-- **main → develop** の同期 PR は必ず **Create a merge commit** でマージする（Squash だと develop → main の PR でコンフリクトが再発する）。詳細は [docs/guides/branch-strategy.md](docs/guides/branch-strategy.md#マージ方法のルール) を参照。
 
 ## その他
 
