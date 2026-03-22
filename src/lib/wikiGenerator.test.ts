@@ -14,7 +14,7 @@ vi.mock("./aiSettings", () => ({
   loadAISettings: vi.fn(),
 }));
 
-vi.mock("./aiService", () => ({
+vi.mock("@/lib/aiService", () => ({
   callAIService: vi.fn(),
 }));
 
@@ -23,7 +23,7 @@ vi.mock("./wikiGenerator/wikiGeneratorStreamFullPrompt", () => ({
 }));
 
 import { loadAISettings } from "./aiSettings";
-import { callAIService, type AIServiceResponse } from "./aiService";
+import { callAIService, type AIServiceResponse } from "@/lib/aiService";
 import { streamWikiStyleFromFullPrompt } from "./wikiGenerator/wikiGeneratorStreamFullPrompt";
 import type { AISettings } from "@/types/ai";
 

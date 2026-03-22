@@ -200,8 +200,8 @@ describe("serializeChatMessagesForPageGeneration", () => {
     const text = serializeChatMessagesForPageGeneration([
       { id: "1", role: "user", content: long, timestamp: 1 },
     ]);
-    expect(text.length).toBeLessThanOrEqual(MAX_CHAT_CONTEXT_CHARS);
-    expect(text.endsWith("x".repeat(50))).toBe(true);
+    expect(text.length).toBe(MAX_CHAT_CONTEXT_CHARS);
+    expect(text.startsWith("User:")).toBe(false);
   });
 
   it("omits system messages from serialized chat", () => {

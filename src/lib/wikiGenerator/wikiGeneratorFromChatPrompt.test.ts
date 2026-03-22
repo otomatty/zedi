@@ -14,4 +14,14 @@ describe("buildChatPageWikiUserPrompt", () => {
     expect(p).toContain("(アウトラインなし)");
     expect(p).toContain("(会話なし)");
   });
+
+  it("keeps outline and conversation sections when title contains placeholder-like text", () => {
+    const p = buildChatPageWikiUserPrompt("About {{outline}}", "- A\n- B", "User: context");
+    const outlineSection =
+      p.split("## ユーザーが承認したアウトライン")[1]?.split("## 会話の文脈")[0] ?? "";
+    const conversationSection = p.split("## 会話の文脈")[1]?.split("## 執筆ルール")[0] ?? "";
+    expect(outlineSection).toContain("- A");
+    expect(outlineSection).toContain("- B");
+    expect(conversationSection).toContain("User: context");
+  });
 });

@@ -26,10 +26,20 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
  */
 function getChangedPaths(base) {
   if (base) {
-    const out = execSync(`git diff --name-only ${base}...HEAD`, {
+    const result = spawnSync("git", ["diff", "--name-only", `${base}...HEAD`], {
       encoding: "utf8",
       cwd: root,
     });
+    if (result.error) {
+      throw result.error;
+    }
+    if (result.status !== 0) {
+      throw new Error(
+        (result.stderr && String(result.stderr)) ||
+          `git diff failed with status ${result.status ?? "unknown"}`,
+      );
+    }
+    const out = result.stdout ?? "";
     return out.trim().split("\n").filter(Boolean);
   }
   const vsHead = execSync("git diff --name-only HEAD", {
