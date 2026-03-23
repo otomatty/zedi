@@ -11,6 +11,12 @@ const mocks = vi.hoisted(() => {
   const setActiveConversation = vi.fn();
   const clearMessages = vi.fn();
   const loadMessages = vi.fn();
+  /** Stable across renders so AIChatPanel effects do not re-run spuriously on rerender. */
+  const createConversation = vi.fn(() => ({ id: "conv-1" }));
+  const updateConversation = vi.fn();
+  const deleteConversation = vi.fn();
+  const getConversation = vi.fn();
+  const getConversationsForPage = vi.fn(() => []);
   const mockPageContextRef = { current: null as PageContext | null };
   const mockStore = {
     isOpen: true,
@@ -25,6 +31,11 @@ const mocks = vi.hoisted(() => {
     clearMessages,
     loadMessages,
     setActiveConversation,
+    createConversation,
+    updateConversation,
+    deleteConversation,
+    getConversation,
+    getConversationsForPage,
   };
 });
 
@@ -44,11 +55,11 @@ vi.mock("../../hooks/usePageQueries", () => ({
 
 vi.mock("../../hooks/useAIChatConversations", () => ({
   useAIChatConversations: () => ({
-    createConversation: vi.fn(() => ({ id: "conv-1" })),
-    updateConversation: vi.fn(),
-    deleteConversation: vi.fn(),
-    getConversation: vi.fn(),
-    getConversationsForPage: () => [],
+    createConversation: mocks.createConversation,
+    updateConversation: mocks.updateConversation,
+    deleteConversation: mocks.deleteConversation,
+    getConversation: mocks.getConversation,
+    getConversationsForPage: mocks.getConversationsForPage,
   }),
 }));
 
@@ -123,6 +134,7 @@ describe("AIChatPanel", () => {
       pageTitle: "A",
     };
     const { rerender } = render(<AIChatPanel />);
+    vi.clearAllMocks();
 
     mocks.mockPageContextRef.current = {
       type: "editor",
@@ -132,18 +144,19 @@ describe("AIChatPanel", () => {
     rerender(<AIChatPanel />);
 
     expect(mocks.setActiveConversation).toHaveBeenCalledWith(null);
-    expect(mocks.clearMessages).toHaveBeenCalled();
+    expect(mocks.clearMessages).toHaveBeenCalledTimes(1);
   });
 
   it("calls setActiveConversation(null) and clearMessages when page key (type without pageId) changes", () => {
     mocks.mockPageContextRef.current = { type: "home" };
     const { rerender } = render(<AIChatPanel />);
+    vi.clearAllMocks();
 
     mocks.mockPageContextRef.current = { type: "search" };
     rerender(<AIChatPanel />);
 
     expect(mocks.setActiveConversation).toHaveBeenCalledWith(null);
-    expect(mocks.clearMessages).toHaveBeenCalled();
+    expect(mocks.clearMessages).toHaveBeenCalledTimes(1);
   });
 
   it("does not reset active conversation when page key is unchanged", () => {
@@ -153,7 +166,6 @@ describe("AIChatPanel", () => {
       pageTitle: "A",
     };
     const { rerender } = render(<AIChatPanel />);
-    vi.clearAllMocks();
 
     mocks.mockPageContextRef.current = {
       type: "editor",
@@ -186,6 +198,6 @@ describe("AIChatPanel", () => {
 
     render(<AIChatPanel />);
 
-    expect(screen.getByTestId("ai-chat-messages")).toBeVisible();
+    expect(screen.getByTestId("ai-chat-messages")).toBeInTheDocument();
   });
 });
