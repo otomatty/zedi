@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, renderHook, waitFor, screen } from "@testing-library/react";
+import { act, render, renderHook, waitFor, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { useEffect } from "react";
 import type { Location } from "react-router-dom";
@@ -315,7 +315,8 @@ describe("usePendingChatPageGeneration", () => {
   });
 
   it("does not start generation when title is blank", async () => {
-    renderHook(() => usePendingChatPageGeneration(buildHookOptions({ title: "   " })), {
+    const blankTitleOptions = buildHookOptions({ title: "   " });
+    renderHook(() => usePendingChatPageGeneration(blankTitleOptions), {
       wrapper: ({ children }) => (
         <MemoryRouter
           initialEntries={[
@@ -330,51 +331,61 @@ describe("usePendingChatPageGeneration", () => {
       ),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
     expect(generateWikiContentFromChatOutlineStream).not.toHaveBeenCalled();
   });
 
   it("invokes setContent when the stream emits chunks (throttled path) before completion", async () => {
-    const setContent = vi.fn();
-    generateWikiContentFromChatOutlineStream.mockImplementation(
-      async (
-        _title: string,
-        _outline: string,
-        _conversationText: string,
-        handlers: {
-          onChunk: (chunk: string) => void;
-          onComplete: (result: { content: string }) => void;
-          onError: (err: Error) => void;
+    vi.useFakeTimers();
+    try {
+      const setContent = vi.fn();
+      generateWikiContentFromChatOutlineStream.mockImplementation(
+        async (
+          _title: string,
+          _outline: string,
+          _conversationText: string,
+          handlers: {
+            onChunk: (chunk: string) => void;
+            onComplete: (result: { content: string }) => void;
+            onError: (err: Error) => void;
+          },
+        ) => {
+          await Promise.resolve();
+          handlers.onChunk("## ");
+          handlers.onChunk("Hi");
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 200);
+          });
+          handlers.onComplete({ content: "## Hi" });
         },
-      ) => {
+      );
+
+      renderHook(() => usePendingChatPageGeneration(buildHookOptions({ setContent })), {
+        wrapper: ({ children }) => (
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: "/page/page-1",
+                state: { pendingChatPageGeneration: defaultPending },
+              },
+            ]}
+          >
+            {children}
+          </MemoryRouter>
+        ),
+      });
+
+      await act(async () => {
         await Promise.resolve();
-        handlers.onChunk("## ");
-        handlers.onChunk("Hi");
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        handlers.onComplete({ content: "## Hi" });
-      },
-    );
+        await vi.advanceTimersByTimeAsync(150);
+      });
 
-    renderHook(() => usePendingChatPageGeneration(buildHookOptions({ setContent })), {
-      wrapper: ({ children }) => (
-        <MemoryRouter
-          initialEntries={[
-            {
-              pathname: "/page/page-1",
-              state: { pendingChatPageGeneration: defaultPending },
-            },
-          ]}
-        >
-          {children}
-        </MemoryRouter>
-      ),
-    });
-
-    await waitFor(
-      () => {
-        expect(setContent).toHaveBeenCalled();
-      },
-      { timeout: 4000 },
-    );
+      expect(setContent).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
