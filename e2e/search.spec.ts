@@ -83,7 +83,7 @@ test.describe("Global Search - Data Tests", () => {
   test("should show recent pages section", async ({ page, helpers }) => {
     // Create a page first
     await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトルを入力").fill("Recent Page Test");
+    await page.getByPlaceholder("タイトル").fill("Recent Page Test");
     await page.waitForTimeout(2000);
 
     // Open search on the same page
