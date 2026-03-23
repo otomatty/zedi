@@ -1,22 +1,40 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import type { PageContext } from "../../types/aiChat";
 import { AIChatPanel } from "./AIChatPanel";
 
-const mockUseAIChatStore = vi.fn(() => ({
-  isOpen: true,
-  activeConversationId: null,
-  setActiveConversation: vi.fn(),
-  contextEnabled: false,
-  showConversationList: false,
-}));
+/**
+ * Shared spies and mutable page context for AIChatPanel tests.
+ * AIChatPanel テスト用の共有スパイと可変ページコンテキスト。
+ */
+const mocks = vi.hoisted(() => {
+  const setActiveConversation = vi.fn();
+  const clearMessages = vi.fn();
+  const loadMessages = vi.fn();
+  const mockPageContextRef = { current: null as PageContext | null };
+  const mockStore = {
+    isOpen: true,
+    activeConversationId: null as string | null,
+    setActiveConversation,
+    contextEnabled: false,
+    showConversationList: false,
+  };
+  return {
+    mockPageContextRef,
+    mockStore,
+    clearMessages,
+    loadMessages,
+    setActiveConversation,
+  };
+});
 
 vi.mock("../../stores/aiChatStore", () => ({
-  useAIChatStore: () => mockUseAIChatStore(),
+  useAIChatStore: () => mocks.mockStore,
 }));
 
 vi.mock("../../contexts/AIChatContext", () => ({
   useAIChatContext: () => ({
-    pageContext: null,
+    pageContext: mocks.mockPageContextRef.current,
   }),
 }));
 
@@ -45,8 +63,8 @@ vi.mock("../../hooks/useAIChat", () => ({
     messages: [],
     sendMessage: vi.fn(),
     stopStreaming: vi.fn(),
-    clearMessages: vi.fn(),
-    loadMessages: vi.fn(),
+    clearMessages: mocks.clearMessages,
+    loadMessages: mocks.loadMessages,
     editAndResend: vi.fn(),
     isStreaming: false,
   }),
@@ -65,10 +83,22 @@ vi.mock("./AIChatInput", () => ({
   AIChatInput: () => <div data-testid="ai-chat-input">Input</div>,
 }));
 vi.mock("./AIChatConversationList", () => ({
-  AIChatConversationList: () => null,
+  AIChatConversationList: () => <div data-testid="ai-chat-conversation-list">ConversationList</div>,
 }));
 
 describe("AIChatPanel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.mockPageContextRef.current = {
+      type: "editor",
+      pageId: "page-1",
+      pageTitle: "Page 1",
+    };
+    mocks.mockStore.isOpen = true;
+    mocks.mockStore.activeConversationId = null;
+    mocks.mockStore.showConversationList = false;
+  });
+
   it("renders header, context bar, messages and input when open", () => {
     render(<AIChatPanel />);
 
@@ -79,16 +109,83 @@ describe("AIChatPanel", () => {
   });
 
   it("returns null when closed", () => {
-    mockUseAIChatStore.mockReturnValueOnce({
-      isOpen: false,
-      activeConversationId: null,
-      setActiveConversation: vi.fn(),
-      contextEnabled: false,
-      showConversationList: false,
-    });
+    mocks.mockStore.isOpen = false;
 
     const { container } = render(<AIChatPanel />);
 
     expect(container.firstChild).toBeNull();
+  });
+
+  it("calls setActiveConversation(null) and clearMessages when page key (pageId) changes", () => {
+    mocks.mockPageContextRef.current = {
+      type: "editor",
+      pageId: "page-1",
+      pageTitle: "A",
+    };
+    const { rerender } = render(<AIChatPanel />);
+
+    mocks.mockPageContextRef.current = {
+      type: "editor",
+      pageId: "page-2",
+      pageTitle: "B",
+    };
+    rerender(<AIChatPanel />);
+
+    expect(mocks.setActiveConversation).toHaveBeenCalledWith(null);
+    expect(mocks.clearMessages).toHaveBeenCalled();
+  });
+
+  it("calls setActiveConversation(null) and clearMessages when page key (type without pageId) changes", () => {
+    mocks.mockPageContextRef.current = { type: "home" };
+    const { rerender } = render(<AIChatPanel />);
+
+    mocks.mockPageContextRef.current = { type: "search" };
+    rerender(<AIChatPanel />);
+
+    expect(mocks.setActiveConversation).toHaveBeenCalledWith(null);
+    expect(mocks.clearMessages).toHaveBeenCalled();
+  });
+
+  it("does not reset active conversation when page key is unchanged", () => {
+    mocks.mockPageContextRef.current = {
+      type: "editor",
+      pageId: "page-1",
+      pageTitle: "A",
+    };
+    const { rerender } = render(<AIChatPanel />);
+    vi.clearAllMocks();
+
+    mocks.mockPageContextRef.current = {
+      type: "editor",
+      pageId: "page-1",
+      pageTitle: "Title updated only",
+    };
+    rerender(<AIChatPanel />);
+
+    expect(mocks.setActiveConversation).not.toHaveBeenCalled();
+  });
+
+  it("renders conversation list when showConversationList is true", () => {
+    mocks.mockStore.showConversationList = true;
+
+    render(<AIChatPanel />);
+
+    expect(screen.getByTestId("ai-chat-conversation-list")).toBeInTheDocument();
+  });
+
+  it("does not render conversation list when showConversationList is false", () => {
+    mocks.mockStore.showConversationList = false;
+
+    render(<AIChatPanel />);
+
+    expect(screen.queryByTestId("ai-chat-conversation-list")).not.toBeInTheDocument();
+  });
+
+  it("renders messages area while panel is open (including when conversation list is shown)", () => {
+    mocks.mockStore.showConversationList = true;
+
+    render(<AIChatPanel />);
+
+    expect(screen.getByTestId("ai-chat-messages")).toBeVisible();
   });
 });
