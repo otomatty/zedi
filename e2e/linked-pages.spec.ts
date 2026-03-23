@@ -13,7 +13,7 @@ test.describe("Linked Pages Cards", () => {
     await helpers.createNewPage(page);
 
     // Should see the title input
-    await expect(page.getByPlaceholder("タイトルを入力")).toBeVisible();
+    await expect(page.getByPlaceholder("タイトル")).toBeVisible();
 
     // Should see the editor
     await expect(page.locator(".tiptap")).toBeVisible();
@@ -24,7 +24,7 @@ test.describe("Linked Pages Cards", () => {
     await helpers.createNewPage(page);
 
     // Enter title
-    const titleInput = page.getByPlaceholder("タイトルを入力");
+    const titleInput = page.getByPlaceholder("タイトル");
     await titleInput.fill("Test Page Title");
 
     // Wait for auto-save (debounced 500ms + some buffer)
@@ -42,7 +42,7 @@ test.describe("Linked Pages Cards", () => {
     await helpers.createNewPage(page);
 
     // Enter title first to avoid warning
-    await page.getByPlaceholder("タイトルを入力").fill("Editor Test");
+    await page.getByPlaceholder("タイトル").fill("Editor Test");
     await page.waitForTimeout(500);
 
     // Click on editor and type
@@ -59,7 +59,7 @@ test.describe("Linked Pages Cards", () => {
     await helpers.createNewPage(page);
 
     // Enter title first
-    await page.getByPlaceholder("タイトルを入力").fill("WikiLink Test");
+    await page.getByPlaceholder("タイトル").fill("WikiLink Test");
     await page.waitForTimeout(500);
 
     // Click on editor and type [[
@@ -80,7 +80,7 @@ test.describe("Linked Pages Cards", () => {
     helpers,
   }) => {
     await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトルを入力").fill("Closed Link Test");
+    await page.getByPlaceholder("タイトル").fill("Closed Link Test");
     // Wait for editor to be ready (no "save complete" UI; debounced save + editor init)
     await page.waitForTimeout(500);
 
@@ -108,7 +108,7 @@ test.describe("Linked Pages Cards", () => {
     // Step 1: Create "Target Page"
     await helpers.createNewPage(page);
 
-    await page.getByPlaceholder("タイトルを入力").fill("Target Page");
+    await page.getByPlaceholder("タイトル").fill("Target Page");
 
     const editor1 = page.locator(".tiptap");
     await editor1.click();
@@ -121,7 +121,7 @@ test.describe("Linked Pages Cards", () => {
     await helpers.createNewPage(page);
     const sourcePageUrl = page.url();
 
-    await page.getByPlaceholder("タイトルを入力").fill("Source Page");
+    await page.getByPlaceholder("タイトル").fill("Source Page");
 
     const editor2 = page.locator(".tiptap");
     await editor2.click();
@@ -171,7 +171,7 @@ test.describe("Linked Pages Cards", () => {
     await helpers.createNewPage(page);
     const pageUrl = page.url();
 
-    await page.getByPlaceholder("タイトルを入力").fill("Ghost Link Test");
+    await page.getByPlaceholder("タイトル").fill("Ghost Link Test");
 
     const editor = page.locator(".tiptap");
     await editor.click();

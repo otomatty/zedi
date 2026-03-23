@@ -6,7 +6,8 @@
  */
 import { createContext, useContext, ReactNode } from "react";
 
-const MOCK_USER_ID = "e2e_test_user_123";
+/** Same ID as local-first guest storage so E2E creates pages offline (no API). / API 不要で IndexedDB のみ作成するため local-user と一致させる。 */
+const MOCK_USER_ID = "local-user";
 const MOCK_USER_EMAIL = "e2e-test@example.com";
 
 interface MockAuthContextValue {
@@ -27,6 +28,10 @@ interface MockAuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * E2E 用の認証プロバイダー。子ツリーにモックの認証コンテキストを供給する。
+ * Mock auth provider for E2E. Supplies mock auth context to the subtree.
+ */
 export function MockAuthProvider({ children }: MockAuthProviderProps) {
   const mockAuthValue: MockAuthContextValue = {
     isLoaded: true,
@@ -43,6 +48,10 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
   return <MockAuthContext.Provider value={mockAuthValue}>{children}</MockAuthContext.Provider>;
 }
 
+/**
+ * MockAuthContext からモック認証状態を取得する。MockAuthProvider 内でのみ使用する。
+ * Returns mock auth from MockAuthContext. Must be used within MockAuthProvider.
+ */
 export function useMockAuth(): MockAuthContextValue {
   const context = useContext(MockAuthContext);
   if (!context) {
@@ -51,10 +60,18 @@ export function useMockAuth(): MockAuthContextValue {
   return context;
 }
 
+/**
+ * E2E 用の SignedIn 代替。子を常に描画する。
+ * Mock SignedIn for E2E. Always renders children.
+ */
 export function MockSignedIn({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * E2E 用の SignedOut 代替。子は描画しない（null を返す）。
+ * Mock SignedOut for E2E. Renders nothing (returns null).
+ */
 export function MockSignedOut({ children }: { children: ReactNode }) {
   void children;
   return null;

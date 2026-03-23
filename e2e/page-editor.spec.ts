@@ -13,15 +13,14 @@ test.describe("Page Editor", () => {
 
       // Verify editor is visible
       await expect(page.locator(".tiptap")).toBeVisible({ timeout: 10000 });
-      await expect(page.getByPlaceholder("タイトルを入力")).toBeVisible();
+      await expect(page.getByPlaceholder("タイトル")).toBeVisible();
     });
 
-    test("should show loading state during page creation", async ({ page }) => {
+    test("redirects /page/new to home (direct /page/new is not a creation entry)", async ({
+      page,
+    }) => {
       await page.goto("/page/new");
-
-      // Loading spinner should be visible briefly
-      // Note: This may be too fast to catch in some cases
-      await page.waitForURL(/\/page\/(?!new).+/, { timeout: 15000 });
+      await expect(page).toHaveURL(/\/home/, { timeout: 10000 });
     });
   });
 
@@ -29,7 +28,7 @@ test.describe("Page Editor", () => {
     test("should save title changes with auto-save", async ({ page, helpers }) => {
       await helpers.createNewPage(page);
 
-      const titleInput = page.getByPlaceholder("タイトルを入力");
+      const titleInput = page.getByPlaceholder("タイトル");
       await titleInput.fill("Test Title");
 
       // Wait for debounced save (500ms + buffer)
@@ -46,19 +45,23 @@ test.describe("Page Editor", () => {
       // Create first page with title
       await helpers.createNewPage(page);
 
-      await page.getByPlaceholder("タイトルを入力").fill("Unique Title");
+      await page.getByPlaceholder("タイトル").fill("Unique Title");
       await page.waitForTimeout(1500);
 
       // Create second page with same title
       await helpers.createNewPage(page);
 
-      await page.getByPlaceholder("タイトルを入力").fill("Unique Title");
-      await page.waitForTimeout(1500);
+      await page.getByPlaceholder("タイトル").fill("Unique Title");
+      // Debounced duplicate check (useTitleValidation) + save
+      await page.waitForTimeout(2500);
 
-      // Should show duplicate warning
-      await expect(page.getByText(/同じタイトルのページ/)).toBeVisible({
-        timeout: 5000,
-      });
+      // Duplicate message: toast + inline title (two role=alert with same copy)
+      await expect(
+        page
+          .getByRole("alert")
+          .filter({ hasText: /既に存在します/ })
+          .first(),
+      ).toBeVisible({ timeout: 15000 });
     });
   });
 
@@ -74,7 +77,7 @@ test.describe("Page Editor", () => {
       await page.waitForTimeout(1500);
 
       // Title should be auto-generated from content
-      const titleInput = page.getByPlaceholder("タイトルを入力");
+      const titleInput = page.getByPlaceholder("タイトル");
       await expect(titleInput).toHaveValue("Auto generated title from first line");
     });
 
@@ -83,7 +86,7 @@ test.describe("Page Editor", () => {
       const currentUrl = page.url();
 
       // Enter title
-      await page.getByPlaceholder("タイトルを入力").fill("Content Test");
+      await page.getByPlaceholder("タイトル").fill("Content Test");
       await page.waitForTimeout(500);
 
       // Enter content
@@ -134,7 +137,7 @@ test.describe("Page Editor", () => {
       await helpers.createNewPage(page);
 
       // Enter title
-      await page.getByPlaceholder("タイトルを入力").fill("Test Topic");
+      await page.getByPlaceholder("タイトル").fill("Test Topic");
       await page.waitForTimeout(500);
 
       // Wiki生成 button should be visible
@@ -145,7 +148,7 @@ test.describe("Page Editor", () => {
       await helpers.createNewPage(page);
 
       // Enter title
-      await page.getByPlaceholder("タイトルを入力").fill("Test Topic");
+      await page.getByPlaceholder("タイトル").fill("Test Topic");
       await page.waitForTimeout(500);
 
       // Enter content
@@ -164,7 +167,7 @@ test.describe("Page Editor", () => {
       await helpers.createNewPage(page);
 
       // Enter title to avoid delete warning
-      await page.getByPlaceholder("タイトルを入力").fill("Navigation Test");
+      await page.getByPlaceholder("タイトル").fill("Navigation Test");
       await page.waitForTimeout(1500);
 
       // Click back button
@@ -201,7 +204,7 @@ test.describe("Page Editor", () => {
       await helpers.createNewPage(page);
 
       // Enter title
-      await page.getByPlaceholder("タイトルを入力").fill("Actions Test");
+      await page.getByPlaceholder("タイトル").fill("Actions Test");
       await page.waitForTimeout(500);
 
       // Click more options button
@@ -219,7 +222,7 @@ test.describe("Page Editor", () => {
       const pageUrl = page.url();
 
       // Enter title
-      await page.getByPlaceholder("タイトルを入力").fill("Delete Test");
+      await page.getByPlaceholder("タイトル").fill("Delete Test");
       await page.waitForTimeout(1500);
 
       // Click more options and delete
@@ -241,7 +244,7 @@ test.describe("Page Editor", () => {
       await helpers.createNewPage(page);
 
       // Enter title to avoid delete warning
-      await page.getByPlaceholder("タイトルを入力").fill("Shortcut Test");
+      await page.getByPlaceholder("タイトル").fill("Shortcut Test");
       await page.waitForTimeout(1500);
 
       // Press Cmd+H (or Ctrl+H on Windows/Linux)
@@ -256,7 +259,7 @@ test.describe("Page Editor", () => {
     test("should show linked pages section when page has WikiLinks", async ({ page, helpers }) => {
       // Create target page first
       await helpers.createNewPage(page);
-      await page.getByPlaceholder("タイトルを入力").fill("Target Page for Links");
+      await page.getByPlaceholder("タイトル").fill("Target Page for Links");
       await page.locator(".tiptap").click();
       await page.keyboard.type("Content of target page");
       await page.waitForTimeout(2000);
@@ -265,7 +268,7 @@ test.describe("Page Editor", () => {
       await helpers.createNewPage(page);
       const sourceUrl = page.url();
 
-      await page.getByPlaceholder("タイトルを入力").fill("Source Page with Links");
+      await page.getByPlaceholder("タイトル").fill("Source Page with Links");
       await page.locator(".tiptap").click();
 
       // Type WikiLink
@@ -302,7 +305,7 @@ test.describe("Page Editor", () => {
         },
         { timeout: 10000 },
       );
-      await page.getByPlaceholder("タイトルを入力").fill("Context Menu Delete Test");
+      await page.getByPlaceholder("タイトル").fill("Context Menu Delete Test");
       await syncPromise;
 
       await page.goto("/home");

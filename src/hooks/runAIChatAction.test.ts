@@ -8,6 +8,25 @@ const t = ((key: string, opts?: Record<string, unknown>) => {
   return key;
 }) as RunAIChatActionDeps["t"];
 
+/** Minimal Tiptap JSON that already contains a wiki link to Alpha (for suggest-wiki-links guards). */
+const TIPTAP_WITH_ALPHA_WIKI_LINK = JSON.stringify({
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [
+        {
+          type: "text",
+          text: "x",
+          marks: [
+            { type: "wikiLink", attrs: { title: "Alpha", exists: false, referenced: false } },
+          ],
+        },
+      ],
+    },
+  ],
+});
+
 function baseDeps(overrides: Partial<RunAIChatActionDeps> = {}): RunAIChatActionDeps {
   return {
     pageContext: null,
@@ -177,9 +196,9 @@ describe("runAIChatAction — append and errors", () => {
     });
   });
 
-  it("append-to-page: requires matching page context", async () => {
+  it("append-to-page: appends and shows appendSuccess when titles match", async () => {
     const toast = vi.fn();
-    const appendContentToCurrentPage = vi.fn();
+    const appendContentToCurrentPage = vi.fn().mockResolvedValue(true);
     const deps = baseDeps({
       pageContext: {
         type: "editor",
@@ -199,6 +218,221 @@ describe("runAIChatAction — append and errors", () => {
     });
 
     expect(appendContentToCurrentPage).toHaveBeenCalledWith("## More");
-    expect(toast).toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.appendSuccess:Current",
+    });
+  });
+});
+
+describe("runAIChatAction — append guards", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("append-to-page: shows pageContextRequired when pageId is missing", async () => {
+    const toast = vi.fn();
+    const appendContentToCurrentPage = vi.fn();
+    const deps = baseDeps({
+      pageContext: {
+        type: "editor",
+        pageId: "",
+        pageTitle: "Current",
+        pageFullContent: "",
+      },
+      appendContentToCurrentPage,
+      toast,
+    });
+
+    await runAIChatAction(deps, {
+      type: "append-to-page",
+      pageTitle: "Current",
+      content: "## More",
+      reason: "r",
+    });
+
+    expect(appendContentToCurrentPage).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.pageContextRequired",
+      variant: "destructive",
+    });
+  });
+
+  it("append-to-page: shows appendUnavailable when target title does not match current", async () => {
+    const toast = vi.fn();
+    const appendContentToCurrentPage = vi.fn();
+    const deps = baseDeps({
+      pageContext: {
+        type: "editor",
+        pageId: "x",
+        pageTitle: "Current",
+        pageFullContent: "",
+      },
+      appendContentToCurrentPage,
+      toast,
+    });
+
+    await runAIChatAction(deps, {
+      type: "append-to-page",
+      pageTitle: "Other Page",
+      content: "## More",
+      reason: "r",
+    });
+
+    expect(appendContentToCurrentPage).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.appendUnavailable",
+      variant: "destructive",
+    });
+  });
+});
+
+describe("runAIChatAction — suggest-wiki-links", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows pageContextRequired when pageId is missing", async () => {
+    const toast = vi.fn();
+    const appendContentToCurrentPage = vi.fn();
+    const deps = baseDeps({
+      pageContext: {
+        type: "editor",
+        pageId: "",
+        pageTitle: "T",
+        pageFullContent: "",
+      },
+      appendContentToCurrentPage,
+      getLatestPageFullContent: () => "",
+      toast,
+    });
+
+    await runAIChatAction(deps, {
+      type: "suggest-wiki-links",
+      links: [{ keyword: "A", existingPageTitle: "A" }],
+      reason: "r",
+    });
+
+    expect(appendContentToCurrentPage).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.pageContextRequired",
+      variant: "destructive",
+    });
+  });
+
+  it("shows noNewWikiLinks when suggested titles are already linked in content", async () => {
+    const toast = vi.fn();
+    const appendContentToCurrentPage = vi.fn();
+    const deps = baseDeps({
+      pageContext: {
+        type: "editor",
+        pageId: "p1",
+        pageTitle: "T",
+        pageFullContent: TIPTAP_WITH_ALPHA_WIKI_LINK,
+      },
+      appendContentToCurrentPage,
+      getLatestPageFullContent: () => TIPTAP_WITH_ALPHA_WIKI_LINK,
+      toast,
+    });
+
+    await runAIChatAction(deps, {
+      type: "suggest-wiki-links",
+      links: [{ keyword: "Alpha", existingPageTitle: "Alpha" }],
+      reason: "r",
+    });
+
+    expect(appendContentToCurrentPage).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({ title: "aiChat.notifications.noNewWikiLinks" });
+  });
+
+  it("shows appendFailed when append returns false", async () => {
+    const toast = vi.fn();
+    const appendContentToCurrentPage = vi.fn().mockResolvedValue(false);
+    const deps = baseDeps({
+      pageContext: {
+        type: "editor",
+        pageId: "p1",
+        pageTitle: "My Page",
+        pageFullContent: "",
+      },
+      appendContentToCurrentPage,
+      getLatestPageFullContent: () => "",
+      toast,
+    });
+
+    await runAIChatAction(deps, {
+      type: "suggest-wiki-links",
+      links: [{ keyword: "Beta", existingPageTitle: "Beta" }],
+      reason: "r",
+    });
+
+    expect(appendContentToCurrentPage).toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.appendFailed:My Page",
+      variant: "destructive",
+    });
+  });
+
+  it("shows wikiLinksAdded on success", async () => {
+    const toast = vi.fn();
+    const appendContentToCurrentPage = vi.fn().mockResolvedValue(true);
+    const deps = baseDeps({
+      pageContext: {
+        type: "editor",
+        pageId: "p1",
+        pageTitle: "T",
+        pageFullContent: "",
+      },
+      appendContentToCurrentPage,
+      getLatestPageFullContent: () => "",
+      toast,
+    });
+
+    await runAIChatAction(deps, {
+      type: "suggest-wiki-links",
+      links: [{ keyword: "Gamma", existingPageTitle: "Gamma" }],
+      reason: "r",
+    });
+
+    expect(appendContentToCurrentPage).toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.wikiLinksAdded:1",
+    });
+  });
+});
+
+describe("runAIChatAction — create navigation guards", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("create-page: does not navigate when create returns no id", async () => {
+    const createPageMutateAsync = vi.fn().mockResolvedValue({ id: undefined });
+    const navigate = vi.fn();
+    const deps = baseDeps({ createPageMutateAsync, navigate, messages: [] });
+
+    await runAIChatAction(deps, {
+      type: "create-page",
+      title: "T",
+      outline: "",
+      suggestedLinks: [],
+      reason: "r",
+    });
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("create-multiple-pages: does not navigate when no page gets an id", async () => {
+    const createPageMutateAsync = vi.fn().mockResolvedValue({});
+    const navigate = vi.fn();
+    const deps = baseDeps({ createPageMutateAsync, navigate, messages: [] });
+
+    await runAIChatAction(deps, {
+      type: "create-multiple-pages",
+      pages: [{ title: "A", content: "", suggestedLinks: [] }],
+      linkStructure: [],
+      reason: "r",
+    });
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
