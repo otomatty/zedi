@@ -26,8 +26,8 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 border-b border-border",
-        "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        "border-border sticky top-0 z-50 border-b",
+        "bg-background/95 supports-[backdrop-filter]:bg-background/60 backdrop-blur",
         className,
       )}
     >
@@ -42,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
         </div>
 
         {/* Center: Search bar & AI Chat button */}
-        <div className="flex min-w-0 max-w-xl flex-1 items-center justify-center gap-2 sm:mx-2">
+        <div className="flex max-w-xl min-w-0 flex-1 items-center justify-center gap-2 sm:mx-2">
           {hasSearchContext && <HeaderSearchBar />}
           <AIChatButton />
         </div>
@@ -50,7 +50,7 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
         {/* Right: Unified menu */}
         <div className="flex shrink-0 items-center gap-2">
           {!isSignedIn && (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
+            <span className="text-muted-foreground hidden text-xs sm:inline">
               {t("common.guestSyncPrompt")}
             </span>
           )}

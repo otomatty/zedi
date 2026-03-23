@@ -16,9 +16,9 @@ export const HomePageCount: React.FC = () => {
   }
 
   return (
-    <span className="flex items-center gap-2 border border-border bg-background px-2.5 py-1 text-sm text-muted-foreground">
+    <span className="border-border bg-background text-muted-foreground flex items-center gap-2 border px-2.5 py-1 text-sm">
       <span>{t("home.pageCountLabel")}</span>
-      <span className="h-4 w-px shrink-0 bg-border" aria-hidden />
+      <span className="bg-border h-4 w-px shrink-0" aria-hidden />
       <span>{t("home.totalPages", { count: pageCount })}</span>
     </span>
   );

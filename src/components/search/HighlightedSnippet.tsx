@@ -11,7 +11,7 @@ export function HighlightedSnippet({ text }: HighlightedSnippetProps) {
   const parts = text.split(/【|】/);
 
   return (
-    <p className="line-clamp-2 text-xs text-muted-foreground">
+    <p className="text-muted-foreground line-clamp-2 text-xs">
       {parts.map((part, index) =>
         // 奇数インデックスがハイライト対象（【と】の間）
         index % 2 === 1 ? (

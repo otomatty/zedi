@@ -13,13 +13,25 @@ interface CollapsibleHelpProps {
   defaultOpen?: boolean;
 }
 
-export const CollapsibleHelp: React.FC<CollapsibleHelpProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const CollapsibleHelp: React.FC<CollapsibleHelpProps> = ({
   triggerLabel,
   triggerLabelOpen,
   children,
   defaultOpen = false,
 }) => {
+  /**
+   *
+   */
   const [open, setOpen] = useState(defaultOpen);
+  /**
+   *
+   */
   const label = open && triggerLabelOpen != null ? triggerLabelOpen : triggerLabel;
 
   return (
@@ -29,7 +41,7 @@ export const CollapsibleHelp: React.FC<CollapsibleHelpProps> = ({
           type="button"
           variant="ghost"
           size="sm"
-          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5"
           aria-expanded={open}
         >
           {open ? (

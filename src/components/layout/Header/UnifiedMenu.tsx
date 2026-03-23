@@ -119,18 +119,18 @@ const SyncStatusRow: React.FC = () => {
 
   return (
     <>
-      <hr className="my-1 border-border" />
+      <hr className="border-border my-1" />
       <div className="px-2 py-1.5">
         <button
           type="button"
           onClick={sync}
           disabled={isSyncing || syncStatus === "syncing"}
-          className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          className="hover:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Icon className={cn("h-4 w-4 shrink-0", config.iconClassName)} />
           <div className="flex min-w-0 flex-col items-start">
             <span className="text-xs font-medium">{config.label}</span>
-            <span className="truncate text-[11px] text-muted-foreground">{config.description}</span>
+            <span className="text-muted-foreground truncate text-[11px]">{config.description}</span>
           </div>
         </button>
       </div>
@@ -166,9 +166,9 @@ const NavItems: React.FC<{
             key={item.path}
             type="button"
             onClick={() => onNavigate(item.path)}
-            className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted"
+            className="hover:bg-muted flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors"
           >
-            <item.icon className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <item.icon className="text-muted-foreground h-5 w-5 shrink-0" />
             <span className="text-sm font-medium">{item.label}</span>
           </button>
         ))}
@@ -183,10 +183,10 @@ const NavItems: React.FC<{
           key={item.path}
           type="button"
           onClick={() => onNavigate(item.path)}
-          className="flex flex-col items-center gap-2 rounded-lg p-3 transition-colors hover:bg-muted"
+          className="hover:bg-muted flex flex-col items-center gap-2 rounded-lg p-3 transition-colors"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-            <item.icon className="h-5 w-5 text-muted-foreground" />
+          <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
+            <item.icon className="text-muted-foreground h-5 w-5" />
           </div>
           <span className="text-xs font-medium">{item.label}</span>
         </button>
@@ -233,14 +233,14 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
             <p className="truncate text-sm font-medium">{displayName || user?.fullName}</p>
           )}
           {user?.primaryEmailAddress && (
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="text-muted-foreground truncate text-xs">
               {user.primaryEmailAddress.emailAddress}
             </p>
           )}
         </div>
       </div>
 
-      <hr className="my-1 border-border" />
+      <hr className="border-border my-1" />
 
       {/* Navigation */}
       <NavItems items={navItems} layout={layout} onNavigate={handleNavigate} />
@@ -248,7 +248,7 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
       {/* Sync status */}
       <SyncStatusRow />
 
-      <hr className="my-1 border-border" />
+      <hr className="border-border my-1" />
 
       {/* Sign out */}
       <div className="p-2">
@@ -258,7 +258,7 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
             signOut();
             onClose();
           }}
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
+          className="text-destructive hover:bg-destructive/10 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors"
         >
           <LogOut className="h-4 w-4" />
           {t("nav.signOut")}
@@ -292,7 +292,7 @@ const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "g
       {/* Navigation */}
       <NavItems items={navItems} layout={layout} onNavigate={handleNavigate} />
 
-      <hr className="my-1 border-border" />
+      <hr className="border-border my-1" />
 
       {/* Sign in */}
       <div className="p-2">
@@ -332,7 +332,7 @@ const AvatarTrigger = React.forwardRef<
       {dotColor && (
         <span
           className={cn(
-            "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background",
+            "border-background absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full border-2",
             dotColor,
           )}
         />
@@ -421,7 +421,16 @@ const MobileMenu: React.FC = () => {
 
 // --- Unified export ---
 
-export const UnifiedMenu: React.FC = () => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const UnifiedMenu: React.FC = () => {
+  /**
+   *
+   */
   const isSmall = useIsSmallScreen();
   return isSmall ? <MobileMenu /> : <DesktopMenu />;
 };

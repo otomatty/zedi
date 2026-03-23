@@ -80,7 +80,7 @@ export const PageEditorDialogs: React.FC<PageEditorDialogsProps> = ({
       <Dialog open={wikiStatus === "error"} onOpenChange={() => onResetWiki()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
+            <DialogTitle className="text-destructive flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
               生成エラー
             </DialogTitle>

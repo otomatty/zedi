@@ -124,7 +124,7 @@ const NotePageView: React.FC = () => {
       <AppLayout>
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">読み込み中...</p>
+            <p className="text-muted-foreground text-sm">読み込み中...</p>
           </Container>
         </main>
       </AppLayout>
@@ -135,7 +135,7 @@ const NotePageView: React.FC = () => {
       <AppLayout>
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               ページが見つからないか、閲覧権限がありません。
             </p>
           </Container>
@@ -146,12 +146,12 @@ const NotePageView: React.FC = () => {
 
   return (
     <AppLayout>
-      <div className="border-b border-border/60">
+      <div className="border-border/60 border-b">
         <Container className="flex h-10 items-center justify-between">
           <Button variant="ghost" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          {!canEdit && <span className="text-xs text-muted-foreground">閲覧専用</span>}
+          {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
         </Container>
       </div>
 

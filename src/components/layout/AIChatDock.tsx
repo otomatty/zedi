@@ -41,7 +41,7 @@ export function AIChatDock() {
       />
       <aside
         className={cn(
-          "fixed right-0 top-[var(--app-header-height)] z-10 overflow-hidden transition-all duration-300 ease-in-out",
+          "fixed top-[var(--app-header-height)] right-0 z-10 overflow-hidden transition-all duration-300 ease-in-out",
           "h-[calc(100svh-var(--app-header-height))]",
           isOpen
             ? "w-[var(--ai-chat-width)] border-l opacity-100"

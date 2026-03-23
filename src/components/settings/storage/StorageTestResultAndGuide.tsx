@@ -5,7 +5,13 @@ import type { StorageSettingsFormContentProps } from "./storageSettingsFormTypes
 
 type Props = Pick<StorageSettingsFormContentProps, "testResult" | "currentProvider">;
 
+/**
+ *
+ */
 export function StorageTestResultAndGuide({ testResult, currentProvider }: Props) {
+  /**
+   *
+   */
   const { t } = useTranslation();
   return (
     <>
@@ -28,13 +34,13 @@ export function StorageTestResultAndGuide({ testResult, currentProvider }: Props
         </Alert>
       )}
       {currentProvider?.helpUrl && (
-        <div className="rounded-lg border border-border bg-muted/50 p-4">
+        <div className="border-border bg-muted/50 rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-medium">{t("storageSettings.setupGuideTitle")}</h4>
           <a
             href={currentProvider.helpUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            className="text-primary inline-flex items-center gap-1 text-sm hover:underline"
           >
             {t("storageSettings.setupGuideLink", {
               name: t(`storageSettings.providers.${currentProvider.id}.name`),

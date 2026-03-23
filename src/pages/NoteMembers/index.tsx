@@ -94,14 +94,14 @@ const NoteMembers: React.FC = () => {
   if (isNoteLoading) {
     return (
       <NoteMembersLoadingOrDenied>
-        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
       </NoteMembersLoadingOrDenied>
     );
   }
   if (!note || !access?.canView) {
     return (
       <NoteMembersLoadingOrDenied>
-        <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
+        <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
       </NoteMembersLoadingOrDenied>
     );
   }
@@ -113,7 +113,7 @@ const NoteMembers: React.FC = () => {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold">{t("notes.members")}</h1>
-              <p className="mt-1 truncate text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-1 truncate text-sm">
                 {note.title || t("notes.untitledNote")}
               </p>
             </div>
@@ -123,7 +123,7 @@ const NoteMembers: React.FC = () => {
           </div>
 
           {!canManageMembers ? (
-            <p className="mt-6 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-6 text-sm">
               {t("notes.noPermissionToManageMembers")}
             </p>
           ) : (

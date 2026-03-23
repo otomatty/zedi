@@ -47,7 +47,7 @@ export function NoteMembersManageSection({
    */
   const { t } = useTranslation();
   return (
-    <section className="mt-6 rounded-lg border border-border/60 p-4">
+    <section className="border-border/60 mt-6 rounded-lg border p-4">
       <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
       <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
         <Input
@@ -74,14 +74,14 @@ export function NoteMembersManageSection({
       </div>
       <div className="mt-4 space-y-3">
         {isMembersLoading ? (
-          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
         ) : members.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("notes.noMembersYet")}</p>
+          <p className="text-muted-foreground text-sm">{t("notes.noMembersYet")}</p>
         ) : (
           members.map((member) => (
             <div
               key={member.memberEmail}
-              className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-2"
+              className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-2"
             >
               <div className="text-sm">{member.memberEmail}</div>
               <div className="flex items-center gap-2">

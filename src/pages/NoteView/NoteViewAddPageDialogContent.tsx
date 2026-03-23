@@ -81,7 +81,7 @@ export function NoteViewAddPageDialogContent({
               />
               <div className="max-h-64 space-y-2 overflow-y-auto">
                 {filteredPages.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("notes.noPagesToAdd")}</p>
+                  <p className="text-muted-foreground text-sm">{t("notes.noPagesToAdd")}</p>
                 ) : (
                   filteredPages.map((page) => (
                     <button
@@ -89,7 +89,7 @@ export function NoteViewAddPageDialogContent({
                       type="button"
                       disabled={isPending}
                       onClick={() => onAddByPageId(page.id)}
-                      className="w-full rounded-md border border-border/50 px-3 py-2 text-left text-sm hover:border-border disabled:pointer-events-none disabled:opacity-50"
+                      className="border-border/50 hover:border-border w-full rounded-md border px-3 py-2 text-left text-sm disabled:pointer-events-none disabled:opacity-50"
                     >
                       {page.title || t("notes.untitledPage")}
                     </button>

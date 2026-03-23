@@ -57,7 +57,7 @@ export function DisplaySettingsCard({
           <div
             role="group"
             aria-labelledby="theme-label"
-            className="inline-flex w-fit gap-0.5 rounded-md bg-muted p-0.5"
+            className="bg-muted inline-flex w-fit gap-0.5 rounded-md p-0.5"
           >
             {THEME_OPTIONS.map((opt) => {
               const isSelected = theme === opt.value;
@@ -77,7 +77,7 @@ export function DisplaySettingsCard({
                   aria-pressed={isSelected}
                   className={cn(
                     "inline-flex items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                     isSelected
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
@@ -97,7 +97,7 @@ export function DisplaySettingsCard({
           <div
             role="group"
             aria-labelledby="fontSize-label"
-            className="inline-flex w-fit flex-wrap gap-0.5 rounded-md bg-muted p-0.5"
+            className="bg-muted inline-flex w-fit flex-wrap gap-0.5 rounded-md p-0.5"
           >
             {FONT_SIZE_OPTIONS.map((opt) => {
               const isSelected = editorFontSize === opt.value;
@@ -109,7 +109,7 @@ export function DisplaySettingsCard({
                   aria-pressed={isSelected}
                   className={cn(
                     "inline-flex items-center justify-center gap-1.5 rounded-sm px-2.5 py-2 text-sm font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                     isSelected
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
@@ -145,13 +145,13 @@ export function DisplaySettingsCard({
             </div>
           )}
           <div
-            className="rounded-md border border-border bg-muted/30 px-3 py-3"
+            className="border-border bg-muted/30 rounded-md border px-3 py-3"
             style={{ fontSize: editorFontSizePx }}
           >
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
               {t("generalSettings.fontSize.preview")}
             </p>
-            <p className="mt-1.5 text-foreground">{t("generalSettings.fontSize.previewText")}</p>
+            <p className="text-foreground mt-1.5">{t("generalSettings.fontSize.previewText")}</p>
           </div>
         </div>
       </CardContent>

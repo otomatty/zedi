@@ -45,8 +45,8 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="bg-background min-h-screen">
+      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
         <Container className="flex h-16 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
             <Button asChild variant="ghost" size="icon">

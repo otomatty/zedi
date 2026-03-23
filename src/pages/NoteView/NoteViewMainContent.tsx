@@ -30,9 +30,9 @@ export function NoteViewMainContent({
   return (
     <div className="mt-4">
       {isPagesLoading ? (
-        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
       ) : notePages.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("notes.noPagesYet")}</p>
+        <p className="text-muted-foreground text-sm">{t("notes.noPagesYet")}</p>
       ) : (
         <NoteViewPageGrid
           noteId={noteId}

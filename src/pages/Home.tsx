@@ -67,7 +67,7 @@ const Home: React.FC = () => {
       <ContentWithAIChat
         floatingAction={
           <>
-            <div className="mb-4 mr-4">
+            <div className="mr-4 mb-4">
               {validClipUrl ? (
                 <FloatingActionButton
                   initialClipUrl={validClipUrl}

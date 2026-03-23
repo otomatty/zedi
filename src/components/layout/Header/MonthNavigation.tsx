@@ -25,59 +25,146 @@ function parseMonthParam(search: string): string | null {
   return month;
 }
 
-export const MonthNavigation: React.FC = () => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const MonthNavigation: React.FC = () => {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const location = useLocation();
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const { data: pages = [] } = usePagesSummary();
 
+  /**
+   *
+   */
   const isOnHome = location.pathname === HOME_PATH;
+  /**
+   *
+   */
   const monthParam = isOnHome ? parseMonthParam(location.search) : null;
+  /**
+   *
+   */
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
 
+  /**
+   *
+   */
   const availableMonths = useMemo(() => {
+    /**
+     *
+     */
     const all = getAvailableMonthsFromPages(pages.filter((p) => !p.isDeleted));
     return all.filter((yyyyMM) => yyyyMM < currentMonthKey);
   }, [pages, currentMonthKey]);
 
+  /**
+   *
+   */
   const displayLabel = useMemo(() => {
     if (!monthParam) return t("home.period.all");
+    /**
+     *
+     */
     const [y, m] = monthParam.split("-").map(Number);
     return formatMonthYear(new Date(y, m - 1, 1));
   }, [monthParam, t]);
 
+  /**
+   *
+   */
   const navigateToMonth = (month: string | null) => {
+    /**
+     *
+     */
     const path = month ? `${HOME_PATH}?month=${month}` : HOME_PATH;
     navigate(path);
   };
 
+  /**
+   *
+   */
   const handlePrev = () => {
     if (monthParam) {
+      /**
+       *
+       */
       const [y, m] = monthParam.split("-").map(Number);
+      /**
+       *
+       */
       const date = new Date(y, m - 1, 1);
+      /**
+       *
+       */
       const prev = subMonths(date, 1);
+      /**
+       *
+       */
       const nextMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
       navigateToMonth(nextMonth);
     } else {
+      /**
+       *
+       */
       const prev = subMonths(new Date(), 1);
+      /**
+       *
+       */
       const nextMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
       navigateToMonth(nextMonth);
     }
   };
 
+  /**
+   *
+   */
   const nextMonthParam = useMemo(() => {
     if (monthParam) {
+      /**
+       *
+       */
       const [y, m] = monthParam.split("-").map(Number);
+      /**
+       *
+       */
       const date = new Date(y, m - 1, 1);
+      /**
+       *
+       */
       const next = addMonths(date, 1);
       return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
     }
+    /**
+     *
+     */
     const next = addMonths(new Date(), 1);
     return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
   }, [monthParam]);
 
+  /**
+   *
+   */
   const canGoNext = nextMonthParam < currentMonthKey;
 
+  /**
+   *
+   */
   const handleNext = () => {
     if (!canGoNext) return;
     navigateToMonth(nextMonthParam);
@@ -100,7 +187,7 @@ export const MonthNavigation: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-9 min-w-[110px] text-sm font-medium text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-9 min-w-[110px] text-sm font-medium"
             aria-label={t("home.period.selectMonth")}
           >
             <span className="text-center">{displayLabel}</span>
@@ -115,7 +202,13 @@ export const MonthNavigation: React.FC = () => {
           </DropdownMenuItem>
           {availableMonths.length > 0 &&
             availableMonths.map((yyyyMM) => {
+              /**
+               *
+               */
               const [y, m] = yyyyMM.split("-").map(Number);
+              /**
+               *
+               */
               const label = formatMonthYear(new Date(y, m - 1, 1));
               return (
                 <DropdownMenuItem

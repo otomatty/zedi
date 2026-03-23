@@ -79,8 +79,8 @@ export default function AuthCallback() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <p className="mb-4 text-destructive">{error}</p>
+      <div className="bg-background flex min-h-screen flex-col items-center justify-center p-4">
+        <p className="text-destructive mb-4">{error}</p>
         <a href="/sign-in" className="text-primary hover:underline">
           {t("auth.backToSignIn")}
         </a>
@@ -89,7 +89,7 @@ export default function AuthCallback() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="bg-background flex min-h-screen flex-col items-center justify-center p-4">
       <p className="text-muted-foreground">{t("auth.signingIn")}</p>
     </div>
   );

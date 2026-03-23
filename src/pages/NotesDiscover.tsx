@@ -6,6 +6,9 @@ import { usePublicNotes, mapDiscoverItemToNoteSummary } from "@/hooks/useNoteQue
 import type { NoteSummary } from "@/types/note";
 import { cn } from "@zedi/ui";
 
+/**
+ *
+ */
 const NotesDiscover: React.FC = () => {
   const { t } = useTranslation();
   const [sort, setSort] = useState<"updated" | "popular">("updated");
@@ -18,12 +21,12 @@ const NotesDiscover: React.FC = () => {
   return (
     <NotesLayout>
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
       ) : (
         <>
           {officialSummaries.length > 0 && (
             <section className="mb-10">
-              <h2 className="mb-4 text-lg font-medium text-foreground">
+              <h2 className="text-foreground mb-4 text-lg font-medium">
                 {t("notes.sectionOfficial")}
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -36,10 +39,10 @@ const NotesDiscover: React.FC = () => {
 
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-              <h2 className="text-lg font-medium text-foreground">
+              <h2 className="text-foreground text-lg font-medium">
                 {t("notes.sectionPublicNotes")}
               </h2>
-              <div className="flex rounded-lg border border-border p-0.5">
+              <div className="border-border flex rounded-lg border p-0.5">
                 <button
                   type="button"
                   onClick={() => setSort("updated")}
@@ -67,7 +70,7 @@ const NotesDiscover: React.FC = () => {
               </div>
             </div>
             {normalSummaries.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("notes.noNotesYet")}</p>
+              <p className="text-muted-foreground text-sm">{t("notes.noNotesYet")}</p>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {normalSummaries.map((note, index) => (

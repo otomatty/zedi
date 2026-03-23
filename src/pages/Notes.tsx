@@ -131,6 +131,9 @@ function CreateNoteDialogContent({
   );
 }
 
+/**
+ *
+ */
 const Notes: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -180,7 +183,7 @@ const Notes: React.FC = () => {
       <NotesLayout>
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <h1 className="mb-4 text-2xl font-semibold">{t("notes.title")}</h1>
-          <p className="mb-6 text-muted-foreground">
+          <p className="text-muted-foreground mb-6">
             {t("notes.signInRequired", "ノートを利用するにはサインインが必要です")}
           </p>
           <Link to="/sign-in">
@@ -218,13 +221,13 @@ const Notes: React.FC = () => {
       </div>
 
       <section className="mb-10">
-        <h2 className="mb-4 text-lg font-medium text-foreground">
+        <h2 className="text-foreground mb-4 text-lg font-medium">
           {t("notes.sectionParticipating")}
         </h2>
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
         ) : sortedNotes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("notes.noNotesYet")}</p>
+          <p className="text-muted-foreground text-sm">{t("notes.noNotesYet")}</p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sortedNotes.map((note, index) => (

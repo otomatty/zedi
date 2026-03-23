@@ -34,7 +34,7 @@ export function NoteViewPageGrid({
               type="button"
               variant="secondary"
               size="icon"
-              className="absolute right-2 top-2 h-7 w-7"
+              className="absolute top-2 right-2 h-7 w-7"
               aria-label={t("notes.a11yRemovePage", {
                 title: page.title || t("notes.untitledPage"),
               })}

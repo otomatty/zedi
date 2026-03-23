@@ -28,18 +28,18 @@ export const SourceUrlBadge: React.FC<SourceUrlBadgeProps> = ({ sourceUrl, class
     <div
       className={cn(
         "flex items-center gap-2 rounded-lg px-3 py-2",
-        "border border-border/50 bg-muted/50",
-        "text-sm text-muted-foreground",
+        "border-border/50 bg-muted/50 border",
+        "text-muted-foreground text-sm",
         className,
       )}
     >
-      <Link2 className="h-4 w-4 shrink-0 text-primary" />
+      <Link2 className="text-primary h-4 w-4 shrink-0" />
       <span className="truncate">引用元:</span>
       <a
         href={sourceUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1 truncate text-primary hover:underline"
+        className="text-primary flex items-center gap-1 truncate hover:underline"
       >
         <span className="truncate">{displayUrl}</span>
         <ExternalLink className="h-3 w-3 shrink-0" />

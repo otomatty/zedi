@@ -64,7 +64,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
               "h-16 w-16 rounded-full",
               "shadow-elevated",
               "transition-all duration-300 ease-in-out",
-              "hover:scale-105 hover:bg-primary",
+              "hover:bg-primary hover:scale-105",
               isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground",
             )}
           >

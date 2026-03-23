@@ -42,6 +42,9 @@ interface AiModelsContentProps {
   onDragEnd: () => void;
 }
 
+/**
+ *
+ */
 export function AiModelsContent({
   models,
   setModels,
@@ -76,6 +79,9 @@ export function AiModelsContent({
         if (v !== model.displayName) {
           setModels((prev) => prev.map((x) => (x.id === model.id ? { ...x, displayName: v } : x)));
         }
+        /**
+         *
+         */
         const originalModel = originalModelsRef.current.find((om) => om.id === model.id);
         if (originalModel && v !== originalModel.displayName) {
           void onModelUpdate(originalModel, { displayName: v });
@@ -124,7 +130,7 @@ export function AiModelsContent({
 
       {/* デスクトップ: テーブル */}
       <div className="mt-4 hidden md:block">
-        <Table className="min-w-[640px] rounded border border-border">
+        <Table className="border-border min-w-[640px] rounded border">
           <TableHeader>
             <TableRow className="border-border bg-muted/50 hover:bg-transparent">
               <TableHead className="w-8 px-1 py-2" aria-label="並び替え" />

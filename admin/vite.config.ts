@@ -1,14 +1,30 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig(({ mode }) => {
+  /**
+   *
+   */
   const env = loadEnv(mode, process.cwd(), "");
+  /**
+   *
+   */
   const port = parseInt(env.VITE_PORT || "30001", 10);
+  /**
+   *
+   */
   const apiTarget = env.ZEDI_API_PROXY_TARGET || "";
+  /**
+   *
+   */
   const apiTargetIsLocal = (() => {
     if (!apiTarget) return false;
     try {
+      /**
+       *
+       */
       const { hostname, protocol } = new URL(apiTarget);
       return (
         protocol === "http:" ||
@@ -42,7 +58,7 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",
       target: "esnext",
     },
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

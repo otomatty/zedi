@@ -4,6 +4,9 @@ import { cn } from "@zedi/ui";
 
 const EMPTY_MESSAGE = "ページが見つかりません";
 
+/**
+ *
+ */
 export interface HeaderSearchDropdownContentProps {
   hasContent: boolean;
   showEmpty: boolean;
@@ -22,6 +25,9 @@ export interface HeaderSearchDropdownContentProps {
   handleSearchSubmit: () => void;
 }
 
+/**
+ *
+ */
 export function HeaderSearchDropdownContent({
   hasContent,
   showEmpty,
@@ -46,24 +52,24 @@ export function HeaderSearchDropdownContent({
       align="start"
       sideOffset={4}
       className={cn(
-        "w-[var(--radix-popover-trigger-width)] min-w-[280px] max-w-[400px] p-0",
+        "w-[var(--radix-popover-trigger-width)] max-w-[400px] min-w-[280px] p-0",
         "flex max-h-[min(70vh,400px)] flex-col overflow-hidden",
       )}
       onOpenAutoFocus={(e) => e.preventDefault()}
     >
       {!hasContent && (
-        <div className="py-6 text-center text-sm text-muted-foreground">
+        <div className="text-muted-foreground py-6 text-center text-sm">
           3文字以上で検索、Enter で検索結果を表示
         </div>
       )}
 
       {showEmpty && (
-        <div className="py-6 text-center text-sm text-muted-foreground">{EMPTY_MESSAGE}</div>
+        <div className="text-muted-foreground py-6 text-center text-sm">{EMPTY_MESSAGE}</div>
       )}
 
       {showResults && (
         <div className="overflow-y-auto py-2">
-          <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
+          <p className="text-muted-foreground px-3 py-1.5 text-xs font-medium">
             候補 ({searchResults.length}件)
           </p>
           <ul ref={listRef} className="list-none" role="group" aria-label="検索候補">
@@ -82,9 +88,9 @@ export function HeaderSearchDropdownContent({
                   onMouseEnter={() => setActiveIndex(index)}
                 >
                   {sourceUrl ? (
-                    <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
                   ) : (
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
                   )}
                   <span className="flex-1 truncate font-medium">{title}</span>
                 </button>
@@ -103,7 +109,7 @@ export function HeaderSearchDropdownContent({
           aria-selected={activeIndex === itemCount}
           className={cn(
             "flex w-full items-center justify-between px-3 py-2.5 text-sm outline-none",
-            "border-t border-border text-muted-foreground",
+            "border-border text-muted-foreground border-t",
             activeIndex === itemCount ? "bg-accent text-accent-foreground" : "hover:bg-muted",
           )}
           onClick={() => {

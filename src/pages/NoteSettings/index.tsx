@@ -93,7 +93,7 @@ const NoteSettings: React.FC = () => {
       <AppLayout>
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+            <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
           </Container>
         </main>
       </AppLayout>
@@ -105,7 +105,7 @@ const NoteSettings: React.FC = () => {
       <AppLayout>
         <main className="py-10">
           <Container>
-            <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
+            <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
           </Container>
         </main>
       </AppLayout>
@@ -122,7 +122,7 @@ const NoteSettings: React.FC = () => {
                 <h1 className="truncate text-xl font-semibold">{t("notes.noteSettings")}</h1>
                 <NoteVisibilityBadge visibility={visibility} />
               </div>
-              <p className="mt-1 truncate text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-1 truncate text-sm">
                 {note.title || t("notes.untitledNote")}
               </p>
             </div>
@@ -132,7 +132,7 @@ const NoteSettings: React.FC = () => {
           </div>
 
           {!canManage ? (
-            <p className="mt-6 text-sm text-muted-foreground">{t("notes.noPermissionToEdit")}</p>
+            <p className="text-muted-foreground mt-6 text-sm">{t("notes.noPermissionToEdit")}</p>
           ) : (
             <>
               <NoteSettingsShareSection noteUrl={noteUrl} onCopyLink={handleCopyLink} />

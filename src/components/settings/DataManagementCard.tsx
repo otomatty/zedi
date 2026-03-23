@@ -61,11 +61,11 @@ export function DataManagementCard(): React.JSX.Element {
         <CardDescription>{t("generalSettings.dataManagement.description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-lg border border-destructive/40 p-4">
+        <div className="border-destructive/40 rounded-lg border p-4">
           <h3 className="text-sm font-semibold">
             {t("generalSettings.dataManagement.resetTitle")}
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             {t("generalSettings.dataManagement.resetDescription")}
           </p>
           <div className="mt-4 flex justify-end">

@@ -63,7 +63,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
         </CardContent>
       </Card>
     );
@@ -97,12 +97,12 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div className="flex items-center gap-3">
-            <Key className="h-5 w-5 text-muted-foreground" />
+            <Key className="text-muted-foreground h-5 w-5" />
             <div>
               <p id="useOwnKey-label" className="text-sm font-medium">
                 {t("aiSettings.useOwnKey")}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 {t("aiSettings.useOwnKeyDescription")}
               </p>
             </div>

@@ -19,7 +19,7 @@ export function NoteSettingsShareSection({ noteUrl, onCopyLink }: NoteSettingsSh
    */
   const { t } = useTranslation();
   return (
-    <section className="mt-6 rounded-lg border border-border/60 p-4">
+    <section className="border-border/60 mt-6 rounded-lg border p-4">
       <h2 className="mb-3 text-sm font-semibold">{t("notes.shareLink")}</h2>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input aria-label={t("notes.shareLink")} value={noteUrl} readOnly />

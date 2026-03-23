@@ -63,13 +63,13 @@ const PlanCard: React.FC<PlanCardProps> = ({
         </Badge>
       )}
       {current && (
-        <Badge variant="secondary" className="absolute right-3 top-3">
+        <Badge variant="secondary" className="absolute top-3 right-3">
           {t("pricing.currentPlan")}
         </Badge>
       )}
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
             {icon}
           </div>
           <div>
@@ -81,7 +81,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
       <CardContent className="flex-1">
         <div className="mb-6">
           <span className="text-3xl font-bold">{price}</span>
-          {priceNote && <span className="ml-2 text-sm text-muted-foreground">{priceNote}</span>}
+          {priceNote && <span className="text-muted-foreground ml-2 text-sm">{priceNote}</span>}
         </div>
         <ul className="space-y-3">
           {features.map((feature, index) => (
@@ -148,15 +148,15 @@ function CurrentPlanStatus({ isSignedIn, isProUser, usage }: CurrentPlanStatusPr
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {isProUser ? (
-                <Zap className="h-5 w-5 text-primary" />
+                <Zap className="text-primary h-5 w-5" />
               ) : (
-                <Sparkles className="h-5 w-5 text-muted-foreground" />
+                <Sparkles className="text-muted-foreground h-5 w-5" />
               )}
               <span className="text-lg font-semibold">
                 {isProUser ? t("pricing.status.proPlan") : t("pricing.status.freePlan")}
               </span>
             </div>
-            <span className="text-sm text-muted-foreground">{yearMonth}</span>
+            <span className="text-muted-foreground text-sm">{yearMonth}</span>
           </div>
 
           <div className="space-y-2">
@@ -183,7 +183,7 @@ function CurrentPlanStatus({ isSignedIn, isProUser, usage }: CurrentPlanStatusPr
                 isWarning && !isDanger && "[&>div]:bg-yellow-500",
               )}
             />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="text-muted-foreground flex items-center justify-between text-xs">
               <span>
                 {consumed.toLocaleString()} / {budget.toLocaleString()}{" "}
                 {t("pricing.status.costUnits")}
@@ -195,7 +195,7 @@ function CurrentPlanStatus({ isSignedIn, isProUser, usage }: CurrentPlanStatusPr
           </div>
 
           {isDanger && (
-            <p className="text-xs text-destructive">{t("pricing.status.dangerWarning")}</p>
+            <p className="text-destructive text-xs">{t("pricing.status.dangerWarning")}</p>
           )}
         </CardContent>
       </Card>
@@ -211,28 +211,28 @@ function PricingAiInfo() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 flex items-center gap-2 font-medium">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Sparkles className="text-primary h-4 w-4" />
             {t("pricing.aiInfo.freeTitle")}
           </h4>
-          <ul className="space-y-1 text-sm text-muted-foreground">
+          <ul className="text-muted-foreground space-y-1 text-sm">
             <li>- {t("pricing.aiInfo.freeFeatures.models")}</li>
             <li>- {t("pricing.aiInfo.freeFeatures.limit")}</li>
             <li>- {t("pricing.aiInfo.freeFeatures.features")}</li>
           </ul>
         </div>
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+        <div className="border-primary/20 bg-primary/5 rounded-lg border p-4">
           <h4 className="mb-2 flex items-center gap-2 font-medium">
-            <Zap className="h-4 w-4 text-primary" />
+            <Zap className="text-primary h-4 w-4" />
             {t("pricing.aiInfo.proTitle")}
           </h4>
-          <ul className="space-y-1 text-sm text-muted-foreground">
+          <ul className="text-muted-foreground space-y-1 text-sm">
             <li>- {t("pricing.aiInfo.proFeatures.models")}</li>
             <li>- {t("pricing.aiInfo.proFeatures.limit")}</li>
             <li>- {t("pricing.aiInfo.proFeatures.features")}</li>
           </ul>
         </div>
       </div>
-      <p className="mt-4 text-center text-xs text-muted-foreground">
+      <p className="text-muted-foreground mt-4 text-center text-xs">
         {t("pricing.aiInfo.ownApiKeyNote")}
       </p>
     </div>
@@ -255,7 +255,7 @@ function PricingFaq() {
         {faqItems.map((key) => (
           <div key={key} className="rounded-lg border p-4">
             <h4 className="mb-1 font-medium">{t(`pricing.faq.${key}.question`)}</h4>
-            <p className="text-sm text-muted-foreground">{t(`pricing.faq.${key}.answer`)}</p>
+            <p className="text-muted-foreground text-sm">{t(`pricing.faq.${key}.answer`)}</p>
           </div>
         ))}
       </div>
@@ -365,6 +365,9 @@ function PricingPlanCards({
   );
 }
 
+/**
+ *
+ */
 const Pricing: React.FC = () => {
   const { t } = useTranslation();
   const { isSignedIn } = useAuth();
@@ -388,8 +391,8 @@ const Pricing: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="bg-background min-h-screen">
+      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
         <Container className="flex h-16 items-center gap-4">
           <Link to="/home">
             <Button variant="ghost" size="icon">
@@ -415,7 +418,7 @@ const Pricing: React.FC = () => {
           />
 
           {isLoading && (
-            <p className="mt-4 text-center text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-4 text-center text-sm">
               {t("pricing.loadingPlan")}
             </p>
           )}

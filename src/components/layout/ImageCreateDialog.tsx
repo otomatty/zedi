@@ -30,24 +30,56 @@ interface ImageCreateDialogProps {
   onCreated: (imageUrl: string, extractedText?: string, description?: string) => void;
 }
 
-export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
-  open,
-  onOpenChange,
-  onCreated,
-}) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChange, onCreated }) => {
+  /**
+   *
+   */
   const [step, setStep] = useState<"source" | "preview">("source");
+  /**
+   *
+   */
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  /**
+   *
+   */
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  /**
+   *
+   */
   const [processingMode, setProcessingMode] = useState<ProcessingMode>("none");
+  /**
+   *
+   */
   const [isProcessing, setIsProcessing] = useState(false);
+  /**
+   *
+   */
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   *
+   */
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /**
+   *
+   */
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   *
+   */
   const { uploadImage, isConfigured } = useImageUpload();
 
   // ダイアログを閉じたときにリセット
+  /**
+   *
+   */
   const handleClose = useCallback(() => {
     setStep("source");
     setSelectedImage(null);
@@ -58,6 +90,9 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
   }, [onOpenChange]);
 
   // 画像選択
+  /**
+   *
+   */
   const handleImageSelect = useCallback((file: File) => {
     // ファイルサイズチェック (10MB)
     if (file.size > 10 * 1024 * 1024) {
@@ -66,6 +101,9 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
     }
 
     // 画像形式チェック
+    /**
+     *
+     */
     const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
     if (!validTypes.includes(file.type)) {
       setError("この画像形式には対応していません（JPEG, PNG, GIF, WebPをお使いください）");
@@ -79,8 +117,14 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
   }, []);
 
   // ファイル選択
+  /**
+   *
+   */
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
+      /**
+       *
+       */
       const file = e.target.files?.[0];
       if (file) {
         handleImageSelect(file);
@@ -92,13 +136,31 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
   );
 
   // クリップボードから
+  /**
+   *
+   */
   const handleClipboard = useCallback(async () => {
     try {
+      /**
+       *
+       */
       const items = await navigator.clipboard.read();
-      for (const item of items) {
+      for (/**
+       *
+       */
+      const item of items) {
+        /**
+         *
+         */
         const imageType = item.types.find((type) => type.startsWith("image/"));
         if (imageType) {
+          /**
+           *
+           */
           const blob = await item.getType(imageType);
+          /**
+           *
+           */
           const file = new File([blob], "clipboard-image.png", {
             type: imageType,
           });
@@ -114,6 +176,9 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
   }, [handleImageSelect]);
 
   // 作成実行
+  /**
+   *
+   */
   const handleCreate = useCallback(async () => {
     if (!selectedImage) return;
 
@@ -129,10 +194,19 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
       }
 
       // 画像をアップロード
+      /**
+       *
+       */
       const imageUrl = await uploadImage(selectedImage);
 
       // 処理モードに応じた処理
+      /**
+       *
+       */
       let extractedText: string | undefined;
+      /**
+       *
+       */
       let description: string | undefined;
 
       if (processingMode === "ocr") {
@@ -180,7 +254,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                 <Camera className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">カメラで撮影</div>
-                  <div className="text-sm text-muted-foreground">その場で写真を撮る</div>
+                  <div className="text-muted-foreground text-sm">その場で写真を撮る</div>
                 </div>
               </Button>
               <input
@@ -201,7 +275,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                 <ImageIcon className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">ギャラリーから選択</div>
-                  <div className="text-sm text-muted-foreground">保存済みの画像を選ぶ</div>
+                  <div className="text-muted-foreground text-sm">保存済みの画像を選ぶ</div>
                 </div>
               </Button>
               <input
@@ -221,7 +295,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                 <Clipboard className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">クリップボードから</div>
-                  <div className="text-sm text-muted-foreground">コピーした画像を貼り付け</div>
+                  <div className="text-muted-foreground text-sm">コピーした画像を貼り付け</div>
                 </div>
               </Button>
             </div>
@@ -238,7 +312,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
         {step === "preview" && previewUrl && (
           <div className="space-y-4 py-4">
             {/* 画像プレビュー */}
-            <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
+            <div className="bg-muted relative aspect-video overflow-hidden rounded-lg">
               <img src={previewUrl} alt="Selected" className="h-full w-full object-contain" />
             </div>
 
@@ -257,7 +331,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                       <FileText className="h-4 w-4" />
                       <span>テキスト抽出（OCR）</span>
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-muted-foreground text-sm">
                       画像内の文字を認識してテキスト化
                     </div>
                   </Label>
@@ -270,7 +344,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                       <MessageSquare className="h-4 w-4" />
                       <span>画像の説明を生成</span>
                     </div>
-                    <div className="text-sm text-muted-foreground">AIが画像の内容を文章で説明</div>
+                    <div className="text-muted-foreground text-sm">AIが画像の内容を文章で説明</div>
                   </Label>
                 </div>
 
@@ -281,7 +355,7 @@ export const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
                       <ImageOff className="h-4 w-4" />
                       <span>画像のみ</span>
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-muted-foreground text-sm">
                       テキスト処理なし、画像だけを添付
                     </div>
                   </Label>

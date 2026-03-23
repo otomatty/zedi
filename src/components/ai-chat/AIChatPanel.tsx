@@ -12,7 +12,13 @@ import { useAIChatConversations } from "../../hooks/useAIChatConversations";
 import type { ReferencedPage } from "../../types/aiChat";
 import { usePagesSummary } from "../../hooks/usePageQueries";
 
+/**
+ *
+ */
 export function AIChatPanel() {
+  /**
+   *
+   */
   const {
     isOpen,
     activeConversationId,
@@ -154,7 +160,7 @@ function AIChatPanelContent({
   );
 
   return (
-    <div className="relative flex h-full flex-col border-l bg-background">
+    <div className="bg-background relative flex h-full flex-col border-l">
       <AIChatHeader />
       <AIChatContextBar />
 
@@ -174,7 +180,7 @@ function AIChatPanelContent({
         isStreaming={isStreaming}
       />
 
-      <div className="border-t bg-background p-4">
+      <div className="bg-background border-t p-4">
         <AIChatInput onSendMessage={handleSendMessage} onStopStreaming={stopStreaming} />
       </div>
     </div>

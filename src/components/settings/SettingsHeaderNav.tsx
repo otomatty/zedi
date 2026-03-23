@@ -72,7 +72,7 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
               className={cn(
                 "inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium",
                 "ring-offset-background transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
@@ -108,7 +108,7 @@ export const SettingsHeaderNav: React.FC<SettingsHeaderNavProps> = ({
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-base font-medium",
                     "ring-offset-background transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",

@@ -6,6 +6,9 @@ interface MermaidGeneratorResultPreviewProps {
   previewError: string | null;
 }
 
+/**
+ *
+ */
 export function MermaidGeneratorResultPreview({
   code,
   previewSvg,
@@ -15,7 +18,7 @@ export function MermaidGeneratorResultPreview({
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>生成されたコード</Label>
-        <pre className="max-h-32 overflow-auto rounded-md bg-muted p-3 font-mono text-sm">
+        <pre className="bg-muted max-h-32 overflow-auto rounded-md p-3 font-mono text-sm">
           {code}
         </pre>
       </div>
@@ -23,7 +26,7 @@ export function MermaidGeneratorResultPreview({
       <div className="space-y-2">
         <Label>プレビュー</Label>
         {previewError ? (
-          <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="bg-destructive/10 text-destructive rounded-md p-4 text-sm">
             {previewError}
           </div>
         ) : previewSvg ? (
@@ -33,7 +36,7 @@ export function MermaidGeneratorResultPreview({
             dangerouslySetInnerHTML={{ __html: previewSvg }}
           />
         ) : (
-          <div className="p-4 text-center text-muted-foreground">プレビューを読み込み中...</div>
+          <div className="text-muted-foreground p-4 text-center">プレビューを読み込み中...</div>
         )}
       </div>
     </div>

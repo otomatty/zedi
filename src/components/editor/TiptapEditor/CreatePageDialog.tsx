@@ -47,13 +47,13 @@ export const CreatePageDialog: React.FC<CreatePageDialogProps> = ({
         aria-modal="true"
         aria-labelledby="create-page-dialog-title"
         aria-describedby="create-page-dialog-description"
-        className="grid w-full max-w-lg gap-4 rounded-lg border bg-background p-6 shadow-lg"
+        className="bg-background grid w-full max-w-lg gap-4 rounded-lg border p-6 shadow-lg"
       >
         <div className="flex flex-col space-y-2 text-center sm:text-left">
           <h2 id="create-page-dialog-title" className="text-lg font-semibold">
             ページを作成しますか？
           </h2>
-          <p id="create-page-dialog-description" className="text-sm text-muted-foreground">
+          <p id="create-page-dialog-description" className="text-muted-foreground text-sm">
             「{pageTitle}」というタイトルのページはまだ存在しません。 新しいページを作成しますか？
           </p>
         </div>

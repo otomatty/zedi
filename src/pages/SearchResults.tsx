@@ -174,13 +174,13 @@ export default function SearchResults() {
               <h1 className="text-lg font-medium">
                 「{searchQuery}」の検索結果
                 {!isLoading && (
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  <span className="text-muted-foreground ml-2 text-sm font-normal">
                     {results.length}件
                   </span>
                 )}
               </h1>
             ) : (
-              <h1 className="text-lg font-medium text-muted-foreground">
+              <h1 className="text-muted-foreground text-lg font-medium">
                 検索キーワードを入力してください
               </h1>
             )}

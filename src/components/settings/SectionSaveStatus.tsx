@@ -28,7 +28,7 @@ export const SectionSaveStatus: React.FC<SectionSaveStatusProps> = ({ status }) 
   if (status === "saving") {
     return (
       <div
-        className="flex items-center gap-1.5 text-sm text-muted-foreground"
+        className="text-muted-foreground flex items-center gap-1.5 text-sm"
         role="status"
         aria-live="polite"
       >
@@ -40,7 +40,7 @@ export const SectionSaveStatus: React.FC<SectionSaveStatusProps> = ({ status }) 
 
   return (
     <div
-      className="flex items-center gap-1.5 text-sm text-muted-foreground"
+      className="text-muted-foreground flex items-center gap-1.5 text-sm"
       role="status"
       aria-live="polite"
     >

@@ -6,6 +6,9 @@ import { Label } from "@zedi/ui";
 import { Alert, AlertDescription, AlertTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
+/**
+ *
+ */
 export interface GoogleDriveSettingsProps {
   clientId: string;
   clientSecret: string;
@@ -18,7 +21,13 @@ export interface GoogleDriveSettingsProps {
   disabled: boolean;
 }
 
-export const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
   clientId,
   clientSecret,
   accessToken,
@@ -29,6 +38,9 @@ export const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
   setShowSecrets,
   disabled,
 }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
@@ -40,7 +52,7 @@ export const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
             href="https://console.cloud.google.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-1 text-primary hover:underline"
+            className="text-primary ml-1 hover:underline"
           >
             {t("storageSettings.googleDrive.oauthAlertLink")}
           </a>
@@ -78,7 +90,7 @@ export const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
             type="button"
             variant="ghost"
             size="icon"
-            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
             onClick={() => setShowSecrets(!showSecrets)}
             disabled={disabled}
             aria-label={
@@ -87,9 +99,9 @@ export const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
             aria-pressed={showSecrets}
           >
             {showSecrets ? (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
+              <EyeOff className="text-muted-foreground h-4 w-4" />
             ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
+              <Eye className="text-muted-foreground h-4 w-4" />
             )}
           </Button>
         </div>
@@ -133,7 +145,7 @@ export const GoogleDriveSettings: React.FC<GoogleDriveSettingsProps> = ({
           placeholder={t("storageSettings.googleDrive.folderIdPlaceholder")}
           disabled={disabled}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           {t("storageSettings.googleDrive.folderIdHelp")}
         </p>
       </div>
