@@ -11,7 +11,10 @@ const mocks = vi.hoisted(() => {
   const setActiveConversation = vi.fn();
   const clearMessages = vi.fn();
   const loadMessages = vi.fn();
-  /** Stable across renders so AIChatPanel effects do not re-run spuriously on rerender. */
+  /**
+   * Stable across renders so AIChatPanel effects do not re-run spuriously on rerender.
+   * レンダー間で参照を固定し、AIChatPanel の effect が不要に再実行されないようにする。
+   */
   const createConversation = vi.fn(() => ({ id: "conv-1" }));
   const updateConversation = vi.fn();
   const deleteConversation = vi.fn();
