@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, renderHook, waitFor, screen } from "@testing-library/react";
+import { act, render, renderHook, waitFor, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { useEffect } from "react";
 import type { Location } from "react-router-dom";
@@ -157,5 +157,235 @@ describe("usePendingChatPageGeneration", () => {
     await waitFor(() => {
       expect(generateWikiContentFromChatOutlineStream).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("on completion calls saveChanges, setContent, and success toast", async () => {
+    const setContent = vi.fn();
+    const setWikiContentForCollab = vi.fn();
+    const saveChanges = vi.fn();
+    const toast = vi.fn();
+
+    renderHook(
+      () =>
+        usePendingChatPageGeneration(
+          buildHookOptions({
+            setContent,
+            setWikiContentForCollab,
+            saveChanges,
+            toast,
+          }),
+        ),
+      {
+        wrapper: ({ children }) => (
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: "/page/page-1",
+                state: { pendingChatPageGeneration: defaultPending },
+              },
+            ]}
+          >
+            {children}
+          </MemoryRouter>
+        ),
+      },
+    );
+
+    await waitFor(() => {
+      expect(saveChanges).toHaveBeenCalledWith("Page title", expect.any(String));
+      expect(setContent).toHaveBeenCalled();
+      expect(setWikiContentForCollab).toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledWith({ title: "aiChat.notifications.pageBodyGenerated" });
+    });
+  });
+
+  it("shows pageBodyGenerateFailed toast when stream reports a non-abort error", async () => {
+    generateWikiContentFromChatOutlineStream.mockImplementation(
+      async (
+        _title: string,
+        _outline: string,
+        _conversationText: string,
+        handlers: {
+          onChunk: (chunk: string) => void;
+          onComplete: (result: { content: string }) => void;
+          onError: (err: Error) => void;
+        },
+      ) => {
+        await Promise.resolve();
+        handlers.onError(new Error("stream failed"));
+      },
+    );
+
+    const toast = vi.fn();
+
+    renderHook(() => usePendingChatPageGeneration(buildHookOptions({ toast })), {
+      wrapper: ({ children }) => (
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: "/page/page-1",
+              state: { pendingChatPageGeneration: defaultPending },
+            },
+          ]}
+        >
+          {children}
+        </MemoryRouter>
+      ),
+    });
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith({
+        title: "aiChat.notifications.pageBodyGenerateFailed",
+        variant: "destructive",
+      });
+    });
+  });
+
+  it("does not show a destructive toast when error message is ABORTED", async () => {
+    generateWikiContentFromChatOutlineStream.mockImplementation(
+      async (
+        _title: string,
+        _outline: string,
+        _conversationText: string,
+        handlers: {
+          onChunk: (chunk: string) => void;
+          onComplete: (result: { content: string }) => void;
+          onError: (err: Error) => void;
+        },
+      ) => {
+        await Promise.resolve();
+        handlers.onError(new Error("ABORTED"));
+      },
+    );
+
+    const toast = vi.fn();
+
+    renderHook(() => usePendingChatPageGeneration(buildHookOptions({ toast })), {
+      wrapper: ({ children }) => (
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: "/page/page-1",
+              state: { pendingChatPageGeneration: defaultPending },
+            },
+          ]}
+        >
+          {children}
+        </MemoryRouter>
+      ),
+    });
+
+    await waitFor(() => {
+      expect(generateWikiContentFromChatOutlineStream).toHaveBeenCalled();
+    });
+
+    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+  });
+
+  it("does not start generation until the editor is initialized", async () => {
+    const { rerender } = renderHook(
+      ({ initialized }: { initialized: boolean }) =>
+        usePendingChatPageGeneration(buildHookOptions({ isInitialized: initialized })),
+      {
+        initialProps: { initialized: false },
+        wrapper: ({ children }) => (
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: "/page/page-1",
+                state: { pendingChatPageGeneration: defaultPending },
+              },
+            ]}
+          >
+            {children}
+          </MemoryRouter>
+        ),
+      },
+    );
+
+    await waitFor(() => {
+      expect(generateWikiContentFromChatOutlineStream).not.toHaveBeenCalled();
+    });
+
+    rerender({ initialized: true });
+
+    await waitFor(() => {
+      expect(generateWikiContentFromChatOutlineStream).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not start generation when title is blank", async () => {
+    const blankTitleOptions = buildHookOptions({ title: "   " });
+    renderHook(() => usePendingChatPageGeneration(blankTitleOptions), {
+      wrapper: ({ children }) => (
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: "/page/page-1",
+              state: { pendingChatPageGeneration: defaultPending },
+            },
+          ]}
+        >
+          {children}
+        </MemoryRouter>
+      ),
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(generateWikiContentFromChatOutlineStream).not.toHaveBeenCalled();
+  });
+
+  it("invokes setContent when the stream emits chunks (throttled path) before completion", async () => {
+    vi.useFakeTimers();
+    try {
+      const setContent = vi.fn();
+      generateWikiContentFromChatOutlineStream.mockImplementation(
+        async (
+          _title: string,
+          _outline: string,
+          _conversationText: string,
+          handlers: {
+            onChunk: (chunk: string) => void;
+            onComplete: (result: { content: string }) => void;
+            onError: (err: Error) => void;
+          },
+        ) => {
+          await Promise.resolve();
+          handlers.onChunk("## ");
+          handlers.onChunk("Hi");
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 200);
+          });
+          handlers.onComplete({ content: "## Hi" });
+        },
+      );
+
+      renderHook(() => usePendingChatPageGeneration(buildHookOptions({ setContent })), {
+        wrapper: ({ children }) => (
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: "/page/page-1",
+                state: { pendingChatPageGeneration: defaultPending },
+              },
+            ]}
+          >
+            {children}
+          </MemoryRouter>
+        ),
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+        await vi.advanceTimersByTimeAsync(150);
+      });
+
+      expect(setContent).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
