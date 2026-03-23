@@ -41,7 +41,7 @@ test.describe("AI Chat panel", () => {
 
     const title = "E2E Ref Page";
     await page.getByPlaceholder("タイトル").fill(title);
-    await page.waitForTimeout(1500);
+    await expect(page.getByText(/に保存/)).toBeVisible({ timeout: 20000 });
 
     await helpers.goToHome(page);
 

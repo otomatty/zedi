@@ -29,12 +29,10 @@ interface MockAuthProviderProps {
 }
 
 /**
- *
+ * E2E 用の認証プロバイダー。子ツリーにモックの認証コンテキストを供給する。
+ * Mock auth provider for E2E. Supplies mock auth context to the subtree.
  */
 export function MockAuthProvider({ children }: MockAuthProviderProps) {
-  /**
-   *
-   */
   const mockAuthValue: MockAuthContextValue = {
     isLoaded: true,
     isSignedIn: true,
@@ -51,12 +49,10 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
 }
 
 /**
- *
+ * MockAuthContext からモック認証状態を取得する。MockAuthProvider 内でのみ使用する。
+ * Returns mock auth from MockAuthContext. Must be used within MockAuthProvider.
  */
 export function useMockAuth(): MockAuthContextValue {
-  /**
-   *
-   */
   const context = useContext(MockAuthContext);
   if (!context) {
     throw new Error("useMockAuth must be used within a MockAuthProvider");
@@ -65,14 +61,16 @@ export function useMockAuth(): MockAuthContextValue {
 }
 
 /**
- *
+ * E2E 用の SignedIn 代替。子を常に描画する。
+ * Mock SignedIn for E2E. Always renders children.
  */
 export function MockSignedIn({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
 /**
- *
+ * E2E 用の SignedOut 代替。子は描画しない（null を返す）。
+ * Mock SignedOut for E2E. Renders nothing (returns null).
  */
 export function MockSignedOut({ children }: { children: ReactNode }) {
   void children;
