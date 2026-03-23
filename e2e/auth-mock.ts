@@ -78,17 +78,16 @@ const helpers = {
  * Seeds onboarding so Home renders (FAB, grid) for mock signed-in users.
  */
 export const test = base.extend<{ helpers: typeof helpers }>({
-  page: async ({ page }, use) => {
+  page: async ({ page }, continueFixture) => {
     await page.addInitScript((onboarding: typeof E2E_DEFAULT_ONBOARDING) => {
       localStorage.setItem("zedi-onboarding", JSON.stringify(onboarding));
     }, E2E_DEFAULT_ONBOARDING);
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- Playwright fixture continuation (not React)
-    await use(page);
+    await continueFixture(page);
   },
-  // eslint-disable-next-line no-empty-pattern
-  helpers: async ({}, use) => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    await use(helpers);
+  /** Depends on `page` only to satisfy Playwright's destructuring requirement (no empty `{}`). */
+  helpers: async ({ page: _page }, continueFixture) => {
+    void _page;
+    await continueFixture(helpers);
   },
 });
 
