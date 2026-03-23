@@ -8,28 +8,73 @@ import { loadAISettings } from "../../lib/aiSettings";
 import type { AIModel } from "../../types/ai";
 import { cn } from "@zedi/ui";
 
+/**
+ *
+ */
 export function AIChatModelSelector() {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const { selectedModel, setSelectedModel, isStreaming } = useAIChatStore();
+  /**
+   *
+   */
   const [models, setModels] = useState<AIModel[]>([]);
+  /**
+   *
+   */
   const [loading, setLoading] = useState(false);
+  /**
+   *
+   */
   const [open, setOpen] = useState(false);
+  /**
+   *
+   */
   const containerRef = useRef<HTMLDivElement>(null);
 
   // モデル一覧をロード
+  /**
+   *
+   */
   const loadModels = useCallback(async () => {
     setLoading(true);
     try {
+      /**
+       *
+       */
       const { models: serverModels } = await fetchServerModels();
+      /**
+       *
+       */
       const available = serverModels.filter((m) => m.available);
       setModels(available);
 
       // 初回: selectedModel がまだ null なら設定画面のモデル or デフォルトを選択
       if (!selectedModel && available.length > 0) {
+        /**
+         *
+         */
         const settings = await loadAISettings();
+        /**
+         *
+         */
         const savedModelId = settings?.modelId;
+        /**
+         *
+         */
         const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
+        /**
+         *
+         */
         const first = available[0];
+        /**
+         *
+         */
         const initial = matched ?? first;
         if (initial) {
           setSelectedModel({
@@ -56,6 +101,9 @@ export function AIChatModelSelector() {
   // 外部クリックで閉じる
   useEffect(() => {
     if (!open) return;
+    /**
+     *
+     */
     const handleClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -65,6 +113,9 @@ export function AIChatModelSelector() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  /**
+   *
+   */
   const handleSelect = useCallback(
     (model: AIModel) => {
       setSelectedModel({
@@ -80,9 +131,18 @@ export function AIChatModelSelector() {
     [setSelectedModel],
   );
 
+  /**
+   *
+   */
   const displayLabel = selectedModel?.displayName ?? t("aiChat.modelSelector.select");
 
+  /**
+   *
+   */
   const sonnetBaseline = getSonnetBaseline(models);
+  /**
+   *
+   */
   const getCostLabel = (model: AIModel) =>
     formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
 
@@ -111,17 +171,26 @@ export function AIChatModelSelector() {
       </button>
 
       {open && models.length > 0 && (
-        <div className="absolute bottom-full left-0 z-50 mb-1 max-h-[280px] min-w-[240px] max-w-[320px] overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+        <div className="border-border bg-popover absolute bottom-full left-0 z-50 mb-1 max-h-[280px] max-w-[320px] min-w-[240px] overflow-hidden overflow-y-auto rounded-lg border shadow-lg">
           {models.map((model) => {
+            /**
+             *
+             */
             const isSelected = selectedModel?.id === model.id;
+            /**
+             *
+             */
             const costLabel = getCostLabel(model);
+            /**
+             *
+             */
             const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
             return (
               <button
                 key={model.id}
                 type="button"
                 className={cn(
-                  "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
+                  "hover:bg-accent flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors",
                   isSelected && "bg-accent/50",
                 )}
                 onClick={() => handleSelect(model)}
@@ -138,7 +207,7 @@ export function AIChatModelSelector() {
                   >
                     {costLabel}
                   </span>
-                  {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                  {isSelected && <Check className="text-primary h-3.5 w-3.5 shrink-0" />}
                 </span>
               </button>
             );

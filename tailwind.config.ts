@@ -60,6 +60,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         link: "hsl(var(--link-color))",
+        "link-referenced": "hsl(var(--link-referenced))",
         "ghost-link": "hsl(var(--link-ghost))",
         "surface-elevated": "hsl(var(--surface-elevated))",
         "text-subtle": "hsl(var(--text-subtle))",

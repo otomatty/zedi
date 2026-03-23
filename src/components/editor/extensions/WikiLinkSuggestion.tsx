@@ -4,6 +4,9 @@ import { usePageStore } from "@/stores/pageStore";
 import { cn } from "@zedi/ui";
 import { FileText, Plus } from "lucide-react";
 
+/**
+ *
+ */
 export interface SuggestionItem {
   id: string;
   title: string;
@@ -18,20 +21,41 @@ interface WikiLinkSuggestionProps {
   onClose: () => void;
 }
 
+/**
+ *
+ */
 export interface WikiLinkSuggestionHandle {
   onKeyDown: (event: KeyboardEvent) => boolean;
 }
 
-export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
+export /**
+ *
+ */
+const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
   ({ query, onSelect, onClose }, ref) => {
+    /**
+     *
+     */
     const [selectedIndex, setSelectedIndex] = useState(0);
+    /**
+     *
+     */
     const { pages } = usePageStore();
 
     // Get matching pages
+    /**
+     *
+     */
     const getItems = useCallback((): SuggestionItem[] => {
+      /**
+       *
+       */
       const normalizedQuery = query.toLowerCase().trim();
 
       // Get existing pages that match
+      /**
+       *
+       */
       const matchingPages = pages
         .filter((p) => !p.isDeleted && p.title.toLowerCase().includes(normalizedQuery))
         .slice(0, 5)
@@ -42,10 +66,16 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
         }));
 
       // If query doesn't match any existing page exactly, add create option
+      /**
+       *
+       */
       const exactMatch = pages.find(
         (p) => !p.isDeleted && p.title.toLowerCase() === normalizedQuery,
       );
 
+      /**
+       *
+       */
       const items: SuggestionItem[] = [...matchingPages];
 
       if (query.trim() && !exactMatch) {
@@ -59,6 +89,9 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
       return items;
     }, [query, pages]);
 
+    /**
+     *
+     */
     const items = getItems();
 
     // Reset selection when items change
@@ -66,8 +99,14 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
       queueMicrotask(() => setSelectedIndex(0));
     }, [query]);
 
+    /**
+     *
+     */
     const selectItem = useCallback(
       (index: number) => {
+        /**
+         *
+         */
         const item = items[index];
         if (item) {
           onSelect(item);
@@ -109,7 +148,7 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
     return (
       <div
         data-testid="wiki-link-suggestion"
-        className="shadow-elevated min-w-[200px] max-w-[300px] animate-fade-in overflow-hidden rounded-lg border border-border bg-popover"
+        className="shadow-elevated animate-fade-in border-border bg-popover max-w-[300px] min-w-[200px] overflow-hidden rounded-lg border"
       >
         <div className="p-1">
           {items.map((item, index) => (
@@ -122,9 +161,9 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
               )}
             >
               {item.exists ? (
-                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
               ) : (
-                <Plus className="h-4 w-4 shrink-0 text-primary" />
+                <Plus className="text-primary h-4 w-4 shrink-0" />
               )}
               <span className="truncate">
                 {item.exists ? item.title : `"${item.title}" を作成`}

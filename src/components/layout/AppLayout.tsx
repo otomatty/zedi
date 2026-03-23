@@ -29,7 +29,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="flex flex-1 overflow-hidden">
         <AppSidebar />
         <SidebarInset className="min-w-0">
-          <div className="min-h-0 flex-1 overflow-y-auto bg-background">{children}</div>
+          <div className="bg-background min-h-0 flex-1 overflow-y-auto">{children}</div>
         </SidebarInset>
         <AIChatDock />
       </div>

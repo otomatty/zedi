@@ -31,6 +31,9 @@ interface UsersContentProps {
   onRoleChange: (user: UserAdmin, role: UserRole) => void;
 }
 
+/**
+ *
+ */
 export function UsersContent({
   users,
   total,
@@ -44,10 +47,25 @@ export function UsersContent({
   savingIds,
   onRoleChange,
 }: UsersContentProps) {
+  /**
+   *
+   */
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  /**
+   *
+   */
   const hasPreviousPage = page > 0;
+  /**
+   *
+   */
   const hasNextPage = page + 1 < pageCount;
+  /**
+   *
+   */
   const rangeStart = total === 0 ? 0 : page * pageSize + 1;
+  /**
+   *
+   */
   const rangeEnd = total === 0 ? 0 : page * pageSize + users.length;
 
   return (
@@ -74,7 +92,7 @@ export function UsersContent({
         <>
           {/* デスクトップ: テーブル */}
           <div className="mt-4 hidden md:block">
-            <Table className="min-w-[480px] rounded border border-border">
+            <Table className="border-border min-w-[480px] rounded border">
               <TableHeader>
                 <TableRow className="border-border bg-muted/50 hover:bg-transparent">
                   <TableHead className="px-3 py-2">メール</TableHead>
@@ -107,10 +125,10 @@ export function UsersContent({
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="px-3 py-2 text-muted-foreground">
+                    <TableCell className="text-muted-foreground px-3 py-2">
                       {formatDate(u.createdAt)}
                     </TableCell>
-                    <TableCell className="px-3 py-2 text-muted-foreground">
+                    <TableCell className="text-muted-foreground px-3 py-2">
                       {savingIds.has(u.id) ? "保存中..." : ""}
                     </TableCell>
                   </TableRow>

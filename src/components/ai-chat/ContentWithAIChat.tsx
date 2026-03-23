@@ -91,7 +91,7 @@ export function ContentWithAIChat({
       <>
         {children}
         {floatingAction && (
-          <div className="fixed bottom-0 right-0 z-40 flex flex-col items-end gap-1 p-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
+          <div className="fixed right-0 bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]">
             {floatingAction}
           </div>
         )}
@@ -118,7 +118,7 @@ export function ContentWithAIChat({
       </div>
       {floatingAction && (
         <div
-          className="fixed bottom-0 z-40 flex flex-col items-end gap-1 p-2 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]"
+          className="fixed bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]"
           style={{
             // Local / global のどちらでも開いているときはパネル幅ぶん左に寄せる
             right: isOpen ? "var(--ai-chat-width)" : 0,
@@ -146,8 +146,8 @@ export function ContentWithAIChat({
       {!isOpen && isDraggingPage && (
         <div
           className={cn(
-            "fixed bottom-0 right-0 top-0 z-50 flex w-16 items-center justify-center transition-all duration-200",
-            isHoveringHint ? "w-24 bg-primary/20" : "bg-primary/5",
+            "fixed top-0 right-0 bottom-0 z-50 flex w-16 items-center justify-center transition-all duration-200",
+            isHoveringHint ? "bg-primary/20 w-24" : "bg-primary/5",
           )}
           onDragEnter={handleHintDragEnter}
           onDragLeave={handleHintDragLeave}
@@ -158,7 +158,7 @@ export function ContentWithAIChat({
           }}
         >
           <div
-            className="writing-mode-vertical whitespace-nowrap text-xs font-medium text-primary"
+            className="writing-mode-vertical text-primary text-xs font-medium whitespace-nowrap"
             style={{ writingMode: "vertical-rl" }}
           >
             {t("aiChat.referencedPages.dragHint")}

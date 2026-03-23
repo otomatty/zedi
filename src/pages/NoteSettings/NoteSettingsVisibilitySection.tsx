@@ -44,7 +44,7 @@ export function NoteSettingsVisibilitySection({
    */
   const { t } = useTranslation();
   return (
-    <section className="mt-6 rounded-lg border border-border/60 p-4">
+    <section className="border-border/60 mt-6 rounded-lg border p-4">
       <h2 className="mb-3 text-sm font-semibold">{t("notes.visibilitySettings")}</h2>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">

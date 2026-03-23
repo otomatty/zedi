@@ -100,7 +100,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
   } = props;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="bg-background flex min-h-screen flex-col">
       <PageEditorHeader
         lastSaved={displayLastSaved}
         onBack={onBack}

@@ -19,7 +19,13 @@ interface AISettingsFormServerSectionProps {
   onServerModelSelect: (modelId: string) => void;
 }
 
-export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionProps> = ({
   serverModels,
   serverModelsError,
   serverModelsLoading,
@@ -28,24 +34,39 @@ export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionPr
   onLoadServerModels,
   onServerModelSelect,
 }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const availableServerModels = serverModels.filter((m) => m.available);
+  /**
+   *
+   */
   const lockedServerModels = serverModels.filter((m) => !m.available);
+  /**
+   *
+   */
   const sonnetBaseline = getSonnetBaseline(serverModels);
+  /**
+   *
+   */
   const getCostLabel = (model: AIModel) =>
     formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Server className="h-4 w-4 text-primary" />
+        <Server className="text-primary h-4 w-4" />
         <Label id="ai-model-select-label">{t("aiSettings.aiModel")}</Label>
       </div>
 
       {serverModelsError && (
         <Alert variant="destructive" className="flex flex-col gap-2">
           <AlertTitle>{t("aiSettings.modelsLoadFailed")}</AlertTitle>
-          <AlertDescription className="whitespace-pre-wrap font-mono text-xs">
+          <AlertDescription className="font-mono text-xs whitespace-pre-wrap">
             {serverModelsError}
           </AlertDescription>
           <Button
@@ -60,7 +81,7 @@ export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionPr
         </Alert>
       )}
       {serverModelsLoading ? (
-        <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           {t("aiSettings.loadingModels")}
         </div>
@@ -76,7 +97,13 @@ export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionPr
           <SelectContent>
             {availableServerModels.length > 0 &&
               availableServerModels.map((model) => {
+                /**
+                 *
+                 */
                 const costLabel = getCostLabel(model);
+                /**
+                 *
+                 */
                 const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
                 return (
                   <SelectItem key={model.id} value={model.id}>
@@ -97,11 +124,14 @@ export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionPr
               })}
             {lockedServerModels.length > 0 &&
               lockedServerModels.map((model) => {
+                /**
+                 *
+                 */
                 const costLabel = getCostLabel(model);
                 return (
                   <SelectItem key={model.id} value={model.id} disabled>
                     <div className="flex items-center gap-2">
-                      <Lock className="h-3 w-3 text-muted-foreground" />
+                      <Lock className="text-muted-foreground h-3 w-3" />
                       <span className="text-muted-foreground">{model.displayName}</span>
                       <Badge variant="outline" className="px-1 py-0 text-[10px]">
                         {t("aiSettings.pro")}
@@ -116,7 +146,7 @@ export const AISettingsFormServerSection: React.FC<AISettingsFormServerSectionPr
           </SelectContent>
         </Select>
       ) : null}
-      <p className="text-xs text-muted-foreground">{t("aiSettings.serverModeHelp")}</p>
+      <p className="text-muted-foreground text-xs">{t("aiSettings.serverModeHelp")}</p>
     </div>
   );
 };

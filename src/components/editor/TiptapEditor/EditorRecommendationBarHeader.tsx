@@ -14,7 +14,13 @@ interface EditorRecommendationBarHeaderProps {
   onDismiss: () => void;
 }
 
-export const EditorRecommendationBarHeader: React.FC<EditorRecommendationBarHeaderProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const EditorRecommendationBarHeader: React.FC<EditorRecommendationBarHeaderProps> = ({
   headerLabel,
   mode,
   nextCursor,
@@ -23,10 +29,13 @@ export const EditorRecommendationBarHeader: React.FC<EditorRecommendationBarHead
   onBackToActions,
   onDismiss,
 }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex items-center gap-2 text-xs">
         <Sparkles className="h-4 w-4" />
         <span>{headerLabel}</span>
       </div>

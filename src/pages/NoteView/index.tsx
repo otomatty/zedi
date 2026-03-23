@@ -115,14 +115,14 @@ const NoteView: React.FC = () => {
   if (isLoading) {
     return (
       <NoteViewLoadingOrDenied>
-        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+        <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
       </NoteViewLoadingOrDenied>
     );
   }
   if (isNotFound) {
     return (
       <NoteViewLoadingOrDenied>
-        <p className="text-sm text-muted-foreground">{t("notes.noteNotFoundOrNoAccess")}</p>
+        <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
       </NoteViewLoadingOrDenied>
     );
   }
@@ -140,7 +140,7 @@ const NoteView: React.FC = () => {
                 <NoteVisibilityBadge visibility={note.visibility} />
                 {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mt-1 text-sm">
                 {t("notes.pagesCount", { count: notePages.length })}
               </p>
             </div>

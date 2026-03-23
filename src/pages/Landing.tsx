@@ -15,15 +15,18 @@ interface FeatureCardProps {
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => (
   <Card className="border-border/50 bg-card/50 backdrop-blur">
     <CardContent className="pt-6">
-      <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <div className="bg-primary/10 text-primary mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg">
         {icon}
       </div>
       <h3 className="mb-2 text-lg font-semibold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <p className="text-muted-foreground text-sm">{description}</p>
     </CardContent>
   </Card>
 );
 
+/**
+ *
+ */
 const Landing: React.FC = () => {
   const { t } = useTranslation();
   const { isSignedIn, isLoaded } = useAuth();
@@ -32,7 +35,7 @@ const Landing: React.FC = () => {
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+        <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2" />
       </div>
     );
   }
@@ -71,11 +74,11 @@ const Landing: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="border-border/50 bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-xl font-bold tracking-tight text-transparent">
+          <h1 className="from-primary to-primary/70 bg-gradient-to-r bg-clip-text text-xl font-bold tracking-tight text-transparent">
             Zedi
           </h1>
           <div className="flex items-center gap-4">
@@ -103,13 +106,13 @@ const Landing: React.FC = () => {
       <section className="container mx-auto px-4 py-20 text-center">
         <div className="mx-auto max-w-3xl">
           <h2 className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+            <span className="from-primary via-primary/80 to-primary/60 bg-gradient-to-r bg-clip-text text-transparent">
               {t("landing.heroTitle1")}
             </span>
             <br />
             {t("landing.heroTitle2")}
           </h2>
-          <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
+          <p className="text-muted-foreground mb-8 text-lg sm:text-xl">
             {t("landing.heroDescription")}
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -149,9 +152,9 @@ const Landing: React.FC = () => {
 
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-16">
-        <div className="mx-auto max-w-2xl rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 p-8 text-center sm:p-12">
+        <div className="from-primary/10 via-primary/5 to-primary/10 mx-auto max-w-2xl rounded-2xl bg-gradient-to-r p-8 text-center sm:p-12">
           <h3 className="mb-4 text-2xl font-bold sm:text-3xl">{t("landing.ctaTitle")}</h3>
-          <p className="mb-6 text-muted-foreground">{t("landing.ctaDescription")}</p>
+          <p className="text-muted-foreground mb-6">{t("landing.ctaDescription")}</p>
           <SignedOut>
             <Link to="/sign-in">
               <Button size="lg">
@@ -172,8 +175,8 @@ const Landing: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 py-8">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+      <footer className="border-border/50 border-t py-8">
+        <div className="text-muted-foreground container mx-auto px-4 text-center text-sm">
           <p>© {new Date().getFullYear()} Zedi. All rights reserved.</p>
         </div>
       </footer>

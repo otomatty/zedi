@@ -38,9 +38,9 @@ export function NoteSettingsDeleteSection({
   const { t } = useTranslation();
   return (
     <>
-      <section className="mt-6 rounded-lg border border-destructive/40 p-4">
-        <h2 className="mb-3 text-sm font-semibold text-destructive">{t("notes.deleteSection")}</h2>
-        <p className="text-sm text-muted-foreground">{t("notes.deleteSectionDescription")}</p>
+      <section className="border-destructive/40 mt-6 rounded-lg border p-4">
+        <h2 className="text-destructive mb-3 text-sm font-semibold">{t("notes.deleteSection")}</h2>
+        <p className="text-muted-foreground text-sm">{t("notes.deleteSectionDescription")}</p>
         <div className="mt-4 flex justify-end">
           <Button variant="destructive" onClick={() => onOpenChange(true)}>
             {t("notes.deleteNote")}

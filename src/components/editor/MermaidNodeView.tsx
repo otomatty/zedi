@@ -26,23 +26,53 @@ async function getMermaid() {
   return mermaidInstance;
 }
 
-export const MermaidNodeView: React.FC<NodeViewProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const MermaidNodeView: React.FC<NodeViewProps> = ({
   node,
   updateAttributes,
   deleteNode,
   selected,
 }) => {
+  /**
+   *
+   */
   const containerRef = useRef<HTMLDivElement>(null);
+  /**
+   *
+   */
   const [isEditing, setIsEditing] = useState(false);
+  /**
+   *
+   */
   const [editCode, setEditCode] = useState(node.attrs.code);
+  /**
+   *
+   */
   const [error, setError] = useState<string | null>(null);
+  /**
+   *
+   */
   const [svgContent, setSvgContent] = useState<string>("");
+  /**
+   *
+   */
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  /**
+   *
+   */
   const code = node.attrs.code as string;
 
   // Mermaidダイアグラムをレンダリング
   useEffect(() => {
+    /**
+     *
+     */
     const renderDiagram = async () => {
       if (!code) {
         setError("ダイアグラムコードが空です");
@@ -50,6 +80,9 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
       }
 
       try {
+        /**
+         *
+         */
         const mermaid = await getMermaid();
 
         // コードを検証
@@ -57,9 +90,15 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
         setError(null);
 
         // ユニークなIDを生成
+        /**
+         *
+         */
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
 
         // SVGをレンダリング
+        /**
+         *
+         */
         const { svg } = await mermaid.render(id, code);
         setSvgContent(svg);
       } catch (err) {
@@ -72,11 +111,17 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
     renderDiagram();
   }, [code]);
 
+  /**
+   *
+   */
   const handleSave = () => {
     updateAttributes({ code: editCode });
     setIsEditing(false);
   };
 
+  /**
+   *
+   */
   const handleCancel = () => {
     setEditCode(code);
     setIsEditing(false);
@@ -85,9 +130,9 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
   if (isEditing) {
     return (
       <NodeViewWrapper className="mermaid-node">
-        <div className="rounded-lg border bg-muted/30 p-4">
+        <div className="bg-muted/30 rounded-lg border p-4">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Mermaidコードを編集</span>
+            <span className="text-muted-foreground text-sm font-medium">Mermaidコードを編集</span>
             <div className="flex gap-1">
               <Button size="sm" variant="ghost" onClick={handleCancel}>
                 <X className="h-4 w-4" />
@@ -112,11 +157,11 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
     <NodeViewWrapper className="mermaid-node">
       <div
         className={`group relative rounded-lg border bg-white p-4 dark:bg-gray-900 ${
-          selected ? "ring-2 ring-primary" : ""
+          selected ? "ring-primary ring-2" : ""
         }`}
       >
         {/* ツールバー */}
-        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <Button size="sm" variant="ghost" onClick={() => setIsFullscreen(true)} title="拡大表示">
             <Maximize2 className="h-4 w-4" />
           </Button>
@@ -136,9 +181,9 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
 
         {/* ダイアグラム表示 */}
         {error ? (
-          <div className="rounded bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="bg-destructive/10 text-destructive rounded p-4 text-sm">
             <p className="mb-1 font-medium">Mermaidエラー</p>
-            <pre className="whitespace-pre-wrap text-xs">{error}</pre>
+            <pre className="text-xs whitespace-pre-wrap">{error}</pre>
             <Button size="sm" variant="outline" onClick={() => setIsEditing(true)} className="mt-2">
               コードを修正
             </Button>
@@ -150,7 +195,7 @@ export const MermaidNodeView: React.FC<NodeViewProps> = ({
             dangerouslySetInnerHTML={{ __html: svgContent }}
           />
         ) : (
-          <div className="flex h-32 items-center justify-center text-muted-foreground">
+          <div className="text-muted-foreground flex h-32 items-center justify-center">
             読み込み中...
           </div>
         )}

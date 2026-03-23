@@ -16,6 +16,9 @@ type Props = Pick<
   | "isTesting"
 >;
 
+/**
+ *
+ */
 export function ExternalStorageProviderSelect({
   useExternalStorageEffective,
   effectiveProvider,
@@ -24,6 +27,9 @@ export function ExternalStorageProviderSelect({
   isSaving,
   isTesting,
 }: Props) {
+  /**
+   *
+   */
   const { t } = useTranslation();
   if (!useExternalStorageEffective) return null;
   return (
@@ -43,7 +49,7 @@ export function ExternalStorageProviderSelect({
               <div className="flex w-full items-center justify-between gap-2">
                 <div className="flex flex-col items-start">
                   <span>{t(`storageSettings.providers.${provider.id}.name`)}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     {t(`storageSettings.providers.${provider.id}.description`)}
                   </span>
                 </div>
@@ -62,7 +68,7 @@ export function ExternalStorageProviderSelect({
         </SelectContent>
       </Select>
       {currentProvider && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
           <Badge variant="outline" className="text-[10px]">
             {t("storageSettings.difficultyLabel")}:{" "}
             {t(`storageSettings.difficulty.${currentProvider.setupDifficulty}`)}

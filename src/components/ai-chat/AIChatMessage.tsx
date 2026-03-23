@@ -17,14 +17,26 @@ interface AIChatMessageProps {
   isStreaming?: boolean;
 }
 
+/**
+ *
+ */
 export function AIChatMessage({
   message,
   onExecuteAction,
   onEditMessage,
   isStreaming = false,
 }: AIChatMessageProps) {
+  /**
+   *
+   */
   const isUser = message.role === "user";
+  /**
+   *
+   */
   const displayContent = isUser ? message.content : getDisplayContent(message.content);
+  /**
+   *
+   */
   const showUserEdit = isUser && onEditMessage;
 
   return (
@@ -41,8 +53,8 @@ export function AIChatMessage({
         <div
           className={`rounded-2xl px-4 py-2 text-sm ${
             isUser
-              ? "rounded-tr-sm bg-primary text-primary-foreground"
-              : "rounded-tl-sm bg-muted text-foreground"
+              ? "bg-primary text-primary-foreground rounded-tr-sm"
+              : "bg-muted text-foreground rounded-tl-sm"
           }`}
         >
           {isUser && showUserEdit ? (
@@ -64,6 +76,9 @@ export function AIChatMessage({
                   pre: CodeBlockWithCopy,
                   a: ({ href, children }) => {
                     if (href?.startsWith("wiki:")) {
+                      /**
+                       *
+                       */
                       let title: string;
                       try {
                         title = decodeURIComponent(href.slice(5));
@@ -72,6 +87,9 @@ export function AIChatMessage({
                       }
                       return <AIChatWikiLink title={title} />;
                     }
+                    /**
+                     *
+                     */
                     const safeHref = href && /^(https?|mailto|tel):/i.test(href) ? href : undefined;
                     return (
                       <a href={safeHref} target="_blank" rel="noopener noreferrer">
@@ -91,12 +109,12 @@ export function AIChatMessage({
         </div>
 
         {!isUser && message.modelDisplayName && !message.isStreaming && (
-          <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
+          <span className="text-muted-foreground mt-0.5 px-1 text-[10px]">
             {message.modelDisplayName}
           </span>
         )}
 
-        {message.error && <div className="mt-1 text-xs text-destructive">{message.error}</div>}
+        {message.error && <div className="text-destructive mt-1 text-xs">{message.error}</div>}
 
         {message.actions && message.actions.length > 0 && onExecuteAction && (
           <div className="mt-2 w-full space-y-2">

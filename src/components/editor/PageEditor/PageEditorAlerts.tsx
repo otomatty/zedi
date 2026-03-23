@@ -40,7 +40,7 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
     <>
       {/* タイトル警告エリア */}
       {showTitleAlerts && (
-        <div className="border-b border-border bg-destructive/10">
+        <div className="border-border bg-destructive/10 border-b">
           <Container>
             {/* タイトル重複警告 */}
             {duplicatePage && (
@@ -66,11 +66,11 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
 
       {/* Wiki生成中バナー */}
       {isWikiGenerating && (
-        <div className="border-b border-border bg-primary/5">
+        <div className="border-border bg-primary/5 border-b">
           <Container>
             <div className="flex items-center justify-between py-3">
               <div className="flex items-center gap-3">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <Loader2 className="text-primary h-4 w-4 animate-spin" />
                 <span className="text-sm">「{title}」について解説を生成しています...</span>
               </div>
               <Button variant="outline" size="sm" onClick={onCancelWiki} className="gap-1.5">
@@ -84,7 +84,7 @@ export const PageEditorAlerts: React.FC<PageEditorAlertsProps> = ({
 
       {/* コンテンツエラー警告 */}
       {contentError && (
-        <div className="border-b border-border bg-amber-500/10">
+        <div className="border-border border-b bg-amber-500/10">
           <Container>
             <Alert className="border-0 bg-transparent py-3">
               <AlertCircle className="h-4 w-4 text-amber-600" />

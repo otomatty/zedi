@@ -5,6 +5,9 @@ import type { MatchType } from "@/lib/searchUtils";
 import { cn } from "@zedi/ui";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 
+/**
+ *
+ */
 export interface SearchResultCardItem {
   pageId: string;
   noteId?: string;
@@ -31,7 +34,13 @@ interface SearchResultCardProps {
   onClick: () => void;
 }
 
+/**
+ *
+ */
 export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
+  /**
+   *
+   */
   const { resolvedUrl: thumbnailSrc, hasError: thumbnailError } = useAuthenticatedImageUrl(
     item.thumbnailUrl,
   );
@@ -41,9 +50,9 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full rounded-lg border border-border p-4 text-left",
-        "transition-colors hover:border-muted-foreground/30 hover:bg-muted/50",
-        "focus:outline-none focus:ring-2 focus:ring-ring",
+        "border-border w-full rounded-lg border p-4 text-left",
+        "hover:border-muted-foreground/30 hover:bg-muted/50 transition-colors",
+        "focus:ring-ring focus:ring-2 focus:outline-none",
       )}
     >
       <div className="flex gap-4">
@@ -52,7 +61,7 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
             <img
               src={thumbnailSrc}
               alt=""
-              className="h-20 w-28 rounded bg-muted object-cover"
+              className="bg-muted h-20 w-28 rounded object-cover"
               loading="lazy"
             />
           </div>
@@ -61,9 +70,9 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex items-center gap-2">
             {item.sourceUrl ? (
-              <LinkIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
             ) : (
-              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
             )}
             <span className="flex-1 truncate text-base font-medium">{item.title}</span>
             <MatchTypeBadge type={item.matchType} />
@@ -78,7 +87,7 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
             <HighlightedSnippet text={item.highlightedSnippet} />
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-3 text-xs">
             <span>{formatDate(item.updatedAt)}</span>
           </div>
         </div>

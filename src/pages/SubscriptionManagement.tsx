@@ -47,6 +47,9 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
+/**
+ *
+ */
 const SubscriptionManagement: React.FC = () => {
   const { t } = useTranslation();
   const { isSignedIn } = useAuth();
@@ -150,8 +153,8 @@ const SubscriptionManagement: React.FC = () => {
   })();
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="bg-background min-h-screen">
+      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
         <Container className="flex h-16 items-center gap-4">
           <Link to="/pricing">
             <Button variant="ghost" size="icon">
@@ -166,7 +169,7 @@ const SubscriptionManagement: React.FC = () => {
         <Container className="max-w-2xl">
           {loading ? (
             <div className="flex justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
             </div>
           ) : !isSignedIn ? (
             <Card>
@@ -186,7 +189,7 @@ const SubscriptionManagement: React.FC = () => {
             </Card>
           ) : !details ? (
             <div className="flex justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
             </div>
           ) : !isProUser ? (
             <Card>
@@ -205,7 +208,7 @@ const SubscriptionManagement: React.FC = () => {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-primary" />
+                      <Zap className="text-primary h-5 w-5" />
                       <CardTitle>{t("pricing.status.proPlan")}</CardTitle>
                     </div>
                     <Badge variant={statusVariant}>{statusLabel}</Badge>
@@ -271,7 +274,7 @@ const SubscriptionManagement: React.FC = () => {
                       isWarning && !isDanger && "[&>div]:bg-yellow-500",
                     )}
                   />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="text-muted-foreground flex items-center justify-between text-xs">
                     <span>
                       {details.usage.consumedUnits.toLocaleString()} /{" "}
                       {details.usage.budgetUnits.toLocaleString()} {t("pricing.status.costUnits")}
@@ -347,7 +350,7 @@ const SubscriptionManagement: React.FC = () => {
                   >
                     <CreditCard className="mr-2 h-4 w-4" />
                     {t("pricing.subscription.paymentInfo")}
-                    <ExternalLink className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
+                    <ExternalLink className="text-muted-foreground ml-auto h-3.5 w-3.5" />
                   </Button>
 
                   {/* Cancel / Reactivate */}
@@ -370,7 +373,7 @@ const SubscriptionManagement: React.FC = () => {
                       <AlertDialogTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="w-full justify-start text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive w-full justify-start"
                           disabled={actionLoading}
                         >
                           {t("pricing.subscription.cancelSubscription")}

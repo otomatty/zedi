@@ -48,6 +48,9 @@ const iconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   Radical,
 };
 
+/**
+ *
+ */
 export interface SlashSuggestionHandle {
   onKeyDown: (event: KeyboardEvent) => boolean;
 }
@@ -133,8 +136,8 @@ const SlashSuggestionMenu = forwardRef<
 
   if (items.length === 0) {
     return (
-      <div className="shadow-elevated min-w-[240px] animate-fade-in overflow-hidden rounded-lg border border-border bg-popover">
-        <div className="px-3 py-2 text-sm text-muted-foreground">{t("editor.slashNoResults")}</div>
+      <div className="shadow-elevated animate-fade-in border-border bg-popover min-w-[240px] overflow-hidden rounded-lg border">
+        <div className="text-muted-foreground px-3 py-2 text-sm">{t("editor.slashNoResults")}</div>
       </div>
     );
   }
@@ -142,7 +145,7 @@ const SlashSuggestionMenu = forwardRef<
   return (
     <div
       ref={listRef}
-      className="shadow-elevated max-h-[320px] min-w-[240px] max-w-[320px] animate-fade-in overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover"
+      className="shadow-elevated animate-fade-in border-border bg-popover max-h-[320px] max-w-[320px] min-w-[240px] overflow-hidden overflow-y-auto rounded-lg border"
       role="listbox"
       aria-label={t("editor.slashMenuAriaLabel")}
     >
@@ -160,10 +163,10 @@ const SlashSuggestionMenu = forwardRef<
                 index === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted",
               )}
             >
-              {Icon && <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              {Icon && <Icon className="text-muted-foreground h-4 w-4 shrink-0" />}
               <div className="flex min-w-0 flex-col">
                 <span className="truncate font-medium">{t(`editor.slash.${item.id}.title`)}</span>
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="text-muted-foreground truncate text-xs">
                   {t(`editor.slash.${item.id}.description`)}
                 </span>
               </div>
@@ -177,7 +180,13 @@ const SlashSuggestionMenu = forwardRef<
 
 SlashSuggestionMenu.displayName = "SlashSuggestionMenu";
 
-export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
   editor,
   suggestionState,
   position,

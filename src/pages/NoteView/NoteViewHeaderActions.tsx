@@ -65,7 +65,7 @@ export function NoteViewHeaderActions({
         </>
       )}
       {!isSignedIn && canView && (
-        <span className="text-sm text-muted-foreground">{t("notes.loginToPost")}</span>
+        <span className="text-muted-foreground text-sm">{t("notes.loginToPost")}</span>
       )}
       {canShowAddPage && (
         <Dialog open={isAddPageOpen} onOpenChange={setIsAddPageOpen}>

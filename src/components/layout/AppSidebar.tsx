@@ -41,12 +41,12 @@ export function AppSidebar() {
       collapsible="offcanvas"
       className="top-[var(--app-header-height)] h-[calc(100svh-var(--app-header-height))]"
     >
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
+      <SidebarHeader className="border-sidebar-border border-b px-4 py-3">
         <Link
           to="/home"
-          className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="focus-visible:ring-ring rounded-md focus:outline-none focus-visible:ring-2"
         >
-          <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-lg font-bold tracking-tight text-transparent">
+          <span className="from-primary to-primary/70 bg-gradient-to-r bg-clip-text text-lg font-bold tracking-tight text-transparent">
             Zedi
           </span>
         </Link>
@@ -76,7 +76,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SignedIn>
-        <SidebarFooter className="border-t border-sidebar-border p-2">
+        <SidebarFooter className="border-sidebar-border border-t p-2">
           <div className="flex items-center gap-2 rounded-md px-2 py-1.5">
             <Avatar className="size-8 shrink-0">
               <AvatarImage
@@ -86,7 +86,7 @@ export function AppSidebar() {
               <AvatarFallback>{(displayName || user?.firstName)?.charAt(0) ?? "U"}</AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1 truncate text-xs">
-              <span className="block font-medium text-sidebar-foreground">
+              <span className="text-sidebar-foreground block font-medium">
                 {displayName || user?.fullName || "—"}
               </span>
             </div>

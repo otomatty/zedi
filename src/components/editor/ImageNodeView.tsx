@@ -32,9 +32,9 @@ function ImageNodeErrorState({
   onCopyUrl: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-      <p className="text-sm font-medium text-destructive">画像の読み込みに失敗しました</p>
-      {src && <p className="mt-1 break-all text-xs text-muted-foreground">{src}</p>}
+    <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
+      <p className="text-destructive text-sm font-medium">画像の読み込みに失敗しました</p>
+      {src && <p className="text-muted-foreground mt-1 text-xs break-all">{src}</p>}
       <div className="mt-3 flex gap-2">
         <Button size="sm" variant="outline" onClick={onReload}>
           <RefreshCcw className="mr-1 h-4 w-4" />
@@ -71,7 +71,7 @@ function ImageNodeToolbar({
   setConfirmOpen: (v: boolean) => void;
 }) {
   return (
-    <div className="absolute right-2 top-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+    <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
       <Badge variant="secondary" className="text-[10px]">
         保存先: {providerLabel}
       </Badge>
@@ -128,12 +128,16 @@ function ImageNodeToolbar({
   );
 }
 
-export const ImageNodeView: React.FC<NodeViewProps> = ({
-  node,
-  selected,
-  extension,
-  deleteNode,
-}) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const ImageNodeView: React.FC<NodeViewProps> = ({ node, selected, extension, deleteNode }) => {
+  /**
+   *
+   */
   const { src, alt, title, storageProviderId } = node.attrs as {
     src?: string;
     alt?: string;
@@ -141,24 +145,57 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
     storageProviderId?: string | null;
   };
 
+  /**
+   *
+   */
   const options = extension.options as StorageImageOptions;
+  /**
+   *
+   */
   const providerLabel = options.getProviderLabel?.(storageProviderId) || "不明";
+  /**
+   *
+   */
   const canDeleteFromStorage = options.canDeleteFromStorage?.(storageProviderId);
 
+  /**
+   *
+   */
   const [hasLoadError, setHasLoadError] = useState(false);
+  /**
+   *
+   */
   const [reloadKey, setReloadKey] = useState(0);
+  /**
+   *
+   */
   const [isDeleting, setIsDeleting] = useState(false);
+  /**
+   *
+   */
   const [confirmOpen, setConfirmOpen] = useState(false);
   /** For /api/media/ URLs: resolved blob URL so img works after reload (auth required) */
   const [authenticatedSrc, setAuthenticatedSrc] = useState<string | null>(null);
+  /**
+   *
+   */
   const blobUrlRef = useRef<string | null>(null);
 
+  /**
+   *
+   */
   const isAuthRequiredUrl =
     src != null && (src.includes("/api/media/") || src.includes("/api/thumbnail/serve/"));
+  /**
+   *
+   */
   const getAuthenticatedImageUrl = options.getAuthenticatedImageUrl;
 
   useEffect(() => {
     if (!isAuthRequiredUrl || !getAuthenticatedImageUrl || !src) return;
+    /**
+     *
+     */
     let cancelled = false;
     getAuthenticatedImageUrl(src).then((blobUrl) => {
       if (cancelled) return;
@@ -178,11 +215,17 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
     };
   }, [src, isAuthRequiredUrl, getAuthenticatedImageUrl, reloadKey]);
 
+  /**
+   *
+   */
   const handleCopyUrl = () => {
     if (!src) return;
     options.onCopyUrl?.(src);
   };
 
+  /**
+   *
+   */
   const handleOpenUrl = () => {
     if (!src) return;
     if (options.onOpenUrl) {
@@ -192,16 +235,25 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
     window.open(src, "_blank", "noopener,noreferrer");
   };
 
+  /**
+   *
+   */
   const handleReload = () => {
     setHasLoadError(false);
     setAuthenticatedSrc(null);
     setReloadKey((prev) => prev + 1);
   };
 
+  /**
+   *
+   */
   const handleDeleteFromNote = () => {
     deleteNode();
   };
 
+  /**
+   *
+   */
   const handleDeleteFromStorage = async () => {
     if (!src || !options.onDeleteFromStorage) return;
     setIsDeleting(true);
@@ -220,13 +272,13 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
     <NodeViewWrapper className="my-4 max-w-full">
       <div
         className={`group relative inline-block max-w-full ${
-          selected ? "rounded-lg ring-2 ring-primary" : ""
+          selected ? "ring-primary rounded-lg ring-2" : ""
         }`}
       >
         {hasLoadError ? (
           <ImageNodeErrorState src={src} onReload={handleReload} onCopyUrl={handleCopyUrl} />
         ) : isAuthRequiredUrl && !authenticatedSrc && getAuthenticatedImageUrl ? (
-          <div className="flex min-h-[120px] items-center justify-center rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+          <div className="bg-muted/50 text-muted-foreground flex min-h-[120px] items-center justify-center rounded-lg border text-sm">
             読み込み中…
           </div>
         ) : (
@@ -235,7 +287,7 @@ export const ImageNodeView: React.FC<NodeViewProps> = ({
             src={isAuthRequiredUrl && authenticatedSrc ? authenticatedSrc : src}
             alt={alt || "image"}
             title={title}
-            className="block h-auto w-auto max-w-full rounded-lg border bg-background"
+            className="bg-background block h-auto w-auto max-w-full rounded-lg border"
             onError={() => setHasLoadError(true)}
           />
         )}

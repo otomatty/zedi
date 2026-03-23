@@ -77,26 +77,65 @@ function handleSearchKeyDown(
   }
 }
 
+/**
+ *
+ */
 export function HeaderSearchBar() {
+  /**
+   *
+   */
   const { query, setQuery, searchResults, hasQuery, handleSelect, handleSearchSubmit } =
     useGlobalSearchContext();
 
+  /**
+   *
+   */
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  /**
+   *
+   */
   const [activeIndex, setActiveIndex] = useState(-1);
+  /**
+   *
+   */
   const inputRef = useRef<HTMLInputElement>(null);
+  /**
+   *
+   */
   const listRef = useRef<HTMLUListElement>(null);
+  /**
+   *
+   */
   const footerRef = useRef<HTMLButtonElement>(null);
 
+  /**
+   *
+   */
   const handleShortcutFocus = useCallback(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
   }, []);
   useGlobalSearchShortcut(handleShortcutFocus);
 
+  /**
+   *
+   */
   const showResults = hasQuery && searchResults.length > 0;
+  /**
+   *
+   */
   const showEmpty = hasQuery && searchResults.length === 0;
+  /**
+   *
+   */
   const hasContent = showResults || showEmpty;
+  /**
+   *
+   */
   const itemCount = showResults ? searchResults.length : 0;
+  /**
+   *
+   */
   const totalItems = hasQuery ? itemCount + 1 : itemCount;
 
   useEffect(() => {
@@ -112,16 +151,25 @@ export function HeaderSearchBar() {
     if (activeIndex === itemCount) {
       footerRef.current?.scrollIntoView({ block: "nearest" });
     } else {
+      /**
+       *
+       */
       const items = listRef.current?.querySelectorAll("[role='option']");
       items?.[activeIndex]?.scrollIntoView({ block: "nearest" });
     }
   }, [activeIndex, itemCount]);
 
+  /**
+   *
+   */
   const closeDropdown = useCallback(() => {
     setDropdownOpen(false);
     setActiveIndex(-1);
   }, []);
 
+  /**
+   *
+   */
   const onSelectItem = useCallback(
     (pageId: string, noteId?: string) => {
       handleSelect(pageId, noteId);
@@ -130,19 +178,25 @@ export function HeaderSearchBar() {
     [handleSelect, closeDropdown],
   );
 
+  /**
+   *
+   */
   const getOptionId = useCallback(
     (index: number) =>
       index === itemCount ? "header-search-footer" : `header-search-option-${index}`,
     [itemCount],
   );
 
+  /**
+   *
+   */
   const activeDescendant = activeIndex >= 0 ? getOptionId(activeIndex) : undefined;
 
   return (
     <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
       <PopoverAnchor asChild>
         <div className="relative flex w-full min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 shrink-0 -translate-y-1/2 text-muted-foreground" />
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 shrink-0 -translate-y-1/2" />
           <Input
             ref={inputRef}
             type="search"
@@ -170,12 +224,12 @@ export function HeaderSearchBar() {
               })
             }
             className={cn(
-              "h-10 w-full rounded-md border-muted-foreground/20 bg-muted/50 pl-10 pr-3 sm:pr-16",
-              "text-sm placeholder:text-muted-foreground",
+              "border-muted-foreground/20 bg-muted/50 h-10 w-full rounded-md pr-3 pl-10 sm:pr-16",
+              "placeholder:text-muted-foreground text-sm",
             )}
           />
           <span
-            className="pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2 items-center rounded border border-border bg-muted/80 px-2 py-1 text-xs text-muted-foreground sm:inline-flex"
+            className="border-border bg-muted/80 text-muted-foreground pointer-events-none absolute top-1/2 right-3.5 hidden -translate-y-1/2 items-center rounded border px-2 py-1 text-xs sm:inline-flex"
             aria-hidden
           >
             {SHORTCUT_HINT}

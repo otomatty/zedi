@@ -92,7 +92,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   return (
     <div
       ref={editorContainerRef}
-      className={cn("relative", className, isDraggingOver && "ring-dashed ring-2 ring-primary")}
+      className={cn("relative", className, isDraggingOver && "ring-dashed ring-primary ring-2")}
       style={{ "--editor-font-size": `${editorFontSizePx}px` } as React.CSSProperties}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

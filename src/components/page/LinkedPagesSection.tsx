@@ -28,9 +28,21 @@ function LinkedPagesSkeleton() {
   );
 }
 
+/**
+ *
+ */
 export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPagesSectionProps) {
+  /**
+   *
+   */
   const { data, isLoading } = useLinkedPages(pageId);
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const createPageMutation = useCreatePage();
 
   if (isLoading || isSyncingLinks) {
@@ -39,23 +51,41 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
 
   if (!data) return null;
 
+  /**
+   *
+   */
   const { outgoingLinks, outgoingLinksWithChildren, backlinks, ghostLinks } = data;
 
   // Combine outgoing links (without children) and backlinks into "リンク" section
+  /**
+   *
+   */
   const allLinks = [...outgoingLinks, ...backlinks];
 
+  /**
+   *
+   */
   const hasAnyLinks =
     allLinks.length > 0 || outgoingLinksWithChildren.length > 0 || ghostLinks.length > 0;
 
   if (!hasAnyLinks) return null;
 
+  /**
+   *
+   */
   const handlePageClick = (id: string) => {
     navigate(`/page/${id}`);
   };
 
+  /**
+   *
+   */
   const handleGhostLinkClick = async (title: string) => {
     // Create a new page with the ghost link title
     try {
+      /**
+       *
+       */
       const newPage = await createPageMutation.mutateAsync({ title });
       navigate(`/page/${newPage.id}`, { flushSync: true });
     } catch (error) {
@@ -91,7 +121,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
       {/* Ghost Links (renamed to 新しいリンク) */}
       {ghostLinks.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
             <FilePlus className="h-4 w-4" />
             <span>新しいリンク ({ghostLinks.length})</span>
           </div>

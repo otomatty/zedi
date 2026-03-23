@@ -49,7 +49,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   const hasSearchContext = searchContext != null;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
       <Container className="flex h-16 items-center gap-4">
         <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
           <ArrowLeft className="h-5 w-5" />
@@ -57,7 +57,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
 
         {/* Center: Search bar */}
         {hasSearchContext ? (
-          <div className="flex min-w-0 max-w-xl flex-1 justify-center">
+          <div className="flex max-w-xl min-w-0 flex-1 justify-center">
             <HeaderSearchBar />
           </div>
         ) : (
@@ -79,7 +79,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
           )}
           <AIChatButton />
           {lastSaved && (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
+            <span className="text-muted-foreground hidden text-xs sm:inline">
               {formatTimeAgo(lastSaved)}に保存
             </span>
           )}

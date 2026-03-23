@@ -34,7 +34,7 @@ export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
     <AppLayout>
       <main className="py-6">
         <Container>
-          <div className="mb-6 flex border-b border-border">
+          <div className="border-border mb-6 flex border-b">
             <Link
               to="/notes"
               onClick={handleMyNotesClick}
@@ -42,7 +42,7 @@ export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
                 "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
                 isMyNotes
                   ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  : "text-muted-foreground hover:text-foreground border-transparent",
               )}
             >
               {t("notes.tabMyNotes")}
@@ -53,7 +53,7 @@ export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
                 "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
                 isDiscover
                   ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  : "text-muted-foreground hover:text-foreground border-transparent",
               )}
             >
               {t("notes.tabDiscover")}

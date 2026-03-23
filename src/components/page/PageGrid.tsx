@@ -36,7 +36,7 @@ const PageGridSkeleton: React.FC<{ columns: 2 | 3 | 4 | 5 | 6 }> = ({ columns })
     {skeletonItems.map((index) => (
       <div
         key={`page-skeleton-${index}`}
-        className="page-card flex aspect-square w-full flex-col overflow-hidden rounded-lg border border-border/50 bg-card"
+        className="page-card border-border/50 bg-card flex aspect-square w-full flex-col overflow-hidden rounded-lg border"
       >
         <div className="p-3 pb-2">
           <div className="flex items-start gap-1.5">
@@ -60,7 +60,7 @@ const MonthFilterEmptyState: React.FC<{ onShowAll: () => void }> = ({ onShowAll 
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center px-4 py-24 text-center">
-      <p className="mb-4 text-muted-foreground">{t("home.monthFilter.empty")}</p>
+      <p className="text-muted-foreground mb-4">{t("home.monthFilter.empty")}</p>
       <Button variant="outline" onClick={onShowAll}>
         {t("home.monthFilter.showAll")}
       </Button>

@@ -1,7 +1,11 @@
 import React, { useMemo } from "react";
-import Joyride, { CallBackProps, STATUS, EVENTS, ACTIONS, Step } from "react-joyride";
+import { ACTIONS, EVENTS, STATUS, Joyride, Step, EventData } from "react-joyride";
 import { useTranslation } from "react-i18next";
 
+/**
+ * Props for the home quick tour (react-joyride v3).
+ * ホームのクイックツアー（react-joyride v3）の props。
+ */
 export interface QuickTourProps {
   run: boolean;
   onComplete: () => void;
@@ -16,6 +20,10 @@ const STEP_TARGETS: (string | undefined)[] = [
   "body",
 ];
 
+/**
+ * Guided tour for first-time home navigation using Joyride v3 (`onEvent` API).
+ * Joyride v3 の `onEvent` を使った初回ホーム案内ツアー。
+ */
 export const QuickTour: React.FC<QuickTourProps> = ({ run, onComplete }) => {
   const { t } = useTranslation();
 
@@ -26,11 +34,11 @@ export const QuickTour: React.FC<QuickTourProps> = ({ run, onComplete }) => {
       title: t(`tour.${key}.title`),
       content: t(`tour.${key}.content`),
       placement: STEP_TARGETS[i] === "body" ? ("center" as const) : ("bottom" as const),
-      disableBeacon: true,
+      skipBeacon: true,
     }));
   }, [t]);
 
-  const handleCallback = (data: CallBackProps) => {
+  const handleEvent = (data: EventData) => {
     const { status, type, action } = data;
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
@@ -61,24 +69,20 @@ export const QuickTour: React.FC<QuickTourProps> = ({ run, onComplete }) => {
       steps={steps}
       run={run}
       continuous
-      showProgress
-      showSkipButton
-      callback={handleCallback}
+      onEvent={handleEvent}
       locale={locale}
       scrollToFirstStep
-      spotlightClicks={false}
-      floaterProps={{
-        disableAnimation: false,
+      options={{
+        showProgress: true,
+        primaryColor: "hsl(var(--primary))",
+        zIndex: 10000,
+        arrowColor: "hsl(var(--card))",
+        backgroundColor: "hsl(var(--card))",
+        overlayColor: "rgba(0, 0, 0, 0.5)",
+        textColor: "hsl(var(--card-foreground))",
+        buttons: ["back", "close", "primary", "skip"],
       }}
       styles={{
-        options: {
-          primaryColor: "hsl(var(--primary))",
-          zIndex: 10000,
-          arrowColor: "hsl(var(--card))",
-          backgroundColor: "hsl(var(--card))",
-          overlayColor: "rgba(0, 0, 0, 0.5)",
-          textColor: "hsl(var(--card-foreground))",
-        },
         tooltip: {
           borderRadius: "var(--radius)",
           padding: 16,

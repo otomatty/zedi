@@ -12,8 +12,17 @@ interface AIChatInputProps {
   onStopStreaming: () => void;
 }
 
+/**
+ *
+ */
 export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps) {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const {
     editorRef,
     dropdownRef,
@@ -36,9 +45,18 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     handleDrop,
   } = useAIChatInput({ onSendMessage });
 
+  /**
+   *
+   */
   const { selectedModel } = useAIChatStore();
+  /**
+   *
+   */
   const estimatedCU = useMemo(() => {
     if (!selectedModel?.inputCostUnits || textLength === 0) return null;
+    /**
+     *
+     */
     const estimatedTokens = Math.ceil(textLength / 4);
     return Math.max(1, Math.round((estimatedTokens / 1000) * selectedModel.inputCostUnits));
   }, [textLength, selectedModel]);
@@ -48,14 +66,14 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       {showMentionDropdown && (
         <div
           ref={dropdownRef}
-          className="absolute bottom-full left-0 right-0 z-50 mb-1 max-h-[240px] overflow-hidden overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
+          className="border-border bg-popover absolute right-0 bottom-full left-0 z-50 mb-1 max-h-[240px] overflow-hidden overflow-y-auto rounded-lg border shadow-lg"
         >
           {mentionCandidates.map((page, idx) => (
             <button
               key={page.id}
               type="button"
               className={cn(
-                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent",
+                "hover:bg-accent flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
                 idx === mentionIndex && "bg-accent",
               )}
               onMouseDown={(e) => {
@@ -64,7 +82,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
               }}
               onMouseEnter={() => setMentionIndex(idx)}
             >
-              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
               <span className="truncate">{page.title || "無題のページ"}</span>
             </button>
           ))}
@@ -74,8 +92,8 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       <form
         onSubmit={handleSubmit}
         className={cn(
-          "relative rounded-lg border bg-background p-2 transition-all focus-within:ring-1 focus-within:ring-primary",
-          isDraggingOver && "border-primary bg-primary/5 ring-2 ring-primary",
+          "bg-background focus-within:ring-primary relative rounded-lg border p-2 transition-all focus-within:ring-1",
+          isDraggingOver && "border-primary bg-primary/5 ring-primary ring-2",
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -92,20 +110,20 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
             onInput={handleEditorInput}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            className="max-h-[120px] min-h-[24px] overflow-y-auto whitespace-pre-wrap bg-transparent p-1 text-sm outline-none [word-break:break-word]"
+            className="max-h-[120px] min-h-[24px] overflow-y-auto bg-transparent p-1 text-sm [word-break:break-word] whitespace-pre-wrap outline-none"
           />
           {isEmpty && (
-            <div className="pointer-events-none absolute inset-0 truncate p-1 text-sm text-muted-foreground">
+            <div className="text-muted-foreground pointer-events-none absolute inset-0 truncate p-1 text-sm">
               {placeholder}
             </div>
           )}
         </div>
 
-        <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-1">
+        <div className="border-border/50 mt-1 flex items-center justify-between border-t pt-1">
           <div className="flex items-center gap-2">
             <AIChatModelSelector />
             {estimatedCU !== null && (
-              <span className="text-[10px] tabular-nums text-muted-foreground">
+              <span className="text-muted-foreground text-[10px] tabular-nums">
                 {t("aiChat.modelSelector.estimatedCost", { cost: estimatedCU })}
               </span>
             )}
@@ -114,7 +132,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
             <button
               type="button"
               onClick={onStopStreaming}
-              className="shrink-0 rounded-md bg-destructive p-1.5 text-destructive-foreground transition-colors hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 shrink-0 rounded-md p-1.5 transition-colors"
               title={t("aiChat.actions.stop")}
             >
               <Square className="h-4 w-4 fill-current" />
@@ -123,7 +141,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
             <button
               type="submit"
               disabled={isEmpty}
-              className="shrink-0 rounded-md bg-primary p-1.5 text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-md p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               title={t("aiChat.actions.send")}
             >
               <Send className="h-4 w-4" />
@@ -133,8 +151,8 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
       </form>
 
       {isDraggingOver && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-primary/5">
-          <span className="text-xs font-medium text-primary">
+        <div className="bg-primary/5 pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg">
+          <span className="text-primary text-xs font-medium">
             {t("aiChat.referencedPages.dropHint")}
           </span>
         </div>
