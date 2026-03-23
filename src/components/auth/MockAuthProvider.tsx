@@ -6,7 +6,8 @@
  */
 import { createContext, useContext, ReactNode } from "react";
 
-const MOCK_USER_ID = "e2e_test_user_123";
+/** Same ID as local-first guest storage so E2E creates pages offline (no API). / API 不要で IndexedDB のみ作成するため local-user と一致させる。 */
+const MOCK_USER_ID = "local-user";
 const MOCK_USER_EMAIL = "e2e-test@example.com";
 
 interface MockAuthContextValue {
@@ -27,7 +28,13 @@ interface MockAuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ *
+ */
 export function MockAuthProvider({ children }: MockAuthProviderProps) {
+  /**
+   *
+   */
   const mockAuthValue: MockAuthContextValue = {
     isLoaded: true,
     isSignedIn: true,
@@ -43,7 +50,13 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
   return <MockAuthContext.Provider value={mockAuthValue}>{children}</MockAuthContext.Provider>;
 }
 
+/**
+ *
+ */
 export function useMockAuth(): MockAuthContextValue {
+  /**
+   *
+   */
   const context = useContext(MockAuthContext);
   if (!context) {
     throw new Error("useMockAuth must be used within a MockAuthProvider");
@@ -51,10 +64,16 @@ export function useMockAuth(): MockAuthContextValue {
   return context;
 }
 
+/**
+ *
+ */
 export function MockSignedIn({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ *
+ */
 export function MockSignedOut({ children }: { children: ReactNode }) {
   void children;
   return null;

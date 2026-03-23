@@ -6,6 +6,14 @@
  */
 import { test as base, expect, Page } from "@playwright/test";
 
+/** Default onboarding so signed-in E2E users stay on /home (not redirected to /onboarding). */
+const E2E_DEFAULT_ONBOARDING = {
+  hasCompletedSetupWizard: true,
+  hasCompletedTour: false,
+  completedSteps: [] as string[],
+  dismissedHints: [] as string[],
+};
+
 /**
  * Helper functions for E2E tests.
  */
@@ -20,15 +28,17 @@ const helpers = {
 
   /**
    * Create a new page and return its ID.
+   * Uses the home FAB (「新規作成」): `/page/new` is no longer a creation entry (editor redirects to /home).
    */
   async createNewPage(page: Page): Promise<string> {
-    // Navigate to new page
-    await page.goto("/page/new");
+    await page.goto("/home");
+    await page.waitForLoadState("networkidle");
 
-    // Wait for redirect to actual page with UUID
+    await page.locator('[data-tour-id="tour-fab"]').click();
+    await page.getByRole("button", { name: "新規作成" }).click();
+
     await page.waitForURL(/\/page\/(?!new).+/, { timeout: 15000 });
 
-    // Extract page ID from URL
     const url = page.url();
     const match = url.match(/\/page\/([^/]+)/);
     if (!match) {
@@ -65,8 +75,16 @@ const helpers = {
 
 /**
  * Custom test fixture with helpers.
+ * Seeds onboarding so Home renders (FAB, grid) for mock signed-in users.
  */
 export const test = base.extend<{ helpers: typeof helpers }>({
+  page: async ({ page }, use) => {
+    await page.addInitScript((onboarding: typeof E2E_DEFAULT_ONBOARDING) => {
+      localStorage.setItem("zedi-onboarding", JSON.stringify(onboarding));
+    }, E2E_DEFAULT_ONBOARDING);
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- Playwright fixture continuation (not React)
+    await use(page);
+  },
   // eslint-disable-next-line no-empty-pattern
   helpers: async ({}, use) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
