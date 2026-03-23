@@ -13,6 +13,11 @@ updates:
         update-types: [minor, patch]
     open-pull-requests-limit: 10
     labels: [dependencies]
+    # ESLint 10: wait until typescript-eslint and plugins support it (closed PR #407).
+    # ESLint 10: typescript-eslint / 各プラグイン対応まで保留（PR #407 参照）。
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   # API server
   - package-ecosystem: npm
