@@ -2,7 +2,20 @@
 export interface Conversation {
   id: string; // UUID
   title: string; // 自動生成タイトル
-  messages: ChatMessage[];
+  /**
+   * Legacy flat transcript (pre–message-tree). Migrated to {@link messageMap} on load.
+   * 旧形式のフラット履歴（メッセージツリー導入前）。読み込み時に {@link messageMap} へ移行する。
+   */
+  messages?: ChatMessage[];
+  /**
+   * Messages indexed by id (tree). Preferred over {@link messages}.
+   * id をキーにしたメッセージマップ（ツリー）。{@link messages} より優先。
+   */
+  messageMap?: MessageMap;
+  /** First message id in the tree, or null when empty. / ツリー先頭メッセージ ID、空なら null */
+  rootMessageId?: string | null;
+  /** Current visible leaf id for the active branch. / 表示中ブランチの末端メッセージ ID */
+  activeLeafId?: string | null;
   pageContext?: PageContextSnapshot; // 会話開始時のコンテキストスナップショット
   createdAt: number;
   updatedAt: number;
@@ -20,6 +33,30 @@ export interface ChatMessage {
   timestamp: number;
   isStreaming?: boolean;
   error?: string;
+}
+
+/**
+ * Chat message node in a branched transcript (parent pointer).
+ * 分岐可能な会話ログ上のメッセージノード（親ポインタ付き）。
+ */
+export interface TreeChatMessage extends ChatMessage {
+  parentId: string | null;
+}
+
+/**
+ * All messages in a conversation keyed by id.
+ * 会話内の全メッセージを id で引けるマップ。
+ */
+export type MessageMap = Record<string, TreeChatMessage>;
+
+/**
+ * Branched transcript state for one conversation (client-side).
+ * 1 会話の分岐付きログ状態（クライアント側）。
+ */
+export interface ChatTreeState {
+  messageMap: MessageMap;
+  rootMessageId: string | null;
+  activeLeafId: string | null;
 }
 
 /** AI がプロアクティブに提案するアクション */
@@ -88,6 +125,15 @@ export interface SuggestWikiLinksAction {
 export interface ReferencedPage {
   id: string;
   title: string;
+}
+
+/**
+ * React Router `location.state` when opening `/ai/:id` from the landing page with a first message.
+ * ランディングから最初のメッセージ付きで `/ai/:id` を開くときの `location.state`。
+ */
+export interface AIChatDetailLocationState {
+  initialMessage?: string;
+  initialReferencedPages?: ReferencedPage[];
 }
 
 /** AIチャットのページD&Dに使うMIMEタイプ */

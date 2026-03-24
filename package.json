@@ -79,6 +79,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@dagrejs/dagre": "^3.0.0",
     "@google/genai": "^1.34.0",
     "@google/generative-ai": "^0.24.1",
     "@hocuspocus/provider": "^3.4.4",
@@ -139,6 +140,7 @@
     "@tiptap/react": "^3.20.0",
     "@tiptap/starter-kit": "^3.20.0",
     "@tiptap/y-tiptap": "^3.0.2",
+    "@xyflow/react": "^12.10.1",
     "@zedi/ui": "workspace:*",
     "baseline-browser-mapping": "^2.9.19",
     "better-auth": "^1.2.0",
@@ -200,6 +202,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
+    "@types/dagre": "^0.7.54",
     "@types/node": "^25.3.5",
     "@types/pg": "^8.18.0",
     "@types/react": "^19.2.14",

@@ -124,6 +124,20 @@ export default tseslint.config(
       "react/no-multi-comp": "warn",
     },
   },
+  // ユーザーメニュー: ドロップダウン／シート／トリガー／コンテンツを 1 ファイルに配置（分割より可読性を優先）
+  {
+    files: ["src/components/layout/Header/UnifiedMenu.tsx"],
+    rules: {
+      "react/no-multi-comp": "off",
+    },
+  },
+  // Vitest: multiple mocked child components per file is normal
+  {
+    files: ["src/components/**/*.test.tsx"],
+    rules: {
+      "react/no-multi-comp": "off",
+    },
+  },
   // スクリプト・e2e・サーバー: console 可、行数制限は緩め
   {
     files: ["scripts/**/*.ts", "e2e/**/*.ts", "server/**/*.ts", "terraform/**/*.ts"],

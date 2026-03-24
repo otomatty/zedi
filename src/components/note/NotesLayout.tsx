@@ -32,7 +32,7 @@ export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
 
   return (
     <AppLayout>
-      <main className="py-6">
+      <main className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <div className="border-border mb-6 flex border-b">
             <Link

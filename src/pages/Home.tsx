@@ -62,33 +62,35 @@ const Home: React.FC = () => {
 
   return (
     <AppLayout>
-      <QuickTour run={isTourRunning} onComplete={completeTour} />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <QuickTour run={isTourRunning} onComplete={completeTour} />
 
-      <ContentWithAIChat
-        floatingAction={
-          <>
-            <div className="mr-4 mb-4">
-              {validClipUrl ? (
-                <FloatingActionButton
-                  initialClipUrl={validClipUrl}
-                  onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
-                />
-              ) : (
-                <FloatingActionButton />
-              )}
-            </div>
-            <HomePageCount />
-          </>
-        }
-      >
-        <main className="py-6">
-          <Container>
-            <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
-              <PageGrid isSeeding={isSeeding} />
-            </div>
-          </Container>
-        </main>
-      </ContentWithAIChat>
+        <ContentWithAIChat
+          floatingAction={
+            <>
+              <div className="mr-4 mb-4">
+                {validClipUrl ? (
+                  <FloatingActionButton
+                    initialClipUrl={validClipUrl}
+                    onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
+                  />
+                ) : (
+                  <FloatingActionButton />
+                )}
+              </div>
+              <HomePageCount />
+            </>
+          }
+        >
+          <main className="min-h-0 flex-1 overflow-y-auto py-6">
+            <Container>
+              <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
+                <PageGrid isSeeding={isSeeding} />
+              </div>
+            </Container>
+          </main>
+        </ContentWithAIChat>
+      </div>
     </AppLayout>
   );
 };

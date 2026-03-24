@@ -1,12 +1,34 @@
 /**
- * Header: sidebar trigger (accessible name), sticky/backdrop, search & AI actions, right menu.
- * ヘッダー: サイドバートリガー（アクセシブルラベル）、sticky/backdrop、検索・AI ボタン・右メニュー。
+ * Header: sidebar trigger on desktop only, sticky/backdrop, search & AI actions, right menu.
+ * ヘッダー: デスクトップのみサイドバートリガー、sticky/backdrop、検索・AI・右メニュー。
  */
 import React from "react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Header from "./index";
 import { useAuth } from "@/hooks/useAuth";
+
+const { mockUseIsMobile, signedInAuth, signedOutAuth } = vi.hoisted(() => {
+  /** Matches `useAuth` return shape (Better Auth) for typed mocks. */
+  const signedInAuth = {
+    isLoaded: true,
+    isSignedIn: true,
+    userId: "test-user-id",
+    sessionId: "test-session-id",
+    orgId: null,
+    orgRole: null,
+    orgSlug: null,
+    getToken: async () => null as string | null,
+    signOut: async () => {},
+  };
+  const signedOutAuth = {
+    ...signedInAuth,
+    isSignedIn: false,
+    userId: null,
+    sessionId: null,
+  };
+  return { mockUseIsMobile: vi.fn(() => false), signedInAuth, signedOutAuth };
+});
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -16,7 +38,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: vi.fn(() => ({ isSignedIn: true })),
+  useAuth: vi.fn(() => ({ ...signedInAuth })),
 }));
 
 vi.mock("@/contexts/GlobalSearchContext", () => ({
@@ -35,6 +57,7 @@ vi.mock("@zedi/ui", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@zedi/ui")>();
   return {
     ...actual,
+    useIsMobile: () => mockUseIsMobile(),
     SidebarTrigger: ({ "aria-label": ariaLabel }: { "aria-label"?: string }) => (
       <button type="button" aria-label={ariaLabel} data-testid="sidebar-trigger">
         Menu
@@ -60,10 +83,21 @@ vi.mock("./AIChatButton", () => ({
 }));
 
 describe("Header", () => {
+  beforeEach(() => {
+    mockUseIsMobile.mockReturnValue(false);
+    vi.mocked(useAuth).mockReturnValue({ ...signedInAuth });
+  });
+
   it("renders sidebar trigger with accessible label (nav.menu)", () => {
     render(<Header />);
     const trigger = screen.getByTestId("sidebar-trigger");
     expect(trigger).toHaveAttribute("aria-label", "Menu");
+  });
+
+  it("does not render sidebar trigger when useIsMobile is true", () => {
+    mockUseIsMobile.mockReturnValue(true);
+    render(<Header />);
+    expect(screen.queryByTestId("sidebar-trigger")).not.toBeInTheDocument();
   });
 
   it("has sticky and backdrop-blur layout classes", () => {
@@ -89,9 +123,8 @@ describe("Header", () => {
   });
 
   it("shows guest sync prompt when not signed in", () => {
-    vi.mocked(useAuth).mockReturnValue({ isSignedIn: false });
+    vi.mocked(useAuth).mockReturnValue({ ...signedOutAuth });
     render(<Header />);
     expect(screen.getByText("common.guestSyncPrompt")).toBeInTheDocument();
-    vi.mocked(useAuth).mockReturnValue({ isSignedIn: true });
   });
 });

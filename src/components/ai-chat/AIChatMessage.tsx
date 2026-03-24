@@ -9,52 +9,56 @@ import { replaceWikiLinksInMarkdown } from "./aiChatMarkdownHelpers";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { SiblingNavigator } from "./SiblingNavigator";
+import { AIChatMessageSkeleton } from "./AIChatMessageSkeleton";
 
 interface AIChatMessageProps {
   message: ChatMessage;
   onExecuteAction?: (action: ChatAction) => void;
   onEditMessage?: (messageId: string, newContent: string) => void;
+  /** Sibling index when this message has alternates. / 代替があるときの兄弟インデックス */
+  siblingIndex?: number;
+  siblingTotal?: number;
+  onSwitchBranch?: (direction: "prev" | "next") => void;
   isStreaming?: boolean;
 }
 
 /**
- *
+ * Renders one chat bubble with optional branch navigation.
+ * 1 件のチャットバブルと、任意でブランチ操作を表示する。
  */
+// eslint-disable-next-line complexity -- user vs assistant rendering forks
 export function AIChatMessage({
   message,
   onExecuteAction,
   onEditMessage,
+  siblingIndex,
+  siblingTotal,
+  onSwitchBranch,
   isStreaming = false,
 }: AIChatMessageProps) {
-  /**
-   *
-   */
   const isUser = message.role === "user";
-  /**
-   *
-   */
   const displayContent = isUser ? message.content : getDisplayContent(message.content);
-  /**
-   *
-   */
   const showUserEdit = isUser && onEditMessage;
 
   return (
     <div className={`mb-4 flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
       <div
-        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
           isUser ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
         }`}
       >
         {isUser ? <User className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
       </div>
 
-      <div className={`flex max-w-[85%] flex-col ${isUser ? "items-end" : "items-start"}`}>
+      <div
+        className={`flex max-w-[85%] flex-col ${isUser ? "items-end" : "min-w-0 flex-1 items-start"}`}
+      >
         <div
           className={`rounded-2xl px-4 py-2 text-sm ${
             isUser
               ? "bg-primary text-primary-foreground rounded-tr-sm"
-              : "bg-muted text-foreground rounded-tl-sm"
+              : "bg-muted text-foreground w-full min-w-0 rounded-tl-sm"
           }`}
         >
           {isUser && showUserEdit ? (
@@ -67,6 +71,8 @@ export function AIChatMessage({
             />
           ) : isUser ? (
             renderUserContent(displayContent, message.referencedPages)
+          ) : message.isStreaming && displayContent === "" ? (
+            <AIChatMessageSkeleton />
           ) : (
             <div className="ai-chat-markdown">
               <ReactMarkdown
@@ -112,6 +118,15 @@ export function AIChatMessage({
           <span className="text-muted-foreground mt-0.5 px-1 text-[10px]">
             {message.modelDisplayName}
           </span>
+        )}
+
+        {siblingTotal != null && siblingIndex != null && onSwitchBranch && (
+          <SiblingNavigator
+            currentIndex={siblingIndex}
+            total={siblingTotal}
+            onSwitch={onSwitchBranch}
+            className="mt-1"
+          />
         )}
 
         {message.error && <div className="text-destructive mt-1 text-xs">{message.error}</div>}

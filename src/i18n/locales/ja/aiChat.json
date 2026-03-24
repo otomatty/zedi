@@ -1,7 +1,12 @@
 {
   "title": "AI",
+  "branch": {
+    "prev": "前のブランチ",
+    "next": "次のブランチ"
+  },
   "actions": {
     "close": "閉じる",
+    "openInPage": "フルページで開く",
     "newConversation": "新規会話",
     "conversationList": "会話一覧",
     "cancel": "キャンセル",
@@ -56,6 +61,23 @@
     "noNewWikiLinks": "追加できる新しいWikiLinkはありません",
     "actionFailed": "アクションの実行に失敗しました"
   },
+  "messages": {
+    "loadingSkeleton": "応答を読み込み中"
+  },
+  "viewTabs": {
+    "chat": "チャット",
+    "branch": "ブランチ",
+    "noBranches": "この会話にはブランチがありません"
+  },
+  "branchTree": {
+    "goToBranch": "このブランチに移動",
+    "branchFromHere": "ここから分岐",
+    "deleteBranch": "このブランチを削除",
+    "deleteConfirmTitle": "このブランチを削除しますか？",
+    "deleteConfirmDescription": "このメッセージとそれ以下の返信がすべて削除されます。元に戻せません。",
+    "deleteCancel": "キャンセル",
+    "deleteConfirm": "削除"
+  },
   "empty": {
     "messages": "メッセージ一覧がここに表示されます",
     "pageConversations": "このページの会話履歴はまだありません"
@@ -66,6 +88,22 @@
     "costLabel": "{{multiplier}}x",
     "cheapest": "1x",
     "estimatedCost": "~{{cost}} CU"
+  },
+  "landing": {
+    "placeholder": "何でも聞いてください...",
+    "recentChats": "最近のチャット",
+    "noRecentChats": "会話履歴はありません",
+    "viewAll": "すべての履歴を見る"
+  },
+  "history": {
+    "pageTitle": "AIチャット履歴",
+    "pageDescription": "一覧から会話をフルページで開くか、右のメニューから削除できます。",
+    "seeAll": "すべて表示",
+    "delete": "削除",
+    "deleteConfirmTitle": "この会話を削除しますか？",
+    "deleteConfirmDescription": "この操作は取り消せません。",
+    "openMenu": "メニューを開く",
+    "empty": "会話履歴はありません"
   },
   "referencedPages": {
     "added": "「{{title}}」を参照に追加しました",

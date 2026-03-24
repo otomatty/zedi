@@ -6,6 +6,7 @@
 /* highlight.js GitHub dark theme for code block syntax highlighting (default) */
 @import "highlight.js/styles/github-dark.css";
 
+@import "@xyflow/react/dist/style.css";
 @import "tailwindcss";
 @config "../tailwind.config.ts";
 
@@ -571,6 +572,19 @@
 
   .shadow-glow {
     box-shadow: var(--shadow-glow);
+  }
+
+  /**
+   * Hide scrollbar while keeping overflow scroll (Firefox / WebKit / legacy Edge).
+   * スクロールは維持しつつスクロールバーを非表示。
+   */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 
   /* Smooth fade-in animation */
