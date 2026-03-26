@@ -232,7 +232,7 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5.8.3",
+    "typescript": "^6.0.2",
     "typescript-eslint": "^8.38.0",
     "vite": "^8.0.0",
     "vitest": "^4.0.16",
