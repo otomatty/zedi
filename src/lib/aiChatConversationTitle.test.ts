@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { generateConversationTitleFromTree } from "./aiChatConversationTitle";
 
 describe("generateConversationTitleFromTree", () => {
-  it("returns default when no user message on path", () => {
+  it("returns empty string when no user message on path (caller localizes)", () => {
     const map = {
       a: {
         id: "a",
@@ -12,7 +12,7 @@ describe("generateConversationTitleFromTree", () => {
         parentId: null as string | null,
       },
     };
-    expect(generateConversationTitleFromTree(map, "a")).toBe("新しい会話");
+    expect(generateConversationTitleFromTree(map, "a")).toBe("");
   });
 
   it("uses first user message and truncates with ellipsis", () => {

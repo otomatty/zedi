@@ -160,6 +160,45 @@ describe("useAIChatDetailLifecycle", () => {
     });
   });
 
+  it("loads conversation when initial executed flag is set but messages are empty (remount recovery)", () => {
+    const convId = "c-exec-remount";
+    const conv: Conversation = {
+      id: convId,
+      title: "t",
+      messageMap: {
+        m1: {
+          id: "m1",
+          role: "user",
+          content: "hi",
+          timestamp: 1,
+          parentId: null,
+        },
+      },
+      rootMessageId: "m1",
+      activeLeafId: "m1",
+      createdAt: 0,
+      updatedAt: 0,
+    };
+
+    try {
+      sessionStorage.setItem(aiChatInitialExecutedStorageKey(convId), "1");
+    } catch {
+      // ignore
+    }
+
+    renderLifecycle(mocks, {
+      conversationId: convId,
+      conversation: conv,
+      location: makeLocation({ pathname: `/ai/${convId}`, state: {} }),
+      messages: [],
+      messageMap: {},
+      rootMessageId: null,
+      activeLeafId: null,
+    });
+
+    expect(mocks.loadConversation).toHaveBeenCalledWith(conv);
+  });
+
   it("sends initial message only once under StrictMode (double mount guard)", async () => {
     const convId = "strict-conv";
     const conv: Conversation = {

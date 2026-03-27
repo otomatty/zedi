@@ -29,11 +29,11 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
     <header
       className={cn(
         "border-border sticky top-0 z-50 border-b",
-        "bg-background/95 supports-backdrop-filter:bg-background/60 backdrop-blur",
+        "bg-background/95 supports-[backdrop-filter]:bg-background/60 backdrop-blur",
         className,
       )}
     >
-      <Container className="flex h-18 items-center justify-between gap-4">
+      <Container className="flex h-[4.5rem] items-center justify-between gap-4">
         {/* Left: Sidebar trigger (desktop only; mobile uses user-menu sheet for nav), Logo & Month Navigation */}
         {/* 左: サイドバートリガー（デスクトップのみ。モバイルはユーザーメニューシートでナビ）・ロゴ・月ナビ */}
         <div className="flex min-w-0 shrink-0 items-center gap-2 md:gap-4">

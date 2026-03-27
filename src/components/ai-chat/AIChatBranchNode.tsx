@@ -23,7 +23,7 @@ export function AIChatBranchNode({ data }: NodeProps<BranchNode>) {
 
   const bubble = (
     <>
-      <Handle type="target" position={Position.Top} className="bg-muted! h-2! w-2! border-2!" />
+      <Handle type="target" position={Position.Top} className="!bg-muted !h-2 !w-2 border-2" />
       <div
         className={cn(
           "flex max-w-[200px] min-w-[160px] items-center gap-2 rounded-lg px-3 py-2 text-xs shadow-md",
@@ -43,11 +43,11 @@ export function AIChatBranchNode({ data }: NodeProps<BranchNode>) {
         >
           {isUser ? <User className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
         </div>
-        <span className="line-clamp-2 flex-1 truncate" title={data.contentPreview}>
+        <span className="line-clamp-2 flex-1 break-words" title={data.contentPreview}>
           {data.contentPreview || (isUser ? "User" : "Assistant")}
         </span>
       </div>
-      <Handle type="source" position={Position.Bottom} className="bg-muted! h-2! w-2! border-2!" />
+      <Handle type="source" position={Position.Bottom} className="!bg-muted !h-2 !w-2 border-2" />
     </>
   );
 

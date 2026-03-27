@@ -96,7 +96,6 @@ export function useAIChatDetailLifecycle({
       return;
     }
     if (executedFlag === "1") {
-      prevLoadedConversationIdRef.current = conversationId;
       try {
         if (typeof sessionStorage !== "undefined") {
           sessionStorage.removeItem(aiChatInitialExecutedStorageKey(conversationId));
@@ -104,7 +103,8 @@ export function useAIChatDetailLifecycle({
       } catch {
         // ignore
       }
-      return;
+      // Fall through: do not set prevLoaded here — StrictMode remount must still load the tree.
+      // フォールスルー: prevLoaded をここで立てない（StrictMode 再マウントでもツリーを読み込めるようにする）。
     }
     if (!switchedConversation) {
       return;
