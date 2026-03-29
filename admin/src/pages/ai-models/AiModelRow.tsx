@@ -26,6 +26,10 @@ interface AiModelRowProps {
   onDragEnd: () => void;
 }
 
+/**
+ * AI モデル管理テーブルの 1 行（表示名・ティア・アクティブ・ドラッグ並べ替え）。
+ * One editable row in the AI model management table.
+ */
 export function AiModelRow({
   model: m,
   draggedId,
@@ -52,11 +56,11 @@ export function AiModelRow({
         draggedId === m.id ? "opacity-50" : ""
       } ${dragOverId === m.id ? "bg-muted/50" : ""}`}
     >
-      <TableCell className="cursor-grab px-1 py-2 text-muted-foreground active:cursor-grabbing">
+      <TableCell className="text-muted-foreground cursor-grab px-1 py-2 active:cursor-grabbing">
         ⋮⋮
       </TableCell>
       <TableCell className="px-3 py-2">{m.provider}</TableCell>
-      <TableCell className="px-3 py-2 font-mono text-muted-foreground">{m.modelId}</TableCell>
+      <TableCell className="text-muted-foreground px-3 py-2 font-mono">{m.modelId}</TableCell>
       <TableCell className="px-3 py-2">
         <Input
           type="text"
@@ -93,7 +97,7 @@ export function AiModelRow({
           {m.isActive ? "ON" : "OFF"}
         </Button>
       </TableCell>
-      <TableCell className="px-3 py-2 text-muted-foreground">{m.sortOrder}</TableCell>
+      <TableCell className="text-muted-foreground px-3 py-2">{m.sortOrder}</TableCell>
     </TableRow>
   );
 }

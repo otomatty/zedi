@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { SearchResultCard } from "@/components/search/SearchResultCard";
 import type { SearchResultCardItem } from "@/components/search/SearchResultCard";
@@ -23,6 +23,11 @@ interface SearchResultItem extends SearchResultCardItem {
   score: number;
 }
 
+/**
+ * Renders global search results for the `q` query string (personal pages and shared notes).
+ *
+ * クエリ `q` に対するグローバル検索結果（個人ページと共有ノート）を表示する。
+ */
 export default function SearchResults() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -85,6 +90,11 @@ export default function SearchResults() {
     return [...personal, ...shared].sort((a, b) => b.score - a.score);
   }, [personalResults, sharedResults, searchQuery, keywords]);
 
+  /**
+   * Navigates to the note page or standalone page for the clicked result.
+   *
+   * クリックされた結果に応じてノート配下または単体ページへ遷移する。
+   */
   const handleResultClick = (item: SearchResultItem) => {
     if (item.noteId) {
       navigate(`/note/${item.noteId}/page/${item.pageId}`);
@@ -93,26 +103,30 @@ export default function SearchResults() {
     }
   };
 
+  /**
+   * Stable React `key` for list items (shared vs personal).
+   *
+   * リスト項目用の安定した React `key`（共有／個人の区別）。
+   */
   const resultKey = (item: SearchResultItem) =>
     item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="py-6">
+    <AppLayout>
+      <main className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <div className="mb-6">
             {searchQuery ? (
               <h1 className="text-lg font-medium">
                 「{searchQuery}」の検索結果
                 {!isLoading && (
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  <span className="text-muted-foreground ml-2 text-sm font-normal">
                     {results.length}件
                   </span>
                 )}
               </h1>
             ) : (
-              <h1 className="text-lg font-medium text-muted-foreground">
+              <h1 className="text-muted-foreground text-lg font-medium">
                 検索キーワードを入力してください
               </h1>
             )}
@@ -148,6 +162,6 @@ export default function SearchResults() {
           )}
         </Container>
       </main>
-    </div>
+    </AppLayout>
   );
 }

@@ -42,5 +42,5 @@ cd admin && npm install && npm run build
 
 ## 仕様
 
-- [管理者基盤・サブドメイン仕様](../docs/specs/admin-base-spec.md)
+- 挙動・契約は **ソースの TSDoc** とテストを正とする（[`SPECIFICATION_POLICY.md`](../SPECIFICATION_POLICY.md)）。
 - [Issue #141 — AIモデル管理](https://github.com/otomatty/zedi/issues/141)

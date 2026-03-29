@@ -34,8 +34,8 @@ assignees: ""
 
 <!-- 小 / 中 / 大 -->
 
-## 参照ドキュメント
+## 参照（リポジトリ内）
 
-- [リアーキテクチャ仕様書](docs/specs/zedi-rearchitecture-spec.md)
-- [データ構造仕様書](docs/specs/zedi-data-structure-spec.md)
-- [タスク細分化](docs/plans/20260209/rearchitecture-task-breakdown.md)
+- [SPECIFICATION_POLICY.md](../../SPECIFICATION_POLICY.md) — 仕様はソースの TSDoc に置く方針
+- [AGENTS.md](../../AGENTS.md) — 開発ガイドライン
+- 過去の長文仕様書は git history にのみ存在する場合がある

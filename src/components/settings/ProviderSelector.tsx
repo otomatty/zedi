@@ -9,7 +9,13 @@ interface ProviderSelectorProps {
   disabled?: boolean;
 }
 
-export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   value,
   onChange,
   disabled = false,
@@ -24,6 +30,9 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         disabled={disabled}
       >
         {AI_PROVIDERS.map((provider) => {
+          /**
+           *
+           */
           const isSelected = value === provider.id;
 
           return (
@@ -47,7 +56,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   {provider.name}
                 </Label>
                 {provider.description && (
-                  <p className="mt-1 text-xs text-muted-foreground">{provider.description}</p>
+                  <p className="text-muted-foreground mt-1 text-xs">{provider.description}</p>
                 )}
               </div>
             </div>

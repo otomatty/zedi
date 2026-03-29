@@ -5,6 +5,9 @@ import type { ReferencedPage } from "../../types/aiChat";
 
 const LONG_PRESS_MS = 500;
 
+/**
+ *
+ */
 export interface UserMessageBubbleProps {
   content: string;
   referencedPages?: ReferencedPage[];
@@ -16,7 +19,7 @@ export interface UserMessageBubbleProps {
 /** Render user message content with inline @PageTitle styled as badges */
 export function renderUserContent(content: string, referencedPages?: ReferencedPage[]) {
   if (!referencedPages || referencedPages.length === 0) {
-    return <div className="whitespace-pre-wrap break-words">{content}</div>;
+    return <div className="break-words whitespace-pre-wrap">{content}</div>;
   }
 
   const sortedPages = [...referencedPages].sort((a, b) => b.title.length - a.title.length);
@@ -27,14 +30,14 @@ export function renderUserContent(content: string, referencedPages?: ReferencedP
   const parts = content.split(pattern);
 
   return (
-    <div className="whitespace-pre-wrap break-words">
+    <div className="break-words whitespace-pre-wrap">
       {parts.map((part, i) => {
         const matchedRef = titleToPage.get(part);
         if (matchedRef) {
           return (
             <span
               key={i}
-              className="mx-0.5 inline-flex items-center gap-0.5 rounded bg-primary-foreground/20 px-1.5 py-0 align-baseline text-xs font-medium text-primary-foreground/90"
+              className="bg-primary-foreground/20 text-primary-foreground/90 mx-0.5 inline-flex items-center gap-0.5 rounded px-1.5 py-0 align-baseline text-xs font-medium"
             >
               <FileText className="h-3 w-3 shrink-0" />
               {matchedRef.title}
@@ -47,6 +50,9 @@ export function renderUserContent(content: string, referencedPages?: ReferencedP
   );
 }
 
+/**
+ *
+ */
 export function UserMessageBubble({
   content,
   referencedPages,
@@ -54,27 +60,60 @@ export function UserMessageBubble({
   onEditMessage,
   isStreaming,
 }: UserMessageBubbleProps) {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const [isEditing, setIsEditing] = useState(false);
+  /**
+   *
+   */
   const [editValue, setEditValue] = useState(content);
+  /**
+   *
+   */
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   *
+   */
   const longPressTriggeredRef = useRef(false);
+  /**
+   *
+   */
   const lastPointerTypeRef = useRef<string>("");
 
+  /**
+   *
+   */
   const canEdit = !isStreaming;
 
+  /**
+   *
+   */
   const startEdit = useCallback(() => {
     if (!canEdit) return;
     setEditValue(content);
     setIsEditing(true);
   }, [canEdit, content]);
 
+  /**
+   *
+   */
   const cancelEdit = useCallback(() => {
     setIsEditing(false);
     setEditValue(content);
   }, [content]);
 
+  /**
+   *
+   */
   const submitEdit = useCallback(() => {
+    /**
+     *
+     */
     const trimmed = editValue.trim();
     if (!trimmed) return;
     if (trimmed === content.trim()) {
@@ -85,6 +124,9 @@ export function UserMessageBubble({
     setIsEditing(false);
   }, [content, editValue, messageId, onEditMessage]);
 
+  /**
+   *
+   */
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!canEdit) return;
@@ -99,6 +141,9 @@ export function UserMessageBubble({
     [canEdit, startEdit],
   );
 
+  /**
+   *
+   */
   const handlePointerUp = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -106,6 +151,9 @@ export function UserMessageBubble({
     }
   }, []);
 
+  /**
+   *
+   */
   const handlePointerCancel = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -113,6 +161,9 @@ export function UserMessageBubble({
     }
   }, []);
 
+  /**
+   *
+   */
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (!canEdit) return;
@@ -137,7 +188,7 @@ export function UserMessageBubble({
     return (
       <div className="flex flex-col gap-2">
         <textarea
-          className="min-h-[80px] w-full resize-y rounded border border-primary-foreground/30 bg-primary-foreground/10 px-2 py-1.5 text-sm text-primary-foreground placeholder:text-primary-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary-foreground/50"
+          className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/60 focus:ring-primary-foreground/50 min-h-[80px] w-full resize-y rounded border px-2 py-1.5 text-sm focus:ring-1 focus:outline-none"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onClick={(e) => e.stopPropagation()}
@@ -156,7 +207,7 @@ export function UserMessageBubble({
               e.stopPropagation();
               cancelEdit();
             }}
-            className="rounded border border-primary-foreground/50 px-2 py-1 text-xs"
+            className="border-primary-foreground/50 rounded border px-2 py-1 text-xs"
           >
             {t("aiChat.actions.cancel")}
           </button>
@@ -166,7 +217,7 @@ export function UserMessageBubble({
               e.stopPropagation();
               submitEdit();
             }}
-            className="rounded bg-primary-foreground/20 px-2 py-1 text-xs font-medium"
+            className="bg-primary-foreground/20 rounded px-2 py-1 text-xs font-medium"
           >
             {t("aiChat.actions.resend")}
           </button>

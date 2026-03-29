@@ -42,6 +42,13 @@ interface AiModelsContentProps {
   onDragEnd: () => void;
 }
 
+/**
+ * AI モデル管理画面のメインコンテンツ（一覧・同期プレビュー・ドラッグ並べ替え）。
+ * Main content for the admin AI models page.
+ *
+ * @param props - Models state, sync preview, and drag-and-drop handlers
+ * @returns AI models management UI
+ */
 export function AiModelsContent({
   models,
   setModels,
@@ -124,7 +131,7 @@ export function AiModelsContent({
 
       {/* デスクトップ: テーブル */}
       <div className="mt-4 hidden md:block">
-        <Table className="min-w-[640px] rounded border border-border">
+        <Table className="border-border min-w-[640px] rounded border">
           <TableHeader>
             <TableRow className="border-border bg-muted/50 hover:bg-transparent">
               <TableHead className="w-8 px-1 py-2" aria-label="並び替え" />

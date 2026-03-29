@@ -1,6 +1,9 @@
 import React, { useCallback } from "react";
 import { cn } from "@zedi/ui";
 
+/**
+ *
+ */
 export interface PageTitleBlockProps {
   /** 表示・編集するタイトル */
   title: string;
@@ -53,8 +56,8 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
 
   if (isReadOnly) {
     return (
-      <div ref={titleRef} className="pb-2 pt-6">
-        <h1 className="whitespace-normal break-words text-2xl font-semibold">
+      <div ref={titleRef} className="pt-6 pb-2">
+        <h1 className="text-2xl font-semibold break-words whitespace-normal">
           {title || "無題のページ"}
         </h1>
       </div>
@@ -62,7 +65,7 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
   }
 
   return (
-    <div ref={titleRef} className="pb-2 pt-6">
+    <div ref={titleRef} className="pt-6 pb-2">
       <input
         type="text"
         value={title}
@@ -80,7 +83,7 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
         aria-invalid={Boolean(errorMessage)}
       />
       {errorMessage && (
-        <p className="mt-1 text-sm text-destructive" role="alert">
+        <p className="text-destructive mt-1 text-sm" role="alert">
           {errorMessage}
         </p>
       )}

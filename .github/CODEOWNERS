@@ -10,6 +10,9 @@
 /docker-compose*.yml @otomatty
 /Dockerfile* @otomatty
 
-# Documentation
-/docs/ @otomatty
-*.md @otomatty
+# Docs policy: prose lives minimally at repo root; journal for daily notes
+/journal/ @otomatty
+/SPECIFICATION_POLICY.md @otomatty
+/AGENTS.md @otomatty
+/README.md @otomatty
+/CONTRIBUTING.md @otomatty

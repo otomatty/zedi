@@ -10,15 +10,36 @@ interface NotePageCardProps {
   page: PageSummary;
 }
 
-export const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
+  /**
+   *
+   */
   const navigate = useNavigate();
 
+  /**
+   *
+   */
   const preview = page.contentPreview ?? "";
+  /**
+   *
+   */
   const { resolvedUrl: thumbnail, hasError: thumbnailError } = useAuthenticatedImageUrl(
     page.thumbnailUrl,
   );
+  /**
+   *
+   */
   const isClipped = !!page.sourceUrl;
 
+  /**
+   *
+   */
   const handleClick = () => {
     navigate(`/note/${noteId}/page/${page.id}`);
   };
@@ -28,15 +49,15 @@ export const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
       onClick={handleClick}
       className={cn(
         "w-full overflow-hidden rounded-lg text-left",
-        "border border-border/50 bg-card hover:border-border",
+        "border-border/50 bg-card hover:border-border border",
         "group transition-all duration-200",
         "flex aspect-square flex-col",
       )}
     >
       <div className="flex-shrink-0 p-3 pb-2">
         <div className="flex items-start gap-1.5">
-          {isClipped && <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
-          <h3 className="line-clamp-2 text-sm font-medium text-foreground">
+          {isClipped && <Link2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />}
+          <h3 className="text-foreground line-clamp-2 text-sm font-medium">
             {page.title || "無題のページ"}
           </h3>
         </div>
@@ -44,7 +65,7 @@ export const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
 
       <div className="min-h-0 flex-1 overflow-hidden">
         {thumbnail && !thumbnailError ? (
-          <div className="flex h-full w-full items-center justify-center px-3 pb-3 pt-0">
+          <div className="flex h-full w-full items-center justify-center px-3 pt-0 pb-3">
             <img
               src={thumbnail}
               alt=""
@@ -56,7 +77,7 @@ export const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
           </div>
         ) : (
           <div className="h-full px-3 pb-3">
-            <p className="line-clamp-4 text-xs leading-relaxed text-muted-foreground">
+            <p className="text-muted-foreground line-clamp-4 text-xs leading-relaxed">
               {preview || "コンテンツがありません"}
             </p>
           </div>

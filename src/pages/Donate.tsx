@@ -22,10 +22,10 @@ const DonationOption: React.FC<DonationOptionProps> = ({
   href,
 }) => {
   return (
-    <Card className="group cursor-pointer transition-all hover:border-primary/50 hover:shadow-md">
+    <Card className="group hover:border-primary/50 cursor-pointer transition-all hover:shadow-md">
       <a href={href} target="_blank" rel="noopener noreferrer">
         <CardHeader className="flex flex-row items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+          <div className="bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex h-12 w-12 items-center justify-center rounded-full transition-colors">
             {icon}
           </div>
           <div className="flex-1">
@@ -35,13 +35,16 @@ const DonationOption: React.FC<DonationOptionProps> = ({
             </CardTitle>
             <CardDescription className="text-sm">{description}</CardDescription>
           </div>
-          <div className="text-lg font-bold text-primary">{amount}</div>
+          <div className="text-primary text-lg font-bold">{amount}</div>
         </CardHeader>
       </a>
     </Card>
   );
 };
 
+/**
+ *
+ */
 const Donate: React.FC = () => {
   const { t } = useTranslation();
   // TODO: 実際の寄付リンクに置き換える
@@ -53,9 +56,9 @@ const Donate: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
         <Container className="flex h-16 items-center gap-4">
           <Link to="/home">
             <Button variant="ghost" size="icon">
@@ -76,7 +79,7 @@ const Donate: React.FC = () => {
                 <Heart className="h-8 w-8" />
               </div>
               <h2 className="mb-3 text-2xl font-bold">{t("donate.heroTitle")}</h2>
-              <p className="mx-auto max-w-md text-muted-foreground">
+              <p className="text-muted-foreground mx-auto max-w-md">
                 {t("donate.heroDescription")}
               </p>
             </div>
@@ -114,10 +117,10 @@ const Donate: React.FC = () => {
             </div>
 
             {/* Thank You Message */}
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+            <Card className="border-primary/20 from-primary/5 to-primary/10 bg-gradient-to-br">
               <CardContent className="py-6">
                 <div className="text-center">
-                  <p className="mb-2 text-sm text-muted-foreground">
+                  <p className="text-muted-foreground mb-2 text-sm">
                     {t("donate.thankYouHeading")}
                   </p>
                   <p className="text-sm">{t("donate.thankYouBody")}</p>
@@ -137,7 +140,7 @@ const Donate: React.FC = () => {
                       <span className="text-2xl">⭐</span>
                       <div>
                         <p className="text-sm font-medium">{t("donate.githubStarTitle")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                           {t("donate.githubStarDescription")}
                         </p>
                       </div>
@@ -150,7 +153,7 @@ const Donate: React.FC = () => {
                       <span className="text-2xl">📣</span>
                       <div>
                         <p className="text-sm font-medium">{t("donate.shareTitle")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                           {t("donate.shareDescription")}
                         </p>
                       </div>
@@ -163,7 +166,7 @@ const Donate: React.FC = () => {
                       <span className="text-2xl">🐛</span>
                       <div>
                         <p className="text-sm font-medium">{t("donate.reportBugTitle")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                           {t("donate.reportBugDescription")}
                         </p>
                       </div>
@@ -176,7 +179,7 @@ const Donate: React.FC = () => {
                       <span className="text-2xl">💡</span>
                       <div>
                         <p className="text-sm font-medium">{t("donate.requestFeatureTitle")}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                           {t("donate.requestFeatureDescription")}
                         </p>
                       </div>

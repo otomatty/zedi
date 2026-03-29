@@ -5,6 +5,9 @@ import { Input } from "@zedi/ui";
 import { Label } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
+/**
+ *
+ */
 export interface GyazoSettingsProps {
   accessToken: string;
   onChange: (value: string) => void;
@@ -13,13 +16,22 @@ export interface GyazoSettingsProps {
   disabled: boolean;
 }
 
-export const GyazoSettings: React.FC<GyazoSettingsProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const GyazoSettings: React.FC<GyazoSettingsProps> = ({
   accessToken,
   onChange,
   showSecrets,
   setShowSecrets,
   disabled,
 }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
   return (
     <div className="space-y-2">
@@ -38,7 +50,7 @@ export const GyazoSettings: React.FC<GyazoSettingsProps> = ({
           type="button"
           variant="ghost"
           size="icon"
-          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+          className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
           onClick={() => setShowSecrets(!showSecrets)}
           aria-label={
             showSecrets ? t("storageSettings.hideSecrets") : t("storageSettings.showSecrets")
@@ -46,13 +58,13 @@ export const GyazoSettings: React.FC<GyazoSettingsProps> = ({
           aria-pressed={showSecrets}
         >
           {showSecrets ? (
-            <EyeOff className="h-4 w-4 text-muted-foreground" />
+            <EyeOff className="text-muted-foreground h-4 w-4" />
           ) : (
-            <Eye className="h-4 w-4 text-muted-foreground" />
+            <Eye className="text-muted-foreground h-4 w-4" />
           )}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-muted-foreground text-xs">
         <a
           href="https://gyazo.com/oauth/applications"
           target="_blank"
@@ -63,20 +75,20 @@ export const GyazoSettings: React.FC<GyazoSettingsProps> = ({
         </a>
         {t("storageSettings.gyazo.getTokenHelp")}
       </p>
-      <div className="mt-2 rounded-lg border border-border bg-muted/50 p-3">
+      <div className="border-border bg-muted/50 mt-2 rounded-lg border p-3">
         <p className="mb-1 text-xs font-medium">{t("storageSettings.gyazo.callbackUrlTitle")}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           {t("storageSettings.gyazo.callbackUrlDescription")}
         </p>
-        <ul className="ml-4 mt-1 list-disc space-y-0.5 text-xs text-muted-foreground">
+        <ul className="text-muted-foreground mt-1 ml-4 list-disc space-y-0.5 text-xs">
           <li>
-            <code className="rounded bg-muted px-1">http://localhost:5173/callback</code>
+            <code className="bg-muted rounded px-1">http://localhost:5173/callback</code>
           </li>
           <li>
-            <code className="rounded bg-muted px-1">urn:ietf:wg:oauth:2.0:oob</code>
+            <code className="bg-muted rounded px-1">urn:ietf:wg:oauth:2.0:oob</code>
           </li>
           <li>
-            <code className="rounded bg-muted px-1">zedi://oauth/callback</code>
+            <code className="bg-muted rounded px-1">zedi://oauth/callback</code>
           </li>
         </ul>
       </div>

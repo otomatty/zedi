@@ -12,19 +12,30 @@ interface EditorRecommendationBarThumbnailsProps {
   onSelectCandidate: (candidate: ThumbnailCandidate) => void;
 }
 
-export const EditorRecommendationBarThumbnails: React.FC<
-  EditorRecommendationBarThumbnailsProps
-> = ({ candidates, isLoading, errorMessage, scrollRef, onWheel, onSelectCandidate }) => (
+/**
+ *
+ */
+export /**
+ *
+ */
+const EditorRecommendationBarThumbnails: React.FC<EditorRecommendationBarThumbnailsProps> = ({
+  candidates,
+  isLoading,
+  errorMessage,
+  scrollRef,
+  onWheel,
+  onSelectCandidate,
+}) => (
   <div className="space-y-2">
     {isLoading && (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="text-muted-foreground flex items-center gap-2 text-xs">
         <Loader2 className="h-4 w-4 animate-spin" />
         画像を検索中...
       </div>
     )}
-    {errorMessage && <div className="text-xs text-destructive">{errorMessage}</div>}
+    {errorMessage && <div className="text-destructive text-xs">{errorMessage}</div>}
     {!isLoading && !errorMessage && candidates.length === 0 && (
-      <div className="text-xs text-muted-foreground">候補が見つかりませんでした</div>
+      <div className="text-muted-foreground text-xs">候補が見つかりませんでした</div>
     )}
 
     {candidates.length > 0 && (
@@ -34,14 +45,20 @@ export const EditorRecommendationBarThumbnails: React.FC<
         className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1"
       >
         {candidates.map((candidate) => {
+          /**
+           *
+           */
           const safeAuthorUrl = candidate.authorUrl ? sanitizeLinkUrl(candidate.authorUrl) : null;
+          /**
+           *
+           */
           const safeSourceUrl = candidate.sourceUrl ? sanitizeLinkUrl(candidate.sourceUrl) : null;
           return (
             <div key={candidate.id} className="flex shrink-0 snap-start flex-col gap-1 text-left">
               <button
                 type="button"
                 onClick={() => onSelectCandidate(candidate)}
-                className="rounded-md border bg-background p-1 text-left"
+                className="bg-background rounded-md border p-1 text-left"
               >
                 <img
                   src={candidate.previewUrl}
@@ -50,7 +67,7 @@ export const EditorRecommendationBarThumbnails: React.FC<
                   loading="lazy"
                 />
               </button>
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-muted-foreground text-[10px]">
                 {candidate.authorName ? (
                   <>
                     {safeAuthorUrl ? (

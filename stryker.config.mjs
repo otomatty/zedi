@@ -1,13 +1,29 @@
 /**
  * Stryker configuration for frontend mutation testing.
  * フロントエンド向け mutation testing の設定。
+ *
+ * - JSON report: `reports/mutation/mutation.json` — input for `mutation:report:summary` (compact Markdown for AI).
+ * - HTML report: optional; set `STRYKER_HTML_REPORT=0` to skip (faster, smaller disk; use JSON + Markdown summary for AI).
+ * - JSON レポート: `mutation:report:summary` の入力。HTML は `STRYKER_HTML_REPORT=0` で省略可能（AI 向けは要約 MD を利用）。
  */
+const htmlReporterDisabled = new Set(["0", "false", "off", "no", "disabled"]);
+const htmlReporterFlag = (process.env.STRYKER_HTML_REPORT ?? "").toLowerCase();
+const htmlReporterEnabled = !htmlReporterDisabled.has(htmlReporterFlag);
+
 export default {
   testRunner: "vitest",
   tempDirName: ".stryker-tmp",
   mutate: [
     "src/lib/**/*.{ts,tsx}",
     "src/hooks/**/*.{ts,tsx}",
+    "src/pages/NoteView/noteViewHelpers.ts",
+    "src/components/layout/AIChatDock.tsx",
+    "src/components/layout/AppLayout.tsx",
+    "src/pages/NoteView/index.tsx",
+    "src/pages/NoteSettings/index.tsx",
+    "src/pages/NoteMembers/index.tsx",
+    "src/components/layout/Header/index.tsx",
+    "src/components/layout/AppSidebar.tsx",
     "!src/**/*.test.{ts,tsx}",
     "!src/**/*.spec.{ts,tsx}",
     "!src/test/**",
@@ -17,13 +33,17 @@ export default {
   vitest: {
     configFile: "vite.config.ts",
   },
-  reporters: ["clear-text", "progress", "html"],
+  reporters: ["clear-text", "progress", "json", ...(htmlReporterEnabled ? ["html"] : [])],
+  jsonReporter: {
+    fileName: "reports/mutation/mutation.json",
+  },
   htmlReporter: {
     fileName: "reports/mutation/mutation.html",
   },
+  // Thresholds raised 2026-03-21 — remediation: fix surviving mutants in targeted tests
   thresholds: {
-    high: 80,
-    low: 70,
-    break: 65,
+    high: 85,
+    low: 75,
+    break: 70,
   },
 };

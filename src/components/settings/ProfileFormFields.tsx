@@ -65,12 +65,12 @@ export const ProfileFormFields: React.FC<ProfileFormFieldsProps> = ({
           aria-describedby={errorId}
         />
         {displayNameError && (
-          <p id={errorId} className="text-xs text-destructive" role="alert">
+          <p id={errorId} className="text-destructive text-xs" role="alert">
             {displayNameError}
           </p>
         )}
         {!displayNameError && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             {t("generalSettings.profile.displayNameHelp")}
           </p>
         )}

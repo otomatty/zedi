@@ -20,13 +20,17 @@ const navLinks = [
   { to: "/users", label: "ユーザー管理", icon: Users },
 ];
 
+/**
+ * 管理画面のレイアウト（サイドバー付き）。
+ * Admin layout with sidebar navigation.
+ */
 export default function Layout() {
   const location = useLocation();
 
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
+        <SidebarHeader className="border-sidebar-border border-b px-4 py-3">
           <span className="text-sm font-semibold tracking-tight">Zedi 管理画面</span>
         </SidebarHeader>
         <SidebarContent>

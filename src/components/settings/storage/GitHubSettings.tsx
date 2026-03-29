@@ -5,6 +5,9 @@ import { Input } from "@zedi/ui";
 import { Label } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
+/**
+ *
+ */
 export interface GitHubSettingsProps {
   repository: string;
   token: string;
@@ -16,7 +19,13 @@ export interface GitHubSettingsProps {
   disabled: boolean;
 }
 
-export const GitHubSettings: React.FC<GitHubSettingsProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const GitHubSettings: React.FC<GitHubSettingsProps> = ({
   repository,
   token,
   branch,
@@ -26,6 +35,9 @@ export const GitHubSettings: React.FC<GitHubSettingsProps> = ({
   setShowSecrets,
   disabled,
 }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
   return (
     <div className="space-y-4">
@@ -39,7 +51,7 @@ export const GitHubSettings: React.FC<GitHubSettingsProps> = ({
           placeholder={t("storageSettings.github.repositoryPlaceholder")}
           disabled={disabled}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           {t("storageSettings.github.repositoryHelp")}
         </p>
       </div>
@@ -60,7 +72,7 @@ export const GitHubSettings: React.FC<GitHubSettingsProps> = ({
             type="button"
             variant="ghost"
             size="icon"
-            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
             onClick={() => setShowSecrets(!showSecrets)}
             aria-label={
               showSecrets ? t("storageSettings.hideSecrets") : t("storageSettings.showSecrets")
@@ -68,9 +80,9 @@ export const GitHubSettings: React.FC<GitHubSettingsProps> = ({
             aria-pressed={showSecrets}
           >
             {showSecrets ? (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
+              <EyeOff className="text-muted-foreground h-4 w-4" />
             ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
+              <Eye className="text-muted-foreground h-4 w-4" />
             )}
           </Button>
         </div>

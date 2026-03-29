@@ -17,6 +17,10 @@ interface SyncPreviewModalProps {
   onConfirm: () => void;
 }
 
+/**
+ * モデル同期のプレビュー結果を表示し、同期実行を確認するモーダル。
+ * Modal to review model sync changes before confirmation.
+ */
 export function SyncPreviewModal({
   open,
   loading,
@@ -43,18 +47,18 @@ export function SyncPreviewModal({
           </DialogDescription>
         </DialogHeader>
         {loading ? (
-          <p className="mt-4 text-muted-foreground">読み込み中...</p>
+          <p className="text-muted-foreground mt-4">読み込み中...</p>
         ) : (
           <>
             <div className="mt-4 space-y-3">
               {previewData?.map((r) => (
-                <div key={r.provider} className="rounded border border-border p-2">
-                  <div className="font-medium text-foreground">
+                <div key={r.provider} className="border-border rounded border p-2">
+                  <div className="text-foreground font-medium">
                     {r.provider}
-                    {r.error && <span className="ml-2 text-destructive">({r.error})</span>}
+                    {r.error && <span className="text-destructive ml-2">({r.error})</span>}
                   </div>
                   {r.toAdd && r.toAdd.length > 0 ? (
-                    <ul className="mt-1 list-inside list-disc text-sm text-muted-foreground">
+                    <ul className="text-muted-foreground mt-1 list-inside list-disc text-sm">
                       {r.toAdd.map((m) => (
                         <li key={m.id}>
                           追加: {m.displayName}
@@ -72,8 +76,10 @@ export function SyncPreviewModal({
                       ))}
                     </ul>
                   ) : null}
-                  {!r.error && r.toAdd.length === 0 && r.toDeactivate.length === 0 ? (
-                    <p className="mt-1 text-sm text-muted-foreground">変更なし</p>
+                  {!r.error &&
+                  (r.toAdd?.length ?? 0) === 0 &&
+                  (r.toDeactivate?.length ?? 0) === 0 ? (
+                    <p className="text-muted-foreground mt-1 text-sm">変更なし</p>
                   ) : null}
                 </div>
               ))}

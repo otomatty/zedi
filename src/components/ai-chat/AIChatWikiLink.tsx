@@ -18,7 +18,7 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
     return (
       <Link
         to={`/page/${page.id}`}
-        className="rounded px-0.5 font-medium text-primary underline decoration-primary/50 underline-offset-2 transition-colors hover:decoration-primary"
+        className="text-primary decoration-primary/50 hover:decoration-primary rounded px-0.5 font-medium underline underline-offset-2 transition-colors"
       >
         [[{normalizedTitle}]]
       </Link>
@@ -26,7 +26,7 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
   }
 
   return (
-    <span className="rounded px-0.5 font-medium text-muted-foreground underline decoration-muted-foreground/60 decoration-dashed underline-offset-2">
+    <span className="text-muted-foreground decoration-muted-foreground/60 rounded px-0.5 font-medium underline decoration-dashed underline-offset-2">
       [[{normalizedTitle}]]
     </span>
   );
