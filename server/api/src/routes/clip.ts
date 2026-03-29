@@ -6,12 +6,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../middleware/auth.js";
-import {
-  ClipFetchBlockedError,
-  DISALLOWED_CLIP_URL_MESSAGE,
-  fetchClipHtmlWithRedirects,
-} from "../lib/clipServerFetch.js";
-import { isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
+import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -24,10 +19,6 @@ app.post("/fetch", authRequired, async (c) => {
   }
 
   const url = body.url.trim();
-
-  if (!(await isClipUrlAllowedAfterDns(url))) {
-    throw new HTTPException(400, { message: DISALLOWED_CLIP_URL_MESSAGE });
-  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);

@@ -18,7 +18,6 @@ import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
-import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
 
 const lowlight = createLowlight(common);
@@ -119,13 +118,6 @@ export interface ClipAndCreateInput {
  */
 export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndCreateResult> {
   const { url, userId, db } = input;
-
-  if (!isClipUrlAllowed(url)) {
-    throw new Error("URL not allowed");
-  }
-  if (!(await isClipUrlAllowedAfterDns(url))) {
-    throw new Error("URL not allowed");
-  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);

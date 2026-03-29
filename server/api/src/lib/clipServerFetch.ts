@@ -32,9 +32,11 @@ export class ClipFetchBlockedError extends Error {
 /**
  * DNS 解決込みで URL が許可されることを検証し、不可なら {@link ClipFetchBlockedError} を投げる。
  * Validates URL with DNS resolution; throws {@link ClipFetchBlockedError} if not allowed.
+ *
+ * @param signal - 渡すと DNS lookup がリクエストの abort/timeout と同期する。Optional; ties DNS lookup to request abort/timeout.
  */
-export async function assertClipFetchUrlAllowed(url: string): Promise<void> {
-  if (!(await isClipUrlAllowedAfterDns(url))) {
+export async function assertClipFetchUrlAllowed(url: string, signal?: AbortSignal): Promise<void> {
+  if (!(await isClipUrlAllowedAfterDns(url, { signal }))) {
     throw new ClipFetchBlockedError(DISALLOWED_CLIP_URL_MESSAGE);
   }
 }
@@ -45,14 +47,17 @@ export async function assertClipFetchUrlAllowed(url: string): Promise<void> {
  *
  * @param url - http(s)。初回 fetch の前に {@link assertClipFetchUrlAllowed} で再検証する。
  *   http(s) URL; re-validated with {@link assertClipFetchUrlAllowed} before the first fetch.
- * @param controller - AbortSignal 用。Abort controller for cancellation.
+ * @param controller - AbortSignal 用。DNS 検証と fetch の両方に渡す。Abort controller for DNS validation and fetch.
  * @returns 本文・最終 URL・Content-Type。Body, final URL, and Content-Type.
+ *
+ * **制限 / Limitation**: 実 TCP/TLS はホスト名で再接続するため、DNS リバインド完全対策（検証 IP への接続固定）は未実装。`ext` の clip-and-create と同様の TOCTOU 残存。Issue #428 参照。
+ * **Limitation**: TCP/TLS reconnects by hostname; full DNS-rebind mitigation (bind to validated IP) is not implemented; same TOCTOU caveat as ext clip-and-create (see issue #428).
  */
 export async function fetchClipHtmlWithRedirects(
   url: string,
   controller: AbortController,
 ): Promise<{ html: string; finalUrl: string; contentType: string }> {
-  await assertClipFetchUrlAllowed(url);
+  await assertClipFetchUrlAllowed(url, controller.signal);
 
   let response!: Response;
   let currentUrl = url;
@@ -81,7 +86,7 @@ export async function fetchClipHtmlWithRedirects(
         throw new ClipFetchBlockedError("Invalid redirect Location");
       }
 
-      await assertClipFetchUrlAllowed(nextUrl);
+      await assertClipFetchUrlAllowed(nextUrl, controller.signal);
       currentUrl = nextUrl;
       continue;
     }
@@ -91,7 +96,7 @@ export async function fetchClipHtmlWithRedirects(
   // `new Response()` 等では url が空のことがある。実リクエストでは response.url が最終 URL。
   // `new Response()` may leave url empty; real fetch sets the final URL on response.url.
   const finalUrlForPolicy = response.url || currentUrl;
-  await assertClipFetchUrlAllowed(finalUrlForPolicy);
+  await assertClipFetchUrlAllowed(finalUrlForPolicy, controller.signal);
 
   if (!response.ok) {
     throw new Error(`Fetch failed: ${response.status}`);
