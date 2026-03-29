@@ -54,8 +54,8 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/* v7_startTransition を無効化: リンククリック後のページ切り替えで表示が即時更新されない問題を防ぐ */}
-        <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: true }}>
+        {/* unstable_useTransitions を無効化: リンク後の表示が遅れる問題を防ぐ（RR v7 は future 廃止） */}
+        <BrowserRouter unstable_useTransitions={false}>
           <AIChatProvider>
             <AIChatConversationsProvider>
               <GlobalShortcutsProvider>

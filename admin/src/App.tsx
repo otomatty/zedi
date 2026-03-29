@@ -5,9 +5,14 @@ import Login from "./pages/Login";
 import AiModels from "./pages/ai-models";
 import Users from "./pages/users";
 
+/**
+ *
+ */
 function App() {
   return (
-    <BrowserRouter>
+    // Match main app: disable startTransition wrapping so navigation updates apply immediately (RR v7 API).
+    // メインアプリと同様: startTransition ラップを無効化し遷移を即時反映（RR v7 は unstable_useTransitions）。
+    <BrowserRouter unstable_useTransitions={false}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
