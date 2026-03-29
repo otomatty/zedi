@@ -74,8 +74,12 @@ app.post("/confirm", authRequired, async (c) => {
     throw new HTTPException(400, { message: "media_id and s3_key are required" });
   }
 
-  const expectedPrefix = `users/${userId}/media/`;
-  if (!body.s3_key.startsWith(expectedPrefix) || body.s3_key.includes("..")) {
+  const expectedPrefix = `users/${userId}/media/${body.media_id}/`;
+  if (
+    typeof body.s3_key !== "string" ||
+    !body.s3_key.startsWith(expectedPrefix) ||
+    body.s3_key.split("/").some((seg) => seg === ".." || seg === ".")
+  ) {
     throw new HTTPException(403, { message: "Invalid S3 key" });
   }
 

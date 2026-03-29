@@ -134,7 +134,7 @@ describe("POST /api/media/confirm — S3 key ownership validation", () => {
   });
 
   it("rejects s3_key with path traversal attempt", async () => {
-    const traversalKey = `users/${TEST_USER_ID}/media/../../other-user/file.png`;
+    const traversalKey = `users/${TEST_USER_ID}/media/${MEDIA_ID}/../../../other-user/file.png`;
     const app = createMediaApp([]);
 
     const res = await app.request("/api/media/confirm", {
@@ -144,6 +144,43 @@ describe("POST /api/media/confirm — S3 key ownership validation", () => {
         media_id: MEDIA_ID,
         s3_key: traversalKey,
         file_name: "file.png",
+        content_type: "image/png",
+      }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("accepts s3_key where filename contains '..' but does not traverse", async () => {
+    const keyWithDots = `users/${TEST_USER_ID}/media/${MEDIA_ID}/a..b.png`;
+    const app = createMediaApp([[{ id: MEDIA_ID, ownerId: TEST_USER_ID, s3Key: keyWithDots }]]);
+
+    const res = await app.request("/api/media/confirm", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        media_id: MEDIA_ID,
+        s3_key: keyWithDots,
+        file_name: "a..b.png",
+        content_type: "image/png",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects s3_key with mismatched media_id in prefix", async () => {
+    const otherMediaId = "media-uuid-other";
+    const mismatchedKey = `users/${TEST_USER_ID}/media/${otherMediaId}/photo.png`;
+    const app = createMediaApp([]);
+
+    const res = await app.request("/api/media/confirm", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        media_id: MEDIA_ID,
+        s3_key: mismatchedKey,
+        file_name: "photo.png",
         content_type: "image/png",
       }),
     });
