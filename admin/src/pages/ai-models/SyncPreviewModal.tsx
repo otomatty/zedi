@@ -18,7 +18,8 @@ interface SyncPreviewModalProps {
 }
 
 /**
- *
+ * モデル同期のプレビュー結果を表示し、同期実行を確認するモーダル。
+ * Modal to review model sync changes before confirmation.
  */
 export function SyncPreviewModal({
   open,
@@ -27,18 +28,9 @@ export function SyncPreviewModal({
   onClose,
   onConfirm,
 }: SyncPreviewModalProps) {
-  /**
-   *
-   */
   const totalToAdd = previewData?.reduce((sum, r) => sum + (r.toAdd?.length ?? 0), 0) ?? 0;
-  /**
-   *
-   */
   const totalToDeactivate =
     previewData?.reduce((sum, r) => sum + (r.toDeactivate?.length ?? 0), 0) ?? 0;
-  /**
-   *
-   */
   const hasPreviewErrors = previewData?.some((r) => r.error) ?? false;
 
   return (
@@ -84,7 +76,9 @@ export function SyncPreviewModal({
                       ))}
                     </ul>
                   ) : null}
-                  {!r.error && r.toAdd.length === 0 && r.toDeactivate.length === 0 ? (
+                  {!r.error &&
+                  (r.toAdd?.length ?? 0) === 0 &&
+                  (r.toDeactivate?.length ?? 0) === 0 ? (
                     <p className="text-muted-foreground mt-1 text-sm">変更なし</p>
                   ) : null}
                 </div>

@@ -27,7 +27,8 @@ interface AiModelRowProps {
 }
 
 /**
- *
+ * AI モデル管理テーブルの 1 行（表示名・ティア・アクティブ・ドラッグ並べ替え）。
+ * One editable row in the AI model management table.
  */
 export function AiModelRow({
   model: m,

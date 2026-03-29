@@ -3,13 +3,18 @@
 プロジェクト全体の AI エージェント向け共通ガイドライン。
 Cursor, Claude Code, GitHub Copilot, Codex 等すべてのエージェントが参照する。
 
-## 仕様・ドキュメント（最重要）
+## 仕様・ドキュメント（最重要） / Specification & documentation (critical)
 
-- **仕様の正（source of truth）はコードの TSDoc / JSDoc とテスト**。詳細は [`SPECIFICATION_POLICY.md`](SPECIFICATION_POLICY.md)。
-- **Git に追跡させない** — `.gitignore` で `docs/` およびルートの `journal/` を除外する。長文の仕様・メモをリモートに載せない。
-- **ローカル専用の `docs/`** — 調査・下書き・作業ログ用に、追跡されない `docs/` 以下へファイルを置いてよい（構成は下記「ローカル専用メモ」）。これらは契約や CI の根拠にはしない。
-- **不要になった説明は削除する**（ローカルファイル含む）。エージェントに古い文面を渡さず、コンテキストを浪費しない。
-- **`docs/` を勝手に読まない**。ユーザーが `@ファイル` で添付したファイルは読む（`.cursor/rules/specification-and-docs.mdc`）。
+- **仕様の正（source of truth）はコードの TSDoc / JSDoc とテスト**。詳細は [`SPECIFICATION_POLICY.md`](SPECIFICATION_POLICY.md)。  
+  _Source of truth: TSDoc/JSDoc and tests; see SPECIFICATION_POLICY.md._
+- **Git に追跡させない** — `.gitignore` で `docs/` およびルートの `journal/` を除外する。長文の仕様・メモをリモートに載せない。  
+  _Do not track long-form prose: `docs/` and root `journal/` are gitignored._
+- **ローカル専用の `docs/`** — 調査・下書き・作業ログ用に、追跡されない `docs/` 以下へファイルを置いてよい（構成は下記「ローカル専用メモ」）。これらは契約や CI の根拠にはしない。  
+  _Optional local-only `docs/` for drafts and notes; not contract or CI truth._
+- **不要になった説明は削除する**（ローカルファイル含む）。エージェントに古い文面を渡さず、コンテキストを浪費しない。  
+  _Delete obsolete explanations (including local files) to avoid stale context._
+- **`docs/` を勝手に読まない**。ユーザーが `@ファイル` で添付したファイルは読む（`.cursor/rules/specification-and-docs.mdc`）。  
+  _Do not browse `docs/` unless the user attaches a file via `@`._
 
 ## 技術スタック
 
