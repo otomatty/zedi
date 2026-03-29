@@ -4,13 +4,16 @@
  */
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { notes, notePages, noteMembers, pages } from "../../schema/index.js";
+import { notes, notePages, noteMembers, pages, users } from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import type { Database } from "../../types/index.js";
 import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 export function noteRowToApi(note: Note): NoteApiFields {
   return {
     id: note.id,
@@ -28,7 +31,13 @@ export function noteRowToApi(note: Note): NoteApiFields {
 
 // ── DB Helpers ──────────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 export async function findActiveNoteById(db: Database, noteId: string): Promise<Note | null> {
+  /**
+   *
+   */
   const result = await db
     .select()
     .from(notes)
@@ -37,12 +46,18 @@ export async function findActiveNoteById(db: Database, noteId: string): Promise<
   return result[0] ?? null;
 }
 
+/**
+ *
+ */
 export async function requireNoteOwner(
   db: Database,
   noteId: string,
   userId: string,
   forbiddenMessage = "Forbidden",
 ): Promise<Note> {
+  /**
+   *
+   */
   const note = await findActiveNoteById(db, noteId);
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (note.ownerId !== userId) {
@@ -51,11 +66,37 @@ export async function requireNoteOwner(
   return note;
 }
 
+/**
+ * Requires `userId` to have admin role (`users.role === 'admin'`).
+ * Used when creating a note with `is_official: true` or changing `is_official` on update.
+ *
+ * `userId` が admin（`users.role === 'admin'`）であることを検証する。
+ * ノート作成で `is_official: true` とする場合、または更新で `is_official` を変更する場合に使う。
+ *
+ * @throws HTTPException 403 when the user is not an admin
+ */
+export async function requireAdminUser(db: Database, userId: string): Promise<void> {
+  const row = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (row[0]?.role !== "admin") {
+    throw new HTTPException(403, { message: "Only admins can set is_official" });
+  }
+}
+
+/**
+ *
+ */
 export async function getActivePageCounts(
   db: Database,
   noteIds: string[],
 ): Promise<Map<string, number>> {
   if (noteIds.length === 0) return new Map();
+  /**
+   *
+   */
   const counts = await db
     .select({
       noteId: notePages.noteId,
@@ -74,11 +115,17 @@ export async function getActivePageCounts(
   return new Map(counts.map((c) => [c.noteId, c.count]));
 }
 
+/**
+ *
+ */
 export async function getActiveMemberCounts(
   db: Database,
   noteIds: string[],
 ): Promise<Map<string, number>> {
   if (noteIds.length === 0) return new Map();
+  /**
+   *
+   */
   const counts = await db
     .select({
       noteId: noteMembers.noteId,
@@ -92,18 +139,27 @@ export async function getActiveMemberCounts(
 
 // ── Role & Permission ───────────────────────────────────────────────────────
 
+/**
+ *
+ */
 export async function getNoteRole(
   noteId: string,
   userId: string | undefined,
   userEmail: string | undefined,
   db: Database,
 ): Promise<{ role: NoteRole; note: Note | null }> {
+  /**
+   *
+   */
   const note = await findActiveNoteById(db, noteId);
   if (!note) return { role: null, note: null };
 
   if (userId && note.ownerId === userId) return { role: "owner", note };
 
   if (userEmail) {
+    /**
+     *
+     */
     const member = await db
       .select({ role: noteMembers.role })
       .from(noteMembers)
@@ -116,6 +172,9 @@ export async function getNoteRole(
       )
       .limit(1);
 
+    /**
+     *
+     */
     const firstMember = member[0];
     if (firstMember) {
       return { role: firstMember.role as NoteMemberRole, note };
@@ -129,6 +188,9 @@ export async function getNoteRole(
   return { role: null, note };
 }
 
+/**
+ *
+ */
 export function canEdit(role: NoteRole, note: Note): boolean {
   if (role === "owner") return true;
   if (role === "editor" && note.editPermission !== "owner_only") return true;

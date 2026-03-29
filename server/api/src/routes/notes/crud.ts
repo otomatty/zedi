@@ -28,6 +28,7 @@ import type {
 import {
   noteRowToApi,
   requireNoteOwner,
+  requireAdminUser,
   getNoteRole,
   getActivePageCounts,
   getActiveMemberCounts,
@@ -74,6 +75,10 @@ app.post("/", authRequired, async (c) => {
   const visibility = validateVisibility(body.visibility);
   const editPermission = validateEditPermission(body.edit_permission);
 
+  if (body.is_official === true) {
+    await requireAdminUser(db, userId);
+  }
+
   const result = await db
     .insert(notes)
     .values({
@@ -116,7 +121,7 @@ app.put("/:noteId", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  await requireNoteOwner(db, noteId, userId);
+  const note = await requireNoteOwner(db, noteId, userId);
 
   const body = await c.req.json<{
     title?: string;
@@ -124,6 +129,10 @@ app.put("/:noteId", authRequired, async (c) => {
     edit_permission?: string;
     is_official?: boolean;
   }>();
+
+  if (body.is_official !== undefined && body.is_official !== note.isOfficial) {
+    await requireAdminUser(db, userId);
+  }
 
   const visibility =
     body.visibility !== undefined ? validateVisibility(body.visibility) : undefined;
