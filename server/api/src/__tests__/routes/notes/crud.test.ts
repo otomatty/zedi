@@ -130,6 +130,18 @@ describe("POST /api/notes", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.is_official).toBe(true);
   });
+
+  it("should return 400 when is_official is not a boolean on create", async () => {
+    const { app } = createTestApp([]);
+
+    const res = await app.request("/api/notes", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Bad", is_official: "true" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── PUT /api/notes/:noteId ──────────────────────────────────────────────────
@@ -196,6 +208,19 @@ describe("PUT /api/notes/:noteId", () => {
     });
 
     expect(res.status).toBe(200);
+  });
+
+  it("should return 400 when is_official is not a boolean on update", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ is_official: 1 }),
+    });
+
+    expect(res.status).toBe(400);
   });
 });
 

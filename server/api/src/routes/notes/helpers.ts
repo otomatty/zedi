@@ -12,7 +12,8 @@ import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
 /**
- *
+ * Maps a DB note row to API snake_case fields.
+ * DB のノート行を API 用の snake_case フィールドへ変換する。
  */
 export function noteRowToApi(note: Note): NoteApiFields {
   return {
@@ -32,12 +33,10 @@ export function noteRowToApi(note: Note): NoteApiFields {
 // ── DB Helpers ──────────────────────────────────────────────────────────────
 
 /**
- *
+ * Returns a non-deleted note by id, or null.
+ * 削除されていないノートを id で取得する。なければ null。
  */
 export async function findActiveNoteById(db: Database, noteId: string): Promise<Note | null> {
-  /**
-   *
-   */
   const result = await db
     .select()
     .from(notes)
@@ -47,7 +46,10 @@ export async function findActiveNoteById(db: Database, noteId: string): Promise<
 }
 
 /**
+ * Ensures the user owns the note; returns the note row.
+ * ユーザーがノートの所有者であることを検証し、行を返す。
  *
+ * @throws HTTPException 404 if missing, 403 if not owner
  */
 export async function requireNoteOwner(
   db: Database,
@@ -55,9 +57,6 @@ export async function requireNoteOwner(
   userId: string,
   forbiddenMessage = "Forbidden",
 ): Promise<Note> {
-  /**
-   *
-   */
   const note = await findActiveNoteById(db, noteId);
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (note.ownerId !== userId) {
@@ -87,16 +86,14 @@ export async function requireAdminUser(db: Database, userId: string): Promise<vo
 }
 
 /**
- *
+ * Active (non-deleted) page counts per note id.
+ * ノート ID ごとのアクティブ（未削除）ページ数を返す。
  */
 export async function getActivePageCounts(
   db: Database,
   noteIds: string[],
 ): Promise<Map<string, number>> {
   if (noteIds.length === 0) return new Map();
-  /**
-   *
-   */
   const counts = await db
     .select({
       noteId: notePages.noteId,
@@ -116,16 +113,14 @@ export async function getActivePageCounts(
 }
 
 /**
- *
+ * Active member counts per note id (non-deleted memberships).
+ * ノート ID ごとのアクティブメンバー数（未削除のメンバーシップ）を返す。
  */
 export async function getActiveMemberCounts(
   db: Database,
   noteIds: string[],
 ): Promise<Map<string, number>> {
   if (noteIds.length === 0) return new Map();
-  /**
-   *
-   */
   const counts = await db
     .select({
       noteId: noteMembers.noteId,
@@ -140,7 +135,8 @@ export async function getActiveMemberCounts(
 // ── Role & Permission ───────────────────────────────────────────────────────
 
 /**
- *
+ * Resolves the caller's role for a note (owner, member, guest, or none).
+ * 呼び出し元のノートに対するロール（owner / メンバー / guest / なし）を解決する。
  */
 export async function getNoteRole(
   noteId: string,
@@ -148,18 +144,12 @@ export async function getNoteRole(
   userEmail: string | undefined,
   db: Database,
 ): Promise<{ role: NoteRole; note: Note | null }> {
-  /**
-   *
-   */
   const note = await findActiveNoteById(db, noteId);
   if (!note) return { role: null, note: null };
 
   if (userId && note.ownerId === userId) return { role: "owner", note };
 
   if (userEmail) {
-    /**
-     *
-     */
     const member = await db
       .select({ role: noteMembers.role })
       .from(noteMembers)
@@ -172,9 +162,6 @@ export async function getNoteRole(
       )
       .limit(1);
 
-    /**
-     *
-     */
     const firstMember = member[0];
     if (firstMember) {
       return { role: firstMember.role as NoteMemberRole, note };
@@ -189,7 +176,8 @@ export async function getNoteRole(
 }
 
 /**
- *
+ * Whether the role may edit the note given visibility and edit_permission.
+ * visibility / edit_permission に基づき、そのロールがノートを編集できるか。
  */
 export function canEdit(role: NoteRole, note: Note): boolean {
   if (role === "owner") return true;
