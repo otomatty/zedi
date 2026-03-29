@@ -6,7 +6,8 @@ import AiModels from "./pages/ai-models";
 import Users from "./pages/users";
 
 /**
- *
+ * Root component for the admin SPA: sets up routing and the admin auth guard.
+ * 管理画面 SPA のルート。ルーティングと管理者向け認証ガードを構成する。
  */
 function App() {
   return (
