@@ -28,6 +28,7 @@ import type {
 import {
   noteRowToApi,
   requireNoteOwner,
+  requireAdminUser,
   getNoteRole,
   getActivePageCounts,
   getActiveMemberCounts,
@@ -56,6 +57,30 @@ function validateEditPermission(value: string | undefined): NoteEditPermission {
   return value as NoteEditPermission;
 }
 
+/**
+ * Parses `is_official` from JSON for note create (defaults to false).
+ * JSON の `is_official` をノート作成用に解釈する（省略時は false）。
+ *
+ * @throws HTTPException 400 when present but not a boolean
+ */
+function parseIsOfficialForCreate(value: unknown): boolean {
+  if (value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  throw new HTTPException(400, { message: "Invalid is_official" });
+}
+
+/**
+ * Parses optional `is_official` for note update.
+ * ノート更新用の任意 `is_official` を解釈する。
+ *
+ * @throws HTTPException 400 when present but not a boolean
+ */
+function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  throw new HTTPException(400, { message: "Invalid is_official" });
+}
+
 const app = new Hono<AppEnv>();
 
 // ── POST / ──────────────────────────────────────────────────────────────────
@@ -68,11 +93,16 @@ app.post("/", authRequired, async (c) => {
     title?: string;
     visibility?: string;
     edit_permission?: string;
-    is_official?: boolean;
+    is_official?: unknown;
   }>();
 
   const visibility = validateVisibility(body.visibility);
   const editPermission = validateEditPermission(body.edit_permission);
+  const isOfficial = parseIsOfficialForCreate(body.is_official);
+
+  if (isOfficial === true) {
+    await requireAdminUser(db, userId);
+  }
 
   const result = await db
     .insert(notes)
@@ -81,7 +111,7 @@ app.post("/", authRequired, async (c) => {
       title: body.title ?? null,
       visibility,
       editPermission,
-      isOfficial: body.is_official ?? false,
+      isOfficial,
     })
     .returning();
 
@@ -122,8 +152,18 @@ app.put("/:noteId", authRequired, async (c) => {
     title?: string;
     visibility?: string;
     edit_permission?: string;
-    is_official?: boolean;
+    is_official?: unknown;
   }>();
+
+  const isOfficial = parseIsOfficialForUpdate(body.is_official);
+  // Require admin whenever the client sends `is_official`, not only when it differs from
+  // the row we read. Otherwise a non-admin could race with an admin toggle and overwrite
+  // the flag using a payload that matched the stale snapshot (TOCTOU).
+  // 読み取り時点と同じ値でもボディに含めたら admin 必須。並行更新との競合で非管理者が
+  // フラグを上書きするのを防ぐ。
+  if (isOfficial !== undefined) {
+    await requireAdminUser(db, userId);
+  }
 
   const visibility =
     body.visibility !== undefined ? validateVisibility(body.visibility) : undefined;
@@ -136,7 +176,7 @@ app.put("/:noteId", authRequired, async (c) => {
       title: body.title !== undefined ? body.title : undefined,
       visibility,
       editPermission,
-      isOfficial: body.is_official !== undefined ? body.is_official : undefined,
+      isOfficial: isOfficial !== undefined ? isOfficial : undefined,
       updatedAt: new Date(),
     })
     .where(eq(notes.id, noteId))

@@ -4,13 +4,17 @@
  */
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { notes, notePages, noteMembers, pages } from "../../schema/index.js";
+import { notes, notePages, noteMembers, pages, users } from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import type { Database } from "../../types/index.js";
 import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
+/**
+ * Maps a DB note row to API snake_case fields.
+ * DB のノート行を API 用の snake_case フィールドへ変換する。
+ */
 export function noteRowToApi(note: Note): NoteApiFields {
   return {
     id: note.id,
@@ -28,6 +32,10 @@ export function noteRowToApi(note: Note): NoteApiFields {
 
 // ── DB Helpers ──────────────────────────────────────────────────────────────
 
+/**
+ * Returns a non-deleted note by id, or null.
+ * 削除されていないノートを id で取得する。なければ null。
+ */
 export async function findActiveNoteById(db: Database, noteId: string): Promise<Note | null> {
   const result = await db
     .select()
@@ -37,6 +45,12 @@ export async function findActiveNoteById(db: Database, noteId: string): Promise<
   return result[0] ?? null;
 }
 
+/**
+ * Ensures the user owns the note; returns the note row.
+ * ユーザーがノートの所有者であることを検証し、行を返す。
+ *
+ * @throws HTTPException 404 if missing, 403 if not owner
+ */
 export async function requireNoteOwner(
   db: Database,
   noteId: string,
@@ -51,6 +65,30 @@ export async function requireNoteOwner(
   return note;
 }
 
+/**
+ * Requires `userId` to have admin role (`users.role === 'admin'`).
+ * Used when creating a note with `is_official: true` or changing `is_official` on update.
+ *
+ * `userId` が admin（`users.role === 'admin'`）であることを検証する。
+ * ノート作成で `is_official: true` とする場合、または更新で `is_official` を変更する場合に使う。
+ *
+ * @throws HTTPException 403 when the user is not an admin
+ */
+export async function requireAdminUser(db: Database, userId: string): Promise<void> {
+  const row = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (row[0]?.role !== "admin") {
+    throw new HTTPException(403, { message: "Only admins can set is_official" });
+  }
+}
+
+/**
+ * Active (non-deleted) page counts per note id.
+ * ノート ID ごとのアクティブ（未削除）ページ数を返す。
+ */
 export async function getActivePageCounts(
   db: Database,
   noteIds: string[],
@@ -74,6 +112,10 @@ export async function getActivePageCounts(
   return new Map(counts.map((c) => [c.noteId, c.count]));
 }
 
+/**
+ * Active member counts per note id (non-deleted memberships).
+ * ノート ID ごとのアクティブメンバー数（未削除のメンバーシップ）を返す。
+ */
 export async function getActiveMemberCounts(
   db: Database,
   noteIds: string[],
@@ -92,6 +134,10 @@ export async function getActiveMemberCounts(
 
 // ── Role & Permission ───────────────────────────────────────────────────────
 
+/**
+ * Resolves the caller's role for a note (owner, member, guest, or none).
+ * 呼び出し元のノートに対するロール（owner / メンバー / guest / なし）を解決する。
+ */
 export async function getNoteRole(
   noteId: string,
   userId: string | undefined,
@@ -129,6 +175,10 @@ export async function getNoteRole(
   return { role: null, note };
 }
 
+/**
+ * Whether the role may edit the note given visibility and edit_permission.
+ * visibility / edit_permission に基づき、そのロールがノートを編集できるか。
+ */
 export function canEdit(role: NoteRole, note: Note): boolean {
   if (role === "owner") return true;
   if (role === "editor" && note.editPermission !== "owner_only") return true;
