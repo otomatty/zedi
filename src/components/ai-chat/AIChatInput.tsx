@@ -10,12 +10,36 @@ import { cn } from "@zedi/ui";
 interface AIChatInputProps {
   onSendMessage: (message: string, referencedPages: ReferencedPage[]) => void;
   onStopStreaming: () => void;
+  /** Overrides default placeholder. / 既定プレースホルダーを上書き */
+  placeholderOverride?: string;
+  /** Extra classes on the form (e.g. landing large input). / フォームへの追加クラス */
+  formClassName?: string;
+  /** Extra classes on the contenteditable (e.g. min-height for landing). / contenteditable への追加クラス */
+  editorClassName?: string;
+  /** Classes for the empty-state placeholder overlay (match editor font size). / 空状態プレースホルダー（フォントサイズ合わせ） */
+  emptyOverlayClassName?: string;
+  /** See {@link useAIChatInput} prefill. / ブランチ分岐時のプリフィル */
+  prefillText?: string;
+  /** See {@link useAIChatInput} prefillNonce. / プリフィル適用のたびにインクリメント */
+  prefillNonce?: number;
+  /** See {@link useAIChatInput} focusEditorNonce. / フォーカスのみ（アシスタント分岐） */
+  focusEditorNonce?: number;
 }
 
 /**
  *
  */
-export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps) {
+export function AIChatInput({
+  onSendMessage,
+  onStopStreaming,
+  placeholderOverride,
+  formClassName,
+  editorClassName,
+  emptyOverlayClassName,
+  prefillText,
+  prefillNonce,
+  focusEditorNonce,
+}: AIChatInputProps) {
   /**
    *
    */
@@ -43,7 +67,13 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
     handleDragOver,
     handleDragLeave,
     handleDrop,
-  } = useAIChatInput({ onSendMessage });
+  } = useAIChatInput({
+    onSendMessage,
+    placeholderOverride,
+    prefillText,
+    prefillNonce,
+    focusEditorNonce,
+  });
 
   /**
    *
@@ -94,6 +124,7 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
         className={cn(
           "bg-background focus-within:ring-primary relative rounded-lg border p-2 transition-all focus-within:ring-1",
           isDraggingOver && "border-primary bg-primary/5 ring-primary ring-2",
+          formClassName,
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -110,10 +141,18 @@ export function AIChatInput({ onSendMessage, onStopStreaming }: AIChatInputProps
             onInput={handleEditorInput}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            className="max-h-[120px] min-h-[24px] overflow-y-auto bg-transparent p-1 text-sm [word-break:break-word] whitespace-pre-wrap outline-none"
+            className={cn(
+              "max-h-[120px] min-h-[24px] overflow-y-auto bg-transparent p-1 text-sm [word-break:break-word] whitespace-pre-wrap outline-none",
+              editorClassName,
+            )}
           />
           {isEmpty && (
-            <div className="text-muted-foreground pointer-events-none absolute inset-0 truncate p-1 text-sm">
+            <div
+              className={cn(
+                "text-muted-foreground pointer-events-none absolute inset-0 truncate p-1 text-sm",
+                emptyOverlayClassName,
+              )}
+            >
               {placeholder}
             </div>
           )}

@@ -24,83 +24,37 @@ interface SearchResultItem extends SearchResultCardItem {
 }
 
 /**
+ * Renders global search results for the `q` query string (personal pages and shared notes).
  *
+ * クエリ `q` に対するグローバル検索結果（個人ページと共有ノート）を表示する。
  */
 export default function SearchResults() {
-  /**
-   *
-   */
   const [searchParams] = useSearchParams();
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const { setQuery } = useGlobalSearchContext();
-  /**
-   *
-   */
   const searchQuery = (searchParams.get("q") ?? "").trim();
 
   useEffect(() => {
     setQuery(searchQuery);
   }, [searchQuery, setQuery]);
 
-  /**
-   *
-   */
   const { data: personalResults = [], isLoading: isPersonalLoading } = useSearchPages(searchQuery);
-  /**
-   *
-   */
   const { data: sharedResponse, isLoading: isSharedLoading } = useSearchSharedNotes(searchQuery);
 
-  /**
-   *
-   */
   const isLoading = isPersonalLoading || isSharedLoading;
-  /**
-   *
-   */
   const keywords = useMemo(() => parseSearchQuery(searchQuery), [searchQuery]);
-  /**
-   *
-   */
   const sharedResults = useMemo(() => sharedResponse?.results ?? [], [sharedResponse]);
 
-  /**
-   *
-   */
   const results = useMemo((): SearchResultItem[] => {
     if (searchQuery.length < 3 || keywords.length === 0) return [];
 
-    /**
-     *
-     */
     const personal: SearchResultItem[] = personalResults
       .filter((page) => !page.isDeleted)
       .map((page) => {
-        /**
-         *
-         */
         const content = extractPlainText(page.content);
-        /**
-         *
-         */
         const matchType = determineMatchType(page.title, content, keywords, searchQuery);
-        /**
-         *
-         */
         const score = calculateEnhancedScore(page, keywords, matchType);
-        /**
-         *
-         */
         const snippet = extractSmartSnippet(content, keywords, 200);
-        /**
-         *
-         */
         const highlightedSnippet = highlightKeywords(snippet, keywords);
         return {
           pageId: page.id,
@@ -115,21 +69,9 @@ export default function SearchResults() {
         };
       });
 
-    /**
-     *
-     */
     const shared: SearchResultItem[] = sharedResults.map((r) => {
-      /**
-       *
-       */
       const preview = r.content_preview ?? "";
-      /**
-       *
-       */
       const snippet = extractSmartSnippet(preview, keywords, 200);
-      /**
-       *
-       */
       const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
       return {
         pageId: r.id,
@@ -149,7 +91,9 @@ export default function SearchResults() {
   }, [personalResults, sharedResults, searchQuery, keywords]);
 
   /**
+   * Navigates to the note page or standalone page for the clicked result.
    *
+   * クリックされた結果に応じてノート配下または単体ページへ遷移する。
    */
   const handleResultClick = (item: SearchResultItem) => {
     if (item.noteId) {
@@ -160,14 +104,16 @@ export default function SearchResults() {
   };
 
   /**
+   * Stable React `key` for list items (shared vs personal).
    *
+   * リスト項目用の安定した React `key`（共有／個人の区別）。
    */
   const resultKey = (item: SearchResultItem) =>
     item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
 
   return (
     <AppLayout>
-      <main className="py-6">
+      <main className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <div className="mb-6">
             {searchQuery ? (

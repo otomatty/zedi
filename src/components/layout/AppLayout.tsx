@@ -9,7 +9,7 @@ interface AppLayoutProps {
 }
 
 /**
- * Shared layout with sidebar and header (sidebar-16 pattern).
+ * Shared layout with sidebar and header (`--sidebar-width` from SidebarProvider).
  * Header is fixed at full width above the sidebar; sidebar opens below the header.
  * ヘッダーは全幅で固定、サイドバーはヘッダーの下で開閉する共通レイアウト。
  */
@@ -17,7 +17,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <SidebarProvider
       defaultOpen={false}
-      className="flex flex-col"
+      className="flex h-svh min-h-0 flex-col overflow-hidden"
       style={
         {
           "--app-header-height": "4.5rem",
@@ -26,10 +26,11 @@ export function AppLayout({ children }: AppLayoutProps) {
       }
     >
       <Header />
-      <div className="flex flex-1 overflow-hidden">
+      {/* min-h-0: flex 子が親より伸びてページ全体がスクロールするのを防ぐ */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <AppSidebar />
-        <SidebarInset className="min-w-0">
-          <div className="bg-background min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <SidebarInset className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+          {children}
         </SidebarInset>
         <AIChatDock />
       </div>

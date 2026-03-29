@@ -13,8 +13,29 @@ import {
 
 interface UseAIChatInputProps {
   onSendMessage: (message: string, referencedPages: ReferencedPage[]) => void;
+  /** Overrides default placeholder (e.g. landing page). / 既定プレースホルダーを上書き（ランディング等） */
+  placeholderOverride?: string;
+  /**
+   * Plain text to insert when `prefillNonce` changes (e.g. branch-from-user flow).
+   * `prefillNonce` が変わったときに挿入するプレーンテキスト（ユーザーから分岐など）。
+   */
+  prefillText?: string;
+  /**
+   * Bump to re-apply `prefillText` and focus the editor (e.g. increment on branch-from-user).
+   * 増やすと `prefillText` を再適用してエディタにフォーカス。
+   */
+  prefillNonce?: number;
+  /**
+   * Bump to focus the editor without changing content (e.g. branch from assistant node).
+   * 内容は変えずエディタにフォーカス（アシスタントから分岐など）。
+   */
+  focusEditorNonce?: number;
 }
 
+/**
+ * Page chip state, editor ref, and DOM sync for the AI chat composer (used by {@link useAIChatInput}).
+ * AI チャット入力のページチップ状態・エディタ ref・DOM 同期（{@link useAIChatInput} が利用）。
+ */
 function useAIChatInputChips() {
   const [pendingRefs, setPendingRefs] = useState<ReferencedPage[]>([]);
   const [isEmpty, setIsEmpty] = useState(true);
@@ -87,7 +108,20 @@ function useAIChatInputChips() {
 }
 
 /* eslint-disable max-lines-per-function -- Issue #72 Phase 3: chip logic in useAIChatInputChips; mention/submit/dnd in main hook (174 lines) */
-export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
+/**
+ * AI chat composer logic: contenteditable editor, page chips, mention autocomplete, drag-and-drop pages, branch prefill/focus, send.
+ * AI チャット入力ロジック：contenteditable、ページチップ、メンション補完、ページの D&D、分岐プリフィル／フォーカス、送信。
+ *
+ * Chip DOM sync lives in {@link useAIChatInputChips}. Options: {@link UseAIChatInputProps}.
+ * チップの DOM 同期は {@link useAIChatInputChips}。引数は {@link UseAIChatInputProps}。
+ */
+export function useAIChatInput({
+  onSendMessage,
+  placeholderOverride,
+  prefillText = "",
+  prefillNonce,
+  focusEditorNonce,
+}: UseAIChatInputProps) {
   const { t } = useTranslation();
   const chips = useAIChatInputChips();
   const {
@@ -110,6 +144,31 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
   const { isStreaming, contextEnabled } = useAIChatStore();
   const { pageContext } = useAIChatContext();
   const { data: pages = [] } = usePagesSummary();
+
+  useEffect(() => {
+    if (prefillNonce === undefined) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.textContent = prefillText;
+    syncRefsFromDOM();
+    checkEmpty();
+    requestAnimationFrame(() => {
+      editor.focus();
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    });
+  }, [prefillNonce, prefillText, syncRefsFromDOM, checkEmpty, editorRef]);
+
+  useEffect(() => {
+    if (focusEditorNonce === undefined || focusEditorNonce === 0) return;
+    requestAnimationFrame(() => {
+      editorRef.current?.focus();
+    });
+  }, [focusEditorNonce, editorRef]);
 
   const deferredMentionQuery = useDeferredValue(mentionQuery);
   const mentionCandidates = useMemo(() => {
@@ -273,9 +332,10 @@ export function useAIChatInput({ onSendMessage }: UseAIChatInputProps) {
   );
 
   const placeholder =
-    contextEnabled && pageContext?.type === "editor"
+    placeholderOverride ??
+    (contextEnabled && pageContext?.type === "editor"
       ? t("aiChat.placeholders.withContext")
-      : t("aiChat.placeholders.default");
+      : t("aiChat.placeholders.default"));
 
   return {
     editorRef,

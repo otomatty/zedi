@@ -21,7 +21,7 @@ export function readSidebarOpenFromCookie(): boolean | null {
 }
 
 /** Default sidebar width (desktop). / デスクトップ時のデフォルト幅 */
-export const SIDEBAR_WIDTH = "16rem";
+export const SIDEBAR_WIDTH = "14rem";
 
 /** Sidebar width on mobile sheet. / モバイルシート時の幅 */
 export const SIDEBAR_WIDTH_MOBILE = "18rem";

@@ -10,7 +10,7 @@ import { AIChatPanel } from "./AIChatPanel";
 const mocks = vi.hoisted(() => {
   const setActiveConversation = vi.fn();
   const clearMessages = vi.fn();
-  const loadMessages = vi.fn();
+  const loadConversation = vi.fn();
   /**
    * Stable across renders so AIChatPanel effects do not re-run spuriously on rerender.
    * レンダー間で参照を固定し、AIChatPanel の effect が不要に再実行されないようにする。
@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => {
     mockPageContextRef,
     mockStore,
     clearMessages,
-    loadMessages,
+    loadConversation,
     setActiveConversation,
     createConversation,
     updateConversation,
@@ -75,11 +75,19 @@ vi.mock("../../hooks/useAIChatActions", () => ({
 vi.mock("../../hooks/useAIChat", () => ({
   useAIChat: () => ({
     messages: [],
+    messageMap: {},
+    rootMessageId: null,
+    activeLeafId: null,
     sendMessage: vi.fn(),
     stopStreaming: vi.fn(),
     clearMessages: mocks.clearMessages,
-    loadMessages: mocks.loadMessages,
+    loadConversation: mocks.loadConversation,
     editAndResend: vi.fn(),
+    switchBranch: vi.fn(),
+    navigateToNode: vi.fn(),
+    setBranchPoint: vi.fn(),
+    deleteBranch: vi.fn(),
+    prepareBranchFromUserMessage: vi.fn(() => ""),
     isStreaming: false,
   }),
 }));
