@@ -19,6 +19,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
+import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
 
 const lowlight = createLowlight(common);
 const YDOC_FRAGMENT = "default";
@@ -54,65 +55,6 @@ function resolveUrl(base: string, relative: string | null): string | null {
   } catch {
     return null;
   }
-}
-
-async function fetchHtmlWithRedirects(
-  url: string,
-  controller: AbortController,
-): Promise<{ html: string; finalUrl: string }> {
-  const MAX_REDIRECTS = 5;
-  let response!: Response;
-  let currentUrl = url;
-
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    response = await fetch(currentUrl, {
-      headers: {
-        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
-        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      },
-      redirect: "manual",
-      signal: controller.signal,
-    });
-    const isRedirect =
-      response.type === "opaqueredirect" || [301, 302, 303, 307, 308].includes(response.status);
-    if (isRedirect) {
-      const location = response.headers.get("Location");
-      if (!location || hop === MAX_REDIRECTS) {
-        throw new Error("Too many redirects or invalid Location");
-      }
-
-      let nextUrl: string;
-      try {
-        nextUrl = new URL(location, currentUrl).href;
-      } catch {
-        throw new Error("Invalid redirect Location");
-      }
-
-      if (!isClipUrlAllowed(nextUrl)) {
-        throw new Error("Redirect to disallowed URL");
-      }
-      if (!(await isClipUrlAllowedAfterDns(nextUrl))) {
-        throw new Error("Redirect to disallowed URL");
-      }
-      currentUrl = nextUrl;
-      continue;
-    }
-    break;
-  }
-
-  if (response.url !== currentUrl && !isClipUrlAllowed(response.url)) {
-    throw new Error("Redirect to disallowed URL");
-  }
-  if (!(await isClipUrlAllowedAfterDns(response.url))) {
-    throw new Error("Redirect to disallowed URL");
-  }
-
-  if (!response.ok) {
-    throw new Error(`Fetch failed: ${response.status}`);
-  }
-
-  const html = await response.text();
-  return { html, finalUrl: response.url };
 }
 
 function cleanupHtml(html: string, doc: Document): string {
@@ -191,7 +133,14 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   let finalUrl: string;
 
   try {
-    ({ html, finalUrl } = await fetchHtmlWithRedirects(url, controller));
+    try {
+      ({ html, finalUrl } = await fetchClipHtmlWithRedirects(url, controller));
+    } catch (err) {
+      if (err instanceof ClipFetchBlockedError) {
+        throw new Error("URL not allowed");
+      }
+      throw err;
+    }
   } finally {
     clearTimeout(timeout);
   }
