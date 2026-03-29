@@ -146,7 +146,7 @@ app.put("/:noteId", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const note = await requireNoteOwner(db, noteId, userId);
+  await requireNoteOwner(db, noteId, userId);
 
   const body = await c.req.json<{
     title?: string;
@@ -156,7 +156,12 @@ app.put("/:noteId", authRequired, async (c) => {
   }>();
 
   const isOfficial = parseIsOfficialForUpdate(body.is_official);
-  if (isOfficial !== undefined && isOfficial !== note.isOfficial) {
+  // Require admin whenever the client sends `is_official`, not only when it differs from
+  // the row we read. Otherwise a non-admin could race with an admin toggle and overwrite
+  // the flag using a payload that matched the stale snapshot (TOCTOU).
+  // 読み取り時点と同じ値でもボディに含めたら admin 必須。並行更新との競合で非管理者が
+  // フラグを上書きするのを防ぐ。
+  if (isOfficial !== undefined) {
     await requireAdminUser(db, userId);
   }
 

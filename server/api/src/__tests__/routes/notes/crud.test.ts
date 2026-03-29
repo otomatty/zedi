@@ -196,10 +196,9 @@ describe("PUT /api/notes/:noteId", () => {
     expect(res.status).toBe(403);
   });
 
-  it("should not require admin when is_official is unchanged on update", async () => {
+  it("should return 403 when non-admin sends is_official even if equal to current (TOCTOU)", async () => {
     const mockNote = createMockNote({ isOfficial: true });
-    const updatedNote = createMockNote({ isOfficial: true, title: "Renamed" });
-    const { app } = createTestApp([[mockNote], [updatedNote]]);
+    const { app } = createTestApp([[mockNote], [{ role: "user" }]]);
 
     const res = await app.request(`/api/notes/${mockNote.id}`, {
       method: "PUT",
@@ -207,7 +206,39 @@ describe("PUT /api/notes/:noteId", () => {
       body: JSON.stringify({ title: "Renamed", is_official: true }),
     });
 
+    expect(res.status).toBe(403);
+  });
+
+  it("should allow admin to set is_official from false to true on update", async () => {
+    const mockNote = createMockNote({ isOfficial: false });
+    const updatedNote = createMockNote({ isOfficial: true });
+    const { app } = createTestApp([[mockNote], [{ role: "admin" }], [updatedNote]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ is_official: true }),
+    });
+
     expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.is_official).toBe(true);
+  });
+
+  it("should allow admin to set is_official from true to false on update", async () => {
+    const mockNote = createMockNote({ isOfficial: true });
+    const updatedNote = createMockNote({ isOfficial: false });
+    const { app } = createTestApp([[mockNote], [{ role: "admin" }], [updatedNote]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ is_official: false }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.is_official).toBe(false);
   });
 
   it("should return 400 when is_official is not a boolean on update", async () => {
