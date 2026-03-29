@@ -173,6 +173,7 @@ app.post("/", authRequired, async (c) => {
     }
     for (const link of body.links) {
       if (link.source_id === link.target_id) continue; // self-ref skip
+      if (!ownedIds.has(link.source_id)) continue; // IDOR protection
       await db
         .insert(links)
         .values({
@@ -196,6 +197,7 @@ app.post("/", authRequired, async (c) => {
       await db.delete(ghostLinks).where(eq(ghostLinks.sourcePageId, sourceId));
     }
     for (const gl of body.ghost_links) {
+      if (!ownedGhostIds.has(gl.source_page_id)) continue; // IDOR protection
       await db
         .insert(ghostLinks)
         .values({
