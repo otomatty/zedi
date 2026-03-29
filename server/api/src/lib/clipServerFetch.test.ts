@@ -2,8 +2,13 @@
  * clipServerFetch（SSRF 安全な fetch）の単体テスト
  * Unit tests for clipServerFetch (SSRF-safe fetch).
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { lookup } from "node:dns/promises";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
+
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(),
+}));
 
 const originalFetch = globalThis.fetch;
 
@@ -13,6 +18,13 @@ afterEach(() => {
 });
 
 describe("fetchClipHtmlWithRedirects", () => {
+  beforeEach(() => {
+    vi.mocked(lookup).mockReset();
+    vi.mocked(lookup).mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+    ] as unknown as Awaited<ReturnType<typeof lookup>>);
+  });
+
   it("throws ClipFetchBlockedError when redirect targets private IP", async () => {
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;

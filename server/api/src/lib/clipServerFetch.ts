@@ -2,9 +2,16 @@
  * サーバー側クリップ用 URL 取得（SSRF 対策付きリダイレクト追従）
  * Server-side clip fetch with SSRF-safe manual redirect handling.
  */
-import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
+import { isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
 
 const MAX_REDIRECTS = 5;
+
+/**
+ * clip fetch で拒否するときの API エラー文言（routes と共有）。
+ * Shared API error message when a clip fetch URL is rejected.
+ */
+export const DISALLOWED_CLIP_URL_MESSAGE =
+  "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)";
 
 /**
  * URL がポリシーに違反した場合に投げる（clip/fetch は 400 にマップする）。
@@ -23,10 +30,21 @@ export class ClipFetchBlockedError extends Error {
 }
 
 /**
+ * DNS 解決込みで URL が許可されることを検証し、不可なら {@link ClipFetchBlockedError} を投げる。
+ * Validates URL with DNS resolution; throws {@link ClipFetchBlockedError} if not allowed.
+ */
+export async function assertClipFetchUrlAllowed(url: string): Promise<void> {
+  if (!(await isClipUrlAllowedAfterDns(url))) {
+    throw new ClipFetchBlockedError(DISALLOWED_CLIP_URL_MESSAGE);
+  }
+}
+
+/**
  * http(s) で HTML を取得する。リダイレクトは手動で追従し、各ホップで SSRF チェックを行う。
  * Fetches HTML over http(s) with manual redirects and SSRF checks on each hop.
  *
- * @param url - 事前に isClipUrlAllowed / isClipUrlAllowedAfterDns を通した URL。Pre-validated URL.
+ * @param url - http(s)。初回 fetch の前に {@link assertClipFetchUrlAllowed} で再検証する。
+ *   http(s) URL; re-validated with {@link assertClipFetchUrlAllowed} before the first fetch.
  * @param controller - AbortSignal 用。Abort controller for cancellation.
  * @returns 本文・最終 URL・Content-Type。Body, final URL, and Content-Type.
  */
@@ -34,6 +52,8 @@ export async function fetchClipHtmlWithRedirects(
   url: string,
   controller: AbortController,
 ): Promise<{ html: string; finalUrl: string; contentType: string }> {
+  await assertClipFetchUrlAllowed(url);
+
   let response!: Response;
   let currentUrl = url;
 
@@ -61,16 +81,7 @@ export async function fetchClipHtmlWithRedirects(
         throw new ClipFetchBlockedError("Invalid redirect Location");
       }
 
-      if (!isClipUrlAllowed(nextUrl)) {
-        throw new ClipFetchBlockedError(
-          "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",
-        );
-      }
-      if (!(await isClipUrlAllowedAfterDns(nextUrl))) {
-        throw new ClipFetchBlockedError(
-          "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",
-        );
-      }
+      await assertClipFetchUrlAllowed(nextUrl);
       currentUrl = nextUrl;
       continue;
     }
@@ -80,16 +91,7 @@ export async function fetchClipHtmlWithRedirects(
   // `new Response()` 等では url が空のことがある。実リクエストでは response.url が最終 URL。
   // `new Response()` may leave url empty; real fetch sets the final URL on response.url.
   const finalUrlForPolicy = response.url || currentUrl;
-  if (!isClipUrlAllowed(finalUrlForPolicy)) {
-    throw new ClipFetchBlockedError(
-      "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",
-    );
-  }
-  if (!(await isClipUrlAllowedAfterDns(finalUrlForPolicy))) {
-    throw new ClipFetchBlockedError(
-      "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)",
-    );
-  }
+  await assertClipFetchUrlAllowed(finalUrlForPolicy);
 
   if (!response.ok) {
     throw new Error(`Fetch failed: ${response.status}`);

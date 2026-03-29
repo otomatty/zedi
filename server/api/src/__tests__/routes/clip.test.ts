@@ -90,6 +90,8 @@ describe("POST /api/clip/fetch", () => {
       body: JSON.stringify({ url: "http://127.0.0.1:8080/" }),
     });
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toMatch(/URL not allowed|only public http/i);
   });
 
   it("returns 200 with html when fetch succeeds", async () => {
@@ -104,7 +106,7 @@ describe("POST /api/clip/fetch", () => {
     const res = await app.request("/api/clip/fetch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: "https://example.com/article" }),
+      body: JSON.stringify({ url: "http://8.8.8.8/article" }),
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { html?: string; url?: string; content_type?: string };

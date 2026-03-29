@@ -6,12 +6,13 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../middleware/auth.js";
-import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
-import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
+import {
+  ClipFetchBlockedError,
+  DISALLOWED_CLIP_URL_MESSAGE,
+  fetchClipHtmlWithRedirects,
+} from "../lib/clipServerFetch.js";
+import { isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
 import type { AppEnv } from "../types/index.js";
-
-const DISALLOWED_URL_MESSAGE =
-  "URL not allowed: only public http/https URLs are supported (no localhost, private IP, or internal hosts)";
 
 const app = new Hono<AppEnv>();
 
@@ -24,11 +25,8 @@ app.post("/fetch", authRequired, async (c) => {
 
   const url = body.url.trim();
 
-  if (!isClipUrlAllowed(url)) {
-    throw new HTTPException(400, { message: DISALLOWED_URL_MESSAGE });
-  }
   if (!(await isClipUrlAllowedAfterDns(url))) {
-    throw new HTTPException(400, { message: DISALLOWED_URL_MESSAGE });
+    throw new HTTPException(400, { message: DISALLOWED_CLIP_URL_MESSAGE });
   }
 
   const controller = new AbortController();
