@@ -26,7 +26,13 @@ interface AISettingsFormUserKeySectionProps {
   embedded: boolean;
 }
 
-export const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySectionProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySectionProps> = ({
   apiKey,
   provider,
   model,
@@ -40,6 +46,9 @@ export const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySection
   testResult,
   embedded,
 }) => {
+  /**
+   *
+   */
   const { t } = useTranslation();
 
   return (
@@ -66,16 +75,16 @@ export const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySection
             type="button"
             variant="ghost"
             size="icon"
-            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
             onClick={onToggleShowApiKey}
             disabled={isSaving || isTesting}
             aria-label={showApiKey ? t("aiSettings.hideApiKey") : t("aiSettings.showApiKey")}
             aria-pressed={showApiKey}
           >
             {showApiKey ? (
-              <EyeOff className="h-4 w-4 text-muted-foreground" />
+              <EyeOff className="text-muted-foreground h-4 w-4" />
             ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
+              <Eye className="text-muted-foreground h-4 w-4" />
             )}
           </Button>
         </div>
@@ -99,7 +108,7 @@ export const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySection
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">{t("aiSettings.modelsAvailableAfterTest")}</p>
+        <p className="text-muted-foreground text-xs">{t("aiSettings.modelsAvailableAfterTest")}</p>
       </div>
 
       {testResult && (

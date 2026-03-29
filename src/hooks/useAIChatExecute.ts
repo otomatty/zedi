@@ -1,81 +1,124 @@
-import type { ChatMessage, PageContext, ReferencedPage } from "../types/aiChat";
-import type { AISettings } from "../types/ai";
-import { callAIService, type AIServiceRequest } from "../lib/aiService";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type {
+  ChatMessage,
+  ChatTreeState,
+  PageContext,
+  ReferencedPage,
+  TreeChatMessage,
+} from "../types/aiChat";
+import type { AIServiceRequest } from "../lib/aiService";
 import { loadAISettings } from "../lib/aiSettings";
 import { buildSystemPrompt } from "../lib/aiChatPrompt";
-import { parseActions } from "../lib/aiChatActions";
-import { useAIChatStore } from "../stores/aiChatStore";
+import { addMessageToTree, getActivePath, stripToChatMessage } from "../lib/messageTree";
+import {
+  buildApiPayload,
+  collectReferencedPagesFromMessages,
+  patchAssistantSettingsLoadFailure,
+  resolveEffectiveAIModel,
+  streamAssistantCompletion,
+} from "./useAIChatExecuteHelpers";
 
-function updateAssistantMessage(
-  prev: ChatMessage[],
-  assistantMessageId: string,
-  patch: Partial<ChatMessage>,
-): ChatMessage[] {
-  return prev.map((m) => (m.id === assistantMessageId ? { ...m, ...patch } : m));
-}
+export { executeRegenerateAssistant } from "./useAIChatExecuteRegenerate";
+export type { ExecuteRegenerateAssistantParams } from "./useAIChatExecuteRegenerate";
 
+/**
+ * Parameters for {@link executeSendMessage}.
+ * {@link executeSendMessage} に渡す引数。
+ */
 export interface ExecuteSendMessageParams {
   content: string;
   messageRefs: ReferencedPage[];
-  currentMessages: ChatMessage[];
-  /** 指定時はこの履歴の直後にユーザー/助手メッセージを追加（チェックポイント編集で使用） */
-  initialMessages?: ChatMessage[];
   pageContext: PageContext | null;
   contextEnabled: boolean;
   existingPageTitles: string[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setError: (value: string | null) => void;
   setStreaming: (value: boolean) => void;
-  streamingContentRef: React.MutableRefObject<string>;
-  abortControllerRef: React.MutableRefObject<AbortController | null>;
+  streamingContentRef: MutableRefObject<string>;
+  abortControllerRef: MutableRefObject<AbortController | null>;
+  treeRef: MutableRefObject<ChatTreeState>;
+  setTree: Dispatch<SetStateAction<ChatTreeState>>;
+  /** 指定時はこのユーザーメッセージと同じ親に新しいユーザーを追加（編集ブランチ）。 */
+  branchFromUserMessageId?: string;
 }
 
+/**
+ * Sends a new user message (and streams assistant) on the active branch or as a sibling branch.
+ * アクティブブランチ、または編集による兄弟ブランチにユーザーメッセージを送る。
+ */
 export async function executeSendMessage(params: ExecuteSendMessageParams): Promise<void> {
   const {
     content,
     messageRefs,
-    currentMessages,
-    initialMessages,
     pageContext,
     contextEnabled,
     existingPageTitles,
-    setMessages,
     setError,
     setStreaming,
     streamingContentRef,
     abortControllerRef,
+    treeRef,
+    setTree,
+    branchFromUserMessageId,
   } = params;
+
+  const tree = treeRef.current;
 
   setError(null);
 
-  const userMessage: ChatMessage = {
+  const userMessage: TreeChatMessage = {
     id: crypto.randomUUID(),
     role: "user",
     content,
     referencedPages: messageRefs.length > 0 ? messageRefs : undefined,
     timestamp: Date.now(),
+    parentId: null,
   };
 
   const assistantMessageId = crypto.randomUUID();
-  const assistantMessage: ChatMessage = {
+  const assistantMessage: TreeChatMessage = {
     id: assistantMessageId,
     role: "assistant",
     content: "",
     timestamp: Date.now(),
     isStreaming: true,
+    parentId: userMessage.id,
   };
 
-  if (initialMessages !== undefined) {
-    setMessages([...initialMessages, userMessage, assistantMessage]);
+  let basePath: ChatMessage[];
+
+  if (branchFromUserMessageId !== undefined) {
+    const oldUser = tree.messageMap[branchFromUserMessageId];
+    if (!oldUser || oldUser.role !== "user") {
+      return;
+    }
+    userMessage.parentId = oldUser.parentId;
+    basePath =
+      oldUser.parentId === null
+        ? []
+        : getActivePath(tree.messageMap, oldUser.parentId).map(stripToChatMessage);
   } else {
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    userMessage.parentId = tree.activeLeafId;
+    basePath =
+      tree.activeLeafId === null
+        ? []
+        : getActivePath(tree.messageMap, tree.activeLeafId).map(stripToChatMessage);
   }
+
+  setTree((prev) => {
+    let map = addMessageToTree(prev.messageMap, userMessage);
+    map = addMessageToTree(map, assistantMessage);
+    return {
+      messageMap: map,
+      rootMessageId: prev.rootMessageId ?? userMessage.id,
+      activeLeafId: assistantMessage.id,
+    };
+  });
 
   setStreaming(true);
   streamingContentRef.current = "";
   abortControllerRef.current = new AbortController();
 
-  let settings: AISettings;
+  let settings;
   try {
     const loaded = await loadAISettings();
     if (!loaded) {
@@ -84,104 +127,43 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     settings = loaded;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "AI設定の読み込みに失敗しました";
-    setMessages((prev) =>
-      updateAssistantMessage(prev, assistantMessageId, {
-        content: "",
-        isStreaming: false,
-        error: errorMessage,
-      }),
+    patchAssistantSettingsLoadFailure(
+      setTree,
+      assistantMessageId,
+      errorMessage,
+      setStreaming,
+      setError,
     );
-    setStreaming(false);
-    setError(errorMessage);
     return;
   }
 
-  const { selectedModel } = useAIChatStore.getState();
-  const effectiveProvider = selectedModel?.provider ?? settings.provider;
-  const effectiveModel = selectedModel?.model ?? settings.model;
-  const effectiveModelId = selectedModel?.id ?? settings.modelId;
-  const modelDisplayName = selectedModel?.displayName ?? effectiveModel;
+  const { effectiveSettings, modelDisplayName } = resolveEffectiveAIModel(settings);
 
   const context = contextEnabled ? pageContext : null;
-  const baseMessages = initialMessages ?? currentMessages;
-  const allRefsInConversation = [...baseMessages, userMessage].flatMap(
-    (m) => m.referencedPages ?? [],
-  );
-  const uniqueRefs = allRefsInConversation.filter(
-    (ref, idx, arr) => arr.findIndex((r) => r.id === ref.id) === idx,
-  );
+  const uniqueRefs = collectReferencedPagesFromMessages([
+    ...basePath,
+    stripToChatMessage(userMessage),
+  ]);
   const systemPrompt = buildSystemPrompt(context, existingPageTitles, uniqueRefs);
 
-  const allMessages = [...baseMessages, userMessage];
   const apiMessages: AIServiceRequest["messages"] = [
     { role: "system", content: systemPrompt },
-    ...allMessages.map((m) => ({ role: m.role, content: m.content })),
+    ...buildApiPayload(basePath, stripToChatMessage(userMessage)),
   ];
 
   const request: AIServiceRequest = {
-    provider: effectiveProvider,
-    model: effectiveModel,
+    provider: effectiveSettings.provider,
+    model: effectiveSettings.model,
     messages: apiMessages,
     options: { stream: true, feature: "chat" },
   };
 
-  const effectiveSettings: AISettings = {
-    ...settings,
-    provider: effectiveProvider,
-    model: effectiveModel,
-    modelId: effectiveModelId,
-  };
-
-  try {
-    await callAIService(
-      effectiveSettings,
-      request,
-      {
-        onChunk: (chunk) => {
-          streamingContentRef.current += chunk;
-          setMessages((prev) =>
-            updateAssistantMessage(prev, assistantMessageId, {
-              content: streamingContentRef.current,
-            }),
-          );
-        },
-        onComplete: (response) => {
-          const finalContent = response.content || streamingContentRef.current;
-          const actions = parseActions(finalContent);
-          setMessages((prev) =>
-            updateAssistantMessage(prev, assistantMessageId, {
-              content: finalContent,
-              isStreaming: false,
-              modelDisplayName,
-              actions: actions.length > 0 ? actions : undefined,
-            }),
-          );
-          setStreaming(false);
-        },
-        onError: (err) => {
-          setMessages((prev) =>
-            updateAssistantMessage(prev, assistantMessageId, {
-              content: streamingContentRef.current || "",
-              isStreaming: false,
-              error: err.message,
-            }),
-          );
-          setStreaming(false);
-          setError(err.message);
-        },
-      },
-      abortControllerRef.current.signal,
-    );
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    setMessages((prev) =>
-      updateAssistantMessage(prev, assistantMessageId, {
-        content: streamingContentRef.current || "",
-        isStreaming: false,
-        error: errorMessage,
-      }),
-    );
-    setStreaming(false);
-    setError(errorMessage);
-  }
+  await streamAssistantCompletion(effectiveSettings, request, abortControllerRef.current.signal, {
+    assistantMessageId,
+    modelDisplayName,
+    streamingContentRef,
+    setTree,
+    setStreaming,
+    setError,
+  });
 }

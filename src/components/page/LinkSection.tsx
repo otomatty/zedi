@@ -9,13 +9,16 @@ interface LinkSectionProps {
   onPageClick: (pageId: string) => void;
 }
 
+/**
+ *
+ */
 export function LinkSection({ title, icon, pages, onPageClick }: LinkSectionProps) {
   if (pages.length === 0) return null;
 
   return (
     <div className="space-y-3">
       {title && (
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
           {icon}
           <span>
             {title} ({pages.length})

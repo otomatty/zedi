@@ -1,9 +1,12 @@
-import { useState, useCallback, useRef } from "react";
-import { ChatMessage, PageContext, ReferencedPage } from "../types/aiChat";
+import { useState, useRef, useMemo, useEffect } from "react";
+import type { ChatTreeState, PageContext } from "../types/aiChat";
 import type { PageSummary } from "@/types/page";
 import { useAIChatStore } from "../stores/aiChatStore";
-import { resolveReferencedPagesFromContent } from "@/lib/aiChatActionHelpers";
-import { executeSendMessage } from "./useAIChatExecute";
+import { emptyTree } from "./aiChatEmptyTree";
+import { useAIChatMessageCallbacks } from "./useAIChatMessageCallbacks";
+import { useAIChatTreeLoaders } from "./useAIChatTreeLoaders";
+import { useAIChatBranchControls } from "./useAIChatBranchControls";
+import { getActivePath } from "@/lib/messageTree";
 
 interface UseAIChatOptions {
   pageContext: PageContext | null;
@@ -12,102 +15,82 @@ interface UseAIChatOptions {
   availablePages?: Pick<PageSummary, "id" | "title" | "isDeleted">[];
 }
 
+/**
+ * AI chat state with branched transcript (tree) and active path for display.
+ * 分岐付き会話ツリーと表示用アクティブパスを持つ AI チャット状態。
+ */
 export function useAIChat({
   pageContext,
   contextEnabled,
   existingPageTitles = [],
   availablePages,
 }: UseAIChatOptions) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [tree, setTree] = useState<ChatTreeState>(emptyTree);
+  const treeRef = useRef(tree);
+  useEffect(() => {
+    treeRef.current = tree;
+  }, [tree]);
+
   const [error, setError] = useState<string | null>(null);
   const { setStreaming, isStreaming } = useAIChatStore();
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamingContentRef = useRef<string>("");
+  /** Next send from branch tree "branch from user" uses this sibling-edit path. / ブランチツリー「ユーザーから分岐」の次回送信で使う */
+  const pendingBranchFromUserIdRef = useRef<string | null>(null);
 
-  const sendMessage = useCallback(
-    async (
-      content: string,
-      messageRefs: ReferencedPage[] = [],
-      options?: { initialMessages?: ChatMessage[] },
-    ) => {
-      const baseMessages = options?.initialMessages ?? messages;
-      try {
-        await executeSendMessage({
-          content,
-          messageRefs,
-          currentMessages: baseMessages,
-          initialMessages: options?.initialMessages,
-          pageContext,
-          contextEnabled,
-          existingPageTitles,
-          setMessages,
-          setError,
-          setStreaming,
-          streamingContentRef,
-          abortControllerRef,
-        });
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        setError(errorMessage);
-        setStreaming(false);
-      }
-    },
-    [messages, pageContext, contextEnabled, existingPageTitles, setStreaming],
+  const {
+    switchBranch,
+    navigateToNode,
+    setBranchPoint,
+    deleteBranch,
+    prepareBranchFromUserMessage,
+  } = useAIChatBranchControls({ treeRef, setTree, pendingBranchFromUserIdRef });
+
+  const messages = useMemo(
+    () => getActivePath(tree.messageMap, tree.activeLeafId),
+    [tree.messageMap, tree.activeLeafId],
   );
 
-  const stopStreaming = useCallback(() => {
-    abortControllerRef.current?.abort();
-    setStreaming(false);
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.isStreaming ? { ...m, isStreaming: false, content: streamingContentRef.current } : m,
-      ),
-    );
-  }, [setStreaming]);
+  const { clearMessages, loadMessages, loadConversation } = useAIChatTreeLoaders({
+    setTree,
+    setError,
+  });
 
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    setError(null);
-  }, []);
-
-  const loadMessages = useCallback((msgs: ChatMessage[]) => {
-    setMessages(msgs);
-  }, []);
-
-  const retryLastMessage = useCallback(() => {
-    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
-    if (lastUserMsg) {
-      setMessages((prev) => prev.filter((m) => !m.error));
-      sendMessage(lastUserMsg.content, lastUserMsg.referencedPages ?? []);
-    }
-  }, [messages, sendMessage]);
-
-  /** 指定したユーザーメッセージを編集して再送信。そのメッセージ以降を破棄し、新内容でAI応答を生成する */
-  const editAndResend = useCallback(
-    async (messageId: string, newContent: string) => {
-      const index = messages.findIndex((m) => m.id === messageId);
-      if (index < 0) return;
-      const message = messages[index];
-      if (message.role !== "user") return;
-      const refs =
-        availablePages == null
-          ? (message.referencedPages ?? [])
-          : resolveReferencedPagesFromContent(newContent, availablePages);
-      const truncated = messages.slice(0, index);
-      await sendMessage(newContent, refs, { initialMessages: truncated });
+  const { sendMessage, stopStreaming, retryLastMessage, editAndResend } = useAIChatMessageCallbacks(
+    {
+      pageContext,
+      contextEnabled,
+      existingPageTitles,
+      availablePages,
+      tree,
+      treeRef,
+      setTree,
+      setError,
+      setStreaming,
+      streamingContentRef,
+      abortControllerRef,
+      pendingBranchFromUserIdRef,
     },
-    [availablePages, messages, sendMessage],
   );
 
   return {
     messages,
+    messageMap: tree.messageMap,
+    rootMessageId: tree.rootMessageId,
+    activeLeafId: tree.activeLeafId,
     error,
     isStreaming,
     sendMessage,
     stopStreaming,
     clearMessages,
     loadMessages,
+    loadConversation,
     retryLastMessage,
     editAndResend,
+    switchBranch,
+    navigateToNode,
+    setBranchPoint,
+    deleteBranch,
+    prepareBranchFromUserMessage,
   };
 }

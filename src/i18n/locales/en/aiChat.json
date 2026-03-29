@@ -1,7 +1,12 @@
 {
   "title": "AI",
+  "branch": {
+    "prev": "Previous branch",
+    "next": "Next branch"
+  },
   "actions": {
     "close": "Close",
+    "openInPage": "Open in full page",
     "newConversation": "New Conversation",
     "conversationList": "Conversations",
     "cancel": "Cancel",
@@ -49,9 +54,29 @@
     "pageContextRequired": "Open a page before running this action",
     "appendUnavailable": "Only appending to the currently open page is supported",
     "appendSuccess": "Appended to \"{{title}}\"",
+    "appendFailed": "Could not append to \"{{title}}\"",
+    "pageBodyGenerated": "Page content generated",
+    "pageBodyGenerateFailed": "Failed to generate page content",
     "wikiLinksAdded": "Added {{count}} wiki links",
     "noNewWikiLinks": "There are no new wiki links to add",
     "actionFailed": "Failed to execute the action"
+  },
+  "messages": {
+    "loadingSkeleton": "Loading response"
+  },
+  "viewTabs": {
+    "chat": "Chat",
+    "branch": "Branches",
+    "noBranches": "No branches in this conversation"
+  },
+  "branchTree": {
+    "goToBranch": "Go to this branch",
+    "branchFromHere": "Branch from here",
+    "deleteBranch": "Delete this branch",
+    "deleteConfirmTitle": "Delete this branch?",
+    "deleteConfirmDescription": "This message and all replies below it will be removed. This cannot be undone.",
+    "deleteCancel": "Cancel",
+    "deleteConfirm": "Delete"
   },
   "empty": {
     "messages": "Messages will appear here",
@@ -63,6 +88,22 @@
     "costLabel": "{{multiplier}}x",
     "cheapest": "1x",
     "estimatedCost": "~{{cost}} CU"
+  },
+  "landing": {
+    "placeholder": "Ask anything...",
+    "recentChats": "Recent chats",
+    "noRecentChats": "No conversations yet",
+    "viewAll": "View all history"
+  },
+  "history": {
+    "pageTitle": "AI chat history",
+    "pageDescription": "Open a conversation on the full page or delete it from this list.",
+    "seeAll": "See all",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete this conversation?",
+    "deleteConfirmDescription": "This cannot be undone.",
+    "openMenu": "Open menu",
+    "empty": "No conversations yet"
   },
   "referencedPages": {
     "added": "Added \"{{title}}\" as reference",

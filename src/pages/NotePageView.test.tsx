@@ -56,6 +56,12 @@ vi.mock("@zedi/ui", () => ({
   ),
 }));
 
+vi.mock("@/components/layout/AppLayout", () => ({
+  AppLayout: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout">{children}</div>
+  ),
+}));
+
 function renderNotePageView() {
   return render(
     <MemoryRouter initialEntries={[`/note/note-1/page/page-1`]}>

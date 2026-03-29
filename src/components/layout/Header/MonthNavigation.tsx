@@ -9,13 +9,22 @@ import { formatMonthYear } from "@/lib/dateUtils";
 import { getAvailableMonthsFromPages } from "@/lib/dateUtils";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 
+/** Path for the home grid; month filter uses `?month=yyyy-MM`. / ホームグリッド。月絞り込みは `?month=yyyy-MM` */
 const HOME_PATH = "/home";
 
+/**
+ * Current calendar month in local time as `yyyy-MM` (for capping prev/next and the dropdown).
+ * ローカル日付の「今月」を `yyyy-MM` で表す（次へ／ドロップダウン上限に使用）。
+ */
 function getCurrentMonthKey(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/**
+ * Reads and validates `month` from `location.search` (`yyyy-MM`, month 1–12).
+ * `location.search` から `month` を読み、`yyyy-MM`（月 1–12）なら検証済みで返す。
+ */
 function parseMonthParam(search: string): string | null {
   const params = new URLSearchParams(search);
   const month = params.get("month");
@@ -25,6 +34,13 @@ function parseMonthParam(search: string): string | null {
   return month;
 }
 
+/**
+ * Month filter for the home page: reads `?month=yyyy-MM`, prev/next, and a dropdown of months that have pages (past months only).
+ * ホームの月フィルタ：`?month=yyyy-MM` の反映、前後月、ページの月ドロップダウン（当月より前のみ）。
+ *
+ * Shown in {@link Header} on desktop (`md+`) next to the logo; other routes ignore the query and behave like “all time”.
+ * {@link Header} のロゴ横（`md+` 表示）。他ルートではクエリを無視し「全期間」相当の表示。
+ */
 export const MonthNavigation: React.FC = () => {
   const { t } = useTranslation();
   const location = useLocation();
@@ -35,6 +51,10 @@ export const MonthNavigation: React.FC = () => {
   const monthParam = isOnHome ? parseMonthParam(location.search) : null;
   const currentMonthKey = useMemo(() => getCurrentMonthKey(), []);
 
+  /**
+   * Months that appear in page `updatedAt`, newest first; excludes the current calendar month and the future (navigation cap).
+   * ページの `updatedAt` に現れる月（新しい順）。当月・未来は除外（ナビの上限と一致）。
+   */
   const availableMonths = useMemo(() => {
     const all = getAvailableMonthsFromPages(pages.filter((p) => !p.isDeleted));
     return all.filter((yyyyMM) => yyyyMM < currentMonthKey);
@@ -65,6 +85,10 @@ export const MonthNavigation: React.FC = () => {
     }
   };
 
+  /**
+   * One step forward from the displayed month (from “all time”, starts at next calendar month after today’s month).
+   * 表示中の月の 1 ヶ月後。「全期間」からは今日の月の次の月（通常は来月）を指す。
+   */
   const nextMonthParam = useMemo(() => {
     if (monthParam) {
       const [y, m] = monthParam.split("-").map(Number);
@@ -84,7 +108,7 @@ export const MonthNavigation: React.FC = () => {
   };
 
   return (
-    <div className="hidden items-center gap-1.5 sm:flex">
+    <div className="flex items-center gap-1.5">
       <Button
         variant="ghost"
         size="icon"
@@ -100,7 +124,7 @@ export const MonthNavigation: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-9 min-w-[110px] text-sm font-medium text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-9 min-w-[110px] text-sm font-medium"
             aria-label={t("home.period.selectMonth")}
           >
             <span className="text-center">{displayLabel}</span>

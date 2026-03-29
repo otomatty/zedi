@@ -14,7 +14,8 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "types": ["node", "bun-types"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

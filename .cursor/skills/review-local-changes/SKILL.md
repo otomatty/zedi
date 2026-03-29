@@ -271,7 +271,7 @@ Phase 2 で収集した情報を以下の観点で分析する。
 
 ### 3-2. レポート出力
 
-`docs/reviews/` に出力する（`.gitignore` に `docs/reviews/` を追加推奨）。
+`docs/reviews/` に出力する（ディレクトリがなければ作成。`docs/` は `.gitignore` により Git 追跡外のローカル作業用。仕様の正はソースとテスト）。
 
 #### ファイル名
 

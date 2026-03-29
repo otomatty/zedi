@@ -179,7 +179,7 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - name: Run mutation tests (limited scope)
-        run: bun run test:mutation -- --mutate "src/lib/dateUtils.ts"
+        run: bun run test:mutation -- --mutate "src/lib/dateUtils.ts,src/hooks/useContainerColumns.ts,src/pages/NoteView/noteViewHelpers.ts"
 
       - name: Upload mutation report
         if: always()

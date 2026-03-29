@@ -14,6 +14,9 @@ interface MermaidGeneratorFormFieldsProps {
   onGenerate: () => void;
 }
 
+/**
+ *
+ */
 export function MermaidGeneratorFormFields({
   selectedText,
   selectedTypes,
@@ -26,7 +29,7 @@ export function MermaidGeneratorFormFields({
     <>
       <div className="space-y-2">
         <Label>選択されたテキスト</Label>
-        <div className="max-h-24 overflow-auto rounded-md bg-muted p-3 text-sm">{selectedText}</div>
+        <div className="bg-muted max-h-24 overflow-auto rounded-md p-3 text-sm">{selectedText}</div>
       </div>
 
       <div className="space-y-2">
@@ -36,7 +39,7 @@ export function MermaidGeneratorFormFields({
             <label
               key={type.id}
               htmlFor={type.id}
-              className="flex cursor-pointer items-start space-x-2 rounded border p-2 hover:bg-muted/50"
+              className="hover:bg-muted/50 flex cursor-pointer items-start space-x-2 rounded border p-2"
             >
               <Checkbox
                 id={type.id}
@@ -46,7 +49,7 @@ export function MermaidGeneratorFormFields({
               />
               <div className="flex-1">
                 <span className="text-sm font-medium">{type.name}</span>
-                <p className="text-xs text-muted-foreground">{type.description}</p>
+                <p className="text-muted-foreground text-xs">{type.description}</p>
               </div>
             </label>
           ))}
@@ -67,7 +70,7 @@ export function MermaidGeneratorFormFields({
       )}
 
       {status === "error" && error && (
-        <div className="rounded-md bg-destructive/10 p-4 text-destructive">
+        <div className="bg-destructive/10 text-destructive rounded-md p-4">
           <p className="font-medium">エラーが発生しました</p>
           <p className="text-sm">{error.message}</p>
           <Button variant="outline" size="sm" onClick={onGenerate} className="mt-2">

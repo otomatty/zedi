@@ -1,5 +1,5 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "paths": {
     "@/*": ["./src/*"]
   },
@@ -26,7 +26,6 @@
     }
   },
   "ignoreDependencies": [
-    "@better-auth/drizzle-adapter",
     "tailwindcss-animate",
     "@google/generative-ai",
     "@hookform/resolvers",

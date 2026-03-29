@@ -101,14 +101,14 @@ const Onboarding: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="bg-background flex min-h-screen flex-col">
       <header className="border-b px-4 py-4">
         <h1 className="text-lg font-semibold">{t("onboarding.title")}</h1>
         <div className="mt-2 flex gap-2">
@@ -129,7 +129,7 @@ const Onboarding: React.FC = () => {
             <>
               <div className="space-y-1 text-center">
                 <h2 className="text-xl font-medium">{t("onboarding.profile.heading")}</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {t("onboarding.profile.description")}
                 </p>
               </div>
@@ -156,7 +156,7 @@ const Onboarding: React.FC = () => {
             <>
               <div className="space-y-1 text-center">
                 <h2 className="text-xl font-medium">{t("onboarding.language.heading")}</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {t("onboarding.language.description")}
                 </p>
               </div>
@@ -174,7 +174,7 @@ const Onboarding: React.FC = () => {
             <>
               <div className="space-y-1 text-center">
                 <h2 className="text-xl font-medium">{t("onboarding.tour.heading")}</h2>
-                <p className="text-sm text-muted-foreground">{t("onboarding.tour.description")}</p>
+                <p className="text-muted-foreground text-sm">{t("onboarding.tour.description")}</p>
               </div>
               <div className="flex flex-col gap-3">
                 <Button onClick={handleCompleteWithTour} size="lg" className="w-full">
@@ -184,7 +184,7 @@ const Onboarding: React.FC = () => {
                   onClick={handleCompleteSkip}
                   variant="ghost"
                   size="lg"
-                  className="w-full text-muted-foreground"
+                  className="text-muted-foreground w-full"
                 >
                   {t("onboarding.tour.skip")}
                 </Button>

@@ -9,6 +9,9 @@ type Props = Pick<
   "useExternalStorage" | "useExternalStorageEffective" | "updateSettings" | "isSaving" | "isTesting"
 >;
 
+/**
+ *
+ */
 export function StorageDestinationSection({
   useExternalStorage,
   useExternalStorageEffective,
@@ -16,15 +19,18 @@ export function StorageDestinationSection({
   isSaving,
   isTesting,
 }: Props) {
+  /**
+   *
+   */
   const { t } = useTranslation();
   return (
     <>
-      <div className="flex items-center justify-between rounded-lg border border-border p-4">
+      <div className="border-border flex items-center justify-between rounded-lg border p-4">
         <div className="space-y-0.5">
           <Label htmlFor="prefer-default" className="text-base">
             {t("storageSettings.storageDestination")}
           </Label>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {useExternalStorageEffective
               ? t("storageSettings.saveToExternal")
               : t("storageSettings.saveToDefault")}

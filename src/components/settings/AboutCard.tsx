@@ -20,9 +20,9 @@ export function AboutCard(): React.JSX.Element {
         <CardDescription>{t("generalSettings.about.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           {t("generalSettings.about.version")}:{" "}
-          <span className="font-mono font-medium text-foreground">
+          <span className="text-foreground font-mono font-medium">
             {import.meta.env.VITE_APP_VERSION ?? "—"}
           </span>
         </p>

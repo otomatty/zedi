@@ -223,4 +223,151 @@ describe("useAIChatActions", () => {
       title: "aiChat.notifications.wikiLinksAdded",
     });
   });
+
+  it("create-multiple-pages creates each page and does not navigate", async () => {
+    const { result } = renderHook(() => useAIChatActions({ pageContext: null }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleExecuteAction({
+        type: "create-multiple-pages",
+        pages: [
+          { title: "A", content: "body-a", suggestedLinks: [] },
+          { title: "B", content: "body-b", suggestedLinks: [] },
+        ],
+        linkStructure: [],
+        reason: "test",
+      });
+    });
+
+    expect(mockCreatePageMutateAsync).toHaveBeenCalledTimes(2);
+    expect(mockCreatePageMutateAsync).toHaveBeenNthCalledWith(1, {
+      title: "A",
+      content: "body-a",
+    });
+    expect(mockCreatePageMutateAsync).toHaveBeenNthCalledWith(2, {
+      title: "B",
+      content: "body-b",
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("append-to-page shows appendUnavailable when page title does not match", async () => {
+    const pageContext = {
+      type: "editor" as const,
+      pageId: "page-1",
+      pageTitle: "Current Page",
+      pageFullContent: "",
+    };
+    const { result } = renderHook(() => useAIChatActions({ pageContext }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleExecuteAction({
+        type: "append-to-page",
+        pageTitle: "Other",
+        content: "x",
+        reason: "test",
+      });
+    });
+
+    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.appendUnavailable",
+      variant: "destructive",
+    });
+  });
+
+  it("suggest-wiki-links shows noNewWikiLinks when all suggested titles are already present", async () => {
+    const pageContext = {
+      type: "editor" as const,
+      pageId: "page-1",
+      pageTitle: "Current Page",
+      pageFullContent: JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "x",
+                marks: [
+                  {
+                    type: "wikiLink",
+                    attrs: { title: "Already", exists: false, referenced: false },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    };
+    const { result } = renderHook(() => useAIChatActions({ pageContext }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleExecuteAction({
+        type: "suggest-wiki-links",
+        links: [{ keyword: "Already", existingPageTitle: "Already" }],
+        reason: "test",
+      });
+    });
+
+    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith({ title: "aiChat.notifications.noNewWikiLinks" });
+  });
+
+  it("append-to-page shows actionFailed and rolls back when syncLinks throws", async () => {
+    const pageContext = {
+      type: "editor" as const,
+      pageId: "page-1",
+      pageTitle: "Current Page",
+      pageFullContent: "",
+    };
+    mockSyncLinks.mockRejectedValue(new Error("sync failed"));
+
+    const { result } = renderHook(() => useAIChatActions({ pageContext }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleExecuteAction({
+        type: "append-to-page",
+        pageTitle: "Current Page",
+        content: "Append body",
+        reason: "test",
+      });
+    });
+
+    expect(mockUpdatePageMutateAsync).toHaveBeenCalledTimes(2);
+    expect(mockSyncLinks).toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith({
+      title: "aiChat.notifications.actionFailed",
+      variant: "destructive",
+    });
+  });
+
+  it("create-page does not navigate when mutate returns no id", async () => {
+    mockCreatePageMutateAsync.mockResolvedValueOnce({ id: undefined });
+    const { result } = renderHook(() => useAIChatActions({ pageContext: null }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleExecuteAction({
+        type: "create-page",
+        title: "Solo",
+        content: "c",
+        suggestedLinks: [],
+        reason: "test",
+      });
+    });
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });

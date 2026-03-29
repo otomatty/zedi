@@ -7,11 +7,16 @@ import { useWikiGenerator } from "@/hooks/useWikiGenerator";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { usePageEditorState } from "./usePageEditorState";
 import { usePageEditorAutoSaveWithMutation } from "./usePageEditorAutoSaveWithMutation";
-import { usePageEditorEffects } from "./usePageEditorEffects";
+import { usePageEditorAIEffects } from "./usePageEditorAIEffects";
 import { usePageEditorWikiCollab } from "./usePageEditorWikiCollab";
 import { usePageDeletion } from "./usePageDeletion";
 import { useMarkdownExport } from "./useMarkdownExport";
 import { usePageEditorKeyboard } from "./usePageEditorKeyboard";
+import {
+  pageEditorActionsReturnSlice,
+  pageEditorCoreReturnSlice,
+  pageEditorWikiReturnSlice,
+} from "./usePageEditorStateAndSyncReturnSlices";
 
 function useDisplayLastSavedAndPending(
   autoSaveLastSaved: number | null | undefined,
@@ -131,7 +136,7 @@ export function usePageEditorStateAndSync() {
   const { displayLastSaved, pendingInitialContent, setPendingInitialContent } =
     useDisplayLastSavedAndPending(autoSaveLastSaved, lastSaved);
 
-  usePageEditorEffects({
+  usePageEditorAIEffects({
     isNewPage,
     currentPageId,
     isInitialized,
@@ -157,45 +162,51 @@ export function usePageEditorStateAndSync() {
   });
 
   return {
-    isLoading,
-    isInitialized,
-    isNewPage,
-    pageId,
-    title,
-    content,
-    sourceUrl,
-    currentPageId,
-    displayLastSaved,
-    wikiStatus,
-    isWikiGenerating,
-    isSyncingLinks,
-    isLocalDocEnabled,
-    collaboration,
-    duplicatePage,
-    errorMessage,
-    contentError,
-    pendingInitialContent,
-    setPendingInitialContent,
-    deleteConfirmOpen,
-    deleteReason,
-    setDeleteConfirmOpen,
-    handleDelete,
-    handleBack,
-    handleConfirmDelete,
-    handleCancelDelete,
-    wikiError,
-    cancelWiki,
-    resetWiki,
-    setTitle,
-    setContent,
-    setContentError,
-    validateTitle,
-    saveChanges,
-    generateWiki,
-    location,
-    handleExportMarkdown,
-    handleCopyMarkdown,
-    wikiContentForCollab,
-    onWikiContentApplied,
+    ...pageEditorCoreReturnSlice({
+      isLoading,
+      isInitialized,
+      isNewPage,
+      pageId,
+      title,
+      content,
+      sourceUrl,
+      currentPageId,
+      displayLastSaved,
+      pendingInitialContent,
+      setPendingInitialContent,
+      contentError,
+      location,
+    }),
+    ...pageEditorWikiReturnSlice({
+      wikiStatus,
+      isWikiGenerating,
+      isSyncingLinks,
+      isLocalDocEnabled,
+      collaboration,
+      wikiError,
+      cancelWiki,
+      resetWiki,
+      generateWiki,
+      wikiContentForCollab,
+      onWikiContentApplied,
+    }),
+    ...pageEditorActionsReturnSlice({
+      duplicatePage,
+      errorMessage,
+      deleteConfirmOpen,
+      deleteReason,
+      setDeleteConfirmOpen,
+      handleDelete,
+      handleBack,
+      handleConfirmDelete,
+      handleCancelDelete,
+      setTitle,
+      setContent,
+      setContentError,
+      validateTitle,
+      saveChanges,
+      handleExportMarkdown,
+      handleCopyMarkdown,
+    }),
   };
 }

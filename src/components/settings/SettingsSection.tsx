@@ -33,7 +33,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         <h2 id={`section-${id}-title`} className="text-xl font-semibold">
           {title}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <p className="text-muted-foreground mt-1 text-sm">{description}</p>
       </div>
       <div>{children}</div>
     </section>

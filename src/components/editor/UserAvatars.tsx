@@ -28,12 +28,21 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+/**
+ *
+ */
 export function UserAvatars({ users, maxDisplay = 3, className }: UserAvatarsProps) {
   if (users.length === 0) {
     return null;
   }
 
+  /**
+   *
+   */
   const displayUsers = users.slice(0, maxDisplay);
+  /**
+   *
+   */
   const remainingCount = users.length - maxDisplay;
 
   return (
@@ -43,7 +52,7 @@ export function UserAvatars({ users, maxDisplay = 3, className }: UserAvatarsPro
           <Tooltip key={user.userId}>
             <TooltipTrigger asChild>
               <Avatar
-                className="h-7 w-7 cursor-default border-2 border-background"
+                className="border-background h-7 w-7 cursor-default border-2"
                 style={{ backgroundColor: user.userColor }}
               >
                 <AvatarFallback
@@ -56,7 +65,7 @@ export function UserAvatars({ users, maxDisplay = 3, className }: UserAvatarsPro
             </TooltipTrigger>
             <TooltipContent>
               <p>{user.userName}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 {user.status === "active" ? "編集中" : user.status === "idle" ? "待機中" : "離席中"}
               </p>
             </TooltipContent>
@@ -66,7 +75,7 @@ export function UserAvatars({ users, maxDisplay = 3, className }: UserAvatarsPro
         {remainingCount > 0 && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Avatar className="h-7 w-7 cursor-default border-2 border-background bg-muted">
+              <Avatar className="border-background bg-muted h-7 w-7 cursor-default border-2">
                 <AvatarFallback className="text-xs font-medium">+{remainingCount}</AvatarFallback>
               </Avatar>
             </TooltipTrigger>

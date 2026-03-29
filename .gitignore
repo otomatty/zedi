@@ -57,3 +57,6 @@ test-results/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Local-only notes (not tracked). See AGENTS.md / SPECIFICATION_POLICY.md.
+/docs/

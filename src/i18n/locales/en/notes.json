@@ -60,6 +60,8 @@
   "roleUpdateFailed": "Failed to update role",
   "memberRemoved": "Member removed",
   "memberRemoveFailed": "Failed to remove member",
+  "a11yRemoveMember": "Remove member {{email}}",
+  "a11yRemovePage": "Remove page: {{title}}",
   "inviteMember": "Invite member",
   "emailPlaceholder": "Email address to invite",
   "role": "Role",

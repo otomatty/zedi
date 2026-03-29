@@ -26,7 +26,13 @@ interface EditorBubbleMenuToolbarProps {
   state: EditorBubbleMenuState;
 }
 
+/**
+ *
+ */
 export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolbarProps) {
+  /**
+   *
+   */
   const {
     showColorPicker,
     setShowColorPicker,
@@ -49,7 +55,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
   } = state;
 
   return (
-    <div className="shadow-elevated flex animate-fade-in items-center gap-0.5 rounded-lg border border-border bg-popover p-1">
+    <div className="shadow-elevated animate-fade-in border-border bg-popover flex items-center gap-0.5 rounded-lg border p-1">
       <BubbleMenuButton
         onClick={toggleBold}
         isActive={editor.isActive("bold")}
@@ -116,7 +122,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
         </BubbleMenuButton>
       )}
 
-      <div className="mx-0.5 h-5 w-px bg-border" />
+      <div className="bg-border mx-0.5 h-5 w-px" />
 
       <BubbleMenuButton
         onClick={toggleBulletList}
@@ -147,7 +153,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
         </BubbleMenuButton>
       )}
 
-      <div className="mx-0.5 h-5 w-px bg-border" />
+      <div className="bg-border mx-0.5 h-5 w-px" />
 
       {hasTable && (
         <BubbleMenuButton
@@ -171,7 +177,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
         </BubbleMenuButton>
 
         {showColorPicker && (
-          <div className="shadow-elevated absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 animate-fade-in rounded-lg border border-border bg-popover p-2">
+          <div className="shadow-elevated animate-fade-in border-border bg-popover absolute top-full left-1/2 z-50 mt-1 -translate-x-1/2 rounded-lg border p-2">
             <div className="grid grid-cols-4 gap-1.5">
               {BUBBLE_MENU_PRESET_COLORS.map((color) => (
                 <button
@@ -183,7 +189,7 @@ export function EditorBubbleMenuToolbar({ editor, state }: EditorBubbleMenuToolb
                   title={color.label}
                   aria-label={color.label}
                   className={cn(
-                    "h-6 w-6 rounded-md border border-border transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring",
+                    "border-border focus:ring-ring h-6 w-6 rounded-md border transition-transform hover:scale-110 focus:ring-2 focus:outline-none",
                     !color.value && "bg-foreground",
                   )}
                   style={color.value ? { backgroundColor: color.value } : undefined}

@@ -10,7 +10,7 @@ assignees: ""
 
 複数コントリビューターでの一貫した実装のため、ESLint と Prettier のルールを強化しました。本 Issue は、そのルールに沿った**今後の実装方針**と、段階的に取り組むタスクを記述するものです。
 
-詳細は `docs/lint-and-format.md` を参照してください。
+詳細は eslint.config.js / AGENTS.md を参照してください。
 
 ---
 
@@ -69,5 +69,5 @@ assignees: ""
 
 ## 参照
 
-- ルール一覧・コマンド: `docs/lint-and-format.md`
+- ルール一覧・コマンド: eslint.config.js / AGENTS.md
 - 設定ファイル: `eslint.config.js`, `.prettierrc`

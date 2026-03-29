@@ -40,8 +40,8 @@ const FABMenuItem: React.FC<FABMenuItemProps> = ({
         "shadow-lg hover:shadow-xl",
         "backdrop-blur-sm",
         "transition-all duration-200 ease-out",
-        "hover:scale-[1.02] hover:bg-secondary active:scale-[0.98]",
-        "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        "hover:bg-secondary hover:scale-[1.02] active:scale-[0.98]",
+        "focus:ring-ring focus:ring-2 focus:ring-offset-2 focus:outline-none",
         isOpen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0",
         disabled && "cursor-not-allowed opacity-50 hover:scale-100",
       )}

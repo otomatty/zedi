@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import PageGrid from "@/components/page/PageGrid";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
@@ -61,37 +61,37 @@ const Home: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      <QuickTour run={isTourRunning} onComplete={completeTour} />
+    <AppLayout>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <QuickTour run={isTourRunning} onComplete={completeTour} />
 
-      <Header />
-
-      <ContentWithAIChat
-        floatingAction={
-          <>
-            <div className="mb-4 mr-4">
-              {validClipUrl ? (
-                <FloatingActionButton
-                  initialClipUrl={validClipUrl}
-                  onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
-                />
-              ) : (
-                <FloatingActionButton />
-              )}
-            </div>
-            <HomePageCount />
-          </>
-        }
-      >
-        <main className="py-6">
-          <Container>
-            <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
-              <PageGrid isSeeding={isSeeding} />
-            </div>
-          </Container>
-        </main>
-      </ContentWithAIChat>
-    </div>
+        <ContentWithAIChat
+          floatingAction={
+            <>
+              <div className="mr-4 mb-4">
+                {validClipUrl ? (
+                  <FloatingActionButton
+                    initialClipUrl={validClipUrl}
+                    onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
+                  />
+                ) : (
+                  <FloatingActionButton />
+                )}
+              </div>
+              <HomePageCount />
+            </>
+          }
+        >
+          <main className="min-h-0 flex-1 overflow-y-auto py-6">
+            <Container>
+              <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
+                <PageGrid isSeeding={isSeeding} />
+              </div>
+            </Container>
+          </main>
+        </ContentWithAIChat>
+      </div>
+    </AppLayout>
   );
 };
 

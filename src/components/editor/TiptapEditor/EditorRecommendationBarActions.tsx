@@ -8,7 +8,13 @@ interface EditorRecommendationBarActionsProps {
   isLoading: boolean;
 }
 
-export const EditorRecommendationBarActions: React.FC<EditorRecommendationBarActionsProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const EditorRecommendationBarActions: React.FC<EditorRecommendationBarActionsProps> = ({
   onOpenThumbnailPicker,
   onGenerateImage,
   isLoading,
@@ -28,6 +34,6 @@ export const EditorRecommendationBarActions: React.FC<EditorRecommendationBarAct
       <Wand2 className="mr-1 h-4 w-4" />
       AIで生成
     </Button>
-    <span className="text-xs text-muted-foreground">タイトルから画像を検索または生成します</span>
+    <span className="text-muted-foreground text-xs">タイトルから画像を検索または生成します</span>
   </div>
 );

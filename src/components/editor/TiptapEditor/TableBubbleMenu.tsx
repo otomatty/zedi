@@ -18,7 +18,13 @@ interface TableBubbleMenuProps {
   editor: Editor;
 }
 
-export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
+/**
+ *
+ */
+export /**
+ *
+ */
+const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
   return (
     <BubbleMenu
       editor={editor}
@@ -28,7 +34,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
         return editor.isActive("table");
       }}
     >
-      <div className="shadow-elevated flex animate-fade-in items-center gap-0.5 rounded-lg border border-border bg-popover p-1">
+      <div className="shadow-elevated animate-fade-in border-border bg-popover flex items-center gap-0.5 rounded-lg border p-1">
         {/* Add row before */}
         <TableButton
           onClick={() => editor.chain().focus().addRowBefore().run()}
@@ -57,7 +63,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
           <Rows3 className="h-3.5 w-3.5" />
         </TableButton>
 
-        <div className="mx-0.5 h-5 w-px bg-border" />
+        <div className="bg-border mx-0.5 h-5 w-px" />
 
         {/* Add column before */}
         <TableButton
@@ -87,7 +93,7 @@ export const TableBubbleMenu: React.FC<TableBubbleMenuProps> = ({ editor }) => {
           <Columns3 className="h-3.5 w-3.5" />
         </TableButton>
 
-        <div className="mx-0.5 h-5 w-px bg-border" />
+        <div className="bg-border mx-0.5 h-5 w-px" />
 
         {/* Toggle header row */}
         <TableButton

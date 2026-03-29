@@ -1,10 +1,11 @@
 /**
  * /api/pages — ページ CRUD + コンテンツ管理
  *
- * GET    /api/pages/:id/content — Y.Doc コンテンツ取得
- * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック)
- * POST   /api/pages             — 新規ページ作成
- * DELETE /api/pages/:id         — ページ論理削除
+ * GET    /api/pages/:id/content — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
+ *        — Retrieve Y.Doc content (200 + empty `ydoc_state` when no `page_contents` row).
+ * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
+ * POST   /api/pages             — 新規ページ作成 / Create page
+ * DELETE /api/pages/:id         — ページ論理削除 / Soft-delete page
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -40,7 +41,13 @@ app.get("/:id/content", authRequired, async (c) => {
     .limit(1);
 
   const row = content[0];
-  if (!row) throw new HTTPException(404, { message: "Page content not found" });
+  if (!row) {
+    return c.json({
+      ydoc_state: "",
+      version: 0,
+      content_text: null,
+    });
+  }
   const ydocBase64 =
     row.ydocState instanceof Buffer
       ? row.ydocState.toString("base64")
@@ -69,7 +76,9 @@ app.put("/:id/content", authRequired, async (c) => {
     title?: string;
   }>();
 
-  if (!body.ydoc_state) {
+  // Allow "" so clients can round-trip GET (empty ydoc_state) with PUT + expected_version.
+  // GET が ydoc_state: "" を返した場合もそのまま初回保存できるようにする。
+  if (body.ydoc_state === undefined || body.ydoc_state === null) {
     throw new HTTPException(400, { message: "ydoc_state is required" });
   }
 
@@ -88,6 +97,43 @@ app.put("/:id/content", authRequired, async (c) => {
 
   // UPSERT page_contents with optimistic locking
   if (body.expected_version != null) {
+    // First save after GET returned version 0 with no row: insert the initial row.
+    // GET が page_contents 未作成で version:0 を返した契約に合わせ、expected_version:0 で初回 INSERT を許容する。
+    if (body.expected_version === 0) {
+      const firstSave = await db.transaction(async (tx) => {
+        const inserted = await tx
+          .insert(pageContents)
+          .values({
+            pageId,
+            ydocState: ydocBuffer,
+            version: 1,
+            contentText: body.content_text ?? null,
+          })
+          .onConflictDoNothing({ target: pageContents.pageId })
+          .returning();
+
+        if (!inserted.length) {
+          return { done: false as const };
+        }
+
+        const insertedRow = inserted[0];
+        if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
+
+        if (body.title !== undefined) {
+          await tx
+            .update(pages)
+            .set({ title: body.title, updatedAt: new Date() })
+            .where(eq(pages.id, pageId));
+        }
+
+        return { done: true as const, version: insertedRow.version ?? 1 };
+      });
+
+      if (firstSave.done) {
+        return c.json({ version: firstSave.version });
+      }
+    }
+
     // 楽観的ロック: expected_version と一致する場合のみ更新
     const updated = await db
       .update(pageContents)

@@ -85,15 +85,15 @@ const ExtensionAuthCallback: React.FC = () => {
 
   if (viewError) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <p className="mb-4 text-destructive">{viewError}</p>
-        <p className="text-sm text-muted-foreground">You can close this tab.</p>
+      <div className="bg-background flex min-h-screen flex-col items-center justify-center p-4">
+        <p className="text-destructive mb-4">{viewError}</p>
+        <p className="text-muted-foreground text-sm">You can close this tab.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="bg-background flex min-h-screen flex-col items-center justify-center p-4">
       <p className="text-muted-foreground">Completing connection…</p>
     </div>
   );

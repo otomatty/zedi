@@ -33,6 +33,9 @@ interface PageCardProps {
   index?: number;
 }
 
+/**
+ *
+ */
 const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -154,12 +157,12 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
             onClick={handleClick}
             className={cn(
               "page-card w-full overflow-hidden rounded-lg text-left",
-              "border border-border/50 bg-card hover:border-border",
+              "border-border/50 bg-card hover:border-border border",
               "group transition-all duration-200",
               "animate-fade-in opacity-0",
               "flex aspect-square flex-col",
               index <= 5 && `stagger-${Math.min(index + 1, 5)}`,
-              isDragging && "opacity-50 ring-2 ring-primary",
+              isDragging && "ring-primary opacity-50 ring-2",
             )}
             style={{
               animationFillMode: "forwards",
@@ -169,8 +172,8 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
             {/* Title - Top */}
             <div className="flex-shrink-0 p-3 pb-2">
               <div className="flex items-start gap-1.5">
-                {isClipped && <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
-                <h3 className="line-clamp-2 text-sm font-medium text-foreground">
+                {isClipped && <Link2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />}
+                <h3 className="text-foreground line-clamp-2 text-sm font-medium">
                   {page.title || "無題のページ"}
                 </h3>
               </div>
@@ -179,7 +182,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
             {/* Thumbnail or Preview - Bottom */}
             <div className="min-h-0 flex-1 overflow-hidden">
               {thumbnail && !thumbnailError ? (
-                <div className="flex h-full w-full items-center justify-center px-3 pb-3 pt-0">
+                <div className="flex h-full w-full items-center justify-center px-3 pt-0 pb-3">
                   <img
                     src={thumbnail}
                     alt=""
@@ -191,7 +194,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
                 </div>
               ) : (
                 <div className="h-full px-3 pb-3">
-                  <p className="line-clamp-4 text-xs leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground line-clamp-4 text-xs leading-relaxed">
                     {preview || "コンテンツがありません"}
                   </p>
                 </div>

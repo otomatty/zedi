@@ -87,16 +87,16 @@ bun run dev
 
 ### ブランチ命名規則
 
-| Type          | Format                 | Example                 |
-| ------------- | ---------------------- | ----------------------- |
-| Feature       | `feature/description`  | `feature/add-backlinks` |
-| Bug Fix       | `fix/description`      | `fix/search-crash`      |
-| Refactor      | `refactor/description` | `refactor/editor-hooks` |
-| Documentation | `docs/description`     | `docs/update-readme`    |
+| Type          | Format                                                                                                   | Example                 |
+| ------------- | -------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Feature       | `feature/description`                                                                                    | `feature/add-backlinks` |
+| Bug Fix       | `fix/description`                                                                                        | `fix/search-crash`      |
+| Refactor      | `refactor/description`                                                                                   | `refactor/editor-hooks` |
+| Documentation | `chore/description` または `documentation/description`（`docs/` はフォルダ名と誤解されやすいため避ける） | `chore/update-readme`   |
 
 ### 開発フロー
 
-> 📖 **詳細なブランチ戦略**: [ブランチ戦略ガイド](../docs/guides/branch-strategy.md) を参照してください。
+> 📖 **ブランチ・PR・マージ方法**: ルートの [AGENTS.md](./AGENTS.md) を参照してください。
 
 1. **develop ブランチから最新を取得**
 

@@ -8,21 +8,51 @@ import { Sparkles } from "lucide-react";
 
 const AI_BUTTON_GRADIENT = "from-violet-500 via-fuchsia-500 to-blue-500";
 
+/**
+ *
+ */
 export function AIChatButton() {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const { isOpen, togglePanel, isStreaming } = useAIChatStore();
+  /**
+   *
+   */
   const { aiChatAvailable } = useAIChatContext();
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const location = useLocation();
+  /**
+   *
+   */
   const gradientId = useId().replaceAll(":", "");
 
   // AIチャットが利用できないページではボタンを非表示
   if (!aiChatAvailable) return null;
 
+  /**
+   *
+   */
   const handleClick = async () => {
+    /**
+     *
+     */
     const settings = await loadAISettings();
     if (!settings) {
       // AI未設定時は設定ページへ遷移
+      /**
+       *
+       */
       const returnTo = `${location.pathname}${location.search}${location.hash}`;
       navigate(`/settings?${new URLSearchParams({ section: "ai", returnTo }).toString()}`);
       return;
@@ -39,7 +69,7 @@ export function AIChatButton() {
         onClick={handleClick}
         aria-label={t("aiChat.title")}
         aria-pressed={isOpen}
-        className={`group relative flex h-full min-h-0 w-full items-center justify-center gap-1 rounded-[calc(theme(borderRadius.md)-1px)] px-3 transition-colors duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
+        className={`group focus-visible:ring-ring focus-visible:ring-offset-background relative flex h-full min-h-0 w-full items-center justify-center gap-1 rounded-[calc(theme(borderRadius.md)-1px)] px-3 transition-colors duration-300 ease-out focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none ${
           isOpen
             ? `bg-gradient-to-r ${AI_BUTTON_GRADIENT} text-white shadow-md`
             : "bg-background text-muted-foreground hover:text-white"

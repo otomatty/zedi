@@ -94,7 +94,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
           </div>
 
           {(status === "fetching" || status === "extracting") && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
               {statusMessages[status]}
             </div>
@@ -111,7 +111,7 @@ export const WebClipperDialog: React.FC<WebClipperDialogProps> = ({
             </Alert>
           )}
 
-          <p className="text-xs text-muted-foreground">{t("editor.webClipper.tip")}</p>
+          <p className="text-muted-foreground text-xs">{t("editor.webClipper.tip")}</p>
         </div>
 
         <WebClipperDialogFooter

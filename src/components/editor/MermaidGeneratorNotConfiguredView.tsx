@@ -16,11 +16,17 @@ interface MermaidGeneratorNotConfiguredViewProps {
   onGoToSettings: () => void;
 }
 
+/**
+ *
+ */
 export function MermaidGeneratorNotConfiguredView({
   open,
   onOpenChange,
   onGoToSettings,
 }: MermaidGeneratorNotConfiguredViewProps) {
+  /**
+   *
+   */
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -35,7 +41,7 @@ export function MermaidGeneratorNotConfiguredView({
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {t("editor.commands.mermaid.notConfigured.hint")}
           </p>
         </div>
