@@ -21,12 +21,10 @@ const navLinks = [
 ];
 
 /**
- *
+ * 管理画面のレイアウト（サイドバー付き）。
+ * Admin layout with sidebar navigation.
  */
 export default function Layout() {
-  /**
-   *
-   */
   const location = useLocation();
 
   return (
@@ -41,9 +39,6 @@ export default function Layout() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {navLinks.map(({ to, label, icon: Icon }) => {
-                  /**
-                   *
-                   */
                   const isActive =
                     location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
                   return (

@@ -43,7 +43,11 @@ interface AiModelsContentProps {
 }
 
 /**
+ * AI モデル管理画面のメインコンテンツ（一覧・同期プレビュー・ドラッグ並べ替え）。
+ * Main content for the admin AI models page.
  *
+ * @param props - Models state, sync preview, and drag-and-drop handlers
+ * @returns AI models management UI
  */
 export function AiModelsContent({
   models,
@@ -79,9 +83,6 @@ export function AiModelsContent({
         if (v !== model.displayName) {
           setModels((prev) => prev.map((x) => (x.id === model.id ? { ...x, displayName: v } : x)));
         }
-        /**
-         *
-         */
         const originalModel = originalModelsRef.current.find((om) => om.id === model.id);
         if (originalModel && v !== originalModel.displayName) {
           void onModelUpdate(originalModel, { displayName: v });

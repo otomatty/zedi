@@ -32,7 +32,11 @@ interface UsersContentProps {
 }
 
 /**
+ * ユーザー管理画面のメインコンテンツ（一覧・検索・ページング・ロール変更）。
+ * Main content for the admin user management page.
  *
+ * @param props - Users, pagination, search, and role-change handlers
+ * @returns User management UI
  */
 export function UsersContent({
   users,
@@ -47,25 +51,10 @@ export function UsersContent({
   savingIds,
   onRoleChange,
 }: UsersContentProps) {
-  /**
-   *
-   */
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  /**
-   *
-   */
   const hasPreviousPage = page > 0;
-  /**
-   *
-   */
   const hasNextPage = page + 1 < pageCount;
-  /**
-   *
-   */
   const rangeStart = total === 0 ? 0 : page * pageSize + 1;
-  /**
-   *
-   */
   const rangeEnd = total === 0 ? 0 : page * pageSize + users.length;
 
   return (
