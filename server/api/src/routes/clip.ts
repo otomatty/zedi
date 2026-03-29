@@ -1,11 +1,12 @@
 /**
  * /api/clip — Web クリッピング
  *
- * POST /api/clip/fetch — URL から HTML をサーバーサイドで取得
+ * POST /api/clip/fetch — URL から HTML をサーバーサイドで取得（SSRF 対策あり）
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../middleware/auth.js";
+import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -19,48 +20,32 @@ app.post("/fetch", authRequired, async (c) => {
 
   const url = body.url.trim();
 
-  // URL バリデーション
-  try {
-    const parsed = new URL(url);
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      throw new HTTPException(400, { message: "Only http/https URLs are supported" });
-    }
-  } catch {
-    throw new HTTPException(400, { message: "Invalid URL" });
-  }
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "zedi-clip/1.0 (https://zedi.app)",
-        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new HTTPException(502, {
-        message: `Fetch failed: ${response.status}`,
+    try {
+      const { html, finalUrl, contentType } = await fetchClipHtmlWithRedirects(url, controller);
+      return c.json({
+        html,
+        url: finalUrl,
+        content_type: contentType,
       });
+    } catch (err) {
+      if (err instanceof ClipFetchBlockedError) {
+        throw new HTTPException(400, { message: err.message });
+      }
+      throw err;
     }
-
-    const contentType = response.headers.get("content-type") || "";
-    const html = await response.text();
-
-    return c.json({
-      html,
-      url: response.url, // final URL after redirects
-      content_type: contentType,
-    });
   } catch (err) {
     if (err instanceof HTTPException) throw err;
-    const message =
-      err instanceof Error && err.name === "AbortError" ? "Request timed out" : "Fetch failed";
-    throw new HTTPException(502, { message });
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new HTTPException(502, { message: "Request timed out" });
+    }
+    if (err instanceof Error && err.message.startsWith("Fetch failed:")) {
+      throw new HTTPException(502, { message: err.message });
+    }
+    throw new HTTPException(502, { message: "Fetch failed" });
   } finally {
     clearTimeout(timeout);
   }
