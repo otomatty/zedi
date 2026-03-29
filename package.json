@@ -1,6 +1,6 @@
 {
   "name": "zedi",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Zero-Friction Knowledge Network - AIネイティブなナレッジアプリ",
   "private": true,
   "type": "module",
