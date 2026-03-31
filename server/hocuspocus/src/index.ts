@@ -4,6 +4,11 @@ import { WebSocketServer } from "ws";
 import { Redis } from "@hocuspocus/extension-redis";
 import { Pool, PoolClient } from "pg";
 import * as Y from "yjs";
+import {
+  decideAuthWhenApiInternalUrlMissing,
+  isTruthyEnvFlag,
+  warnDevAuthBypassOnce,
+} from "./dev-auth-bypass.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
@@ -240,9 +245,14 @@ const hocuspocus = new Hocuspocus({
     console.log(`[Auth] Document: ${documentName}, Token: ${token ? "provided" : "none"}`);
 
     if (!API_INTERNAL_URL) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("API_INTERNAL_URL must be set in production");
+      const decision = decideAuthWhenApiInternalUrlMissing(
+        process.env.NODE_ENV,
+        process.env.HOCUSPOCUS_DEV_MODE,
+      );
+      if (decision.action === "throw") {
+        throw new Error(decision.message);
       }
+      warnDevAuthBypassOnce();
       return { user: { id: "dev-user", name: "Developer" } };
     }
 
@@ -363,6 +373,19 @@ httpServer.listen(PORT, () => {
   console.log(`  WebSocket:    ws://localhost:${PORT}`);
   console.log(`  Redis:        ${REDIS_URL ? "Enabled" : "Disabled"}`);
   console.log(`  Environment:  ${process.env.NODE_ENV || "development"}`);
+  if (!API_INTERNAL_URL && process.env.NODE_ENV !== "production") {
+    if (isTruthyEnvFlag(process.env.HOCUSPOCUS_DEV_MODE)) {
+      console.warn(
+        "[Auth] API_INTERNAL_URL is unset; HOCUSPOCUS_DEV_MODE allows unauthenticated collaboration. / " +
+          "内部 API URL 未設定のため開発バイパスが有効です。",
+      );
+    } else {
+      console.warn(
+        "[Auth] API_INTERNAL_URL is unset; WebSocket auth will fail until it is set or HOCUSPOCUS_DEV_MODE=true (local dev only). / " +
+          "内部 API URL 未設定のため接続は拒否されます（ローカル検証のみ HOCUSPOCUS_DEV_MODE=true）。",
+      );
+    }
+  }
   console.log("========================================");
 });
 
