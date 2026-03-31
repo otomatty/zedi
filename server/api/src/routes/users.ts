@@ -19,9 +19,21 @@ app.get("/me", authRequired, async (c) => {
   return c.json({ user: result[0] });
 });
 
+/**
+ * 自分自身のプロフィール（限定フィールド）を取得する。
+ * 他ユーザーの ID を指定した場合は 403 を返す（列挙リスク防止）。
+ *
+ * Returns own profile (limited fields). Returns 403 for other users'
+ * IDs to prevent user enumeration. See: #430
+ */
 app.get("/:id", authRequired, async (c) => {
   const id = c.req.param("id");
+  const userId = c.get("userId");
   const db = c.get("db");
+
+  if (id !== userId) {
+    throw new HTTPException(403, { message: "Forbidden" });
+  }
 
   const result = await db
     .select({
