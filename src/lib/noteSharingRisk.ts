@@ -2,8 +2,8 @@ import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 
 /**
  * True when visibility is public or unlisted and any authenticated user may edit
- * (`any_logged_in`). Matches the high-risk combo from issue #432.
- * 公開または限定公開(URL)で、ログイン済みユーザー全員が編集可能な組み合わせか（#432 の高リスク組み合わせ）。
+ * (`any_logged_in`). Same cases as the UI confirmation flow for open collaboration.
+ * 公開または限定公開(URL)でログイン済みユーザー全員が編集可能な組み合わせ（UI 確認ダイアログの対象と一致）。
  */
 export function isPublicAnyLoggedInCombo(
   visibility: NoteVisibility,
