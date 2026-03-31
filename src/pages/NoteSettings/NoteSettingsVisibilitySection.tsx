@@ -13,7 +13,10 @@ import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { NoteEditPermissionControls } from "@/components/note/NoteEditPermissionControls";
 import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
 
-/** Props for the visibility / title / edit-permission block on note settings. */
+/**
+ * Props for the visibility / title / edit-permission block on note settings.
+ * ノート設定の公開範囲・タイトル・編集権限ブロック用 Props。
+ */
 export interface NoteSettingsVisibilitySectionProps {
   title: string;
   setTitle: (v: string) => void;

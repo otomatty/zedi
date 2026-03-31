@@ -45,6 +45,13 @@ export function useNoteSettingsSaveWithPublicConfirm({
 
   const handleSaveNote = useCallback(() => {
     if (!noteId || !note) return;
+    if (!title.trim()) {
+      toast({
+        title: t("notes.titleRequired"),
+        variant: "destructive",
+      });
+      return;
+    }
     if (
       shouldConfirmPublicAnyLoggedInSave(
         visibility,
@@ -57,7 +64,7 @@ export function useNoteSettingsSaveWithPublicConfirm({
       return;
     }
     void performSaveNote();
-  }, [noteId, note, visibility, editPermission, performSaveNote]);
+  }, [noteId, note, title, visibility, editPermission, performSaveNote, toast, t]);
 
   const handleConfirmPublicAnyLoggedInSave = useCallback(() => {
     setConfirmOpen(false);

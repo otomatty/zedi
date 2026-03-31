@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { NotesLayout } from "@/components/note/NotesLayout";
@@ -111,7 +111,8 @@ function CreateNoteDialogContent({
 }
 
 /**
- *
+ * Signed-in notes list and new-note flow (with public + any_logged_in create confirmation).
+ * サインイン済みユーザーのノート一覧と新規作成（公開協業確認付き）。
  */
 const Notes: React.FC = () => {
   const { t } = useTranslation();
@@ -120,6 +121,8 @@ const Notes: React.FC = () => {
   const { isSignedIn } = useAuth();
   const { data: notes = [], isLoading } = useNotes();
   const createNoteMutation = useCreateNote();
+  /** After closing the public-collab confirm, reopen the create dialog if user cancelled. / 確認をキャンセルしたら作成ダイアログを再度開く */
+  const reopenCreateAfterPublicConfirmRef = useRef(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPublicAnyLoggedInCreateConfirmOpen, setIsPublicAnyLoggedInCreateConfirmOpen] =
@@ -131,6 +134,7 @@ const Notes: React.FC = () => {
   const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes]);
 
   const executeCreate = async () => {
+    reopenCreateAfterPublicConfirmRef.current = false;
     try {
       const newNote = await createNoteMutation.mutateAsync({
         title: title.trim(),
@@ -146,6 +150,7 @@ const Notes: React.FC = () => {
     } catch (error) {
       console.error("Failed to create note:", error);
       setIsPublicAnyLoggedInCreateConfirmOpen(false);
+      setIsDialogOpen(true);
       toast({
         title: t("notes.createFailed"),
         variant: "destructive",
@@ -163,6 +168,8 @@ const Notes: React.FC = () => {
     }
 
     if (shouldConfirmPublicAnyLoggedInSave(visibility, editPermission, "private", "owner_only")) {
+      reopenCreateAfterPublicConfirmRef.current = true;
+      setIsDialogOpen(false);
       setIsPublicAnyLoggedInCreateConfirmOpen(true);
       return;
     }
@@ -218,7 +225,14 @@ const Notes: React.FC = () => {
 
       <AlertDialog
         open={isPublicAnyLoggedInCreateConfirmOpen}
-        onOpenChange={setIsPublicAnyLoggedInCreateConfirmOpen}
+        onOpenChange={(next) => {
+          if (!next && createNoteMutation.isPending) return;
+          setIsPublicAnyLoggedInCreateConfirmOpen(next);
+          if (!next && reopenCreateAfterPublicConfirmRef.current && !createNoteMutation.isPending) {
+            reopenCreateAfterPublicConfirmRef.current = false;
+            setIsDialogOpen(true);
+          }
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -228,7 +242,9 @@ const Notes: React.FC = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={createNoteMutation.isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmPublicAnyLoggedInCreate}
               disabled={createNoteMutation.isPending}

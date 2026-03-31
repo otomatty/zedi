@@ -13,7 +13,10 @@ import { NoteSettingsDeleteSection } from "./NoteSettingsDeleteSection";
 import { PublicAnyLoggedInSaveAlertDialog } from "./PublicAnyLoggedInSaveAlertDialog";
 import { useNoteSettingsSaveWithPublicConfirm } from "./useNoteSettingsSaveWithPublicConfirm";
 
-/** Note settings page: share link, visibility, delete; save confirms public + any_logged_in once. */
+/**
+ * Note settings page: share link, visibility, delete; save confirms public + any_logged_in once.
+ * ノート設定ページ（共有リンク・公開範囲・削除）。公開 + any_logged_in への初回保存時に確認する。
+ */
 const NoteSettings: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
