@@ -14,6 +14,9 @@ const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL;
+/** Cached env reads for auth paths (avoid repeated `process.env` lookups). / 認証経路用に env を一度だけ読む */
+const NODE_ENV = process.env.NODE_ENV;
+const HOCUSPOCUS_DEV_MODE = process.env.HOCUSPOCUS_DEV_MODE;
 
 type AuthenticatedUser = {
   id: string;
@@ -245,10 +248,7 @@ const hocuspocus = new Hocuspocus({
     console.log(`[Auth] Document: ${documentName}, Token: ${token ? "provided" : "none"}`);
 
     if (!API_INTERNAL_URL) {
-      const decision = decideAuthWhenApiInternalUrlMissing(
-        process.env.NODE_ENV,
-        process.env.HOCUSPOCUS_DEV_MODE,
-      );
+      const decision = decideAuthWhenApiInternalUrlMissing(NODE_ENV, HOCUSPOCUS_DEV_MODE);
       if (decision.action === "throw") {
         throw new Error(decision.message);
       }
@@ -363,6 +363,14 @@ wss.on("connection", (socket, request) => {
   hocuspocus.handleConnection(socket, request);
 });
 
+if (NODE_ENV === "production" && !API_INTERNAL_URL) {
+  console.error(
+    "[Auth] CRITICAL: API_INTERNAL_URL is unset in production. Refusing to start. / " +
+      "本番で内部 API URL が未設定です。起動を中止します。",
+  );
+  process.exit(1);
+}
+
 // サーバー起動
 httpServer.listen(PORT, () => {
   console.log("========================================");
@@ -372,9 +380,9 @@ httpServer.listen(PORT, () => {
   console.log(`  Health:       http://localhost:${PORT}/health`);
   console.log(`  WebSocket:    ws://localhost:${PORT}`);
   console.log(`  Redis:        ${REDIS_URL ? "Enabled" : "Disabled"}`);
-  console.log(`  Environment:  ${process.env.NODE_ENV || "development"}`);
-  if (!API_INTERNAL_URL && process.env.NODE_ENV !== "production") {
-    if (isTruthyEnvFlag(process.env.HOCUSPOCUS_DEV_MODE)) {
+  console.log(`  Environment:  ${NODE_ENV || "development"}`);
+  if (!API_INTERNAL_URL && NODE_ENV !== "production") {
+    if (isTruthyEnvFlag(HOCUSPOCUS_DEV_MODE)) {
       console.warn(
         "[Auth] API_INTERNAL_URL is unset; HOCUSPOCUS_DEV_MODE allows unauthenticated collaboration. / " +
           "内部 API URL 未設定のため開発バイパスが有効です。",

@@ -22,6 +22,7 @@
     "@types/pg": "^8.16.0",
     "@types/ws": "^8.18.1",
     "tsx": "^4.19.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.0.16"
   }
 }
