@@ -22,7 +22,22 @@ import userRoutes from "../../routes/users.js";
 const TEST_USER_ID = "user-test-123";
 const OTHER_USER_ID = "user-other-456";
 
-function createTestApp(dbResults: unknown[]) {
+/** GET /me のモック行（users テーブル全列に相当） / Mock row shape for GET /me (full user row). */
+type MockFullUserRow = {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image: string;
+  role: "user";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function createTestApp(dbResults: unknown[]): {
+  app: Hono<AppEnv>;
+  chains: ReturnType<typeof createMockDb>["chains"];
+} {
   const { db, chains } = createMockDb(dbResults);
   const app = new Hono<AppEnv>();
 
@@ -35,14 +50,14 @@ function createTestApp(dbResults: unknown[]) {
   return { app, chains };
 }
 
-function authHeaders(userId = TEST_USER_ID) {
+function authHeaders(userId: string = TEST_USER_ID): Record<string, string> {
   return {
     "x-test-user-id": userId,
     "Content-Type": "application/json",
   };
 }
 
-function createMockUser(overrides: Record<string, unknown> = {}) {
+function createMockUser(overrides: Partial<MockFullUserRow> = {}): MockFullUserRow {
   return {
     id: TEST_USER_ID,
     name: "Test User",
@@ -70,7 +85,13 @@ describe("GET /api/users/me", () => {
     expect(body.user).toMatchObject({
       id: TEST_USER_ID,
       name: "Test User",
+      email: "test@example.com",
+      emailVerified: true,
+      image: "https://example.com/avatar.png",
+      role: "user",
     });
+    expect(body.user.createdAt).toEqual(expect.any(String));
+    expect(body.user.updatedAt).toEqual(expect.any(String));
   });
 
   it("returns 404 when user does not exist in DB", async () => {
@@ -96,7 +117,10 @@ describe("GET /api/users/me", () => {
 
 describe("GET /api/users/:id", () => {
   it("returns own profile (limited fields) when id matches authenticated user", async () => {
-    /** Drizzle の部分 select と同じ形（モックが余分な列を返すとレスポンス契約のテストにならない） */
+    /**
+     * Drizzle の部分 select と同じ形。モックが余分な列を返すとレスポンス契約のテストにならない。
+     * Same shape as Drizzle partial select; extra columns in the mock would invalidate the response contract test.
+     */
     const mockPublicProfile = {
       id: TEST_USER_ID,
       name: "Test User",
