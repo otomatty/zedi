@@ -6,8 +6,19 @@ import { useNotes, useCreateNote } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { NoteCard } from "@/components/note/NoteCard";
+import { NoteEditPermissionControls } from "@/components/note/NoteEditPermissionControls";
+import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
+import { shouldConfirmPublicAnyLoggedInSave } from "@/lib/noteSharingRisk";
 import { Button } from "@zedi/ui";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -20,26 +31,6 @@ import { Label } from "@zedi/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
 import { useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-
-const visibilityKeys: Record<NoteVisibility, string> = {
-  private: "notes.visibilityPrivate",
-  public: "notes.visibilityPublic",
-  unlisted: "notes.visibilityUnlisted",
-  restricted: "notes.visibilityRestricted",
-};
-
-const editPermissionKeys: Record<NoteEditPermission, string> = {
-  owner_only: "notes.editPermissionOwnerOnly",
-  members_editors: "notes.editPermissionMembersEditors",
-  any_logged_in: "notes.editPermissionAnyLoggedIn",
-};
-
-const allowedEditPermissions: Record<NoteVisibility, NoteEditPermission[]> = {
-  private: ["owner_only"],
-  restricted: ["owner_only", "members_editors"],
-  unlisted: ["owner_only", "members_editors", "any_logged_in"],
-  public: ["owner_only", "members_editors", "any_logged_in"],
-};
 
 interface CreateNoteDialogContentProps {
   title: string;
@@ -103,24 +94,12 @@ function CreateNoteDialogContent({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>{t("notes.editPermission")}</Label>
-          <Select
-            value={editPermission}
-            onValueChange={(v) => setEditPermission(v as NoteEditPermission)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {allowedEditPermissions[visibility].map((value) => (
-                <SelectItem key={value} value={value}>
-                  {t(editPermissionKeys[value])}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <NoteEditPermissionControls
+          visibility={visibility}
+          editPermission={editPermission}
+          setEditPermission={setEditPermission}
+          selectId="new-note-edit-permission"
+        />
       </div>
       <DialogFooter>
         <Button type="button" onClick={onCreate} disabled={isPending}>
@@ -143,11 +122,36 @@ const Notes: React.FC = () => {
   const createNoteMutation = useCreateNote();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPublicAnyLoggedInCreateConfirmOpen, setIsPublicAnyLoggedInCreateConfirmOpen] =
+    useState(false);
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<NoteVisibility>("private");
   const [editPermission, setEditPermission] = useState<NoteEditPermission>("owner_only");
 
   const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes]);
+
+  const executeCreate = async () => {
+    try {
+      const newNote = await createNoteMutation.mutateAsync({
+        title: title.trim(),
+        visibility,
+        editPermission,
+      });
+      setIsDialogOpen(false);
+      setIsPublicAnyLoggedInCreateConfirmOpen(false);
+      setTitle("");
+      setVisibility("private");
+      setEditPermission("owner_only");
+      navigate(`/note/${newNote.id}`);
+    } catch (error) {
+      console.error("Failed to create note:", error);
+      setIsPublicAnyLoggedInCreateConfirmOpen(false);
+      toast({
+        title: t("notes.createFailed"),
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleCreate = async () => {
     if (!title.trim()) {
@@ -158,24 +162,16 @@ const Notes: React.FC = () => {
       return;
     }
 
-    try {
-      const newNote = await createNoteMutation.mutateAsync({
-        title: title.trim(),
-        visibility,
-        editPermission,
-      });
-      setIsDialogOpen(false);
-      setTitle("");
-      setVisibility("private");
-      setEditPermission("owner_only");
-      navigate(`/note/${newNote.id}`);
-    } catch (error) {
-      console.error("Failed to create note:", error);
-      toast({
-        title: t("notes.createFailed"),
-        variant: "destructive",
-      });
+    if (shouldConfirmPublicAnyLoggedInSave(visibility, editPermission, "private", "owner_only")) {
+      setIsPublicAnyLoggedInCreateConfirmOpen(true);
+      return;
     }
+
+    await executeCreate();
+  };
+
+  const handleConfirmPublicAnyLoggedInCreate = () => {
+    void executeCreate();
   };
 
   if (!isSignedIn) {
@@ -219,6 +215,29 @@ const Notes: React.FC = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <AlertDialog
+        open={isPublicAnyLoggedInCreateConfirmOpen}
+        onOpenChange={setIsPublicAnyLoggedInCreateConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("notes.publicAnyLoggedInCreateConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("notes.publicAnyLoggedInCreateConfirmDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmPublicAnyLoggedInCreate}
+              disabled={createNoteMutation.isPending}
+            >
+              {createNoteMutation.isPending ? t("notes.creating") : t("common.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <section className="mb-10">
         <h2 className="text-foreground mb-4 text-lg font-medium">

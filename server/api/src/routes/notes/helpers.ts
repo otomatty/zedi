@@ -178,6 +178,16 @@ export async function getNoteRole(
 /**
  * Whether the role may edit the note given visibility and edit_permission.
  * visibility / edit_permission に基づき、そのロールがノートを編集できるか。
+ *
+ * **Security / UX note:** When `edit_permission === 'any_logged_in'` and
+ * `visibility` is `public` or `unlisted`, every authenticated user in the app
+ * can edit pages in this note (guest role gains edit). The UI warns before
+ * saving `public` + `any_logged_in`; callers should document this for operators.
+ *
+ * **セキュリティ・UX:** `edit_permission` が `any_logged_in` かつ `visibility` が
+ * `public` または `unlisted` のとき、当該ノートはアプリ内の全認証済みユーザーが
+ * ページ編集可能（guest でも編集可）。UI は `public` + `any_logged_in` 保存前に
+ * 確認する。運用向けに本挙動を文書化すること。
  */
 export function canEdit(role: NoteRole, note: Note): boolean {
   if (role === "owner") return true;

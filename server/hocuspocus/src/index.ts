@@ -85,6 +85,13 @@ async function getCurrentUserById(client: PoolClient, userId: string): Promise<D
   return { id: row.id, email: String(row.email).trim().toLowerCase() };
 }
 
+/**
+ * Allows edit when user is owner, editor member, or note has `any_logged_in` with
+ * `public` / `unlisted` visibility (any signed-in user). Matches API `canEdit` rules.
+ *
+ * オーナー・編集メンバー、または `any_logged_in` かつ `public`/`unlisted` のとき
+ * 編集可（ログイン済みユーザー全員）。API の `canEdit` と整合。
+ */
 async function canEditNotePage(client: PoolClient, pageId: string, user: DbUser): Promise<boolean> {
   const result = await client.query(
     `
