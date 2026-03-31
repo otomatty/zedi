@@ -86,11 +86,12 @@ async function getCurrentUserById(client: PoolClient, userId: string): Promise<D
 }
 
 /**
- * Allows edit when user is owner, editor member, or note has `any_logged_in` with
- * `public` / `unlisted` visibility (any signed-in user). Matches API `canEdit` rules.
+ * Allows edit when user is owner; when editor member and `edit_permission` is not
+ * `owner_only`; or when note has `any_logged_in` with `public` / `unlisted` (guest).
+ * Matches API `canEdit` rules.
  *
- * オーナー・編集メンバー、または `any_logged_in` かつ `public`/`unlisted` のとき
- * 編集可（ログイン済みユーザー全員）。API の `canEdit` と整合。
+ * オーナー、または `edit_permission` が `owner_only` 以外のときの編集メンバー、
+ * または `any_logged_in` かつ `public`/`unlisted` のゲスト。API の `canEdit` と整合。
  */
 async function canEditNotePage(client: PoolClient, pageId: string, user: DbUser): Promise<boolean> {
   const result = await client.query(
@@ -108,7 +109,10 @@ async function canEditNotePage(client: PoolClient, pageId: string, user: DbUser)
         AND np.is_deleted = FALSE
         AND (
           n.owner_id = $2
-          OR nm.role = 'editor'
+          OR (
+            nm.role = 'editor'
+            AND COALESCE(n.edit_permission, 'owner_only') <> 'owner_only'
+          )
           OR (
             COALESCE(n.edit_permission, 'owner_only') = 'any_logged_in'
             AND n.visibility IN ('public', 'unlisted')

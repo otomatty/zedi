@@ -4,7 +4,7 @@
  */
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, type RenderResult } from "@testing-library/react";
 import { useTranslation } from "react-i18next";
 import { TooltipProvider } from "@zedi/ui";
 import { NoteEditPermissionControls } from "./NoteEditPermissionControls";
@@ -13,7 +13,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: vi.fn(),
 }));
 
-function renderWithProviders(ui: React.ReactElement) {
+function renderWithProviders(ui: React.ReactElement): RenderResult {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 }
 

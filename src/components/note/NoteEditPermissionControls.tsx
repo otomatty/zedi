@@ -18,6 +18,20 @@ import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { allowedEditPermissions, editPermissionKeys } from "@/lib/noteSettingsConfig";
 
 /**
+ *
+ */
+export type NoteEditPermissionControlsProps = {
+  visibility: NoteVisibility;
+  editPermission: NoteEditPermission;
+  setEditPermission: (v: NoteEditPermission) => void;
+  /**
+   * Optional id for the select trigger (e.g. new-note dialog vs settings).
+   * セレクトトリガー用の任意 id（例: 新規ノートダイアログと設定画面の切り替え）。
+   */
+  selectId?: string;
+};
+
+/**
  * Edit-permission select with help tooltip and warning when `any_logged_in` is selected.
  * 編集権限セレクト、ヘルプツールチップ、`any_logged_in` 時の警告。
  */
@@ -26,13 +40,7 @@ export function NoteEditPermissionControls({
   editPermission,
   setEditPermission,
   selectId = "note-edit-permission-select",
-}: {
-  visibility: NoteVisibility;
-  editPermission: NoteEditPermission;
-  setEditPermission: (v: NoteEditPermission) => void;
-  /** Optional id for the select trigger (e.g. new-note dialog vs settings). */
-  selectId?: string;
-}) {
+}: NoteEditPermissionControlsProps) {
   const { t } = useTranslation();
   const showAnyLoggedInWarning = editPermission === "any_logged_in";
 

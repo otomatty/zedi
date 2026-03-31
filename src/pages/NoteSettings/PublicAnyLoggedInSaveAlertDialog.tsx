@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,21 +11,24 @@ import {
 } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
+/** Props for save confirmation (public or unlisted + any_logged_in). */
+export type PublicAnyLoggedInSaveAlertDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+  isSaving: boolean;
+};
+
 /**
- * Confirmation before saving a note as public with any_logged_in edit policy.
- * 公開 + any_logged_in で保存する前の確認ダイアログ。
+ * Confirmation before saving with open collaboration (public or unlisted + any_logged_in).
+ * 公開または限定公開(URL) + any_logged_in で保存する前の確認ダイアログ。
  */
 export function PublicAnyLoggedInSaveAlertDialog({
   open,
   onOpenChange,
   onConfirm,
   isSaving,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-  isSaving: boolean;
-}) {
+}: PublicAnyLoggedInSaveAlertDialogProps): JSX.Element {
   const { t } = useTranslation();
   return (
     <AlertDialog
