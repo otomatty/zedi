@@ -6,18 +6,13 @@ import { describe, it, expect, vi } from "vitest";
 import type { Context, Next } from "hono";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
-import { createMockDb } from "./notes/setup.js";
+import { createMockDb } from "../createMockDb.js";
 
 vi.mock("../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
     const userId = c.req.header("x-test-user-id");
     if (!userId) return c.json({ message: "Unauthorized" }, 401);
     c.set("userId", userId);
-    await next();
-  },
-  authOptional: async (c: Context<AppEnv>, next: Next) => {
-    const userId = c.req.header("x-test-user-id");
-    if (userId) c.set("userId", userId);
     await next();
   },
 }));
@@ -101,8 +96,13 @@ describe("GET /api/users/me", () => {
 
 describe("GET /api/users/:id", () => {
   it("returns own profile (limited fields) when id matches authenticated user", async () => {
-    const mockUser = createMockUser();
-    const { app } = createTestApp([[mockUser]]);
+    /** Drizzle の部分 select と同じ形（モックが余分な列を返すとレスポンス契約のテストにならない） */
+    const mockPublicProfile = {
+      id: TEST_USER_ID,
+      name: "Test User",
+      image: "https://example.com/avatar.png",
+    };
+    const { app } = createTestApp([[mockPublicProfile]]);
 
     const res = await app.request(`/api/users/${TEST_USER_ID}`, {
       headers: authHeaders(),
@@ -110,11 +110,14 @@ describe("GET /api/users/:id", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { user: Record<string, unknown> };
+    expect(Object.keys(body.user).sort()).toEqual(["id", "image", "name"]);
     expect(body.user).toMatchObject({
       id: TEST_USER_ID,
       name: "Test User",
       image: "https://example.com/avatar.png",
     });
+    expect(body.user).not.toHaveProperty("email");
+    expect(body.user).not.toHaveProperty("role");
   });
 
   it("returns 403 when requesting another user's profile", async () => {
