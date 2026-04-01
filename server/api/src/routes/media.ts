@@ -28,12 +28,23 @@ const BUCKET = getEnv("STORAGE_BUCKET_NAME");
 
 /**
  * api オリジンでバイトを返すため、ユーザー提供の Content-Type をそのまま使わない。
- * インライン表示してよい画像のみ許可（SVG は XSS リスクのため除外 — サムネイル配信と同様）。
+ * ブラウザが img で表示しやすいラスタ系のみインライン許可（SVG は XSS のため除外 — サムネイル配信と同様）。
+ * AVIF/APNG などはアップロードで保存され得るため GET でも同じ扱いにする（/upload は file.type 依存のためここで広げる）。
  *
- * Do not reflect user-supplied Content-Type verbatim when serving from the API origin.
- * Only allow safe inline image types (exclude SVG — same rationale as thumbnail/serve).
+ * Do not reflect user-supplied Content-Type verbatim from the API origin.
+ * Allow common safe raster types for inline display; exclude SVG (XSS — same as thumbnail/serve).
+ * Include AVIF/APNG so GET matches types clients may store via `/upload`.
  */
-const SAFE_INLINE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const SAFE_INLINE_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/apng",
+  "image/bmp",
+  "image/x-ms-bmp",
+]);
 
 /**
  * MIME 文字列からセミコロンより前の部分だけを小文字で返す。
@@ -194,9 +205,12 @@ app.get("/:id", authRequired, async (c) => {
 
   const webStream = body instanceof Readable ? Readable.toWeb(body) : (body as ReadableStream);
 
+  // Cookie セッション認可: ログアウト後の別アカウントで古いバイトが再利用されないよう no-store + Vary: Cookie
+  // Cookie-auth: avoid serving stale cached bytes after logout or account switch
   const headers: Record<string, string> = {
     "Content-Type": contentType,
-    "Cache-Control": "private, max-age=3600",
+    "Cache-Control": "private, no-store",
+    Vary: "Cookie",
     "X-Content-Type-Options": "nosniff",
   };
   if (contentDisposition) {

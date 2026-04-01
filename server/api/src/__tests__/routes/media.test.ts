@@ -257,7 +257,8 @@ describe("GET /api/media/:id — proxy stream (no redirect to storage)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/png");
     expect(res.headers.get("Content-Length")).toBe(String(payload.length));
-    expect(res.headers.get("Cache-Control")).toBe("private, max-age=3600");
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(res.headers.get("Vary")).toBe("Cookie");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(res.headers.get("Content-Disposition")).toBeNull();
     expect(await res.text()).toBe("fake-bytes");
@@ -278,6 +279,24 @@ describe("GET /api/media/:id — proxy stream (no redirect to storage)", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/webp");
+    expect(res.headers.get("Content-Disposition")).toBeNull();
+  });
+
+  it("returns inline image/avif when declared on the row", async () => {
+    mockS3Send.mockResolvedValueOnce({
+      Body: Readable.from([Buffer.from("x")]),
+      ContentType: "application/octet-stream",
+      ContentLength: 1,
+    });
+    const app = createMediaApp([[{ ...mediaRow, contentType: "image/avif", fileName: "x.avif" }]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/avif");
     expect(res.headers.get("Content-Disposition")).toBeNull();
   });
 
