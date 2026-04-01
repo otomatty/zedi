@@ -87,6 +87,13 @@ export interface UseCollaborationReturn extends CollaborationState {
   reconnect: () => void;
   /** 保留中の保存をキャンセルし、直ちに API へ保存する（local モード・URL 取り込み後の即時保存用） */
   flushSave: () => void;
+  /**
+   * ページタイトルを CollaborationManager に伝達する。
+   * 次回の Y.Doc 保存時にサーバーへ同期される。
+   * Notify the CollaborationManager of the current page title
+   * so it is included in the next Y.Doc save to the server.
+   */
+  setPageTitle: (title: string) => void;
 }
 
 /**

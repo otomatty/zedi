@@ -12,6 +12,9 @@ import { Awareness } from "y-protocols/awareness";
 import type { UserPresence, ConnectionStatus, CollaborationState } from "./types";
 import { getUserColor } from "./types";
 
+/**
+ *
+ */
 export type CollaborationManagerMode = "local" | "collaborative";
 
 /** Debounce timer for saving Y.Doc to API in local mode. */
@@ -23,6 +26,9 @@ const DUPLICATION_RATIO_THRESHOLD = 1.5;
 /** ブラウザの keepalive ペイロード制限（64 KiB）より少し小さい安全な上限（バイト） */
 const KEEPALIVE_PAYLOAD_LIMIT = 63 * 1024;
 
+/**
+ *
+ */
 export class CollaborationManager {
   private ydoc: Y.Doc;
   private wsProvider: HocuspocusProvider | null = null;
@@ -39,7 +45,15 @@ export class CollaborationManager {
   private apiSaveTimer: ReturnType<typeof setTimeout> | null = null;
   /** Whether initial API fetch has completed (local mode). */
   private apiFetched = false;
+  /**
+   * ページタイトル。saveToApi 時に PUT リクエストに含めてサーバーに同期する。
+   * Page title included in PUT requests to keep the server in sync.
+   */
+  private pageTitle: string | null = null;
 
+  /**
+   *
+   */
   constructor(
     pageId: string,
     userId: string,
@@ -82,12 +96,27 @@ export class CollaborationManager {
     try {
       if (this.destroyed) return;
 
+      /**
+       *
+       */
       const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+      /**
+       *
+       */
       const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+      /**
+       *
+       */
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
+      /**
+       *
+       */
       const beforeText = this.getPlainText();
 
+      /**
+       *
+       */
       const res = await fetch(url, {
         credentials: "include",
       });
@@ -95,14 +124,26 @@ export class CollaborationManager {
       if (this.destroyed) return;
 
       if (res.ok) {
+        /**
+         *
+         */
         const data = (await res.json()) as {
           ok?: boolean;
           data?: { ydoc_state?: string };
           ydoc_state?: string;
         };
+        /**
+         *
+         */
         const envelope = data?.ok === true && data?.data ? data.data : data;
+        /**
+         *
+         */
         const b64 = envelope?.ydoc_state;
         if (b64 && typeof b64 === "string") {
+          /**
+           *
+           */
           const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
           if (binary.length > 2) {
             Y.applyUpdate(this.ydoc, binary);
@@ -161,34 +202,76 @@ export class CollaborationManager {
   private async saveToApi(): Promise<void> {
     if (this.destroyed) return;
     try {
+      /**
+       *
+       */
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length <= 2) return; // empty Y.Doc
 
       // Base64 encode
+      /**
+       *
+       */
       let b64 = "";
+      /**
+       *
+       */
       const chunkSize = 8192;
-      for (let i = 0; i < state.length; i += chunkSize) {
+      for (
+        /**
+         *
+         */
+        let i = 0;
+        i < state.length;
+        i += chunkSize
+      ) {
         b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
       }
       b64 = btoa(b64);
 
+      /**
+       *
+       */
       const fragment = this.ydoc.getXmlFragment("default");
+      /**
+       *
+       */
       const contentText = fragment.toJSON() ? this.extractText(fragment) : "";
 
+      /**
+       *
+       */
       const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+      /**
+       *
+       */
       const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+      /**
+       *
+       */
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
+      /**
+       *
+       */
+      const payload: Record<string, string> = {
+        ydoc_state: b64,
+        content_text: contentText,
+      };
+      if (this.pageTitle !== null) {
+        payload.title = this.pageTitle;
+      }
+
+      /**
+       *
+       */
       const res = await fetch(url, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          ydoc_state: b64,
-          content_text: contentText, // 全文検索用プレーンテキスト
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (this.destroyed) return;
@@ -212,13 +295,22 @@ export class CollaborationManager {
    * マージ前後のテキストを比較し、不自然な増加があれば console.error で報告する。
    */
   private detectContentDuplication(beforeText: string, phase: string): void {
+    /**
+     *
+     */
     const afterText = this.getPlainText();
     if (beforeText.length < 10) return;
     if (afterText.length <= beforeText.length) return;
 
+    /**
+     *
+     */
     const ratio = afterText.length / beforeText.length;
     if (ratio < DUPLICATION_RATIO_THRESHOLD) return;
 
+    /**
+     *
+     */
     const occurrences = afterText.split(beforeText).length - 1;
     if (occurrences < 2) return;
 
@@ -236,12 +328,21 @@ export class CollaborationManager {
    * XmlFragment からプレーンテキストを抽出
    */
   private extractText(fragment: Y.XmlFragment): string {
+    /**
+     *
+     */
     const parts: string[] = [];
+    /**
+     *
+     */
     const walk = (node: Y.XmlFragment | Y.XmlElement | Y.XmlText) => {
       if (node instanceof Y.XmlText) {
         parts.push(node.toJSON());
       } else {
-        for (const child of node.toArray()) {
+        for (/**
+         *
+         */
+        const child of node.toArray()) {
           if (
             child instanceof Y.XmlText ||
             child instanceof Y.XmlElement ||
@@ -257,6 +358,9 @@ export class CollaborationManager {
   }
 
   private async connectWebSocket() {
+    /**
+     *
+     */
     const token = await this.getAuthToken();
     if (!token) {
       console.warn("[Collab] No auth token, staying offline");
@@ -264,7 +368,13 @@ export class CollaborationManager {
       return;
     }
 
+    /**
+     *
+     */
     const wsUrl = import.meta.env.VITE_REALTIME_URL || "ws://localhost:1234";
+    /**
+     *
+     */
     const documentName = `page-${this.pageId}`;
 
     this.wsProvider = new HocuspocusProvider({
@@ -306,6 +416,9 @@ export class CollaborationManager {
   setLocalPresence(presence: Partial<UserPresence>) {
     if (!this.awareness) return;
 
+    /**
+     *
+     */
     const current = this.awareness.getLocalState() || {};
     this.awareness.setLocalState({
       ...current,
@@ -336,7 +449,13 @@ export class CollaborationManager {
   private updatePresence() {
     if (!this.awareness) return;
 
+    /**
+     *
+     */
     const states = this.awareness.getStates();
+    /**
+     *
+     */
     const onlineUsers: UserPresence[] = [];
 
     states.forEach((state, clientId) => {
@@ -361,6 +480,14 @@ export class CollaborationManager {
     // 現在の状態を即座に通知
     listener(this.state);
     return () => this.listeners.delete(listener);
+  }
+
+  /**
+   * ページタイトルを設定する。次回の saveToApi / fireAndForgetSave で PUT に含まれる。
+   * Set the page title so it is included in subsequent PUT requests to the server.
+   */
+  setPageTitle(title: string): void {
+    this.pageTitle = title;
   }
 
   /**
@@ -395,6 +522,9 @@ export class CollaborationManager {
    * 手動再接続
    */
   reconnect() {
+    /**
+     *
+     */
     const websocketProvider = (
       this.wsProvider as HocuspocusProvider & {
         configuration?: { websocketProvider?: { connect?: () => Promise<void>; status?: string } };
@@ -419,8 +549,14 @@ export class CollaborationManager {
 
     // 最終保存: ydoc 破棄前に同期的にステートをエンコードし、非同期で送信
     if (this.mode === "local" && this.apiFetched) {
+      /**
+       *
+       */
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length > 2) {
+        /**
+         *
+         */
         const contentText = this.extractText(this.ydoc.getXmlFragment("default"));
         this.fireAndForgetSave(state, contentText);
       }
@@ -445,24 +581,65 @@ export class CollaborationManager {
    * ブラウザの keepalive ペイロード制限（約 64 KiB）を超える場合は keepalive なしで送信する。
    */
   private fireAndForgetSave(state: Uint8Array, contentText: string): void {
+    /**
+     *
+     */
     let b64 = "";
+    /**
+     *
+     */
     const chunkSize = 8192;
-    for (let i = 0; i < state.length; i += chunkSize) {
+    for (
+      /**
+       *
+       */
+      let i = 0;
+      i < state.length;
+      i += chunkSize
+    ) {
       b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
     }
     b64 = btoa(b64);
 
-    const body = JSON.stringify({
+    /**
+     *
+     */
+    const payload: Record<string, string> = {
       ydoc_state: b64,
       content_text: contentText,
-    });
+    };
+    if (this.pageTitle !== null) {
+      payload.title = this.pageTitle;
+    }
+    /**
+     *
+     */
+    const body = JSON.stringify(payload);
+    /**
+     *
+     */
     const bodyByteLength =
       typeof TextEncoder !== "undefined" ? new TextEncoder().encode(body).length : body.length * 2;
+    /**
+     *
+     */
     const useKeepalive = bodyByteLength <= KEEPALIVE_PAYLOAD_LIMIT;
 
+    /**
+     *
+     */
     const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    /**
+     *
+     */
     const baseUrl = rawBaseUrl.replace(/\/$/, "");
+    /**
+     *
+     */
     const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+    /**
+     *
+     */
     const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
     fetch(url, {

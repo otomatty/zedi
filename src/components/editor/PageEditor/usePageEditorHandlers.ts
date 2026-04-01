@@ -7,6 +7,8 @@ import type { Page } from "@/types/page";
 interface UsePageEditorHandlersOptions {
   title: string;
   content: string;
+  /** true のときだけオートタイトル（コンテンツ先頭行からの自動生成）を有効にする */
+  enableAutoTitle: boolean;
   duplicatePage: Page | null;
   setTitle: (title: string) => void;
   setContent: (content: string) => void;
@@ -18,11 +20,21 @@ interface UsePageEditorHandlersOptions {
   location: { pathname: string; search: string; hash?: string };
 }
 
+/**
+ *
+ */
 export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const {
     title,
     content,
+    enableAutoTitle,
     duplicatePage,
     setTitle,
     setContent,
@@ -34,19 +46,32 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     location,
   } = options;
 
+  /**
+   *
+   */
   const handleContentChange = useCallback(
     (newContent: string) => {
       setContent(newContent);
-      const autoTitle = !title ? generateAutoTitle(newContent) : title;
-      if (!title && autoTitle !== "無題のページ") {
-        setTitle(autoTitle);
-        validateTitle(autoTitle);
+      if (enableAutoTitle && !title) {
+        /**
+         *
+         */
+        const autoTitle = generateAutoTitle(newContent);
+        if (autoTitle !== "無題のページ") {
+          setTitle(autoTitle);
+          validateTitle(autoTitle);
+          saveChanges(autoTitle, newContent);
+          return;
+        }
       }
-      saveChanges(autoTitle || title, newContent);
+      saveChanges(title, newContent);
     },
-    [title, saveChanges, validateTitle, setContent, setTitle],
+    [title, enableAutoTitle, saveChanges, validateTitle, setContent, setTitle],
   );
 
+  /**
+   *
+   */
   const handleTitleChange = useCallback(
     (newTitle: string) => {
       setTitle(newTitle);
@@ -56,6 +81,9 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     [content, saveChanges, validateTitle, setTitle],
   );
 
+  /**
+   *
+   */
   const handleContentError = useCallback(
     (error: ContentError | null) => {
       setContentError(error);
@@ -63,19 +91,34 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     [setContentError],
   );
 
+  /**
+   *
+   */
   const handleOpenDuplicatePage = useCallback(() => {
     if (duplicatePage) {
       navigate(`/page/${duplicatePage.id}`);
     }
   }, [duplicatePage, navigate]);
 
+  /**
+   *
+   */
   const handleGenerateWiki = useCallback(() => {
     generateWiki(title);
   }, [generateWiki, title]);
 
+  /**
+   *
+   */
   const handleGoToAISettings = useCallback(() => {
     resetWiki();
+    /**
+     *
+     */
     const returnTo = `${location.pathname}${location.search}${location.hash ?? ""}`;
+    /**
+     *
+     */
     const search = new URLSearchParams({ section: "ai", returnTo }).toString();
     navigate(`/settings?${search}`);
   }, [resetWiki, navigate, location.pathname, location.search, location.hash]);

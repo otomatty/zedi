@@ -148,6 +148,10 @@ export function useCollaboration({
     managerRef.current?.flushSave();
   }, []);
 
+  const setPageTitle = useCallback((title: string) => {
+    managerRef.current?.setPageTitle(title);
+  }, []);
+
   const collaborationUser =
     enabled && effectiveUserId
       ? {
@@ -166,5 +170,6 @@ export function useCollaboration({
     updateSelection,
     reconnect,
     flushSave,
+    setPageTitle,
   };
 }
