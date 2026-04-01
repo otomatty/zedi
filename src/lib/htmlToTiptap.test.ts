@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatClippedContentAsTiptap } from "./htmlToTiptap";
+import { formatClippedContentAsTiptap, htmlToTiptapJSON } from "./htmlToTiptap";
 
 describe("formatClippedContentAsTiptap", () => {
   it("returns main content without citation block or thumbnail when thumbnailUrl is omitted", () => {
@@ -75,5 +75,73 @@ describe("formatClippedContentAsTiptap", () => {
     const first = result.content?.[0];
     expect(first?.type).toBe("paragraph");
     expect(first?.type).not.toBe("image");
+  });
+});
+
+describe("htmlToTiptapJSON", () => {
+  it("rejects javascript: and data: URI schemes in links", () => {
+    const html =
+      '<p><a href="javascript:alert(1)">bad-js</a> <a href="data:text/html;base64,AAAA">bad-data</a></p>';
+    const result = htmlToTiptapJSON(html);
+    const json = JSON.stringify(result);
+    expect(json).not.toContain("javascript:alert(1)");
+    expect(json).not.toContain("data:text/html");
+  });
+
+  it("allows safe URI schemes (https, mailto, tel) and relative paths", () => {
+    const html = [
+      '<p><a href="https://example.com">https</a>',
+      '<a href="mailto:test@example.com">mail</a>',
+      '<a href="tel:+819012345678">tel</a>',
+      '<a href="/relative/path">relative</a></p>',
+    ].join(" ");
+    const result = htmlToTiptapJSON(html);
+    const json = JSON.stringify(result);
+    expect(json).toContain("https://example.com");
+    expect(json).toContain("mailto:test@example.com");
+    expect(json).toContain("tel:+819012345678");
+    expect(json).toContain("/relative/path");
+  });
+
+  it("converts inline <img> tags to image nodes", () => {
+    const html = '<p>Before</p><img src="https://example.com/photo.png" alt="photo"><p>After</p>';
+    const result = htmlToTiptapJSON(html);
+
+    expect(result.type).toBe("doc");
+    const imageNodes = result.content?.filter((n) => n.type === "image") ?? [];
+    expect(imageNodes.length).toBe(1);
+    expect(imageNodes[0]).toMatchObject({
+      type: "image",
+      attrs: expect.objectContaining({
+        src: "https://example.com/photo.png",
+        alt: "photo",
+      }),
+    });
+  });
+
+  it("preserves multiple inline images in article body", () => {
+    const html = [
+      "<p>Intro</p>",
+      '<img src="https://example.com/img1.png" alt="first">',
+      "<p>Middle</p>",
+      '<img src="https://example.com/img2.jpg" alt="second">',
+      "<p>End</p>",
+    ].join("");
+    const result = htmlToTiptapJSON(html);
+
+    const imageNodes = result.content?.filter((n) => n.type === "image") ?? [];
+    expect(imageNodes.length).toBe(2);
+    expect(imageNodes[0]?.attrs).toMatchObject({ src: "https://example.com/img1.png" });
+    expect(imageNodes[1]?.attrs).toMatchObject({ src: "https://example.com/img2.jpg" });
+  });
+
+  it("converts <img> wrapped in other elements", () => {
+    const html =
+      '<div><figure><img src="https://example.com/fig.webp" alt="figure"></figure></div>';
+    const result = htmlToTiptapJSON(html);
+
+    const imageNodes = result.content?.filter((n) => n.type === "image") ?? [];
+    expect(imageNodes.length).toBe(1);
+    expect(imageNodes[0]?.attrs).toMatchObject({ src: "https://example.com/fig.webp" });
   });
 });

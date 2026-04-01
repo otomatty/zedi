@@ -5,8 +5,12 @@
  * 除外: localhost, loopback, プライベート IP, link-local, .local, chrome/about/file.
  * Policy for clip-and-create and clipUrl. Allows http/https only; rejects localhost, loopback, private IP, link-local, .local.
  */
+import type { LookupAllOptions } from "node:dns";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+
+/** Node の `dns.lookup` は runtime で `signal` を受け取るが、TypeScript の `LookupOptions` に未反映のため拡張する。Runtime accepts `signal`; types omit it so we extend locally. */
+type LookupAllOptionsWithSignal = LookupAllOptions & { signal?: AbortSignal };
 
 /**
  * 文字列の IP がプライベート・ループバック・link-local かどうかを判定する。
@@ -77,8 +81,13 @@ export function isClipUrlAllowed(url: string): boolean {
  * DNS 解決後の IP がすべて公開アドレスであることを確認する（SSRF 対策）。
  * ホスト名がドメインの場合は resolve し、いずれかが private/loopback/link-local なら false。
  * Verifies that all resolved IPs for the URL hostname are public (no private/loopback/link-local).
+ *
+ * @param options - 省略可。`signal` を渡すと `dns.lookup` を中断可能（fetch の AbortController と共有）。Optional; pass `signal` to abort in-flight DNS lookup.
  */
-export async function isClipUrlAllowedAfterDns(url: string): Promise<boolean> {
+export async function isClipUrlAllowedAfterDns(
+  url: string,
+  options?: { signal?: AbortSignal },
+): Promise<boolean> {
   if (!isClipUrlAllowed(url)) return false;
   try {
     const parsed = new URL(url.trim());
@@ -88,12 +97,14 @@ export async function isClipUrlAllowedAfterDns(url: string): Promise<boolean> {
     }
     // ホスト名がすでに IP の場合は、private/ULA でなければ許可する（ULA 短縮形 fc::1 等もここで判定）。
     if (isIP(hostname) !== 0) return !isPrivateOrLoopbackOrLinkLocalIp(hostname);
-    const result = await lookup(hostname, { all: true });
+    const lookupOpts: LookupAllOptionsWithSignal = { all: true, signal: options?.signal };
+    const result = await lookup(hostname, lookupOpts);
     const addresses = result.map((r) => r.address);
     if (addresses.length === 0) return false;
     const allPublic = addresses.every((addr) => !isPrivateOrLoopbackOrLinkLocalIp(addr));
     return allPublic;
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
     return false;
   }
 }

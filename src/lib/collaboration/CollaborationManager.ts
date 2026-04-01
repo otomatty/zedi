@@ -12,6 +12,10 @@ import { Awareness } from "y-protocols/awareness";
 import type { UserPresence, ConnectionStatus, CollaborationState } from "./types";
 import { getUserColor } from "./types";
 
+/**
+ * コラボレーションの動作モード。
+ * Collaboration operating mode: local (personal pages) or collaborative (shared notes).
+ */
 export type CollaborationManagerMode = "local" | "collaborative";
 
 /** Debounce timer for saving Y.Doc to API in local mode. */
@@ -23,6 +27,10 @@ const DUPLICATION_RATIO_THRESHOLD = 1.5;
 /** ブラウザの keepalive ペイロード制限（64 KiB）より少し小さい安全な上限（バイト） */
 const KEEPALIVE_PAYLOAD_LIMIT = 63 * 1024;
 
+/**
+ * Y.js ドキュメントの管理・永続化・リアルタイム同期を担当するマネージャー。
+ * Manages Y.js document lifecycle, IndexedDB persistence, and real-time sync.
+ */
 export class CollaborationManager {
   private ydoc: Y.Doc;
   private wsProvider: HocuspocusProvider | null = null;
@@ -39,7 +47,16 @@ export class CollaborationManager {
   private apiSaveTimer: ReturnType<typeof setTimeout> | null = null;
   /** Whether initial API fetch has completed (local mode). */
   private apiFetched = false;
+  /**
+   * ページタイトル。saveToApi 時に PUT リクエストに含めてサーバーに同期する。
+   * Page title included in PUT requests to keep the server in sync.
+   */
+  private pageTitle: string | null = null;
 
+  /**
+   * 新しい CollaborationManager を作成する。
+   * Creates a new CollaborationManager for the given page and user.
+   */
   constructor(
     pageId: string,
     userId: string,
@@ -75,6 +92,29 @@ export class CollaborationManager {
   }
 
   /**
+   * API リクエスト用の origin。`VITE_API_BASE_URL` の末尾スラッシュ（複数可）を除去し、URL 連結時の二重スラッシュを防ぐ。
+   * Resolves API origin from env, stripping one or more trailing slashes to avoid `//api` in URLs.
+   */
+  private getApiOrigin(): string {
+    const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    const baseUrl = rawBaseUrl.replace(/\/+$/, "");
+    return baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  }
+
+  /**
+   * Y.js エンコード済みステートを Base64 文字列に変換する（大きなペイロードはチャンク処理）。
+   * Encodes a Y.js state update to Base64 (chunked for large payloads).
+   */
+  private encodeStateUpdateToBase64(state: Uint8Array): string {
+    let b64 = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < state.length; i += chunkSize) {
+      b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
+    }
+    return btoa(b64);
+  }
+
+  /**
    * REST API から Y.Doc を取得してローカル Y.Doc にマージする（local モード用）。
    * マージ後、Y.Doc の変更監視を開始する。
    */
@@ -82,8 +122,7 @@ export class CollaborationManager {
     try {
       if (this.destroyed) return;
 
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-      const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+      const origin = this.getApiOrigin();
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
       const beforeText = this.getPlainText();
@@ -158,26 +197,33 @@ export class CollaborationManager {
     void this.saveToApi();
   }
 
+  /**
+   * PUT /content 用 JSON ボディ。ydoc_state / content_text に加え、setPageTitle 済みなら title を含む。
+   */
+  private buildPutContentBody(ydocStateB64: string, contentText: string): Record<string, string> {
+    const payload: Record<string, string> = {
+      ydoc_state: ydocStateB64,
+      content_text: contentText,
+    };
+    if (this.pageTitle !== null) {
+      payload.title = this.pageTitle;
+    }
+    return payload;
+  }
+
   private async saveToApi(): Promise<void> {
     if (this.destroyed) return;
     try {
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length <= 2) return; // empty Y.Doc
 
-      // Base64 encode
-      let b64 = "";
-      const chunkSize = 8192;
-      for (let i = 0; i < state.length; i += chunkSize) {
-        b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
-      }
-      b64 = btoa(b64);
+      const b64 = this.encodeStateUpdateToBase64(state);
+      const contentText = this.getPlainText();
 
-      const fragment = this.ydoc.getXmlFragment("default");
-      const contentText = fragment.toJSON() ? this.extractText(fragment) : "";
-
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-      const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+      const origin = this.getApiOrigin();
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
+
+      const payload = this.buildPutContentBody(b64, contentText);
 
       const res = await fetch(url, {
         method: "PUT",
@@ -185,10 +231,7 @@ export class CollaborationManager {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          ydoc_state: b64,
-          content_text: contentText, // 全文検索用プレーンテキスト
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (this.destroyed) return;
@@ -364,6 +407,14 @@ export class CollaborationManager {
   }
 
   /**
+   * ページタイトルを設定する。次回の saveToApi / fireAndForgetSave で PUT に含まれる。
+   * Set the page title so it is included in subsequent PUT requests to the server.
+   */
+  setPageTitle(title: string): void {
+    this.pageTitle = title;
+  }
+
+  /**
    * Y.Docを取得
    */
   get document(): Y.Doc {
@@ -421,7 +472,7 @@ export class CollaborationManager {
     if (this.mode === "local" && this.apiFetched) {
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length > 2) {
-        const contentText = this.extractText(this.ydoc.getXmlFragment("default"));
+        const contentText = this.getPlainText();
         this.fireAndForgetSave(state, contentText);
       }
     }
@@ -445,24 +496,15 @@ export class CollaborationManager {
    * ブラウザの keepalive ペイロード制限（約 64 KiB）を超える場合は keepalive なしで送信する。
    */
   private fireAndForgetSave(state: Uint8Array, contentText: string): void {
-    let b64 = "";
-    const chunkSize = 8192;
-    for (let i = 0; i < state.length; i += chunkSize) {
-      b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
-    }
-    b64 = btoa(b64);
+    const b64 = this.encodeStateUpdateToBase64(state);
 
-    const body = JSON.stringify({
-      ydoc_state: b64,
-      content_text: contentText,
-    });
+    const payload = this.buildPutContentBody(b64, contentText);
+    const body = JSON.stringify(payload);
     const bodyByteLength =
       typeof TextEncoder !== "undefined" ? new TextEncoder().encode(body).length : body.length * 2;
     const useKeepalive = bodyByteLength <= KEEPALIVE_PAYLOAD_LIMIT;
 
-    const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-    const baseUrl = rawBaseUrl.replace(/\/$/, "");
-    const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+    const origin = this.getApiOrigin();
     const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
     fetch(url, {

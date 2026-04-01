@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq } from "drizzle-orm";
@@ -24,6 +25,64 @@ const s3 = new S3Client({
 });
 
 const BUCKET = getEnv("STORAGE_BUCKET_NAME");
+
+/**
+ * api オリジンでバイトを返すため、ユーザー提供の Content-Type をそのまま使わない。
+ * ブラウザが img で表示しやすいラスタ系のみインライン許可（SVG は XSS のため除外 — サムネイル配信と同様）。
+ * AVIF/APNG などはアップロードで保存され得るため GET でも同じ扱いにする（/upload は file.type 依存のためここで広げる）。
+ *
+ * Do not reflect user-supplied Content-Type verbatim from the API origin.
+ * Allow common safe raster types for inline display; exclude SVG (XSS — same as thumbnail/serve).
+ * Include AVIF/APNG so GET matches types clients may store via `/upload`.
+ */
+const SAFE_INLINE_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/apng",
+  "image/bmp",
+  "image/x-ms-bmp",
+]);
+
+/**
+ * MIME 文字列からセミコロンより前の部分だけを小文字で返す。
+ *
+ * Returns the part before `;`, lowercased (e.g. `image/png; charset=binary` → `image/png`).
+ *
+ * @param raw - MIME string, possibly with parameters
+ */
+function normalizeMimeBase(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const base = raw.split(";")[0]?.trim().toLowerCase();
+  return base || null;
+}
+
+/**
+ * プロキシ応答用の Content-Type と、必要なら Content-Disposition（attachment）。
+ *
+ * Resolves safe `Content-Type` and optional `Content-Disposition` for proxied bytes.
+ */
+function resolveProxyContentHeaders(
+  rowContentType: string | null | undefined,
+  s3ContentType: string | undefined,
+  fileName: string | null | undefined,
+): { contentType: string; contentDisposition?: string } {
+  const declared = normalizeMimeBase(rowContentType) ?? normalizeMimeBase(s3ContentType);
+  if (declared && SAFE_INLINE_IMAGE_TYPES.has(declared)) {
+    return { contentType: declared };
+  }
+  const safeFile =
+    fileName
+      ?.trim()
+      .replace(/[^\w.-]+/g, "_")
+      .slice(0, 200) || "download";
+  return {
+    contentType: "application/octet-stream",
+    contentDisposition: `attachment; filename="${safeFile}"`,
+  };
+}
 
 const app = new Hono<AppEnv>();
 
@@ -74,6 +133,15 @@ app.post("/confirm", authRequired, async (c) => {
     throw new HTTPException(400, { message: "media_id and s3_key are required" });
   }
 
+  const expectedPrefix = `users/${userId}/media/${body.media_id}/`;
+  if (
+    typeof body.s3_key !== "string" ||
+    !body.s3_key.startsWith(expectedPrefix) ||
+    body.s3_key.split("/").some((seg) => seg === ".." || seg === ".")
+  ) {
+    throw new HTTPException(403, { message: "Invalid S3 key" });
+  }
+
   const result = await db
     .insert(media)
     .values({
@@ -90,6 +158,14 @@ app.post("/confirm", authRequired, async (c) => {
   return c.json({ media: result[0] });
 });
 
+/**
+ * GET /api/media/:id — メディアをプロキシ配信
+ * 302 で presigned URL へ飛ばすと、ブラウザの credentials 付き fetch がストレージ側で CORS に阻まれることがあるため、
+ * API 上で GetObject してストリーム返却する（サムネイル配信と同じ理由）。
+ *
+ * GET /api/media/:id — proxy media bytes through the API.
+ * A 302 to a presigned URL can make credentialed browser fetches fail on storage CORS; stream from S3 here instead (same as thumbnails).
+ */
 app.get("/:id", authRequired, async (c) => {
   const mediaId = c.req.param("id");
   const userId = c.get("userId");
@@ -103,13 +179,52 @@ app.get("/:id", authRequired, async (c) => {
     throw new HTTPException(403, { message: "You can only access your own media" });
   }
 
-  const signedUrl = await getSignedUrl(
-    s3,
-    new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }),
-    { expiresIn: 3600 },
+  let response;
+  try {
+    response = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }));
+  } catch (err) {
+    const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
+      ?.$metadata;
+    const code = meta?.httpStatusCode;
+    const name = (err as { name?: string }).name;
+    if (name === "NoSuchKey" || code === 404) {
+      return c.json({ error: "Object not found" }, 404);
+    }
+    console.error("[media] S3 GetObject failed:", err);
+    return c.json({ error: "Failed to retrieve object" }, 502);
+  }
+
+  const body = response.Body;
+  if (!body) return c.json({ error: "Object not found" }, 404);
+
+  const { contentType, contentDisposition } = resolveProxyContentHeaders(
+    row.contentType,
+    response.ContentType,
+    row.fileName,
   );
 
-  return c.redirect(signedUrl, 302);
+  const webStream = body instanceof Readable ? Readable.toWeb(body) : (body as ReadableStream);
+
+  // Cookie セッション認可: ログアウト後の別アカウントで古いバイトが再利用されないよう no-store + Vary: Cookie
+  // Cookie-auth: avoid serving stale cached bytes after logout or account switch
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    "Cache-Control": "private, no-store",
+    Vary: "Cookie",
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (contentDisposition) {
+    headers["Content-Disposition"] = contentDisposition;
+  }
+  const len = response.ContentLength;
+  if (typeof len === "number" && len >= 0) {
+    headers["Content-Length"] = String(len);
+  }
+
+  return new Response(webStream as BodyInit, {
+    status: 200,
+    headers,
+  });
 });
 
 app.delete("/:id", authRequired, async (c) => {

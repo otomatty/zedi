@@ -4,15 +4,18 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Button, useToast } from "@zedi/ui";
-import { useDeleteNote, useNote, useUpdateNote } from "@/hooks/useNoteQueries";
+import { useDeleteNote, useNote } from "@/hooks/useNoteQueries";
 import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { useTranslation } from "react-i18next";
 import { NoteSettingsShareSection } from "./NoteSettingsShareSection";
 import { NoteSettingsVisibilitySection } from "./NoteSettingsVisibilitySection";
 import { NoteSettingsDeleteSection } from "./NoteSettingsDeleteSection";
+import { PublicAnyLoggedInSaveAlertDialog } from "./PublicAnyLoggedInSaveAlertDialog";
+import { useNoteSettingsSaveWithPublicConfirm } from "./useNoteSettingsSaveWithPublicConfirm";
 
 /**
- *
+ * Note settings page: share link, visibility, delete; save confirms public + any_logged_in once.
+ * ノート設定ページ（共有リンク・公開範囲・削除）。公開 + any_logged_in への初回保存時に確認する。
  */
 const NoteSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -28,13 +31,26 @@ const NoteSettings: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const canManage = Boolean(access?.canManageMembers && source === "local");
-  const updateNoteMutation = useUpdateNote();
   const deleteNoteMutation = useDeleteNote();
 
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState<NoteVisibility>("private");
   const [editPermission, setEditPermission] = useState<NoteEditPermission>("owner_only");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const {
+    handleSaveNote,
+    confirmOpen: isPublicAnyLoggedInSaveConfirmOpen,
+    setConfirmOpen: setIsPublicAnyLoggedInSaveConfirmOpen,
+    handleConfirmPublicAnyLoggedInSave,
+    isSaving,
+  } = useNoteSettingsSaveWithPublicConfirm({
+    noteId,
+    note: note ?? undefined,
+    title,
+    visibility,
+    editPermission,
+  });
 
   useEffect(() => {
     if (note) {
@@ -58,20 +74,6 @@ const NoteSettings: React.FC = () => {
     } catch (error) {
       console.error("Failed to copy link:", error);
       toast({ title: t("notes.linkCopyFailed"), variant: "destructive" });
-    }
-  };
-
-  const handleSaveNote = async () => {
-    if (!noteId) return;
-    try {
-      await updateNoteMutation.mutateAsync({
-        noteId,
-        updates: { title: title.trim(), visibility, editPermission },
-      });
-      toast({ title: t("notes.noteUpdated") });
-    } catch (error) {
-      console.error("Failed to update note:", error);
-      toast({ title: t("notes.noteUpdateFailed"), variant: "destructive" });
     }
   };
 
@@ -144,7 +146,7 @@ const NoteSettings: React.FC = () => {
                 editPermission={editPermission}
                 setEditPermission={setEditPermission}
                 onSaveNote={handleSaveNote}
-                isSaving={updateNoteMutation.isPending}
+                isSaving={isSaving}
               />
               <NoteSettingsDeleteSection
                 isDeleteDialogOpen={isDeleteDialogOpen}
@@ -152,6 +154,13 @@ const NoteSettings: React.FC = () => {
                 onConfirmDelete={handleDeleteNote}
                 isDeleting={deleteNoteMutation.isPending}
                 noteTitle={note.title || t("notes.untitledNote")}
+              />
+
+              <PublicAnyLoggedInSaveAlertDialog
+                open={isPublicAnyLoggedInSaveConfirmOpen}
+                onOpenChange={setIsPublicAnyLoggedInSaveConfirmOpen}
+                onConfirm={handleConfirmPublicAnyLoggedInSave}
+                isSaving={isSaving}
               />
             </>
           )}

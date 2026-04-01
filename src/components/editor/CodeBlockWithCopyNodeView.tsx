@@ -59,9 +59,13 @@ const CodeBlockWithCopyNodeView: React.FC<NodeViewProps> = ({ node }) => {
   const language = (node.attrs.language as string) ?? "";
 
   return (
-    <NodeViewWrapper as="div" className="group/code relative">
-      <pre ref={preRef} className="overflow-x-auto">
-        <NodeViewContent as="code" className={language ? `language-${language}` : ""} />
+    <NodeViewWrapper as="div" className="group/code relative" spellCheck={false}>
+      <pre ref={preRef} className="overflow-x-auto" spellCheck={false}>
+        <NodeViewContent
+          as="code"
+          className={language ? `language-${language}` : ""}
+          spellCheck={false}
+        />
       </pre>
       <button
         type="button"

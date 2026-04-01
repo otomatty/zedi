@@ -103,6 +103,45 @@ describe("POST /api/notes", () => {
 
     expect(res.status).toBe(401);
   });
+
+  it("should return 403 when non-admin sets is_official true on create", async () => {
+    const { app } = createTestApp([[{ role: "user" }]]);
+
+    const res = await app.request("/api/notes", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Fake official", is_official: true }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should allow admin to create note with is_official true", async () => {
+    const mockNote = createMockNote({ isOfficial: true });
+    const { app } = createTestApp([[{ role: "admin" }], [mockNote], []]);
+
+    const res = await app.request("/api/notes", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Official", is_official: true }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.is_official).toBe(true);
+  });
+
+  it("should return 400 when is_official is not a boolean on create", async () => {
+    const { app } = createTestApp([]);
+
+    const res = await app.request("/api/notes", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Bad", is_official: "true" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── PUT /api/notes/:noteId ──────────────────────────────────────────────────
@@ -142,6 +181,77 @@ describe("PUT /api/notes/:noteId", () => {
     });
 
     expect(res.status).toBe(403);
+  });
+
+  it("should return 403 when non-admin changes is_official", async () => {
+    const mockNote = createMockNote({ isOfficial: false });
+    const { app } = createTestApp([[mockNote], [{ role: "user" }]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ is_official: true }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should return 403 when non-admin sends is_official even if equal to current (TOCTOU)", async () => {
+    const mockNote = createMockNote({ isOfficial: true });
+    const { app } = createTestApp([[mockNote], [{ role: "user" }]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Renamed", is_official: true }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should allow admin to set is_official from false to true on update", async () => {
+    const mockNote = createMockNote({ isOfficial: false });
+    const updatedNote = createMockNote({ isOfficial: true });
+    const { app } = createTestApp([[mockNote], [{ role: "admin" }], [updatedNote]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ is_official: true }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.is_official).toBe(true);
+  });
+
+  it("should allow admin to set is_official from true to false on update", async () => {
+    const mockNote = createMockNote({ isOfficial: true });
+    const updatedNote = createMockNote({ isOfficial: false });
+    const { app } = createTestApp([[mockNote], [{ role: "admin" }], [updatedNote]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ is_official: false }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.is_official).toBe(false);
+  });
+
+  it("should return 400 when is_official is not a boolean on update", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ is_official: 1 }),
+    });
+
+    expect(res.status).toBe(400);
   });
 });
 

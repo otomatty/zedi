@@ -65,6 +65,7 @@ export function usePageEditor() {
   const handlers = usePageEditorHandlers({
     title: state.title,
     content: state.content,
+    enableAutoTitle: state.isNewPage,
     duplicatePage: state.duplicatePage ?? null,
     setTitle: state.setTitle,
     setContent: state.setContent,

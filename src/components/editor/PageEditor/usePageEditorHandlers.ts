@@ -7,6 +7,8 @@ import type { Page } from "@/types/page";
 interface UsePageEditorHandlersOptions {
   title: string;
   content: string;
+  /** true のときだけオートタイトル（コンテンツ先頭行からの自動生成）を有効にする */
+  enableAutoTitle: boolean;
   duplicatePage: Page | null;
   setTitle: (title: string) => void;
   setContent: (content: string) => void;
@@ -18,11 +20,13 @@ interface UsePageEditorHandlersOptions {
   location: { pathname: string; search: string; hash?: string };
 }
 
+/** Page editor event handlers (title, content, wiki, navigation). */
 export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
   const navigate = useNavigate();
   const {
     title,
     content,
+    enableAutoTitle,
     duplicatePage,
     setTitle,
     setContent,
@@ -37,14 +41,20 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
   const handleContentChange = useCallback(
     (newContent: string) => {
       setContent(newContent);
-      const autoTitle = !title ? generateAutoTitle(newContent) : title;
-      if (!title && autoTitle !== "無題のページ") {
-        setTitle(autoTitle);
-        validateTitle(autoTitle);
+      if (enableAutoTitle && !title) {
+        const autoTitle = generateAutoTitle(newContent);
+        if (autoTitle !== "無題のページ") {
+          setTitle(autoTitle);
+          validateTitle(autoTitle);
+          saveChanges(autoTitle, newContent);
+          return;
+        }
+        saveChanges("無題のページ", newContent);
+        return;
       }
-      saveChanges(autoTitle || title, newContent);
+      saveChanges(title, newContent);
     },
-    [title, saveChanges, validateTitle, setContent, setTitle],
+    [title, enableAutoTitle, saveChanges, validateTitle, setContent, setTitle],
   );
 
   const handleTitleChange = useCallback(
