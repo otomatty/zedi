@@ -26,6 +26,53 @@ const s3 = new S3Client({
 
 const BUCKET = getEnv("STORAGE_BUCKET_NAME");
 
+/**
+ * api オリジンでバイトを返すため、ユーザー提供の Content-Type をそのまま使わない。
+ * インライン表示してよい画像のみ許可（SVG は XSS リスクのため除外 — サムネイル配信と同様）。
+ *
+ * Do not reflect user-supplied Content-Type verbatim when serving from the API origin.
+ * Only allow safe inline image types (exclude SVG — same rationale as thumbnail/serve).
+ */
+const SAFE_INLINE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+/**
+ * MIME 文字列からセミコロンより前の部分だけを小文字で返す。
+ *
+ * Returns the part before `;`, lowercased (e.g. `image/png; charset=binary` → `image/png`).
+ *
+ * @param raw - MIME string, possibly with parameters
+ */
+function normalizeMimeBase(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const base = raw.split(";")[0]?.trim().toLowerCase();
+  return base || null;
+}
+
+/**
+ * プロキシ応答用の Content-Type と、必要なら Content-Disposition（attachment）。
+ *
+ * Resolves safe `Content-Type` and optional `Content-Disposition` for proxied bytes.
+ */
+function resolveProxyContentHeaders(
+  rowContentType: string | null | undefined,
+  s3ContentType: string | undefined,
+  fileName: string | null | undefined,
+): { contentType: string; contentDisposition?: string } {
+  const declared = normalizeMimeBase(rowContentType) ?? normalizeMimeBase(s3ContentType);
+  if (declared && SAFE_INLINE_IMAGE_TYPES.has(declared)) {
+    return { contentType: declared };
+  }
+  const safeFile =
+    fileName
+      ?.trim()
+      .replace(/[^\w.-]+/g, "_")
+      .slice(0, 200) || "download";
+  return {
+    contentType: "application/octet-stream",
+    contentDisposition: `attachment; filename="${safeFile}"`,
+  };
+}
+
 const app = new Hono<AppEnv>();
 
 app.post("/upload", authRequired, async (c) => {
@@ -139,16 +186,30 @@ app.get("/:id", authRequired, async (c) => {
   const body = response.Body;
   if (!body) return c.json({ error: "Object not found" }, 404);
 
-  const contentType = row.contentType ?? response.ContentType ?? "application/octet-stream";
+  const { contentType, contentDisposition } = resolveProxyContentHeaders(
+    row.contentType,
+    response.ContentType,
+    row.fileName,
+  );
 
   const webStream = body instanceof Readable ? Readable.toWeb(body) : (body as ReadableStream);
+
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    "Cache-Control": "private, max-age=3600",
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (contentDisposition) {
+    headers["Content-Disposition"] = contentDisposition;
+  }
+  const len = response.ContentLength;
+  if (typeof len === "number" && len >= 0) {
+    headers["Content-Length"] = String(len);
+  }
+
   return new Response(webStream as BodyInit, {
     status: 200,
-    headers: {
-      "Content-Type": contentType,
-      "Cache-Control": "private, max-age=3600",
-      "X-Content-Type-Options": "nosniff",
-    },
+    headers,
   });
 });
 

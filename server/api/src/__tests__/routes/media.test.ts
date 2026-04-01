@@ -241,9 +241,11 @@ describe("GET /api/media/:id — proxy stream (no redirect to storage)", () => {
   };
 
   it("returns 200 and streams object bytes with Content-Type from DB row", async () => {
+    const payload = Buffer.from("fake-bytes");
     mockS3Send.mockResolvedValueOnce({
-      Body: Readable.from([Buffer.from("fake-bytes")]),
+      Body: Readable.from([payload]),
       ContentType: "image/jpeg",
+      ContentLength: payload.length,
     });
     const app = createMediaApp([[mediaRow]]);
 
@@ -254,9 +256,49 @@ describe("GET /api/media/:id — proxy stream (no redirect to storage)", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("image/png");
+    expect(res.headers.get("Content-Length")).toBe(String(payload.length));
     expect(res.headers.get("Cache-Control")).toBe("private, max-age=3600");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("Content-Disposition")).toBeNull();
     expect(await res.text()).toBe("fake-bytes");
+  });
+
+  it("uses S3 Content-Type when DB row has no content type and MIME is safe", async () => {
+    mockS3Send.mockResolvedValueOnce({
+      Body: Readable.from([Buffer.from("w")]),
+      ContentType: "image/webp",
+      ContentLength: 1,
+    });
+    const app = createMediaApp([[{ ...mediaRow, contentType: null }]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/webp");
+    expect(res.headers.get("Content-Disposition")).toBeNull();
+  });
+
+  it("forces application/octet-stream and attachment for disallowed types such as SVG", async () => {
+    mockS3Send.mockResolvedValueOnce({
+      Body: Readable.from([Buffer.from("<svg")]),
+      ContentType: "image/svg+xml",
+      ContentLength: 4,
+    });
+    const app = createMediaApp([
+      [{ ...mediaRow, contentType: "image/svg+xml", fileName: "x.svg" }],
+    ]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("application/octet-stream");
+    expect(res.headers.get("Content-Disposition")).toBe('attachment; filename="x.svg"');
   });
 
   it("returns 403 when media belongs to another user", async () => {
