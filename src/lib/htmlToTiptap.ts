@@ -11,17 +11,34 @@ import { common, createLowlight } from "lowlight";
 
 const lowlight = createLowlight(common);
 
-// Tiptap の拡張機能（TiptapEditorと同じ構成にする）
-// generateJSON が認識できるノードタイプを定義。Image がないと <img> がドロップされる。
+/**
+ * Link の `isAllowedUri` はエディタ（`editorConfig.ts`）と同じ方針で、
+ * クリップ結果のリンクがエディタで拒否されないよう揃える。
+ * Keep aligned with `createEditorExtensions` Link XSS rules.
+ */
+function isClipLinkUriAllowed(url: string | undefined): boolean {
+  const value = (url ?? "").trim();
+  if (!value) return false;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return true;
+  if (/^https?:\/\//i.test(value)) return true;
+  if (/^(mailto|tel):/i.test(value)) return true;
+  return false;
+}
+
+// Web クリップ用の最小スキーマ（サーバー `clipAndCreate` と同系）。
+// Table / TaskList 等は含めない — 拡張は別 PR で検討する。
+// generateJSON に Image がないと <img> がドロップされる。
 const extensions = [
   StarterKit.configure({
     heading: {
       levels: [1, 2, 3],
     },
     codeBlock: false,
+    link: false,
   }),
   Link.configure({
     openOnClick: false,
+    isAllowedUri: isClipLinkUriAllowed,
   }),
   Image,
   CodeBlockLowlight.configure({
@@ -123,9 +140,11 @@ function cleanupHtml(html: string): string {
 }
 
 /**
- * 空の要素を再帰的に削除
+ * 空の要素を再帰的に削除。
+ * `VOID_LIKE_KEEP_TAGS` は cleanupHtml の `unwantedSelectors` で既に除去される
+ * video / iframe / input 等は含めない（純粋な自己完結タグのみ）。
  */
-const VOID_CONTENT_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "HR", "BR", "INPUT", "SOURCE"]);
+const VOID_LIKE_KEEP_TAGS = new Set(["IMG", "HR", "BR", "SOURCE"]);
 
 function removeEmptyElements(element: Element): void {
   const children = Array.from(element.children);
@@ -133,8 +152,8 @@ function removeEmptyElements(element: Element): void {
   for (const child of children) {
     removeEmptyElements(child);
 
-    // void 要素（img, hr 等）は自身がコンテンツなので削除しない
-    if (VOID_CONTENT_TAGS.has(child.tagName)) continue;
+    // 子を持たないが自己完結コンテンツとなる要素は削除しない（img 等）
+    if (VOID_LIKE_KEEP_TAGS.has(child.tagName)) continue;
 
     const hasContent =
       child.textContent?.trim() || child.querySelector("img, video, iframe, hr, br");
