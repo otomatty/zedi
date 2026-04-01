@@ -31,7 +31,10 @@ import type { Extension } from "@tiptap/core";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 
-// Create shared lowlight instance with common languages
+/**
+ * Shared lowlight instance for code block syntax highlighting (built-in common languages).
+ * コードブロックのシンタックスハイライト用の lowlight 共有インスタンス（common 言語セット）。
+ */
 export const lowlight = createLowlight(common);
 
 /**
@@ -225,7 +228,9 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
 }
 
 /**
- * Default editor props for Tiptap
+ * Default editor props for Tiptap (ProseMirror root `editorProps.attributes`).
+ * エディタルートに付与する属性。コードブロックのスペルチェックは NodeView 側で制御する。
+ * Root attributes; code-block spellcheck is handled in `CodeBlockWithCopyNodeView`.
  */
 export const defaultEditorProps = {
   attributes: {
