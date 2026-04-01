@@ -92,12 +92,12 @@ export class CollaborationManager {
   }
 
   /**
-   * API リクエスト用の origin。`VITE_API_BASE_URL` の末尾スラッシュを除去し、URL 連結時の二重スラッシュを防ぐ。
-   * Resolves API origin from env, stripping a trailing slash to avoid `//api` in URLs.
+   * API リクエスト用の origin。`VITE_API_BASE_URL` の末尾スラッシュ（複数可）を除去し、URL 連結時の二重スラッシュを防ぐ。
+   * Resolves API origin from env, stripping one or more trailing slashes to avoid `//api` in URLs.
    */
   private getApiOrigin(): string {
     const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-    const baseUrl = rawBaseUrl.replace(/\/$/, "");
+    const baseUrl = rawBaseUrl.replace(/\/+$/, "");
     return baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
   }
 
