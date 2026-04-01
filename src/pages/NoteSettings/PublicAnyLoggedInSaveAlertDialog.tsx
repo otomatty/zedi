@@ -11,7 +11,10 @@ import {
 } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
-/** Props for save confirmation (public or unlisted + any_logged_in). */
+/**
+ * Props for the save confirmation dialog (public or unlisted + any_logged_in).
+ * 保存前確認ダイアログの Props（公開または限定公開URL + any_logged_in）。
+ */
 export type PublicAnyLoggedInSaveAlertDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
