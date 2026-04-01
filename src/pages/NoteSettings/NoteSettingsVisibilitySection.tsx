@@ -10,10 +10,12 @@ import {
 } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import type { NoteEditPermission, NoteVisibility } from "@/types/note";
-import { allowedEditPermissions, editPermissionKeys, visibilityKeys } from "./noteSettingsConfig";
+import { NoteEditPermissionControls } from "@/components/note/NoteEditPermissionControls";
+import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
 
 /**
- *
+ * Props for the visibility / title / edit-permission block on note settings.
+ * ノート設定の公開範囲・タイトル・編集権限ブロック用 Props。
  */
 export interface NoteSettingsVisibilitySectionProps {
   title: string;
@@ -27,7 +29,8 @@ export interface NoteSettingsVisibilitySectionProps {
 }
 
 /**
- *
+ * Title, visibility, and edit permission controls with inline risk warning and help tooltip.
+ * タイトル・公開範囲・編集権限。リスク警告とヘルプツールチップ付き。
  */
 export function NoteSettingsVisibilitySection({
   title,
@@ -39,10 +42,8 @@ export function NoteSettingsVisibilitySection({
   onSaveNote,
   isSaving,
 }: NoteSettingsVisibilitySectionProps) {
-  /**
-   *
-   */
   const { t } = useTranslation();
+
   return (
     <section className="border-border/60 mt-6 rounded-lg border p-4">
       <h2 className="mb-3 text-sm font-semibold">{t("notes.visibilitySettings")}</h2>
@@ -61,14 +62,8 @@ export function NoteSettingsVisibilitySection({
           <Select
             value={visibility}
             onValueChange={(value) => {
-              /**
-               *
-               */
               const next = value as NoteVisibility;
               setVisibility(next);
-              /**
-               *
-               */
               const allowed = allowedEditPermissions[next];
               if (!allowed.includes(editPermission)) {
                 setEditPermission(allowed[0]);
@@ -87,23 +82,13 @@ export function NoteSettingsVisibilitySection({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>{t("notes.editPermission")}</Label>
-          <Select
-            value={editPermission}
-            onValueChange={(v) => setEditPermission(v as NoteEditPermission)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {allowedEditPermissions[visibility].map((value) => (
-                <SelectItem key={value} value={value}>
-                  {t(editPermissionKeys[value])}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="md:col-span-2">
+          <NoteEditPermissionControls
+            visibility={visibility}
+            editPermission={editPermission}
+            setEditPermission={setEditPermission}
+            selectId="note-settings-edit-permission"
+          />
         </div>
       </div>
       <div className="mt-4 flex justify-end">
