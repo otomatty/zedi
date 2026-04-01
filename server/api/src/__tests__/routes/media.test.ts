@@ -1,10 +1,16 @@
 /**
  * POST /api/media/confirm の S3 キー所有者検証テスト。
- * Tests for S3 key ownership validation on POST /api/media/confirm.
+ * GET /api/media/:id のプロキシ配信テスト。
+ * Tests for S3 key ownership on confirm and streaming GET for media.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Readable } from "node:stream";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
+
+const { mockS3Send } = vi.hoisted(() => ({
+  mockS3Send: vi.fn(),
+}));
 
 vi.mock("../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
@@ -28,8 +34,8 @@ vi.mock("../../lib/env.js", () => ({
 }));
 
 vi.mock("@aws-sdk/client-s3", () => {
-  function MockS3Client() {
-    /* stub */
+  class MockS3Client {
+    send = (...args: unknown[]) => mockS3Send(...args);
   }
   function MockPutObjectCommand() {
     /* stub */
@@ -77,6 +83,10 @@ function createMediaApp(dbResults: unknown[]) {
   app.route("/api/media", mediaRoutes);
   return app;
 }
+
+beforeEach(() => {
+  mockS3Send.mockReset();
+});
 
 describe("POST /api/media/confirm — S3 key ownership validation", () => {
   it("accepts s3_key matching the authenticated user's prefix", async () => {
@@ -214,5 +224,102 @@ describe("POST /api/media/confirm — S3 key ownership validation", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/media/:id — proxy stream (no redirect to storage)", () => {
+  const s3Key = `users/${TEST_USER_ID}/media/${MEDIA_ID}/photo.png`;
+  const mediaRow = {
+    id: MEDIA_ID,
+    ownerId: TEST_USER_ID,
+    s3Key,
+    fileName: "photo.png",
+    contentType: "image/png",
+    fileSize: null as number | null,
+    pageId: null as string | null,
+    createdAt: new Date(),
+  };
+
+  it("returns 200 and streams object bytes with Content-Type from DB row", async () => {
+    mockS3Send.mockResolvedValueOnce({
+      Body: Readable.from([Buffer.from("fake-bytes")]),
+      ContentType: "image/jpeg",
+    });
+    const app = createMediaApp([[mediaRow]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    expect(res.headers.get("Cache-Control")).toBe("private, max-age=3600");
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(await res.text()).toBe("fake-bytes");
+  });
+
+  it("returns 403 when media belongs to another user", async () => {
+    const app = createMediaApp([[{ ...mediaRow, ownerId: ATTACKER_ID }]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(403);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when media row is missing", async () => {
+    const app = createMediaApp([[]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(404);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 without auth header", async () => {
+    const app = createMediaApp([[mediaRow]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, { method: "GET" });
+
+    expect(res.status).toBe(401);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when S3 reports NoSuchKey", async () => {
+    mockS3Send.mockRejectedValueOnce({
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+    const app = createMediaApp([[mediaRow]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe("Object not found");
+  });
+
+  it("returns 502 on unexpected S3 GetObject failure", async () => {
+    mockS3Send.mockRejectedValueOnce(new Error("network down"));
+    const app = createMediaApp([[mediaRow]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "GET",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe("Failed to retrieve object");
   });
 });

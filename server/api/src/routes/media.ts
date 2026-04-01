@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq } from "drizzle-orm";
@@ -99,6 +100,14 @@ app.post("/confirm", authRequired, async (c) => {
   return c.json({ media: result[0] });
 });
 
+/**
+ * GET /api/media/:id — メディアをプロキシ配信
+ * 302 で presigned URL へ飛ばすと、ブラウザの credentials 付き fetch がストレージ側で CORS に阻まれることがあるため、
+ * API 上で GetObject してストリーム返却する（サムネイル配信と同じ理由）。
+ *
+ * GET /api/media/:id — proxy media bytes through the API.
+ * A 302 to a presigned URL can make credentialed browser fetches fail on storage CORS; stream from S3 here instead (same as thumbnails).
+ */
 app.get("/:id", authRequired, async (c) => {
   const mediaId = c.req.param("id");
   const userId = c.get("userId");
@@ -112,13 +121,35 @@ app.get("/:id", authRequired, async (c) => {
     throw new HTTPException(403, { message: "You can only access your own media" });
   }
 
-  const signedUrl = await getSignedUrl(
-    s3,
-    new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }),
-    { expiresIn: 3600 },
-  );
+  let response;
+  try {
+    response = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }));
+  } catch (err) {
+    const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
+      ?.$metadata;
+    const code = meta?.httpStatusCode;
+    const name = (err as { name?: string }).name;
+    if (name === "NoSuchKey" || code === 404) {
+      return c.json({ error: "Object not found" }, 404);
+    }
+    console.error("[media] S3 GetObject failed:", err);
+    return c.json({ error: "Failed to retrieve object" }, 502);
+  }
 
-  return c.redirect(signedUrl, 302);
+  const body = response.Body;
+  if (!body) return c.json({ error: "Object not found" }, 404);
+
+  const contentType = row.contentType ?? response.ContentType ?? "application/octet-stream";
+
+  const webStream = body instanceof Readable ? Readable.toWeb(body) : (body as ReadableStream);
+  return new Response(webStream as BodyInit, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "private, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 });
 
 app.delete("/:id", authRequired, async (c) => {
