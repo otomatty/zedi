@@ -31,11 +31,11 @@ import type { Extension } from "@tiptap/core";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 
-// Create shared lowlight instance with common languages
-export /**
- *
+/**
+ * Shared lowlight instance for code block syntax highlighting (built-in common languages).
+ * コードブロックのシンタックスハイライト用の lowlight 共有インスタンス（common 言語セット）。
  */
-const lowlight = createLowlight(common);
+export const lowlight = createLowlight(common);
 
 /**
  * Language display name mapping for code block language selector.
@@ -228,13 +228,12 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
 }
 
 /**
- * Default editor props for Tiptap.
- * spellcheck を無効にし、コードブロック等でブラウザの赤い波線（誤スペル扱い）が出ないようにする。
- * Disables native spellcheck so code blocks are not underlined as misspellings.
+ * Default editor props for Tiptap (ProseMirror root `editorProps.attributes`).
+ * エディタルートに付与する属性。コードブロックのスペルチェックは NodeView 側で制御する。
+ * Root attributes; code-block spellcheck is handled in `CodeBlockWithCopyNodeView`.
  */
 export const defaultEditorProps = {
   attributes: {
     class: "tiptap-editor focus:outline-none",
-    spellcheck: "false",
   },
 };
