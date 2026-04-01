@@ -20,17 +20,9 @@ interface UsePageEditorHandlersOptions {
   location: { pathname: string; search: string; hash?: string };
 }
 
-/**
- *
- */
+/** Page editor event handlers (title, content, wiki, navigation). */
 export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const {
     title,
     content,
@@ -46,16 +38,10 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     location,
   } = options;
 
-  /**
-   *
-   */
   const handleContentChange = useCallback(
     (newContent: string) => {
       setContent(newContent);
       if (enableAutoTitle && !title) {
-        /**
-         *
-         */
         const autoTitle = generateAutoTitle(newContent);
         if (autoTitle !== "無題のページ") {
           setTitle(autoTitle);
@@ -63,15 +49,14 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
           saveChanges(autoTitle, newContent);
           return;
         }
+        saveChanges("無題のページ", newContent);
+        return;
       }
       saveChanges(title, newContent);
     },
     [title, enableAutoTitle, saveChanges, validateTitle, setContent, setTitle],
   );
 
-  /**
-   *
-   */
   const handleTitleChange = useCallback(
     (newTitle: string) => {
       setTitle(newTitle);
@@ -81,9 +66,6 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     [content, saveChanges, validateTitle, setTitle],
   );
 
-  /**
-   *
-   */
   const handleContentError = useCallback(
     (error: ContentError | null) => {
       setContentError(error);
@@ -91,34 +73,19 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     [setContentError],
   );
 
-  /**
-   *
-   */
   const handleOpenDuplicatePage = useCallback(() => {
     if (duplicatePage) {
       navigate(`/page/${duplicatePage.id}`);
     }
   }, [duplicatePage, navigate]);
 
-  /**
-   *
-   */
   const handleGenerateWiki = useCallback(() => {
     generateWiki(title);
   }, [generateWiki, title]);
 
-  /**
-   *
-   */
   const handleGoToAISettings = useCallback(() => {
     resetWiki();
-    /**
-     *
-     */
     const returnTo = `${location.pathname}${location.search}${location.hash ?? ""}`;
-    /**
-     *
-     */
     const search = new URLSearchParams({ section: "ai", returnTo }).toString();
     navigate(`/settings?${search}`);
   }, [resetWiki, navigate, location.pathname, location.search, location.hash]);

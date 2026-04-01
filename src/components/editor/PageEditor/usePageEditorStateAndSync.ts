@@ -54,11 +54,12 @@ function useSyncCollaborationPageTitle(
   title: string,
   collaboration: ReturnType<typeof useCollaboration>,
 ): void {
+  const { setPageTitle } = collaboration;
   useEffect(() => {
-    if (isLocalDocEnabled && title) {
-      collaboration.setPageTitle(title);
+    if (isLocalDocEnabled) {
+      setPageTitle(title);
     }
-  }, [isLocalDocEnabled, title, collaboration]);
+  }, [isLocalDocEnabled, title, setPageTitle]);
 }
 
 /**

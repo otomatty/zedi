@@ -199,6 +199,23 @@ export class CollaborationManager {
     void this.saveToApi();
   }
 
+  /**
+   * PUT /content 用 JSON ボディ。ydoc_state / content_text に加え、setPageTitle 済みなら title を含む。
+   */
+  private buildPutContentBody(ydocStateB64: string, contentText: string): Record<string, string> {
+    /**
+     *
+     */
+    const payload: Record<string, string> = {
+      ydoc_state: ydocStateB64,
+      content_text: contentText,
+    };
+    if (this.pageTitle !== null) {
+      payload.title = this.pageTitle;
+    }
+    return payload;
+  }
+
   private async saveToApi(): Promise<void> {
     if (this.destroyed) return;
     try {
@@ -208,7 +225,6 @@ export class CollaborationManager {
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length <= 2) return; // empty Y.Doc
 
-      // Base64 encode
       /**
        *
        */
@@ -254,13 +270,7 @@ export class CollaborationManager {
       /**
        *
        */
-      const payload: Record<string, string> = {
-        ydoc_state: b64,
-        content_text: contentText,
-      };
-      if (this.pageTitle !== null) {
-        payload.title = this.pageTitle;
-      }
+      const payload = this.buildPutContentBody(b64, contentText);
 
       /**
        *
@@ -604,13 +614,7 @@ export class CollaborationManager {
     /**
      *
      */
-    const payload: Record<string, string> = {
-      ydoc_state: b64,
-      content_text: contentText,
-    };
-    if (this.pageTitle !== null) {
-      payload.title = this.pageTitle;
-    }
+    const payload = this.buildPutContentBody(b64, contentText);
     /**
      *
      */
