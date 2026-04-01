@@ -5,12 +5,14 @@ import { generateJSON } from "@tiptap/html";
 import type { JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 
 const lowlight = createLowlight(common);
 
 // Tiptap の拡張機能（TiptapEditorと同じ構成にする）
+// generateJSON が認識できるノードタイプを定義。Image がないと <img> がドロップされる。
 const extensions = [
   StarterKit.configure({
     heading: {
@@ -21,6 +23,7 @@ const extensions = [
   Link.configure({
     openOnClick: false,
   }),
+  Image,
   CodeBlockLowlight.configure({
     lowlight,
     defaultLanguage: null,
@@ -122,13 +125,17 @@ function cleanupHtml(html: string): string {
 /**
  * 空の要素を再帰的に削除
  */
+const VOID_CONTENT_TAGS = new Set(["IMG", "VIDEO", "IFRAME", "HR", "BR", "INPUT", "SOURCE"]);
+
 function removeEmptyElements(element: Element): void {
   const children = Array.from(element.children);
 
   for (const child of children) {
     removeEmptyElements(child);
 
-    // テキストコンテンツが空で、子要素もない場合は削除
+    // void 要素（img, hr 等）は自身がコンテンツなので削除しない
+    if (VOID_CONTENT_TAGS.has(child.tagName)) continue;
+
     const hasContent =
       child.textContent?.trim() || child.querySelector("img, video, iframe, hr, br");
     if (!hasContent && child.children.length === 0) {
