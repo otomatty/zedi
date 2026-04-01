@@ -54,7 +54,8 @@ export class CollaborationManager {
   private pageTitle: string | null = null;
 
   /**
-   *
+   * 新しい CollaborationManager を作成する。
+   * Creates a new CollaborationManager for the given page and user.
    */
   constructor(
     pageId: string,
@@ -91,6 +92,29 @@ export class CollaborationManager {
   }
 
   /**
+   * API リクエスト用の origin。`VITE_API_BASE_URL` の末尾スラッシュを除去し、URL 連結時の二重スラッシュを防ぐ。
+   * Resolves API origin from env, stripping a trailing slash to avoid `//api` in URLs.
+   */
+  private getApiOrigin(): string {
+    const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+    const baseUrl = rawBaseUrl.replace(/\/$/, "");
+    return baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  }
+
+  /**
+   * Y.js エンコード済みステートを Base64 文字列に変換する（大きなペイロードはチャンク処理）。
+   * Encodes a Y.js state update to Base64 (chunked for large payloads).
+   */
+  private encodeStateUpdateToBase64(state: Uint8Array): string {
+    let b64 = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < state.length; i += chunkSize) {
+      b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
+    }
+    return btoa(b64);
+  }
+
+  /**
    * REST API から Y.Doc を取得してローカル Y.Doc にマージする（local モード用）。
    * マージ後、Y.Doc の変更監視を開始する。
    */
@@ -98,8 +122,7 @@ export class CollaborationManager {
     try {
       if (this.destroyed) return;
 
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-      const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+      const origin = this.getApiOrigin();
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
       const beforeText = this.getPlainText();
@@ -194,18 +217,10 @@ export class CollaborationManager {
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length <= 2) return; // empty Y.Doc
 
-      let b64 = "";
-      const chunkSize = 8192;
-      for (let i = 0; i < state.length; i += chunkSize) {
-        b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
-      }
-      b64 = btoa(b64);
+      const b64 = this.encodeStateUpdateToBase64(state);
+      const contentText = this.getPlainText();
 
-      const fragment = this.ydoc.getXmlFragment("default");
-      const contentText = this.extractText(fragment);
-
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-      const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+      const origin = this.getApiOrigin();
       const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
       const payload = this.buildPutContentBody(b64, contentText);
@@ -457,7 +472,7 @@ export class CollaborationManager {
     if (this.mode === "local" && this.apiFetched) {
       const state = Y.encodeStateAsUpdate(this.ydoc);
       if (state.length > 2) {
-        const contentText = this.extractText(this.ydoc.getXmlFragment("default"));
+        const contentText = this.getPlainText();
         this.fireAndForgetSave(state, contentText);
       }
     }
@@ -481,12 +496,7 @@ export class CollaborationManager {
    * ブラウザの keepalive ペイロード制限（約 64 KiB）を超える場合は keepalive なしで送信する。
    */
   private fireAndForgetSave(state: Uint8Array, contentText: string): void {
-    let b64 = "";
-    const chunkSize = 8192;
-    for (let i = 0; i < state.length; i += chunkSize) {
-      b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
-    }
-    b64 = btoa(b64);
+    const b64 = this.encodeStateUpdateToBase64(state);
 
     const payload = this.buildPutContentBody(b64, contentText);
     const body = JSON.stringify(payload);
@@ -494,9 +504,7 @@ export class CollaborationManager {
       typeof TextEncoder !== "undefined" ? new TextEncoder().encode(body).length : body.length * 2;
     const useKeepalive = bodyByteLength <= KEEPALIVE_PAYLOAD_LIMIT;
 
-    const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-    const baseUrl = rawBaseUrl.replace(/\/$/, "");
-    const origin = baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+    const origin = this.getApiOrigin();
     const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
 
     fetch(url, {
