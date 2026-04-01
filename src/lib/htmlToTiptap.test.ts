@@ -79,6 +79,30 @@ describe("formatClippedContentAsTiptap", () => {
 });
 
 describe("htmlToTiptapJSON", () => {
+  it("rejects javascript: and data: URI schemes in links", () => {
+    const html =
+      '<p><a href="javascript:alert(1)">bad-js</a> <a href="data:text/html;base64,AAAA">bad-data</a></p>';
+    const result = htmlToTiptapJSON(html);
+    const json = JSON.stringify(result);
+    expect(json).not.toContain("javascript:alert(1)");
+    expect(json).not.toContain("data:text/html");
+  });
+
+  it("allows safe URI schemes (https, mailto, tel) and relative paths", () => {
+    const html = [
+      '<p><a href="https://example.com">https</a>',
+      '<a href="mailto:test@example.com">mail</a>',
+      '<a href="tel:+819012345678">tel</a>',
+      '<a href="/relative/path">relative</a></p>',
+    ].join(" ");
+    const result = htmlToTiptapJSON(html);
+    const json = JSON.stringify(result);
+    expect(json).toContain("https://example.com");
+    expect(json).toContain("mailto:test@example.com");
+    expect(json).toContain("tel:+819012345678");
+    expect(json).toContain("/relative/path");
+  });
+
   it("converts inline <img> tags to image nodes", () => {
     const html = '<p>Before</p><img src="https://example.com/photo.png" alt="photo"><p>After</p>';
     const result = htmlToTiptapJSON(html);

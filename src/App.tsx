@@ -54,7 +54,8 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/* unstable_useTransitions を無効化: リンク後の表示が遅れる問題を防ぐ（RR v7 は future 廃止） */}
+        {/* unstable_useTransitions を無効化: リンク後の表示が遅れる問題を防ぐ（RR v7 は future 廃止）
+            Disable unstable_useTransitions: prevents display delay after link navigation (RR v7 removed future flags) */}
         <BrowserRouter unstable_useTransitions={false}>
           <AIChatProvider>
             <AIChatConversationsProvider>
