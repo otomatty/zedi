@@ -18,7 +18,8 @@ import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { allowedEditPermissions, editPermissionKeys } from "@/lib/noteSettingsConfig";
 
 /**
- *
+ * Props for the shared note edit-permission UI (select, help tooltip, any_logged_in warning).
+ * ノート編集権限の共有 UI（セレクト、ヘルプツールチップ、any_logged_in 時の警告）用 Props。
  */
 export type NoteEditPermissionControlsProps = {
   visibility: NoteVisibility;
