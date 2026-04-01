@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePage, useUpdatePage } from "@/hooks/usePageQueries";
 import { useTitleValidation } from "@/hooks/useTitleValidation";
@@ -43,6 +43,23 @@ function usePageEditorDeletionAndNav(
   const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(title, content, sourceUrl);
   usePageEditorKeyboard({ onBack: deletion.handleBack });
   return { ...deletion, handleExportMarkdown, handleCopyMarkdown };
+}
+
+/**
+ * Pushes current page title into CollaborationManager so PUT /content includes it.
+ * タイトルを CollaborationManager に渡し、Y.Doc 保存時にサーバーへ同期する。
+ */
+function useSyncCollaborationPageTitle(
+  isLocalDocEnabled: boolean,
+  title: string,
+  collaboration: ReturnType<typeof useCollaboration>,
+): void {
+  const { setPageTitle } = collaboration;
+  useEffect(() => {
+    if (isLocalDocEnabled) {
+      setPageTitle(title);
+    }
+  }, [isLocalDocEnabled, title, setPageTitle]);
 }
 
 /**
@@ -135,6 +152,8 @@ export function usePageEditorStateAndSync() {
 
   const { displayLastSaved, pendingInitialContent, setPendingInitialContent } =
     useDisplayLastSavedAndPending(autoSaveLastSaved, lastSaved);
+
+  useSyncCollaborationPageTitle(isLocalDocEnabled, title, collaboration);
 
   usePageEditorAIEffects({
     isNewPage,
