@@ -8,7 +8,7 @@
   "ignoreBinaries": ["docker-compose"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/**/*.ts", "e2e/**/*.ts"],
+      "entry": ["scripts/**/*.ts", "e2e/**/*.ts", "src/lib/claudeCode/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "e2e/**/*.{ts,tsx}"]
     },
     "admin": {
@@ -16,6 +16,9 @@
     },
     "packages/ui": {
       "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/claude-sidecar": {
+      "project": ["src/**/*.ts"]
     },
     "server/api": {
       "entry": ["scripts/**/*.ts"],
@@ -83,7 +86,6 @@
     "@types/uuid",
     "@vitejs/plugin-react",
     "wrangler",
-    "@tauri-apps/api",
     "@tauri-apps/plugin-shell",
     "@tauri-apps/plugin-store"
   ],
