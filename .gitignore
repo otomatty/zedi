@@ -58,5 +58,9 @@ test-results/
 # TypeScript build info
 *.tsbuildinfo
 
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
 # Local-only notes (not tracked). See AGENTS.md / SPECIFICATION_POLICY.md.
 /docs/
