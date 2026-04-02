@@ -12,6 +12,14 @@ const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, "package.jso
 };
 const appVersion = packageJson.version ?? "0.0.0";
 
+/**
+ * Parse a truthy env string (e.g. `TAURI_ENV_DEBUG`). Non-empty strings like `"false"` are not treated as true.
+ * 環境変数の真偽フラグを解釈する。`"false"` などは true にしない。
+ */
+function envFlagIsTrue(value: string | undefined): boolean {
+  return /^(1|true|yes)$/i.test(String(value ?? "").trim());
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load all env vars (including non-VITE_ prefixed) for vite.config use
@@ -28,7 +36,7 @@ export default defineConfig(({ mode }) => {
   // Tauri CLI injects TAURI_* into the dev server process; merge with loadEnv for reliable detection.
   const tauriPlatform = process.env.TAURI_ENV_PLATFORM ?? env.TAURI_ENV_PLATFORM;
   const tauriDevHost = process.env.TAURI_DEV_HOST ?? env.TAURI_DEV_HOST;
-  const tauriEnvDebug = process.env.TAURI_ENV_DEBUG ?? env.TAURI_ENV_DEBUG;
+  const tauriEnvDebug = envFlagIsTrue(process.env.TAURI_ENV_DEBUG ?? env.TAURI_ENV_DEBUG);
   const isTauri = !!tauriPlatform;
 
   return {
@@ -58,7 +66,7 @@ export default defineConfig(({ mode }) => {
     build: {
       target: isTauri ? (tauriPlatform === "windows" ? "chrome105" : "safari13") : "esnext",
       minify: tauriEnvDebug ? false : "esbuild",
-      sourcemap: !!tauriEnvDebug,
+      sourcemap: tauriEnvDebug,
     },
     define: {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),

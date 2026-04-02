@@ -204,7 +204,6 @@ bun run tauri:build
 > Developer Command Prompt for VS 2022 から実行するか、
 > `.bashrc` に `LIB`, `INCLUDE`, `PATH` を設定してください。
 > 詳細は [Issue #49](https://github.com/otomatty/zedi/issues/49) を参照。
-
 > **Note**: デスクトップ版は現在 Phase D（開発中）です。ストレージは暫定的に IndexedDB を使用しており、
 > Tauri 固有のストレージ (SQLite) は [#50](https://github.com/otomatty/zedi/issues/50) で対応予定です。
 
