@@ -1,0 +1,20 @@
+{
+  "name": "@zedi/claude-sidecar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JSONL stdin/stdout bridge between Zedi Tauri and @anthropic-ai/claude-agent-sdk. / Tauri と Claude Agent SDK をつなぐ JSONL ブリッジ。",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.90"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "vitest": "^4.0.16"
+  }
+}

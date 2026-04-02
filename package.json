@@ -34,7 +34,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run && vitest run --config server/hocuspocus/vitest.config.ts",
+    "test:run": "vitest run && vitest run --config packages/claude-sidecar/vitest.config.ts && vitest run --config server/hocuspocus/vitest.config.ts",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
@@ -58,9 +58,10 @@
     "prepare:extension:prod": "node scripts/prepare-extension.js prod",
     "build:extension": "npm run prepare:extension:prod",
     "build:extension:dev": "npm run prepare:extension:dev",
+    "sidecar:build": "node scripts/build-claude-sidecar.mjs",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:dev": "node scripts/ensure-claude-sidecar-bin.mjs && tauri dev",
+    "tauri:build": "bun run sidecar:build && tauri build",
     "prepare": "husky"
   },
   "lint-staged": {

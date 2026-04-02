@@ -200,6 +200,8 @@ bun run tauri:dev
 bun run tauri:build
 ```
 
+- **Claude Code sidecar** ([Issue #456](https://github.com/otomatty/zedi/issues/456)): Tauri bundles a compiled helper under `src-tauri/binaries/` (`externalBin`). On first `bun run tauri:dev`, a missing binary is built automatically; run `bun run sidecar:build` manually if needed. / `externalBin` 用の sidecar は `src-tauri/binaries/` に配置する。初回 `tauri:dev` で自動ビルド、手動は `bun run sidecar:build`。
+
 > **Windows + Git Bash の場合**: MSVC のビルドツールが PATH に含まれていない場合、
 > Developer Command Prompt for VS 2022 から実行するか、
 > `.bashrc` に `LIB`, `INCLUDE`, `PATH` を設定してください。
@@ -315,7 +317,7 @@ src/                     # フロントエンド（React）
 │   ├── layout/          # レイアウト
 │   └── ui/              # shadcn/ui コンポーネント
 ├── hooks/               # カスタムフック
-├── lib/                 # ユーティリティ
+├── lib/                 # ユーティリティ（`claudeCode/` = Tauri↔Claude Code ブリッジ）
 ├── pages/               # ページコンポーネント
 ├── stores/              # Zustand ストア
 └── types/               # TypeScript 型定義
@@ -323,7 +325,9 @@ src/                     # フロントエンド（React）
 src-tauri/               # Tauri デスクトップバックエンド（Rust）
 ├── src/
 │   ├── main.rs          # デスクトップ エントリポイント
-│   └── lib.rs           # Tauri アプリ本体・Commands 定義
+│   ├── lib.rs           # Tauri アプリ本体・Commands 定義
+│   └── claude_sidecar.rs # Claude Code sidecar プロセス管理（Issue #456）
+├── binaries/            # externalBin（`bun run sidecar:build`、gitignore）
 ├── capabilities/        # セキュリティ権限定義
 ├── icons/               # アプリアイコン（各 OS 用）
 ├── Cargo.toml           # Rust 依存管理

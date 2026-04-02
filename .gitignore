@@ -61,6 +61,8 @@ test-results/
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+# Sidecar executable for externalBin (build with `bun run sidecar:build` or `tauri:dev` ensure step)
+src-tauri/binaries/claude-sidecar*
 
 # Local-only notes (not tracked). See AGENTS.md / SPECIFICATION_POLICY.md.
 /docs/
