@@ -2,6 +2,7 @@
 
 import { encrypt, decrypt } from "./encryption";
 import { AISettings, DEFAULT_AI_SETTINGS } from "@/types/ai";
+import { isTauriDesktop } from "@/lib/platform";
 
 const STORAGE_KEY = "zedi-ai-settings";
 
@@ -81,7 +82,14 @@ export async function isAIConfigured(): Promise<boolean> {
     return true;
   }
   if (settings.provider === "claude-code") {
-    return true;
+    if (!isTauriDesktop()) return false;
+    try {
+      const { checkClaudeInstallation } = await import("@/lib/claudeCode/bridge");
+      const result = await checkClaudeInstallation();
+      return result.installed;
+    } catch {
+      return false;
+    }
   }
   if (settings.apiMode === "api_server") {
     return true;

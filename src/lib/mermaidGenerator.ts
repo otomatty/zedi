@@ -7,9 +7,7 @@ import { AISettings } from "@/types/ai";
 import { loadAISettings } from "./aiSettings";
 
 // ダイアグラムタイプの定義
-/**
- *
- */
+/** Supported Mermaid diagram kinds for the generator. */
 export type MermaidDiagramType =
   | "flowchart"
   | "sequence"
@@ -20,9 +18,7 @@ export type MermaidDiagramType =
   | "pie"
   | "mindmap";
 
-/**
- *
- */
+/** Metadata for one diagram type (label, description, example). */
 export interface DiagramTypeInfo {
   id: MermaidDiagramType;
   name: string;
@@ -30,10 +26,8 @@ export interface DiagramTypeInfo {
   example: string;
 }
 
-export /**
- *
- */
-const DIAGRAM_TYPES: DiagramTypeInfo[] = [
+/** Built-in diagram type list for the Mermaid generator UI. */
+export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
   {
     id: "flowchart",
     name: "フローチャート",
@@ -110,17 +104,13 @@ const MERMAID_GENERATOR_PROMPT = `あなたはMermaidダイアグラムの専門
 ## 出力形式
 Mermaidコードのみを出力してください。`;
 
-/**
- *
- */
+/** Result of a successful Mermaid generation. */
 export interface MermaidGeneratorResult {
   code: string;
   diagramType: MermaidDiagramType;
 }
 
-/**
- *
- */
+/** Streaming / completion callbacks for Mermaid generation. */
 export interface MermaidGeneratorCallbacks {
   onComplete: (result: MermaidGeneratorResult) => void;
   onError: (error: Error) => void;
@@ -142,6 +132,11 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
   // api_serverモードならAPIキー不要
   const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
   if (effectiveMode === "api_server") {
+    return { ...settings, isConfigured: true };
+  }
+
+  // Claude Code は API キー不要（後段で未対応エラーに分岐）
+  if (settings.provider === "claude-code") {
     return { ...settings, isConfigured: true };
   }
 

@@ -6,19 +6,13 @@
  */
 export type AIProviderType = "openai" | "anthropic" | "google" | "claude-code";
 
-/**
- *
- */
+/** User API key vs Zedi server API. */
 export type APIMode = "user_api_key" | "api_server";
 
-/**
- *
- */
+/** Subscription tier for model access. */
 export type UserTier = "free" | "pro";
 
-/**
- *
- */
+/** Persisted AI preferences (provider, model, mode). */
 export interface AISettings {
   provider: AIProviderType;
   apiKey: string; // ユーザーAPIキーモード時のみ使用
@@ -69,9 +63,7 @@ export interface AIProvider {
 }
 
 // サーバーから取得するモデル情報
-/**
- *
- */
+/** Model row returned from the server models API. */
 export interface AIModel {
   id: string; // e.g. "openai:gpt-4o-mini"
   provider: AIProviderType;
@@ -84,9 +76,7 @@ export interface AIModel {
 }
 
 // AI使用量情報
-/**
- *
- */
+/** Usage quota snapshot for the current billing period. */
 export interface AIUsage {
   usagePercent: number;
   consumedUnits: number;
@@ -97,9 +87,7 @@ export interface AIUsage {
 }
 
 // AIレスポンスに含まれるusage情報
-/**
- *
- */
+/** Token/cost usage attached to a completion response. */
 export interface AIResponseUsage {
   inputTokens: number;
   outputTokens: number;
@@ -108,9 +96,7 @@ export interface AIResponseUsage {
 }
 
 // キャッシュされたモデル一覧（レガシー：ユーザーAPIキーモード用）
-/**
- *
- */
+/** Legacy cache of model id strings for user-key mode. */
 export interface CachedModels {
   provider: AIProviderType;
   models: string[];
@@ -118,9 +104,7 @@ export interface CachedModels {
 }
 
 // サーバーから取得したモデル一覧のキャッシュ
-/**
- *
- */
+/** Cached server model list + tier from `/api/ai/models`. */
 export interface CachedServerModels {
   models: AIModel[];
   tier: UserTier;
@@ -148,10 +132,8 @@ const CLAUDE_CODE_CAPABILITIES: AICapabilities = {
 };
 
 // モデル方針: Gemini 3.x / GPT-5 / Claude 4 以上のみ
-export /**
- *
- */
-const AI_PROVIDERS: AIProvider[] = [
+/** Static registry of AI providers for settings UI. */
+export const AI_PROVIDERS: AIProvider[] = [
   {
     id: "google",
     name: "Google",
@@ -199,10 +181,8 @@ const AI_PROVIDERS: AIProvider[] = [
   },
 ];
 
-export /**
- *
- */
-const DEFAULT_AI_SETTINGS: AISettings = {
+/** Default settings when none are stored yet. */
+export const DEFAULT_AI_SETTINGS: AISettings = {
   provider: "google",
   apiKey: "",
   apiMode: "api_server",
@@ -223,9 +203,7 @@ export type APIProviderType = Exclude<AIProviderType, "claude-code">;
  */
 export const API_ONLY_PROVIDERS: AIProvider[] = AI_PROVIDERS.filter((p) => !p.desktopOnly);
 
-/**
- *
- */
+/** Look up provider metadata by id. */
 export function getProviderById(id: AIProviderType): AIProvider | undefined {
   return AI_PROVIDERS.find((p) => p.id === id);
 }
@@ -238,24 +216,14 @@ export function isAPIProvider(id: AIProviderType): id is APIProviderType {
   return id !== "claude-code";
 }
 
-/**
- *
- */
+/** First default model id for a provider. */
 export function getDefaultModel(provider: AIProviderType): string {
-  /**
-   *
-   */
   const providerInfo = getProviderById(provider);
   return providerInfo?.defaultModels[0] ?? "";
 }
 
-/**
- *
- */
+/** Default model list for a provider. */
 export function getDefaultModels(provider: AIProviderType): string[] {
-  /**
-   *
-   */
   const providerInfo = getProviderById(provider);
   return providerInfo?.defaultModels ?? [];
 }

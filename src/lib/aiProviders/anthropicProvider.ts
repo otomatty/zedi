@@ -5,6 +5,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { getProviderById } from "@/types/ai";
+import { mergeAbortSignals } from "@/lib/mergeAbortSignals";
 import type { AIRequest, AIStreamChunk, UnifiedAIProvider } from "./types";
 
 /**
@@ -25,7 +26,7 @@ export function createAnthropicProvider(apiKey: string): UnifiedAIProvider {
     async *query(request: AIRequest, signal?: AbortSignal): AsyncIterable<AIStreamChunk> {
       const client = new Anthropic({ apiKey });
       abortController = new AbortController();
-      const mergedSignal = signal ?? abortController.signal;
+      const mergedSignal = mergeAbortSignals(signal, abortController);
 
       const systemMessages = request.messages.filter((m) => m.role === "system");
       const chatMessages = request.messages.filter((m) => m.role !== "system");

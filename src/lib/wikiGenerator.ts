@@ -36,6 +36,10 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
     return { ...settings, isConfigured: true };
   }
 
+  if (settings.provider === "claude-code") {
+    return { ...settings, isConfigured: true };
+  }
+
   if (!settings.isConfigured || !settings.apiKey) {
     throw new Error("AI_NOT_CONFIGURED");
   }

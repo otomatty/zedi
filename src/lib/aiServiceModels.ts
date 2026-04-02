@@ -33,7 +33,12 @@ function normalizeToAIModel(raw: Record<string, unknown>): AIModel {
  */
 export class FetchServerModelsError extends Error {
   /**
+   * サーバーからモデル一覧を取得できなかったときのエラー。
+   * Error thrown when the server model list cannot be fetched.
    *
+   * @param message - Human-readable message.
+   * @param code - Machine-readable error category.
+   * @param details - Optional HTTP / response details.
    */
   constructor(
     message: string,

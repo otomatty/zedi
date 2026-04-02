@@ -34,17 +34,27 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
 
       aborted = false;
 
-      const { claudeQuery, onClaudeStreamChunk, onClaudeStreamComplete, onClaudeError } =
-        await import("@/lib/claudeCode/bridge");
+      const {
+        claudeQuery,
+        onClaudeStreamChunk,
+        onClaudeStreamComplete,
+        onClaudeError,
+        claudeAbort,
+      } = await import("@/lib/claudeCode/bridge");
 
       const chunks: AIStreamChunk[] = [];
       let done = false;
       let resolveWait: (() => void) | null = null;
 
+      const wake = () => {
+        resolveWait?.();
+        resolveWait = null;
+      };
+
       const unlistenChunk = await onClaudeStreamChunk((payload) => {
         if (currentRequestId && payload.id === currentRequestId) {
           chunks.push({ type: "text", content: payload.content });
-          resolveWait?.();
+          wake();
         }
       });
 
@@ -52,7 +62,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         if (currentRequestId && payload.id === currentRequestId) {
           chunks.push({ type: "done", content: "" });
           done = true;
-          resolveWait?.();
+          wake();
         }
       });
 
@@ -60,7 +70,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         if (currentRequestId && payload.id === currentRequestId) {
           chunks.push({ type: "error", content: payload.error });
           done = true;
-          resolveWait?.();
+          wake();
         }
       });
 
@@ -74,7 +84,6 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
 
         while (!done && !aborted) {
           if (signal?.aborted) {
-            const { claudeAbort } = await import("@/lib/claudeCode/bridge");
             if (currentRequestId) await claudeAbort(currentRequestId);
             break;
           }
@@ -87,6 +96,10 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
           } else {
             await new Promise<void>((resolve) => {
               resolveWait = resolve;
+              if (chunks.length > 0 || done) {
+                resolve();
+                resolveWait = null;
+              }
             });
           }
         }
@@ -100,9 +113,10 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
 
     abort() {
       aborted = true;
-      if (currentRequestId && isTauriDesktop()) {
-        import("@/lib/claudeCode/bridge").then(({ claudeAbort }) => {
-          if (currentRequestId) claudeAbort(currentRequestId);
+      const reqId = currentRequestId;
+      if (reqId && isTauriDesktop()) {
+        void import("@/lib/claudeCode/bridge").then(({ claudeAbort }) => {
+          claudeAbort(reqId);
         });
       }
     },

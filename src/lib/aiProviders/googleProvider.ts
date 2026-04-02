@@ -5,6 +5,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { getProviderById } from "@/types/ai";
+import { mergeAbortSignals } from "@/lib/mergeAbortSignals";
 import type { AIRequest, AIStreamChunk, UnifiedAIProvider } from "./types";
 
 /**
@@ -25,7 +26,7 @@ export function createGoogleProvider(apiKey: string): UnifiedAIProvider {
     async *query(request: AIRequest, signal?: AbortSignal): AsyncIterable<AIStreamChunk> {
       const client = new GoogleGenAI({ apiKey });
       abortController = new AbortController();
-      const mergedSignal = signal ?? abortController.signal;
+      const mergedSignal = mergeAbortSignals(signal, abortController);
 
       const response = await client.models.generateContentStream({
         model: request.model,

@@ -3,15 +3,22 @@
  * AI service abstraction layer. Dispatches API calls based on mode.
  */
 
-import { type AISettings, type APIMode, type AIResponseUsage, isAPIProvider } from "@/types/ai";
+import {
+  type AISettings,
+  type APIMode,
+  type AIProviderType,
+  type AIResponseUsage,
+  isAPIProvider,
+} from "@/types/ai";
 import { callOpenAI, callAnthropic, callGoogle } from "./aiServiceDirectProviders";
 import { callAIWithServer } from "./aiServiceServer";
 
 /**
- *
+ * `callAIService` へ渡すリクエスト本文。
+ * Request body passed to `callAIService`.
  */
 export interface AIServiceRequest {
-  provider: string;
+  provider: AIProviderType;
   model: string;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   options?: {
@@ -26,7 +33,8 @@ export interface AIServiceRequest {
 }
 
 /**
- *
+ * 非ストリーミング完了時のレスポンス。
+ * Response for non-streaming completion.
  */
 export interface AIServiceResponse {
   content: string;
@@ -35,7 +43,8 @@ export interface AIServiceResponse {
 }
 
 /**
- *
+ * ストリーミング／完了時のコールバック。
+ * Callbacks for streaming and completion.
  */
 export interface AIServiceCallbacks {
   onChunk?: (chunk: string) => void;

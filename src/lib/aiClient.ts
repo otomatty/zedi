@@ -5,9 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { AISettings, AIProviderType, CachedModels, getDefaultModels } from "@/types/ai";
 
-/**
- *
- */
+/** Union of SDK client types used for user-API-key mode. */
 export type AIClient = OpenAI | Anthropic | GoogleGenAI;
 
 // モデルキャッシュのストレージキー
@@ -42,9 +40,7 @@ export function createAIClient(settings: AISettings): AIClient {
   }
 }
 
-/**
- *
- */
+/** Result of a user-API-key connection test from the settings UI. */
 export interface ConnectionTestResult {
   success: boolean;
   message: string;

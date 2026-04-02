@@ -5,6 +5,7 @@
 
 import OpenAI from "openai";
 import { getProviderById } from "@/types/ai";
+import { mergeAbortSignals } from "@/lib/mergeAbortSignals";
 import type { AIRequest, AIStreamChunk, UnifiedAIProvider } from "./types";
 
 /**
@@ -25,7 +26,7 @@ export function createOpenAIProvider(apiKey: string): UnifiedAIProvider {
     async *query(request: AIRequest, signal?: AbortSignal): AsyncIterable<AIStreamChunk> {
       const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
       abortController = new AbortController();
-      const mergedSignal = signal ?? abortController.signal;
+      const mergedSignal = mergeAbortSignals(signal, abortController);
 
       const stream = await client.chat.completions.create(
         {
