@@ -20,6 +20,12 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
 
   let currentRequestId: string | null = null;
   let aborted = false;
+  let resolveWait: (() => void) | null = null;
+
+  const wake = (): void => {
+    resolveWait?.();
+    resolveWait = null;
+  };
 
   return {
     id: "claude-code",
@@ -33,6 +39,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
       }
 
       aborted = false;
+      resolveWait = null;
 
       const {
         claudeQuery,
@@ -44,12 +51,6 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
 
       const chunks: AIStreamChunk[] = [];
       let done = false;
-      let resolveWait: (() => void) | null = null;
-
-      const wake = () => {
-        resolveWait?.();
-        resolveWait = null;
-      };
 
       const unlistenChunk = await onClaudeStreamChunk((payload) => {
         if (currentRequestId && payload.id === currentRequestId) {
@@ -113,6 +114,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
 
     abort() {
       aborted = true;
+      wake();
       const reqId = currentRequestId;
       if (reqId && isTauriDesktop()) {
         void import("@/lib/claudeCode/bridge").then(({ claudeAbort }) => {

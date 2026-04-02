@@ -56,11 +56,13 @@ export async function checkAllProviderAvailability(
   const visible = getVisibleProviders();
   const results: ProviderAvailability[] = [];
 
+  const isServerMode = settings.apiMode === "api_server";
+
   for (const providerMeta of visible) {
     let available: boolean;
 
     if (isAPIProvider(providerMeta.id)) {
-      available = providerMeta.requiresApiKey ? !!settings.apiKey?.trim() : true;
+      available = isServerMode || !providerMeta.requiresApiKey || !!settings.apiKey?.trim();
     } else {
       const providerSettings: AISettings = { ...settings, provider: providerMeta.id };
       const instance = createProvider(providerSettings);
@@ -74,7 +76,8 @@ export async function checkAllProviderAvailability(
       } else if (
         isAPIProvider(providerMeta.id) &&
         providerMeta.requiresApiKey &&
-        !settings.apiKey
+        !isServerMode &&
+        !settings.apiKey?.trim()
       ) {
         reason = "API キーが未設定 / API key not configured";
       } else if (providerMeta.id === "claude-code") {

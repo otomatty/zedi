@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { isTauriDesktop } from "./platform";
 
+type TauriWindow = Window & { __TAURI_INTERNALS__?: unknown };
+
 describe("isTauriDesktop", () => {
   afterEach(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (window as any).__TAURI_INTERNALS__;
+    delete (window as TauriWindow).__TAURI_INTERNALS__;
   });
 
   it("returns false when __TAURI_INTERNALS__ is absent", () => {
@@ -12,8 +13,7 @@ describe("isTauriDesktop", () => {
   });
 
   it("returns true when __TAURI_INTERNALS__ is present", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__TAURI_INTERNALS__ = {};
+    (window as TauriWindow).__TAURI_INTERNALS__ = {};
     expect(isTauriDesktop()).toBe(true);
   });
 });

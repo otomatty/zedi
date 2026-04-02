@@ -86,6 +86,15 @@ async function consumeSSEStream(
       newlineIndex = buffer.indexOf("\n");
     }
   }
+
+  buffer += decoder.decode();
+  const tail = buffer.trim();
+  if (tail.startsWith("data:")) {
+    const ssePayload = tail.slice(5).trim();
+    if (ssePayload && processSSEDataLine(ssePayload, state, callbacks)) {
+      return true;
+    }
+  }
   return false;
 }
 

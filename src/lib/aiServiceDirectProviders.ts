@@ -127,25 +127,29 @@ export async function callAnthropic(
 
   const useWebSearch = request.options?.useWebSearch ?? isClaudeWebSearchSupported(request.model);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestParams: any = {
+  const systemMessages = request.messages.filter((msg) => msg.role === "system");
+  const chatMessages = request.messages.filter((msg) => msg.role !== "system");
+
+  const requestParams: Anthropic.MessageCreateParams = {
     model: request.model,
     max_tokens: request.options?.maxTokens ?? 4000,
-    messages: request.messages.map((msg) => ({
-      role: msg.role,
+    messages: chatMessages.map((msg) => ({
+      role: msg.role as "user" | "assistant",
       content: msg.content,
     })),
+    ...(systemMessages.length > 0 && {
+      system: systemMessages.map((msg) => msg.content).join("\n\n"),
+    }),
+    ...(useWebSearch && {
+      tools: [
+        {
+          type: "web_search_20250305" as const,
+          name: "web_search",
+          max_uses: 5,
+        },
+      ],
+    }),
   };
-
-  if (useWebSearch) {
-    requestParams.tools = [
-      {
-        type: "web_search_20250305",
-        name: "web_search",
-        max_uses: 5,
-      },
-    ];
-  }
 
   if (request.options?.stream) {
     const stream = client.messages.stream(requestParams, { signal: abortSignal });

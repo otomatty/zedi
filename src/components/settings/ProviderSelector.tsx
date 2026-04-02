@@ -29,12 +29,12 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   disabled = false,
   claudeCodeAvailable,
 }) => {
-  const { t } = useTranslation("aiSettings");
+  const { t } = useTranslation();
   const providers = getVisibleProviders();
 
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium">{t("providerLabel")}</Label>
+      <Label className="text-sm font-medium">{t("aiSettings.providerLabel")}</Label>
       <RadioGroup
         value={value}
         onValueChange={(v) => onChange(v as AIProviderType)}
@@ -75,7 +75,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   {provider.desktopOnly && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <Monitor className="h-3 w-3" />
-                      {t("desktopOnly")}
+                      {t("aiSettings.desktopOnly")}
                     </Badge>
                   )}
                   {isClaudeCode && isChecking && (
@@ -83,12 +83,12 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   )}
                   {isClaudeCode && claudeCodeAvailable === false && (
                     <Badge variant="destructive" className="text-xs">
-                      {t("providerUnavailable")}
+                      {t("aiSettings.providerUnavailable")}
                     </Badge>
                   )}
                   {isClaudeCode && claudeCodeAvailable === true && (
                     <Badge variant="secondary" className="text-xs">
-                      {t("providerAvailable")}
+                      {t("aiSettings.providerAvailable")}
                     </Badge>
                   )}
                 </Label>
@@ -110,15 +110,15 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
  * Sub-component that displays a provider's capability matrix.
  */
 function CapabilityMatrix({ capabilities }: { capabilities: AICapabilities }) {
-  const { t } = useTranslation("aiSettings");
+  const { t } = useTranslation();
 
   const entries: Array<{ key: keyof AICapabilities; label: string }> = [
-    { key: "textGeneration", label: t("capabilityTextGeneration") },
-    { key: "fileAccess", label: t("capabilityFileAccess") },
-    { key: "commandExecution", label: t("capabilityCommandExecution") },
-    { key: "webSearch", label: t("capabilityWebSearch") },
-    { key: "mcpIntegration", label: t("capabilityMcpIntegration") },
-    { key: "agentLoop", label: t("capabilityAgentLoop") },
+    { key: "textGeneration", label: t("aiSettings.capabilityTextGeneration") },
+    { key: "fileAccess", label: t("aiSettings.capabilityFileAccess") },
+    { key: "commandExecution", label: t("aiSettings.capabilityCommandExecution") },
+    { key: "webSearch", label: t("aiSettings.capabilityWebSearch") },
+    { key: "mcpIntegration", label: t("aiSettings.capabilityMcpIntegration") },
+    { key: "agentLoop", label: t("aiSettings.capabilityAgentLoop") },
   ];
 
   return (

@@ -193,13 +193,13 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
  * Section displayed when the Claude Code provider is selected.
  */
 function ClaudeCodeSection({ available }: { available: boolean | null }) {
-  const { t } = useTranslation("aiSettings");
+  const { t } = useTranslation();
 
   if (available === null) {
     return (
       <div className="flex items-center gap-2 rounded-lg border p-4">
         <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-        <p className="text-muted-foreground text-sm">{t("checkingAvailability")}</p>
+        <p className="text-muted-foreground text-sm">{t("aiSettings.checkingAvailability")}</p>
       </div>
     );
   }
@@ -208,11 +208,11 @@ function ClaudeCodeSection({ available }: { available: boolean | null }) {
     return (
       <Alert>
         <CheckCircle2 className="h-4 w-4" />
-        <AlertTitle>{t("providerAvailable")}</AlertTitle>
+        <AlertTitle>{t("aiSettings.providerAvailable")}</AlertTitle>
         <AlertDescription>
           <div className="flex items-center gap-2">
             <Terminal className="h-4 w-4" />
-            <span>{t("claudeCodeDescription")}</span>
+            <span>{t("aiSettings.claudeCodeDescription")}</span>
           </div>
         </AlertDescription>
       </Alert>
@@ -222,8 +222,8 @@ function ClaudeCodeSection({ available }: { available: boolean | null }) {
   return (
     <Alert variant="destructive">
       <XCircle className="h-4 w-4" />
-      <AlertTitle>{t("claudeCodeNotInstalled")}</AlertTitle>
-      <AlertDescription>{t("claudeCodeDesktopRequired")}</AlertDescription>
+      <AlertTitle>{t("aiSettings.claudeCodeNotInstalled")}</AlertTitle>
+      <AlertDescription>{t("aiSettings.claudeCodeDesktopRequired")}</AlertDescription>
     </Alert>
   );
 }

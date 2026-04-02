@@ -6,24 +6,32 @@
 import type { AIModel, AIUsage, CachedServerModels, UserTier } from "@/types/ai";
 
 /** Uses same base URL as REST API (VITE_API_BASE_URL). */
-const getAIAPIBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
+const getAIAPIBaseUrl = (): string => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
 
 const SERVER_MODELS_CACHE_KEY = "zedi-ai-server-models";
 const SERVER_MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+const VALID_PROVIDERS = ["openai", "anthropic", "google", "claude-code"] as const;
+const isValidProvider = (v: unknown): v is AIModel["provider"] =>
+  typeof v === "string" && (VALID_PROVIDERS as readonly string[]).includes(v);
+const toStr = (v: unknown, fallback = ""): string => (typeof v === "string" ? v : fallback);
+const toNum = (v: unknown, fallback = 0): number =>
+  typeof v === "number" && Number.isFinite(v) ? v : fallback;
+const toBool = (v: unknown, fallback = false): boolean => (typeof v === "boolean" ? v : fallback);
 
 /** API/cache の snake_case または camelCase を AIModel に正規化 */
 function normalizeToAIModel(raw: Record<string, unknown>): AIModel {
   const rawTier = (raw.tierRequired ?? raw.tier_required) as string | undefined;
   const tierRequired: UserTier = rawTier === "pro" ? "pro" : "free";
   return {
-    id: (raw.id as string) ?? "",
-    provider: (raw.provider as AIModel["provider"]) ?? "google",
-    modelId: (raw.modelId as string) ?? (raw.model_id as string) ?? "",
-    displayName: (raw.displayName as string) ?? (raw.display_name as string) ?? "",
+    id: toStr(raw.id),
+    provider: isValidProvider(raw.provider) ? raw.provider : "google",
+    modelId: toStr(raw.modelId ?? raw.model_id),
+    displayName: toStr(raw.displayName ?? raw.display_name),
     tierRequired,
-    available: (raw.available as boolean) ?? false,
-    inputCostUnits: (raw.inputCostUnits as number) ?? (raw.input_cost_units as number) ?? 0,
-    outputCostUnits: (raw.outputCostUnits as number) ?? (raw.output_cost_units as number) ?? 0,
+    available: toBool(raw.available),
+    inputCostUnits: toNum(raw.inputCostUnits ?? raw.input_cost_units),
+    outputCostUnits: toNum(raw.outputCostUnits ?? raw.output_cost_units),
   };
 }
 
@@ -52,7 +60,7 @@ export class FetchServerModelsError extends Error {
 
 async function fetchModelsFromApi(
   apiBaseUrl: string,
-): Promise<{ models: AIModel[]; tier: string }> {
+): Promise<{ models: AIModel[]; tier: UserTier }> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}/api/ai/models`, {
@@ -129,7 +137,7 @@ async function fetchModelsFromApi(
  */
 export async function fetchServerModels(forceRefresh = false): Promise<{
   models: AIModel[];
-  tier: string;
+  tier: UserTier;
 }> {
   if (!forceRefresh) {
     try {
@@ -141,7 +149,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
             normalizeToAIModel(m as unknown as Record<string, unknown>),
           );
           const rawTier = parsed.tier as string;
-          const cachedTier: string = rawTier === "pro" ? "pro" : "free";
+          const cachedTier: UserTier = rawTier === "pro" ? "pro" : "free";
           console.debug("[fetchServerModels] cache hit", {
             count: models.length,
             tier: cachedTier,
@@ -223,5 +231,22 @@ export async function fetchUsage(): Promise<AIUsage> {
     throw new Error("Failed to fetch usage");
   }
 
-  return (await response.json()) as AIUsage;
+  const payload: unknown = await response.json();
+  if (!isAIUsage(payload)) {
+    throw new Error("INVALID_USAGE_RESPONSE");
+  }
+  return payload;
+}
+
+function isAIUsage(value: unknown): value is AIUsage {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.usagePercent === "number" &&
+    typeof v.consumedUnits === "number" &&
+    typeof v.budgetUnits === "number" &&
+    typeof v.remaining === "number" &&
+    (v.tier === "free" || v.tier === "pro") &&
+    typeof v.yearMonth === "string"
+  );
 }
