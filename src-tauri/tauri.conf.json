@@ -10,7 +10,6 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "title": "Zedi",
     "windows": [
       {
         "title": "Zedi",
