@@ -10,10 +10,17 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+/**
+ *
+ */
 export function createStorageAdapter(): StorageAdapter {
   if (isTauri()) {
-    // Phase D: TauriStorageAdapter
-    throw new Error("TauriStorageAdapter is not implemented yet (Phase D).");
+    // TODO(D2): TauriStorageAdapter 実装後に切り替え (#50)
+    // Tauri 環境でも暫定的に IndexedDB を使用する
+    // Replace with TauriStorageAdapter once #50 is implemented
+    console.warn(
+      "[StorageAdapter] Tauri detected but TauriStorageAdapter not yet available. Falling back to IndexedDB.",
+    );
   }
   return new IndexedDBStorageAdapter();
 }
