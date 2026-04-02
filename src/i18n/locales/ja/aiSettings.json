@@ -29,5 +29,20 @@
   "costLabel": "{{multiplier}}x コスト",
   "cheapest": "最安",
   "showApiKey": "APIキーを表示",
-  "hideApiKey": "APIキーを隠す"
+  "hideApiKey": "APIキーを隠す",
+  "providerLabel": "プロバイダー",
+  "capabilities": "機能",
+  "capabilityTextGeneration": "テキスト生成",
+  "capabilityFileAccess": "ファイルアクセス",
+  "capabilityCommandExecution": "コマンド実行",
+  "capabilityWebSearch": "Web 検索",
+  "capabilityMcpIntegration": "MCP 統合",
+  "capabilityAgentLoop": "エージェントループ",
+  "desktopOnly": "デスクトップ専用",
+  "claudeCodeNotInstalled": "Claude Code がインストールされていません",
+  "claudeCodeDesktopRequired": "Claude Code はデスクトップアプリでのみ利用可能です",
+  "claudeCodeDescription": "ファイル操作やコマンド実行など、高度な機能を持つ AI アシスタントです。",
+  "providerUnavailable": "利用不可",
+  "providerAvailable": "利用可能",
+  "checkingAvailability": "確認中..."
 }

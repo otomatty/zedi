@@ -29,5 +29,20 @@
   "costLabel": "{{multiplier}}x cost",
   "cheapest": "cheapest",
   "showApiKey": "Show API key",
-  "hideApiKey": "Hide API key"
+  "hideApiKey": "Hide API key",
+  "providerLabel": "Provider",
+  "capabilities": "Capabilities",
+  "capabilityTextGeneration": "Text generation",
+  "capabilityFileAccess": "File access",
+  "capabilityCommandExecution": "Command execution",
+  "capabilityWebSearch": "Web search",
+  "capabilityMcpIntegration": "MCP integration",
+  "capabilityAgentLoop": "Agent loop",
+  "desktopOnly": "Desktop only",
+  "claudeCodeNotInstalled": "Claude Code is not installed",
+  "claudeCodeDesktopRequired": "Claude Code is only available in the desktop app",
+  "claudeCodeDescription": "An AI assistant with advanced capabilities including file operations and command execution.",
+  "providerUnavailable": "Unavailable",
+  "providerAvailable": "Available",
+  "checkingAvailability": "Checking..."
 }

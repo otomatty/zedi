@@ -7,6 +7,9 @@ import { AISettings } from "@/types/ai";
 import { loadAISettings } from "./aiSettings";
 
 // ダイアグラムタイプの定義
+/**
+ *
+ */
 export type MermaidDiagramType =
   | "flowchart"
   | "sequence"
@@ -17,6 +20,9 @@ export type MermaidDiagramType =
   | "pie"
   | "mindmap";
 
+/**
+ *
+ */
 export interface DiagramTypeInfo {
   id: MermaidDiagramType;
   name: string;
@@ -24,7 +30,10 @@ export interface DiagramTypeInfo {
   example: string;
 }
 
-export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
+export /**
+ *
+ */
+const DIAGRAM_TYPES: DiagramTypeInfo[] = [
   {
     id: "flowchart",
     name: "フローチャート",
@@ -101,11 +110,17 @@ const MERMAID_GENERATOR_PROMPT = `あなたはMermaidダイアグラムの専門
 ## 出力形式
 Mermaidコードのみを出力してください。`;
 
+/**
+ *
+ */
 export interface MermaidGeneratorResult {
   code: string;
   diagramType: MermaidDiagramType;
 }
 
+/**
+ *
+ */
 export interface MermaidGeneratorCallbacks {
   onComplete: (result: MermaidGeneratorResult) => void;
   onError: (error: Error) => void;
@@ -374,7 +389,14 @@ export async function generateMermaidDiagram(
       return generateWithAnthropic(settings, text, diagramTypes, callbacks);
     case "google":
       return generateWithGoogle(settings, text, diagramTypes, callbacks);
-    default:
-      callbacks.onError(new Error(`Unknown provider: ${settings.provider}`));
+    case "claude-code":
+      callbacks.onError(
+        new Error("Mermaid generation is not supported with Claude Code provider."),
+      );
+      break;
+    default: {
+      const _exhaustive: never = settings.provider;
+      callbacks.onError(new Error(`Unknown provider: ${_exhaustive}`));
+    }
   }
 }

@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
 import { useAISettings } from "@/hooks/useAISettings";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
-import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
+import {
+  useSavedIndicator,
+  useClaudeCodeAvailability,
+  useServerModels,
+} from "./useAISettingsFormHelpers";
 import type { AISettings } from "@/types/ai";
-import type { AIModel } from "@/types/ai";
-
-const SAVED_INDICATOR_MS = 3000;
 
 /**
  * Custom hook for AI settings form state and actions.
@@ -30,41 +30,20 @@ export function useAISettingsForm() {
   } = useAISettings();
 
   const [showApiKey, setShowApiKey] = useState(false);
-  const [useOwnKey, setUseOwnKey] = useState(false);
-  const [serverModels, setServerModels] = useState<AIModel[]>([]);
-  const [serverModelsLoading, setServerModelsLoading] = useState(false);
-  const [serverModelsError, setServerModelsError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const savedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
-  const isServerMode = settings.apiMode === "api_server" && !useOwnKey;
+  const { savedAt, clear: clearSavedIndicator, markSaved } = useSavedIndicator();
+  const claudeCodeAvailable = useClaudeCodeAvailability();
+  const {
+    models: serverModels,
+    loading: serverModelsLoading,
+    error: serverModelsError,
+    load: loadServerModels,
+  } = useServerModels();
 
-  const loadServerModels = useCallback(
-    async (forceRefresh = false) => {
-      setServerModelsError(null);
-      setServerModelsLoading(true);
-      try {
-        const { models } = await fetchServerModels(forceRefresh);
-        setServerModels(models ?? []);
-        if (!models?.length) {
-          setServerModelsError(t("aiSettings.modelsEmpty"));
-        }
-      } catch (e) {
-        const message =
-          e instanceof FetchServerModelsError
-            ? e.message
-            : e instanceof Error
-              ? e.message
-              : String(e);
-        setServerModelsError(message);
-        setServerModels([]);
-      } finally {
-        setServerModelsLoading(false);
-      }
-    },
-    [t],
-  );
+  const useOwnKey = !isLoading && settings.apiMode === "user_api_key";
+  const isClaudeCode = settings.provider === "claude-code";
+  const isServerMode = settings.apiMode === "api_server" && !useOwnKey && !isClaudeCode;
 
   useEffect(() => {
     if (isServerMode) {
@@ -72,43 +51,11 @@ export function useAISettingsForm() {
     }
   }, [isServerMode, loadServerModels]);
 
-  useEffect(() => {
-    if (!isLoading) {
-      setUseOwnKey(settings.apiMode === "user_api_key");
-    }
-  }, [isLoading, settings.apiMode]);
-
-  useEffect(() => {
-    return () => {
-      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
-    };
-  }, []);
-
   const runSave = useCallback(async () => {
-    const success = await save();
-    if (success) {
-      setSavedAt(Date.now());
-      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
-      savedAtTimeoutRef.current = setTimeout(() => {
-        setSavedAt(null);
-        savedAtTimeoutRef.current = null;
-      }, SAVED_INDICATOR_MS);
-    } else {
-      sonnerToast.error(t("common.error"), {
-        description: t("aiSettings.saveFailedToastDescription"),
-      });
-    }
-  }, [save, t]);
+    markSaved(await save());
+  }, [save, markSaved]);
 
   const scheduleSave = useDebouncedCallback(runSave, 800);
-
-  const clearSavedIndicator = useCallback(() => {
-    if (savedAtTimeoutRef.current) {
-      clearTimeout(savedAtTimeoutRef.current);
-      savedAtTimeoutRef.current = null;
-    }
-    setSavedAt(null);
-  }, []);
 
   const updateSettings = useCallback(
     (updates: Partial<AISettings>) => {
@@ -126,10 +73,7 @@ export function useAISettingsForm() {
 
   const handleToggleOwnKey = useCallback(
     (checked: boolean) => {
-      setUseOwnKey(checked);
-      updateSettings({
-        apiMode: checked ? "user_api_key" : "api_server",
-      });
+      updateSettings({ apiMode: checked ? "user_api_key" : "api_server" });
     },
     [updateSettings],
   );
@@ -149,7 +93,6 @@ export function useAISettingsForm() {
 
   const handleReset = useCallback(() => {
     reset();
-    setUseOwnKey(false);
     clearSavedIndicator();
     toast({
       title: t("aiSettings.resetToast"),
@@ -186,6 +129,8 @@ export function useAISettingsForm() {
     serverModelsLoading,
     serverModelsError,
     isServerMode,
+    isClaudeCode,
+    claudeCodeAvailable,
     loadServerModels,
     updateSettings,
     handleToggleOwnKey,

@@ -5,6 +5,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { AISettings, AIProviderType, CachedModels, getDefaultModels } from "@/types/ai";
 
+/**
+ *
+ */
 export type AIClient = OpenAI | Anthropic | GoogleGenAI;
 
 // モデルキャッシュのストレージキー
@@ -20,7 +23,7 @@ export function createAIClient(settings: AISettings): AIClient {
     case "openai":
       return new OpenAI({
         apiKey: settings.apiKey,
-        dangerouslyAllowBrowser: true, // Web App用
+        dangerouslyAllowBrowser: true,
       });
     case "anthropic":
       return new Anthropic({
@@ -28,11 +31,20 @@ export function createAIClient(settings: AISettings): AIClient {
       });
     case "google":
       return new GoogleGenAI({ apiKey: settings.apiKey });
-    default:
-      throw new Error(`Unknown provider: ${settings.provider}`);
+    case "claude-code":
+      throw new Error(
+        "Claude Code does not use a traditional AI client. Use the sidecar bridge instead.",
+      );
+    default: {
+      const _exhaustive: never = settings.provider;
+      throw new Error(`Unknown provider: ${_exhaustive}`);
+    }
   }
 }
 
+/**
+ *
+ */
 export interface ConnectionTestResult {
   success: boolean;
   message: string;
@@ -318,10 +330,18 @@ export async function testConnection(
       return testAnthropicConnection(apiKey);
     case "google":
       return testGoogleConnection(apiKey);
-    default:
+    case "claude-code":
       return {
         success: false,
-        message: `不明なプロバイダー: ${provider}`,
+        message:
+          "Claude Code は API キー接続テスト非対応です。設定画面で利用可否を確認してください。",
       };
+    default: {
+      const _exhaustive: never = provider;
+      return {
+        success: false,
+        message: `不明なプロバイダー: ${_exhaustive}`,
+      };
+    }
   }
 }
