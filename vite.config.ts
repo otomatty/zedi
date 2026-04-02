@@ -17,20 +17,27 @@ export default defineConfig(({ mode }) => {
   // Load all env vars (including non-VITE_ prefixed) for vite.config use
   const env = loadEnv(mode, process.cwd(), "");
 
-  // 環境変数からポートを取得、デフォルトは30000（被りにくい開発用ポート）
-  // ポートが使用中の場合は自動的に次の利用可能なポートを使用
   const port = parseInt(env.VITE_PORT || env.PORT || "30000", 10);
 
   // API Gateway URL for dev proxy (avoids CORS in local development).
-  // Uses ZEDI_API_PROXY_TARGET (no VITE_ prefix) so client code doesn't see it;
-  // client requests go to same-origin /api/* which Vite proxies to the real API.
+  // Uses ZEDI_API_PROXY_TARGET (no VITE_ prefix) so client code doesn't see it.
   const apiTarget = env.ZEDI_API_PROXY_TARGET || "";
 
+  // Tauri が設定する環境変数。セットされていれば Tauri WebView 内で動作中。
+  // Set by Tauri CLI; when present the app runs inside a Tauri WebView.
+  const isTauri = !!env.TAURI_ENV_PLATFORM;
+  const tauriDevHost = env.TAURI_DEV_HOST;
+
   return {
+    clearScreen: false,
     server: {
-      host: "::",
+      host: tauriDevHost || "::",
       port,
-      strictPort: false, // ポートが使用中の場合は自動的に次のポートを使用
+      strictPort: isTauri, // Tauri はポート固定を期待 / Tauri expects a fixed port
+      hmr: tauriDevHost ? { protocol: "ws", host: tauriDevHost, port: 1421 } : undefined,
+      watch: {
+        ignored: ["**/src-tauri/**"],
+      },
       ...(apiTarget
         ? {
             proxy: {
@@ -43,9 +50,15 @@ export default defineConfig(({ mode }) => {
           }
         : {}),
     },
-    // Enable top-level await for sql.js
+    envPrefix: ["VITE_", "TAURI_ENV_*"],
     build: {
-      target: "esnext",
+      target: isTauri
+        ? process.env.TAURI_ENV_PLATFORM === "windows"
+          ? "chrome105"
+          : "safari13"
+        : "esnext",
+      minify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
+      sourcemap: !!process.env.TAURI_ENV_DEBUG,
     },
     define: {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
