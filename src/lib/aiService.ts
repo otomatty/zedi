@@ -187,9 +187,7 @@ async function callAIWithClaudeCode(
       }
     }
 
-    if (fullContent) {
-      callbacks.onComplete?.({ content: fullContent, finishReason: "stop" });
-    }
+    callbacks.onComplete?.({ content: fullContent, finishReason: fullContent ? "stop" : "abort" });
   } catch (error) {
     callbacks.onError?.(error instanceof Error ? error : new Error("Claude Code 呼び出しエラー"));
   }

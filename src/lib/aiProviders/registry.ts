@@ -6,7 +6,7 @@
  * プロバイダーインスタンスの管理と利用可否の判定を行う。
  */
 
-import { AI_PROVIDERS, type AIProviderType, type AISettings, isAPIProvider } from "@/types/ai";
+import { AI_PROVIDERS, type AISettings, isAPIProvider } from "@/types/ai";
 import { isTauriDesktop } from "@/lib/platform";
 import type { ProviderAvailability, UnifiedAIProvider } from "./types";
 import { createOpenAIProvider } from "./openaiProvider";
@@ -89,17 +89,4 @@ export async function checkAllProviderAvailability(
   }
 
   return results;
-}
-
-/**
- * 特定のプロバイダーの利用可否を判定する。
- * Checks if a specific provider is available.
- */
-export async function isProviderAvailable(
-  providerId: AIProviderType,
-  settings: AISettings,
-): Promise<boolean> {
-  const providerSettings: AISettings = { ...settings, provider: providerId };
-  const instance = createProvider(providerSettings);
-  return instance.isAvailable();
 }

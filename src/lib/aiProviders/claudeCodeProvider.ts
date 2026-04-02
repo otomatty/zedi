@@ -97,9 +97,15 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
           } else {
             await new Promise<void>((resolve) => {
               resolveWait = resolve;
-              if (chunks.length > 0 || done) {
+              const onAbort = (): void => {
                 resolve();
                 resolveWait = null;
+              };
+              signal?.addEventListener("abort", onAbort, { once: true });
+              if (chunks.length > 0 || done || signal?.aborted) {
+                resolve();
+                resolveWait = null;
+                signal?.removeEventListener("abort", onAbort);
               }
             });
           }
