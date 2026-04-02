@@ -279,8 +279,6 @@ VITE_ZEDI_API_BASE_URL=https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.c
 - [ ] iOS / Android モバイルアプリ
 - [ ] Share Sheet 連携
 - [ ] Magic Split / Flick-to-Split
-- [ ] Ghost Link System
-- [ ] Semantic Search（ベクトル検索）
 
 ロードマップの詳細は Issue / Discussions を参照してください。
 
