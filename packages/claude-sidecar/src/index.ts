@@ -34,7 +34,7 @@ async function handleRequest(raw: string): Promise<void> {
 
   switch (req.type) {
     case "shutdown": {
-      tracker.abortAll();
+      tracker.clearAll();
       writeLine(formatResponseLine({ type: "shutdown-ack" }));
       process.exit(0);
       return;
@@ -68,6 +68,10 @@ async function handleRequest(raw: string): Promise<void> {
       return;
     }
     case "query": {
+      if (abortById.has(req.id)) {
+        emitError(req.id, "duplicate query id", "duplicate_id");
+        return;
+      }
       const ac = new AbortController();
       abortById.set(req.id, ac);
       void runQuery({

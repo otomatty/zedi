@@ -17,8 +17,8 @@ export class QueryActivityTracker {
     this.active.delete(id);
   }
 
-  /** Clears all active ids (e.g. shutdown). / 全アクティブ ID を消す */
-  abortAll(): void {
+  /** Clears all tracked ids without aborting controllers (e.g. shutdown). / コントローラは中断せず追跡 ID のみクリア */
+  clearAll(): void {
     this.active.clear();
   }
 

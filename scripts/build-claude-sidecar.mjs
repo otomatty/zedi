@@ -17,7 +17,12 @@ const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const outDir = join(root, "src-tauri", "binaries");
 
 function run(cmd, args, options = {}) {
-  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", ...options });
+  const r = spawnSync(cmd, args, {
+    cwd: root,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+    ...options,
+  });
   if (r.status !== 0) {
     process.exit(r.status ?? 1);
   }
