@@ -82,7 +82,10 @@
     "@types/sql.js",
     "@types/uuid",
     "@vitejs/plugin-react",
-    "wrangler"
+    "wrangler",
+    "@tauri-apps/api",
+    "@tauri-apps/plugin-shell",
+    "@tauri-apps/plugin-store"
   ],
   "ignoreExportsUsedInFile": {
     "interface": true,
