@@ -10,6 +10,7 @@ describe("createStorageAdapter", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (originalTauriInternals === undefined) {
       delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
     } else {
@@ -31,6 +32,7 @@ describe("createStorageAdapter", () => {
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("Tauri detected but TauriStorageAdapter not yet available"),
     );
-    warnSpy.mockRestore();
+    createStorageAdapter();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });

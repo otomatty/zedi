@@ -23,10 +23,13 @@ export default defineConfig(({ mode }) => {
   // Uses ZEDI_API_PROXY_TARGET (no VITE_ prefix) so client code doesn't see it.
   const apiTarget = env.ZEDI_API_PROXY_TARGET || "";
 
-  // Tauri が設定する環境変数。セットされていれば Tauri WebView 内で動作中。
-  // Set by Tauri CLI; when present the app runs inside a Tauri WebView.
-  const isTauri = !!env.TAURI_ENV_PLATFORM;
-  const tauriDevHost = env.TAURI_DEV_HOST;
+  // Tauri CLI は子プロセスの process.env に TAURI_* を注入する。loadEnv は .env 由来のみのため
+  // process.env とマージして参照する（strictPort / build.target の分岐を確実にする）。
+  // Tauri CLI injects TAURI_* into the dev server process; merge with loadEnv for reliable detection.
+  const tauriPlatform = process.env.TAURI_ENV_PLATFORM ?? env.TAURI_ENV_PLATFORM;
+  const tauriDevHost = process.env.TAURI_DEV_HOST ?? env.TAURI_DEV_HOST;
+  const tauriEnvDebug = process.env.TAURI_ENV_DEBUG ?? env.TAURI_ENV_DEBUG;
+  const isTauri = !!tauriPlatform;
 
   return {
     clearScreen: false,
@@ -50,15 +53,12 @@ export default defineConfig(({ mode }) => {
           }
         : {}),
     },
-    envPrefix: ["VITE_", "TAURI_ENV_*"],
+    // Vite はプレフィックスの前方一致のみ（ワイルドカードなし）。TAURI_ENV_* は使えない。
+    envPrefix: ["VITE_", "TAURI_ENV_"],
     build: {
-      target: isTauri
-        ? process.env.TAURI_ENV_PLATFORM === "windows"
-          ? "chrome105"
-          : "safari13"
-        : "esnext",
-      minify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
-      sourcemap: !!process.env.TAURI_ENV_DEBUG,
+      target: isTauri ? (tauriPlatform === "windows" ? "chrome105" : "safari13") : "esnext",
+      minify: tauriEnvDebug ? false : "esbuild",
+      sourcemap: !!tauriEnvDebug,
     },
     define: {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
