@@ -11,7 +11,7 @@
         {
           "name": "binaries/claude-sidecar",
           "sidecar": true,
-          "args": true
+          "args": false
         }
       ]
     }

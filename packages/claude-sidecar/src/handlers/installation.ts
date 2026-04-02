@@ -11,13 +11,21 @@ export interface InstallationCheckResult {
 
 const CLAUDE = process.platform === "win32" ? "claude.exe" : "claude";
 
+/** argv for `claude --version` (Windows uses `cmd /c` for npm-style shims). / Windows は npm 系シム解決のため cmd 経由 */
+function claudeVersionArgv(): string[] {
+  if (process.platform === "win32") {
+    return ["cmd.exe", "/c", "claude", "--version"];
+  }
+  return [CLAUDE, "--version"];
+}
+
 /**
  * Runs `claude --version` (or `claude.exe` on Windows).
  * `claude --version` を実行する（Windows は `claude.exe`）。
  */
 export async function checkClaudeInstallation(): Promise<InstallationCheckResult> {
   try {
-    const proc = Bun.spawn([CLAUDE, "--version"], {
+    const proc = Bun.spawn(claudeVersionArgv(), {
       stdout: "pipe",
       stderr: "pipe",
       stdin: "ignore",

@@ -18,19 +18,27 @@ use tokio::sync::{oneshot, Mutex as TokioMutex};
 /// sidecar の子プロセス stdin と相関 ID 用の共有状態。
 #[derive(Debug)]
 pub struct ClaudeSidecarState {
-    repo_root: PathBuf,
+    /// Dev-only: repo root for `bun packages/claude-sidecar/...`. Omitted in release builds.
+    /// 開発時のみ: `bun` で sidecar を起動する際のリポジトリルート。release では未使用。
+    repo_root: Option<PathBuf>,
     child: Arc<TokioMutex<Option<CommandChild>>>,
     pending: Arc<TokioMutex<HashMap<String, oneshot::Sender<Value>>>>,
 }
 
 impl ClaudeSidecarState {
-    /// Builds state using the workspace root (parent of `src-tauri`).
-    /// ワークスペースルート（`src-tauri` の親）で状態を構築する。
+    /// Builds state. `repo_root` is only set in debug builds (no embedded path in release).
+    /// `repo_root` はデバッグビルドでのみ設定（release にビルドマシン絶対パスを埋め込まない）。
     pub fn new() -> Self {
-        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
+        let repo_root = if cfg!(debug_assertions) {
+            Some(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| PathBuf::from(".")),
+            )
+        } else {
+            None
+        };
         Self {
             repo_root,
             child: Arc::new(TokioMutex::new(None)),
@@ -47,6 +55,24 @@ impl Default for ClaudeSidecarState {
 
 fn map_shell_err(e: tauri_plugin_shell::Error) -> String {
     e.to_string()
+}
+
+/// Completes all pending RPC waiters after sidecar failure (timeout avoided).
+/// sidecar 失敗後に保留中 RPC を完了させる（タイムアウト待ちを避ける）。
+async fn fail_pending_rpc(
+    pending: &Arc<TokioMutex<HashMap<String, oneshot::Sender<Value>>>>,
+    message: &str,
+    code: &str,
+) {
+    let mut guard = pending.lock().await;
+    for (cid, tx) in guard.drain() {
+        let _ = tx.send(serde_json::json!({
+            "type": "error",
+            "correlationId": cid,
+            "error": message,
+            "code": code,
+        }));
+    }
 }
 
 async fn process_sidecar_line(
@@ -95,10 +121,14 @@ async fn ensure_sidecar(app: &AppHandle, state: &ClaudeSidecarState) -> Result<(
     }
 
     let (mut rx, child) = if cfg!(debug_assertions) {
+        let root = state
+            .repo_root
+            .as_ref()
+            .ok_or_else(|| "internal error: missing repo root for dev sidecar".to_string())?;
         app.shell()
             .command("bun")
             .args(["packages/claude-sidecar/src/index.ts"])
-            .current_dir(&state.repo_root)
+            .current_dir(root)
             .spawn()
             .map_err(map_shell_err)?
     } else {
@@ -114,14 +144,16 @@ async fn ensure_sidecar(app: &AppHandle, state: &ClaudeSidecarState) -> Result<(
     let child_slot = state.child.clone();
 
     tauri::async_runtime::spawn(async move {
-        let mut line_buf = String::new();
+        let mut line_buf: Vec<u8> = Vec::new();
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(bytes) => {
-                    line_buf.push_str(&String::from_utf8_lossy(&bytes));
-                    while let Some(pos) = line_buf.find('\n') {
-                        let line = line_buf[..pos].trim().to_string();
-                        line_buf.drain(..=pos);
+                    line_buf.extend_from_slice(&bytes);
+                    while let Some(pos) = line_buf.iter().position(|&b| b == b'\n') {
+                        let line_bytes: Vec<u8> = line_buf.drain(..=pos).collect();
+                        let without_nl = line_bytes.strip_suffix(b"\n").unwrap_or(&line_bytes);
+                        let without_cr = without_nl.strip_suffix(b"\r").unwrap_or(without_nl);
+                        let line = String::from_utf8_lossy(without_cr).trim().to_string();
                         if !line.is_empty() {
                             process_sidecar_line(&app_handle, &pending, &line).await;
                         }
@@ -132,17 +164,25 @@ async fn ensure_sidecar(app: &AppHandle, state: &ClaudeSidecarState) -> Result<(
                 }
                 CommandEvent::Error(e) => {
                     eprintln!("claude-sidecar command error: {e}");
+                    fail_pending_rpc(&pending, "sidecar command error", "sidecar_io_error").await;
                     let _ = app_handle.emit(
                         "claude-error",
                         serde_json::json!({
                             "id": "sidecar",
-                            "error": e,
-                            "code": "sidecar_io_error"
+                            "error": e.to_string(),
+                            "code": "sidecar_io_error",
+                            "type": "error",
                         }),
                     );
                 }
                 CommandEvent::Terminated(payload) => {
                     eprintln!("claude-sidecar terminated: {payload:?}");
+                    fail_pending_rpc(
+                        &pending,
+                        "Claude sidecar process terminated",
+                        "sidecar_terminated",
+                    )
+                    .await;
                     *child_slot.lock().await = None;
                     let _ = app_handle.emit(
                         "claude-error",
@@ -150,6 +190,7 @@ async fn ensure_sidecar(app: &AppHandle, state: &ClaudeSidecarState) -> Result<(
                             "id": "sidecar",
                             "error": "Claude sidecar process terminated",
                             "code": "sidecar_terminated",
+                            "type": "error",
                             "exitCode": payload.code,
                             "signal": payload.signal,
                         }),
@@ -171,9 +212,12 @@ async fn write_line(state: &ClaudeSidecarState, line: &str) -> Result<(), String
         .as_mut()
         .ok_or_else(|| "Claude sidecar is not running".to_string())?;
     let bytes = format!("{}\n", line.trim_end());
-    child
-        .write(bytes.as_bytes())
-        .map_err(|e| format!("failed to write sidecar stdin: {e}"))?;
+    let bytes_buf = bytes.into_bytes();
+    tokio::task::block_in_place(|| {
+        child
+            .write(&bytes_buf)
+            .map_err(|e| format!("failed to write sidecar stdin: {e}"))
+    })?;
     Ok(())
 }
 
@@ -201,8 +245,19 @@ async fn rpc_json(
         return Err("sidecar RPC timed out".to_string());
     }
 
-    out.unwrap()
-        .map_err(|_| "sidecar RPC channel closed".to_string())
+    let value = out
+        .unwrap()
+        .map_err(|_| "sidecar RPC channel closed".to_string())?;
+
+    if value.get("type").and_then(|t| t.as_str()) == Some("error") {
+        let msg = value
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("sidecar RPC error");
+        return Err(msg.to_string());
+    }
+
+    Ok(value)
 }
 
 /// Sends a prompt to Claude Code via the sidecar; returns the request id for event correlation.

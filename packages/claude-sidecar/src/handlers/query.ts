@@ -110,11 +110,13 @@ export async function runQuery(params: {
       prompt,
       options: {
         cwd: cwd ?? process.cwd(),
-        maxTurns: maxTurns ?? 10,
+        maxTurns: maxTurns ?? 25,
         allowedTools: allowedTools?.length ? allowedTools : [...DEFAULT_TOOLS],
         abortController,
         includePartialMessages: true,
         resume,
+        // Desktop app may later expose this; matches Claude Code CLI-style defaults.
+        // デスクトップでは後段で UI から指定可能にする想定。CLI 相当の既定。
         permissionMode: "acceptEdits",
         settingSources: ["user", "project", "local"],
       },
@@ -148,6 +150,16 @@ export async function runQuery(params: {
         emitResultOrError(id, msg, aggregated, emit);
         return;
       }
+    }
+
+    if (abortController.signal.aborted) {
+      emit({
+        type: "error",
+        id,
+        error: "Query aborted",
+        code: "aborted",
+      });
+      return;
     }
 
     emit({
