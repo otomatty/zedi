@@ -83,7 +83,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
           allowedTools: request.options?.allowedTools,
         });
 
-        while (!done && !aborted) {
+        while (!aborted) {
           if (signal?.aborted) {
             if (currentRequestId) await claudeAbort(currentRequestId);
             break;
@@ -94,6 +94,8 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
             if (!chunk) continue;
             yield chunk;
             if (chunk.type === "done" || chunk.type === "error") break;
+          } else if (done) {
+            break;
           } else {
             await new Promise<void>((resolve) => {
               resolveWait = resolve;
