@@ -48,7 +48,7 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
 
 /**
  * Wikiコンテンツをストリーミング生成
- * api_serverモード: callAIService経由でサーバーに委譲
+ * api_serverモード / claude-code: callAIService経由でサーバーに委譲
  * user_api_keyモード: 直接SDKで呼び出し（既存動作）
  */
 export async function generateWikiContentStream(
@@ -60,7 +60,7 @@ export async function generateWikiContentStream(
     const settings = await getAISettingsOrThrow();
     const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
-    if (effectiveMode === "api_server") {
+    if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");
       const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
       let fullContent = "";
@@ -139,7 +139,7 @@ export async function generateWikiContentFromChatOutlineStream(
     const settings = await getAISettingsOrThrow();
     const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
-    if (effectiveMode === "api_server") {
+    if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");
       let fullContent = "";
 

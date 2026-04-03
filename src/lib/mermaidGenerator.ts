@@ -336,8 +336,8 @@ export async function generateMermaidDiagram(
   const settings = await getAISettingsOrThrow();
   const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
-  // api_serverモード: 統一されたcallAIService経由
-  if (effectiveMode === "api_server") {
+  // api_server / claude-code: 統一された callAIService 経由
+  if (settings.provider === "claude-code" || effectiveMode === "api_server") {
     try {
       const { callAIService } = await import("@/lib/aiService");
       const diagramTypeStr = diagramTypes.join(", ");
