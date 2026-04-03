@@ -2,6 +2,7 @@
 
 import { encrypt, decrypt } from "./encryption";
 import { AISettings, DEFAULT_AI_SETTINGS } from "@/types/ai";
+import { isTauriDesktop } from "@/lib/platform";
 
 const STORAGE_KEY = "zedi-ai-settings";
 
@@ -68,14 +69,27 @@ export function clearAISettings(): void {
 }
 
 /**
- * AI設定が有効かどうかを確認する
- * api_serverモードではシステムプロバイダーが利用可能なため常にtrue
+ * AI設定が有効かどうかを確認する。
+ * api_serverモードではシステムプロバイダーが利用可能なため常にtrue。
+ * claude-code はデスクトップ環境でインストール済みなら常に利用可能。
+ *
+ * Checks if AI is configured. Server mode is always available.
+ * Claude Code is available when installed in a desktop environment.
  */
 export async function isAIConfigured(): Promise<boolean> {
   const settings = await loadAISettings();
   if (!settings) {
-    // 未設定の場合、デフォルトのapi_serverモードで利用可能
     return true;
+  }
+  if (settings.provider === "claude-code") {
+    if (!isTauriDesktop()) return false;
+    try {
+      const { checkClaudeInstallation } = await import("@/lib/claudeCode/bridge");
+      const result = await checkClaudeInstallation();
+      return result.installed;
+    } catch {
+      return false;
+    }
   }
   if (settings.apiMode === "api_server") {
     return true;

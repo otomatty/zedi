@@ -1,8 +1,9 @@
 import React from "react";
-import { Bot, Loader2, Trash2, Key } from "lucide-react";
+import { Bot, Loader2, Trash2, Key, CheckCircle2, XCircle, Terminal } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Switch } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
+import { Alert, AlertDescription, AlertTitle } from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,8 +18,9 @@ import {
 import { useAISettingsForm } from "./useAISettingsForm";
 import { AISettingsFormServerSection } from "./AISettingsFormServerSection";
 import { AISettingsFormUserKeySection } from "./AISettingsFormUserKeySection";
+import { ProviderSelector } from "./ProviderSelector";
 import { SectionSaveStatus } from "./SectionSaveStatus";
-import { getProviderById } from "@/types/ai";
+import { getProviderById, type AIProviderType } from "@/types/ai";
 import { useTranslation } from "react-i18next";
 
 interface AISettingsFormProps {
@@ -47,6 +49,8 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
     serverModelsLoading,
     serverModelsError,
     isServerMode,
+    isClaudeCode,
+    claudeCodeAvailable,
     loadServerModels,
     updateSettings,
     handleToggleOwnKey,
@@ -83,7 +87,15 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 
       <CardContent className={embedded ? "space-y-6 pt-0" : "space-y-6"}>
         {embedded && saveStatus !== "idle" && <SectionSaveStatus status={saveStatus} />}
-        {isServerMode && (
+
+        <ProviderSelector
+          value={settings.provider}
+          onChange={(p: AIProviderType) => updateSettings({ provider: p })}
+          disabled={isSaving || isTesting}
+          claudeCodeAvailable={claudeCodeAvailable}
+        />
+
+        {!isClaudeCode && isServerMode && (
           <AISettingsFormServerSection
             serverModels={serverModels}
             serverModelsError={serverModelsError}
@@ -95,27 +107,29 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
           />
         )}
 
-        <div className="flex items-center justify-between rounded-lg border p-4">
-          <div className="flex items-center gap-3">
-            <Key className="text-muted-foreground h-5 w-5" />
-            <div>
-              <p id="useOwnKey-label" className="text-sm font-medium">
-                {t("aiSettings.useOwnKey")}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                {t("aiSettings.useOwnKeyDescription")}
-              </p>
+        {!isClaudeCode && (
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="flex items-center gap-3">
+              <Key className="text-muted-foreground h-5 w-5" />
+              <div>
+                <p id="useOwnKey-label" className="text-sm font-medium">
+                  {t("aiSettings.useOwnKey")}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {t("aiSettings.useOwnKeyDescription")}
+                </p>
+              </div>
             </div>
+            <Switch
+              aria-labelledby="useOwnKey-label"
+              checked={useOwnKey}
+              onCheckedChange={handleToggleOwnKey}
+              disabled={isSaving || isTesting}
+            />
           </div>
-          <Switch
-            aria-labelledby="useOwnKey-label"
-            checked={useOwnKey}
-            onCheckedChange={handleToggleOwnKey}
-            disabled={isSaving || isTesting}
-          />
-        </div>
+        )}
 
-        {useOwnKey && (
+        {useOwnKey && !isClaudeCode && (
           <AISettingsFormUserKeySection
             apiKey={settings.apiKey}
             provider={settings.provider}
@@ -131,6 +145,8 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
             embedded={embedded}
           />
         )}
+
+        {isClaudeCode && <ClaudeCodeSection available={claudeCodeAvailable} />}
       </CardContent>
 
       <CardFooter className="flex justify-between">
@@ -156,7 +172,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
         </AlertDialog>
 
         <div className="flex gap-2">
-          {useOwnKey && (
+          {useOwnKey && !isClaudeCode && (
             <Button
               variant="outline"
               onClick={handleTest}
@@ -171,3 +187,43 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
     </Card>
   );
 };
+
+/**
+ * Claude Code プロバイダー選択時に表示するセクション。
+ * Section displayed when the Claude Code provider is selected.
+ */
+function ClaudeCodeSection({ available }: { available: boolean | null }) {
+  const { t } = useTranslation();
+
+  if (available === null) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border p-4">
+        <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+        <p className="text-muted-foreground text-sm">{t("aiSettings.checkingAvailability")}</p>
+      </div>
+    );
+  }
+
+  if (available) {
+    return (
+      <Alert>
+        <CheckCircle2 className="h-4 w-4" />
+        <AlertTitle>{t("aiSettings.providerAvailable")}</AlertTitle>
+        <AlertDescription>
+          <div className="flex items-center gap-2">
+            <Terminal className="h-4 w-4" />
+            <span>{t("aiSettings.claudeCodeDescription")}</span>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <Alert variant="destructive">
+      <XCircle className="h-4 w-4" />
+      <AlertTitle>{t("aiSettings.claudeCodeNotInstalled")}</AlertTitle>
+      <AlertDescription>{t("aiSettings.claudeCodeDesktopRequired")}</AlertDescription>
+    </Alert>
+  );
+}

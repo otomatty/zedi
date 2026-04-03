@@ -7,6 +7,7 @@ import { AISettings } from "@/types/ai";
 import { loadAISettings } from "./aiSettings";
 
 // ダイアグラムタイプの定義
+/** Supported Mermaid diagram kinds for the generator. */
 export type MermaidDiagramType =
   | "flowchart"
   | "sequence"
@@ -17,6 +18,7 @@ export type MermaidDiagramType =
   | "pie"
   | "mindmap";
 
+/** Metadata for one diagram type (label, description, example). */
 export interface DiagramTypeInfo {
   id: MermaidDiagramType;
   name: string;
@@ -24,6 +26,7 @@ export interface DiagramTypeInfo {
   example: string;
 }
 
+/** Built-in diagram type list for the Mermaid generator UI. */
 export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
   {
     id: "flowchart",
@@ -101,11 +104,13 @@ const MERMAID_GENERATOR_PROMPT = `あなたはMermaidダイアグラムの専門
 ## 出力形式
 Mermaidコードのみを出力してください。`;
 
+/** Result of a successful Mermaid generation. */
 export interface MermaidGeneratorResult {
   code: string;
   diagramType: MermaidDiagramType;
 }
 
+/** Streaming / completion callbacks for Mermaid generation. */
 export interface MermaidGeneratorCallbacks {
   onComplete: (result: MermaidGeneratorResult) => void;
   onError: (error: Error) => void;
@@ -127,6 +132,11 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
   // api_serverモードならAPIキー不要
   const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
   if (effectiveMode === "api_server") {
+    return { ...settings, isConfigured: true };
+  }
+
+  // Claude Code は API キー不要（後段で未対応エラーに分岐）
+  if (settings.provider === "claude-code") {
     return { ...settings, isConfigured: true };
   }
 
@@ -326,8 +336,8 @@ export async function generateMermaidDiagram(
   const settings = await getAISettingsOrThrow();
   const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
-  // api_serverモード: 統一されたcallAIService経由
-  if (effectiveMode === "api_server") {
+  // api_server / claude-code: 統一された callAIService 経由
+  if (settings.provider === "claude-code" || effectiveMode === "api_server") {
     try {
       const { callAIService } = await import("@/lib/aiService");
       const diagramTypeStr = diagramTypes.join(", ");
@@ -374,7 +384,14 @@ export async function generateMermaidDiagram(
       return generateWithAnthropic(settings, text, diagramTypes, callbacks);
     case "google":
       return generateWithGoogle(settings, text, diagramTypes, callbacks);
-    default:
-      callbacks.onError(new Error(`Unknown provider: ${settings.provider}`));
+    case "claude-code":
+      callbacks.onError(
+        new Error("Mermaid generation is not supported with Claude Code provider."),
+      );
+      break;
+    default: {
+      const _exhaustive: never = settings.provider;
+      callbacks.onError(new Error(`Unknown provider: ${_exhaustive}`));
+    }
   }
 }

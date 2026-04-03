@@ -28,6 +28,9 @@ interface UseAISettingsReturn {
   reset: () => void;
 }
 
+/**
+ * Load/save AI settings, model lists, and connection test from the settings UI.
+ */
 export function useAISettings(): UseAISettingsReturn {
   const [settings, setSettings] = useState<AISettings>(getDefaultAISettings());
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -76,12 +79,7 @@ export function useAISettings(): UseAISettingsReturn {
           newSettings.model = models[0] || getDefaultModel(updates.provider);
         }
 
-        // APIキーが必要かどうかを確認
-        const provider = getProviderById(updates.provider);
-        if (provider && !provider.requiresApiKey) {
-          // APIキー不要のプロバイダーの場合、キーをクリア
-          newSettings.apiKey = "";
-        }
+        // API キーは他プロバイダーに戻す際に必要なため、切り替え時に消去しない
       }
 
       // プロバイダーまたはモデルが変わった場合は、呼び出し元が明示的に modelId を渡していなければクリアする（古い modelId の永続化を防ぐ）
@@ -101,22 +99,22 @@ export function useAISettings(): UseAISettingsReturn {
   const save = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     try {
-      // api_serverモードではAPIキー不要で常にconfigured
+      const isClaudeCode = settings.provider === "claude-code";
       const isServerMode = settings.apiMode === "api_server";
       const provider = getProviderById(settings.provider);
-      const isConfigured = isServerMode
-        ? true
-        : provider?.requiresApiKey
-          ? settings.apiKey.trim() !== ""
-          : true;
 
-      // 永続化時は常に provider:model から modelId を算出し、他経路で変更された provider/model に古い modelId が残っていても保存しない
-      const modelId = `${settings.provider}:${settings.model}`;
+      const needsApiKey = !isClaudeCode && !isServerMode && provider?.requiresApiKey;
+      const isConfigured = needsApiKey ? settings.apiKey.trim() !== "" : true;
+
+      const modelId = isClaudeCode
+        ? "claude-code:default"
+        : `${settings.provider}:${settings.model}`;
 
       const settingsToSave = {
         ...settings,
         modelId,
         isConfigured,
+        apiKey: settings.apiKey,
       };
       await saveAISettings(settingsToSave);
       setSettings(settingsToSave);
