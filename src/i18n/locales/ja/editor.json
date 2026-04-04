@@ -48,6 +48,11 @@
       "description": "シンタックスハイライト付きコード",
       "aliases": "コード,code,pre,プログラム"
     },
+    "executableCodeBlock": {
+      "title": "実行可能コード",
+      "description": "Claude Code 経由でシェル/Python/JS を実行（デスクトップ）",
+      "aliases": "run,execute,terminal,notebook,claude,実行"
+    },
     "horizontalRule": {
       "title": "水平線",
       "description": "区切り線",
@@ -107,6 +112,33 @@
     "cancel": "キャンセル",
     "importing": "取り込み中...",
     "import": "取り込み"
+  },
+  "executableCode": {
+    "language": "言語",
+    "run": "実行",
+    "interpret": "Claude に解説",
+    "stdout": "標準出力",
+    "stderr": "標準エラー",
+    "duration": "{{seconds}} 秒",
+    "claudeUnavailable": "Claude Code を利用できません（デスクトップアプリと CLI のインストールが必要です）。",
+    "interpretationHeading": "Claude の解説",
+    "confirmTitle": "このコードを実行しますか？",
+    "confirmDescription": "Claude Code の Bash ツールにより、お使いのマシン上でコードが実行されます。信頼できるコードのみ実行してください。",
+    "confirmCancel": "キャンセル",
+    "confirmRun": "実行",
+    "status": {
+      "idle": "待機中",
+      "running": "実行中…",
+      "done": "実行完了",
+      "error": "エラー"
+    },
+    "lang": {
+      "bash": "Bash",
+      "shell": "Shell",
+      "python": "Python",
+      "javascript": "JavaScript",
+      "typescript": "TypeScript"
+    }
   },
   "markdownExport": {
     "sourceAttribution": "📎 引用元",

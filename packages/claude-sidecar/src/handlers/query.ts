@@ -52,9 +52,8 @@ function extractToolUseStart(
  * ストリームイベントから content_block_stop を検出する。
  */
 function isContentBlockStop(msg: SDKPartialAssistantMessage): boolean {
-  const ev = msg.event as unknown as Record<string, unknown> | undefined;
-  if (!ev || typeof ev !== "object") return false;
-  return ev.type === "content_block_stop";
+  const ev = msg.event as { type?: string } | undefined;
+  return ev?.type === "content_block_stop";
 }
 
 function isToolProgressMessage(msg: SDKMessage): msg is SDKToolProgressMessage {
@@ -156,7 +155,9 @@ export async function runQuery(params: {
         model: model || undefined,
         cwd: cwd ?? process.cwd(),
         maxTurns: maxTurns ?? 25,
-        allowedTools: allowedTools?.length ? allowedTools : [...DEFAULT_TOOLS],
+        // `undefined` → default tools; explicit `[]` → no tools (interpret-only queries).
+        // `undefined` → 既定ツール、明示的な `[]` → ツールなし（解説のみのクエリ等）。
+        allowedTools: allowedTools !== undefined ? allowedTools : [...DEFAULT_TOOLS],
         abortController,
         includePartialMessages: true,
         resume,

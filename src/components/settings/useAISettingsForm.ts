@@ -9,7 +9,7 @@ import {
   useServerModels,
 } from "./useAISettingsFormHelpers";
 import type { AIProviderType, AISettings, AIInteractionMode } from "@/types/ai";
-import { getInteractionMode } from "@/types/ai";
+import { DEFAULT_AI_SETTINGS, getInteractionMode } from "@/types/ai";
 
 /** Per-mode snapshot so switching modes does not lose provider/model/API key. / モード切替で値を失わないためのスナップショット */
 type ModeFieldsSnapshot = {
@@ -38,14 +38,17 @@ function buildInteractionModeUpdates(
 
   const snap = snapshotsRef.current[newMode];
 
+  const fallbackFromClaudeCode =
+    settings.provider === "claude-code" || settings.modelId.startsWith("claude-code:");
+
   switch (newMode) {
     case "default": {
       const base =
         snap ??
         ({
           provider: settings.provider === "claude-code" ? "google" : settings.provider,
-          model: settings.model,
-          modelId: settings.modelId,
+          model: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.model : settings.model,
+          modelId: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.modelId : settings.modelId,
           apiKey: "",
         } satisfies ModeFieldsSnapshot);
       return {
@@ -61,8 +64,8 @@ function buildInteractionModeUpdates(
         snap ??
         ({
           provider: settings.provider === "claude-code" ? "google" : settings.provider,
-          model: settings.model,
-          modelId: settings.modelId,
+          model: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.model : settings.model,
+          modelId: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.modelId : settings.modelId,
           apiKey: "",
         } satisfies ModeFieldsSnapshot);
       return {

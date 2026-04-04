@@ -54,11 +54,17 @@ export function loadGeneralSettings(): GeneralSettings {
         ? Math.min(24, Math.max(12, parsed.customFontSizePx))
         : undefined;
 
+    const executableCodeConfirmBeforeRun =
+      typeof parsed.executableCodeConfirmBeforeRun === "boolean"
+        ? parsed.executableCodeConfirmBeforeRun
+        : DEFAULT_GENERAL_SETTINGS.executableCodeConfirmBeforeRun;
+
     return {
       ...DEFAULT_GENERAL_SETTINGS,
       ...parsed,
       editorFontSize,
       customFontSizePx,
+      executableCodeConfirmBeforeRun,
     };
   } catch (error) {
     console.error("Failed to load general settings:", error);
