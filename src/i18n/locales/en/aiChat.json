@@ -21,7 +21,8 @@
     "copyCode": "Copy code",
     "copiedCode": "Copied",
     "insertToNote": "Insert to note",
-    "copyMessage": "Copy"
+    "copyMessage": "Copy",
+    "copyFailed": "Failed to copy"
   },
   "placeholders": {
     "default": "Type a message...",

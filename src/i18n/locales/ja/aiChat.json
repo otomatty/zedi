@@ -21,7 +21,8 @@
     "copyCode": "コードをコピー",
     "copiedCode": "コピーしました",
     "insertToNote": "ノートに挿入",
-    "copyMessage": "コピー"
+    "copyMessage": "コピー",
+    "copyFailed": "コピーに失敗しました"
   },
   "placeholders": {
     "default": "メッセージを入力...",

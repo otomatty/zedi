@@ -6,13 +6,13 @@ import { fetchServerModels } from "../../lib/aiService";
 import { getSonnetBaseline, formatCostMultiplierLabel } from "../../lib/aiCostUtils";
 import { loadAISettings } from "../../lib/aiSettings";
 import { isTauriDesktop } from "../../lib/platform";
-import type { AIModel, AIInteractionMode } from "../../types/ai";
+import type { AIModel, AIInteractionMode, AIProviderType } from "../../types/ai";
 import { getInteractionMode } from "../../types/ai";
 import { cn } from "@zedi/ui";
 
 interface DisplayModel {
   id: string;
-  provider: string;
+  provider: AIProviderType;
   modelId: string;
   displayName: string;
   inputCostUnits?: number;
@@ -144,7 +144,7 @@ export function AIChatModelSelector() {
     (model: DisplayModel) => {
       setSelectedModel({
         id: model.id,
-        provider: model.provider as "claude-code",
+        provider: model.provider,
         model: model.modelId,
         displayName: model.displayName,
         inputCostUnits: model.inputCostUnits,

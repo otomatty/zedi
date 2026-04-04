@@ -19,24 +19,13 @@ interface AIChatContextValue {
 const AIChatContext = createContext<AIChatContextValue | undefined>(undefined);
 
 /**
- *
+ * AIチャットコンテキストプロバイダー。ページ情報・挿入ハンドラを子孫に提供する。
+ * Provides page context, content-append handler, and insert-at-cursor handler to descendants.
  */
 export function AIChatProvider({ children }: { children: ReactNode }) {
-  /**
-   *
-   */
   const [pageContext, setPageContext] = useState<PageContext | null>(null);
-  /**
-   *
-   */
   const [aiChatAvailable, setAIChatAvailable] = useState(false);
-  /**
-   *
-   */
   const contentAppendHandlerRef = useRef<((nextContent: string) => void) | null>(null);
-  /**
-   *
-   */
   const insertAtCursorRef = useRef<((markdown: string) => boolean) | null>(null);
 
   return (
@@ -56,12 +45,10 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- *
+ * AIチャットコンテキストを取得するフック。AIChatProvider 内でのみ使用可能。
+ * Hook to access the AI chat context. Must be used within an AIChatProvider.
  */
 export function useAIChatContext() {
-  /**
-   *
-   */
   const context = useContext(AIChatContext);
   if (context === undefined) {
     throw new Error("useAIChatContext must be used within an AIChatProvider");

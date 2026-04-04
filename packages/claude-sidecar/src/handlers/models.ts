@@ -6,7 +6,8 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
 /**
- *
+ * SDK の initializationResult から取得する Claude モデル情報。
+ * Claude model info extracted from the SDK initialization result.
  */
 export interface ClaudeModelInfo {
   value: string;

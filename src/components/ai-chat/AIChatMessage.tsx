@@ -1,5 +1,7 @@
+import { useCallback } from "react";
 import { ClipboardPaste, Copy, Sparkles, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useToast } from "@zedi/ui";
 import { ChatMessage, ChatAction } from "../../types/aiChat";
 import { getDisplayContent } from "../../lib/aiChatActions";
 import { AIChatActionCard } from "./AIChatActionCard";
@@ -46,10 +48,23 @@ export function AIChatMessage({
   isStreaming = false,
 }: AIChatMessageProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const isUser = message.role === "user";
   const displayContent = isUser ? message.content : getDisplayContent(message.content);
   const showUserEdit = isUser && onEditMessage;
   const showInsertButton = !isUser && !message.isStreaming && onInsertToNote && displayContent;
+
+  const handleCopy = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast({ title: t("aiChat.actions.copiedCode") });
+      } catch {
+        toast({ title: t("aiChat.actions.copyFailed"), variant: "destructive" });
+      }
+    },
+    [t, toast],
+  );
 
   return (
     <div className={`mb-4 flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
@@ -141,7 +156,7 @@ export function AIChatMessage({
               <button
                 type="button"
                 className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors"
-                onClick={() => navigator.clipboard.writeText(displayContent)}
+                onClick={() => handleCopy(displayContent)}
                 title={t("aiChat.actions.copyMessage")}
               >
                 <Copy className="h-3 w-3" />

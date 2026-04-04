@@ -1,6 +1,8 @@
 import React from "react";
 import { Bot, Loader2, Trash2, Server, Key, Terminal } from "lucide-react";
 import { Button } from "@zedi/ui";
+import { RadioGroup, RadioGroupItem } from "@zedi/ui";
+import { Label } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
 import {
   AlertDialog,
@@ -182,6 +184,10 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
  * 3-mode segment control (Default / API Key / Claude Code).
  * 3モードセグメントコントロール。
  */
+/**
+ * 3 モードセグメントコントロール（RadioGroup ベース）。
+ * 3-mode segment control using RadioGroup for proper a11y semantics.
+ */
 function ModeSelector({
   value,
   onChange,
@@ -202,7 +208,7 @@ function ModeSelector({
     label: string;
     icon: React.ReactNode;
     description: string;
-    disabled?: boolean;
+    itemDisabled?: boolean;
   }> = [
     {
       id: "default",
@@ -224,42 +230,47 @@ function ModeSelector({
       label: t("aiSettings.modeClaudeCode"),
       icon: <Terminal className="h-4 w-4" />,
       description: t("aiSettings.modeClaudeCodeDescription"),
-      disabled: claudeCodeAvailable === false,
+      itemDisabled: claudeCodeAvailable === false,
     });
   }
 
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">{t("aiSettings.modeLabel")}</p>
-      <div className="grid gap-2">
+      <RadioGroup
+        value={value}
+        onValueChange={(v) => onChange(v as AIInteractionMode)}
+        className="grid gap-2"
+        disabled={disabled}
+      >
         {modes.map((mode) => {
           const isSelected = value === mode.id;
-          const isDisabled = disabled || mode.disabled;
           return (
-            <button
+            <div
               key={mode.id}
-              type="button"
-              disabled={isDisabled}
-              onClick={() => onChange(mode.id)}
               className={cn(
-                "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
+                "flex items-start gap-3 rounded-lg border p-3 transition-colors",
                 isSelected
                   ? "border-primary bg-primary/5"
-                  : isDisabled
-                    ? "border-border bg-muted/30 cursor-not-allowed opacity-60"
+                  : mode.itemDisabled
+                    ? "border-border bg-muted/30 opacity-60"
                     : "border-border hover:bg-muted/50",
               )}
             >
-              <div
-                className={cn(
-                  "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-                  isSelected ? "border-primary bg-primary" : "border-muted-foreground",
-                )}
-              >
-                {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
-              </div>
+              <RadioGroupItem
+                value={mode.id}
+                id={`mode-${mode.id}`}
+                disabled={disabled || mode.itemDisabled}
+                className="mt-0.5"
+              />
               <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-2">
+                <Label
+                  htmlFor={`mode-${mode.id}`}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2",
+                    mode.itemDisabled && "cursor-not-allowed",
+                  )}
+                >
                   {mode.icon}
                   <span className="text-sm font-medium">{mode.label}</span>
                   {mode.id === "claude_code" && claudeCodeAvailable === false && (
@@ -275,13 +286,13 @@ function ModeSelector({
                   {mode.id === "claude_code" && claudeCodeAvailable === null && (
                     <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
                   )}
-                </div>
+                </Label>
                 <p className="text-muted-foreground text-xs">{mode.description}</p>
               </div>
-            </button>
+            </div>
           );
         })}
-      </div>
+      </RadioGroup>
     </div>
   );
 }
