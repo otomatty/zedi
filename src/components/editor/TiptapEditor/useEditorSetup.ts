@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type MutableRefObject,
@@ -14,6 +15,15 @@ import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion"
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { createEditorExtensions, defaultEditorProps } from "./editorConfig";
 import type { TiptapEditorProps } from "./types";
+
+/** Keeps latest `workspaceRoot` in a ref without re-running `useEditor` (Issue #461). */
+function useWorkspaceRootRef(workspaceRoot: string | null) {
+  const r = useRef(workspaceRoot);
+  useLayoutEffect(() => {
+    r.current = workspaceRoot;
+  }, [workspaceRoot]);
+  return r;
+}
 
 interface UseEditorSetupOptions {
   content: TiptapEditorProps["content"];
@@ -43,13 +53,8 @@ interface UseEditorSetupOptions {
   workspaceRoot: string | null;
 }
 
-/**
- *
- */
+/** Tiptap `useEditor` wiring: extensions, collaboration, note `@file:` root (Issue #461). */
 export function useEditorSetup(options: UseEditorSetupOptions) {
-  /**
-   *
-   */
   const {
     content,
     onChange,
@@ -77,18 +82,9 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     workspaceRoot,
   } = options;
 
-  /**
-   *
-   */
   const isEditorInitializedRef = useRef(false);
-  /**
-   *
-   */
   const lastReportedContentRef = useRef<string | null>(null);
 
-  /**
-   *
-   */
   const initialParsedContent = useMemo(() => {
     if (!content) return undefined;
     try {
@@ -111,31 +107,22 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     });
   }, [content, initialParsedContent, onContentError]);
 
-  /**
-   *
-   */
   const useCollaborationMode = Boolean(
     collaborationConfig?.xmlFragment && collaborationConfig?.user,
   );
 
-  /**
-   *
-   */
   const slashStateRef = useRef(slashState);
-  /**
-   *
-   */
   const suggestionStateRef = useRef(suggestionState);
   useEffect(() => {
     slashStateRef.current = slashState;
     suggestionStateRef.current = suggestionState;
   }, [slashState, suggestionState]);
 
-  /**
-   *
-   */
+  const workspaceRootRef = useWorkspaceRootRef(workspaceRoot);
+
   const editor = useEditor(
     {
+      /* eslint-disable react-hooks/refs -- createEditorExtensions runs at render but refs are only read in ProseMirror/Tiptap handlers (not during render) */
       extensions: createEditorExtensions({
         placeholder,
         onLinkClick: handleLinkClick,
@@ -153,9 +140,6 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
           onCopyUrl: handleCopyImageUrl,
           getAuthenticatedImageUrl: async (url: string) => {
             try {
-              /**
-               *
-               */
               const r = await fetch(url, {
                 credentials: "include",
               });
@@ -176,9 +160,10 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
               }
             : undefined,
         fileReference: {
-          getWorkspaceRoot: () => workspaceRoot,
+          getWorkspaceRoot: () => workspaceRootRef.current,
         },
       }),
+      /* eslint-enable react-hooks/refs */
       content: useCollaborationMode ? undefined : initialParsedContent,
       autofocus: autoFocus ? "end" : false,
       editable: !isReadOnly,
@@ -204,9 +189,6 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
         if (initialParsedContent) isEditorInitializedRef.current = true;
       },
       onSelectionUpdate: ({ editor }) => {
-        /**
-         *
-         */
         const { from, to } = editor.state.selection;
         lastSelectionRef.current = { from, to };
         if (useCollaborationMode && collaborationConfig?.awareness) {
@@ -215,16 +197,14 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
         }
       },
     },
-    [pageId, useCollaborationMode, workspaceRoot],
+    [pageId, useCollaborationMode],
   );
 
   useEffect(() => {
     editorRef.current = editor;
   }, [editor, editorRef]);
 
-  /**
-   *
-   */
+  /** Inserts a Mermaid diagram at the current selection. / 現在の選択位置に Mermaid を挿入する。 */
   const handleInsertMermaid = useCallback(
     (code: string) => {
       if (!editor) return;

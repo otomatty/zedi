@@ -1,5 +1,4 @@
-import { useRef, useState, type MutableRefObject } from "react";
-import type { MutableRefObject, RefObject } from "react";
+import { useRef, useState, type MutableRefObject, type RefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";

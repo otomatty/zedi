@@ -17,7 +17,8 @@ const DEFAULT_NOTE_WORKSPACE_MAX_ENTRIES: u32 = 500;
 const HARD_MAX_NOTE_WORKSPACE_ENTRIES: u32 = 2000;
 
 /// Resolves `relative` under an already-canonicalized root (traversal-safe).
-/// 正規化済みルート配下に `relative` を解決する（トラバーサル対策）。
+/// Lexical joins first, then `canonicalize` on the resolved path or the longest existing prefix.
+/// 正規化済みルート配下に解決。字句結合後に終端または最長の存在接頭辞を `canonicalize`。
 pub(crate) fn resolve_under_root(root_canon: &PathBuf, relative: &str) -> Result<PathBuf, String> {
     let trimmed = relative.trim();
     if trimmed.is_empty() {
@@ -26,16 +27,7 @@ pub(crate) fn resolve_under_root(root_canon: &PathBuf, relative: &str) -> Result
     let mut acc = root_canon.clone();
     for comp in Path::new(trimmed).components() {
         match comp {
-            Component::Normal(c) => {
-                acc.push(c);
-                if acc.exists() {
-                    let canon = acc.canonicalize().map_err(|e| e.to_string())?;
-                    if !canon.starts_with(root_canon) {
-                        return Err("path outside workspace".into());
-                    }
-                    acc = canon;
-                }
-            }
+            Component::Normal(c) => acc.push(c),
             Component::ParentDir => {
                 acc.pop();
                 if !acc.starts_with(root_canon) {
@@ -54,6 +46,23 @@ pub(crate) fn resolve_under_root(root_canon: &PathBuf, relative: &str) -> Result
             return Err("path outside workspace".into());
         }
         return Ok(canon);
+    }
+    // Non-existent leaf: walk up to the longest existing prefix so symlink escapes are still detected.
+    let mut check = acc.clone();
+    loop {
+        if check.exists() {
+            let canon = check.canonicalize().map_err(|e| e.to_string())?;
+            if !canon.starts_with(root_canon) {
+                return Err("path outside workspace".into());
+            }
+            break;
+        }
+        if check == *root_canon {
+            break;
+        }
+        if !check.pop() {
+            break;
+        }
     }
     if !acc.starts_with(root_canon) {
         return Err("path outside workspace".into());
