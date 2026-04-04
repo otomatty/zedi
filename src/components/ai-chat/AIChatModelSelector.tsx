@@ -35,12 +35,15 @@ export function AIChatModelSelector() {
 
       if (currentMode === "claude_code") {
         setModels([]);
-        setSelectedModel({
-          id: "claude-code:default",
-          provider: "claude-code",
-          model: "default",
-          displayName: "Claude Code",
-        });
+        const current = useAIChatStore.getState().selectedModel;
+        if (current?.id !== "claude-code:default") {
+          setSelectedModel({
+            id: "claude-code:default",
+            provider: "claude-code",
+            model: "default",
+            displayName: "Claude Code",
+          });
+        }
         return;
       }
 
@@ -53,7 +56,8 @@ export function AIChatModelSelector() {
 
       setModels(available);
 
-      if (!selectedModel && available.length > 0) {
+      const current = useAIChatStore.getState().selectedModel;
+      if (!current && available.length > 0) {
         const savedModelId = settings?.modelId;
         const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
         const initial = matched ?? available[0];
@@ -73,7 +77,7 @@ export function AIChatModelSelector() {
     } finally {
       setLoading(false);
     }
-  }, [selectedModel, setSelectedModel]);
+  }, [setSelectedModel]);
 
   useEffect(() => {
     loadModels();
