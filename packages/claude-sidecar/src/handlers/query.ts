@@ -156,7 +156,9 @@ export async function runQuery(params: {
         model: model || undefined,
         cwd: cwd ?? process.cwd(),
         maxTurns: maxTurns ?? 25,
-        allowedTools: allowedTools?.length ? allowedTools : [...DEFAULT_TOOLS],
+        // `undefined` → default tools; explicit `[]` → no tools (interpret-only queries).
+        // `undefined` → 既定ツール、明示的な `[]` → ツールなし（解説のみのクエリ等）。
+        allowedTools: allowedTools !== undefined ? allowedTools : [...DEFAULT_TOOLS],
         abortController,
         includePartialMessages: true,
         resume,

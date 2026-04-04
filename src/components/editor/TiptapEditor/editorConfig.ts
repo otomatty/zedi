@@ -15,6 +15,7 @@ import { Color } from "@tiptap/extension-color";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import { common, createLowlight } from "lowlight";
 import { CodeBlockWithCopy } from "../extensions/CodeBlockWithCopyExtension";
+import { ExecutableCodeBlock } from "../extensions/ExecutableCodeBlockExtension";
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
@@ -165,6 +166,7 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       lowlight,
       defaultLanguage: null,
     }),
+    ExecutableCodeBlock,
     // --- Phase 2: Table ---
     Table.configure({
       resizable: false,

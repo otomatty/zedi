@@ -1,5 +1,8 @@
 import type { Editor } from "@tiptap/core";
 
+/**
+ *
+ */
 export interface SlashCommandItem {
   id: string;
   icon: string; // Lucide icon name
@@ -65,6 +68,14 @@ export const slashCommandItems: SlashCommandItem[] = [
     id: "codeBlock",
     icon: "Code2",
     action: (editor, range) => editor.chain().focus().deleteRange(range).setCodeBlock().run(),
+  },
+  {
+    id: "executableCodeBlock",
+    icon: "Terminal",
+    isAvailable: (editor) =>
+      !!editor.extensionManager.extensions.find((e) => e.name === "executableCodeBlock"),
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertExecutableCodeBlock().run(),
   },
   {
     id: "horizontalRule",

@@ -48,6 +48,11 @@
       "description": "Code with syntax highlighting",
       "aliases": "code,pre"
     },
+    "executableCodeBlock": {
+      "title": "Executable code",
+      "description": "Run shell/Python/JS via Claude Code (desktop)",
+      "aliases": "run,execute,terminal,notebook,claude"
+    },
     "horizontalRule": {
       "title": "Horizontal rule",
       "description": "Divider line",
@@ -107,6 +112,33 @@
     "cancel": "Cancel",
     "importing": "Importing...",
     "import": "Import"
+  },
+  "executableCode": {
+    "language": "Language",
+    "run": "Run",
+    "interpret": "Ask Claude",
+    "stdout": "stdout",
+    "stderr": "stderr",
+    "duration": "{{seconds}}s",
+    "claudeUnavailable": "Claude Code is not available (use the desktop app with the CLI installed).",
+    "interpretationHeading": "Claude interpretation",
+    "confirmTitle": "Run this code?",
+    "confirmDescription": "Code will be executed on your machine via Claude Code’s Bash tool. Only run snippets you trust.",
+    "confirmCancel": "Cancel",
+    "confirmRun": "Run",
+    "status": {
+      "idle": "Idle",
+      "running": "Running…",
+      "done": "Finished",
+      "error": "Error"
+    },
+    "lang": {
+      "bash": "Bash",
+      "shell": "Shell",
+      "python": "Python",
+      "javascript": "JavaScript",
+      "typescript": "TypeScript"
+    }
   },
   "markdownExport": {
     "sourceAttribution": "📎 Source",
