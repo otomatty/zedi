@@ -20,6 +20,39 @@ interface DisplayModel {
 }
 
 /**
+ * Resolves which Claude Code model to select after loading the list.
+ * 一覧取得後に選ぶ Claude Code モデルを解決する。
+ */
+function resolveClaudeInitialSelection(
+  claudeModels: DisplayModel[],
+  current: { id: string; provider: AIProviderType } | null,
+  savedModelId: string | undefined,
+): DisplayModel | undefined {
+  if (claudeModels.length === 0) return undefined;
+  const matchedCurrent =
+    current?.provider === "claude-code" ? claudeModels.find((m) => m.id === current.id) : undefined;
+  if (matchedCurrent) return undefined;
+  const matchedSaved = savedModelId ? claudeModels.find((m) => m.id === savedModelId) : undefined;
+  return matchedSaved ?? claudeModels[0];
+}
+
+/**
+ * Resolves which server model to select when the current store id is not in the list.
+ * ストアの選択が一覧に無いときに選ぶサーバーモデルを解決する。
+ */
+function resolveServerInitialSelection(
+  available: AIModel[],
+  current: { id: string } | null,
+  savedModelId: string | undefined,
+): AIModel | undefined {
+  if (available.length === 0) return undefined;
+  const matchedCurrent = current ? available.find((m) => m.id === current.id) : undefined;
+  if (matchedCurrent) return undefined;
+  const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
+  return matched ?? available[0];
+}
+
+/**
  * Chat-panel model selector. Behaviour varies by interaction mode:
  * - default: shows all available server models
  * - user_api_key: filters to the configured provider only
@@ -71,16 +104,14 @@ export function AIChatModelSelector() {
         setServerAIModels([]);
 
         const current = useAIChatStore.getState().selectedModel;
-        if (!current || current.provider !== "claude-code") {
-          const first = claudeModels[0];
-          if (first) {
-            setSelectedModel({
-              id: first.id,
-              provider: "claude-code",
-              model: first.modelId,
-              displayName: first.displayName,
-            });
-          }
+        const initial = resolveClaudeInitialSelection(claudeModels, current, settings?.modelId);
+        if (initial) {
+          setSelectedModel({
+            id: initial.id,
+            provider: "claude-code",
+            model: initial.modelId,
+            displayName: initial.displayName,
+          });
         }
         return;
       }
@@ -103,20 +134,16 @@ export function AIChatModelSelector() {
       );
 
       const current = useAIChatStore.getState().selectedModel;
-      if (!current && available.length > 0) {
-        const savedModelId = settings?.modelId;
-        const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
-        const initial = matched ?? available[0];
-        if (initial) {
-          setSelectedModel({
-            id: initial.id,
-            provider: initial.provider,
-            model: initial.modelId,
-            displayName: initial.displayName,
-            inputCostUnits: initial.inputCostUnits,
-            outputCostUnits: initial.outputCostUnits,
-          });
-        }
+      const initial = resolveServerInitialSelection(available, current, settings?.modelId);
+      if (initial) {
+        setSelectedModel({
+          id: initial.id,
+          provider: initial.provider,
+          model: initial.modelId,
+          displayName: initial.displayName,
+          inputCostUnits: initial.inputCostUnits,
+          outputCostUnits: initial.outputCostUnits,
+        });
       }
     } catch {
       // fallback: use settings model

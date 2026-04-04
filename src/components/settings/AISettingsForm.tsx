@@ -181,10 +181,6 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 };
 
 /**
- * 3-mode segment control (Default / API Key / Claude Code).
- * 3モードセグメントコントロール。
- */
-/**
  * 3 モードセグメントコントロール（RadioGroup ベース）。
  * 3-mode segment control using RadioGroup for proper a11y semantics.
  */
@@ -208,7 +204,6 @@ function ModeSelector({
     label: string;
     icon: React.ReactNode;
     description: string;
-    itemDisabled?: boolean;
   }> = [
     {
       id: "default",
@@ -230,14 +225,18 @@ function ModeSelector({
       label: t("aiSettings.modeClaudeCode"),
       icon: <Terminal className="h-4 w-4" />,
       description: t("aiSettings.modeClaudeCodeDescription"),
-      itemDisabled: claudeCodeAvailable === false,
     });
   }
 
+  const modeGroupId = "ai-settings-interaction-mode";
+
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{t("aiSettings.modeLabel")}</p>
+    <fieldset className="space-y-2 border-0 p-0">
+      <legend id={modeGroupId} className="text-sm font-medium">
+        {t("aiSettings.modeLabel")}
+      </legend>
       <RadioGroup
+        aria-labelledby={modeGroupId}
         value={value}
         onValueChange={(v) => onChange(v as AIInteractionMode)}
         className="grid gap-2"
@@ -250,26 +249,19 @@ function ModeSelector({
               key={mode.id}
               className={cn(
                 "flex items-start gap-3 rounded-lg border p-3 transition-colors",
-                isSelected
-                  ? "border-primary bg-primary/5"
-                  : mode.itemDisabled
-                    ? "border-border bg-muted/30 opacity-60"
-                    : "border-border hover:bg-muted/50",
+                isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
               )}
             >
               <RadioGroupItem
                 value={mode.id}
                 id={`mode-${mode.id}`}
-                disabled={disabled || mode.itemDisabled}
+                disabled={disabled}
                 className="mt-0.5"
               />
               <div className="flex-1 space-y-1">
                 <Label
                   htmlFor={`mode-${mode.id}`}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2",
-                    mode.itemDisabled && "cursor-not-allowed",
-                  )}
+                  className="flex cursor-pointer items-center gap-2"
                 >
                   {mode.icon}
                   <span className="text-sm font-medium">{mode.label}</span>
@@ -293,6 +285,6 @@ function ModeSelector({
           );
         })}
       </RadioGroup>
-    </div>
+    </fieldset>
   );
 }
