@@ -190,7 +190,7 @@ const NotePageView: React.FC = () => {
 
         <div className="min-h-0 flex-1 overflow-hidden">
           {canEdit ? (
-            <NoteWorkspaceProvider noteId={note.id}>
+            <NoteWorkspaceProvider key={note.id} noteId={note.id}>
               <NotePageEditorEditable
                 key={page.id}
                 noteId={note.id}

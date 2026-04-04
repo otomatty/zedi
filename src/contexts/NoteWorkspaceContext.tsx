@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -56,25 +57,33 @@ export function NoteWorkspaceProvider({
     readNoteWorkspacePath(noteId),
   );
 
+  /**
+   * Serialize Rust registry updates so async completions cannot apply out of order (Issue #461).
+   * Rust レジストリ更新を直列化し、非同期完了順の逆転で stale が残らないようにする（Issue #461）。
+   */
+  const rustRegistryQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const enqueueRustRegistrySync = useCallback((run: () => Promise<void>) => {
+    if (!isTauriDesktop()) return;
+    rustRegistryQueueRef.current = rustRegistryQueueRef.current.then(run).catch((e) => {
+      console.error("[NoteWorkspace] Rust registry sync failed", e);
+    });
+  }, []);
+
   useEffect(() => {
     setWorkspaceRootState(readNoteWorkspacePath(noteId));
   }, [noteId]);
 
   /** Keep Rust-side registry in sync with localStorage (trusted read/list in Tauri). */
   useEffect(() => {
-    if (!isTauriDesktop()) return;
-    void (async () => {
-      try {
-        if (workspaceRoot) {
-          await registerNoteWorkspaceRoot(noteId, workspaceRoot);
-        } else {
-          await clearNoteWorkspaceRoot(noteId);
-        }
-      } catch (e) {
-        console.error("[NoteWorkspace] Rust registry sync failed", e);
+    enqueueRustRegistrySync(async () => {
+      if (workspaceRoot) {
+        await registerNoteWorkspaceRoot(noteId, workspaceRoot);
+      } else {
+        await clearNoteWorkspaceRoot(noteId);
       }
-    })();
-  }, [noteId, workspaceRoot]);
+    });
+  }, [noteId, workspaceRoot, enqueueRustRegistrySync]);
 
   const setWorkspaceRoot = useCallback(
     (path: string) => {
@@ -82,27 +91,27 @@ export function NoteWorkspaceProvider({
       if (!normalized) {
         clearNoteWorkspacePath(noteId);
         setWorkspaceRootState(null);
-        void clearNoteWorkspaceRoot(noteId).catch((e) => {
-          console.error("[NoteWorkspace] clearNoteWorkspaceRoot failed", e);
+        enqueueRustRegistrySync(async () => {
+          await clearNoteWorkspaceRoot(noteId);
         });
         return;
       }
       writeNoteWorkspacePath(noteId, normalized);
       setWorkspaceRootState(normalized);
-      void registerNoteWorkspaceRoot(noteId, normalized).catch((e) => {
-        console.error("[NoteWorkspace] registerNoteWorkspaceRoot failed", e);
+      enqueueRustRegistrySync(async () => {
+        await registerNoteWorkspaceRoot(noteId, normalized);
       });
     },
-    [noteId],
+    [noteId, enqueueRustRegistrySync],
   );
 
   const clearWorkspace = useCallback(() => {
     clearNoteWorkspacePath(noteId);
     setWorkspaceRootState(null);
-    void clearNoteWorkspaceRoot(noteId).catch((e) => {
-      console.error("[NoteWorkspace] clearNoteWorkspaceRoot failed", e);
+    enqueueRustRegistrySync(async () => {
+      await clearNoteWorkspaceRoot(noteId);
     });
-  }, [noteId]);
+  }, [noteId, enqueueRustRegistrySync]);
 
   const pickWorkspace = useCallback(async () => {
     const path = await pickNoteWorkspaceDirectory();
