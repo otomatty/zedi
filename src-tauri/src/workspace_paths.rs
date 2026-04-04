@@ -43,12 +43,6 @@ fn atomic_write_file(path: &Path, contents: &[u8]) -> Result<(), String> {
         .ok_or_else(|| "registry path has no parent".to_string())?;
     let tmp_path = parent.join(tmp_name);
     fs::write(&tmp_path, contents).map_err(|e| e.to_string())?;
-    #[cfg(windows)]
-    {
-        if path.exists() {
-            fs::remove_file(path).map_err(|e| e.to_string())?;
-        }
-    }
     fs::rename(&tmp_path, path).map_err(|e| e.to_string())
 }
 
@@ -261,7 +255,7 @@ pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<Stri
     if !target.is_dir() {
         return Ok(vec![]);
     }
-    list_directory_names(&target, DEFAULT_NOTE_WORKSPACE_MAX_ENTRIES)
+    list_directory_names(&target, DEFAULT_NOTE_WORKSPACE_MAX_ENTRIES, None)
 }
 
 /// Reads a UTF-8 text file under the registered workspace for `note_id`; size-capped via one handle.
@@ -275,12 +269,15 @@ pub fn read_note_workspace_file(note_id: String, relative_path: String) -> Resul
 }
 
 /// Lists names in `relative_dir` under the registered workspace for `note_id`.
+/// Optional `name_prefix` filters case-insensitively before the entry cap (large-dir completions).
 /// 登録済み `note_id` のワークスペース配下で `relative_dir` を列挙する。
+/// `name_prefix` は上限適用前に大小無視で絞り込み（大きいディレクトリの補完向け）。
 #[tauri::command]
 pub fn list_note_workspace_entries(
     note_id: String,
     relative_dir: String,
     max_entries: Option<u32>,
+    name_prefix: Option<String>,
 ) -> Result<Vec<String>, String> {
     let note_id = parse_note_id_key(note_id)?;
     let cap = max_entries
@@ -296,28 +293,43 @@ pub fn list_note_workspace_entries(
     if !target.is_dir() {
         return Ok(vec![]);
     }
-    list_directory_names(&target, cap)
+    let prefix = name_prefix
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    list_directory_names(&target, cap, prefix)
 }
 
-fn list_directory_names(target: &Path, max_entries: u32) -> Result<Vec<String>, String> {
+/// Lists entry display names (file name or `name/` for dirs), optional case-insensitive prefix, then sort and cap.
+/// エントリ名を列挙し、任意のプレフィックス（大小無視）で絞ってからソートして上限適用。
+fn list_directory_names(
+    target: &Path,
+    max_entries: u32,
+    name_prefix: Option<&str>,
+) -> Result<Vec<String>, String> {
+    let prefix_lower = name_prefix.map(|s| s.to_lowercase());
     let mut out: Vec<String> = Vec::new();
     for entry in fs::read_dir(target).map_err(|e| e.to_string())? {
-        if out.len() >= max_entries as usize {
-            break;
-        }
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name().to_string_lossy().to_string();
         if name.starts_with('.') {
             continue;
         }
         let is_dir = entry.file_type().map_err(|e| e.to_string())?.is_dir();
-        out.push(if is_dir {
+        let display = if is_dir {
             format!("{name}/")
         } else {
             name
-        });
+        };
+        if let Some(ref pl) = prefix_lower {
+            if !display.to_lowercase().starts_with(pl.as_str()) {
+                continue;
+            }
+        }
+        out.push(display);
     }
     out.sort();
+    out.truncate(max_entries as usize);
     Ok(out)
 }
 

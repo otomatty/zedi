@@ -189,8 +189,8 @@ const NotePageView: React.FC = () => {
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden">
-          {canEdit ? (
-            <NoteWorkspaceProvider key={note.id} noteId={note.id}>
+          <NoteWorkspaceProvider key={note.id} noteId={note.id}>
+            {canEdit ? (
               <NotePageEditorEditable
                 key={page.id}
                 noteId={note.id}
@@ -198,23 +198,23 @@ const NotePageView: React.FC = () => {
                 collaboration={collaboration}
                 isCollaborationEnabled={isCollaborationEnabled}
               />
-            </NoteWorkspaceProvider>
-          ) : (
-            <PageEditorContent
-              content={page?.content ?? ""}
-              title={page.title}
-              sourceUrl={page.sourceUrl}
-              currentPageId={page.id}
-              pageId={page.id}
-              isNewPage={false}
-              isWikiGenerating={false}
-              isReadOnly={true}
-              showLinkedPages={false}
-              showToolbar={false}
-              onContentChange={() => undefined}
-              onContentError={() => undefined}
-            />
-          )}
+            ) : (
+              <PageEditorContent
+                content={page?.content ?? ""}
+                title={page.title}
+                sourceUrl={page.sourceUrl}
+                currentPageId={page.id}
+                pageId={page.id}
+                isNewPage={false}
+                isWikiGenerating={false}
+                isReadOnly={true}
+                showLinkedPages={false}
+                showToolbar={false}
+                onContentChange={() => undefined}
+                onContentError={() => undefined}
+              />
+            )}
+          </NoteWorkspaceProvider>
         </div>
       </div>
     </AppLayout>

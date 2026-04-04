@@ -64,11 +64,15 @@ export async function listNoteWorkspaceEntries(
   noteId: string,
   relativeDir: string,
   maxEntries?: number,
+  /** Filter names before the cap (case-insensitive prefix); Issue #461 path completion. */
+  namePrefix?: string,
 ): Promise<string[]> {
   if (!isTauriDesktop()) return [];
+  const trimmed = namePrefix?.trim();
   return await invoke<string[]>("list_note_workspace_entries", {
     noteId,
     relativeDir: relativeDir.replace(/\\/g, "/"),
     maxEntries: maxEntries ?? null,
+    namePrefix: trimmed && trimmed.length > 0 ? trimmed : null,
   });
 }

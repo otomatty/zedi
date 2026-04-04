@@ -49,14 +49,15 @@ export function useWorkspacePathCompletions(
     let cancelled = false;
     const t = window.setTimeout(() => {
       const promise = noteWorkspaceNoteId
-        ? listNoteWorkspaceEntries(noteWorkspaceNoteId, dir)
-        : listWorkspaceDirectoryEntries(dir);
+        ? listNoteWorkspaceEntries(noteWorkspaceNoteId, dir, 40, filePrefix)
+        : listWorkspaceDirectoryEntries(dir).then((names) => {
+            const fp = filePrefix.toLowerCase();
+            return fp ? names.filter((n) => n.toLowerCase().startsWith(fp)) : names;
+          });
       void promise
         .then((names) => {
           if (cancelled) return;
-          const fp = filePrefix.toLowerCase();
-          const filtered = fp ? names.filter((n) => n.toLowerCase().startsWith(fp)) : names;
-          setItems(filtered.slice(0, 40));
+          setItems(names.slice(0, 40));
         })
         .catch((err: unknown) => {
           if (cancelled) return;
