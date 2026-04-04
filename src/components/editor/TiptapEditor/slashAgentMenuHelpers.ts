@@ -37,8 +37,17 @@ export function filterAgentSlashItems(query: string, t: TFunction): AgentSlashCo
     const aliasesStr = t(`editor.slash.${def.id}.aliases`);
     const aliases = aliasesStr ? aliasesStr.split(",").map((s) => s.trim().toLowerCase()) : [];
     let ok = false;
-    if (title.includes(q)) ok = true;
-    else if (aliases.some((a) => a.includes(q) || q.includes(a))) ok = true;
+    if (firstToken && title.includes(firstToken)) ok = true;
+    else if (
+      firstToken &&
+      aliases.some(
+        (a) =>
+          (firstToken.length >= 2 && a.includes(firstToken)) ||
+          firstToken.startsWith(a) ||
+          a.startsWith(firstToken),
+      )
+    )
+      ok = true;
     else if (def.prefix.startsWith(firstToken) || firstToken.startsWith(def.prefix)) ok = true;
     else if (def.aliases?.some((a) => a.startsWith(firstToken) || firstToken.startsWith(a)))
       ok = true;

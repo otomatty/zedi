@@ -50,7 +50,7 @@ export function buildAgentSlashPrompt(
       return buildSummarizePrompt(editor, captures);
     default: {
       const _exhaustive: never = id;
-      return String(_exhaustive);
+      throw new Error(`Unhandled agent slash command: ${String(_exhaustive)}`);
     }
   }
 }

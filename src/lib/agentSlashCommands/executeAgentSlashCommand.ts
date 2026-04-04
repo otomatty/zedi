@@ -14,6 +14,10 @@ import {
 import { getSlashAgentCommandHook } from "./hook";
 import { insertSlashAgentMarkdownAt } from "./insertSlashAgentMarkdown";
 import { readSlashAgentInsertPosition } from "./insertPosition";
+import {
+  clearLastSlashAgentSelection,
+  getLastSlashAgentSelection,
+} from "./slashAgentSelectionCache";
 import type { AgentSlashCommandId } from "./types";
 import { AGENT_SLASH_PREFIXES, resolveArgsForSelectedAgent } from "./parseAgentSlashQuery";
 
@@ -34,8 +38,11 @@ export async function executeAgentSlashCommand(options: {
   const prefix = meta?.prefix ?? "";
   const args = resolveArgsForSelectedAgent(prefix, meta?.aliases, query);
 
-  const insertAt = range.from;
-  const selectionText = getEditorSelectionText(editor);
+  const liveSelection = getEditorSelectionText(editor);
+  const selectionText =
+    commandId === "agent-explain"
+      ? liveSelection || getLastSlashAgentSelection(editor)
+      : liveSelection;
   const plainText = getEditorPlainText(editor);
 
   const hook = getSlashAgentCommandHook();
@@ -43,7 +50,14 @@ export async function executeAgentSlashCommand(options: {
     const hooked = await hook({ commandId, args, query, editor });
     if (hooked) {
       editor.chain().focus().deleteRange(range).run();
-      insertSlashAgentMarkdownAt(editor, insertAt, hooked.markdown, readSlashAgentInsertPosition());
+      const insertPos = editor.state.selection.from;
+      insertSlashAgentMarkdownAt(
+        editor,
+        insertPos,
+        hooked.markdown,
+        readSlashAgentInsertPosition(),
+      );
+      if (commandId === "agent-explain") clearLastSlashAgentSelection(editor);
       return null;
     }
   }
@@ -55,10 +69,11 @@ export async function executeAgentSlashCommand(options: {
   const result = await runClaudeQueryToCompletion(prompt, claudeOpts, signal);
 
   if (!result.ok) {
+    const insertPos = editor.state.selection.from;
     editor
       .chain()
       .focus()
-      .insertContentAt(insertAt, {
+      .insertContentAt(insertPos, {
         type: "paragraph",
         content: [{ type: "text", text: `Claude Code: ${result.error}` }],
       })
@@ -66,6 +81,8 @@ export async function executeAgentSlashCommand(options: {
     return result.error;
   }
 
-  insertSlashAgentMarkdownAt(editor, insertAt, result.content, readSlashAgentInsertPosition());
+  const insertPos = editor.state.selection.from;
+  insertSlashAgentMarkdownAt(editor, insertPos, result.content, readSlashAgentInsertPosition());
+  if (commandId === "agent-explain") clearLastSlashAgentSelection(editor);
   return null;
 }

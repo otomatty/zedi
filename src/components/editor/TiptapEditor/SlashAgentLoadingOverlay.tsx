@@ -3,7 +3,7 @@
  * Claude Code スラッシュ実行中のオーバーレイ。
  */
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
 interface SlashAgentLoadingOverlayProps {
@@ -16,11 +16,24 @@ interface SlashAgentLoadingOverlayProps {
  * エージェント実行中はエディタ操作をブロックする表示。
  */
 export function SlashAgentLoadingOverlay({ label }: SlashAgentLoadingOverlayProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    rootRef.current?.focus({ preventScroll: true });
+  }, []);
+
   return (
     <div
-      className="bg-background/80 absolute inset-0 z-40 flex items-center justify-center"
+      ref={rootRef}
+      tabIndex={-1}
+      className="bg-background/80 absolute inset-0 z-40 flex items-center justify-center outline-none"
       aria-busy="true"
       aria-live="polite"
+      role="presentation"
+      onKeyDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     >
       <div className="border-border bg-popover text-foreground flex items-center gap-2 rounded-lg border px-4 py-3 shadow-md">
         <Loader2 className="h-5 w-5 animate-spin" aria-hidden />

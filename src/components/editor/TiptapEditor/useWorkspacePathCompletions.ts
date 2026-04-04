@@ -42,12 +42,16 @@ export function useWorkspacePathCompletions(args: string, enabled: boolean): str
     const { dir, filePrefix } = parsePathCompletionArgs(args);
     let cancelled = false;
     const t = window.setTimeout(() => {
-      void listWorkspaceDirectoryEntries(dir).then((names) => {
-        if (cancelled) return;
-        const fp = filePrefix.toLowerCase();
-        const filtered = fp ? names.filter((n) => n.toLowerCase().startsWith(fp)) : names;
-        setItems(filtered.slice(0, 40));
-      });
+      void listWorkspaceDirectoryEntries(dir)
+        .then((names) => {
+          if (cancelled) return;
+          const fp = filePrefix.toLowerCase();
+          const filtered = fp ? names.filter((n) => n.toLowerCase().startsWith(fp)) : names;
+          setItems(filtered.slice(0, 40));
+        })
+        .catch(() => {
+          if (!cancelled) setItems([]);
+        });
     }, 120);
     return () => {
       cancelled = true;
