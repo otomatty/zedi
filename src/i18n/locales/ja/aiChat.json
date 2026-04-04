@@ -86,6 +86,13 @@
     "messages": "メッセージ一覧がここに表示されます",
     "pageConversations": "このページの会話履歴はまだありません"
   },
+  "mode": {
+    "default": "サーバー",
+    "apiKey": "APIキー",
+    "apiKeyWithProvider": "APIキー: {{provider}}",
+    "claudeCode": "Claude Code",
+    "openSettings": "AI設定を開く"
+  },
   "modelSelector": {
     "select": "モデルを選択",
     "tooltip": "AIモデルを切り替え",

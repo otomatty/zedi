@@ -86,6 +86,13 @@
     "messages": "Messages will appear here",
     "pageConversations": "No conversation history for this page yet"
   },
+  "mode": {
+    "default": "Server",
+    "apiKey": "API Key",
+    "apiKeyWithProvider": "API Key: {{provider}}",
+    "claudeCode": "Claude Code",
+    "openSettings": "Open AI settings"
+  },
   "modelSelector": {
     "select": "Select model",
     "tooltip": "Switch AI model",

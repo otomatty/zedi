@@ -1,81 +1,62 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronDown, Check, Loader2 } from "lucide-react";
+import { ChevronDown, Check, Loader2, Terminal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { fetchServerModels } from "../../lib/aiService";
 import { getSonnetBaseline, formatCostMultiplierLabel } from "../../lib/aiCostUtils";
 import { loadAISettings } from "../../lib/aiSettings";
-import type { AIModel } from "../../types/ai";
+import type { AIModel, AIInteractionMode } from "../../types/ai";
+import { getInteractionMode } from "../../types/ai";
 import { cn } from "@zedi/ui";
 
 /**
+ * Chat-panel model selector. Behaviour varies by interaction mode:
+ * - default: shows all available server models
+ * - user_api_key: filters to the configured provider only
+ * - claude_code: renders a static "Claude Code" label (no dropdown)
  *
+ * チャットパネルのモデルセレクター。利用モードに応じて動作が変わる。
  */
 export function AIChatModelSelector() {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const { selectedModel, setSelectedModel, isStreaming } = useAIChatStore();
-  /**
-   *
-   */
   const [models, setModels] = useState<AIModel[]>([]);
-  /**
-   *
-   */
   const [loading, setLoading] = useState(false);
-  /**
-   *
-   */
   const [open, setOpen] = useState(false);
-  /**
-   *
-   */
+  const [mode, setMode] = useState<AIInteractionMode>("default");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // モデル一覧をロード
-  /**
-   *
-   */
   const loadModels = useCallback(async () => {
     setLoading(true);
     try {
-      /**
-       *
-       */
+      const settings = await loadAISettings();
+      const currentMode = settings ? getInteractionMode(settings) : "default";
+      setMode(currentMode);
+
+      if (currentMode === "claude_code") {
+        setModels([]);
+        setSelectedModel({
+          id: "claude-code:default",
+          provider: "claude-code",
+          model: "default",
+          displayName: "Claude Code",
+        });
+        return;
+      }
+
       const { models: serverModels } = await fetchServerModels();
-      /**
-       *
-       */
-      const available = serverModels.filter((m) => m.available);
+      let available = serverModels.filter((m) => m.available);
+
+      if (currentMode === "user_api_key" && settings) {
+        available = available.filter((m) => m.provider === settings.provider);
+      }
+
       setModels(available);
 
-      // 初回: selectedModel がまだ null なら設定画面のモデル or デフォルトを選択
       if (!selectedModel && available.length > 0) {
-        /**
-         *
-         */
-        const settings = await loadAISettings();
-        /**
-         *
-         */
         const savedModelId = settings?.modelId;
-        /**
-         *
-         */
         const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
-        /**
-         *
-         */
-        const first = available[0];
-        /**
-         *
-         */
-        const initial = matched ?? first;
+        const initial = matched ?? available[0];
         if (initial) {
           setSelectedModel({
             id: initial.id,
@@ -88,7 +69,7 @@ export function AIChatModelSelector() {
         }
       }
     } catch {
-      // フォールバック: 設定画面のモデルを使用
+      // fallback: use settings model
     } finally {
       setLoading(false);
     }
@@ -98,12 +79,8 @@ export function AIChatModelSelector() {
     loadModels();
   }, [loadModels]);
 
-  // 外部クリックで閉じる
   useEffect(() => {
     if (!open) return;
-    /**
-     *
-     */
     const handleClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -113,9 +90,6 @@ export function AIChatModelSelector() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  /**
-   *
-   */
   const handleSelect = useCallback(
     (model: AIModel) => {
       setSelectedModel({
@@ -131,18 +105,17 @@ export function AIChatModelSelector() {
     [setSelectedModel],
   );
 
-  /**
-   *
-   */
-  const displayLabel = selectedModel?.displayName ?? t("aiChat.modelSelector.select");
+  if (mode === "claude_code") {
+    return (
+      <div className="inline-flex items-center gap-1 px-2 py-1 text-xs">
+        <Terminal className="h-3 w-3" />
+        <span className="text-muted-foreground">Claude Code</span>
+      </div>
+    );
+  }
 
-  /**
-   *
-   */
+  const displayLabel = selectedModel?.displayName ?? t("aiChat.modelSelector.select");
   const sonnetBaseline = getSonnetBaseline(models);
-  /**
-   *
-   */
   const getCostLabel = (model: AIModel) =>
     formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
 
@@ -173,17 +146,8 @@ export function AIChatModelSelector() {
       {open && models.length > 0 && (
         <div className="border-border bg-popover absolute bottom-full left-0 z-50 mb-1 max-h-[280px] max-w-[320px] min-w-[240px] overflow-hidden overflow-y-auto rounded-lg border shadow-lg">
           {models.map((model) => {
-            /**
-             *
-             */
             const isSelected = selectedModel?.id === model.id;
-            /**
-             *
-             */
             const costLabel = getCostLabel(model);
-            /**
-             *
-             */
             const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
             return (
               <button

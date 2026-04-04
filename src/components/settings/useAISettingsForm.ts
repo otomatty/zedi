@@ -8,7 +8,8 @@ import {
   useClaudeCodeAvailability,
   useServerModels,
 } from "./useAISettingsFormHelpers";
-import type { AISettings } from "@/types/ai";
+import type { AISettings, AIInteractionMode } from "@/types/ai";
+import { getInteractionMode } from "@/types/ai";
 
 /**
  * Custom hook for AI settings form state and actions.
@@ -41,9 +42,10 @@ export function useAISettingsForm() {
     load: loadServerModels,
   } = useServerModels();
 
-  const useOwnKey = !isLoading && settings.apiMode === "user_api_key";
-  const isClaudeCode = settings.provider === "claude-code";
-  const isServerMode = settings.apiMode === "api_server" && !useOwnKey && !isClaudeCode;
+  const interactionMode: AIInteractionMode = isLoading ? "default" : getInteractionMode(settings);
+  const isServerMode = interactionMode === "default";
+  const isClaudeCode = interactionMode === "claude_code";
+  const useOwnKey = interactionMode === "user_api_key";
 
   useEffect(() => {
     if (isServerMode) {
@@ -71,11 +73,37 @@ export function useAISettingsForm() {
     [clearSavedIndicator, updateSettingsBase, scheduleSave],
   );
 
-  const handleToggleOwnKey = useCallback(
-    (checked: boolean) => {
-      updateSettings({ apiMode: checked ? "user_api_key" : "api_server" });
+  /**
+   * 利用モードを切り替える。設定を適切にリセットして保存する。
+   * Switches the interaction mode with appropriate settings reset.
+   */
+  const handleModeChange = useCallback(
+    (newMode: AIInteractionMode) => {
+      switch (newMode) {
+        case "default":
+          updateSettings({
+            provider: settings.provider === "claude-code" ? "google" : settings.provider,
+            apiMode: "api_server",
+            apiKey: "",
+          });
+          break;
+        case "user_api_key":
+          updateSettings({
+            provider: settings.provider === "claude-code" ? "google" : settings.provider,
+            apiMode: "user_api_key",
+          });
+          break;
+        case "claude_code":
+          updateSettings({
+            provider: "claude-code",
+            apiMode: "api_server",
+            model: "default",
+            modelId: "claude-code:default",
+          });
+          break;
+      }
     },
-    [updateSettings],
+    [settings.provider, updateSettings],
   );
 
   const handleTest = useCallback(async () => {
@@ -130,10 +158,11 @@ export function useAISettingsForm() {
     serverModelsError,
     isServerMode,
     isClaudeCode,
+    interactionMode,
     claudeCodeAvailable,
     loadServerModels,
     updateSettings,
-    handleToggleOwnKey,
+    handleModeChange,
     handleServerModelSelect,
     handleTest,
     handleReset,

@@ -17,6 +17,11 @@ interface ProviderSelectorProps {
    * Claude Code availability (injected from parent).
    */
   claudeCodeAvailable?: boolean | null;
+  /**
+   * true のとき API プロバイダー（openai / anthropic / google）のみ表示する。
+   * When true, only show API providers (hide claude-code).
+   */
+  apiProvidersOnly?: boolean;
 }
 
 /**
@@ -28,9 +33,11 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   onChange,
   disabled = false,
   claudeCodeAvailable,
+  apiProvidersOnly = false,
 }) => {
   const { t } = useTranslation();
-  const providers = getVisibleProviders();
+  const allProviders = getVisibleProviders();
+  const providers = apiProvidersOnly ? allProviders.filter((p) => !p.desktopOnly) : allProviders;
 
   return (
     <div className="space-y-2">

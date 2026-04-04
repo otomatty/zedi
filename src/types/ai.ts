@@ -9,6 +9,12 @@ export type AIProviderType = "openai" | "anthropic" | "google" | "claude-code";
 /** User API key vs Zedi server API. */
 export type APIMode = "user_api_key" | "api_server";
 
+/**
+ * 利用モードの論理的な 3 分類。`AISettings` の `provider` + `apiMode` から導出する。
+ * Logical interaction mode derived from `AISettings.provider` + `apiMode`.
+ */
+export type AIInteractionMode = "default" | "user_api_key" | "claude_code";
+
 /** Subscription tier for model access. */
 export type UserTier = "free" | "pro";
 
@@ -226,4 +232,14 @@ export function getDefaultModel(provider: AIProviderType): string {
 export function getDefaultModels(provider: AIProviderType): string[] {
   const providerInfo = getProviderById(provider);
   return providerInfo?.defaultModels ?? [];
+}
+
+/**
+ * `AISettings` から論理的な利用モードを導出する。
+ * Derives the logical interaction mode from settings.
+ */
+export function getInteractionMode(settings: AISettings): AIInteractionMode {
+  if (settings.provider === "claude-code") return "claude_code";
+  if (settings.apiMode === "user_api_key") return "user_api_key";
+  return "default";
 }

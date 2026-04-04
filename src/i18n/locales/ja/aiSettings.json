@@ -44,5 +44,12 @@
   "claudeCodeDescription": "ファイル操作やコマンド実行など、高度な機能を持つ AI アシスタントです。",
   "providerUnavailable": "利用不可",
   "providerAvailable": "利用可能",
-  "checkingAvailability": "確認中..."
+  "checkingAvailability": "確認中...",
+  "modeLabel": "利用モード",
+  "modeDefault": "デフォルト（サーバー経由）",
+  "modeDefaultDescription": "Zedi の AI サーバー経由で利用します。APIキーは不要です。",
+  "modeApiKey": "自分のAPIキーを使用",
+  "modeApiKeyDescription": "自分のAPIキーを設定し、制限なくすべてのモデルを利用できます。",
+  "modeClaudeCode": "Claude Code",
+  "modeClaudeCodeDescription": "Claude Code エージェントを使用します（デスクトップアプリ専用）。"
 }

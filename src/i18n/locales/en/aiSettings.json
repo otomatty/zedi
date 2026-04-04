@@ -44,5 +44,12 @@
   "claudeCodeDescription": "An AI assistant with advanced capabilities including file operations and command execution.",
   "providerUnavailable": "Unavailable",
   "providerAvailable": "Available",
-  "checkingAvailability": "Checking..."
+  "checkingAvailability": "Checking...",
+  "modeLabel": "Mode",
+  "modeDefault": "Default (via server)",
+  "modeDefaultDescription": "Uses Zedi's AI server. No API key required.",
+  "modeApiKey": "Use your own API key",
+  "modeApiKeyDescription": "Set your own API key to use all models without limits.",
+  "modeClaudeCode": "Claude Code",
+  "modeClaudeCodeDescription": "Use the Claude Code agent (desktop app only)."
 }
