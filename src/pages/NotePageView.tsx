@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 import { useAIChatContext } from "@/contexts/AIChatContext";
+import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { Page } from "@/types/page";
 
@@ -34,7 +35,8 @@ function NotePageEditorEditable({
   isCollaborationEnabled: boolean;
 }) {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
-  const { setPageContext, contentAppendHandlerRef } = useAIChatContext();
+  const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
+  const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
 
   useEffect(() => {
     setPageContext({
@@ -57,6 +59,22 @@ function NotePageEditorEditable({
     };
   }, [contentAppendHandlerRef]);
 
+  useEffect(() => {
+    insertAtCursorRef.current = (markdown: string) => {
+      if (!editorInsertRef.current) return false;
+      try {
+        const docJson = convertMarkdownToTiptapContent(markdown);
+        const doc = JSON.parse(docJson) as { content: unknown[] };
+        return editorInsertRef.current(doc.content);
+      } catch {
+        return false;
+      }
+    };
+    return () => {
+      insertAtCursorRef.current = null;
+    };
+  }, [insertAtCursorRef]);
+
   return (
     <ContentWithAIChat>
       <PageEditorContent
@@ -73,6 +91,7 @@ function NotePageEditorEditable({
         onContentChange={setEditorContent}
         onContentError={() => undefined}
         collaboration={isCollaborationEnabled ? collaboration : undefined}
+        insertAtCursorRef={editorInsertRef}
       />
     </ContentWithAIChat>
   );

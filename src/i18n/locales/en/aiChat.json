@@ -19,7 +19,9 @@
     "createMultiple": "Create All",
     "addLink": "Add Link",
     "copyCode": "Copy code",
-    "copiedCode": "Copied"
+    "copiedCode": "Copied",
+    "insertToNote": "Insert to note",
+    "copyMessage": "Copy"
   },
   "placeholders": {
     "default": "Type a message...",
@@ -59,7 +61,9 @@
     "pageBodyGenerateFailed": "Failed to generate page content",
     "wikiLinksAdded": "Added {{count}} wiki links",
     "noNewWikiLinks": "There are no new wiki links to add",
-    "actionFailed": "Failed to execute the action"
+    "actionFailed": "Failed to execute the action",
+    "insertSuccess": "Inserted into note",
+    "insertUnavailable": "No editor available for insertion"
   },
   "messages": {
     "loadingSkeleton": "Loading response"
@@ -104,6 +108,15 @@
     "deleteConfirmDescription": "This cannot be undone.",
     "openMenu": "Open menu",
     "empty": "No conversations yet"
+  },
+  "toolStatus": {
+    "read": "Reading file",
+    "write": "Writing file",
+    "bash": "Running command",
+    "webSearch": "Searching web",
+    "glob": "Searching files",
+    "grep": "Searching text",
+    "ls": "Listing directory"
   },
   "referencedPages": {
     "added": "Added \"{{title}}\" as reference",

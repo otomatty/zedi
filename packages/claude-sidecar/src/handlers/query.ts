@@ -9,6 +9,7 @@ import type {
   SDKMessage,
   SDKPartialAssistantMessage,
   SDKResultMessage,
+  SDKToolProgressMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { SidecarResponse } from "../protocol";
 import { formatResponseLine } from "../protocol";
@@ -27,6 +28,37 @@ function extractTextDelta(msg: SDKPartialAssistantMessage): string | null {
   if (!delta || delta.type !== "text_delta") return null;
   const text = delta.text;
   return typeof text === "string" ? text : null;
+}
+
+/**
+ * Detects a tool_use content_block_start from a stream event.
+ * ストリームイベントから tool_use の content_block_start を検出する。
+ */
+function extractToolUseStart(
+  msg: SDKPartialAssistantMessage,
+): { name: string; input: string } | null {
+  const ev = msg.event as unknown as Record<string, unknown> | undefined;
+  if (!ev || typeof ev !== "object") return null;
+  if (ev.type !== "content_block_start") return null;
+  const block = ev.content_block as Record<string, unknown> | undefined;
+  if (!block || block.type !== "tool_use") return null;
+  const name = typeof block.name === "string" ? block.name : "unknown";
+  const input = typeof block.input === "string" ? block.input : JSON.stringify(block.input ?? "");
+  return { name, input };
+}
+
+/**
+ * Detects a content_block_stop from a stream event (to mark tool use complete).
+ * ストリームイベントから content_block_stop を検出する。
+ */
+function isContentBlockStop(msg: SDKPartialAssistantMessage): boolean {
+  const ev = msg.event as unknown as Record<string, unknown> | undefined;
+  if (!ev || typeof ev !== "object") return false;
+  return ev.type === "content_block_stop";
+}
+
+function isToolProgressMessage(msg: SDKMessage): msg is SDKToolProgressMessage {
+  return typeof msg === "object" && msg !== null && "type" in msg && msg.type === "tool_progress";
 }
 
 function extractAssistantText(msg: SDKAssistantMessage): string {
@@ -104,6 +136,7 @@ export async function runQuery(params: {
 
   tracker.start(id);
   let aggregated = "";
+  let activeToolName: string | null = null;
 
   try {
     const q = query({
@@ -115,8 +148,6 @@ export async function runQuery(params: {
         abortController,
         includePartialMessages: true,
         resume,
-        // Desktop app may later expose this; matches Claude Code CLI-style defaults.
-        // デスクトップでは後段で UI から指定可能にする想定。CLI 相当の既定。
         permissionMode: "acceptEdits",
         settingSources: ["user", "project", "local"],
       },
@@ -128,6 +159,24 @@ export async function runQuery(params: {
       }
 
       if (msg.type === "stream_event") {
+        const toolStart = extractToolUseStart(msg);
+        if (toolStart) {
+          activeToolName = toolStart.name;
+          emit({
+            type: "tool-use-start",
+            id,
+            toolName: toolStart.name,
+            toolInput: toolStart.input,
+          });
+          continue;
+        }
+
+        if (isContentBlockStop(msg) && activeToolName) {
+          emit({ type: "tool-use-complete", id, toolName: activeToolName });
+          activeToolName = null;
+          continue;
+        }
+
         const delta = extractTextDelta(msg);
         if (delta) {
           aggregated += delta;
@@ -136,7 +185,24 @@ export async function runQuery(params: {
         continue;
       }
 
+      if (isToolProgressMessage(msg)) {
+        if (!activeToolName || activeToolName !== msg.tool_name) {
+          activeToolName = msg.tool_name;
+          emit({
+            type: "tool-use-start",
+            id,
+            toolName: msg.tool_name,
+            toolInput: "",
+          });
+        }
+        continue;
+      }
+
       if (msg.type === "assistant") {
+        if (activeToolName) {
+          emit({ type: "tool-use-complete", id, toolName: activeToolName });
+          activeToolName = null;
+        }
         const text = extractAssistantText(msg);
         const delta = text.length > 0 ? text.slice(aggregated.length) : "";
         if (delta.length > 0) {
@@ -147,6 +213,10 @@ export async function runQuery(params: {
       }
 
       if (isResultMessage(msg)) {
+        if (activeToolName) {
+          emit({ type: "tool-use-complete", id, toolName: activeToolName });
+          activeToolName = null;
+        }
         emitResultOrError(id, msg, aggregated, emit);
         return;
       }

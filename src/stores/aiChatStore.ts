@@ -12,6 +12,13 @@ interface SelectedModel {
   outputCostUnits?: number;
 }
 
+/** Default panel width in pixels. / パネルの既定幅（ピクセル） */
+const DEFAULT_PANEL_WIDTH = 352;
+/** Minimum panel width in pixels. / パネルの最小幅（ピクセル） */
+export const MIN_PANEL_WIDTH = 280;
+/** Maximum panel width in pixels. / パネルの最大幅（ピクセル） */
+export const MAX_PANEL_WIDTH = 600;
+
 interface AIChatUIState {
   isOpen: boolean;
   activeConversationId: string | null;
@@ -22,6 +29,8 @@ interface AIChatUIState {
   pendingPageToAdd: ReferencedPage | null;
   /** チャット欄で選択中のモデル */
   selectedModel: SelectedModel | null;
+  /** パネル幅（ピクセル） / Panel width in pixels */
+  panelWidth: number;
 
   // Actions
   togglePanel: () => void;
@@ -33,6 +42,7 @@ interface AIChatUIState {
   toggleConversationList: () => void;
   setPendingPageToAdd: (page: ReferencedPage | null) => void;
   setSelectedModel: (model: SelectedModel | null) => void;
+  setPanelWidth: (width: number) => void;
 }
 
 /**
@@ -49,6 +59,7 @@ export const useAIChatStore = create<AIChatUIState>()(
       showConversationList: false,
       pendingPageToAdd: null,
       selectedModel: null,
+      panelWidth: DEFAULT_PANEL_WIDTH,
 
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
       openPanel: () => set({ isOpen: true }),
@@ -60,6 +71,8 @@ export const useAIChatStore = create<AIChatUIState>()(
         set((state) => ({ showConversationList: !state.showConversationList })),
       setPendingPageToAdd: (page) => set({ pendingPageToAdd: page }),
       setSelectedModel: (model) => set({ selectedModel: model }),
+      setPanelWidth: (width) =>
+        set({ panelWidth: Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, width)) }),
     }),
     {
       name: "ai-chat-storage",
@@ -68,6 +81,7 @@ export const useAIChatStore = create<AIChatUIState>()(
         isOpen: state.isOpen,
         contextEnabled: state.contextEnabled,
         selectedModel: state.selectedModel,
+        panelWidth: state.panelWidth,
       }),
     },
   ),

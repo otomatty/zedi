@@ -9,14 +9,35 @@ interface AIChatContextValue {
   setAIChatAvailable: (available: boolean) => void;
   /** AI追記後にエディタ内容を同期するハンドラ ref */
   contentAppendHandlerRef: React.MutableRefObject<((nextContent: string) => void) | null>;
+  /**
+   * エディタのカーソル位置にマークダウンを挿入するハンドラ ref。
+   * Ref to a handler that inserts markdown at the editor's current cursor position.
+   */
+  insertAtCursorRef: React.MutableRefObject<((markdown: string) => boolean) | null>;
 }
 
 const AIChatContext = createContext<AIChatContextValue | undefined>(undefined);
 
+/**
+ *
+ */
 export function AIChatProvider({ children }: { children: ReactNode }) {
+  /**
+   *
+   */
   const [pageContext, setPageContext] = useState<PageContext | null>(null);
+  /**
+   *
+   */
   const [aiChatAvailable, setAIChatAvailable] = useState(false);
+  /**
+   *
+   */
   const contentAppendHandlerRef = useRef<((nextContent: string) => void) | null>(null);
+  /**
+   *
+   */
+  const insertAtCursorRef = useRef<((markdown: string) => boolean) | null>(null);
 
   return (
     <AIChatContext.Provider
@@ -26,6 +47,7 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
         aiChatAvailable,
         setAIChatAvailable,
         contentAppendHandlerRef,
+        insertAtCursorRef,
       }}
     >
       {children}
@@ -33,7 +55,13 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ *
+ */
 export function useAIChatContext() {
+  /**
+   *
+   */
   const context = useContext(AIChatContext);
   if (context === undefined) {
     throw new Error("useAIChatContext must be used within an AIChatProvider");

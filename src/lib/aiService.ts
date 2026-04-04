@@ -51,6 +51,16 @@ export interface AIServiceCallbacks {
   onComplete?: (response: AIServiceResponse) => void;
   onError?: (error: Error) => void;
   onUsageUpdate?: (usage: AIResponseUsage) => void;
+  /**
+   * ツール実行開始時のコールバック（Claude Code のみ）。
+   * Callback when a tool starts executing (Claude Code only).
+   */
+  onToolUseStart?: (toolName: string) => void;
+  /**
+   * ツール実行完了時のコールバック（Claude Code のみ）。
+   * Callback when a tool finishes executing (Claude Code only).
+   */
+  onToolUseComplete?: (toolName: string) => void;
 }
 
 /**
@@ -178,6 +188,12 @@ async function callAIWithClaudeCode(
         case "text":
           fullContent += chunk.content;
           callbacks.onChunk?.(chunk.content);
+          break;
+        case "tool_use_start":
+          callbacks.onToolUseStart?.(chunk.toolName ?? "unknown");
+          break;
+        case "tool_use_complete":
+          callbacks.onToolUseComplete?.(chunk.toolName ?? "unknown");
           break;
         case "error":
           throw new Error(chunk.content);

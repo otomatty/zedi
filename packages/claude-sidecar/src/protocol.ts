@@ -30,6 +30,17 @@ export type SidecarResponse =
   | { type: "stream-complete"; id: string; result: { content: string } }
   | { type: "error"; id: string; error: string; code?: string }
   | {
+      type: "tool-use-start";
+      id: string;
+      toolName: string;
+      toolInput: string;
+    }
+  | {
+      type: "tool-use-complete";
+      id: string;
+      toolName: string;
+    }
+  | {
       type: "status-response";
       correlationId: string;
       status: "idle" | "processing";

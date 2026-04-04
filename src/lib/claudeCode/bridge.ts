@@ -12,11 +12,15 @@ import {
   CLAUDE_ERROR_EVENT,
   CLAUDE_STREAM_CHUNK_EVENT,
   CLAUDE_STREAM_COMPLETE_EVENT,
+  CLAUDE_TOOL_USE_START_EVENT,
+  CLAUDE_TOOL_USE_COMPLETE_EVENT,
   type ClaudeErrorPayload,
   type ClaudeInstallationResult,
   type ClaudeStreamChunkPayload,
   type ClaudeStreamCompletePayload,
   type ClaudeStatusResult,
+  type ClaudeToolUseStartPayload,
+  type ClaudeToolUseCompletePayload,
 } from "./types";
 
 /** Throws if not running inside a Tauri WebView. / Tauri WebView 外なら例外 */
@@ -114,6 +118,32 @@ export function onClaudeError(
 ): Promise<UnlistenFn> {
   assertTauriWebview();
   return listen<ClaudeErrorPayload>(CLAUDE_ERROR_EVENT, (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Subscribe to tool use start events (when the agent begins using a tool).
+ * ツール使用開始イベントを購読する。
+ */
+export function onClaudeToolUseStart(
+  callback: (payload: ClaudeToolUseStartPayload) => void,
+): Promise<UnlistenFn> {
+  assertTauriWebview();
+  return listen<ClaudeToolUseStartPayload>(CLAUDE_TOOL_USE_START_EVENT, (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Subscribe to tool use complete events (when the agent finishes using a tool).
+ * ツール使用完了イベントを購読する。
+ */
+export function onClaudeToolUseComplete(
+  callback: (payload: ClaudeToolUseCompletePayload) => void,
+): Promise<UnlistenFn> {
+  assertTauriWebview();
+  return listen<ClaudeToolUseCompletePayload>(CLAUDE_TOOL_USE_COMPLETE_EVENT, (event) => {
     callback(event.payload);
   });
 }

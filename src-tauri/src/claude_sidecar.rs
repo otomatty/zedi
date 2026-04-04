@@ -99,6 +99,12 @@ async fn process_sidecar_line(
         "stream-complete" => {
             let _ = app.emit("claude-stream-complete", &value);
         }
+        "tool-use-start" => {
+            let _ = app.emit("claude-tool-use-start", &value);
+        }
+        "tool-use-complete" => {
+            let _ = app.emit("claude-tool-use-complete", &value);
+        }
         "error" => {
             let _ = app.emit("claude-error", &value);
         }

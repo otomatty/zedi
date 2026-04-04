@@ -21,6 +21,15 @@ export interface Conversation {
   updatedAt: number;
 }
 
+/**
+ * ツール実行状況の 1 エントリ。
+ * A single tool execution status entry.
+ */
+export interface ToolExecution {
+  toolName: string;
+  status: "running" | "completed";
+}
+
 /** メッセージ */
 export interface ChatMessage {
   id: string;
@@ -30,6 +39,11 @@ export interface ChatMessage {
   referencedPages?: ReferencedPage[]; // このメッセージに添付された参照ページ
   /** このメッセージの生成に使用されたモデル表示名 */
   modelDisplayName?: string;
+  /**
+   * ストリーミング中のツール実行状況リスト（Claude Code のみ）。
+   * Tool execution status list during streaming (Claude Code only).
+   */
+  toolExecutions?: ToolExecution[];
   timestamp: number;
   isStreaming?: boolean;
   error?: string;

@@ -16,6 +16,7 @@ interface UseEditorLifecycleOptions {
   isWikiGenerating?: boolean;
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
   focusContentRef: TiptapEditorProps["focusContentRef"];
+  insertAtCursorRef: TiptapEditorProps["insertAtCursorRef"];
   initialContent: TiptapEditorProps["initialContent"];
   onInitialContentApplied: TiptapEditorProps["onInitialContentApplied"];
   wikiContentForCollab: TiptapEditorProps["wikiContentForCollab"];
@@ -38,6 +39,7 @@ export function useEditorLifecycle({
   isWikiGenerating = false,
   collaborationConfig,
   focusContentRef,
+  insertAtCursorRef,
   initialContent,
   onInitialContentApplied,
   wikiContentForCollab,
@@ -54,6 +56,20 @@ export function useEditorLifecycle({
       focusContentRef.current = null;
     };
   }, [editor, focusContentRef]);
+
+  useEffect(() => {
+    if (!insertAtCursorRef || !editor) return;
+    insertAtCursorRef.current = (content: unknown) => {
+      return editor
+        .chain()
+        .focus()
+        .insertContent(content as Parameters<typeof editor.commands.insertContent>[0])
+        .run();
+    };
+    return () => {
+      insertAtCursorRef.current = null;
+    };
+  }, [editor, insertAtCursorRef]);
 
   useEffect(() => {
     if (!editor || !collaborationConfig || !initialContent || initialContentAppliedRef.current)
