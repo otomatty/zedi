@@ -146,12 +146,15 @@ export function useSlashSuggestionMenu(
   const applyPathPick = useCallback(
     (picked: string) => {
       const m = matchAgentSlashByQuery(query);
-      if (!m) return;
+      if (!m) {
+        onClose();
+        return;
+      }
       const newArgs = buildNewArgsFromPick(pathArgs, picked);
       const newQuery = `${m.prefix} ${newArgs}`.trim();
       editor.chain().focus().deleteRange(range).insertContent(`/${newQuery} `).run();
     },
-    [editor, query, range, pathArgs],
+    [editor, onClose, query, range, pathArgs],
   );
 
   useSlashMenuScrollEffects(

@@ -47,7 +47,13 @@ export async function executeAgentSlashCommand(options: {
 
   const hook = getSlashAgentCommandHook();
   if (hook) {
-    const hooked = await hook({ commandId, args, query, editor });
+    let hooked: { markdown: string } | null;
+    try {
+      hooked = await hook({ commandId, args, query, editor });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return message;
+    }
     if (hooked) {
       editor.chain().focus().deleteRange(range).run();
       const insertPos = editor.state.selection.from;
