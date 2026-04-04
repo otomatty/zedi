@@ -1,8 +1,7 @@
 import React from "react";
-import { Bot, Loader2, Trash2, Server, Key, Terminal, CheckCircle2, XCircle } from "lucide-react";
+import { Bot, Loader2, Trash2, Server, Key, Terminal } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
-import { Alert, AlertDescription, AlertTitle } from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +18,7 @@ import { AISettingsFormServerSection } from "./AISettingsFormServerSection";
 import { AISettingsFormUserKeySection } from "./AISettingsFormUserKeySection";
 import { ProviderSelector } from "./ProviderSelector";
 import { SectionSaveStatus } from "./SectionSaveStatus";
+import { ClaudeCodePrerequisites } from "./ClaudeCodePrerequisites";
 import { getProviderById, type AIInteractionMode } from "@/types/ai";
 import { isTauriDesktop } from "@/lib/platform";
 import { useTranslation } from "react-i18next";
@@ -136,7 +136,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
           </>
         )}
 
-        {isClaudeCode && <ClaudeCodeSection available={claudeCodeAvailable} />}
+        {isClaudeCode && <ClaudeCodePrerequisites />}
       </CardContent>
 
       <CardFooter className="flex justify-between">
@@ -283,45 +283,5 @@ function ModeSelector({
         })}
       </div>
     </div>
-  );
-}
-
-/**
- * Claude Code プロバイダー選択時に表示するセクション。
- * Section displayed when the Claude Code provider is selected.
- */
-function ClaudeCodeSection({ available }: { available: boolean | null }) {
-  const { t } = useTranslation();
-
-  if (available === null) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border p-4">
-        <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-        <p className="text-muted-foreground text-sm">{t("aiSettings.checkingAvailability")}</p>
-      </div>
-    );
-  }
-
-  if (available) {
-    return (
-      <Alert>
-        <CheckCircle2 className="h-4 w-4" />
-        <AlertTitle>{t("aiSettings.providerAvailable")}</AlertTitle>
-        <AlertDescription>
-          <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4" />
-            <span>{t("aiSettings.claudeCodeDescription")}</span>
-          </div>
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  return (
-    <Alert variant="destructive">
-      <XCircle className="h-4 w-4" />
-      <AlertTitle>{t("aiSettings.claudeCodeNotInstalled")}</AlertTitle>
-      <AlertDescription>{t("aiSettings.claudeCodeDesktopRequired")}</AlertDescription>
-    </Alert>
   );
 }
