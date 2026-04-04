@@ -46,6 +46,7 @@ describe("claudeCode bridge", () => {
     expect(id).toBe("req-1");
     expect(invoke).toHaveBeenCalledWith("claude_query", {
       prompt: "hello",
+      model: null,
       cwd: "/tmp",
       maxTurns: 5,
       allowedTools: null,
