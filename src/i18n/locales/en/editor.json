@@ -2,6 +2,12 @@
   "uploadedImageAlt": "Uploaded image",
   "slashMenuAriaLabel": "Slash command menu",
   "slashNoResults": "No matching commands",
+  "slashAgentRunning": "Running Claude Code…",
+  "slashAgent": {
+    "errorTitle": "Agent command failed"
+  },
+  "slashPathCompletionAriaLabel": "Path suggestions",
+  "slashPathCompletionHint": "Workspace path suggestions",
   "slash": {
     "paragraph": {
       "title": "Paragraph",
@@ -87,6 +93,46 @@
       "title": "Math (block)",
       "description": "Insert block math",
       "aliases": "math block,block math,equation"
+    },
+    "agent-analyze": {
+      "title": "/analyze — analyze code",
+      "description": "Analyze a path with Claude Code and insert the result",
+      "aliases": "analyze,code analysis"
+    },
+    "agent-git-summary": {
+      "title": "/git-summary — recent commits",
+      "description": "Summarize recent git commits and insert",
+      "aliases": "git-summary,git,git log"
+    },
+    "agent-run": {
+      "title": "/run — run shell command",
+      "description": "Run a command and insert stdout/stderr",
+      "aliases": "run,exec,shell,command"
+    },
+    "agent-research": {
+      "title": "/research — web research",
+      "description": "Research a topic and insert a structured summary",
+      "aliases": "research,web,search"
+    },
+    "agent-review": {
+      "title": "/review — code review",
+      "description": "Review code at a path and insert a checklist",
+      "aliases": "review,cr"
+    },
+    "agent-test": {
+      "title": "/test — run tests",
+      "description": "Run tests and insert results",
+      "aliases": "test,vitest,bun test"
+    },
+    "agent-explain": {
+      "title": "/explain — explain selection",
+      "description": "Explain the selected code and insert",
+      "aliases": "explain,selection"
+    },
+    "agent-summarize": {
+      "title": "/summarize — summarize note",
+      "description": "Summarize the note and insert",
+      "aliases": "summarize,summary"
     }
   },
   "recommendation": {
