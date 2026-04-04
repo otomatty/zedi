@@ -20,6 +20,19 @@ interface DisplayModel {
 }
 
 /**
+ * Fallback when sidecar is unavailable or the app is not running in Tauri (web build).
+ * sidecar 不可時、または Tauri 外（Web ビルド）のときの Claude Code モデル一覧の既定。
+ */
+const DEFAULT_CLAUDE_CODE_MODELS: DisplayModel[] = [
+  {
+    id: "claude-code:claude-sonnet-4-6",
+    provider: "claude-code",
+    modelId: "claude-sonnet-4-6",
+    displayName: "Claude Sonnet 4.6",
+  },
+];
+
+/**
  * Resolves which Claude Code model to select after loading the list.
  * 一覧取得後に選ぶ Claude Code モデルを解決する。
  */
@@ -78,7 +91,7 @@ export function AIChatModelSelector() {
       setMode(currentMode);
 
       if (currentMode === "claude_code") {
-        let claudeModels: DisplayModel[] = [];
+        let claudeModels: DisplayModel[] = [...DEFAULT_CLAUDE_CODE_MODELS];
         if (isTauriDesktop()) {
           try {
             const { claudeListModels } = await import("@/lib/claudeCode/bridge");
@@ -90,14 +103,7 @@ export function AIChatModelSelector() {
               displayName: m.displayName,
             }));
           } catch {
-            claudeModels = [
-              {
-                id: "claude-code:claude-sonnet-4-6",
-                provider: "claude-code",
-                modelId: "claude-sonnet-4-6",
-                displayName: "Claude Sonnet 4.6",
-              },
-            ];
+            claudeModels = [...DEFAULT_CLAUDE_CODE_MODELS];
           }
         }
         setModels(claudeModels);
