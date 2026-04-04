@@ -64,10 +64,14 @@ export function NoteWorkspaceProvider({
   useEffect(() => {
     if (!isTauriDesktop()) return;
     void (async () => {
-      if (workspaceRoot) {
-        await registerNoteWorkspaceRoot(noteId, workspaceRoot);
-      } else {
-        await clearNoteWorkspaceRoot(noteId);
+      try {
+        if (workspaceRoot) {
+          await registerNoteWorkspaceRoot(noteId, workspaceRoot);
+        } else {
+          await clearNoteWorkspaceRoot(noteId);
+        }
+      } catch (e) {
+        console.error("[NoteWorkspace] Rust registry sync failed", e);
       }
     })();
   }, [noteId, workspaceRoot]);
@@ -78,12 +82,16 @@ export function NoteWorkspaceProvider({
       if (!normalized) {
         clearNoteWorkspacePath(noteId);
         setWorkspaceRootState(null);
-        void clearNoteWorkspaceRoot(noteId);
+        void clearNoteWorkspaceRoot(noteId).catch((e) => {
+          console.error("[NoteWorkspace] clearNoteWorkspaceRoot failed", e);
+        });
         return;
       }
       writeNoteWorkspacePath(noteId, normalized);
       setWorkspaceRootState(normalized);
-      void registerNoteWorkspaceRoot(noteId, normalized);
+      void registerNoteWorkspaceRoot(noteId, normalized).catch((e) => {
+        console.error("[NoteWorkspace] registerNoteWorkspaceRoot failed", e);
+      });
     },
     [noteId],
   );
@@ -91,7 +99,9 @@ export function NoteWorkspaceProvider({
   const clearWorkspace = useCallback(() => {
     clearNoteWorkspacePath(noteId);
     setWorkspaceRootState(null);
-    void clearNoteWorkspaceRoot(noteId);
+    void clearNoteWorkspaceRoot(noteId).catch((e) => {
+      console.error("[NoteWorkspace] clearNoteWorkspaceRoot failed", e);
+    });
   }, [noteId]);
 
   const pickWorkspace = useCallback(async () => {

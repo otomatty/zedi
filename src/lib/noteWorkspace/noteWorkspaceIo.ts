@@ -9,30 +9,26 @@ import { isTauriDesktop } from "@/lib/platform";
 /**
  * Registers the workspace root for a note in the Rust-side registry (required before read/list).
  * Rust 側レジストリにワークスペースルートを登録する（read/list の前提）。
+ * @throws Tauri invoke が失敗した場合（呼び出し側で catch してログ可）。
+ * @throws When Tauri invoke fails (callers may catch and log).
  */
 export async function registerNoteWorkspaceRoot(
   noteId: string,
   workspaceRoot: string,
 ): Promise<void> {
   if (!isTauriDesktop()) return;
-  try {
-    await invoke("register_note_workspace_root", { noteId, workspaceRoot });
-  } catch {
-    /* ignore */
-  }
+  await invoke("register_note_workspace_root", { noteId, workspaceRoot });
 }
 
 /**
  * Clears the registered workspace root for a note.
  * ノートの登録済みワークスペースルートを消す。
+ * @throws Tauri invoke が失敗した場合（呼び出し側で catch してログ可）。
+ * @throws When Tauri invoke fails (callers may catch and log).
  */
 export async function clearNoteWorkspaceRoot(noteId: string): Promise<void> {
   if (!isTauriDesktop()) return;
-  try {
-    await invoke("clear_note_workspace_root", { noteId });
-  } catch {
-    /* ignore */
-  }
+  await invoke("clear_note_workspace_root", { noteId });
 }
 
 /**
@@ -61,6 +57,8 @@ export async function readNoteWorkspaceFile(
 /**
  * Lists directory entries under the registered workspace for the note.
  * 登録済みノートのワークスペース配下のエントリを列挙する。
+ * @throws Tauri invoke が失敗した場合（呼び出し側で catch してログまたは空表示可）。
+ * @throws When Tauri invoke fails (callers may catch and log or show empty UI).
  */
 export async function listNoteWorkspaceEntries(
   noteId: string,
@@ -68,13 +66,9 @@ export async function listNoteWorkspaceEntries(
   maxEntries?: number,
 ): Promise<string[]> {
   if (!isTauriDesktop()) return [];
-  try {
-    return await invoke<string[]>("list_note_workspace_entries", {
-      noteId,
-      relativeDir: relativeDir.replace(/\\/g, "/"),
-      maxEntries: maxEntries ?? null,
-    });
-  } catch {
-    return [];
-  }
+  return await invoke<string[]>("list_note_workspace_entries", {
+    noteId,
+    relativeDir: relativeDir.replace(/\\/g, "/"),
+    maxEntries: maxEntries ?? null,
+  });
 }

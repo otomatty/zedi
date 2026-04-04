@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { FolderOpen, FolderTree, Trash2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,11 @@ export function NoteWorkspaceToolbar() {
 
   const root = ctx?.workspaceRoot ?? null;
   const noteId = ctx?.noteId ?? null;
+  /**
+   * ツリー操作で複数の list が並行しても、古い応答で上書きしない。
+   * Latest in-flight list request wins when navigating directories quickly.
+   */
+  const fetchSeqRef = useRef(0);
 
   const fetchEntries = useCallback(
     async (dir: string) => {
@@ -26,8 +31,16 @@ export function NoteWorkspaceToolbar() {
         setEntries([]);
         return;
       }
-      const list = await listNoteWorkspaceEntries(noteId, dir);
-      setEntries(list);
+      const seq = ++fetchSeqRef.current;
+      try {
+        const list = await listNoteWorkspaceEntries(noteId, dir);
+        if (seq !== fetchSeqRef.current) return;
+        setEntries(list);
+      } catch (e) {
+        if (seq !== fetchSeqRef.current) return;
+        console.error("[NoteWorkspaceToolbar] listNoteWorkspaceEntries failed", e);
+        setEntries([]);
+      }
     },
     [root, noteId],
   );

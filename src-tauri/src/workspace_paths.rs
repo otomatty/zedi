@@ -6,8 +6,51 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
+
+/// Serializes read-modify-write on the note workspace registry file (concurrent IPC).
+/// ノートワークスペースレジストリの read-modify-write を直列化する（並行 IPC）。
+static REGISTRY_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn registry_mutex() -> &'static Mutex<()> {
+    REGISTRY_MUTEX.get_or_init(|| Mutex::new(()))
+}
+
+/// Runs `f` while holding the registry lock (register/clear only).
+/// レジストリロック保持中に `f` を実行する（register/clear のみ）。
+fn with_registry_write_lock<F, R>(f: F) -> Result<R, String>
+where
+    F: FnOnce() -> Result<R, String>,
+{
+    let _guard = registry_mutex()
+        .lock()
+        .map_err(|e| format!("registry mutex poisoned: {e}"))?;
+    f()
+}
+
+/// Writes `contents` to `path` via a same-directory temp file + rename (crash-safe partial writes).
+/// 同一ディレクトリの一時ファイルへ書き込み後にリネーム（クラッシュ時の部分書き込みを避ける）。
+fn atomic_write_file(path: &Path, contents: &[u8]) -> Result<(), String> {
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| "registry path has no file name".to_string())?;
+    let mut tmp_name = file_name.to_os_string();
+    tmp_name.push(".tmp");
+    let parent = path
+        .parent()
+        .ok_or_else(|| "registry path has no parent".to_string())?;
+    let tmp_path = parent.join(tmp_name);
+    fs::write(&tmp_path, contents).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    {
+        if path.exists() {
+            fs::remove_file(path).map_err(|e| e.to_string())?;
+        }
+    }
+    fs::rename(&tmp_path, path).map_err(|e| e.to_string())
+}
 
 /// Maximum bytes returned by {@link read_note_workspace_file}.
 /// {@link read_note_workspace_file} が返す最大バイト数。
@@ -136,7 +179,7 @@ fn load_registry() -> Result<NoteWorkspaceRegistry, String> {
 fn save_registry(reg: &NoteWorkspaceRegistry) -> Result<(), String> {
     let path = registry_file()?;
     let raw = serde_json::to_string_pretty(reg).map_err(|e| e.to_string())?;
-    fs::write(&path, raw).map_err(|e| e.to_string())
+    atomic_write_file(&path, raw.as_bytes())
 }
 
 fn resolve_registered_root(note_id: &str) -> Result<PathBuf, String> {
@@ -154,10 +197,12 @@ fn resolve_registered_root(note_id: &str) -> Result<PathBuf, String> {
 pub fn register_note_workspace_root(note_id: String, workspace_root: String) -> Result<(), String> {
     validate_note_id_key(&note_id)?;
     let canon = canonical_note_workspace_root(&workspace_root)?;
-    let mut reg = load_registry()?;
-    reg.roots
-        .insert(note_id, canon.to_string_lossy().to_string());
-    save_registry(&reg)
+    with_registry_write_lock(|| {
+        let mut reg = load_registry()?;
+        reg.roots
+            .insert(note_id, canon.to_string_lossy().to_string());
+        save_registry(&reg)
+    })
 }
 
 /// Removes the registered workspace root for a note.
@@ -165,9 +210,11 @@ pub fn register_note_workspace_root(note_id: String, workspace_root: String) -> 
 #[tauri::command]
 pub fn clear_note_workspace_root(note_id: String) -> Result<(), String> {
     validate_note_id_key(&note_id)?;
-    let mut reg = load_registry()?;
-    reg.roots.remove(&note_id);
-    save_registry(&reg)
+    with_registry_write_lock(|| {
+        let mut reg = load_registry()?;
+        reg.roots.remove(&note_id);
+        save_registry(&reg)
+    })
 }
 
 /// Reads UTF-8 under `root_canon` with a single file handle and a hard byte cap (no metadata/read split).

@@ -58,8 +58,10 @@ export function useWorkspacePathCompletions(
           const filtered = fp ? names.filter((n) => n.toLowerCase().startsWith(fp)) : names;
           setItems(filtered.slice(0, 40));
         })
-        .catch(() => {
-          if (!cancelled) setItems([]);
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          console.error("[useWorkspacePathCompletions] directory listing failed", err);
+          setItems([]);
         });
     }, 120);
     return () => {
