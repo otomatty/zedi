@@ -160,7 +160,10 @@ export const MAX_REFERENCED_PAGES = 5;
 export interface PageContext {
   type: "editor" | "home" | "search" | "other";
   pageId?: string;
-  /** Parent note id when editing a page inside a note (local metadata only). */
+  /**
+   * Parent note id when editing a page inside a note (local metadata only).
+   * ノート内ページ編集中の親ノート ID（ローカルメタデータのみ）。
+   */
   noteId?: string;
   /**
    * Linked local workspace root for Claude Code cwd (desktop, not sent to API server).

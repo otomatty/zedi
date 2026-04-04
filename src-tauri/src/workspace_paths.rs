@@ -70,6 +70,16 @@ pub(crate) fn resolve_under_root(root_canon: &PathBuf, relative: &str) -> Result
     Ok(acc)
 }
 
+/// Re-canonicalize immediately before opening to narrow TOCTOU vs symlink swap (not full `openat` hardening).
+/// オープン直前に再 canonicalize して TOCTOU を狭める（openat 相当の完全対策ではない）。
+fn assert_still_under_root(root_canon: &PathBuf, path: &Path) -> Result<PathBuf, String> {
+    let canon = path.canonicalize().map_err(|e| e.to_string())?;
+    if !canon.starts_with(root_canon) {
+        return Err("path outside workspace".into());
+    }
+    Ok(canon)
+}
+
 fn canonical_note_workspace_root(workspace_root: &str) -> Result<PathBuf, String> {
     let trimmed = workspace_root.trim();
     if trimmed.is_empty() {
@@ -94,6 +104,10 @@ pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<Stri
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
     let cwd_canon = cwd.canonicalize().map_err(|e| e.to_string())?;
     let target = resolve_under_root(&cwd_canon, &relative_dir)?;
+    if !target.exists() {
+        return Ok(vec![]);
+    }
+    let target = assert_still_under_root(&cwd_canon, target.as_path())?;
     if !target.is_dir() {
         return Ok(vec![]);
     }
@@ -106,6 +120,10 @@ pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<Stri
 pub fn read_note_workspace_file(workspace_root: String, relative_path: String) -> Result<String, String> {
     let root_canon = canonical_note_workspace_root(&workspace_root)?;
     let target = resolve_under_root(&root_canon, &relative_path)?;
+    if !target.exists() {
+        return Err("not a file".into());
+    }
+    let target = assert_still_under_root(&root_canon, target.as_path())?;
     if !target.is_file() {
         return Err("not a file".into());
     }
@@ -129,6 +147,10 @@ pub fn list_note_workspace_entries(
         .min(HARD_MAX_NOTE_WORKSPACE_ENTRIES);
     let root_canon = canonical_note_workspace_root(&workspace_root)?;
     let target = resolve_under_root(&root_canon, &relative_dir)?;
+    if !target.exists() {
+        return Ok(vec![]);
+    }
+    let target = assert_still_under_root(&root_canon, target.as_path())?;
     if !target.is_dir() {
         return Ok(vec![]);
     }

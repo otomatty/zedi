@@ -88,7 +88,9 @@ export const FileReference = Mark.create<FileReferenceOptions>({
   addInputRules() {
     return [
       markInputRule({
-        find: /(?:^|\s)(@file:[^\s]+)\s$/,
+        // Path may contain spaces; closing `\s$` ends the token (same as before).
+        // パスに空白を含められる。末尾の空白でトークン終端。
+        find: /(?:^|\s)(@file:(.+))\s$/,
         type: this.type,
         getAttributes: (match) => {
           const full = match[1] ?? "";
@@ -101,6 +103,8 @@ export const FileReference = Mark.create<FileReferenceOptions>({
 
   addProseMirrorPlugins() {
     const getRoot = this.options.getWorkspaceRoot;
+    // Latest click wins if previews overlap. / 連続クリック時は最後の結果のみ反映
+    let previewSeq = 0;
     return [
       new Plugin({
         key: new PluginKey("fileReferenceClick"),
@@ -120,8 +124,10 @@ export const FileReference = Mark.create<FileReferenceOptions>({
             }
             event.preventDefault();
             event.stopPropagation();
+            const seq = ++previewSeq;
             void (async () => {
               const result = await readNoteWorkspaceFile(root, path);
+              if (seq !== previewSeq) return;
               if (result.ok) {
                 const truncated = result.content.length > FILE_PREVIEW_DISPLAY_MAX_CHARS;
                 const content = truncated

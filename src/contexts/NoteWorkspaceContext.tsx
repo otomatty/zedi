@@ -57,8 +57,14 @@ export function NoteWorkspaceProvider({
 
   const setWorkspaceRoot = useCallback(
     (path: string) => {
-      writeNoteWorkspacePath(noteId, path);
-      setWorkspaceRootState(path.trim());
+      const normalized = path.trim();
+      if (!normalized) {
+        clearNoteWorkspacePath(noteId);
+        setWorkspaceRootState(null);
+        return;
+      }
+      writeNoteWorkspacePath(noteId, normalized);
+      setWorkspaceRootState(normalized);
     },
     [noteId],
   );

@@ -17,4 +17,11 @@ describe("noteWorkspaceStore", () => {
     clearNoteWorkspacePath("n1");
     expect(readNoteWorkspacePath("n1")).toBe(null);
   });
+
+  it("rejects reserved note keys (prototype pollution)", () => {
+    writeNoteWorkspacePath("__proto__", "/evil");
+    expect(readNoteWorkspacePath("__proto__")).toBe(null);
+    writeNoteWorkspacePath("prototype", "/evil");
+    expect(readNoteWorkspacePath("prototype")).toBe(null);
+  });
 });

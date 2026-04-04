@@ -16,7 +16,10 @@ import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { createEditorExtensions, defaultEditorProps } from "./editorConfig";
 import type { TiptapEditorProps } from "./types";
 
-/** Keeps latest `workspaceRoot` in a ref without re-running `useEditor` (Issue #461). */
+/**
+ * Keeps latest `workspaceRoot` in a ref without re-running `useEditor` (Issue #461).
+ * `useEditor` を再実行せずに最新のワークスペースルートを ref に保持する（Issue #461）。
+ */
 function useWorkspaceRootRef(workspaceRoot: string | null) {
   const r = useRef(workspaceRoot);
   useLayoutEffect(() => {
@@ -53,7 +56,10 @@ interface UseEditorSetupOptions {
   workspaceRoot: string | null;
 }
 
-/** Tiptap `useEditor` wiring: extensions, collaboration, note `@file:` root (Issue #461). */
+/**
+ * Tiptap `useEditor` wiring: extensions, collaboration, note `@file:` root (Issue #461).
+ * Tiptap の `useEditor` 拡張・コラボレーション・ノート連動 `@file:` ルート（Issue #461）。
+ */
 export function useEditorSetup(options: UseEditorSetupOptions) {
   const {
     content,

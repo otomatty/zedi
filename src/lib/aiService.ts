@@ -29,7 +29,10 @@ export interface AIServiceRequest {
     webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
     useWebSearch?: boolean;
     useGoogleSearch?: boolean;
-    /** Claude Code sidecar cwd (note-linked workspace, desktop only). */
+    /**
+     * Claude Code sidecar cwd (note-linked workspace, desktop only).
+     * Claude Code サイドカーの cwd（ノート連動ワークスペース、デスクトップのみ）。
+     */
     cwd?: string;
   };
 }

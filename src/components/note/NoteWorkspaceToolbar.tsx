@@ -33,6 +33,7 @@ export function NoteWorkspaceToolbar() {
 
   const openTree = useCallback(() => {
     setRelDir("");
+    setEntries([]);
     setTreeOpen(true);
     void fetchEntries("");
   }, [fetchEntries]);

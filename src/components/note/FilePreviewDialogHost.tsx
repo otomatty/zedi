@@ -16,8 +16,12 @@ export function FilePreviewDialogHost(): React.ReactElement {
   const [detail, setDetail] = useState<FilePreviewEventDetail | null>(null);
 
   const onEvent = useCallback((ev: Event) => {
-    const ce = ev as CustomEvent<FilePreviewEventDetail>;
-    setDetail(ce.detail ?? null);
+    if (!(ev instanceof CustomEvent)) return;
+    const raw = ev.detail;
+    if (raw == null || typeof raw !== "object") return;
+    const d = raw as FilePreviewEventDetail;
+    if (typeof d.relativePath !== "string") return;
+    setDetail(d);
     setOpen(true);
   }, []);
 
