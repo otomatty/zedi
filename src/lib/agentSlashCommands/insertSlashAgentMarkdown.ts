@@ -18,10 +18,20 @@ export function insertSlashAgentMarkdownAt(
   position: SlashAgentInsertPosition,
 ): void {
   const normalized = markdown.trim() || "(empty result)";
-  const docJson = JSON.parse(convertMarkdownToTiptapContent(normalized)) as {
-    content: unknown[];
-  };
-  const content = docJson.content;
+  let content: unknown[];
+  try {
+    const docJson = JSON.parse(convertMarkdownToTiptapContent(normalized)) as {
+      content?: unknown[];
+    };
+    content = Array.isArray(docJson.content) ? docJson.content : [];
+  } catch {
+    content = [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: normalized }],
+      },
+    ];
+  }
 
   if (position === "end") {
     const end = editor.state.doc.content.size;

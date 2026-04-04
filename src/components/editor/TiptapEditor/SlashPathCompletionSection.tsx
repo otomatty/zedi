@@ -24,7 +24,7 @@ export function SlashPathCompletionSection({
   return (
     <div
       className="border-border max-h-[160px] overflow-y-auto border-t p-1"
-      role="listbox"
+      role="group"
       aria-label={t("editor.slashPathCompletionAriaLabel")}
     >
       <div className="text-muted-foreground px-2 py-1 text-xs">

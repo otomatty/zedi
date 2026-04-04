@@ -8,10 +8,12 @@ use std::path::PathBuf;
 /// Directories are suffixed with `/`. Hidden names (leading `.`) are skipped.
 ///
 /// 列挙先が cwd 外に出る場合はエラーにする（パストラバーサル対策）。
+/// 存在するパスは `canonicalize` してシンボリックリンク越しのエスケープを検出する。
 #[tauri::command]
 pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<String>, String> {
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let target = resolve_under_cwd(&cwd, &relative_dir)?;
+    let cwd_canon = cwd.canonicalize().map_err(|e| e.to_string())?;
+    let target = resolve_under_cwd(&cwd_canon, &relative_dir)?;
     if !target.is_dir() {
         return Ok(vec![]);
     }
@@ -33,17 +35,29 @@ pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<Stri
     Ok(out)
 }
 
-fn resolve_under_cwd(cwd: &PathBuf, relative_dir: &str) -> Result<PathBuf, String> {
+fn resolve_under_cwd(cwd_canon: &PathBuf, relative_dir: &str) -> Result<PathBuf, String> {
     let trimmed = relative_dir.trim();
     if trimmed.is_empty() {
-        return Ok(cwd.clone());
+        return Ok(cwd_canon.clone());
     }
-    let mut acc = cwd.clone();
+    let mut acc = cwd_canon.clone();
     for comp in std::path::Path::new(trimmed).components() {
         match comp {
-            std::path::Component::Normal(c) => acc.push(c),
+            std::path::Component::Normal(c) => {
+                acc.push(c);
+                if acc.exists() {
+                    let canon = acc.canonicalize().map_err(|e| e.to_string())?;
+                    if !canon.starts_with(cwd_canon) {
+                        return Err("path outside workspace".into());
+                    }
+                    acc = canon;
+                }
+            }
             std::path::Component::ParentDir => {
                 acc.pop();
+                if !acc.starts_with(cwd_canon) {
+                    return Err("path outside workspace".into());
+                }
             }
             std::path::Component::CurDir => {}
             std::path::Component::RootDir | std::path::Component::Prefix(_) => {
@@ -51,7 +65,14 @@ fn resolve_under_cwd(cwd: &PathBuf, relative_dir: &str) -> Result<PathBuf, Strin
             }
         }
     }
-    if !acc.starts_with(cwd) {
+    if acc.exists() {
+        let canon = acc.canonicalize().map_err(|e| e.to_string())?;
+        if !canon.starts_with(cwd_canon) {
+            return Err("path outside workspace".into());
+        }
+        return Ok(canon);
+    }
+    if !acc.starts_with(cwd_canon) {
         return Err("path outside workspace".into());
     }
     Ok(acc)

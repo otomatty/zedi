@@ -18,7 +18,7 @@ interface SlashAgentLoadingOverlayProps {
 export function SlashAgentLoadingOverlay({ label }: SlashAgentLoadingOverlayProps) {
   return (
     <div
-      className="bg-background/80 pointer-events-none absolute inset-0 z-40 flex items-center justify-center"
+      className="bg-background/80 absolute inset-0 z-40 flex items-center justify-center"
       aria-busy="true"
       aria-live="polite"
     >

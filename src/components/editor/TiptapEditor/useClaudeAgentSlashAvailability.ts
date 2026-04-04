@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { isTauriDesktop } from "@/lib/platform";
 
 /**
  * Resolves availability once on mount (matches {@link createClaudeCodeProvider}).
@@ -13,6 +14,10 @@ export function useClaudeAgentSlashAvailability(): boolean {
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {
+    if (!isTauriDesktop()) {
+      setAvailable(false);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {

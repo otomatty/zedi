@@ -64,15 +64,25 @@ export function getAgentSlashClaudeOptions(id: AgentSlashCommandId): {
   allowedTools?: string[];
 } {
   switch (id) {
+    case "agent-analyze":
+      return { maxTurns: 20, allowedTools: ["Read"] };
     case "agent-explain":
       return { maxTurns: 8, allowedTools: [] };
     case "agent-git-summary":
       return { maxTurns: 10, allowedTools: ["Bash"] };
+    case "agent-research":
+      return { maxTurns: 20, allowedTools: ["WebSearch", "Read"] };
+    case "agent-review":
+      return { maxTurns: 20, allowedTools: ["Read"] };
     case "agent-run":
       return { maxTurns: 12, allowedTools: ["Bash"] };
+    case "agent-summarize":
+      return { maxTurns: 16, allowedTools: [] };
     case "agent-test":
       return { maxTurns: 18, allowedTools: ["Bash", "Read"] };
-    default:
-      return { maxTurns: 20 };
+    default: {
+      const _exhaustive: never = id;
+      throw new Error(`Unhandled agent slash command: ${String(_exhaustive)}`);
+    }
   }
 }

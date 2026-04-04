@@ -63,6 +63,13 @@ export const SlashSuggestionMenu = forwardRef<SlashSuggestionHandle, SlashSugges
       queueMicrotask(() => setSelectedIndex(0));
     }, [query]);
 
+    useEffect(() => {
+      setSelectedIndex((i) => {
+        if (items.length === 0) return 0;
+        return Math.min(i, items.length - 1);
+      });
+    }, [items.length]);
+
     const runAgentCommand = useCallback(
       async (id: AgentSlashCommandId) => {
         onClose();
@@ -122,35 +129,48 @@ export const SlashSuggestionMenu = forwardRef<SlashSuggestionHandle, SlashSugges
       }
     }, [selectedIndex]);
 
-    useImperativeHandle(ref, () => ({
-      onKeyDown: (event: KeyboardEvent) => {
-        if (event.key === "ArrowUp") {
-          event.preventDefault();
-          setSelectedIndex((prev) => (prev <= 0 ? items.length - 1 : prev - 1));
-          return true;
-        }
+    useImperativeHandle(
+      ref,
+      () => ({
+        onKeyDown: (event: KeyboardEvent) => {
+          if (items.length === 0) {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              onClose();
+              return true;
+            }
+            return false;
+          }
 
-        if (event.key === "ArrowDown") {
-          event.preventDefault();
-          setSelectedIndex((prev) => (prev >= items.length - 1 ? 0 : prev + 1));
-          return true;
-        }
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setSelectedIndex((prev) => (prev <= 0 ? items.length - 1 : prev - 1));
+            return true;
+          }
 
-        if (event.key === "Enter") {
-          event.preventDefault();
-          void selectItem(selectedIndex);
-          return true;
-        }
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setSelectedIndex((prev) => (prev >= items.length - 1 ? 0 : prev + 1));
+            return true;
+          }
 
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-          return true;
-        }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            void selectItem(selectedIndex);
+            return true;
+          }
 
-        return false;
-      },
-    }));
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onClose();
+            return true;
+          }
+
+          return false;
+        },
+      }),
+      [items, onClose, selectItem, selectedIndex],
+    );
 
     if (items.length === 0) {
       return (
