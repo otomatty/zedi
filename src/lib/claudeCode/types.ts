@@ -58,6 +58,26 @@ export interface ClaudeInstallationResult {
   version?: string;
 }
 
+/**
+ * Result of {@link claudeListModels} (sidecar `models-list`).
+ * {@link claudeListModels} の結果（sidecar `models-list`）。
+ */
+export interface ClaudeModelsListResult {
+  type: "models-list";
+  correlationId: string;
+  models: ClaudeModelEntry[];
+}
+
+/**
+ * SDK が返す個別モデル情報。
+ * Individual model info returned by the SDK.
+ */
+export interface ClaudeModelEntry {
+  value: string;
+  displayName: string;
+  description: string;
+}
+
 /** Tauri event name for streaming assistant text chunks. / ストリーミングアシスタントテキストチャンク用の Tauri イベント名。 */
 export const CLAUDE_STREAM_CHUNK_EVENT = "claude-stream-chunk" as const;
 

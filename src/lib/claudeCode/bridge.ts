@@ -16,6 +16,7 @@ import {
   CLAUDE_TOOL_USE_COMPLETE_EVENT,
   type ClaudeErrorPayload,
   type ClaudeInstallationResult,
+  type ClaudeModelsListResult,
   type ClaudeStreamChunkPayload,
   type ClaudeStreamCompletePayload,
   type ClaudeStatusResult,
@@ -34,6 +35,8 @@ function assertTauriWebview(): void {
 
 /** Optional arguments for {@link claudeQuery}. / {@link claudeQuery} の任意引数 */
 export interface ClaudeQueryOptions {
+  /** Claude model to use (e.g. 'claude-sonnet-4-6'). / 使用する Claude モデル */
+  model?: string;
   cwd?: string;
   maxTurns?: number;
   allowedTools?: string[];
@@ -49,6 +52,7 @@ export async function claudeQuery(prompt: string, options?: ClaudeQueryOptions):
   assertTauriWebview();
   return invoke<string>("claude_query", {
     prompt,
+    model: options?.model ?? null,
     cwd: options?.cwd ?? null,
     maxTurns: options?.maxTurns ?? null,
     allowedTools: options?.allowedTools ?? null,
@@ -146,4 +150,13 @@ export function onClaudeToolUseComplete(
   return listen<ClaudeToolUseCompletePayload>(CLAUDE_TOOL_USE_COMPLETE_EVENT, (event) => {
     callback(event.payload);
   });
+}
+
+/**
+ * Lists available Claude models via the sidecar (RPC).
+ * sidecar 経由で利用可能な Claude モデル一覧を取得する。
+ */
+export async function claudeListModels(): Promise<ClaudeModelsListResult> {
+  assertTauriWebview();
+  return invoke<ClaudeModelsListResult>("claude_list_models");
 }

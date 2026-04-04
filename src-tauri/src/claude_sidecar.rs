@@ -108,7 +108,7 @@ async fn process_sidecar_line(
         "error" => {
             let _ = app.emit("claude-error", &value);
         }
-        "status-response" | "installation-status" => {
+        "status-response" | "installation-status" | "models-list" => {
             if let Some(cid) = value.get("correlationId").and_then(|c| c.as_str()) {
                 let mut guard = pending.lock().await;
                 if let Some(tx) = guard.remove(cid) {
@@ -273,6 +273,7 @@ pub async fn claude_query(
     app: AppHandle,
     state: State<'_, ClaudeSidecarState>,
     prompt: String,
+    model: Option<String>,
     cwd: Option<String>,
     max_turns: Option<u32>,
     allowed_tools: Option<Vec<String>>,
@@ -286,6 +287,9 @@ pub async fn claude_query(
         "id": id,
         "prompt": prompt,
     });
+    if let Some(m) = &model {
+        req["model"] = Value::String(m.clone());
+    }
     if let Some(c) = cwd {
         req["cwd"] = Value::String(c);
     }
@@ -351,6 +355,24 @@ pub async fn check_claude_installation(
     let correlation_id = uuid::Uuid::new_v4().to_string();
     let req = serde_json::json!({
         "type": "check_installation",
+        "correlationId": correlation_id,
+    });
+
+    rpc_json(&app, &state, req, &correlation_id).await
+}
+
+/// Lists available Claude models via the sidecar (SDK `supportedModels()`).
+/// sidecar 経由で利用可能な Claude モデル一覧を取得する。
+#[tauri::command]
+pub async fn claude_list_models(
+    app: AppHandle,
+    state: State<'_, ClaudeSidecarState>,
+) -> Result<Value, String> {
+    ensure_sidecar(&app, &state).await?;
+
+    let correlation_id = uuid::Uuid::new_v4().to_string();
+    let req = serde_json::json!({
+        "type": "list_models",
         "correlationId": correlation_id,
     });
 

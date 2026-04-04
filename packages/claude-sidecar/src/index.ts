@@ -8,6 +8,7 @@
 import * as readline from "node:readline";
 import { formatResponseLine, parseRequestLine } from "./protocol";
 import { checkClaudeInstallation } from "./handlers/installation";
+import { listClaudeModels } from "./handlers/models";
 import { runQuery } from "./handlers/query";
 import { QueryActivityTracker } from "./handlers/status";
 
@@ -67,6 +68,22 @@ async function handleRequest(raw: string): Promise<void> {
       abortById.get(req.id)?.abort();
       return;
     }
+    case "list_models": {
+      try {
+        const models = await listClaudeModels();
+        writeLine(
+          formatResponseLine({
+            type: "models-list",
+            correlationId: req.correlationId,
+            models,
+          }),
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        emitError("list_models", message, "list_models_error");
+      }
+      return;
+    }
     case "query": {
       if (abortById.has(req.id)) {
         emitError(req.id, "duplicate query id", "duplicate_id");
@@ -77,6 +94,7 @@ async function handleRequest(raw: string): Promise<void> {
       void runQuery({
         id: req.id,
         prompt: req.prompt,
+        model: req.model,
         cwd: req.cwd,
         maxTurns: req.maxTurns,
         allowedTools: req.allowedTools,

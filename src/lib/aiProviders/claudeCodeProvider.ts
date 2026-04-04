@@ -102,6 +102,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
       try {
         const prompt = request.messages.map((m) => m.content).join("\n\n");
         currentRequestId = await claudeQuery(prompt, {
+          model: request.model || undefined,
           cwd: request.options?.cwd,
           maxTurns: request.options?.maxTurns,
           allowedTools: request.options?.allowedTools,

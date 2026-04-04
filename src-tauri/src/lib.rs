@@ -16,6 +16,7 @@ pub fn run() {
             claude_sidecar::claude_abort,
             claude_sidecar::claude_status,
             claude_sidecar::check_claude_installation,
+            claude_sidecar::claude_list_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

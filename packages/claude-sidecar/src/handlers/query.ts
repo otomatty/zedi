@@ -119,6 +119,7 @@ function emitResultOrError(
 export async function runQuery(params: {
   id: string;
   prompt: string;
+  model?: string;
   cwd?: string;
   maxTurns?: number;
   allowedTools?: string[];
@@ -127,8 +128,18 @@ export async function runQuery(params: {
   abortController: AbortController;
   tracker: QueryActivityTracker;
 }): Promise<void> {
-  const { id, prompt, cwd, maxTurns, allowedTools, resume, writeLine, abortController, tracker } =
-    params;
+  const {
+    id,
+    prompt,
+    model,
+    cwd,
+    maxTurns,
+    allowedTools,
+    resume,
+    writeLine,
+    abortController,
+    tracker,
+  } = params;
 
   const emit = (response: SidecarResponse): void => {
     writeLine(formatResponseLine(response));
@@ -142,6 +153,7 @@ export async function runQuery(params: {
     const q = query({
       prompt,
       options: {
+        model: model || undefined,
         cwd: cwd ?? process.cwd(),
         maxTurns: maxTurns ?? 25,
         allowedTools: allowedTools?.length ? allowedTools : [...DEFAULT_TOOLS],
