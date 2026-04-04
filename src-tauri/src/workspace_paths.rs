@@ -312,10 +312,11 @@ fn list_directory_names(
     for entry in fs::read_dir(target).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') {
+        let is_dir = entry.file_type().map_err(|e| e.to_string())?.is_dir();
+        // Skip dotfiles except `.zedi/` (workspace metadata; Issue #461).
+        if name.starts_with('.') && !(name == ".zedi" && is_dir) {
             continue;
         }
-        let is_dir = entry.file_type().map_err(|e| e.to_string())?.is_dir();
         let display = if is_dir {
             format!("{name}/")
         } else {

@@ -70,23 +70,21 @@ export function NoteWorkspaceProvider({
     });
   }, []);
 
-  useEffect(() => {
-    setWorkspaceRootState(readNoteWorkspacePath(noteId));
-  }, [noteId]);
-
   /**
-   * Single source of Rust registry sync (setters only update local state; avoids duplicate IPC).
-   * Rust レジストリ同期はここのみ（setter はローカル状態のみ更新し二重 IPC を避ける）。
+   * On mount / note change, `key={note.id}` remounts this provider so `useState` reads storage.
+   * Enqueue Rust registry sync here (same tick as first paint) so Tauri I/O is not ahead of registration.
+   * `key={note.id}` で再マウント時は `useState` がストレージを読む。ここでは Rust 同期のみ即キュー。
    */
   useEffect(() => {
+    const path = readNoteWorkspacePath(noteId);
     enqueueRustRegistrySync(async () => {
-      if (workspaceRoot) {
-        await registerNoteWorkspaceRoot(noteId, workspaceRoot);
+      if (path) {
+        await registerNoteWorkspaceRoot(noteId, path);
       } else {
         await clearNoteWorkspaceRoot(noteId);
       }
     });
-  }, [noteId, workspaceRoot, enqueueRustRegistrySync]);
+  }, [noteId, enqueueRustRegistrySync]);
 
   const setWorkspaceRoot = useCallback(
     (path: string) => {
@@ -94,18 +92,27 @@ export function NoteWorkspaceProvider({
       if (!normalized) {
         clearNoteWorkspacePath(noteId);
         setWorkspaceRootState(null);
+        enqueueRustRegistrySync(async () => {
+          await clearNoteWorkspaceRoot(noteId);
+        });
         return;
       }
       writeNoteWorkspacePath(noteId, normalized);
       setWorkspaceRootState(normalized);
+      enqueueRustRegistrySync(async () => {
+        await registerNoteWorkspaceRoot(noteId, normalized);
+      });
     },
-    [noteId],
+    [noteId, enqueueRustRegistrySync],
   );
 
   const clearWorkspace = useCallback(() => {
     clearNoteWorkspacePath(noteId);
     setWorkspaceRootState(null);
-  }, [noteId]);
+    enqueueRustRegistrySync(async () => {
+      await clearNoteWorkspaceRoot(noteId);
+    });
+  }, [noteId, enqueueRustRegistrySync]);
 
   const pickWorkspace = useCallback(async () => {
     const path = await pickNoteWorkspaceDirectory();
