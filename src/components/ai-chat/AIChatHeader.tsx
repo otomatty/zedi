@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Sparkles, ClipboardList, Plus, X, Maximize2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { AI_CHAT_BASE_PATH, aiChatConversationPath } from "@/constants/aiChatSidebar";
-import { loadAISettings } from "@/lib/aiSettings";
+import { AI_SETTINGS_CHANGED_EVENT, loadAISettings } from "@/lib/aiSettings";
 import {
   type AIInteractionMode,
   getInteractionMode,
@@ -19,6 +19,7 @@ import {
 export function AIChatHeader() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { closePanel, toggleConversationList, setActiveConversation, activeConversationId } =
     useAIChatStore();
 
@@ -29,7 +30,7 @@ export function AIChatHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const refresh = async () => {
       const settings = await loadAISettings();
       if (cancelled) return;
       const s = settings ?? DEFAULT_AI_SETTINGS;
@@ -37,11 +38,17 @@ export function AIChatHeader() {
       const providerName =
         mode === "user_api_key" ? (getProviderById(s.provider)?.name ?? s.provider) : undefined;
       setModeInfo({ mode, providerName });
-    })();
+    };
+    void refresh();
+    const onSettingsChanged = () => {
+      void refresh();
+    };
+    window.addEventListener(AI_SETTINGS_CHANGED_EVENT, onSettingsChanged);
     return () => {
       cancelled = true;
+      window.removeEventListener(AI_SETTINGS_CHANGED_EVENT, onSettingsChanged);
     };
-  }, []);
+  }, [location.pathname, location.search]);
 
   const handleNewConversation = () => {
     setActiveConversation(null);

@@ -198,6 +198,11 @@ export async function runQuery(params: {
       }
 
       if (isToolProgressMessage(msg)) {
+        // Complete the previous tool before starting the next when SDK switches tools mid-stream.
+        // SDK がツールを切り替えたとき、次の tool_progress の前に前ツールを完了扱いにする。
+        if (activeToolName && activeToolName !== msg.tool_name) {
+          emit({ type: "tool-use-complete", id, toolName: activeToolName });
+        }
         if (!activeToolName || activeToolName !== msg.tool_name) {
           activeToolName = msg.tool_name;
           emit({

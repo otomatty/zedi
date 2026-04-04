@@ -110,14 +110,18 @@ export function AIChatModelSelector() {
         setServerAIModels([]);
 
         const current = useAIChatStore.getState().selectedModel;
-        const initial = resolveClaudeInitialSelection(claudeModels, current, settings?.modelId);
-        if (initial) {
-          setSelectedModel({
-            id: initial.id,
-            provider: "claude-code",
-            model: initial.modelId,
-            displayName: initial.displayName,
-          });
+        if (claudeModels.length === 0) {
+          setSelectedModel(null);
+        } else {
+          const initial = resolveClaudeInitialSelection(claudeModels, current, settings?.modelId);
+          if (initial) {
+            setSelectedModel({
+              id: initial.id,
+              provider: "claude-code",
+              model: initial.modelId,
+              displayName: initial.displayName,
+            });
+          }
         }
         return;
       }
@@ -140,16 +144,20 @@ export function AIChatModelSelector() {
       );
 
       const current = useAIChatStore.getState().selectedModel;
-      const initial = resolveServerInitialSelection(available, current, settings?.modelId);
-      if (initial) {
-        setSelectedModel({
-          id: initial.id,
-          provider: initial.provider,
-          model: initial.modelId,
-          displayName: initial.displayName,
-          inputCostUnits: initial.inputCostUnits,
-          outputCostUnits: initial.outputCostUnits,
-        });
+      if (available.length === 0) {
+        setSelectedModel(null);
+      } else {
+        const initial = resolveServerInitialSelection(available, current, settings?.modelId);
+        if (initial) {
+          setSelectedModel({
+            id: initial.id,
+            provider: initial.provider,
+            model: initial.modelId,
+            displayName: initial.displayName,
+            inputCostUnits: initial.inputCostUnits,
+            outputCostUnits: initial.outputCostUnits,
+          });
+        }
       }
     } catch {
       // fallback: use settings model
