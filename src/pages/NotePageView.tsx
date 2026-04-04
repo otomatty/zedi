@@ -40,7 +40,7 @@ function NotePageEditorEditable({
   noteId: string;
   collaboration: UseCollaborationReturn;
   isCollaborationEnabled: boolean;
-}) {
+}): React.JSX.Element {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
   const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
   const noteWorkspace = useNoteWorkspaceOptional();

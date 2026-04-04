@@ -74,7 +74,10 @@ export function NoteWorkspaceProvider({
     setWorkspaceRootState(readNoteWorkspacePath(noteId));
   }, [noteId]);
 
-  /** Keep Rust-side registry in sync with localStorage (trusted read/list in Tauri). */
+  /**
+   * Single source of Rust registry sync (setters only update local state; avoids duplicate IPC).
+   * Rust レジストリ同期はここのみ（setter はローカル状態のみ更新し二重 IPC を避ける）。
+   */
   useEffect(() => {
     enqueueRustRegistrySync(async () => {
       if (workspaceRoot) {
@@ -91,27 +94,18 @@ export function NoteWorkspaceProvider({
       if (!normalized) {
         clearNoteWorkspacePath(noteId);
         setWorkspaceRootState(null);
-        enqueueRustRegistrySync(async () => {
-          await clearNoteWorkspaceRoot(noteId);
-        });
         return;
       }
       writeNoteWorkspacePath(noteId, normalized);
       setWorkspaceRootState(normalized);
-      enqueueRustRegistrySync(async () => {
-        await registerNoteWorkspaceRoot(noteId, normalized);
-      });
     },
-    [noteId, enqueueRustRegistrySync],
+    [noteId],
   );
 
   const clearWorkspace = useCallback(() => {
     clearNoteWorkspacePath(noteId);
     setWorkspaceRootState(null);
-    enqueueRustRegistrySync(async () => {
-      await clearNoteWorkspaceRoot(noteId);
-    });
-  }, [noteId, enqueueRustRegistrySync]);
+  }, [noteId]);
 
   const pickWorkspace = useCallback(async () => {
     const path = await pickNoteWorkspaceDirectory();

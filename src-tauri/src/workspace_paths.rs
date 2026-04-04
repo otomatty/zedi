@@ -148,14 +148,16 @@ fn canonical_note_workspace_root(workspace_root: &str) -> Result<PathBuf, String
     Ok(canon)
 }
 
-fn validate_note_id_key(note_id: &str) -> Result<(), String> {
+/// Validates reserved keys and returns a trimmed registry key (must match lookup keys).
+/// 予約キーを検証し、レジストリキー用に trim 済み文字列を返す（参照キーと一致させる）。
+fn parse_note_id_key(note_id: String) -> Result<String, String> {
     let t = note_id.trim();
     if t.is_empty() {
         return Err("invalid note id".into());
     }
     match t {
         "__proto__" | "prototype" | "constructor" => Err("invalid note id".into()),
-        _ => Ok(()),
+        _ => Ok(t.to_string()),
     }
 }
 
@@ -195,7 +197,7 @@ fn resolve_registered_root(note_id: &str) -> Result<PathBuf, String> {
 /// ノートのワークスペースルートを登録する（読み取りはここ経由。IPC の生パスだけは信用しない）。
 #[tauri::command]
 pub fn register_note_workspace_root(note_id: String, workspace_root: String) -> Result<(), String> {
-    validate_note_id_key(&note_id)?;
+    let note_id = parse_note_id_key(note_id)?;
     let canon = canonical_note_workspace_root(&workspace_root)?;
     with_registry_write_lock(|| {
         let mut reg = load_registry()?;
@@ -209,7 +211,7 @@ pub fn register_note_workspace_root(note_id: String, workspace_root: String) -> 
 /// ノートの登録済みワークスペースルートを削除する。
 #[tauri::command]
 pub fn clear_note_workspace_root(note_id: String) -> Result<(), String> {
-    validate_note_id_key(&note_id)?;
+    let note_id = parse_note_id_key(note_id)?;
     with_registry_write_lock(|| {
         let mut reg = load_registry()?;
         reg.roots.remove(&note_id);
@@ -266,7 +268,7 @@ pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<Stri
 /// 登録済み `note_id` のワークスペース配下の UTF-8 を読む（単一ハンドルでサイズ上限）。
 #[tauri::command]
 pub fn read_note_workspace_file(note_id: String, relative_path: String) -> Result<String, String> {
-    validate_note_id_key(&note_id)?;
+    let note_id = parse_note_id_key(note_id)?;
     let root_canon = resolve_registered_root(&note_id)?;
     let rel = relative_path.replace('\\', "/");
     read_utf8_file_under_root(&root_canon, &rel)
@@ -280,7 +282,7 @@ pub fn list_note_workspace_entries(
     relative_dir: String,
     max_entries: Option<u32>,
 ) -> Result<Vec<String>, String> {
-    validate_note_id_key(&note_id)?;
+    let note_id = parse_note_id_key(note_id)?;
     let cap = max_entries
         .unwrap_or(DEFAULT_NOTE_WORKSPACE_MAX_ENTRIES)
         .min(HARD_MAX_NOTE_WORKSPACE_ENTRIES);
