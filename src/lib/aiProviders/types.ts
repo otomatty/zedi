@@ -32,8 +32,13 @@ export interface AIRequest {
  * A chunk yielded during streaming.
  */
 export interface AIStreamChunk {
-  type: "text" | "tool_use" | "error" | "done";
+  type: "text" | "tool_use_start" | "tool_use_complete" | "error" | "done";
   content: string;
+  /**
+   * ツール名（tool_use_start / tool_use_complete 時に設定）。
+   * Tool name, set for tool_use_start and tool_use_complete chunks.
+   */
+  toolName?: string;
 }
 
 /**

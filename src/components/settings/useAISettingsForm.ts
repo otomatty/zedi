@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@zedi/ui";
 import { useAISettings } from "@/hooks/useAISettings";
@@ -8,7 +8,90 @@ import {
   useClaudeCodeAvailability,
   useServerModels,
 } from "./useAISettingsFormHelpers";
-import type { AISettings } from "@/types/ai";
+import type { AIProviderType, AISettings, AIInteractionMode } from "@/types/ai";
+import { getInteractionMode } from "@/types/ai";
+
+/** Per-mode snapshot so switching modes does not lose provider/model/API key. / モード切替で値を失わないためのスナップショット */
+type ModeFieldsSnapshot = {
+  provider: AIProviderType;
+  model: string;
+  modelId: string;
+  apiKey: string;
+};
+
+/**
+ * Builds persisted field updates for a mode switch and records per-mode snapshots.
+ * モード切替用の更新オブジェクトを組み立て、モードごとのスナップショットを記録する。
+ */
+function buildInteractionModeUpdates(
+  settings: AISettings,
+  newMode: AIInteractionMode,
+  snapshotsRef: MutableRefObject<Partial<Record<AIInteractionMode, ModeFieldsSnapshot>>>,
+): Partial<AISettings> {
+  const currentMode = getInteractionMode(settings);
+  snapshotsRef.current[currentMode] = {
+    provider: settings.provider,
+    model: settings.model,
+    modelId: settings.modelId,
+    apiKey: settings.apiKey,
+  };
+
+  const snap = snapshotsRef.current[newMode];
+
+  switch (newMode) {
+    case "default": {
+      const base =
+        snap ??
+        ({
+          provider: settings.provider === "claude-code" ? "google" : settings.provider,
+          model: settings.model,
+          modelId: settings.modelId,
+          apiKey: "",
+        } satisfies ModeFieldsSnapshot);
+      return {
+        provider: base.provider,
+        model: base.model,
+        modelId: base.modelId,
+        apiMode: "api_server",
+        apiKey: "",
+      };
+    }
+    case "user_api_key": {
+      const base =
+        snap ??
+        ({
+          provider: settings.provider === "claude-code" ? "google" : settings.provider,
+          model: settings.model,
+          modelId: settings.modelId,
+          apiKey: "",
+        } satisfies ModeFieldsSnapshot);
+      return {
+        provider: base.provider,
+        model: base.model,
+        modelId: base.modelId,
+        apiMode: "user_api_key",
+        apiKey: base.apiKey,
+      };
+    }
+    case "claude_code": {
+      const base =
+        snap ??
+        ({
+          provider: "claude-code",
+          model: "default",
+          modelId: "claude-code:default",
+          apiKey: "",
+        } satisfies ModeFieldsSnapshot);
+      return {
+        provider: "claude-code",
+        model: base.model,
+        modelId: base.modelId,
+        apiMode: "api_server",
+        apiKey: "",
+      };
+    }
+  }
+}
 
 /**
  * Custom hook for AI settings form state and actions.
@@ -41,9 +124,12 @@ export function useAISettingsForm() {
     load: loadServerModels,
   } = useServerModels();
 
-  const useOwnKey = !isLoading && settings.apiMode === "user_api_key";
-  const isClaudeCode = settings.provider === "claude-code";
-  const isServerMode = settings.apiMode === "api_server" && !useOwnKey && !isClaudeCode;
+  const interactionMode: AIInteractionMode = isLoading ? "default" : getInteractionMode(settings);
+  const isServerMode = interactionMode === "default";
+  const isClaudeCode = interactionMode === "claude_code";
+  const useOwnKey = interactionMode === "user_api_key";
+
+  const modeSnapshotsRef = useRef<Partial<Record<AIInteractionMode, ModeFieldsSnapshot>>>({});
 
   useEffect(() => {
     if (isServerMode) {
@@ -71,11 +157,15 @@ export function useAISettingsForm() {
     [clearSavedIndicator, updateSettingsBase, scheduleSave],
   );
 
-  const handleToggleOwnKey = useCallback(
-    (checked: boolean) => {
-      updateSettings({ apiMode: checked ? "user_api_key" : "api_server" });
+  /**
+   * 利用モードを切り替える。モードごとのスナップショットで provider/model/API キーを復元する。
+   * Switches interaction mode and restores per-mode snapshots for provider/model/API key.
+   */
+  const handleModeChange = useCallback(
+    (newMode: AIInteractionMode) => {
+      updateSettings(buildInteractionModeUpdates(settings, newMode, modeSnapshotsRef));
     },
-    [updateSettings],
+    [settings, updateSettings],
   );
 
   const handleTest = useCallback(async () => {
@@ -130,10 +220,11 @@ export function useAISettingsForm() {
     serverModelsError,
     isServerMode,
     isClaudeCode,
+    interactionMode,
     claudeCodeAvailable,
     loadServerModels,
     updateSettings,
-    handleToggleOwnKey,
+    handleModeChange,
     handleServerModelSelect,
     handleTest,
     handleReset,

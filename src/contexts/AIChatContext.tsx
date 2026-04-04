@@ -9,14 +9,24 @@ interface AIChatContextValue {
   setAIChatAvailable: (available: boolean) => void;
   /** AI追記後にエディタ内容を同期するハンドラ ref */
   contentAppendHandlerRef: React.MutableRefObject<((nextContent: string) => void) | null>;
+  /**
+   * エディタのカーソル位置にマークダウンを挿入するハンドラ ref。
+   * Ref to a handler that inserts markdown at the editor's current cursor position.
+   */
+  insertAtCursorRef: React.MutableRefObject<((markdown: string) => boolean) | null>;
 }
 
 const AIChatContext = createContext<AIChatContextValue | undefined>(undefined);
 
+/**
+ * AIチャットコンテキストプロバイダー。ページ情報・挿入ハンドラを子孫に提供する。
+ * Provides page context, content-append handler, and insert-at-cursor handler to descendants.
+ */
 export function AIChatProvider({ children }: { children: ReactNode }) {
   const [pageContext, setPageContext] = useState<PageContext | null>(null);
   const [aiChatAvailable, setAIChatAvailable] = useState(false);
   const contentAppendHandlerRef = useRef<((nextContent: string) => void) | null>(null);
+  const insertAtCursorRef = useRef<((markdown: string) => boolean) | null>(null);
 
   return (
     <AIChatContext.Provider
@@ -26,6 +36,7 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
         aiChatAvailable,
         setAIChatAvailable,
         contentAppendHandlerRef,
+        insertAtCursorRef,
       }}
     >
       {children}
@@ -33,6 +44,10 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * AIチャットコンテキストを取得するフック。AIChatProvider 内でのみ使用可能。
+ * Hook to access the AI chat context. Must be used within an AIChatProvider.
+ */
 export function useAIChatContext() {
   const context = useContext(AIChatContext);
   if (context === undefined) {

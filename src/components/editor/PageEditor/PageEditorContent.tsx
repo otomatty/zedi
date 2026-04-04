@@ -1,4 +1,5 @@
 import React, { useRef, useCallback, useMemo } from "react";
+import type { MutableRefObject } from "react";
 import { Loader2 } from "lucide-react";
 import TiptapEditor from "../TiptapEditor";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
@@ -64,6 +65,11 @@ interface PageEditorContentProps {
   /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied でクリア */
   wikiContentForCollab?: string | null;
   onWikiContentApplied?: () => void;
+  /**
+   * カーソル位置にコンテンツを挿入するコールバック ref。TiptapEditor に透過的に渡す。
+   * Ref to insert content at the editor's cursor. Forwarded to TiptapEditor.
+   */
+  insertAtCursorRef?: MutableRefObject<((content: unknown) => boolean) | null>;
 }
 
 /**
@@ -93,6 +99,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   onGenerateWiki,
   wikiContentForCollab = null,
   onWikiContentApplied,
+  insertAtCursorRef,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
   const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
@@ -158,6 +165,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 onContentError={onContentError}
                 collaborationConfig={collaborationConfig}
                 focusContentRef={contentFocusRef}
+                insertAtCursorRef={insertAtCursorRef}
                 initialContent={initialContent}
                 onInitialContentApplied={onInitialContentApplied}
                 wikiContentForCollab={wikiContentForCollab ?? undefined}

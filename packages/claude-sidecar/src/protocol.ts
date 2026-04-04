@@ -12,6 +12,7 @@ export type SidecarRequest =
       type: "query";
       id: string;
       prompt: string;
+      model?: string;
       cwd?: string;
       maxTurns?: number;
       allowedTools?: string[];
@@ -22,6 +23,7 @@ export type SidecarRequest =
   | { type: "abort"; id: string }
   | { type: "status"; correlationId: string }
   | { type: "check_installation"; correlationId: string }
+  | { type: "list_models"; correlationId: string }
   | { type: "shutdown" };
 
 /** Outbound message to the host (one JSON object per line on stdout). */
@@ -29,6 +31,17 @@ export type SidecarResponse =
   | { type: "stream-chunk"; id: string; content: string }
   | { type: "stream-complete"; id: string; result: { content: string } }
   | { type: "error"; id: string; error: string; code?: string }
+  | {
+      type: "tool-use-start";
+      id: string;
+      toolName: string;
+      toolInput: string;
+    }
+  | {
+      type: "tool-use-complete";
+      id: string;
+      toolName: string;
+    }
   | {
       type: "status-response";
       correlationId: string;
@@ -40,6 +53,11 @@ export type SidecarResponse =
       correlationId: string;
       installed: boolean;
       version?: string;
+    }
+  | {
+      type: "models-list";
+      correlationId: string;
+      models: Array<{ value: string; displayName: string; description: string }>;
     }
   | { type: "shutdown-ack" };
 

@@ -19,7 +19,10 @@
     "createMultiple": "Create All",
     "addLink": "Add Link",
     "copyCode": "Copy code",
-    "copiedCode": "Copied"
+    "copiedCode": "Copied",
+    "insertToNote": "Insert to note",
+    "copyMessage": "Copy",
+    "copyFailed": "Failed to copy"
   },
   "placeholders": {
     "default": "Type a message...",
@@ -59,7 +62,9 @@
     "pageBodyGenerateFailed": "Failed to generate page content",
     "wikiLinksAdded": "Added {{count}} wiki links",
     "noNewWikiLinks": "There are no new wiki links to add",
-    "actionFailed": "Failed to execute the action"
+    "actionFailed": "Failed to execute the action",
+    "insertSuccess": "Inserted into note",
+    "insertUnavailable": "No editor available for insertion"
   },
   "messages": {
     "loadingSkeleton": "Loading response"
@@ -81,6 +86,13 @@
   "empty": {
     "messages": "Messages will appear here",
     "pageConversations": "No conversation history for this page yet"
+  },
+  "mode": {
+    "default": "Server",
+    "apiKey": "API Key",
+    "apiKeyWithProvider": "API Key: {{provider}}",
+    "claudeCode": "Claude Code",
+    "openSettings": "Open AI settings"
   },
   "modelSelector": {
     "select": "Select model",
@@ -104,6 +116,15 @@
     "deleteConfirmDescription": "This cannot be undone.",
     "openMenu": "Open menu",
     "empty": "No conversations yet"
+  },
+  "toolStatus": {
+    "read": "Reading file",
+    "write": "Writing file",
+    "bash": "Running command",
+    "webSearch": "Searching web",
+    "glob": "Searching files",
+    "grep": "Searching text",
+    "ls": "Listing directory"
   },
   "referencedPages": {
     "added": "Added \"{{title}}\" as reference",

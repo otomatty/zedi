@@ -1,4 +1,6 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { useToast } from "@zedi/ui";
 import { AIChatHeader } from "./AIChatHeader";
 import { AIChatViewTabs } from "./AIChatViewTabs";
 import { AIChatInput } from "./AIChatInput";
@@ -6,6 +8,7 @@ import { AIChatMessages } from "./AIChatMessages";
 import { AIChatContextBar } from "./AIChatContextBar";
 import { AIChatConversationList } from "./AIChatConversationList";
 import { useAIChatPanelContentLogic } from "@/hooks/useAIChatPanelContentLogic";
+import { useAIChatContext } from "@/contexts/AIChatContext";
 
 const AIChatBranchTree = lazy(() =>
   import("./AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
@@ -63,6 +66,27 @@ export function AIChatPanelContent({
     contextEnabled,
   });
 
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const { insertAtCursorRef, pageContext } = useAIChatContext();
+
+  const handleInsertToNote = useCallback(
+    (markdown: string) => {
+      const ok = insertAtCursorRef.current?.(markdown);
+      if (ok) {
+        toast({ title: t("aiChat.notifications.insertSuccess") });
+      } else {
+        toast({
+          title: t("aiChat.notifications.insertUnavailable"),
+          variant: "destructive",
+        });
+      }
+    },
+    [insertAtCursorRef, t, toast],
+  );
+
+  const canInsert = pageContext?.type === "editor";
+
   return (
     <div className="bg-background relative flex h-full flex-col border-l">
       <AIChatHeader />
@@ -88,6 +112,7 @@ export function AIChatPanelContent({
             onSuggestionClick={handleSendMessage}
             onExecuteAction={handleExecuteAction}
             onEditMessage={handleEditMessage}
+            onInsertToNote={canInsert ? handleInsertToNote : undefined}
             onSwitchBranch={switchBranch}
             isStreaming={isStreaming}
           />

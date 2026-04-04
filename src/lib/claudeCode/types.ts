@@ -27,6 +27,21 @@ export interface ClaudeErrorPayload {
   signal?: number | null;
 }
 
+/** Emitted as {@link CLAUDE_TOOL_USE_START_EVENT}. / {@link CLAUDE_TOOL_USE_START_EVENT} として発行される。 */
+export interface ClaudeToolUseStartPayload {
+  type: "tool-use-start";
+  id: string;
+  toolName: string;
+  toolInput: string;
+}
+
+/** Emitted as {@link CLAUDE_TOOL_USE_COMPLETE_EVENT}. / {@link CLAUDE_TOOL_USE_COMPLETE_EVENT} として発行される。 */
+export interface ClaudeToolUseCompletePayload {
+  type: "tool-use-complete";
+  id: string;
+  toolName: string;
+}
+
 /** Result of {@link claudeStatus} (sidecar `status-response`). / {@link claudeStatus} の結果（sidecar `status-response`）。 */
 export interface ClaudeStatusResult {
   type: "status-response";
@@ -43,6 +58,26 @@ export interface ClaudeInstallationResult {
   version?: string;
 }
 
+/**
+ * Result of {@link claudeListModels} (sidecar `models-list`).
+ * {@link claudeListModels} の結果（sidecar `models-list`）。
+ */
+export interface ClaudeModelsListResult {
+  type: "models-list";
+  correlationId: string;
+  models: ClaudeModelEntry[];
+}
+
+/**
+ * SDK が返す個別モデル情報。
+ * Individual model info returned by the SDK.
+ */
+export interface ClaudeModelEntry {
+  value: string;
+  displayName: string;
+  description: string;
+}
+
 /** Tauri event name for streaming assistant text chunks. / ストリーミングアシスタントテキストチャンク用の Tauri イベント名。 */
 export const CLAUDE_STREAM_CHUNK_EVENT = "claude-stream-chunk" as const;
 
@@ -51,3 +86,9 @@ export const CLAUDE_STREAM_COMPLETE_EVENT = "claude-stream-complete" as const;
 
 /** Tauri event name for errors (sidecar, SDK, or process). / エラー（sidecar, SDK, プロセス）用の Tauri イベント名。 */
 export const CLAUDE_ERROR_EVENT = "claude-error" as const;
+
+/** Tauri event name when a tool starts executing. / ツール実行開始時の Tauri イベント名。 */
+export const CLAUDE_TOOL_USE_START_EVENT = "claude-tool-use-start" as const;
+
+/** Tauri event name when a tool finishes executing. / ツール実行完了時の Tauri イベント名。 */
+export const CLAUDE_TOOL_USE_COMPLETE_EVENT = "claude-tool-use-complete" as const;

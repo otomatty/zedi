@@ -12,11 +12,16 @@ import {
   CLAUDE_ERROR_EVENT,
   CLAUDE_STREAM_CHUNK_EVENT,
   CLAUDE_STREAM_COMPLETE_EVENT,
+  CLAUDE_TOOL_USE_START_EVENT,
+  CLAUDE_TOOL_USE_COMPLETE_EVENT,
   type ClaudeErrorPayload,
   type ClaudeInstallationResult,
+  type ClaudeModelsListResult,
   type ClaudeStreamChunkPayload,
   type ClaudeStreamCompletePayload,
   type ClaudeStatusResult,
+  type ClaudeToolUseStartPayload,
+  type ClaudeToolUseCompletePayload,
 } from "./types";
 
 /** Throws if not running inside a Tauri WebView. / Tauri WebView 外なら例外 */
@@ -30,6 +35,8 @@ function assertTauriWebview(): void {
 
 /** Optional arguments for {@link claudeQuery}. / {@link claudeQuery} の任意引数 */
 export interface ClaudeQueryOptions {
+  /** Claude model to use (e.g. 'claude-sonnet-4-6'). / 使用する Claude モデル */
+  model?: string;
   cwd?: string;
   maxTurns?: number;
   allowedTools?: string[];
@@ -45,6 +52,7 @@ export async function claudeQuery(prompt: string, options?: ClaudeQueryOptions):
   assertTauriWebview();
   return invoke<string>("claude_query", {
     prompt,
+    model: options?.model ?? null,
     cwd: options?.cwd ?? null,
     maxTurns: options?.maxTurns ?? null,
     allowedTools: options?.allowedTools ?? null,
@@ -116,4 +124,39 @@ export function onClaudeError(
   return listen<ClaudeErrorPayload>(CLAUDE_ERROR_EVENT, (event) => {
     callback(event.payload);
   });
+}
+
+/**
+ * Subscribe to tool use start events (when the agent begins using a tool).
+ * ツール使用開始イベントを購読する。
+ */
+export function onClaudeToolUseStart(
+  callback: (payload: ClaudeToolUseStartPayload) => void,
+): Promise<UnlistenFn> {
+  assertTauriWebview();
+  return listen<ClaudeToolUseStartPayload>(CLAUDE_TOOL_USE_START_EVENT, (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Subscribe to tool use complete events (when the agent finishes using a tool).
+ * ツール使用完了イベントを購読する。
+ */
+export function onClaudeToolUseComplete(
+  callback: (payload: ClaudeToolUseCompletePayload) => void,
+): Promise<UnlistenFn> {
+  assertTauriWebview();
+  return listen<ClaudeToolUseCompletePayload>(CLAUDE_TOOL_USE_COMPLETE_EVENT, (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Lists available Claude models via the sidecar (RPC).
+ * sidecar 経由で利用可能な Claude モデル一覧を取得する。
+ */
+export async function claudeListModels(): Promise<ClaudeModelsListResult> {
+  assertTauriWebview();
+  return invoke<ClaudeModelsListResult>("claude_list_models");
 }

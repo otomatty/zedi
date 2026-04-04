@@ -7,6 +7,18 @@ import { isTauriDesktop } from "@/lib/platform";
 const STORAGE_KEY = "zedi-ai-settings";
 
 /**
+ * Same-tab notification after AI settings persist (the `storage` event does not fire on the writer).
+ * AI 設定保存後の同一タブ向け通知（書き込み側では `storage` が発火しない）。
+ */
+export const AI_SETTINGS_CHANGED_EVENT = "zedi-ai-settings-changed";
+
+function dispatchAISettingsChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(AI_SETTINGS_CHANGED_EVENT));
+  }
+}
+
+/**
  * AI設定を保存する
  * APIキーは暗号化して保存
  */
@@ -18,6 +30,7 @@ export async function saveAISettings(settings: AISettings): Promise<void> {
       apiKey: settings.apiKey ? await encrypt(settings.apiKey) : "",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
+    dispatchAISettingsChanged();
   } catch (error) {
     console.error("Failed to save AI settings:", error);
     throw new Error("AI設定の保存に失敗しました");
@@ -66,6 +79,7 @@ export async function loadAISettings(): Promise<AISettings | null> {
  */
 export function clearAISettings(): void {
   localStorage.removeItem(STORAGE_KEY);
+  dispatchAISettingsChanged();
 }
 
 /**

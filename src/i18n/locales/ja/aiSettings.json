@@ -44,5 +44,32 @@
   "claudeCodeDescription": "ファイル操作やコマンド実行など、高度な機能を持つ AI アシスタントです。",
   "providerUnavailable": "利用不可",
   "providerAvailable": "利用可能",
-  "checkingAvailability": "確認中..."
+  "checkingAvailability": "確認中...",
+  "modeLabel": "利用モード",
+  "modeDefault": "デフォルト（サーバー経由）",
+  "modeDefaultDescription": "Zedi の AI サーバー経由で利用します。APIキーは不要です。",
+  "modeApiKey": "自分のAPIキーを使用",
+  "modeApiKeyDescription": "自分のAPIキーを設定し、制限なくすべてのモデルを利用できます。",
+  "modeClaudeCode": "Claude Code",
+  "modeClaudeCodeDescription": "Claude Code エージェントを使用します（デスクトップアプリ専用）。",
+  "prereq": {
+    "title": "前提条件チェック",
+    "recheck": "再確認",
+    "allPassed": "すべての前提条件を満たしています。Claude Code を利用できます。",
+    "desktop": "デスクトップアプリ",
+    "desktopDescription": "Zedi デスクトップアプリ（Tauri）で実行している必要があります。",
+    "desktopOk": "デスクトップアプリで実行中",
+    "desktopFail": "Web ブラウザでは利用できません。デスクトップアプリをお使いください。",
+    "cli": "Claude Code CLI",
+    "cliDescription": "claude コマンドがインストールされている必要があります。",
+    "cliOk": "インストール済み",
+    "cliOkVersion": "インストール済み（v{{version}}）",
+    "cliFail": "claude コマンドが見つかりません。npm install -g @anthropic-ai/claude-code でインストールしてください。",
+    "sidecar": "サイドカー接続",
+    "sidecarDescription": "Claude Code のバックグラウンドプロセスと通信できる必要があります。",
+    "sidecarOk": "接続可能",
+    "sidecarFail": "サイドカーに接続できませんでした。アプリを再起動してみてください。",
+    "requiresDesktop": "デスクトップアプリが必要です",
+    "requiresCli": "Claude Code CLI のインストールが必要です"
+  }
 }

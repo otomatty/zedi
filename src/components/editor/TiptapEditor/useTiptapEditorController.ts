@@ -25,6 +25,8 @@ function useEditorControllers(args: {
   onContentError: TiptapEditorProps["onContentError"];
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
   focusContentRef: TiptapEditorProps["focusContentRef"];
+  /** @see TiptapEditorProps.insertAtCursorRef */
+  insertAtCursorRef: TiptapEditorProps["insertAtCursorRef"];
   initialContent: TiptapEditorProps["initialContent"];
   onInitialContentApplied: TiptapEditorProps["onInitialContentApplied"];
   isWikiGenerating: boolean;
@@ -94,6 +96,7 @@ function useEditorControllers(args: {
     isWikiGenerating: args.isWikiGenerating,
     collaborationConfig: args.collaborationConfig,
     focusContentRef: args.focusContentRef,
+    insertAtCursorRef: args.insertAtCursorRef,
     initialContent: args.initialContent,
     onInitialContentApplied: args.onInitialContentApplied,
     wikiContentForCollab: args.wikiContentForCollab,
@@ -120,6 +123,7 @@ export function useTiptapEditorController({
   onContentError,
   collaborationConfig,
   focusContentRef,
+  insertAtCursorRef,
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
@@ -175,6 +179,7 @@ export function useTiptapEditorController({
     onContentError,
     collaborationConfig,
     focusContentRef,
+    insertAtCursorRef,
     initialContent,
     onInitialContentApplied,
     isWikiGenerating,

@@ -46,6 +46,8 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         onClaudeStreamChunk,
         onClaudeStreamComplete,
         onClaudeError,
+        onClaudeToolUseStart,
+        onClaudeToolUseComplete,
         claudeAbort,
       } = await import("@/lib/claudeCode/bridge");
 
@@ -75,9 +77,32 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         }
       });
 
+      const unlistenToolStart = await onClaudeToolUseStart((payload) => {
+        if (currentRequestId && payload.id === currentRequestId) {
+          chunks.push({
+            type: "tool_use_start",
+            content: payload.toolInput,
+            toolName: payload.toolName,
+          });
+          wake();
+        }
+      });
+
+      const unlistenToolComplete = await onClaudeToolUseComplete((payload) => {
+        if (currentRequestId && payload.id === currentRequestId) {
+          chunks.push({
+            type: "tool_use_complete",
+            content: "",
+            toolName: payload.toolName,
+          });
+          wake();
+        }
+      });
+
       try {
         const prompt = request.messages.map((m) => m.content).join("\n\n");
         currentRequestId = await claudeQuery(prompt, {
+          model: request.model || undefined,
           cwd: request.options?.cwd,
           maxTurns: request.options?.maxTurns,
           allowedTools: request.options?.allowedTools,
@@ -116,6 +141,8 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         unlistenChunk();
         unlistenComplete();
         unlistenError();
+        unlistenToolStart();
+        unlistenToolComplete();
         currentRequestId = null;
       }
     },

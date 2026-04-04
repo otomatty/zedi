@@ -16,6 +16,11 @@ interface AIChatMessagesProps {
   onSuggestionClick: (text: string) => void;
   onExecuteAction?: (action: ChatAction) => void;
   onEditMessage?: (messageId: string, newContent: string) => void;
+  /**
+   * カーソル位置にメッセージ内容を挿入するコールバック。
+   * Callback to insert message content at editor cursor position.
+   */
+  onInsertToNote?: (markdown: string) => void;
   /** Switch active branch at a fork. / 分岐点で表示ブランチを切り替え */
   onSwitchBranch?: (messageId: string, direction: "prev" | "next") => void;
   isStreaming?: boolean;
@@ -33,6 +38,7 @@ export function AIChatMessages({
   onSuggestionClick,
   onExecuteAction,
   onEditMessage,
+  onInsertToNote,
   onSwitchBranch,
   isStreaming = false,
   className,
@@ -70,6 +76,7 @@ export function AIChatMessages({
                 message={message}
                 onExecuteAction={onExecuteAction}
                 onEditMessage={onEditMessage}
+                onInsertToNote={onInsertToNote}
                 siblingIndex={hasSiblings ? index : undefined}
                 siblingTotal={hasSiblings ? siblings.length : undefined}
                 onSwitchBranch={

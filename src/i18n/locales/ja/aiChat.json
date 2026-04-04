@@ -19,7 +19,10 @@
     "createMultiple": "まとめて作成",
     "addLink": "リンクを追加",
     "copyCode": "コードをコピー",
-    "copiedCode": "コピーしました"
+    "copiedCode": "コピーしました",
+    "insertToNote": "ノートに挿入",
+    "copyMessage": "コピー",
+    "copyFailed": "コピーに失敗しました"
   },
   "placeholders": {
     "default": "メッセージを入力...",
@@ -59,7 +62,9 @@
     "pageBodyGenerateFailed": "ページ本文の生成に失敗しました",
     "wikiLinksAdded": "{{count}}件のWikiLinkを追加しました",
     "noNewWikiLinks": "追加できる新しいWikiLinkはありません",
-    "actionFailed": "アクションの実行に失敗しました"
+    "actionFailed": "アクションの実行に失敗しました",
+    "insertSuccess": "ノートに挿入しました",
+    "insertUnavailable": "挿入先のエディタがありません"
   },
   "messages": {
     "loadingSkeleton": "応答を読み込み中"
@@ -81,6 +86,13 @@
   "empty": {
     "messages": "メッセージ一覧がここに表示されます",
     "pageConversations": "このページの会話履歴はまだありません"
+  },
+  "mode": {
+    "default": "サーバー",
+    "apiKey": "APIキー",
+    "apiKeyWithProvider": "APIキー: {{provider}}",
+    "claudeCode": "Claude Code",
+    "openSettings": "AI設定を開く"
   },
   "modelSelector": {
     "select": "モデルを選択",
@@ -104,6 +116,15 @@
     "deleteConfirmDescription": "この操作は取り消せません。",
     "openMenu": "メニューを開く",
     "empty": "会話履歴はありません"
+  },
+  "toolStatus": {
+    "read": "ファイル読み込み中",
+    "write": "ファイル書き込み中",
+    "bash": "コマンド実行中",
+    "webSearch": "Web 検索中",
+    "glob": "ファイル検索中",
+    "grep": "テキスト検索中",
+    "ls": "ディレクトリ一覧取得中"
   },
   "referencedPages": {
     "added": "「{{title}}」を参照に追加しました",

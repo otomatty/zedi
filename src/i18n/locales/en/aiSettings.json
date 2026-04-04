@@ -44,5 +44,32 @@
   "claudeCodeDescription": "An AI assistant with advanced capabilities including file operations and command execution.",
   "providerUnavailable": "Unavailable",
   "providerAvailable": "Available",
-  "checkingAvailability": "Checking..."
+  "checkingAvailability": "Checking...",
+  "modeLabel": "Mode",
+  "modeDefault": "Default (via server)",
+  "modeDefaultDescription": "Uses Zedi's AI server. No API key required.",
+  "modeApiKey": "Use your own API key",
+  "modeApiKeyDescription": "Set your own API key to use all models without limits.",
+  "modeClaudeCode": "Claude Code",
+  "modeClaudeCodeDescription": "Use the Claude Code agent (desktop app only).",
+  "prereq": {
+    "title": "Prerequisites check",
+    "recheck": "Recheck",
+    "allPassed": "All prerequisites are met. Claude Code is ready to use.",
+    "desktop": "Desktop app",
+    "desktopDescription": "Must be running in the Zedi desktop app (Tauri).",
+    "desktopOk": "Running in desktop app",
+    "desktopFail": "Not available in the web browser. Please use the desktop app.",
+    "cli": "Claude Code CLI",
+    "cliDescription": "The claude command must be installed.",
+    "cliOk": "Installed",
+    "cliOkVersion": "Installed (v{{version}})",
+    "cliFail": "claude command not found. Install with: npm install -g @anthropic-ai/claude-code",
+    "sidecar": "Sidecar connection",
+    "sidecarDescription": "Must be able to communicate with the Claude Code background process.",
+    "sidecarOk": "Connected",
+    "sidecarFail": "Could not connect to the sidecar. Try restarting the app.",
+    "requiresDesktop": "Requires desktop app",
+    "requiresCli": "Requires Claude Code CLI"
+  }
 }

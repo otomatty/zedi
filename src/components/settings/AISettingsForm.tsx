@@ -1,9 +1,9 @@
 import React from "react";
-import { Bot, Loader2, Trash2, Key, CheckCircle2, XCircle, Terminal } from "lucide-react";
+import { Bot, Loader2, Trash2, Server, Key, Terminal } from "lucide-react";
 import { Button } from "@zedi/ui";
-import { Switch } from "@zedi/ui";
+import { RadioGroup, RadioGroupItem } from "@zedi/ui";
+import { Label } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
-import { Alert, AlertDescription, AlertTitle } from "@zedi/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,17 +20,19 @@ import { AISettingsFormServerSection } from "./AISettingsFormServerSection";
 import { AISettingsFormUserKeySection } from "./AISettingsFormUserKeySection";
 import { ProviderSelector } from "./ProviderSelector";
 import { SectionSaveStatus } from "./SectionSaveStatus";
-import { getProviderById, type AIProviderType } from "@/types/ai";
+import { ClaudeCodePrerequisites } from "./ClaudeCodePrerequisites";
+import { getProviderById, type AIInteractionMode } from "@/types/ai";
+import { isTauriDesktop } from "@/lib/platform";
 import { useTranslation } from "react-i18next";
+import { cn } from "@zedi/ui";
 
 interface AISettingsFormProps {
-  /** When true, used inside settings hub; section title/description are provided by parent */
   embedded?: boolean;
 }
 
 /**
- * AI settings form. Manages LLM provider, API key, and server model selection.
- * AI設定フォーム。LLMプロバイダー・APIキー・サーバーモデル選択を管理する。
+ * AI settings form with 3-mode segment control (Default / API Key / Claude Code).
+ * 3モードセグメントコントロール付きAI設定フォーム。
  */
 export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false }) => {
   const { t } = useTranslation();
@@ -50,10 +52,11 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
     serverModelsError,
     isServerMode,
     isClaudeCode,
+    interactionMode,
     claudeCodeAvailable,
     loadServerModels,
     updateSettings,
-    handleToggleOwnKey,
+    handleModeChange,
     handleServerModelSelect,
     handleTest,
     handleReset,
@@ -62,6 +65,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
   const currentProvider = getProviderById(settings.provider);
   const currentModelId = settings.modelId || `${settings.provider}:${settings.model}`;
   const saveStatus = isSaving ? "saving" : savedAt != null ? "saved" : "idle";
+  const isDesktop = isTauriDesktop();
 
   if (isLoading) {
     return (
@@ -88,14 +92,15 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
       <CardContent className={embedded ? "space-y-6 pt-0" : "space-y-6"}>
         {embedded && saveStatus !== "idle" && <SectionSaveStatus status={saveStatus} />}
 
-        <ProviderSelector
-          value={settings.provider}
-          onChange={(p: AIProviderType) => updateSettings({ provider: p })}
+        <ModeSelector
+          value={interactionMode}
+          onChange={handleModeChange}
           disabled={isSaving || isTesting}
+          showClaudeCode={isDesktop}
           claudeCodeAvailable={claudeCodeAvailable}
         />
 
-        {!isClaudeCode && isServerMode && (
+        {isServerMode && (
           <AISettingsFormServerSection
             serverModels={serverModels}
             serverModelsError={serverModelsError}
@@ -107,46 +112,33 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
           />
         )}
 
-        {!isClaudeCode && (
-          <div className="flex items-center justify-between rounded-lg border p-4">
-            <div className="flex items-center gap-3">
-              <Key className="text-muted-foreground h-5 w-5" />
-              <div>
-                <p id="useOwnKey-label" className="text-sm font-medium">
-                  {t("aiSettings.useOwnKey")}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {t("aiSettings.useOwnKeyDescription")}
-                </p>
-              </div>
-            </div>
-            <Switch
-              aria-labelledby="useOwnKey-label"
-              checked={useOwnKey}
-              onCheckedChange={handleToggleOwnKey}
+        {useOwnKey && (
+          <>
+            <ProviderSelector
+              value={settings.provider}
+              onChange={(p) => updateSettings({ provider: p })}
               disabled={isSaving || isTesting}
+              claudeCodeAvailable={claudeCodeAvailable}
+              apiProvidersOnly
             />
-          </div>
+            <AISettingsFormUserKeySection
+              apiKey={settings.apiKey}
+              provider={settings.provider}
+              model={settings.model}
+              availableModels={availableModels}
+              currentProvider={currentProvider}
+              showApiKey={showApiKey}
+              onToggleShowApiKey={() => setShowApiKey(!showApiKey)}
+              onUpdateSettings={updateSettings}
+              isSaving={isSaving}
+              isTesting={isTesting}
+              testResult={testResult}
+              embedded={embedded}
+            />
+          </>
         )}
 
-        {useOwnKey && !isClaudeCode && (
-          <AISettingsFormUserKeySection
-            apiKey={settings.apiKey}
-            provider={settings.provider}
-            model={settings.model}
-            availableModels={availableModels}
-            currentProvider={currentProvider}
-            showApiKey={showApiKey}
-            onToggleShowApiKey={() => setShowApiKey(!showApiKey)}
-            onUpdateSettings={updateSettings}
-            isSaving={isSaving}
-            isTesting={isTesting}
-            testResult={testResult}
-            embedded={embedded}
-          />
-        )}
-
-        {isClaudeCode && <ClaudeCodeSection available={claudeCodeAvailable} />}
+        {isClaudeCode && <ClaudeCodePrerequisites />}
       </CardContent>
 
       <CardFooter className="flex justify-between">
@@ -172,7 +164,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
         </AlertDialog>
 
         <div className="flex gap-2">
-          {useOwnKey && !isClaudeCode && (
+          {useOwnKey && (
             <Button
               variant="outline"
               onClick={handleTest}
@@ -189,41 +181,110 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 };
 
 /**
- * Claude Code プロバイダー選択時に表示するセクション。
- * Section displayed when the Claude Code provider is selected.
+ * 3 モードセグメントコントロール（RadioGroup ベース）。
+ * 3-mode segment control using RadioGroup for proper a11y semantics.
  */
-function ClaudeCodeSection({ available }: { available: boolean | null }) {
+function ModeSelector({
+  value,
+  onChange,
+  disabled,
+  showClaudeCode,
+  claudeCodeAvailable,
+}: {
+  value: AIInteractionMode;
+  onChange: (mode: AIInteractionMode) => void;
+  disabled: boolean;
+  showClaudeCode: boolean;
+  claudeCodeAvailable: boolean | null;
+}) {
   const { t } = useTranslation();
 
-  if (available === null) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border p-4">
-        <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
-        <p className="text-muted-foreground text-sm">{t("aiSettings.checkingAvailability")}</p>
-      </div>
-    );
+  const modes: Array<{
+    id: AIInteractionMode;
+    label: string;
+    icon: React.ReactNode;
+    description: string;
+  }> = [
+    {
+      id: "default",
+      label: t("aiSettings.modeDefault"),
+      icon: <Server className="h-4 w-4" />,
+      description: t("aiSettings.modeDefaultDescription"),
+    },
+    {
+      id: "user_api_key",
+      label: t("aiSettings.modeApiKey"),
+      icon: <Key className="h-4 w-4" />,
+      description: t("aiSettings.modeApiKeyDescription"),
+    },
+  ];
+
+  if (showClaudeCode) {
+    modes.push({
+      id: "claude_code",
+      label: t("aiSettings.modeClaudeCode"),
+      icon: <Terminal className="h-4 w-4" />,
+      description: t("aiSettings.modeClaudeCodeDescription"),
+    });
   }
 
-  if (available) {
-    return (
-      <Alert>
-        <CheckCircle2 className="h-4 w-4" />
-        <AlertTitle>{t("aiSettings.providerAvailable")}</AlertTitle>
-        <AlertDescription>
-          <div className="flex items-center gap-2">
-            <Terminal className="h-4 w-4" />
-            <span>{t("aiSettings.claudeCodeDescription")}</span>
-          </div>
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  const modeGroupId = "ai-settings-interaction-mode";
 
   return (
-    <Alert variant="destructive">
-      <XCircle className="h-4 w-4" />
-      <AlertTitle>{t("aiSettings.claudeCodeNotInstalled")}</AlertTitle>
-      <AlertDescription>{t("aiSettings.claudeCodeDesktopRequired")}</AlertDescription>
-    </Alert>
+    <fieldset className="space-y-2 border-0 p-0">
+      <legend id={modeGroupId} className="text-sm font-medium">
+        {t("aiSettings.modeLabel")}
+      </legend>
+      <RadioGroup
+        aria-labelledby={modeGroupId}
+        value={value}
+        onValueChange={(v) => onChange(v as AIInteractionMode)}
+        className="grid gap-2"
+        disabled={disabled}
+      >
+        {modes.map((mode) => {
+          const isSelected = value === mode.id;
+          return (
+            <div
+              key={mode.id}
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
+              )}
+            >
+              <RadioGroupItem
+                value={mode.id}
+                id={`mode-${mode.id}`}
+                disabled={disabled}
+                className="mt-0.5"
+              />
+              <div className="flex-1 space-y-1">
+                <Label
+                  htmlFor={`mode-${mode.id}`}
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  {mode.icon}
+                  <span className="text-sm font-medium">{mode.label}</span>
+                  {mode.id === "claude_code" && claudeCodeAvailable === false && (
+                    <span className="bg-destructive/10 text-destructive rounded px-1.5 py-0.5 text-[10px]">
+                      {t("aiSettings.providerUnavailable")}
+                    </span>
+                  )}
+                  {mode.id === "claude_code" && claudeCodeAvailable === true && (
+                    <span className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px]">
+                      {t("aiSettings.providerAvailable")}
+                    </span>
+                  )}
+                  {mode.id === "claude_code" && claudeCodeAvailable === null && (
+                    <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
+                  )}
+                </Label>
+                <p className="text-muted-foreground text-xs">{mode.description}</p>
+              </div>
+            </div>
+          );
+        })}
+      </RadioGroup>
+    </fieldset>
   );
 }

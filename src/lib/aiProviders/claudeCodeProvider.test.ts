@@ -12,6 +12,8 @@ vi.mock("@/lib/claudeCode/bridge", () => ({
   onClaudeStreamChunk: vi.fn(),
   onClaudeStreamComplete: vi.fn(),
   onClaudeError: vi.fn(),
+  onClaudeToolUseStart: vi.fn(),
+  onClaudeToolUseComplete: vi.fn(),
   checkClaudeInstallation: vi.fn(),
 }));
 
@@ -27,6 +29,8 @@ const bridgeMod = () =>
     onClaudeStreamChunk: ReturnType<typeof vi.fn>;
     onClaudeStreamComplete: ReturnType<typeof vi.fn>;
     onClaudeError: ReturnType<typeof vi.fn>;
+    onClaudeToolUseStart: ReturnType<typeof vi.fn>;
+    onClaudeToolUseComplete: ReturnType<typeof vi.fn>;
     checkClaudeInstallation: ReturnType<typeof vi.fn>;
   }>;
 
@@ -65,6 +69,8 @@ async function setupStreamingBridge(
     errorCb = cb;
     return Promise.resolve(vi.fn());
   });
+  bridge.onClaudeToolUseStart.mockImplementation(() => Promise.resolve(vi.fn()));
+  bridge.onClaudeToolUseComplete.mockImplementation(() => Promise.resolve(vi.fn()));
   bridge.claudeQuery.mockImplementation(async () => {
     let delay = 0;
     for (const event of events) {
