@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { listNoteWorkspaceEntries } from "@/lib/noteWorkspace/noteWorkspaceIo";
 import { listWorkspaceDirectoryEntries } from "@/lib/workspace/bridge";
 
 /**
@@ -31,7 +32,12 @@ export function parsePathCompletionArgs(args: string): { dir: string; filePrefix
  * Loads directory entry names for slash path completion (max 40).
  * スラッシュのパス補完用にディレクトリエントリを読む（最大 40 件）。
  */
-export function useWorkspacePathCompletions(args: string, enabled: boolean): string[] {
+export function useWorkspacePathCompletions(
+  args: string,
+  enabled: boolean,
+  /** When set, list under the registered workspace for this note (Issue #461). Else process cwd. */
+  noteWorkspaceNoteId: string | null,
+): string[] {
   const [items, setItems] = useState<string[]>([]);
 
   useEffect(() => {
@@ -42,22 +48,28 @@ export function useWorkspacePathCompletions(args: string, enabled: boolean): str
     const { dir, filePrefix } = parsePathCompletionArgs(args);
     let cancelled = false;
     const t = window.setTimeout(() => {
-      void listWorkspaceDirectoryEntries(dir)
+      const promise = noteWorkspaceNoteId
+        ? listNoteWorkspaceEntries(noteWorkspaceNoteId, dir, 40, filePrefix)
+        : listWorkspaceDirectoryEntries(dir).then((names) => {
+            const fp = filePrefix.toLowerCase();
+            return fp ? names.filter((n) => n.toLowerCase().startsWith(fp)) : names;
+          });
+      void promise
         .then((names) => {
           if (cancelled) return;
-          const fp = filePrefix.toLowerCase();
-          const filtered = fp ? names.filter((n) => n.toLowerCase().startsWith(fp)) : names;
-          setItems(filtered.slice(0, 40));
+          setItems(names.slice(0, 40));
         })
-        .catch(() => {
-          if (!cancelled) setItems([]);
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          console.error("[useWorkspacePathCompletions] directory listing failed", err);
+          setItems([]);
         });
     }, 120);
     return () => {
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [args, enabled]);
+  }, [args, enabled, noteWorkspaceNoteId]);
 
   return items;
 }

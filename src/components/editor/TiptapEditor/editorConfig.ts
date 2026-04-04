@@ -19,6 +19,7 @@ import { ExecutableCodeBlock } from "../extensions/ExecutableCodeBlockExtension"
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
+import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import {
   WikiLinkSuggestionPlugin,
@@ -102,6 +103,14 @@ export interface EditorExtensionsOptions {
   imageOptions: Partial<StorageImageOptions>;
   /** When set, enables Y.js collaboration and caret; StarterKit history is disabled */
   collaboration?: CollaborationExtensionsOptions;
+  /**
+   * Optional note-linked workspace for `@file:` and Claude cwd (Issue #461).
+   * `@file:` と Claude cwd 用のノート紐付けワークスペース（任意、Issue #461）。
+   */
+  fileReference?: {
+    getWorkspaceRoot: () => string | null;
+    getNoteId: () => string | null;
+  };
 }
 
 /**
@@ -186,6 +195,10 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     // --- WikiLink ---
     WikiLink.configure({
       onLinkClick: options.onLinkClick,
+    }),
+    FileReference.configure({
+      getWorkspaceRoot: options.fileReference?.getWorkspaceRoot ?? (() => null),
+      getNoteId: options.fileReference?.getNoteId ?? (() => null),
     }),
     WikiLinkSuggestionPlugin.configure({
       onStateChange: options.onStateChange,

@@ -155,7 +155,13 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     provider: effectiveSettings.provider,
     model: effectiveSettings.model,
     messages: apiMessages,
-    options: { stream: true, feature: "chat" },
+    options: {
+      stream: true,
+      feature: "chat",
+      ...(effectiveSettings.provider === "claude-code" && context?.claudeWorkspaceRoot
+        ? { cwd: context.claudeWorkspaceRoot }
+        : {}),
+    },
   };
 
   await streamAssistantCompletion(effectiveSettings, request, abortControllerRef.current.signal, {

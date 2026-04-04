@@ -44,6 +44,7 @@ export async function runExecutableCodeInNotebook(
   language: string,
   code: string,
   signal?: AbortSignal,
+  options?: { cwd?: string },
 ): Promise<ExecutableCodeRunResult> {
   const prompt = buildExecutableCodeRunPrompt(language, code);
   const completion = await runClaudeQueryToCompletion(
@@ -51,6 +52,7 @@ export async function runExecutableCodeInNotebook(
     {
       maxTurns: 12,
       allowedTools: ["Bash"],
+      ...(options?.cwd ? { cwd: options.cwd } : {}),
     },
     signal,
   );

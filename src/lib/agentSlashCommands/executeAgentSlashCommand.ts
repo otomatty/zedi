@@ -31,8 +31,10 @@ export async function executeAgentSlashCommand(options: {
   editor: Editor;
   range: { from: number; to: number };
   signal?: AbortSignal;
+  /** Claude Code working directory (note-linked workspace, Issue #461). */
+  claudeCwd?: string;
 }): Promise<string | null> {
-  const { commandId, query, editor, range, signal } = options;
+  const { commandId, query, editor, range, signal, claudeCwd } = options;
 
   const meta = AGENT_SLASH_PREFIXES.find((p) => p.id === commandId);
   const prefix = meta?.prefix ?? "";
@@ -71,7 +73,10 @@ export async function executeAgentSlashCommand(options: {
   editor.chain().focus().deleteRange(range).run();
 
   const prompt = buildAgentSlashPrompt(commandId, args, editor, { selectionText, plainText });
-  const claudeOpts = getAgentSlashClaudeOptions(commandId);
+  const claudeOpts = {
+    ...getAgentSlashClaudeOptions(commandId),
+    ...(claudeCwd ? { cwd: claudeCwd } : {}),
+  };
   const result = await runClaudeQueryToCompletion(prompt, claudeOpts, signal);
 
   if (!result.ok) {

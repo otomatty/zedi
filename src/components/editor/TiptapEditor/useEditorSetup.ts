@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type MutableRefObject,
+  type RefObject,
+} from "react";
 import { useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
@@ -7,6 +15,30 @@ import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion"
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { createEditorExtensions, defaultEditorProps } from "./editorConfig";
 import type { TiptapEditorProps } from "./types";
+
+/**
+ * Keeps latest `workspaceRoot` in a ref without re-running `useEditor` (Issue #461).
+ * `useEditor` を再実行せずに最新のワークスペースルートを ref に保持する（Issue #461）。
+ */
+function useWorkspaceRootRef(workspaceRoot: string | null) {
+  const r = useRef(workspaceRoot);
+  useLayoutEffect(() => {
+    r.current = workspaceRoot;
+  }, [workspaceRoot]);
+  return r;
+}
+
+/**
+ * Keeps latest `noteId` in a ref without re-running `useEditor` (Issue #461).
+ * `useEditor` を再実行せずに最新のノート ID を ref に保持する（Issue #461）。
+ */
+function useNoteIdRef(noteId: string | null) {
+  const r = useRef(noteId);
+  useLayoutEffect(() => {
+    r.current = noteId;
+  }, [noteId]);
+  return r;
+}
 
 interface UseEditorSetupOptions {
   content: TiptapEditorProps["content"];
@@ -17,8 +49,8 @@ interface UseEditorSetupOptions {
   isReadOnly: boolean;
   onContentError: TiptapEditorProps["onContentError"];
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
-  editorRef: React.MutableRefObject<Editor | null>;
-  lastSelectionRef: React.MutableRefObject<{ from: number; to: number } | null>;
+  editorRef: MutableRefObject<Editor | null>;
+  lastSelectionRef: MutableRefObject<{ from: number; to: number } | null>;
   handleLinkClick: (title: string) => void;
   handleStateChange: (state: WikiLinkSuggestionState) => void;
   handleSlashStateChange: (state: SlashSuggestionState) => void;
@@ -30,10 +62,18 @@ interface UseEditorSetupOptions {
   handleCopyImageUrl: (src: string) => void;
   suggestionState: WikiLinkSuggestionState | null;
   slashState: SlashSuggestionState | null;
-  suggestionRef: React.RefObject<WikiLinkSuggestionHandle | null>;
-  slashRef: React.RefObject<SlashSuggestionHandle | null>;
+  suggestionRef: RefObject<WikiLinkSuggestionHandle | null>;
+  slashRef: RefObject<SlashSuggestionHandle | null>;
+  /** Note-linked workspace root for `@file:` (Issue #461). / `@file:` 用ワークスペースルート */
+  workspaceRoot: string | null;
+  /** Current note id for Tauri workspace registry reads (Issue #461). */
+  noteId: string | null;
 }
 
+/**
+ * Tiptap `useEditor` wiring: extensions, collaboration, note `@file:` root (Issue #461).
+ * Tiptap の `useEditor` 拡張・コラボレーション・ノート連動 `@file:` ルート（Issue #461）。
+ */
 export function useEditorSetup(options: UseEditorSetupOptions) {
   const {
     content,
@@ -59,6 +99,8 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     slashState,
     suggestionRef,
     slashRef,
+    workspaceRoot,
+    noteId,
   } = options;
 
   const isEditorInitializedRef = useRef(false);
@@ -97,8 +139,12 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     suggestionStateRef.current = suggestionState;
   }, [slashState, suggestionState]);
 
+  const workspaceRootRef = useWorkspaceRootRef(workspaceRoot);
+  const noteIdRef = useNoteIdRef(noteId);
+
   const editor = useEditor(
     {
+      /* eslint-disable react-hooks/refs -- createEditorExtensions runs at render but refs are only read in ProseMirror/Tiptap handlers (not during render) */
       extensions: createEditorExtensions({
         placeholder,
         onLinkClick: handleLinkClick,
@@ -135,7 +181,12 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
                 user: collaborationConfig.user,
               }
             : undefined,
+        fileReference: {
+          getWorkspaceRoot: () => workspaceRootRef.current,
+          getNoteId: () => noteIdRef.current,
+        },
       }),
+      /* eslint-enable react-hooks/refs */
       content: useCollaborationMode ? undefined : initialParsedContent,
       autofocus: autoFocus ? "end" : false,
       editable: !isReadOnly,
@@ -176,6 +227,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     editorRef.current = editor;
   }, [editor, editorRef]);
 
+  /** Inserts a Mermaid diagram at the current selection. / 現在の選択位置に Mermaid を挿入する。 */
   const handleInsertMermaid = useCallback(
     (code: string) => {
       if (!editor) return;

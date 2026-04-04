@@ -78,6 +78,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     slashAgentBusy,
     claudeAgentSlashAvailable,
     onSlashAgentBusyChange,
+    claudeWorkspaceRoot,
+    claudeWorkspaceNoteId,
   } = useTiptapEditorController({
     content,
     onChange,
@@ -139,6 +141,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           onClose={handleSlashClose}
           claudeAgentSlashAvailable={claudeAgentSlashAvailable}
           onAgentBusyChange={onSlashAgentBusyChange}
+          claudeWorkspaceRoot={claudeWorkspaceRoot}
+          claudeWorkspaceNoteId={claudeWorkspaceNoteId}
         />
       )}
       {slashAgentBusy ? <SlashAgentLoadingOverlay label={t("editor.slashAgentRunning")} /> : null}

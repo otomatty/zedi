@@ -3,6 +3,20 @@
   "slashMenuAriaLabel": "Slash command menu",
   "slashNoResults": "No matching commands",
   "slashAgentRunning": "Running Claude Code…",
+  "noteWorkspace": {
+    "label": "Workspace",
+    "linkFolder": "Link folder",
+    "change": "Change",
+    "browse": "Browse files",
+    "clear": "Clear workspace link",
+    "treeTitle": "Workspace files",
+    "treeEmpty": "This folder is empty."
+  },
+  "filePreview": {
+    "truncated": "Preview shows the first 32,000 characters only.",
+    "close": "Close",
+    "noWorkspace": "Link a workspace folder for this note (toolbar) to preview files."
+  },
   "slashAgent": {
     "errorTitle": "Agent command failed"
   },
