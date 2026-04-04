@@ -80,7 +80,9 @@ async function handleRequest(raw: string): Promise<void> {
         );
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        emitError("list_models", message, "list_models_error");
+        // Use request correlation id so the Tauri host can resolve the pending RPC (avoids 30s timeout).
+        // リクエストの correlation id を使い、Tauri 側の保留 RPC を解決する（30 秒タイムアウトを避ける）。
+        emitError(req.correlationId, message, "list_models_error");
       }
       return;
     }

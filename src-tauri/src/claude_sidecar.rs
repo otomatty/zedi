@@ -106,6 +106,19 @@ async fn process_sidecar_line(
             let _ = app.emit("claude-tool-use-complete", &value);
         }
         "error" => {
+            // RPC waiters (status, installation, list_models) key pending by correlation id.
+            // Sidecar errors use `id` (or `correlationId` from fail_pending_rpc) matching that id.
+            let cid = value
+                .get("correlationId")
+                .and_then(|c| c.as_str())
+                .or_else(|| value.get("id").and_then(|c| c.as_str()));
+            if let Some(cid) = cid {
+                let mut guard = pending.lock().await;
+                if let Some(tx) = guard.remove(cid) {
+                    let _ = tx.send(value);
+                    return;
+                }
+            }
             let _ = app.emit("claude-error", &value);
         }
         "status-response" | "installation-status" | "models-list" => {

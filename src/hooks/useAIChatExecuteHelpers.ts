@@ -170,12 +170,16 @@ export async function streamAssistantCompletion(
           setStreaming(false);
         },
         onError: (err) => {
+          toolExecutions.forEach((e) => {
+            if (e.status === "running") e.status = "completed";
+          });
           setTree((prev) => ({
             ...prev,
             messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
               content: streamingContentRef.current || "",
               isStreaming: false,
               error: err.message,
+              toolExecutions: toolExecutions.length > 0 ? [...toolExecutions] : undefined,
             }),
           }));
           setStreaming(false);
@@ -186,12 +190,16 @@ export async function streamAssistantCompletion(
     );
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    toolExecutions.forEach((e) => {
+      if (e.status === "running") e.status = "completed";
+    });
     setTree((prev) => ({
       ...prev,
       messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
         content: streamingContentRef.current || "",
         isStreaming: false,
         error: errorMessage,
+        toolExecutions: toolExecutions.length > 0 ? [...toolExecutions] : undefined,
       }),
     }));
     setStreaming(false);
