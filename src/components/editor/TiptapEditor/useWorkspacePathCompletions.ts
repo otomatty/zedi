@@ -35,8 +35,8 @@ export function parsePathCompletionArgs(args: string): { dir: string; filePrefix
 export function useWorkspacePathCompletions(
   args: string,
   enabled: boolean,
-  /** When set, list under this root (Issue #461). Else process cwd. */
-  noteWorkspaceRoot: string | null,
+  /** When set, list under the registered workspace for this note (Issue #461). Else process cwd. */
+  noteWorkspaceNoteId: string | null,
 ): string[] {
   const [items, setItems] = useState<string[]>([]);
 
@@ -48,8 +48,8 @@ export function useWorkspacePathCompletions(
     const { dir, filePrefix } = parsePathCompletionArgs(args);
     let cancelled = false;
     const t = window.setTimeout(() => {
-      const promise = noteWorkspaceRoot
-        ? listNoteWorkspaceEntries(noteWorkspaceRoot, dir)
+      const promise = noteWorkspaceNoteId
+        ? listNoteWorkspaceEntries(noteWorkspaceNoteId, dir)
         : listWorkspaceDirectoryEntries(dir);
       void promise
         .then((names) => {
@@ -66,7 +66,7 @@ export function useWorkspacePathCompletions(
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [args, enabled, noteWorkspaceRoot]);
+  }, [args, enabled, noteWorkspaceNoteId]);
 
   return items;
 }

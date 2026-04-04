@@ -7,11 +7,40 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauriDesktop } from "@/lib/platform";
 
 /**
- * Reads a UTF-8 file under workspace root (server-validated path).
- * ワークスペースルート配下の UTF-8 ファイルを読む（サーバ側でパス検証）。
+ * Registers the workspace root for a note in the Rust-side registry (required before read/list).
+ * Rust 側レジストリにワークスペースルートを登録する（read/list の前提）。
+ */
+export async function registerNoteWorkspaceRoot(
+  noteId: string,
+  workspaceRoot: string,
+): Promise<void> {
+  if (!isTauriDesktop()) return;
+  try {
+    await invoke("register_note_workspace_root", { noteId, workspaceRoot });
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Clears the registered workspace root for a note.
+ * ノートの登録済みワークスペースルートを消す。
+ */
+export async function clearNoteWorkspaceRoot(noteId: string): Promise<void> {
+  if (!isTauriDesktop()) return;
+  try {
+    await invoke("clear_note_workspace_root", { noteId });
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Reads a UTF-8 file under the registered workspace for the note (Rust-resolved root).
+ * 登録済みノートのワークスペース配下の UTF-8 を読む（ルートは Rust で解決）。
  */
 export async function readNoteWorkspaceFile(
-  workspaceRoot: string,
+  noteId: string,
   relativePath: string,
 ): Promise<{ ok: true; content: string } | { ok: false; error: string }> {
   if (!isTauriDesktop()) {
@@ -19,7 +48,7 @@ export async function readNoteWorkspaceFile(
   }
   try {
     const content = await invoke<string>("read_note_workspace_file", {
-      workspaceRoot,
+      noteId,
       relativePath: relativePath.replace(/\\/g, "/"),
     });
     return { ok: true, content };
@@ -30,18 +59,18 @@ export async function readNoteWorkspaceFile(
 }
 
 /**
- * Lists directory entries (same shape as process-cwd listing).
- * ディレクトリエントリを列挙する（プロセス cwd 列挙と同じ形）。
+ * Lists directory entries under the registered workspace for the note.
+ * 登録済みノートのワークスペース配下のエントリを列挙する。
  */
 export async function listNoteWorkspaceEntries(
-  workspaceRoot: string,
+  noteId: string,
   relativeDir: string,
   maxEntries?: number,
 ): Promise<string[]> {
   if (!isTauriDesktop()) return [];
   try {
     return await invoke<string[]>("list_note_workspace_entries", {
-      workspaceRoot,
+      noteId,
       relativeDir: relativeDir.replace(/\\/g, "/"),
       maxEntries: maxEntries ?? null,
     });

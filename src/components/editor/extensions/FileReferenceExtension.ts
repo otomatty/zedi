@@ -17,6 +17,8 @@ export interface FileReferenceOptions {
   HTMLAttributes: Record<string, unknown>;
   /** Returns linked workspace root for the current note (desktop). / ノートのワークスペースルート */
   getWorkspaceRoot: () => string | null;
+  /** Note id for Tauri registry-backed reads (do not pass root alone). / Tauri レジストリ読み取り用ノート ID */
+  getNoteId: () => string | null;
 }
 
 declare module "@tiptap/core" {
@@ -41,6 +43,7 @@ export const FileReference = Mark.create<FileReferenceOptions>({
     return {
       HTMLAttributes: {},
       getWorkspaceRoot: () => null as string | null,
+      getNoteId: () => null as string | null,
     };
   },
 
@@ -103,6 +106,7 @@ export const FileReference = Mark.create<FileReferenceOptions>({
 
   addProseMirrorPlugins() {
     const getRoot = this.options.getWorkspaceRoot;
+    const getNoteId = this.options.getNoteId;
     // Latest click wins if previews overlap. / 連続クリック時は最後の結果のみ反映
     let previewSeq = 0;
     return [
@@ -116,17 +120,27 @@ export const FileReference = Mark.create<FileReferenceOptions>({
             const path = el.getAttribute("data-path");
             if (!path) return false;
             const root = getRoot();
+            const noteId = getNoteId();
             if (!root) {
               event.preventDefault();
               event.stopPropagation();
               dispatchFilePreview({ relativePath: path, noWorkspace: true });
               return true;
             }
+            if (!noteId) {
+              event.preventDefault();
+              event.stopPropagation();
+              dispatchFilePreview({
+                relativePath: path,
+                error: "Note id missing for workspace read.",
+              });
+              return true;
+            }
             event.preventDefault();
             event.stopPropagation();
             const seq = ++previewSeq;
             void (async () => {
-              const result = await readNoteWorkspaceFile(root, path);
+              const result = await readNoteWorkspaceFile(noteId, path);
               if (seq !== previewSeq) return;
               if (result.ok) {
                 const truncated = result.content.length > FILE_PREVIEW_DISPLAY_MAX_CHARS;

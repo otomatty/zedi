@@ -109,6 +109,7 @@ export interface EditorExtensionsOptions {
    */
   fileReference?: {
     getWorkspaceRoot: () => string | null;
+    getNoteId: () => string | null;
   };
 }
 
@@ -197,6 +198,7 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     }),
     FileReference.configure({
       getWorkspaceRoot: options.fileReference?.getWorkspaceRoot ?? (() => null),
+      getNoteId: options.fileReference?.getNoteId ?? (() => null),
     }),
     WikiLinkSuggestionPlugin.configure({
       onStateChange: options.onStateChange,

@@ -12,7 +12,12 @@ import {
   readNoteWorkspacePath,
   writeNoteWorkspacePath,
 } from "@/lib/noteWorkspace/noteWorkspaceStore";
+import {
+  clearNoteWorkspaceRoot,
+  registerNoteWorkspaceRoot,
+} from "@/lib/noteWorkspace/noteWorkspaceIo";
 import { pickNoteWorkspaceDirectory } from "@/lib/noteWorkspace/pickNoteWorkspaceDirectory";
+import { isTauriDesktop } from "@/lib/platform";
 
 /**
  * Value provided by {@link NoteWorkspaceProvider} (local workspace path, Issue #461).
@@ -55,16 +60,30 @@ export function NoteWorkspaceProvider({
     setWorkspaceRootState(readNoteWorkspacePath(noteId));
   }, [noteId]);
 
+  /** Keep Rust-side registry in sync with localStorage (trusted read/list in Tauri). */
+  useEffect(() => {
+    if (!isTauriDesktop()) return;
+    void (async () => {
+      if (workspaceRoot) {
+        await registerNoteWorkspaceRoot(noteId, workspaceRoot);
+      } else {
+        await clearNoteWorkspaceRoot(noteId);
+      }
+    })();
+  }, [noteId, workspaceRoot]);
+
   const setWorkspaceRoot = useCallback(
     (path: string) => {
       const normalized = path.trim();
       if (!normalized) {
         clearNoteWorkspacePath(noteId);
         setWorkspaceRootState(null);
+        void clearNoteWorkspaceRoot(noteId);
         return;
       }
       writeNoteWorkspacePath(noteId, normalized);
       setWorkspaceRootState(normalized);
+      void registerNoteWorkspaceRoot(noteId, normalized);
     },
     [noteId],
   );
@@ -72,6 +91,7 @@ export function NoteWorkspaceProvider({
   const clearWorkspace = useCallback(() => {
     clearNoteWorkspacePath(noteId);
     setWorkspaceRootState(null);
+    void clearNoteWorkspaceRoot(noteId);
   }, [noteId]);
 
   const pickWorkspace = useCallback(async () => {

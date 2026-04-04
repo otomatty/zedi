@@ -28,6 +28,18 @@ function useWorkspaceRootRef(workspaceRoot: string | null) {
   return r;
 }
 
+/**
+ * Keeps latest `noteId` in a ref without re-running `useEditor` (Issue #461).
+ * `useEditor` を再実行せずに最新のノート ID を ref に保持する（Issue #461）。
+ */
+function useNoteIdRef(noteId: string | null) {
+  const r = useRef(noteId);
+  useLayoutEffect(() => {
+    r.current = noteId;
+  }, [noteId]);
+  return r;
+}
+
 interface UseEditorSetupOptions {
   content: TiptapEditorProps["content"];
   onChange: TiptapEditorProps["onChange"];
@@ -54,6 +66,8 @@ interface UseEditorSetupOptions {
   slashRef: RefObject<SlashSuggestionHandle | null>;
   /** Note-linked workspace root for `@file:` (Issue #461). / `@file:` 用ワークスペースルート */
   workspaceRoot: string | null;
+  /** Current note id for Tauri workspace registry reads (Issue #461). */
+  noteId: string | null;
 }
 
 /**
@@ -86,6 +100,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     suggestionRef,
     slashRef,
     workspaceRoot,
+    noteId,
   } = options;
 
   const isEditorInitializedRef = useRef(false);
@@ -125,6 +140,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
   }, [slashState, suggestionState]);
 
   const workspaceRootRef = useWorkspaceRootRef(workspaceRoot);
+  const noteIdRef = useNoteIdRef(noteId);
 
   const editor = useEditor(
     {
@@ -167,6 +183,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
             : undefined,
         fileReference: {
           getWorkspaceRoot: () => workspaceRootRef.current,
+          getNoteId: () => noteIdRef.current,
         },
       }),
       /* eslint-enable react-hooks/refs */

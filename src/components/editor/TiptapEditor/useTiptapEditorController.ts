@@ -53,6 +53,8 @@ function useEditorControllers(args: {
   handleImageUpload: (files: File[]) => Promise<void>;
   /** Note-linked workspace root for `@file:` (Issue #461). */
   workspaceRoot: string | null;
+  /** Note id for Tauri workspace registry (Issue #461). */
+  noteId: string | null;
 }) {
   const { editor, handleInsertMermaid, isEditorInitializedRef } = useEditorSetup({
     content: args.content,
@@ -79,6 +81,7 @@ function useEditorControllers(args: {
     suggestionRef: args.suggestionRef,
     slashRef: args.slashRef,
     workspaceRoot: args.workspaceRoot,
+    noteId: args.noteId,
   });
 
   const suggestionUi = useSuggestionEffects({
@@ -137,6 +140,7 @@ export function useTiptapEditorController({
   const { editorFontSizePx } = useGeneralSettings();
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
+  const noteIdForWorkspace = noteWorkspace?.noteId ?? null;
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
@@ -212,6 +216,7 @@ export function useTiptapEditorController({
     handleInsertImageClick: imageUpload.handleInsertImageClick,
     handleImageUpload: imageUpload.handleImageUpload,
     workspaceRoot,
+    noteId: noteIdForWorkspace,
   });
   const { handleInsertThumbnailImage } = useThumbnailController(
     editorRef,
@@ -254,5 +259,6 @@ export function useTiptapEditorController({
     claudeAgentSlashAvailable,
     onSlashAgentBusyChange: setSlashAgentBusy,
     claudeWorkspaceRoot: noteWorkspace?.workspaceRoot ?? null,
+    claudeWorkspaceNoteId: noteWorkspace?.noteId ?? null,
   };
 }

@@ -18,17 +18,18 @@ export function NoteWorkspaceToolbar() {
   const [relDir, setRelDir] = useState("");
 
   const root = ctx?.workspaceRoot ?? null;
+  const noteId = ctx?.noteId ?? null;
 
   const fetchEntries = useCallback(
     async (dir: string) => {
-      if (!root) {
+      if (!root || !noteId) {
         setEntries([]);
         return;
       }
-      const list = await listNoteWorkspaceEntries(root, dir);
+      const list = await listNoteWorkspaceEntries(noteId, dir);
       setEntries(list);
     },
-    [root],
+    [root, noteId],
   );
 
   const openTree = useCallback(() => {

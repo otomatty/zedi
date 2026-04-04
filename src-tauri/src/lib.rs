@@ -20,6 +20,8 @@ pub fn run() {
             claude_sidecar::check_claude_installation,
             claude_sidecar::claude_list_models,
             workspace_paths::list_workspace_directory_entries,
+            workspace_paths::register_note_workspace_root,
+            workspace_paths::clear_note_workspace_root,
             workspace_paths::read_note_workspace_file,
             workspace_paths::list_note_workspace_entries,
         ])

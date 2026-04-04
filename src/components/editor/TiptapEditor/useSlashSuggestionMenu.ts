@@ -76,6 +76,7 @@ export function useSlashSuggestionMenu(
     claudeAgentSlashAvailable,
     onAgentBusyChange,
     claudeWorkspaceRoot,
+    claudeWorkspaceNoteId,
   } = props;
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -90,7 +91,7 @@ export function useSlashSuggestionMenu(
     editor,
     t,
     claudeAgentSlashAvailable,
-    claudeWorkspaceRoot ?? null,
+    claudeWorkspaceNoteId ?? null,
   );
 
   useEffect(() => {

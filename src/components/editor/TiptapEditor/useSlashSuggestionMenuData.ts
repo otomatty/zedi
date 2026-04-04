@@ -21,8 +21,8 @@ export function useSlashSuggestionMenuData(
   editor: Editor,
   t: (key: string) => string,
   claudeAgentSlashAvailable: boolean,
-  /** When set, path completion lists this root instead of process cwd (Issue #461). */
-  noteWorkspaceRoot: string | null,
+  /** When set, path completion lists under this note's registered workspace (Issue #461). */
+  noteWorkspaceNoteId: string | null,
 ): {
   items: ReturnType<typeof mergeSlashItems>;
   pathCompletionEnabled: boolean;
@@ -41,7 +41,7 @@ export function useSlashSuggestionMenuData(
   const pathSuggestions = useWorkspacePathCompletions(
     pathArgs,
     pathCompletionEnabled,
-    noteWorkspaceRoot,
+    noteWorkspaceNoteId,
   );
 
   return { items, pathCompletionEnabled, pathArgs, pathSuggestions };
