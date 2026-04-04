@@ -1,7 +1,8 @@
 import type { Editor } from "@tiptap/core";
 
 /**
- *
+ * One slash-menu entry (paragraph, heading, code block, etc.).
+ * スラッシュメニューの 1 項目（段落、見出し、コードブロックなど）。
  */
 export interface SlashCommandItem {
   id: string;

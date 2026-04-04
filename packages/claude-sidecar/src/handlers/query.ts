@@ -52,9 +52,8 @@ function extractToolUseStart(
  * ストリームイベントから content_block_stop を検出する。
  */
 function isContentBlockStop(msg: SDKPartialAssistantMessage): boolean {
-  const ev = msg.event as unknown as Record<string, unknown> | undefined;
-  if (!ev || typeof ev !== "object") return false;
-  return ev.type === "content_block_stop";
+  const ev = msg.event as { type?: string } | undefined;
+  return ev?.type === "content_block_stop";
 }
 
 function isToolProgressMessage(msg: SDKMessage): msg is SDKToolProgressMessage {

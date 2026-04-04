@@ -73,7 +73,11 @@ export async function runClaudeQueryToCompletion(
 
   let requestId: string | null = null;
   let resolveWait: (() => void) | null = null;
+  /** Removes the pending `abort` listener when the wait ends without firing abort. */
+  let pendingAbortCleanup: (() => void) | null = null;
   const wake = (): void => {
+    pendingAbortCleanup?.();
+    pendingAbortCleanup = null;
     resolveWait?.();
     resolveWait = null;
   };
@@ -140,14 +144,19 @@ export async function runClaudeQueryToCompletion(
       await new Promise<void>((resolve) => {
         resolveWait = resolve;
         const onAbort = (): void => {
+          pendingAbortCleanup = null;
           resolve();
           resolveWait = null;
         };
+        pendingAbortCleanup = (): void => {
+          signal?.removeEventListener("abort", onAbort);
+        };
         signal?.addEventListener("abort", onAbort, { once: true });
         if (finished || signal?.aborted) {
+          pendingAbortCleanup?.();
+          pendingAbortCleanup = null;
           resolve();
           resolveWait = null;
-          signal?.removeEventListener("abort", onAbort);
         }
       });
     }

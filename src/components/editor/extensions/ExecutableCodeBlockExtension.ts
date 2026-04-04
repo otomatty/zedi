@@ -163,7 +163,9 @@ export const ExecutableCodeBlock = Node.create<ExecutableCodeBlockOptions>({
           commands.insertContent({
             type: this.name,
             attrs: { language: attrs?.language ?? "bash" },
-            content: [{ type: "text", text: "" }],
+            // Zero-width space: empty string can be rejected by ProseMirror text schema.
+            // U+200B: ProseMirror の text* で空文字が弾かれるのを避ける。
+            content: [{ type: "text", text: "\u200b" }],
           }),
     };
   },

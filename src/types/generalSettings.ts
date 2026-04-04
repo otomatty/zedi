@@ -1,23 +1,15 @@
 // 一般設定の型定義
 
-/**
- *
- */
+/** UI テーマ（システム追従またはライト/ダーク）。 / UI theme (system, light, or dark). */
 export type ThemeMode = "system" | "light" | "dark";
 
-/**
- *
- */
+/** エディタのプリセットまたはカスタム px。 / Editor font size preset or custom px. */
 export type EditorFontSize = "small" | "medium" | "large" | "custom";
 
-/**
- *
- */
+/** UI 表示言語。 / UI display language. */
 export type UILocale = "ja" | "en";
 
-/**
- *
- */
+/** 一般設定の永続化フィールド。 / Persisted general settings fields. */
 export interface GeneralSettings {
   theme: ThemeMode;
   editorFontSize: EditorFontSize;
@@ -31,10 +23,8 @@ export interface GeneralSettings {
   executableCodeConfirmBeforeRun?: boolean;
 }
 
-export /**
- *
- */
-const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+/** 初回・リセット時の既定値。 / Defaults for first load and reset. */
+export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   theme: "system",
   editorFontSize: "medium",
   locale: "ja",
