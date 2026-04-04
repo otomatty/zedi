@@ -8,7 +8,12 @@
   "ignoreBinaries": ["docker-compose"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/**/*.ts", "e2e/**/*.ts", "src/lib/claudeCode/index.ts"],
+      "entry": [
+        "scripts/**/*.ts",
+        "e2e/**/*.ts",
+        "src/lib/claudeCode/index.ts",
+        "src/lib/agentSlashCommands/index.ts"
+      ],
       "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "e2e/**/*.{ts,tsx}"]
     },
     "admin": {

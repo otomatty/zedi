@@ -1,4 +1,5 @@
 mod claude_sidecar;
+mod workspace_paths;
 
 /// Tauri アプリケーション共通エントリポイント。
 /// デスクトップ (main.rs) とモバイル (mobile entry point) の両方から呼ばれる。
@@ -17,6 +18,7 @@ pub fn run() {
             claude_sidecar::claude_status,
             claude_sidecar::check_claude_installation,
             claude_sidecar::claude_list_models,
+            workspace_paths::list_workspace_directory_entries,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

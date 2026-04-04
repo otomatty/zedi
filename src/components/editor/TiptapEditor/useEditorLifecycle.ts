@@ -4,6 +4,7 @@ import { sanitizeTiptapContent } from "@/lib/contentUtils";
 import { useContentSanitizer } from "./useContentSanitizer";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
 import { usePasteImageHandler } from "./usePasteImageHandler";
+import { rememberSlashAgentSelection } from "@/lib/agentSlashCommands/slashAgentSelectionCache";
 import type { TiptapEditorProps } from "./types";
 
 interface UseEditorLifecycleOptions {
@@ -48,6 +49,15 @@ export function useEditorLifecycle({
   isEditorInitializedRef,
 }: UseEditorLifecycleOptions) {
   const initialContentAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (!editor) return;
+    const onSelection = () => rememberSlashAgentSelection(editor);
+    editor.on("selectionUpdate", onSelection);
+    return () => {
+      editor.off("selectionUpdate", onSelection);
+    };
+  }, [editor]);
 
   useEffect(() => {
     if (!focusContentRef || !editor) return;

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { EditorContent } from "@tiptap/react";
 import { cn } from "@zedi/ui";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
@@ -12,6 +13,7 @@ import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
+import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -41,6 +43,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   wikiContentForCollab,
   onWikiContentApplied,
 }) => {
+  const { t } = useTranslation();
   const {
     editor,
     editorFontSizePx,
@@ -72,6 +75,9 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     storageSetupDialogOpen,
     setStorageSetupDialogOpen,
     handleGoToStorageSettings,
+    slashAgentBusy,
+    claudeAgentSlashAvailable,
+    onSlashAgentBusyChange,
   } = useTiptapEditorController({
     content,
     onChange,
@@ -131,8 +137,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           position={slashPos}
           suggestionRef={slashRef}
           onClose={handleSlashClose}
+          claudeAgentSlashAvailable={claudeAgentSlashAvailable}
+          onAgentBusyChange={onSlashAgentBusyChange}
         />
       )}
+      {slashAgentBusy ? <SlashAgentLoadingOverlay label={t("editor.slashAgentRunning")} /> : null}
       <MermaidGeneratorDialog
         open={mermaidDialogOpen}
         onOpenChange={setMermaidDialogOpen}

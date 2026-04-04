@@ -2,6 +2,12 @@
   "uploadedImageAlt": "アップロードした画像",
   "slashMenuAriaLabel": "スラッシュコマンドメニュー",
   "slashNoResults": "一致する項目がありません",
+  "slashAgentRunning": "Claude Code を実行中…",
+  "slashAgent": {
+    "errorTitle": "エージェントコマンドに失敗しました"
+  },
+  "slashPathCompletionAriaLabel": "パス候補",
+  "slashPathCompletionHint": "ワークスペース内のパス候補",
   "slash": {
     "paragraph": {
       "title": "段落",
@@ -87,6 +93,46 @@
       "title": "数式（ブロック）",
       "description": "ブロック数式を挿入",
       "aliases": "数式ブロック,block math,ブロック数式,equation"
+    },
+    "agent-analyze": {
+      "title": "/analyze — コード分析",
+      "description": "パスを指定して Claude Code で分析し結果を挿入",
+      "aliases": "analyze,解析,あならいず"
+    },
+    "agent-git-summary": {
+      "title": "/git-summary — コミット要約",
+      "description": "直近の git ログを要約して挿入",
+      "aliases": "git-summary,git,ログ,gitlog"
+    },
+    "agent-run": {
+      "title": "/run — コマンド実行",
+      "description": "シェルコマンドを実行し出力を挿入",
+      "aliases": "run,exec,シェル,command"
+    },
+    "agent-research": {
+      "title": "/research — Web 調査",
+      "description": "トピックを調べ構造化した要約を挿入",
+      "aliases": "research,調査,検索,web"
+    },
+    "agent-review": {
+      "title": "/review — コードレビュー",
+      "description": "パスのコードをレビューしチェックリストを挿入",
+      "aliases": "review,レビュー,指摘"
+    },
+    "agent-test": {
+      "title": "/test — テスト実行",
+      "description": "テストを実行し結果を記録",
+      "aliases": "test,テスト,vitest,bun test"
+    },
+    "agent-explain": {
+      "title": "/explain — 選択を解説",
+      "description": "選択範囲のコードを解説して挿入",
+      "aliases": "explain,解説,説明"
+    },
+    "agent-summarize": {
+      "title": "/summarize — ノート要約",
+      "description": "ノート全体の要約を挿入",
+      "aliases": "summarize,要約,サマリ"
     }
   },
   "recommendation": {

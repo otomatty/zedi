@@ -13,6 +13,7 @@ import { useEditorLifecycle } from "./useEditorLifecycle";
 import { useTiptapEditorStorageFeatures, useThumbnailController } from "./useTiptapEditorStorage";
 import { useSuggestionControllers } from "./useSuggestionControllers";
 import { useImageUploadController } from "./useImageUploadController";
+import { useClaudeAgentSlashAvailability } from "./useClaudeAgentSlashAvailability";
 import type { TiptapEditorProps } from "./types";
 
 function useEditorControllers(args: {
@@ -158,6 +159,8 @@ export function useTiptapEditorController({
     handleDeleteFromStorage,
   } = useTiptapEditorStorageFeatures(content);
   const suggestionControllers = useSuggestionControllers();
+  const [slashAgentBusy, setSlashAgentBusy] = useState(false);
+  const claudeAgentSlashAvailable = useClaudeAgentSlashAvailability();
   const imageUpload = useImageUploadController({
     editorRef,
     onChange,
@@ -241,5 +244,8 @@ export function useTiptapEditorController({
     storageSetupDialogOpen,
     setStorageSetupDialogOpen,
     handleGoToStorageSettings,
+    slashAgentBusy,
+    claudeAgentSlashAvailable,
+    onSlashAgentBusyChange: setSlashAgentBusy,
   };
 }
