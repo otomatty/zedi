@@ -12,4 +12,6 @@ export interface SlashSuggestionMenuProps {
   onClose: () => void;
   claudeAgentSlashAvailable: boolean;
   onAgentBusyChange?: (busy: boolean) => void;
+  /** Note-linked workspace for agent cwd + path completion (Issue #461). */
+  claudeWorkspaceRoot?: string | null;
 }

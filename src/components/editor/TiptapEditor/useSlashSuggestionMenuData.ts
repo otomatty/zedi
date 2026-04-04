@@ -21,6 +21,8 @@ export function useSlashSuggestionMenuData(
   editor: Editor,
   t: (key: string) => string,
   claudeAgentSlashAvailable: boolean,
+  /** When set, path completion lists this root instead of process cwd (Issue #461). */
+  noteWorkspaceRoot: string | null,
 ): {
   items: ReturnType<typeof mergeSlashItems>;
   pathCompletionEnabled: boolean;
@@ -36,7 +38,11 @@ export function useSlashSuggestionMenuData(
   const pathCompletionEnabled =
     claudeAgentSlashAvailable && shouldOfferPathCompletion(query) && pathMatch !== null;
   const pathArgs = pathMatch?.args ?? "";
-  const pathSuggestions = useWorkspacePathCompletions(pathArgs, pathCompletionEnabled);
+  const pathSuggestions = useWorkspacePathCompletions(
+    pathArgs,
+    pathCompletionEnabled,
+    noteWorkspaceRoot,
+  );
 
   return { items, pathCompletionEnabled, pathArgs, pathSuggestions };
 }

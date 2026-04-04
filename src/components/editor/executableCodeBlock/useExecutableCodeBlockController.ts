@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { NodeViewProps } from "@tiptap/react";
 import { toast } from "@zedi/ui/components/sonner";
+import { useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import { loadGeneralSettings } from "@/lib/generalSettings";
 import {
   interpretExecutableCodeOutput,
@@ -39,6 +40,8 @@ export function useExecutableCodeBlockController({
 }: UseExecutableCodeBlockControllerParams) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [interpretLoading, setInterpretLoading] = useState(false);
+  const noteWorkspace = useNoteWorkspaceOptional();
+  const claudeCwd = noteWorkspace?.workspaceRoot ?? undefined;
 
   const runImpl = useCallback(async () => {
     updateAttributes({
@@ -50,7 +53,9 @@ export function useExecutableCodeBlockController({
       durationMs: null,
     });
     const started = performance.now();
-    const result = await runExecutableCodeInNotebook(language, codeText);
+    const result = await runExecutableCodeInNotebook(language, codeText, undefined, {
+      cwd: claudeCwd,
+    });
     const durationMsNext = Math.round(performance.now() - started);
 
     if (!result.ok) {
@@ -70,7 +75,7 @@ export function useExecutableCodeBlockController({
       durationMs: durationMsNext,
       errorMessage: "",
     });
-  }, [codeText, language, updateAttributes]);
+  }, [codeText, language, updateAttributes, claudeCwd]);
 
   const handleRunClick = useCallback(() => {
     if (claudeAvailable !== true || runStatus === "running") return;

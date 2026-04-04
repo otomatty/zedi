@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type MutableRefObject,
+  type RefObject,
+} from "react";
 import { useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
@@ -17,8 +24,8 @@ interface UseEditorSetupOptions {
   isReadOnly: boolean;
   onContentError: TiptapEditorProps["onContentError"];
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
-  editorRef: React.MutableRefObject<Editor | null>;
-  lastSelectionRef: React.MutableRefObject<{ from: number; to: number } | null>;
+  editorRef: MutableRefObject<Editor | null>;
+  lastSelectionRef: MutableRefObject<{ from: number; to: number } | null>;
   handleLinkClick: (title: string) => void;
   handleStateChange: (state: WikiLinkSuggestionState) => void;
   handleSlashStateChange: (state: SlashSuggestionState) => void;
@@ -30,11 +37,19 @@ interface UseEditorSetupOptions {
   handleCopyImageUrl: (src: string) => void;
   suggestionState: WikiLinkSuggestionState | null;
   slashState: SlashSuggestionState | null;
-  suggestionRef: React.RefObject<WikiLinkSuggestionHandle | null>;
-  slashRef: React.RefObject<SlashSuggestionHandle | null>;
+  suggestionRef: RefObject<WikiLinkSuggestionHandle | null>;
+  slashRef: RefObject<SlashSuggestionHandle | null>;
+  /** Note-linked workspace root for `@file:` (Issue #461). / `@file:` 用ワークスペースルート */
+  workspaceRoot: string | null;
 }
 
+/**
+ *
+ */
 export function useEditorSetup(options: UseEditorSetupOptions) {
+  /**
+   *
+   */
   const {
     content,
     onChange,
@@ -59,11 +74,21 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     slashState,
     suggestionRef,
     slashRef,
+    workspaceRoot,
   } = options;
 
+  /**
+   *
+   */
   const isEditorInitializedRef = useRef(false);
+  /**
+   *
+   */
   const lastReportedContentRef = useRef<string | null>(null);
 
+  /**
+   *
+   */
   const initialParsedContent = useMemo(() => {
     if (!content) return undefined;
     try {
@@ -86,17 +111,29 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     });
   }, [content, initialParsedContent, onContentError]);
 
+  /**
+   *
+   */
   const useCollaborationMode = Boolean(
     collaborationConfig?.xmlFragment && collaborationConfig?.user,
   );
 
+  /**
+   *
+   */
   const slashStateRef = useRef(slashState);
+  /**
+   *
+   */
   const suggestionStateRef = useRef(suggestionState);
   useEffect(() => {
     slashStateRef.current = slashState;
     suggestionStateRef.current = suggestionState;
   }, [slashState, suggestionState]);
 
+  /**
+   *
+   */
   const editor = useEditor(
     {
       extensions: createEditorExtensions({
@@ -116,6 +153,9 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
           onCopyUrl: handleCopyImageUrl,
           getAuthenticatedImageUrl: async (url: string) => {
             try {
+              /**
+               *
+               */
               const r = await fetch(url, {
                 credentials: "include",
               });
@@ -135,6 +175,9 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
                 user: collaborationConfig.user,
               }
             : undefined,
+        fileReference: {
+          getWorkspaceRoot: () => workspaceRoot,
+        },
       }),
       content: useCollaborationMode ? undefined : initialParsedContent,
       autofocus: autoFocus ? "end" : false,
@@ -161,6 +204,9 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
         if (initialParsedContent) isEditorInitializedRef.current = true;
       },
       onSelectionUpdate: ({ editor }) => {
+        /**
+         *
+         */
         const { from, to } = editor.state.selection;
         lastSelectionRef.current = { from, to };
         if (useCollaborationMode && collaborationConfig?.awareness) {
@@ -169,13 +215,16 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
         }
       },
     },
-    [pageId, useCollaborationMode],
+    [pageId, useCollaborationMode, workspaceRoot],
   );
 
   useEffect(() => {
     editorRef.current = editor;
   }, [editor, editorRef]);
 
+  /**
+   *
+   */
   const handleInsertMermaid = useCallback(
     (code: string) => {
       if (!editor) return;

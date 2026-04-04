@@ -9,7 +9,9 @@ import { useNote, useNotePage } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
+import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import { useAIChatContext } from "@/contexts/AIChatContext";
+import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { Page } from "@/types/page";
@@ -24,29 +26,38 @@ function canEditPage(
   return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
 }
 
-/** key={page.id} でページ切替時にリセット。editorContent の初期値を page.content から取得。 */
+/**
+ * Uses `key` on the parent so page switches reset local editor state.
+ * `editorContent` の初期値は `page.content` から。
+ */
 function NotePageEditorEditable({
   page,
+  noteId,
   collaboration,
   isCollaborationEnabled,
 }: {
   page: Page;
+  noteId: string;
   collaboration: UseCollaborationReturn;
   isCollaborationEnabled: boolean;
 }) {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
   const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
+  const noteWorkspace = useNoteWorkspaceOptional();
+  const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
 
   useEffect(() => {
     setPageContext({
       type: "editor",
       pageId: page.id,
+      noteId,
+      claudeWorkspaceRoot: workspaceRoot ?? undefined,
       pageTitle: page.title,
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-  }, [page.id, page.title, editorContent, setPageContext]);
+  }, [page.id, page.title, editorContent, setPageContext, noteId, workspaceRoot]);
 
   useEffect(() => {
     return () => setPageContext(null);
@@ -77,6 +88,7 @@ function NotePageEditorEditable({
 
   return (
     <ContentWithAIChat>
+      <NoteWorkspaceToolbar />
       <PageEditorContent
         content={editorContent}
         title={page.title}
@@ -98,7 +110,8 @@ function NotePageEditorEditable({
 }
 
 /**
- *
+ * Single page inside a note (collaboration, AI chat, optional linked workspace).
+ * ノート内の 1 ページ（コラボ・AI チャット・任意のワークスペース連携）。
  */
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
@@ -177,12 +190,15 @@ const NotePageView: React.FC = () => {
 
         <div className="min-h-0 flex-1 overflow-hidden">
           {canEdit ? (
-            <NotePageEditorEditable
-              key={page.id}
-              page={page}
-              collaboration={collaboration}
-              isCollaborationEnabled={isCollaborationEnabled}
-            />
+            <NoteWorkspaceProvider noteId={note.id}>
+              <NotePageEditorEditable
+                key={page.id}
+                noteId={note.id}
+                page={page}
+                collaboration={collaboration}
+                isCollaborationEnabled={isCollaborationEnabled}
+              />
+            </NoteWorkspaceProvider>
           ) : (
             <PageEditorContent
               content={page?.content ?? ""}

@@ -3,6 +3,20 @@
   "slashMenuAriaLabel": "スラッシュコマンドメニュー",
   "slashNoResults": "一致する項目がありません",
   "slashAgentRunning": "Claude Code を実行中…",
+  "noteWorkspace": {
+    "label": "ワークスペース",
+    "linkFolder": "フォルダをリンク",
+    "change": "変更",
+    "browse": "ファイルを参照",
+    "clear": "リンクを解除",
+    "treeTitle": "ワークスペース内のファイル",
+    "treeEmpty": "このフォルダは空です。"
+  },
+  "filePreview": {
+    "truncated": "先頭 32,000 文字のみ表示します。",
+    "close": "閉じる",
+    "noWorkspace": "ファイルをプレビューするには、ツールバーからこのノート用のワークスペースフォルダをリンクしてください。"
+  },
   "slashAgent": {
     "errorTitle": "エージェントコマンドに失敗しました"
   },

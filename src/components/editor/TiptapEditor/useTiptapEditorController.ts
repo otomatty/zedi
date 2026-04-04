@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type MutableRefObject } from "react";
 import type { MutableRefObject, RefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
@@ -14,6 +14,7 @@ import { useTiptapEditorStorageFeatures, useThumbnailController } from "./useTip
 import { useSuggestionControllers } from "./useSuggestionControllers";
 import { useImageUploadController } from "./useImageUploadController";
 import { useClaudeAgentSlashAvailability } from "./useClaudeAgentSlashAvailability";
+import { useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import type { TiptapEditorProps } from "./types";
 
 function useEditorControllers(args: {
@@ -51,6 +52,8 @@ function useEditorControllers(args: {
   slashRef: RefObject<SlashSuggestionHandle | null>;
   handleInsertImageClick: () => void;
   handleImageUpload: (files: File[]) => Promise<void>;
+  /** Note-linked workspace root for `@file:` (Issue #461). */
+  workspaceRoot: string | null;
 }) {
   const { editor, handleInsertMermaid, isEditorInitializedRef } = useEditorSetup({
     content: args.content,
@@ -76,6 +79,7 @@ function useEditorControllers(args: {
     slashState: args.slashState,
     suggestionRef: args.suggestionRef,
     slashRef: args.slashRef,
+    workspaceRoot: args.workspaceRoot,
   });
 
   const suggestionUi = useSuggestionEffects({
@@ -132,6 +136,8 @@ export function useTiptapEditorController({
   onWikiContentApplied,
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
+  const noteWorkspace = useNoteWorkspaceOptional();
+  const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
@@ -206,6 +212,7 @@ export function useTiptapEditorController({
     slashRef: suggestionControllers.slashRef,
     handleInsertImageClick: imageUpload.handleInsertImageClick,
     handleImageUpload: imageUpload.handleImageUpload,
+    workspaceRoot,
   });
   const { handleInsertThumbnailImage } = useThumbnailController(
     editorRef,
@@ -247,5 +254,6 @@ export function useTiptapEditorController({
     slashAgentBusy,
     claudeAgentSlashAvailable,
     onSlashAgentBusyChange: setSlashAgentBusy,
+    claudeWorkspaceRoot: noteWorkspace?.workspaceRoot ?? null,
   };
 }

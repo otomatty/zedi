@@ -21,6 +21,8 @@ interface SlashSuggestionLayerProps {
   claudeAgentSlashAvailable: boolean;
   /** Fires while Claude Code runs for an agent command. / エージェント実行中 */
   onAgentBusyChange?: (busy: boolean) => void;
+  /** Note-linked workspace root (desktop). / ノート紐付けワークスペース */
+  claudeWorkspaceRoot?: string | null;
 }
 
 /**
@@ -35,6 +37,7 @@ export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
   onClose,
   claudeAgentSlashAvailable,
   onAgentBusyChange,
+  claudeWorkspaceRoot,
 }) => {
   if (!suggestionState?.active || !suggestionState.range || !position || !editor) return null;
 
@@ -54,6 +57,7 @@ export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
         onClose={onClose}
         claudeAgentSlashAvailable={claudeAgentSlashAvailable}
         onAgentBusyChange={onAgentBusyChange}
+        claudeWorkspaceRoot={claudeWorkspaceRoot}
       />
     </div>
   );

@@ -1,7 +1,78 @@
-//! Workspace-relative directory listing for slash-command path completion.
-//! スラッシュコマンドのパス補完用、ワークスペース相対ディレクトリ一覧。
+//! Workspace-relative paths: process cwd (slash completion) and note-linked roots (Issue #461).
+//! プロセス cwd 基準（スラッシュ補完）とノート紐付けルート（Issue #461）。
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Component, Path, PathBuf};
+
+/// Maximum bytes returned by {@link read_note_workspace_file}.
+/// {@link read_note_workspace_file} が返す最大バイト数。
+const MAX_NOTE_WORKSPACE_FILE_BYTES: u64 = 512 * 1024;
+
+/// Default cap for {@link list_note_workspace_entries}.
+/// {@link list_note_workspace_entries} の既定上限。
+const DEFAULT_NOTE_WORKSPACE_MAX_ENTRIES: u32 = 500;
+
+/// Hard cap for list entries (API + UI abuse mitigation).
+/// 列挙件数の上限（API 悪用緩和）。
+const HARD_MAX_NOTE_WORKSPACE_ENTRIES: u32 = 2000;
+
+/// Resolves `relative` under an already-canonicalized root (traversal-safe).
+/// 正規化済みルート配下に `relative` を解決する（トラバーサル対策）。
+pub(crate) fn resolve_under_root(root_canon: &PathBuf, relative: &str) -> Result<PathBuf, String> {
+    let trimmed = relative.trim();
+    if trimmed.is_empty() {
+        return Ok(root_canon.clone());
+    }
+    let mut acc = root_canon.clone();
+    for comp in Path::new(trimmed).components() {
+        match comp {
+            Component::Normal(c) => {
+                acc.push(c);
+                if acc.exists() {
+                    let canon = acc.canonicalize().map_err(|e| e.to_string())?;
+                    if !canon.starts_with(root_canon) {
+                        return Err("path outside workspace".into());
+                    }
+                    acc = canon;
+                }
+            }
+            Component::ParentDir => {
+                acc.pop();
+                if !acc.starts_with(root_canon) {
+                    return Err("path outside workspace".into());
+                }
+            }
+            Component::CurDir => {}
+            Component::RootDir | Component::Prefix(_) => {
+                return Err("invalid path".into());
+            }
+        }
+    }
+    if acc.exists() {
+        let canon = acc.canonicalize().map_err(|e| e.to_string())?;
+        if !canon.starts_with(root_canon) {
+            return Err("path outside workspace".into());
+        }
+        return Ok(canon);
+    }
+    if !acc.starts_with(root_canon) {
+        return Err("path outside workspace".into());
+    }
+    Ok(acc)
+}
+
+fn canonical_note_workspace_root(workspace_root: &str) -> Result<PathBuf, String> {
+    let trimmed = workspace_root.trim();
+    if trimmed.is_empty() {
+        return Err("empty workspace root".into());
+    }
+    let p = PathBuf::from(trimmed);
+    let canon = p.canonicalize().map_err(|e| e.to_string())?;
+    if !canon.is_dir() {
+        return Err("workspace root is not a directory".into());
+    }
+    Ok(canon)
+}
 
 /// Lists file and subdirectory names under `relative_dir` (relative to process cwd).
 /// `relative_dir` が空なら cwd 直下を列挙する。
@@ -13,12 +84,54 @@ use std::path::PathBuf;
 pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<String>, String> {
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
     let cwd_canon = cwd.canonicalize().map_err(|e| e.to_string())?;
-    let target = resolve_under_cwd(&cwd_canon, &relative_dir)?;
+    let target = resolve_under_root(&cwd_canon, &relative_dir)?;
     if !target.is_dir() {
         return Ok(vec![]);
     }
+    list_directory_names(&target, DEFAULT_NOTE_WORKSPACE_MAX_ENTRIES)
+}
+
+/// Reads a UTF-8 text file under `workspace_root` (canonicalized); size-capped.
+/// `workspace_root` 配下の UTF-8 テキストを読む（サイズ上限あり）。
+#[tauri::command]
+pub fn read_note_workspace_file(workspace_root: String, relative_path: String) -> Result<String, String> {
+    let root_canon = canonical_note_workspace_root(&workspace_root)?;
+    let target = resolve_under_root(&root_canon, &relative_path)?;
+    if !target.is_file() {
+        return Err("not a file".into());
+    }
+    let meta = fs::metadata(&target).map_err(|e| e.to_string())?;
+    if meta.len() > MAX_NOTE_WORKSPACE_FILE_BYTES {
+        return Err("file too large".into());
+    }
+    fs::read_to_string(&target).map_err(|e| e.to_string())
+}
+
+/// Lists names in `relative_dir` under `workspace_root` (same shape as {@link list_workspace_directory_entries}).
+/// {@link list_workspace_directory_entries} と同じ形で `workspace_root` 配下を列挙する。
+#[tauri::command]
+pub fn list_note_workspace_entries(
+    workspace_root: String,
+    relative_dir: String,
+    max_entries: Option<u32>,
+) -> Result<Vec<String>, String> {
+    let cap = max_entries
+        .unwrap_or(DEFAULT_NOTE_WORKSPACE_MAX_ENTRIES)
+        .min(HARD_MAX_NOTE_WORKSPACE_ENTRIES);
+    let root_canon = canonical_note_workspace_root(&workspace_root)?;
+    let target = resolve_under_root(&root_canon, &relative_dir)?;
+    if !target.is_dir() {
+        return Ok(vec![]);
+    }
+    list_directory_names(&target, cap)
+}
+
+fn list_directory_names(target: &Path, max_entries: u32) -> Result<Vec<String>, String> {
     let mut out: Vec<String> = Vec::new();
-    for entry in std::fs::read_dir(&target).map_err(|e| e.to_string())? {
+    for entry in fs::read_dir(target).map_err(|e| e.to_string())? {
+        if out.len() >= max_entries as usize {
+            break;
+        }
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name().to_string_lossy().to_string();
         if name.starts_with('.') {
@@ -35,45 +148,36 @@ pub fn list_workspace_directory_entries(relative_dir: String) -> Result<Vec<Stri
     Ok(out)
 }
 
-fn resolve_under_cwd(cwd_canon: &PathBuf, relative_dir: &str) -> Result<PathBuf, String> {
-    let trimmed = relative_dir.trim();
-    if trimmed.is_empty() {
-        return Ok(cwd_canon.clone());
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn resolve_under_root_rejects_parent_escape() {
+        let tmp = tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let err = resolve_under_root(&root, "..").unwrap_err();
+        assert!(err.contains("outside") || err.contains("workspace"));
     }
-    let mut acc = cwd_canon.clone();
-    for comp in std::path::Path::new(trimmed).components() {
-        match comp {
-            std::path::Component::Normal(c) => {
-                acc.push(c);
-                if acc.exists() {
-                    let canon = acc.canonicalize().map_err(|e| e.to_string())?;
-                    if !canon.starts_with(cwd_canon) {
-                        return Err("path outside workspace".into());
-                    }
-                    acc = canon;
-                }
-            }
-            std::path::Component::ParentDir => {
-                acc.pop();
-                if !acc.starts_with(cwd_canon) {
-                    return Err("path outside workspace".into());
-                }
-            }
-            std::path::Component::CurDir => {}
-            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
-                return Err("invalid path".into());
-            }
-        }
+
+    #[test]
+    fn read_note_workspace_file_reads_utf8() {
+        let tmp = tempdir().unwrap();
+        let sub = tmp.path().join("proj");
+        fs::create_dir(&sub).unwrap();
+        let f = sub.join("hello.txt");
+        let mut file = fs::File::create(&f).unwrap();
+        writeln!(file, "hi").unwrap();
+        drop(file);
+
+        let root = sub.canonicalize().unwrap();
+        let text = read_note_workspace_file(
+            root.to_string_lossy().to_string(),
+            "hello.txt".to_string(),
+        )
+        .unwrap();
+        assert!(text.contains("hi"));
     }
-    if acc.exists() {
-        let canon = acc.canonicalize().map_err(|e| e.to_string())?;
-        if !canon.starts_with(cwd_canon) {
-            return Err("path outside workspace".into());
-        }
-        return Ok(canon);
-    }
-    if !acc.starts_with(cwd_canon) {
-        return Err("path outside workspace".into());
-    }
-    Ok(acc)
 }

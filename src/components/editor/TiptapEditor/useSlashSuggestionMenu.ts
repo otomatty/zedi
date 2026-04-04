@@ -68,7 +68,15 @@ export function useSlashSuggestionMenu(
   props: SlashSuggestionMenuProps,
   ref: Ref<SlashSuggestionHandle>,
 ): UseSlashSuggestionMenuResult {
-  const { editor, query, range, onClose, claudeAgentSlashAvailable, onAgentBusyChange } = props;
+  const {
+    editor,
+    query,
+    range,
+    onClose,
+    claudeAgentSlashAvailable,
+    onAgentBusyChange,
+    claudeWorkspaceRoot,
+  } = props;
   const { t } = useTranslation();
   const { toast } = useToast();
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -82,6 +90,7 @@ export function useSlashSuggestionMenu(
     editor,
     t,
     claudeAgentSlashAvailable,
+    claudeWorkspaceRoot ?? null,
   );
 
   useEffect(() => {
@@ -114,6 +123,7 @@ export function useSlashSuggestionMenu(
           query,
           editor,
           range,
+          claudeCwd: claudeWorkspaceRoot ?? undefined,
         });
         if (err) {
           toast({
@@ -126,7 +136,7 @@ export function useSlashSuggestionMenu(
         onAgentBusyChange?.(false);
       }
     },
-    [onClose, onAgentBusyChange, query, editor, range, toast, t],
+    [onClose, onAgentBusyChange, query, editor, range, toast, t, claudeWorkspaceRoot],
   );
 
   const selectItem = useCallback(

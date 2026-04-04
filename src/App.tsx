@@ -32,6 +32,7 @@ import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProv
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AIChatProvider } from "./contexts/AIChatContext";
 import { AIChatConversationsProvider } from "./hooks/useAIChatConversations";
+import { FilePreviewDialogHost } from "./components/note/FilePreviewDialogHost";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ const App = () => (
         {/* unstable_useTransitions を無効化: リンク後の表示が遅れる問題を防ぐ（RR v7 は future 廃止）
             Disable unstable_useTransitions: prevents display delay after link navigation (RR v7 removed future flags) */}
         <BrowserRouter unstable_useTransitions={false}>
+          <FilePreviewDialogHost />
           <AIChatProvider>
             <AIChatConversationsProvider>
               <GlobalShortcutsProvider>

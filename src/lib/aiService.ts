@@ -29,6 +29,8 @@ export interface AIServiceRequest {
     webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
     useWebSearch?: boolean;
     useGoogleSearch?: boolean;
+    /** Claude Code sidecar cwd (note-linked workspace, desktop only). */
+    cwd?: string;
   };
 }
 
@@ -178,6 +180,7 @@ async function callAIWithClaudeCode(
           maxTokens: request.options?.maxTokens,
           temperature: request.options?.temperature,
           stream: request.options?.stream,
+          cwd: request.options?.cwd,
         },
       },
       abortSignal,
