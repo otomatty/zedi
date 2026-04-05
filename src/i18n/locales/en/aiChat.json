@@ -19,7 +19,10 @@
     "createMultiple": "Create All",
     "addLink": "Add Link",
     "copyCode": "Copy code",
-    "copiedCode": "Copied"
+    "copiedCode": "Copied",
+    "insertToNote": "Insert to note",
+    "copyMessage": "Copy",
+    "copyFailed": "Failed to copy"
   },
   "placeholders": {
     "default": "Type a message...",
@@ -59,7 +62,9 @@
     "pageBodyGenerateFailed": "Failed to generate page content",
     "wikiLinksAdded": "Added {{count}} wiki links",
     "noNewWikiLinks": "There are no new wiki links to add",
-    "actionFailed": "Failed to execute the action"
+    "actionFailed": "Failed to execute the action",
+    "insertSuccess": "Inserted into note",
+    "insertUnavailable": "No editor available for insertion"
   },
   "messages": {
     "loadingSkeleton": "Loading response"
@@ -67,7 +72,55 @@
   "viewTabs": {
     "chat": "Chat",
     "branch": "Branches",
+    "workflow": "Workflow",
     "noBranches": "No branches in this conversation"
+  },
+  "workflow": {
+    "subtitle": "Multi-step Claude Code runs with live note updates (desktop).",
+    "desktopOnly": "Workflows require the Zedi desktop app with Claude Code.",
+    "editorRequired": "Open a note page to write results into the editor.",
+    "nameRequired": "Enter a workflow name.",
+    "stepsRequired": "Add at least one step with a title and instructions.",
+    "nothingToResume": "Nothing to resume. Run a workflow first, then pause.",
+    "pausedStepNotFound": "The paused step is no longer in this workflow. Run again from the start.",
+    "workflowName": "Workflow name",
+    "workflowNamePlaceholder": "e.g. New API endpoint design",
+    "template": "Template",
+    "templatePlaceholder": "Load a template…",
+    "templates": {
+      "codeInvestigateDesign": "Code investigation → design memo",
+      "testAnalyzeImprove": "Run tests → analyze → suggest improvements",
+      "repoAnalyzeDocs": "Repository analysis → documentation draft",
+      "webResearchNote": "Web research → organize → draft note"
+    },
+    "savedWorkflows": "Saved workflows",
+    "pickSaved": "Load saved…",
+    "deleteSaved": "Delete saved workflow",
+    "save": "Save",
+    "export": "Export",
+    "import": "Import",
+    "steps": "Steps",
+    "addStep": "Add step",
+    "stepLabel": "Step {{n}}",
+    "removeStep": "Remove step {{n}}",
+    "stepTitleAria": "Step {{n}} title",
+    "stepInstructionAria": "Step {{n}} instructions",
+    "stepTitlePlaceholder": "Step title",
+    "stepInstructionPlaceholder": "What Claude Code should do in this step",
+    "unnamedStep": "Step {{n}}",
+    "progressTitle": "Progress",
+    "run": "Run",
+    "pause": "Pause",
+    "resume": "Resume",
+    "stop": "Stop",
+    "saved": "Workflow saved",
+    "deleted": "Workflow removed",
+    "imported": "Workflow imported",
+    "importFailed": "Could not import workflow JSON",
+    "completed": "Workflow completed",
+    "paused": "Workflow paused",
+    "stopped": "Workflow stopped",
+    "error": "Workflow error: {{message}}"
   },
   "branchTree": {
     "goToBranch": "Go to this branch",
@@ -81,6 +134,13 @@
   "empty": {
     "messages": "Messages will appear here",
     "pageConversations": "No conversation history for this page yet"
+  },
+  "mode": {
+    "default": "Server",
+    "apiKey": "API Key",
+    "apiKeyWithProvider": "API Key: {{provider}}",
+    "claudeCode": "Claude Code",
+    "openSettings": "Open AI settings"
   },
   "modelSelector": {
     "select": "Select model",
@@ -104,6 +164,15 @@
     "deleteConfirmDescription": "This cannot be undone.",
     "openMenu": "Open menu",
     "empty": "No conversations yet"
+  },
+  "toolStatus": {
+    "read": "Reading file",
+    "write": "Writing file",
+    "bash": "Running command",
+    "webSearch": "Searching web",
+    "glob": "Searching files",
+    "grep": "Searching text",
+    "ls": "Listing directory"
   },
   "referencedPages": {
     "added": "Added \"{{title}}\" as reference",

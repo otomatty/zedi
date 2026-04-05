@@ -126,7 +126,11 @@ export async function streamWikiStyleFromFullPrompt(
     case "google":
       await streamGoogleFullPrompt(settings, fullUserPrompt, callbacks, abortSignal);
       break;
-    default:
-      throw new Error(`Unknown provider: ${settings.provider}`);
+    case "claude-code":
+      throw new Error("Wiki generation is not supported with Claude Code provider.");
+    default: {
+      const _exhaustive: never = settings.provider;
+      throw new Error(`Unknown provider: ${_exhaustive}`);
+    }
   }
 }

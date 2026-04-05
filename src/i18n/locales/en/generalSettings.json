@@ -14,6 +14,11 @@
     "light": "Light",
     "dark": "Dark"
   },
+  "executableCode": {
+    "title": "Executable code blocks",
+    "description": "Notebook-style cells run through Claude Code (desktop). Bash tool executes your snippet.",
+    "confirmBeforeRun": "Ask for confirmation before running code"
+  },
   "fontSize": {
     "label": "Editor Font Size",
     "small": "Small",

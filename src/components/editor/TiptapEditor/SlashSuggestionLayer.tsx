@@ -1,197 +1,46 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useImperativeHandle,
-  forwardRef,
-  useRef,
-} from "react";
+/**
+ * Floating slash menu wrapper (positioning only).
+ * スラッシュメニューのフローティングラッパー（位置のみ）。
+ */
+
+import React from "react";
 import type { Editor } from "@tiptap/core";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
-import { slashCommandItems, filterSlashCommandItems } from "./slashCommandItems";
-import { cn } from "@zedi/ui";
-import { useTranslation } from "react-i18next";
-import {
-  Pilcrow,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  CheckSquare,
-  Quote,
-  Code2,
-  Minus,
-  Table,
-  ImagePlus,
-  GitBranch,
-  Sigma,
-  Radical,
-} from "lucide-react";
+import { SlashSuggestionMenu } from "./SlashSuggestionMenu";
+import type { SlashSuggestionHandle } from "./slashSuggestionHandle";
 
-/** Map icon name string → Lucide component */
-const iconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  Pilcrow,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  CheckSquare,
-  Quote,
-  Code2,
-  Minus,
-  Table,
-  ImagePlus,
-  GitBranch,
-  Sigma,
-  Radical,
-};
-
-/**
- *
- */
-export interface SlashSuggestionHandle {
-  onKeyDown: (event: KeyboardEvent) => boolean;
-}
+export type { SlashSuggestionHandle } from "./slashSuggestionHandle";
 
 interface SlashSuggestionLayerProps {
   editor: Editor | null;
   suggestionState: SlashSuggestionState | null;
   position: { top: number; left: number } | null;
-  suggestionRef: React.RefObject<SlashSuggestionHandle>;
+  suggestionRef: React.RefObject<SlashSuggestionHandle | null>;
   onClose: () => void;
+  /** When false, agent rows are omitted (web or Claude CLI missing). / false ならエージェント行を出さない */
+  claudeAgentSlashAvailable: boolean;
+  /** Fires while Claude Code runs for an agent command. / エージェント実行中 */
+  onAgentBusyChange?: (busy: boolean) => void;
+  /** Note-linked workspace root for agent cwd (desktop). / エージェント cwd 用 */
+  claudeWorkspaceRoot?: string | null;
+  /** Note id for Tauri path completion (desktop). / パス補完用ノート ID */
+  claudeWorkspaceNoteId?: string | null;
 }
 
-const SlashSuggestionMenu = forwardRef<
-  SlashSuggestionHandle,
-  {
-    editor: Editor;
-    query: string;
-    range: { from: number; to: number };
-    onClose: () => void;
-  }
->(({ editor, query, range, onClose }, ref) => {
-  const { t } = useTranslation();
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  const items = filterSlashCommandItems(slashCommandItems, query, editor, t);
-
-  // Reset selection when query changes
-  useEffect(() => {
-    queueMicrotask(() => setSelectedIndex(0));
-  }, [query]);
-
-  const selectItem = useCallback(
-    (index: number) => {
-      const item = items[index];
-      if (item) {
-        item.action(editor, range);
-        onClose();
-      }
-    },
-    [items, editor, range, onClose],
-  );
-
-  // Scroll selected item into view
-  useEffect(() => {
-    if (!listRef.current) return;
-    const buttons = listRef.current.querySelectorAll("button");
-    const target = buttons[selectedIndex];
-    if (target) {
-      target.scrollIntoView({ block: "nearest" });
-    }
-  }, [selectedIndex]);
-
-  useImperativeHandle(ref, () => ({
-    onKeyDown: (event: KeyboardEvent) => {
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        setSelectedIndex((prev) => (prev <= 0 ? items.length - 1 : prev - 1));
-        return true;
-      }
-
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        setSelectedIndex((prev) => (prev >= items.length - 1 ? 0 : prev + 1));
-        return true;
-      }
-
-      if (event.key === "Enter") {
-        event.preventDefault();
-        selectItem(selectedIndex);
-        return true;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return true;
-      }
-
-      return false;
-    },
-  }));
-
-  if (items.length === 0) {
-    return (
-      <div className="shadow-elevated animate-fade-in border-border bg-popover min-w-[240px] overflow-hidden rounded-lg border">
-        <div className="text-muted-foreground px-3 py-2 text-sm">{t("editor.slashNoResults")}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={listRef}
-      className="shadow-elevated animate-fade-in border-border bg-popover max-h-[320px] max-w-[320px] min-w-[240px] overflow-hidden overflow-y-auto rounded-lg border"
-      role="listbox"
-      aria-label={t("editor.slashMenuAriaLabel")}
-    >
-      <div className="p-1">
-        {items.map((item, index) => {
-          const Icon = iconMap[item.icon];
-          return (
-            <button
-              key={item.id}
-              role="option"
-              aria-selected={index === selectedIndex}
-              onClick={() => selectItem(index)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                index === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted",
-              )}
-            >
-              {Icon && <Icon className="text-muted-foreground h-4 w-4 shrink-0" />}
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate font-medium">{t(`editor.slash.${item.id}.title`)}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {t(`editor.slash.${item.id}.description`)}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
-SlashSuggestionMenu.displayName = "SlashSuggestionMenu";
-
 /**
- *
+ * Positions the slash menu under the `/` trigger.
+ * `/` トリガー下にスラッシュメニューを配置する。
  */
-export /**
- *
- */
-const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
+export const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
   editor,
   suggestionState,
   position,
   suggestionRef,
   onClose,
+  claudeAgentSlashAvailable,
+  onAgentBusyChange,
+  claudeWorkspaceRoot,
+  claudeWorkspaceNoteId,
 }) => {
   if (!suggestionState?.active || !suggestionState.range || !position || !editor) return null;
 
@@ -209,6 +58,10 @@ const SlashSuggestionLayer: React.FC<SlashSuggestionLayerProps> = ({
         query={suggestionState.query}
         range={suggestionState.range}
         onClose={onClose}
+        claudeAgentSlashAvailable={claudeAgentSlashAvailable}
+        onAgentBusyChange={onAgentBusyChange}
+        claudeWorkspaceRoot={claudeWorkspaceRoot}
+        claudeWorkspaceNoteId={claudeWorkspaceNoteId}
       />
     </div>
   );

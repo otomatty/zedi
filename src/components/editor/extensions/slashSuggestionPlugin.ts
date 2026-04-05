@@ -2,6 +2,10 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
+/**
+ * UI state for the `/` slash menu (query, range, decorations).
+ * `/` スラッシュメニュー用 UI 状態（クエリ、範囲、装飾）。
+ */
 export interface SlashSuggestionState {
   active: boolean;
   query: string;
@@ -9,9 +13,18 @@ export interface SlashSuggestionState {
   decorations: DecorationSet;
 }
 
+/**
+ * ProseMirror plugin key for slash suggestions.
+ * スラッシュサジェスト用 ProseMirror プラグインキー。
+ */
 export const slashSuggestionPluginKey = new PluginKey<SlashSuggestionState>("slashSuggestion");
 
+/**
+ * Options for {@link SlashSuggestionPlugin}.
+ * {@link SlashSuggestionPlugin} のオプション。
+ */
 export interface SlashSuggestionOptions {
+  /** Called when slash menu state changes. / スラッシュメニュー状態が変わったときに呼ぶ */
   onStateChange?: (state: SlashSuggestionState) => void;
 }
 
@@ -87,7 +100,9 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
 
             // Match "/" at the start of line, or " /" preceded by a space.
             // Capture the query after "/"
-            const match = textBefore.match(/(^|\s)\/([^\s/]*)$/);
+            // Allow spaces after the first token so `/analyze path/to/file` stays active.
+            // 1 語目以降にスペースを許可し、`/analyze path` 入力中もメニューを維持する。
+            const match = textBefore.match(/(^|\s)\/([^\n]*)$/);
 
             if (match) {
               const query = match[2]; // text after "/"

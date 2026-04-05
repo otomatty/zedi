@@ -2,8 +2,21 @@
 
 import { encrypt, decrypt } from "./encryption";
 import { AISettings, DEFAULT_AI_SETTINGS } from "@/types/ai";
+import { isTauriDesktop } from "@/lib/platform";
 
 const STORAGE_KEY = "zedi-ai-settings";
+
+/**
+ * Same-tab notification after AI settings persist (the `storage` event does not fire on the writer).
+ * AI 設定保存後の同一タブ向け通知（書き込み側では `storage` が発火しない）。
+ */
+export const AI_SETTINGS_CHANGED_EVENT = "zedi-ai-settings-changed";
+
+function dispatchAISettingsChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(AI_SETTINGS_CHANGED_EVENT));
+  }
+}
 
 /**
  * AI設定を保存する
@@ -17,6 +30,7 @@ export async function saveAISettings(settings: AISettings): Promise<void> {
       apiKey: settings.apiKey ? await encrypt(settings.apiKey) : "",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
+    dispatchAISettingsChanged();
   } catch (error) {
     console.error("Failed to save AI settings:", error);
     throw new Error("AI設定の保存に失敗しました");
@@ -65,17 +79,31 @@ export async function loadAISettings(): Promise<AISettings | null> {
  */
 export function clearAISettings(): void {
   localStorage.removeItem(STORAGE_KEY);
+  dispatchAISettingsChanged();
 }
 
 /**
- * AI設定が有効かどうかを確認する
- * api_serverモードではシステムプロバイダーが利用可能なため常にtrue
+ * AI設定が有効かどうかを確認する。
+ * api_serverモードではシステムプロバイダーが利用可能なため常にtrue。
+ * claude-code はデスクトップ環境でインストール済みなら常に利用可能。
+ *
+ * Checks if AI is configured. Server mode is always available.
+ * Claude Code is available when installed in a desktop environment.
  */
 export async function isAIConfigured(): Promise<boolean> {
   const settings = await loadAISettings();
   if (!settings) {
-    // 未設定の場合、デフォルトのapi_serverモードで利用可能
     return true;
+  }
+  if (settings.provider === "claude-code") {
+    if (!isTauriDesktop()) return false;
+    try {
+      const { checkClaudeInstallation } = await import("@/lib/claudeCode/bridge");
+      const result = await checkClaudeInstallation();
+      return result.installed;
+    } catch {
+      return false;
+    }
   }
   if (settings.apiMode === "api_server") {
     return true;

@@ -5,7 +5,6 @@ import { Input } from "@zedi/ui";
 import { Label } from "@zedi/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
 import { Alert, AlertDescription, AlertTitle } from "@zedi/ui";
-import { ProviderSelector } from "./ProviderSelector";
 import { CollapsibleHelp } from "./CollapsibleHelp";
 import { ApiKeySourcesHelp } from "./ApiKeySourcesHelp";
 import type { AIProvider } from "@/types/ai";
@@ -27,14 +26,11 @@ interface AISettingsFormUserKeySectionProps {
 }
 
 /**
- *
+ * API key and model selection section for user-key mode.
+ * ユーザーキーモード用の API キー・モデル選択セクション。
  */
-export /**
- *
- */
-const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySectionProps> = ({
+export const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySectionProps> = ({
   apiKey,
-  provider,
   model,
   availableModels,
   currentProvider,
@@ -46,19 +42,10 @@ const AISettingsFormUserKeySection: React.FC<AISettingsFormUserKeySectionProps> 
   testResult,
   embedded,
 }) => {
-  /**
-   *
-   */
   const { t } = useTranslation();
 
   return (
     <>
-      <ProviderSelector
-        value={provider}
-        onChange={(p) => onUpdateSettings({ provider: p })}
-        disabled={isSaving || isTesting}
-      />
-
       <div className="space-y-2">
         <Label htmlFor="apiKey">{t("aiSettings.apiKey")}</Label>
         <div className="relative">

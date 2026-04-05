@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  AI_SETTINGS_CHANGED_EVENT,
   saveAISettings,
   loadAISettings,
   clearAISettings,
@@ -49,6 +50,23 @@ describe("aiSettings - 回帰テスト", () => {
       });
       expect(encrypt).toHaveBeenCalledWith("test-api-key");
       expect(decrypt).toHaveBeenCalledWith("encrypted:test-api-key");
+    });
+
+    it("保存後に AI_SETTINGS_CHANGED_EVENT を dispatch する", async () => {
+      const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+      const settings: AISettings = {
+        provider: "openai",
+        apiKey: "",
+        apiMode: "api_server",
+        model: "gpt-4o",
+        modelId: "openai:gpt-4o",
+        isConfigured: false,
+      };
+      await saveAISettings(settings);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: AI_SETTINGS_CHANGED_EVENT }),
+      );
+      dispatchSpy.mockRestore();
     });
 
     it("apiKeyが空の場合は暗号化されない", async () => {

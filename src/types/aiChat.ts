@@ -21,6 +21,15 @@ export interface Conversation {
   updatedAt: number;
 }
 
+/**
+ * ツール実行状況の 1 エントリ。
+ * A single tool execution status entry.
+ */
+export interface ToolExecution {
+  toolName: string;
+  status: "running" | "completed";
+}
+
 /** メッセージ */
 export interface ChatMessage {
   id: string;
@@ -30,6 +39,11 @@ export interface ChatMessage {
   referencedPages?: ReferencedPage[]; // このメッセージに添付された参照ページ
   /** このメッセージの生成に使用されたモデル表示名 */
   modelDisplayName?: string;
+  /**
+   * ストリーミング中のツール実行状況リスト（Claude Code のみ）。
+   * Tool execution status list during streaming (Claude Code only).
+   */
+  toolExecutions?: ToolExecution[];
   timestamp: number;
   isStreaming?: boolean;
   error?: string;
@@ -146,6 +160,16 @@ export const MAX_REFERENCED_PAGES = 5;
 export interface PageContext {
   type: "editor" | "home" | "search" | "other";
   pageId?: string;
+  /**
+   * Parent note id when editing a page inside a note (local metadata only).
+   * ノート内ページ編集中の親ノート ID（ローカルメタデータのみ）。
+   */
+  noteId?: string;
+  /**
+   * Linked local workspace root for Claude Code cwd (desktop, not sent to API server).
+   * Claude Code cwd 用のローカルワークスペース（デスクトップ、API サーバには送らない）。
+   */
+  claudeWorkspaceRoot?: string;
   pageTitle?: string;
   pageContent?: string;
   /** Full editor content for local actions such as AI-driven page updates. */

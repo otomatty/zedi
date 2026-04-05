@@ -5,77 +5,149 @@ import { useAIChatStore } from "../../stores/aiChatStore";
 import { fetchServerModels } from "../../lib/aiService";
 import { getSonnetBaseline, formatCostMultiplierLabel } from "../../lib/aiCostUtils";
 import { loadAISettings } from "../../lib/aiSettings";
-import type { AIModel } from "../../types/ai";
+import { isTauriDesktop } from "../../lib/platform";
+import type { AIModel, AIInteractionMode, AIProviderType } from "../../types/ai";
+import { getInteractionMode } from "../../types/ai";
 import { cn } from "@zedi/ui";
 
+interface DisplayModel {
+  id: string;
+  provider: AIProviderType;
+  modelId: string;
+  displayName: string;
+  inputCostUnits?: number;
+  outputCostUnits?: number;
+}
+
 /**
+ * Fallback when sidecar is unavailable or the app is not running in Tauri (web build).
+ * sidecar 不可時、または Tauri 外（Web ビルド）のときの Claude Code モデル一覧の既定。
+ */
+const DEFAULT_CLAUDE_CODE_MODELS: DisplayModel[] = [
+  {
+    id: "claude-code:claude-sonnet-4-6",
+    provider: "claude-code",
+    modelId: "claude-sonnet-4-6",
+    displayName: "Claude Sonnet 4.6",
+  },
+];
+
+/**
+ * Resolves which Claude Code model to select after loading the list.
+ * 一覧取得後に選ぶ Claude Code モデルを解決する。
+ */
+function resolveClaudeInitialSelection(
+  claudeModels: DisplayModel[],
+  current: { id: string; provider: AIProviderType } | null,
+  savedModelId: string | undefined,
+): DisplayModel | undefined {
+  if (claudeModels.length === 0) return undefined;
+  const matchedCurrent =
+    current?.provider === "claude-code" ? claudeModels.find((m) => m.id === current.id) : undefined;
+  if (matchedCurrent) return undefined;
+  const matchedSaved = savedModelId ? claudeModels.find((m) => m.id === savedModelId) : undefined;
+  return matchedSaved ?? claudeModels[0];
+}
+
+/**
+ * Resolves which server model to select when the current store id is not in the list.
+ * ストアの選択が一覧に無いときに選ぶサーバーモデルを解決する。
+ */
+function resolveServerInitialSelection(
+  available: AIModel[],
+  current: { id: string } | null,
+  savedModelId: string | undefined,
+): AIModel | undefined {
+  if (available.length === 0) return undefined;
+  const matchedCurrent = current ? available.find((m) => m.id === current.id) : undefined;
+  if (matchedCurrent) return undefined;
+  const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
+  return matched ?? available[0];
+}
+
+/**
+ * Chat-panel model selector. Behaviour varies by interaction mode:
+ * - default: shows all available server models
+ * - user_api_key: filters to the configured provider only
+ * - claude_code: fetches available Claude models from the sidecar
  *
+ * チャットパネルのモデルセレクター。利用モードに応じて動作が変わる。
  */
 export function AIChatModelSelector() {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
-  const { selectedModel, setSelectedModel, isStreaming } = useAIChatStore();
-  /**
-   *
-   */
-  const [models, setModels] = useState<AIModel[]>([]);
-  /**
-   *
-   */
+  const { setSelectedModel, isStreaming } = useAIChatStore();
+  const [models, setModels] = useState<DisplayModel[]>([]);
+  const [serverAIModels, setServerAIModels] = useState<AIModel[]>([]);
   const [loading, setLoading] = useState(false);
-  /**
-   *
-   */
   const [open, setOpen] = useState(false);
-  /**
-   *
-   */
+  const [mode, setMode] = useState<AIInteractionMode>("default");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // モデル一覧をロード
-  /**
-   *
-   */
   const loadModels = useCallback(async () => {
     setLoading(true);
     try {
-      /**
-       *
-       */
-      const { models: serverModels } = await fetchServerModels();
-      /**
-       *
-       */
-      const available = serverModels.filter((m) => m.available);
-      setModels(available);
+      const settings = await loadAISettings();
+      const currentMode = settings ? getInteractionMode(settings) : "default";
+      setMode(currentMode);
 
-      // 初回: selectedModel がまだ null なら設定画面のモデル or デフォルトを選択
-      if (!selectedModel && available.length > 0) {
-        /**
-         *
-         */
-        const settings = await loadAISettings();
-        /**
-         *
-         */
-        const savedModelId = settings?.modelId;
-        /**
-         *
-         */
-        const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
-        /**
-         *
-         */
-        const first = available[0];
-        /**
-         *
-         */
-        const initial = matched ?? first;
+      if (currentMode === "claude_code") {
+        let claudeModels: DisplayModel[] = [...DEFAULT_CLAUDE_CODE_MODELS];
+        if (isTauriDesktop()) {
+          try {
+            const { claudeListModels } = await import("@/lib/claudeCode/bridge");
+            const result = await claudeListModels();
+            claudeModels = result.models.map((m) => ({
+              id: `claude-code:${m.value}`,
+              provider: "claude-code",
+              modelId: m.value,
+              displayName: m.displayName,
+            }));
+          } catch {
+            claudeModels = [...DEFAULT_CLAUDE_CODE_MODELS];
+          }
+        }
+        setModels(claudeModels);
+        setServerAIModels([]);
+
+        const current = useAIChatStore.getState().selectedModel;
+        if (claudeModels.length === 0) {
+          setSelectedModel(null);
+        } else {
+          const initial = resolveClaudeInitialSelection(claudeModels, current, settings?.modelId);
+          if (initial) {
+            setSelectedModel({
+              id: initial.id,
+              provider: "claude-code",
+              model: initial.modelId,
+              displayName: initial.displayName,
+            });
+          }
+        }
+        return;
+      }
+
+      const { models: serverModels } = await fetchServerModels();
+      let available = serverModels.filter((m) => m.available);
+      if (currentMode === "user_api_key" && settings) {
+        available = available.filter((m) => m.provider === settings.provider);
+      }
+      setServerAIModels(available);
+      setModels(
+        available.map((m) => ({
+          id: m.id,
+          provider: m.provider,
+          modelId: m.modelId,
+          displayName: m.displayName,
+          inputCostUnits: m.inputCostUnits,
+          outputCostUnits: m.outputCostUnits,
+        })),
+      );
+
+      const current = useAIChatStore.getState().selectedModel;
+      if (available.length === 0) {
+        setSelectedModel(null);
+      } else {
+        const initial = resolveServerInitialSelection(available, current, settings?.modelId);
         if (initial) {
           setSelectedModel({
             id: initial.id,
@@ -88,22 +160,18 @@ export function AIChatModelSelector() {
         }
       }
     } catch {
-      // フォールバック: 設定画面のモデルを使用
+      // fallback: use settings model
     } finally {
       setLoading(false);
     }
-  }, [selectedModel, setSelectedModel]);
+  }, [setSelectedModel]);
 
   useEffect(() => {
     loadModels();
   }, [loadModels]);
 
-  // 外部クリックで閉じる
   useEffect(() => {
     if (!open) return;
-    /**
-     *
-     */
     const handleClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -113,11 +181,8 @@ export function AIChatModelSelector() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  /**
-   *
-   */
   const handleSelect = useCallback(
-    (model: AIModel) => {
+    (model: DisplayModel) => {
       setSelectedModel({
         id: model.id,
         provider: model.provider,
@@ -131,20 +196,10 @@ export function AIChatModelSelector() {
     [setSelectedModel],
   );
 
-  /**
-   *
-   */
+  const selectedModel = useAIChatStore((s) => s.selectedModel);
   const displayLabel = selectedModel?.displayName ?? t("aiChat.modelSelector.select");
-
-  /**
-   *
-   */
-  const sonnetBaseline = getSonnetBaseline(models);
-  /**
-   *
-   */
-  const getCostLabel = (model: AIModel) =>
-    formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline);
+  const sonnetBaseline = getSonnetBaseline(serverAIModels);
+  const showCost = mode !== "claude_code";
 
   return (
     <div ref={containerRef} className="relative">
@@ -173,18 +228,13 @@ export function AIChatModelSelector() {
       {open && models.length > 0 && (
         <div className="border-border bg-popover absolute bottom-full left-0 z-50 mb-1 max-h-[280px] max-w-[320px] min-w-[240px] overflow-hidden overflow-y-auto rounded-lg border shadow-lg">
           {models.map((model) => {
-            /**
-             *
-             */
             const isSelected = selectedModel?.id === model.id;
-            /**
-             *
-             */
-            const costLabel = getCostLabel(model);
-            /**
-             *
-             */
-            const isCheaperOrBaseline = model.inputCostUnits <= sonnetBaseline;
+            const costLabel =
+              showCost && model.inputCostUnits != null
+                ? formatCostMultiplierLabel(model.inputCostUnits, sonnetBaseline)
+                : null;
+            const isCheaperOrBaseline =
+              model.inputCostUnits != null && model.inputCostUnits <= sonnetBaseline;
             return (
               <button
                 key={model.id}
@@ -197,16 +247,18 @@ export function AIChatModelSelector() {
               >
                 <span className="truncate">{model.displayName}</span>
                 <span className="flex shrink-0 items-center gap-1.5">
-                  <span
-                    className={cn(
-                      "rounded px-1 py-0.5 text-[10px] tabular-nums",
-                      isCheaperOrBaseline
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {costLabel}
-                  </span>
+                  {costLabel && (
+                    <span
+                      className={cn(
+                        "rounded px-1 py-0.5 text-[10px] tabular-nums",
+                        isCheaperOrBaseline
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {costLabel}
+                    </span>
+                  )}
                   {isSelected && <Check className="text-primary h-3.5 w-3.5 shrink-0" />}
                 </span>
               </button>

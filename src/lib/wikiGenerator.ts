@@ -36,6 +36,10 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
     return { ...settings, isConfigured: true };
   }
 
+  if (settings.provider === "claude-code") {
+    return { ...settings, isConfigured: true };
+  }
+
   if (!settings.isConfigured || !settings.apiKey) {
     throw new Error("AI_NOT_CONFIGURED");
   }
@@ -44,7 +48,7 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
 
 /**
  * Wikiコンテンツをストリーミング生成
- * api_serverモード: callAIService経由でサーバーに委譲
+ * api_serverモード / claude-code: callAIService経由でサーバーに委譲
  * user_api_keyモード: 直接SDKで呼び出し（既存動作）
  */
 export async function generateWikiContentStream(
@@ -56,7 +60,7 @@ export async function generateWikiContentStream(
     const settings = await getAISettingsOrThrow();
     const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
-    if (effectiveMode === "api_server") {
+    if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");
       const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
       let fullContent = "";
@@ -103,8 +107,12 @@ export async function generateWikiContentStream(
       case "google":
         await generateWithGoogle(settings, title, callbacks, abortSignal);
         break;
-      default:
-        throw new Error(`Unknown provider: ${settings.provider}`);
+      case "claude-code":
+        throw new Error("Wiki generation is not supported with Claude Code provider.");
+      default: {
+        const _exhaustive: never = settings.provider;
+        throw new Error(`Unknown provider: ${_exhaustive}`);
+      }
     }
   } catch (error) {
     if (error instanceof Error) {
@@ -131,7 +139,7 @@ export async function generateWikiContentFromChatOutlineStream(
     const settings = await getAISettingsOrThrow();
     const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
 
-    if (effectiveMode === "api_server") {
+    if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");
       let fullContent = "";
 

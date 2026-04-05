@@ -19,7 +19,10 @@
     "createMultiple": "まとめて作成",
     "addLink": "リンクを追加",
     "copyCode": "コードをコピー",
-    "copiedCode": "コピーしました"
+    "copiedCode": "コピーしました",
+    "insertToNote": "ノートに挿入",
+    "copyMessage": "コピー",
+    "copyFailed": "コピーに失敗しました"
   },
   "placeholders": {
     "default": "メッセージを入力...",
@@ -59,7 +62,9 @@
     "pageBodyGenerateFailed": "ページ本文の生成に失敗しました",
     "wikiLinksAdded": "{{count}}件のWikiLinkを追加しました",
     "noNewWikiLinks": "追加できる新しいWikiLinkはありません",
-    "actionFailed": "アクションの実行に失敗しました"
+    "actionFailed": "アクションの実行に失敗しました",
+    "insertSuccess": "ノートに挿入しました",
+    "insertUnavailable": "挿入先のエディタがありません"
   },
   "messages": {
     "loadingSkeleton": "応答を読み込み中"
@@ -67,7 +72,55 @@
   "viewTabs": {
     "chat": "チャット",
     "branch": "ブランチ",
+    "workflow": "ワークフロー",
     "noBranches": "この会話にはブランチがありません"
+  },
+  "workflow": {
+    "subtitle": "Claude Code で複数ステップを順に実行し、ノートへリアルタイム反映（デスクトップ）。",
+    "desktopOnly": "ワークフローは Claude Code 利用可能な Zedi デスクトップアプリが必要です。",
+    "editorRequired": "結果を書き込むにはノートページを開いてください。",
+    "nameRequired": "ワークフロー名を入力してください。",
+    "stepsRequired": "タイトルと指示があるステップを1つ以上追加してください。",
+    "nothingToResume": "再開できる実行がありません。実行して一時停止してください。",
+    "pausedStepNotFound": "一時停止中のステップがワークフローにありません。最初からやり直してください。",
+    "workflowName": "ワークフロー名",
+    "workflowNamePlaceholder": "例: 新 API エンドポイント設計",
+    "template": "テンプレート",
+    "templatePlaceholder": "テンプレートを読み込む…",
+    "templates": {
+      "codeInvestigateDesign": "コード調査→設計メモ作成",
+      "testAnalyzeImprove": "テスト実行→結果分析→改善提案",
+      "repoAnalyzeDocs": "リポジトリ分析→ドキュメント生成",
+      "webResearchNote": "Web 調査→情報整理→ノート作成"
+    },
+    "savedWorkflows": "保存済みワークフロー",
+    "pickSaved": "保存を読み込む…",
+    "deleteSaved": "保存を削除",
+    "save": "保存",
+    "export": "エクスポート",
+    "import": "インポート",
+    "steps": "ステップ",
+    "addStep": "ステップを追加",
+    "stepLabel": "ステップ {{n}}",
+    "removeStep": "ステップ {{n}} を削除",
+    "stepTitleAria": "ステップ {{n}} のタイトル",
+    "stepInstructionAria": "ステップ {{n}} の指示",
+    "stepTitlePlaceholder": "ステップのタイトル",
+    "stepInstructionPlaceholder": "このステップで Claude Code にやってほしいこと",
+    "unnamedStep": "ステップ {{n}}",
+    "progressTitle": "進捗",
+    "run": "実行",
+    "pause": "一時停止",
+    "resume": "再開",
+    "stop": "中断",
+    "saved": "ワークフローを保存しました",
+    "deleted": "ワークフローを削除しました",
+    "imported": "ワークフローをインポートしました",
+    "importFailed": "ワークフロー JSON を読み込めませんでした",
+    "completed": "ワークフローが完了しました",
+    "paused": "ワークフローを一時停止しました",
+    "stopped": "ワークフローを中断しました",
+    "error": "ワークフローエラー: {{message}}"
   },
   "branchTree": {
     "goToBranch": "このブランチに移動",
@@ -81,6 +134,13 @@
   "empty": {
     "messages": "メッセージ一覧がここに表示されます",
     "pageConversations": "このページの会話履歴はまだありません"
+  },
+  "mode": {
+    "default": "サーバー",
+    "apiKey": "APIキー",
+    "apiKeyWithProvider": "APIキー: {{provider}}",
+    "claudeCode": "Claude Code",
+    "openSettings": "AI設定を開く"
   },
   "modelSelector": {
     "select": "モデルを選択",
@@ -104,6 +164,15 @@
     "deleteConfirmDescription": "この操作は取り消せません。",
     "openMenu": "メニューを開く",
     "empty": "会話履歴はありません"
+  },
+  "toolStatus": {
+    "read": "ファイル読み込み中",
+    "write": "ファイル書き込み中",
+    "bash": "コマンド実行中",
+    "webSearch": "Web 検索中",
+    "glob": "ファイル検索中",
+    "grep": "テキスト検索中",
+    "ls": "ディレクトリ一覧取得中"
   },
   "referencedPages": {
     "added": "「{{title}}」を参照に追加しました",
