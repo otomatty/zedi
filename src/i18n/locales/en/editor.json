@@ -20,6 +20,12 @@
   "slashAgent": {
     "errorTitle": "Agent command failed"
   },
+  "mcpResourceEmbed": {
+    "desktopOnly": "MCP is only available in the desktop app.",
+    "unknownServer": "This server is not registered or not enabled. Add it in AI settings.",
+    "loadingFrom": "Loading from {{server}}...",
+    "fetchHint": "Click \"Fetch\" to load data from the MCP server."
+  },
   "slashPathCompletionAriaLabel": "Path suggestions",
   "slashPathCompletionHint": "Workspace path suggestions",
   "slash": {
@@ -107,6 +113,11 @@
       "title": "Math (block)",
       "description": "Insert block math",
       "aliases": "math block,block math,equation"
+    },
+    "mcpResource": {
+      "title": "MCP Resource",
+      "description": "Embed external data from an MCP server",
+      "aliases": "mcp,external data,github,supabase,integration"
     },
     "agent-analyze": {
       "title": "/analyze — analyze code",

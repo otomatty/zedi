@@ -101,6 +101,7 @@ async function handleRequest(raw: string): Promise<void> {
         maxTurns: req.maxTurns,
         allowedTools: req.allowedTools,
         resume: req.resume,
+        mcpServers: req.mcpServers,
         writeLine,
         abortController: ac,
         tracker,

@@ -4,6 +4,7 @@
  */
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import type {
   SDKAssistantMessage,
   SDKMessage,
@@ -11,7 +12,7 @@ import type {
   SDKResultMessage,
   SDKToolProgressMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { SidecarResponse } from "../protocol";
+import type { SidecarMcpServerConfig, SidecarResponse } from "../protocol";
 import { formatResponseLine } from "../protocol";
 import type { QueryActivityTracker } from "./status";
 
@@ -84,6 +85,21 @@ function isResultMessage(msg: SDKMessage): msg is SDKResultMessage {
 }
 
 /**
+ * Checks if a message is a system init message containing MCP server status.
+ * system init メッセージ（MCP サーバーステータスを含む）かどうかを判定する。
+ */
+function isSystemInitMessage(msg: SDKMessage): boolean {
+  return (
+    typeof msg === "object" &&
+    msg !== null &&
+    "type" in msg &&
+    (msg as { type: string }).type === "system" &&
+    "subtype" in msg &&
+    (msg as { subtype: string }).subtype === "init"
+  );
+}
+
+/**
  * Emits stream-complete on success or error line on failure.
  * 成功時は stream-complete、失敗時は error 行を出す。
  */
@@ -123,6 +139,7 @@ export async function runQuery(params: {
   maxTurns?: number;
   allowedTools?: string[];
   resume?: string;
+  mcpServers?: Record<string, SidecarMcpServerConfig>;
   writeLine: WriteLine;
   abortController: AbortController;
   tracker: QueryActivityTracker;
@@ -135,6 +152,7 @@ export async function runQuery(params: {
     maxTurns,
     allowedTools,
     resume,
+    mcpServers,
     writeLine,
     abortController,
     tracker,
@@ -149,15 +167,27 @@ export async function runQuery(params: {
   let activeToolName: string | null = null;
 
   try {
+    const hasMcp = mcpServers && Object.keys(mcpServers).length > 0;
+
+    const resolvedTools: string[] | undefined =
+      allowedTools !== undefined
+        ? allowedTools
+        : hasMcp
+          ? [...DEFAULT_TOOLS, "mcp__*"]
+          : [...DEFAULT_TOOLS];
+
     const q = query({
       prompt,
       options: {
         model: model || undefined,
         cwd: cwd ?? process.cwd(),
         maxTurns: maxTurns ?? 25,
-        // `undefined` → default tools; explicit `[]` → no tools (interpret-only queries).
-        // `undefined` → 既定ツール、明示的な `[]` → ツールなし（解説のみのクエリ等）。
-        allowedTools: allowedTools !== undefined ? allowedTools : [...DEFAULT_TOOLS],
+        allowedTools: resolvedTools,
+        // SDK `Options.mcpServers` と protocol の SidecarMcpServerConfig は形状が一致するが、型は別定義のため unknown 経由で渡す。
+        // Shapes match SDK `Options.mcpServers`; cast via `unknown` because types differ from protocol.
+        mcpServers: hasMcp
+          ? (mcpServers as unknown as NonNullable<Options["mcpServers"]>)
+          : undefined,
         abortController,
         includePartialMessages: true,
         resume,
@@ -226,6 +256,29 @@ export async function runQuery(params: {
         if (delta.length > 0) {
           aggregated += delta;
           emit({ type: "stream-chunk", id, content: delta });
+        }
+        continue;
+      }
+
+      if (isSystemInitMessage(msg)) {
+        const sysMsg = msg as unknown as { mcp_servers?: unknown[] };
+        const mcpArr = sysMsg.mcp_servers;
+        if (Array.isArray(mcpArr) && mcpArr.length > 0) {
+          const servers = mcpArr.map((raw: unknown) => {
+            const s = raw as Record<string, unknown>;
+            return {
+              name: String(s.name ?? ""),
+              status: String(s.status ?? "unknown"),
+              error: s.error ? String(s.error) : undefined,
+              tools: Array.isArray(s.tools)
+                ? (s.tools as Array<Record<string, unknown>>).map((t) => ({
+                    name: String(t.name ?? ""),
+                    description: t.description ? String(t.description) : undefined,
+                  }))
+                : undefined,
+            };
+          });
+          emit({ type: "mcp-status", id, servers });
         }
         continue;
       }

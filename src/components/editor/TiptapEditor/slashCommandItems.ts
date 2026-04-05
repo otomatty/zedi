@@ -141,6 +141,19 @@ export const slashCommandItems: SlashCommandItem[] = [
         .insertContent({ type: "mathBlock", attrs: { latex: "\\sum_{i=1}^{n} x_i" } })
         .run(),
   },
+  {
+    id: "mcpResource",
+    icon: "Plug",
+    isAvailable: (editor) =>
+      !!editor.extensionManager.extensions.find((e) => e.name === "mcpResource"),
+    action: (editor, range) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertMcpResource({ server: "", resource: "" })
+        .run(),
+  },
 ];
 
 /**

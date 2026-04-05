@@ -14,6 +14,7 @@ vi.mock("@/lib/claudeCode/bridge", () => ({
   onClaudeError: vi.fn(),
   onClaudeToolUseStart: vi.fn(),
   onClaudeToolUseComplete: vi.fn(),
+  onClaudeMcpStatus: vi.fn(),
   checkClaudeInstallation: vi.fn(),
 }));
 
@@ -31,6 +32,7 @@ const bridgeMod = () =>
     onClaudeError: ReturnType<typeof vi.fn>;
     onClaudeToolUseStart: ReturnType<typeof vi.fn>;
     onClaudeToolUseComplete: ReturnType<typeof vi.fn>;
+    onClaudeMcpStatus: ReturnType<typeof vi.fn>;
     checkClaudeInstallation: ReturnType<typeof vi.fn>;
   }>;
 
@@ -71,6 +73,7 @@ async function setupStreamingBridge(
   });
   bridge.onClaudeToolUseStart.mockImplementation(() => Promise.resolve(vi.fn()));
   bridge.onClaudeToolUseComplete.mockImplementation(() => Promise.resolve(vi.fn()));
+  bridge.onClaudeMcpStatus.mockImplementation(() => Promise.resolve(vi.fn()));
   bridge.claudeQuery.mockImplementation(async () => {
     let delay = 0;
     for (const event of events) {
@@ -226,6 +229,7 @@ describe("createClaudeCodeProvider", () => {
         cwd: "/tmp",
         maxTurns: 3,
         allowedTools: undefined,
+        mcpServers: undefined,
       });
     });
 
@@ -252,6 +256,7 @@ describe("createClaudeCodeProvider", () => {
         errorCb = cb;
         return Promise.resolve(vi.fn());
       });
+      bridge.onClaudeMcpStatus.mockImplementation(() => Promise.resolve(vi.fn()));
 
       bridge.claudeQuery.mockImplementation(async () => {
         setTimeout(() => {
@@ -311,6 +316,7 @@ describe("createClaudeCodeProvider", () => {
       const unlistenChunk = vi.fn();
       const unlistenComplete = vi.fn();
       const unlistenError = vi.fn();
+      const unlistenMcpStatus = vi.fn();
 
       const bridge = await bridgeMod();
       bridge.onClaudeStreamChunk.mockImplementation(() => Promise.resolve(unlistenChunk));
@@ -319,6 +325,7 @@ describe("createClaudeCodeProvider", () => {
         return Promise.resolve(unlistenComplete);
       });
       bridge.onClaudeError.mockImplementation(() => Promise.resolve(unlistenError));
+      bridge.onClaudeMcpStatus.mockImplementation(() => Promise.resolve(unlistenMcpStatus));
       bridge.claudeQuery.mockResolvedValue("req-cleanup");
 
       for await (const _ of createClaudeCodeProvider().query(request)) {
@@ -328,6 +335,7 @@ describe("createClaudeCodeProvider", () => {
       expect(unlistenChunk).toHaveBeenCalled();
       expect(unlistenComplete).toHaveBeenCalled();
       expect(unlistenError).toHaveBeenCalled();
+      expect(unlistenMcpStatus).toHaveBeenCalled();
     });
   });
 

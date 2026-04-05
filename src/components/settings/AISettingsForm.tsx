@@ -21,6 +21,7 @@ import { AISettingsFormUserKeySection } from "./AISettingsFormUserKeySection";
 import { ProviderSelector } from "./ProviderSelector";
 import { SectionSaveStatus } from "./SectionSaveStatus";
 import { ClaudeCodePrerequisites } from "./ClaudeCodePrerequisites";
+import { McpServerSettings } from "./McpServerSettings";
 import { getProviderById, type AIInteractionMode } from "@/types/ai";
 import { isTauriDesktop } from "@/lib/platform";
 import { useTranslation } from "react-i18next";
@@ -139,6 +140,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
         )}
 
         {isClaudeCode && <ClaudeCodePrerequisites />}
+        {isClaudeCode && <McpServerSettings />}
       </CardContent>
 
       <CardFooter className="flex justify-between">

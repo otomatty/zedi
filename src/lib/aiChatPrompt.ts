@@ -1,4 +1,5 @@
 import { PageContext, ReferencedPage } from "../types/aiChat";
+import type { McpServerEntry } from "../types/mcp";
 
 function buildContextSection(context: PageContext): string {
   let section = "## 現在のコンテキスト\n";
@@ -37,10 +38,43 @@ function buildReferencedPagesSection(referencedPages: ReferencedPage[]): string 
   return section;
 }
 
+/**
+ * 有効な MCP サーバー情報をシステムプロンプトに含めるセクションを構築する。
+ * Builds a section describing enabled MCP servers for the system prompt.
+ */
+function buildMcpSection(mcpServers: McpServerEntry[]): string {
+  const enabled = mcpServers.filter((s) => s.enabled);
+  if (enabled.length === 0) return "";
+
+  let section = "\n## MCP 連携\n";
+  section +=
+    "以下の MCP サーバーが接続されています。ユーザーが外部サービスのデータを参照・操作したい場合は、対応する MCP ツールを使用してください。\n";
+  section +=
+    "ユーザーが `@mcp:サーバー名/リソース` のような記法を使った場合は、該当する MCP サーバーのツールでデータを取得してください。\n\n";
+
+  for (const server of enabled) {
+    section += `- **${server.name}**`;
+    if (server.tools && server.tools.length > 0) {
+      const toolNames = server.tools.map((t) => t.name).join(", ");
+      section += ` (ツール: ${toolNames})`;
+    }
+    if (server.status === "connected") {
+      section += " [接続済み]";
+    }
+    section += "\n";
+  }
+
+  return section;
+}
+
+/**
+ *
+ */
 export function buildSystemPrompt(
   context: PageContext | null,
   existingPageTitles: string[],
   referencedPages: ReferencedPage[] = [],
+  mcpServers: McpServerEntry[] = [],
 ): string {
   return `
 あなたは Zedi のAIアシスタントです。
@@ -94,5 +128,6 @@ ${existingPageTitles.map((t) => `- ${t}`).join("\n")}
 
 ${context ? buildContextSection(context) : ""}
 ${buildReferencedPagesSection(referencedPages)}
+${buildMcpSection(mcpServers)}
 `;
 }

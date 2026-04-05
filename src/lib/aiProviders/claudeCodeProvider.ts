@@ -8,6 +8,8 @@
 
 import { getProviderById } from "@/types/ai";
 import { isTauriDesktop } from "@/lib/platform";
+import { useMcpConfigStore, getMcpServersForQuery } from "@/stores/mcpConfigStore";
+import type { McpConnectionStatus, McpServerTool } from "@/types/mcp";
 import type { AIRequest, AIStreamChunk, UnifiedAIProvider } from "./types";
 
 /**
@@ -48,6 +50,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         onClaudeError,
         onClaudeToolUseStart,
         onClaudeToolUseComplete,
+        onClaudeMcpStatus,
         claudeAbort,
       } = await import("@/lib/claudeCode/bridge");
 
@@ -99,13 +102,30 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         }
       });
 
+      const unlistenMcpStatus = await onClaudeMcpStatus((payload) => {
+        if (currentRequestId && payload.id === currentRequestId && payload.servers) {
+          const store = useMcpConfigStore.getState();
+          store.updateStatuses(
+            payload.servers.map((s) => ({
+              name: s.name,
+              status: (s.status as McpConnectionStatus) || "unknown",
+              error: s.error,
+              tools: s.tools as McpServerTool[] | undefined,
+            })),
+          );
+        }
+      });
+
       try {
+        const mcpServers = getMcpServersForQuery(useMcpConfigStore.getState().servers);
+
         const prompt = request.messages.map((m) => m.content).join("\n\n");
         currentRequestId = await claudeQuery(prompt, {
           model: request.model || undefined,
           cwd: request.options?.cwd,
           maxTurns: request.options?.maxTurns,
           allowedTools: request.options?.allowedTools,
+          mcpServers: mcpServers as Record<string, Record<string, unknown>> | undefined,
         });
 
         while (!aborted) {
@@ -143,6 +163,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
         unlistenError();
         unlistenToolStart();
         unlistenToolComplete();
+        unlistenMcpStatus();
         currentRequestId = null;
       }
     },
