@@ -117,7 +117,6 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
               .focus()
               .insertYouTubeEmbed({
                 videoId: result.videoId,
-                src: result.embedUrl,
               })
               .run();
             return;

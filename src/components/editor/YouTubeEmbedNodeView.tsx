@@ -1,11 +1,16 @@
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
+import { buildYouTubeEmbedUrl } from "./extensions/YouTubeEmbedExtension";
 
 /**
  * YouTube 動画埋め込みの NodeView コンポーネント。
+ * videoId から埋め込み URL を導出してレスポンシブ iframe で表示する。
+ *
  * NodeView component that renders a YouTube video embed as a responsive iframe.
+ * Derives the embed URL from videoId.
  */
 export function YouTubeEmbedNodeView({ node }: NodeViewProps) {
-  const { src, videoId } = node.attrs as { src: string; videoId: string };
+  const videoId = node.attrs.videoId as string;
+  const embedSrc = videoId ? buildYouTubeEmbedUrl(videoId) : "";
 
   return (
     <NodeViewWrapper data-type="youtube-embed" data-video-id={videoId}>
@@ -14,9 +19,8 @@ export function YouTubeEmbedNodeView({ node }: NodeViewProps) {
         style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}
       >
         <iframe
-          src={src}
+          src={embedSrc}
           title={`YouTube video ${videoId}`}
-          frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           style={{
@@ -25,6 +29,7 @@ export function YouTubeEmbedNodeView({ node }: NodeViewProps) {
             left: 0,
             width: "100%",
             height: "100%",
+            border: 0,
           }}
         />
       </div>

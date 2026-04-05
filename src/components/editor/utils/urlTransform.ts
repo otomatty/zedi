@@ -31,10 +31,10 @@ export function isGyazoUrl(url: string): boolean {
 // --- YouTube ---
 
 const YOUTUBE_WATCH_PATTERN =
-  /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/;
-const YOUTUBE_SHORT_PATTERN = /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/;
+  /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i;
+const YOUTUBE_SHORT_PATTERN = /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i;
 const YOUTUBE_EMBED_PATTERN =
-  /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/;
+  /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i;
 
 /**
  * YouTube URL から動画 ID を抽出する。

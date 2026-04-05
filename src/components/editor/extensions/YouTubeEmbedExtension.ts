@@ -10,20 +10,35 @@ export interface YouTubeEmbedOptions {
   HTMLAttributes: Record<string, unknown>;
 }
 
+/** YouTube 動画 ID のバリデーション / Validate a YouTube video ID (11 alphanumeric + _ + -) */
+const YOUTUBE_VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
+
+/**
+ * videoId から埋め込み URL を導出する。
+ * Derives the embed URL from a video ID.
+ */
+export function buildYouTubeEmbedUrl(videoId: string): string {
+  return `https://www.youtube.com/embed/${videoId}`;
+}
+
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     youtubeEmbed: {
       /**
-       * YouTube 動画を埋め込む / Insert a YouTube video embed
+       * YouTube 動画を埋め込む（videoId のみ指定）。
+       * Insert a YouTube video embed (videoId only; embed URL is derived).
        */
-      insertYouTubeEmbed: (attrs: { videoId: string; src: string }) => ReturnType;
+      insertYouTubeEmbed: (attrs: { videoId: string }) => ReturnType;
     };
   }
 }
 
 /**
  * YouTube 動画をiframeで埋め込み表示するノード拡張。
+ * videoId のみをスキーマに保持し、埋め込み URL は常に videoId から導出する。
+ *
  * Node extension that renders YouTube videos as iframe embeds.
+ * Only stores videoId in the schema; the embed URL is always derived from it.
  */
 export const YouTubeEmbed = Node.create<YouTubeEmbedOptions>({
   name: "youtubeEmbed",
@@ -46,14 +61,6 @@ export const YouTubeEmbed = Node.create<YouTubeEmbedOptions>({
         renderHTML: (attributes) =>
           attributes.videoId ? { "data-video-id": attributes.videoId } : {},
       },
-      src: {
-        default: null,
-        parseHTML: (element) => {
-          const iframe = element.querySelector("iframe");
-          return iframe?.getAttribute("src") || null;
-        },
-        renderHTML: () => ({}),
-      },
     };
   },
 
@@ -66,6 +73,8 @@ export const YouTubeEmbed = Node.create<YouTubeEmbedOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
+    const videoId = HTMLAttributes["data-video-id"] as string | undefined;
+    const embedSrc = videoId ? buildYouTubeEmbedUrl(videoId) : "";
     return [
       "div",
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
@@ -74,8 +83,8 @@ export const YouTubeEmbed = Node.create<YouTubeEmbedOptions>({
       [
         "iframe",
         {
-          src: HTMLAttributes.src || "",
-          frameborder: "0",
+          src: embedSrc,
+          style: "border:0",
           allowfullscreen: "true",
           allow:
             "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
@@ -91,11 +100,15 @@ export const YouTubeEmbed = Node.create<YouTubeEmbedOptions>({
   addCommands() {
     return {
       insertYouTubeEmbed:
-        (attrs) =>
+        ({ videoId }) =>
         ({ commands }) => {
+          // videoId のバリデーション / Validate videoId format
+          if (!videoId || !YOUTUBE_VIDEO_ID_PATTERN.test(videoId)) {
+            return false;
+          }
           return commands.insertContent({
             type: this.name,
-            attrs,
+            attrs: { videoId },
           });
         },
     };
