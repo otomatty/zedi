@@ -159,17 +159,16 @@ export function AIChatPanelContent({
         ) : null}
       </div>
 
-      {activeViewTab !== "workflow" && (
-        <div className="bg-background border-t p-4">
-          <AIChatInput
-            onSendMessage={handleSendMessage}
-            onStopStreaming={stopStreaming}
-            prefillText={inputPrefill?.text}
-            prefillNonce={inputPrefill?.nonce}
-            focusEditorNonce={focusEditorNonce}
-          />
-        </div>
-      )}
+      {/* Stay mounted on workflow tab so uncontrolled input draft is not lost. / ワークフロー切替で下書きを失わない */}
+      <div className={cn("bg-background border-t p-4", activeViewTab === "workflow" && "hidden")}>
+        <AIChatInput
+          onSendMessage={handleSendMessage}
+          onStopStreaming={stopStreaming}
+          prefillText={inputPrefill?.text}
+          prefillNonce={inputPrefill?.nonce}
+          focusEditorNonce={focusEditorNonce}
+        />
+      </div>
     </div>
   );
 }

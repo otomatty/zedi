@@ -22,6 +22,9 @@ type PausedState = {
 /**
  * Applies execution outcome: toasts and state setters for pause / complete / error.
  * 実行結果を適用する（トーストと pause / 完了 / エラー用の setter）。
+ *
+ * Terminal outcomes keep `activeRunSteps` as `validSteps` so progress rows align with `stepStatuses`
+ * when the draft still contains empty placeholder steps. / 終端時も activeRunSteps を validSteps に保ち、空ステップがあっても進捗行と stepStatuses を一致させる。
  */
 export function applyWorkflowRunOutcome(
   result: WorkflowExecutionOutcome,
@@ -39,7 +42,7 @@ export function applyWorkflowRunOutcome(
   switch (result.outcome) {
     case "completed":
       setPausedState(null);
-      setActiveRunSteps(null);
+      setActiveRunSteps(validSteps);
       setProgress((p) => (p ? { ...p, phase: "completed" } : null));
       toast({ title: t("aiChat.workflow.completed") });
       return;
@@ -55,7 +58,7 @@ export function applyWorkflowRunOutcome(
       return;
     case "stopped":
       setPausedState(null);
-      setActiveRunSteps(null);
+      setActiveRunSteps(validSteps);
       setProgress((p) => {
         if (!p) return null;
         const stepStatuses = p.stepStatuses.map((s) => (s === "running" ? "pending" : s));
@@ -70,7 +73,7 @@ export function applyWorkflowRunOutcome(
       return;
     case "error":
       setPausedState(null);
-      setActiveRunSteps(null);
+      setActiveRunSteps(validSteps);
       setProgress((p) => {
         if (!p) return null;
         const stepStatuses = p.stepStatuses.map((s) => (s === "running" ? "error" : s));
