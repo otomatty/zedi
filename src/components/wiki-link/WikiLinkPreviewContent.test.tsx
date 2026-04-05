@@ -114,7 +114,20 @@ describe("WikiLinkPreviewContent", () => {
       expect(screen.getByText("まだ作成されていないページです。")).toBeInTheDocument();
     });
 
-    it("should show 'クリックして作成' prompt", () => {
+    it("should show 'クリックして作成' prompt when onClick is provided", () => {
+      render(
+        <WikiLinkPreviewContent
+          title="新しいページ"
+          page={undefined}
+          exists={false}
+          referenced={false}
+          onClick={() => {}}
+        />,
+      );
+      expect(screen.getByText("クリックして作成")).toBeInTheDocument();
+    });
+
+    it("should not show 'クリックして作成' when onClick is absent", () => {
       render(
         <WikiLinkPreviewContent
           title="新しいページ"
@@ -123,7 +136,7 @@ describe("WikiLinkPreviewContent", () => {
           referenced={false}
         />,
       );
-      expect(screen.getByText("クリックして作成")).toBeInTheDocument();
+      expect(screen.queryByText("クリックして作成")).not.toBeInTheDocument();
     });
   });
 

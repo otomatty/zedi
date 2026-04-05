@@ -33,6 +33,7 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
   const [isOpen, setIsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<number>();
+  const preventClickResetTimerRef = useRef<number>();
   const preventClickRef = useRef(false);
 
   const handleTouchStart = useCallback(() => {
@@ -44,9 +45,10 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
 
   const handleTouchEnd = useCallback(() => {
     clearTimeout(longPressTimerRef.current);
-    setTimeout(() => {
+    clearTimeout(preventClickResetTimerRef.current);
+    preventClickResetTimerRef.current = window.setTimeout(() => {
       preventClickRef.current = false;
-    }, 0);
+    }, 100);
   }, []);
 
   const handleTouchMove = useCallback(() => {
@@ -65,6 +67,13 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
       navigate(`/page/${page.id}`);
     }
   }, [page, navigate]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(longPressTimerRef.current);
+      clearTimeout(preventClickResetTimerRef.current);
+    };
+  }, []);
 
   // Close on outside touch and scroll (mobile)
   // モバイルで外部タッチ・スクロール時にカードを閉じる

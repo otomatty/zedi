@@ -49,8 +49,8 @@ export function WikiLinkPreviewContent({
     );
   }
 
-  return (
-    <button type="button" className="w-full text-left" onClick={onClick}>
+  const ghostBody = (
+    <>
       <div className="flex items-center gap-2">
         <FileText className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
         <span className="text-muted-foreground truncate text-sm font-medium">{title}</span>
@@ -60,7 +60,17 @@ export function WikiLinkPreviewContent({
           ? "まだ作成されていないページです。他のページからも参照されています。"
           : "まだ作成されていないページです。"}
       </p>
-      <p className="text-primary mt-2 text-xs">クリックして作成</p>
-    </button>
+      {onClick ? <p className="text-primary mt-2 text-xs">クリックして作成</p> : null}
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" className="w-full text-left" onClick={onClick}>
+        {ghostBody}
+      </button>
+    );
+  }
+
+  return <div className="w-full text-left">{ghostBody}</div>;
 }

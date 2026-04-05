@@ -145,8 +145,7 @@ export function useWikiLinkHover(
       clearTimeout(closeTimerRef.current);
       clearTimeout(longPressTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs and isVisible used in event handlers
-  }, [editorContainerRef, editor, openCard, closeCard]);
+  }, [editorContainerRef, editor, openCard, closeCard, isVisible]);
 
   // モバイル: 外部タッチで閉じる / Close on outside touch (mobile)
   useEffect(() => {
