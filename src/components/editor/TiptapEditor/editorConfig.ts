@@ -21,6 +21,7 @@ import { StorageImage, type StorageImageOptions } from "../extensions/StorageIma
 import { WikiLink } from "../extensions/WikiLinkExtension";
 import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
+import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import { McpResource } from "../extensions/McpResourceExtension";
 import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import {
@@ -223,6 +224,8 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       ...options.imageOptions,
     }),
     Mermaid,
+    // --- YouTube Embed ---
+    YouTubeEmbed,
     McpResource,
     // --- YouTube Embed ---
     YouTubeEmbed,
