@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@zedi/ui";
+import { useWikiLinkNavigation } from "@/components/editor/TiptapEditor/useWikiLinkNavigation";
+import { CreatePageDialog } from "@/components/editor/TiptapEditor/CreatePageDialog";
 import { usePageStore } from "../../stores/pageStore";
 import { WikiLinkPreviewContent } from "../wiki-link/WikiLinkPreviewContent";
 
@@ -28,7 +30,14 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
   const referenced = usePageStore(
     (state) => !page && state.ghostLinks.some((gl) => gl.linkText === normalizedTitle),
   );
-  const navigate = useNavigate();
+
+  const {
+    handleLinkClick: navigateWikiLinkByTitle,
+    createPageDialogOpen,
+    pendingCreatePageTitle,
+    handleConfirmCreate,
+    handleCancelCreate,
+  } = useWikiLinkNavigation();
 
   const [isOpen, setIsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -55,7 +64,7 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
     clearTimeout(longPressTimerRef.current);
   }, []);
 
-  const handleLinkClick = useCallback((e: React.MouseEvent) => {
+  const handleAnchorClick = useCallback((e: React.MouseEvent) => {
     if (preventClickRef.current) {
       e.preventDefault();
     }
@@ -63,10 +72,8 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
 
   const handleCardClick = useCallback(() => {
     setIsOpen(false);
-    if (page) {
-      navigate(`/page/${page.id}`);
-    }
-  }, [page, navigate]);
+    navigateWikiLinkByTitle(normalizedTitle);
+  }, [normalizedTitle, navigateWikiLinkByTitle]);
 
   useEffect(() => {
     return () => {
@@ -113,7 +120,7 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
           <Link
             to={`/page/${page.id}`}
             className="text-primary decoration-primary/50 hover:decoration-primary rounded px-0.5 font-medium underline underline-offset-2 transition-colors"
-            onClick={handleLinkClick}
+            onClick={handleAnchorClick}
             {...touchProps}
           >
             [[{normalizedTitle}]]
@@ -133,9 +140,15 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
           page={page}
           exists={!!page}
           referenced={referenced}
-          onClick={page ? handleCardClick : undefined}
+          onClick={handleCardClick}
         />
       </HoverCardContent>
+      <CreatePageDialog
+        open={createPageDialogOpen}
+        pageTitle={pendingCreatePageTitle}
+        onConfirm={handleConfirmCreate}
+        onCancel={handleCancelCreate}
+      />
     </HoverCard>
   );
 }

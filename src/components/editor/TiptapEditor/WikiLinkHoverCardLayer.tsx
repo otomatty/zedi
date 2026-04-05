@@ -70,7 +70,6 @@ export const WikiLinkHoverCardLayer: React.FC<WikiLinkHoverCardLayerProps> = ({
   return createPortal(
     <div
       ref={cardRef}
-      role="tooltip"
       style={cardStyle}
       className="bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 w-64 rounded-md border p-4 shadow-md"
       onMouseEnter={handleCardMouseEnter}

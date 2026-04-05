@@ -33,8 +33,8 @@ export function WikiLinkPreviewContent({
 }: WikiLinkPreviewContentProps) {
   if (page && exists) {
     const preview = page.contentPreview || getContentPreview(page.content, 100);
-    return (
-      <button type="button" className="w-full text-left" onClick={onClick}>
+    const existingBody = (
+      <>
         <div className="flex items-center gap-2">
           {page.sourceUrl ? (
             <LinkIcon className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
@@ -45,8 +45,16 @@ export function WikiLinkPreviewContent({
         </div>
         {preview && <p className="text-muted-foreground mt-1.5 line-clamp-3 text-xs">{preview}</p>}
         <p className="text-muted-foreground mt-2 text-[11px]">{formatTimeAgo(page.updatedAt)}</p>
-      </button>
+      </>
     );
+    if (onClick) {
+      return (
+        <button type="button" className="w-full text-left" onClick={onClick}>
+          {existingBody}
+        </button>
+      );
+    }
+    return <div className="w-full text-left">{existingBody}</div>;
   }
 
   const ghostBody = (

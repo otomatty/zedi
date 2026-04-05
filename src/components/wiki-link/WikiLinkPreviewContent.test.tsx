@@ -87,6 +87,19 @@ describe("WikiLinkPreviewContent", () => {
       await user.click(screen.getByRole("button"));
       expect(handleClick).toHaveBeenCalledTimes(1);
     });
+
+    it("should not render a focusable button when onClick is absent", () => {
+      const page = createMockPage();
+      render(
+        <WikiLinkPreviewContent
+          title="テストページ"
+          page={page}
+          exists={true}
+          referenced={false}
+        />,
+      );
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
   });
 
   describe("ghost link (exists=false, referenced=false)", () => {
