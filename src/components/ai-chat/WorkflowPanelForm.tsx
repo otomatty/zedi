@@ -43,6 +43,8 @@ export function WorkflowPanelForm(props: WorkflowPanelFormProps) {
     deleteSaved,
   } = props;
 
+  const canRunWorkflow = isTauriDesktop() && isEditor;
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-3">
       <div className="text-muted-foreground flex items-center gap-2 text-xs">
@@ -89,7 +91,7 @@ export function WorkflowPanelForm(props: WorkflowPanelFormProps) {
           type="button"
           size="sm"
           className="h-8 text-xs"
-          disabled={running || !isEditor}
+          disabled={running || !canRunWorkflow}
           onClick={() => void runExecution("fresh")}
         >
           <Play className="mr-1 h-3 w-3" />
@@ -111,7 +113,7 @@ export function WorkflowPanelForm(props: WorkflowPanelFormProps) {
           variant="secondary"
           size="sm"
           className="h-8 text-xs"
-          disabled={running || !pausedState}
+          disabled={running || !pausedState || !canRunWorkflow}
           onClick={() => void runExecution("resume")}
         >
           {t("aiChat.workflow.resume")}

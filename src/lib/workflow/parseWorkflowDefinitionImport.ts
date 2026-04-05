@@ -77,11 +77,17 @@ export function parseWorkflowDefinitionImport(raw: unknown): {
   }
 
   const steps: WorkflowStepDefinition[] = [];
+  const seenIds = new Set<string>();
   for (const item of o.steps) {
     if (!item || typeof item !== "object") {
       throw new Error(INVALID);
     }
-    steps.push(parseWorkflowStepImport(item as Record<string, unknown>));
+    let step = parseWorkflowStepImport(item as Record<string, unknown>);
+    if (seenIds.has(step.id)) {
+      step = { ...step, id: newWorkflowId() };
+    }
+    seenIds.add(step.id);
+    steps.push(step);
   }
 
   return { name, steps };

@@ -54,13 +54,32 @@ export function applyWorkflowRunOutcome(
     case "stopped":
       setPausedState(null);
       setActiveRunSteps(null);
-      setProgress((p) => (p ? { ...p, phase: "aborted" } : null));
+      setProgress((p) => {
+        if (!p) return null;
+        const stepStatuses = p.stepStatuses.map((s) => (s === "running" ? "pending" : s));
+        return {
+          ...p,
+          phase: "aborted",
+          stepStatuses,
+          currentStepStreaming: "",
+        };
+      });
       toast({ title: t("aiChat.workflow.stopped") });
       return;
     case "error":
       setPausedState(null);
       setActiveRunSteps(null);
-      setProgress((p) => (p ? { ...p, phase: "aborted" } : null));
+      setProgress((p) => {
+        if (!p) return null;
+        const stepStatuses = p.stepStatuses.map((s) => (s === "running" ? "error" : s));
+        return {
+          ...p,
+          phase: "aborted",
+          stepStatuses,
+          currentStepStreaming: "",
+          lastError: result.error,
+        };
+      });
       toast({
         title: t("aiChat.workflow.error", { message: result.error }),
         variant: "destructive",

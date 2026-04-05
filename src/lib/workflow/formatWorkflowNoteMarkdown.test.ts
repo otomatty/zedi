@@ -17,6 +17,18 @@ describe("formatWorkflowNoteMarkdown", () => {
     expect(md).toContain("### ⬜ 2. B");
   });
 
+  it("shows (empty) for done step with empty output", () => {
+    const md = formatWorkflowNoteMarkdown({
+      title: "E",
+      stepTitles: ["Only"],
+      stepStatuses: ["done"],
+      stepOutputs: [""],
+      streamingStepIndex: null,
+      streamingText: "",
+    });
+    expect(md).toContain("(empty)");
+  });
+
   it("includes streaming text for the running step", () => {
     const md = formatWorkflowNoteMarkdown({
       title: "S",

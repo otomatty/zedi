@@ -1,6 +1,6 @@
-import { Suspense, lazy, useCallback } from "react";
+import { Suspense, lazy, useCallback, useLayoutEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useToast } from "@zedi/ui";
+import { cn, useToast } from "@zedi/ui";
 import { AIChatHeader } from "./AIChatHeader";
 import { AIChatViewTabs } from "./AIChatViewTabs";
 import { AIChatInput } from "./AIChatInput";
@@ -91,6 +91,19 @@ export function AIChatPanelContent({
 
   const canInsert = pageContext?.type === "editor";
 
+  /** After the workflow tab is visited once, keep the panel mounted so run state survives tab switches. / ワークフロータブを一度開いたらマウントを維持し、タブ切替で実行状態を失わない */
+  const [keepWorkflowMounted, setKeepWorkflowMounted] = useState(
+    () => activeViewTab === "workflow",
+  );
+  useLayoutEffect(() => {
+    if (activeViewTab === "workflow") {
+      // Latch: after first visit to the workflow tab, keep the panel mounted so run/pause state survives tab switches.
+      // 初回表示後はマウントを維持し、タブ切替で実行状態を失わない。
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-way latch from tab selection (not external sync)
+      setKeepWorkflowMounted(true);
+    }
+  }, [activeViewTab]);
+
   return (
     <div className="bg-background relative flex h-full flex-col border-l">
       <AIChatHeader />
@@ -131,11 +144,19 @@ export function AIChatPanelContent({
               onDeleteBranch={handleDeleteBranchFromTree}
             />
           </Suspense>
-        ) : (
-          <Suspense fallback={null}>
-            <AIChatWorkflowPanel />
-          </Suspense>
-        )}
+        ) : null}
+        {keepWorkflowMounted ? (
+          <div
+            className={cn(
+              "min-h-0 flex-1 flex-col",
+              activeViewTab === "workflow" ? "flex" : "hidden",
+            )}
+          >
+            <Suspense fallback={null}>
+              <AIChatWorkflowPanel />
+            </Suspense>
+          </div>
+        ) : null}
       </div>
 
       {activeViewTab !== "workflow" && (

@@ -62,8 +62,11 @@ export function WorkflowPanelMetaSection(props: Props) {
   return (
     <>
       <div className="grid gap-2">
-        <Label className="text-xs">{t("aiChat.workflow.workflowName")}</Label>
+        <Label htmlFor="workflow-panel-name" className="text-xs">
+          {t("aiChat.workflow.workflowName")}
+        </Label>
         <Input
+          id="workflow-panel-name"
           value={draft.name}
           onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value, updatedAt: Date.now() }))}
           placeholder={t("aiChat.workflow.workflowNamePlaceholder")}
@@ -72,9 +75,11 @@ export function WorkflowPanelMetaSection(props: Props) {
       </div>
 
       <div className="grid gap-2">
-        <Label className="text-xs">{t("aiChat.workflow.template")}</Label>
+        <Label htmlFor="workflow-panel-template" className="text-xs">
+          {t("aiChat.workflow.template")}
+        </Label>
         <Select disabled={running} onValueChange={(v) => loadTemplate(v as WorkflowTemplateId)}>
-          <SelectTrigger className="h-8 text-xs">
+          <SelectTrigger id="workflow-panel-template" className="h-8 text-xs">
             <SelectValue placeholder={t("aiChat.workflow.templatePlaceholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -88,14 +93,16 @@ export function WorkflowPanelMetaSection(props: Props) {
       </div>
 
       <div className="grid gap-2">
-        <Label className="text-xs">{t("aiChat.workflow.savedWorkflows")}</Label>
+        <Label htmlFor="workflow-panel-saved" className="text-xs">
+          {t("aiChat.workflow.savedWorkflows")}
+        </Label>
         <div className="flex gap-2">
           <Select
             disabled={running}
             value={selectedSavedId || undefined}
             onValueChange={(v) => loadSaved(v)}
           >
-            <SelectTrigger className="h-8 flex-1 text-xs">
+            <SelectTrigger id="workflow-panel-saved" className="h-8 flex-1 text-xs">
               <SelectValue placeholder={t("aiChat.workflow.pickSaved")} />
             </SelectTrigger>
             <SelectContent>
@@ -113,6 +120,7 @@ export function WorkflowPanelMetaSection(props: Props) {
             className="h-8 w-8 shrink-0"
             disabled={!selectedSavedId || running}
             onClick={deleteSaved}
+            aria-label={t("aiChat.workflow.deleteSaved")}
             title={t("aiChat.workflow.deleteSaved")}
           >
             <Trash2 className="h-3.5 w-3.5" />

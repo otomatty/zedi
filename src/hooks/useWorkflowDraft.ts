@@ -93,7 +93,7 @@ export function useWorkflowDraft() {
     a.href = url;
     a.download = `${draft.name.trim() || "workflow"}.json`;
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }, [draft]);
 
   const onImportFile = useCallback(

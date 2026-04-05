@@ -56,7 +56,12 @@ describe("runWorkflowExecution", () => {
   });
 
   it("returns paused when only the step signal aborts", async () => {
-    vi.mocked(streamClaudeQuery).mockResolvedValue({ ok: false, error: "Aborted" });
+    vi.mocked(streamClaudeQuery).mockImplementation(async (_p, _o, signal) => {
+      if (signal?.aborted) {
+        return { ok: false, error: "Aborted" };
+      }
+      return { ok: false, error: "Aborted" };
+    });
 
     const workflow = new AbortController();
     const step = new AbortController();
@@ -72,6 +77,7 @@ describe("runWorkflowExecution", () => {
       workflowSignal: workflow.signal,
       createStepAbort: () => {
         createCount += 1;
+        step.abort();
         return step;
       },
       startStepIndex: 0,

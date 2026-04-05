@@ -57,6 +57,7 @@ export function WorkflowPanelStepsAndProgress(props: Props) {
                 className="h-7 w-7"
                 disabled={running || draft.steps.length <= 1}
                 onClick={() => removeStep(index)}
+                aria-label={t("aiChat.workflow.removeStep", { n: index + 1 })}
               >
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -65,6 +66,7 @@ export function WorkflowPanelStepsAndProgress(props: Props) {
               className="h-8 text-xs"
               value={step.title}
               placeholder={t("aiChat.workflow.stepTitlePlaceholder")}
+              aria-label={t("aiChat.workflow.stepTitleAria", { n: index + 1 })}
               disabled={running}
               onChange={(e) => updateStep(index, { title: e.target.value })}
             />
@@ -72,6 +74,7 @@ export function WorkflowPanelStepsAndProgress(props: Props) {
               className="border-input bg-background focus-visible:ring-ring min-h-[72px] w-full rounded-md border px-2 py-1.5 text-xs focus-visible:ring-2 focus-visible:outline-none"
               value={step.instruction}
               placeholder={t("aiChat.workflow.stepInstructionPlaceholder")}
+              aria-label={t("aiChat.workflow.stepInstructionAria", { n: index + 1 })}
               disabled={running}
               onChange={(e) => updateStep(index, { instruction: e.target.value })}
             />
@@ -94,7 +97,9 @@ export function WorkflowPanelStepsAndProgress(props: Props) {
                   <span>
                     {mark} {s.title || t("aiChat.workflow.unnamedStep", { n: i + 1 })}
                   </span>
-                  {st === "running" && progress.currentStepStreaming ? (
+                  {progress.phase === "running" &&
+                  st === "running" &&
+                  progress.currentStepStreaming ? (
                     <span className="text-muted-foreground line-clamp-3 pl-4">
                       {progress.currentStepStreaming}
                     </span>

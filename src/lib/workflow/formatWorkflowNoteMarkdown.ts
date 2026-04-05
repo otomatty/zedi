@@ -41,8 +41,8 @@ export function formatWorkflowNoteMarkdown(options: {
     lines.push(`### ${prefix} ${i + 1}. ${stepTitles[i]}`);
     lines.push("");
 
-    if (status === "done" && stepOutputs[i]) {
-      lines.push(stepOutputs[i].trim() || "(empty)");
+    if (status === "done") {
+      lines.push((stepOutputs[i] ?? "").trim() || "(empty)");
       lines.push("");
     } else if (status === "running" && streamingStepIndex === i && streamingText.trim()) {
       lines.push(streamingText.trim());

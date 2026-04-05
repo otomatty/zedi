@@ -30,6 +30,19 @@ describe("parseWorkflowDefinitionImport", () => {
     ).toThrow();
   });
 
+  it("re-issues step ids when duplicates appear", () => {
+    const r = parseWorkflowDefinitionImport({
+      name: "Dup",
+      steps: [
+        { id: "same", title: "A", instruction: "a" },
+        { id: "same", title: "B", instruction: "b" },
+      ],
+    });
+    expect(r.steps[0].id).toBe("same");
+    expect(r.steps[1].id).not.toBe("same");
+    expect(r.steps[1].title).toBe("B");
+  });
+
   it("accepts optional maxTurns and allowedTools", () => {
     const r = parseWorkflowDefinitionImport({
       name: "x",

@@ -24,7 +24,9 @@ export type ClaudeQueryCompletionResult =
 type PreRequestEvent =
   | { type: "chunk"; id: string; content: string }
   | { type: "complete"; id: string; result?: { content: string } }
-  | { type: "error"; id: string; error: string };
+  | { type: "error"; id: string; error: string }
+  | { type: "toolStart"; id: string; toolName: string }
+  | { type: "toolComplete"; id: string; toolName: string };
 
 /**
  * Optional callbacks while streaming Claude Code output.
@@ -51,19 +53,23 @@ function applyPreRequestBuffer(
     finished: boolean;
     errorMessage: string | null;
   },
-  onChunk?: (text: string) => void,
+  callbacks: StreamClaudeQueryCallbacks,
 ): void {
   for (const ev of buffer) {
     if (ev.id !== requestId) continue;
     if (ev.type === "chunk") {
       state.aggregated += ev.content;
-      onChunk?.(ev.content);
+      callbacks.onChunk?.(ev.content);
     } else if (ev.type === "complete") {
       state.aggregated = ev.result?.content ?? state.aggregated;
       state.finished = true;
     } else if (ev.type === "error") {
       state.errorMessage = ev.error;
       state.finished = true;
+    } else if (ev.type === "toolStart") {
+      callbacks.onToolUseStart?.(ev.toolName);
+    } else if (ev.type === "toolComplete") {
+      callbacks.onToolUseComplete?.(ev.toolName);
     }
   }
   buffer.length = 0;
@@ -99,66 +105,90 @@ export async function streamClaudeQuery(
 
   const preRequestBuffer: PreRequestEvent[] = [];
 
-  const unlistenChunk = await onClaudeStreamChunk((payload) => {
-    if (finished) return;
-    if (requestId && payload.id === requestId) {
-      aggregated += payload.content;
-      callbacks.onChunk?.(payload.content);
-      wake();
-    } else if (!requestId) {
-      preRequestBuffer.push({ type: "chunk", id: payload.id, content: payload.content });
-    }
-  });
-
-  const unlistenComplete = await onClaudeStreamComplete((payload) => {
-    if (finished) return;
-    if (requestId && payload.id === requestId) {
-      const text = payload.result?.content ?? aggregated;
-      aggregated = text;
-      finished = true;
-      wake();
-    } else if (!requestId) {
-      preRequestBuffer.push({
-        type: "complete",
-        id: payload.id,
-        result: payload.result,
-      });
-    }
-  });
-
-  const unlistenError = await onClaudeError((payload) => {
-    if (finished) return;
-    if (requestId && payload.id === requestId) {
-      errorMessage = payload.error;
-      finished = true;
-      wake();
-    } else if (!requestId) {
-      preRequestBuffer.push({ type: "error", id: payload.id, error: payload.error });
-    }
-  });
-
-  const unlistenToolStart = await onClaudeToolUseStart((payload) => {
-    if (finished) return;
-    if (requestId && payload.id === requestId) {
-      callbacks.onToolUseStart?.(payload.toolName);
-    }
-  });
-
-  const unlistenToolComplete = await onClaudeToolUseComplete((payload) => {
-    if (finished) return;
-    if (requestId && payload.id === requestId) {
-      callbacks.onToolUseComplete?.(payload.toolName);
-    }
-  });
+  const cleanups: Array<() => void> = [];
 
   try {
+    cleanups.push(
+      await onClaudeStreamChunk((payload) => {
+        if (finished) return;
+        if (requestId && payload.id === requestId) {
+          aggregated += payload.content;
+          callbacks.onChunk?.(payload.content);
+          wake();
+        } else if (!requestId) {
+          preRequestBuffer.push({ type: "chunk", id: payload.id, content: payload.content });
+        }
+      }),
+    );
+
+    cleanups.push(
+      await onClaudeStreamComplete((payload) => {
+        if (finished) return;
+        if (requestId && payload.id === requestId) {
+          const text = payload.result?.content ?? aggregated;
+          aggregated = text;
+          finished = true;
+          wake();
+        } else if (!requestId) {
+          preRequestBuffer.push({
+            type: "complete",
+            id: payload.id,
+            result: payload.result,
+          });
+        }
+      }),
+    );
+
+    cleanups.push(
+      await onClaudeError((payload) => {
+        if (finished) return;
+        if (requestId && payload.id === requestId) {
+          errorMessage = payload.error;
+          finished = true;
+          wake();
+        } else if (!requestId) {
+          preRequestBuffer.push({ type: "error", id: payload.id, error: payload.error });
+        }
+      }),
+    );
+
+    cleanups.push(
+      await onClaudeToolUseStart((payload) => {
+        if (finished) return;
+        if (requestId && payload.id === requestId) {
+          callbacks.onToolUseStart?.(payload.toolName);
+        } else if (!requestId) {
+          preRequestBuffer.push({
+            type: "toolStart",
+            id: payload.id,
+            toolName: payload.toolName,
+          });
+        }
+      }),
+    );
+
+    cleanups.push(
+      await onClaudeToolUseComplete((payload) => {
+        if (finished) return;
+        if (requestId && payload.id === requestId) {
+          callbacks.onToolUseComplete?.(payload.toolName);
+        } else if (!requestId) {
+          preRequestBuffer.push({
+            type: "toolComplete",
+            id: payload.id,
+            toolName: payload.toolName,
+          });
+        }
+      }),
+    );
+
     if (signal?.aborted) {
       return { ok: false, error: "Aborted" };
     }
     requestId = await claudeQuery(prompt, options);
 
     const merged = { aggregated, finished, errorMessage };
-    applyPreRequestBuffer(requestId, preRequestBuffer, merged, callbacks.onChunk);
+    applyPreRequestBuffer(requestId, preRequestBuffer, merged, callbacks);
     aggregated = merged.aggregated;
     finished = merged.finished;
     errorMessage = merged.errorMessage;
@@ -198,11 +228,15 @@ export async function streamClaudeQuery(
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
   } finally {
-    unlistenChunk();
-    unlistenComplete();
-    unlistenError();
-    unlistenToolStart();
-    unlistenToolComplete();
+    for (let i = cleanups.length - 1; i >= 0; i -= 1) {
+      const unlisten = cleanups[i];
+      if (!unlisten) continue;
+      try {
+        unlisten();
+      } catch {
+        /* ignore unlisten errors */
+      }
+    }
     requestId = null;
   }
 }
