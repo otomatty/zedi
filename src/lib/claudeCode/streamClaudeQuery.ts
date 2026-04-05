@@ -152,6 +152,9 @@ export async function streamClaudeQuery(
   });
 
   try {
+    if (signal?.aborted) {
+      return { ok: false, error: "Aborted" };
+    }
     requestId = await claudeQuery(prompt, options);
 
     const merged = { aggregated, finished, errorMessage };

@@ -52,12 +52,15 @@ export function applyWorkflowRunOutcome(
       toast({ title: t("aiChat.workflow.paused") });
       return;
     case "stopped":
+      setPausedState(null);
       setActiveRunSteps(null);
       setProgress((p) => (p ? { ...p, phase: "aborted" } : null));
       toast({ title: t("aiChat.workflow.stopped") });
       return;
     case "error":
+      setPausedState(null);
       setActiveRunSteps(null);
+      setProgress((p) => (p ? { ...p, phase: "aborted" } : null));
       toast({
         title: t("aiChat.workflow.error", { message: result.error }),
         variant: "destructive",

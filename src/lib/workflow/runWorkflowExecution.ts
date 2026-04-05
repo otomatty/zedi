@@ -185,7 +185,7 @@ async function runWorkflowStepsLoop(
     pushProgress("running", i, statusesBefore, initialStreaming, undefined);
     emitNote(i, statusesBefore, i, initialStreaming);
 
-    const prior = stepOutputs.slice(0, i).map((_, idx) => stepOutputs[idx] ?? "");
+    const prior = stepOutputs.slice(0, i);
 
     const prompt = buildWorkflowStepPrompt({
       workflowName: definition.name,
@@ -194,7 +194,7 @@ async function runWorkflowStepsLoop(
       totalSteps: steps.length,
       pageExcerpt,
       priorOutputs: prior,
-      resumePartial: i === startStepIndex ? resumePartialForCurrentStep : undefined,
+      resumeFromPartial: i === startStepIndex ? resumePartialForCurrentStep : undefined,
     });
 
     const stepController = createStepAbort();

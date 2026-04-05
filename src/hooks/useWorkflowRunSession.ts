@@ -90,7 +90,9 @@ export function useWorkflowRunSession(draft: WorkflowDefinition) {
       };
 
       workflowAbortRef.current = new AbortController();
-      baseSnapshotRef.current = pageContext?.pageFullContent ?? "";
+      if (mode === "fresh") {
+        baseSnapshotRef.current = pageContext?.pageFullContent ?? "";
+      }
 
       const startIndex = mode === "resume" && pausedState ? pausedState.pausedAtStepIndex : 0;
       const initialOutputs = mode === "resume" && pausedState ? [...pausedState.stepOutputs] : [];
