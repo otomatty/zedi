@@ -22,6 +22,7 @@ import { WikiLink } from "../extensions/WikiLinkExtension";
 import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import { McpResource } from "../extensions/McpResourceExtension";
+import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
@@ -223,6 +224,8 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     }),
     Mermaid,
     McpResource,
+    // --- YouTube Embed ---
+    YouTubeEmbed,
     // Y.js リアルタイムコラボレーション（オプション）
     ...(options.collaboration
       ? [
