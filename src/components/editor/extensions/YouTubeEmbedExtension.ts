@@ -85,7 +85,7 @@ export const YouTubeEmbed = Node.create<YouTubeEmbedOptions>({
         {
           src: embedSrc,
           style: "border:0",
-          allowfullscreen: "true",
+          allowfullscreen: true,
           allow:
             "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
         },
