@@ -16,6 +16,10 @@ export type WorkflowExecutionOutcome =
       outcome: "paused";
       /** Step index where the run stopped (same step on resume). / 停止したステップ index（再開時も同じ） */
       pausedAtStepIndex: number;
+      /** Step id at pause (stable across draft edits). / 一時停止時のステップ id（ドラフト編集後も追跡） */
+      pausedStepId: string;
+      /** Completed outputs keyed by step id. / 完了ステップの出力（id キー） */
+      stepOutputsById: Record<string, string>;
       /** Snapshot of outputs for completed steps. / 完了ステップの出力スナップショット */
       stepOutputs: string[];
       /** Streaming buffer at pause time for the active step. / 停止時点のアクティブステップのストリーム */
@@ -228,9 +232,15 @@ async function runWorkflowStepsLoop(
         }
         pushProgress("paused", i, buildStatuses(steps.length, i, "running"), streaming, undefined);
         emitNote(i, buildStatuses(steps.length, i, "running"), i, streaming);
+        const stepOutputsById: Record<string, string> = {};
+        for (let k = 0; k < i; k += 1) {
+          stepOutputsById[steps[k].id] = stepOutputs[k];
+        }
         return {
           outcome: "paused",
           pausedAtStepIndex: i,
+          pausedStepId: steps[i].id,
+          stepOutputsById,
           stepOutputs: [...stepOutputs],
           partialForStep: streaming,
         };

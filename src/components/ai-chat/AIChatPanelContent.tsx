@@ -148,7 +148,7 @@ export function AIChatPanelContent({
         {keepWorkflowMounted ? (
           <div
             className={cn(
-              "min-h-0 flex-1 flex-col",
+              "h-full min-h-0 flex-col",
               activeViewTab === "workflow" ? "flex" : "hidden",
             )}
           >

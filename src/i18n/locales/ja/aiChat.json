@@ -82,6 +82,7 @@
     "nameRequired": "ワークフロー名を入力してください。",
     "stepsRequired": "タイトルと指示があるステップを1つ以上追加してください。",
     "nothingToResume": "再開できる実行がありません。実行して一時停止してください。",
+    "pausedStepNotFound": "一時停止中のステップがワークフローにありません。最初からやり直してください。",
     "workflowName": "ワークフロー名",
     "workflowNamePlaceholder": "例: 新 API エンドポイント設計",
     "template": "テンプレート",

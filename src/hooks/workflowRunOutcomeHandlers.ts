@@ -12,8 +12,10 @@ type ToastArg = { title: string; variant?: "destructive" };
 type ToastFn = (props: ToastArg) => void;
 
 type PausedState = {
-  pausedAtStepIndex: number;
-  stepOutputs: string[];
+  /** Step to resume (lookup in current valid steps). / 再開するステップ（現在の有効ステップで解決） */
+  pausedStepId: string;
+  /** Completed outputs keyed by step id. / 完了ステップの出力（id キー） */
+  stepOutputsById: Record<string, string>;
   partialForStep: string;
 };
 
@@ -44,8 +46,8 @@ export function applyWorkflowRunOutcome(
     case "paused":
       setActiveRunSteps(validSteps);
       setPausedState({
-        pausedAtStepIndex: result.pausedAtStepIndex,
-        stepOutputs: result.stepOutputs,
+        pausedStepId: result.pausedStepId,
+        stepOutputsById: result.stepOutputsById,
         partialForStep: result.partialForStep,
       });
       setProgress((p) => (p ? { ...p, phase: "paused" } : null));

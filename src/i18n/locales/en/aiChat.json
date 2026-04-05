@@ -82,6 +82,7 @@
     "nameRequired": "Enter a workflow name.",
     "stepsRequired": "Add at least one step with a title and instructions.",
     "nothingToResume": "Nothing to resume. Run a workflow first, then pause.",
+    "pausedStepNotFound": "The paused step is no longer in this workflow. Run again from the start.",
     "workflowName": "Workflow name",
     "workflowNamePlaceholder": "e.g. New API endpoint design",
     "template": "Template",

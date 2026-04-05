@@ -90,6 +90,8 @@ describe("runWorkflowExecution", () => {
     expect(r.outcome).toBe("paused");
     if (r.outcome === "paused") {
       expect(r.pausedAtStepIndex).toBe(0);
+      expect(r.pausedStepId).toBe("s1");
+      expect(r.stepOutputsById).toEqual({});
       expect(r.stepOutputs).toEqual([""]);
     }
     expect(createCount).toBe(1);

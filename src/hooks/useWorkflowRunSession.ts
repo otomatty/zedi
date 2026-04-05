@@ -16,6 +16,30 @@ import type {
 } from "@/lib/workflow/types";
 import { applyWorkflowRunOutcome } from "./workflowRunOutcomeHandlers";
 
+/** Snapshot while paused (step id + outputs by id). / 一時停止中のスナップショット */
+type PausedSnapshot = {
+  pausedStepId: string;
+  stepOutputsById: Record<string, string>;
+  partialForStep: string;
+};
+
+/**
+ * Maps paused snapshot onto current valid steps; returns null if the paused step id is missing.
+ * 現在の有効ステップへ一時停止状態を写す。paused ステップが無ければ null。
+ */
+function resolveResumeFromPaused(
+  paused: PausedSnapshot,
+  validSteps: WorkflowStepDefinition[],
+): { startIndex: number; initialOutputs: string[]; resumePartial: string } | null {
+  const j = validSteps.findIndex((s) => s.id === paused.pausedStepId);
+  if (j === -1) return null;
+  return {
+    startIndex: j,
+    initialOutputs: validSteps.map((s, k) => (k < j ? (paused.stepOutputsById[s.id] ?? "") : "")),
+    resumePartial: paused.partialForStep,
+  };
+}
+
 /**
  * Runs, pauses, and resumes workflows against the current note context.
  * 現在のノート文脈に対してワークフローを実行・一時停止・再開する。
@@ -27,11 +51,7 @@ export function useWorkflowRunSession(draft: WorkflowDefinition) {
 
   const [progress, setProgress] = useState<WorkflowRunProgress | null>(null);
   const [activeRunSteps, setActiveRunSteps] = useState<WorkflowStepDefinition[] | null>(null);
-  const [pausedState, setPausedState] = useState<{
-    pausedAtStepIndex: number;
-    stepOutputs: string[];
-    partialForStep: string;
-  } | null>(null);
+  const [pausedState, setPausedState] = useState<PausedSnapshot | null>(null);
 
   const workflowAbortRef = useRef<AbortController | null>(null);
   const currentStepAbortRef = useRef<AbortController | null>(null);
@@ -94,10 +114,18 @@ export function useWorkflowRunSession(draft: WorkflowDefinition) {
         baseSnapshotRef.current = pageContext?.pageFullContent ?? "";
       }
 
-      const startIndex = mode === "resume" && pausedState ? pausedState.pausedAtStepIndex : 0;
-      const initialOutputs = mode === "resume" && pausedState ? [...pausedState.stepOutputs] : [];
-      const resumePartial =
-        mode === "resume" && pausedState ? pausedState.partialForStep : undefined;
+      let startIndex = 0;
+      let initialOutputs: string[] = [];
+      let resumePartial: string | undefined;
+      if (mode === "resume" && pausedState) {
+        const resolved = resolveResumeFromPaused(pausedState, validSteps);
+        if (!resolved) {
+          toast({ title: t("aiChat.workflow.pausedStepNotFound"), variant: "destructive" });
+          setPausedState(null);
+          return;
+        }
+        ({ startIndex, initialOutputs, resumePartial } = resolved);
+      }
 
       if (mode === "fresh") {
         setPausedState(null);
