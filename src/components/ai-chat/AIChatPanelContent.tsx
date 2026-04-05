@@ -14,6 +14,10 @@ const AIChatBranchTree = lazy(() =>
   import("./AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
 );
 
+const AIChatWorkflowPanel = lazy(() =>
+  import("./AIChatWorkflowPanel").then((m) => ({ default: m.AIChatWorkflowPanel })),
+);
+
 /**
  * Props for {@link AIChatPanelContent}.
  * {@link AIChatPanelContent} 向けプロパティ。
@@ -116,7 +120,7 @@ export function AIChatPanelContent({
             onSwitchBranch={switchBranch}
             isStreaming={isStreaming}
           />
-        ) : (
+        ) : activeViewTab === "branch" ? (
           <Suspense fallback={null}>
             <AIChatBranchTree
               messageMap={messageMap}
@@ -127,18 +131,24 @@ export function AIChatPanelContent({
               onDeleteBranch={handleDeleteBranchFromTree}
             />
           </Suspense>
+        ) : (
+          <Suspense fallback={null}>
+            <AIChatWorkflowPanel />
+          </Suspense>
         )}
       </div>
 
-      <div className="bg-background border-t p-4">
-        <AIChatInput
-          onSendMessage={handleSendMessage}
-          onStopStreaming={stopStreaming}
-          prefillText={inputPrefill?.text}
-          prefillNonce={inputPrefill?.nonce}
-          focusEditorNonce={focusEditorNonce}
-        />
-      </div>
+      {activeViewTab !== "workflow" && (
+        <div className="bg-background border-t p-4">
+          <AIChatInput
+            onSendMessage={handleSendMessage}
+            onStopStreaming={stopStreaming}
+            prefillText={inputPrefill?.text}
+            prefillNonce={inputPrefill?.nonce}
+            focusEditorNonce={focusEditorNonce}
+          />
+        </div>
+      )}
     </div>
   );
 }
