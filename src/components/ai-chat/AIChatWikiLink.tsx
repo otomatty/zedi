@@ -1,33 +1,132 @@
-import { Link } from "react-router-dom";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@zedi/ui";
 import { usePageStore } from "../../stores/pageStore";
+import { WikiLinkPreviewContent } from "../wiki-link/WikiLinkPreviewContent";
 
 interface AIChatWikiLinkProps {
   /** WikiLink title (e.g. from [[Title]]) */
   title: string;
 }
 
+const OPEN_DELAY_MS = 300;
+const CLOSE_DELAY_MS = 200;
+const LONG_PRESS_MS = 500;
+
 /**
- * Renders a clickable WikiLink in AI chat. Resolves title to page id;
- * existing pages link to /page/:id, missing pages render as ghost style.
+ * AI チャット内の WikiLink をレンダリングする。
+ * ホバーでページプレビューを表示し、クリックでページ遷移する。
+ * モバイルでは長押しでプレビューを表示する。
+ *
+ * Renders a clickable WikiLink in AI chat with hover preview.
+ * Existing pages link to /page/:id, missing pages render as ghost style.
+ * Supports long-press preview on mobile.
  */
 export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
   const normalizedTitle = title.trim();
   const page = usePageStore((state) => state.getPageByTitle(normalizedTitle));
+  const referenced = usePageStore(
+    (state) => !page && state.ghostLinks.some((gl) => gl.linkText === normalizedTitle),
+  );
+  const navigate = useNavigate();
 
-  if (page) {
-    return (
-      <Link
-        to={`/page/${page.id}`}
-        className="text-primary decoration-primary/50 hover:decoration-primary rounded px-0.5 font-medium underline underline-offset-2 transition-colors"
-      >
-        [[{normalizedTitle}]]
-      </Link>
-    );
-  }
+  const [isOpen, setIsOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<number>();
+  const preventClickRef = useRef(false);
+
+  const handleTouchStart = useCallback(() => {
+    longPressTimerRef.current = window.setTimeout(() => {
+      setIsOpen(true);
+      preventClickRef.current = true;
+    }, LONG_PRESS_MS);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    clearTimeout(longPressTimerRef.current);
+    setTimeout(() => {
+      preventClickRef.current = false;
+    }, 0);
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    clearTimeout(longPressTimerRef.current);
+  }, []);
+
+  const handleLinkClick = useCallback((e: React.MouseEvent) => {
+    if (preventClickRef.current) {
+      e.preventDefault();
+    }
+  }, []);
+
+  const handleCardClick = useCallback(() => {
+    setIsOpen(false);
+    if (page) {
+      navigate(`/page/${page.id}`);
+    }
+  }, [page, navigate]);
+
+  // Close on outside touch and scroll (mobile)
+  // モバイルで外部タッチ・スクロール時にカードを閉じる
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsideTouch = (e: TouchEvent) => {
+      if (contentRef.current?.contains(e.target as Node)) return;
+      setIsOpen(false);
+    };
+    const handleScroll = () => setIsOpen(false);
+    const timer = window.setTimeout(() => {
+      document.addEventListener("touchstart", handleOutsideTouch);
+    }, 100);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("touchstart", handleOutsideTouch);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [isOpen]);
+
+  const touchProps = {
+    onTouchStart: handleTouchStart,
+    onTouchEnd: handleTouchEnd,
+    onTouchMove: handleTouchMove,
+  };
 
   return (
-    <span className="text-muted-foreground decoration-muted-foreground/60 rounded px-0.5 font-medium underline decoration-dashed underline-offset-2">
-      [[{normalizedTitle}]]
-    </span>
+    <HoverCard
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      openDelay={OPEN_DELAY_MS}
+      closeDelay={CLOSE_DELAY_MS}
+    >
+      <HoverCardTrigger asChild>
+        {page ? (
+          <Link
+            to={`/page/${page.id}`}
+            className="text-primary decoration-primary/50 hover:decoration-primary rounded px-0.5 font-medium underline underline-offset-2 transition-colors"
+            onClick={handleLinkClick}
+            {...touchProps}
+          >
+            [[{normalizedTitle}]]
+          </Link>
+        ) : (
+          <span
+            className="text-muted-foreground decoration-muted-foreground/60 rounded px-0.5 font-medium underline decoration-dashed underline-offset-2"
+            {...touchProps}
+          >
+            [[{normalizedTitle}]]
+          </span>
+        )}
+      </HoverCardTrigger>
+      <HoverCardContent ref={contentRef} className="w-64" side="top" align="start">
+        <WikiLinkPreviewContent
+          title={normalizedTitle}
+          page={page}
+          exists={!!page}
+          referenced={referenced}
+          onClick={page ? handleCardClick : undefined}
+        />
+      </HoverCardContent>
+    </HoverCard>
   );
 }

@@ -228,6 +228,7 @@ export function useTiptapEditorController({
     editor: editorControllers.editor,
     editorFontSizePx,
     editorContainerRef,
+    handleLinkClick,
     fileInputRef: imageUpload.fileInputRef,
     isDraggingOver: imageUpload.isDraggingOver,
     handleFileInputChange: imageUpload.handleFileInputChange,
