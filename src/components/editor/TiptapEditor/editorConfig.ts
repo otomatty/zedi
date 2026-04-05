@@ -19,6 +19,7 @@ import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadE
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
+import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
@@ -206,6 +207,8 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       ...options.imageOptions,
     }),
     Mermaid,
+    // --- YouTube Embed ---
+    YouTubeEmbed,
     // Y.js リアルタイムコラボレーション（オプション）
     ...(options.collaboration
       ? [

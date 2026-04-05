@@ -2,10 +2,14 @@ import Image, { type ImageOptions } from "@tiptap/extension-image";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { InputRule } from "@tiptap/core";
 import { ImageNodeView } from "../ImageNodeView.tsx";
+import { gyazoToImageUrl } from "../utils/urlTransform";
 
 /** Returns a displayable URL (e.g. blob URL) for auth-required URLs like /api/media/:id, /api/thumbnail/serve/:id */
 export type GetAuthenticatedImageUrl = (url: string) => Promise<string | null>;
 
+/**
+ *
+ */
 export interface StorageImageOptions extends ImageOptions {
   getProviderLabel?: (providerId?: string | null) => string | null;
   canDeleteFromStorage?: (providerId?: string | null) => boolean;
@@ -16,7 +20,10 @@ export interface StorageImageOptions extends ImageOptions {
   getAuthenticatedImageUrl?: GetAuthenticatedImageUrl;
 }
 
-export const StorageImage = Image.extend<StorageImageOptions>({
+export /**
+ *
+ */
+const StorageImage = Image.extend<StorageImageOptions>({
   addOptions() {
     return {
       ...this.parent?.(),
@@ -46,10 +53,17 @@ export const StorageImage = Image.extend<StorageImageOptions>({
 
   addInputRules() {
     return [
+      // 通常の画像 URL / Standard image URLs
       new InputRule({
         find: /(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?[^\s]*)?)$/i,
         handler: ({ state, range, match }) => {
+          /**
+           *
+           */
           const imageUrl = match[1];
+          /**
+           *
+           */
           const { tr } = state;
           tr.replaceWith(
             range.from,
@@ -58,6 +72,34 @@ export const StorageImage = Image.extend<StorageImageOptions>({
               src: imageUrl,
               alt: imageUrl.split("/").pop() || "image",
               title: imageUrl,
+            }),
+          );
+        },
+      }),
+      // Gyazo パーマリンク / Gyazo permalink → image
+      new InputRule({
+        find: /(https?:\/\/gyazo\.com\/[a-f0-9]{32})$/i,
+        handler: ({ state, range, match }) => {
+          /**
+           *
+           */
+          const originalUrl = match[1];
+          /**
+           *
+           */
+          const imageUrl = gyazoToImageUrl(originalUrl);
+          if (!imageUrl) return;
+          /**
+           *
+           */
+          const { tr } = state;
+          tr.replaceWith(
+            range.from,
+            range.to,
+            this.type.create({
+              src: imageUrl,
+              alt: "Gyazo image",
+              title: originalUrl,
             }),
           );
         },

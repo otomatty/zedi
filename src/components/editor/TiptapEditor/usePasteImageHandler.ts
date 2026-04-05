@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Editor } from "@tiptap/core";
+import { transformUrl } from "../utils/urlTransform";
 
 const IMAGE_URL_PATTERN = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|bmp|ico)(\?[^\s]*)?/i;
 const DISALLOWED_HOSTS = new Set(["0.0.0.0", "127.0.0.1", "::1", "[::1]", "localhost"]);
@@ -88,6 +89,42 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
       }
 
       if (text) {
+        const trimmedText = text.trim();
+
+        // 外部サービス URL の変換を優先チェック
+        // Check for external service URL transformations first
+        if (isEmbeddableImageUrl(trimmedText)) {
+          const result = transformUrl(trimmedText);
+
+          if (result?.type === "gyazo-image") {
+            event.preventDefault();
+            editor
+              .chain()
+              .focus()
+              .setImage({
+                src: result.imageUrl,
+                alt: "Gyazo image",
+                title: result.originalUrl,
+              })
+              .run();
+            return;
+          }
+
+          if (result?.type === "youtube-embed") {
+            event.preventDefault();
+            editor
+              .chain()
+              .focus()
+              .insertYouTubeEmbed({
+                videoId: result.videoId,
+                src: result.embedUrl,
+              })
+              .run();
+            return;
+          }
+        }
+
+        // 通常の画像 URL パターン / Standard image URL pattern
         const matches = text.match(IMAGE_URL_PATTERN);
 
         if (matches && matches[0]) {
