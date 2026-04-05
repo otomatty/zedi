@@ -23,7 +23,6 @@ import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import { McpResource } from "../extensions/McpResourceExtension";
-import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
