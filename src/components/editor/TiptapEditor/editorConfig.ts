@@ -226,8 +226,6 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     // --- YouTube Embed ---
     YouTubeEmbed,
     McpResource,
-    // --- YouTube Embed ---
-    YouTubeEmbed,
     // Y.js リアルタイムコラボレーション（オプション）
     ...(options.collaboration
       ? [
