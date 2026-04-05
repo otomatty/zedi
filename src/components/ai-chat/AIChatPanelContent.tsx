@@ -1,6 +1,6 @@
-import { Suspense, lazy, useCallback } from "react";
+import { Suspense, lazy, useCallback, useLayoutEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useToast } from "@zedi/ui";
+import { cn, useToast } from "@zedi/ui";
 import { AIChatHeader } from "./AIChatHeader";
 import { AIChatViewTabs } from "./AIChatViewTabs";
 import { AIChatInput } from "./AIChatInput";
@@ -12,6 +12,10 @@ import { useAIChatContext } from "@/contexts/AIChatContext";
 
 const AIChatBranchTree = lazy(() =>
   import("./AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
+);
+
+const AIChatWorkflowPanel = lazy(() =>
+  import("./AIChatWorkflowPanel").then((m) => ({ default: m.AIChatWorkflowPanel })),
 );
 
 /**
@@ -87,6 +91,19 @@ export function AIChatPanelContent({
 
   const canInsert = pageContext?.type === "editor";
 
+  /** After the workflow tab is visited once, keep the panel mounted so run state survives tab switches. / ワークフロータブを一度開いたらマウントを維持し、タブ切替で実行状態を失わない */
+  const [keepWorkflowMounted, setKeepWorkflowMounted] = useState(
+    () => activeViewTab === "workflow",
+  );
+  useLayoutEffect(() => {
+    if (activeViewTab === "workflow") {
+      // Latch: after first visit to the workflow tab, keep the panel mounted so run/pause state survives tab switches.
+      // 初回表示後はマウントを維持し、タブ切替で実行状態を失わない。
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-way latch from tab selection (not external sync)
+      setKeepWorkflowMounted(true);
+    }
+  }, [activeViewTab]);
+
   return (
     <div className="bg-background relative flex h-full flex-col border-l">
       <AIChatHeader />
@@ -116,7 +133,7 @@ export function AIChatPanelContent({
             onSwitchBranch={switchBranch}
             isStreaming={isStreaming}
           />
-        ) : (
+        ) : activeViewTab === "branch" ? (
           <Suspense fallback={null}>
             <AIChatBranchTree
               messageMap={messageMap}
@@ -127,10 +144,23 @@ export function AIChatPanelContent({
               onDeleteBranch={handleDeleteBranchFromTree}
             />
           </Suspense>
-        )}
+        ) : null}
+        {keepWorkflowMounted ? (
+          <div
+            className={cn(
+              "h-full min-h-0 flex-col",
+              activeViewTab === "workflow" ? "flex" : "hidden",
+            )}
+          >
+            <Suspense fallback={null}>
+              <AIChatWorkflowPanel />
+            </Suspense>
+          </div>
+        ) : null}
       </div>
 
-      <div className="bg-background border-t p-4">
+      {/* Stay mounted on workflow tab so uncontrolled input draft is not lost. / ワークフロー切替で下書きを失わない */}
+      <div className={cn("bg-background border-t p-4", activeViewTab === "workflow" && "hidden")}>
         <AIChatInput
           onSendMessage={handleSendMessage}
           onStopStreaming={stopStreaming}

@@ -30,6 +30,8 @@ vi.mock("./bridge", () => ({
     onError = cb;
     return Promise.resolve(() => {});
   }),
+  onClaudeToolUseStart: vi.fn().mockResolvedValue(() => {}),
+  onClaudeToolUseComplete: vi.fn().mockResolvedValue(() => {}),
 }));
 
 import { claudeQuery } from "./bridge";
