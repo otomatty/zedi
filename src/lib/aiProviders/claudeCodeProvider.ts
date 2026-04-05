@@ -12,6 +12,26 @@ import { useMcpConfigStore, getMcpServersForQuery } from "@/stores/mcpConfigStor
 import type { McpConnectionStatus, McpServerTool } from "@/types/mcp";
 import type { AIRequest, AIStreamChunk, UnifiedAIProvider } from "./types";
 
+const MCP_STATUS_SET: ReadonlySet<string> = new Set([
+  "connected",
+  "failed",
+  "needs-auth",
+  "pending",
+  "disabled",
+  "unknown",
+]);
+
+/**
+ * Coerces sidecar MCP status strings to a known {@link McpConnectionStatus}.
+ * サイドカーからの MCP ステータス文字列を既知の {@link McpConnectionStatus} に寄せる。
+ */
+function normalizeMcpConnectionStatus(raw: unknown): McpConnectionStatus {
+  if (typeof raw !== "string" || !MCP_STATUS_SET.has(raw)) {
+    return "unknown";
+  }
+  return raw as McpConnectionStatus;
+}
+
 /**
  * Claude Code プロバイダーを生成する。デスクトップ環境（Tauri）でのみ動作する。
  * Creates a Claude Code provider. Only works in a desktop (Tauri) environment.
@@ -108,7 +128,7 @@ export function createClaudeCodeProvider(): UnifiedAIProvider {
           store.updateStatuses(
             payload.servers.map((s) => ({
               name: s.name,
-              status: (s.status as McpConnectionStatus) || "unknown",
+              status: normalizeMcpConnectionStatus(s.status),
               error: s.error,
               tools: s.tools as McpServerTool[] | undefined,
             })),

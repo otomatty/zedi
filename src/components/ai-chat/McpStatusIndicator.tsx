@@ -63,6 +63,7 @@ export function McpStatusIndicator() {
             <button
               type="button"
               className="hover:bg-muted flex items-center gap-1 rounded-full px-1.5 py-0.5 transition-colors"
+              aria-label={`${t("aiSettings.mcp.title")}: ${connectedCount}/${totalEnabled}`}
             >
               <Plug className="h-3 w-3" />
               <Badge

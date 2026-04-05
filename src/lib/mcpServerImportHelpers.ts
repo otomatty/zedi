@@ -52,3 +52,14 @@ export function normalizeImportedConfig(raw: Record<string, unknown>): McpServer
     env: normalizeStringRecord(raw.env),
   };
 }
+
+/**
+ * Returns whether a normalized config has the minimum fields required to run.
+ * 正規化済み設定に実行に必要な最低限のフィールドがあるかを返す。
+ */
+export function isValidMcpServerConfig(config: McpServerConfig): boolean {
+  if (config.type === "stdio") {
+    return config.command.trim().length > 0;
+  }
+  return config.url.trim().length > 0;
+}

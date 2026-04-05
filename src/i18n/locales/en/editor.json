@@ -23,6 +23,9 @@
   "mcpResourceEmbed": {
     "desktopOnly": "MCP is only available in the desktop app.",
     "unknownServer": "This server is not registered or not enabled. Add it in AI settings.",
+    "resourceRequired": "Enter a non-empty resource URI for this MCP resource block.",
+    "promptServer": "MCP server name (registered in AI settings)",
+    "promptResource": "Resource URI to fetch",
     "loadingFrom": "Loading from {{server}}...",
     "fetchHint": "Click \"Fetch\" to load data from the MCP server."
   },

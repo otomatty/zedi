@@ -84,6 +84,8 @@
     "noServersDescription": "「サーバーを追加」からサーバーを登録してください。",
     "importFromClaude": "Claude Code 設定からインポート",
     "importSuccess": "{{count}} 件のサーバーをインポートしました",
+    "importSuccessWithSkipped": "{{imported}} 件をインポートしました。無効な定義を {{skipped}} 件スキップしました。",
+    "importSkippedInvalid": "設定ファイル内の無効なサーバー定義を {{count}} 件スキップしました。",
     "importNone": "インポートできるサーバーがありません（すべて登録済み、または設定ファイルが見つかりません）",
     "serverName": "サーバー名",
     "serverNamePlaceholder": "例: github, supabase",

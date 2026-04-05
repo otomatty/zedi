@@ -84,6 +84,8 @@
     "noServersDescription": "Click \"Add Server\" to register a server.",
     "importFromClaude": "Import from Claude Code config",
     "importSuccess": "Imported {{count}} server(s)",
+    "importSuccessWithSkipped": "Imported {{imported}} server(s); skipped {{skipped}} invalid entries.",
+    "importSkippedInvalid": "Skipped {{count}} invalid server entries in the config file.",
     "importNone": "No servers to import (all already registered or config file not found)",
     "serverName": "Server name",
     "serverNamePlaceholder": "e.g. github, supabase",

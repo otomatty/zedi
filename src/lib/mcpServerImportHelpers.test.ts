@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeImportedConfig } from "./mcpServerImportHelpers";
+import { isValidMcpServerConfig, normalizeImportedConfig } from "./mcpServerImportHelpers";
 
 describe("normalizeImportedConfig", () => {
   it("normalizes http with string headers", () => {
@@ -27,5 +27,23 @@ describe("normalizeImportedConfig", () => {
       expect(c.args).toEqual(["-y", "pkg"]);
       expect(c.env).toEqual({ FOO: "true" });
     }
+  });
+});
+
+describe("isValidMcpServerConfig", () => {
+  it("rejects stdio with empty command", () => {
+    expect(isValidMcpServerConfig({ type: "stdio", command: "  ", args: [] })).toBe(false);
+  });
+
+  it("accepts stdio with command", () => {
+    expect(isValidMcpServerConfig({ type: "stdio", command: "node" })).toBe(true);
+  });
+
+  it("rejects http with empty url", () => {
+    expect(isValidMcpServerConfig({ type: "http", url: "   " })).toBe(false);
+  });
+
+  it("accepts http with url", () => {
+    expect(isValidMcpServerConfig({ type: "http", url: "https://x" })).toBe(true);
   });
 });

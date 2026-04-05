@@ -131,23 +131,18 @@ export function getMcpServersForQuery(servers: McpServerEntry[]): McpServersReco
   return record;
 }
 
-export /**
- *
+/**
+ * MCP サーバー設定の Zustand ストア（永続化あり）。
+ * Zustand store for MCP server settings (persisted).
  */
-const useMcpConfigStore = create<McpConfigState>()(
+export const useMcpConfigStore = create<McpConfigState>()(
   persist(
     (set) => ({
       servers: [],
 
       addServer: (name, config) =>
         set((state) => {
-          /**
-           *
-           */
           const existing = state.servers.findIndex((s) => s.name === name);
-          /**
-           *
-           */
           const entry: McpServerEntry = {
             name,
             config,
@@ -155,9 +150,6 @@ const useMcpConfigStore = create<McpConfigState>()(
             status: "unknown",
           };
           if (existing >= 0) {
-            /**
-             *
-             */
             const updated = [...state.servers];
             updated[existing] = entry;
             return { servers: updated };
@@ -191,15 +183,9 @@ const useMcpConfigStore = create<McpConfigState>()(
 
       updateStatuses: (statuses) =>
         set((state) => {
-          /**
-           *
-           */
           const statusMap = new Map(statuses.map((s) => [s.name, s]));
           return {
             servers: state.servers.map((s) => {
-              /**
-               *
-               */
               const update = statusMap.get(s.name);
               if (!update) return s;
               return {
@@ -214,13 +200,7 @@ const useMcpConfigStore = create<McpConfigState>()(
 
       importServers: (entries) =>
         set((state) => {
-          /**
-           *
-           */
           const existingNames = new Set(state.servers.map((s) => s.name));
-          /**
-           *
-           */
           const newEntries: McpServerEntry[] = entries
             .filter((e) => !existingNames.has(e.name))
             .map((e) => ({
@@ -244,9 +224,6 @@ const useMcpConfigStore = create<McpConfigState>()(
           typeof persistedState === "object" &&
           "servers" in persistedState
         ) {
-          /**
-           *
-           */
           const ps = persistedState as { servers: McpServerEntry[] };
           return {
             servers: ps.servers.map((s) => ({

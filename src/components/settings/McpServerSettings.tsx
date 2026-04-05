@@ -13,7 +13,7 @@ import { McpServerRow } from "./McpServerRow";
 import type { McpServerConfig, McpServerEntry } from "@/types/mcp";
 import { isTauriDesktop } from "@/lib/platform";
 import { useToast } from "@zedi/ui";
-import { normalizeImportedConfig } from "@/lib/mcpServerImportHelpers";
+import { isValidMcpServerConfig, normalizeImportedConfig } from "@/lib/mcpServerImportHelpers";
 
 /**
  * MCP サーバー設定セクション。Claude Code モード時に AI 設定内に表示される。
@@ -93,10 +93,12 @@ export const McpServerSettings: React.FC = () => {
         return;
       }
 
-      const entries = Object.entries(mcpServers).map(([name, raw]) => ({
+      const rawEntries = Object.entries(mcpServers).map(([name, raw]) => ({
         name,
-        config: normalizeImportedConfig(raw),
+        config: normalizeImportedConfig(raw as Record<string, unknown>),
       }));
+      const entries = rawEntries.filter((e) => isValidMcpServerConfig(e.config));
+      const skippedInvalid = rawEntries.length - entries.length;
 
       const beforeCount = servers.length;
       importServers(entries);
@@ -106,7 +108,18 @@ export const McpServerSettings: React.FC = () => {
       if (imported > 0) {
         toast({
           title: t("aiSettings.mcp.importFromClaude"),
-          description: t("aiSettings.mcp.importSuccess", { count: imported }),
+          description:
+            skippedInvalid > 0
+              ? t("aiSettings.mcp.importSuccessWithSkipped", {
+                  imported,
+                  skipped: skippedInvalid,
+                })
+              : t("aiSettings.mcp.importSuccess", { count: imported }),
+        });
+      } else if (skippedInvalid > 0) {
+        toast({
+          title: t("aiSettings.mcp.importFromClaude"),
+          description: t("aiSettings.mcp.importSkippedInvalid", { count: skippedInvalid }),
         });
       } else {
         toast({

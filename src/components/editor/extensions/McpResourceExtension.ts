@@ -3,9 +3,9 @@
  * MCP resource embed node extension (Issue #463).
  *
  * ノート内に MCP リソース参照を埋め込むためのブロックノード。
- * `@mcp:サーバー名/リソース` 記法またはスラッシュコマンドで挿入する。
+ * スラッシュコマンドなどから挿入する（`@mcp:` 記法の入力ルールは未実装）。
  * Block node for embedding MCP resource references in notes.
- * Inserted via `@mcp:server/resource` notation or slash command.
+ * Inserted via the slash command (and similar commands); `@mcp:` text parsing is not implemented yet.
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
@@ -41,10 +41,11 @@ declare module "@tiptap/core" {
   }
 }
 
-export /**
- *
+/**
+ * MCP リソース参照用の Tiptap ブロックノード。
+ * Tiptap block node for MCP resource references.
  */
-const McpResource = Node.create<McpResourceOptions>({
+export const McpResource = Node.create<McpResourceOptions>({
   name: "mcpResource",
 
   group: "block",

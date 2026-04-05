@@ -68,7 +68,9 @@ function buildMcpSection(mcpServers: McpServerEntry[]): string {
 }
 
 /**
- *
+ * 現在のコンテキスト・既存ページ・参照ページ・（Claude Code 向け）MCP サーバー一覧から
+ * AI チャット用のシステムプロンプト文字列を組み立てる。
+ * Builds the AI chat system prompt from context, pages, references, and optional MCP servers.
  */
 export function buildSystemPrompt(
   context: PageContext | null,

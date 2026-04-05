@@ -23,6 +23,9 @@
   "mcpResourceEmbed": {
     "desktopOnly": "MCP はデスクトップアプリでのみ利用できます。",
     "unknownServer": "このサーバーは未登録か無効です。AI 設定で追加してください。",
+    "resourceRequired": "リソース URI を空にしないでください。",
+    "promptServer": "MCP サーバー名（AI 設定で登録した名前）",
+    "promptResource": "取得するリソース URI",
     "loadingFrom": "{{server}} から読み込み中…",
     "fetchHint": "「取得」をクリックして MCP サーバーからデータを読み込みます。"
   },

@@ -1,4 +1,5 @@
 import type { Editor } from "@tiptap/core";
+import i18n from "@/i18n";
 
 /**
  * One slash-menu entry (paragraph, heading, code block, etc.).
@@ -146,13 +147,22 @@ export const slashCommandItems: SlashCommandItem[] = [
     icon: "Plug",
     isAvailable: (editor) =>
       !!editor.extensionManager.extensions.find((e) => e.name === "mcpResource"),
-    action: (editor, range) =>
+    action: (editor, range) => {
+      const server = window.prompt(i18n.t("editor.mcpResourceEmbed.promptServer"), "");
+      if (server === null) return;
+      const trimmedServer = server.trim();
+      if (!trimmedServer) return;
+      const resource = window.prompt(i18n.t("editor.mcpResourceEmbed.promptResource"), "");
+      if (resource === null) return;
+      const trimmedResource = resource.trim();
+      if (!trimmedResource) return;
       editor
         .chain()
         .focus()
         .deleteRange(range)
-        .insertMcpResource({ server: "", resource: "" })
-        .run(),
+        .insertMcpResource({ server: trimmedServer, resource: trimmedResource })
+        .run();
+    },
   },
 ];
 

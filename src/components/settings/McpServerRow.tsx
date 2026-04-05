@@ -46,7 +46,8 @@ function statusVariant(
 }
 
 /**
- *
+ * MCP サーバー一覧の 1 行コンポーネントに渡す props。
+ * Props for a single row in the MCP server list.
  */
 export interface McpServerRowProps {
   server: McpServerEntry;

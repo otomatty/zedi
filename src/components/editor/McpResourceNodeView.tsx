@@ -11,7 +11,7 @@
  * Error: error message + retry.
  */
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { Plug, RefreshCw, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@zedi/ui";
@@ -19,6 +19,7 @@ import { Badge } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import { useMcpConfigStore, getMcpServersForQuery } from "@/stores/mcpConfigStore";
 import { isTauriDesktop } from "@/lib/platform";
+import type { ClaudeErrorPayload, ClaudeStreamCompletePayload } from "@/lib/claudeCode/types";
 
 /**
  * MCP リソースのノードビューコンポーネント。
@@ -33,6 +34,16 @@ export const McpResourceNodeView: React.FC<NodeViewProps> = ({
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** Unsubscribes Tauri listeners for the in-flight fetch, if any. / 進行中フェッチの Tauri リスナーを解除 */
+  const activeUnlistenRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      activeUnlistenRef.current?.();
+      activeUnlistenRef.current = null;
+    };
+  }, []);
 
   const { server, resource, params, resolvedContent, status } = node.attrs as {
     server: string;
@@ -55,8 +66,13 @@ export const McpResourceNodeView: React.FC<NodeViewProps> = ({
         .map((s) => s.name),
     );
     const trimmedServer = server.trim();
+    const trimmedResource = resource.trim();
     if (!trimmedServer || !registeredNames.has(trimmedServer)) {
       setError(t("editor.mcpResourceEmbed.unknownServer"));
+      return;
+    }
+    if (!trimmedResource) {
+      setError(t("editor.mcpResourceEmbed.resourceRequired"));
       return;
     }
 
@@ -68,43 +84,76 @@ export const McpResourceNodeView: React.FC<NodeViewProps> = ({
         await import("@/lib/claudeCode/bridge");
 
       const mcpServers = getMcpServersForQuery(useMcpConfigStore.getState().servers);
-      const safeResource = resource.trim().slice(0, 2000);
+      const safeResource = trimmedResource.slice(0, 2000);
       const safeParams = params.trim().slice(0, 2000);
       const prompt = `Use the MCP server "${trimmedServer}" to fetch the resource "${safeResource}"${safeParams ? ` with parameters: ${safeParams}` : ""}. Return ONLY the raw data/content, no explanation or formatting. If it's structured data, return it as a formatted code block.`;
 
-      const requestId = await claudeQuery(prompt, {
-        mcpServers: mcpServers as Record<string, Record<string, unknown>> | undefined,
-      });
+      let requestId: string | null = null;
+      const bufferedComplete: ClaudeStreamCompletePayload[] = [];
+      const bufferedError: ClaudeErrorPayload[] = [];
 
       let cleaned = false;
       let unlistenComplete: () => void = () => {};
       let unlistenError: () => void = () => {};
+      let cleanup: () => void = () => {};
 
-      const cleanup = (): void => {
-        if (cleaned) return;
-        cleaned = true;
-        unlistenComplete();
-        unlistenError();
-      };
-
-      unlistenComplete = await onClaudeStreamComplete((payload) => {
-        if (payload.id !== requestId) return;
+      const processComplete = (payload: ClaudeStreamCompletePayload): void => {
         updateAttributes({
           resolvedContent: payload.result.content,
           status: "resolved",
         });
         setIsLoading(false);
         cleanup();
-      });
+      };
 
-      unlistenError = await onClaudeError((payload) => {
-        if (payload.id !== requestId) return;
+      const processError = (payload: ClaudeErrorPayload): void => {
         setError(payload.error);
         updateAttributes({ status: "error" });
         setIsLoading(false);
         cleanup();
+      };
+
+      unlistenComplete = await onClaudeStreamComplete((payload) => {
+        if (requestId === null) {
+          bufferedComplete.push(payload);
+          return;
+        }
+        if (payload.id !== requestId) return;
+        processComplete(payload);
       });
+
+      unlistenError = await onClaudeError((payload) => {
+        if (requestId === null) {
+          bufferedError.push(payload);
+          return;
+        }
+        if (payload.id !== requestId) return;
+        processError(payload);
+      });
+
+      cleanup = (): void => {
+        if (cleaned) return;
+        cleaned = true;
+        activeUnlistenRef.current = null;
+        unlistenComplete();
+        unlistenError();
+      };
+
+      activeUnlistenRef.current = cleanup;
+
+      requestId = await claudeQuery(prompt, {
+        mcpServers: mcpServers as Record<string, Record<string, unknown>> | undefined,
+      });
+
+      for (const p of bufferedComplete) {
+        if (p.id === requestId) processComplete(p);
+      }
+      for (const p of bufferedError) {
+        if (p.id === requestId) processError(p);
+      }
     } catch (err) {
+      activeUnlistenRef.current?.();
+      activeUnlistenRef.current = null;
       setError(err instanceof Error ? err.message : String(err));
       updateAttributes({ status: "error" });
       setIsLoading(false);

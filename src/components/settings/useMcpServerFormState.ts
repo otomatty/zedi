@@ -6,6 +6,7 @@
 import { useState, useCallback } from "react";
 import type { McpServerConfig } from "@/types/mcp";
 import { getMcpFormInitialSnapshot } from "./mcpServerFormInitialState";
+import { parseStdioArgsLine } from "@/lib/parseStdioArgs";
 
 /** Parameters for {@link useMcpServerFormState}. / {@link useMcpServerFormState} の引数 */
 export interface UseMcpServerFormStateParams {
@@ -44,7 +45,7 @@ export function useMcpServerFormState({
     if (transport === "stdio") {
       const trimmedCmd = command.trim();
       if (!trimmedCmd) return;
-      const parsedArgs = args.trim() ? args.trim().split(/\s+/) : undefined;
+      const parsedArgs = args.trim() ? parseStdioArgsLine(args) : undefined;
       const env = envVars.reduce<Record<string, string>>((acc, { key, value }) => {
         if (key.trim()) acc[key.trim()] = value;
         return acc;
