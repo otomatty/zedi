@@ -35,16 +35,20 @@ export function WikiLinkPreviewContent({
     const preview = page.contentPreview || getContentPreview(page.content, 100);
     const existingBody = (
       <>
-        <div className="flex items-center gap-2">
+        <span className="flex items-center gap-2">
           {page.sourceUrl ? (
             <LinkIcon className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           ) : (
             <FileText className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           )}
           <span className="truncate text-sm font-medium">{page.title || "無題のページ"}</span>
-        </div>
-        {preview && <p className="text-muted-foreground mt-1.5 line-clamp-3 text-xs">{preview}</p>}
-        <p className="text-muted-foreground mt-2 text-[11px]">{formatTimeAgo(page.updatedAt)}</p>
+        </span>
+        {preview && (
+          <span className="text-muted-foreground mt-1.5 line-clamp-3 block text-xs">{preview}</span>
+        )}
+        <span className="text-muted-foreground mt-2 block text-[11px]">
+          {formatTimeAgo(page.updatedAt)}
+        </span>
       </>
     );
     if (onClick) {
@@ -59,16 +63,16 @@ export function WikiLinkPreviewContent({
 
   const ghostBody = (
     <>
-      <div className="flex items-center gap-2">
+      <span className="flex items-center gap-2">
         <FileText className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
         <span className="text-muted-foreground truncate text-sm font-medium">{title}</span>
-      </div>
-      <p className="text-muted-foreground mt-1.5 text-xs">
+      </span>
+      <span className="text-muted-foreground mt-1.5 block text-xs">
         {referenced
           ? "まだ作成されていないページです。他のページからも参照されています。"
           : "まだ作成されていないページです。"}
-      </p>
-      {onClick ? <p className="text-primary mt-2 text-xs">クリックして作成</p> : null}
+      </span>
+      {onClick ? <span className="text-primary mt-2 block text-xs">クリックして作成</span> : null}
     </>
   );
 

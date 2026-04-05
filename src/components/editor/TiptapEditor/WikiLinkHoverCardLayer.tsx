@@ -44,6 +44,12 @@ export const WikiLinkHoverCardLayer: React.FC<WikiLinkHoverCardLayerProps> = ({
     return state.getPageByTitle(target.title);
   });
 
+  const referenced = usePageStore((state) => {
+    if (!target) return false;
+    const resolved = state.getPageByTitle(target.title);
+    return !resolved && state.ghostLinks.some((gl) => gl.linkText === target.title);
+  });
+
   const handleCardClick = useCallback(() => {
     if (!target) return;
     closeCard();
@@ -78,8 +84,8 @@ export const WikiLinkHoverCardLayer: React.FC<WikiLinkHoverCardLayerProps> = ({
       <WikiLinkPreviewContent
         title={target.title}
         page={page}
-        exists={target.exists}
-        referenced={target.referenced}
+        exists={!!page}
+        referenced={referenced}
         onClick={handleCardClick}
       />
     </div>,

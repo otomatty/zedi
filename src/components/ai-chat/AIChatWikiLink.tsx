@@ -64,6 +64,13 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
     clearTimeout(longPressTimerRef.current);
   }, []);
 
+  /** OS ジェスチャ等で touch がキャンセルされたとき long-press が遅延発火しないようクリアする。 */
+  const handleTouchCancel = useCallback(() => {
+    clearTimeout(longPressTimerRef.current);
+    clearTimeout(preventClickResetTimerRef.current);
+    preventClickRef.current = false;
+  }, []);
+
   const handleAnchorClick = useCallback((e: React.MouseEvent) => {
     if (preventClickRef.current) {
       e.preventDefault();
@@ -74,6 +81,17 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
     setIsOpen(false);
     navigateWikiLinkByTitle(normalizedTitle);
   }, [normalizedTitle, navigateWikiLinkByTitle]);
+
+  const handleGhostTriggerClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (preventClickRef.current) {
+        e.preventDefault();
+        return;
+      }
+      navigateWikiLinkByTitle(normalizedTitle);
+    },
+    [normalizedTitle, navigateWikiLinkByTitle],
+  );
 
   useEffect(() => {
     return () => {
@@ -106,6 +124,7 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
     onTouchStart: handleTouchStart,
     onTouchEnd: handleTouchEnd,
     onTouchMove: handleTouchMove,
+    onTouchCancel: handleTouchCancel,
   };
 
   return (
@@ -126,12 +145,14 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
             [[{normalizedTitle}]]
           </Link>
         ) : (
-          <span
-            className="text-muted-foreground decoration-muted-foreground/60 rounded px-0.5 font-medium underline decoration-dashed underline-offset-2"
+          <button
+            type="button"
+            className="text-muted-foreground decoration-muted-foreground/60 inline cursor-pointer rounded border-0 bg-transparent px-0.5 font-medium underline decoration-dashed underline-offset-2"
+            onClick={handleGhostTriggerClick}
             {...touchProps}
           >
             [[{normalizedTitle}]]
-          </span>
+          </button>
         )}
       </HoverCardTrigger>
       <HoverCardContent ref={contentRef} className="w-64" side="top" align="start">
