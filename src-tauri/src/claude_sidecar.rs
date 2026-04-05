@@ -121,6 +121,9 @@ async fn process_sidecar_line(
             }
             let _ = app.emit("claude-error", &value);
         }
+        "mcp-status" => {
+            let _ = app.emit("claude-mcp-status", &value);
+        }
         "status-response" | "installation-status" | "models-list" => {
             if let Some(cid) = value.get("correlationId").and_then(|c| c.as_str()) {
                 let mut guard = pending.lock().await;
@@ -291,6 +294,7 @@ pub async fn claude_query(
     max_turns: Option<u32>,
     allowed_tools: Option<Vec<String>>,
     resume: Option<String>,
+    mcp_servers: Option<Value>,
 ) -> Result<String, String> {
     ensure_sidecar(&app, &state).await?;
 
@@ -314,6 +318,11 @@ pub async fn claude_query(
     }
     if let Some(r) = resume {
         req["resume"] = Value::String(r);
+    }
+    if let Some(mcp) = mcp_servers {
+        if mcp.is_object() {
+            req["mcpServers"] = mcp;
+        }
     }
 
     let line = serde_json::to_string(&req).map_err(|e| e.to_string())?;

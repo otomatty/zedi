@@ -78,6 +78,21 @@ export interface ClaudeModelEntry {
   description: string;
 }
 
+/**
+ * MCP サーバーステータス情報（sidecar `mcp-status` イベント）。
+ * MCP server status info from sidecar `mcp-status` event.
+ */
+export interface ClaudeMcpStatusPayload {
+  type: "mcp-status";
+  id: string;
+  servers: Array<{
+    name: string;
+    status: string;
+    error?: string;
+    tools?: Array<{ name: string; description?: string }>;
+  }>;
+}
+
 /** Tauri event name for streaming assistant text chunks. / ストリーミングアシスタントテキストチャンク用の Tauri イベント名。 */
 export const CLAUDE_STREAM_CHUNK_EVENT = "claude-stream-chunk" as const;
 
@@ -92,3 +107,6 @@ export const CLAUDE_TOOL_USE_START_EVENT = "claude-tool-use-start" as const;
 
 /** Tauri event name when a tool finishes executing. / ツール実行完了時の Tauri イベント名。 */
 export const CLAUDE_TOOL_USE_COMPLETE_EVENT = "claude-tool-use-complete" as const;
+
+/** Tauri event name for MCP server status updates. / MCP サーバーステータス更新の Tauri イベント名。 */
+export const CLAUDE_MCP_STATUS_EVENT = "claude-mcp-status" as const;

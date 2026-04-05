@@ -21,6 +21,7 @@ import { StorageImage, type StorageImageOptions } from "../extensions/StorageIma
 import { WikiLink } from "../extensions/WikiLinkExtension";
 import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
+import { McpResource } from "../extensions/McpResourceExtension";
 import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
@@ -221,6 +222,7 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       ...options.imageOptions,
     }),
     Mermaid,
+    McpResource,
     // Y.js リアルタイムコラボレーション（オプション）
     ...(options.collaboration
       ? [

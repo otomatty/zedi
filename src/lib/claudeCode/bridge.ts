@@ -10,12 +10,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   CLAUDE_ERROR_EVENT,
+  CLAUDE_MCP_STATUS_EVENT,
   CLAUDE_STREAM_CHUNK_EVENT,
   CLAUDE_STREAM_COMPLETE_EVENT,
   CLAUDE_TOOL_USE_START_EVENT,
   CLAUDE_TOOL_USE_COMPLETE_EVENT,
   type ClaudeErrorPayload,
   type ClaudeInstallationResult,
+  type ClaudeMcpStatusPayload,
   type ClaudeModelsListResult,
   type ClaudeStreamChunkPayload,
   type ClaudeStreamCompletePayload,
@@ -42,6 +44,11 @@ export interface ClaudeQueryOptions {
   allowedTools?: string[];
   /** SDK session resume id. / SDK のセッション再開 ID */
   resume?: string;
+  /**
+   * MCP サーバー設定。サイドカー経由で SDK に渡す。
+   * MCP server configs passed to SDK via sidecar.
+   */
+  mcpServers?: Record<string, Record<string, unknown>>;
 }
 
 /**
@@ -57,6 +64,7 @@ export async function claudeQuery(prompt: string, options?: ClaudeQueryOptions):
     maxTurns: options?.maxTurns ?? null,
     allowedTools: options?.allowedTools ?? null,
     resume: options?.resume ?? null,
+    mcpServers: options?.mcpServers ?? null,
   });
 }
 
@@ -148,6 +156,19 @@ export function onClaudeToolUseComplete(
 ): Promise<UnlistenFn> {
   assertTauriWebview();
   return listen<ClaudeToolUseCompletePayload>(CLAUDE_TOOL_USE_COMPLETE_EVENT, (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Subscribe to MCP server status events from the sidecar.
+ * sidecar からの MCP サーバーステータスイベントを購読する。
+ */
+export function onClaudeMcpStatus(
+  callback: (payload: ClaudeMcpStatusPayload) => void,
+): Promise<UnlistenFn> {
+  assertTauriWebview();
+  return listen<ClaudeMcpStatusPayload>(CLAUDE_MCP_STATUS_EVENT, (event) => {
     callback(event.payload);
   });
 }

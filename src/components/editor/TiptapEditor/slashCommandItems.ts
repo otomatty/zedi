@@ -1,4 +1,5 @@
 import type { Editor } from "@tiptap/core";
+import i18n from "@/i18n";
 
 /**
  * One slash-menu entry (paragraph, heading, code block, etc.).
@@ -140,6 +141,28 @@ export const slashCommandItems: SlashCommandItem[] = [
         .deleteRange(range)
         .insertContent({ type: "mathBlock", attrs: { latex: "\\sum_{i=1}^{n} x_i" } })
         .run(),
+  },
+  {
+    id: "mcpResource",
+    icon: "Plug",
+    isAvailable: (editor) =>
+      !!editor.extensionManager.extensions.find((e) => e.name === "mcpResource"),
+    action: (editor, range) => {
+      const server = window.prompt(i18n.t("editor.mcpResourceEmbed.promptServer"), "");
+      if (server === null) return;
+      const trimmedServer = server.trim();
+      if (!trimmedServer) return;
+      const resource = window.prompt(i18n.t("editor.mcpResourceEmbed.promptResource"), "");
+      if (resource === null) return;
+      const trimmedResource = resource.trim();
+      if (!trimmedResource) return;
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertMcpResource({ server: trimmedServer, resource: trimmedResource })
+        .run();
+    },
   },
 ];
 

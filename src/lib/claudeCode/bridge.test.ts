@@ -51,6 +51,7 @@ describe("claudeCode bridge", () => {
       maxTurns: 5,
       allowedTools: null,
       resume: null,
+      mcpServers: null,
     });
   });
 

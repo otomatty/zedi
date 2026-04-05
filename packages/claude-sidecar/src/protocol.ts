@@ -6,6 +6,15 @@
  * stdin の 1 行が 1 リクエスト、stdout の 1 行が 1 レスポンス。
  */
 
+/**
+ * MCP サーバー設定（シリアライズ可能なトランスポート設定のみ）。
+ * MCP server config (serializable process transports only).
+ */
+export type SidecarMcpServerConfig =
+  | { type?: "stdio"; command: string; args?: string[]; env?: Record<string, string> }
+  | { type: "http"; url: string; headers?: Record<string, string> }
+  | { type: "sse"; url: string; headers?: Record<string, string> };
+
 /** Inbound message from the host (one JSON object per line on stdin). */
 export type SidecarRequest =
   | {
@@ -18,6 +27,11 @@ export type SidecarRequest =
       allowedTools?: string[];
       /** Optional Claude session to resume (SDK `resume`). */
       resume?: string;
+      /**
+       * MCP サーバー設定。SDK の `options.mcpServers` に渡す。
+       * MCP server configs passed to SDK's `options.mcpServers`.
+       */
+      mcpServers?: Record<string, SidecarMcpServerConfig>;
       correlationId?: string;
     }
   | { type: "abort"; id: string }
@@ -58,6 +72,16 @@ export type SidecarResponse =
       type: "models-list";
       correlationId: string;
       models: Array<{ value: string; displayName: string; description: string }>;
+    }
+  | {
+      type: "mcp-status";
+      id: string;
+      servers: Array<{
+        name: string;
+        status: string;
+        error?: string;
+        tools?: Array<{ name: string; description?: string }>;
+      }>;
     }
   | { type: "shutdown-ack" };
 

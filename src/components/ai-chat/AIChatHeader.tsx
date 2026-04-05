@@ -11,6 +11,7 @@ import {
   getProviderById,
   DEFAULT_AI_SETTINGS,
 } from "@/types/ai";
+import { McpStatusIndicator } from "./McpStatusIndicator";
 
 /**
  * AI chat dock header: list, new chat, open full page, close, and mode badge.
@@ -94,6 +95,7 @@ export function AIChatHeader() {
         >
           {modeLabel}
         </button>
+        {modeInfo.mode === "claude_code" && <McpStatusIndicator />}
       </div>
       <div className="flex items-center gap-2">
         <button
