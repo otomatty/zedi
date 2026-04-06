@@ -8,6 +8,7 @@ import type { TiptapEditorProps } from "./TiptapEditor/types";
 import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
+import { WikiLinkHoverCardLayer } from "./TiptapEditor/WikiLinkHoverCardLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
@@ -48,6 +49,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     editor,
     editorFontSizePx,
     editorContainerRef,
+    handleLinkClick,
     fileInputRef,
     isDraggingOver,
     handleFileInputChange,
@@ -131,6 +133,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         suggestionRef={suggestionRef}
         onSelect={handleSuggestionSelect}
         onClose={handleSuggestionClose}
+      />
+      <WikiLinkHoverCardLayer
+        editor={editor}
+        editorContainerRef={editorContainerRef}
+        onLinkClick={handleLinkClick}
       />
       {!isReadOnly && (
         <SlashSuggestionLayer

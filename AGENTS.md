@@ -71,39 +71,9 @@ bun run test:run       # Vitest 単体テスト
 
 ## PR レビューコメント対応フロー
 
-レビューコメントへの対応は以下の手順で行う。
+レビューコメントへの対応は [`.cursor/skills/handle-pr-review/SKILL.md`](.cursor/skills/handle-pr-review/SKILL.md) の手順に従う（Cursor / Claude Code 共通）。
 
-### 1. 未対応コメントの取得
-
-**注意**: 以下は「未返信」のトップレベルコメントを取得する方式。GitHub の `Require conversation resolution before merging` は「未解決のスレッド」をブロックするため、返信済みだが未解決のスレッドはこの方式では検出されない。マージ可否の完全な判定には、PR の `mergeable` 状態や `reviewDecision` の確認を併用すること。
-
-返信済みコメントを除外し、未返信のトップレベルコメントを取得する（新規セッションでも動作する）:
-
-```bash
-gh api repos/{owner}/{repo}/pulls/{number}/comments \
-  --jq '
-    [.[] | select(.in_reply_to_id != null) | .in_reply_to_id] as $replied |
-    [.[] | select(.in_reply_to_id == null and (.id | IN($replied[]) | not))]
-    | .[] | {id, path, line, body: (.body | .[0:300]), user: .user.login}'
-```
-
-コメントが 30 件を超える場合は `?per_page=100` や `--paginate` でページネーションを指定すること。
-
-### 2. PR の自動検出
-
-ブランチ名から PR を特定する:
-
-```bash
-gh pr list --head "$(git branch --show-current)" --json number,url --jq '.[0]'
-```
-
-### 3. 再レビュー依頼
-
-```bash
-gh pr comment {number} --body "レビューコメントへの対応をコミットしました。最新の変更に対する再レビューをお願いします。
-
-@coderabbitai review"
-```
+**基本方針**: コメントをそのまま受け入れるのではなく、TSDoc/テスト/型定義に照らして妥当性を検証し、「修正する / 代替案で対応 / 対応不要」の 3 択で判断する。対応不要の場合は仕様根拠を添えて丁寧に説明する。
 
 ## ディレクトリ構成
 
