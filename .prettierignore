@@ -1,8 +1,10 @@
 # Release Please が自動生成するため、Prettier の対象外にして競合を防ぐ
 CHANGELOG.md
 
+.claude/
 dist/
 dist-ssr/
+src-tauri/target/
 node_modules/
 .wrangler/
 playwright-report/

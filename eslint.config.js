@@ -28,6 +28,8 @@ export default tseslint.config(
       "test-results",
       ".stryker-tmp",
       "**/.stryker-tmp/**",
+      ".claude/**",
+      "src-tauri/target/**",
       ".wrangler",
       "*.config.js",
       "*.config.mjs",
