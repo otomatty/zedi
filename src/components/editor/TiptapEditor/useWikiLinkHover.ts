@@ -67,11 +67,11 @@ export function useWikiLinkHover(
   const [isVisible, setIsVisible] = useState(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
-  const openTimerRef = useRef<number>();
-  const closeTimerRef = useRef<number>();
+  const openTimerRef = useRef<number | undefined>(undefined);
+  const closeTimerRef = useRef<number | undefined>(undefined);
   const currentElementRef = useRef<HTMLElement | null>(null);
   const lastKeyTimeRef = useRef(0);
-  const longPressTimerRef = useRef<number>();
+  const longPressTimerRef = useRef<number | undefined>(undefined);
   /** 長押しでカードを開いた直後の合成 click をナビゲーションへ伝播させない / Block synthetic click after long-press open */
   const suppressNextWikiLinkClickAfterLongPressRef = useRef(false);
 
@@ -103,6 +103,7 @@ export function useWikiLinkHover(
       lastKeyTimeRef.current = Date.now();
       clearTimeout(openTimerRef.current);
       clearTimeout(longPressTimerRef.current);
+      currentElementRef.current = null;
       if (isVisible) closeCard();
     };
     dom.addEventListener("keydown", onKeyDown);
@@ -125,12 +126,15 @@ export function useWikiLinkHover(
     const onMouseOver = (e: MouseEvent) => {
       const el = (e.target as HTMLElement).closest("[data-wiki-link]") as HTMLElement | null;
       if (el && el !== currentElementRef.current) {
-        currentElementRef.current = el;
         clearTimeout(closeTimerRef.current);
         clearTimeout(openTimerRef.current);
         if (isWithinTypingSuppressWindow(editor, lastKeyTimeRef)) return;
+        currentElementRef.current = el;
         openTimerRef.current = window.setTimeout(() => {
-          if (isWithinTypingSuppressWindow(editor, lastKeyTimeRef)) return;
+          if (isWithinTypingSuppressWindow(editor, lastKeyTimeRef)) {
+            currentElementRef.current = null;
+            return;
+          }
           openCard(el);
         }, OPEN_DELAY_MS);
       } else if (el && el === currentElementRef.current) {
