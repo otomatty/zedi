@@ -20,11 +20,17 @@ interface UseGeneralSettingsReturn {
   updateEditorFontSize: (fontSize: EditorFontSize) => void;
   updateCustomFontSizePx: (px: number) => void;
   updateLocale: (locale: UILocale) => void;
+  /** Toggle confirmation before running executable code blocks (Claude Code). */
+  updateExecutableCodeConfirmBeforeRun: (value: boolean) => void;
   save: () => Promise<boolean>;
   /** エディタ用のフォントサイズ px 値 */
   editorFontSizePx: number;
 }
 
+/**
+ * Loads and persists general settings (theme, font, locale, executable-code confirm).
+ * 一般設定（テーマ・フォント・言語・実行前確認）の読込と永続化。
+ */
 export function useGeneralSettings(): UseGeneralSettingsReturn {
   const [settings, setSettings] = useState<GeneralSettings>(() => loadGeneralSettings());
   const [isLoading, setIsLoading] = useState(true);
@@ -82,6 +88,14 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
     [i18n],
   );
 
+  const updateExecutableCodeConfirmBeforeRun = useCallback((value: boolean) => {
+    setSettings((prev) => {
+      const next = { ...prev, executableCodeConfirmBeforeRun: value };
+      saveGeneralSettings(next);
+      return next;
+    });
+  }, []);
+
   const save = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     try {
@@ -109,6 +123,7 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
     updateEditorFontSize,
     updateCustomFontSizePx,
     updateLocale,
+    updateExecutableCodeConfirmBeforeRun,
     save,
     editorFontSizePx,
   };

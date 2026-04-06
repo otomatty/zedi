@@ -4,6 +4,7 @@ import { sanitizeTiptapContent } from "@/lib/contentUtils";
 import { useContentSanitizer } from "./useContentSanitizer";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
 import { usePasteImageHandler } from "./usePasteImageHandler";
+import { rememberSlashAgentSelection } from "@/lib/agentSlashCommands/slashAgentSelectionCache";
 import type { TiptapEditorProps } from "./types";
 
 interface UseEditorLifecycleOptions {
@@ -16,6 +17,7 @@ interface UseEditorLifecycleOptions {
   isWikiGenerating?: boolean;
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
   focusContentRef: TiptapEditorProps["focusContentRef"];
+  insertAtCursorRef: TiptapEditorProps["insertAtCursorRef"];
   initialContent: TiptapEditorProps["initialContent"];
   onInitialContentApplied: TiptapEditorProps["onInitialContentApplied"];
   wikiContentForCollab: TiptapEditorProps["wikiContentForCollab"];
@@ -38,6 +40,7 @@ export function useEditorLifecycle({
   isWikiGenerating = false,
   collaborationConfig,
   focusContentRef,
+  insertAtCursorRef,
   initialContent,
   onInitialContentApplied,
   wikiContentForCollab,
@@ -48,12 +51,35 @@ export function useEditorLifecycle({
   const initialContentAppliedRef = useRef(false);
 
   useEffect(() => {
+    if (!editor) return;
+    const onSelection = () => rememberSlashAgentSelection(editor);
+    editor.on("selectionUpdate", onSelection);
+    return () => {
+      editor.off("selectionUpdate", onSelection);
+    };
+  }, [editor]);
+
+  useEffect(() => {
     if (!focusContentRef || !editor) return;
     focusContentRef.current = () => editor.commands.focus();
     return () => {
       focusContentRef.current = null;
     };
   }, [editor, focusContentRef]);
+
+  useEffect(() => {
+    if (!insertAtCursorRef || !editor) return;
+    insertAtCursorRef.current = (content: unknown) => {
+      return editor
+        .chain()
+        .focus()
+        .insertContent(content as Parameters<typeof editor.commands.insertContent>[0])
+        .run();
+    };
+    return () => {
+      insertAtCursorRef.current = null;
+    };
+  }, [editor, insertAtCursorRef]);
 
   useEffect(() => {
     if (!editor || !collaborationConfig || !initialContent || initialContentAppliedRef.current)

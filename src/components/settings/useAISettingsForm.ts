@@ -1,14 +1,100 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
 import { useAISettings } from "@/hooks/useAISettings";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
-import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
-import type { AISettings } from "@/types/ai";
-import type { AIModel } from "@/types/ai";
+import {
+  useSavedIndicator,
+  useClaudeCodeAvailability,
+  useServerModels,
+} from "./useAISettingsFormHelpers";
+import type { AIProviderType, AISettings, AIInteractionMode } from "@/types/ai";
+import { DEFAULT_AI_SETTINGS, getInteractionMode } from "@/types/ai";
 
-const SAVED_INDICATOR_MS = 3000;
+/** Per-mode snapshot so switching modes does not lose provider/model/API key. / モード切替で値を失わないためのスナップショット */
+type ModeFieldsSnapshot = {
+  provider: AIProviderType;
+  model: string;
+  modelId: string;
+  apiKey: string;
+};
+
+/**
+ * Builds persisted field updates for a mode switch and records per-mode snapshots.
+ * モード切替用の更新オブジェクトを組み立て、モードごとのスナップショットを記録する。
+ */
+function buildInteractionModeUpdates(
+  settings: AISettings,
+  newMode: AIInteractionMode,
+  snapshotsRef: MutableRefObject<Partial<Record<AIInteractionMode, ModeFieldsSnapshot>>>,
+): Partial<AISettings> {
+  const currentMode = getInteractionMode(settings);
+  snapshotsRef.current[currentMode] = {
+    provider: settings.provider,
+    model: settings.model,
+    modelId: settings.modelId,
+    apiKey: settings.apiKey,
+  };
+
+  const snap = snapshotsRef.current[newMode];
+
+  const fallbackFromClaudeCode =
+    settings.provider === "claude-code" || settings.modelId.startsWith("claude-code:");
+
+  switch (newMode) {
+    case "default": {
+      const base =
+        snap ??
+        ({
+          provider: settings.provider === "claude-code" ? "google" : settings.provider,
+          model: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.model : settings.model,
+          modelId: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.modelId : settings.modelId,
+          apiKey: "",
+        } satisfies ModeFieldsSnapshot);
+      return {
+        provider: base.provider,
+        model: base.model,
+        modelId: base.modelId,
+        apiMode: "api_server",
+        apiKey: "",
+      };
+    }
+    case "user_api_key": {
+      const base =
+        snap ??
+        ({
+          provider: settings.provider === "claude-code" ? "google" : settings.provider,
+          model: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.model : settings.model,
+          modelId: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.modelId : settings.modelId,
+          apiKey: "",
+        } satisfies ModeFieldsSnapshot);
+      return {
+        provider: base.provider,
+        model: base.model,
+        modelId: base.modelId,
+        apiMode: "user_api_key",
+        apiKey: base.apiKey,
+      };
+    }
+    case "claude_code": {
+      const base =
+        snap ??
+        ({
+          provider: "claude-code",
+          model: "default",
+          modelId: "claude-code:default",
+          apiKey: "",
+        } satisfies ModeFieldsSnapshot);
+      return {
+        provider: "claude-code",
+        model: base.model,
+        modelId: base.modelId,
+        apiMode: "api_server",
+        apiKey: "",
+      };
+    }
+  }
+}
 
 /**
  * Custom hook for AI settings form state and actions.
@@ -30,41 +116,23 @@ export function useAISettingsForm() {
   } = useAISettings();
 
   const [showApiKey, setShowApiKey] = useState(false);
-  const [useOwnKey, setUseOwnKey] = useState(false);
-  const [serverModels, setServerModels] = useState<AIModel[]>([]);
-  const [serverModelsLoading, setServerModelsLoading] = useState(false);
-  const [serverModelsError, setServerModelsError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const savedAtTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
-  const isServerMode = settings.apiMode === "api_server" && !useOwnKey;
+  const { savedAt, clear: clearSavedIndicator, markSaved } = useSavedIndicator();
+  const claudeCodeAvailable = useClaudeCodeAvailability();
+  const {
+    models: serverModels,
+    loading: serverModelsLoading,
+    error: serverModelsError,
+    load: loadServerModels,
+  } = useServerModels();
 
-  const loadServerModels = useCallback(
-    async (forceRefresh = false) => {
-      setServerModelsError(null);
-      setServerModelsLoading(true);
-      try {
-        const { models } = await fetchServerModels(forceRefresh);
-        setServerModels(models ?? []);
-        if (!models?.length) {
-          setServerModelsError(t("aiSettings.modelsEmpty"));
-        }
-      } catch (e) {
-        const message =
-          e instanceof FetchServerModelsError
-            ? e.message
-            : e instanceof Error
-              ? e.message
-              : String(e);
-        setServerModelsError(message);
-        setServerModels([]);
-      } finally {
-        setServerModelsLoading(false);
-      }
-    },
-    [t],
-  );
+  const interactionMode: AIInteractionMode = isLoading ? "default" : getInteractionMode(settings);
+  const isServerMode = interactionMode === "default";
+  const isClaudeCode = interactionMode === "claude_code";
+  const useOwnKey = interactionMode === "user_api_key";
+
+  const modeSnapshotsRef = useRef<Partial<Record<AIInteractionMode, ModeFieldsSnapshot>>>({});
 
   useEffect(() => {
     if (isServerMode) {
@@ -72,43 +140,11 @@ export function useAISettingsForm() {
     }
   }, [isServerMode, loadServerModels]);
 
-  useEffect(() => {
-    if (!isLoading) {
-      setUseOwnKey(settings.apiMode === "user_api_key");
-    }
-  }, [isLoading, settings.apiMode]);
-
-  useEffect(() => {
-    return () => {
-      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
-    };
-  }, []);
-
   const runSave = useCallback(async () => {
-    const success = await save();
-    if (success) {
-      setSavedAt(Date.now());
-      if (savedAtTimeoutRef.current) clearTimeout(savedAtTimeoutRef.current);
-      savedAtTimeoutRef.current = setTimeout(() => {
-        setSavedAt(null);
-        savedAtTimeoutRef.current = null;
-      }, SAVED_INDICATOR_MS);
-    } else {
-      sonnerToast.error(t("common.error"), {
-        description: t("aiSettings.saveFailedToastDescription"),
-      });
-    }
-  }, [save, t]);
+    markSaved(await save());
+  }, [save, markSaved]);
 
   const scheduleSave = useDebouncedCallback(runSave, 800);
-
-  const clearSavedIndicator = useCallback(() => {
-    if (savedAtTimeoutRef.current) {
-      clearTimeout(savedAtTimeoutRef.current);
-      savedAtTimeoutRef.current = null;
-    }
-    setSavedAt(null);
-  }, []);
 
   const updateSettings = useCallback(
     (updates: Partial<AISettings>) => {
@@ -124,14 +160,15 @@ export function useAISettingsForm() {
     [clearSavedIndicator, updateSettingsBase, scheduleSave],
   );
 
-  const handleToggleOwnKey = useCallback(
-    (checked: boolean) => {
-      setUseOwnKey(checked);
-      updateSettings({
-        apiMode: checked ? "user_api_key" : "api_server",
-      });
+  /**
+   * 利用モードを切り替える。モードごとのスナップショットで provider/model/API キーを復元する。
+   * Switches interaction mode and restores per-mode snapshots for provider/model/API key.
+   */
+  const handleModeChange = useCallback(
+    (newMode: AIInteractionMode) => {
+      updateSettings(buildInteractionModeUpdates(settings, newMode, modeSnapshotsRef));
     },
-    [updateSettings],
+    [settings, updateSettings],
   );
 
   const handleTest = useCallback(async () => {
@@ -149,7 +186,6 @@ export function useAISettingsForm() {
 
   const handleReset = useCallback(() => {
     reset();
-    setUseOwnKey(false);
     clearSavedIndicator();
     toast({
       title: t("aiSettings.resetToast"),
@@ -186,9 +222,12 @@ export function useAISettingsForm() {
     serverModelsLoading,
     serverModelsError,
     isServerMode,
+    isClaudeCode,
+    interactionMode,
+    claudeCodeAvailable,
     loadServerModels,
     updateSettings,
-    handleToggleOwnKey,
+    handleModeChange,
     handleServerModelSelect,
     handleTest,
     handleReset,

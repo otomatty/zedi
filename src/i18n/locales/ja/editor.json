@@ -2,6 +2,35 @@
   "uploadedImageAlt": "アップロードした画像",
   "slashMenuAriaLabel": "スラッシュコマンドメニュー",
   "slashNoResults": "一致する項目がありません",
+  "slashAgentRunning": "Claude Code を実行中…",
+  "noteWorkspace": {
+    "label": "ワークスペース",
+    "linkFolder": "フォルダをリンク",
+    "change": "変更",
+    "browse": "ファイルを参照",
+    "clear": "リンクを解除",
+    "treeTitle": "ワークスペース内のファイル",
+    "treeEmpty": "このフォルダは空です。"
+  },
+  "filePreview": {
+    "truncated": "先頭 32,000 文字のみ表示します。",
+    "close": "閉じる",
+    "noWorkspace": "ファイルをプレビューするには、ツールバーからこのノート用のワークスペースフォルダをリンクしてください。"
+  },
+  "slashAgent": {
+    "errorTitle": "エージェントコマンドに失敗しました"
+  },
+  "mcpResourceEmbed": {
+    "desktopOnly": "MCP はデスクトップアプリでのみ利用できます。",
+    "unknownServer": "このサーバーは未登録か無効です。AI 設定で追加してください。",
+    "resourceRequired": "リソース URI を空にしないでください。",
+    "promptServer": "MCP サーバー名（AI 設定で登録した名前）",
+    "promptResource": "取得するリソース URI",
+    "loadingFrom": "{{server}} から読み込み中…",
+    "fetchHint": "「取得」をクリックして MCP サーバーからデータを読み込みます。"
+  },
+  "slashPathCompletionAriaLabel": "パス候補",
+  "slashPathCompletionHint": "ワークスペース内のパス候補",
   "slash": {
     "paragraph": {
       "title": "段落",
@@ -48,6 +77,11 @@
       "description": "シンタックスハイライト付きコード",
       "aliases": "コード,code,pre,プログラム"
     },
+    "executableCodeBlock": {
+      "title": "実行可能コード",
+      "description": "Claude Code 経由でシェル/Python/JS を実行（デスクトップ）",
+      "aliases": "run,execute,terminal,notebook,claude,実行"
+    },
     "horizontalRule": {
       "title": "水平線",
       "description": "区切り線",
@@ -82,6 +116,51 @@
       "title": "数式（ブロック）",
       "description": "ブロック数式を挿入",
       "aliases": "数式ブロック,block math,ブロック数式,equation"
+    },
+    "mcpResource": {
+      "title": "MCP リソース",
+      "description": "MCP サーバーから外部データを埋め込む",
+      "aliases": "mcp,外部データ,github,supabase,連携"
+    },
+    "agent-analyze": {
+      "title": "/analyze — コード分析",
+      "description": "パスを指定して Claude Code で分析し結果を挿入",
+      "aliases": "analyze,解析,あならいず"
+    },
+    "agent-git-summary": {
+      "title": "/git-summary — コミット要約",
+      "description": "直近の git ログを要約して挿入",
+      "aliases": "git-summary,git,ログ,gitlog"
+    },
+    "agent-run": {
+      "title": "/run — コマンド実行",
+      "description": "シェルコマンドを実行し出力を挿入",
+      "aliases": "run,exec,シェル,command"
+    },
+    "agent-research": {
+      "title": "/research — Web 調査",
+      "description": "トピックを調べ構造化した要約を挿入",
+      "aliases": "research,調査,検索,web"
+    },
+    "agent-review": {
+      "title": "/review — コードレビュー",
+      "description": "パスのコードをレビューしチェックリストを挿入",
+      "aliases": "review,レビュー,指摘"
+    },
+    "agent-test": {
+      "title": "/test — テスト実行",
+      "description": "テストを実行し結果を記録",
+      "aliases": "test,テスト,vitest,bun test"
+    },
+    "agent-explain": {
+      "title": "/explain — 選択を解説",
+      "description": "選択範囲のコードを解説して挿入",
+      "aliases": "explain,解説,説明"
+    },
+    "agent-summarize": {
+      "title": "/summarize — ノート要約",
+      "description": "ノート全体の要約を挿入",
+      "aliases": "summarize,要約,サマリ"
     }
   },
   "recommendation": {
@@ -107,6 +186,33 @@
     "cancel": "キャンセル",
     "importing": "取り込み中...",
     "import": "取り込み"
+  },
+  "executableCode": {
+    "language": "言語",
+    "run": "実行",
+    "interpret": "Claude に解説",
+    "stdout": "標準出力",
+    "stderr": "標準エラー",
+    "duration": "{{seconds}} 秒",
+    "claudeUnavailable": "Claude Code を利用できません（デスクトップアプリと CLI のインストールが必要です）。",
+    "interpretationHeading": "Claude の解説",
+    "confirmTitle": "このコードを実行しますか？",
+    "confirmDescription": "Claude Code の Bash ツールにより、お使いのマシン上でコードが実行されます。信頼できるコードのみ実行してください。",
+    "confirmCancel": "キャンセル",
+    "confirmRun": "実行",
+    "status": {
+      "idle": "待機中",
+      "running": "実行中…",
+      "done": "実行完了",
+      "error": "エラー"
+    },
+    "lang": {
+      "bash": "Bash",
+      "shell": "Shell",
+      "python": "Python",
+      "javascript": "JavaScript",
+      "typescript": "TypeScript"
+    }
   },
   "markdownExport": {
     "sourceAttribution": "📎 引用元",

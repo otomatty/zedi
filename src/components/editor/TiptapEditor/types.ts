@@ -36,6 +36,13 @@ export interface TiptapEditorProps {
   collaborationConfig?: CollaborationConfig;
   /** 親がコンテンツにフォーカスするためのコールバック。editor 準備後に ref.current に focus() を代入 */
   focusContentRef?: MutableRefObject<(() => void) | null>;
+  /**
+   * カーソル位置にコンテンツを挿入するコールバック ref。editor 準備後に代入。
+   * TipTap の `insertContent` に渡せる任意のコンテンツ（JSON ノード配列等）を受け取る。
+   * Ref to insert content at the editor's cursor position; assigned when the editor is ready.
+   * Accepts any content that TipTap's `insertContent` can handle (e.g. array of JSON nodes).
+   */
+  insertAtCursorRef?: MutableRefObject<((content: unknown) => boolean) | null>;
   /** URL から作成時など、Y.Doc が空のときに一度だけ反映する Tiptap JSON 文字列 */
   initialContent?: string;
   /** initialContent をエディタに反映したあとに呼ぶ */

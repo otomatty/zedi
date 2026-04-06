@@ -1,4 +1,7 @@
-import { Sparkles, User } from "lucide-react";
+import { useCallback } from "react";
+import { ClipboardPaste, Copy, Sparkles, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useToast } from "@zedi/ui";
 import { ChatMessage, ChatAction } from "../../types/aiChat";
 import { getDisplayContent } from "../../lib/aiChatActions";
 import { AIChatActionCard } from "./AIChatActionCard";
@@ -11,11 +14,17 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { SiblingNavigator } from "./SiblingNavigator";
 import { AIChatMessageSkeleton } from "./AIChatMessageSkeleton";
+import { ToolExecutionStatus } from "./ToolExecutionStatus";
 
 interface AIChatMessageProps {
   message: ChatMessage;
   onExecuteAction?: (action: ChatAction) => void;
   onEditMessage?: (messageId: string, newContent: string) => void;
+  /**
+   * カーソル位置にメッセージ内容を挿入するコールバック。エディタページで利用可能。
+   * Callback to insert message content at editor cursor. Available on editor pages.
+   */
+  onInsertToNote?: (markdown: string) => void;
   /** Sibling index when this message has alternates. / 代替があるときの兄弟インデックス */
   siblingIndex?: number;
   siblingTotal?: number;
@@ -32,14 +41,30 @@ export function AIChatMessage({
   message,
   onExecuteAction,
   onEditMessage,
+  onInsertToNote,
   siblingIndex,
   siblingTotal,
   onSwitchBranch,
   isStreaming = false,
 }: AIChatMessageProps) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
   const isUser = message.role === "user";
   const displayContent = isUser ? message.content : getDisplayContent(message.content);
   const showUserEdit = isUser && onEditMessage;
+  const showInsertButton = !isUser && !message.isStreaming && onInsertToNote && displayContent;
+
+  const handleCopy = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast({ title: t("aiChat.actions.copiedCode") });
+      } catch {
+        toast({ title: t("aiChat.actions.copyFailed"), variant: "destructive" });
+      }
+    },
+    [t, toast],
+  );
 
   return (
     <div className={`mb-4 flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
@@ -114,10 +139,36 @@ export function AIChatMessage({
           )}
         </div>
 
-        {!isUser && message.modelDisplayName && !message.isStreaming && (
-          <span className="text-muted-foreground mt-0.5 px-1 text-[10px]">
-            {message.modelDisplayName}
-          </span>
+        {!isUser && !message.isStreaming && (
+          <div className="mt-1 flex items-center gap-1">
+            {showInsertButton && (
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors"
+                onClick={() => onInsertToNote(displayContent)}
+                title={t("aiChat.actions.insertToNote")}
+              >
+                <ClipboardPaste className="h-3 w-3" />
+                {t("aiChat.actions.insertToNote")}
+              </button>
+            )}
+            {!isUser && !message.isStreaming && displayContent && (
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors"
+                onClick={() => handleCopy(displayContent)}
+                title={t("aiChat.actions.copyMessage")}
+              >
+                <Copy className="h-3 w-3" />
+                {t("aiChat.actions.copyMessage")}
+              </button>
+            )}
+            {message.modelDisplayName && (
+              <span className="text-muted-foreground px-1 text-[10px]">
+                {message.modelDisplayName}
+              </span>
+            )}
+          </div>
         )}
 
         {siblingTotal != null && siblingIndex != null && onSwitchBranch && (
@@ -127,6 +178,10 @@ export function AIChatMessage({
             onSwitch={onSwitchBranch}
             className="mt-1"
           />
+        )}
+
+        {!isUser && message.toolExecutions && message.toolExecutions.length > 0 && (
+          <ToolExecutionStatus toolExecutions={message.toolExecutions} className="mt-1" />
         )}
 
         {message.error && <div className="text-destructive mt-1 text-xs">{message.error}</div>}

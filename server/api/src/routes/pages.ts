@@ -12,9 +12,26 @@ import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
 import { pages, pageContents } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
-import type { AppEnv } from "../types/index.js";
+import type { AppEnv, Database } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
+
+/**
+ * PUT /content リクエストから pages テーブルの更新セットを構築し、変更があれば適用する。
+ * Build and apply pages-table updates (title, content_preview, updated_at) from PUT body.
+ */
+async function applyPagesMetadataUpdate(
+  db: { update: Database["update"] },
+  pageId: string,
+  body: { title?: string; content_preview?: string },
+): Promise<void> {
+  const set: Record<string, unknown> = {};
+  if (body.title !== undefined) set.title = body.title;
+  if (body.content_preview !== undefined) set.contentPreview = body.content_preview;
+  if (Object.keys(set).length === 0) return;
+  set.updatedAt = new Date();
+  await db.update(pages).set(set).where(eq(pages.id, pageId));
+}
 
 // ── GET /pages/:id/content ──────────────────────────────────────────────────
 app.get("/:id/content", authRequired, async (c) => {
@@ -73,6 +90,7 @@ app.put("/:id/content", authRequired, async (c) => {
     ydoc_state: string; // base64-encoded Y.Doc state
     expected_version?: number;
     content_text?: string;
+    content_preview?: string;
     title?: string;
   }>();
 
@@ -119,12 +137,7 @@ app.put("/:id/content", authRequired, async (c) => {
         const insertedRow = inserted[0];
         if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
 
-        if (body.title !== undefined) {
-          await tx
-            .update(pages)
-            .set({ title: body.title, updatedAt: new Date() })
-            .where(eq(pages.id, pageId));
-        }
+        await applyPagesMetadataUpdate(tx, pageId, body);
 
         return { done: true as const, version: insertedRow.version ?? 1 };
       });
@@ -162,12 +175,7 @@ app.put("/:id/content", authRequired, async (c) => {
     const updatedRow = updated[0];
     if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
 
-    if (body.title !== undefined) {
-      await db
-        .update(pages)
-        .set({ title: body.title, updatedAt: new Date() })
-        .where(eq(pages.id, pageId));
-    }
+    await applyPagesMetadataUpdate(db, pageId, body);
 
     return c.json({ version: updatedRow.version ?? 0 });
   }
@@ -192,12 +200,7 @@ app.put("/:id/content", authRequired, async (c) => {
     })
     .returning();
 
-  if (body.title !== undefined) {
-    await db
-      .update(pages)
-      .set({ title: body.title, updatedAt: new Date() })
-      .where(eq(pages.id, pageId));
-  }
+  await applyPagesMetadataUpdate(db, pageId, body);
 
   const resultRow = result[0];
   if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });

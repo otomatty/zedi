@@ -19,11 +19,12 @@ describe("AIChatViewTabs", () => {
     vi.clearAllMocks();
   });
 
-  it("renders Chat and Branch tabs", () => {
+  it("renders Chat, Branch, and Workflow tabs", () => {
     const onTabChange = vi.fn();
     render(<AIChatViewTabs activeTab="chat" onTabChange={onTabChange} />);
     expect(screen.getByRole("tab", { name: "aiChat.viewTabs.chat" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "aiChat.viewTabs.branch" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "aiChat.viewTabs.workflow" })).toBeInTheDocument();
   });
 
   it("Branch tab is always enabled", () => {
@@ -46,5 +47,13 @@ describe("AIChatViewTabs", () => {
     render(<AIChatViewTabs activeTab="branch" onTabChange={onTabChange} />);
     await user.click(screen.getByRole("tab", { name: "aiChat.viewTabs.chat" }));
     expect(onTabChange).toHaveBeenCalledWith("chat");
+  });
+
+  it("calls onTabChange with workflow when Workflow tab is clicked", async () => {
+    const user = userEvent.setup();
+    const onTabChange = vi.fn();
+    render(<AIChatViewTabs activeTab="chat" onTabChange={onTabChange} />);
+    await user.click(screen.getByRole("tab", { name: "aiChat.viewTabs.workflow" }));
+    expect(onTabChange).toHaveBeenCalledWith("workflow");
   });
 });

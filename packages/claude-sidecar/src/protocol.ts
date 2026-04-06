@@ -1,0 +1,110 @@
+/**
+ * JSONL protocol between the Tauri host and this sidecar process.
+ * Tauri ホストとこの sidecar プロセス間の JSONL プロトコル。
+ *
+ * Each line on stdin is one JSON request; each line on stdout is one JSON response.
+ * stdin の 1 行が 1 リクエスト、stdout の 1 行が 1 レスポンス。
+ */
+
+/**
+ * MCP サーバー設定（シリアライズ可能なトランスポート設定のみ）。
+ * MCP server config (serializable process transports only).
+ */
+export type SidecarMcpServerConfig =
+  | { type?: "stdio"; command: string; args?: string[]; env?: Record<string, string> }
+  | { type: "http"; url: string; headers?: Record<string, string> }
+  | { type: "sse"; url: string; headers?: Record<string, string> };
+
+/** Inbound message from the host (one JSON object per line on stdin). */
+export type SidecarRequest =
+  | {
+      type: "query";
+      id: string;
+      prompt: string;
+      model?: string;
+      cwd?: string;
+      maxTurns?: number;
+      allowedTools?: string[];
+      /** Optional Claude session to resume (SDK `resume`). */
+      resume?: string;
+      /**
+       * MCP サーバー設定。SDK の `options.mcpServers` に渡す。
+       * MCP server configs passed to SDK's `options.mcpServers`.
+       */
+      mcpServers?: Record<string, SidecarMcpServerConfig>;
+      correlationId?: string;
+    }
+  | { type: "abort"; id: string }
+  | { type: "status"; correlationId: string }
+  | { type: "check_installation"; correlationId: string }
+  | { type: "list_models"; correlationId: string }
+  | { type: "shutdown" };
+
+/** Outbound message to the host (one JSON object per line on stdout). */
+export type SidecarResponse =
+  | { type: "stream-chunk"; id: string; content: string }
+  | { type: "stream-complete"; id: string; result: { content: string } }
+  | { type: "error"; id: string; error: string; code?: string }
+  | {
+      type: "tool-use-start";
+      id: string;
+      toolName: string;
+      toolInput: string;
+    }
+  | {
+      type: "tool-use-complete";
+      id: string;
+      toolName: string;
+    }
+  | {
+      type: "status-response";
+      correlationId: string;
+      status: "idle" | "processing";
+      activeQueryIds: string[];
+    }
+  | {
+      type: "installation-status";
+      correlationId: string;
+      installed: boolean;
+      version?: string;
+    }
+  | {
+      type: "models-list";
+      correlationId: string;
+      models: Array<{ value: string; displayName: string; description: string }>;
+    }
+  | {
+      type: "mcp-status";
+      id: string;
+      servers: Array<{
+        name: string;
+        status: string;
+        error?: string;
+        tools?: Array<{ name: string; description?: string }>;
+      }>;
+    }
+  | { type: "shutdown-ack" };
+
+/**
+ * Parses a single JSON line into {@link SidecarRequest}.
+ * 1 行を {@link SidecarRequest} としてパースする。
+ */
+export function parseRequestLine(line: string): SidecarRequest {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    throw new Error("empty line");
+  }
+  const value: unknown = JSON.parse(trimmed);
+  if (!value || typeof value !== "object" || !("type" in value)) {
+    throw new Error("invalid request: missing type");
+  }
+  return value as SidecarRequest;
+}
+
+/**
+ * Serializes a response as one JSON line (with trailing newline for writing).
+ * レスポンスを JSON 1 行（書き込み用に末尾改行付き）にする。
+ */
+export function formatResponseLine(response: SidecarResponse): string {
+  return `${JSON.stringify(response)}\n`;
+}

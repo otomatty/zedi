@@ -10,12 +10,20 @@ import { useAIChatStore } from "@/stores/aiChatStore";
 import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
 import { useTranslation } from "react-i18next";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
+import { useLongPress } from "@/hooks/useLongPress";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+} from "@zedi/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@zedi/ui";
 import {
   AlertDialog,
@@ -34,7 +42,8 @@ interface PageCardProps {
 }
 
 /**
- *
+ * ページカードコンポーネント。デスクトップでは右クリック、モバイルでは長押しでメニューを表示する。
+ * Page card component. Shows context menu on right-click (desktop) or long press (mobile).
  */
 const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const navigate = useNavigate();
@@ -49,6 +58,10 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const isMobile = useIsMobile();
   const { openPanel, setPendingPageToAdd } = useAIChatStore();
 
+  // モバイル長押しメニュー用 state / Mobile long-press menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuPos, setMobileMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
   const preview = page.contentPreview ?? "";
   const { resolvedUrl: thumbnail, hasError: thumbnailError } = useAuthenticatedImageUrl(
     page.thumbnailUrl,
@@ -56,7 +69,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const isClipped = !!page.sourceUrl;
 
   const handleClick = () => {
-    // ドラッグ直後のクリックを無視
+    // ドラッグ直後のクリックを無視 / Ignore click right after drag
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       return;
@@ -77,7 +90,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
-    // クリック抑制は短い遅延後にリセット
+    // クリック抑制は短い遅延後にリセット / Reset click suppression after short delay
     setTimeout(() => {
       isDraggingRef.current = false;
     }, 100);
@@ -146,82 +159,136 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     });
   }, []);
 
+  // 長押し検出フック / Long press detection hook
+  const longPress = useLongPress(
+    useCallback((pos: { x: number; y: number }) => {
+      setMobileMenuPos(pos);
+      setMobileMenuOpen(true);
+    }, []),
+  );
+
+  // カード本体の button 要素 / Card button element
+  const cardButton = (
+    <button
+      draggable={!isMobile}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onClick={(e) => {
+        // 長押し発火直後のクリックを無視 / Ignore click right after long press
+        if (longPress.firedRef.current) {
+          longPress.firedRef.current = false;
+          e.preventDefault();
+          return;
+        }
+        handleClick();
+      }}
+      {...(isMobile
+        ? {
+            onTouchStart: longPress.onTouchStart,
+            onTouchMove: longPress.onTouchMove,
+            onTouchEnd: longPress.onTouchEnd,
+          }
+        : {})}
+      className={cn(
+        "page-card w-full overflow-hidden rounded-lg text-left",
+        "border-border/50 bg-card hover:border-border border",
+        "group transition-all duration-200",
+        "animate-fade-in opacity-0",
+        "flex aspect-square flex-col",
+        index <= 5 && `stagger-${Math.min(index + 1, 5)}`,
+        isDragging && "ring-primary opacity-50 ring-2",
+      )}
+      style={{
+        animationFillMode: "forwards",
+        animationDelay: `${index * 50}ms`,
+      }}
+    >
+      {/* Title - Top */}
+      <div className="flex-shrink-0 p-3 pb-2">
+        <div className="flex items-start gap-1.5">
+          {isClipped && <Link2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />}
+          <h3 className="text-foreground line-clamp-2 text-sm font-medium">
+            {page.title || "無題のページ"}
+          </h3>
+        </div>
+      </div>
+
+      {/* Thumbnail or Preview - Bottom */}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {thumbnail && !thumbnailError ? (
+          <div className="flex h-full w-full items-center justify-center px-3 pt-0 pb-3">
+            <img
+              src={thumbnail}
+              alt=""
+              className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
+              decoding="async"
+              loading="lazy"
+              {...({ fetchpriority: "low" } as React.ImgHTMLAttributes<HTMLImageElement>)}
+            />
+          </div>
+        ) : (
+          <div className="h-full px-3 pb-3">
+            <p className="text-muted-foreground line-clamp-4 text-xs leading-relaxed">
+              {preview || "コンテンツがありません"}
+            </p>
+          </div>
+        )}
+      </div>
+    </button>
+  );
+
+  // メニューアイテム（デスクトップ・モバイル共通の内容） / Shared menu items
+  const menuItems = (
+    MenuItemComponent: typeof ContextMenuItem | typeof DropdownMenuItem,
+    SeparatorComponent: typeof ContextMenuSeparator | typeof DropdownMenuSeparator,
+  ) => (
+    <>
+      <MenuItemComponent onClick={handleAddToAIChat}>
+        <Sparkles className="mr-2 h-4 w-4" />
+        {t("aiChat.referencedPages.addToChat")}
+      </MenuItemComponent>
+      <SeparatorComponent />
+      <MenuItemComponent onClick={handleDuplicate} disabled={createPageMutation.isPending}>
+        <Copy className="mr-2 h-4 w-4" />
+        複製
+      </MenuItemComponent>
+      <SeparatorComponent />
+      <MenuItemComponent
+        onSelect={openDeleteDialogAfterMenuClose}
+        className="text-destructive focus:text-destructive"
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        削除
+      </MenuItemComponent>
+    </>
+  );
+
   return (
     <>
-      <ContextMenu modal={false}>
-        <ContextMenuTrigger asChild>
-          <button
-            draggable={!isMobile}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onClick={handleClick}
-            className={cn(
-              "page-card w-full overflow-hidden rounded-lg text-left",
-              "border-border/50 bg-card hover:border-border border",
-              "group transition-all duration-200",
-              "animate-fade-in opacity-0",
-              "flex aspect-square flex-col",
-              index <= 5 && `stagger-${Math.min(index + 1, 5)}`,
-              isDragging && "ring-primary opacity-50 ring-2",
-            )}
+      {isMobile ? (
+        // モバイル: 長押しで DropdownMenu を表示 / Mobile: long press opens DropdownMenu
+        <DropdownMenu open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <DropdownMenuTrigger asChild>{cardButton}</DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-48"
             style={{
-              animationFillMode: "forwards",
-              animationDelay: `${index * 50}ms`,
+              position: "fixed",
+              left: mobileMenuPos.x,
+              top: mobileMenuPos.y,
             }}
           >
-            {/* Title - Top */}
-            <div className="flex-shrink-0 p-3 pb-2">
-              <div className="flex items-start gap-1.5">
-                {isClipped && <Link2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />}
-                <h3 className="text-foreground line-clamp-2 text-sm font-medium">
-                  {page.title || "無題のページ"}
-                </h3>
-              </div>
-            </div>
-
-            {/* Thumbnail or Preview - Bottom */}
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {thumbnail && !thumbnailError ? (
-                <div className="flex h-full w-full items-center justify-center px-3 pt-0 pb-3">
-                  <img
-                    src={thumbnail}
-                    alt=""
-                    className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
-                    decoding="async"
-                    loading="lazy"
-                    {...({ fetchpriority: "low" } as React.ImgHTMLAttributes<HTMLImageElement>)}
-                  />
-                </div>
-              ) : (
-                <div className="h-full px-3 pb-3">
-                  <p className="text-muted-foreground line-clamp-4 text-xs leading-relaxed">
-                    {preview || "コンテンツがありません"}
-                  </p>
-                </div>
-              )}
-            </div>
-          </button>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-48">
-          <ContextMenuItem onClick={handleAddToAIChat}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            {t("aiChat.referencedPages.addToChat")}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem onClick={handleDuplicate} disabled={createPageMutation.isPending}>
-            <Copy className="mr-2 h-4 w-4" />
-            複製
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onSelect={openDeleteDialogAfterMenuClose}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            削除
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+            {menuItems(DropdownMenuItem, DropdownMenuSeparator)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        // デスクトップ: 右クリックで ContextMenu を表示 / Desktop: right-click opens ContextMenu
+        <ContextMenu modal={false}>
+          <ContextMenuTrigger asChild>{cardButton}</ContextMenuTrigger>
+          <ContextMenuContent className="w-48">
+            {menuItems(ContextMenuItem, ContextMenuSeparator)}
+          </ContextMenuContent>
+        </ContextMenu>
+      )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>

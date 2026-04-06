@@ -15,10 +15,14 @@ import { Color } from "@tiptap/extension-color";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import { common, createLowlight } from "lowlight";
 import { CodeBlockWithCopy } from "../extensions/CodeBlockWithCopyExtension";
+import { ExecutableCodeBlock } from "../extensions/ExecutableCodeBlockExtension";
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
+import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
+import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
+import { McpResource } from "../extensions/McpResourceExtension";
 import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
@@ -101,6 +105,14 @@ export interface EditorExtensionsOptions {
   imageOptions: Partial<StorageImageOptions>;
   /** When set, enables Y.js collaboration and caret; StarterKit history is disabled */
   collaboration?: CollaborationExtensionsOptions;
+  /**
+   * Optional note-linked workspace for `@file:` and Claude cwd (Issue #461).
+   * `@file:` と Claude cwd 用のノート紐付けワークスペース（任意、Issue #461）。
+   */
+  fileReference?: {
+    getWorkspaceRoot: () => string | null;
+    getNoteId: () => string | null;
+  };
 }
 
 /**
@@ -165,6 +177,7 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       lowlight,
       defaultLanguage: null,
     }),
+    ExecutableCodeBlock,
     // --- Phase 2: Table ---
     Table.configure({
       resizable: false,
@@ -184,6 +197,10 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     // --- WikiLink ---
     WikiLink.configure({
       onLinkClick: options.onLinkClick,
+    }),
+    FileReference.configure({
+      getWorkspaceRoot: options.fileReference?.getWorkspaceRoot ?? (() => null),
+      getNoteId: options.fileReference?.getNoteId ?? (() => null),
     }),
     WikiLinkSuggestionPlugin.configure({
       onStateChange: options.onStateChange,
@@ -206,6 +223,9 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       ...options.imageOptions,
     }),
     Mermaid,
+    // --- YouTube Embed ---
+    YouTubeEmbed,
+    McpResource,
     // Y.js リアルタイムコラボレーション（オプション）
     ...(options.collaboration
       ? [

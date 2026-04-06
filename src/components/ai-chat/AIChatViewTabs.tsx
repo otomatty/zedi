@@ -1,12 +1,12 @@
 import { useTranslation } from "react-i18next";
-import { MessageSquare, GitBranch } from "lucide-react";
+import { MessageSquare, GitBranch, ListChecks } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@zedi/ui";
 
 /**
  * Active AI chat panel view: threaded messages or branch tree.
  * AI チャットパネルの表示：スレッド表示かブランチツリーか。
  */
-export type AIChatViewTab = "chat" | "branch";
+export type AIChatViewTab = "chat" | "branch" | "workflow";
 
 /**
  * Props for {@link AIChatViewTabs}.
@@ -42,6 +42,13 @@ export function AIChatViewTabs({ activeTab, onTabChange }: AIChatViewTabsProps) 
         >
           <GitBranch className="h-3.5 w-3.5" />
           {t("aiChat.viewTabs.branch")}
+        </TabsTrigger>
+        <TabsTrigger
+          value="workflow"
+          className="flex h-7 items-center gap-1.5 px-3 text-xs data-[state=active]:shadow-sm"
+        >
+          <ListChecks className="h-3.5 w-3.5" />
+          {t("aiChat.viewTabs.workflow")}
         </TabsTrigger>
       </TabsList>
     </Tabs>

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createStorageAdapter } from "./createStorageAdapter";
 import { IndexedDBStorageAdapter } from "./IndexedDBStorageAdapter";
 
@@ -10,6 +10,7 @@ describe("createStorageAdapter", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (originalTauriInternals === undefined) {
       delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
     } else {
@@ -23,10 +24,15 @@ describe("createStorageAdapter", () => {
     expect(adapter).toBeInstanceOf(IndexedDBStorageAdapter);
   });
 
-  it("throws error when in Tauri environment", () => {
+  it("falls back to IndexedDB in Tauri environment until TauriStorageAdapter exists (#50)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
-    expect(() => createStorageAdapter()).toThrow(
-      "TauriStorageAdapter is not implemented yet (Phase D).",
+    const adapter = createStorageAdapter();
+    expect(adapter).toBeInstanceOf(IndexedDBStorageAdapter);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Tauri detected but TauriStorageAdapter not yet available"),
     );
+    createStorageAdapter();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });

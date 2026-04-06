@@ -2,6 +2,35 @@
   "uploadedImageAlt": "Uploaded image",
   "slashMenuAriaLabel": "Slash command menu",
   "slashNoResults": "No matching commands",
+  "slashAgentRunning": "Running Claude Code…",
+  "noteWorkspace": {
+    "label": "Workspace",
+    "linkFolder": "Link folder",
+    "change": "Change",
+    "browse": "Browse files",
+    "clear": "Clear workspace link",
+    "treeTitle": "Workspace files",
+    "treeEmpty": "This folder is empty."
+  },
+  "filePreview": {
+    "truncated": "Preview shows the first 32,000 characters only.",
+    "close": "Close",
+    "noWorkspace": "Link a workspace folder for this note (toolbar) to preview files."
+  },
+  "slashAgent": {
+    "errorTitle": "Agent command failed"
+  },
+  "mcpResourceEmbed": {
+    "desktopOnly": "MCP is only available in the desktop app.",
+    "unknownServer": "This server is not registered or not enabled. Add it in AI settings.",
+    "resourceRequired": "Enter a non-empty resource URI for this MCP resource block.",
+    "promptServer": "MCP server name (registered in AI settings)",
+    "promptResource": "Resource URI to fetch",
+    "loadingFrom": "Loading from {{server}}...",
+    "fetchHint": "Click \"Fetch\" to load data from the MCP server."
+  },
+  "slashPathCompletionAriaLabel": "Path suggestions",
+  "slashPathCompletionHint": "Workspace path suggestions",
   "slash": {
     "paragraph": {
       "title": "Paragraph",
@@ -48,6 +77,11 @@
       "description": "Code with syntax highlighting",
       "aliases": "code,pre"
     },
+    "executableCodeBlock": {
+      "title": "Executable code",
+      "description": "Run shell/Python/JS via Claude Code (desktop)",
+      "aliases": "run,execute,terminal,notebook,claude"
+    },
     "horizontalRule": {
       "title": "Horizontal rule",
       "description": "Divider line",
@@ -82,6 +116,51 @@
       "title": "Math (block)",
       "description": "Insert block math",
       "aliases": "math block,block math,equation"
+    },
+    "mcpResource": {
+      "title": "MCP Resource",
+      "description": "Embed external data from an MCP server",
+      "aliases": "mcp,external data,github,supabase,integration"
+    },
+    "agent-analyze": {
+      "title": "/analyze — analyze code",
+      "description": "Analyze a path with Claude Code and insert the result",
+      "aliases": "analyze,code analysis"
+    },
+    "agent-git-summary": {
+      "title": "/git-summary — recent commits",
+      "description": "Summarize recent git commits and insert",
+      "aliases": "git-summary,git,git log"
+    },
+    "agent-run": {
+      "title": "/run — run shell command",
+      "description": "Run a command and insert stdout/stderr",
+      "aliases": "run,exec,shell,command"
+    },
+    "agent-research": {
+      "title": "/research — web research",
+      "description": "Research a topic and insert a structured summary",
+      "aliases": "research,web,search"
+    },
+    "agent-review": {
+      "title": "/review — code review",
+      "description": "Review code at a path and insert a checklist",
+      "aliases": "review,cr"
+    },
+    "agent-test": {
+      "title": "/test — run tests",
+      "description": "Run tests and insert results",
+      "aliases": "test,vitest,bun test"
+    },
+    "agent-explain": {
+      "title": "/explain — explain selection",
+      "description": "Explain the selected code and insert",
+      "aliases": "explain,selection"
+    },
+    "agent-summarize": {
+      "title": "/summarize — summarize note",
+      "description": "Summarize the note and insert",
+      "aliases": "summarize,summary"
     }
   },
   "recommendation": {
@@ -107,6 +186,33 @@
     "cancel": "Cancel",
     "importing": "Importing...",
     "import": "Import"
+  },
+  "executableCode": {
+    "language": "Language",
+    "run": "Run",
+    "interpret": "Ask Claude",
+    "stdout": "stdout",
+    "stderr": "stderr",
+    "duration": "{{seconds}}s",
+    "claudeUnavailable": "Claude Code is not available (use the desktop app with the CLI installed).",
+    "interpretationHeading": "Claude interpretation",
+    "confirmTitle": "Run this code?",
+    "confirmDescription": "Code will be executed on your machine via Claude Code’s Bash tool. Only run snippets you trust.",
+    "confirmCancel": "Cancel",
+    "confirmRun": "Run",
+    "status": {
+      "idle": "Idle",
+      "running": "Running…",
+      "done": "Finished",
+      "error": "Error"
+    },
+    "lang": {
+      "bash": "Bash",
+      "shell": "Shell",
+      "python": "Python",
+      "javascript": "JavaScript",
+      "typescript": "TypeScript"
+    }
   },
   "markdownExport": {
     "sourceAttribution": "📎 Source",

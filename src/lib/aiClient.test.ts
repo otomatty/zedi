@@ -152,5 +152,11 @@ describe("aiClient", () => {
       expect(result.success).toBe(false);
       expect(result.message).toContain("APIキー");
     });
+
+    it("returns Claude Code guidance when API key is empty (no API key required)", async () => {
+      const result = await testConnection("claude-code", "");
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("Claude Code");
+    });
   });
 });

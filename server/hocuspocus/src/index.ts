@@ -9,6 +9,7 @@ import {
   isTruthyEnvFlag,
   warnDevAuthBypassOnce,
 } from "./dev-auth-bypass.js";
+import { buildContentPreview, extractTextFromYXml } from "./extractPlainTextFromYXml.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
@@ -195,19 +196,33 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
 
 async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> {
   const encodedState = Buffer.from(Y.encodeStateAsUpdate(document));
+  const contentText = extractTextFromYXml(document.getXmlFragment("default"));
+  const contentPreview = buildContentPreview(contentText);
   const client = await getPool().connect();
   try {
+    await client.query("BEGIN");
     await client.query(
       `
         INSERT INTO page_contents (page_id, ydoc_state, version, content_text, updated_at)
-        VALUES ($1, $2, 1, '', NOW())
+        VALUES ($1, $2, 1, $3, NOW())
         ON CONFLICT (page_id) DO UPDATE
           SET ydoc_state = EXCLUDED.ydoc_state,
               version = page_contents.version + 1,
+              content_text = EXCLUDED.content_text,
               updated_at = NOW()
       `,
-      [pageId, encodedState],
+      [pageId, encodedState, contentText],
     );
+    // ページ一覧用のプレビューを pages テーブルにも同期
+    // Sync content preview to the pages table for page list display
+    await client.query(`UPDATE pages SET content_preview = $1, updated_at = NOW() WHERE id = $2`, [
+      contentPreview,
+      pageId,
+    ]);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
   } finally {
     client.release();
   }

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { EditorContent } from "@tiptap/react";
 import { cn } from "@zedi/ui";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
@@ -7,11 +8,13 @@ import type { TiptapEditorProps } from "./TiptapEditor/types";
 import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
+import { WikiLinkHoverCardLayer } from "./TiptapEditor/WikiLinkHoverCardLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
+import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -34,16 +37,19 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   onContentError,
   collaborationConfig,
   focusContentRef,
+  insertAtCursorRef,
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
   wikiContentForCollab,
   onWikiContentApplied,
 }) => {
+  const { t } = useTranslation();
   const {
     editor,
     editorFontSizePx,
     editorContainerRef,
+    handleLinkClick,
     fileInputRef,
     isDraggingOver,
     handleFileInputChange,
@@ -71,6 +77,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     storageSetupDialogOpen,
     setStorageSetupDialogOpen,
     handleGoToStorageSettings,
+    slashAgentBusy,
+    claudeAgentSlashAvailable,
+    onSlashAgentBusyChange,
+    claudeWorkspaceRoot,
+    claudeWorkspaceNoteId,
   } = useTiptapEditorController({
     content,
     onChange,
@@ -82,6 +93,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     collaborationConfig,
     onContentError,
     focusContentRef,
+    insertAtCursorRef,
     initialContent,
     onInitialContentApplied,
     isWikiGenerating,
@@ -122,6 +134,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         onSelect={handleSuggestionSelect}
         onClose={handleSuggestionClose}
       />
+      <WikiLinkHoverCardLayer
+        editor={editor}
+        editorContainerRef={editorContainerRef}
+        onLinkClick={handleLinkClick}
+      />
       {!isReadOnly && (
         <SlashSuggestionLayer
           editor={editor}
@@ -129,8 +146,13 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           position={slashPos}
           suggestionRef={slashRef}
           onClose={handleSlashClose}
+          claudeAgentSlashAvailable={claudeAgentSlashAvailable}
+          onAgentBusyChange={onSlashAgentBusyChange}
+          claudeWorkspaceRoot={claudeWorkspaceRoot}
+          claudeWorkspaceNoteId={claudeWorkspaceNoteId}
         />
       )}
+      {slashAgentBusy ? <SlashAgentLoadingOverlay label={t("editor.slashAgentRunning")} /> : null}
       <MermaidGeneratorDialog
         open={mermaidDialogOpen}
         onOpenChange={setMermaidDialogOpen}

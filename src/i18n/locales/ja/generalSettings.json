@@ -14,6 +14,11 @@
     "light": "ライト",
     "dark": "ダーク"
   },
+  "executableCode": {
+    "title": "実行可能コードブロック",
+    "description": "ノートブック風のセルを Claude Code（デスクトップ）経由で実行します。Bash ツールがコードを実行します。",
+    "confirmBeforeRun": "実行前に確認ダイアログを表示する"
+  },
   "fontSize": {
     "label": "エディタのフォントサイズ",
     "small": "小",
