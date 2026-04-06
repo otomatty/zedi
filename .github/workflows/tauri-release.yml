@@ -2,10 +2,14 @@
 # 各プラットフォーム向けの Tauri デスクトップアプリをビルドし、
 # リリースアセットとしてアップロードする。
 # 自動更新用の latest.json も生成・アップロードする（署名キー設定時のみ）。
+# リリース時は GitHub Secrets の TAURI_SIGNING_PUBLIC_KEY（公開鍵文字列）を
+# tauri.conf.json の plugins.updater.pubkey に注入する（scripts/inject-tauri-updater-pubkey.mjs）。
+# TAURI_SIGNING_PRIVATE_KEY と対になる公開鍵を設定すること。
 #
 # Builds Tauri desktop apps for all platforms when a GitHub Release is
 # published (by Release Please) and uploads them as release assets.
 # Also generates latest.json for the Tauri updater (when signing key is set).
+# Injects `plugins.updater.pubkey` from the `TAURI_SIGNING_PUBLIC_KEY` secret before build.
 name: Build & Release Desktop App
 
 on:
@@ -54,6 +58,11 @@ jobs:
 
       - name: Build sidecar
         run: bun run sidecar:build
+
+      - name: Inject Tauri updater public key
+        env:
+          TAURI_SIGNING_PUBLIC_KEY: ${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}
+        run: node scripts/inject-tauri-updater-pubkey.mjs
 
       - name: Build Tauri app and upload to release
         uses: tauri-apps/tauri-action@v0
