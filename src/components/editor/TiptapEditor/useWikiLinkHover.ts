@@ -33,6 +33,28 @@ export interface HoverTarget {
 }
 
 /**
+ * useWikiLinkHover の公開戻り値型。
+ * 内部実装の変更が利用側に波及しないよう、戻り値の形状を固定する。
+ *
+ * Public return type of useWikiLinkHover.
+ * Fixes the return shape so internal changes do not break consumers.
+ */
+export interface UseWikiLinkHoverResult {
+  /** ホバー対象の WikiLink 情報 / Hovered WikiLink info */
+  target: HoverTarget | null;
+  /** カードが表示中か / Whether the card is visible */
+  isVisible: boolean;
+  /** カード要素の ref / Ref for the card element */
+  cardRef: React.RefObject<HTMLDivElement | null>;
+  /** カードを閉じる / Close the card */
+  closeCard: () => void;
+  /** カードへのマウスエンター時ハンドラ / Handler for card mouse enter */
+  handleCardMouseEnter: () => void;
+  /** カードからのマウスリーブ時ハンドラ / Handler for card mouse leave */
+  handleCardMouseLeave: () => void;
+}
+
+/**
  * エディタ内 WikiLink のホバー検出ロジック（イベント委譲・長押し・入力抑制）。
  * Event delegation, long-press detection, and typing suppression for WikiLink hover.
  */
@@ -40,7 +62,7 @@ export interface HoverTarget {
 export function useWikiLinkHover(
   editor: Editor | null,
   editorContainerRef: React.RefObject<HTMLDivElement | null>,
-) {
+): UseWikiLinkHoverResult {
   const [target, setTarget] = useState<HoverTarget | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
