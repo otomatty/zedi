@@ -31,14 +31,15 @@ function isInlineXmlElement(node: Y.XmlElement): boolean {
 /**
  * Y.Doc の XmlFragment（または XmlElement 根）からプレーンテキストを再帰的に抽出する。
  * `server/hocuspocus` の `extractTextFromYXml` と同じ走査・接尾辞ルール（インラインはスペース、ブロックは改行）。
+ * 子の列挙は `toArray()` を使う（`get(i)` をループで繰り返すと兄弟が多いときに二乗になりうるため）。
  *
  * Recursively extract plain text matching `extractTextFromYXml` in `server/hocuspocus`.
+ * Iterate children with `toArray()` to avoid repeated `get(i)` scans over siblings.
  */
 function extractTextFromYXml(node: Y.XmlFragment | Y.XmlElement): string {
   let text = "";
 
-  for (let i = 0; i < node.length; i++) {
-    const child = node.get(i);
+  for (const child of node.toArray()) {
     if (child instanceof Y.XmlText) {
       for (const op of child.toDelta()) {
         if (typeof op.insert === "string") {
