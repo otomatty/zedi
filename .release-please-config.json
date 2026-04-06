@@ -3,7 +3,18 @@
   "packages": {
     ".": {
       "changelog-type": "github",
-      "component": "zedi"
+      "component": "zedi",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "src-tauri/tauri.conf.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "generic",
+          "path": "src-tauri/Cargo.toml"
+        }
+      ]
     }
   }
 }

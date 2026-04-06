@@ -1,0 +1,71 @@
+# Release Please が GitHub Release を作成したタイミングで、
+# 各プラットフォーム向けの Tauri デスクトップアプリをビルドし、
+# リリースアセットとしてアップロードする。
+# 自動更新用の latest.json も生成・アップロードする（署名キー設定時のみ）。
+#
+# Builds Tauri desktop apps for all platforms when a GitHub Release is
+# published (by Release Please) and uploads them as release assets.
+# Also generates latest.json for the Tauri updater (when signing key is set).
+name: Build & Release Desktop App
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+          - platform: macos-latest
+          - platform: windows-latest
+
+    runs-on: ${{ matrix.platform }}
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build sidecar
+        run: bun run sidecar:build
+
+      - name: Build Tauri app and upload to release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_REALTIME_URL: ${{ vars.REALTIME_URL }}
+          VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
+          VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
+        with:
+          releaseId: ${{ github.event.release.id }}
+          tauriScript: bunx tauri
+          updaterJsonPreferNsis: true

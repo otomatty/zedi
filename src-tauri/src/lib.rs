@@ -13,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(claude_sidecar::ClaudeSidecarState::new())
         .invoke_handler(tauri::generate_handler![
             claude_sidecar::claude_query,
