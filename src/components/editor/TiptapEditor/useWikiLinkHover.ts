@@ -7,6 +7,17 @@ const TYPING_SUPPRESS_MS = 500;
 const LONG_PRESS_MS = 500;
 
 /**
+ * 直近キー入力からの経過が入力抑制ウィンドウ内か（編集可能時のみ）。
+ * Whether the last keypress is still within the typing-suppression window (editable only).
+ */
+function isWithinTypingSuppressWindow(
+  editor: Editor | null,
+  lastKeyTimeRef: React.MutableRefObject<number>,
+): boolean {
+  return !!(editor?.isEditable && Date.now() - lastKeyTimeRef.current < TYPING_SUPPRESS_MS);
+}
+
+/**
  * ホバーカードの表示対象となる WikiLink 情報。
  * WikiLink information targeted by the hover card.
  */
@@ -25,6 +36,7 @@ export interface HoverTarget {
  * エディタ内 WikiLink のホバー検出ロジック（イベント委譲・長押し・入力抑制）。
  * Event delegation, long-press detection, and typing suppression for WikiLink hover.
  */
+// eslint-disable-next-line max-lines-per-function -- Mouse/touch delegation, timers, and typing suppression are kept in one hook for readability.
 export function useWikiLinkHover(
   editor: Editor | null,
   editorContainerRef: React.RefObject<HTMLDivElement | null>,
@@ -38,10 +50,14 @@ export function useWikiLinkHover(
   const currentElementRef = useRef<HTMLElement | null>(null);
   const lastKeyTimeRef = useRef(0);
   const longPressTimerRef = useRef<number>();
+  /** 長押しでカードを開いた直後の合成 click をナビゲーションへ伝播させない / Block synthetic click after long-press open */
+  const suppressNextWikiLinkClickAfterLongPressRef = useRef(false);
 
   const closeCard = useCallback(() => {
     clearTimeout(openTimerRef.current);
     clearTimeout(closeTimerRef.current);
+    clearTimeout(longPressTimerRef.current);
+    suppressNextWikiLinkClickAfterLongPressRef.current = false;
     setIsVisible(false);
     setTarget(null);
     currentElementRef.current = null;
@@ -63,6 +79,8 @@ export function useWikiLinkHover(
     const dom = editor.view.dom;
     const onKeyDown = () => {
       lastKeyTimeRef.current = Date.now();
+      clearTimeout(openTimerRef.current);
+      clearTimeout(longPressTimerRef.current);
       if (isVisible) closeCard();
     };
     dom.addEventListener("keydown", onKeyDown);
@@ -88,8 +106,11 @@ export function useWikiLinkHover(
         currentElementRef.current = el;
         clearTimeout(closeTimerRef.current);
         clearTimeout(openTimerRef.current);
-        if (editor?.isEditable && Date.now() - lastKeyTimeRef.current < TYPING_SUPPRESS_MS) return;
-        openTimerRef.current = window.setTimeout(() => openCard(el), OPEN_DELAY_MS);
+        if (isWithinTypingSuppressWindow(editor, lastKeyTimeRef)) return;
+        openTimerRef.current = window.setTimeout(() => {
+          if (isWithinTypingSuppressWindow(editor, lastKeyTimeRef)) return;
+          openCard(el);
+        }, OPEN_DELAY_MS);
       } else if (el && el === currentElementRef.current) {
         // ホバーカードから同じ WikiLink へ戻ったとき、カード側 mouseleave で開始した閉じタイマーを止める。
         // Cancel close timer started from the card when the pointer returns to the same wiki-link.
@@ -119,6 +140,14 @@ export function useWikiLinkHover(
       }, CLOSE_DELAY_MS);
     };
 
+    const onClickCapture = (e: MouseEvent) => {
+      if (!suppressNextWikiLinkClickAfterLongPressRef.current) return;
+      if (!(e.target as HTMLElement).closest("[data-wiki-link]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      suppressNextWikiLinkClickAfterLongPressRef.current = false;
+    };
+
     const onClick = (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest("[data-wiki-link]") && isVisible) closeCard();
     };
@@ -126,25 +155,37 @@ export function useWikiLinkHover(
     const onTouchStart = (e: TouchEvent) => {
       const el = (e.target as HTMLElement).closest("[data-wiki-link]") as HTMLElement | null;
       if (!el) return;
-      longPressTimerRef.current = window.setTimeout(() => openCard(el), LONG_PRESS_MS);
+      if (isWithinTypingSuppressWindow(editor, lastKeyTimeRef)) return;
+      longPressTimerRef.current = window.setTimeout(() => {
+        if (isWithinTypingSuppressWindow(editor, lastKeyTimeRef)) return;
+        openCard(el);
+        suppressNextWikiLinkClickAfterLongPressRef.current = true;
+      }, LONG_PRESS_MS);
     };
-    const onTouchEnd = () => clearTimeout(longPressTimerRef.current);
-    const onTouchMove = () => clearTimeout(longPressTimerRef.current);
+    const clearLongPressTimer = () => clearTimeout(longPressTimerRef.current);
+    const onTouchEnd = clearLongPressTimer;
+    const onTouchMove = clearLongPressTimer;
+    // touchcancel: OS ジェスチャ等で長押しタイマーを破棄 / clear long-press timer on touch cancel (e.g. OS gestures)
+    const onTouchCancel = clearLongPressTimer;
 
     container.addEventListener("mouseover", onMouseOver);
     container.addEventListener("mouseout", onMouseOut);
+    container.addEventListener("click", onClickCapture, true);
     container.addEventListener("click", onClick);
     container.addEventListener("touchstart", onTouchStart, { passive: true });
     container.addEventListener("touchend", onTouchEnd);
     container.addEventListener("touchmove", onTouchMove, { passive: true });
+    container.addEventListener("touchcancel", onTouchCancel);
 
     return () => {
       container.removeEventListener("mouseover", onMouseOver);
       container.removeEventListener("mouseout", onMouseOut);
+      container.removeEventListener("click", onClickCapture, true);
       container.removeEventListener("click", onClick);
       container.removeEventListener("touchstart", onTouchStart);
       container.removeEventListener("touchend", onTouchEnd);
       container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchcancel", onTouchCancel);
       clearTimeout(openTimerRef.current);
       clearTimeout(closeTimerRef.current);
       clearTimeout(longPressTimerRef.current);
