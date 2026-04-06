@@ -64,7 +64,10 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
     clearTimeout(longPressTimerRef.current);
   }, []);
 
-  /** OS ジェスチャ等で touch がキャンセルされたとき long-press が遅延発火しないようクリアする。 */
+  /**
+   * OS ジェスチャ等で touch がキャンセルされたとき long-press が遅延発火しないようクリアする。
+   * Clears long-press timers when touch is cancelled (e.g. OS gestures) so the card does not open late.
+   */
   const handleTouchCancel = useCallback(() => {
     clearTimeout(longPressTimerRef.current);
     clearTimeout(preventClickResetTimerRef.current);

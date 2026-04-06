@@ -90,6 +90,10 @@ export function useWikiLinkHover(
         clearTimeout(openTimerRef.current);
         if (editor?.isEditable && Date.now() - lastKeyTimeRef.current < TYPING_SUPPRESS_MS) return;
         openTimerRef.current = window.setTimeout(() => openCard(el), OPEN_DELAY_MS);
+      } else if (el && el === currentElementRef.current) {
+        // ホバーカードから同じ WikiLink へ戻ったとき、カード側 mouseleave で開始した閉じタイマーを止める。
+        // Cancel close timer started from the card when the pointer returns to the same wiki-link.
+        clearTimeout(closeTimerRef.current);
       } else if (!el && !cardRef.current?.contains(e.target as Node)) {
         clearTimeout(openTimerRef.current);
         currentElementRef.current = null;
