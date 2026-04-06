@@ -9,6 +9,7 @@ import {
   isTruthyEnvFlag,
   warnDevAuthBypassOnce,
 } from "./dev-auth-bypass.js";
+import { buildContentPreview, extractTextFromYXml } from "./extractPlainTextFromYXml.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
@@ -193,39 +194,9 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
   }
 }
 
-/**
- * Y.Doc の XmlFragment からプレーンテキストを再帰的に抽出するヘルパー。
- * Recursively extract plain text from a Y.Doc XmlFragment.
- */
-function extractTextFromFragment(node: Y.XmlFragment): string {
-  let text = "";
-
-  for (let i = 0; i < node.length; i++) {
-    const child = node.get(i);
-    if (child instanceof Y.XmlText) {
-      text += child.toString();
-    } else if (child instanceof Y.XmlElement) {
-      text += extractTextFromFragment(child) + "\n";
-    }
-  }
-  return text;
-}
-
-const CONTENT_PREVIEW_MAX_LENGTH = 120;
-
-/**
- * プレーンテキストからコンテンツプレビュー（先頭120文字）を生成する。
- * Generate content preview (first 120 chars) from plain text.
- */
-function buildContentPreview(text: string): string {
-  const trimmed = text.trim().replace(/\s+/g, " ");
-  if (trimmed.length <= CONTENT_PREVIEW_MAX_LENGTH) return trimmed;
-  return trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trim() + "...";
-}
-
 async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> {
   const encodedState = Buffer.from(Y.encodeStateAsUpdate(document));
-  const contentText = extractTextFromFragment(document.getXmlFragment("default"));
+  const contentText = extractTextFromYXml(document.getXmlFragment("default"));
   const contentPreview = buildContentPreview(contentText);
   const client = await getPool().connect();
   try {
