@@ -73,6 +73,7 @@ app.put("/:id/content", authRequired, async (c) => {
     ydoc_state: string; // base64-encoded Y.Doc state
     expected_version?: number;
     content_text?: string;
+    content_preview?: string;
     title?: string;
   }>();
 
@@ -119,11 +120,11 @@ app.put("/:id/content", authRequired, async (c) => {
         const insertedRow = inserted[0];
         if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
 
-        if (body.title !== undefined) {
-          await tx
-            .update(pages)
-            .set({ title: body.title, updatedAt: new Date() })
-            .where(eq(pages.id, pageId));
+        const pagesUpdate: Record<string, unknown> = { updatedAt: new Date() };
+        if (body.title !== undefined) pagesUpdate.title = body.title;
+        if (body.content_preview !== undefined) pagesUpdate.contentPreview = body.content_preview;
+        if (Object.keys(pagesUpdate).length > 1) {
+          await tx.update(pages).set(pagesUpdate).where(eq(pages.id, pageId));
         }
 
         return { done: true as const, version: insertedRow.version ?? 1 };
@@ -162,11 +163,13 @@ app.put("/:id/content", authRequired, async (c) => {
     const updatedRow = updated[0];
     if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
 
-    if (body.title !== undefined) {
-      await db
-        .update(pages)
-        .set({ title: body.title, updatedAt: new Date() })
-        .where(eq(pages.id, pageId));
+    {
+      const pagesUpdate: Record<string, unknown> = { updatedAt: new Date() };
+      if (body.title !== undefined) pagesUpdate.title = body.title;
+      if (body.content_preview !== undefined) pagesUpdate.contentPreview = body.content_preview;
+      if (Object.keys(pagesUpdate).length > 1) {
+        await db.update(pages).set(pagesUpdate).where(eq(pages.id, pageId));
+      }
     }
 
     return c.json({ version: updatedRow.version ?? 0 });
@@ -192,11 +195,13 @@ app.put("/:id/content", authRequired, async (c) => {
     })
     .returning();
 
-  if (body.title !== undefined) {
-    await db
-      .update(pages)
-      .set({ title: body.title, updatedAt: new Date() })
-      .where(eq(pages.id, pageId));
+  {
+    const pagesUpdate: Record<string, unknown> = { updatedAt: new Date() };
+    if (body.title !== undefined) pagesUpdate.title = body.title;
+    if (body.content_preview !== undefined) pagesUpdate.contentPreview = body.content_preview;
+    if (Object.keys(pagesUpdate).length > 1) {
+      await db.update(pages).set(pagesUpdate).where(eq(pages.id, pageId));
+    }
   }
 
   const resultRow = result[0];

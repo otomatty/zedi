@@ -193,21 +193,62 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
   }
 }
 
+/**
+ * Y.Doc の XmlFragment からプレーンテキストを再帰的に抽出するヘルパー。
+ * Recursively extract plain text from a Y.Doc XmlFragment.
+ */
+function extractTextFromFragment(node: Y.XmlFragment): string {
+  let text = "";
+
+  for (let i = 0; i < node.length; i++) {
+    const child = node.get(i);
+    if (child instanceof Y.XmlText) {
+      text += child.toString();
+    } else if (child instanceof Y.XmlElement) {
+      text += extractTextFromFragment(child) + "\n";
+    }
+  }
+  return text;
+}
+
+const CONTENT_PREVIEW_MAX_LENGTH = 120;
+
+/**
+ * Y.Doc からコンテンツプレビューを生成する。
+ * Generate content preview (first 120 chars) from a Y.Doc.
+ */
+function buildContentPreview(document: Y.Doc): string {
+  const fragment = document.getXmlFragment("default");
+  const raw = extractTextFromFragment(fragment);
+  const trimmed = raw.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= CONTENT_PREVIEW_MAX_LENGTH) return trimmed;
+  return trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trim() + "...";
+}
+
 async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> {
   const encodedState = Buffer.from(Y.encodeStateAsUpdate(document));
+  const contentText = extractTextFromFragment(document.getXmlFragment("default"));
+  const contentPreview = buildContentPreview(document);
   const client = await getPool().connect();
   try {
     await client.query(
       `
         INSERT INTO page_contents (page_id, ydoc_state, version, content_text, updated_at)
-        VALUES ($1, $2, 1, '', NOW())
+        VALUES ($1, $2, 1, $3, NOW())
         ON CONFLICT (page_id) DO UPDATE
           SET ydoc_state = EXCLUDED.ydoc_state,
               version = page_contents.version + 1,
+              content_text = EXCLUDED.content_text,
               updated_at = NOW()
       `,
-      [pageId, encodedState],
+      [pageId, encodedState, contentText],
     );
+    // ページ一覧用のプレビューを pages テーブルにも同期
+    // Sync content preview to the pages table for page list display
+    await client.query(`UPDATE pages SET content_preview = $1, updated_at = NOW() WHERE id = $2`, [
+      contentPreview,
+      pageId,
+    ]);
   } finally {
     client.release();
   }

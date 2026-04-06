@@ -28,6 +28,12 @@ const DUPLICATION_RATIO_THRESHOLD = 1.5;
 const KEEPALIVE_PAYLOAD_LIMIT = 63 * 1024;
 
 /**
+ * ページ一覧用プレビューの最大文字数。
+ * Maximum character length for page list content preview.
+ */
+const CONTENT_PREVIEW_MAX_LENGTH = 120;
+
+/**
  * Y.js ドキュメントの管理・永続化・リアルタイム同期を担当するマネージャー。
  * Manages Y.js document lifecycle, IndexedDB persistence, and real-time sync.
  */
@@ -198,12 +204,20 @@ export class CollaborationManager {
   }
 
   /**
-   * PUT /content 用 JSON ボディ。ydoc_state / content_text に加え、setPageTitle 済みなら title を含む。
+   * PUT /content 用 JSON ボディ。ydoc_state / content_text / content_preview に加え、setPageTitle 済みなら title を含む。
+   * Build JSON body for PUT /content. Includes ydoc_state, content_text, content_preview, and optionally title.
    */
   private buildPutContentBody(ydocStateB64: string, contentText: string): Record<string, string> {
+    const trimmed = contentText.trim().replace(/\s+/g, " ");
+    const contentPreview =
+      trimmed.length <= CONTENT_PREVIEW_MAX_LENGTH
+        ? trimmed
+        : trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trim() + "...";
+
     const payload: Record<string, string> = {
       ydoc_state: ydocStateB64,
       content_text: contentText,
+      content_preview: contentPreview,
     };
     if (this.pageTitle !== null) {
       payload.title = this.pageTitle;
