@@ -196,6 +196,8 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
 
 async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> {
   const encodedState = Buffer.from(Y.encodeStateAsUpdate(document));
+  // Y.Doc からプレーンテキストを抽出（HTML タグなし・toDelta() ベース）
+  // Extract plain text from Y.Doc (without HTML tags, using toDelta())
   const contentText = extractTextFromYXml(document.getXmlFragment("default"));
   const contentPreview = buildContentPreview(contentText);
   const client = await getPool().connect();
@@ -207,8 +209,8 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
         VALUES ($1, $2, 1, $3, NOW())
         ON CONFLICT (page_id) DO UPDATE
           SET ydoc_state = EXCLUDED.ydoc_state,
-              version = page_contents.version + 1,
               content_text = EXCLUDED.content_text,
+              version = page_contents.version + 1,
               updated_at = NOW()
       `,
       [pageId, encodedState, contentText],

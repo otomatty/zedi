@@ -11,6 +11,7 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { Awareness } from "y-protocols/awareness";
 import type { UserPresence, ConnectionStatus, CollaborationState } from "./types";
 import { getUserColor } from "./types";
+import { extractPlainTextFromYXmlFragment } from "./plainTextFromYXmlFragment";
 
 /**
  * コラボレーションの動作モード。
@@ -293,24 +294,7 @@ export class CollaborationManager {
    * XmlFragment からプレーンテキストを抽出
    */
   private extractText(fragment: Y.XmlFragment): string {
-    const parts: string[] = [];
-    const walk = (node: Y.XmlFragment | Y.XmlElement | Y.XmlText) => {
-      if (node instanceof Y.XmlText) {
-        parts.push(node.toJSON());
-      } else {
-        for (const child of node.toArray()) {
-          if (
-            child instanceof Y.XmlText ||
-            child instanceof Y.XmlElement ||
-            child instanceof Y.XmlFragment
-          ) {
-            walk(child);
-          }
-        }
-      }
-    };
-    walk(fragment);
-    return parts.join("\n").trim();
+    return extractPlainTextFromYXmlFragment(fragment);
   }
 
   private async connectWebSocket() {
