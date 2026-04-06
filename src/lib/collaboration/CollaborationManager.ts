@@ -296,7 +296,15 @@ export class CollaborationManager {
     const parts: string[] = [];
     const walk = (node: Y.XmlFragment | Y.XmlElement | Y.XmlText) => {
       if (node instanceof Y.XmlText) {
-        parts.push(node.toJSON());
+        // toDelta() を使い書式属性なしの純粋なテキストのみを抽出する。
+        // toString() / toJSON() は <bold> 等の HTML タグを返すため使用しない。
+        // Use toDelta() to extract pure text without formatting attributes.
+        // toString() / toJSON() return HTML-like tags (<bold>, etc.) so we avoid them.
+        for (const op of node.toDelta()) {
+          if (typeof op.insert === "string") {
+            parts.push(op.insert);
+          }
+        }
       } else {
         for (const child of node.toArray()) {
           if (

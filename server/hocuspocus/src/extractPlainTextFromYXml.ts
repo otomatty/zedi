@@ -30,7 +30,12 @@ function isInlineXmlElement(node: Y.XmlElement): boolean {
 
 /**
  * Y.Doc の XmlFragment（または XmlElement 根）からプレーンテキストを再帰的に抽出する。
+ * `Y.XmlText.toString()` / `toJSON()` は `<bold>` 等の HTML タグを返すため、
+ * `toDelta()` を使い `insert` 文字列のみを連結する。
+ *
  * Recursively extract plain text from a Y.XmlFragment or Y.XmlElement subtree.
+ * Uses `toDelta()` instead of `toString()` / `toJSON()` because the latter
+ * returns HTML-like tags (`<bold>`, `<italic>`, etc.) for formatted text.
  */
 export function extractTextFromYXml(node: Y.XmlFragment | Y.XmlElement): string {
   let text = "";
@@ -38,7 +43,13 @@ export function extractTextFromYXml(node: Y.XmlFragment | Y.XmlElement): string 
   for (let i = 0; i < node.length; i++) {
     const child = node.get(i);
     if (child instanceof Y.XmlText) {
-      text += child.toString();
+      // toDelta() を使い書式属性なしの純粋なテキストのみを抽出する。
+      // Use toDelta() to extract pure text without formatting attributes.
+      for (const op of child.toDelta()) {
+        if (typeof op.insert === "string") {
+          text += op.insert;
+        }
+      }
     } else if (child instanceof Y.XmlElement) {
       const inner = extractTextFromYXml(child);
       const suffix = isInlineXmlElement(child) ? " " : "\n";
