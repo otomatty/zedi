@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.11.0 (2026-04-06)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump @anthropic-ai/sdk from 0.80.0 to 0.82.0 in the npm_and_yarn group across 1 directory by @dependabot[bot] in https://github.com/otomatty/zedi/pull/454
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.10.0...zedi-v0.11.0
+
 ## 0.10.0 (2026-04-01)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
