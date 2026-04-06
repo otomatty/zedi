@@ -12,7 +12,7 @@ import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
 import { pages, pageContents } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
-import type { AppEnv } from "../types/index.js";
+import type { AppEnv, Database } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
 
