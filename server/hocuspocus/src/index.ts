@@ -214,13 +214,11 @@ function extractTextFromFragment(node: Y.XmlFragment): string {
 const CONTENT_PREVIEW_MAX_LENGTH = 120;
 
 /**
- * Y.Doc からコンテンツプレビューを生成する。
- * Generate content preview (first 120 chars) from a Y.Doc.
+ * プレーンテキストからコンテンツプレビュー（先頭120文字）を生成する。
+ * Generate content preview (first 120 chars) from plain text.
  */
-function buildContentPreview(document: Y.Doc): string {
-  const fragment = document.getXmlFragment("default");
-  const raw = extractTextFromFragment(fragment);
-  const trimmed = raw.trim().replace(/\s+/g, " ");
+function buildContentPreview(text: string): string {
+  const trimmed = text.trim().replace(/\s+/g, " ");
   if (trimmed.length <= CONTENT_PREVIEW_MAX_LENGTH) return trimmed;
   return trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trim() + "...";
 }
@@ -228,9 +226,10 @@ function buildContentPreview(document: Y.Doc): string {
 async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> {
   const encodedState = Buffer.from(Y.encodeStateAsUpdate(document));
   const contentText = extractTextFromFragment(document.getXmlFragment("default"));
-  const contentPreview = buildContentPreview(document);
+  const contentPreview = buildContentPreview(contentText);
   const client = await getPool().connect();
   try {
+    await client.query("BEGIN");
     await client.query(
       `
         INSERT INTO page_contents (page_id, ydoc_state, version, content_text, updated_at)
@@ -249,6 +248,10 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
       contentPreview,
       pageId,
     ]);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
   } finally {
     client.release();
   }

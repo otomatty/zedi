@@ -16,6 +16,23 @@ import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
 
+/**
+ * PUT /content リクエストから pages テーブルの更新セットを構築し、変更があれば適用する。
+ * Build and apply pages-table updates (title, content_preview, updated_at) from PUT body.
+ */
+async function applyPagesMetadataUpdate(
+  db: { update: Database["update"] },
+  pageId: string,
+  body: { title?: string; content_preview?: string },
+): Promise<void> {
+  const set: Record<string, unknown> = {};
+  if (body.title !== undefined) set.title = body.title;
+  if (body.content_preview !== undefined) set.contentPreview = body.content_preview;
+  if (Object.keys(set).length === 0) return;
+  set.updatedAt = new Date();
+  await db.update(pages).set(set).where(eq(pages.id, pageId));
+}
+
 // ── GET /pages/:id/content ──────────────────────────────────────────────────
 app.get("/:id/content", authRequired, async (c) => {
   const pageId = c.req.param("id");
@@ -120,12 +137,7 @@ app.put("/:id/content", authRequired, async (c) => {
         const insertedRow = inserted[0];
         if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
 
-        const pagesUpdate: Record<string, unknown> = { updatedAt: new Date() };
-        if (body.title !== undefined) pagesUpdate.title = body.title;
-        if (body.content_preview !== undefined) pagesUpdate.contentPreview = body.content_preview;
-        if (Object.keys(pagesUpdate).length > 1) {
-          await tx.update(pages).set(pagesUpdate).where(eq(pages.id, pageId));
-        }
+        await applyPagesMetadataUpdate(tx, pageId, body);
 
         return { done: true as const, version: insertedRow.version ?? 1 };
       });
@@ -163,14 +175,7 @@ app.put("/:id/content", authRequired, async (c) => {
     const updatedRow = updated[0];
     if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
 
-    {
-      const pagesUpdate: Record<string, unknown> = { updatedAt: new Date() };
-      if (body.title !== undefined) pagesUpdate.title = body.title;
-      if (body.content_preview !== undefined) pagesUpdate.contentPreview = body.content_preview;
-      if (Object.keys(pagesUpdate).length > 1) {
-        await db.update(pages).set(pagesUpdate).where(eq(pages.id, pageId));
-      }
-    }
+    await applyPagesMetadataUpdate(db, pageId, body);
 
     return c.json({ version: updatedRow.version ?? 0 });
   }
@@ -195,14 +200,7 @@ app.put("/:id/content", authRequired, async (c) => {
     })
     .returning();
 
-  {
-    const pagesUpdate: Record<string, unknown> = { updatedAt: new Date() };
-    if (body.title !== undefined) pagesUpdate.title = body.title;
-    if (body.content_preview !== undefined) pagesUpdate.contentPreview = body.content_preview;
-    if (Object.keys(pagesUpdate).length > 1) {
-      await db.update(pages).set(pagesUpdate).where(eq(pages.id, pageId));
-    }
-  }
+  await applyPagesMetadataUpdate(db, pageId, body);
 
   const resultRow = result[0];
   if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
