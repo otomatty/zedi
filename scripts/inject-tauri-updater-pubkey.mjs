@@ -15,10 +15,21 @@ const repoRoot = path.resolve(__dirname, "..");
 const configPath = path.join(repoRoot, "src-tauri", "tauri.conf.json");
 
 const key = process.env.TAURI_SIGNING_PUBLIC_KEY?.trim();
+// Release job / tag context: missing pubkey must fail (no unsigned release artifacts).
+const isReleaseContext =
+  process.env.GITHUB_ACTIONS === "true" &&
+  (process.env.GITHUB_EVENT_NAME === "release" || process.env.GITHUB_REF?.startsWith("refs/tags/"));
+
 if (!key) {
-  console.log(
-    "TAURI_SIGNING_PUBLIC_KEY is not set; skipping updater pubkey injection (local / unsigned builds).",
-  );
+  const msg =
+    "TAURI_SIGNING_PUBLIC_KEY is not set; skipping updater pubkey injection (local / unsigned builds).";
+  if (isReleaseContext) {
+    console.error(
+      `ERROR: ${msg} In this release context (GitHub Actions release or refs/tags), set TAURI_SIGNING_PUBLIC_KEY so updater signatures can be verified.`,
+    );
+    process.exit(1);
+  }
+  console.log(msg);
   process.exit(0);
 }
 
