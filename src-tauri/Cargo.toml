@@ -1,6 +1,6 @@
 [package]
 name = "zedi"
-version = "0.11.0" # x-release-please-version
+version = "0.11.0"
 description = "Zero-Friction Knowledge Network"
 authors = ["Zedi Team"]
 edition = "2021"
