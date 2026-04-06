@@ -41,8 +41,8 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
 
   const [isOpen, setIsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const longPressTimerRef = useRef<number>();
-  const preventClickResetTimerRef = useRef<number>();
+  const longPressTimerRef = useRef<number | undefined>(undefined);
+  const preventClickResetTimerRef = useRef<number | undefined>(undefined);
   const preventClickRef = useRef(false);
 
   const handleTouchStart = useCallback(() => {

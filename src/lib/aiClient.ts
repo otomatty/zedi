@@ -311,8 +311,9 @@ export async function testConnection(
   provider: AIProviderType,
   apiKey: string,
 ): Promise<ConnectionTestResult> {
-  // APIキーが必要
-  if (!apiKey || apiKey.trim() === "") {
+  // Claude Code は API キー不要のため、空キーでも専用メッセージへ進める。
+  // Claude Code does not use an API key; allow reaching the provider-specific branch.
+  if (provider !== "claude-code" && (!apiKey || apiKey.trim() === "")) {
     return {
       success: false,
       message: "APIキーを入力してください",
