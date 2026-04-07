@@ -214,6 +214,108 @@ describe("syncWithApi", () => {
     expect(adapter.saveLinks).toHaveBeenCalledWith("p1", []);
   });
 
+  it("preserves local thumbnailUrl when server returns null", async () => {
+    const localPage: PageMetadata = {
+      id: "p1",
+      ownerId: TEST_USER_ID,
+      sourcePageId: null,
+      title: "Page with thumbnail",
+      contentPreview: "preview",
+      thumbnailUrl: "/api/thumbnail/serve/abc123",
+      sourceUrl: null,
+      createdAt: new Date("2025-01-01").getTime(),
+      updatedAt: new Date("2025-05-01").getTime(),
+      isDeleted: false,
+    };
+
+    const adapter = createMockAdapter({
+      getPage: vi.fn().mockResolvedValue(localPage),
+      getAllPages: vi.fn().mockResolvedValue([localPage]),
+      getLastSyncTime: vi.fn().mockResolvedValue(new Date("2025-04-01").getTime()),
+    });
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [
+          {
+            id: "p1",
+            owner_id: TEST_USER_ID,
+            source_page_id: null,
+            title: "Page with thumbnail",
+            content_preview: "preview",
+            thumbnail_url: null, // Server has no thumbnail
+            source_url: null,
+            created_at: "2025-01-01T00:00:00Z",
+            updated_at: "2025-06-01T00:00:00Z", // Server is newer
+            is_deleted: false,
+          },
+        ],
+        links: [],
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    expect(adapter.upsertPage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "p1",
+        thumbnailUrl: "/api/thumbnail/serve/abc123", // Local thumbnail preserved
+      }),
+    );
+  });
+
+  it("uses server thumbnailUrl when server provides one", async () => {
+    const localPage: PageMetadata = {
+      id: "p1",
+      ownerId: TEST_USER_ID,
+      sourcePageId: null,
+      title: "Page",
+      contentPreview: null,
+      thumbnailUrl: "/api/thumbnail/serve/old",
+      sourceUrl: null,
+      createdAt: new Date("2025-01-01").getTime(),
+      updatedAt: new Date("2025-05-01").getTime(),
+      isDeleted: false,
+    };
+
+    const adapter = createMockAdapter({
+      getPage: vi.fn().mockResolvedValue(localPage),
+      getAllPages: vi.fn().mockResolvedValue([localPage]),
+      getLastSyncTime: vi.fn().mockResolvedValue(new Date("2025-04-01").getTime()),
+    });
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [
+          {
+            id: "p1",
+            owner_id: TEST_USER_ID,
+            source_page_id: null,
+            title: "Page",
+            content_preview: null,
+            thumbnail_url: "/api/thumbnail/serve/new", // Server has a different thumbnail
+            source_url: null,
+            created_at: "2025-01-01T00:00:00Z",
+            updated_at: "2025-06-01T00:00:00Z",
+            is_deleted: false,
+          },
+        ],
+        links: [],
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    expect(adapter.upsertPage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "p1",
+        thumbnailUrl: "/api/thumbnail/serve/new", // Server thumbnail used
+      }),
+    );
+  });
+
   // ── PUSH ──────────────────────────────────────────────────────────────
 
   it("pushes locally modified pages to server", async () => {

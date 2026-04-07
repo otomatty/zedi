@@ -59,6 +59,9 @@ let consecutiveFailures = 0;
 /** Maximum consecutive failures before giving up automatic retries. */
 const MAX_CONSECUTIVE_FAILURES = 3;
 const PAGE_PUSH_CHUNK_SIZE = 100;
+/**
+ *
+ */
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "db-resuming";
 let syncStatus: SyncStatus = "idle";
 const syncStatusListeners = new Set<(status: SyncStatus) => void>();
@@ -68,6 +71,9 @@ function setSyncStatus(status: SyncStatus) {
   syncStatusListeners.forEach((fn) => fn(status));
 }
 
+/**
+ *
+ */
 export function getSyncStatus(): SyncStatus {
   return syncStatus;
 }
@@ -77,6 +83,9 @@ export function hasNeverSynced(): boolean {
   return !hasCompletedFirstSync;
 }
 
+/**
+ *
+ */
 export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () => void {
   syncStatusListeners.add(listener);
   listener(syncStatus);
@@ -90,6 +99,9 @@ if (typeof window !== "undefined") {
   });
 }
 
+/**
+ *
+ */
 export function isSyncInProgress(): boolean {
   return syncInProgress;
 }
@@ -104,6 +116,9 @@ export function resetSyncFailures(): void {
   consecutiveFailures = 0;
 }
 
+/**
+ *
+ */
 export type SyncWithApiOptions = {
   /** When true and local has 0 pages, do a full pull (since=omit). */
   forceFullSyncWhenLocalEmpty?: boolean;
@@ -221,6 +236,13 @@ async function applyPull(
     const meta = syncPageToMetadata(row);
     const local = await adapter.getPage(meta.id);
     if (local && local.updatedAt > meta.updatedAt) continue;
+    // thumbnailUrl はクライアント側で extractFirstImage から生成されるため、
+    // サーバーが null を返してもローカルの値を保持する。
+    // Preserve local thumbnailUrl when server returns null, since it is
+    // derived client-side via extractFirstImage.
+    if (local && meta.thumbnailUrl == null && local.thumbnailUrl != null) {
+      meta.thumbnailUrl = local.thumbnailUrl;
+    }
     await adapter.upsertPage(meta);
   }
 
@@ -399,14 +421,29 @@ export async function syncWithApi(
   }
 }
 
+/**
+ *
+ */
 export async function runApiSync(
   userId: string,
   getToken: () => Promise<string | null>,
   options?: SyncWithApiOptions & { force?: boolean },
 ): Promise<void> {
+  /**
+   *
+   */
   const { createStorageAdapter } = await import("@/lib/storageAdapter");
+  /**
+   *
+   */
   const { createApiClient } = await import("@/lib/api");
+  /**
+   *
+   */
   const adapter = createStorageAdapter();
+  /**
+   *
+   */
   const api = createApiClient({ getToken });
   await syncWithApi(adapter, api, userId, options);
 }
