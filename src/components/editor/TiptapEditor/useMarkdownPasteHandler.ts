@@ -65,10 +65,14 @@ export function useMarkdownPasteHandler({ editor }: UseMarkdownPasteHandlerParam
       // Use the parse method provided by @tiptap/markdown
       if (!editor.markdown) return;
 
-      event.preventDefault();
-
-      const parsed = editor.markdown.parse(text);
-      editor.commands.insertContent(parsed);
+      try {
+        const parsed = editor.markdown.parse(text);
+        event.preventDefault();
+        editor.commands.insertContent(parsed);
+      } catch {
+        // パース失敗時は TipTap のデフォルトペースト処理にフォールバック
+        // On parse failure, fall back to TipTap's default paste handling
+      }
     };
 
     const editorElement = editor.view.dom;

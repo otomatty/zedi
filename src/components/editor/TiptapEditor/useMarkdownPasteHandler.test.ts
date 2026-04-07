@@ -173,6 +173,32 @@ describe("useMarkdownPasteHandler", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it("falls back to default paste when markdown.parse throws", () => {
+    const dom = document.createElement("div");
+    const insertContent = vi.fn(() => true);
+
+    const editor = {
+      view: { dom },
+      commands: { insertContent },
+      markdown: {
+        parse: vi.fn(() => {
+          throw new Error("parse error");
+        }),
+      },
+    } as unknown as Editor;
+
+    renderHook(() => useMarkdownPasteHandler({ editor }));
+
+    const event = createPasteEvent({ text: "# Hello" });
+
+    act(() => {
+      dom.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(insertContent).not.toHaveBeenCalled();
+  });
+
   it("does nothing when editor.markdown is not available", () => {
     const { editor, dom, insertContent } = createMockEditor(false);
 

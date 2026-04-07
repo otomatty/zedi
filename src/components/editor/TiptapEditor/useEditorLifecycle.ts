@@ -28,8 +28,8 @@ interface UseEditorLifecycleOptions {
 }
 
 /**
- * エディタのライフサイクル管理（コンテンツ同期・読み取り専用切替・画像ペースト・WikiLink 同期）。
- * Manages editor lifecycle: content sync, read-only toggling, image paste handling, and WikiLink status sync.
+ * エディタのライフサイクル管理（コンテンツ同期・読み取り専用切替・画像ペースト・マークダウンペースト・WikiLink 同期）。
+ * Manages editor lifecycle: content sync, read-only toggling, image paste handling, markdown paste handling, and WikiLink status sync.
  */
 export function useEditorLifecycle({
   editor,
