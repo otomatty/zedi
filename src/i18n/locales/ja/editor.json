@@ -31,6 +31,17 @@
   },
   "slashPathCompletionAriaLabel": "パス候補",
   "slashPathCompletionHint": "ワークスペース内のパス候補",
+  "htmlArtifact": {
+    "editHeading": "HTML アーティファクトを編集",
+    "emptyState": "HTML アーティファクトが空です",
+    "placeholder": "<div>Hello World</div>",
+    "iframeTitle": "HTML アーティファクト",
+    "fullscreen": "拡大表示",
+    "edit": "編集",
+    "delete": "削除",
+    "cancel": "キャンセル",
+    "save": "保存"
+  },
   "slash": {
     "paragraph": {
       "title": "段落",

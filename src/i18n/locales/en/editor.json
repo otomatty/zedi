@@ -31,6 +31,17 @@
   },
   "slashPathCompletionAriaLabel": "Path suggestions",
   "slashPathCompletionHint": "Workspace path suggestions",
+  "htmlArtifact": {
+    "editHeading": "Edit HTML artifact",
+    "emptyState": "This HTML artifact is empty.",
+    "placeholder": "<div>Hello World</div>",
+    "iframeTitle": "HTML Artifact",
+    "fullscreen": "Expand",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
   "slash": {
     "paragraph": {
       "title": "Paragraph",
