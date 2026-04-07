@@ -116,6 +116,7 @@ async function canEditNotePage(client: PoolClient, pageId: string, user: DbUser)
         ON nm.note_id = np.note_id
        AND nm.member_email = $3
        AND nm.is_deleted = FALSE
+       AND nm.status = 'accepted'
       WHERE np.page_id = $1
         AND np.is_deleted = FALSE
         AND (

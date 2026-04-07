@@ -127,7 +127,13 @@ export async function getActiveMemberCounts(
       count: sql<number>`cast(count(*) as integer)`,
     })
     .from(noteMembers)
-    .where(and(inArray(noteMembers.noteId, noteIds), eq(noteMembers.isDeleted, false)))
+    .where(
+      and(
+        inArray(noteMembers.noteId, noteIds),
+        eq(noteMembers.isDeleted, false),
+        eq(noteMembers.status, "accepted"),
+      ),
+    )
     .groupBy(noteMembers.noteId);
   return new Map(counts.map((c) => [c.noteId, c.count]));
 }
