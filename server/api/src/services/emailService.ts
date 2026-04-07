@@ -60,7 +60,10 @@ export interface SendEmailResult {
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
   const client = getResendClient();
   if (!client) {
-    console.warn("[emailService] Email sending is disabled (no API key). Skipping email to:", params.to);
+    console.warn(
+      "[emailService] Email sending is disabled (no API key). Skipping email to:",
+      params.to,
+    );
     return { success: false, error: "Email sending is disabled (RESEND_API_KEY not set)" };
   }
 
