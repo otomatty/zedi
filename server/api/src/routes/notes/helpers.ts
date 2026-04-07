@@ -158,6 +158,7 @@ export async function getNoteRole(
           eq(noteMembers.noteId, noteId),
           eq(noteMembers.memberEmail, userEmail),
           eq(noteMembers.isDeleted, false),
+          eq(noteMembers.status, "accepted"),
         ),
       )
       .limit(1);

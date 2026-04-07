@@ -58,6 +58,7 @@ export async function assertPageViewAccess(
         eq(noteMembers.noteId, notePages.noteId),
         eq(noteMembers.memberEmail, userEmail),
         eq(noteMembers.isDeleted, false),
+        eq(noteMembers.status, "accepted"),
       ),
     )
     .where(and(eq(notePages.pageId, pageId), eq(notePages.isDeleted, false)))

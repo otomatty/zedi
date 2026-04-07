@@ -60,6 +60,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
         role: memberRole,
         isDeleted: false,
         status: "pending",
+        acceptedUserId: null,
         updatedAt: new Date(),
       },
     })
