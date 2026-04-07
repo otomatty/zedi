@@ -143,6 +143,33 @@ export const slashCommandItems: SlashCommandItem[] = [
         .run(),
   },
   {
+    id: "htmlArtifact",
+    icon: "Code2",
+    isAvailable: (editor) =>
+      !!editor.extensionManager.extensions.find((e) => e.name === "htmlArtifact"),
+    action: (editor, range) => {
+      const html = window.prompt(
+        i18n.t("editor.slash.htmlArtifact.prompt", {
+          defaultValue: "HTML コードを貼り付けてください",
+        }),
+        "",
+      );
+      if (html === null) return;
+      const trimmed = html.trim();
+      if (!trimmed) return;
+      const title = window.prompt(
+        i18n.t("editor.slash.htmlArtifact.promptTitle", { defaultValue: "タイトル（省略可）" }),
+        "",
+      );
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertHtmlArtifact({ content: trimmed, title: title?.trim() || "" })
+        .run();
+    },
+  },
+  {
     id: "mcpResource",
     icon: "Plug",
     isAvailable: (editor) =>

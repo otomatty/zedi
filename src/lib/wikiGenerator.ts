@@ -107,8 +107,6 @@ export async function generateWikiContentStream(
       case "google":
         await generateWithGoogle(settings, title, callbacks, abortSignal);
         break;
-      case "claude-code":
-        throw new Error("Wiki generation is not supported with Claude Code provider.");
       default: {
         const _exhaustive: never = settings.provider;
         throw new Error(`Unknown provider: ${_exhaustive}`);

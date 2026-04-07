@@ -117,6 +117,13 @@
       "description": "ブロック数式を挿入",
       "aliases": "数式ブロック,block math,ブロック数式,equation"
     },
+    "htmlArtifact": {
+      "title": "HTML アーティファクト",
+      "description": "インタラクティブな HTML を埋め込む（Claude 出力等）",
+      "aliases": "html,artifact,アーティファクト,埋め込み,interactive,claude",
+      "prompt": "HTML コードを貼り付けてください",
+      "promptTitle": "タイトル（省略可）"
+    },
     "mcpResource": {
       "title": "MCP リソース",
       "description": "MCP サーバーから外部データを埋め込む",

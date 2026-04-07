@@ -117,6 +117,13 @@
       "description": "Insert block math",
       "aliases": "math block,block math,equation"
     },
+    "htmlArtifact": {
+      "title": "HTML Artifact",
+      "description": "Embed interactive HTML (Claude output, etc.)",
+      "aliases": "html,artifact,embed,interactive,claude",
+      "prompt": "Paste your HTML code",
+      "promptTitle": "Title (optional)"
+    },
     "mcpResource": {
       "title": "MCP Resource",
       "description": "Embed external data from an MCP server",

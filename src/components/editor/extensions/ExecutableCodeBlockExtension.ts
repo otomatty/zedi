@@ -17,10 +17,16 @@ export interface ExecutableCodeBlockOptions {
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     /**
-     * Inserts an executable code block (Claude Code / Bash).
-     * 実行可能コードブロック（Claude Code / Bash）を挿入する。
+     * Executable code block commands (nested shape matches Tiptap `UnionCommands` merging).
+     * ネスト形は Tiptap の `UnionCommands` がチェーンへ正しく載せるため（Mermaid 等と同様）。
      */
-    insertExecutableCodeBlock: (attrs?: { language?: string }) => ReturnType;
+    executableCodeBlock: {
+      /**
+       * Inserts an executable code block (Claude Code / Bash).
+       * 実行可能コードブロック（Claude Code / Bash）を挿入する。
+       */
+      insertExecutableCodeBlock: (attrs?: { language?: string }) => ReturnType;
+    };
   }
 }
 
