@@ -4,11 +4,15 @@ import { pages } from "./pages.js";
 import { notes, notePages, noteMembers } from "./notes.js";
 import { links, ghostLinks } from "./links.js";
 import { pageContents } from "./pageContents.js";
+import { pageSnapshots } from "./pageSnapshots.js";
 import { media } from "./media.js";
 import { subscriptions } from "./subscriptions.js";
 import { aiUsageLogs, aiMonthlyUsage } from "./aiModels.js";
 
-export const usersRelations = relations(users, ({ many, one }) => ({
+export /**
+ *
+ */
+const usersRelations = relations(users, ({ many, one }) => ({
   pages: many(pages),
   notes: many(notes),
   media: many(media),
@@ -22,21 +26,30 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   aiMonthlyUsage: many(aiMonthlyUsage),
 }));
 
-export const sessionRelations = relations(session, ({ one }) => ({
+export /**
+ *
+ */
+const sessionRelations = relations(session, ({ one }) => ({
   user: one(users, {
     fields: [session.userId],
     references: [users.id],
   }),
 }));
 
-export const accountRelations = relations(account, ({ one }) => ({
+export /**
+ *
+ */
+const accountRelations = relations(account, ({ one }) => ({
   user: one(users, {
     fields: [account.userId],
     references: [users.id],
   }),
 }));
 
-export const pagesRelations = relations(pages, ({ one, many }) => ({
+export /**
+ *
+ */
+const pagesRelations = relations(pages, ({ one, many }) => ({
   owner: one(users, {
     fields: [pages.ownerId],
     references: [users.id],
@@ -51,13 +64,17 @@ export const pagesRelations = relations(pages, ({ one, many }) => ({
     references: [pageContents.pageId],
   }),
   notePages: many(notePages),
+  snapshots: many(pageSnapshots),
   media: many(media),
   outgoingLinks: many(links, { relationName: "sourceLinks" }),
   incomingLinks: many(links, { relationName: "targetLinks" }),
   ghostLinksFrom: many(ghostLinks, { relationName: "ghostLinkSource" }),
 }));
 
-export const notesRelations = relations(notes, ({ one, many }) => ({
+export /**
+ *
+ */
+const notesRelations = relations(notes, ({ one, many }) => ({
   owner: one(users, {
     fields: [notes.ownerId],
     references: [users.id],
@@ -66,7 +83,10 @@ export const notesRelations = relations(notes, ({ one, many }) => ({
   noteMembers: many(noteMembers),
 }));
 
-export const notePagesRelations = relations(notePages, ({ one }) => ({
+export /**
+ *
+ */
+const notePagesRelations = relations(notePages, ({ one }) => ({
   note: one(notes, {
     fields: [notePages.noteId],
     references: [notes.id],
@@ -81,7 +101,10 @@ export const notePagesRelations = relations(notePages, ({ one }) => ({
   }),
 }));
 
-export const noteMembersRelations = relations(noteMembers, ({ one }) => ({
+export /**
+ *
+ */
+const noteMembersRelations = relations(noteMembers, ({ one }) => ({
   note: one(notes, {
     fields: [noteMembers.noteId],
     references: [notes.id],
@@ -92,7 +115,10 @@ export const noteMembersRelations = relations(noteMembers, ({ one }) => ({
   }),
 }));
 
-export const linksRelations = relations(links, ({ one }) => ({
+export /**
+ *
+ */
+const linksRelations = relations(links, ({ one }) => ({
   source: one(pages, {
     fields: [links.sourceId],
     references: [pages.id],
@@ -105,7 +131,10 @@ export const linksRelations = relations(links, ({ one }) => ({
   }),
 }));
 
-export const ghostLinksRelations = relations(ghostLinks, ({ one }) => ({
+export /**
+ *
+ */
+const ghostLinksRelations = relations(ghostLinks, ({ one }) => ({
   sourcePage: one(pages, {
     fields: [ghostLinks.sourcePageId],
     references: [pages.id],
@@ -122,14 +151,30 @@ export const ghostLinksRelations = relations(ghostLinks, ({ one }) => ({
   }),
 }));
 
-export const pageContentsRelations = relations(pageContents, ({ one }) => ({
+export /**
+ *
+ */
+const pageContentsRelations = relations(pageContents, ({ one }) => ({
   page: one(pages, {
     fields: [pageContents.pageId],
     references: [pages.id],
   }),
 }));
 
-export const mediaRelations = relations(media, ({ one }) => ({
+export /**
+ *
+ */
+const pageSnapshotsRelations = relations(pageSnapshots, ({ one }) => ({
+  page: one(pages, {
+    fields: [pageSnapshots.pageId],
+    references: [pages.id],
+  }),
+}));
+
+export /**
+ *
+ */
+const mediaRelations = relations(media, ({ one }) => ({
   owner: one(users, {
     fields: [media.ownerId],
     references: [users.id],
@@ -140,21 +185,30 @@ export const mediaRelations = relations(media, ({ one }) => ({
   }),
 }));
 
-export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+export /**
+ *
+ */
+const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   user: one(users, {
     fields: [subscriptions.userId],
     references: [users.id],
   }),
 }));
 
-export const aiUsageLogsRelations = relations(aiUsageLogs, ({ one }) => ({
+export /**
+ *
+ */
+const aiUsageLogsRelations = relations(aiUsageLogs, ({ one }) => ({
   user: one(users, {
     fields: [aiUsageLogs.userId],
     references: [users.id],
   }),
 }));
 
-export const aiMonthlyUsageRelations = relations(aiMonthlyUsage, ({ one }) => ({
+export /**
+ *
+ */
+const aiMonthlyUsageRelations = relations(aiMonthlyUsage, ({ one }) => ({
   user: one(users, {
     fields: [aiMonthlyUsage.userId],
     references: [users.id],
