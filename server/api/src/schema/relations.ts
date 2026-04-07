@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import { users, session, account } from "./users.js";
 import { pages } from "./pages.js";
-import { notes, notePages, noteMembers } from "./notes.js";
+import { notes, notePages, noteMembers, noteInvitations } from "./notes.js";
 import { links, ghostLinks } from "./links.js";
 import { pageContents } from "./pageContents.js";
 import { pageSnapshots } from "./pageSnapshots.js";
@@ -81,6 +81,7 @@ const notesRelations = relations(notes, ({ one, many }) => ({
   }),
   notePages: many(notePages),
   noteMembers: many(noteMembers),
+  noteInvitations: many(noteInvitations),
 }));
 
 export /**
@@ -112,6 +113,21 @@ const noteMembersRelations = relations(noteMembers, ({ one }) => ({
   invitedBy: one(users, {
     fields: [noteMembers.invitedByUserId],
     references: [users.id],
+  }),
+  acceptedUser: one(users, {
+    fields: [noteMembers.acceptedUserId],
+    references: [users.id],
+    relationName: "acceptedMember",
+  }),
+}));
+
+export /**
+ *
+ */
+const noteInvitationsRelations = relations(noteInvitations, ({ one }) => ({
+  note: one(notes, {
+    fields: [noteInvitations.noteId],
+    references: [notes.id],
   }),
 }));
 

@@ -84,6 +84,12 @@ export const noteMembers = pgTable(
     invitedByUserId: text("invited_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "accepted", "declined"] })
+      .notNull()
+      .default("pending"),
+    acceptedUserId: text("accepted_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -97,3 +103,29 @@ export const noteMembers = pgTable(
 
 export type NoteMember = typeof noteMembers.$inferSelect;
 export type NewNoteMember = typeof noteMembers.$inferInsert;
+
+/**
+ * 招待トークンテーブル
+ * Invitation tokens table
+ */
+export const noteInvitations = pgTable(
+  "note_invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    memberEmail: text("member_email").notNull(),
+    token: text("token").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("idx_note_invitations_token").on(table.token),
+    index("idx_note_invitations_note_id").on(table.noteId),
+  ],
+);
+
+export type NoteInvitation = typeof noteInvitations.$inferSelect;
+export type NewNoteInvitation = typeof noteInvitations.$inferInsert;
