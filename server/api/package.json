@@ -38,6 +38,7 @@
     "jsdom": "^29.0.0",
     "lowlight": "^3.3.0",
     "pg": "^8.20.0",
+    "resend": "^6.10.0",
     "yjs": "^13.6.30"
   },
   "devDependencies": {

@@ -12,12 +12,15 @@ export {
   notes,
   notePages,
   noteMembers,
+  noteInvitations,
   type Note,
   type NewNote,
   type NotePage,
   type NewNotePage,
   type NoteMember,
   type NewNoteMember,
+  type NoteInvitation,
+  type NewNoteInvitation,
 } from "./notes.js";
 export {
   links,
@@ -62,6 +65,7 @@ export {
   notesRelations,
   notePagesRelations,
   noteMembersRelations,
+  noteInvitationsRelations,
   linksRelations,
   ghostLinksRelations,
   pageContentsRelations,

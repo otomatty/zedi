@@ -8,7 +8,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { noteMembers } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
@@ -52,12 +52,15 @@ app.post("/:noteId/members", authRequired, async (c) => {
       memberEmail,
       role: memberRole,
       invitedByUserId: userId,
+      status: "pending",
     })
     .onConflictDoUpdate({
       target: [noteMembers.noteId, noteMembers.memberEmail],
       set: {
         role: memberRole,
         isDeleted: false,
+        status: sql`CASE WHEN ${noteMembers.status} = 'accepted' AND ${noteMembers.isDeleted} = FALSE THEN 'accepted' ELSE 'pending' END`,
+        acceptedUserId: sql`CASE WHEN ${noteMembers.status} = 'accepted' AND ${noteMembers.isDeleted} = FALSE THEN ${noteMembers.acceptedUserId} ELSE NULL END`,
         updatedAt: new Date(),
       },
     })
@@ -65,6 +68,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
       noteId: noteMembers.noteId,
       memberEmail: noteMembers.memberEmail,
       role: noteMembers.role,
+      status: noteMembers.status,
       invitedByUserId: noteMembers.invitedByUserId,
       createdAt: noteMembers.createdAt,
       updatedAt: noteMembers.updatedAt,
@@ -76,6 +80,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
     note_id: member.noteId,
     member_email: member.memberEmail,
     role: member.role,
+    status: member.status,
     invited_by_user_id: member.invitedByUserId,
     created_at: member.createdAt,
     updated_at: member.updatedAt,
@@ -111,6 +116,7 @@ app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
       noteId: noteMembers.noteId,
       memberEmail: noteMembers.memberEmail,
       role: noteMembers.role,
+      status: noteMembers.status,
       invitedByUserId: noteMembers.invitedByUserId,
       createdAt: noteMembers.createdAt,
       updatedAt: noteMembers.updatedAt,
@@ -122,6 +128,7 @@ app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
     note_id: updated.noteId,
     member_email: updated.memberEmail,
     role: updated.role,
+    status: updated.status,
     invited_by_user_id: updated.invitedByUserId,
     created_at: updated.createdAt,
     updated_at: updated.updatedAt,
@@ -163,6 +170,7 @@ app.get("/:noteId/members", authRequired, async (c) => {
       noteId: noteMembers.noteId,
       memberEmail: noteMembers.memberEmail,
       role: noteMembers.role,
+      status: noteMembers.status,
       invitedByUserId: noteMembers.invitedByUserId,
       createdAt: noteMembers.createdAt,
       updatedAt: noteMembers.updatedAt,
@@ -176,6 +184,7 @@ app.get("/:noteId/members", authRequired, async (c) => {
       note_id: m.noteId,
       member_email: m.memberEmail,
       role: m.role,
+      status: m.status,
       invited_by_user_id: m.invitedByUserId,
       created_at: m.createdAt,
       updated_at: m.updatedAt,
