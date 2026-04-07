@@ -7,6 +7,10 @@ ALTER TABLE note_members
   ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'accepted', 'declined'));
 
+-- Backfill: treat all existing non-deleted members as accepted
+-- 既存の有効メンバーを accepted に設定する
+UPDATE note_members SET status = 'accepted' WHERE is_deleted = FALSE;
+
 ALTER TABLE note_members
   ADD COLUMN IF NOT EXISTS accepted_user_id TEXT REFERENCES "user"(id) ON DELETE SET NULL;
 
