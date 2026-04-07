@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import type { Editor } from "@tiptap/core";
-import { Slice } from "@tiptap/pm/model";
 
 /**
  * マークダウンらしいテキストかどうかを簡易判定する。
@@ -16,11 +15,12 @@ function looksLikeMarkdown(text: string): boolean {
   if (/^[\t ]*[-*+]\s/m.test(text)) return true;
   // 番号付きリスト / Ordered lists: 1. item
   if (/^[\t ]*\d+\.\s/m.test(text)) return true;
-  // コードブロック / Fenced code blocks: ```
-  if (/^```/m.test(text)) return true;
+  // コードブロック / Fenced code blocks (up to 3 leading spaces per CommonMark)
+  if (/^[\t ]{0,3}```/m.test(text)) return true;
   // 引用 / Blockquotes: > text
   if (/^>\s/m.test(text)) return true;
-  // 太字・斜体 / Bold/italic: **text** / *text* / __text__ / _text_
+  // 太字（`**`, `__`）のみ検出（単独の `*` / `_` は誤検知しやすいため除外）
+  // Bold only (`**`, `__`); single `*` / `_` omitted due to false positives (filenames, etc.)
   if (/\*\*.+?\*\*|__.+?__/.test(text)) return true;
   // タスクリスト / Task lists: - [ ] / - [x]
   if (/^[\t ]*[-*+]\s\[[ xX]\]/m.test(text)) return true;
@@ -47,6 +47,12 @@ export function useMarkdownPasteHandler({ editor }: UseMarkdownPasteHandlerParam
     if (!editor) return;
 
     const handlePaste = (event: ClipboardEvent) => {
+      // 同一要素に複数の paste リスナーがあると、先に登録されたハンドラが preventDefault しても
+      // 後続リスナーは呼ばれる。画像 URL などで別ハンドラが処理済みならスキップする。
+      // Multiple listeners on the same element: later listeners still run after preventDefault.
+      // Skip when another handler already handled the paste (e.g. image URL paste).
+      if (event.defaultPrevented) return;
+
       // HTML が含まれている場合はリッチペーストを優先（他アプリからのコピーなど）
       // If HTML is present, let TipTap handle it as rich paste (e.g., copy from other apps)
       const html = event.clipboardData?.getData("text/html");
@@ -62,16 +68,10 @@ export function useMarkdownPasteHandler({ editor }: UseMarkdownPasteHandlerParam
       event.preventDefault();
 
       const parsed = editor.markdown.parse(text);
-      const doc = editor.state.schema.nodeFromJSON(parsed);
-      const slice = new Slice(doc.content, 0, 0);
-
-      const tr = editor.view.state.tr.replaceSelection(slice);
-      editor.view.dispatch(tr);
+      editor.commands.insertContent(parsed);
     };
 
     const editorElement = editor.view.dom;
-    // usePasteImageHandler よりも後に登録されるため、画像ペーストが先に処理される
-    // Registered after usePasteImageHandler, so image paste is processed first
     editorElement.addEventListener("paste", handlePaste);
 
     return () => {

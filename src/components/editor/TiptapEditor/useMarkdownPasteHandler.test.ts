@@ -26,43 +26,33 @@ function createPasteEvent({
 function createMockEditor(hasMarkdown = true) {
   const dom = document.createElement("div");
 
-  const mockContent = { childCount: 1 };
-  const mockDoc = { content: mockContent };
-  const mockTr = {
-    replaceSelection: vi.fn().mockReturnThis(),
+  const parsedDoc = {
+    type: "doc",
+    content: [{ type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Hello" }] }],
   };
+
+  const insertContent = vi.fn(() => true);
 
   const editor = {
     view: {
       dom,
-      state: {
-        tr: mockTr,
-      },
-      dispatch: vi.fn(),
     },
-    state: {
-      schema: {
-        nodeFromJSON: vi.fn(() => mockDoc),
-      },
+    commands: {
+      insertContent,
     },
     markdown: hasMarkdown
       ? {
-          parse: vi.fn(() => ({
-            type: "doc",
-            content: [
-              { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Hello" }] },
-            ],
-          })),
+          parse: vi.fn(() => parsedDoc),
         }
       : undefined,
   } as unknown as Editor;
 
-  return { editor, dom, mockTr };
+  return { editor, dom, insertContent, parsedDoc };
 }
 
 describe("useMarkdownPasteHandler", () => {
   it("converts pasted markdown text to rich content", () => {
-    const { editor, dom, mockTr } = createMockEditor();
+    const { editor, dom, insertContent, parsedDoc } = createMockEditor();
 
     renderHook(() => useMarkdownPasteHandler({ editor }));
 
@@ -76,12 +66,11 @@ describe("useMarkdownPasteHandler", () => {
     expect(
       (editor as unknown as { markdown: { parse: ReturnType<typeof vi.fn> } }).markdown.parse,
     ).toHaveBeenCalledWith("# Hello World");
-    expect(editor.view.dispatch).toHaveBeenCalled();
-    expect(mockTr.replaceSelection).toHaveBeenCalled();
+    expect(insertContent).toHaveBeenCalledWith(parsedDoc);
   });
 
   it("does not intercept plain text without markdown patterns", () => {
-    const { editor, dom } = createMockEditor();
+    const { editor, dom, insertContent } = createMockEditor();
 
     renderHook(() => useMarkdownPasteHandler({ editor }));
 
@@ -92,10 +81,11 @@ describe("useMarkdownPasteHandler", () => {
     });
 
     expect(event.defaultPrevented).toBe(false);
+    expect(insertContent).not.toHaveBeenCalled();
   });
 
   it("does not intercept when HTML is present (rich paste)", () => {
-    const { editor, dom } = createMockEditor();
+    const { editor, dom, insertContent } = createMockEditor();
 
     renderHook(() => useMarkdownPasteHandler({ editor }));
 
@@ -109,9 +99,25 @@ describe("useMarkdownPasteHandler", () => {
     });
 
     expect(event.defaultPrevented).toBe(false);
+    expect(insertContent).not.toHaveBeenCalled();
   });
 
-  it("handles bold/italic markdown", () => {
+  it("does not run when another handler already called preventDefault", () => {
+    const { editor, dom, insertContent } = createMockEditor();
+
+    renderHook(() => useMarkdownPasteHandler({ editor }));
+
+    const event = createPasteEvent({ text: "# Hello World" });
+    event.preventDefault();
+
+    act(() => {
+      dom.dispatchEvent(event);
+    });
+
+    expect(insertContent).not.toHaveBeenCalled();
+  });
+
+  it("handles bold markdown", () => {
     const { editor, dom } = createMockEditor();
 
     renderHook(() => useMarkdownPasteHandler({ editor }));
@@ -153,8 +159,22 @@ describe("useMarkdownPasteHandler", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it("detects indented fenced code blocks (up to 3 spaces)", () => {
+    const { editor, dom } = createMockEditor();
+
+    renderHook(() => useMarkdownPasteHandler({ editor }));
+
+    const event = createPasteEvent({ text: "   ```js\nx\n```" });
+
+    act(() => {
+      dom.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it("does nothing when editor.markdown is not available", () => {
-    const { editor, dom } = createMockEditor(false);
+    const { editor, dom, insertContent } = createMockEditor(false);
 
     renderHook(() => useMarkdownPasteHandler({ editor }));
 
@@ -165,5 +185,6 @@ describe("useMarkdownPasteHandler", () => {
     });
 
     expect(event.defaultPrevented).toBe(false);
+    expect(insertContent).not.toHaveBeenCalled();
   });
 });
