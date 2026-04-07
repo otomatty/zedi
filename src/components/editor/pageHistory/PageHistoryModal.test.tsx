@@ -115,7 +115,7 @@ const defaultProps = {
   open: true,
   onOpenChange: vi.fn(),
   pageId: "page-123",
-  currentYdocState: "current-base64",
+  currentYdoc: null,
   onRestored: vi.fn(),
 };
 

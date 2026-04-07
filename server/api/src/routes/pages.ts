@@ -197,7 +197,7 @@ app.put("/:id/content", authRequired, async (c) => {
 
     await applyPagesMetadataUpdate(db, pageId, body);
 
-    await tryAutoSnapshot(
+    void tryAutoSnapshot(
       db,
       pageId,
       ydocBuffer,
@@ -234,7 +234,7 @@ app.put("/:id/content", authRequired, async (c) => {
   const resultRow = result[0];
   if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
 
-  await tryAutoSnapshot(
+  void tryAutoSnapshot(
     db,
     pageId,
     ydocBuffer,

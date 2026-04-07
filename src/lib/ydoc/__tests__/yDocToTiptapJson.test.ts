@@ -4,7 +4,12 @@
  */
 import { describe, it, expect } from "vitest";
 import * as Y from "yjs";
-import { yXmlFragmentToTiptapJson, yXmlElementToJson, textToJson } from "../yDocToTiptapJson";
+import {
+  yXmlFragmentToTiptapJson,
+  yXmlElementToJson,
+  textToInlineNodes,
+  textToJson,
+} from "../yDocToTiptapJson";
 
 describe("yXmlFragmentToTiptapJson", () => {
   it("returns doc with empty paragraph for empty fragment", () => {
@@ -34,10 +39,13 @@ describe("yXmlFragmentToTiptapJson", () => {
     expect(result.content).toBeInstanceOf(Array);
     const content = result.content as Array<Record<string, unknown>>;
     expect(content).toHaveLength(1);
-    expect(content[0].type).toBe("paragraph");
+    expect(content[0]).toMatchObject({
+      type: "paragraph",
+      content: [{ type: "text", text: "Hello, world!" }],
+    });
   });
 
-  it("converts nested elements (heading with text)", () => {
+  it("converts nested elements (heading with text) — inline text, not nested paragraph", () => {
     const doc = new Y.Doc();
     const fragment = doc.getXmlFragment("default");
     const heading = new Y.XmlElement("heading");
@@ -50,8 +58,11 @@ describe("yXmlFragmentToTiptapJson", () => {
     const result = yXmlFragmentToTiptapJson(fragment);
 
     const content = result.content as Array<Record<string, unknown>>;
-    expect(content[0].type).toBe("heading");
-    expect(content[0].attrs).toEqual({ level: 2 });
+    expect(content[0]).toMatchObject({
+      type: "heading",
+      attrs: { level: 2 },
+      content: [{ type: "text", text: "Title" }],
+    });
   });
 });
 
@@ -90,18 +101,56 @@ describe("yXmlElementToJson", () => {
   });
 });
 
-describe("textToJson", () => {
-  it("returns null for empty text", () => {
+describe("textToInlineNodes", () => {
+  it("returns empty array for empty text", () => {
     const doc = new Y.Doc();
     const fragment = doc.getXmlFragment("test");
     const text = new Y.XmlText();
     fragment.insert(0, [text]);
 
-    const result = textToJson(text);
-    expect(result).toBeNull();
+    expect(textToInlineNodes(text)).toEqual([]);
   });
 
-  it("converts plain text to paragraph", () => {
+  it("converts plain text to inline text nodes", () => {
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("test");
+    const text = new Y.XmlText();
+    fragment.insert(0, [text]);
+    text.insert(0, "Plain text");
+
+    expect(textToInlineNodes(text)).toEqual([{ type: "text", text: "Plain text" }]);
+  });
+
+  it("converts text with bold mark", () => {
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("test");
+    const text = new Y.XmlText();
+    fragment.insert(0, [text]);
+    text.insert(0, "Bold", { bold: true });
+
+    expect(textToInlineNodes(text)).toEqual([
+      {
+        type: "text",
+        text: "Bold",
+        marks: [{ type: "bold" }],
+      },
+    ]);
+  });
+
+  it("converts text with non-boolean mark attributes", () => {
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("test");
+    const text = new Y.XmlText();
+    fragment.insert(0, [text]);
+    text.insert(0, "Link", { link: { href: "https://example.com" } });
+
+    const nodes = textToInlineNodes(text);
+    expect(nodes[0]?.marks).toEqual([{ type: "link", attrs: { href: "https://example.com" } }]);
+  });
+});
+
+describe("textToJson (paragraph wrapper)", () => {
+  it("wraps inline nodes in a paragraph for legacy callers", () => {
     const doc = new Y.Doc();
     const fragment = doc.getXmlFragment("test");
     const text = new Y.XmlText();
@@ -114,39 +163,5 @@ describe("textToJson", () => {
       type: "paragraph",
       content: [{ type: "text", text: "Plain text" }],
     });
-  });
-
-  it("converts text with bold mark", () => {
-    const doc = new Y.Doc();
-    const fragment = doc.getXmlFragment("test");
-    const text = new Y.XmlText();
-    fragment.insert(0, [text]);
-    text.insert(0, "Bold", { bold: true });
-
-    const result = textToJson(text);
-
-    expect(result).toEqual({
-      type: "paragraph",
-      content: [
-        {
-          type: "text",
-          text: "Bold",
-          marks: [{ type: "bold" }],
-        },
-      ],
-    });
-  });
-
-  it("converts text with non-boolean mark attributes", () => {
-    const doc = new Y.Doc();
-    const fragment = doc.getXmlFragment("test");
-    const text = new Y.XmlText();
-    fragment.insert(0, [text]);
-    text.insert(0, "Link", { link: { href: "https://example.com" } });
-
-    const result = textToJson(text);
-
-    const content = (result as Record<string, unknown>).content as Array<Record<string, unknown>>;
-    expect(content[0].marks).toEqual([{ type: "link", attrs: { href: "https://example.com" } }]);
   });
 });

@@ -78,7 +78,7 @@ export function usePageSnapshot(pageId: string, snapshotId: string | null) {
 }
 
 /**
- * スナップショットを復元する（新バージョンと��て）
+ * スナップショットを復元する（新バージョンとして）
  * Restore a snapshot as a new version
  */
 export function useRestorePageSnapshot(pageId: string) {

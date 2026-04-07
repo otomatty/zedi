@@ -47,7 +47,7 @@ vi.mock("../pageHistory/PageHistoryModal", () => ({
     onOpenChange,
   }: {
     open: boolean;
-    currentYdocState: string;
+    currentYdoc: unknown;
     onRestored?: () => void;
     onOpenChange: (open: boolean) => void;
   }) =>
@@ -61,10 +61,6 @@ vi.mock("../pageHistory/PageHistoryModal", () => ({
         </button>
       </div>
     ) : null,
-}));
-
-vi.mock("yjs", () => ({
-  encodeStateAsUpdate: () => new Uint8Array([1, 2, 3]),
 }));
 
 const defaultProps: PageEditorLayoutProps = {

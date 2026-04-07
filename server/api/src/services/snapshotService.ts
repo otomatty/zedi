@@ -16,6 +16,20 @@ import { SNAPSHOT_INTERVAL_MS, MAX_SNAPSHOTS_PER_PAGE } from "../constants.js";
 import type { Database } from "../types/index.js";
 
 /**
+ * 保持上限を超えたスナップショットを削除する SQL（Drizzle raw）。
+ * Raw SQL fragment to delete snapshots beyond the retention limit.
+ *
+ * API の `maybeCreateSnapshot` と復元トランザクションの両方で共有する。
+ * Shared by `maybeCreateSnapshot` and the restore transaction.
+ */
+export function pruneSnapshotsExceedingLimitSql(pageId: string) {
+  return sql`DELETE FROM page_snapshots WHERE id IN (
+    SELECT id FROM page_snapshots WHERE page_id = ${pageId}
+    ORDER BY created_at DESC OFFSET ${MAX_SNAPSHOTS_PER_PAGE}
+  )`;
+}
+
+/**
  * 前回スナップショットから10分経過していればスナップショットを自動作成する。
  * Creates an auto-snapshot if 10+ minutes have elapsed since the last one.
  *
@@ -58,10 +72,5 @@ export async function maybeCreateSnapshot(
   });
 
   // 100件超過分を削除 / Prune snapshots exceeding the limit
-  await db.execute(
-    sql`DELETE FROM page_snapshots WHERE id IN (
-      SELECT id FROM page_snapshots WHERE page_id = ${pageId}
-      ORDER BY created_at DESC OFFSET ${MAX_SNAPSHOTS_PER_PAGE}
-    )`,
-  );
+  await db.execute(pruneSnapshotsExceedingLimitSql(pageId));
 }

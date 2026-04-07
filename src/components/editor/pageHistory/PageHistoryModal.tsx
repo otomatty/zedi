@@ -2,9 +2,10 @@
  * ページ変更履歴モーダル
  * Page version history modal
  */
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import * as Y from "yjs";
 import {
   Dialog,
   DialogContent,
@@ -40,10 +41,27 @@ interface PageHistoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pageId: string;
-  /** 現在のページの Y.Doc state (base64)。比較表示に使用 */
-  currentYdocState: string;
+  /** 現在の編集用 Y.Doc（比較タブ選択時のみ base64 化する） */
+  currentYdoc: Y.Doc | null;
   /** 復元後にエディタをリロードするコールバック */
   onRestored?: () => void;
+}
+
+/**
+ * 比較表示用に Y.Doc を base64 でエンコードする（重い処理のため Compare タブ時のみ実行）。
+ * Encode Y.Doc to base64 for compare — only when Compare tab needs it.
+ */
+function encodeYdocStateToBase64(ydoc: Y.Doc): string {
+  try {
+    const state = Y.encodeStateAsUpdate(ydoc);
+    const chunks: string[] = [];
+    for (let i = 0; i < state.length; i += 8192) {
+      chunks.push(String.fromCharCode.apply(null, [...state.subarray(i, i + 8192)]));
+    }
+    return btoa(chunks.join(""));
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -56,7 +74,7 @@ const PageHistoryModal: React.FC<PageHistoryModalProps> = ({
   open,
   onOpenChange,
   pageId,
-  currentYdocState,
+  currentYdoc,
   onRestored,
 }) => {
   /**
@@ -91,6 +109,12 @@ const PageHistoryModal: React.FC<PageHistoryModalProps> = ({
    *
    */
   const restoreMutation = useRestorePageSnapshot(pageId);
+
+  /** 比較タブがアクティブなときだけ現在ドキュメントをエンコード（協調編集中の負荷を抑える） */
+  const currentYdocState = useMemo((): string => {
+    if (!open || tab !== "compare" || !currentYdoc) return "";
+    return encodeYdocStateToBase64(currentYdoc);
+  }, [open, tab, currentYdoc]);
 
   /**
    *
@@ -128,7 +152,6 @@ const PageHistoryModal: React.FC<PageHistoryModalProps> = ({
           </DialogHeader>
 
           <div className="flex min-h-0 flex-1">
-            {/* 左パネル: スナップショット一覧 */}
             <div className="w-56 shrink-0 border-r">
               {isLoadingList ? (
                 <div className="flex flex-col gap-2 p-3">
@@ -145,7 +168,6 @@ const PageHistoryModal: React.FC<PageHistoryModalProps> = ({
               )}
             </div>
 
-            {/* 右パネル: プレビュー / 比較 */}
             <div className="flex min-w-0 flex-1 flex-col">
               {!selectedSnapshot ? (
                 <div className="flex flex-1 items-center justify-center">
@@ -202,7 +224,6 @@ const PageHistoryModal: React.FC<PageHistoryModalProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* 復元確認ダイアログ */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -12,8 +12,8 @@ import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { pages, pageContents, pageSnapshots, users } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
-import { MAX_SNAPSHOTS_PER_PAGE } from "../constants.js";
 import { assertPageViewAccess } from "../services/pageAccessService.js";
+import { pruneSnapshotsExceedingLimitSql } from "../services/snapshotService.js";
 
 const app = new Hono<AppEnv>();
 
@@ -120,6 +120,10 @@ app.get("/:id/snapshots/:snapshotId", authRequired, async (c) => {
  * Restore a snapshot. Only the page owner can perform a restore.
  * Note members (collaborators) are intentionally excluded from this operation
  * to ensure only owner-approved states are restored.
+ *
+ * **Collaboration / コラボレーション**: Active Hocuspocus clients may hold stale Y.Doc in memory;
+ * a reconnect or a future invalidation channel (e.g. Redis) may be needed to avoid overwriting
+ * a restored DB state. Not addressed in this endpoint yet.
  */
 // ── POST /:id/snapshots/:snapshotId/restore ─────────────────────────────────
 app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
@@ -208,12 +212,7 @@ app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
       .where(eq(pages.id, pageId));
 
     // 5. 100件超過分を削除
-    await tx.execute(
-      sql`DELETE FROM page_snapshots WHERE id IN (
-        SELECT id FROM page_snapshots WHERE page_id = ${pageId}
-        ORDER BY created_at DESC OFFSET ${MAX_SNAPSHOTS_PER_PAGE}
-      )`,
-    );
+    await tx.execute(pruneSnapshotsExceedingLimitSql(pageId));
 
     return {
       version: updatedRow.version,

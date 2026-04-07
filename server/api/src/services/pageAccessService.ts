@@ -4,7 +4,7 @@
  */
 import { HTTPException } from "hono/http-exception";
 import { eq, and } from "drizzle-orm";
-import { pages, users, notePages, noteMembers } from "../schema/index.js";
+import { pages, users, notes, notePages, noteMembers } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 
 /**
@@ -13,8 +13,8 @@ import type { Database } from "../types/index.js";
  *
  * Hocuspocus の `canEditNotePage` に準拠し、`note_members` を JOIN して
  * 現在のユーザーが当該ノートのメンバーであることを検証する。
- * Mirrors the Hocuspocus `canEditNotePage` logic: JOINs `note_members`
- * to verify the current user is a member of the note.
+ * Mirrors the Hocuspocus `canEditNotePage` logic: JOINs `notes` with
+ * `is_deleted = FALSE` and `note_members` to verify membership.
  */
 export async function assertPageViewAccess(
   db: Database,
@@ -51,6 +51,7 @@ export async function assertPageViewAccess(
   const noteMembership = await db
     .select({ noteId: notePages.noteId })
     .from(notePages)
+    .innerJoin(notes, and(eq(notes.id, notePages.noteId), eq(notes.isDeleted, false)))
     .innerJoin(
       noteMembers,
       and(

@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
-import * as Y from "yjs";
+import React, { useState, useCallback } from "react";
 import { PageEditorHeader } from "./PageEditorHeader";
 import { PageEditorAlerts } from "./PageEditorAlerts";
 import { PageEditorContent } from "./PageEditorContent";
@@ -117,27 +116,6 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
   // Extract ydoc to avoid React Compiler memoization issue with optional chaining
   const ydoc = collaboration?.ydoc ?? null;
 
-  /**
-   * historyOpen 時のみ Y.Doc の状態を base64 でエンコードする（重い処理のためメモ化）。
-   * Memoize Y.Doc state encoding — only computed when history modal is open.
-   *
-   * チャンク処理で大きなドキュメント（64KB 超）でも RangeError を回避する。
-   * Uses chunk processing to avoid RangeError on large documents (>64KB).
-   */
-  const currentYdocState = useMemo((): string => {
-    if (!historyOpen || !ydoc) return "";
-    try {
-      const state = Y.encodeStateAsUpdate(ydoc);
-      const chunks: string[] = [];
-      for (let i = 0; i < state.length; i += 8192) {
-        chunks.push(String.fromCharCode.apply(null, [...state.subarray(i, i + 8192)]));
-      }
-      return btoa(chunks.join(""));
-    } catch {
-      return "";
-    }
-  }, [historyOpen, ydoc]);
-
   return (
     <div className="bg-background flex min-h-screen flex-col">
       <PageEditorHeader
@@ -204,7 +182,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
           open={historyOpen}
           onOpenChange={setHistoryOpen}
           pageId={pageId}
-          currentYdocState={currentYdocState}
+          currentYdoc={ydoc}
           onRestored={handleRestored}
         />
       )}

@@ -7,13 +7,23 @@ import * as Y from "yjs";
 /**
  * Y.XmlFragment を TipTap JSON (ProseMirror Doc) に変換する。
  * Converts a Y.XmlFragment into TipTap-compatible ProseMirror JSON.
+ *
+ * ルート直下の XmlText は paragraph でラップする（フラグメントにブロックが必須なため）。
+ * Top-level XmlText is wrapped in a paragraph (fragment must contain blocks).
  */
 export function yXmlFragmentToTiptapJson(fragment: Y.XmlFragment): Record<string, unknown> {
-  const children = [];
+  const children: Record<string, unknown>[] = [];
   for (let i = 0; i < fragment.length; i++) {
     const child = fragment.get(i);
-    const node = yXmlElementToJson(child);
-    if (node) children.push(node);
+    if (child instanceof Y.XmlText) {
+      const inlines = textToInlineNodes(child);
+      if (inlines.length > 0) {
+        children.push({ type: "paragraph", content: inlines });
+      }
+    } else {
+      const node = yXmlElementToJson(child);
+      if (node) children.push(node);
+    }
   }
   return { type: "doc", content: children.length > 0 ? children : [{ type: "paragraph" }] };
 }
@@ -21,12 +31,18 @@ export function yXmlFragmentToTiptapJson(fragment: Y.XmlFragment): Record<string
 /**
  * Y.XmlElement / Y.XmlText を ProseMirror ノードに変換する。
  * Converts a Y.XmlElement or Y.XmlText into a ProseMirror node.
+ *
+ * XmlText がブロック要素の子の場合はインライン（text ノード）の配列として返すため、
+ * 親の `content` にそのままマージする。ルート直下の XmlText は
+ * `yXmlFragmentToTiptapJson` で paragraph に包む。
  */
 export function yXmlElementToJson(
   element: Y.XmlElement | Y.XmlText | Y.AbstractType<unknown>,
 ): Record<string, unknown> | null {
   if (element instanceof Y.XmlText) {
-    return textToJson(element);
+    const inlines = textToInlineNodes(element);
+    if (inlines.length === 0) return null;
+    return { type: "paragraph", content: inlines };
   }
   if (element instanceof Y.XmlElement) {
     const nodeName = element.nodeName;
@@ -35,8 +51,15 @@ export function yXmlElementToJson(
 
     for (let i = 0; i < element.length; i++) {
       const child = element.get(i);
-      const node = yXmlElementToJson(child);
-      if (node) children.push(node);
+      if (child instanceof Y.XmlText) {
+        const inlines = textToInlineNodes(child);
+        for (const inline of inlines) {
+          children.push(inline);
+        }
+      } else {
+        const node = yXmlElementToJson(child);
+        if (node) children.push(node);
+      }
     }
 
     const result: Record<string, unknown> = { type: nodeName };
@@ -48,14 +71,14 @@ export function yXmlElementToJson(
 }
 
 /**
- * Y.XmlText をテキストノード（ProseMirror paragraph）に変換する。
- * Converts Y.XmlText into a ProseMirror text node (paragraph).
+ * Y.XmlText を ProseMirror インライン（text ノード）の配列に変換する。
+ * Converts Y.XmlText to an array of ProseMirror inline (text) nodes.
  */
-export function textToJson(text: Y.XmlText): Record<string, unknown> | null {
+export function textToInlineNodes(text: Y.XmlText): Record<string, unknown>[] {
   const delta = text.toDelta();
-  if (!delta || delta.length === 0) return null;
+  if (!delta || delta.length === 0) return [];
 
-  const content = delta.map((op: { insert?: string; attributes?: Record<string, unknown> }) => {
+  return delta.map((op: { insert?: string; attributes?: Record<string, unknown> }) => {
     const mark: Record<string, unknown> = { type: "text", text: op.insert ?? "" };
     if (op.attributes) {
       mark.marks = Object.entries(op.attributes)
@@ -67,6 +90,14 @@ export function textToJson(text: Y.XmlText): Record<string, unknown> | null {
     }
     return mark;
   });
+}
 
-  return { type: "paragraph", content };
+/**
+ * @deprecated テスト互換用。通常は `textToInlineNodes` と親の paragraph を使う。
+ * Test-only convenience: wraps inline nodes in a paragraph.
+ */
+export function textToJson(text: Y.XmlText): Record<string, unknown> | null {
+  const inlines = textToInlineNodes(text);
+  if (inlines.length === 0) return null;
+  return { type: "paragraph", content: inlines };
 }
