@@ -58,14 +58,14 @@ describe("WikiLinkExtension paste rule", () => {
       expect(matches).toHaveLength(0);
     });
 
-    it("should handle nested brackets [[[Title]]] gracefully", () => {
-      // With `[[[Title]]]`, the regex greedily matches `[[Title]]` starting
-      // at position 1, so captured group 1 includes the leading `[`.
-      // The paste rule trims titles; this is acceptable edge-case behavior.
-      // `[[[Title]]]` は通常ペーストされないため、エッジケースとして許容する。
+    it("should not capture brackets inside title with [[[Title]]]", () => {
+      // The improved regex `[^\[\]]` excludes both `[` and `]` from capture,
+      // so `[[[Title]]]` correctly matches only `[[Title]]` with capture "Title".
+      // 改善した正規表現により、`[[[Title]]]` でも正しく "Title" だけをキャプチャする。
       const text = "[[[Title]]]";
       const matches = [...text.matchAll(WIKI_LINK_PASTE_REGEX)];
       expect(matches).toHaveLength(1);
+      expect(matches[0][1]).toBe("Title");
     });
   });
 
