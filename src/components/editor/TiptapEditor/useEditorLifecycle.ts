@@ -4,6 +4,7 @@ import { sanitizeTiptapContent } from "@/lib/contentUtils";
 import { useContentSanitizer } from "./useContentSanitizer";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
 import { usePasteImageHandler } from "./usePasteImageHandler";
+import { useMarkdownPasteHandler } from "./useMarkdownPasteHandler";
 import { rememberSlashAgentSelection } from "@/lib/agentSlashCommands/slashAgentSelectionCache";
 import type { TiptapEditorProps } from "./types";
 
@@ -127,6 +128,7 @@ export function useEditorLifecycle({
   ]);
 
   usePasteImageHandler({ editor, handleImageUpload });
+  useMarkdownPasteHandler({ editor });
 
   useEffect(() => {
     if (editor) editor.setEditable(!isReadOnly);
