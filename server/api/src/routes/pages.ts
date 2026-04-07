@@ -163,6 +163,14 @@ app.put("/:id/content", authRequired, async (c) => {
       });
 
       if (firstSave.done) {
+        void tryAutoSnapshot(
+          db,
+          pageId,
+          ydocBuffer,
+          body.content_text ?? null,
+          firstSave.version,
+          userId,
+        );
         return c.json({ version: firstSave.version });
       }
     }

@@ -19,26 +19,8 @@ vi.mock("@tiptap/react", () => ({
   ),
 }));
 
-vi.mock("@tiptap/starter-kit", () => ({
-  default: { configure: () => ({}) },
-}));
-vi.mock("@tiptap/extension-highlight", () => ({ Highlight: {} }));
-vi.mock("@tiptap/extension-underline", () => ({ Underline: {} }));
-vi.mock("@tiptap/extension-task-list", () => ({ TaskList: {} }));
-vi.mock("@tiptap/extension-task-item", () => ({ TaskItem: { configure: () => ({}) } }));
-vi.mock("@tiptap/extension-table", () => ({
-  Table: { configure: () => ({}) },
-  TableRow: {},
-  TableCell: {},
-  TableHeader: {},
-}));
-vi.mock("@tiptap/extension-mathematics", () => ({ Mathematics: {} }));
-vi.mock("lowlight", () => ({
-  common: {},
-  createLowlight: () => ({}),
-}));
-vi.mock("../extensions/CodeBlockWithCopyExtension", () => ({
-  CodeBlockWithCopy: { configure: () => ({}) },
+vi.mock("../TiptapEditor/editorConfig", () => ({
+  createSnapshotPreviewExtensions: () => [],
 }));
 vi.mock("@/lib/ydoc/yDocToTiptapJson", () => ({
   yXmlFragmentToTiptapJson: () => ({ type: "doc", content: [{ type: "paragraph" }] }),

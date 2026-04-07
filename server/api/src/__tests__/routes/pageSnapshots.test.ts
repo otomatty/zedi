@@ -137,7 +137,6 @@ describe("GET /api/pages/:id/snapshots", () => {
   });
 
   it("allows access for note member", async () => {
-    const now = new Date();
     const app = createSnapshotsApp([
       // assertPageViewAccess: pages query (owner is different)
       [{ id: PAGE_ID, ownerId: OWNER_ID }],
@@ -282,6 +281,8 @@ describe("POST /api/pages/:id/snapshots/:snapshotId/restore", () => {
           createdAt: new Date(),
         },
       ],
+      // transaction: row lock
+      [{}],
       // transaction: current content
       [{ version: 2, ydocState: Buffer.from("current"), contentText: "current" }],
       // transaction: insert current snapshot

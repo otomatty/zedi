@@ -40,6 +40,17 @@ function createPagesApp(dbResults: unknown[]) {
   return app;
 }
 
+function createPagesAppWithChains(dbResults: unknown[]) {
+  const { db, chains } = createMockDb(dbResults);
+  const app = new Hono<AppEnv>();
+  app.use("*", async (c, next) => {
+    c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+    await next();
+  });
+  app.route("/api/pages", pageRoutes);
+  return { app, chains };
+}
+
 describe("GET /api/pages/:id/content", () => {
   it("returns 200 with empty ydoc_state when page exists but page_contents row is missing", async () => {
     const app = createPagesApp([[{ id: PAGE_ID, ownerId: TEST_USER_ID }], []]);
@@ -84,9 +95,12 @@ describe("GET /api/pages/:id/content", () => {
 describe("PUT /api/pages/:id/content", () => {
   it("creates page_contents when expected_version is 0 and no row exists (aligns with GET version 0)", async () => {
     const ydocB64 = Buffer.from("hello").toString("base64");
-    const app = createPagesApp([
+    const { app, chains } = createPagesAppWithChains([
       [{ id: PAGE_ID, ownerId: TEST_USER_ID }],
       [{ version: 1, pageId: PAGE_ID }],
+      [],
+      [{ id: "snap-1" }],
+      [],
     ]);
 
     const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
@@ -101,12 +115,22 @@ describe("PUT /api/pages/:id/content", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { version: number };
     expect(body.version).toBe(1);
+    expect(chains.map((chain) => chain.startMethod)).toEqual([
+      "select",
+      "insert",
+      "select",
+      "insert",
+      "execute",
+    ]);
   });
 
   it("accepts ydoc_state empty string for first save (matches GET when page_contents is missing)", async () => {
     const app = createPagesApp([
       [{ id: PAGE_ID, ownerId: TEST_USER_ID }],
       [{ version: 1, pageId: PAGE_ID }],
+      [],
+      [{ id: "snap-2" }],
+      [],
     ]);
 
     const res = await app.request(`/api/pages/${PAGE_ID}/content`, {

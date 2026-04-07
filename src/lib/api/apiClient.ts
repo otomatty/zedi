@@ -24,7 +24,8 @@ import type {
 export type { NoteListItem };
 
 /**
- *
+ * API クライアント生成オプション。
+ * Options for creating the API client.
  */
 export interface ApiClientOptions {
   /** Base URL for API (e.g. https://api.zedi-note.app or "" for same-origin). */
@@ -36,7 +37,8 @@ export interface ApiClientOptions {
 /** API error with status and optional code from body. */
 export class ApiError extends Error {
   /**
-   *
+   * API エラーを生成する。
+   * Creates an API error with HTTP status and optional application code.
    */
   constructor(
     message: string,
@@ -186,26 +188,21 @@ async function requestOptionalAuth<T>(
 }
 
 /**
+ * 型付き API クライアントを生成する。
+ * Creates a typed API client for Zedi backend endpoints.
  *
+ * @param options - API クライアント設定 / API client options
+ * @returns API 呼び出しヘルパー群 / API request helpers
  */
 export function createApiClient(options?: Partial<ApiClientOptions>) {
-  /**
-   *
-   */
   const baseUrl = options?.baseUrl ?? getDefaultBaseUrl();
 
-  /**
-   *
-   */
   const req = <T>(
     method: string,
     path: string,
     opts: { body?: unknown; query?: Record<string, string> } = {},
   ) => request<T>(method, path, baseUrl, opts);
 
-  /**
-   *
-   */
   const reqOptionalAuth = <T>(
     method: string,
     path: string,
@@ -215,9 +212,6 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
   return {
     /** GET /api/sync/pages?since= (ISO8601). Omit since for full pull. */
     async getSyncPages(since?: string): Promise<SyncPagesResponse> {
-      /**
-       *
-       */
       const query: Record<string, string> = {};
       if (since) query.since = since;
       return req<SyncPagesResponse>("GET", "/api/sync/pages", { query });
@@ -336,7 +330,7 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       );
     },
 
-    /** POST /api/notes/:id/pages — add page { pageId } or create new { title }. */
+    /** POST /api/notes/:id/pages — add an existing page or create a new titled page. */
     async addNotePage(
       noteId: string,
       body: { pageId?: string; page_id?: string; title?: string },
@@ -399,9 +393,6 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
 
     /** POST /api/clip/fetch — fetch URL HTML server-side (for Web Clipping, avoids CORS). */
     async clipFetchHtml(url: string): Promise<string> {
-      /**
-       *
-       */
       const { html } = await req<{ html: string }>("POST", "/api/clip/fetch", {
         body: { url },
       });
@@ -411,6 +402,7 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
 }
 
 /**
- *
+ * API クライアント型。
+ * API client type inferred from `createApiClient`.
  */
 export type ApiClient = ReturnType<typeof createApiClient>;

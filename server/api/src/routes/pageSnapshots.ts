@@ -16,6 +16,43 @@ import { assertPageViewAccess } from "../services/pageAccessService.js";
 import { pruneSnapshotsExceedingLimitSql } from "../services/snapshotService.js";
 
 const app = new Hono<AppEnv>();
+const DEFAULT_HOCUSPOCUS_INTERNAL_URL = "http://127.0.0.1:1234";
+
+function getHocuspocusInternalUrl(): string | null {
+  const explicitUrl = process.env.HOCUSPOCUS_INTERNAL_URL?.trim();
+  if (explicitUrl) {
+    return explicitUrl.replace(/\/$/, "");
+  }
+  return process.env.NODE_ENV === "development" ? DEFAULT_HOCUSPOCUS_INTERNAL_URL : null;
+}
+
+async function invalidateHocuspocusDocument(pageId: string): Promise<void> {
+  const baseUrl = getHocuspocusInternalUrl();
+  const internalSecret = process.env.BETTER_AUTH_SECRET?.trim();
+
+  if (!baseUrl || !internalSecret) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        `[Snapshots] Skipped Hocuspocus invalidation for page ${pageId}: internal URL or secret is missing.`,
+      );
+    }
+    return;
+  }
+
+  const response = await fetch(
+    `${baseUrl}/internal/documents/${encodeURIComponent(pageId)}/invalidate`,
+    {
+      method: "POST",
+      headers: {
+        "x-internal-secret": internalSecret,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Hocuspocus invalidation failed with HTTP ${response.status}`);
+  }
+}
 
 // ── GET /:id/snapshots ──────────────────────────────────────────────────────
 app.get("/:id/snapshots", authRequired, async (c) => {
@@ -121,9 +158,10 @@ app.get("/:id/snapshots/:snapshotId", authRequired, async (c) => {
  * Note members (collaborators) are intentionally excluded from this operation
  * to ensure only owner-approved states are restored.
  *
- * **Collaboration / コラボレーション**: Active Hocuspocus clients may hold stale Y.Doc in memory;
- * a reconnect or a future invalidation channel (e.g. Redis) may be needed to avoid overwriting
- * a restored DB state. Not addressed in this endpoint yet.
+ * **Collaboration / コラボレーション**: This endpoint acquires a DB row lock for `page_contents`
+ * and then asks Hocuspocus to invalidate the live document after commit. Configure
+ * `HOCUSPOCUS_INTERNAL_URL` (or rely on the local default) plus `BETTER_AUTH_SECRET`
+ * so stale in-memory Y.Doc state is disconnected before it can overwrite the restored DB state.
  */
 // ── POST /:id/snapshots/:snapshotId/restore ─────────────────────────────────
 app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
@@ -155,6 +193,10 @@ app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
 
   // トランザクションで復元処理
   const result = await db.transaction(async (tx) => {
+    // page_contents 行をロックし、pre-restore バックアップと復元を同じ直列化境界で実行する。
+    // Lock the current page_contents row so backup + restore observe a consistent state.
+    await tx.execute(sql`SELECT 1 FROM page_contents WHERE page_id = ${pageId} FOR UPDATE`);
+
     // 1. 現在の状態をスナップショットとして保存
     const currentContent = await tx
       .select()
@@ -201,6 +243,10 @@ app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
         trigger: "restore",
       })
       .returning();
+    const restoreSnapshotId = restoreSnap[0]?.id;
+    if (!restoreSnapshotId) {
+      throw new HTTPException(500, { message: "Restore snapshot insert failed" });
+    }
 
     // 4. pages メタデータ更新
     const contentPreview = snap.contentText
@@ -216,9 +262,18 @@ app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
 
     return {
       version: updatedRow.version,
-      snapshotId: restoreSnap[0]?.id,
+      snapshotId: restoreSnapshotId,
     };
   });
+
+  try {
+    await invalidateHocuspocusDocument(pageId);
+  } catch (error) {
+    console.error(
+      `[Snapshots] Failed to invalidate Hocuspocus document for page ${pageId}:`,
+      error,
+    );
+  }
 
   return c.json({
     version: result.version,
