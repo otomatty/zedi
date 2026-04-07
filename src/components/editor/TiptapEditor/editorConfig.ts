@@ -23,6 +23,7 @@ import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import { McpResource } from "../extensions/McpResourceExtension";
+import { HtmlArtifact } from "../extensions/HtmlArtifactExtension";
 import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
@@ -244,6 +245,8 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     // --- YouTube Embed ---
     YouTubeEmbed,
     McpResource,
+    // --- HTML Artifact (Claude interactive HTML) ---
+    HtmlArtifact,
     // Y.js リアルタイムコラボレーション（オプション）
     ...(options.collaboration
       ? [
