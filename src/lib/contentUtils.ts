@@ -44,9 +44,7 @@ const SUPPORTED_MARK_TYPES = new Set([
   "textStyle",
 ]);
 
-/**
- *
- */
+/** Result of sanitizing Tiptap JSON (unsupported nodes/marks removed). */
 export interface SanitizeResult {
   content: string;
   hadErrors: boolean;
@@ -338,17 +336,13 @@ function validateNode(node: Record<string, unknown>, errors: string[]): void {
   }
 }
 
-// Extract plain text from Tiptap JSON content
 /**
- *
+ * Extract plain text from Tiptap JSON content.
  */
 export function extractPlainText(content: string): string {
   if (!content) return "";
 
   try {
-    /**
-     *
-     */
     const doc = JSON.parse(content);
     return extractTextFromNode(doc);
   } catch {
@@ -377,23 +371,14 @@ function extractTextFromNode(node: unknown): string {
   return "";
 }
 
-export /**
- *
- */
-const PAGE_LIST_PREVIEW_LENGTH = 120;
+/** Max length for page list preview text. */
+export const PAGE_LIST_PREVIEW_LENGTH = 120;
 
-// Get a preview snippet of the content
 /**
- *
+ * Get a preview snippet of the content (whitespace collapsed, optional truncation).
  */
 export function getContentPreview(content: string, maxLength: number = 100): string {
-  /**
-   *
-   */
   const plainText = extractPlainText(content);
-  /**
-   *
-   */
   const trimmed = plainText.trim().replace(/\s+/g, " ");
 
   if (trimmed.length <= maxLength) return trimmed;
@@ -401,32 +386,20 @@ export function getContentPreview(content: string, maxLength: number = 100): str
   return trimmed.slice(0, maxLength).trim() + "...";
 }
 
-// Standard preview for page list UI
-/**
- *
- */
+/** Standard preview for page list UI. */
 export function getPageListPreview(content: string): string {
   return getContentPreview(content, PAGE_LIST_PREVIEW_LENGTH);
 }
 
-// Extract first image URL from Tiptap content
-/**
- *
- */
+/** Extract first image URL from Tiptap JSON or plain text. */
 export function extractFirstImage(content: string): string | null {
   if (!content) return null;
 
   try {
-    /**
-     *
-     */
     const doc = JSON.parse(content);
     return findFirstImage(doc);
   } catch {
     // Check for image URLs in plain text
-    /**
-     *
-     */
     const imgMatch = content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
     return imgMatch ? imgMatch[0] : null;
   }
@@ -455,18 +428,9 @@ function findFirstImage(node: unknown): string | null {
   return null;
 }
 
-// Extract wiki links [[Link Text]] from content
-/**
- *
- */
+/** Extract wiki links `[[Link Text]]` from content. */
 export function extractWikiLinks(content: string): string[] {
-  /**
-   *
-   */
   const plainText = extractPlainText(content);
-  /**
-   *
-   */
   const matches = plainText.match(/\[\[([^\]]+)\]\]/g);
 
   if (!matches) return [];
@@ -474,18 +438,9 @@ export function extractWikiLinks(content: string): string[] {
   return matches.map((match) => match.slice(2, -2).trim());
 }
 
-// Generate auto title from content
-/**
- *
- */
+/** Generate an auto title from the first line of plain text. */
 export function generateAutoTitle(content: string): string {
-  /**
-   *
-   */
   const plainText = extractPlainText(content);
-  /**
-   *
-   */
   const firstLine = plainText.split("\n")[0]?.trim() || "";
 
   if (!firstLine) return "無題のページ";

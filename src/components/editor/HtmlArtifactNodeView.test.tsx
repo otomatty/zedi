@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HtmlArtifactNodeView } from "./HtmlArtifactNodeView";
 import type { NodeViewProps } from "@tiptap/react";
@@ -55,6 +55,22 @@ describe("HtmlArtifactNodeView", () => {
 
     const iframe = getIframe();
     expect(iframe.getAttribute("sandbox")).not.toContain("allow-same-origin");
+  });
+
+  it("ignores resize postMessage when event.source is not this artifact iframe", () => {
+    const props = createMockProps({ content: "<div>x</div>" });
+    render(<HtmlArtifactNodeView {...props} />);
+
+    const iframe = getIframe();
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "zedi-artifact-resize", height: 40 },
+          source: window,
+        }),
+      );
+    });
+    expect(iframe.style.height).toBe("300px");
   });
 
   it("displays the title when provided", () => {

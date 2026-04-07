@@ -36,15 +36,19 @@ export const HtmlArtifactNodeView: React.FC<NodeViewProps> = ({
   const isEditable = editor.isEditable;
 
   const handleMessage = useCallback((event: MessageEvent) => {
+    const inlineWin = iframeRef.current?.contentWindow;
+    const fullscreenWin = fullscreenIframeRef.current?.contentWindow;
     if (
-      event.data &&
-      typeof event.data === "object" &&
-      event.data.type === "zedi-artifact-resize" &&
-      typeof event.data.height === "number"
+      (event.source !== inlineWin && event.source !== fullscreenWin) ||
+      !event.data ||
+      typeof event.data !== "object" ||
+      event.data.type !== "zedi-artifact-resize" ||
+      typeof event.data.height !== "number"
     ) {
-      const newHeight = Math.max(MIN_HEIGHT, event.data.height + 32);
-      setIframeHeight(newHeight);
+      return;
     }
+    const newHeight = Math.max(MIN_HEIGHT, event.data.height + 32);
+    setIframeHeight(newHeight);
   }, []);
 
   useEffect(() => {
