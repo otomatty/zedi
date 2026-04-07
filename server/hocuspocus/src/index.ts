@@ -10,11 +10,13 @@ import {
   warnDevAuthBypassOnce,
 } from "./dev-auth-bypass.js";
 import { buildContentPreview, extractTextFromYXml } from "./extractPlainTextFromYXml.js";
+import { maybeCreateSnapshot } from "./snapshotUtils.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL;
+
 /** Cached env reads for auth paths (avoid repeated `process.env` lookups). / 認証経路用に env を一度だけ読む */
 const NODE_ENV = process.env.NODE_ENV;
 const HOCUSPOCUS_DEV_MODE = process.env.HOCUSPOCUS_DEV_MODE;
@@ -221,12 +223,24 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
       contentPreview,
       pageId,
     ]);
+
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
+  }
+
+  // 自動スナップショット判定（ベストエフォート: 失敗してもドキュメント保存に影響させない）
+  // Auto-snapshot check (best-effort: failures do not affect document save)
+  const snapshotClient = await getPool().connect();
+  try {
+    await maybeCreateSnapshot(snapshotClient, pageId, encodedState, contentText);
+  } catch (error) {
+    console.error(`[Snapshot] Failed to create auto-snapshot for page ${pageId}:`, error);
+  } finally {
+    snapshotClient.release();
   }
 }
 

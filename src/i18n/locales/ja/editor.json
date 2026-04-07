@@ -214,6 +214,32 @@
       "typescript": "TypeScript"
     }
   },
+  "pageHistory": {
+    "title": "変更履歴",
+    "description": "このページの過去のバージョンを表示します",
+    "menuButton": "変更履歴",
+    "snapshotList": "バージョン一覧",
+    "preview": "プレビュー",
+    "compare": "比較",
+    "auto": "自動保存",
+    "restore": "復元",
+    "pre-restore": "復元前",
+    "version": "v{{version}}",
+    "noSnapshots": "変更履歴がまだありません",
+    "noSnapshotsDescription": "編集内容は10分ごとに自動保存されます",
+    "selectSnapshot": "左の一覧からバージョンを選択してください",
+    "restoreButton": "このバージョンに復元する",
+    "restoreConfirmTitle": "このバージョンに復元しますか？",
+    "restoreConfirmDescription": "現在の内容はスナップショットとして保存され、選択したバージョンが新しいバージョンとして復元されます。",
+    "restoreConfirmCancel": "キャンセル",
+    "restoreConfirmAction": "復元する",
+    "restoring": "復元中...",
+    "restoreSuccess": "バージョンを復元しました",
+    "restoreError": "復元に失敗しました",
+    "currentVersion": "現在のバージョン",
+    "selectedVersion": "選択したバージョン",
+    "by": "by {{email}}"
+  },
   "markdownExport": {
     "sourceAttribution": "📎 引用元",
     "downloaded": "Markdownファイルをダウンロードしました",

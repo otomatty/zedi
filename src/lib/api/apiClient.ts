@@ -16,10 +16,16 @@ import type {
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
+  SnapshotListResponse,
+  SnapshotDetailResponse,
+  RestoreSnapshotResponse,
 } from "./types";
 
 export type { NoteListItem };
 
+/**
+ *
+ */
 export interface ApiClientOptions {
   /** Base URL for API (e.g. https://api.zedi-note.app or "" for same-origin). */
   baseUrl?: string;
@@ -29,6 +35,9 @@ export interface ApiClientOptions {
 
 /** API error with status and optional code from body. */
 export class ApiError extends Error {
+  /**
+   *
+   */
   constructor(
     message: string,
     public status: number,
@@ -176,15 +185,27 @@ async function requestOptionalAuth<T>(
   return unwrapEnvelope<T>(data);
 }
 
+/**
+ *
+ */
 export function createApiClient(options?: Partial<ApiClientOptions>) {
+  /**
+   *
+   */
   const baseUrl = options?.baseUrl ?? getDefaultBaseUrl();
 
+  /**
+   *
+   */
   const req = <T>(
     method: string,
     path: string,
     opts: { body?: unknown; query?: Record<string, string> } = {},
   ) => request<T>(method, path, baseUrl, opts);
 
+  /**
+   *
+   */
   const reqOptionalAuth = <T>(
     method: string,
     path: string,
@@ -194,6 +215,9 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
   return {
     /** GET /api/sync/pages?since= (ISO8601). Omit since for full pull. */
     async getSyncPages(since?: string): Promise<SyncPagesResponse> {
+      /**
+       *
+       */
       const query: Record<string, string> = {};
       if (since) query.since = since;
       return req<SyncPagesResponse>("GET", "/api/sync/pages", { query });
@@ -226,6 +250,32 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<{ id: string; deleted: boolean }>(
         "DELETE",
         `/api/pages/${encodeURIComponent(pageId)}`,
+      );
+    },
+
+    // ── Page Snapshots (Version History) ──────────────────────────────────
+
+    /** GET /api/pages/:id/snapshots — スナップショット一覧 / List snapshots */
+    async getPageSnapshots(pageId: string): Promise<SnapshotListResponse> {
+      return req<SnapshotListResponse>("GET", `/api/pages/${encodeURIComponent(pageId)}/snapshots`);
+    },
+
+    /** GET /api/pages/:id/snapshots/:snapshotId — スナップショット詳細 / Get snapshot detail */
+    async getPageSnapshot(pageId: string, snapshotId: string): Promise<SnapshotDetailResponse> {
+      return req<SnapshotDetailResponse>(
+        "GET",
+        `/api/pages/${encodeURIComponent(pageId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+      );
+    },
+
+    /** POST /api/pages/:id/snapshots/:snapshotId/restore — 復元 / Restore snapshot */
+    async restorePageSnapshot(
+      pageId: string,
+      snapshotId: string,
+    ): Promise<RestoreSnapshotResponse> {
+      return req<RestoreSnapshotResponse>(
+        "POST",
+        `/api/pages/${encodeURIComponent(pageId)}/snapshots/${encodeURIComponent(snapshotId)}/restore`,
       );
     },
 
@@ -349,6 +399,9 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
 
     /** POST /api/clip/fetch — fetch URL HTML server-side (for Web Clipping, avoids CORS). */
     async clipFetchHtml(url: string): Promise<string> {
+      /**
+       *
+       */
       const { html } = await req<{ html: string }>("POST", "/api/clip/fetch", {
         body: { url },
       });
@@ -357,4 +410,7 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
   };
 }
 
+/**
+ *
+ */
 export type ApiClient = ReturnType<typeof createApiClient>;

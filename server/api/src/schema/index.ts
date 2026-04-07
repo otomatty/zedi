@@ -28,6 +28,7 @@ export {
   type NewGhostLink,
 } from "./links.js";
 export { pageContents, type PageContent, type NewPageContent } from "./pageContents.js";
+export { pageSnapshots, type PageSnapshot, type NewPageSnapshot } from "./pageSnapshots.js";
 export { media, type Media, type NewMedia } from "./media.js";
 export { subscriptions, type Subscription, type NewSubscription } from "./subscriptions.js";
 export {
@@ -64,6 +65,7 @@ export {
   linksRelations,
   ghostLinksRelations,
   pageContentsRelations,
+  pageSnapshotsRelations,
   mediaRelations,
   subscriptionsRelations,
   aiUsageLogsRelations,

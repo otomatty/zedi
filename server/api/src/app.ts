@@ -11,6 +11,7 @@ import type { AppEnv } from "./types/index.js";
 import healthRoutes from "./routes/health.js";
 import userRoutes from "./routes/users.js";
 import pageRoutes from "./routes/pages.js";
+import pageSnapshotRoutes from "./routes/pageSnapshots.js";
 import syncPageRoutes from "./routes/syncPages.js";
 import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
@@ -82,6 +83,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Pages
   app.route("/api/pages", pageRoutes);
+
+  // Page Snapshots (version history)
+  app.route("/api/pages", pageSnapshotRoutes);
 
   // Sync
   app.route("/api/sync/pages", syncPageRoutes);
