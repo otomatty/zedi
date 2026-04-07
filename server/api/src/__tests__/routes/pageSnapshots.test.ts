@@ -96,9 +96,12 @@ describe("GET /api/pages/:id/snapshots", () => {
         created_at: string;
       }>;
     };
-    expect(body.snapshots).toHaveLength(1);
-    expect(body.snapshots[0].id).toBe(SNAPSHOT_ID);
-    expect(body.snapshots[0].created_by_email).toBe("owner@example.com");
+    expect(body.snapshots).toEqual([
+      expect.objectContaining({
+        id: SNAPSHOT_ID,
+        created_by_email: "owner@example.com",
+      }),
+    ]);
   });
 
   it("returns 404 when page does not exist", async () => {
