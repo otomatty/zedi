@@ -266,7 +266,11 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
 }
 
 /**
- * Create the array of Tiptap extensions for the editor
+ * メインエディタ用の Tiptap 拡張配列を生成する（プレースホルダー、スラッシュ、コラボ等を含む）。
+ * Creates the full Tiptap extension list for the main editor (placeholder, slash, collaboration, etc.).
+ *
+ * @param options - 拡張のオプション（リンク・画像・コラボ設定など） / Extension options (links, images, collaboration, …)
+ * @returns Tiptap の `Extension[]` / Array of Tiptap extensions
  */
 export function createEditorExtensions(options: EditorExtensionsOptions): Extension[] {
   return createCommonEditorExtensions({

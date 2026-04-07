@@ -385,13 +385,14 @@ const hocuspocus = new Hocuspocus({
 });
 
 async function invalidateLiveDocument(documentName: string): Promise<boolean> {
-  const liveDoc = hocuspocus.documents.get(documentName);
-  if (!liveDoc) return false;
+  if (!hocuspocus.documents.has(documentName)) {
+    return false;
+  }
 
-  // 対象ドキュメントをキャッシュから外してから接続を閉じ、stale state の再保存を防ぐ。
-  // Remove the live document from cache before disconnecting clients to avoid stale re-persist.
+  // closeConnections(documentName) は documents マップを走査するため、delete より先に呼ぶ。
+  // Pass documentName so only that document's WebSocket connections close (not server-wide).
+  hocuspocus.closeConnections(documentName);
   hocuspocus.documents.delete(documentName);
-  hocuspocus.closeConnections();
   return true;
 }
 

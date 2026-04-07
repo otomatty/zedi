@@ -2,7 +2,7 @@
  * pageSnapshots ルートのテスト（認可・CRUD）
  * Tests for page snapshots routes: authorization, list, detail, restore.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
 
@@ -43,6 +43,14 @@ function createSnapshotsApp(dbResults: unknown[]) {
   app.route("/api/pages", pageSnapshotRoutes);
   return app;
 }
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" }));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // ── 認証 / Authentication ──────────────────────────────────────────────────
 

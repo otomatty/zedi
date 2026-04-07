@@ -17,6 +17,8 @@ import { pruneSnapshotsExceedingLimitSql } from "../services/snapshotService.js"
 
 const app = new Hono<AppEnv>();
 const DEFAULT_HOCUSPOCUS_INTERNAL_URL = "http://127.0.0.1:1234";
+/** Best-effort invalidation HTTP timeout (ms). / ベストエフォート無効化の HTTP タイムアウト（ミリ秒） */
+const HOCUSPOCUS_INVALIDATE_TIMEOUT_MS = 2500;
 
 function getHocuspocusInternalUrl(): string | null {
   const explicitUrl = process.env.HOCUSPOCUS_INTERNAL_URL?.trim();
@@ -26,6 +28,13 @@ function getHocuspocusInternalUrl(): string | null {
   return process.env.NODE_ENV === "development" ? DEFAULT_HOCUSPOCUS_INTERNAL_URL : null;
 }
 
+/**
+ * Hocuspocus に復元後のライブドキュメント無効化を依頼する（ベストエフォート）。
+ * タイムアウト・HTTP エラーはログのみで呼び出し元には伝えない。
+ *
+ * Best-effort: asks Hocuspocus to drop live Y.Doc after restore. Timeouts and HTTP
+ * errors are logged only and never thrown to the caller.
+ */
 async function invalidateHocuspocusDocument(pageId: string): Promise<void> {
   const baseUrl = getHocuspocusInternalUrl();
   const internalSecret = process.env.BETTER_AUTH_SECRET?.trim();
@@ -39,18 +48,33 @@ async function invalidateHocuspocusDocument(pageId: string): Promise<void> {
     return;
   }
 
-  const response = await fetch(
-    `${baseUrl}/internal/documents/${encodeURIComponent(pageId)}/invalidate`,
-    {
+  const url = `${baseUrl}/internal/documents/${encodeURIComponent(pageId)}/invalidate`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), HOCUSPOCUS_INVALIDATE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "x-internal-secret": internalSecret,
       },
-    },
-  );
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
 
-  if (!response.ok) {
-    throw new Error(`Hocuspocus invalidation failed with HTTP ${response.status}`);
+    if (!response.ok) {
+      console.warn(
+        `[Snapshots] Hocuspocus invalidation HTTP ${response.status} for page ${pageId}`,
+      );
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const name = error instanceof Error ? error.name : "";
+    if (name === "AbortError") {
+      console.warn(`[Snapshots] Hocuspocus invalidation timed out for page ${pageId}`);
+      return;
+    }
+    console.warn(`[Snapshots] Hocuspocus invalidation failed for page ${pageId}:`, error);
   }
 }
 
@@ -266,14 +290,7 @@ app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
     };
   });
 
-  try {
-    await invalidateHocuspocusDocument(pageId);
-  } catch (error) {
-    console.error(
-      `[Snapshots] Failed to invalidate Hocuspocus document for page ${pageId}:`,
-      error,
-    );
-  }
+  await invalidateHocuspocusDocument(pageId);
 
   return c.json({
     version: result.version,
