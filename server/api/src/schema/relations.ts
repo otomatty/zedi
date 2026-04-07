@@ -113,6 +113,7 @@ const noteMembersRelations = relations(noteMembers, ({ one }) => ({
   invitedBy: one(users, {
     fields: [noteMembers.invitedByUserId],
     references: [users.id],
+    relationName: "invitedMember",
   }),
   acceptedUser: one(users, {
     fields: [noteMembers.acceptedUserId],
