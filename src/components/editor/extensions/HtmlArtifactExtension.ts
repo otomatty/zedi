@@ -12,16 +12,18 @@ export interface HtmlArtifactOptions {
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
-    /**
-     * HTML アーティファクトを挿入する。
-     * Insert an HTML artifact block.
-     */
-    insertHtmlArtifact: (attrs: { content: string; title?: string }) => ReturnType;
-    /**
-     * HTML アーティファクトの属性を更新する。
-     * Update an HTML artifact's attributes.
-     */
-    updateHtmlArtifact: (attrs: { content?: string; title?: string }) => ReturnType;
+    htmlArtifact: {
+      /**
+       * HTML アーティファクトを挿入する。
+       * Insert an HTML artifact block.
+       */
+      insertHtmlArtifact: (attrs: { content: string; title?: string }) => ReturnType;
+      /**
+       * HTML アーティファクトの属性を更新する。
+       * Update an HTML artifact's attributes.
+       */
+      updateHtmlArtifact: (attrs: { content?: string; title?: string }) => ReturnType;
+    };
   }
 }
 
