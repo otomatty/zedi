@@ -1,6 +1,18 @@
-import { Mark, mergeAttributes } from "@tiptap/core";
+import { Mark, markPasteRule, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
+/**
+ * Regex to match completed WikiLink patterns `[[Title]]` in pasted text.
+ * Captures the title (non-empty, no `]` characters) inside the brackets.
+ *
+ * 貼り付けテキスト中の完成済み WikiLink パターン `[[Title]]` にマッチする正規表現。
+ * ブラケット内のタイトル（空でなく `]` を含まない）をキャプチャする。
+ */
+export const WIKI_LINK_PASTE_REGEX = /\[\[([^\]]+)\]\]/g;
+
+/**
+ *
+ */
 export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>;
   onLinkClick?: (title: string) => void;
@@ -20,7 +32,10 @@ declare module "@tiptap/core" {
   }
 }
 
-export const WikiLink = Mark.create<WikiLinkOptions>({
+export /**
+ *
+ */
+const WikiLink = Mark.create<WikiLinkOptions>({
   name: "wikiLink",
 
   priority: 1000,
@@ -67,12 +82,21 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
+    /**
+     *
+     */
     const exists =
       HTMLAttributes["data-exists"] === "true" || HTMLAttributes["data-exists"] === true;
+    /**
+     *
+     */
     const referenced =
       HTMLAttributes["data-referenced"] === "true" || HTMLAttributes["data-referenced"] === true;
 
     // Determine CSS class based on link status
+    /**
+     *
+     */
     let className = "wiki-link";
     if (!exists) {
       className = referenced ? "wiki-link-referenced" : "wiki-link-ghost";
@@ -88,6 +112,23 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
     ];
   },
 
+  addPasteRules() {
+    return [
+      markPasteRule({
+        find: WIKI_LINK_PASTE_REGEX,
+        type: this.type,
+        getAttributes: (match) => {
+          /**
+           *
+           */
+          const title = (match[1] ?? "").trim();
+          if (!title) return false;
+          return { title, exists: false, referenced: false };
+        },
+      }),
+    ];
+  },
+
   addKeyboardShortcuts() {
     return {
       "Mod-[": () => false, // Prevent default
@@ -95,6 +136,9 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
   },
 
   addProseMirrorPlugins() {
+    /**
+     *
+     */
     const { onLinkClick } = this.options;
 
     return [
@@ -104,12 +148,21 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
           handleClick: (_view, _pos, event) => {
             if (!onLinkClick) return false;
 
+            /**
+             *
+             */
             const target = event.target as HTMLElement;
 
             // Check if clicked on a wiki-link element
+            /**
+             *
+             */
             const wikiLinkElement = target.closest("[data-wiki-link]") as HTMLElement | null;
             if (!wikiLinkElement) return false;
 
+            /**
+             *
+             */
             const title = wikiLinkElement.getAttribute("data-title");
 
             if (title) {
