@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import { PageEditorHeader } from "./PageEditorHeader";
 import { PageEditorAlerts } from "./PageEditorAlerts";
 import { PageEditorContent } from "./PageEditorContent";
 import { PageEditorDialogs } from "./PageEditorDialogs";
 import { ContentWithAIChat } from "../../ai-chat/ContentWithAIChat";
+import { PageHistoryModal } from "../pageHistory/PageHistoryModal";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
 import type { Page } from "@/types/page";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
@@ -99,6 +100,22 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
     onWikiContentApplied,
   } = props;
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const handleOpenHistory = useCallback(() => {
+    setHistoryOpen(true);
+  }, []);
+
+  const handleRestored = useCallback(() => {
+    // 復元後にページをリロードして最新状態を反映する
+    // Reload the page after restore to reflect the latest state
+    window.location.reload();
+  }, []);
+
+  // React Compiler が optional chain の依存を保持できないため先に抽出する
+  // Extract ydoc to avoid React Compiler memoization issue with optional chaining
+  const ydoc = collaboration?.ydoc ?? null;
+
   return (
     <div className="bg-background flex min-h-screen flex-col">
       <PageEditorHeader
@@ -107,6 +124,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
         onDelete={onDelete}
         onExportMarkdown={onExportMarkdown}
         onCopyMarkdown={onCopyMarkdown}
+        onOpenHistory={handleOpenHistory}
         collaboration={undefined}
       />
 
@@ -158,6 +176,16 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
         onResetWiki={onResetWiki}
         onGoToAISettings={onGoToAISettings}
       />
+
+      {historyOpen && (
+        <PageHistoryModal
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          pageId={pageId}
+          currentYdoc={ydoc}
+          onRestored={handleRestored}
+        />
+      )}
     </div>
   );
 };

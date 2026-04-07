@@ -10,11 +10,14 @@ import {
   warnDevAuthBypassOnce,
 } from "./dev-auth-bypass.js";
 import { buildContentPreview, extractTextFromYXml } from "./extractPlainTextFromYXml.js";
+import { maybeCreateSnapshot } from "./snapshotUtils.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL;
+const INTERNAL_SECRET = process.env.BETTER_AUTH_SECRET?.trim();
+
 /** Cached env reads for auth paths (avoid repeated `process.env` lookups). / 認証経路用に env を一度だけ読む */
 const NODE_ENV = process.env.NODE_ENV;
 const HOCUSPOCUS_DEV_MODE = process.env.HOCUSPOCUS_DEV_MODE;
@@ -50,6 +53,11 @@ function getPool(): Pool {
     idleTimeoutMillis: 30000,
   });
   return pgPool;
+}
+
+function isAuthorizedInternalRequest(req: IncomingMessage): boolean {
+  if (!INTERNAL_SECRET) return false;
+  return req.headers["x-internal-secret"] === INTERNAL_SECRET;
 }
 
 async function verifySession(
@@ -221,12 +229,24 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
       contentPreview,
       pageId,
     ]);
+
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
+  }
+
+  // 自動スナップショット判定（ベストエフォート: 失敗してもドキュメント保存に影響させない）
+  // Auto-snapshot check (best-effort: failures do not affect document save)
+  const snapshotClient = await getPool().connect();
+  try {
+    await maybeCreateSnapshot(snapshotClient, pageId, encodedState, contentText);
+  } catch (error) {
+    console.error(`[Snapshot] Failed to create auto-snapshot for page ${pageId}:`, error);
+  } finally {
+    snapshotClient.release();
   }
 }
 
@@ -364,10 +384,57 @@ const hocuspocus = new Hocuspocus({
   },
 });
 
+async function invalidateLiveDocument(documentName: string): Promise<boolean> {
+  if (!hocuspocus.documents.has(documentName)) {
+    return false;
+  }
+
+  // closeConnections(documentName) は documents マップを走査するため、delete より先に呼ぶ。
+  // Pass documentName so only that document's WebSocket connections close (not server-wide).
+  hocuspocus.closeConnections(documentName);
+  hocuspocus.documents.delete(documentName);
+  return true;
+}
+
+async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+
+  if (req.method === "POST") {
+    const match = requestUrl.pathname.match(/^\/internal\/documents\/([^/]+)\/invalidate$/);
+    if (match) {
+      if (!isAuthorizedInternalRequest(req)) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
+
+      const pageId = decodeURIComponent(match[1] ?? "");
+      const documentName = `page-${pageId}`;
+      const invalidated = await invalidateLiveDocument(documentName);
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, documentName, invalidated }));
+      return;
+    }
+  }
+
+  await handleHttpRequestFallback(requestUrl, res);
+}
+
 // カスタムHTTPサーバー（ヘルスチェック用）
 const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+  void handleHttpRequest(req, res).catch((error) => {
+    console.error("[HTTP] Request handling failed:", error);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Internal Server Error" }));
+    }
+  });
+});
+
+async function handleHttpRequestFallback(requestUrl: URL, res: ServerResponse): Promise<void> {
   // ヘルスチェックエンドポイント
-  if (req.url === "/health" || req.url === "/") {
+  if (requestUrl.pathname === "/health" || requestUrl.pathname === "/") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
@@ -384,7 +451,7 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
   // その他のリクエストは404
   res.writeHead(404, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: "Not Found" }));
-});
+}
 
 // WebSocketサーバーをHTTPサーバーにアタッチ
 const wss = new WebSocketServer({ server: httpServer });

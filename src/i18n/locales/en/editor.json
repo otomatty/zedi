@@ -221,6 +221,32 @@
       "typescript": "TypeScript"
     }
   },
+  "pageHistory": {
+    "title": "Version History",
+    "description": "View previous versions of this page",
+    "menuButton": "Version History",
+    "snapshotList": "Versions",
+    "preview": "Preview",
+    "compare": "Compare",
+    "auto": "Auto-saved",
+    "restore": "Restored",
+    "pre-restore": "Pre-restore",
+    "version": "v{{version}}",
+    "noSnapshots": "No version history yet",
+    "noSnapshotsDescription": "Edits are auto-saved every 10 minutes",
+    "selectSnapshot": "Select a version from the list on the left",
+    "restoreButton": "Restore this version",
+    "restoreConfirmTitle": "Restore this version?",
+    "restoreConfirmDescription": "The current content will be saved as a snapshot, and the selected version will be restored as a new version.",
+    "restoreConfirmCancel": "Cancel",
+    "restoreConfirmAction": "Restore",
+    "restoring": "Restoring...",
+    "restoreSuccess": "Version restored",
+    "restoreError": "Failed to restore",
+    "currentVersion": "Current version",
+    "selectedVersion": "Selected version",
+    "by": "by {{email}}"
+  },
   "markdownExport": {
     "sourceAttribution": "📎 Source",
     "downloaded": "Markdown file downloaded",

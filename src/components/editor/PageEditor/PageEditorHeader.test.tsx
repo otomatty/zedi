@@ -132,6 +132,31 @@ describe("PageEditorHeader", () => {
       expect(onDelete).toHaveBeenCalledTimes(1);
     });
 
+    it("onOpenHistory を渡すとドロップダウンに変更履歴メニューが表示される", async () => {
+      const user = userEvent.setup();
+      const onOpenHistory = vi.fn();
+      renderHeader({ onOpenHistory });
+      const buttons = screen.getAllByRole("button");
+      await user.click(buttons[buttons.length - 1]);
+      const historyItem = await screen.findByRole("menuitem", { name: /変更履歴|pageHistory/ });
+      await user.click(historyItem);
+      expect(onOpenHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it("onOpenHistory を渡さないとき変更履歴メニューは表示されない", async () => {
+      const user = userEvent.setup();
+      renderHeader();
+      const buttons = screen.getAllByRole("button");
+      await user.click(buttons[buttons.length - 1]);
+      // 変更履歴メニューが存在しないことを確認
+      const historyItems = screen
+        .queryAllByRole("menuitem")
+        .filter(
+          (el) => el.textContent?.includes("変更履歴") || el.textContent?.includes("pageHistory"),
+        );
+      expect(historyItems).toHaveLength(0);
+    });
+
     it("collaboration ありで ConnectionIndicator の onReconnect をクリックすると onReconnect が呼ばれる", async () => {
       const user = userEvent.setup();
       const onReconnect = vi.fn();

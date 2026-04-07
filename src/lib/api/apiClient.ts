@@ -16,10 +16,17 @@ import type {
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
+  SnapshotListResponse,
+  SnapshotDetailResponse,
+  RestoreSnapshotResponse,
 } from "./types";
 
 export type { NoteListItem };
 
+/**
+ * API クライアント生成オプション。
+ * Options for creating the API client.
+ */
 export interface ApiClientOptions {
   /** Base URL for API (e.g. https://api.zedi-note.app or "" for same-origin). */
   baseUrl?: string;
@@ -29,6 +36,10 @@ export interface ApiClientOptions {
 
 /** API error with status and optional code from body. */
 export class ApiError extends Error {
+  /**
+   * API エラーを生成する。
+   * Creates an API error with HTTP status and optional application code.
+   */
   constructor(
     message: string,
     public status: number,
@@ -176,6 +187,13 @@ async function requestOptionalAuth<T>(
   return unwrapEnvelope<T>(data);
 }
 
+/**
+ * 型付き API クライアントを生成する。
+ * Creates a typed API client for Zedi backend endpoints.
+ *
+ * @param options - API クライアント設定 / API client options
+ * @returns API 呼び出しヘルパー群 / API request helpers
+ */
 export function createApiClient(options?: Partial<ApiClientOptions>) {
   const baseUrl = options?.baseUrl ?? getDefaultBaseUrl();
 
@@ -226,6 +244,32 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<{ id: string; deleted: boolean }>(
         "DELETE",
         `/api/pages/${encodeURIComponent(pageId)}`,
+      );
+    },
+
+    // ── Page Snapshots (Version History) ──────────────────────────────────
+
+    /** GET /api/pages/:id/snapshots — スナップショット一覧 / List snapshots */
+    async getPageSnapshots(pageId: string): Promise<SnapshotListResponse> {
+      return req<SnapshotListResponse>("GET", `/api/pages/${encodeURIComponent(pageId)}/snapshots`);
+    },
+
+    /** GET /api/pages/:id/snapshots/:snapshotId — スナップショット詳細 / Get snapshot detail */
+    async getPageSnapshot(pageId: string, snapshotId: string): Promise<SnapshotDetailResponse> {
+      return req<SnapshotDetailResponse>(
+        "GET",
+        `/api/pages/${encodeURIComponent(pageId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+      );
+    },
+
+    /** POST /api/pages/:id/snapshots/:snapshotId/restore — 復元 / Restore snapshot */
+    async restorePageSnapshot(
+      pageId: string,
+      snapshotId: string,
+    ): Promise<RestoreSnapshotResponse> {
+      return req<RestoreSnapshotResponse>(
+        "POST",
+        `/api/pages/${encodeURIComponent(pageId)}/snapshots/${encodeURIComponent(snapshotId)}/restore`,
       );
     },
 
@@ -286,7 +330,7 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       );
     },
 
-    /** POST /api/notes/:id/pages — add page { pageId } or create new { title }. */
+    /** POST /api/notes/:id/pages — add an existing page or create a new titled page. */
     async addNotePage(
       noteId: string,
       body: { pageId?: string; page_id?: string; title?: string },
@@ -357,4 +401,8 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
   };
 }
 
+/**
+ * API クライアント型。
+ * API client type inferred from `createApiClient`.
+ */
 export type ApiClient = ReturnType<typeof createApiClient>;

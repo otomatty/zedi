@@ -116,10 +116,20 @@ export interface EditorExtensionsOptions {
   };
 }
 
-/**
- * Create the array of Tiptap extensions for the editor
- */
-export function createEditorExtensions(options: EditorExtensionsOptions): Extension[] {
+interface CommonEditorExtensionsOptions {
+  placeholder?: string;
+  onLinkClick: (title: string) => void;
+  onStateChange?: (state: WikiLinkSuggestionState) => void;
+  onSlashStateChange?: (state: SlashSuggestionState) => void;
+  imageUploadOptions?: Partial<ImageUploadOptions>;
+  imageOptions?: Partial<StorageImageOptions>;
+  fileReference?: EditorExtensionsOptions["fileReference"];
+  includePlaceholder?: boolean;
+  includeInteractionPlugins?: boolean;
+  collaboration?: CollaborationExtensionsOptions;
+}
+
+function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): Extension[] {
   const useCollaboration = Boolean(options.collaboration);
 
   return [
@@ -141,10 +151,14 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     }),
     // Typography for smart quotes and dashes
     Typography,
-    Placeholder.configure({
-      placeholder: options.placeholder,
-      emptyEditorClass: "is-editor-empty",
-    }),
+    ...(options.includePlaceholder
+      ? [
+          Placeholder.configure({
+            placeholder: options.placeholder ?? "",
+            emptyEditorClass: "is-editor-empty",
+          }),
+        ]
+      : []),
     Link.configure({
       openOnClick: true,
       HTMLAttributes: {
@@ -203,13 +217,17 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
       getWorkspaceRoot: options.fileReference?.getWorkspaceRoot ?? (() => null),
       getNoteId: options.fileReference?.getNoteId ?? (() => null),
     }),
-    WikiLinkSuggestionPlugin.configure({
-      onStateChange: options.onStateChange,
-    }),
-    // --- Phase 0: Slash Command ---
-    SlashSuggestionPlugin.configure({
-      onStateChange: options.onSlashStateChange,
-    }),
+    ...(options.includeInteractionPlugins
+      ? [
+          WikiLinkSuggestionPlugin.configure({
+            onStateChange: options.onStateChange ?? (() => undefined),
+          }),
+          // --- Phase 0: Slash Command ---
+          SlashSuggestionPlugin.configure({
+            onStateChange: options.onSlashStateChange ?? (() => undefined),
+          }),
+        ]
+      : []),
     // --- Image ---
     ImageUpload.configure({
       HTMLAttributes: {},
@@ -248,6 +266,42 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
         ]
       : []),
   ] as Extension[];
+}
+
+/**
+ * メインエディタ用の Tiptap 拡張配列を生成する（プレースホルダー、スラッシュ、コラボ等を含む）。
+ * Creates the full Tiptap extension list for the main editor (placeholder, slash, collaboration, etc.).
+ *
+ * @param options - 拡張のオプション（リンク・画像・コラボ設定など） / Extension options (links, images, collaboration, …)
+ * @returns Tiptap の `Extension[]` / Array of Tiptap extensions
+ */
+export function createEditorExtensions(options: EditorExtensionsOptions): Extension[] {
+  return createCommonEditorExtensions({
+    placeholder: options.placeholder,
+    onLinkClick: options.onLinkClick,
+    onStateChange: options.onStateChange,
+    onSlashStateChange: options.onSlashStateChange,
+    imageUploadOptions: options.imageUploadOptions,
+    imageOptions: options.imageOptions,
+    fileReference: options.fileReference,
+    includePlaceholder: true,
+    includeInteractionPlugins: true,
+    collaboration: options.collaboration,
+  });
+}
+
+/**
+ * スナップショットプレビュー用の拡張セットを返す。
+ * Returns the shared extension set used by snapshot preview editors.
+ */
+export function createSnapshotPreviewExtensions(): Extension[] {
+  return createCommonEditorExtensions({
+    onLinkClick: () => undefined,
+    imageUploadOptions: {},
+    imageOptions: {},
+    includePlaceholder: false,
+    includeInteractionPlugins: false,
+  });
 }
 
 /**
