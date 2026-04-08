@@ -250,12 +250,13 @@ describe("GET /api/invite/:token", () => {
 describe("POST /api/invite/:token/accept", () => {
   it("should accept invitation when email matches", async () => {
     const invitation = createMockInvitation();
+    const claimed = { noteId: NOTE_ID, memberEmail: TEST_USER_EMAIL };
     const updatedMember = { role: "editor", status: "accepted" };
 
     const { app } = createTestApp([
       [invitation], // select noteInvitations
+      [claimed], // update noteInvitations (claim) → returning
       [updatedMember], // update noteMembers → returning
-      [], // update noteInvitations (used_at)
     ]);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}/accept`, {
@@ -342,9 +343,11 @@ describe("POST /api/invite/:token/accept", () => {
 
   it("should return 404 when member record was soft-deleted", async () => {
     const invitation = createMockInvitation();
+    const claimed = { noteId: NOTE_ID, memberEmail: TEST_USER_EMAIL };
 
     const { app } = createTestApp([
       [invitation], // select noteInvitations
+      [claimed], // claim invitation
       [], // update noteMembers → returning empty (soft-deleted)
     ]);
 
@@ -371,16 +374,36 @@ describe("POST /api/invite/:token/accept", () => {
     expect(res.status).toBe(401);
   });
 
+  it("should return 400 when user email is missing", async () => {
+    const invitation = createMockInvitation();
+    const { app } = createTestApp([[invitation]]);
+
+    const res = await app.request(`/api/invite/${TEST_TOKEN}/accept`, {
+      method: "POST",
+      headers: {
+        "x-test-user-id": TEST_USER_ID,
+        "Content-Type": "application/json",
+      },
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      error: "Could not determine your email address. Please log in again.",
+    });
+  });
+
   it("should handle case-insensitive email matching", async () => {
     const invitation = createMockInvitation({
       memberEmail: "TEST@EXAMPLE.COM", // uppercase
     });
+    const claimed = { noteId: NOTE_ID, memberEmail: "TEST@EXAMPLE.COM" };
     const updatedMember = { role: "viewer", status: "accepted" };
 
     const { app } = createTestApp([
       [invitation], // select noteInvitations
+      [claimed], // claim invitation (returning row)
       [updatedMember], // update noteMembers → returning
-      [], // update noteInvitations (used_at)
     ]);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}/accept`, {

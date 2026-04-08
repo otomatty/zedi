@@ -96,8 +96,12 @@ const NoteMembers: React.FC = () => {
   const handleResendInvitation = async (email: string) => {
     if (!noteId) return;
     try {
-      await resendInvitationMutation.mutateAsync({ noteId, memberEmail: email });
-      toast({ title: t("notes.resendInvitationSuccess") });
+      const result = await resendInvitationMutation.mutateAsync({ noteId, memberEmail: email });
+      if (result.resent) {
+        toast({ title: t("notes.resendInvitationSuccess") });
+      } else {
+        toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });
+      }
     } catch (error) {
       console.error("Failed to resend invitation:", error);
       toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });

@@ -7,7 +7,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull, gt } from "drizzle-orm";
 import { noteInvitations, noteMembers, notes, users } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
@@ -112,15 +112,56 @@ app.post("/:token/accept", authRequired, async (c) => {
   }
 
   // メール一致チェック / Check email match
-  if (userEmail?.toLowerCase() !== invitation.memberEmail.toLowerCase()) {
+  if (!userEmail?.trim()) {
+    throw new HTTPException(400, {
+      message: "Could not determine your email address. Please log in again.",
+    });
+  }
+  if (userEmail.toLowerCase() !== invitation.memberEmail.toLowerCase()) {
     throw new HTTPException(400, {
       message: "Please log in with the invited email address",
     });
   }
 
-  // トランザクションで noteMembers + noteInvitations を一括更新
-  // Update noteMembers + noteInvitations atomically in a transaction
+  // トランザクション内でトークンを先にクレームし、単一利用を原子的に保証する。
+  // Claim the token inside the transaction so concurrent accepts cannot both succeed.
   const [updatedMember] = await db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(noteInvitations)
+      .set({ usedAt: new Date() })
+      .where(
+        and(
+          eq(noteInvitations.token, token),
+          isNull(noteInvitations.usedAt),
+          gt(noteInvitations.expiresAt, new Date()),
+        ),
+      )
+      .returning({
+        noteId: noteInvitations.noteId,
+        memberEmail: noteInvitations.memberEmail,
+      });
+
+    if (!claimed) {
+      const [invState] = await tx
+        .select({
+          usedAt: noteInvitations.usedAt,
+          expiresAt: noteInvitations.expiresAt,
+        })
+        .from(noteInvitations)
+        .where(eq(noteInvitations.token, token))
+        .limit(1);
+      if (!invState) {
+        throw new HTTPException(404, { message: "Invalid invitation link" });
+      }
+      if (invState.usedAt !== null) {
+        throw new HTTPException(409, { message: "Invitation already accepted" });
+      }
+      if (invState.expiresAt < new Date()) {
+        throw new HTTPException(410, { message: "Invitation has expired" });
+      }
+      throw new HTTPException(409, { message: "Invitation already accepted" });
+    }
+
     const [m] = await tx
       .update(noteMembers)
       .set({
@@ -130,8 +171,8 @@ app.post("/:token/accept", authRequired, async (c) => {
       })
       .where(
         and(
-          eq(noteMembers.noteId, invitation.noteId),
-          eq(noteMembers.memberEmail, invitation.memberEmail),
+          eq(noteMembers.noteId, claimed.noteId),
+          eq(noteMembers.memberEmail, claimed.memberEmail),
           eq(noteMembers.isDeleted, false),
         ),
       )
@@ -143,11 +184,6 @@ app.post("/:token/accept", authRequired, async (c) => {
     if (!m) {
       throw new HTTPException(404, { message: "Member record not found" });
     }
-
-    await tx
-      .update(noteInvitations)
-      .set({ usedAt: new Date() })
-      .where(eq(noteInvitations.token, token));
 
     return [m];
   });
