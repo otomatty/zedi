@@ -234,6 +234,8 @@ export interface NoteMemberItem {
 /** POST /api/notes/:noteId/members/:email/resend response. */
 export interface ResendInvitationResponse {
   resent: boolean;
+}
+
 /** GET /api/invite/:token response. */
 export interface InvitationInfoResponse {
   noteId: string;
