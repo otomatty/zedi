@@ -229,3 +229,21 @@ export interface NoteMemberItem {
   created_at: string;
   updated_at: string;
 }
+
+/** GET /api/invite/:token response. */
+export interface InvitationInfoResponse {
+  noteId: string;
+  noteTitle: string;
+  inviterName: string;
+  role: "viewer" | "editor";
+  memberEmail: string;
+  isExpired: boolean;
+  isUsed: boolean;
+}
+
+/** POST /api/invite/:token/accept response. */
+export interface AcceptInvitationResponse {
+  noteId: string;
+  role: string;
+  status: "accepted";
+}

@@ -1,0 +1,20 @@
+{
+  "loading": "Loading invitation...",
+  "noteInvitation": "Note Invitation",
+  "invitedBy": "Invited by {{inviterName}}",
+  "roleViewer": "Viewer",
+  "roleEditor": "Editor",
+  "roleLabel": "Role: {{role}}",
+  "joinNote": "Join Note",
+  "joining": "Joining...",
+  "signInToAccept": "Sign in to accept this invitation",
+  "signInWithGoogle": "Sign in with Google",
+  "signInWithGitHub": "Sign in with GitHub",
+  "emailMismatch": "This invitation is for {{email}}. Please sign in with the correct account.",
+  "signOutAndRetry": "Sign out and try again",
+  "expired": "This invitation link has expired. Please ask the inviter to resend it.",
+  "invalid": "Invalid invitation link.",
+  "alreadyAccepted": "This invitation has already been accepted.",
+  "acceptError": "Failed to accept invitation. Please try again.",
+  "goToNote": "Open Note"
+}
