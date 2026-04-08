@@ -64,5 +64,11 @@ src-tauri/gen/
 # Sidecar executable for externalBin (build with `bun run sidecar:build` or `tauri:dev` ensure step)
 src-tauri/binaries/claude-sidecar*
 
+# Claude Code (not tracked)
+.claude/
+
+# Cursor skills (installed locally, not tracked)
+.cursor/skills/
+
 # Local-only notes (not tracked). See AGENTS.md / SPECIFICATION_POLICY.md.
 /docs/

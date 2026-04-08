@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowLeft, Trash2, MoreHorizontal, Download, Copy } from "lucide-react";
+import { ArrowLeft, Trash2, MoreHorizontal, Download, Copy, History } from "lucide-react";
 import { Button } from "@zedi/ui";
 import {
   DropdownMenu,
@@ -11,6 +11,7 @@ import {
 import Container from "@/components/layout/Container";
 import { HeaderSearchBar } from "@/components/layout/Header/HeaderSearchBar";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
+import { useTranslation } from "react-i18next";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import { ConnectionIndicator } from "../ConnectionIndicator";
 import { UserAvatars } from "../UserAvatars";
@@ -24,6 +25,8 @@ interface PageEditorHeaderProps {
   onDelete: () => void;
   onExportMarkdown: () => void;
   onCopyMarkdown: () => void;
+  /** 変更履歴モーダルを開く / Open version history modal */
+  onOpenHistory?: () => void;
   /** リアルタイムコラボレーション状態（有効時のみ渡す） */
   collaboration?: {
     status: ConnectionStatus;
@@ -43,8 +46,10 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   onDelete,
   onExportMarkdown,
   onCopyMarkdown,
+  onOpenHistory,
   collaboration,
 }) => {
+  const { t } = useTranslation();
   const searchContext = useGlobalSearchContextOptional();
   const hasSearchContext = searchContext != null;
 
@@ -91,6 +96,12 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {onOpenHistory && (
+                <DropdownMenuItem onClick={onOpenHistory}>
+                  <History className="mr-2 h-4 w-4" />
+                  {t("editor.pageHistory.menuButton")}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={onExportMarkdown}>
                 <Download className="mr-2 h-4 w-4" />
                 Markdownでエクスポート

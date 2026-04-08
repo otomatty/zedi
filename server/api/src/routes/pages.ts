@@ -13,6 +13,26 @@ import { eq, and, sql } from "drizzle-orm";
 import { pages, pageContents } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
+import { maybeCreateSnapshot } from "../services/snapshotService.js";
+
+/**
+ * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
+ * Best-effort auto-snapshot creation. Failures are logged but never propagate.
+ */
+async function tryAutoSnapshot(
+  db: Database,
+  pageId: string,
+  ydocState: Buffer,
+  contentText: string | null,
+  version: number,
+  userId: string,
+): Promise<void> {
+  try {
+    await maybeCreateSnapshot(db, pageId, ydocState, contentText, version, userId);
+  } catch (error) {
+    console.error(`[Snapshot] Failed to create auto-snapshot for page ${pageId}:`, error);
+  }
+}
 
 const app = new Hono<AppEnv>();
 
@@ -143,6 +163,14 @@ app.put("/:id/content", authRequired, async (c) => {
       });
 
       if (firstSave.done) {
+        void tryAutoSnapshot(
+          db,
+          pageId,
+          ydocBuffer,
+          body.content_text ?? null,
+          firstSave.version,
+          userId,
+        );
         return c.json({ version: firstSave.version });
       }
     }
@@ -177,6 +205,15 @@ app.put("/:id/content", authRequired, async (c) => {
 
     await applyPagesMetadataUpdate(db, pageId, body);
 
+    void tryAutoSnapshot(
+      db,
+      pageId,
+      ydocBuffer,
+      body.content_text ?? null,
+      updatedRow.version ?? 0,
+      userId,
+    );
+
     return c.json({ version: updatedRow.version ?? 0 });
   }
 
@@ -204,6 +241,16 @@ app.put("/:id/content", authRequired, async (c) => {
 
   const resultRow = result[0];
   if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
+
+  void tryAutoSnapshot(
+    db,
+    pageId,
+    ydocBuffer,
+    body.content_text ?? null,
+    resultRow.version ?? 0,
+    userId,
+  );
+
   return c.json({ version: resultRow.version });
 });
 

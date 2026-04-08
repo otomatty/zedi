@@ -126,12 +126,16 @@ app.post("/", authRequired, async (c) => {
         memberEmail: userEmail,
         role: "editor" as const,
         invitedByUserId: userId,
+        status: "accepted",
+        acceptedUserId: userId,
       })
       .onConflictDoUpdate({
         target: [noteMembers.noteId, noteMembers.memberEmail],
         set: {
           role: "editor" as const,
           isDeleted: false,
+          status: "accepted",
+          acceptedUserId: userId,
           updatedAt: new Date(),
         },
       });
@@ -363,7 +367,13 @@ app.get("/", authRequired, async (c) => {
     const memberData = await db
       .select({ noteId: noteMembers.noteId, role: noteMembers.role })
       .from(noteMembers)
-      .where(and(eq(noteMembers.memberEmail, userEmail), eq(noteMembers.isDeleted, false)));
+      .where(
+        and(
+          eq(noteMembers.memberEmail, userEmail),
+          eq(noteMembers.isDeleted, false),
+          eq(noteMembers.status, "accepted"),
+        ),
+      );
 
     if (memberData.length > 0) {
       for (const m of memberData) {

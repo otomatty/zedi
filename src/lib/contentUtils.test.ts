@@ -210,12 +210,34 @@ describe("sanitizeTiptapContent", () => {
         { type: "codeBlock", content: [{ type: "text", text: "code" }] },
         { type: "horizontalRule" },
         { type: "mermaid", attrs: { code: "graph TD" } },
+        { type: "htmlArtifact", attrs: { content: "<p>hello</p>", title: "test" } },
       ],
     });
 
     const result = sanitizeTiptapContent(contentWithAllNodes);
     expect(result.hadErrors).toBe(false);
     expect(result.removedNodeTypes).toEqual([]);
+  });
+
+  it("should preserve htmlArtifact nodes", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "htmlArtifact",
+          attrs: { content: "<div>interactive</div>", title: "My Artifact" },
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+
+    const parsed = JSON.parse(result.content);
+    expect(parsed.content[0].type).toBe("htmlArtifact");
+    expect(parsed.content[0].attrs.content).toBe("<div>interactive</div>");
+    expect(parsed.content[0].attrs.title).toBe("My Artifact");
   });
 
   it("should support task list nodes", () => {

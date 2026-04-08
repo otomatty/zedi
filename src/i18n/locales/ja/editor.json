@@ -31,6 +31,17 @@
   },
   "slashPathCompletionAriaLabel": "パス候補",
   "slashPathCompletionHint": "ワークスペース内のパス候補",
+  "htmlArtifact": {
+    "editHeading": "HTML アーティファクトを編集",
+    "emptyState": "HTML アーティファクトが空です",
+    "placeholder": "<div>Hello World</div>",
+    "iframeTitle": "HTML アーティファクト",
+    "fullscreen": "拡大表示",
+    "edit": "編集",
+    "delete": "削除",
+    "cancel": "キャンセル",
+    "save": "保存"
+  },
   "slash": {
     "paragraph": {
       "title": "段落",
@@ -116,6 +127,13 @@
       "title": "数式（ブロック）",
       "description": "ブロック数式を挿入",
       "aliases": "数式ブロック,block math,ブロック数式,equation"
+    },
+    "htmlArtifact": {
+      "title": "HTML アーティファクト",
+      "description": "インタラクティブな HTML を埋め込む（Claude 出力等）",
+      "aliases": "html,artifact,アーティファクト,埋め込み,interactive,claude",
+      "prompt": "HTML コードを貼り付けてください",
+      "promptTitle": "タイトル（省略可）"
     },
     "mcpResource": {
       "title": "MCP リソース",
@@ -213,6 +231,32 @@
       "javascript": "JavaScript",
       "typescript": "TypeScript"
     }
+  },
+  "pageHistory": {
+    "title": "変更履歴",
+    "description": "このページの過去のバージョンを表示します",
+    "menuButton": "変更履歴",
+    "snapshotList": "バージョン一覧",
+    "preview": "プレビュー",
+    "compare": "比較",
+    "auto": "自動保存",
+    "restore": "復元",
+    "pre-restore": "復元前",
+    "version": "v{{version}}",
+    "noSnapshots": "変更履歴がまだありません",
+    "noSnapshotsDescription": "編集内容は10分ごとに自動保存されます",
+    "selectSnapshot": "左の一覧からバージョンを選択してください",
+    "restoreButton": "このバージョンに復元する",
+    "restoreConfirmTitle": "このバージョンに復元しますか？",
+    "restoreConfirmDescription": "現在の内容はスナップショットとして保存され、選択したバージョンが新しいバージョンとして復元されます。",
+    "restoreConfirmCancel": "キャンセル",
+    "restoreConfirmAction": "復元する",
+    "restoring": "復元中...",
+    "restoreSuccess": "バージョンを復元しました",
+    "restoreError": "復元に失敗しました",
+    "currentVersion": "現在のバージョン",
+    "selectedVersion": "選択したバージョン",
+    "by": "by {{email}}"
   },
   "markdownExport": {
     "sourceAttribution": "📎 引用元",

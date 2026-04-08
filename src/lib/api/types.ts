@@ -11,6 +11,9 @@ export interface SyncPagesResponse {
   server_time: string;
 }
 
+/**
+ *
+ */
 export interface SyncPageItem {
   id: string;
   owner_id: string;
@@ -24,12 +27,18 @@ export interface SyncPageItem {
   is_deleted: boolean;
 }
 
+/**
+ *
+ */
 export interface SyncLinkItem {
   source_id: string;
   target_id: string;
   created_at: string;
 }
 
+/**
+ *
+ */
 export interface SyncGhostLinkItem {
   link_text: string;
   source_page_id: string;
@@ -130,6 +139,9 @@ export interface DiscoverResponse {
   notes: DiscoverNoteItem[];
 }
 
+/**
+ *
+ */
 export interface DiscoverNoteItem {
   id: string;
   owner_id: string;
@@ -174,12 +186,70 @@ export interface GetNoteResponse {
   }>;
 }
 
+/** GET /api/pages/:id/snapshots response. */
+export interface SnapshotListResponse {
+  snapshots: SnapshotListItem[];
+}
+
+/** Snapshot list item (without ydoc_state). */
+export interface SnapshotListItem {
+  id: string;
+  version: number;
+  content_text: string | null;
+  created_by: string | null;
+  created_by_email: string | null;
+  trigger: "auto" | "restore" | "pre-restore";
+  created_at: string;
+}
+
+/** GET /api/pages/:id/snapshots/:snapshotId response. */
+export interface SnapshotDetailResponse {
+  id: string;
+  version: number;
+  ydoc_state: string; // base64
+  content_text: string | null;
+  created_by: string | null;
+  created_by_email: string | null;
+  trigger: "auto" | "restore" | "pre-restore";
+  created_at: string;
+}
+
+/** POST /api/pages/:id/snapshots/:snapshotId/restore response. */
+export interface RestoreSnapshotResponse {
+  version: number;
+  snapshot_id: string;
+}
+
 /** GET /api/notes/:id/members response item. */
 export interface NoteMemberItem {
   note_id: string;
   member_email: string;
   role: string;
+  status: "pending" | "accepted" | "declined";
   invited_by_user_id: string;
   created_at: string;
   updated_at: string;
+}
+
+/** POST /api/notes/:noteId/members/:email/resend response. */
+export interface ResendInvitationResponse {
+  resent: boolean;
+}
+
+/** GET /api/invite/:token response. */
+export interface InvitationInfoResponse {
+  noteId: string;
+  noteTitle: string;
+  inviterName: string;
+  role: "viewer" | "editor";
+  memberEmail: string;
+  isExpired: boolean;
+  isUsed: boolean;
+}
+
+/** POST /api/invite/:token/accept response. */
+export interface AcceptInvitationResponse {
+  noteId: string;
+  role: string;
+  status: "accepted";
 }

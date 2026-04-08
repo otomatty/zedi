@@ -11,12 +11,14 @@ import type { AppEnv } from "./types/index.js";
 import healthRoutes from "./routes/health.js";
 import userRoutes from "./routes/users.js";
 import pageRoutes from "./routes/pages.js";
+import pageSnapshotRoutes from "./routes/pageSnapshots.js";
 import syncPageRoutes from "./routes/syncPages.js";
 import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
 import extRoutes from "./routes/ext.js";
+import inviteRoutes from "./routes/invite.js";
 import aiChatRoutes from "./routes/ai/chat.js";
 import aiModelsRoutes from "./routes/ai/models.js";
 import aiUsageRoutes from "./routes/ai/usage.js";
@@ -83,11 +85,17 @@ export function createApp(): Hono<AppEnv> {
   // Pages
   app.route("/api/pages", pageRoutes);
 
+  // Page Snapshots (version history)
+  app.route("/api/pages", pageSnapshotRoutes);
+
   // Sync
   app.route("/api/sync/pages", syncPageRoutes);
 
   // Notes
   app.route("/api/notes", noteRoutes);
+
+  // Invitation acceptance (public + auth)
+  app.route("/api/invite", inviteRoutes);
 
   // Search
   app.route("/api/search", searchRoutes);

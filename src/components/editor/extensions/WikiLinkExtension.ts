@@ -1,6 +1,19 @@
-import { Mark, mergeAttributes } from "@tiptap/core";
+import { Mark, markPasteRule, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
+/**
+ * Regex to match completed WikiLink patterns `[[Title]]` in pasted text.
+ * Captures the title (non-empty, no `[` or `]` characters) inside the brackets.
+ *
+ * 貼り付けテキスト中の完成済み WikiLink パターン `[[Title]]` にマッチする正規表現。
+ * ブラケット内のタイトル（空でなく `[` や `]` を含まない）をキャプチャする。
+ */
+export const WIKI_LINK_PASTE_REGEX = /\[\[([^[\]]+)\]\]/g;
+
+/**
+ * Options for the WikiLink mark extension.
+ * WikiLink マーク拡張のオプション。
+ */
 export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>;
   onLinkClick?: (title: string) => void;
@@ -20,6 +33,10 @@ declare module "@tiptap/core" {
   }
 }
 
+/**
+ * Tiptap mark extension for WikiLinks (`[[Title]]`).
+ * WikiLink（`[[Title]]`）用の Tiptap マーク拡張。
+ */
 export const WikiLink = Mark.create<WikiLinkOptions>({
   name: "wikiLink",
 
@@ -85,6 +102,20 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
         class: className,
       }),
       0,
+    ];
+  },
+
+  addPasteRules() {
+    return [
+      markPasteRule({
+        find: WIKI_LINK_PASTE_REGEX,
+        type: this.type,
+        getAttributes: (match) => {
+          const title = (match[1] ?? "").trim();
+          if (!title) return false;
+          return { title, exists: false, referenced: false };
+        },
+      }),
     ];
   },
 
