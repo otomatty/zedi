@@ -139,6 +139,10 @@ app.post("/:token/accept", authRequired, async (c) => {
         status: noteMembers.status,
       });
 
+    if (!m) {
+      throw new HTTPException(404, { message: "Member record not found" });
+    }
+
     await tx
       .update(noteInvitations)
       .set({ usedAt: new Date() })
@@ -149,7 +153,7 @@ app.post("/:token/accept", authRequired, async (c) => {
 
   return c.json({
     noteId: invitation.noteId,
-    role: updatedMember?.role ?? "viewer",
+    role: updatedMember.role,
     status: "accepted",
   });
 });

@@ -316,6 +316,26 @@ describe("POST /api/invite/:token/accept", () => {
     });
   });
 
+  it("should return 404 when member record was soft-deleted", async () => {
+    const invitation = createMockInvitation();
+
+    const { app } = createTestApp([
+      [invitation], // select noteInvitations
+      [], // update noteMembers → returning empty (soft-deleted)
+    ]);
+
+    const res = await app.request(`/api/invite/${TEST_TOKEN}/accept`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      error: "Member record not found",
+    });
+  });
+
   it("should return 401 without auth", async () => {
     const { app } = createTestApp([]);
 
