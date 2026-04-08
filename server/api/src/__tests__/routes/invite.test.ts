@@ -132,16 +132,19 @@ function createMockInvitation(overrides: Record<string, unknown> = {}) {
 
 describe("GET /api/invite/:token", () => {
   it("should return invitation info for a valid token", async () => {
-    const invitation = createMockInvitation();
-    const noteRow = { title: "Test Note" };
-    const memberRow = { invitedByUserId: "inviter-001", role: "editor" };
-    const inviterRow = { name: "Alice" };
+    // JOIN クエリで1回のDB呼び出し / Single joined query result
+    const joinedRow = {
+      noteId: NOTE_ID,
+      memberEmail: TEST_USER_EMAIL,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      usedAt: null,
+      noteTitle: "Test Note",
+      role: "editor",
+      inviterName: "Alice",
+    };
 
     const { app } = createTestApp([
-      [invitation], // select noteInvitations
-      [noteRow], // select notes (title)
-      [memberRow], // select noteMembers (inviter + role)
-      [inviterRow], // select users (inviter name)
+      [joinedRow], // single joined select
     ]);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}`);
@@ -159,14 +162,17 @@ describe("GET /api/invite/:token", () => {
   });
 
   it("should return isExpired: true for an expired invitation", async () => {
-    const invitation = createMockInvitation({
-      expiresAt: new Date("2020-01-01T00:00:00Z"), // past date
-    });
-    const noteRow = { title: "Expired Note" };
-    const memberRow = { invitedByUserId: "inviter-001", role: "viewer" };
-    const inviterRow = { name: "Bob" };
+    const joinedRow = {
+      noteId: NOTE_ID,
+      memberEmail: TEST_USER_EMAIL,
+      expiresAt: new Date("2020-01-01T00:00:00Z"),
+      usedAt: null,
+      noteTitle: "Expired Note",
+      role: "viewer",
+      inviterName: "Bob",
+    };
 
-    const { app } = createTestApp([[invitation], [noteRow], [memberRow], [inviterRow]]);
+    const { app } = createTestApp([[joinedRow]]);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}`);
 
@@ -179,7 +185,7 @@ describe("GET /api/invite/:token", () => {
 
   it("should return 404 for an invalid token", async () => {
     const { app } = createTestApp([
-      [], // select noteInvitations → empty
+      [], // select → empty (no matching token)
     ]);
 
     const res = await app.request("/api/invite/invalid-token");
@@ -187,13 +193,20 @@ describe("GET /api/invite/:token", () => {
     expect(res.status).toBe(404);
   });
 
-  it("should return default values when note or inviter not found", async () => {
-    const invitation = createMockInvitation();
+  it("should return default values when note or member is null (LEFT JOIN)", async () => {
+    // LEFT JOIN でノート・メンバーが見つからない場合 null が返る
+    const joinedRow = {
+      noteId: NOTE_ID,
+      memberEmail: TEST_USER_EMAIL,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      usedAt: null,
+      noteTitle: null,
+      role: null,
+      inviterName: null,
+    };
 
     const { app } = createTestApp([
-      [invitation], // select noteInvitations
-      [], // select notes → empty
-      [], // select noteMembers → empty
+      [joinedRow], // single joined select with nulls
     ]);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}`);

@@ -18,68 +18,53 @@ const app = new Hono<AppEnv>();
 
 /**
  * トークンを検証し、招待情報を返す。認証不要。
+ * JOIN で1クエリにまとめ、DB 往復を削減する。
+ *
  * Validate token and return invitation info. No auth required.
+ * Uses a single joined query to reduce DB round-trips.
  */
 app.get("/:token", async (c) => {
   const token = c.req.param("token");
   const db = c.get("db");
 
-  // トークンで招待レコードを検索 / Find invitation by token
-  const [invitation] = await db
+  // トークン + ノート + メンバー + 招待者を JOIN で一括取得
+  // Fetch invitation + note + member + inviter in a single joined query
+  const [data] = await db
     .select({
       noteId: noteInvitations.noteId,
       memberEmail: noteInvitations.memberEmail,
       expiresAt: noteInvitations.expiresAt,
       usedAt: noteInvitations.usedAt,
+      noteTitle: notes.title,
+      role: noteMembers.role,
+      inviterName: users.name,
     })
     .from(noteInvitations)
+    .leftJoin(notes, eq(notes.id, noteInvitations.noteId))
+    .leftJoin(
+      noteMembers,
+      and(
+        eq(noteMembers.noteId, noteInvitations.noteId),
+        eq(noteMembers.memberEmail, noteInvitations.memberEmail),
+        eq(noteMembers.isDeleted, false),
+      ),
+    )
+    .leftJoin(users, eq(users.id, noteMembers.invitedByUserId))
     .where(eq(noteInvitations.token, token))
     .limit(1);
 
-  if (!invitation) {
+  if (!data) {
     throw new HTTPException(404, { message: "Invalid invitation link" });
   }
 
-  // ノート情報を取得 / Fetch note info
-  const [note] = await db
-    .select({ title: notes.title })
-    .from(notes)
-    .where(eq(notes.id, invitation.noteId))
-    .limit(1);
-
-  // 招待者情報を取得 / Fetch inviter info
-  const [member] = await db
-    .select({
-      invitedByUserId: noteMembers.invitedByUserId,
-      role: noteMembers.role,
-    })
-    .from(noteMembers)
-    .where(
-      and(
-        eq(noteMembers.noteId, invitation.noteId),
-        eq(noteMembers.memberEmail, invitation.memberEmail),
-      ),
-    )
-    .limit(1);
-
-  let inviterName = "Unknown";
-  if (member?.invitedByUserId) {
-    const [inviter] = await db
-      .select({ name: users.name })
-      .from(users)
-      .where(eq(users.id, member.invitedByUserId))
-      .limit(1);
-    inviterName = inviter?.name ?? "Unknown";
-  }
-
-  const isExpired = invitation.expiresAt < new Date();
+  const isExpired = data.expiresAt < new Date();
 
   return c.json({
-    noteId: invitation.noteId,
-    noteTitle: note?.title ?? "Untitled",
-    inviterName,
-    role: member?.role ?? "viewer",
-    memberEmail: invitation.memberEmail,
+    noteId: data.noteId,
+    noteTitle: data.noteTitle ?? "Untitled",
+    inviterName: data.inviterName ?? "Unknown",
+    role: data.role ?? "viewer",
+    memberEmail: data.memberEmail,
     isExpired,
   });
 });
@@ -88,7 +73,10 @@ app.get("/:token", async (c) => {
 
 /**
  * 招待を承認する。認証必須。
+ * noteMembers と noteInvitations の更新をトランザクションで実行する。
+ *
  * Accept an invitation. Auth required.
+ * Updates to noteMembers and noteInvitations are wrapped in a transaction.
  */
 app.post("/:token/accept", authRequired, async (c) => {
   const token = c.req.param("token");
@@ -129,30 +117,35 @@ app.post("/:token/accept", authRequired, async (c) => {
     });
   }
 
-  // メンバーステータスを accepted に更新 / Update member status to accepted
-  const [updatedMember] = await db
-    .update(noteMembers)
-    .set({
-      status: "accepted",
-      acceptedUserId: userId,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(noteMembers.noteId, invitation.noteId),
-        eq(noteMembers.memberEmail, invitation.memberEmail),
-      ),
-    )
-    .returning({
-      role: noteMembers.role,
-      status: noteMembers.status,
-    });
+  // トランザクションで noteMembers + noteInvitations を一括更新
+  // Update noteMembers + noteInvitations atomically in a transaction
+  const [updatedMember] = await db.transaction(async (tx) => {
+    const [m] = await tx
+      .update(noteMembers)
+      .set({
+        status: "accepted",
+        acceptedUserId: userId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(noteMembers.noteId, invitation.noteId),
+          eq(noteMembers.memberEmail, invitation.memberEmail),
+          eq(noteMembers.isDeleted, false),
+        ),
+      )
+      .returning({
+        role: noteMembers.role,
+        status: noteMembers.status,
+      });
 
-  // 招待トークンの used_at を更新 / Update invitation used_at
-  await db
-    .update(noteInvitations)
-    .set({ usedAt: new Date() })
-    .where(eq(noteInvitations.token, token));
+    await tx
+      .update(noteInvitations)
+      .set({ usedAt: new Date() })
+      .where(eq(noteInvitations.token, token));
+
+    return [m];
+  });
 
   return c.json({
     noteId: invitation.noteId,
