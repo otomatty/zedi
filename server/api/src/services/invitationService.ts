@@ -86,63 +86,83 @@ export type UpsertInvitationTokenResult =
   | { ok: false; error: string };
 
 /**
+ * トークン upsert の本体。例外は呼び出し元へ伝播する（トランザクション内ではロールバック用）。
+ * Core token upsert; errors propagate (so transactions roll back).
+ */
+async function upsertInvitationTokenDbImpl(
+  params: SendInvitationParams,
+): Promise<InvitationEmailContext> {
+  const { db, noteId, memberEmail, role, invitedByUserId } = params;
+
+  const [note] = await db
+    .select({ title: notes.title })
+    .from(notes)
+    .where(eq(notes.id, noteId))
+    .limit(1);
+  const noteTitle = note?.title ?? "Untitled";
+
+  const [inviter] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, invitedByUserId))
+    .limit(1);
+  const inviterName = inviter?.name ?? "Unknown";
+
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
+
+  await db
+    .insert(noteInvitations)
+    .values({ noteId, memberEmail, token, expiresAt })
+    .onConflictDoUpdate({
+      target: [noteInvitations.noteId, noteInvitations.memberEmail],
+      set: { token, expiresAt, usedAt: null },
+    });
+
+  const baseUrl = getOptionalEnv("APP_URL", "https://zedi-note.app");
+  const inviteUrl = `${baseUrl}/invite?token=${token}`;
+  const locale: Locale = "ja";
+
+  return {
+    memberEmail,
+    role,
+    inviteUrl,
+    noteTitle,
+    inviterName,
+    locale,
+  };
+}
+
+/**
  * トークンを生成して DB に保存し、メール送信用コンテキストを返す（メールは送らない）。
+ * 失敗時は `{ ok: false }` を返し、例外は飲み込む（バックグラウンド `sendInvitation` 向け）。
  * Generate a token, upsert into DB, return context for email (does not send email).
+ * On failure returns `{ ok: false }` (for background `sendInvitation`).
  */
 export async function upsertInvitationTokenInDb(
   params: SendInvitationParams,
 ): Promise<UpsertInvitationTokenResult> {
-  const { db, noteId, memberEmail, role, invitedByUserId } = params;
-
   try {
-    const [note] = await db
-      .select({ title: notes.title })
-      .from(notes)
-      .where(eq(notes.id, noteId))
-      .limit(1);
-    const noteTitle = note?.title ?? "Untitled";
-
-    const [inviter] = await db
-      .select({ name: users.name })
-      .from(users)
-      .where(eq(users.id, invitedByUserId))
-      .limit(1);
-    const inviterName = inviter?.name ?? "Unknown";
-
-    const token = generateToken();
-    const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
-
-    await db
-      .insert(noteInvitations)
-      .values({ noteId, memberEmail, token, expiresAt })
-      .onConflictDoUpdate({
-        target: [noteInvitations.noteId, noteInvitations.memberEmail],
-        set: { token, expiresAt, usedAt: null },
-      });
-
-    const baseUrl = getOptionalEnv("APP_URL", "https://zedi-note.app");
-    const inviteUrl = `${baseUrl}/invite?token=${token}`;
-    const locale: Locale = "ja";
-
-    return {
-      ok: true,
-      context: {
-        memberEmail,
-        role,
-        inviteUrl,
-        noteTitle,
-        inviterName,
-        locale,
-      },
-    };
+    const context = await upsertInvitationTokenDbImpl(params);
+    return { ok: true, context };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(
-      `[invitationService] Unexpected error upserting invitation for ${memberEmail}:`,
+      `[invitationService] Unexpected error upserting invitation for ${params.memberEmail}:`,
       message,
     );
     return { ok: false, error: message };
   }
+}
+
+/**
+ * トランザクション内で使用する。DB 失敗は例外として伝播し、tx をロールバックさせる。
+ * Use inside a transaction: DB failures propagate so the transaction rolls back.
+ */
+export async function upsertInvitationTokenInDbThrowing(
+  params: SendInvitationParams,
+): Promise<InvitationEmailContext> {
+  return upsertInvitationTokenDbImpl(params);
 }
 
 /**
@@ -202,19 +222,4 @@ export async function sendInvitation(params: SendInvitationParams): Promise<Send
     return { sent: false, error: built.error };
   }
   return deliverInvitationEmail(built.context);
-}
-
-/**
- * 招待メールを再送信する（トークン再生成 + expires_at リセット）
- * Resend an invitation email (regenerate token + reset expires_at)
- *
- * @param params - 送信パラメータ / Sending parameters
- * @returns 送信結果 / Sending result
- */
-export async function resendInvitation(
-  params: SendInvitationParams,
-): Promise<SendInvitationResult> {
-  // 再送信はトークン再生成を伴うため、sendInvitation と同じロジックで OK
-  // Resend uses the same logic since it regenerates the token
-  return sendInvitation(params);
 }

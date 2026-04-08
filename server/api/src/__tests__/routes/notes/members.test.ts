@@ -24,21 +24,19 @@ vi.mock("../../../middleware/auth.js", () => ({
 }));
 
 const mockSendInvitation = vi.fn().mockResolvedValue({ sent: true });
-const mockUpsertInvitationTokenInDb = vi.fn().mockResolvedValue({
-  ok: true,
-  context: {
-    memberEmail: "other@example.com",
-    role: "editor",
-    inviteUrl: "https://zedi-note.app/invite?token=deadbeef",
-    noteTitle: "Test Note",
-    inviterName: "Inviter",
-    locale: "ja",
-  },
+const mockUpsertInvitationTokenInDbThrowing = vi.fn().mockResolvedValue({
+  memberEmail: "other@example.com",
+  role: "editor",
+  inviteUrl: "https://zedi-note.app/invite?token=deadbeef",
+  noteTitle: "Test Note",
+  inviterName: "Inviter",
+  locale: "ja",
 });
 const mockDeliverInvitationEmail = vi.fn().mockResolvedValue({ sent: true });
 vi.mock("../../../services/invitationService.js", () => ({
   sendInvitation: (...args: unknown[]) => mockSendInvitation(...args),
-  upsertInvitationTokenInDb: (...args: unknown[]) => mockUpsertInvitationTokenInDb(...args),
+  upsertInvitationTokenInDbThrowing: (...args: unknown[]) =>
+    mockUpsertInvitationTokenInDbThrowing(...args),
   deliverInvitationEmail: (...args: unknown[]) => mockDeliverInvitationEmail(...args),
 }));
 
@@ -325,7 +323,7 @@ describe("PUT /api/notes/:noteId/members/:memberEmail", () => {
 
 describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
   beforeEach(() => {
-    mockUpsertInvitationTokenInDb.mockClear();
+    mockUpsertInvitationTokenInDbThrowing.mockClear();
     mockDeliverInvitationEmail.mockClear();
   });
 
@@ -334,9 +332,9 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     const { app } = createTestApp([
       [mockNote], // requireNoteOwner
       [{ status: "pending" as const, role: "editor" }], // JOIN … FOR UPDATE
-      [{ title: "Test Note" }], // upsertInvitationTokenInDb → notes
-      [{ name: "Inviter" }], // upsertInvitationTokenInDb → users
-      [], // upsertInvitationTokenInDb → insert
+      [{ title: "Test Note" }], // upsertInvitationTokenInDbThrowing → notes
+      [{ name: "Inviter" }], // upsertInvitationTokenInDbThrowing → users
+      [], // upsertInvitationTokenInDbThrowing → insert
     ]);
 
     const encoded = encodeURIComponent(OTHER_USER_EMAIL);
@@ -348,7 +346,7 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toEqual({ resent: true });
-    expect(mockUpsertInvitationTokenInDb).toHaveBeenCalledWith(
+    expect(mockUpsertInvitationTokenInDbThrowing).toHaveBeenCalledWith(
       expect.objectContaining({
         noteId: NOTE_ID,
         memberEmail: OTHER_USER_EMAIL,
@@ -373,7 +371,7 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(mockUpsertInvitationTokenInDb).not.toHaveBeenCalled();
+    expect(mockUpsertInvitationTokenInDbThrowing).not.toHaveBeenCalled();
   });
 
   it("should return 404 when member does not exist", async () => {
