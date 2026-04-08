@@ -1,5 +1,6 @@
-# Release Please が自動生成するため、Prettier の対象外にして競合を防ぐ
+# Release Please が自動更新するため、Prettier の対象外にして競合を防ぐ
 CHANGELOG.md
+src-tauri/tauri.conf.json
 
 .claude/
 dist/
