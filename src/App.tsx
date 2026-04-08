@@ -27,6 +27,7 @@ import Onboarding from "./pages/Onboarding";
 import AIChatHistory from "./pages/AIChatHistory";
 import AIChatLanding from "./pages/AIChatLanding";
 import AIChatDetail from "./pages/AIChatDetail";
+import InvitePage from "./pages/InvitePage";
 import { GlobalSearchProvider } from "./contexts/GlobalSearchContext";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -70,6 +71,7 @@ const App = () => (
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/auth/extension" element={<ExtensionAuth />} />
                     <Route path="/auth/extension-callback" element={<ExtensionAuthCallback />} />
+                    <Route path="/invite" element={<InvitePage />} />
                     <Route path="/note/:noteId" element={<NoteView />} />
                     <Route path="/note/:noteId/settings" element={<NoteSettings />} />
                     <Route path="/note/:noteId/members" element={<NoteMembers />} />

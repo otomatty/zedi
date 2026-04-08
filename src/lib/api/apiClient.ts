@@ -19,6 +19,8 @@ import type {
   SnapshotListResponse,
   SnapshotDetailResponse,
   RestoreSnapshotResponse,
+  InvitationInfoResponse,
+  AcceptInvitationResponse,
 } from "./types";
 
 export type { NoteListItem };
@@ -397,6 +399,24 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
         body: { url },
       });
       return html;
+    },
+
+    // ── Invitation ───────────────────────────────────────────────────────
+
+    /** GET /api/invite/:token — トークン検証 + 招待情報取得（認証不要）/ Validate token & get invitation info (no auth). */
+    async getInvitation(token: string): Promise<InvitationInfoResponse> {
+      return reqOptionalAuth<InvitationInfoResponse>(
+        "GET",
+        `/api/invite/${encodeURIComponent(token)}`,
+      );
+    },
+
+    /** POST /api/invite/:token/accept — 招待承認（認証必須）/ Accept invitation (auth required). */
+    async acceptInvitation(token: string): Promise<AcceptInvitationResponse> {
+      return req<AcceptInvitationResponse>(
+        "POST",
+        `/api/invite/${encodeURIComponent(token)}/accept`,
+      );
     },
   };
 }
