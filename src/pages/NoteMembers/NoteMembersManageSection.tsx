@@ -13,6 +13,26 @@ import { useTranslation } from "react-i18next";
 import type { NoteMemberRole, NoteMemberStatus } from "@/types/note";
 
 /**
+ * ステータスごとのバッジスタイル定義。
+ * Badge style definitions per member status.
+ */
+const statusBadgeStyles: Record<NoteMemberStatus, string> = {
+  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  accepted: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  declined: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+};
+
+/**
+ * ステータスごとの i18n キー。
+ * i18n keys per member status.
+ */
+const statusLabelKeys: Record<NoteMemberStatus, string> = {
+  pending: "notes.statusPending",
+  accepted: "notes.statusAccepted",
+  declined: "notes.statusDeclined",
+};
+
+/**
  * メンバー管理セクションの Props。
  * Props for the member management section.
  */
@@ -82,6 +102,7 @@ export function NoteMembersManageSection({
         ) : (
           members.map((member) => {
             const isPending = member.status === "pending";
+            const isActionable = member.status !== "accepted";
             return (
               <div
                 key={member.memberEmail}
@@ -89,15 +110,9 @@ export function NoteMembersManageSection({
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm">{member.memberEmail}</span>
-                  {isPending ? (
-                    <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200 dark:hover:bg-yellow-900">
-                      {t("notes.statusPending")}
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-900">
-                      {t("notes.statusAccepted")}
-                    </Badge>
-                  )}
+                  <Badge className={statusBadgeStyles[member.status]}>
+                    {t(statusLabelKeys[member.status])}
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <Select
@@ -132,14 +147,18 @@ export function NoteMembersManageSection({
                     variant="ghost"
                     size="icon"
                     aria-label={
-                      isPending
+                      isActionable
                         ? t("notes.a11yCancelInvitation", { email: member.memberEmail })
                         : t("notes.a11yRemoveMember", { email: member.memberEmail })
                     }
-                    title={isPending ? t("notes.cancelInvitation") : undefined}
+                    title={isActionable ? t("notes.cancelInvitation") : undefined}
                     onClick={() => onRemoveMember(member.memberEmail)}
                   >
-                    {isPending ? <XCircle className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                    {isActionable ? (
+                      <XCircle className="h-4 w-4" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>

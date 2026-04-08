@@ -62,6 +62,7 @@
   "memberRemoveFailed": "メンバー削除に失敗しました",
   "statusPending": "招待中",
   "statusAccepted": "参加済み",
+  "statusDeclined": "辞退",
   "resendInvitation": "再送信",
   "resendInvitationSuccess": "招待メールを再送信しました",
   "resendInvitationFailed": "招待メールの再送信に失敗しました",

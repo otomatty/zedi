@@ -62,6 +62,7 @@
   "memberRemoveFailed": "Failed to remove member",
   "statusPending": "Pending",
   "statusAccepted": "Accepted",
+  "statusDeclined": "Declined",
   "resendInvitation": "Resend",
   "resendInvitationSuccess": "Invitation email resent",
   "resendInvitationFailed": "Failed to resend invitation email",
