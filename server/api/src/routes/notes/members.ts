@@ -123,35 +123,47 @@ app.post("/:noteId/members/:memberEmail/resend", authRequired, async (c) => {
   // オーナーのみ実行可能 / Only the owner can resend invitations
   await requireNoteOwner(db, noteId, userId, "Only the owner can resend invitations");
 
-  // メンバーが pending か確認 / Verify member is in pending status
-  const [member] = await db
-    .select({ status: noteMembers.status, role: noteMembers.role })
-    .from(noteMembers)
-    .where(
-      and(
-        eq(noteMembers.noteId, noteId),
-        eq(noteMembers.memberEmail, memberEmail),
-        eq(noteMembers.isDeleted, false),
-      ),
-    )
-    .limit(1);
+  // pending 確認とトークン更新を同一トランザクションで行い、受諾との競合で usedAt が不整合になるのを防ぐ。
+  // Lock the member row (FOR UPDATE) then resend so accept cannot interleave between check and upsert.
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`
+        SELECT 1 FROM ${noteMembers}
+        WHERE ${noteMembers.noteId} = ${noteId}
+          AND ${noteMembers.memberEmail} = ${memberEmail}
+          AND ${noteMembers.isDeleted} = FALSE
+        FOR UPDATE
+      `,
+    );
 
-  if (!member) {
-    throw new HTTPException(404, { message: "Member not found" });
-  }
-  if (member.status !== "pending") {
-    throw new HTTPException(400, {
-      message: "Invitation can only be resent for pending members",
+    const [member] = await tx
+      .select({ status: noteMembers.status, role: noteMembers.role })
+      .from(noteMembers)
+      .where(
+        and(
+          eq(noteMembers.noteId, noteId),
+          eq(noteMembers.memberEmail, memberEmail),
+          eq(noteMembers.isDeleted, false),
+        ),
+      )
+      .limit(1);
+
+    if (!member) {
+      throw new HTTPException(404, { message: "Member not found" });
+    }
+    if (member.status !== "pending") {
+      throw new HTTPException(400, {
+        message: "Invitation can only be resent for pending members",
+      });
+    }
+
+    return resendInvitation({
+      db: tx,
+      noteId,
+      memberEmail,
+      role: member.role,
+      invitedByUserId: userId,
     });
-  }
-
-  // トークン再生成 + メール再送信 / Regenerate token + resend email
-  const result = await resendInvitation({
-    db,
-    noteId,
-    memberEmail,
-    role: member.role,
-    invitedByUserId: userId,
   });
 
   if (!result.sent) {
