@@ -1,0 +1,20 @@
+{
+  "loading": "招待情報を読み込み中...",
+  "noteInvitation": "ノートへの招待",
+  "invitedBy": "{{inviterName}} さんからの招待",
+  "roleViewer": "閲覧者",
+  "roleEditor": "編集者",
+  "roleLabel": "ロール: {{role}}",
+  "joinNote": "ノートに参加する",
+  "joining": "参加中...",
+  "signInToAccept": "招待を承認するにはサインインしてください",
+  "signInWithGoogle": "Google でサインイン",
+  "signInWithGitHub": "GitHub でサインイン",
+  "emailMismatch": "この招待は {{email}} 宛てです。該当のアカウントでログインし直してください。",
+  "signOutAndRetry": "ログアウトしてやり直す",
+  "expired": "この招待リンクは有効期限が切れています。招待者に再送信を依頼してください。",
+  "invalid": "無効な招待リンクです。",
+  "alreadyAccepted": "この招待は既に承認されています。",
+  "acceptError": "招待の承認に失敗しました。再度お試しください。",
+  "goToNote": "ノートを開く"
+}
