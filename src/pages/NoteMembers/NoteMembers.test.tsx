@@ -30,6 +30,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   useAddNoteMember: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateNoteMemberRole: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRemoveNoteMember: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useResendInvitation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/components/layout/AppLayout", () => ({

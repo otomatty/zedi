@@ -19,6 +19,7 @@ import type {
   SnapshotListResponse,
   SnapshotDetailResponse,
   RestoreSnapshotResponse,
+  ResendInvitationResponse,
   InvitationInfoResponse,
   AcceptInvitationResponse,
 } from "./types";
@@ -382,6 +383,14 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
         "PUT",
         `/api/notes/${encodeURIComponent(noteId)}/members/${encodeURIComponent(memberEmail)}`,
         { body },
+      );
+    },
+
+    /** POST /api/notes/:id/members/:email/resend — resend invitation email. */
+    async resendInvitation(noteId: string, memberEmail: string): Promise<ResendInvitationResponse> {
+      return req<ResendInvitationResponse>(
+        "POST",
+        `/api/notes/${encodeURIComponent(noteId)}/members/${encodeURIComponent(memberEmail)}/resend`,
       );
     },
 

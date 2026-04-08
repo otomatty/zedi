@@ -13,7 +13,10 @@ import type { Page, PageSummary } from "@/types/page";
 /** Page in a note with who added it (for canDeletePage). */
 export type NotePageSummary = PageSummary & { addedByUserId: string };
 
-export const noteKeys = {
+export /**
+ *
+ */
+const noteKeys = {
   all: ["notes"] as const,
   lists: () => [...noteKeys.all, "list"] as const,
   list: (userId: string, userEmail?: string) =>
@@ -147,6 +150,7 @@ function apiMemberToNoteMember(m: NoteMemberItem, noteId: string): NoteMember {
     noteId,
     memberEmail: m.member_email,
     role: (m.role === "editor" ? "editor" : "viewer") as NoteMemberRole,
+    status: m.status ?? "pending",
     invitedByUserId: m.invited_by_user_id,
     createdAt: parseTs(m.created_at),
     updatedAt: parseTs(m.updated_at),
@@ -173,12 +177,24 @@ export function useNoteApi() {
   };
 }
 
+/**
+ *
+ */
 export function useNotes() {
+  /**
+   *
+   */
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
+  /**
+   *
+   */
   const query = useQuery({
     queryKey: noteKeys.list(userId, userEmail),
     queryFn: async () => {
+      /**
+       *
+       */
       const list = await api.getNotes();
       return list.map(apiNoteToNoteSummary);
     },
@@ -194,20 +210,41 @@ export function useNotes() {
 
 type UseNoteOptions = { allowRemote?: boolean };
 
+/**
+ *
+ */
 export function useNote(noteId: string, _options?: UseNoteOptions) {
+  /**
+   *
+   */
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
+  /**
+   *
+   */
   const query = useQuery({
     queryKey: noteKeys.detail(noteId, userId, userEmail),
     queryFn: async (): Promise<NoteWithAccess> => {
+      /**
+       *
+       */
       const res = await api.getNote(noteId);
+      /**
+       *
+       */
       const note = apiNoteToNote(res);
+      /**
+       *
+       */
       const access = buildAccessFromApi(note, res.current_user_role, userId);
       return { note, access };
     },
     enabled: isLoaded && !!noteId,
   });
 
+  /**
+   *
+   */
   const noteWithAccess = query.data ?? null;
 
   return {
@@ -219,7 +256,13 @@ export function useNote(noteId: string, _options?: UseNoteOptions) {
   };
 }
 
+/**
+ *
+ */
 export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 20, offset = 0) {
+  /**
+   *
+   */
   const { api } = useNoteApi();
   return useQuery({
     queryKey: noteKeys.publicList(sort, limit, offset),
@@ -230,16 +273,25 @@ export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 
   });
 }
 
+/**
+ *
+ */
 export function useNotePages(
   noteId: string,
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
+  /**
+   *
+   */
   const { api, isLoaded } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.pageList(noteId),
     queryFn: async (): Promise<NotePageSummary[]> => {
+      /**
+       *
+       */
       const res = await api.getNote(noteId);
       return res.pages.map((p) => ({
         ...apiPageToPageSummary(p),
@@ -250,18 +302,30 @@ export function useNotePages(
   });
 }
 
+/**
+ *
+ */
 export function useNotePage(
   noteId: string,
   pageId: string,
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
+  /**
+   *
+   */
   const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.page(noteId, pageId),
     queryFn: async (): Promise<Page | null> => {
+      /**
+       *
+       */
       const res = await api.getNote(noteId);
+      /**
+       *
+       */
       const p = res.pages.find((x) => x.id === pageId);
       return p ? apiPageToPage(p) : null;
     },
@@ -269,12 +333,21 @@ export function useNotePage(
   });
 }
 
+/**
+ *
+ */
 export function useNoteMembers(noteId: string, enabled: boolean = true) {
+  /**
+   *
+   */
   const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.memberList(noteId),
     queryFn: async (): Promise<NoteMember[]> => {
+      /**
+       *
+       */
       const list = await api.getNoteMembers(noteId);
       return list.map((m) => apiMemberToNoteMember(m, noteId));
     },
@@ -282,8 +355,17 @@ export function useNoteMembers(noteId: string, enabled: boolean = true) {
   });
 }
 
+/**
+ *
+ */
 export function useCreateNote() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -296,6 +378,9 @@ export function useCreateNote() {
       visibility: Note["visibility"];
       editPermission?: Note["editPermission"];
     }) => {
+      /**
+       *
+       */
       const created = await api.createNote({
         title,
         visibility,
@@ -309,8 +394,17 @@ export function useCreateNote() {
   });
 }
 
+/**
+ *
+ */
 export function useUpdateNote() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -337,8 +431,17 @@ export function useUpdateNote() {
   });
 }
 
+/**
+ *
+ */
 export function useDeleteNote() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -352,8 +455,17 @@ export function useDeleteNote() {
   });
 }
 
+/**
+ *
+ */
 export function useAddPageToNote() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -375,8 +487,17 @@ export function useAddPageToNote() {
   });
 }
 
+/**
+ *
+ */
 export function useRemovePageFromNote() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -390,8 +511,17 @@ export function useRemovePageFromNote() {
   });
 }
 
+/**
+ *
+ */
 export function useAddNoteMember() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -413,8 +543,17 @@ export function useAddNoteMember() {
   });
 }
 
+/**
+ *
+ */
 export function useUpdateNoteMemberRole() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -436,8 +575,17 @@ export function useUpdateNoteMemberRole() {
   });
 }
 
+/**
+ *
+ */
 export function useRemoveNoteMember() {
+  /**
+   *
+   */
   const { api } = useNoteApi();
+  /**
+   *
+   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -447,6 +595,24 @@ export function useRemoveNoteMember() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.memberList(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+    },
+  });
+}
+
+/**
+ * 招待メールを再送信する Mutation hook。
+ * Mutation hook for resending an invitation email.
+ */
+export function useResendInvitation() {
+  const { api } = useNoteApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noteId, memberEmail }: { noteId: string; memberEmail: string }) => {
+      return api.resendInvitation(noteId, memberEmail);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: noteKeys.memberList(variables.noteId) });
     },
   });
 }

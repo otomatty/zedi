@@ -8,6 +8,7 @@ import {
   useNote,
   useNoteMembers,
   useRemoveNoteMember,
+  useResendInvitation,
   useUpdateNoteMemberRole,
 } from "@/hooks/useNoteQueries";
 import type { NoteMemberRole } from "@/types/note";
@@ -40,6 +41,7 @@ const NoteMembers: React.FC = () => {
   const addMemberMutation = useAddNoteMember();
   const updateMemberRoleMutation = useUpdateNoteMemberRole();
   const removeMemberMutation = useRemoveNoteMember();
+  const resendInvitationMutation = useResendInvitation();
 
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<NoteMemberRole>("viewer");
@@ -91,6 +93,17 @@ const NoteMembers: React.FC = () => {
     }
   };
 
+  const handleResendInvitation = async (email: string) => {
+    if (!noteId) return;
+    try {
+      await resendInvitationMutation.mutateAsync({ noteId, memberEmail: email });
+      toast({ title: t("notes.resendInvitationSuccess") });
+    } catch (error) {
+      console.error("Failed to resend invitation:", error);
+      toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });
+    }
+  };
+
   if (isNoteLoading) {
     return (
       <NoteMembersLoadingOrDenied>
@@ -138,6 +151,7 @@ const NoteMembers: React.FC = () => {
               onAddMember={handleAddMember}
               onUpdateRole={handleUpdateMemberRole}
               onRemoveMember={handleRemoveMember}
+              onResendInvitation={handleResendInvitation}
             />
           )}
         </Container>
