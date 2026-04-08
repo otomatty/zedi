@@ -225,7 +225,13 @@ export interface NoteMemberItem {
   note_id: string;
   member_email: string;
   role: string;
+  status: "pending" | "accepted" | "declined";
   invited_by_user_id: string;
   created_at: string;
   updated_at: string;
+}
+
+/** POST /api/notes/:noteId/members/:email/resend response. */
+export interface ResendInvitationResponse {
+  resent: boolean;
 }
