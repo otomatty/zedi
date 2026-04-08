@@ -10,13 +10,28 @@ import noteRoutes from "../../../routes/notes/index.js";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-export const TEST_USER_ID = "user-test-123";
-export const TEST_USER_EMAIL = "test@example.com";
-export const OTHER_USER_ID = "user-other-456";
-export const OTHER_USER_EMAIL = "other@example.com";
+export /**
+ *
+ */
+const TEST_USER_ID = "user-test-123";
+export /**
+ *
+ */
+const TEST_USER_EMAIL = "test@example.com";
+export /**
+ *
+ */
+const OTHER_USER_ID = "user-other-456";
+export /**
+ *
+ */
+const OTHER_USER_EMAIL = "other@example.com";
 
 // ── Mock Data Factories ─────────────────────────────────────────────────────
 
+/**
+ *
+ */
 export function createMockNote(overrides: Record<string, unknown> = {}) {
   return {
     id: "note-test-001",
@@ -33,6 +48,9 @@ export function createMockNote(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ *
+ */
 export function createMockPageRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "page-test-001",
@@ -52,6 +70,9 @@ export function createMockPageRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ *
+ */
 export function createMockPageListRow(overrides: Record<string, unknown> = {}) {
   return {
     page_id: "page-test-001",
@@ -80,6 +101,9 @@ export function createMockMember(overrides: Record<string, unknown> = {}) {
 
 // ── Mock DB ─────────────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 export interface ChainInfo {
   startMethod: string;
   startArgs: unknown[];
@@ -126,6 +150,14 @@ export function createMockDb(results: unknown[]) {
       if (prop === "transaction") {
         return (fn: (tx: typeof db) => Promise<unknown>) => fn(db);
       }
+      if (prop === "execute") {
+        return (...args: unknown[]) => {
+          const idx = chainIndex++;
+          const ops: { method: string; args: unknown[] }[] = [];
+          chains.push({ startMethod: "execute", startArgs: args, ops });
+          return makeChainProxy(idx, ops);
+        };
+      }
       return (...args: unknown[]) => {
         const idx = chainIndex++;
         const ops: { method: string; args: unknown[] }[] = [];
@@ -140,8 +172,17 @@ export function createMockDb(results: unknown[]) {
 
 // ── Test App Factory ────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 export function createTestApp(dbResults: unknown[]) {
+  /**
+   *
+   */
   const { db, chains } = createMockDb(dbResults);
+  /**
+   *
+   */
   const app = new Hono<AppEnv>();
 
   app.use("*", async (c, next) => {
@@ -155,6 +196,9 @@ export function createTestApp(dbResults: unknown[]) {
 
 // ── Auth Headers ────────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 export function authHeaders(userId = TEST_USER_ID, userEmail = TEST_USER_EMAIL) {
   return {
     "x-test-user-id": userId,

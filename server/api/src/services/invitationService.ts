@@ -29,7 +29,10 @@ function generateToken(): string {
  * Parameters for sending an invitation email
  */
 export interface SendInvitationParams {
-  /** データベース接続 / Database connection */
+  /**
+   * データベース接続（`db.transaction` 内のクライアントでも可）
+   * Database connection (may be a transaction-scoped client)
+   */
   db: Database;
   /** ノート ID / Note ID */
   noteId: string;

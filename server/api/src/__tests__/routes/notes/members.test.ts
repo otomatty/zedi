@@ -317,6 +317,7 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     const pendingMember = createMockMember({ status: "pending", role: "editor" });
     const { app } = createTestApp([
       [mockNote], // requireNoteOwner
+      [], // tx.execute SELECT … FOR UPDATE
       [pendingMember], // select noteMembers (pending check)
     ]);
 
@@ -344,6 +345,7 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     const acceptedMember = createMockMember({ status: "accepted" });
     const { app } = createTestApp([
       [mockNote], // requireNoteOwner
+      [], // FOR UPDATE
       [acceptedMember], // select noteMembers (not pending)
     ]);
 
@@ -360,6 +362,7 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     const mockNote = createMockNote();
     const { app } = createTestApp([
       [mockNote], // requireNoteOwner
+      [], // FOR UPDATE
       [], // select noteMembers → empty
     ]);
 
