@@ -23,6 +23,13 @@ vi.mock("../../../middleware/auth.js", () => ({
   },
 }));
 
+const mockSendInvitation = vi.fn().mockResolvedValue({ sent: true });
+const mockResendInvitation = vi.fn().mockResolvedValue({ sent: true });
+vi.mock("../../../services/invitationService.js", () => ({
+  sendInvitation: (...args: unknown[]) => mockSendInvitation(...args),
+  resendInvitation: (...args: unknown[]) => mockResendInvitation(...args),
+}));
+
 import {
   TEST_USER_ID,
   OTHER_USER_ID,
@@ -38,12 +45,13 @@ const NOTE_ID = "note-test-001";
 // ── POST /api/notes/:noteId/members ─────────────────────────────────────────
 
 describe("POST /api/notes/:noteId/members", () => {
-  it("should add a member and return the added member (NoteMemberItem)", async () => {
+  it("should add a member and return the added member with invitation_sent", async () => {
     const mockNote = createMockNote();
     const addedMember = createMockMember({
       noteId: NOTE_ID,
       memberEmail: OTHER_USER_EMAIL,
       role: "editor",
+      status: "pending",
     });
     const { app, chains } = createTestApp([
       [mockNote], // requireNoteOwner → findActiveNoteById (owner)
@@ -63,6 +71,7 @@ describe("POST /api/notes/:noteId/members", () => {
       member_email: OTHER_USER_EMAIL,
       role: "editor",
       invited_by_user_id: TEST_USER_ID,
+      invitation_sent: true,
     });
     expect(body).toHaveProperty("created_at");
     expect(body).toHaveProperty("updated_at");
@@ -78,6 +87,29 @@ describe("POST /api/notes/:noteId/members", () => {
       role: "editor",
       invitedByUserId: TEST_USER_ID,
     });
+  });
+
+  it("should set invitation_sent to false when member is already accepted", async () => {
+    const mockNote = createMockNote();
+    const addedMember = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: OTHER_USER_EMAIL,
+      status: "accepted",
+    });
+    const { app } = createTestApp([
+      [mockNote], // requireNoteOwner
+      [addedMember], // insert (conflict → accepted status preserved)
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/members`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ member_email: OTHER_USER_EMAIL }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.invitation_sent).toBe(false);
   });
 
   it("should default role to 'viewer' when not specified", async () => {
@@ -274,6 +306,111 @@ describe("PUT /api/notes/:noteId/members/:memberEmail", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ── POST /api/notes/:noteId/members/:memberEmail/resend ────────────────────
+
+describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
+  it("should resend invitation for a pending member", async () => {
+    const mockNote = createMockNote();
+    const pendingMember = createMockMember({ status: "pending", role: "editor" });
+    const { app } = createTestApp([
+      [mockNote], // requireNoteOwner
+      [pendingMember], // select noteMembers (pending check)
+    ]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}/resend`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toEqual({ resent: true });
+    expect(mockResendInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        noteId: NOTE_ID,
+        memberEmail: OTHER_USER_EMAIL,
+        role: "editor",
+        invitedByUserId: TEST_USER_ID,
+      }),
+    );
+  });
+
+  it("should return 400 when member is not pending", async () => {
+    const mockNote = createMockNote();
+    const acceptedMember = createMockMember({ status: "accepted" });
+    const { app } = createTestApp([
+      [mockNote], // requireNoteOwner
+      [acceptedMember], // select noteMembers (not pending)
+    ]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}/resend`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("should return 404 when member does not exist", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([
+      [mockNote], // requireNoteOwner
+      [], // select noteMembers → empty
+    ]);
+
+    const encoded = encodeURIComponent("unknown@example.com");
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}/resend`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("should return 403 when non-owner tries to resend", async () => {
+    const mockNote = createMockNote({ ownerId: OTHER_USER_ID });
+    const { app } = createTestApp([
+      [mockNote], // requireNoteOwner (owner mismatch)
+    ]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}/resend`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should return 404 when note does not exist", async () => {
+    const { app } = createTestApp([
+      [], // requireNoteOwner → findActiveNoteById → null → 404
+    ]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}/resend`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("should return 401 without auth", async () => {
+    const { app } = createTestApp([]);
+
+    const encoded = encodeURIComponent(OTHER_USER_EMAIL);
+    const res = await app.request(`/api/notes/${NOTE_ID}/members/${encoded}/resend`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).toBe(401);
   });
 });
 
