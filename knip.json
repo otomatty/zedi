@@ -27,7 +27,7 @@
     },
     "server/api": {
       "entry": ["scripts/**/*.ts"],
-      "project": ["src/**/*.ts", "scripts/**/*.ts"]
+      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"]
     },
     "server/hocuspocus": {
       "project": ["src/**/*.ts"]
@@ -80,7 +80,6 @@
     "react-hook-form",
     "react-resizable-panels",
     "recharts",
-    "sonner",
     "sql.js",
     "tailwind-merge",
     "vaul",
