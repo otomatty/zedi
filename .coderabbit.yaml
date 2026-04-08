@@ -1,0 +1,8 @@
+# CodeRabbit configuration
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+reviews:
+  base_branches:
+    - "main"
+    - "develop"
+    - "release/.*"
+    - "feature/.*"
