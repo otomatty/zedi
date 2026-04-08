@@ -234,9 +234,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
         // デスクトップ: 右クリックで ContextMenu を表示 / Desktop: right-click opens ContextMenu
         <ContextMenu modal={false}>
           <ContextMenuTrigger asChild>{cardButton}</ContextMenuTrigger>
-          <ContextMenuContent className="w-48">
-            {menuItems}
-          </ContextMenuContent>
+          <ContextMenuContent className="w-48">{menuItems}</ContextMenuContent>
         </ContextMenu>
       )}
 
