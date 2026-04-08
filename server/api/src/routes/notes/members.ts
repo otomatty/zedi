@@ -10,12 +10,16 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, asc, sql } from "drizzle-orm";
-import { noteMembers } from "../../schema/index.js";
+import { noteInvitations, noteMembers } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
 import type { NoteMemberRole } from "./types.js";
 import { requireNoteOwner, getNoteRole } from "./helpers.js";
-import { sendInvitation, resendInvitation } from "../../services/invitationService.js";
+import {
+  deliverInvitationEmail,
+  sendInvitation,
+  upsertInvitationTokenInDbThrowing,
+} from "../../services/invitationService.js";
 
 const app = new Hono<AppEnv>();
 
@@ -123,36 +127,54 @@ app.post("/:noteId/members/:memberEmail/resend", authRequired, async (c) => {
   // オーナーのみ実行可能 / Only the owner can resend invitations
   await requireNoteOwner(db, noteId, userId, "Only the owner can resend invitations");
 
-  // メンバーが pending か確認 / Verify member is in pending status
-  const [member] = await db
-    .select({ status: noteMembers.status, role: noteMembers.role })
-    .from(noteMembers)
-    .where(
-      and(
-        eq(noteMembers.noteId, noteId),
-        eq(noteMembers.memberEmail, memberEmail),
-        eq(noteMembers.isDeleted, false),
-      ),
-    )
-    .limit(1);
+  // pending 確認とトークン upsert を同一トランザクションで行い、受諾との競合で usedAt が不整合になるのを防ぐ。
+  // `note_members` を起点に LEFT JOIN（招待行が無いレガシー pending も再送可能）。FOR UPDATE でメンバー行をロックし、存在すれば招待行もロック。
+  // Start from note_members with LEFT JOIN so pending members without a note_invitations row can still resend; FOR UPDATE locks member and invitation when present.
+  // メール送信はコミット後（外部 API）。DB 失敗は upsertInvitationTokenInDbThrowing の例外で tx をロールバック。
+  // Send email after commit; DB failures throw so the transaction rolls back.
+  const emailContext = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({
+        status: noteMembers.status,
+        role: noteMembers.role,
+      })
+      .from(noteMembers)
+      .leftJoin(
+        noteInvitations,
+        and(
+          eq(noteInvitations.noteId, noteMembers.noteId),
+          eq(noteInvitations.memberEmail, noteMembers.memberEmail),
+        ),
+      )
+      .where(
+        and(
+          eq(noteMembers.noteId, noteId),
+          eq(noteMembers.memberEmail, memberEmail),
+          eq(noteMembers.isDeleted, false),
+        ),
+      )
+      .for("update")
+      .limit(1);
 
-  if (!member) {
-    throw new HTTPException(404, { message: "Member not found" });
-  }
-  if (member.status !== "pending") {
-    throw new HTTPException(400, {
-      message: "Invitation can only be resent for pending members",
+    if (!row) {
+      throw new HTTPException(404, { message: "Member not found" });
+    }
+    if (row.status !== "pending") {
+      throw new HTTPException(400, {
+        message: "Invitation can only be resent for pending members",
+      });
+    }
+
+    return upsertInvitationTokenInDbThrowing({
+      db: tx,
+      noteId,
+      memberEmail,
+      role: row.role,
+      invitedByUserId: userId,
     });
-  }
-
-  // トークン再生成 + メール再送信 / Regenerate token + resend email
-  const result = await resendInvitation({
-    db,
-    noteId,
-    memberEmail,
-    role: member.role,
-    invitedByUserId: userId,
   });
+
+  const result = await deliverInvitationEmail(emailContext);
 
   if (!result.sent) {
     console.warn(`[members] Resend invitation to ${memberEmail} failed:`, result.error);
