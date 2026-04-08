@@ -18,6 +18,7 @@ import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
 import extRoutes from "./routes/ext.js";
+import inviteRoutes from "./routes/invite.js";
 import aiChatRoutes from "./routes/ai/chat.js";
 import aiModelsRoutes from "./routes/ai/models.js";
 import aiUsageRoutes from "./routes/ai/usage.js";
@@ -92,6 +93,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Notes
   app.route("/api/notes", noteRoutes);
+
+  // Invitation acceptance (public + auth)
+  app.route("/api/invite", inviteRoutes);
 
   // Search
   app.route("/api/search", searchRoutes);
