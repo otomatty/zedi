@@ -2,7 +2,7 @@
  * snapshotService のテスト
  * Tests for snapshotService (API-side auto-snapshot logic)
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockDb } from "../createMockDb.js";
 import { maybeCreateSnapshot } from "../../services/snapshotService.js";
 
@@ -20,6 +20,10 @@ describe("maybeCreateSnapshot", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("前回スナップショットがない場合、スナップショットを作成する / creates snapshot when no prior snapshot exists", async () => {
