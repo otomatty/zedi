@@ -66,6 +66,7 @@ app.get("/:token", async (c) => {
     role: data.role ?? "viewer",
     memberEmail: data.memberEmail,
     isExpired,
+    isUsed: data.usedAt !== null,
   });
 });
 

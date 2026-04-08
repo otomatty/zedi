@@ -158,6 +158,30 @@ describe("GET /api/invite/:token", () => {
       role: "editor",
       memberEmail: TEST_USER_EMAIL,
       isExpired: false,
+      isUsed: false,
+    });
+  });
+
+  it("should return isUsed: true for an already accepted invitation", async () => {
+    const joinedRow = {
+      noteId: NOTE_ID,
+      memberEmail: TEST_USER_EMAIL,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      usedAt: new Date("2026-03-01T00:00:00Z"),
+      noteTitle: "Used Note",
+      role: "viewer",
+      inviterName: "Alice",
+    };
+
+    const { app } = createTestApp([[joinedRow]]);
+
+    const res = await app.request(`/api/invite/${TEST_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      isUsed: true,
+      isExpired: false,
     });
   });
 
