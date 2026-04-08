@@ -56,17 +56,45 @@ export interface SendInvitationResult {
 }
 
 /**
- * 招待トークンを生成し、メールを送信する
- * Generate an invitation token and send the email
+ * メール送信用に DB でトークンを upsert し、テンプレートへ渡すコンテキストを組み立てる。
+ * Build email context by upserting a token in the DB (no external I/O).
  *
- * @param params - 送信パラメータ / Sending parameters
- * @returns 送信結果 / Sending result
+ * 再送ルートではトランザクション内で呼び、コミット後に `deliverInvitationEmail` を実行する。
+ * For resend, call inside a transaction, then `deliverInvitationEmail` after commit.
  */
-export async function sendInvitation(params: SendInvitationParams): Promise<SendInvitationResult> {
+export interface InvitationEmailContext {
+  /** 宛先 / Recipient */
+  memberEmail: string;
+  /** 付与ロール / Assigned role */
+  role: string;
+  /** 招待 URL / Invitation URL including token */
+  inviteUrl: string;
+  /** ノート表示名 / Note title for template */
+  noteTitle: string;
+  /** 招待者表示名 / Inviter display name */
+  inviterName: string;
+  /** メールロケール / Email locale */
+  locale: Locale;
+}
+
+/**
+ * `upsertInvitationTokenInDb` の結果（成功時はメール送信前のコンテキスト）
+ * Result of DB upsert before sending email.
+ */
+export type UpsertInvitationTokenResult =
+  | { ok: true; context: InvitationEmailContext }
+  | { ok: false; error: string };
+
+/**
+ * トークンを生成して DB に保存し、メール送信用コンテキストを返す（メールは送らない）。
+ * Generate a token, upsert into DB, return context for email (does not send email).
+ */
+export async function upsertInvitationTokenInDb(
+  params: SendInvitationParams,
+): Promise<UpsertInvitationTokenResult> {
   const { db, noteId, memberEmail, role, invitedByUserId } = params;
 
   try {
-    // ノートタイトルを取得 / Fetch note title
     const [note] = await db
       .select({ title: notes.title })
       .from(notes)
@@ -74,7 +102,6 @@ export async function sendInvitation(params: SendInvitationParams): Promise<Send
       .limit(1);
     const noteTitle = note?.title ?? "Untitled";
 
-    // 招待者の名前を取得 / Fetch inviter's display name
     const [inviter] = await db
       .select({ name: users.name })
       .from(users)
@@ -82,7 +109,6 @@ export async function sendInvitation(params: SendInvitationParams): Promise<Send
       .limit(1);
     const inviterName = inviter?.name ?? "Unknown";
 
-    // トークン生成 + DB 保存（upsert） / Generate token + upsert into DB
     const token = generateToken();
     const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
@@ -94,14 +120,41 @@ export async function sendInvitation(params: SendInvitationParams): Promise<Send
         set: { token, expiresAt, usedAt: null },
       });
 
-    // 招待 URL を構築 / Build invitation URL
     const baseUrl = getOptionalEnv("APP_URL", "https://zedi-note.app");
     const inviteUrl = `${baseUrl}/invite?token=${token}`;
-
-    // デフォルトロケール（ユーザーテーブルに locale なし） / Default locale (no locale column in users table)
     const locale: Locale = "ja";
 
-    // メールをレンダリングして送信 / Render and send email
+    return {
+      ok: true,
+      context: {
+        memberEmail,
+        role,
+        inviteUrl,
+        noteTitle,
+        inviterName,
+        locale,
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[invitationService] Unexpected error upserting invitation for ${memberEmail}:`,
+      message,
+    );
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * `InvitationEmailContext` に基づき HTML メールを送信する。
+ * Send the invitation HTML email using a pre-built context.
+ */
+export async function deliverInvitationEmail(
+  context: InvitationEmailContext,
+): Promise<SendInvitationResult> {
+  const { memberEmail, role, inviteUrl, noteTitle, inviterName, locale } = context;
+
+  try {
     const subject = getInviteNoteSubject({
       inviterName,
       noteTitle,
@@ -134,6 +187,21 @@ export async function sendInvitation(params: SendInvitationParams): Promise<Send
     );
     return { sent: false, error: message };
   }
+}
+
+/**
+ * 招待トークンを生成し、メールを送信する
+ * Generate an invitation token and send the email
+ *
+ * @param params - 送信パラメータ / Sending parameters
+ * @returns 送信結果 / Sending result
+ */
+export async function sendInvitation(params: SendInvitationParams): Promise<SendInvitationResult> {
+  const built = await upsertInvitationTokenInDb(params);
+  if (!built.ok) {
+    return { sent: false, error: built.error };
+  }
+  return deliverInvitationEmail(built.context);
 }
 
 /**

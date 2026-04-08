@@ -10,12 +10,16 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, asc, sql } from "drizzle-orm";
-import { noteMembers } from "../../schema/index.js";
+import { noteInvitations, noteMembers } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
 import type { NoteMemberRole } from "./types.js";
 import { requireNoteOwner, getNoteRole } from "./helpers.js";
-import { sendInvitation, resendInvitation } from "../../services/invitationService.js";
+import {
+  deliverInvitationEmail,
+  sendInvitation,
+  upsertInvitationTokenInDb,
+} from "../../services/invitationService.js";
 
 const app = new Hono<AppEnv>();
 
@@ -123,48 +127,56 @@ app.post("/:noteId/members/:memberEmail/resend", authRequired, async (c) => {
   // オーナーのみ実行可能 / Only the owner can resend invitations
   await requireNoteOwner(db, noteId, userId, "Only the owner can resend invitations");
 
-  // pending 確認とトークン更新を同一トランザクションで行い、受諾との競合で usedAt が不整合になるのを防ぐ。
-  // Lock the member row (FOR UPDATE) then resend so accept cannot interleave between check and upsert.
-  const result = await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`
-        SELECT 1 FROM ${noteMembers}
-        WHERE ${noteMembers.noteId} = ${noteId}
-          AND ${noteMembers.memberEmail} = ${memberEmail}
-          AND ${noteMembers.isDeleted} = FALSE
-        FOR UPDATE
-      `,
-    );
-
-    const [member] = await tx
-      .select({ status: noteMembers.status, role: noteMembers.role })
-      .from(noteMembers)
-      .where(
+  // pending 確認とトークン upsert を同一トランザクションで行い、受諾との競合で usedAt が不整合になるのを防ぐ。
+  // Single JOIN ... FOR UPDATE locks invitation + member rows in one statement (consistent order vs accept flow).
+  // メール送信はコミット後（外部 API）に行い、行ロックを長く握らない。
+  // Send email after commit so row locks are not held during the external email API call.
+  const upsertResult = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({
+        status: noteMembers.status,
+        role: noteMembers.role,
+      })
+      .from(noteInvitations)
+      .innerJoin(
+        noteMembers,
         and(
-          eq(noteMembers.noteId, noteId),
-          eq(noteMembers.memberEmail, memberEmail),
+          eq(noteMembers.noteId, noteInvitations.noteId),
+          eq(noteMembers.memberEmail, noteInvitations.memberEmail),
           eq(noteMembers.isDeleted, false),
         ),
       )
+      .where(and(eq(noteInvitations.noteId, noteId), eq(noteInvitations.memberEmail, memberEmail)))
+      .for("update")
       .limit(1);
 
-    if (!member) {
-      throw new HTTPException(404, { message: "Member not found" });
+    if (!row) {
+      throw new HTTPException(404, { message: "Member or invitation not found" });
     }
-    if (member.status !== "pending") {
+    if (row.status !== "pending") {
       throw new HTTPException(400, {
         message: "Invitation can only be resent for pending members",
       });
     }
 
-    return resendInvitation({
+    return upsertInvitationTokenInDb({
       db: tx,
       noteId,
       memberEmail,
-      role: member.role,
+      role: row.role,
       invitedByUserId: userId,
     });
   });
+
+  if (!upsertResult.ok) {
+    console.warn(
+      `[members] Resend invitation DB step failed for ${memberEmail}:`,
+      upsertResult.error,
+    );
+    return c.json({ resent: false });
+  }
+
+  const result = await deliverInvitationEmail(upsertResult.context);
 
   if (!result.sent) {
     console.warn(`[members] Resend invitation to ${memberEmail} failed:`, result.error);

@@ -1,7 +1,7 @@
 /**
  * ノートメンバー管理ルートのテスト
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
@@ -24,10 +24,22 @@ vi.mock("../../../middleware/auth.js", () => ({
 }));
 
 const mockSendInvitation = vi.fn().mockResolvedValue({ sent: true });
-const mockResendInvitation = vi.fn().mockResolvedValue({ sent: true });
+const mockUpsertInvitationTokenInDb = vi.fn().mockResolvedValue({
+  ok: true,
+  context: {
+    memberEmail: "other@example.com",
+    role: "editor",
+    inviteUrl: "https://zedi-note.app/invite?token=deadbeef",
+    noteTitle: "Test Note",
+    inviterName: "Inviter",
+    locale: "ja",
+  },
+});
+const mockDeliverInvitationEmail = vi.fn().mockResolvedValue({ sent: true });
 vi.mock("../../../services/invitationService.js", () => ({
   sendInvitation: (...args: unknown[]) => mockSendInvitation(...args),
-  resendInvitation: (...args: unknown[]) => mockResendInvitation(...args),
+  upsertInvitationTokenInDb: (...args: unknown[]) => mockUpsertInvitationTokenInDb(...args),
+  deliverInvitationEmail: (...args: unknown[]) => mockDeliverInvitationEmail(...args),
 }));
 
 import {
@@ -312,13 +324,19 @@ describe("PUT /api/notes/:noteId/members/:memberEmail", () => {
 // ── POST /api/notes/:noteId/members/:memberEmail/resend ────────────────────
 
 describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
+  beforeEach(() => {
+    mockUpsertInvitationTokenInDb.mockClear();
+    mockDeliverInvitationEmail.mockClear();
+  });
+
   it("should resend invitation for a pending member", async () => {
     const mockNote = createMockNote();
-    const pendingMember = createMockMember({ status: "pending", role: "editor" });
     const { app } = createTestApp([
       [mockNote], // requireNoteOwner
-      [], // tx.execute SELECT … FOR UPDATE
-      [pendingMember], // select noteMembers (pending check)
+      [{ status: "pending" as const, role: "editor" }], // JOIN … FOR UPDATE
+      [{ title: "Test Note" }], // upsertInvitationTokenInDb → notes
+      [{ name: "Inviter" }], // upsertInvitationTokenInDb → users
+      [], // upsertInvitationTokenInDb → insert
     ]);
 
     const encoded = encodeURIComponent(OTHER_USER_EMAIL);
@@ -330,7 +348,7 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toEqual({ resent: true });
-    expect(mockResendInvitation).toHaveBeenCalledWith(
+    expect(mockUpsertInvitationTokenInDb).toHaveBeenCalledWith(
       expect.objectContaining({
         noteId: NOTE_ID,
         memberEmail: OTHER_USER_EMAIL,
@@ -338,15 +356,14 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
         invitedByUserId: TEST_USER_ID,
       }),
     );
+    expect(mockDeliverInvitationEmail).toHaveBeenCalled();
   });
 
   it("should return 400 when member is not pending", async () => {
     const mockNote = createMockNote();
-    const acceptedMember = createMockMember({ status: "accepted" });
     const { app } = createTestApp([
       [mockNote], // requireNoteOwner
-      [], // FOR UPDATE
-      [acceptedMember], // select noteMembers (not pending)
+      [{ status: "accepted" as const, role: "viewer" }], // JOIN … FOR UPDATE
     ]);
 
     const encoded = encodeURIComponent(OTHER_USER_EMAIL);
@@ -356,14 +373,14 @@ describe("POST /api/notes/:noteId/members/:memberEmail/resend", () => {
     });
 
     expect(res.status).toBe(400);
+    expect(mockUpsertInvitationTokenInDb).not.toHaveBeenCalled();
   });
 
   it("should return 404 when member does not exist", async () => {
     const mockNote = createMockNote();
     const { app } = createTestApp([
       [mockNote], // requireNoteOwner
-      [], // FOR UPDATE
-      [], // select noteMembers → empty
+      [], // JOIN … FOR UPDATE → empty
     ]);
 
     const encoded = encodeURIComponent("unknown@example.com");

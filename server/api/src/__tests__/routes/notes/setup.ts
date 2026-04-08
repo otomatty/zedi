@@ -10,28 +10,18 @@ import noteRoutes from "../../../routes/notes/index.js";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-export /**
- *
- */
-const TEST_USER_ID = "user-test-123";
-export /**
- *
- */
-const TEST_USER_EMAIL = "test@example.com";
-export /**
- *
- */
-const OTHER_USER_ID = "user-other-456";
-export /**
- *
- */
-const OTHER_USER_EMAIL = "other@example.com";
+/** モック認証で使うユーザー ID / Mock auth user id */
+export const TEST_USER_ID = "user-test-123";
+/** モック認証で使うメール / Mock auth email */
+export const TEST_USER_EMAIL = "test@example.com";
+/** 別ユーザーのモック ID / Second mock user id */
+export const OTHER_USER_ID = "user-other-456";
+/** 別ユーザーのモックメール / Second mock user email */
+export const OTHER_USER_EMAIL = "other@example.com";
 
 // ── Mock Data Factories ─────────────────────────────────────────────────────
 
-/**
- *
- */
+/** テスト用ノート行のデフォルト / Default mock note row */
 export function createMockNote(overrides: Record<string, unknown> = {}) {
   return {
     id: "note-test-001",
@@ -48,9 +38,7 @@ export function createMockNote(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/**
- *
- */
+/** テスト用ページ行のデフォルト / Default mock page row */
 export function createMockPageRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "page-test-001",
@@ -70,9 +58,7 @@ export function createMockPageRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/**
- *
- */
+/** テスト用ページ一覧行のデフォルト / Default mock page list row */
 export function createMockPageListRow(overrides: Record<string, unknown> = {}) {
   return {
     page_id: "page-test-001",
@@ -101,9 +87,7 @@ export function createMockMember(overrides: Record<string, unknown> = {}) {
 
 // ── Mock DB ─────────────────────────────────────────────────────────────────
 
-/**
- *
- */
+/** プロキシ DB モックが記録するチェーン情報 / Recorded chain info from proxy DB mock */
 export interface ChainInfo {
   startMethod: string;
   startArgs: unknown[];
@@ -172,17 +156,9 @@ export function createMockDb(results: unknown[]) {
 
 // ── Test App Factory ────────────────────────────────────────────────────────
 
-/**
- *
- */
+/** `dbResults` の順にクエリ結果を返すテスト用 Hono アプリを組み立てる。 */
 export function createTestApp(dbResults: unknown[]) {
-  /**
-   *
-   */
   const { db, chains } = createMockDb(dbResults);
-  /**
-   *
-   */
   const app = new Hono<AppEnv>();
 
   app.use("*", async (c, next) => {
@@ -196,9 +172,7 @@ export function createTestApp(dbResults: unknown[]) {
 
 // ── Auth Headers ────────────────────────────────────────────────────────────
 
-/**
- *
- */
+/** テスト用の認証ヘッダ / Test auth headers */
 export function authHeaders(userId = TEST_USER_ID, userEmail = TEST_USER_EMAIL) {
   return {
     "x-test-user-id": userId,
