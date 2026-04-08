@@ -10,20 +10,12 @@ import { useAIChatStore } from "@/stores/aiChatStore";
 import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
 import { useTranslation } from "react-i18next";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
-import { useLongPress } from "@/hooks/useLongPress";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@zedi/ui";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@zedi/ui";
 import {
   AlertDialog,
@@ -42,8 +34,8 @@ interface PageCardProps {
 }
 
 /**
- * ページカードコンポーネント。デスクトップでは右クリック、モバイルでは長押しでメニューを表示する。
- * Page card component. Shows context menu on right-click (desktop) or long press (mobile).
+ * ページカードコンポーネント。デスクトップでは右クリックでコンテキストメニューを表示する。モバイルではメニュー非表示。
+ * Page card component. Shows context menu on right-click (desktop only). No context menu on mobile.
  */
 const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const navigate = useNavigate();
@@ -57,10 +49,6 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const isDraggingRef = useRef(false);
   const isMobile = useIsMobile();
   const { openPanel, setPendingPageToAdd } = useAIChatStore();
-
-  // モバイル長押しメニュー用 state / Mobile long-press menu state
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [mobileMenuPos, setMobileMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const preview = page.contentPreview ?? "";
   const { resolvedUrl: thumbnail, hasError: thumbnailError } = useAuthenticatedImageUrl(
@@ -159,36 +147,13 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     });
   }, []);
 
-  // 長押し検出フック / Long press detection hook
-  const longPress = useLongPress(
-    useCallback((pos: { x: number; y: number }) => {
-      setMobileMenuPos(pos);
-      setMobileMenuOpen(true);
-    }, []),
-  );
-
   // カード本体の button 要素 / Card button element
   const cardButton = (
     <button
       draggable={!isMobile}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onClick={(e) => {
-        // 長押し発火直後のクリックを無視 / Ignore click right after long press
-        if (longPress.firedRef.current) {
-          longPress.firedRef.current = false;
-          e.preventDefault();
-          return;
-        }
-        handleClick();
-      }}
-      {...(isMobile
-        ? {
-            onTouchStart: longPress.onTouchStart,
-            onTouchMove: longPress.onTouchMove,
-            onTouchEnd: longPress.onTouchEnd,
-          }
-        : {})}
+      onClick={handleClick}
       className={cn(
         "page-card w-full overflow-hidden rounded-lg text-left",
         "border-border/50 bg-card hover:border-border border",
@@ -237,55 +202,40 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     </button>
   );
 
-  // メニューアイテム（デスクトップ・モバイル共通の内容） / Shared menu items
+  // デスクトップ用メニューアイテム / Desktop menu items
   const menuItems = (
-    MenuItemComponent: typeof ContextMenuItem | typeof DropdownMenuItem,
-    SeparatorComponent: typeof ContextMenuSeparator | typeof DropdownMenuSeparator,
-  ) => (
     <>
-      <MenuItemComponent onClick={handleAddToAIChat}>
+      <ContextMenuItem onClick={handleAddToAIChat}>
         <Sparkles className="mr-2 h-4 w-4" />
         {t("aiChat.referencedPages.addToChat")}
-      </MenuItemComponent>
-      <SeparatorComponent />
-      <MenuItemComponent onClick={handleDuplicate} disabled={createPageMutation.isPending}>
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem onClick={handleDuplicate} disabled={createPageMutation.isPending}>
         <Copy className="mr-2 h-4 w-4" />
         複製
-      </MenuItemComponent>
-      <SeparatorComponent />
-      <MenuItemComponent
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem
         onSelect={openDeleteDialogAfterMenuClose}
         className="text-destructive focus:text-destructive"
       >
         <Trash2 className="mr-2 h-4 w-4" />
         削除
-      </MenuItemComponent>
+      </ContextMenuItem>
     </>
   );
 
   return (
     <>
       {isMobile ? (
-        // モバイル: 長押しで DropdownMenu を表示 / Mobile: long press opens DropdownMenu
-        <DropdownMenu open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-          <DropdownMenuTrigger asChild>{cardButton}</DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-48"
-            style={{
-              position: "fixed",
-              left: mobileMenuPos.x,
-              top: mobileMenuPos.y,
-            }}
-          >
-            {menuItems(DropdownMenuItem, DropdownMenuSeparator)}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        // モバイル: コンテキストメニューなし / Mobile: no context menu
+        cardButton
       ) : (
         // デスクトップ: 右クリックで ContextMenu を表示 / Desktop: right-click opens ContextMenu
         <ContextMenu modal={false}>
           <ContextMenuTrigger asChild>{cardButton}</ContextMenuTrigger>
           <ContextMenuContent className="w-48">
-            {menuItems(ContextMenuItem, ContextMenuSeparator)}
+            {menuItems}
           </ContextMenuContent>
         </ContextMenu>
       )}
