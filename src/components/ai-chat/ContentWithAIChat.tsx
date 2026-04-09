@@ -91,7 +91,7 @@ export function ContentWithAIChat({
       <>
         {children}
         {floatingAction && (
-          <div className="fixed right-0 bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]">
+          <div className="pointer-events-none fixed right-0 bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]">
             {floatingAction}
           </div>
         )}
@@ -118,7 +118,7 @@ export function ContentWithAIChat({
       </div>
       {floatingAction && (
         <div
-          className="fixed bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]"
+          className="pointer-events-none fixed bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]"
           style={{
             // Local / global のどちらでも開いているときはパネル幅ぶん左に寄せる
             right: isOpen ? "var(--ai-chat-width)" : 0,
