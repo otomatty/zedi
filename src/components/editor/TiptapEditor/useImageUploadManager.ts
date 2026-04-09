@@ -26,6 +26,9 @@ interface UseImageUploadManagerParams {
 }
 
 /* eslint-disable max-lines-per-function -- Issue #72 Phase 3: runSingleUpload + editor ops extracted; further hook split deferred */
+/**
+ *
+ */
 export function useImageUploadManager({
   editorRef,
   onChange,
@@ -37,21 +40,55 @@ export function useImageUploadManager({
   onRequestStorageSetup,
   lastSelectionRef,
 }: UseImageUploadManagerParams) {
+  /**
+   *
+   */
   const { getToken } = useAuth();
+  /**
+   *
+   */
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  /**
+   *
+   */
   const [pendingRetryUploadId, setPendingRetryUploadId] = useState<string | null>(null);
+  /**
+   *
+   */
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /**
+   *
+   */
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  /**
+   *
+   */
   const uploadFilesRef = useRef<Map<string, File>>(new Map());
+  /**
+   *
+   */
   const uploadPreviewUrlsRef = useRef<Map<string, string>>(new Map());
+  /**
+   *
+   */
   const uploadTimersRef = useRef<Map<string, number>>(new Map());
 
+  /**
+   *
+   */
   const cleanupUploadResources = useCallback((uploadId: string) => {
+    /**
+     *
+     */
     const previewUrl = uploadPreviewUrlsRef.current.get(uploadId);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       uploadPreviewUrlsRef.current.delete(uploadId);
     }
     uploadFilesRef.current.delete(uploadId);
+    /**
+     *
+     */
     const timerId = uploadTimersRef.current.get(uploadId);
     if (timerId) {
       window.clearInterval(timerId);
@@ -59,12 +96,18 @@ export function useImageUploadManager({
     }
   }, []);
 
+  /**
+   *
+   */
   const updateUploadNodeAttributes = useCallback(
     (uploadId: string, attrs: Record<string, unknown>) =>
       updateUploadNodeAttributesImpl(editorRef.current, uploadId, attrs),
     [editorRef],
   );
 
+  /**
+   *
+   */
   const replaceUploadNodeWithImage = useCallback(
     (uploadId: string, attrs: Record<string, unknown>) =>
       replaceUploadNodeWithImageImpl(
@@ -77,11 +120,17 @@ export function useImageUploadManager({
     [cleanupUploadResources, editorRef, onChange],
   );
 
+  /**
+   *
+   */
   const removeUploadNode = useCallback(
     (uploadId: string) => removeUploadNodeImpl(editorRef.current, uploadId, cleanupUploadResources),
     [cleanupUploadResources, editorRef],
   );
 
+  /**
+   *
+   */
   const startUpload = useCallback(
     async (uploadId: string, file: File) => {
       await runSingleUpload({
@@ -112,8 +161,14 @@ export function useImageUploadManager({
     ],
   );
 
+  /**
+   *
+   */
   const handleRetryUpload = useCallback(
     (uploadId: string) => {
+      /**
+       *
+       */
       const existingFile = uploadFilesRef.current.get(uploadId);
       if (existingFile) {
         updateUploadNodeAttributes(uploadId, {
@@ -131,6 +186,9 @@ export function useImageUploadManager({
     [startUpload, updateUploadNodeAttributes],
   );
 
+  /**
+   *
+   */
   const handleRemoveUpload = useCallback(
     (uploadId: string) => {
       removeUploadNode(uploadId);
@@ -138,6 +196,9 @@ export function useImageUploadManager({
     [removeUploadNode],
   );
 
+  /**
+   *
+   */
   const createUploadId = useCallback(() => {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
       return crypto.randomUUID();
@@ -145,20 +206,38 @@ export function useImageUploadManager({
     return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }, []);
 
+  /**
+   *
+   */
   const restoreSelectionIfNeeded = useCallback(() => {
+    /**
+     *
+     */
     const activeEditor = editorRef.current;
     if (!activeEditor) return;
     if (activeEditor.isFocused) return;
+    /**
+     *
+     */
     const lastSelection = lastSelectionRef?.current;
     if (lastSelection) {
       activeEditor.commands.setTextSelection(lastSelection);
     }
   }, [editorRef, lastSelectionRef]);
 
+  /**
+   *
+   */
   const createUploadItems = useCallback(
     (files: File[]) =>
       files.map((file) => {
+        /**
+         *
+         */
         const uploadId = createUploadId();
+        /**
+         *
+         */
         const previewUrl = URL.createObjectURL(file);
         uploadFilesRef.current.set(uploadId, file);
         uploadPreviewUrlsRef.current.set(uploadId, previewUrl);
@@ -178,18 +257,30 @@ export function useImageUploadManager({
     [createUploadId, storageSettings.provider],
   );
 
+  /**
+   *
+   */
   const insertUploadItems = useCallback(
     (
       uploadItems: Array<{ uploadId: string; file: File; attrs: Record<string, unknown> }>,
       insertAtStart: boolean,
     ) => {
+      /**
+       *
+       */
       const activeEditor = editorRef.current;
       if (!activeEditor) return;
+      /**
+       *
+       */
       const content = uploadItems.map((item) => ({
         type: "imageUpload",
         attrs: item.attrs,
       }));
 
+      /**
+       *
+       */
       const chain = activeEditor.chain().focus();
       if (insertAtStart) {
         chain.insertContentAt(0, content);
@@ -201,6 +292,9 @@ export function useImageUploadManager({
     [editorRef],
   );
 
+  /**
+   *
+   */
   const startUploads = useCallback(
     (uploadItems: Array<{ uploadId: string; file: File }>) => {
       uploadItems.forEach((item) => {
@@ -210,6 +304,9 @@ export function useImageUploadManager({
     [startUpload],
   );
 
+  /**
+   *
+   */
   const processImageUpload = useCallback(
     (files: FileList | File[], insertAtStart: boolean) => {
       if (!editorRef.current || isReadOnly) return;
@@ -218,6 +315,9 @@ export function useImageUploadManager({
         toast({ title: "読み込み中", description: "ストレージ設定を読み込み中です" });
         return;
       }
+      /**
+       *
+       */
       const imageFiles = filterImageFiles(files);
       if (imageFiles.length === 0) {
         toast({
@@ -232,6 +332,9 @@ export function useImageUploadManager({
         return;
       }
       restoreSelectionIfNeeded();
+      /**
+       *
+       */
       const uploadItems = createUploadItems(imageFiles);
       insertUploadItems(uploadItems, insertAtStart);
       startUploads(uploadItems);
@@ -251,19 +354,34 @@ export function useImageUploadManager({
     ],
   );
 
+  /**
+   *
+   */
   const handleImageUpload = useCallback(
     (files: FileList | File[]) => processImageUpload(files, false),
     [processImageUpload],
   );
 
+  /**
+   *
+   */
   const handleImageUploadAtStart = useCallback(
     (files: FileList | File[]) => processImageUpload(files, true),
     [processImageUpload],
   );
 
+  /**
+   *
+   */
   const handleRetryWithFile = useCallback(
     (uploadId: string, file: File) => {
+      /**
+       *
+       */
       const previewUrl = URL.createObjectURL(file);
+      /**
+       *
+       */
       const existingPreview = uploadPreviewUrlsRef.current.get(uploadId);
       if (existingPreview) {
         URL.revokeObjectURL(existingPreview);
@@ -283,6 +401,9 @@ export function useImageUploadManager({
     [startUpload, storageSettings.provider, updateUploadNodeAttributes],
   );
 
+  /**
+   *
+   */
   const handleFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!e.target.files || e.target.files.length === 0) {
@@ -301,6 +422,9 @@ export function useImageUploadManager({
     [handleImageUpload, handleRetryWithFile, pendingRetryUploadId],
   );
 
+  /**
+   *
+   */
   const handleInsertImageClick = useCallback(() => {
     if (isStorageLoading) {
       toast({
@@ -317,18 +441,46 @@ export function useImageUploadManager({
     fileInputRef.current?.click();
   }, [isStorageConfigured, isStorageLoading, onRequestStorageSetup, toast]);
 
+  /**
+   *
+   */
+  const handleInsertCameraImageClick = useCallback(() => {
+    if (isStorageLoading) {
+      toast({
+        title: "読み込み中",
+        description: "ストレージ設定を読み込み中です",
+      });
+      return;
+    }
+    if (!isStorageConfigured) {
+      onRequestStorageSetup();
+      return;
+    }
+    setPendingRetryUploadId(null);
+    cameraInputRef.current?.click();
+  }, [isStorageConfigured, isStorageLoading, onRequestStorageSetup, toast]);
+
+  /**
+   *
+   */
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingOver(true);
   }, []);
 
+  /**
+   *
+   */
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingOver(false);
   }, []);
 
+  /**
+   *
+   */
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -343,8 +495,17 @@ export function useImageUploadManager({
   );
 
   useEffect(() => {
+    /**
+     *
+     */
     const timers = uploadTimersRef.current;
+    /**
+     *
+     */
     const previewUrls = uploadPreviewUrlsRef.current;
+    /**
+     *
+     */
     const files = uploadFilesRef.current;
 
     return () => {
@@ -362,9 +523,11 @@ export function useImageUploadManager({
 
   return {
     fileInputRef,
+    cameraInputRef,
     isDraggingOver,
     handleFileInputChange,
     handleInsertImageClick,
+    handleInsertCameraImageClick,
     handleDragOver,
     handleDragLeave,
     handleDrop,
