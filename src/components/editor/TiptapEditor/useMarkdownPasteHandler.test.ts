@@ -84,14 +84,32 @@ describe("useMarkdownPasteHandler", () => {
     expect(insertContent).not.toHaveBeenCalled();
   });
 
-  it("does not intercept when HTML is present (rich paste)", () => {
-    const { editor, dom, insertContent } = createMockEditor();
+  it("parses markdown even when HTML is present (e.g. pasting from VS Code)", () => {
+    const { editor, dom, insertContent, parsedDoc } = createMockEditor();
 
     renderHook(() => useMarkdownPasteHandler({ editor }));
 
     const event = createPasteEvent({
       text: "# Hello",
-      html: "<h1>Hello</h1>",
+      html: '<meta charset="utf-8"><div style="color:#d4d4d4">## Hello</div>',
+    });
+
+    act(() => {
+      dom.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(insertContent).toHaveBeenCalledWith(parsedDoc);
+  });
+
+  it("does not intercept when HTML is present but text has no markdown patterns", () => {
+    const { editor, dom, insertContent } = createMockEditor();
+
+    renderHook(() => useMarkdownPasteHandler({ editor }));
+
+    const event = createPasteEvent({
+      text: "Just plain text",
+      html: "<p>Just plain text</p>",
     });
 
     act(() => {
