@@ -18,8 +18,12 @@ interface UseSuggestionEffectsOptions {
   editorContainerRef: React.RefObject<HTMLDivElement | null>;
   pageId: string;
   handleInsertImageClick: () => void;
+  handleInsertCameraImageClick: () => void;
 }
 
+/**
+ *
+ */
 export function useSuggestionEffects({
   editor,
   suggestionState,
@@ -27,15 +31,34 @@ export function useSuggestionEffects({
   editorContainerRef,
   pageId,
   handleInsertImageClick,
+  handleInsertCameraImageClick,
 }: UseSuggestionEffectsOptions) {
+  /**
+   *
+   */
   const { checkReferenced } = useCheckGhostLinkReferenced();
+  /**
+   *
+   */
   const [suggestionPos, setSuggestionPos] = useState<{ top: number; left: number } | null>(null);
+  /**
+   *
+   */
   const [slashPos, setSlashPos] = useState<{ top: number; left: number } | null>(null);
 
   // 依存はプリミティブに限定。suggestionState 自体は毎レンダーで新しい参照になるため
   // オブジェクトを依存にすると setState → 再レンダ → effect 再実行の無限ループになる。
+  /**
+   *
+   */
   const suggestionActive = suggestionState?.active ?? false;
+  /**
+   *
+   */
   const suggestionFrom = suggestionState?.range?.from ?? null;
+  /**
+   *
+   */
   const suggestionTo = suggestionState?.range?.to ?? null;
 
   useEffect(() => {
@@ -43,7 +66,13 @@ export function useSuggestionEffects({
       queueMicrotask(() => setSuggestionPos(null));
       return;
     }
+    /**
+     *
+     */
     const coords = editor.view.coordsAtPos(suggestionFrom);
+    /**
+     *
+     */
     const containerRect = editorContainerRef.current?.getBoundingClientRect();
     if (containerRect) {
       queueMicrotask(() =>
@@ -55,8 +84,17 @@ export function useSuggestionEffects({
     }
   }, [editor, suggestionActive, suggestionFrom, suggestionTo, editorContainerRef]);
 
+  /**
+   *
+   */
   const slashActive = slashState?.active ?? false;
+  /**
+   *
+   */
   const slashFrom = slashState?.range?.from ?? null;
+  /**
+   *
+   */
   const slashTo = slashState?.range?.to ?? null;
 
   useEffect(() => {
@@ -64,7 +102,13 @@ export function useSuggestionEffects({
       queueMicrotask(() => setSlashPos(null));
       return;
     }
+    /**
+     *
+     */
     const coords = editor.view.coordsAtPos(slashFrom);
+    /**
+     *
+     */
     const containerRect = editorContainerRef.current?.getBoundingClientRect();
     if (containerRect) {
       queueMicrotask(() =>
@@ -77,15 +121,36 @@ export function useSuggestionEffects({
   }, [editor, slashActive, slashFrom, slashTo, editorContainerRef]);
 
   useEffect(() => {
+    /**
+     *
+     */
     const handler = () => handleInsertImageClick();
     window.addEventListener("slash-command-insert-image", handler);
     return () => window.removeEventListener("slash-command-insert-image", handler);
   }, [handleInsertImageClick]);
 
+  useEffect(() => {
+    /**
+     *
+     */
+    const handler = () => handleInsertCameraImageClick();
+    window.addEventListener("slash-command-insert-camera-image", handler);
+    return () => window.removeEventListener("slash-command-insert-camera-image", handler);
+  }, [handleInsertCameraImageClick]);
+
+  /**
+   *
+   */
   const handleSuggestionSelect = useCallback(
     async (item: SuggestionItem) => {
       if (!editor || !suggestionState?.range) return;
+      /**
+       *
+       */
       const { from, to } = suggestionState.range;
+      /**
+       *
+       */
       let referenced = false;
       if (!item.exists) {
         referenced = await checkReferenced(item.title, pageId);
@@ -114,6 +179,9 @@ export function useSuggestionEffects({
     [editor, suggestionState, checkReferenced, pageId],
   );
 
+  /**
+   *
+   */
   const handleSuggestionClose = useCallback(() => {
     if (!editor) return;
     editor.view.dispatch(
@@ -121,6 +189,9 @@ export function useSuggestionEffects({
     );
   }, [editor]);
 
+  /**
+   *
+   */
   const handleSlashClose = useCallback(() => {
     if (!editor) return;
     editor.view.dispatch(editor.view.state.tr.setMeta(slashSuggestionPluginKey, { close: true }));
