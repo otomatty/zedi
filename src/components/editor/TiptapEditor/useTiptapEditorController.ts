@@ -50,6 +50,7 @@ function useEditorControllers(args: {
   suggestionRef: RefObject<WikiLinkSuggestionHandle | null>;
   slashRef: RefObject<SlashSuggestionHandle | null>;
   handleInsertImageClick: () => void;
+  handleInsertCameraImageClick: () => void;
   handleImageUpload: (files: File[]) => Promise<void>;
   /** Note-linked workspace root for `@file:` (Issue #461). */
   workspaceRoot: string | null;
@@ -91,6 +92,7 @@ function useEditorControllers(args: {
     editorContainerRef: args.editorContainerRef,
     pageId: args.pageId,
     handleInsertImageClick: args.handleInsertImageClick,
+    handleInsertCameraImageClick: args.handleInsertCameraImageClick,
   });
 
   useEditorLifecycle({
@@ -214,6 +216,7 @@ export function useTiptapEditorController({
     suggestionRef: suggestionControllers.suggestionRef,
     slashRef: suggestionControllers.slashRef,
     handleInsertImageClick: imageUpload.handleInsertImageClick,
+    handleInsertCameraImageClick: imageUpload.handleInsertCameraImageClick,
     handleImageUpload: imageUpload.handleImageUpload,
     workspaceRoot,
     noteId: noteIdForWorkspace,
@@ -230,6 +233,7 @@ export function useTiptapEditorController({
     editorContainerRef,
     handleLinkClick,
     fileInputRef: imageUpload.fileInputRef,
+    cameraInputRef: imageUpload.cameraInputRef,
     isDraggingOver: imageUpload.isDraggingOver,
     handleFileInputChange: imageUpload.handleFileInputChange,
     handleDragOver: imageUpload.handleDragOver,

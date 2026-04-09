@@ -2,6 +2,15 @@ import type { Editor } from "@tiptap/core";
 import i18n from "@/i18n";
 
 /**
+ * Check if the current device is a mobile device (phone or tablet).
+ * モバイルデバイス（スマートフォン・タブレット）かどうかを判定する。
+ */
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || "ontouchend" in document;
+}
+
+/**
  * One slash-menu entry (paragraph, heading, code block, etc.).
  * スラッシュメニューの 1 項目（段落、見出し、コードブロックなど）。
  */
@@ -102,6 +111,15 @@ export const slashCommandItems: SlashCommandItem[] = [
     action: (editor, range) => {
       editor.chain().focus().deleteRange(range).run();
       window.dispatchEvent(new CustomEvent("slash-command-insert-image"));
+    },
+  },
+  {
+    id: "camera",
+    icon: "Camera",
+    isAvailable: () => isMobileDevice(),
+    action: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      window.dispatchEvent(new CustomEvent("slash-command-insert-camera-image"));
     },
   },
   {

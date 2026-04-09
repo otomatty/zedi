@@ -109,7 +109,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
         className={cn(
           "fixed inset-0 z-30 bg-black/35",
           "transition-opacity duration-200",
-          open ? "opacity-100" : "pointer-events-none opacity-0",
+          open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={() => onOpenChange(false)}
       />
@@ -120,7 +120,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
       <div
         className={cn(
           "relative z-40 flex flex-col items-end gap-3",
-          !open && "pointer-events-none",
+          open ? "pointer-events-auto" : "pointer-events-none",
         )}
       >
         {/* メニューアイテム（上方向に展開） */}

@@ -108,6 +108,11 @@
       "description": "画像をアップロード",
       "aliases": "画像,image,img,写真"
     },
+    "camera": {
+      "title": "カメラ",
+      "description": "カメラで撮影して挿入",
+      "aliases": "カメラ,camera,撮影,photo"
+    },
     "mermaid": {
       "title": "ダイアグラム",
       "description": "Mermaid でフローチャートや図を作成",

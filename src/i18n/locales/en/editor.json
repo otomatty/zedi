@@ -108,6 +108,11 @@
       "description": "Upload image",
       "aliases": "image,img"
     },
+    "camera": {
+      "title": "Camera",
+      "description": "Take a photo and insert",
+      "aliases": "camera,photo,capture"
+    },
     "mermaid": {
       "title": "Diagram",
       "description": "Create flowcharts and diagrams with Mermaid",

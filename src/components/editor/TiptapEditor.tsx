@@ -51,6 +51,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     editorContainerRef,
     handleLinkClick,
     fileInputRef,
+    cameraInputRef,
     isDraggingOver,
     handleFileInputChange,
     handleDragOver,
@@ -115,6 +116,14 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         type="file"
         accept="image/*"
         multiple
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         onChange={handleFileInputChange}
         className="hidden"
       />
