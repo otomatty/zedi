@@ -53,11 +53,6 @@ export function useMarkdownPasteHandler({ editor }: UseMarkdownPasteHandlerParam
       // Skip when another handler already handled the paste (e.g. image URL paste).
       if (event.defaultPrevented) return;
 
-      // HTML が含まれている場合はリッチペーストを優先（他アプリからのコピーなど）
-      // If HTML is present, let TipTap handle it as rich paste (e.g., copy from other apps)
-      const html = event.clipboardData?.getData("text/html");
-      if (html) return;
-
       const text = event.clipboardData?.getData("text/plain");
       if (!text || !looksLikeMarkdown(text)) return;
 
