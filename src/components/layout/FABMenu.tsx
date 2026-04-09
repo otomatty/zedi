@@ -115,7 +115,14 @@ export const FABMenu: React.FC<FABMenuProps> = ({
       />
 
       {/* FABメニューコンテナ */}
-      <div className="relative z-40 flex flex-col items-end gap-3">
+      {/* メニュー非展開時は pointer-events-none で不可視領域がタッチ・スクロールを遮断しないようにする */}
+      {/* Disable pointer events on the container when closed so invisible menu area doesn't block touch/scroll */}
+      <div
+        className={cn(
+          "relative z-40 flex flex-col items-end gap-3",
+          !open && "pointer-events-none",
+        )}
+      >
         {/* メニューアイテム（上方向に展開） */}
         <div className="mb-2 flex flex-col items-end gap-3">
           {menuItems.map((item, index) => (
@@ -131,8 +138,9 @@ export const FABMenu: React.FC<FABMenuProps> = ({
           ))}
         </div>
 
-        {/* メインFAB（トリガー） */}
-        {trigger}
+        {/* メインFAB（トリガー）— 常にクリック可能にする */}
+        {/* Trigger always receives pointer events so FAB stays clickable */}
+        <div className="pointer-events-auto">{trigger}</div>
       </div>
     </>
   );
