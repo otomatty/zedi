@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@zedi/ui";
 import { WikiGeneratorStatus } from "@/hooks/useWikiGenerator";
-import { loadAISettings } from "@/lib/aiSettings";
+import { isAIConfigured } from "@/lib/aiSettings";
 
 interface WikiGeneratorButtonProps {
   title: string;
@@ -24,26 +24,54 @@ interface WikiGeneratorButtonProps {
   disabled?: boolean;
 }
 
-export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
   title,
   hasContent,
   onGenerate,
   status,
   disabled = false,
 }) => {
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const location = useLocation();
+  /**
+   *
+   */
   const [showNotConfiguredDialog, setShowNotConfiguredDialog] = React.useState(false);
 
   // タイトルがない、または本文がある場合はボタンを非表示
+  /**
+   *
+   */
   const shouldShowButton = title.trim() !== "" && !hasContent;
 
+  /**
+   *
+   */
   const isGenerating = status === "generating";
 
+  /**
+   *
+   */
   const handleClick = async () => {
-    // AI設定を確認
-    const settings = await loadAISettings();
-    if (!settings || !settings.isConfigured || !settings.apiKey) {
+    // AI が利用可能か確認（api_server モードでは API キー不要）。
+    // Check AI availability (no API key required in api_server mode).
+    /**
+     *
+     */
+    const configured = await isAIConfigured();
+    if (!configured) {
       setShowNotConfiguredDialog(true);
       return;
     }
@@ -51,9 +79,18 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
     onGenerate();
   };
 
+  /**
+   *
+   */
   const handleGoToSettings = () => {
     setShowNotConfiguredDialog(false);
+    /**
+     *
+     */
     const returnTo = `${location.pathname}${location.search}${location.hash ?? ""}`;
+    /**
+     *
+     */
     const search = new URLSearchParams({ section: "ai", returnTo }).toString();
     navigate(`/settings?${search}`);
   };
@@ -95,7 +132,7 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
               AI設定が必要です
             </DialogTitle>
             <DialogDescription>
-              Wiki生成機能を使用するには、AI設定でAPIキーを設定してください。
+              Wiki生成機能を使用するには、AI設定を完了してください。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
