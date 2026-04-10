@@ -24,6 +24,7 @@ import { Mermaid } from "../extensions/MermaidExtension";
 import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
 import { McpResource } from "../extensions/McpResourceExtension";
 import { HtmlArtifact } from "../extensions/HtmlArtifactExtension";
+import { MarkdownPaste } from "../extensions/MarkdownPasteExtension";
 import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
@@ -149,6 +150,7 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     Markdown.configure({
       markedOptions: { gfm: true },
     }),
+    MarkdownPaste,
     // Typography for smart quotes and dashes
     Typography,
     ...(options.includePlaceholder

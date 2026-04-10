@@ -4,7 +4,7 @@ import { sanitizeTiptapContent } from "@/lib/contentUtils";
 import { useContentSanitizer } from "./useContentSanitizer";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
 import { usePasteImageHandler } from "./usePasteImageHandler";
-import { useMarkdownPasteHandler } from "./useMarkdownPasteHandler";
+
 import { rememberSlashAgentSelection } from "@/lib/agentSlashCommands/slashAgentSelectionCache";
 import type { TiptapEditorProps } from "./types";
 
@@ -28,8 +28,10 @@ interface UseEditorLifecycleOptions {
 }
 
 /**
- * エディタのライフサイクル管理（コンテンツ同期・読み取り専用切替・画像ペースト・マークダウンペースト・WikiLink 同期）。
- * Manages editor lifecycle: content sync, read-only toggling, image paste handling, markdown paste handling, and WikiLink status sync.
+ * エディタのライフサイクル管理（コンテンツ同期・読み取り専用切替・画像ペースト・WikiLink 同期）。
+ * マークダウンペーストは MarkdownPasteExtension（ProseMirror プラグイン）が担当する。
+ * Manages editor lifecycle: content sync, read-only toggling, image paste handling, and WikiLink status sync.
+ * Markdown paste is handled by MarkdownPasteExtension (ProseMirror plugin).
  */
 export function useEditorLifecycle({
   editor,
@@ -128,7 +130,6 @@ export function useEditorLifecycle({
   ]);
 
   usePasteImageHandler({ editor, handleImageUpload });
-  useMarkdownPasteHandler({ editor });
 
   useEffect(() => {
     if (editor) editor.setEditable(!isReadOnly);

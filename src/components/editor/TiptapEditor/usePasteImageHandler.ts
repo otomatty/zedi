@@ -72,6 +72,10 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
     if (!editor) return;
 
     const handlePaste = (event: ClipboardEvent) => {
+      // ProseMirror プラグイン（例: MarkdownPaste）が処理済みの場合はスキップ
+      // Skip when a ProseMirror plugin (e.g. MarkdownPaste) already handled this paste
+      if (event.defaultPrevented) return;
+
       const items = event.clipboardData?.items;
       const text = event.clipboardData?.getData("text/plain");
 
