@@ -70,13 +70,14 @@ export interface AIServiceCallbacks {
 
 /**
  * 有効な API モードを取得（後方互換性対応）。
- * Returns the effective API mode, with backward compatibility.
+ * apiMode が未設定の場合は、apiKey の有無に関わらず api_server をデフォルトとする。
+ *
+ * Returns the effective API mode with backward compatibility.
+ * When apiMode is unset, default to `api_server` regardless of whether an
+ * apiKey is present — users who want their own key must opt in explicitly.
  */
 export function getEffectiveAPIMode(settings: AISettings): APIMode {
-  if (!settings.apiMode) {
-    return settings.apiKey.trim() !== "" ? "user_api_key" : "api_server";
-  }
-  return settings.apiMode;
+  return settings.apiMode ?? "api_server";
 }
 
 /**

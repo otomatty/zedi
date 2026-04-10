@@ -88,8 +88,11 @@ describe("aiSettings - 回帰テスト", () => {
   });
 
   describe("loadAISettings - 後方互換性（マイグレーション）", () => {
-    it("apiModeがない既存設定を読み込むと自動でuser_api_keyになる（apiKeyあり）", async () => {
+    it("apiModeがない既存設定を読み込むとapiKeyの有無に関わらずapi_serverになる（apiKeyあり）", async () => {
       // 既存の設定形式（apiModeなし）をシミュレート
+      // Simulate legacy settings shape without apiMode.
+      // apiKeyが残っていてもデフォルトはアプリのサーバー経由とする。
+      // Even with a leftover apiKey, default to the app's server.
       const oldSettings = {
         provider: "openai",
         apiKey: "encrypted:test-key",
@@ -102,7 +105,7 @@ describe("aiSettings - 回帰テスト", () => {
       const loaded = await loadAISettings();
 
       expect(loaded).not.toBeNull();
-      expect(loaded?.apiMode).toBe("user_api_key");
+      expect(loaded?.apiMode).toBe("api_server");
       expect(loaded?.apiKey).toBe("test-key");
     });
 

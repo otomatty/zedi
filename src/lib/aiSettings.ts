@@ -40,7 +40,11 @@ export async function saveAISettings(settings: AISettings): Promise<void> {
 /**
  * AI設定を読み込む
  * 暗号化されたAPIキーを復号化して返す
- * 後方互換性: apiModeがない場合は自動判定
+ * 後方互換性: apiModeがない場合はapi_server（アプリのサーバー経由）をデフォルトとする。
+ *
+ * Loads AI settings and decrypts the stored API key.
+ * Backward compatibility: when apiMode is missing, default to `api_server`
+ * so legacy users transparently move to the app-hosted AI endpoint.
  */
 export async function loadAISettings(): Promise<AISettings | null> {
   try {
@@ -49,15 +53,15 @@ export async function loadAISettings(): Promise<AISettings | null> {
 
     const parsed = JSON.parse(stored) as AISettings;
 
-    // APIキーを復号化（後方互換性判定の前に復号化）
+    // APIキーを復号化 / Decrypt the stored API key.
     if (parsed.apiKey) {
       parsed.apiKey = await decrypt(parsed.apiKey);
     }
 
-    // 後方互換性: apiModeがない場合は自動判定（復号化後）
+    // 後方互換性: apiModeがない場合はデフォルトでアプリのサーバー経由とする。
+    // Backward compatibility: default missing apiMode to the app's server.
     if (!parsed.apiMode) {
-      // apiKeyが設定されている場合はuser_api_key、そうでなければapi_server
-      parsed.apiMode = parsed.apiKey.trim() !== "" ? "user_api_key" : "api_server";
+      parsed.apiMode = "api_server";
     }
 
     // 後方互換性: modelIdがない場合はprovider:modelから生成

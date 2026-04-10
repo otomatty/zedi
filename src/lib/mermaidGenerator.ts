@@ -129,8 +129,9 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
     return { ...DEFAULT_AI_SETTINGS, isConfigured: true };
   }
 
-  // api_serverモードならAPIキー不要
-  const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+  // api_serverモードならAPIキー不要 / api_server needs no user API key.
+  // apiMode未設定時はapi_serverをデフォルトとする / Default to api_server when apiMode is unset.
+  const effectiveMode = settings.apiMode ?? "api_server";
   if (effectiveMode === "api_server") {
     return { ...settings, isConfigured: true };
   }
@@ -334,7 +335,8 @@ export async function generateMermaidDiagram(
   callbacks: MermaidGeneratorCallbacks,
 ): Promise<void> {
   const settings = await getAISettingsOrThrow();
-  const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+  // apiMode未設定時はapi_serverをデフォルトとする / Default to api_server when apiMode is unset.
+  const effectiveMode = settings.apiMode ?? "api_server";
 
   // api_server / claude-code: 統一された callAIService 経由
   if (settings.provider === "claude-code" || effectiveMode === "api_server") {

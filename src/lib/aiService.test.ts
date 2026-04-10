@@ -76,7 +76,9 @@ describe("aiService - 回帰テスト", () => {
       expect(getEffectiveAPIMode(settings)).toBe("user_api_key");
     });
 
-    it("apiModeが未設定でapiKeyがある場合はuser_api_keyを返す", () => {
+    it("apiModeが未設定の場合はapiKeyの有無に関わらずapi_serverを返す", () => {
+      // 後方互換: 未設定時のデフォルトはアプリのサーバー経由
+      // Backward compat: default to the app's server when apiMode is unset.
       const settings: AISettings = {
         provider: "openai",
         apiKey: "test-key",
@@ -84,7 +86,7 @@ describe("aiService - 回帰テスト", () => {
         modelId: "openai:gpt-4o",
         isConfigured: true,
       };
-      expect(getEffectiveAPIMode(settings)).toBe("user_api_key");
+      expect(getEffectiveAPIMode(settings)).toBe("api_server");
     });
 
     it("apiModeが未設定でapiKeyが空の場合はapi_serverを返す", () => {
