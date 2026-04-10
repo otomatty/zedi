@@ -219,6 +219,40 @@ describe("aiSettings - 回帰テスト", () => {
       const result = await isAIConfigured();
       expect(result).toBe(true);
     });
+
+    it("回帰: api_serverモードではisConfigured=false・apiKey空でもtrueを返す", async () => {
+      // Wiki/Mermaid 生成ボタンがサーバーモードでもダイアログを出していた問題の回帰テスト。
+      // Regression test for the wiki/mermaid buttons blocking server-mode users.
+      const settings: AISettings = {
+        provider: "google",
+        apiKey: "",
+        apiMode: "api_server",
+        model: "gemini-3-flash-preview",
+        modelId: "google:gemini-3-flash-preview",
+        isConfigured: false,
+      };
+
+      await saveAISettings(settings);
+      const result = await isAIConfigured();
+
+      expect(result).toBe(true);
+    });
+
+    it("回帰: 旧設定（apiMode未設定・apiKeyあり）は後方互換でapi_server扱いとなりtrueを返す", async () => {
+      // 既存ユーザーがアップデート後にサーバーモードに移行するパスの回帰テスト。
+      // Regression test for legacy users migrating to server mode after the update.
+      const oldSettings = {
+        provider: "openai",
+        apiKey: "encrypted:leftover-key",
+        model: "gpt-4o",
+        isConfigured: true,
+      };
+      localStorage.setItem("zedi-ai-settings", JSON.stringify(oldSettings));
+
+      const result = await isAIConfigured();
+
+      expect(result).toBe(true);
+    });
   });
 
   describe("getDefaultAISettings", () => {
