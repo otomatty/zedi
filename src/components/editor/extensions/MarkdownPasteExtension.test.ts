@@ -89,6 +89,7 @@ interface MockEditorOptions {
   parse?: ReturnType<typeof vi.fn>;
   insertContent?: ReturnType<typeof vi.fn>;
   hasMarkdown?: boolean;
+  isEditable?: boolean;
 }
 
 function getHandlePaste(opts: MockEditorOptions = {}): {
@@ -96,11 +97,13 @@ function getHandlePaste(opts: MockEditorOptions = {}): {
   mockEditor: {
     markdown: { parse: ReturnType<typeof vi.fn> } | undefined;
     commands: { insertContent: ReturnType<typeof vi.fn> };
+    isEditable: boolean;
   };
 } {
   const mockEditor = {
     markdown: opts.hasMarkdown === false ? undefined : { parse: opts.parse ?? vi.fn() },
     commands: { insertContent: opts.insertContent ?? vi.fn(() => true) },
+    isEditable: opts.isEditable !== false,
   };
 
   const addPlugins = MarkdownPaste.config.addProseMirrorPlugins;
@@ -173,5 +176,15 @@ describe("MarkdownPaste extension", () => {
     expect(handlePaste(null, event, null)).toBe(true);
     expect(mockEditor.markdown?.parse).toHaveBeenCalledWith("# Hello");
     expect(mockEditor.commands.insertContent).toHaveBeenCalledWith(parsedDoc);
+  });
+
+  it("returns false when editor is read-only", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({
+      isEditable: false,
+    });
+
+    const event = createMockPasteEvent("# Hello");
+    expect(handlePaste(null, event, null)).toBe(false);
+    expect(mockEditor.markdown?.parse).not.toHaveBeenCalled();
   });
 });

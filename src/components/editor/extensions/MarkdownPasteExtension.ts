@@ -2,6 +2,12 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 /**
+ * ProseMirror プラグインキー（拡張再初期化時の再生成を避けるためトップレベルで定義）。
+ * Top-level PluginKey to avoid re-creation on extension re-initialisation.
+ */
+const markdownPasteKey = new PluginKey("markdownPaste");
+
+/**
  * マークダウンらしいテキストかどうかを簡易判定する。
  * Heuristically checks whether the given text looks like markdown.
  *
@@ -48,9 +54,11 @@ export const MarkdownPaste = Extension.create({
 
     return [
       new Plugin({
-        key: new PluginKey("markdownPaste"),
+        key: markdownPasteKey,
         props: {
           handlePaste(_view, event, _slice) {
+            if (!editor.isEditable) return false;
+
             const text = event.clipboardData?.getData("text/plain");
             if (!text || !looksLikeMarkdown(text)) return false;
 
