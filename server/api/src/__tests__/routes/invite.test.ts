@@ -35,7 +35,9 @@ import { errorHandler } from "../../middleware/errorHandler.js";
 const TEST_USER_ID = "user-test-123";
 const TEST_USER_EMAIL = "test@example.com";
 const OTHER_USER_EMAIL = "other@example.com";
-const TEST_TOKEN = "abc123def456";
+// Mock invitation token used as a URL path parameter in tests only.
+// テスト用のモック招待トークン（URL パスパラメータとして使用）。本物のシークレットではない。
+const TEST_TOKEN = "abc123def456"; // gitleaks:allow
 const NOTE_ID = "note-test-001";
 
 // ── Mock DB (same proxy-based pattern as notes tests) ──────────────────────
