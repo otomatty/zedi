@@ -18,6 +18,7 @@ import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
 import extRoutes from "./routes/ext.js";
+import mcpRoutes from "./routes/mcp.js";
 import inviteRoutes from "./routes/invite.js";
 import aiChatRoutes from "./routes/ai/chat.js";
 import aiModelsRoutes from "./routes/ai/models.js";
@@ -108,6 +109,10 @@ export function createApp(): Hono<AppEnv> {
 
   // Chrome Extension (OAuth + clip-and-create)
   app.route("/api/ext", extRoutes);
+
+  // MCP (Model Context Protocol) — PKCE auth + clip endpoint for external Claude Code clients.
+  // MCP サーバー用ルート: PKCE 認証フローと、MCP JWT 経由の clip エンドポイント。
+  app.route("/api/mcp", mcpRoutes);
 
   // AI
   app.route("/api/ai/chat", aiChatRoutes);
