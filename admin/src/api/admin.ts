@@ -234,3 +234,69 @@ export async function patchUserRole(id: string, role: UserRole): Promise<{ user:
   }
   return res.json();
 }
+
+/**
+ * 監査ログ 1 行。
+ * A single admin audit log row as returned by `GET /api/admin/audit-logs`.
+ */
+export interface AuditLogEntry {
+  id: string;
+  actorUserId: string;
+  actorEmail: string | null;
+  actorName: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  targetEmail: string | null;
+  targetName: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+/**
+ * `GET /api/admin/audit-logs` のクエリパラメータ。
+ * Query params for the audit log list API.
+ */
+export interface GetAuditLogsParams {
+  actorUserId?: string;
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+  /** ISO 8601 datetime (inclusive lower bound). */
+  from?: string;
+  /** ISO 8601 datetime (inclusive upper bound). */
+  to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * 管理監査ログ一覧を取得する。
+ * Fetch a paginated list of admin audit logs.
+ *
+ * @param params - フィルター・ページング / Filters and pagination
+ * @returns ログ配列と総件数 / Logs and total count
+ */
+export async function getAuditLogs(params?: GetAuditLogsParams): Promise<{
+  logs: AuditLogEntry[];
+  total: number;
+}> {
+  const sp = new URLSearchParams();
+  if (params?.actorUserId) sp.set("actorUserId", params.actorUserId);
+  if (params?.action) sp.set("action", params.action);
+  if (params?.targetType) sp.set("targetType", params.targetType);
+  if (params?.targetId) sp.set("targetId", params.targetId);
+  if (params?.from) sp.set("from", params.from);
+  if (params?.to) sp.set("to", params.to);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.offset != null) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  const res = await adminFetch(`/api/admin/audit-logs${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch audit logs"));
+  }
+  return res.json();
+}
