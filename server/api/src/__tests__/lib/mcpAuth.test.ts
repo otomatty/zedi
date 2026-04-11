@@ -6,7 +6,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Make env vars deterministic before importing module under test.
 // 環境変数を決定的にしてからモジュールを読み込む。
-process.env.BETTER_AUTH_SECRET = "test-mcp-secret-1234567890abcdef";
+// NOTE: The secret below is a dummy value used only in unit tests.
+// 以下のシークレットはユニットテスト専用のダミー値。
+process.env.BETTER_AUTH_SECRET = "dummy-unit-test-secret"; // gitleaks:allow
 process.env.MCP_REDIRECT_URI_ALLOW = "http://127.0.0.1:,https://app.zedi.example/";
 
 import {
@@ -165,7 +167,7 @@ describe("issueMcpToken / verifyMcpToken", () => {
   it("rejects tokens signed with the wrong secret", async () => {
     const { access_token } = await issueMcpToken("user-42", [MCP_SCOPE_READ]);
     const originalSecret = process.env.BETTER_AUTH_SECRET;
-    process.env.BETTER_AUTH_SECRET = "a-completely-different-secret-value";
+    process.env.BETTER_AUTH_SECRET = "dummy-other-secret"; // gitleaks:allow
     try {
       const payload = await verifyMcpToken(access_token);
       expect(payload).toBeNull();
