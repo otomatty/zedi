@@ -1,0 +1,28 @@
+{
+  "name": "@zedi/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zedi MCP (Model Context Protocol) server — exposes Zedi data to external Claude Code clients via stdio.",
+  "bin": {
+    "zedi-mcp-stdio": "./dist/stdio.js"
+  },
+  "scripts": {
+    "dev:stdio": "tsx watch src/stdio.ts",
+    "build": "tsc",
+    "start:stdio": "node dist/stdio.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.0.18"
+  }
+}
