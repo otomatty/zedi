@@ -66,7 +66,9 @@ function buildInteractionModeUpdates(
           provider: settings.provider === "claude-code" ? "google" : settings.provider,
           model: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.model : settings.model,
           modelId: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.modelId : settings.modelId,
-          apiKey: "",
+          // Preserve a previously stored key when legacy users opt back into user-key mode.
+          // 旧設定ユーザーが user_api_key に戻したとき、保存済みキーを失わないよう保持する。
+          apiKey: settings.provider === "claude-code" ? "" : settings.apiKey,
         } satisfies ModeFieldsSnapshot);
       return {
         provider: base.provider,

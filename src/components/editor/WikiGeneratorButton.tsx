@@ -25,51 +25,28 @@ interface WikiGeneratorButtonProps {
 }
 
 /**
- *
+ * Wiki 生成ボタン。タイトルがあり、本文が未入力のときだけ表示する。
+ * Wiki generation button shown only when the note has a title and no body yet.
  */
-export /**
- *
- */
-const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
+export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
   title,
   hasContent,
   onGenerate,
   status,
   disabled = false,
 }) => {
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const location = useLocation();
-  /**
-   *
-   */
   const [showNotConfiguredDialog, setShowNotConfiguredDialog] = React.useState(false);
 
   // タイトルがない、または本文がある場合はボタンを非表示
-  /**
-   *
-   */
   const shouldShowButton = title.trim() !== "" && !hasContent;
 
-  /**
-   *
-   */
   const isGenerating = status === "generating";
 
-  /**
-   *
-   */
   const handleClick = async () => {
     // AI が利用可能か確認（api_server モードでは API キー不要）。
     // Check AI availability (no API key required in api_server mode).
-    /**
-     *
-     */
     const configured = await isAIConfigured();
     if (!configured) {
       setShowNotConfiguredDialog(true);
@@ -79,18 +56,9 @@ const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
     onGenerate();
   };
 
-  /**
-   *
-   */
   const handleGoToSettings = () => {
     setShowNotConfiguredDialog(false);
-    /**
-     *
-     */
     const returnTo = `${location.pathname}${location.search}${location.hash ?? ""}`;
-    /**
-     *
-     */
     const search = new URLSearchParams({ section: "ai", returnTo }).toString();
     navigate(`/settings?${search}`);
   };

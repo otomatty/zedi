@@ -15,59 +15,24 @@ function effectiveStorageProviderId(provider: string): StorageProviderType {
 }
 
 /**
- *
+ * Builds one-line summaries for each settings section card.
+ * 各設定セクションカード向けの 1 行サマリーを生成する。
  */
 export function useSettingsSummaries(): Record<SettingsSectionId, string> {
-  /**
-   *
-   */
   const { t, i18n } = useTranslation();
-  /**
-   *
-   */
   const general = useGeneralSettings();
-  /**
-   *
-   */
   const ai = useAISettings();
-  /**
-   *
-   */
   const storage = useStorageSettings();
-  /**
-   *
-   */
   const { displayName } = useProfile();
 
-  /**
-   *
-   */
   const generalSummary = (): string => {
     if (general.isLoading) return "";
-    /**
-     *
-     */
     const themeOpt = THEME_OPTIONS.find((o) => o.value === general.settings.theme);
-    /**
-     *
-     */
     const themeText =
       i18n.language === "ja" ? themeOpt?.label : (themeOpt?.labelEn ?? general.settings.theme);
-    /**
-     *
-     */
     const fontSizePx = general.editorFontSizePx ?? 16;
-    /**
-     *
-     */
     const localeOpt = LOCALE_OPTIONS.find((o) => o.value === general.settings.locale);
-    /**
-     *
-     */
     const localeText = localeOpt?.label ?? general.settings.locale;
-    /**
-     *
-     */
     const profileText = displayName
       ? t("settings.summary.general.profileSet")
       : t("settings.summary.general.profileUnset");
@@ -79,36 +44,18 @@ export function useSettingsSummaries(): Record<SettingsSectionId, string> {
     ].join(" · ");
   };
 
-  /**
-   *
-   */
   const aiSummary = (): string => {
     if (ai.isLoading) return "";
-    /**
-     *
-     */
     const useOwnKey = ai.settings.apiMode === "user_api_key";
-    /**
-     *
-     */
     const modeText = useOwnKey
       ? t("settings.summary.ai.ownKeyMode")
       : t("settings.summary.ai.serverMode");
     // api_server モードでは API キー不要のため常に設定済みとして扱う。
     // In api_server mode no API key is required, so always treat as configured.
-    /**
-     *
-     */
     const effectivelyConfigured = !useOwnKey || ai.settings.isConfigured;
-    /**
-     *
-     */
     const statusText = effectivelyConfigured
       ? t("settings.summary.ai.configured")
       : t("settings.summary.ai.notSet");
-    /**
-     *
-     */
     const parts = [modeText, statusText];
     if (ai.settings.modelId) {
       parts.splice(1, 0, t("settings.summary.ai.model", { value: ai.settings.modelId }));
@@ -116,22 +63,10 @@ export function useSettingsSummaries(): Record<SettingsSectionId, string> {
     return parts.join(" · ");
   };
 
-  /**
-   *
-   */
   const storageSummary = (): string => {
     if (storage.isLoading) return "";
-    /**
-     *
-     */
     const isLegacyCloudflareR2 = (storage.settings.provider as string) === LEGACY_CLOUDFLARE_R2;
-    /**
-     *
-     */
     const useDefault = storage.settings.preferDefaultStorage !== false || isLegacyCloudflareR2;
-    /**
-     *
-     */
     const destinationText = useDefault
       ? t("settings.summary.storage.default")
       : t("settings.summary.storage.external", {
@@ -139,9 +74,6 @@ export function useSettingsSummaries(): Record<SettingsSectionId, string> {
             `storageSettings.providers.${effectiveStorageProviderId(storage.settings.provider)}.name`,
           ),
         });
-    /**
-     *
-     */
     let statusText = t("settings.summary.storage.notTested");
     if (storage.testResult) {
       statusText = storage.testResult.success
