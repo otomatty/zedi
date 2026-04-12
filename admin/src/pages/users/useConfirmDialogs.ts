@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import type { UserAdmin, UserRole } from "@/api/admin";
+import type { UserAdmin, UserRole, UserImpact } from "@/api/admin";
+import { getUserImpact } from "@/api/admin";
 
 /**
  * ロール変更の確認ダイアログ用ターゲット型。
@@ -11,19 +12,32 @@ export interface RoleChangeTarget {
 }
 
 /**
- * ロール変更・サスペンド解除の確認ダイアログ状態を管理するフック。
- * Hook that manages confirmation dialog state for role change and unsuspend actions.
+ * 削除確認ダイアログ用ターゲット型。
+ * Target type for delete confirmation dialog.
+ */
+export interface DeleteTarget {
+  user: UserAdmin;
+  impact: UserImpact | null;
+  loadingImpact: boolean;
+}
+
+/**
+ * ロール変更・サスペンド解除・削除の確認ダイアログ状態を管理するフック。
+ * Hook that manages confirmation dialog state for role change, unsuspend, and delete actions.
  *
  * @param onRoleChange - ロール変更実行コールバック / Role change callback
  * @param onUnsuspend - サスペンド解除実行コールバック / Unsuspend callback
+ * @param onDelete - 削除実行コールバック / Delete callback
  * @returns ダイアログ状態とハンドラ / Dialog state and handlers
  */
 export function useConfirmDialogs(
   onRoleChange: (user: UserAdmin, role: UserRole) => void,
   onUnsuspend: (user: UserAdmin) => void,
+  onDelete: (user: UserAdmin) => void,
 ) {
   const [roleChangeTarget, setRoleChangeTarget] = useState<RoleChangeTarget | null>(null);
   const [unsuspendTarget, setUnsuspendTarget] = useState<UserAdmin | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
   const requestRoleChange = useCallback((user: UserAdmin, role: UserRole) => {
     if (user.role === role) return;
@@ -54,14 +68,39 @@ export function useConfirmDialogs(
     setUnsuspendTarget(null);
   }, []);
 
+  const requestDelete = useCallback((user: UserAdmin) => {
+    setDeleteTarget({ user, impact: null, loadingImpact: true });
+    getUserImpact(user.id)
+      .then((impact) => {
+        setDeleteTarget((prev) => (prev ? { ...prev, impact, loadingImpact: false } : null));
+      })
+      .catch(() => {
+        setDeleteTarget((prev) => (prev ? { ...prev, loadingImpact: false } : null));
+      });
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (!deleteTarget) return;
+    onDelete(deleteTarget.user);
+    setDeleteTarget(null);
+  }, [deleteTarget, onDelete]);
+
+  const cancelDelete = useCallback(() => {
+    setDeleteTarget(null);
+  }, []);
+
   return {
     roleChangeTarget,
     unsuspendTarget,
+    deleteTarget,
     requestRoleChange,
     confirmRoleChange,
     cancelRoleChange,
     requestUnsuspend,
     confirmUnsuspend,
     cancelUnsuspend,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
   } as const;
 }

@@ -38,6 +38,7 @@ interface UsersContentProps {
   onRoleChange: (user: UserAdmin, role: UserRole) => void;
   onSuspend: (user: UserAdmin, reason?: string) => void;
   onUnsuspend: (user: UserAdmin) => void;
+  onDelete: (user: UserAdmin) => void;
 }
 
 /**
@@ -84,6 +85,7 @@ export function UsersContent({
   onRoleChange,
   onSuspend,
   onUnsuspend,
+  onDelete,
 }: UsersContentProps) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const hasPreviousPage = page > 0;
@@ -92,7 +94,7 @@ export function UsersContent({
   const rangeEnd = total === 0 ? 0 : page * pageSize + users.length;
 
   const [suspendTarget, setSuspendTarget] = useState<UserAdmin | null>(null);
-  const confirm = useConfirmDialogs(onRoleChange, onUnsuspend);
+  const confirm = useConfirmDialogs(onRoleChange, onUnsuspend, onDelete);
 
   return (
     <div>
@@ -110,6 +112,7 @@ export function UsersContent({
               <SelectItem value="all">すべて</SelectItem>
               <SelectItem value="active">active</SelectItem>
               <SelectItem value="suspended">suspended</SelectItem>
+              <SelectItem value="deleted">deleted</SelectItem>
             </SelectContent>
           </Select>
           <Input
@@ -148,7 +151,7 @@ export function UsersContent({
                 {users.map((u) => (
                   <TableRow
                     key={u.id}
-                    className={`border-border ${u.status === "suspended" ? "opacity-50" : ""}`}
+                    className={`border-border ${u.status === "suspended" ? "opacity-50" : u.status === "deleted" ? "opacity-40" : ""}`}
                   >
                     <TableCell className="px-3 py-2">{u.email}</TableCell>
                     <TableCell className="px-3 py-2">{u.name || "—"}</TableCell>
@@ -171,7 +174,7 @@ export function UsersContent({
                       <Select
                         value={u.role}
                         onValueChange={(v) => confirm.requestRoleChange(u, v as UserRole)}
-                        disabled={savingIds.has(u.id) || u.status === "suspended"}
+                        disabled={savingIds.has(u.id) || u.status !== "active"}
                       >
                         <SelectTrigger
                           className="h-8 min-w-[100px]"
@@ -191,24 +194,39 @@ export function UsersContent({
                     <TableCell className="px-3 py-2">
                       {savingIds.has(u.id) ? (
                         <span className="text-muted-foreground text-sm">保存中...</span>
-                      ) : u.status === "suspended" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => confirm.requestUnsuspend(u)}
-                        >
-                          復活
-                        </Button>
+                      ) : u.status === "deleted" ? (
+                        <span className="text-muted-foreground text-sm">削除済み</span>
                       ) : (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setSuspendTarget(u)}
-                        >
-                          サスペンド
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          {u.status === "suspended" ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => confirm.requestUnsuspend(u)}
+                            >
+                              復活
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setSuspendTarget(u)}
+                            >
+                              サスペンド
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => confirm.requestDelete(u)}
+                          >
+                            削除
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -226,6 +244,7 @@ export function UsersContent({
                 onRoleChange={(role) => confirm.requestRoleChange(u, role)}
                 onSuspend={() => setSuspendTarget(u)}
                 onUnsuspend={() => confirm.requestUnsuspend(u)}
+                onDelete={() => confirm.requestDelete(u)}
                 saving={savingIds.has(u.id)}
               />
             ))}
@@ -303,6 +322,45 @@ export function UsersContent({
         confirmLabel="復活させる"
         onConfirm={confirm.confirmUnsuspend}
       />
+
+      {/* ユーザー削除確認ダイアログ / User deletion confirmation dialog */}
+      <ConfirmActionDialog
+        open={confirm.deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) confirm.cancelDelete();
+        }}
+        title="ユーザーを削除"
+        description={
+          confirm.deleteTarget
+            ? `${confirm.deleteTarget.user.name || confirm.deleteTarget.user.email} を削除します。個人情報は匿名化され、セッションと OAuth 連携は削除されます。この操作は元に戻せません。`
+            : ""
+        }
+        confirmLabel="削除する"
+        destructive
+        confirmPhrase={confirm.deleteTarget?.user.email}
+        loading={confirm.deleteTarget?.loadingImpact}
+        onConfirm={confirm.confirmDelete}
+      >
+        {confirm.deleteTarget?.impact && (
+          <div className="rounded border border-yellow-600/40 bg-yellow-900/20 p-3 text-sm">
+            <p className="mb-1 font-medium text-yellow-300">影響範囲:</p>
+            <ul className="text-muted-foreground list-inside list-disc space-y-0.5">
+              <li>所有ノート: {confirm.deleteTarget.impact.notesCount} 件</li>
+              <li>アクティブセッション: {confirm.deleteTarget.impact.sessionsCount} 件</li>
+              <li>
+                サブスクリプション:{" "}
+                {confirm.deleteTarget.impact.activeSubscription ? "あり (active)" : "なし"}
+              </li>
+              {confirm.deleteTarget.impact.lastAiUsageAt && (
+                <li>
+                  最後の AI 使用:{" "}
+                  {new Date(confirm.deleteTarget.impact.lastAiUsageAt).toLocaleDateString("ja-JP")}
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+      </ConfirmActionDialog>
     </div>
   );
 }

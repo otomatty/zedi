@@ -281,6 +281,53 @@ export async function unsuspendUser(id: string): Promise<{ user: UserAdmin }> {
 }
 
 /**
+ * ユーザー削除前の影響範囲情報。
+ * Impact information shown before user deletion.
+ */
+export interface UserImpact {
+  /** 所有ノート数 / Number of notes owned */
+  notesCount: number;
+  /** アクティブセッション数 / Number of active sessions */
+  sessionsCount: number;
+  /** アクティブなサブスクリプションがあるか / Active subscription exists */
+  activeSubscription: boolean;
+  /** 最後の AI 使用日時 / Last AI usage timestamp or null */
+  lastAiUsageAt: string | null;
+}
+
+/**
+ * ユーザーの削除影響範囲を取得する。
+ * Fetches the impact of deleting a user.
+ *
+ * @param id - ユーザー ID / User ID
+ * @returns 影響範囲情報 / Impact information
+ */
+export async function getUserImpact(id: string): Promise<UserImpact> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/impact`);
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch user impact"));
+  }
+  return res.json();
+}
+
+/**
+ * ユーザーを削除（論理削除）する。
+ * Deletes (soft-deletes) a user account.
+ *
+ * @param id - ユーザー ID / User ID
+ * @returns 削除後のユーザー情報 / Deleted user info
+ */
+export async function deleteUser(id: string): Promise<{ user: UserAdmin }> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to delete user"));
+  }
+  return res.json();
+}
+
+/**
  * 監査ログ 1 行。
  * A single admin audit log row as returned by `GET /api/admin/audit-logs`.
  */

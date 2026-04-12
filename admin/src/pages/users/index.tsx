@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UserAdmin, UserRole, UserStatus } from "@/api/admin";
-import { getUsers, patchUserRole, suspendUser, unsuspendUser } from "@/api/admin";
+import { getUsers, patchUserRole, suspendUser, unsuspendUser, deleteUser } from "@/api/admin";
 import { UsersContent } from "./UsersContent";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -155,6 +155,31 @@ export default function Users() {
     [load],
   );
 
+  const handleDelete = useCallback(
+    async (user: UserAdmin) => {
+      setSavingIds((prev) => new Set(prev).add(user.id));
+      setError(null);
+      try {
+        await deleteUser(user.id);
+        if (!isMountedRef.current) return;
+        latestRequestRef.current += 1;
+        await load(false);
+      } catch (e) {
+        if (!isMountedRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (isMountedRef.current) {
+          setSavingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(user.id);
+            return next;
+          });
+        }
+      }
+    },
+    [load],
+  );
+
   const handleStatusFilterChange = useCallback((value: UserStatus | "all") => {
     setStatusFilter(value);
     setPage(0);
@@ -177,6 +202,7 @@ export default function Users() {
       onRoleChange={handleRoleChange}
       onSuspend={handleSuspend}
       onUnsuspend={handleUnsuspend}
+      onDelete={handleDelete}
     />
   );
 }
