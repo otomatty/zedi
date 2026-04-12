@@ -3,12 +3,17 @@ import { eq, like, desc, sql } from "drizzle-orm";
 import { authRequired } from "../../middleware/auth.js";
 import { adminRequired } from "../../middleware/adminAuth.js";
 import { users } from "../../schema/users.js";
+import { recordAuditLog } from "../../lib/auditLog.js";
+import auditLogsRoutes from "./auditLogs.js";
 import type { AppEnv } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
 
 app.use("*", authRequired);
 app.use("*", adminRequired);
+
+// 監査ログのサブルート / Audit log sub-routes
+app.route("/audit-logs", auditLogsRoutes);
 
 /** GET /api/admin/me — current admin user (for admin UI). */
 app.get("/me", (c) => {
@@ -74,7 +79,17 @@ app.get("/users", async (c) => {
   });
 });
 
-/** PATCH /api/admin/users/:id — update user role (admin only). */
+/**
+ * PATCH /api/admin/users/:id — update user role (admin only).
+ *
+ * ロール変更時は `admin_audit_logs` に `user.role.update` を記録する。
+ * 監査ログの書き込みは本体 UPDATE と同一トランザクションで行われ、
+ * どちらかが失敗した場合は全体がロールバックされる。
+ *
+ * On role change, an `admin_audit_logs` row is written with action
+ * `user.role.update` inside the same transaction as the UPDATE, so the
+ * entire operation is atomic.
+ */
 app.patch("/users/:id", async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
@@ -85,42 +100,72 @@ app.patch("/users/:id", async (c) => {
     return c.json({ error: "invalid JSON body" }, 400);
   }
 
-  if (body.role !== undefined) {
-    if (body.role !== "user" && body.role !== "admin") {
-      return c.json({ error: "role must be 'user' or 'admin'" }, 400);
-    }
-  } else {
+  if (body.role === undefined) {
     return c.json({ error: "role is required" }, 400);
   }
+  if (body.role !== "user" && body.role !== "admin") {
+    return c.json({ error: "role must be 'user' or 'admin'" }, 400);
+  }
 
+  const newRole = body.role;
   const currentUserId = c.get("userId");
-  if (id === currentUserId && body.role === "user") {
+  if (id === currentUserId && newRole === "user") {
     return c.json(
       { error: "Cannot change your own role to user (self-demotion not allowed)" },
       400,
     );
   }
 
-  const [updated] = await db
-    .update(users)
-    .set({
-      role: body.role as "user" | "admin",
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, id))
-    .returning({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      createdAt: users.createdAt,
-    });
+  const result = await db.transaction(async (tx) => {
+    const [before] = await tx
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
 
-  if (!updated) {
+    if (!before) {
+      return { notFound: true } as const;
+    }
+
+    const [updated] = await tx
+      .update(users)
+      .set({
+        role: newRole,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        createdAt: users.createdAt,
+      });
+
+    // 通常ここには到達しない（select で存在を確認済み）。
+    // Should be unreachable: row existence was just verified above.
+    if (!updated) {
+      return { notFound: true } as const;
+    }
+
+    if (before.role !== newRole) {
+      await recordAuditLog(c, tx, {
+        action: "user.role.update",
+        targetType: "user",
+        targetId: updated.id,
+        before: { role: before.role },
+        after: { role: newRole },
+      });
+    }
+
+    return { updated } as const;
+  });
+
+  if ("notFound" in result) {
     return c.json({ error: "User not found" }, 404);
   }
 
-  return c.json({ user: updated });
+  return c.json({ user: result.updated });
 });
 
 export default app;

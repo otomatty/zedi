@@ -100,6 +100,12 @@ describe("GET /api/admin/users", () => {
 });
 
 // ── PATCH /api/admin/users/:id ──────────────────────────────────────────────
+//
+// DB chain order after audit-log integration:
+//   [0] adminRequired  → ADMIN_ROLE_RESULT
+//   [1] tx.select before → [{ id, role }]
+//   [2] tx.update returning → [updated]
+//   [3] tx.insert audit log → [] (only when role actually changes)
 
 describe("PATCH /api/admin/users/:id", () => {
   it("returns 200 and updated user when role is valid", async () => {
@@ -108,7 +114,12 @@ describe("PATCH /api/admin/users/:id", () => {
       email: "user@example.com",
       role: "admin",
     });
-    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT, [updated]]);
+    const { app } = createAdminTestApp([
+      ADMIN_ROLE_RESULT,
+      [{ id: "user-target-001", role: "user" }], // before snapshot
+      [updated], // update returning
+      [], // audit log insert
+    ]);
 
     const res = await app.request("/api/admin/users/user-target-001", {
       method: "PATCH",
@@ -125,6 +136,69 @@ describe("PATCH /api/admin/users/:id", () => {
       role: "admin",
       createdAt: updated.createdAt.toISOString(),
     });
+  });
+
+  it("records an audit log row when the role actually changes", async () => {
+    const updated = createMockUserRow({
+      id: "user-target-001",
+      email: "user@example.com",
+      role: "admin",
+    });
+    const { app, chains } = createAdminTestApp([
+      ADMIN_ROLE_RESULT,
+      [{ id: "user-target-001", role: "user" }],
+      [updated],
+      [],
+    ]);
+
+    const res = await app.request("/api/admin/users/user-target-001", {
+      method: "PATCH",
+      headers: adminAuthHeaders(),
+      body: JSON.stringify({ role: "admin" }),
+    });
+
+    expect(res.status).toBe(200);
+
+    // An insert chain (audit log) must have been recorded.
+    const insertChains = chains.filter((ch) => ch.startMethod === "insert");
+    expect(insertChains).toHaveLength(1);
+
+    const firstInsert = insertChains.at(0);
+    expect(firstInsert).toBeDefined();
+    const valuesOp = (firstInsert as NonNullable<typeof firstInsert>).ops.find(
+      (op) => op.method === "values",
+    );
+    expect(valuesOp).toBeDefined();
+    const values = valuesOp?.args[0] as Record<string, unknown>;
+    expect(values.action).toBe("user.role.update");
+    expect(values.targetType).toBe("user");
+    expect(values.targetId).toBe("user-target-001");
+    expect(values.before).toEqual({ role: "user" });
+    expect(values.after).toEqual({ role: "admin" });
+    expect(values.actorUserId).toBe("user-admin-001");
+  });
+
+  it("does not record an audit log row when the role is unchanged", async () => {
+    const updated = createMockUserRow({
+      id: "user-target-001",
+      email: "user@example.com",
+      role: "admin",
+    });
+    const { app, chains } = createAdminTestApp([
+      ADMIN_ROLE_RESULT,
+      [{ id: "user-target-001", role: "admin" }], // already admin
+      [updated],
+    ]);
+
+    const res = await app.request("/api/admin/users/user-target-001", {
+      method: "PATCH",
+      headers: adminAuthHeaders(),
+      body: JSON.stringify({ role: "admin" }),
+    });
+
+    expect(res.status).toBe(200);
+    const insertChains = chains.filter((ch) => ch.startMethod === "insert");
+    expect(insertChains).toHaveLength(0);
   });
 
   it("returns 400 when role is missing", async () => {
@@ -172,7 +246,7 @@ describe("PATCH /api/admin/users/:id", () => {
   it("returns 404 when user not found", async () => {
     const { app } = createAdminTestApp([
       ADMIN_ROLE_RESULT,
-      [], // update ... returning → no row
+      [], // tx.select before → no row
     ]);
 
     const res = await app.request("/api/admin/users/nonexistent-id", {

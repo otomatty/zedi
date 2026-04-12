@@ -56,6 +56,7 @@ export {
   type ThumbnailObject,
   type NewThumbnailObject,
 } from "./thumbnails.js";
+export { adminAuditLogs, type AdminAuditLog, type NewAdminAuditLog } from "./auditLogs.js";
 
 export {
   usersRelations,
