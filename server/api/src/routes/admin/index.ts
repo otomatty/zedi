@@ -388,11 +388,7 @@ app.get("/users/:id/impact", async (c) => {
   const db = c.get("db");
 
   // ユーザーの存在確認 / Verify user exists
-  const [target] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1);
+  const [target] = await db.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
 
   if (!target) {
     return c.json({ error: "User not found" }, 404);

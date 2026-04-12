@@ -35,7 +35,9 @@ export function UserCard({
 }: UserCardProps) {
   return (
     <Card
-      className={user.status === "suspended" ? "opacity-50" : user.status === "deleted" ? "opacity-40" : ""}
+      className={
+        user.status === "suspended" ? "opacity-50" : user.status === "deleted" ? "opacity-40" : ""
+      }
     >
       <CardContent className="p-3">
         <div className="flex items-center gap-2">
