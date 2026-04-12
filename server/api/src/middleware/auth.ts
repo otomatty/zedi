@@ -5,13 +5,14 @@ import { auth } from "../auth.js";
 import { users } from "../schema/users.js";
 import type { AppEnv } from "../types/index.js";
 
-export /**
+/**
+ * セッション認証を要求するミドルウェア。
+ * サスペンドされたユーザーのアクセスも拒否する（DB がコンテキストにある場合）。
  *
+ * Middleware that requires a valid session. Also rejects suspended users
+ * when the database is available on the context (set by dbMiddleware).
  */
-const authRequired = createMiddleware<AppEnv>(async (c, next) => {
-  /**
-   *
-   */
+export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
   let session: Awaited<ReturnType<typeof auth.api.getSession>> | null = null;
   try {
     session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -22,26 +23,24 @@ const authRequired = createMiddleware<AppEnv>(async (c, next) => {
     throw new HTTPException(401, { message: "Unauthorized" });
   }
 
-  // サスペンドされたユーザーのアクセスを拒否する
-  // Reject access for suspended users
-  /**
-   *
-   */
-  const db = c.get("db");
-  /**
-   *
-   */
-  const [row] = await db
-    .select({ status: users.status })
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-  if (row?.status !== "active") {
-    throw new HTTPException(403, { message: "Account suspended" });
-  }
-
   c.set("userId", session.user.id);
   c.set("userEmail", session.user.email);
+
+  // サスペンドされたユーザーのアクセスを拒否する。
+  // dbMiddleware がセットした Drizzle DB インスタンスを使い、ステータスを検証する。
+  // Reject suspended users using the Drizzle DB instance set by dbMiddleware.
+  const db = c.get("db");
+  if (db && typeof db.select === "function") {
+    const [row] = await db
+      .select({ status: users.status })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    if (row?.status !== "active") {
+      throw new HTTPException(403, { message: "Account suspended" });
+    }
+  }
+
   await next();
 });
 

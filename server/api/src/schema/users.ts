@@ -29,8 +29,11 @@ const users = pgTable(
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     /** Reason for suspension provided by the admin. */
     suspendedReason: text("suspended_reason"),
-    /** Admin user ID who performed the suspension. */
-    suspendedBy: text("suspended_by").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * Admin user ID who performed the suspension.
+     * FK constraint is defined in migration 0005_add_user_status.sql.
+     */
+    suspendedBy: text("suspended_by"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
