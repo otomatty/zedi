@@ -220,6 +220,45 @@ describe("ConfirmActionDialog", () => {
       expect(onConfirm).toHaveBeenCalledTimes(1);
     });
 
+    it("確認後に phraseInput がリセットされる / resets phraseInput after confirm", async () => {
+      const onConfirm = vi.fn();
+      const { rerender } = render(
+        <ConfirmActionDialog
+          {...defaultProps}
+          open={true}
+          onConfirm={onConfirm}
+          confirmPhrase="delete-me"
+        />,
+      );
+
+      const input = screen.getByPlaceholderText("delete-me");
+      await userEvent.type(input, "delete-me");
+      await userEvent.click(screen.getByTestId("confirm-button"));
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+
+      // 親がダイアログを閉じて再度開く / Parent closes and reopens dialog
+      rerender(
+        <ConfirmActionDialog
+          {...defaultProps}
+          open={false}
+          onConfirm={onConfirm}
+          confirmPhrase="delete-me"
+        />,
+      );
+      rerender(
+        <ConfirmActionDialog
+          {...defaultProps}
+          open={true}
+          onConfirm={onConfirm}
+          confirmPhrase="delete-me"
+        />,
+      );
+
+      // 確認ボタンが無効化されている（phraseInput がリセット済み）
+      // Confirm button should be disabled (phraseInput was reset)
+      expect(screen.getByTestId("confirm-button")).toBeDisabled();
+    });
+
     it("カスタム confirmPhraseLabel を設定できる / supports custom phrase label", () => {
       render(
         <ConfirmActionDialog

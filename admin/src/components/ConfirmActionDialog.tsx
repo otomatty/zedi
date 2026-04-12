@@ -97,6 +97,7 @@ export function ConfirmActionDialog({
 
   const handleConfirm = () => {
     if (!canConfirm) return;
+    setPhraseInput("");
     onConfirm();
   };
 
