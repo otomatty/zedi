@@ -106,7 +106,7 @@ const mockCancelDelete = vi.fn();
 
 let hookRoleChangeTarget: { user: UserAdmin; newRole: string } | null = null;
 let hookUnsuspendTarget: UserAdmin | null = null;
-let hookDeleteTarget: { user: UserAdmin; impact: null; loadingImpact: boolean } | null = null;
+const hookDeleteTarget: { user: UserAdmin; impact: null; loadingImpact: boolean } | null = null;
 
 vi.mock("./useConfirmDialogs", () => ({
   useConfirmDialogs: () => ({
