@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { eq, like, desc, sql, and } from "drizzle-orm";
+import { eq, like, desc, sql, and, ne } from "drizzle-orm";
 import { authRequired } from "../../middleware/auth.js";
 import { adminRequired } from "../../middleware/adminAuth.js";
 import { users, session } from "../../schema/users.js";
 import { recordAuditLog } from "../../lib/auditLog.js";
+import { getUserImpact, anonymizeUser } from "../../lib/userDelete.js";
 import auditLogsRoutes from "./auditLogs.js";
 import type { AppEnv } from "../../types/index.js";
 import type { UserStatus } from "../../schema/users.js";
@@ -52,6 +53,10 @@ app.get("/users", async (c) => {
   }
   if (statusFilter && ["active", "suspended", "deleted"].includes(statusFilter)) {
     conditions.push(eq(users.status, statusFilter));
+  } else if (!statusFilter) {
+    // デフォルトでは削除済みユーザーを除外する
+    // Exclude deleted users by default when no status filter is specified
+    conditions.push(ne(users.status, "deleted"));
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : sql`true`;
@@ -367,6 +372,100 @@ app.post("/users/:id/unsuspend", async (c) => {
 
   if ("notSuspended" in result) {
     return c.json({ error: "User is not suspended" }, 400);
+  }
+
+  return c.json({ user: result.updated });
+});
+
+/**
+ * GET /api/admin/users/:id/impact — 削除前の影響範囲を取得する。
+ *
+ * Returns the impact of deleting a user: owned notes count, active sessions,
+ * subscription status, and last AI usage timestamp.
+ */
+app.get("/users/:id/impact", async (c) => {
+  const id = c.req.param("id");
+  const db = c.get("db");
+
+  // ユーザーの存在確認 / Verify user exists
+  const [target] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+
+  if (!target) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  const impact = await getUserImpact(db, id);
+  return c.json(impact);
+});
+
+/**
+ * DELETE /api/admin/users/:id — ユーザーを論理削除する（admin only）。
+ *
+ * トランザクション内で以下を実行する:
+ * 1. 対象ユーザーの全セッション削除
+ * 2. OAuth 連携情報（account テーブル）を削除
+ * 3. 個人情報を匿名化し status='deleted' に設定
+ * 4. 監査ログに user.delete を記録
+ *
+ * Soft-deletes a user within a single transaction:
+ * 1. Deletes all sessions (forced logout)
+ * 2. Deletes OAuth account records
+ * 3. Anonymizes personal data and sets status='deleted'
+ * 4. Records audit log with action 'user.delete'
+ */
+app.delete("/users/:id", async (c) => {
+  const id = c.req.param("id");
+  const db = c.get("db");
+  const currentUserId = c.get("userId");
+
+  // 自己削除防止 / Prevent self-deletion
+  if (id === currentUserId) {
+    return c.json({ error: "Cannot delete yourself" }, 400);
+  }
+
+  const result = await db.transaction(async (tx) => {
+    // 対象ユーザーの存在・ステータス確認 / Check target user exists and status
+    const [target] = await tx
+      .select({ id: users.id, status: users.status })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+
+    if (!target) {
+      return { notFound: true } as const;
+    }
+
+    if (target.status === "deleted") {
+      return { alreadyDeleted: true } as const;
+    }
+
+    // 匿名化・セッション削除・アカウント削除を実行
+    // Anonymize user, delete sessions and account records
+    const { updated, before } = await anonymizeUser(tx, id);
+
+    // 監査ログに記録（匿名化前のスナップショットを before に保存）
+    // Record audit log with before-snapshot (pre-anonymization)
+    await recordAuditLog(c, tx, {
+      action: "user.delete",
+      targetType: "user",
+      targetId: id,
+      before,
+      after: { status: "deleted" },
+    });
+
+    return { updated } as const;
+  });
+
+  if ("notFound" in result) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  if ("alreadyDeleted" in result) {
+    return c.json({ error: "User is already deleted" }, 400);
   }
 
   return c.json({ user: result.updated });

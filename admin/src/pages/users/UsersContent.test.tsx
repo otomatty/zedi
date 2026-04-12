@@ -100,20 +100,28 @@ const mockCancelRoleChange = vi.fn();
 const mockRequestUnsuspend = vi.fn();
 const mockConfirmUnsuspend = vi.fn();
 const mockCancelUnsuspend = vi.fn();
+const mockRequestDelete = vi.fn();
+const mockConfirmDelete = vi.fn();
+const mockCancelDelete = vi.fn();
 
 let hookRoleChangeTarget: { user: UserAdmin; newRole: string } | null = null;
 let hookUnsuspendTarget: UserAdmin | null = null;
+let hookDeleteTarget: { user: UserAdmin; impact: null; loadingImpact: boolean } | null = null;
 
 vi.mock("./useConfirmDialogs", () => ({
   useConfirmDialogs: () => ({
     roleChangeTarget: hookRoleChangeTarget,
     unsuspendTarget: hookUnsuspendTarget,
+    deleteTarget: hookDeleteTarget,
     requestRoleChange: mockRequestRoleChange,
     confirmRoleChange: mockConfirmRoleChange,
     cancelRoleChange: mockCancelRoleChange,
     requestUnsuspend: mockRequestUnsuspend,
     confirmUnsuspend: mockConfirmUnsuspend,
     cancelUnsuspend: mockCancelUnsuspend,
+    requestDelete: mockRequestDelete,
+    confirmDelete: mockConfirmDelete,
+    cancelDelete: mockCancelDelete,
   }),
 }));
 
@@ -149,6 +157,7 @@ const defaultProps = {
   onRoleChange: vi.fn(),
   onSuspend: vi.fn(),
   onUnsuspend: vi.fn(),
+  onDelete: vi.fn(),
 };
 
 describe("UsersContent", () => {

@@ -83,6 +83,10 @@ const mockUsers = (n: number, offset: number) =>
     email: `user${offset + i}@example.com`,
     name: `User ${offset + i}`,
     role: "user" as const,
+    status: "active" as const,
+    suspendedAt: null,
+    suspendedReason: null,
+    suspendedBy: null,
     createdAt: "2026-01-01T00:00:00Z",
   }));
 

@@ -17,6 +17,7 @@ interface UserCardProps {
   onRoleChange: (role: UserRole) => void;
   onSuspend: () => void;
   onUnsuspend: () => void;
+  onDelete: () => void;
   saving: boolean;
 }
 
@@ -24,9 +25,18 @@ interface UserCardProps {
  * モバイル向けユーザーカードコンポーネント。
  * User card component for mobile view.
  */
-export function UserCard({ user, onRoleChange, onSuspend, onUnsuspend, saving }: UserCardProps) {
+export function UserCard({
+  user,
+  onRoleChange,
+  onSuspend,
+  onUnsuspend,
+  onDelete,
+  saving,
+}: UserCardProps) {
   return (
-    <Card className={user.status === "suspended" ? "opacity-50" : ""}>
+    <Card
+      className={user.status === "suspended" ? "opacity-50" : user.status === "deleted" ? "opacity-40" : ""}
+    >
       <CardContent className="p-3">
         <div className="flex items-center gap-2">
           <div className="font-medium text-slate-200">{user.name || "—"}</div>
@@ -48,7 +58,7 @@ export function UserCard({ user, onRoleChange, onSuspend, onUnsuspend, saving }:
           <Select
             value={user.role}
             onValueChange={(v) => onRoleChange(v as UserRole)}
-            disabled={saving || user.status === "suspended"}
+            disabled={saving || user.status !== "active"}
           >
             <SelectTrigger className="h-8 w-[120px]" aria-label={`${user.email} のロール`}>
               <SelectValue />
@@ -59,16 +69,32 @@ export function UserCard({ user, onRoleChange, onSuspend, onUnsuspend, saving }:
             </SelectContent>
           </Select>
           <span className="text-xs text-slate-500">{formatDate(user.createdAt)}</span>
-          {!saving &&
-            (user.status === "suspended" ? (
-              <Button type="button" variant="outline" size="sm" onClick={onUnsuspend}>
-                復活
-              </Button>
-            ) : (
-              <Button type="button" variant="destructive" size="sm" onClick={onSuspend}>
-                サスペンド
-              </Button>
-            ))}
+          {!saving && user.status === "deleted" ? (
+            <span className="text-muted-foreground text-xs">削除済み</span>
+          ) : (
+            !saving && (
+              <>
+                {user.status === "suspended" ? (
+                  <Button type="button" variant="outline" size="sm" onClick={onUnsuspend}>
+                    復活
+                  </Button>
+                ) : (
+                  <Button type="button" variant="destructive" size="sm" onClick={onSuspend}>
+                    サスペンド
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={onDelete}
+                >
+                  削除
+                </Button>
+              </>
+            )
+          )}
           {saving && <span className="text-muted-foreground text-xs">保存中...</span>}
         </div>
       </CardContent>
