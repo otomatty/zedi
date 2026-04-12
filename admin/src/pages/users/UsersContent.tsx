@@ -17,8 +17,10 @@ import {
 } from "@zedi/ui";
 import type { UserAdmin, UserRole, UserStatus } from "@/api/admin";
 import { formatDate } from "@/lib/dateUtils";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { UserCard } from "./UserCard";
 import { SuspendDialog } from "./SuspendDialog";
+import { useConfirmDialogs } from "./useConfirmDialogs";
 
 interface UsersContentProps {
   users: UserAdmin[];
@@ -90,6 +92,7 @@ export function UsersContent({
   const rangeEnd = total === 0 ? 0 : page * pageSize + users.length;
 
   const [suspendTarget, setSuspendTarget] = useState<UserAdmin | null>(null);
+  const confirm = useConfirmDialogs(onRoleChange, onUnsuspend);
 
   return (
     <div>
@@ -167,7 +170,7 @@ export function UsersContent({
                     <TableCell className="px-3 py-2">
                       <Select
                         value={u.role}
-                        onValueChange={(v) => onRoleChange(u, v as UserRole)}
+                        onValueChange={(v) => confirm.requestRoleChange(u, v as UserRole)}
                         disabled={savingIds.has(u.id) || u.status === "suspended"}
                       >
                         <SelectTrigger
@@ -193,7 +196,7 @@ export function UsersContent({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => onUnsuspend(u)}
+                          onClick={() => confirm.requestUnsuspend(u)}
                         >
                           復活
                         </Button>
@@ -220,9 +223,9 @@ export function UsersContent({
               <UserCard
                 key={u.id}
                 user={u}
-                onRoleChange={(role) => onRoleChange(u, role)}
+                onRoleChange={(role) => confirm.requestRoleChange(u, role)}
                 onSuspend={() => setSuspendTarget(u)}
-                onUnsuspend={() => onUnsuspend(u)}
+                onUnsuspend={() => confirm.requestUnsuspend(u)}
                 saving={savingIds.has(u.id)}
               />
             ))}
@@ -266,6 +269,39 @@ export function UsersContent({
         user={suspendTarget}
         onClose={() => setSuspendTarget(null)}
         onConfirm={onSuspend}
+      />
+
+      {/* ロール変更確認ダイアログ / Role change confirmation dialog */}
+      <ConfirmActionDialog
+        open={confirm.roleChangeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) confirm.cancelRoleChange();
+        }}
+        title="ロールを変更"
+        description={
+          confirm.roleChangeTarget
+            ? `${confirm.roleChangeTarget.user.name || confirm.roleChangeTarget.user.email} のロールを「${confirm.roleChangeTarget.user.role}」から「${confirm.roleChangeTarget.newRole}」に変更しますか？`
+            : ""
+        }
+        confirmLabel="変更する"
+        destructive
+        onConfirm={confirm.confirmRoleChange}
+      />
+
+      {/* サスペンド解除確認ダイアログ / Unsuspend confirmation dialog */}
+      <ConfirmActionDialog
+        open={confirm.unsuspendTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) confirm.cancelUnsuspend();
+        }}
+        title="サスペンドを解除"
+        description={
+          confirm.unsuspendTarget
+            ? `${confirm.unsuspendTarget.name || confirm.unsuspendTarget.email} のサスペンドを解除し、アカウントを復活させますか？`
+            : ""
+        }
+        confirmLabel="復活させる"
+        onConfirm={confirm.confirmUnsuspend}
       />
     </div>
   );
