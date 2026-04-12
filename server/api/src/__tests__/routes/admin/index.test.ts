@@ -163,7 +163,11 @@ describe("PATCH /api/admin/users/:id", () => {
     const insertChains = chains.filter((ch) => ch.startMethod === "insert");
     expect(insertChains).toHaveLength(1);
 
-    const valuesOp = insertChains[0].ops.find((op) => op.method === "values");
+    const firstInsert = insertChains.at(0);
+    expect(firstInsert).toBeDefined();
+    const valuesOp = (firstInsert as NonNullable<typeof firstInsert>).ops.find(
+      (op) => op.method === "values",
+    );
     expect(valuesOp).toBeDefined();
     const values = valuesOp?.args[0] as Record<string, unknown>;
     expect(values.action).toBe("user.role.update");

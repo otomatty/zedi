@@ -101,7 +101,9 @@ describe("recordAuditLog", () => {
     });
 
     expect(inserts).toHaveLength(1);
-    const row = inserts[0].values as Record<string, unknown>;
+    const first = inserts.at(0);
+    expect(first).toBeDefined();
+    const row = (first as NonNullable<typeof first>).values as Record<string, unknown>;
     expect(row.actorUserId).toBe("admin-001");
     expect(row.action).toBe("user.role.update");
     expect(row.targetType).toBe("user");
@@ -123,7 +125,9 @@ describe("recordAuditLog", () => {
       targetType: "user",
     });
 
-    const row = inserts[0].values as Record<string, unknown>;
+    const second = inserts.at(0);
+    expect(second).toBeDefined();
+    const row = (second as NonNullable<typeof second>).values as Record<string, unknown>;
     expect(row.targetId).toBeNull();
     expect(row.before).toBeNull();
     expect(row.after).toBeNull();
@@ -159,8 +163,12 @@ describe("recordAuditLog", () => {
       targetId: "t2",
     });
 
-    const id1 = (inserts[0].values as Record<string, unknown>).id;
-    const id2 = (inserts[1].values as Record<string, unknown>).id;
+    const entry0 = inserts.at(0);
+    const entry1 = inserts.at(1);
+    expect(entry0).toBeDefined();
+    expect(entry1).toBeDefined();
+    const id1 = ((entry0 as NonNullable<typeof entry0>).values as Record<string, unknown>).id;
+    const id2 = ((entry1 as NonNullable<typeof entry1>).values as Record<string, unknown>).id;
     expect(id1).not.toBe(id2);
   });
 });
