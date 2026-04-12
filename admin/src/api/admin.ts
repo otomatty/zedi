@@ -10,12 +10,19 @@ export interface AdminMe {
 /** ユーザー役割 / User role */
 export type UserRole = "user" | "admin";
 
+/** ユーザーアカウントステータス / User account status */
+export type UserStatus = "active" | "suspended" | "deleted";
+
 /** 管理者画面で表示するユーザー情報 / User info for admin UI */
 export interface UserAdmin {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  status: UserStatus;
+  suspendedAt: string | null;
+  suspendedReason: string | null;
+  suspendedBy: string | null;
   createdAt: string;
 }
 
@@ -189,6 +196,7 @@ export async function syncAiModels(): Promise<SyncResultItem[]> {
 /** ユーザー一覧取得のクエリパラメータ / Query params for user list */
 export interface GetUsersParams {
   search?: string;
+  status?: UserStatus;
   limit?: number;
   offset?: number;
 }
@@ -206,6 +214,7 @@ export async function getUsers(params?: GetUsersParams): Promise<{
 }> {
   const sp = new URLSearchParams();
   if (params?.search) sp.set("search", params.search);
+  if (params?.status) sp.set("status", params.status);
   if (params?.limit != null) sp.set("limit", String(params.limit));
   if (params?.offset != null) sp.set("offset", String(params.offset));
   const qs = sp.toString();
@@ -231,6 +240,42 @@ export async function patchUserRole(id: string, role: UserRole): Promise<{ user:
   });
   if (!res.ok) {
     throw new Error(await getErrorMessage(res, "Failed to update user role"));
+  }
+  return res.json();
+}
+
+/**
+ * ユーザーをサスペンドする。
+ * Suspends a user account.
+ *
+ * @param id - ユーザー ID / User ID
+ * @param reason - サスペンド理由（任意）/ Suspension reason (optional)
+ * @returns 更新後のユーザー情報 / Updated user
+ */
+export async function suspendUser(id: string, reason?: string): Promise<{ user: UserAdmin }> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/suspend`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to suspend user"));
+  }
+  return res.json();
+}
+
+/**
+ * サスペンドされたユーザーを復活させる。
+ * Unsuspends (reactivates) a user account.
+ *
+ * @param id - ユーザー ID / User ID
+ * @returns 更新後のユーザー情報 / Updated user
+ */
+export async function unsuspendUser(id: string): Promise<{ user: UserAdmin }> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/unsuspend`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to unsuspend user"));
   }
   return res.json();
 }

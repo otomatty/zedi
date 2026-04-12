@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { UserAdmin, UserRole } from "@/api/admin";
-import { getUsers, patchUserRole } from "@/api/admin";
+import type { UserAdmin, UserRole, UserStatus } from "@/api/admin";
+import { getUsers, patchUserRole, suspendUser, unsuspendUser } from "@/api/admin";
 import { UsersContent } from "./UsersContent";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SIZE = 50;
 
+/**
+ * ユーザー管理ページのコンテナコンポーネント。
+ * Container component for the user management page.
+ */
 export default function Users() {
   const [users, setUsers] = useState<UserAdmin[]>([]);
   const [total, setTotal] = useState(0);
@@ -13,6 +17,7 @@ export default function Users() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all");
   const [page, setPage] = useState(0);
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const isMountedRef = useRef(true);
@@ -20,8 +25,10 @@ export default function Users() {
   const latestRequestRef = useRef(0);
   const pageRef = useRef(page);
   const searchRef = useRef(search);
+  const statusFilterRef = useRef(statusFilter);
   pageRef.current = page;
   searchRef.current = search;
+  statusFilterRef.current = statusFilter;
 
   const load = useCallback(
     async (showLoading = true) => {
@@ -31,6 +38,7 @@ export default function Users() {
       try {
         const result = await getUsers({
           search: searchRef.current || undefined,
+          status: statusFilterRef.current === "all" ? undefined : statusFilterRef.current,
           limit: PAGE_SIZE,
           offset: pageRef.current * PAGE_SIZE,
         });
@@ -47,7 +55,7 @@ export default function Users() {
         }
       }
     },
-    [page, search],
+    [page, search, statusFilter],
   );
 
   useEffect(() => {
@@ -97,6 +105,61 @@ export default function Users() {
     [load],
   );
 
+  const handleSuspend = useCallback(
+    async (user: UserAdmin, reason?: string) => {
+      setSavingIds((prev) => new Set(prev).add(user.id));
+      setError(null);
+      try {
+        await suspendUser(user.id, reason);
+        if (!isMountedRef.current) return;
+        latestRequestRef.current += 1;
+        await load(false);
+      } catch (e) {
+        if (!isMountedRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (isMountedRef.current) {
+          setSavingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(user.id);
+            return next;
+          });
+        }
+      }
+    },
+    [load],
+  );
+
+  const handleUnsuspend = useCallback(
+    async (user: UserAdmin) => {
+      setSavingIds((prev) => new Set(prev).add(user.id));
+      setError(null);
+      try {
+        await unsuspendUser(user.id);
+        if (!isMountedRef.current) return;
+        latestRequestRef.current += 1;
+        await load(false);
+      } catch (e) {
+        if (!isMountedRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (isMountedRef.current) {
+          setSavingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(user.id);
+            return next;
+          });
+        }
+      }
+    },
+    [load],
+  );
+
+  const handleStatusFilterChange = useCallback((value: UserStatus | "all") => {
+    setStatusFilter(value);
+    setPage(0);
+  }, []);
+
   return (
     <UsersContent
       users={users}
@@ -104,12 +167,16 @@ export default function Users() {
       page={page}
       pageSize={PAGE_SIZE}
       search={searchInput}
+      statusFilter={statusFilter}
       onSearchChange={setSearchInput}
+      onStatusFilterChange={handleStatusFilterChange}
       onPageChange={setPage}
       error={error}
       loading={loading}
       savingIds={savingIds}
       onRoleChange={handleRoleChange}
+      onSuspend={handleSuspend}
+      onUnsuspend={handleUnsuspend}
     />
   );
 }
