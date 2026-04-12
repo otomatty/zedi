@@ -1,16 +1,7 @@
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Button,
-  Label,
-  Textarea,
-} from "@zedi/ui";
+import { Label, Textarea } from "@zedi/ui";
 import type { UserAdmin } from "@/api/admin";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 interface SuspendDialogProps {
   /** サスペンド対象のユーザー（null で非表示）/ User to suspend (null to hide) */
@@ -43,36 +34,29 @@ export function SuspendDialog({ user, onClose, onConfirm }: SuspendDialogProps) 
   };
 
   return (
-    <Dialog open={user !== null} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>ユーザーをサスペンド</DialogTitle>
-          <DialogDescription>
-            {user?.name || user?.email} をサスペンドします。サスペンドされたユーザーはすべての API
-            にアクセスできなくなり、既存セッションも無効化されます。
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="suspend-reason">理由（任意）</Label>
-            <Textarea
-              id="suspend-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="サスペンドの理由を入力してください"
-              rows={3}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button type="button" variant="destructive" onClick={handleConfirm}>
-            サスペンド
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmActionDialog
+      open={user !== null}
+      onOpenChange={handleOpenChange}
+      title="ユーザーをサスペンド"
+      description={
+        user
+          ? `${user.name || user.email} をサスペンドします。サスペンドされたユーザーはすべての API にアクセスできなくなり、既存セッションも無効化されます。`
+          : ""
+      }
+      confirmLabel="サスペンド"
+      destructive
+      onConfirm={handleConfirm}
+    >
+      <div className="grid gap-2">
+        <Label htmlFor="suspend-reason">理由（任意）</Label>
+        <Textarea
+          id="suspend-reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="サスペンドの理由を入力してください"
+          rows={3}
+        />
+      </div>
+    </ConfirmActionDialog>
   );
 }
