@@ -3,7 +3,13 @@ import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 /** User role for access control. 'admin' can access /api/admin/* and admin UI. */
 export type UserRole = "user" | "admin";
 
-export const users = pgTable(
+/** User account status. 'suspended' blocks all API access. */
+export type UserStatus = "active" | "suspended" | "deleted";
+
+export /**
+ *
+ */
+const users = pgTable(
   "user",
   {
     id: text("id").primaryKey(),
@@ -15,16 +21,35 @@ export const users = pgTable(
     role: text("role", { enum: ["user", "admin"] })
       .notNull()
       .default("user"),
+    /** Account status: 'active' (default), 'suspended', or 'deleted'. */
+    status: text("status", { enum: ["active", "suspended", "deleted"] })
+      .notNull()
+      .default("active"),
+    /** Timestamp when the user was suspended. Null if not suspended. */
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    /** Reason for suspension provided by the admin. */
+    suspendedReason: text("suspended_reason"),
+    /** Admin user ID who performed the suspension. */
+    suspendedBy: text("suspended_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("idx_user_email").on(table.email)],
+  (table) => [index("idx_user_email").on(table.email), index("idx_user_status").on(table.status)],
 );
 
+/**
+ *
+ */
 export type User = typeof users.$inferSelect;
+/**
+ *
+ */
 export type NewUser = typeof users.$inferInsert;
 
-export const session = pgTable("session", {
+export /**
+ *
+ */
+const session = pgTable("session", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -37,7 +62,10 @@ export const session = pgTable("session", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const account = pgTable("account", {
+export /**
+ *
+ */
+const account = pgTable("account", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -55,7 +83,10 @@ export const account = pgTable("account", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const verification = pgTable("verification", {
+export /**
+ *
+ */
+const verification = pgTable("verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
