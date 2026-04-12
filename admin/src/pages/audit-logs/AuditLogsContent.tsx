@@ -23,8 +23,6 @@ import { formatDate } from "@/lib/dateUtils";
  */
 export interface AuditLogsFilters {
   action?: string;
-  actorEmail?: string;
-  targetEmail?: string;
   from?: string;
   to?: string;
 }
@@ -111,7 +109,7 @@ export function AuditLogsContent({
         <h1 className="text-lg font-semibold">監査ログ</h1>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <label
             htmlFor="audit-filter-action"
@@ -133,34 +131,6 @@ export function AuditLogsContent({
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <div>
-          <label htmlFor="audit-filter-actor" className="mb-1 block text-xs text-slate-400">
-            操作者メール
-          </label>
-          <Input
-            id="audit-filter-actor"
-            type="search"
-            value={filters.actorEmail ?? ""}
-            onChange={(e) =>
-              onFilterChange({ ...filters, actorEmail: e.target.value || undefined })
-            }
-            placeholder="admin@example.com"
-          />
-        </div>
-        <div>
-          <label htmlFor="audit-filter-target" className="mb-1 block text-xs text-slate-400">
-            対象メール
-          </label>
-          <Input
-            id="audit-filter-target"
-            type="search"
-            value={filters.targetEmail ?? ""}
-            onChange={(e) =>
-              onFilterChange({ ...filters, targetEmail: e.target.value || undefined })
-            }
-            placeholder="user@example.com"
-          />
         </div>
         <div>
           <label htmlFor="audit-filter-from" className="mb-1 block text-xs text-slate-400">

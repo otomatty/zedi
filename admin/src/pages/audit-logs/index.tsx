@@ -49,8 +49,6 @@ export default function AuditLogs() {
         limit: PAGE_SIZE,
         offset: pageRef.current * PAGE_SIZE,
         action: f.action,
-        // actorEmail / targetEmail は将来の拡張用（現状サーバー側は actorUserId / targetId）。
-        // actorEmail / targetEmail are reserved for a future server-side filter.
         from: toIso(f.from),
         to: toIso(f.to),
       };
