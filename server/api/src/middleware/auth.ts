@@ -26,9 +26,9 @@ export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
   c.set("userId", session.user.id);
   c.set("userEmail", session.user.email);
 
-  // サスペンドされたユーザーのアクセスを拒否する。
+  // サスペンドまたは削除されたユーザーのアクセスを拒否する。
   // dbMiddleware がセットした Drizzle DB インスタンスを使い、ステータスを検証する。
-  // Reject suspended users using the Drizzle DB instance set by dbMiddleware.
+  // Reject suspended/deleted users using the Drizzle DB instance set by dbMiddleware.
   const db = c.get("db");
   if (db && typeof db.select === "function") {
     const [row] = await db
@@ -36,8 +36,14 @@ export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
       .from(users)
       .where(eq(users.id, session.user.id))
       .limit(1);
-    if (row?.status !== "active") {
+    if (!row) {
+      throw new HTTPException(401, { message: "Unauthorized" });
+    }
+    if (row.status === "suspended") {
       throw new HTTPException(403, { message: "Account suspended" });
+    }
+    if (row.status !== "active") {
+      throw new HTTPException(403, { message: "Account is not active" });
     }
   }
 

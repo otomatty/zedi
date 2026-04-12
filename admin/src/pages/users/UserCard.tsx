@@ -21,7 +21,8 @@ interface UserCardProps {
 }
 
 /**
- *
+ * モバイル向けユーザーカードコンポーネント。
+ * User card component for mobile view.
  */
 export function UserCard({ user, onRoleChange, onSuspend, onUnsuspend, saving }: UserCardProps) {
   return (

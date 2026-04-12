@@ -7,88 +7,35 @@ const SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SIZE = 50;
 
 /**
- *
+ * ユーザー管理ページのコンテナコンポーネント。
+ * Container component for the user management page.
  */
 export default function Users() {
-  /**
-   *
-   */
   const [users, setUsers] = useState<UserAdmin[]>([]);
-  /**
-   *
-   */
   const [total, setTotal] = useState(0);
-  /**
-   *
-   */
   const [loading, setLoading] = useState(true);
-  /**
-   *
-   */
   const [error, setError] = useState<string | null>(null);
-  /**
-   *
-   */
   const [search, setSearch] = useState("");
-  /**
-   *
-   */
   const [searchInput, setSearchInput] = useState("");
-  /**
-   *
-   */
   const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all");
-  /**
-   *
-   */
   const [page, setPage] = useState(0);
-  /**
-   *
-   */
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
-  /**
-   *
-   */
   const isMountedRef = useRef(true);
-  /**
-   *
-   */
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /**
-   *
-   */
   const latestRequestRef = useRef(0);
-  /**
-   *
-   */
   const pageRef = useRef(page);
-  /**
-   *
-   */
   const searchRef = useRef(search);
-  /**
-   *
-   */
   const statusFilterRef = useRef(statusFilter);
   pageRef.current = page;
   searchRef.current = search;
   statusFilterRef.current = statusFilter;
 
-  /**
-   *
-   */
   const load = useCallback(
     async (showLoading = true) => {
-      /**
-       *
-       */
       const requestId = ++latestRequestRef.current;
       if (showLoading && isMountedRef.current) setLoading(true);
       if (isMountedRef.current) setError(null);
       try {
-        /**
-         *
-         */
         const result = await getUsers({
           search: searchRef.current || undefined,
           status: statusFilterRef.current === "all" ? undefined : statusFilterRef.current,
@@ -132,9 +79,6 @@ export default function Users() {
     };
   }, [searchInput]);
 
-  /**
-   *
-   */
   const handleRoleChange = useCallback(
     async (user: UserAdmin, role: UserRole) => {
       if (user.role === role) return;
@@ -151,9 +95,6 @@ export default function Users() {
       } finally {
         if (isMountedRef.current) {
           setSavingIds((prev) => {
-            /**
-             *
-             */
             const next = new Set(prev);
             next.delete(user.id);
             return next;
@@ -164,9 +105,6 @@ export default function Users() {
     [load],
   );
 
-  /**
-   *
-   */
   const handleSuspend = useCallback(
     async (user: UserAdmin, reason?: string) => {
       setSavingIds((prev) => new Set(prev).add(user.id));
@@ -182,9 +120,6 @@ export default function Users() {
       } finally {
         if (isMountedRef.current) {
           setSavingIds((prev) => {
-            /**
-             *
-             */
             const next = new Set(prev);
             next.delete(user.id);
             return next;
@@ -195,9 +130,6 @@ export default function Users() {
     [load],
   );
 
-  /**
-   *
-   */
   const handleUnsuspend = useCallback(
     async (user: UserAdmin) => {
       setSavingIds((prev) => new Set(prev).add(user.id));
@@ -213,9 +145,6 @@ export default function Users() {
       } finally {
         if (isMountedRef.current) {
           setSavingIds((prev) => {
-            /**
-             *
-             */
             const next = new Set(prev);
             next.delete(user.id);
             return next;
@@ -226,9 +155,6 @@ export default function Users() {
     [load],
   );
 
-  /**
-   *
-   */
   const handleStatusFilterChange = useCallback((value: UserStatus | "all") => {
     setStatusFilter(value);
     setPage(0);
