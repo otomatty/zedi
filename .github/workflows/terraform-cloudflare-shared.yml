@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
@@ -45,7 +45,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [plan]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
