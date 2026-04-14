@@ -1,5 +1,9 @@
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import {
+  containsWikiLinkPattern,
+  transformWikiLinksInContent,
+} from "./transformWikiLinksInContent";
 
 /**
  * ProseMirror プラグインキー（拡張再初期化時の再生成を避けるためトップレベルで定義）。
@@ -60,13 +64,28 @@ export const MarkdownPaste = Extension.create({
             if (!editor.isEditable) return false;
 
             const text = event.clipboardData?.getData("text/plain");
-            if (!text || !looksLikeMarkdown(text)) return false;
+            if (!text) return false;
+
+            // マークダウン記法または Wikiリンク記法のいずれかが含まれる場合のみ介入する。
+            // Intercept only when markdown patterns OR wiki link syntax are detected.
+            const hasMarkdown = looksLikeMarkdown(text);
+            const hasWikiLink = containsWikiLinkPattern(text);
+            if (!hasMarkdown && !hasWikiLink) return false;
 
             if (!editor.markdown) return false;
 
             try {
               const parsed = editor.markdown.parse(text);
-              editor.commands.insertContent(parsed);
+              // Wikiリンクは @tiptap/markdown がプレーンテキストとしてパースするため、
+              // 後処理で `wikiLink` マークを付与する。
+              // `@tiptap/markdown` leaves `[[...]]` as plain text, so post-process
+              // the parsed JSON to apply the `wikiLink` mark.
+              const content = hasWikiLink
+                ? transformWikiLinksInContent(
+                    parsed as Parameters<typeof transformWikiLinksInContent>[0],
+                  )
+                : parsed;
+              editor.commands.insertContent(content);
               return true;
             } catch {
               // パース失敗時は ProseMirror のデフォルトペースト処理にフォールバック
