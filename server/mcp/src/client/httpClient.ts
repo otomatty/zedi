@@ -49,7 +49,15 @@ export class HttpZediClient implements ZediClient {
    * @param opts - baseUrl, token, optional fetch を含むオプション。
    */
   constructor(opts: HttpZediClientOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
+    // 末尾のスラッシュを除去する。ReDoS（CodeQL `js/polynomial-redos`）を避けるため、
+    // `String.prototype.replace` と正規表現ではなく手動で切り詰める。
+    // Strip trailing slashes manually instead of via a regex, to avoid the
+    // polynomial ReDoS pattern flagged by CodeQL (`js/polynomial-redos`).
+    let normalizedBaseUrl = opts.baseUrl;
+    while (normalizedBaseUrl.endsWith("/")) {
+      normalizedBaseUrl = normalizedBaseUrl.slice(0, -1);
+    }
+    this.baseUrl = normalizedBaseUrl;
     this.token = opts.token;
     this.fetchImpl = opts.fetch ?? globalThis.fetch;
   }
