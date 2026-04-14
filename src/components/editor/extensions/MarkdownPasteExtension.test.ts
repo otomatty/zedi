@@ -188,3 +188,120 @@ describe("MarkdownPaste extension", () => {
     expect(mockEditor.markdown?.parse).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Wikiリンクペーストの統合テスト / Wiki link paste integration tests
+// ---------------------------------------------------------------------------
+
+describe("MarkdownPaste extension - wiki links", () => {
+  /**
+   * editor.markdown.parse がテキストをそのまま段落として返すモック。
+   * Mock `parse` that echoes the text back as a single paragraph.
+   */
+  function createEchoParse() {
+    return vi.fn((text: string) => ({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text }],
+        },
+      ],
+    }));
+  }
+
+  it("intercepts paste of a bare wiki link like [[Foo]]", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({ parse: createEchoParse() });
+
+    const event = createMockPasteEvent("[[Foo]]");
+    expect(handlePaste(null, event, null)).toBe(true);
+    expect(mockEditor.commands.insertContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies wikiLink mark to pasted [[Title]] text", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({ parse: createEchoParse() });
+
+    const event = createMockPasteEvent("[[Foo]]");
+    handlePaste(null, event, null);
+
+    const inserted = mockEditor.commands.insertContent.mock.calls[0]?.[0] as {
+      content: Array<{
+        content: Array<{
+          type: string;
+          text: string;
+          marks?: Array<{ type: string; attrs: Record<string, unknown> }>;
+        }>;
+      }>;
+    };
+    const textNode = inserted.content[0].content[0];
+    expect(textNode.text).toBe("Foo");
+    expect(textNode.marks).toEqual([
+      {
+        type: "wikiLink",
+        attrs: { title: "Foo", exists: false, referenced: false },
+      },
+    ]);
+  });
+
+  it("handles wiki links mixed with surrounding text", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({ parse: createEchoParse() });
+
+    const event = createMockPasteEvent("see [[Foo]] today");
+    expect(handlePaste(null, event, null)).toBe(true);
+
+    const inserted = mockEditor.commands.insertContent.mock.calls[0]?.[0] as {
+      content: Array<{
+        content: Array<{ type: string; text: string; marks?: unknown[] }>;
+      }>;
+    };
+    const nodes = inserted.content[0].content;
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0].text).toBe("see ");
+    expect(nodes[1].text).toBe("Foo");
+    expect(nodes[1].marks).toBeDefined();
+    expect(nodes[2].text).toBe(" today");
+  });
+
+  it("applies wiki link transformation even when markdown patterns co-exist", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({ parse: createEchoParse() });
+
+    const event = createMockPasteEvent("# Heading with [[Ref]]");
+    expect(handlePaste(null, event, null)).toBe(true);
+
+    const inserted = mockEditor.commands.insertContent.mock.calls[0]?.[0] as {
+      content: Array<{
+        content: Array<{
+          type: string;
+          text: string;
+          marks?: Array<{ type: string }>;
+        }>;
+      }>;
+    };
+    const textNodes = inserted.content[0].content;
+    const wikiNode = textNodes.find((n) => n.text === "Ref");
+    expect(wikiNode).toBeDefined();
+    expect(wikiNode?.marks?.[0]?.type).toBe("wikiLink");
+  });
+
+  it("does not intercept text with empty-bracket pattern only", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({ parse: createEchoParse() });
+
+    const event = createMockPasteEvent("empty [[]] brackets");
+    // `[[]]` は Wikiリンクとも Markdown ともみなされないため、デフォルト処理に委ねる。
+    // `[[]]` matches neither wiki link nor markdown patterns, so fall through.
+    expect(handlePaste(null, event, null)).toBe(false);
+    expect(mockEditor.commands.insertContent).not.toHaveBeenCalled();
+  });
+
+  it("skips transformation when markdown.parse throws (falls back)", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({
+      parse: vi.fn(() => {
+        throw new Error("parse error");
+      }),
+    });
+
+    const event = createMockPasteEvent("[[Foo]]");
+    expect(handlePaste(null, event, null)).toBe(false);
+    expect(mockEditor.commands.insertContent).not.toHaveBeenCalled();
+  });
+});
