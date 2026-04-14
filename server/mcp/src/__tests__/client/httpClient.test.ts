@@ -284,4 +284,20 @@ describe("HttpZediClient error normalization", () => {
     await c.getCurrentUser();
     expect(callArgs(localFetch as unknown as Mock)[0]).toBe(`${BASE}/api/users/me`);
   });
+
+  it("normalizes baseUrl with multiple trailing slashes", async () => {
+    // 連続する末尾スラッシュも正しく除去されること（ReDoS 回避のためループ実装）。
+    // Multiple trailing slashes are stripped (manual loop, ReDoS-safe).
+    const localFetch = vi.fn<typeof fetch>();
+    const c = new HttpZediClient({
+      baseUrl: `${BASE}/////`,
+      token: TOKEN,
+      fetch: localFetch,
+    });
+    localFetch.mockResolvedValueOnce(
+      makeJsonResponse(200, { id: "u1", email: null, name: null, image: null }),
+    );
+    await c.getCurrentUser();
+    expect(callArgs(localFetch as unknown as Mock)[0]).toBe(`${BASE}/api/users/me`);
+  });
 });
