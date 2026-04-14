@@ -9,7 +9,7 @@
         "@aws-sdk/s3-request-presigner": "^3.1002.0",
         "@hono/node-server": "^1.19.11",
         "@mozilla/readability": "^0.6.0",
-        "@polar-sh/sdk": "^0.46.3",
+        "@polar-sh/sdk": "^0.47.0",
         "@react-email/components": "^1.0.11",
         "@tiptap/core": "^3.20.1",
         "@tiptap/extension-code-block-lowlight": "^3.20.1",
@@ -253,7 +253,7 @@
 
     "@noble/hashes": ["@noble/hashes@2.0.1", "", {}, "sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw=="],
 
-    "@polar-sh/sdk": ["@polar-sh/sdk@0.46.3", "", { "dependencies": { "standardwebhooks": "^1.0.0", "zod": "^3.25.65 || ^4.0.0" } }, "sha512-o7e1TOJ6xMIS/cFflmAKzuczmaZDGddUP1uQNGDYb9d3ktigDXj88CP6ITTy3AEenhACRp65Ks/hVZ/rsQyI4Q=="],
+    "@polar-sh/sdk": ["@polar-sh/sdk@0.47.0", "", { "dependencies": { "standardwebhooks": "^1.0.0", "zod": "^3.25.65 || ^4.0.0" } }, "sha512-tZEt8eLWsQVhmyfUQzXhnN84e5Cnu/JsYFnCci1ranWkIGveQc+wTiyzDCG9Tl1xiz1Y/ztPsAJ1fevj6ExdAA=="],
 
     "@prisma/client": ["@prisma/client@7.4.2", "", { "dependencies": { "@prisma/client-runtime-utils": "7.4.2" }, "peerDependencies": { "prisma": "*", "typescript": ">=5.4.0" }, "optionalPeers": ["prisma", "typescript"] }, "sha512-ts2mu+cQHriAhSxngO3StcYubBGTWDtu/4juZhXCUKOwgh26l+s4KD3vT2kMUzFyrYnll9u/3qWrtzRv9CGWzA=="],
 
