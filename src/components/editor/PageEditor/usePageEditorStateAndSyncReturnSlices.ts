@@ -70,6 +70,7 @@ export interface PageEditorActionsReturnSlice {
   handleBack: () => void;
   handleConfirmDelete: () => void;
   handleCancelDelete: () => void;
+  handleOpenDuplicatePage: (targetPageId: string) => void;
   setTitle: (t: string) => void;
   setContent: (c: string) => void;
   setContentError: (e: string | null) => void;

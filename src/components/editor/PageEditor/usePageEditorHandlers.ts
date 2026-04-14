@@ -2,14 +2,12 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ContentError } from "../TiptapEditor/useContentSanitizer";
 import { generateAutoTitle } from "@/lib/contentUtils";
-import type { Page } from "@/types/page";
 
 interface UsePageEditorHandlersOptions {
   title: string;
   content: string;
   /** true のときだけオートタイトル（コンテンツ先頭行からの自動生成）を有効にする */
   enableAutoTitle: boolean;
-  duplicatePage: Page | null;
   setTitle: (title: string) => void;
   setContent: (content: string) => void;
   setContentError: (error: ContentError | null) => void;
@@ -27,7 +25,6 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     title,
     content,
     enableAutoTitle,
-    duplicatePage,
     setTitle,
     setContent,
     setContentError,
@@ -73,12 +70,6 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     [setContentError],
   );
 
-  const handleOpenDuplicatePage = useCallback(() => {
-    if (duplicatePage) {
-      navigate(`/page/${duplicatePage.id}`);
-    }
-  }, [duplicatePage, navigate]);
-
   const handleGenerateWiki = useCallback(() => {
     generateWiki(title);
   }, [generateWiki, title]);
@@ -94,7 +85,6 @@ export function usePageEditorHandlers(options: UsePageEditorHandlersOptions) {
     handleContentChange,
     handleTitleChange,
     handleContentError,
-    handleOpenDuplicatePage,
     handleGenerateWiki,
     handleGoToAISettings,
   };

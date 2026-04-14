@@ -66,7 +66,6 @@ export function usePageEditor() {
     title: state.title,
     content: state.content,
     enableAutoTitle: state.isNewPage,
-    duplicatePage: state.duplicatePage ?? null,
     setTitle: state.setTitle,
     setContent: state.setContent,
     setContentError: state.setContentError,
@@ -109,7 +108,11 @@ export function usePageEditor() {
       onExportMarkdown: state.handleExportMarkdown,
       onCopyMarkdown: state.handleCopyMarkdown,
       onGenerateWiki: handlers.handleGenerateWiki,
-      onOpenDuplicatePage: handlers.handleOpenDuplicatePage,
+      onOpenDuplicatePage: () => {
+        if (state.duplicatePage) {
+          state.handleOpenDuplicatePage(state.duplicatePage.id);
+        }
+      },
       onCancelWiki: state.cancelWiki,
       onContentChange: handlers.handleContentChange,
       onContentError: handlers.handleContentError,
