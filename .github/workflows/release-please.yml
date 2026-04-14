@@ -23,7 +23,7 @@ jobs:
     outputs:
       pr-branch: ${{ steps.rp.outputs.prs_created == 'true' && fromJSON(steps.rp.outputs.pr).headBranchName || '' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
@@ -42,7 +42,7 @@ jobs:
     if: needs.release-please.outputs.pr-branch != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           ref: ${{ needs.release-please.outputs.pr-branch }}
 
