@@ -19,6 +19,16 @@ interface UsePageDeletionReturn {
   handleBack: () => void;
   handleConfirmDelete: () => void;
   handleCancelDelete: () => void;
+  /**
+   * 重複警告の「開く」ボタン押下時のハンドラ。
+   * 現在編集中のページ（重複側）を削除してから既存ページへ遷移する。
+   * コンテンツがある場合は確認ダイアログを表示する。
+   *
+   * Handler for the "Open" button on the duplicate-title warning.
+   * Deletes the currently editing (duplicate) page before navigating to the existing one.
+   * Shows a confirmation dialog when the page has content.
+   */
+  handleOpenDuplicatePage: (targetPageId: string) => void;
 }
 
 /**
@@ -37,6 +47,9 @@ export function usePageDeletion({
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState<string>("");
+  // 確認ダイアログ確定後の遷移先。デフォルトは /home。
+  // Navigation target to use after the confirmation dialog resolves. Defaults to /home.
+  const [pendingNavTarget, setPendingNavTarget] = useState<string>("/home");
 
   const handleDelete = useCallback(() => {
     if (currentPageId) {
@@ -75,6 +88,8 @@ export function usePageDeletion({
         } else {
           setDeleteReason("タイトルが未入力のページ");
         }
+        // 戻る経由なので遷移先はホーム
+        setPendingNavTarget("/home");
         setDeleteConfirmOpen(true);
         return;
       }
@@ -102,12 +117,48 @@ export function usePageDeletion({
       });
     }
     setDeleteConfirmOpen(false);
-    navigate("/home");
-  }, [currentPageId, deletePageMutation, deleteReason, navigate, toast]);
+    navigate(pendingNavTarget);
+    // 次回に備えてデフォルトに戻す / reset to default for next invocation
+    setPendingNavTarget("/home");
+  }, [currentPageId, deletePageMutation, deleteReason, navigate, pendingNavTarget, toast]);
 
   const handleCancelDelete = useCallback(() => {
     setDeleteConfirmOpen(false);
+    setPendingNavTarget("/home");
   }, []);
+
+  const handleOpenDuplicatePage = useCallback(
+    (targetPageId: string) => {
+      const targetPath = `/page/${targetPageId}`;
+
+      // 現在のページがまだ作成されていない場合は削除不要でそのまま遷移
+      // No current page persisted yet — just navigate.
+      if (!currentPageId) {
+        navigate(targetPath);
+        return;
+      }
+
+      const hasContent = isContentNotEmpty(content);
+
+      // コンテンツがある場合は確認ダイアログを表示
+      // Ask for confirmation when the duplicate page has content.
+      if (hasContent) {
+        setDeleteReason("重複するタイトルのページ");
+        setPendingNavTarget(targetPath);
+        setDeleteConfirmOpen(true);
+        return;
+      }
+
+      // コンテンツがない場合はそのまま削除して遷移
+      // Otherwise delete immediately and navigate to the existing page.
+      deletePageMutation.mutate(currentPageId);
+      toast({
+        title: "重複するタイトルのため、ページを削除しました",
+      });
+      navigate(targetPath);
+    },
+    [currentPageId, content, deletePageMutation, navigate, toast],
+  );
 
   return {
     deleteConfirmOpen,
@@ -117,5 +168,6 @@ export function usePageDeletion({
     handleBack,
     handleConfirmDelete,
     handleCancelDelete,
+    handleOpenDuplicatePage,
   };
 }
