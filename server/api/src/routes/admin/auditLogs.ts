@@ -120,7 +120,7 @@ app.get("/", async (c) => {
       and(eq(adminAuditLogs.targetType, "user"), eq(target.id, adminAuditLogs.targetId)),
     )
     .where(whereClause)
-    .orderBy(desc(adminAuditLogs.createdAt))
+    .orderBy(desc(adminAuditLogs.createdAt), desc(adminAuditLogs.id))
     .limit(limit)
     .offset(offset);
 

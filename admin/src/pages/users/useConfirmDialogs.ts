@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { UserAdmin, UserRole, UserImpact } from "@/api/admin";
 import { getUserImpact } from "@/api/admin";
 
@@ -38,6 +38,7 @@ export function useConfirmDialogs(
   const [roleChangeTarget, setRoleChangeTarget] = useState<RoleChangeTarget | null>(null);
   const [unsuspendTarget, setUnsuspendTarget] = useState<UserAdmin | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const deleteImpactRequestIdRef = useRef(0);
 
   const requestRoleChange = useCallback((user: UserAdmin, role: UserRole) => {
     if (user.role === role) return;
@@ -69,13 +70,23 @@ export function useConfirmDialogs(
   }, []);
 
   const requestDelete = useCallback((user: UserAdmin) => {
+    const requestId = deleteImpactRequestIdRef.current + 1;
+    deleteImpactRequestIdRef.current = requestId;
     setDeleteTarget({ user, impact: null, loadingImpact: true });
     getUserImpact(user.id)
       .then((impact) => {
-        setDeleteTarget((prev) => (prev ? { ...prev, impact, loadingImpact: false } : null));
+        setDeleteTarget((prev) =>
+          prev && prev.user.id === user.id && deleteImpactRequestIdRef.current === requestId
+            ? { ...prev, impact, loadingImpact: false }
+            : prev,
+        );
       })
       .catch(() => {
-        setDeleteTarget((prev) => (prev ? { ...prev, loadingImpact: false } : null));
+        setDeleteTarget((prev) =>
+          prev && prev.user.id === user.id && deleteImpactRequestIdRef.current === requestId
+            ? { ...prev, loadingImpact: false }
+            : prev,
+        );
       });
   }, []);
 
@@ -86,6 +97,7 @@ export function useConfirmDialogs(
   }, [deleteTarget, onDelete]);
 
   const cancelDelete = useCallback(() => {
+    deleteImpactRequestIdRef.current += 1;
     setDeleteTarget(null);
   }, []);
 

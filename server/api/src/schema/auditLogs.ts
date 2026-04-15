@@ -32,6 +32,7 @@ export const adminAuditLogs = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    index("idx_admin_audit_logs_created_id").on(table.createdAt, table.id),
     index("idx_admin_audit_logs_actor_created").on(table.actorUserId, table.createdAt),
     index("idx_admin_audit_logs_target_created").on(
       table.targetType,

@@ -137,6 +137,17 @@ describe("MarkdownPaste extension", () => {
     expect(mockEditor.commands.insertContent).toHaveBeenCalledWith(parsedDoc);
   });
 
+  it("returns false when insertContent rejects the parsed content", () => {
+    const parsedDoc = { type: "doc", content: [] };
+    const { handlePaste } = getHandlePaste({
+      parse: vi.fn(() => parsedDoc),
+      insertContent: vi.fn(() => false),
+    });
+
+    const event = createMockPasteEvent("# Hello");
+    expect(handlePaste(null, event, null)).toBe(false);
+  });
+
   it("returns false for plain text without markdown patterns", () => {
     const { handlePaste, mockEditor } = getHandlePaste();
 

@@ -85,8 +85,7 @@ export const MarkdownPaste = Extension.create({
                     parsed as Parameters<typeof transformWikiLinksInContent>[0],
                   )
                 : parsed;
-              editor.commands.insertContent(content);
-              return true;
+              return editor.commands.insertContent(content);
             } catch {
               // パース失敗時は ProseMirror のデフォルトペースト処理にフォールバック
               // On parse failure, fall back to ProseMirror's default paste handling

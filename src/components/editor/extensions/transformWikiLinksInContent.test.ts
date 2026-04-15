@@ -328,4 +328,32 @@ describe("transformWikiLinksInContent", () => {
 
     expect(doc).toEqual(snapshot);
   });
+
+  it("keeps wiki-link syntax literal inside inline code marks", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "[[Foo]]", marks: [{ type: "code" }] }],
+        },
+      ],
+    };
+
+    expect(transformWikiLinksInContent(doc)).toEqual(doc);
+  });
+
+  it("keeps wiki-link syntax literal inside code blocks", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          content: [{ type: "text", text: "[[Foo]]" }],
+        },
+      ],
+    };
+
+    expect(transformWikiLinksInContent(doc)).toEqual(doc);
+  });
 });
