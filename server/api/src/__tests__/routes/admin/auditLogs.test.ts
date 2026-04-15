@@ -165,6 +165,19 @@ describe("GET /api/admin/audit-logs", () => {
     expect(body.error).toMatch(/to|date/i);
   });
 
+  it("returns 400 when 'from' is later than 'to'", async () => {
+    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+
+    const res = await app.request(
+      "/api/admin/audit-logs?from=2026-12-31T23:59:59Z&to=2026-01-01T00:00:00Z",
+      { headers: adminAuthHeaders() },
+    );
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toMatch(/from|to|earlier/i);
+  });
+
   it("accepts filter query params without error", async () => {
     const { app } = createAdminTestApp([ADMIN_ROLE_RESULT, [], [{ count: 0 }]]);
 

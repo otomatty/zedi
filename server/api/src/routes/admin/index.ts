@@ -226,14 +226,20 @@ app.post("/users/:id/suspend", async (c) => {
     return c.json({ error: "Cannot suspend yourself" }, 400);
   }
 
-  let body: { reason?: string };
-  try {
-    body = await c.req.json<{ reason?: string }>();
-  } catch {
-    body = {};
+  const rawBody = await c.req.text();
+  let reason: string | null = null;
+  if (rawBody.trim().length > 0) {
+    let body: { reason?: unknown } | null;
+    try {
+      body = JSON.parse(rawBody) as { reason?: unknown } | null;
+    } catch {
+      return c.json({ error: "invalid JSON body" }, 400);
+    }
+    reason =
+      body && typeof body === "object" && !Array.isArray(body) && typeof body.reason === "string"
+        ? body.reason.trim() || null
+        : null;
   }
-
-  const reason = typeof body.reason === "string" ? body.reason.trim() || null : null;
 
   const result = await db.transaction(async (tx) => {
     const [target] = await tx

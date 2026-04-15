@@ -145,7 +145,6 @@ export function ConfirmActionDialog({
                 e.preventDefault();
                 return;
               }
-              e.preventDefault();
               handleConfirm();
             }}
           >

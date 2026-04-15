@@ -49,10 +49,9 @@ export async function getUserImpact(db: Database, userId: string): Promise<UserI
       .from(session)
       .where(eq(session.userId, userId)),
     db
-      .select({ status: subscriptions.status })
+      .select({ count: sql<number>`cast(count(*) as integer)` })
       .from(subscriptions)
-      .where(eq(subscriptions.userId, userId))
-      .limit(1),
+      .where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, "active"))),
     db
       .select({ createdAt: aiUsageLogs.createdAt })
       .from(aiUsageLogs)
@@ -64,7 +63,7 @@ export async function getUserImpact(db: Database, userId: string): Promise<UserI
   return {
     notesCount: notesResult[0]?.count ?? 0,
     sessionsCount: sessionsResult[0]?.count ?? 0,
-    activeSubscription: subResult[0]?.status === "active",
+    activeSubscription: (subResult[0]?.count ?? 0) > 0,
     lastAiUsageAt: aiResult[0]?.createdAt?.toISOString() ?? null,
   };
 }
