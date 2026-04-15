@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Camera,
   ImageIcon,
@@ -20,7 +20,12 @@ import {
 import { RadioGroup, RadioGroupItem } from "@zedi/ui";
 import { Label } from "@zedi/ui";
 import { Alert, AlertDescription } from "@zedi/ui";
+import { Progress } from "@zedi/ui";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { useAISettings } from "@/hooks/useAISettings";
+import { runOcr, detectOcrLanguages } from "@/lib/ocr/tesseractOcr";
+import { describeImage } from "@/lib/ai/describeImage";
+import i18n from "@/i18n";
 
 type ProcessingMode = "ocr" | "describe" | "none";
 
@@ -61,6 +66,10 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    *
    */
   const [error, setError] = useState<string | null>(null);
+  /**
+   * OCR 進捗 (0-100)。null の場合は非表示 / OCR progress 0-100; null hides the UI.
+   */
+  const [ocrProgress, setOcrProgress] = useState<number | null>(null);
 
   /**
    *
@@ -70,24 +79,44 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    *
    */
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  /**
+   * 実行中の OCR / 画像解析を中断するための AbortController
+   * AbortController used to cancel in-flight OCR / describe calls.
+   */
+  const abortRef = useRef<AbortController | null>(null);
 
   /**
    *
    */
   const { uploadImage, isConfigured } = useImageUpload();
+  /**
+   * AI 設定 (プロバイダー・モデル・API キー) / AI settings used for the describe mode.
+   */
+  const { settings: aiSettings } = useAISettings();
 
   // ダイアログを閉じたときにリセット
+  // Reset all transient state and abort any in-flight OCR / describe request.
   /**
    *
    */
   const handleClose = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setStep("source");
     setSelectedImage(null);
     setPreviewUrl(null);
     setProcessingMode("none");
     setError(null);
+    setOcrProgress(null);
     onOpenChange(false);
   }, [onOpenChange]);
+
+  // コンポーネントアンマウント時も abort する / Also abort on unmount.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // 画像選択
   /**
@@ -176,6 +205,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
   }, [handleImageSelect]);
 
   // 作成実行
+  // Execute creation: upload the image, then run OCR or LLM description if requested.
   /**
    *
    */
@@ -184,6 +214,13 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
 
     setIsProcessing(true);
     setError(null);
+    setOcrProgress(null);
+
+    // 既存の abort があれば中断し、新しい controller を用意
+    // Abort any previous run and set up a fresh controller for this invocation.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       // ストレージ設定確認
@@ -199,7 +236,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
        */
       const imageUrl = await uploadImage(selectedImage);
 
-      // 処理モードに応じた処理
+      // 処理モードに応じた処理 / Run OCR or describe depending on the selected mode.
       /**
        *
        */
@@ -210,25 +247,52 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
       let description: string | undefined;
 
       if (processingMode === "ocr") {
-        // TODO: OCR処理を実装
-        // 現在は空のテキストを返す
-        extractedText = "";
+        // Tesseract.js でクライアントサイド OCR を実行。
+        // Run Tesseract.js OCR on the device (no external API call).
+        setOcrProgress(0);
+        extractedText = await runOcr(selectedImage, {
+          languages: detectOcrLanguages(i18n.language),
+          onProgress: (percent) => setOcrProgress(percent),
+          signal: controller.signal,
+        });
+        setOcrProgress(null);
       } else if (processingMode === "describe") {
-        // TODO: AI画像説明生成を実装
-        // 現在は空の説明を返す
-        description = "";
+        // AI 設定が未構成ならここには来ないはずだが防御的に弾く。
+        // Guard defensively — the UI should already disable the button in this case.
+        if (!aiSettings.isConfigured) {
+          throw new Error(
+            "画像解析には AI 設定が必要です。設定画面で AI プロバイダーを設定してください。",
+          );
+        }
+        description = await describeImage(selectedImage, aiSettings, {
+          signal: controller.signal,
+        });
       }
 
       // 作成完了コールバック
       onCreated(imageUrl, extractedText, description);
       handleClose();
     } catch (err) {
+      // 中断時は静かに閉じる（ユーザーが明示的にキャンセルしたケース）
+      // If the user cancelled, swallow the abort error silently.
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
       console.error("Failed to create page from image:", err);
       setError(err instanceof Error ? err.message : "画像の処理に失敗しました");
     } finally {
       setIsProcessing(false);
+      setOcrProgress(null);
     }
-  }, [selectedImage, processingMode, isConfigured, uploadImage, onCreated, handleClose]);
+  }, [
+    selectedImage,
+    processingMode,
+    isConfigured,
+    uploadImage,
+    onCreated,
+    handleClose,
+    aiSettings,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -363,6 +427,26 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
               </RadioGroup>
             </div>
 
+            {/* describe モード選択時、AI 設定が未構成なら誘導 Alert を表示 */}
+            {/* Show guidance when 'describe' is selected but AI is not configured. */}
+            {processingMode === "describe" && !aiSettings.isConfigured && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  画像解析には AI 設定が必要です。設定画面で AI プロバイダーを設定してください。
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* OCR 進捗バー / OCR progress bar */}
+            {isProcessing && processingMode === "ocr" && ocrProgress !== null && (
+              <div className="space-y-2">
+                <div className="text-muted-foreground text-sm">
+                  テキスト抽出中... {ocrProgress}%
+                </div>
+                <Progress value={ocrProgress} />
+              </div>
+            )}
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -398,11 +482,22 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
             キャンセル
           </Button>
           {step === "preview" && (
-            <Button onClick={handleCreate} disabled={isProcessing || !isConfigured}>
+            <Button
+              onClick={handleCreate}
+              disabled={
+                isProcessing ||
+                !isConfigured ||
+                (processingMode === "describe" && !aiSettings.isConfigured)
+              }
+            >
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  処理中...
+                  {processingMode === "ocr" && ocrProgress !== null
+                    ? `テキスト抽出中... ${ocrProgress}%`
+                    : processingMode === "describe"
+                      ? "画像を解析中..."
+                      : "処理中..."}
                 </>
               ) : (
                 "作成"
