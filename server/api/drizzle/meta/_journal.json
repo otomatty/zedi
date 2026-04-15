@@ -29,6 +29,13 @@
       "when": 1776211200000,
       "tag": "0004_add_admin_audit_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776297600000,
+      "tag": "0005_add_user_status",
+      "breakpoints": true
     }
   ]
 }

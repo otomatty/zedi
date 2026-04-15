@@ -185,6 +185,23 @@ describe("POST /api/admin/users/:id/suspend", () => {
     expect(body.error).toContain("already suspended");
   });
 
+  it("returns 400 when user is already deleted", async () => {
+    const { app } = createAdminTestApp([
+      ADMIN_ROLE_RESULT,
+      [{ id: "user-target-001", status: "deleted", role: "user" }],
+    ]);
+
+    const res = await app.request("/api/admin/users/user-target-001/suspend", {
+      method: "POST",
+      headers: adminAuthHeaders(),
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("deleted");
+  });
+
   it("returns 404 when user not found", async () => {
     const { app } = createAdminTestApp([
       ADMIN_ROLE_RESULT,

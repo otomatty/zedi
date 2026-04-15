@@ -29,8 +29,23 @@ const ADMIN_ROLE_RESULT = [{ role: "admin" }];
 const USER_ROLE_RESULT = [{ role: "user" }];
 
 import { createAdminTestApp, createMockUserRow, adminAuthHeaders } from "./setup.js";
+import { parseAdminUserStatusFilter } from "../../../routes/admin/index.js";
 
 // ── GET /api/admin/users ─────────────────────────────────────────────────────
+
+describe("parseAdminUserStatusFilter", () => {
+  it("returns a valid status filter unchanged", () => {
+    expect(parseAdminUserStatusFilter("active")).toBe("active");
+    expect(parseAdminUserStatusFilter("suspended")).toBe("suspended");
+    expect(parseAdminUserStatusFilter("deleted")).toBe("deleted");
+  });
+
+  it("falls back to null for missing or invalid values", () => {
+    expect(parseAdminUserStatusFilter(undefined)).toBeNull();
+    expect(parseAdminUserStatusFilter("")).toBeNull();
+    expect(parseAdminUserStatusFilter("archived")).toBeNull();
+  });
+});
 
 describe("GET /api/admin/users", () => {
   it("returns 200 with users and total", async () => {

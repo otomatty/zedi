@@ -18,8 +18,26 @@ vi.mock("../../lib/mcpAuth.js", async (importOriginal) => {
 import { mcpReadRequired, mcpWriteRequired } from "../../middleware/mcpAuth.js";
 import { MCP_JWT_AUDIENCE, MCP_SCOPE_READ, MCP_SCOPE_WRITE } from "../../lib/mcpAuth.js";
 
-function createApp() {
+type MockStatusRow = { status: "active" | "suspended" | "deleted" };
+
+function createMockDb(statusRows: MockStatusRow[]) {
+  return {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => statusRows,
+        }),
+      }),
+    }),
+  } as unknown as AppEnv["Variables"]["db"];
+}
+
+function createApp(statusRows: MockStatusRow[] = [{ status: "active" }]) {
   const app = new Hono<AppEnv>();
+  app.use("*", async (c, next) => {
+    c.set("db", createMockDb(statusRows));
+    await next();
+  });
   app.get("/read", mcpReadRequired, (c) => c.json({ ok: true, userId: c.get("userId") }));
   app.get("/write", mcpWriteRequired, (c) => c.json({ ok: true, userId: c.get("userId") }));
   return app;
@@ -88,6 +106,19 @@ describe("mcpReadRequired", () => {
     });
     expect(res.status).toBe(200);
   });
+
+  it("returns 403 when the MCP user is suspended", async () => {
+    mockVerifyMcpToken.mockResolvedValue({
+      sub: "user-42",
+      scope: [MCP_SCOPE_READ],
+      aud: MCP_JWT_AUDIENCE,
+      exp: 0,
+    });
+    const res = await createApp([{ status: "suspended" }]).request("/read", {
+      headers: { Authorization: "Bearer t" },
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe("mcpWriteRequired", () => {
@@ -117,5 +148,31 @@ describe("mcpWriteRequired", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { userId: string };
     expect(body.userId).toBe("user-7");
+  });
+
+  it("returns 403 when the MCP user is deleted", async () => {
+    mockVerifyMcpToken.mockResolvedValue({
+      sub: "user-7",
+      scope: [MCP_SCOPE_WRITE],
+      aud: MCP_JWT_AUDIENCE,
+      exp: 0,
+    });
+    const res = await createApp([{ status: "deleted" }]).request("/write", {
+      headers: { Authorization: "Bearer t" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 401 when the MCP user no longer exists", async () => {
+    mockVerifyMcpToken.mockResolvedValue({
+      sub: "user-7",
+      scope: [MCP_SCOPE_WRITE],
+      aud: MCP_JWT_AUDIENCE,
+      exp: 0,
+    });
+    const res = await createApp([]).request("/write", {
+      headers: { Authorization: "Bearer t" },
+    });
+    expect(res.status).toBe(401);
   });
 });
