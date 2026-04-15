@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.14.2 (2026-04-15)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump actions/checkout from 4.3.1 to 6.0.2 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/581
+* chore(deps): bump @polar-sh/sdk from 0.46.7 to 0.47.0 in /server/api in the minor-and-patch group across 1 directory by @dependabot[bot] in https://github.com/otomatty/zedi/pull/491
+* chore(deps): bump @anthropic-ai/sdk from 0.82.0 to 0.88.0 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/582
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.14.1...zedi-v0.14.2
+
 ## 0.14.1 (2026-04-11)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
