@@ -9,6 +9,12 @@ import {
   fileToBase64,
 } from "../types";
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException("Image upload aborted", "AbortError");
+  }
+}
+
 /**
  * GitHub ストレージプロバイダー
  *
@@ -27,6 +33,9 @@ export class GitHubProvider implements StorageProviderInterface {
   private readonly path: string;
   private readonly apiUrl = "https://api.github.com";
 
+  /**
+   *
+   */
   constructor(config: { repository: string; token: string; branch?: string; path?: string }) {
     if (!config.repository || !config.token) {
       throw new Error("GitHub configuration is incomplete");
@@ -41,12 +50,14 @@ export class GitHubProvider implements StorageProviderInterface {
    * 画像をGitHubリポジトリにアップロード
    */
   async uploadImage(file: File, options?: UploadOptions): Promise<string> {
+    throwIfAborted(options?.signal);
     const fileName = options?.fileName || generateFileName(file);
     const folder = options?.folder || this.path;
     const filePath = folder ? `${folder}/${fileName}` : fileName;
 
     // ファイルをBase64に変換
     const content = await fileToBase64(file);
+    throwIfAborted(options?.signal);
 
     // GitHub Contents API
     const url = `${this.apiUrl}/repos/${this.repository}/contents/${filePath}`;
@@ -59,6 +70,7 @@ export class GitHubProvider implements StorageProviderInterface {
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json",
       },
+      signal: options?.signal,
       body: JSON.stringify({
         message: `Upload image: ${fileName}`,
         content: content,

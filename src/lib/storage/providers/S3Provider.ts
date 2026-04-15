@@ -5,6 +5,9 @@
 
 import { StorageProviderInterface, UploadOptions, ConnectionTestResult } from "../types";
 
+/**
+ *
+ */
 export interface S3ProviderContext {
   getToken: () => Promise<string | null>;
   baseUrl?: string;
@@ -23,11 +26,23 @@ function buildImageUrl(baseUrl: string, mediaId: string): string {
   return `${base}/api/media/${mediaId}`;
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException("Image upload aborted", "AbortError");
+  }
+}
+
+/**
+ *
+ */
 export class S3Provider implements StorageProviderInterface {
   readonly name = "デフォルトストレージ";
   private readonly getToken: () => Promise<string | null>;
   private readonly baseUrl: string;
 
+  /**
+   *
+   */
   constructor(_config: Record<string, unknown>, context: S3ProviderContext) {
     if (!context.getToken) {
       throw new Error("S3Provider requires getToken in context");
@@ -36,28 +51,43 @@ export class S3Provider implements StorageProviderInterface {
     this.baseUrl = context.baseUrl ?? getDefaultBaseUrl();
   }
 
+  /**
+   *
+   */
   async uploadImage(file: File, options?: UploadOptions): Promise<string> {
-    const { uploadUrl, mediaId, s3Key } = await this.requestUploadUrl(file);
-    await this.putToS3(uploadUrl, file);
+    throwIfAborted(options?.signal);
+    /**
+     *
+     */
+    const { uploadUrl, mediaId, s3Key } = await this.requestUploadUrl(file, options?.signal);
+    await this.putToS3(uploadUrl, file, options?.signal);
     if (options?.onProgress) {
       options.onProgress({ loaded: file.size, total: file.size, percentage: 100 });
     }
-    await this.confirmUpload(mediaId, s3Key, file);
+    await this.confirmUpload(mediaId, s3Key, file, options?.signal);
     return buildImageUrl(this.baseUrl, mediaId);
   }
 
   private async requestUploadUrl(
     file: File,
+    signal?: AbortSignal,
   ): Promise<{ uploadUrl: string; mediaId: string; s3Key: string }> {
+    /**
+     *
+     */
     const base =
       this.baseUrl.replace(/\/$/, "") ||
       (typeof window !== "undefined" ? window.location.origin : "");
+    /**
+     *
+     */
     const uploadRes = await fetch(`${base}/api/media/upload`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       credentials: "include",
+      signal,
       body: JSON.stringify({
         content_type: file.type || "application/octet-stream",
         file_name: file.name || undefined,
@@ -69,6 +99,9 @@ export class S3Provider implements StorageProviderInterface {
       );
     }
     if (!uploadRes.ok) {
+      /**
+       *
+       */
       const err = await uploadRes.text().catch(() => "");
       throw new Error(
         uploadRes.status === 503
@@ -76,12 +109,21 @@ export class S3Provider implements StorageProviderInterface {
           : `アップロード準備に失敗しました: ${err || uploadRes.status}`,
       );
     }
+    /**
+     *
+     */
     interface UploadPayload {
       upload_url: string;
       media_id: string;
       s3_key: string;
     }
+    /**
+     *
+     */
     const raw = (await uploadRes.json()) as { data?: UploadPayload } | UploadPayload;
+    /**
+     *
+     */
     const data: UploadPayload =
       raw && typeof raw === "object" && "data" in raw && raw.data
         ? raw.data
@@ -96,29 +138,45 @@ export class S3Provider implements StorageProviderInterface {
     };
   }
 
-  private async putToS3(uploadUrl: string, file: File): Promise<void> {
+  private async putToS3(uploadUrl: string, file: File, signal?: AbortSignal): Promise<void> {
+    /**
+     *
+     */
     const putRes = await fetch(uploadUrl, {
       method: "PUT",
       body: file,
       headers: {
         "Content-Type": file.type || "application/octet-stream",
       },
+      signal,
     });
     if (!putRes.ok) {
       throw new Error(`アップロードに失敗しました: ${putRes.status}`);
     }
   }
 
-  private async confirmUpload(mediaId: string, s3Key: string, file: File): Promise<void> {
+  private async confirmUpload(
+    mediaId: string,
+    s3Key: string,
+    file: File,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    /**
+     *
+     */
     const base =
       this.baseUrl.replace(/\/$/, "") ||
       (typeof window !== "undefined" ? window.location.origin : "");
+    /**
+     *
+     */
     const confirmRes = await fetch(`${base}/api/media/confirm`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       credentials: "include",
+      signal,
       body: JSON.stringify({
         media_id: mediaId,
         s3_key: s3Key,
@@ -128,6 +186,9 @@ export class S3Provider implements StorageProviderInterface {
       }),
     });
     if (!confirmRes.ok) {
+      /**
+       *
+       */
       const err = await confirmRes.text().catch(() => "");
       throw new Error(`アップロードの登録に失敗しました: ${err || confirmRes.status}`);
     }
@@ -139,6 +200,9 @@ export class S3Provider implements StorageProviderInterface {
    * クロスオリジン対策: baseUrl 由来の origin のみ使用
    */
   async deleteImage(url: string): Promise<void> {
+    /**
+     *
+     */
     const base =
       this.baseUrl.replace(/\/$/, "") ||
       (typeof window !== "undefined" ? window.location.origin : "");
@@ -146,21 +210,39 @@ export class S3Provider implements StorageProviderInterface {
       throw new Error("API base URL is not configured");
     }
 
+    /**
+     *
+     */
     const baseOrigin = new URL(base).origin;
+    /**
+     *
+     */
     const parsed = new URL(url, baseOrigin);
     if (parsed.origin !== baseOrigin) {
       throw new Error("異なるオリジンのURLは削除できません");
     }
 
     // /api/media/:id 形式
+    /**
+     *
+     */
     const mediaMatch = parsed.pathname.match(/^\/api\/media\/([^/?#]+)$/);
     if (mediaMatch) {
+      /**
+       *
+       */
       const mediaId = mediaMatch[1];
+      /**
+       *
+       */
       const res = await fetch(`${baseOrigin}/api/media/${mediaId}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (!res.ok) {
+        /**
+         *
+         */
         const err = await res.json().catch(() => ({ message: res.statusText }));
         throw new Error(
           res.status === 403
@@ -174,14 +256,26 @@ export class S3Provider implements StorageProviderInterface {
     }
 
     // /api/thumbnail/serve/:id 形式
+    /**
+     *
+     */
     const thumbMatch = parsed.pathname.match(/^\/api\/thumbnail\/serve\/([^/?#]+)$/);
     if (thumbMatch) {
+      /**
+       *
+       */
       const objectId = thumbMatch[1];
+      /**
+       *
+       */
       const res = await fetch(`${baseOrigin}/api/thumbnail/serve/${objectId}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (!res.ok) {
+        /**
+         *
+         */
         const err = await res.json().catch(() => ({ message: res.statusText }));
         throw new Error(
           res.status === 404
@@ -197,9 +291,15 @@ export class S3Provider implements StorageProviderInterface {
     );
   }
 
+  /**
+   *
+   */
   async testConnection(): Promise<ConnectionTestResult> {
     try {
       // 最小のテスト画像でアップロードを試行
+      /**
+       *
+       */
       const testImage = this.createTestImage();
       await this.uploadImage(testImage);
       return {
@@ -216,11 +316,27 @@ export class S3Provider implements StorageProviderInterface {
   }
 
   private createTestImage(): File {
+    /**
+     *
+     */
     const base64 =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    /**
+     *
+     */
     const binary = atob(base64);
+    /**
+     *
+     */
     const array = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
+    for (
+      /**
+       *
+       */
+      let i = 0;
+      i < binary.length;
+      i++
+    ) {
       array[i] = binary.charCodeAt(i);
     }
     return new File([array], "test.png", { type: "image/png" });

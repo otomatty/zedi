@@ -3,6 +3,12 @@
 
 import { StorageProviderInterface, UploadOptions, ConnectionTestResult } from "../types";
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException("Image upload aborted", "AbortError");
+  }
+}
+
 /**
  * Gyazo API レスポンス
  */
@@ -33,6 +39,9 @@ export class GyazoProvider implements StorageProviderInterface {
   private readonly accessToken: string;
   private readonly uploadUrl = "https://upload.gyazo.com/api/upload";
 
+  /**
+   *
+   */
   constructor(accessToken: string) {
     if (!accessToken) {
       throw new Error("Gyazo Access Token is required");
@@ -44,6 +53,7 @@ export class GyazoProvider implements StorageProviderInterface {
    * 画像をGyazoにアップロード
    */
   async uploadImage(file: File, _options?: UploadOptions): Promise<string> {
+    throwIfAborted(_options?.signal);
     // FormDataを作成
     const formData = new FormData();
     formData.append("imagedata", file);
@@ -52,6 +62,7 @@ export class GyazoProvider implements StorageProviderInterface {
     // アップロードリクエスト
     const response = await fetch(this.uploadUrl, {
       method: "POST",
+      signal: _options?.signal,
       body: formData,
     });
 

@@ -92,6 +92,37 @@ describe("S3Provider", () => {
         /アップロードに失敗しました/,
       );
     });
+
+    it("forwards AbortSignal to every fetch request", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      const controller = new AbortController();
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            upload_url: "https://s3.example.com/presigned",
+            media_id: "media-123",
+            s3_key: "uploads/media-123.png",
+          }),
+          { status: 200 },
+        ),
+      );
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 200 }));
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+      await provider.uploadImage(createTestFile(), { signal: controller.signal });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(fetchSpy.mock.calls[0]?.[1]).toEqual(
+        expect.objectContaining({ signal: controller.signal }),
+      );
+      expect(fetchSpy.mock.calls[1]?.[1]).toEqual(
+        expect.objectContaining({ signal: controller.signal }),
+      );
+      expect(fetchSpy.mock.calls[2]?.[1]).toEqual(
+        expect.objectContaining({ signal: controller.signal }),
+      );
+    });
   });
 
   describe("testConnection", () => {

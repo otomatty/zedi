@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Camera,
   ImageIcon,
@@ -20,7 +20,13 @@ import {
 import { RadioGroup, RadioGroupItem } from "@zedi/ui";
 import { Label } from "@zedi/ui";
 import { Alert, AlertDescription } from "@zedi/ui";
+import { Progress } from "@zedi/ui";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { useAISettings } from "@/hooks/useAISettings";
+import { runOcr, detectOcrLanguages } from "@/lib/ocr/tesseractOcr";
+import { describeImage } from "@/lib/ai/describeImage";
+import { getEffectiveAPIMode } from "@/lib/aiService";
+import i18n from "@/i18n";
 
 type ProcessingMode = "ocr" | "describe" | "none";
 
@@ -61,6 +67,10 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    *
    */
   const [error, setError] = useState<string | null>(null);
+  /**
+   * OCR 進捗 (0-100)。null の場合は非表示 / OCR progress 0-100; null hides the UI.
+   */
+  const [ocrProgress, setOcrProgress] = useState<number | null>(null);
 
   /**
    *
@@ -70,51 +80,118 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    *
    */
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  /**
+   * 実行中の OCR / 画像解析を中断するための AbortController
+   * AbortController used to cancel in-flight OCR / describe calls.
+   */
+  const abortRef = useRef<AbortController | null>(null);
 
   /**
    *
    */
   const { uploadImage, isConfigured } = useImageUpload();
+  /**
+   * AI 設定 (プロバイダー・モデル・API キー) / AI settings used for the describe mode.
+   */
+  const { settings: aiSettings } = useAISettings();
+
+  /**
+   * describe モードが現時点で利用できない理由を返す。
+   * - `not-configured`: AI 設定が未構成
+   * - `unsupported-provider`: 現在のプロバイダーは describe 未対応
+   * - `api-server`: `api_server` モード（本 PR では Vision 非対応、ユーザー API キーモードが必要）
+   *
+   * Why the describe mode is currently unavailable. Covers:
+   * - `not-configured`: AI settings are not configured
+   * - `unsupported-provider`: the selected provider cannot describe images yet
+   * - `api-server`: `api_server` mode (server-side Vision not yet supported in this PR)
+   */
+  const describeUnavailableReason: "not-configured" | "unsupported-provider" | "api-server" | null =
+    !aiSettings.isConfigured
+      ? "not-configured"
+      : aiSettings.provider === "claude-code"
+        ? "unsupported-provider"
+        : getEffectiveAPIMode(aiSettings) === "api_server"
+          ? "api-server"
+          : null;
+
+  const clearPreviewUrl = useCallback((updateState = true) => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    if (updateState) {
+      setPreviewUrl(null);
+    }
+  }, []);
+
+  const updatePreviewUrl = useCallback(
+    (nextPreviewUrl: string) => {
+      clearPreviewUrl(false);
+      previewUrlRef.current = nextPreviewUrl;
+      setPreviewUrl(nextPreviewUrl);
+    },
+    [clearPreviewUrl],
+  );
 
   // ダイアログを閉じたときにリセット
+  // Reset all transient state and abort any in-flight OCR / describe request.
   /**
    *
    */
   const handleClose = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setStep("source");
     setSelectedImage(null);
-    setPreviewUrl(null);
+    clearPreviewUrl();
     setProcessingMode("none");
     setError(null);
+    setOcrProgress(null);
+    // 実行中に閉じた場合 `handleCreate` の finally が走らず frozen になるのを防ぐ
+    // Ensure isProcessing is reset; otherwise an in-flight cancel can leave the dialog frozen.
+    setIsProcessing(false);
     onOpenChange(false);
-  }, [onOpenChange]);
+  }, [clearPreviewUrl, onOpenChange]);
+
+  // コンポーネントアンマウント時も abort する / Also abort on unmount.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      clearPreviewUrl(false);
+    };
+  }, [clearPreviewUrl]);
 
   // 画像選択
   /**
    *
    */
-  const handleImageSelect = useCallback((file: File) => {
-    // ファイルサイズチェック (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setError("画像サイズが大きすぎます（最大10MB）");
-      return;
-    }
+  const handleImageSelect = useCallback(
+    (file: File) => {
+      // ファイルサイズチェック (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("画像サイズが大きすぎます（最大10MB）");
+        return;
+      }
 
-    // 画像形式チェック
-    /**
-     *
-     */
-    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
-    if (!validTypes.includes(file.type)) {
-      setError("この画像形式には対応していません（JPEG, PNG, GIF, WebPをお使いください）");
-      return;
-    }
+      // 画像形式チェック
+      /**
+       *
+       */
+      const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
+      if (!validTypes.includes(file.type)) {
+        setError("この画像形式には対応していません（JPEG, PNG, GIF, WebPをお使いください）");
+        return;
+      }
 
-    setSelectedImage(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    setError(null);
-    setStep("preview");
-  }, []);
+      setSelectedImage(file);
+      updatePreviewUrl(URL.createObjectURL(file));
+      setError(null);
+      setStep("preview");
+    },
+    [updatePreviewUrl],
+  );
 
   // ファイル選択
   /**
@@ -176,6 +253,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
   }, [handleImageSelect]);
 
   // 作成実行
+  // Execute creation: upload the image, then run OCR or LLM description if requested.
   /**
    *
    */
@@ -184,6 +262,13 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
 
     setIsProcessing(true);
     setError(null);
+    setOcrProgress(null);
+
+    // 既存の abort があれば中断し、新しい controller を用意
+    // Abort any previous run and set up a fresh controller for this invocation.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       // ストレージ設定確認
@@ -197,9 +282,9 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
       /**
        *
        */
-      const imageUrl = await uploadImage(selectedImage);
+      const imageUrl = await uploadImage(selectedImage, { signal: controller.signal });
 
-      // 処理モードに応じた処理
+      // 処理モードに応じた処理 / Run OCR or describe depending on the selected mode.
       /**
        *
        */
@@ -210,25 +295,62 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
       let description: string | undefined;
 
       if (processingMode === "ocr") {
-        // TODO: OCR処理を実装
-        // 現在は空のテキストを返す
-        extractedText = "";
+        // Tesseract.js でクライアントサイド OCR を実行。
+        // Run Tesseract.js OCR on the device (no external API call).
+        setOcrProgress(0);
+        extractedText = await runOcr(selectedImage, {
+          languages: detectOcrLanguages(i18n.language),
+          onProgress: (percent) => setOcrProgress(percent),
+          signal: controller.signal,
+        });
+        setOcrProgress(null);
       } else if (processingMode === "describe") {
-        // TODO: AI画像説明生成を実装
-        // 現在は空の説明を返す
-        description = "";
+        // AI 設定が未構成ならここには来ないはずだが防御的に弾く。
+        // Guard defensively — the UI should already disable the button in this case.
+        if (!aiSettings.isConfigured) {
+          throw new Error(
+            "画像解析には AI 設定が必要です。設定画面で AI プロバイダーを設定してください。",
+          );
+        }
+        description = await describeImage(selectedImage, aiSettings, {
+          signal: controller.signal,
+        });
+      }
+
+      // Defense-in-depth: キャンセル済みなら onCreated を呼ばない。
+      // Defense-in-depth: don't fire onCreated if the user cancelled mid-flight.
+      if (controller.signal.aborted) {
+        return;
       }
 
       // 作成完了コールバック
       onCreated(imageUrl, extractedText, description);
       handleClose();
     } catch (err) {
+      // 中断時は静かに閉じる（ユーザーが明示的にキャンセルしたケース）。
+      // Tesseract.js の `worker.terminate()` 由来のエラーは DOMException/AbortError とは
+      // 限らないため、`signal.aborted` を直接確認してユーザーキャンセルを判定する。
+      //
+      // Silently swallow the error when the user cancelled. Tesseract's `worker.terminate()`
+      // may raise a non-AbortError, so we also check `signal.aborted` directly.
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        return;
+      }
       console.error("Failed to create page from image:", err);
       setError(err instanceof Error ? err.message : "画像の処理に失敗しました");
     } finally {
       setIsProcessing(false);
+      setOcrProgress(null);
     }
-  }, [selectedImage, processingMode, isConfigured, uploadImage, onCreated, handleClose]);
+  }, [
+    selectedImage,
+    processingMode,
+    isConfigured,
+    uploadImage,
+    onCreated,
+    handleClose,
+    aiSettings,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -363,6 +485,43 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
               </RadioGroup>
             </div>
 
+            {/* describe モード選択時、AI 設定が未構成 / api_server モードなら誘導 Alert を表示 */}
+            {/* Guide the user when 'describe' is selected but describe mode is unavailable. */}
+            {processingMode === "describe" && describeUnavailableReason === "not-configured" && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  画像解析には AI 設定が必要です。設定画面で AI プロバイダーを設定してください。
+                </AlertDescription>
+              </Alert>
+            )}
+            {processingMode === "describe" &&
+              describeUnavailableReason === "unsupported-provider" && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    Claude Code では現在この画像解析機能は未対応です。OpenAI、Anthropic、Google
+                    のいずれかを「ユーザー API キー」モードで選択してください。
+                  </AlertDescription>
+                </Alert>
+              )}
+            {processingMode === "describe" && describeUnavailableReason === "api-server" && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  画像解析は現在サーバー API モードでは未対応です。AI設定で「ユーザー API
+                  キー」モードに切り替えてください。
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* OCR 進捗バー / OCR progress bar */}
+            {isProcessing && processingMode === "ocr" && ocrProgress !== null && (
+              <div className="space-y-2">
+                <div className="text-muted-foreground text-sm">
+                  テキスト抽出中... {ocrProgress}%
+                </div>
+                <Progress value={ocrProgress} />
+              </div>
+            )}
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -386,7 +545,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
               onClick={() => {
                 setStep("source");
                 setSelectedImage(null);
-                setPreviewUrl(null);
+                clearPreviewUrl();
                 setError(null);
               }}
               disabled={isProcessing}
@@ -398,11 +557,22 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
             キャンセル
           </Button>
           {step === "preview" && (
-            <Button onClick={handleCreate} disabled={isProcessing || !isConfigured}>
+            <Button
+              onClick={handleCreate}
+              disabled={
+                isProcessing ||
+                !isConfigured ||
+                (processingMode === "describe" && describeUnavailableReason !== null)
+              }
+            >
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  処理中...
+                  {processingMode === "ocr" && ocrProgress !== null
+                    ? `テキスト抽出中... ${ocrProgress}%`
+                    : processingMode === "describe"
+                      ? "画像を解析中..."
+                      : "処理中..."}
                 </>
               ) : (
                 "作成"
