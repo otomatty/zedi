@@ -356,4 +356,19 @@ describe("transformWikiLinksInContent", () => {
 
     expect(transformWikiLinksInContent(doc)).toEqual(doc);
   });
+
+  it("keeps wiki-link syntax literal inside executable code blocks", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "executableCodeBlock",
+          attrs: { language: "bash" },
+          content: [{ type: "text", text: "echo [[Foo]]" }],
+        },
+      ],
+    };
+
+    expect(transformWikiLinksInContent(doc)).toEqual(doc);
+  });
 });

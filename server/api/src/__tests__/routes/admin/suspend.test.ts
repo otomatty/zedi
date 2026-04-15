@@ -202,6 +202,20 @@ describe("POST /api/admin/users/:id/suspend", () => {
     expect(body.error).toContain("deleted");
   });
 
+  it("returns 400 for malformed JSON instead of suspending the user", async () => {
+    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+
+    const res = await app.request("/api/admin/users/user-target-001/suspend", {
+      method: "POST",
+      headers: adminAuthHeaders(),
+      body: '{"reason":',
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toContain("invalid JSON");
+  });
+
   it("returns 404 when user not found", async () => {
     const { app } = createAdminTestApp([
       ADMIN_ROLE_RESULT,

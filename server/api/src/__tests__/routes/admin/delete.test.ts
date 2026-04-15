@@ -270,7 +270,7 @@ describe("GET /api/admin/users/:id/impact", () => {
       [{ id: "user-target-001" }], // user exists
       [{ count: 5 }], // notesCount
       [{ count: 2 }], // sessionsCount
-      [{ status: "active" }], // subscription
+      [{ count: 1 }], // active subscription count
       [{ createdAt: new Date("2026-04-01T12:00:00Z") }], // lastAiUsage
     ]);
 
@@ -280,11 +280,16 @@ describe("GET /api/admin/users/:id/impact", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body).toHaveProperty("notesCount");
-    expect(body).toHaveProperty("sessionsCount");
-    expect(body).toHaveProperty("activeSubscription");
-    expect(body).toHaveProperty("lastAiUsageAt");
+    const body = (await res.json()) as {
+      notesCount: number;
+      sessionsCount: number;
+      activeSubscription: boolean;
+      lastAiUsageAt: string | null;
+    };
+    expect(body.notesCount).toBe(5);
+    expect(body.sessionsCount).toBe(2);
+    expect(body.activeSubscription).toBe(true);
+    expect(body.lastAiUsageAt).toBe("2026-04-01T12:00:00.000Z");
   });
 
   it("returns 404 when user not found", async () => {

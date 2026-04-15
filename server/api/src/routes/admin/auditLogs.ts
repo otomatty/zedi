@@ -60,6 +60,14 @@ function parseDate(raw: string | undefined): { date: Date | null; invalid: boole
  * - `targetId`: 対象 ID で絞り込む
  * - `from`, `to`: ISO 8601 日時で期間絞り込み（createdAt）
  * - `limit`, `offset`: ページング（limit は最大 200）
+ *
+ * Query parameters:
+ * - `actorUserId`: filter by actor user ID
+ * - `action`: filter by action (e.g. `user.role.update`)
+ * - `targetType`: filter by target type (e.g. `user`)
+ * - `targetId`: filter by target ID
+ * - `from`, `to`: ISO 8601 datetime range on `createdAt`
+ * - `limit`, `offset`: pagination (`limit` max 200)
  */
 app.get("/", async (c) => {
   const db = c.get("db");
@@ -76,6 +84,9 @@ app.get("/", async (c) => {
   const to = parseDate(c.req.query("to"));
   if (to.invalid) {
     return c.json({ error: "invalid 'to' date (ISO 8601 required)" }, 400);
+  }
+  if (from.date && to.date && from.date > to.date) {
+    return c.json({ error: "'from' must be earlier than or equal to 'to'" }, 400);
   }
 
   const limit = clampLimit(c.req.query("limit"));

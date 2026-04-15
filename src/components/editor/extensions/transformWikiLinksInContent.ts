@@ -145,7 +145,7 @@ function mergeMarks(existing: MarkJSON[] | undefined, extra: MarkJSON): MarkJSON
  * Returns whether the given parent node type should preserve literal code text.
  */
 function isCodeContainerType(type: string): boolean {
-  return type === "codeBlock" || type === "code_block";
+  return type === "codeBlock" || type === "code_block" || type === "executableCodeBlock";
 }
 
 /**

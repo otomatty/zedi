@@ -5,87 +5,103 @@ import userEvent from "@testing-library/user-event";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 
 // AlertDialog のモック / Mock AlertDialog components from @zedi/ui
-vi.mock("@zedi/ui", () => ({
-  AlertDialog: ({
-    open,
-    onOpenChange,
-    children,
-  }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    children: React.ReactNode;
-  }) =>
-    open ? (
-      <div data-testid="alert-dialog" data-open={open}>
+vi.mock("@zedi/ui", () => {
+  const AlertDialogContext = React.createContext<{ onOpenChange: (open: boolean) => void } | null>(
+    null,
+  );
+
+  return {
+    AlertDialog: ({
+      open,
+      onOpenChange,
+      children,
+    }: {
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      children: React.ReactNode;
+    }) =>
+      open ? (
+        <AlertDialogContext.Provider value={{ onOpenChange }}>
+          <div data-testid="alert-dialog" data-open={open}>
+            {children}
+            <button type="button" data-testid="backdrop" onClick={() => onOpenChange(false)}>
+              backdrop
+            </button>
+          </div>
+        </AlertDialogContext.Provider>
+      ) : null,
+    AlertDialogContent: ({
+      children,
+      ...props
+    }: {
+      children: React.ReactNode;
+      className?: string;
+    }) => (
+      <div data-testid="alert-dialog-content" {...props}>
         {children}
-        <button type="button" data-testid="backdrop" onClick={() => onOpenChange(false)}>
-          backdrop
-        </button>
       </div>
-    ) : null,
-  AlertDialogContent: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <div data-testid="alert-dialog-content" {...props}>
-      {children}
-    </div>
-  ),
-  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="alert-dialog-header">{children}</div>
-  ),
-  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="alert-dialog-footer">{children}</div>
-  ),
-  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => (
-    <h2 data-testid="alert-dialog-title">{children}</h2>
-  ),
-  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => (
-    <p data-testid="alert-dialog-description">{children}</p>
-  ),
-  AlertDialogCancel: ({
-    children,
-    disabled,
-    ...props
-  }: {
-    children: React.ReactNode;
-    disabled?: boolean;
-  }) => (
-    <button type="button" data-testid="cancel-button" disabled={disabled} {...props}>
-      {children}
-    </button>
-  ),
-  AlertDialogAction: ({
-    children,
-    onClick,
-    disabled,
-    className,
-    ...props
-  }: {
-    children: React.ReactNode;
-    onClick?: (e: React.MouseEvent) => void;
-    disabled?: boolean;
-    className?: string;
-  }) => (
-    <button
-      type="button"
-      data-testid="confirm-button"
-      disabled={disabled}
-      className={className}
-      onClick={onClick}
-      {...props}
-    >
-      {children}
-    </button>
-  ),
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
-  Label: ({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) => (
-    <label htmlFor={htmlFor}>{children}</label>
-  ),
-}));
+    ),
+    AlertDialogHeader: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="alert-dialog-header">{children}</div>
+    ),
+    AlertDialogFooter: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="alert-dialog-footer">{children}</div>
+    ),
+    AlertDialogTitle: ({ children }: { children: React.ReactNode }) => (
+      <h2 data-testid="alert-dialog-title">{children}</h2>
+    ),
+    AlertDialogDescription: ({ children }: { children: React.ReactNode }) => (
+      <p data-testid="alert-dialog-description">{children}</p>
+    ),
+    AlertDialogCancel: ({
+      children,
+      disabled,
+      ...props
+    }: {
+      children: React.ReactNode;
+      disabled?: boolean;
+    }) => (
+      <button type="button" data-testid="cancel-button" disabled={disabled} {...props}>
+        {children}
+      </button>
+    ),
+    AlertDialogAction: ({
+      children,
+      onClick,
+      disabled,
+      className,
+      ...props
+    }: {
+      children: React.ReactNode;
+      onClick?: (e: React.MouseEvent) => void;
+      disabled?: boolean;
+      className?: string;
+    }) => {
+      const dialog = React.useContext(AlertDialogContext);
+      return (
+        <button
+          type="button"
+          data-testid="confirm-button"
+          disabled={disabled}
+          className={className}
+          onClick={(e) => {
+            onClick?.(e);
+            if (!e.defaultPrevented) {
+              dialog?.onOpenChange(false);
+            }
+          }}
+          {...props}
+        >
+          {children}
+        </button>
+      );
+    },
+    Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+    Label: ({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) => (
+      <label htmlFor={htmlFor}>{children}</label>
+    ),
+  };
+});
 
 vi.mock("@zedi/ui/lib/utils", () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
@@ -123,6 +139,15 @@ describe("ConfirmActionDialog", () => {
 
     await userEvent.click(screen.getByTestId("confirm-button"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("有効な確認クリックでダイアログを閉じる / closes dialog after enabled confirm click", async () => {
+    const onOpenChange = vi.fn();
+    render(<ConfirmActionDialog {...defaultProps} onOpenChange={onOpenChange} />);
+
+    await userEvent.click(screen.getByTestId("confirm-button"));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("キャンセルボタンのデフォルトラベルは「キャンセル」/ cancel button shows default label", () => {
