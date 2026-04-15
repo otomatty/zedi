@@ -14,6 +14,10 @@ function effectiveStorageProviderId(provider: string): StorageProviderType {
   return provider === LEGACY_CLOUDFLARE_R2 ? "s3" : (provider as StorageProviderType);
 }
 
+/**
+ * Builds one-line summaries for each settings section card.
+ * 各設定セクションカード向けの 1 行サマリーを生成する。
+ */
 export function useSettingsSummaries(): Record<SettingsSectionId, string> {
   const { t, i18n } = useTranslation();
   const general = useGeneralSettings();
@@ -46,7 +50,13 @@ export function useSettingsSummaries(): Record<SettingsSectionId, string> {
     const modeText = useOwnKey
       ? t("settings.summary.ai.ownKeyMode")
       : t("settings.summary.ai.serverMode");
-    const statusText = ai.settings.isConfigured
+    // api_server モードでは API キー不要のため常に設定済みとして扱う。
+    // In api_server mode no API key is required, except for claude-code which
+    // still depends on its own local configuration state.
+    const effectivelyConfigured =
+      ai.settings.isConfigured ||
+      (ai.settings.apiMode === "api_server" && ai.settings.provider !== "claude-code");
+    const statusText = effectivelyConfigured
       ? t("settings.summary.ai.configured")
       : t("settings.summary.ai.notSet");
     const parts = [modeText, statusText];

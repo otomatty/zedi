@@ -4,6 +4,7 @@ import Layout from "./pages/Layout";
 import Login from "./pages/Login";
 import AiModels from "./pages/ai-models";
 import Users from "./pages/users";
+import AuditLogs from "./pages/audit-logs";
 
 /**
  * Root component for the admin SPA: sets up routing and the admin auth guard.
@@ -27,6 +28,7 @@ function App() {
           <Route index element={<Navigate to="/ai-models" replace />} />
           <Route path="ai-models" element={<AiModels />} />
           <Route path="users" element={<Users />} />
+          <Route path="audit-logs" element={<AuditLogs />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

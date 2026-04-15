@@ -88,8 +88,11 @@ describe("aiSettings - 回帰テスト", () => {
   });
 
   describe("loadAISettings - 後方互換性（マイグレーション）", () => {
-    it("apiModeがない既存設定を読み込むと自動でuser_api_keyになる（apiKeyあり）", async () => {
+    it("apiModeがない既存設定を読み込むとapiKeyの有無に関わらずapi_serverになる（apiKeyあり）", async () => {
       // 既存の設定形式（apiModeなし）をシミュレート
+      // Simulate legacy settings shape without apiMode.
+      // apiKeyが残っていてもデフォルトはアプリのサーバー経由とする。
+      // Even with a leftover apiKey, default to the app's server.
       const oldSettings = {
         provider: "openai",
         apiKey: "encrypted:test-key",
@@ -102,7 +105,7 @@ describe("aiSettings - 回帰テスト", () => {
       const loaded = await loadAISettings();
 
       expect(loaded).not.toBeNull();
-      expect(loaded?.apiMode).toBe("user_api_key");
+      expect(loaded?.apiMode).toBe("api_server");
       expect(loaded?.apiKey).toBe("test-key");
     });
 
@@ -214,6 +217,40 @@ describe("aiSettings - 回帰テスト", () => {
 
     it("設定が存在しない場合はデフォルトでtrueを返す（api_server利用可能）", async () => {
       const result = await isAIConfigured();
+      expect(result).toBe(true);
+    });
+
+    it("回帰: api_serverモードではisConfigured=false・apiKey空でもtrueを返す", async () => {
+      // Wiki/Mermaid 生成ボタンがサーバーモードでもダイアログを出していた問題の回帰テスト。
+      // Regression test for the wiki/mermaid buttons blocking server-mode users.
+      const settings: AISettings = {
+        provider: "google",
+        apiKey: "",
+        apiMode: "api_server",
+        model: "gemini-3-flash-preview",
+        modelId: "google:gemini-3-flash-preview",
+        isConfigured: false,
+      };
+
+      await saveAISettings(settings);
+      const result = await isAIConfigured();
+
+      expect(result).toBe(true);
+    });
+
+    it("回帰: 旧設定（apiMode未設定・apiKeyあり）は後方互換でapi_server扱いとなりtrueを返す", async () => {
+      // 既存ユーザーがアップデート後にサーバーモードに移行するパスの回帰テスト。
+      // Regression test for legacy users migrating to server mode after the update.
+      const oldSettings = {
+        provider: "openai",
+        apiKey: "encrypted:leftover-key",
+        model: "gpt-4o",
+        isConfigured: true,
+      };
+      localStorage.setItem("zedi-ai-settings", JSON.stringify(oldSettings));
+
+      const result = await isAIConfigured();
+
       expect(result).toBe(true);
     });
   });

@@ -31,7 +31,8 @@ export async function getAISettingsOrThrow(): Promise<AISettings> {
     return { ...DEFAULT_AI_SETTINGS, isConfigured: true };
   }
 
-  const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+  // apiMode未設定時はapi_serverをデフォルトとする / Default to api_server when apiMode is unset.
+  const effectiveMode = settings.apiMode ?? "api_server";
   if (effectiveMode === "api_server") {
     return { ...settings, isConfigured: true };
   }
@@ -58,7 +59,8 @@ export async function generateWikiContentStream(
 ): Promise<void> {
   try {
     const settings = await getAISettingsOrThrow();
-    const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+    // apiMode未設定時はapi_serverをデフォルトとする / Default to api_server when apiMode is unset.
+    const effectiveMode = settings.apiMode ?? "api_server";
 
     if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");
@@ -135,7 +137,8 @@ export async function generateWikiContentFromChatOutlineStream(
   const userPrompt = buildChatPageWikiUserPrompt(title, outline, conversationText);
   try {
     const settings = await getAISettingsOrThrow();
-    const effectiveMode = settings.apiMode || (settings.apiKey ? "user_api_key" : "api_server");
+    // apiMode未設定時はapi_serverをデフォルトとする / Default to api_server when apiMode is unset.
+    const effectiveMode = settings.apiMode ?? "api_server";
 
     if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");

@@ -113,4 +113,41 @@ describe("useSettingsSummaries", () => {
     const { result } = renderHook(() => useSettingsSummaries());
     expect(result.current.general).toContain("settings.summary.general.profileUnset");
   });
+
+  describe("ai summary - server mode configured-state regression", () => {
+    it("回帰: api_serverモードではisConfigured=falseでも設定済みと表示する", () => {
+      // サーバーモードは API キー不要のため、isConfigured フラグに関わらず「設定済み」扱い。
+      // Server mode needs no API key, so it is always treated as configured.
+      mockAi.settings = {
+        apiMode: "api_server",
+        isConfigured: false,
+        modelId: "google:gemini-3-flash-preview",
+      };
+      const { result } = renderHook(() => useSettingsSummaries());
+      expect(result.current.ai).toContain("settings.summary.ai.configured");
+      expect(result.current.ai).not.toContain("settings.summary.ai.notSet");
+    });
+
+    it("user_api_keyモードでisConfigured=falseなら未設定と表示する", () => {
+      mockAi.settings = {
+        // @ts-expect-error — 簡略化したテスト用モック / simplified test mock
+        apiMode: "user_api_key",
+        isConfigured: false,
+        modelId: "openai:gpt-4o",
+      };
+      const { result } = renderHook(() => useSettingsSummaries());
+      expect(result.current.ai).toContain("settings.summary.ai.notSet");
+    });
+
+    it("user_api_keyモードでisConfigured=trueなら設定済みと表示する", () => {
+      mockAi.settings = {
+        // @ts-expect-error — 簡略化したテスト用モック / simplified test mock
+        apiMode: "user_api_key",
+        isConfigured: true,
+        modelId: "openai:gpt-4o",
+      };
+      const { result } = renderHook(() => useSettingsSummaries());
+      expect(result.current.ai).toContain("settings.summary.ai.configured");
+    });
+  });
 });

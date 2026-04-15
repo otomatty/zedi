@@ -6,6 +6,7 @@ export {
   type User,
   type NewUser,
   type UserRole,
+  type UserStatus,
 } from "./users.js";
 export { pages, type Page, type NewPage } from "./pages.js";
 export {
@@ -56,6 +57,7 @@ export {
   type ThumbnailObject,
   type NewThumbnailObject,
 } from "./thumbnails.js";
+export { adminAuditLogs, type AdminAuditLog, type NewAdminAuditLog } from "./auditLogs.js";
 
 export {
   usersRelations,

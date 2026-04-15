@@ -10,12 +10,19 @@ export interface AdminMe {
 /** ユーザー役割 / User role */
 export type UserRole = "user" | "admin";
 
+/** ユーザーアカウントステータス / User account status */
+export type UserStatus = "active" | "suspended" | "deleted";
+
 /** 管理者画面で表示するユーザー情報 / User info for admin UI */
 export interface UserAdmin {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  status: UserStatus;
+  suspendedAt: string | null;
+  suspendedReason: string | null;
+  suspendedBy: string | null;
   createdAt: string;
 }
 
@@ -189,6 +196,7 @@ export async function syncAiModels(): Promise<SyncResultItem[]> {
 /** ユーザー一覧取得のクエリパラメータ / Query params for user list */
 export interface GetUsersParams {
   search?: string;
+  status?: UserStatus;
   limit?: number;
   offset?: number;
 }
@@ -206,6 +214,7 @@ export async function getUsers(params?: GetUsersParams): Promise<{
 }> {
   const sp = new URLSearchParams();
   if (params?.search) sp.set("search", params.search);
+  if (params?.status) sp.set("status", params.status);
   if (params?.limit != null) sp.set("limit", String(params.limit));
   if (params?.offset != null) sp.set("offset", String(params.offset));
   const qs = sp.toString();
@@ -231,6 +240,155 @@ export async function patchUserRole(id: string, role: UserRole): Promise<{ user:
   });
   if (!res.ok) {
     throw new Error(await getErrorMessage(res, "Failed to update user role"));
+  }
+  return res.json();
+}
+
+/**
+ * ユーザーをサスペンドする。
+ * Suspends a user account.
+ *
+ * @param id - ユーザー ID / User ID
+ * @param reason - サスペンド理由（任意）/ Suspension reason (optional)
+ * @returns 更新後のユーザー情報 / Updated user
+ */
+export async function suspendUser(id: string, reason?: string): Promise<{ user: UserAdmin }> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/suspend`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to suspend user"));
+  }
+  return res.json();
+}
+
+/**
+ * サスペンドされたユーザーを復活させる。
+ * Unsuspends (reactivates) a user account.
+ *
+ * @param id - ユーザー ID / User ID
+ * @returns 更新後のユーザー情報 / Updated user
+ */
+export async function unsuspendUser(id: string): Promise<{ user: UserAdmin }> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/unsuspend`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to unsuspend user"));
+  }
+  return res.json();
+}
+
+/**
+ * ユーザー削除前の影響範囲情報。
+ * Impact information shown before user deletion.
+ */
+export interface UserImpact {
+  /** 所有ノート数 / Number of notes owned */
+  notesCount: number;
+  /** アクティブセッション数 / Number of active sessions */
+  sessionsCount: number;
+  /** アクティブなサブスクリプションがあるか / Active subscription exists */
+  activeSubscription: boolean;
+  /** 最後の AI 使用日時 / Last AI usage timestamp or null */
+  lastAiUsageAt: string | null;
+}
+
+/**
+ * ユーザーの削除影響範囲を取得する。
+ * Fetches the impact of deleting a user.
+ *
+ * @param id - ユーザー ID / User ID
+ * @returns 影響範囲情報 / Impact information
+ */
+export async function getUserImpact(id: string): Promise<UserImpact> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/impact`);
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch user impact"));
+  }
+  return res.json();
+}
+
+/**
+ * ユーザーを削除（論理削除）する。
+ * Deletes (soft-deletes) a user account.
+ *
+ * @param id - ユーザー ID / User ID
+ * @returns 削除後のユーザー情報 / Deleted user info
+ */
+export async function deleteUser(id: string): Promise<{ user: UserAdmin }> {
+  const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to delete user"));
+  }
+  return res.json();
+}
+
+/**
+ * 監査ログ 1 行。
+ * A single admin audit log row as returned by `GET /api/admin/audit-logs`.
+ */
+export interface AuditLogEntry {
+  id: string;
+  actorUserId: string;
+  actorEmail: string | null;
+  actorName: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  targetEmail: string | null;
+  targetName: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+/**
+ * `GET /api/admin/audit-logs` のクエリパラメータ。
+ * Query params for the audit log list API.
+ */
+export interface GetAuditLogsParams {
+  actorUserId?: string;
+  action?: string;
+  targetType?: string;
+  targetId?: string;
+  /** ISO 8601 datetime (inclusive lower bound). */
+  from?: string;
+  /** ISO 8601 datetime (inclusive upper bound). */
+  to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * 管理監査ログ一覧を取得する。
+ * Fetch a paginated list of admin audit logs.
+ *
+ * @param params - フィルター・ページング / Filters and pagination
+ * @returns ログ配列と総件数 / Logs and total count
+ */
+export async function getAuditLogs(params?: GetAuditLogsParams): Promise<{
+  logs: AuditLogEntry[];
+  total: number;
+}> {
+  const sp = new URLSearchParams();
+  if (params?.actorUserId) sp.set("actorUserId", params.actorUserId);
+  if (params?.action) sp.set("action", params.action);
+  if (params?.targetType) sp.set("targetType", params.targetType);
+  if (params?.targetId) sp.set("targetId", params.targetId);
+  if (params?.from) sp.set("from", params.from);
+  if (params?.to) sp.set("to", params.to);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.offset != null) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  const res = await adminFetch(`/api/admin/audit-logs${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch audit logs"));
   }
   return res.json();
 }

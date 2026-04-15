@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@zedi/ui";
 import { WikiGeneratorStatus } from "@/hooks/useWikiGenerator";
-import { loadAISettings } from "@/lib/aiSettings";
+import { isAIConfigured } from "@/lib/aiSettings";
 
 interface WikiGeneratorButtonProps {
   title: string;
@@ -24,6 +24,10 @@ interface WikiGeneratorButtonProps {
   disabled?: boolean;
 }
 
+/**
+ * Wiki 生成ボタン。タイトルがあり、本文が未入力のときだけ表示する。
+ * Wiki generation button shown only when the note has a title and no body yet.
+ */
 export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
   title,
   hasContent,
@@ -41,9 +45,10 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
   const isGenerating = status === "generating";
 
   const handleClick = async () => {
-    // AI設定を確認
-    const settings = await loadAISettings();
-    if (!settings || !settings.isConfigured || !settings.apiKey) {
+    // AI が利用可能か確認（api_server モードでは API キー不要）。
+    // Check AI availability (no API key required in api_server mode).
+    const configured = await isAIConfigured();
+    if (!configured) {
       setShowNotConfiguredDialog(true);
       return;
     }
@@ -95,7 +100,7 @@ export const WikiGeneratorButton: React.FC<WikiGeneratorButtonProps> = ({
               AI設定が必要です
             </DialogTitle>
             <DialogDescription>
-              Wiki生成機能を使用するには、AI設定でAPIキーを設定してください。
+              Wiki生成機能を使用するには、AI設定を完了してください。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

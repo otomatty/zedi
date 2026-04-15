@@ -31,6 +31,10 @@
     },
     "server/hocuspocus": {
       "project": ["src/**/*.ts"]
+    },
+    "server/mcp": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
     }
   },
   "ignoreDependencies": [

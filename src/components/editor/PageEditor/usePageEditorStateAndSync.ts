@@ -136,6 +136,7 @@ export function usePageEditorStateAndSync() {
     handleBack,
     handleConfirmDelete,
     handleCancelDelete,
+    handleOpenDuplicatePage,
     handleExportMarkdown,
     handleCopyMarkdown,
   } = usePageEditorDeletionAndNav(currentPageId, title, content, sourceUrl, shouldBlockSave);
@@ -219,6 +220,7 @@ export function usePageEditorStateAndSync() {
       handleBack,
       handleConfirmDelete,
       handleCancelDelete,
+      handleOpenDuplicatePage,
       setTitle,
       setContent,
       setContentError,
