@@ -107,6 +107,14 @@ describe("mcpReadRequired", () => {
     expect(res.status).toBe(200);
   });
 
+  it("returns 401 when Authorization has extra segments after the token", async () => {
+    const res = await createApp().request("/read", {
+      headers: { Authorization: "Bearer t extra" },
+    });
+    expect(res.status).toBe(401);
+    expect(mockVerifyMcpToken).not.toHaveBeenCalled();
+  });
+
   it("accepts a token that has only mcp:write (write implies read)", async () => {
     mockVerifyMcpToken.mockResolvedValue({
       sub: "user-42",
