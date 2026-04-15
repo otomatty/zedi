@@ -141,6 +141,14 @@ function mergeMarks(existing: MarkJSON[] | undefined, extra: MarkJSON): MarkJSON
 }
 
 /**
+ * コードとして扱うノード種別かを返す。
+ * Returns whether the given parent node type should preserve literal code text.
+ */
+function isCodeContainerType(type: string): boolean {
+  return type === "codeBlock" || type === "code_block";
+}
+
+/**
  * 任意のノードを再帰的に変換する（テキストノードのみWikiリンク変換を適用）。
  * Recursively transform a node; wiki link extraction only applies to text nodes.
  */
@@ -157,7 +165,10 @@ function transformNode(node: NodeJSON): NodeJSON {
 
   const newContent: NodeJSON[] = [];
   for (const child of node.content) {
-    if (child.type === "text") {
+    const isLiteralCodeText =
+      child.type === "text" &&
+      (isCodeContainerType(node.type) || child.marks?.some((mark) => mark.type === "code"));
+    if (child.type === "text" && !isLiteralCodeText) {
       newContent.push(...splitTextNodeByWikiLinks(child));
     } else {
       newContent.push(transformNode(child));

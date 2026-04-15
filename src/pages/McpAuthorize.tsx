@@ -94,7 +94,13 @@ const McpAuthorize: React.FC = () => {
         return;
       }
       const { code } = body as { code: string };
-      const target = new URL(redirectUri);
+      let target: URL;
+      try {
+        target = new URL(redirectUri);
+      } catch {
+        setError("Invalid redirect URI");
+        return;
+      }
       target.searchParams.set("code", code);
       target.searchParams.set("state", state);
       setDone(true);

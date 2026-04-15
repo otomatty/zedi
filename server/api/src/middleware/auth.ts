@@ -50,14 +50,12 @@ export const authRequired = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-export /**
- *
+/**
+ * セッションがあればユーザー情報をコンテキストへ設定する任意認証ミドルウェア。
+ * Continues without failure when no valid session exists, but populates context when present.
  */
-const authOptional = createMiddleware<AppEnv>(async (c, next) => {
+export const authOptional = createMiddleware<AppEnv>(async (c, next) => {
   try {
-    /**
-     *
-     */
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (session) {
       c.set("userId", session.user.id);

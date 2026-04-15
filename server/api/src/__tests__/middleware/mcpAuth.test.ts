@@ -94,6 +94,27 @@ describe("mcpReadRequired", () => {
     expect(body.userId).toBe("user-42");
   });
 
+  it("accepts a lowercase bearer scheme", async () => {
+    mockVerifyMcpToken.mockResolvedValue({
+      sub: "user-42",
+      scope: [MCP_SCOPE_READ],
+      aud: MCP_JWT_AUDIENCE,
+      exp: 0,
+    });
+    const res = await createApp().request("/read", {
+      headers: { Authorization: "bearer t" },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 401 when Authorization has extra segments after the token", async () => {
+    const res = await createApp().request("/read", {
+      headers: { Authorization: "Bearer t extra" },
+    });
+    expect(res.status).toBe(401);
+    expect(mockVerifyMcpToken).not.toHaveBeenCalled();
+  });
+
   it("accepts a token that has only mcp:write (write implies read)", async () => {
     mockVerifyMcpToken.mockResolvedValue({
       sub: "user-42",

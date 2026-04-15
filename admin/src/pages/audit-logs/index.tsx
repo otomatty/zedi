@@ -5,6 +5,7 @@ import { AuditLogsContent, type AuditLogsFilters } from "./AuditLogsContent";
 
 const FILTER_DEBOUNCE_MS = 300;
 const PAGE_SIZE = 50;
+const INITIAL_FILTERS: AuditLogsFilters = {};
 
 /**
  * `datetime-local` の値 (`YYYY-MM-DDTHH:mm`) を API が受け付ける ISO 文字列に変換する。
@@ -28,8 +29,8 @@ export default function AuditLogs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState<AuditLogsFilters>({});
-  const [appliedFilters, setAppliedFilters] = useState<AuditLogsFilters>({});
+  const [filters, setFilters] = useState<AuditLogsFilters>(INITIAL_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<AuditLogsFilters>(INITIAL_FILTERS);
 
   const isMountedRef = useRef(true);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -51,8 +51,11 @@ export function useSettingsSummaries(): Record<SettingsSectionId, string> {
       ? t("settings.summary.ai.ownKeyMode")
       : t("settings.summary.ai.serverMode");
     // api_server モードでは API キー不要のため常に設定済みとして扱う。
-    // In api_server mode no API key is required, so always treat as configured.
-    const effectivelyConfigured = !useOwnKey || ai.settings.isConfigured;
+    // In api_server mode no API key is required, except for claude-code which
+    // still depends on its own local configuration state.
+    const effectivelyConfigured =
+      ai.settings.isConfigured ||
+      (ai.settings.apiMode === "api_server" && ai.settings.provider !== "claude-code");
     const statusText = effectivelyConfigured
       ? t("settings.summary.ai.configured")
       : t("settings.summary.ai.notSet");

@@ -29,11 +29,11 @@ import type {
 
 /** HttpZediClient のコンストラクタオプション / Options for HttpZediClient. */
 export interface HttpZediClientOptions {
-  /** Zedi API の baseUrl。末尾スラッシュは正規化される。 */
+  /** Zedi API の baseUrl。末尾スラッシュは正規化される。 Base URL for the Zedi API; trailing slashes are normalized. */
   baseUrl: string;
-  /** MCP JWT。`Authorization: Bearer ...` に付与される。 */
+  /** MCP JWT。`Authorization: Bearer ...` に付与される。 MCP JWT attached as `Authorization: Bearer ...`. */
   token: string;
-  /** テスト用 fetch 注入。省略時は globalThis.fetch を使用。 */
+  /** テスト用 fetch 注入。省略時は globalThis.fetch を使用。 Optional fetch implementation for tests; defaults to globalThis.fetch. */
   fetch?: typeof fetch;
 }
 

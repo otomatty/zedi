@@ -78,7 +78,7 @@ export async function getUserImpact(db: Database, userId: string): Promise<UserI
  *
  * @param tx - Drizzle transaction client
  * @param userId - Target user ID
- * @returns Anonymized user row (for the API response) and before-snapshot
+ * @returns Anonymized user row (for the API response) and a redacted before-snapshot for audit logs
  */
 export async function anonymizeUser(
   tx: Database,
@@ -96,13 +96,12 @@ export async function anonymizeUser(
     createdAt: Date;
   };
   before: {
-    name: string;
-    email: string;
-    image: string | null;
     status: string;
+    piiRedacted: true;
   };
 }> {
-  // 変更前のスナップショットを取得 / Capture before-snapshot
+  // 変更前ステータスを取得する。監査ログには PII を残さない。
+  // Capture the pre-delete status only; audit logs must not retain recoverable PII.
   const [target] = await tx
     .select({
       id: users.id,
@@ -120,10 +119,8 @@ export async function anonymizeUser(
   }
 
   const before = {
-    name: target.name,
-    email: target.email,
-    image: target.image,
     status: target.status,
+    piiRedacted: true as const,
   };
 
   const now = new Date();

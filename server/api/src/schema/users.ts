@@ -6,10 +6,11 @@ export type UserRole = "user" | "admin";
 /** User account status. 'suspended' blocks all API access. */
 export type UserStatus = "active" | "suspended" | "deleted";
 
-export /**
- *
+/**
+ * Better Auth user table with Zedi-specific role and status columns.
+ * Zedi 固有のロール・ステータス列を含む Better Auth のユーザーテーブル。
  */
-const users = pgTable(
+export const users = pgTable(
   "user",
   {
     id: text("id").primaryKey(),
@@ -41,18 +42,21 @@ const users = pgTable(
 );
 
 /**
- *
+ * User row type inferred from the `user` table.
+ * `user` テーブルから推論した行型。
  */
 export type User = typeof users.$inferSelect;
 /**
- *
+ * Insert payload type inferred from the `user` table.
+ * `user` テーブルから推論した挿入型。
  */
 export type NewUser = typeof users.$inferInsert;
 
-export /**
- *
+/**
+ * Better Auth session table.
+ * Better Auth のセッションテーブル。
  */
-const session = pgTable("session", {
+export const session = pgTable("session", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -65,10 +69,11 @@ const session = pgTable("session", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export /**
- *
+/**
+ * Better Auth account table for linked OAuth identities.
+ * OAuth 連携アカウントを保持する Better Auth の account テーブル。
  */
-const account = pgTable("account", {
+export const account = pgTable("account", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -86,10 +91,11 @@ const account = pgTable("account", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export /**
- *
+/**
+ * Better Auth verification table for one-time verification values.
+ * ワンタイム検証値を保持する Better Auth の verification テーブル。
  */
-const verification = pgTable("verification", {
+export const verification = pgTable("verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),

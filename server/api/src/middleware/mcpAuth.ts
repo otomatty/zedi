@@ -23,10 +23,11 @@ import type { AppEnv } from "../types/index.js";
  * Verifies the Bearer token from request headers; throws HTTPException 401 on failure.
  */
 async function extractAndVerify(authHeader: string | undefined) {
-  if (!authHeader?.startsWith("Bearer ")) {
+  const parts = authHeader?.trim().split(/\s+/) ?? [];
+  if (parts.length !== 2 || parts[0]?.toLowerCase() !== "bearer" || !parts[1]) {
     throw new HTTPException(401, { message: "Bearer token required" });
   }
-  const token = authHeader.slice(7).trim();
+  const token = parts[1];
   const payload = await verifyMcpToken(token);
   if (!payload) {
     throw new HTTPException(401, { message: "Invalid or expired token" });
