@@ -21,6 +21,14 @@ vi.mock("tesseract.js", () => {
         };
       },
     ),
+    // OEM.LSTM_ONLY が runOcr から参照されるためモックに含める
+    // Include OEM because runOcr references OEM.LSTM_ONLY.
+    OEM: {
+      TESSERACT_ONLY: 0,
+      LSTM_ONLY: 1,
+      TESSERACT_LSTM_COMBINED: 2,
+      DEFAULT: 3,
+    },
   };
 });
 
@@ -90,6 +98,23 @@ describe("runOcr", () => {
     expect(onProgress).toHaveBeenCalledWith(25);
     expect(onProgress).toHaveBeenCalledWith(50);
     expect(onProgress).toHaveBeenCalledWith(100);
+  });
+
+  it("ignores progress events from non-recognition phases / 認識フェーズ以外の progress は無視する", async () => {
+    const onProgress = vi.fn();
+    const promise = runOcr(makeFile(), { languages: ["eng"], onProgress });
+    await vi.waitFor(() => expect(capturedLogger).toBeDefined());
+
+    // 言語 DL や初期化フェーズは UI がガタつくため無視される
+    // Language download / init phases reset to 0→1 and must be ignored.
+    capturedLogger?.({ status: "loading language traineddata", progress: 0.8 });
+    capturedLogger?.({ status: "initializing api", progress: 0.9 });
+    capturedLogger?.({ status: "recognizing text", progress: 0.5 });
+
+    await promise;
+
+    expect(onProgress).toHaveBeenCalledTimes(1);
+    expect(onProgress).toHaveBeenCalledWith(50);
   });
 
   it("always terminates worker after success / 成功時に worker.terminate が呼ばれる", async () => {

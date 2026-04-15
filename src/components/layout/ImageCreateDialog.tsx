@@ -108,6 +108,9 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
     setProcessingMode("none");
     setError(null);
     setOcrProgress(null);
+    // 実行中に閉じた場合 `handleCreate` の finally が走らず frozen になるのを防ぐ
+    // Ensure isProcessing is reset; otherwise an in-flight cancel can leave the dialog frozen.
+    setIsProcessing(false);
     onOpenChange(false);
   }, [onOpenChange]);
 
@@ -269,13 +272,23 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
         });
       }
 
+      // Defense-in-depth: キャンセル済みなら onCreated を呼ばない。
+      // Defense-in-depth: don't fire onCreated if the user cancelled mid-flight.
+      if (controller.signal.aborted) {
+        return;
+      }
+
       // 作成完了コールバック
       onCreated(imageUrl, extractedText, description);
       handleClose();
     } catch (err) {
-      // 中断時は静かに閉じる（ユーザーが明示的にキャンセルしたケース）
-      // If the user cancelled, swallow the abort error silently.
-      if (err instanceof DOMException && err.name === "AbortError") {
+      // 中断時は静かに閉じる（ユーザーが明示的にキャンセルしたケース）。
+      // Tesseract.js の `worker.terminate()` 由来のエラーは DOMException/AbortError とは
+      // 限らないため、`signal.aborted` を直接確認してユーザーキャンセルを判定する。
+      //
+      // Silently swallow the error when the user cancelled. Tesseract's `worker.terminate()`
+      // may raise a non-AbortError, so we also check `signal.aborted` directly.
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
         return;
       }
       console.error("Failed to create page from image:", err);

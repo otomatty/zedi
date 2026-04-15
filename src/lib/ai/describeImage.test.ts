@@ -65,18 +65,37 @@ describe("describeImage", () => {
     ).rejects.toThrow(/claude-code|claude code|not supported/i);
   });
 
-  it("calls OpenAI chat.completions.create with image_url content / OpenAI は image_url 形式", async () => {
+  it("throws when apiMode is api_server / api_server モードは本 PR 未対応として throw", async () => {
+    await expect(
+      describeImage(
+        imageFile(),
+        makeSettings({ provider: "openai", apiMode: "api_server", apiKey: "" }),
+      ),
+    ).rejects.toThrow(/server API|サーバー API|not yet supported/i);
+  });
+
+  it("throws for unsupported MIME types like HEIC / 未対応 MIME (HEIC) は throw", async () => {
+    const heic = new File([new Uint8Array([1, 2])], "img.heic", { type: "image/heic" });
+    await expect(describeImage(heic, makeSettings({ provider: "openai" }))).rejects.toThrow(
+      /unsupported image type|image\/heic|対応していない/i,
+    );
+  });
+
+  it("calls OpenAI chat.completions.create with image_url content and forwards signal / OpenAI は image_url 形式 + signal 伝搬", async () => {
     openaiCreate.mockResolvedValue({
       choices: [{ message: { content: "An image of a cat." } }],
     });
 
-    const result = await describeImage(imageFile(), makeSettings({ provider: "openai" }));
+    const controller = new AbortController();
+    const result = await describeImage(imageFile(), makeSettings({ provider: "openai" }), {
+      signal: controller.signal,
+    });
 
     expect(openaiCreate).toHaveBeenCalledTimes(1);
-    const call = openaiCreate.mock.calls[0][0];
-    expect(call.model).toBe("gpt-5-mini");
-    expect(Array.isArray(call.messages)).toBe(true);
-    const userMessage = call.messages[0];
+    const [body, requestOptions] = openaiCreate.mock.calls[0];
+    expect(body.model).toBe("gpt-5-mini");
+    expect(Array.isArray(body.messages)).toBe(true);
+    const userMessage = body.messages[0];
     expect(userMessage.role).toBe("user");
     expect(Array.isArray(userMessage.content)).toBe(true);
     expect(userMessage.content).toEqual(
@@ -90,14 +109,17 @@ describe("describeImage", () => {
         }),
       ]),
     );
+    // signal が SDK に転送される / signal is forwarded to the SDK.
+    expect(requestOptions).toEqual(expect.objectContaining({ signal: controller.signal }));
     expect(result).toBe("An image of a cat.");
   });
 
-  it("calls Anthropic messages.create with base64 image block / Anthropic は base64 image ブロック", async () => {
+  it("calls Anthropic messages.create with base64 image block and forwards signal / Anthropic は base64 image ブロック + signal 伝搬", async () => {
     anthropicCreate.mockResolvedValue({
       content: [{ type: "text", text: "Anthropic description" }],
     });
 
+    const controller = new AbortController();
     const result = await describeImage(
       imageFile(),
       makeSettings({
@@ -105,13 +127,15 @@ describe("describeImage", () => {
         model: "claude-opus-4-6",
         modelId: "anthropic:claude-opus-4-6",
       }),
+      { signal: controller.signal },
     );
 
     expect(anthropicCreate).toHaveBeenCalledTimes(1);
-    const call = anthropicCreate.mock.calls[0][0];
-    expect(call.model).toBe("claude-opus-4-6");
-    expect(typeof call.max_tokens).toBe("number");
-    const userMessage = call.messages[0];
+    const [body, requestOptions] = anthropicCreate.mock.calls[0];
+    expect(body.model).toBe("claude-opus-4-6");
+    expect(typeof body.max_tokens).toBe("number");
+    expect(requestOptions).toEqual(expect.objectContaining({ signal: controller.signal }));
+    const userMessage = body.messages[0];
     expect(userMessage.role).toBe("user");
     expect(userMessage.content).toEqual(
       expect.arrayContaining([
@@ -129,9 +153,10 @@ describe("describeImage", () => {
     expect(result).toBe("Anthropic description");
   });
 
-  it("calls Google generateContent with inlineData / Google は inlineData 形式", async () => {
+  it("calls Google generateContent with inlineData and forwards signal via config.abortSignal / Google は inlineData 形式 + config.abortSignal", async () => {
     googleGenerateContent.mockResolvedValue({ text: "Gemini description" });
 
+    const controller = new AbortController();
     const result = await describeImage(
       imageFile(),
       makeSettings({
@@ -139,11 +164,15 @@ describe("describeImage", () => {
         model: "gemini-3-pro-preview",
         modelId: "google:gemini-3-pro-preview",
       }),
+      { signal: controller.signal },
     );
 
     expect(googleGenerateContent).toHaveBeenCalledTimes(1);
     const call = googleGenerateContent.mock.calls[0][0];
     expect(call.model).toBe("gemini-3-pro-preview");
+    // Google SDK 固有の config.abortSignal 経由で signal が伝搬される
+    // @google/genai forwards AbortSignal via config.abortSignal.
+    expect(call.config).toEqual(expect.objectContaining({ abortSignal: controller.signal }));
     const firstContent = Array.isArray(call.contents) ? call.contents[0] : call.contents;
     const parts = firstContent.parts ?? firstContent;
     expect(parts).toEqual(
@@ -179,6 +208,22 @@ describe("describeImage", () => {
   it("throws AbortError if signal is already aborted / 既に abort 済みなら throw", async () => {
     const controller = new AbortController();
     controller.abort();
+    await expect(
+      describeImage(imageFile(), makeSettings({ provider: "openai" }), {
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow(/abort/i);
+  });
+
+  it("throws AbortError if signal is aborted after SDK call returns / SDK から戻った後に abort されたら throw", async () => {
+    const controller = new AbortController();
+    // SDK の呼び出しは成功しつつ、その直後に signal を abort する
+    // SDK call resolves successfully, then we abort before the result is returned.
+    openaiCreate.mockImplementationOnce(async () => {
+      controller.abort();
+      return { choices: [{ message: { content: "leaked result" } }] };
+    });
+
     await expect(
       describeImage(imageFile(), makeSettings({ provider: "openai" }), {
         signal: controller.signal,

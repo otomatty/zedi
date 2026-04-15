@@ -63,10 +63,15 @@ export async function runOcr(file: File, options: OcrOptions = {}): Promise<stri
   const langs = languages && languages.length > 0 ? languages : ["eng"];
 
   // 動的 import でメインバンドルから分離 / Dynamic import keeps this out of the main bundle.
-  const { createWorker } = await import("tesseract.js");
+  const { createWorker, OEM } = await import("tesseract.js");
 
-  const worker: Worker = await createWorker(langs, 1, {
+  const worker: Worker = await createWorker(langs, OEM.LSTM_ONLY, {
     logger: (m: { status: string; progress: number }) => {
+      // `progress` は各フェーズ (言語 DL / 初期化 / 認識) ごとに 0→1 にリセットされるため、
+      // UI がガタつかないよう認識フェーズのみを通知対象とする。
+      // `progress` resets per phase (language load / init / recognize); only surface the
+      // recognition phase to avoid the progress bar jumping back to 0%.
+      if (m?.status !== "recognizing text") return;
       if (typeof m?.progress === "number" && onProgress) {
         onProgress(Math.round(Math.max(0, Math.min(1, m.progress)) * 100));
       }
