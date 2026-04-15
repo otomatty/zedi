@@ -7,33 +7,38 @@ import { WikiLink, WIKI_LINK_PASTE_REGEX } from "./WikiLinkExtension";
  */
 describe("WikiLinkExtension paste rule", () => {
   describe("WIKI_LINK_PASTE_REGEX", () => {
-    it("should match a basic [[Title]] pattern", () => {
+    // 正規表現はキャプチャグループを持たず、マッチ全体 `[[Title]]` を対象とする
+    // （Tiptap の `markPasteRule` に括弧ごとマークを付与させるため）。
+    // The regex has no capture group; the full `[[Title]]` match is the target
+    // so that Tiptap's `markPasteRule` applies the mark to the brackets as well.
+
+    it("should match a basic [[Title]] pattern (full bracket form)", () => {
       const text = "[[MyPage]]";
       const matches = [...text.matchAll(WIKI_LINK_PASTE_REGEX)];
       expect(matches).toHaveLength(1);
-      expect(matches[0][1]).toBe("MyPage");
+      expect(matches[0][0]).toBe("[[MyPage]]");
     });
 
     it("should match multiple [[WikiLink]] patterns in text", () => {
       const text = "See [[PageA]] and [[PageB]] for details";
       const matches = [...text.matchAll(WIKI_LINK_PASTE_REGEX)];
       expect(matches).toHaveLength(2);
-      expect(matches[0][1]).toBe("PageA");
-      expect(matches[1][1]).toBe("PageB");
+      expect(matches[0][0]).toBe("[[PageA]]");
+      expect(matches[1][0]).toBe("[[PageB]]");
     });
 
     it("should match titles with spaces", () => {
       const text = "[[My Page Title]]";
       const matches = [...text.matchAll(WIKI_LINK_PASTE_REGEX)];
       expect(matches).toHaveLength(1);
-      expect(matches[0][1]).toBe("My Page Title");
+      expect(matches[0][0]).toBe("[[My Page Title]]");
     });
 
     it("should match titles with Japanese characters", () => {
       const text = "[[日本語ページ]]";
       const matches = [...text.matchAll(WIKI_LINK_PASTE_REGEX)];
       expect(matches).toHaveLength(1);
-      expect(matches[0][1]).toBe("日本語ページ");
+      expect(matches[0][0]).toBe("[[日本語ページ]]");
     });
 
     it("should not match empty brackets [[]]", () => {
@@ -42,14 +47,15 @@ describe("WikiLinkExtension paste rule", () => {
       expect(matches).toHaveLength(0);
     });
 
-    it("should not match whitespace-only titles [[ ]]", () => {
+    it("should match whitespace-only titles [[ ]] (handler filters via getAttributes)", () => {
       const text = "[[ ]]";
       const matches = [...text.matchAll(WIKI_LINK_PASTE_REGEX)];
-      // The regex matches but the title is whitespace-only; the paste rule
-      // handler trims and skips empty titles at the attribute level.
-      // Regex itself captures the content between brackets.
+      // 正規表現自体は空白のみのタイトルもマッチさせるが、`getAttributes` 側で
+      // トリム後に空だった場合は `false` を返してマーク適用を抑止する。
+      // The regex itself matches whitespace-only titles, but `getAttributes`
+      // returns `false` after trimming so no mark is applied.
       expect(matches).toHaveLength(1);
-      expect(matches[0][1].trim()).toBe("");
+      expect(matches[0][0]).toBe("[[ ]]");
     });
 
     it("should not match single brackets [Title]", () => {
@@ -58,14 +64,15 @@ describe("WikiLinkExtension paste rule", () => {
       expect(matches).toHaveLength(0);
     });
 
-    it("should not capture brackets inside title with [[[Title]]]", () => {
-      // The improved regex `[^\[\]]` excludes both `[` and `]` from capture,
-      // so `[[[Title]]]` correctly matches only `[[Title]]` with capture "Title".
-      // 改善した正規表現により、`[[[Title]]]` でも正しく "Title" だけをキャプチャする。
+    it("should not include extra outer brackets in a [[[Title]]] match", () => {
+      // `[^[\]]` が `[` と `]` の両方を除外するため、`[[[Title]]]` は
+      // 内側の `[[Title]]` のみにマッチする。
+      // Because `[^[\]]` excludes both `[` and `]`, `[[[Title]]]` matches only
+      // the inner `[[Title]]`.
       const text = "[[[Title]]]";
       const matches = [...text.matchAll(WIKI_LINK_PASTE_REGEX)];
       expect(matches).toHaveLength(1);
-      expect(matches[0][1]).toBe("Title");
+      expect(matches[0][0]).toBe("[[Title]]");
     });
   });
 

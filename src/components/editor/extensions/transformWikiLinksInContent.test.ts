@@ -57,7 +57,7 @@ describe("transformWikiLinksInContent", () => {
     expect(transformWikiLinksInContent(doc)).toEqual(doc);
   });
 
-  it("transforms a single wiki link into a text node with wikiLink mark", () => {
+  it("transforms a single wiki link into a text node with wikiLink mark (brackets preserved)", () => {
     const doc = {
       type: "doc",
       content: [
@@ -79,9 +79,11 @@ describe("transformWikiLinksInContent", () => {
     };
 
     expect(result.content[0].content).toHaveLength(1);
+    // 括弧 `[[ ]]` は表示テキストとして保持し、マークの attrs.title にはトリム済みタイトルを格納する。
+    // Brackets `[[ ]]` are preserved in the display text; the mark's `attrs.title` holds the trimmed title.
     expect(result.content[0].content[0]).toEqual({
       type: "text",
-      text: "Foo",
+      text: "[[Foo]]",
       marks: [
         {
           type: "wikiLink",
@@ -110,7 +112,7 @@ describe("transformWikiLinksInContent", () => {
       { type: "text", text: "before " },
       {
         type: "text",
-        text: "Foo",
+        text: "[[Foo]]",
         marks: [
           {
             type: "wikiLink",
@@ -138,11 +140,11 @@ describe("transformWikiLinksInContent", () => {
     };
 
     expect(result.content[0].content).toHaveLength(3);
-    expect(result.content[0].content[0].text).toBe("A");
+    expect(result.content[0].content[0].text).toBe("[[A]]");
     expect(result.content[0].content[0].marks).toHaveLength(1);
     expect(result.content[0].content[1].text).toBe(" and ");
     expect(result.content[0].content[1].marks).toBeUndefined();
-    expect(result.content[0].content[2].text).toBe("B");
+    expect(result.content[0].content[2].text).toBe("[[B]]");
     expect(result.content[0].content[2].marks).toHaveLength(1);
   });
 
@@ -167,7 +169,7 @@ describe("transformWikiLinksInContent", () => {
 
     expect(result.content[0].type).toBe("heading");
     expect(result.content[0].content).toHaveLength(2);
-    expect(result.content[0].content[1].text).toBe("Link");
+    expect(result.content[0].content[1].text).toBe("[[Link]]");
     expect(result.content[0].content[1].marks).toEqual([
       {
         type: "wikiLink",
@@ -206,7 +208,7 @@ describe("transformWikiLinksInContent", () => {
     const nodes = result.content[0].content;
     expect(nodes).toHaveLength(3);
     expect(nodes[0].marks).toEqual([{ type: "bold" }]);
-    expect(nodes[1].text).toBe("Link");
+    expect(nodes[1].text).toBe("[[Link]]");
     // 既存マーク + wikiLink マークを両方保持する
     // Preserve both the existing mark(s) and the wikiLink mark
     expect(nodes[1].marks).toEqual(
@@ -221,7 +223,7 @@ describe("transformWikiLinksInContent", () => {
     expect(nodes[2].marks).toEqual([{ type: "bold" }]);
   });
 
-  it("trims whitespace from wiki link title", () => {
+  it("trims whitespace from wiki link title but keeps brackets/inner text verbatim", () => {
     const doc = {
       type: "doc",
       content: [
@@ -242,7 +244,9 @@ describe("transformWikiLinksInContent", () => {
       }>;
     };
 
-    expect(result.content[0].content[0].text).toBe("Foo Bar");
+    // 表示テキストは原文ママ（括弧と内部空白を保持）/ Display text preserves brackets and inner whitespace verbatim.
+    expect(result.content[0].content[0].text).toBe("[[  Foo Bar  ]]");
+    // attrs.title はトリム後 / `attrs.title` stores the trimmed title.
     expect(result.content[0].content[0].marks?.[0]?.attrs).toEqual({
       title: "Foo Bar",
       exists: false,
@@ -303,7 +307,7 @@ describe("transformWikiLinksInContent", () => {
 
     const textNodes = result.content[0].content[0].content[0].content;
     expect(textNodes).toHaveLength(2);
-    expect(textNodes[1].text).toBe("Ref");
+    expect(textNodes[1].text).toBe("[[Ref]]");
     expect(textNodes[1].marks).toEqual([
       {
         type: "wikiLink",
