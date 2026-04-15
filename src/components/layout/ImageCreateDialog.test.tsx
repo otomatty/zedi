@@ -146,6 +146,31 @@ describe("ImageCreateDialog", () => {
     expect(describeImageMock).not.toHaveBeenCalled();
   });
 
+  it("shows api_server alert and disables create button when apiMode is 'api_server' and 'describe' is chosen", async () => {
+    // api_server モードでは isConfigured は true だが describe は本 PR 未対応
+    // In api_server mode, isConfigured is true but describe mode is unsupported in this PR.
+    useAISettingsMock.settings.isConfigured = true;
+    useAISettingsMock.settings.apiMode = "api_server";
+
+    const user = userEvent.setup();
+    render(<ImageCreateDialog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    await advanceToPreview(user);
+    await user.click(await screen.findByLabelText(/画像の説明を生成/));
+
+    // サーバー API モード向けの誘導 Alert / Guidance alert for api_server mode.
+    expect(
+      await screen.findByText(/サーバー API|ユーザー API キー|api_server/i),
+    ).toBeInTheDocument();
+
+    const createButton = screen.getByRole("button", { name: /作成/ });
+    expect(createButton).toBeDisabled();
+    expect(describeImageMock).not.toHaveBeenCalled();
+
+    // 以降のテストへの漏れ防止 / Clean up for the next test.
+    useAISettingsMock.settings.apiMode = "user_api_key";
+  });
+
   it("passes neither extractedText nor description when 'none' is selected", async () => {
     const user = userEvent.setup();
     render(<ImageCreateDialog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);

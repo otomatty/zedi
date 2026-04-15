@@ -94,6 +94,21 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    */
   const { settings: aiSettings } = useAISettings();
 
+  /**
+   * describe モードが現時点で利用できない理由を返す。
+   * - `not-configured`: AI 設定が未構成
+   * - `api-server`: `api_server` モード（本 PR では Vision 非対応、ユーザー API キーモードが必要）
+   *
+   * Why the describe mode is currently unavailable. Covers:
+   * - `not-configured`: AI settings are not configured
+   * - `api-server`: `api_server` mode (server-side Vision not yet supported in this PR)
+   */
+  const describeUnavailableReason: "not-configured" | "api-server" | null = !aiSettings.isConfigured
+    ? "not-configured"
+    : aiSettings.apiMode === "api_server"
+      ? "api-server"
+      : null;
+
   // ダイアログを閉じたときにリセット
   // Reset all transient state and abort any in-flight OCR / describe request.
   /**
@@ -440,12 +455,20 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
               </RadioGroup>
             </div>
 
-            {/* describe モード選択時、AI 設定が未構成なら誘導 Alert を表示 */}
-            {/* Show guidance when 'describe' is selected but AI is not configured. */}
-            {processingMode === "describe" && !aiSettings.isConfigured && (
+            {/* describe モード選択時、AI 設定が未構成 / api_server モードなら誘導 Alert を表示 */}
+            {/* Guide the user when 'describe' is selected but describe mode is unavailable. */}
+            {processingMode === "describe" && describeUnavailableReason === "not-configured" && (
               <Alert variant="destructive">
                 <AlertDescription>
                   画像解析には AI 設定が必要です。設定画面で AI プロバイダーを設定してください。
+                </AlertDescription>
+              </Alert>
+            )}
+            {processingMode === "describe" && describeUnavailableReason === "api-server" && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  画像解析は現在サーバー API モードでは未対応です。AI設定で「ユーザー API
+                  キー」モードに切り替えてください。
                 </AlertDescription>
               </Alert>
             )}
@@ -500,7 +523,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
               disabled={
                 isProcessing ||
                 !isConfigured ||
-                (processingMode === "describe" && !aiSettings.isConfigured)
+                (processingMode === "describe" && describeUnavailableReason !== null)
               }
             >
               {isProcessing ? (
