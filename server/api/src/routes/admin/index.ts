@@ -32,6 +32,17 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 /**
+ * 管理画面のユーザーステータス絞り込み値を正規化する。
+ * Returns a valid user status filter, or null when the value is missing/invalid.
+ */
+export function parseAdminUserStatusFilter(value: string | undefined): UserStatus | null {
+  if (value === "active" || value === "suspended" || value === "deleted") {
+    return value;
+  }
+  return null;
+}
+
+/**
  * GET /api/admin/users — list users (paginated, optional email search, optional status filter).
  *
  * ユーザー一覧を取得する（ページネーション、メール検索、ステータスフィルタ対応）。
@@ -39,7 +50,7 @@ const MAX_LIMIT = 200;
 app.get("/users", async (c) => {
   const db = c.get("db");
   const search = c.req.query("search")?.trim();
-  const statusFilter = c.req.query("status")?.trim() as UserStatus | undefined;
+  const statusFilter = parseAdminUserStatusFilter(c.req.query("status")?.trim());
   const limitRaw = parseInt(c.req.query("limit") ?? String(DEFAULT_LIMIT), 10);
   const limit = Number.isFinite(limitRaw)
     ? Math.min(Math.max(1, limitRaw), MAX_LIMIT)
@@ -51,11 +62,12 @@ app.get("/users", async (c) => {
   if (search) {
     conditions.push(like(users.email, `%${search.replace(/[%_\\]/g, (ch) => `\\${ch}`)}%`));
   }
-  if (statusFilter && ["active", "suspended", "deleted"].includes(statusFilter)) {
+  if (statusFilter) {
     conditions.push(eq(users.status, statusFilter));
-  } else if (!statusFilter) {
-    // デフォルトでは削除済みユーザーを除外する
-    // Exclude deleted users by default when no status filter is specified
+  }
+  // デフォルトでは削除済みユーザーを除外する。無効な status 値でも同じ既定動作に戻す。
+  // Exclude deleted users by default, including when an invalid status filter is provided.
+  if (!statusFilter) {
     conditions.push(ne(users.status, "deleted"));
   }
 
@@ -238,6 +250,10 @@ app.post("/users/:id/suspend", async (c) => {
       return { notFound: true } as const;
     }
 
+    if (target.status === "deleted") {
+      return { alreadyDeleted: true } as const;
+    }
+
     if (target.status === "suspended") {
       return { alreadySuspended: true } as const;
     }
@@ -292,6 +308,10 @@ app.post("/users/:id/suspend", async (c) => {
 
   if ("alreadySuspended" in result) {
     return c.json({ error: "User is already suspended" }, 400);
+  }
+
+  if ("alreadyDeleted" in result) {
+    return c.json({ error: "Cannot suspend a deleted user" }, 400);
   }
 
   return c.json({ user: result.updated });
