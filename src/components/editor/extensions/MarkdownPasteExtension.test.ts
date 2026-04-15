@@ -245,7 +245,9 @@ describe("MarkdownPaste extension - wiki links", () => {
       }>;
     };
     const textNode = inserted.content[0].content[0];
-    expect(textNode.text).toBe("Foo");
+    // 括弧 `[[ ]]` を保持したまま wikiLink マークを付与する。
+    // Preserve the `[[ ]]` brackets while applying the wikiLink mark.
+    expect(textNode.text).toBe("[[Foo]]");
     expect(textNode.marks).toEqual([
       {
         type: "wikiLink",
@@ -268,7 +270,7 @@ describe("MarkdownPaste extension - wiki links", () => {
     const nodes = inserted.content[0].content;
     expect(nodes).toHaveLength(3);
     expect(nodes[0].text).toBe("see ");
-    expect(nodes[1].text).toBe("Foo");
+    expect(nodes[1].text).toBe("[[Foo]]");
     expect(nodes[1].marks).toBeDefined();
     expect(nodes[2].text).toBe(" today");
   });
@@ -289,7 +291,7 @@ describe("MarkdownPaste extension - wiki links", () => {
       }>;
     };
     const textNodes = inserted.content[0].content;
-    const wikiNode = textNodes.find((n) => n.text === "Ref");
+    const wikiNode = textNodes.find((n) => n.text === "[[Ref]]");
     expect(wikiNode).toBeDefined();
     expect(wikiNode?.marks?.[0]?.type).toBe("wikiLink");
   });

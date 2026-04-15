@@ -91,13 +91,19 @@ function splitTextNodeByWikiLinks(node: NodeJSON): NodeJSON[] {
       result.push(buildTextNode(text.slice(cursor, start), node.marks));
     }
 
-    // Wikiリンクマーク付きノードを追加
-    // Push the wiki-linked text node
+    // Wikiリンクマーク付きノードを追加する。
+    // 表示テキストは `[[ ... ]]` を含む原文（match[0]）をそのまま保持し、
+    // マークの `attrs.title` にはトリム済みタイトルを格納する。
+    // これにより、再シリアライズ時や Markdown 出力時にも記法が失われない。
+    //
+    // Push the wiki-linked text node. The displayed text keeps the original
+    // `[[ ... ]]` syntax (match[0]) so that re-serialisation / markdown output
+    // preserves the wiki link notation, while `attrs.title` holds the trimmed title.
     const wikiMark: MarkJSON = {
       type: "wikiLink",
       attrs: { title, exists: false, referenced: false },
     };
-    result.push(buildTextNode(title, mergeMarks(node.marks, wikiMark)));
+    result.push(buildTextNode(match[0], mergeMarks(node.marks, wikiMark)));
 
     cursor = end;
   }
