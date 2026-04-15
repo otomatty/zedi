@@ -81,6 +81,11 @@ describe("ImageCreateDialog", () => {
     vi.clearAllMocks();
     uploadImage.mockResolvedValue("https://cdn.example.com/image.webp");
     useImageUploadMock.isConfigured = true;
+    useAISettingsMock.settings.provider = "openai";
+    useAISettingsMock.settings.apiKey = "sk-test";
+    useAISettingsMock.settings.apiMode = "user_api_key";
+    useAISettingsMock.settings.model = "gpt-5-mini";
+    useAISettingsMock.settings.modelId = "openai:gpt-5-mini";
     useAISettingsMock.settings.isConfigured = true;
     onOpenChange = vi.fn();
     onCreated = vi.fn();
@@ -170,9 +175,47 @@ describe("ImageCreateDialog", () => {
     const createButton = screen.getByRole("button", { name: /作成/ });
     expect(createButton).toBeDisabled();
     expect(describeImageMock).not.toHaveBeenCalled();
+  });
 
-    // 以降のテストへの漏れ防止 / Clean up for the next test.
-    useAISettingsMock.settings.apiMode = "user_api_key";
+  it("treats missing apiMode as api_server in the UI and disables describe mode", async () => {
+    useAISettingsMock.settings.isConfigured = true;
+    delete (useAISettingsMock.settings as { apiMode?: "user_api_key" | "api_server" }).apiMode;
+
+    const user = userEvent.setup();
+    render(<ImageCreateDialog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    await advanceToPreview(user);
+    await user.click(await screen.findByLabelText(/画像の説明を生成/));
+
+    expect(
+      await screen.findByText(/サーバー API|ユーザー API キー|api_server/i),
+    ).toBeInTheDocument();
+
+    const createButton = screen.getByRole("button", { name: /作成/ });
+    expect(createButton).toBeDisabled();
+    expect(describeImageMock).not.toHaveBeenCalled();
+  });
+
+  it("shows unsupported-provider alert and disables create button for claude-code", async () => {
+    useAISettingsMock.settings.provider = "claude-code";
+    useAISettingsMock.settings.apiKey = "";
+    useAISettingsMock.settings.model = "";
+    useAISettingsMock.settings.modelId = "claude-code:default";
+    useAISettingsMock.settings.isConfigured = true;
+
+    const user = userEvent.setup();
+    render(<ImageCreateDialog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    await advanceToPreview(user);
+    await user.click(await screen.findByLabelText(/画像の説明を生成/));
+
+    expect(
+      await screen.findByText(/Claude Code|claude-code|未対応|サポートしていません/i),
+    ).toBeInTheDocument();
+
+    const createButton = screen.getByRole("button", { name: /作成/ });
+    expect(createButton).toBeDisabled();
+    expect(describeImageMock).not.toHaveBeenCalled();
   });
 
   it("passes neither extractedText nor description when 'none' is selected", async () => {
