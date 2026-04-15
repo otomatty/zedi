@@ -53,7 +53,11 @@ beforeEach(() => {
   if (!URL.createObjectURL) {
     Object.defineProperty(URL, "createObjectURL", { value: vi.fn(), configurable: true });
   }
+  if (!URL.revokeObjectURL) {
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+  }
   URL.createObjectURL = vi.fn(() => "blob:preview");
+  URL.revokeObjectURL = vi.fn();
 });
 
 import ImageCreateDialog from "./ImageCreateDialog";
@@ -233,5 +237,27 @@ describe("ImageCreateDialog", () => {
     expect(description).toBeUndefined();
     expect(runOcrMock).not.toHaveBeenCalled();
     expect(describeImageMock).not.toHaveBeenCalled();
+  });
+
+  it("revokes preview object URLs when leaving the preview step", async () => {
+    URL.createObjectURL = vi
+      .fn()
+      .mockReturnValueOnce("blob:first-preview")
+      .mockReturnValueOnce("blob:second-preview");
+    URL.revokeObjectURL = vi.fn();
+
+    const user = userEvent.setup();
+    render(<ImageCreateDialog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
+
+    await advanceToPreview(user);
+    await user.click(screen.getByRole("button", { name: /戻る/ }));
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:first-preview");
+
+    await advanceToPreview(user);
+    await user.click(screen.getByRole("button", { name: /キャンセル/ }));
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:second-preview");
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
   });
 });

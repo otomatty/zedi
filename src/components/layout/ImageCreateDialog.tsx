@@ -80,6 +80,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    *
    */
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
   /**
    * 実行中の OCR / 画像解析を中断するための AbortController
    * AbortController used to cancel in-flight OCR / describe calls.
@@ -115,6 +116,25 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
           ? "api-server"
           : null;
 
+  const clearPreviewUrl = useCallback((updateState = true) => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    if (updateState) {
+      setPreviewUrl(null);
+    }
+  }, []);
+
+  const updatePreviewUrl = useCallback(
+    (nextPreviewUrl: string) => {
+      clearPreviewUrl(false);
+      previewUrlRef.current = nextPreviewUrl;
+      setPreviewUrl(nextPreviewUrl);
+    },
+    [clearPreviewUrl],
+  );
+
   // ダイアログを閉じたときにリセット
   // Reset all transient state and abort any in-flight OCR / describe request.
   /**
@@ -125,7 +145,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
     abortRef.current = null;
     setStep("source");
     setSelectedImage(null);
-    setPreviewUrl(null);
+    clearPreviewUrl();
     setProcessingMode("none");
     setError(null);
     setOcrProgress(null);
@@ -133,41 +153,45 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
     // Ensure isProcessing is reset; otherwise an in-flight cancel can leave the dialog frozen.
     setIsProcessing(false);
     onOpenChange(false);
-  }, [onOpenChange]);
+  }, [clearPreviewUrl, onOpenChange]);
 
   // コンポーネントアンマウント時も abort する / Also abort on unmount.
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      clearPreviewUrl(false);
     };
-  }, []);
+  }, [clearPreviewUrl]);
 
   // 画像選択
   /**
    *
    */
-  const handleImageSelect = useCallback((file: File) => {
-    // ファイルサイズチェック (10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setError("画像サイズが大きすぎます（最大10MB）");
-      return;
-    }
+  const handleImageSelect = useCallback(
+    (file: File) => {
+      // ファイルサイズチェック (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError("画像サイズが大きすぎます（最大10MB）");
+        return;
+      }
 
-    // 画像形式チェック
-    /**
-     *
-     */
-    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
-    if (!validTypes.includes(file.type)) {
-      setError("この画像形式には対応していません（JPEG, PNG, GIF, WebPをお使いください）");
-      return;
-    }
+      // 画像形式チェック
+      /**
+       *
+       */
+      const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"];
+      if (!validTypes.includes(file.type)) {
+        setError("この画像形式には対応していません（JPEG, PNG, GIF, WebPをお使いください）");
+        return;
+      }
 
-    setSelectedImage(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    setError(null);
-    setStep("preview");
-  }, []);
+      setSelectedImage(file);
+      updatePreviewUrl(URL.createObjectURL(file));
+      setError(null);
+      setStep("preview");
+    },
+    [updatePreviewUrl],
+  );
 
   // ファイル選択
   /**
@@ -521,7 +545,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
               onClick={() => {
                 setStep("source");
                 setSelectedImage(null);
-                setPreviewUrl(null);
+                clearPreviewUrl();
                 setError(null);
               }}
               disabled={isProcessing}
