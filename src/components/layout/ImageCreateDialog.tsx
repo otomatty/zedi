@@ -252,7 +252,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
       /**
        *
        */
-      const imageUrl = await uploadImage(selectedImage);
+      const imageUrl = await uploadImage(selectedImage, { signal: controller.signal });
 
       // 処理モードに応じた処理 / Run OCR or describe depending on the selected mode.
       /**

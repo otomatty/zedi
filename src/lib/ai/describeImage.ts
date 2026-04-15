@@ -10,6 +10,7 @@ import type { GoogleGenAI } from "@google/genai";
 import i18n from "@/i18n";
 import type { AISettings } from "@/types/ai";
 import { createAIClient } from "@/lib/aiClient";
+import { getEffectiveAPIMode } from "@/lib/aiService";
 import { fileToBase64 } from "@/lib/storage/types";
 
 /**
@@ -95,7 +96,7 @@ export async function describeImage(
   // 本 PR では server API 経由の Vision 呼び出しに未対応。バックエンド実装が必要なため
   // 明示的にエラーで弾いてユーザーに誘導する。
   // This PR does not implement server-mode Vision yet; surface a clear error.
-  if (settings.apiMode === "api_server") {
+  if (getEffectiveAPIMode(settings) === "api_server") {
     throw new Error(
       "Image description via the Zedi server API is not yet supported. Switch to 'user API key' mode in AI settings. / 画像解析は現在サーバー API モードでは未対応です。AI 設定で「ユーザー API キー」モードに切り替えてください。",
     );

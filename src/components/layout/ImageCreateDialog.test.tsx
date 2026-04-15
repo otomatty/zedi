@@ -104,6 +104,10 @@ describe("ImageCreateDialog", () => {
 
     await waitFor(() => expect(runOcrMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
+    expect(uploadImage).toHaveBeenCalledWith(
+      expect.any(File),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     const [imageUrl, extractedText, description] = onCreated.mock.calls[0];
     expect(imageUrl).toBe("https://cdn.example.com/image.webp");
     expect(extractedText).toBe("抽出されたテキスト");

@@ -7,6 +7,7 @@ export interface UploadOptions {
   fileName?: string;
   folder?: string;
   onProgress?: (progress: UploadProgress) => void;
+  signal?: AbortSignal;
 }
 
 /**

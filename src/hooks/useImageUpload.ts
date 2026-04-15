@@ -17,8 +17,12 @@ interface ImageUploadState {
   error: string | null;
 }
 
+interface ImageUploadOptions {
+  signal?: AbortSignal;
+}
+
 interface UseImageUploadReturn {
-  uploadImage: (file: File) => Promise<string>;
+  uploadImage: (file: File, options?: ImageUploadOptions) => Promise<string>;
   uploadImages: (files: File[]) => Promise<string[]>;
   isUploading: boolean;
   progress: UploadProgress | null;
@@ -27,22 +31,52 @@ interface UseImageUploadReturn {
   clearError: () => void;
 }
 
+/**
+ *
+ */
 export function useImageUpload(): UseImageUploadReturn {
+  /**
+   *
+   */
   const { settings, isLoading } = useStorageSettings();
+  /**
+   *
+   */
   const { getToken } = useAuth();
+  /**
+   *
+   */
   const [state, setState] = useState<ImageUploadState>({
     isUploading: false,
     progress: null,
     error: null,
   });
 
+  /**
+   *
+   */
   const isConfigured = !isLoading && isStorageConfiguredForUpload(settings);
 
   /**
    * 単一の画像をアップロード
    */
   const uploadImage = useCallback(
-    async (file: File): Promise<string> => {
+    async (file: File, options: ImageUploadOptions = {}): Promise<string> => {
+      /**
+       *
+       */
+      const { signal } = options;
+      /**
+       *
+       */
+      const throwIfAborted = () => {
+        if (signal?.aborted) {
+          throw new DOMException("Image upload aborted", "AbortError");
+        }
+      };
+
+      throwIfAborted();
+
       // ストレージ設定の確認
       if (!isStorageConfiguredForUpload(settings)) {
         throw new Error("ストレージが設定されていません。設定画面でストレージを設定してください。");
@@ -62,20 +96,35 @@ export function useImageUpload(): UseImageUploadReturn {
 
       try {
         // プロバイダーを取得（S3 の場合は getToken を渡す）
+        /**
+         *
+         */
         const provider = getStorageProvider(getSettingsForUpload(settings), {
           getToken,
         });
 
         // JPEG/PNG のみ WebP に変換（GIF はそのまま。APNG は MIME が image/png のため現状は変換対象）
+        /**
+         *
+         */
         const isStaticImage = file.type === "image/jpeg" || file.type === "image/png";
+        /**
+         *
+         */
         const fileToUpload = isStaticImage ? await convertToWebP(file) : file;
+        throwIfAborted();
 
         // アップロード実行
+        /**
+         *
+         */
         const url = await provider.uploadImage(fileToUpload, {
           onProgress: (progress) => {
             setState((prev) => ({ ...prev, progress }));
           },
+          signal,
         });
+        throwIfAborted();
 
         setState((prev) => ({
           ...prev,
@@ -85,10 +134,28 @@ export function useImageUpload(): UseImageUploadReturn {
 
         return url;
       } catch (error) {
+        /**
+         *
+         */
+        const isAborted =
+          signal?.aborted || (error instanceof DOMException && error.name === "AbortError");
+        if (isAborted) {
+          setState((prev) => ({
+            ...prev,
+            isUploading: false,
+            progress: null,
+            error: null,
+          }));
+          throw error;
+        }
+        /**
+         *
+         */
         const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
         setState((prev) => ({
           ...prev,
           isUploading: false,
+          progress: null,
           error: errorMessage,
         }));
         throw error;
@@ -103,6 +170,9 @@ export function useImageUpload(): UseImageUploadReturn {
   const uploadImages = useCallback(
     async (files: File[]): Promise<string[]> => {
       // 画像ファイルのみをフィルタリング
+      /**
+       *
+       */
       const imageFiles = files.filter((file) => file.type.startsWith("image/"));
 
       if (imageFiles.length === 0) {
@@ -117,12 +187,18 @@ export function useImageUpload(): UseImageUploadReturn {
 
       try {
         // 並列でアップロード
+        /**
+         *
+         */
         const urls = await Promise.all(imageFiles.map((file) => uploadImage(file)));
 
         setState((prev) => ({ ...prev, isUploading: false }));
 
         return urls;
       } catch (error) {
+        /**
+         *
+         */
         const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
         setState((prev) => ({
           ...prev,

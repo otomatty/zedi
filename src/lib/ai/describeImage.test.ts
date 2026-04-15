@@ -74,6 +74,15 @@ describe("describeImage", () => {
     ).rejects.toThrow(/server API|サーバー API|not yet supported/i);
   });
 
+  it("treats missing apiMode as api_server for backward compatibility / apiMode 未設定でも後方互換で api_server 扱い", async () => {
+    const legacySettings = { ...makeSettings({ provider: "openai", apiKey: "sk-test" }) };
+    delete legacySettings.apiMode;
+
+    await expect(describeImage(imageFile(), legacySettings)).rejects.toThrow(
+      /server API|サーバー API|not yet supported/i,
+    );
+  });
+
   it("throws for unsupported MIME types like HEIC / 未対応 MIME (HEIC) は throw", async () => {
     const heic = new File([new Uint8Array([1, 2])], "img.heic", { type: "image/heic" });
     await expect(describeImage(heic, makeSettings({ provider: "openai" }))).rejects.toThrow(
