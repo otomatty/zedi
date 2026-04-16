@@ -51,10 +51,14 @@ async function fetchPageFindings(pageId: string): Promise<LintFindingResponse[]>
  */
 async function resolveFinding(findingId: string): Promise<void> {
   const baseUrl = getApiBaseUrl();
-  await fetch(`${baseUrl}/api/lint/findings/${encodeURIComponent(findingId)}/resolve`, {
+  const res = await fetch(`${baseUrl}/api/lint/findings/${encodeURIComponent(findingId)}/resolve`, {
     method: "POST",
     credentials: "include",
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((body as { message?: string }).message ?? "Failed to resolve finding");
+  }
 }
 
 /**
