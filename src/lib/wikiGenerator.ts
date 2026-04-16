@@ -56,6 +56,7 @@ export async function generateWikiContentStream(
   title: string,
   callbacks: WikiGeneratorCallbacks,
   abortSignal?: AbortSignal,
+  userSchema?: string,
 ): Promise<void> {
   try {
     const settings = await getAISettingsOrThrow();
@@ -64,7 +65,14 @@ export async function generateWikiContentStream(
 
     if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");
-      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
+      const schemaBlock =
+        userSchema && userSchema.trim()
+          ? `## ユーザー定義スキーマ（構成・表記ルールなど。必ず従うこと）\n${userSchema.trim()}\n\n`
+          : "";
+      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title).replace(
+        "{{schema}}",
+        schemaBlock,
+      );
       let fullContent = "";
 
       await callAIService(
@@ -133,8 +141,9 @@ export async function generateWikiContentFromChatOutlineStream(
   conversationText: string,
   callbacks: WikiGeneratorCallbacks,
   abortSignal?: AbortSignal,
+  userSchema?: string,
 ): Promise<void> {
-  const userPrompt = buildChatPageWikiUserPrompt(title, outline, conversationText);
+  const userPrompt = buildChatPageWikiUserPrompt(title, outline, conversationText, userSchema);
   try {
     const settings = await getAISettingsOrThrow();
     // apiMode未設定時はapi_serverをデフォルトとする / Default to api_server when apiMode is unset.

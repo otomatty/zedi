@@ -5,6 +5,8 @@ import Container from "@/components/layout/Container";
 import { AIChatMessages } from "@/components/ai-chat/AIChatMessages";
 import { AIChatInput } from "@/components/ai-chat/AIChatInput";
 import { AIChatViewTabs, type AIChatViewTab } from "@/components/ai-chat/AIChatViewTabs";
+import { PromoteToWikiDialog } from "@/components/ai-chat/PromoteToWikiDialog";
+import { usePromoteToWiki } from "@/hooks/usePromoteToWiki";
 
 const AIChatBranchTree = lazy(() =>
   import("@/components/ai-chat/AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
@@ -22,6 +24,7 @@ import { useAIChatDetailLifecycle } from "./useAIChatDetailLifecycle";
  * Messages fill available height and scroll; input is pinned to the bottom.
  * 会話詳細ページ（`/ai/:conversationId`）。メッセージは残り高さでスクロール、入力欄は下端固定。
  */
+// eslint-disable-next-line max-lines-per-function -- full-page chat with branch/workflow tabs
 export default function AIChatDetail() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
@@ -95,6 +98,8 @@ export default function AIChatDetail() {
     [editAndResend],
   );
 
+  const promote = usePromoteToWiki(messages);
+
   const [activeViewTab, setActiveViewTab] = useState<AIChatViewTab>("chat");
   const [inputPrefill, setInputPrefill] = useState<{ nonce: number; text: string } | null>(null);
   const [focusEditorNonce, setFocusEditorNonce] = useState(0);
@@ -150,6 +155,7 @@ export default function AIChatDetail() {
               onSuggestionClick={handleSendMessage}
               onExecuteAction={handleExecuteAction}
               onEditMessage={handleEditMessage}
+              onPromoteToWiki={promote.handlePromote}
               onSwitchBranch={switchBranch}
               isStreaming={isStreaming}
             />
@@ -180,6 +186,13 @@ export default function AIChatDetail() {
           </Container>
         </div>
       </div>
+      <PromoteToWikiDialog
+        open={promote.open}
+        onClose={promote.close}
+        conversationText={promote.conversationText}
+        existingTitles={[]}
+        conversationId={conversationId}
+      />
     </AppLayout>
   );
 }

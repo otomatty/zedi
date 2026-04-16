@@ -7,8 +7,10 @@ import { AIChatInput } from "./AIChatInput";
 import { AIChatMessages } from "./AIChatMessages";
 import { AIChatContextBar } from "./AIChatContextBar";
 import { AIChatConversationList } from "./AIChatConversationList";
+import { PromoteToWikiDialog } from "./PromoteToWikiDialog";
 import { useAIChatPanelContentLogic } from "@/hooks/useAIChatPanelContentLogic";
 import { useAIChatContext } from "@/contexts/AIChatContext";
+import { usePromoteToWiki } from "@/hooks/usePromoteToWiki";
 
 const AIChatBranchTree = lazy(() =>
   import("./AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
@@ -91,6 +93,9 @@ export function AIChatPanelContent({
 
   const canInsert = pageContext?.type === "editor";
 
+  const promote = usePromoteToWiki(messages);
+  const existingTitles = pageContext?.recentPageTitles ?? [];
+
   /** After the workflow tab is visited once, keep the panel mounted so run state survives tab switches. / ワークフロータブを一度開いたらマウントを維持し、タブ切替で実行状態を失わない */
   const [keepWorkflowMounted, setKeepWorkflowMounted] = useState(
     () => activeViewTab === "workflow",
@@ -130,6 +135,7 @@ export function AIChatPanelContent({
             onExecuteAction={handleExecuteAction}
             onEditMessage={handleEditMessage}
             onInsertToNote={canInsert ? handleInsertToNote : undefined}
+            onPromoteToWiki={promote.handlePromote}
             onSwitchBranch={switchBranch}
             isStreaming={isStreaming}
           />
@@ -169,6 +175,13 @@ export function AIChatPanelContent({
           focusEditorNonce={focusEditorNonce}
         />
       </div>
+      <PromoteToWikiDialog
+        open={promote.open}
+        onClose={promote.close}
+        conversationText={promote.conversationText}
+        existingTitles={existingTitles}
+        conversationId={activeConversationId ?? undefined}
+      />
     </div>
   );
 }

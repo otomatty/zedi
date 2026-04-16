@@ -18,6 +18,7 @@ import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
 import ingestRoutes from "./routes/ingest.js";
+import wikiSchemaRoutes from "./routes/wikiSchema.js";
 import extRoutes from "./routes/ext.js";
 import mcpRoutes from "./routes/mcp.js";
 import inviteRoutes from "./routes/invite.js";
@@ -111,6 +112,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Ingest (LLM Wiki pattern, P1)
   app.route("/api/ingest", ingestRoutes);
+
+  // Wiki Schema (P3 — user-defined wiki "constitution")
+  app.route("/api/wiki-schema", wikiSchemaRoutes);
 
   // Lint (Wiki Health, P2)
   app.route("/api/lint", lintRoutes);

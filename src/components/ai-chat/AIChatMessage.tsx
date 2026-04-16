@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { ClipboardPaste, Copy, Sparkles, User } from "lucide-react";
+import { BookOpen, ClipboardPaste, Copy, Sparkles, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@zedi/ui";
 import { ChatMessage, ChatAction } from "../../types/aiChat";
@@ -25,6 +25,11 @@ interface AIChatMessageProps {
    * Callback to insert message content at editor cursor. Available on editor pages.
    */
   onInsertToNote?: (markdown: string) => void;
+  /**
+   * Callback to promote this message's content to a wiki page.
+   * このメッセージの内容を Wiki ページに昇格させるコールバック。
+   */
+  onPromoteToWiki?: (messageContent: string) => void;
   /** Sibling index when this message has alternates. / 代替があるときの兄弟インデックス */
   siblingIndex?: number;
   siblingTotal?: number;
@@ -36,12 +41,13 @@ interface AIChatMessageProps {
  * Renders one chat bubble with optional branch navigation.
  * 1 件のチャットバブルと、任意でブランチ操作を表示する。
  */
-// eslint-disable-next-line complexity -- user vs assistant rendering forks
+// eslint-disable-next-line complexity, max-lines-per-function -- user vs assistant rendering forks
 export function AIChatMessage({
   message,
   onExecuteAction,
   onEditMessage,
   onInsertToNote,
+  onPromoteToWiki,
   siblingIndex,
   siblingTotal,
   onSwitchBranch,
@@ -161,6 +167,17 @@ export function AIChatMessage({
               >
                 <Copy className="h-3 w-3" />
                 {t("aiChat.actions.copyMessage")}
+              </button>
+            )}
+            {!isUser && !message.isStreaming && displayContent && onPromoteToWiki && (
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition-colors"
+                onClick={() => onPromoteToWiki(displayContent)}
+                title={t("aiChat.actions.promoteToWiki")}
+              >
+                <BookOpen className="h-3 w-3" />
+                {t("aiChat.actions.promoteToWiki")}
               </button>
             )}
             {message.modelDisplayName && (

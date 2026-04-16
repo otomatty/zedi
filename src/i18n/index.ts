@@ -22,6 +22,7 @@ import jaTour from "./locales/ja/tour.json";
 import jaHome from "./locales/ja/home.json";
 import jaAiChat from "./locales/ja/aiChat.json";
 import jaInvite from "./locales/ja/invite.json";
+import jaWikiSchema from "./locales/ja/wikiSchema.json";
 import enCommon from "./locales/en/common.json";
 import enSettings from "./locales/en/settings.json";
 import enGeneralSettings from "./locales/en/generalSettings.json";
@@ -40,6 +41,7 @@ import enTour from "./locales/en/tour.json";
 import enHome from "./locales/en/home.json";
 import enAiChat from "./locales/en/aiChat.json";
 import enInvite from "./locales/en/invite.json";
+import enWikiSchema from "./locales/en/wikiSchema.json";
 
 const ja = {
   common: jaCommon,
@@ -60,6 +62,7 @@ const ja = {
   home: jaHome,
   aiChat: jaAiChat,
   invite: jaInvite,
+  wikiSchema: jaWikiSchema,
 };
 
 const en = {
@@ -81,6 +84,7 @@ const en = {
   home: enHome,
   aiChat: enAiChat,
   invite: enInvite,
+  wikiSchema: enWikiSchema,
 };
 
 // localStorage の設定から初期言語を取得

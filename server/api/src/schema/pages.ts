@@ -2,7 +2,10 @@ import { pgTable, uuid, text, timestamp, boolean, index } from "drizzle-orm/pg-c
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 
-export const pages = pgTable(
+export /**
+ *
+ */
+const pages = pgTable(
   "pages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -17,6 +20,11 @@ export const pages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     isDeleted: boolean("is_deleted").default(false).notNull(),
+    /**
+     * True for the special "wiki schema" page (at most one per owner).
+     * Wiki の「憲法」ページを示すフラグ（オーナーごとに最大 1 つ）。
+     */
+    isSchema: boolean("is_schema").default(false).notNull(),
   },
   (table) => [
     index("idx_pages_owner_id").on(table.ownerId),
@@ -28,5 +36,11 @@ export const pages = pgTable(
   ],
 );
 
+/**
+ *
+ */
 export type Page = typeof pages.$inferSelect;
+/**
+ *
+ */
 export type NewPage = typeof pages.$inferInsert;

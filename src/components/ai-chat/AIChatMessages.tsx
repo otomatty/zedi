@@ -21,6 +21,11 @@ interface AIChatMessagesProps {
    * Callback to insert message content at editor cursor position.
    */
   onInsertToNote?: (markdown: string) => void;
+  /**
+   * Callback to promote a message's content to a wiki page.
+   * メッセージ内容を Wiki ページに昇格させるコールバック。
+   */
+  onPromoteToWiki?: (messageContent: string) => void;
   /** Switch active branch at a fork. / 分岐点で表示ブランチを切り替え */
   onSwitchBranch?: (messageId: string, direction: "prev" | "next") => void;
   isStreaming?: boolean;
@@ -39,6 +44,7 @@ export function AIChatMessages({
   onExecuteAction,
   onEditMessage,
   onInsertToNote,
+  onPromoteToWiki,
   onSwitchBranch,
   isStreaming = false,
   className,
@@ -77,6 +83,7 @@ export function AIChatMessages({
                 onExecuteAction={onExecuteAction}
                 onEditMessage={onEditMessage}
                 onInsertToNote={onInsertToNote}
+                onPromoteToWiki={onPromoteToWiki}
                 siblingIndex={hasSiblings ? index : undefined}
                 siblingTotal={hasSiblings ? siblings.length : undefined}
                 onSwitchBranch={

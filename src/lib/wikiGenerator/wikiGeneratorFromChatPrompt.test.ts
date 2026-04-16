@@ -24,4 +24,39 @@ describe("buildChatPageWikiUserPrompt", () => {
     expect(outlineSection).toContain("- B");
     expect(conversationSection).toContain("User: context");
   });
+
+  // --- P3: userSchema injection tests (otomatty/zedi#597) ---
+
+  it("does not include schema section when userSchema is undefined", () => {
+    const p = buildChatPageWikiUserPrompt("Test", "outline", "conv");
+    expect(p).not.toContain("<user_schema>");
+    expect(p).not.toContain("ユーザー定義スキーマ");
+  });
+
+  it("does not include schema section when userSchema is empty", () => {
+    const p = buildChatPageWikiUserPrompt("Test", "outline", "conv", "");
+    expect(p).not.toContain("<user_schema>");
+  });
+
+  it("does not include schema section when userSchema is whitespace-only", () => {
+    const p = buildChatPageWikiUserPrompt("Test", "outline", "conv", "   \n  ");
+    expect(p).not.toContain("<user_schema>");
+  });
+
+  it("includes schema section when userSchema is provided", () => {
+    const schema = "- Person pages: Overview, Career";
+    const p = buildChatPageWikiUserPrompt("Test", "outline", "conv", schema);
+    expect(p).toContain("<user_schema>");
+    expect(p).toContain("Person pages: Overview, Career");
+    expect(p).toContain("</user_schema>");
+  });
+
+  it("places schema before 執筆ルール", () => {
+    const p = buildChatPageWikiUserPrompt("T", "o", "c", "schema rules");
+    const schemaIdx = p.indexOf("<user_schema>");
+    const rulesIdx = p.indexOf("## 執筆ルール");
+    expect(schemaIdx).toBeGreaterThan(-1);
+    expect(rulesIdx).toBeGreaterThan(-1);
+    expect(schemaIdx).toBeLessThan(rulesIdx);
+  });
 });
