@@ -10,6 +10,7 @@ import { subscriptions } from "./subscriptions.js";
 import { aiUsageLogs, aiMonthlyUsage } from "./aiModels.js";
 import { sources } from "./sources.js";
 import { pageSources } from "./pageSources.js";
+import { lintFindings } from "./lintFindings.js";
 
 export /**
  *
@@ -258,5 +259,16 @@ export const pageSourcesRelations = relations(pageSources, ({ one }) => ({
   source: one(sources, {
     fields: [pageSources.sourceId],
     references: [sources.id],
+  }),
+}));
+
+/**
+ * `lint_findings` のリレーション定義。オーナーへの多対一。
+ * Relations for `lint_findings`: many-to-one to owner.
+ */
+export const lintFindingsRelations = relations(lintFindings, ({ one }) => ({
+  owner: one(users, {
+    fields: [lintFindings.ownerId],
+    references: [users.id],
   }),
 }));
