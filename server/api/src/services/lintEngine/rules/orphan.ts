@@ -28,7 +28,10 @@ export async function runOrphanRule(ownerId: string, db: Database): Promise<Lint
         eq(pages.ownerId, ownerId),
         eq(pages.isDeleted, false),
         sql`NOT EXISTS (
-          SELECT 1 FROM links WHERE links.target_id = ${pages.id}
+          SELECT 1 FROM links
+          INNER JOIN pages AS src ON src.id = links.source_id
+          WHERE links.target_id = ${pages.id}
+          AND src.is_deleted = false
         )`,
       ),
     );

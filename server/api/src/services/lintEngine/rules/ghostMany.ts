@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { ghostLinks } from "../../../schema/links.js";
 import { pages } from "../../../schema/pages.js";
 import type { Database } from "../../../types/index.js";
@@ -34,7 +34,7 @@ export async function runGhostManyRule(ownerId: string, db: Database): Promise<L
     })
     .from(ghostLinks)
     .innerJoin(pages, eq(ghostLinks.sourcePageId, pages.id))
-    .where(eq(pages.ownerId, ownerId))
+    .where(and(eq(pages.ownerId, ownerId), eq(pages.isDeleted, false)))
     .groupBy(ghostLinks.linkText)
     .having(sql`count(*) >= ${GHOST_LINK_THRESHOLD}`);
 

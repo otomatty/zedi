@@ -14,19 +14,21 @@ import type { LintRuleResult, LintFindingCandidate } from "../types.js";
 export function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array<number>(n + 1).fill(0));
-
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  // prev と curr の 2 行だけで DP を回す（型安全かつ省メモリ）
+  // Use two rows for DP (type-safe and memory efficient)
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  let curr = new Array<number>(n + 1).fill(0);
 
   for (let i = 1; i <= m; i++) {
+    curr[0] = i;
     for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+      const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min((prev[j] ?? 0) + 1, (curr[j - 1] ?? 0) + 1, (prev[j - 1] ?? 0) + cost);
     }
+    [prev, curr] = [curr, prev];
   }
 
-  return dp[m][n];
+  return prev[n] ?? 0;
 }
 
 /**
@@ -57,9 +59,11 @@ export async function runTitleSimilarRule(ownerId: string, db: Database): Promis
   const seen = new Set<string>();
 
   for (let i = 0; i < titled.length; i++) {
+    const a = titled[i];
+    if (!a) continue;
     for (let j = i + 1; j < titled.length; j++) {
-      const a = titled[i];
       const b = titled[j];
+      if (!b) continue;
       const titleA = (a.title ?? "").trim().toLowerCase();
       const titleB = (b.title ?? "").trim().toLowerCase();
 

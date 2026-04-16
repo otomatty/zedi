@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { lintFindings } from "../../schema/lintFindings.js";
 import type { Database } from "../../types/index.js";
 import type { LintFindingCandidate, LintRuleResult } from "./types.js";
@@ -31,27 +31,27 @@ export async function runAllLintRules(ownerId: string, db: Database): Promise<Li
     runConflictRule(ownerId, db),
   ]);
 
-  // 既存の未解決 findings を削除して最新結果のみ保持
-  // Delete existing unresolved findings and keep only latest results
-  await db
-    .delete(lintFindings)
-    .where(and(eq(lintFindings.ownerId, ownerId), isNull(lintFindings.resolvedAt)));
-
-  // 全 findings を集約してバルクインサート
-  // Aggregate all findings and bulk insert
+  // トランザクション内で既存の未解決 findings を削除し、最新結果のみ保持
+  // Within a transaction: delete unresolved findings and insert new ones atomically
   const allFindings: LintFindingCandidate[] = results.flatMap((r) => r.findings);
 
-  if (allFindings.length > 0) {
-    await db.insert(lintFindings).values(
-      allFindings.map((f) => ({
-        ownerId,
-        rule: f.rule,
-        severity: f.severity,
-        pageIds: f.pageIds,
-        detail: f.detail,
-      })),
-    );
-  }
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(lintFindings)
+      .where(and(eq(lintFindings.ownerId, ownerId), isNull(lintFindings.resolvedAt)));
+
+    if (allFindings.length > 0) {
+      await tx.insert(lintFindings).values(
+        allFindings.map((f) => ({
+          ownerId,
+          rule: f.rule,
+          severity: f.severity,
+          pageIds: f.pageIds,
+          detail: f.detail,
+        })),
+      );
+    }
+  });
 
   return results;
 }
@@ -82,8 +82,17 @@ export async function getUnresolvedFindings(ownerId: string, db: Database) {
  * @returns 該当ページに関連する findings / Findings related to the page
  */
 export async function getFindingsForPage(ownerId: string, pageId: string, db: Database) {
-  const all = await getUnresolvedFindings(ownerId, db);
-  return all.filter((f) => f.pageIds.includes(pageId));
+  return db
+    .select()
+    .from(lintFindings)
+    .where(
+      and(
+        eq(lintFindings.ownerId, ownerId),
+        isNull(lintFindings.resolvedAt),
+        sql`${pageId} = ANY(${lintFindings.pageIds})`,
+      ),
+    )
+    .orderBy(lintFindings.createdAt);
 }
 
 /**
