@@ -43,6 +43,13 @@
       "when": 1776384000000,
       "tag": "0006_audit_logs_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776470400000,
+      "tag": "0007_add_sources_and_page_sources",
+      "breakpoints": true
     }
   ]
 }

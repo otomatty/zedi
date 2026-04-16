@@ -8,6 +8,8 @@ import { pageSnapshots } from "./pageSnapshots.js";
 import { media } from "./media.js";
 import { subscriptions } from "./subscriptions.js";
 import { aiUsageLogs, aiMonthlyUsage } from "./aiModels.js";
+import { sources } from "./sources.js";
+import { pageSources } from "./pageSources.js";
 
 export /**
  *
@@ -229,5 +231,32 @@ const aiMonthlyUsageRelations = relations(aiMonthlyUsage, ({ one }) => ({
   user: one(users, {
     fields: [aiMonthlyUsage.userId],
     references: [users.id],
+  }),
+}));
+
+/**
+ * `sources` のリレーション定義。オーナー・ページ引用。
+ * Relations for `sources`: owner and citations from pages.
+ */
+export const sourcesRelations = relations(sources, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [sources.ownerId],
+    references: [users.id],
+  }),
+  citations: many(pageSources),
+}));
+
+/**
+ * `page_sources` のリレーション定義。ページとソースを両端に持つ。
+ * Relations for `page_sources`: page and source endpoints.
+ */
+export const pageSourcesRelations = relations(pageSources, ({ one }) => ({
+  page: one(pages, {
+    fields: [pageSources.pageId],
+    references: [pages.id],
+  }),
+  source: one(sources, {
+    fields: [pageSources.sourceId],
+    references: [sources.id],
   }),
 }));

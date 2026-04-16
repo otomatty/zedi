@@ -17,6 +17,7 @@ import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
+import ingestRoutes from "./routes/ingest.js";
 import extRoutes from "./routes/ext.js";
 import mcpRoutes from "./routes/mcp.js";
 import inviteRoutes from "./routes/invite.js";
@@ -106,6 +107,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Clip
   app.route("/api/clip", clipRoutes);
+
+  // Ingest (LLM Wiki pattern, P1)
+  app.route("/api/ingest", ingestRoutes);
 
   // Chrome Extension (OAuth + clip-and-create)
   app.route("/api/ext", extRoutes);
