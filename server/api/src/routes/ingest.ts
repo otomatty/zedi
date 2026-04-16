@@ -17,6 +17,13 @@ import { authRequired } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { extractArticleFromUrl } from "../lib/articleExtractor.js";
 import { callProvider, getProviderApiKeyName } from "../services/aiProviders.js";
+import { getUserTier } from "../services/subscriptionService.js";
+import {
+  checkUsage,
+  validateModelAccess,
+  calculateCost,
+  recordUsage,
+} from "../services/usageService.js";
 import {
   createIngestLlmDriver,
   planIngest,
@@ -126,17 +133,38 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
     throw new HTTPException(400, { message: "Invalid JSON body" });
   }
 
-  const url = body.url?.trim();
-  if (!url) {
+  // --- Input validation (runtime type checks) ---
+  if (typeof body.url !== "string" || !body.url.trim()) {
     throw new HTTPException(400, { message: "url is required" });
   }
-  const provider = body.provider;
-  const model = body.model?.trim();
-  if (!provider || !model) {
+  const url = body.url.trim();
+
+  if (typeof body.provider !== "string" || typeof body.model !== "string" || !body.model.trim()) {
     throw new HTTPException(400, { message: "provider and model are required" });
   }
+  const supportedProviders: AIProviderType[] = ["openai", "anthropic", "google"];
+  if (!supportedProviders.includes(body.provider as AIProviderType)) {
+    throw new HTTPException(400, { message: `unsupported provider: ${body.provider}` });
+  }
+  const provider = body.provider as AIProviderType;
+  const model = body.model.trim();
 
-  const candidateLimit = Math.min(Math.max(body.candidateLimit ?? 5, 1), 10);
+  const rawLimit = Number(body.candidateLimit ?? 5);
+  const candidateLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 10) : 5;
+
+  // --- Model access & usage enforcement (mirrors /api/ai/chat) ---
+  const tier = await getUserTier(userId, db);
+  const modelInfo = await validateModelAccess(model, tier, db);
+  const usageCheck = await checkUsage(userId, tier, db);
+  if (!usageCheck.allowed) {
+    throw new HTTPException(429, { message: "Monthly budget exceeded" });
+  }
+
+  const apiKeyName = getProviderApiKeyName(provider);
+  const apiKey = process.env[apiKeyName];
+  if (!apiKey) {
+    throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });
+  }
 
   let article;
   try {
@@ -151,13 +179,11 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
   const keywords = extractTitleKeywords(article.title);
   const candidates = await fetchCandidates({ db, userId, keywords, limit: candidateLimit });
 
-  const apiKeyName = getProviderApiKeyName(provider);
-  const apiKey = process.env[apiKeyName];
-  if (!apiKey) {
-    throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });
-  }
-
-  const llm = createIngestLlmDriver(callProvider, { provider, model, apiKey });
+  const llm = createIngestLlmDriver(callProvider, {
+    provider: modelInfo.provider as AIProviderType,
+    model: modelInfo.apiModelId,
+    apiKey,
+  });
 
   try {
     const plan = await planIngest({
@@ -171,6 +197,24 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
       candidates,
       llm,
     });
+
+    // --- Usage recording (approximate token estimation, same approach as streaming in chat) ---
+    const inputTokens = Math.ceil(article.contentText.length / 4);
+    const outputTokens = Math.ceil((plan.reason?.length ?? 0) / 4) + 50;
+    const costUnits = calculateCost(
+      { inputTokens, outputTokens },
+      modelInfo.inputCostUnits,
+      modelInfo.outputCostUnits,
+    );
+    await recordUsage(
+      userId,
+      model,
+      "ingest_plan",
+      { inputTokens, outputTokens },
+      costUnits,
+      "system",
+      db,
+    );
 
     return c.json({
       plan,

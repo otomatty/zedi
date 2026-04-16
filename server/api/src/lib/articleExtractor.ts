@@ -21,6 +21,8 @@ import { common, createLowlight } from "lowlight";
 import { createHash } from "node:crypto";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
 
+export { ClipFetchBlockedError };
+
 const lowlight = createLowlight(common);
 
 /**
@@ -187,7 +189,9 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
       ({ html, finalUrl } = await fetchClipHtmlWithRedirects(url, controller));
     } catch (err) {
       if (err instanceof ClipFetchBlockedError) {
-        throw new Error("URL not allowed");
+        // Preserve the original error type so callers can differentiate
+        // policy-blocked URLs from other fetch failures.
+        throw err;
       }
       throw err;
     }
