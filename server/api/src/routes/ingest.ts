@@ -98,7 +98,7 @@ async function fetchCandidates(params: {
     content_preview: string | null;
     content_text: string | null;
   }>(sql`
-    SELECT p.id, p.title, p.content_preview, pc.content_text
+    SELECT p.id, p.title, p.content_preview, LEFT(pc.content_text, 400) AS content_text
     FROM pages p
     LEFT JOIN page_contents pc ON pc.page_id = p.id
     WHERE p.is_deleted = false

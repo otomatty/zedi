@@ -179,12 +179,14 @@ export function buildIngestPlannerPrompt(input: BuildIngestPlannerPromptInput): 
 }
 
 /**
- * 文字列を指定長に切り詰める（UTF-8 安全な単純実装）。
- * Truncates a string to at most `max` characters. Adds an ellipsis when cut.
+ * 文字列を指定長に切り詰める（Unicode コードポイント単位でサロゲートペアを壊さない）。
+ * Truncates a string to at most `max` Unicode code points.
+ * Uses `Array.from` so surrogate pairs (emoji etc.) are never split.
  */
 function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max).trimEnd() + "…";
+  const chars = Array.from(text);
+  if (chars.length <= max) return text;
+  return chars.slice(0, max).join("").trimEnd() + "…";
 }
 
 /**
