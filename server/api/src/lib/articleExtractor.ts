@@ -20,6 +20,9 @@ import Image from "@tiptap/extension-image";
 import { common, createLowlight } from "lowlight";
 import { createHash } from "node:crypto";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
+import { YouTubeEmbedServer } from "./youtubeEmbedServerExtension.js";
+import { extractYouTubeContent } from "./youtubeExtractor.js";
+import type { AIProviderType } from "../types/index.js";
 
 export { ClipFetchBlockedError };
 
@@ -43,6 +46,7 @@ export const articleExtractorExtensions = [
   Link.configure({ openOnClick: false }),
   CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }),
   Image,
+  YouTubeEmbedServer,
 ];
 
 /**
@@ -103,6 +107,26 @@ export interface ExtractArticleInput {
   url: string;
   timeoutMs?: number;
   previewLength?: number;
+  /**
+   * YouTube Data API キー。YouTube URL の場合にメタデータ取得に使用。
+   * YouTube Data API key. Used for metadata retrieval when URL is a YouTube video.
+   */
+  youtubeApiKey?: string;
+  /**
+   * AI プロバイダー。YouTube URL の場合に要約生成に使用。
+   * AI provider for YouTube summary generation.
+   */
+  aiProvider?: AIProviderType;
+  /**
+   * AI モデル ID。YouTube URL の場合に要約生成に使用。
+   * AI model ID for YouTube summary generation.
+   */
+  aiModel?: string;
+  /**
+   * AI プロバイダーの API キー。YouTube URL の場合に要約生成に使用。
+   * AI provider API key for YouTube summary generation.
+   */
+  aiApiKey?: string;
 }
 
 /**
@@ -176,13 +200,65 @@ export function extractTextFromTiptap(node: TiptapNode | null): string {
  * @throws URL が許可されない、fetch 失敗、Readability 抽出失敗時。
  * Throws when URL is disallowed, fetch fails, or Readability cannot parse.
  */
+/**
+ * YouTube URL から動画 ID を抽出する（サーバーサイド版）。
+ * Extracts a YouTube video ID from various YouTube URL formats (server-side).
+ */
+function extractYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i,
+    /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+    /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
+ *
+ */
 export async function extractArticleFromUrl(input: ExtractArticleInput): Promise<ExtractedArticle> {
+  /**
+   *
+   */
   const { url, timeoutMs = ARTICLE_FETCH_TIMEOUT_MS, previewLength = 200 } = input;
 
+  // YouTube URL の場合は専用パイプラインに委譲
+  // Delegate to YouTube-specific pipeline for YouTube URLs
+  /**
+   *
+   */
+  const videoId = extractYouTubeVideoId(url);
+  if (videoId) {
+    return extractYouTubeContent({
+      videoId,
+      youtubeApiKey: input.youtubeApiKey,
+      aiProvider: input.aiProvider,
+      aiModel: input.aiModel,
+      aiApiKey: input.aiApiKey,
+      previewLength,
+    });
+  }
+
+  /**
+   *
+   */
   const controller = new AbortController();
+  /**
+   *
+   */
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  /**
+   *
+   */
   let html: string;
+  /**
+   *
+   */
   let finalUrl: string;
   try {
     try {
@@ -199,21 +275,48 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
     clearTimeout(timer);
   }
 
+  /**
+   *
+   */
   const dom = new JSDOM(html, { url: finalUrl });
+  /**
+   *
+   */
   const document = dom.window.document;
 
+  /**
+   *
+   */
   const reader = new Readability(document.cloneNode(true) as Document);
+  /**
+   *
+   */
   const article = reader.parse();
   if (!article) {
     throw new Error("Failed to extract article content");
   }
 
+  /**
+   *
+   */
   const ogImage = extractOgImage(document);
+  /**
+   *
+   */
   const thumbnailUrl = resolveUrl(finalUrl, ogImage);
 
+  /**
+   *
+   */
   const cleanContent = cleanupHtml(article.content ?? "", document);
 
+  /**
+   *
+   */
   const mainJson = await extractorDocMutex.runExclusive(async () => {
+    /**
+     *
+     */
     const prevDocument = (globalThis as { document?: Document }).document;
     (globalThis as { document?: Document }).document = document;
     try {
@@ -223,7 +326,13 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
     }
   });
 
+  /**
+   *
+   */
   const baseContent = Array.isArray(mainJson.content) ? mainJson.content : [];
+  /**
+   *
+   */
   const imageNode: TiptapNode | null = thumbnailUrl
     ? {
         type: "image",
@@ -233,15 +342,30 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
         },
       }
     : null;
+  /**
+   *
+   */
   const tiptapJson: TiptapNode = {
     type: "doc",
     content: imageNode ? [imageNode, ...baseContent] : baseContent,
   };
 
+  /**
+   *
+   */
   const rawText = extractTextFromTiptap(tiptapJson);
+  /**
+   *
+   */
   const contentText = rawText.slice(0, previewLength);
+  /**
+   *
+   */
   const title = article.title || "Untitled";
 
+  /**
+   *
+   */
   const contentHash = createHash("sha256").update(rawText).digest("hex");
 
   return {

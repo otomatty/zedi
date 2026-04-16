@@ -5,6 +5,7 @@
 import { useState, useCallback, useRef } from "react";
 import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/webClipper";
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
+import { isYouTubeUrl } from "@/components/editor/utils/urlTransform";
 import type { ApiClient } from "@/lib/api/apiClient";
 
 /**
@@ -64,6 +65,29 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
       setClippedContent(null);
 
       try {
+        // YouTube URL の場合は専用サーバーサイドエンドポイントを使用
+        // Use dedicated server-side endpoint for YouTube URLs
+        if (isYouTubeUrl(url) && api) {
+          setStatus("extracting");
+          const result = await api.clipYoutube(url);
+
+          if (currentId !== clipIdRef.current) return null;
+
+          const content: ClippedContent = {
+            title: result.title,
+            content: JSON.stringify(result.tiptapJson),
+            textContent: result.contentText,
+            excerpt: result.contentText,
+            byline: null,
+            sourceUrl: result.sourceUrl,
+            thumbnailUrl: result.thumbnailUrl,
+            siteName: "YouTube",
+          };
+          setClippedContent(content);
+          setStatus("completed");
+          return content;
+        }
+
         setStatus("extracting");
         const content = await clipWebPage(url, api ? fetchHtmlFn : undefined);
 
@@ -94,6 +118,22 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
   const getTiptapContent = useCallback(
     (thumbnailUrl?: string | null, storageProviderId?: string | null): string | null => {
       if (!clippedContent) return null;
+
+      // YouTube のコンテンツは既に Tiptap JSON 形式
+      // YouTube content is already in Tiptap JSON format
+      if (clippedContent.siteName === "YouTube") {
+        try {
+          // content が既に JSON オブジェクトの文字列かどうかチェック
+          // Check if content is already a JSON string
+          const parsed = JSON.parse(clippedContent.content);
+          if (parsed.type === "doc") {
+            return clippedContent.content;
+          }
+        } catch {
+          // JSON パース失敗 — 通常の HTML → Tiptap 変換にフォールバック
+          // Parse failure — fall through to normal HTML → Tiptap conversion
+        }
+      }
 
       const tiptapDoc = formatClippedContentAsTiptap(
         clippedContent.content,

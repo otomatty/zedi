@@ -142,7 +142,7 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const body = await c.req.json<{ url?: string }>();
+  const body = await c.req.json<{ url?: string; provider?: string; model?: string }>();
   if (!body.url?.trim()) {
     throw new HTTPException(400, { message: "url is required" });
   }
@@ -162,8 +162,33 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
     });
   }
 
+  // YouTube 要約用の AI パラメータ / AI params for YouTube summary
+  const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
+  let aiProvider: string | undefined;
+  let aiModel: string | undefined;
+  let aiApiKey: string | undefined;
+
+  if (body.provider && body.model) {
+    aiProvider = body.provider;
+    aiModel = body.model;
+    const keyMap: Record<string, string> = {
+      openai: "OPENAI_API_KEY",
+      anthropic: "ANTHROPIC_API_KEY",
+      google: "GOOGLE_AI_API_KEY",
+    };
+    aiApiKey = process.env[keyMap[aiProvider] ?? ""];
+  }
+
   try {
-    const result = await clipAndCreate({ url, userId, db });
+    const result = await clipAndCreate({
+      url,
+      userId,
+      db,
+      youtubeApiKey,
+      aiProvider: aiProvider as "openai" | "anthropic" | "google" | undefined,
+      aiModel,
+      aiApiKey,
+    });
     return c.json({
       page_id: result.page_id,
       title: result.title,

@@ -76,6 +76,11 @@ Object.assign(nodeHandlers, {
     const title = (n.attrs?.title as string) || "";
     return title ? `![${alt}](${src} "${title}")\n\n` : `![${alt}](${src})\n\n`;
   },
+  youtubeEmbed: (n) => {
+    const videoId = (n.attrs?.videoId as string) || "";
+    if (!videoId) return "";
+    return `[YouTube](https://www.youtube.com/watch?v=${videoId})\n\n`;
+  },
   link: (n) => convertChildren(n),
 });
 

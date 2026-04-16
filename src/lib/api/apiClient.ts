@@ -410,6 +410,26 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return html;
     },
 
+    /**
+     * POST /api/clip/youtube — YouTube URL からメタデータ + 字幕 + AI 要約を取得。
+     * Fetches YouTube metadata + transcript + AI summary and returns Tiptap JSON.
+     */
+    async clipYoutube(
+      url: string,
+      options?: { provider?: string; model?: string },
+    ): Promise<{
+      title: string;
+      thumbnailUrl: string | null;
+      tiptapJson: Record<string, unknown>;
+      contentText: string;
+      contentHash: string;
+      sourceUrl: string;
+    }> {
+      return req("POST", "/api/clip/youtube", {
+        body: { url, ...options },
+      });
+    },
+
     // ── Invitation ───────────────────────────────────────────────────────
 
     /** GET /api/invite/:token — トークン検証 + 招待情報取得（認証不要）/ Validate token & get invitation info (no auth). */
