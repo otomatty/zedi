@@ -58,6 +58,8 @@ export {
   type NewThumbnailObject,
 } from "./thumbnails.js";
 export { adminAuditLogs, type AdminAuditLog, type NewAdminAuditLog } from "./auditLogs.js";
+export { sources, type Source, type NewSource } from "./sources.js";
+export { pageSources, type PageSource, type NewPageSource } from "./pageSources.js";
 
 export {
   usersRelations,
@@ -76,4 +78,6 @@ export {
   subscriptionsRelations,
   aiUsageLogsRelations,
   aiMonthlyUsageRelations,
+  sourcesRelations,
+  pageSourcesRelations,
 } from "./relations.js";

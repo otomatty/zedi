@@ -2,83 +2,20 @@
  * clip-and-create: URL → fetch → Readability → Tiptap JSON → Y.Doc → DB
  *
  * Server-side web clipping pipeline for Chrome extension.
+ * Chrome 拡張向けのサーバー側 Web クリッピングパイプライン。
+ *
+ * Since sub-issue otomatty/zedi#595 (Karpathy "LLM Wiki" ingest flow), the
+ * URL → Tiptap JSON extraction is delegated to {@link extractArticleFromUrl}
+ * so the ingest planner can reuse the same pipeline without DB writes.
  */
-import { Mutex } from "async-mutex";
-import { JSDOM } from "jsdom";
-import { Readability } from "@mozilla/readability";
-import { generateJSON } from "@tiptap/html";
-import { getSchema } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
-import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
-import Image from "@tiptap/extension-image";
-import { common, createLowlight } from "lowlight";
 import * as Y from "yjs";
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
-import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
+import { buildArticleSchema, extractArticleFromUrl } from "./articleExtractor.js";
 
-const lowlight = createLowlight(common);
 const YDOC_FRAGMENT = "default";
-/** Serializes globalThis.document mutation so concurrent clipAndCreate calls do not race. */
-const clipDocMutex = new Mutex();
-
-const extensions = [
-  StarterKit.configure({
-    heading: { levels: [1, 2, 3] },
-    codeBlock: false,
-  }),
-  Link.configure({ openOnClick: false }),
-  CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }),
-  Image,
-];
-
-function buildSchema() {
-  return getSchema(extensions);
-}
-
-function extractOgImage(doc: Document): string | null {
-  const meta =
-    doc.querySelector('meta[property="og:image"]') || doc.querySelector('meta[name="og:image"]');
-  return meta?.getAttribute("content") || null;
-}
-
-function resolveUrl(base: string, relative: string | null): string | null {
-  if (!relative) return null;
-  try {
-    const resolved = new URL(relative, base);
-    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return null;
-    return resolved.href;
-  } catch {
-    return null;
-  }
-}
-
-function cleanupHtml(html: string, doc: Document): string {
-  const div = doc.createElement("div");
-  div.innerHTML = html;
-
-  const unwanted = ["script", "style", "noscript", "iframe", "object", "embed", "form"];
-  for (const sel of unwanted) {
-    div.querySelectorAll(sel).forEach((el) => {
-      el.remove();
-    });
-  }
-  return div.innerHTML.trim();
-}
-
-function extractTextFromTiptap(node: { text?: string; content?: unknown[] } | null): string {
-  if (!node) return "";
-  if (typeof node.text === "string") return node.text;
-  if (!Array.isArray(node.content)) return "";
-  return node.content
-    .map((child: unknown) => extractTextFromTiptap(child as { text?: string; content?: unknown[] }))
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 /**
  * クリップ作成結果。作成されたページの ID・タイトル・サムネイル URL。
@@ -119,81 +56,22 @@ export interface ClipAndCreateInput {
 export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndCreateResult> {
   const { url, userId, db } = input;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
-  let html: string;
-  let finalUrl: string;
+  const article = await extractArticleFromUrl({ url });
 
-  try {
-    try {
-      ({ html, finalUrl } = await fetchClipHtmlWithRedirects(url, controller));
-    } catch (err) {
-      if (err instanceof ClipFetchBlockedError) {
-        throw new Error("URL not allowed");
-      }
-      throw err;
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
-  const dom = new JSDOM(html, { url: finalUrl });
-  const document = dom.window.document;
-
-  const reader = new Readability(document.cloneNode(true) as Document);
-  const article = reader.parse();
-
-  if (!article) {
-    throw new Error("Failed to extract article content");
-  }
-
-  const ogImage = extractOgImage(document);
-  const thumbnailUrl = resolveUrl(finalUrl, ogImage);
-
-  const cleanContent = cleanupHtml(article.content ?? "", document);
-
-  const mainJson = await clipDocMutex.runExclusive(async () => {
-    const prevDocument = (globalThis as { document?: Document }).document;
-    (globalThis as { document?: Document }).document = document;
-    try {
-      return generateJSON(cleanContent, extensions) as {
-        type: string;
-        content?: Array<{ type: string; attrs?: Record<string, unknown> }>;
-      };
-    } finally {
-      (globalThis as { document?: Document }).document = prevDocument;
-    }
-  });
-
-  const baseContent = mainJson.content ?? [];
-  const imageNode = thumbnailUrl
-    ? {
-        type: "image",
-        attrs: {
-          src: thumbnailUrl,
-          alt: (article.title ?? "OGP thumbnail") as string,
-        },
-      }
-    : null;
-  const tiptapJson = {
-    type: "doc",
-    content: imageNode ? [imageNode, ...baseContent] : baseContent,
-  };
-  const schema = buildSchema();
-  const ydoc = prosemirrorJSONToYDoc(schema, tiptapJson, YDOC_FRAGMENT);
+  const tiptapSchema = buildArticleSchema();
+  const ydoc = prosemirrorJSONToYDoc(tiptapSchema, article.tiptapJson, YDOC_FRAGMENT);
   const ydocState = Y.encodeStateAsUpdate(ydoc);
   const ydocBase64 = Buffer.from(ydocState).toString("base64");
-  const contentText = extractTextFromTiptap(tiptapJson).slice(0, 200);
-  const title = article.title || "Untitled";
 
   const result = await db.transaction(async (tx) => {
     const [page] = await tx
       .insert(pages)
       .values({
         ownerId: userId,
-        title,
-        contentPreview: contentText || null,
-        sourceUrl: finalUrl,
-        thumbnailUrl: thumbnailUrl ?? null,
+        title: article.title,
+        contentPreview: article.contentText || null,
+        sourceUrl: article.finalUrl,
+        thumbnailUrl: article.thumbnailUrl ?? null,
       })
       .returning({ id: pages.id });
 
@@ -203,10 +81,10 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
       pageId: page.id,
       ydocState: Buffer.from(ydocBase64, "base64"),
       version: 1,
-      contentText: contentText || null,
+      contentText: article.contentText || null,
     });
 
-    return { page, title, thumbnailUrl };
+    return { page, title: article.title, thumbnailUrl: article.thumbnailUrl };
   });
 
   return {
