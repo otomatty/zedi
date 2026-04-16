@@ -127,7 +127,7 @@ export async function fetchYouTubeMetadata(
     throw new Error(`YouTube video not found: ${videoId}`);
   }
 
-  const item = data.items[0];
+  const item = data.items[0] as NonNullable<(typeof data.items)[number]>;
   const snippet = item.snippet;
   const thumbnails = snippet.thumbnails;
 
@@ -145,7 +145,7 @@ export async function fetchYouTubeMetadata(
     description: snippet.description,
     channelTitle: snippet.channelTitle,
     publishedAt: snippet.publishedAt,
-    duration: item.contentDetails.duration,
+    duration: item.contentDetails?.duration ?? "",
     thumbnailUrl,
     tags: snippet.tags ?? [],
   };

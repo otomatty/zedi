@@ -87,7 +87,7 @@ function extractVideoId(url: string): string | null {
   ];
   for (const p of patterns) {
     const m = url.match(p);
-    if (m) return m[1];
+    if (m?.[1]) return m[1];
   }
   return null;
 }

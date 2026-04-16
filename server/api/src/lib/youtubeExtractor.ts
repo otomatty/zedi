@@ -165,7 +165,7 @@ function summaryToTiptapNodes(markdown: string): TiptapNode[] {
       flushList();
       // 要約内の見出しは h3 に統一（h2 は動画情報セクションで使用）
       // Normalize summary headings to h3 (h2 is used for section headers)
-      nodes.push(heading(3, headingMatch[2]));
+      nodes.push(heading(3, headingMatch[2] ?? ""));
       continue;
     }
 
@@ -174,7 +174,7 @@ function summaryToTiptapNodes(markdown: string): TiptapNode[] {
     if (listMatch) {
       currentListItems.push({
         type: "listItem",
-        content: [textParagraph(listMatch[1])],
+        content: [textParagraph(listMatch[1] ?? "")],
       });
       continue;
     }
@@ -184,7 +184,7 @@ function summaryToTiptapNodes(markdown: string): TiptapNode[] {
     if (numberedMatch) {
       currentListItems.push({
         type: "listItem",
-        content: [textParagraph(numberedMatch[1])],
+        content: [textParagraph(numberedMatch[1] ?? "")],
       });
       continue;
     }

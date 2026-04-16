@@ -62,8 +62,10 @@ describe("youtubeExtractor", () => {
     const doc = result.tiptapJson;
     expect(doc.type).toBe("doc");
     expect(doc.content).toBeDefined();
-    expect((doc.content ?? [])[0].type).toBe("youtubeEmbed");
-    expect((doc.content ?? [])[0].attrs?.videoId).toBe("abc12345678");
+    const firstNode = (doc.content ?? [])[0];
+    expect(firstNode).toBeDefined();
+    expect(firstNode?.type).toBe("youtubeEmbed");
+    expect(firstNode?.attrs?.videoId).toBe("abc12345678");
   });
 
   it("includes AI summary when provider is configured and transcript exists", async () => {
@@ -134,7 +136,7 @@ describe("youtubeExtractor", () => {
 
     // エラーが throw されないこと / No error thrown
     expect(result.title).toBe("テスト動画");
-    expect((result.tiptapJson.content ?? [])[0].type).toBe("youtubeEmbed");
+    expect((result.tiptapJson.content ?? [])[0]?.type).toBe("youtubeEmbed");
   });
 
   it("includes transcript section when transcript is available", async () => {
