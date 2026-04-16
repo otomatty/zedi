@@ -26,7 +26,8 @@ import {
 } from "../services/usageService.js";
 import {
   createIngestLlmDriver,
-  planIngest,
+  buildIngestPlannerPrompt,
+  parseIngestPlanResponse,
   IngestPlanParseError,
   type CandidatePage,
 } from "../services/ingestPlanner.js";
@@ -185,47 +186,45 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
     apiKey,
   });
 
+  // Build prompt in the route so we can measure ALL message content for
+  // accurate token estimation (system prompt + article + candidates).
+  const articleSummary = {
+    title: article.title,
+    url: article.finalUrl,
+    excerpt: article.contentText,
+  };
+  const messages = buildIngestPlannerPrompt({ article: articleSummary, candidates });
+
+  let rawResponse: string;
   try {
-    const plan = await planIngest({
-      article: {
-        title: article.title,
-        url: article.finalUrl,
-        // contentText は extractArticleFromUrl で previewLength=4000 に制限済。
-        // Planner 側でさらに truncate(4000) されるため二重の上限になる。
-        excerpt: article.contentText,
-      },
-      candidates,
-      llm,
-    });
+    rawResponse = await llm(messages);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "LLM call failed";
+    throw new HTTPException(502, { message: msg });
+  }
 
-    // --- Usage recording (approximate token estimation, same approach as streaming in chat) ---
-    const inputTokens = Math.ceil(article.contentText.length / 4);
-    const outputTokens = Math.ceil((plan.reason?.length ?? 0) / 4) + 50;
-    const costUnits = calculateCost(
-      { inputTokens, outputTokens },
-      modelInfo.inputCostUnits,
-      modelInfo.outputCostUnits,
-    );
-    await recordUsage(
-      userId,
-      model,
-      "ingest_plan",
-      { inputTokens, outputTokens },
-      costUnits,
-      "system",
-      db,
-    );
+  // --- Usage recording (sum ALL message content, matching chat.ts:66-68) ---
+  const inputTokens = Math.ceil(messages.reduce((sum, m) => sum + m.content.length, 0) / 4);
+  const outputTokens = Math.ceil(rawResponse.length / 4);
+  const costUnits = calculateCost(
+    { inputTokens, outputTokens },
+    modelInfo.inputCostUnits,
+    modelInfo.outputCostUnits,
+  );
+  await recordUsage(
+    userId,
+    model,
+    "ingest_plan",
+    { inputTokens, outputTokens },
+    costUnits,
+    "system",
+    db,
+  );
 
-    return c.json({
-      plan,
-      source: {
-        url: article.finalUrl,
-        title: article.title,
-        thumbnailUrl: article.thumbnailUrl,
-        contentHash: article.contentHash,
-      },
-      candidates,
-    });
+  let plan;
+  try {
+    const validCandidateIds = new Set(candidates.map((c) => c.id));
+    plan = parseIngestPlanResponse(rawResponse, { validCandidateIds });
   } catch (err) {
     if (err instanceof IngestPlanParseError) {
       throw new HTTPException(502, {
@@ -234,6 +233,17 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
     }
     throw err;
   }
+
+  return c.json({
+    plan,
+    source: {
+      url: article.finalUrl,
+      title: article.title,
+      thumbnailUrl: article.thumbnailUrl,
+      contentHash: article.contentHash,
+    },
+    candidates,
+  });
 });
 
 export default app;
