@@ -60,6 +60,13 @@ export {
 export { adminAuditLogs, type AdminAuditLog, type NewAdminAuditLog } from "./auditLogs.js";
 export { sources, type Source, type NewSource } from "./sources.js";
 export { pageSources, type PageSource, type NewPageSource } from "./pageSources.js";
+export {
+  lintFindings,
+  type LintFinding,
+  type NewLintFinding,
+  type LintRule,
+  type LintSeverity,
+} from "./lintFindings.js";
 
 export {
   usersRelations,
@@ -80,4 +87,5 @@ export {
   aiMonthlyUsageRelations,
   sourcesRelations,
   pageSourcesRelations,
+  lintFindingsRelations,
 } from "./relations.js";
