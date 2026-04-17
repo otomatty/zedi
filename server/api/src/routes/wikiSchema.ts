@@ -85,20 +85,26 @@ app.put("/", authRequired, async (c) => {
   const content = body.content;
   const now = new Date();
 
-  // Check for existing schema page
-  const [existing] = await db
-    .select({ id: pages.id })
-    .from(pages)
-    .where(and(eq(pages.ownerId, userId), eq(pages.isSchema, true), eq(pages.isDeleted, false)))
-    .limit(1);
+  // Wrap the read-modify-write in a transaction so concurrent PUTs from the
+  // same user cannot both INSERT and race the (owner_id) WHERE is_schema=true
+  // unique index. A row-level lock (FOR UPDATE) on the existing row, or the
+  // unique index itself on insert, serializes the operation.
+  // 同一ユーザーの並行 PUT が両方 INSERT して一意インデックスで衝突するのを防ぐため、
+  // 読み書きをトランザクションで囲む。
+  const pageId = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.ownerId, userId), eq(pages.isSchema, true), eq(pages.isDeleted, false)))
+      .for("update")
+      .limit(1);
 
-  let pageId: string;
+    if (existing) {
+      await tx.update(pages).set({ title, updatedAt: now }).where(eq(pages.id, existing.id));
+      return existing.id;
+    }
 
-  if (existing) {
-    pageId = existing.id;
-    await db.update(pages).set({ title, updatedAt: now }).where(eq(pages.id, pageId));
-  } else {
-    const [newPage] = await db
+    const [newPage] = await tx
       .insert(pages)
       .values({
         ownerId: userId,
@@ -112,8 +118,8 @@ app.put("/", authRequired, async (c) => {
     if (!newPage) {
       throw new HTTPException(500, { message: "Failed to create schema page" });
     }
-    pageId = newPage.id;
-  }
+    return newPage.id;
+  });
 
   // Upsert page_contents in a single round-trip.
   // page_contents を 1 回の往復で upsert する。

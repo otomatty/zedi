@@ -67,7 +67,13 @@ function createExtractionHandlers(
     onChunk: (chunk: string) => {
       result += chunk;
     },
-    onComplete: () => onEntities(parseExtractedEntities(result)),
+    onComplete: (response?: { content?: string }) => {
+      // Prefer the streamed chunks, but fall back to the final response content
+      // so that non-streaming providers (which never call onChunk) still work.
+      // ストリームされたチャンクを優先しつつ、非ストリーミング経路でも動くようフォールバックする。
+      const text = result || response?.content || "";
+      onEntities(parseExtractedEntities(text));
+    },
     onError,
   };
 }
@@ -102,7 +108,12 @@ function useEntityExtraction(
             provider: settings.provider,
             model: settings.model,
             messages: [{ role: "user", content: prompt }],
-            options: { maxTokens: 2000, temperature: 0.3, feature: "entity_extraction" },
+            options: {
+              maxTokens: 2000,
+              temperature: 0.3,
+              stream: true,
+              feature: "entity_extraction",
+            },
           },
           createExtractionHandlers(onEntities, (err) => setError(err.message)),
         );

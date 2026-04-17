@@ -310,6 +310,17 @@ app.post("/apply", authRequired, rateLimit(), async (c) => {
   if (!body.title || typeof body.title !== "string") {
     throw new HTTPException(400, { message: "title is required" });
   }
+  if (body.kind === "url" && (typeof body.url !== "string" || !body.url.trim())) {
+    throw new HTTPException(400, { message: "url is required when kind is 'url'" });
+  }
+  if (
+    body.kind === "conversation" &&
+    (typeof body.conversationJson !== "string" || !body.conversationJson.trim())
+  ) {
+    throw new HTTPException(400, {
+      message: "conversationJson is required when kind is 'conversation'",
+    });
+  }
 
   // Verify ownership of the target page before any write to prevent cross-user linking.
   // クロスユーザーリンクを防ぐため、書き込み前に targetPageId のオーナー権を検証する。
