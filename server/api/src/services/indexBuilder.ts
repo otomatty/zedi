@@ -282,21 +282,44 @@ export async function rebuildIndexForOwner(
       pageId = existing.id;
       created = false;
     } else {
-      const [newRow] = await tx
-        .insert(pages)
-        .values({
-          ownerId,
-          title: INDEX_PAGE_TITLE,
-          specialKind: "__index__",
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning({ id: pages.id });
-      if (!newRow) {
-        throw new Error("Failed to insert __index__ page");
+      // Partial unique index (`idx_pages_unique_special_kind_per_owner`) protects
+      // against two concurrent rebuilds both passing the SELECT above and then
+      // racing to INSERT. On conflict, re-read the winner instead of failing.
+      // 並行再構築で SELECT を両方通過し INSERT が衝突した場合に備え、
+      // 一意インデックス違反を捕捉して勝者行を読み直す。
+      try {
+        const [newRow] = await tx
+          .insert(pages)
+          .values({
+            ownerId,
+            title: INDEX_PAGE_TITLE,
+            specialKind: "__index__",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning({ id: pages.id });
+        if (!newRow) {
+          throw new Error("Failed to insert __index__ page");
+        }
+        pageId = newRow.id;
+        created = true;
+      } catch (insertErr) {
+        const [winner] = await tx
+          .select({ id: pages.id })
+          .from(pages)
+          .where(
+            and(
+              eq(pages.ownerId, ownerId),
+              eq(pages.specialKind, "__index__"),
+              eq(pages.isDeleted, false),
+            ),
+          )
+          .for("update")
+          .limit(1);
+        if (!winner) throw insertErr;
+        pageId = winner.id;
+        created = false;
       }
-      pageId = newRow.id;
-      created = true;
     }
 
     await tx

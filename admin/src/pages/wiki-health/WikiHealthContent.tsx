@@ -26,6 +26,7 @@ const RULE_LABELS: Record<LintRule, string> = {
   title_similar: "タイトル類似 / Title Similar",
   conflict: "矛盾 / Conflict",
   broken_link: "リンク切れ / Broken Link",
+  stale: "古い情報 / Stale",
 };
 
 /**
