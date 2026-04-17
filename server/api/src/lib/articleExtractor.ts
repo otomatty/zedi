@@ -195,20 +195,6 @@ export function extractTextFromTiptap(node: TiptapNode | null): string {
 }
 
 /**
- * URL から記事を抽出して Tiptap JSON / プレビュー / コンテンツハッシュを返す。
- * Fetches a URL and extracts a Tiptap JSON document plus preview and content hash.
- *
- * Page の作成はここでは行わない（DB 書き込みなし）。ingest プランナーと
- * clipAndCreate の両方から再利用される。
- * This helper is pure with respect to the database; it performs fetching and
- * parsing only.
- *
- * @param input - 抽出入力。Extraction input.
- * @returns 抽出された Tiptap JSON ドキュメントとメタデータ。Parsed article.
- * @throws URL が許可されない、fetch 失敗、Readability 抽出失敗時。
- * Throws when URL is disallowed, fetch fails, or Readability cannot parse.
- */
-/**
  * YouTube URL から動画 ID を抽出する（サーバーサイド版）。
  * Extracts a YouTube video ID from various YouTube URL formats (server-side).
  */
@@ -226,19 +212,33 @@ function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
+ * URL から記事を抽出して Tiptap JSON / プレビュー / コンテンツハッシュを返す。
+ * Fetches a URL and extracts a Tiptap JSON document plus preview and content hash.
  *
+ * Page の作成はここでは行わない（DB 書き込みなし）。ingest プランナーと
+ * clipAndCreate の両方から再利用される。
+ * This helper is pure with respect to the database; it performs fetching and
+ * parsing only.
+ *
+ * YouTube URL（watch / youtu.be / embed）の場合は専用パイプライン
+ * ({@link extractYouTubeContent}) に委譲し、動画埋め込み + メタデータ + 任意の
+ * AI 要約を含む Tiptap JSON を返す。それ以外の URL は Readability による本文抽出。
+ *
+ * When the URL is a YouTube watch/short/embed link, delegates to the dedicated
+ * pipeline ({@link extractYouTubeContent}) which returns a Tiptap JSON doc with
+ * embed + metadata + optional AI summary. All other URLs are processed via
+ * Readability-based article extraction.
+ *
+ * @param input - 抽出入力。Extraction input.
+ * @returns 抽出された Tiptap JSON ドキュメントとメタデータ。Parsed article.
+ * @throws URL が許可されない、fetch 失敗、Readability 抽出失敗時。
+ * Throws when URL is disallowed, fetch fails, or Readability cannot parse.
  */
 export async function extractArticleFromUrl(input: ExtractArticleInput): Promise<ExtractedArticle> {
-  /**
-   *
-   */
   const { url, timeoutMs = ARTICLE_FETCH_TIMEOUT_MS, previewLength = 200 } = input;
 
   // YouTube URL の場合は専用パイプラインに委譲
   // Delegate to YouTube-specific pipeline for YouTube URLs
-  /**
-   *
-   */
   const videoId = extractYouTubeVideoId(url);
   if (videoId) {
     return extractYouTubeContent({

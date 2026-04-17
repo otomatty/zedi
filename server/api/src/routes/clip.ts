@@ -201,6 +201,10 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
       sourceUrl: result.finalUrl,
     });
   } catch (err) {
+    // HTTPException（4xx 等）はそのままのステータスで伝播させる。
+    // /fetch ハンドラと同じパターンに合わせる。
+    // Preserve HTTPException status codes (4xx etc.); mirrors the /fetch handler.
+    if (err instanceof HTTPException) throw err;
     const msg = err instanceof Error ? err.message : "YouTube extraction failed";
     throw new HTTPException(502, { message: msg });
   }
