@@ -22,7 +22,8 @@
     "copiedCode": "コピーしました",
     "insertToNote": "ノートに挿入",
     "copyMessage": "コピー",
-    "copyFailed": "コピーに失敗しました"
+    "copyFailed": "コピーに失敗しました",
+    "promoteToWiki": "Wikiに残す"
   },
   "placeholders": {
     "default": "メッセージを入力...",
@@ -63,6 +64,9 @@
     "wikiLinksAdded": "{{count}}件のWikiLinkを追加しました",
     "noNewWikiLinks": "追加できる新しいWikiLinkはありません",
     "actionFailed": "アクションの実行に失敗しました",
+    "promoteStarted": "会話からエンティティを抽出中...",
+    "promoteSuccess": "会話からページを作成しました",
+    "promoteFailed": "会話からのページ作成に失敗しました",
     "insertSuccess": "ノートに挿入しました",
     "insertUnavailable": "挿入先のエディタがありません"
   },

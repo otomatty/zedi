@@ -2,6 +2,10 @@ import { pgTable, uuid, text, timestamp, boolean, index } from "drizzle-orm/pg-c
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 
+/**
+ * Wiki pages table. Holds mutable Wiki entries owned by a user.
+ * 可変の Wiki ページテーブル（各ユーザーが所有）。
+ */
 export const pages = pgTable(
   "pages",
   {
@@ -17,6 +21,11 @@ export const pages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     isDeleted: boolean("is_deleted").default(false).notNull(),
+    /**
+     * True for the special "wiki schema" page (at most one per owner).
+     * Wiki の「憲法」ページを示すフラグ（オーナーごとに最大 1 つ）。
+     */
+    isSchema: boolean("is_schema").default(false).notNull(),
   },
   (table) => [
     index("idx_pages_owner_id").on(table.ownerId),
@@ -28,5 +37,7 @@ export const pages = pgTable(
   ],
 );
 
+/** Select type for the pages table. / pages テーブルの SELECT 型。 */
 export type Page = typeof pages.$inferSelect;
+/** Insert type for the pages table. / pages テーブルの INSERT 型。 */
 export type NewPage = typeof pages.$inferInsert;

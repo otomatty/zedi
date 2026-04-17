@@ -16,9 +16,18 @@ export function buildChatPageWikiUserPrompt(
   title: string,
   outline: string,
   conversation: string,
+  userSchema?: string,
 ): string {
   const outlineBlock = outline || "(アウトラインなし)";
   const conversationBlock = conversation || "(会話なし)";
+
+  const schemaSection =
+    userSchema && userSchema.trim()
+      ? `\n## ユーザー定義スキーマ（構成・表記ルールなど。必ず従うこと）
+<user_schema>
+${userSchema.trim()}
+</user_schema>\n`
+      : "";
 
   return `あなたは百科事典風の解説記事を執筆する専門家です。以下の**ページタイトル**について、ユーザーが承認した**アウトライン**に沿い、**会話の文脈**を踏まえて、包括的なMarkdown記事を1本書いてください。
 
@@ -36,7 +45,7 @@ ${outlineBlock}
 <conversation_context>
 ${conversationBlock}
 </conversation_context>
-
+${schemaSection}
 ## 執筆ルール
 - 出力は**Markdownのみ**（前置きや「以下に」などのメタ文は不要）。
 - 導入部でトピックを定義し、見出し（## / ###）でアウトラインの各点を展開する。

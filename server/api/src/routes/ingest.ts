@@ -15,6 +15,9 @@ import { HTTPException } from "hono/http-exception";
 import { sql } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { sources } from "../schema/sources.js";
+import { pageSources } from "../schema/pageSources.js";
+import { eq, and } from "drizzle-orm";
 import { extractArticleFromUrl } from "../lib/articleExtractor.js";
 import { callProvider, getProviderApiKeyName } from "../services/aiProviders.js";
 import { getUserTier } from "../services/subscriptionService.js";
@@ -31,6 +34,8 @@ import {
   IngestPlanParseError,
   type CandidatePage,
 } from "../services/ingestPlanner.js";
+import { pages } from "../schema/pages.js";
+import { pageContents } from "../schema/pageContents.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -186,6 +191,16 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
     apiKey,
   });
 
+  // Fetch user's wiki schema page (if any) for prompt injection.
+  // ユーザーのスキーマページがあればプロンプトに注入する。
+  const [schemaRow] = await db
+    .select({ contentText: pageContents.contentText })
+    .from(pages)
+    .leftJoin(pageContents, eq(pageContents.pageId, pages.id))
+    .where(and(eq(pages.ownerId, userId), eq(pages.isSchema, true), eq(pages.isDeleted, false)))
+    .limit(1);
+  const userSchema = schemaRow?.contentText ?? undefined;
+
   // Build prompt in the route so we can measure ALL message content for
   // accurate token estimation (system prompt + article + candidates).
   const articleSummary = {
@@ -193,7 +208,7 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
     url: article.finalUrl,
     excerpt: article.contentText,
   };
-  const messages = buildIngestPlannerPrompt({ article: articleSummary, candidates });
+  const messages = buildIngestPlannerPrompt({ article: articleSummary, candidates, userSchema });
 
   let rawResponse: string;
   try {
@@ -244,6 +259,139 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
     },
     candidates,
   });
+});
+
+/**
+ * Request body for POST /api/ingest/apply.
+ * Ingest プラン適用リクエストボディ。
+ */
+interface IngestApplyRequestBody {
+  /** Source kind: "url" or "conversation". / ソース種別 */
+  kind: "url" | "conversation";
+  /** Source URL (required when kind="url"). / ソース URL（kind="url" のとき必須） */
+  url?: string;
+  /** Source title. / ソースタイトル */
+  title: string;
+  /** Content hash for dedup. / 重複検出用コンテンツハッシュ */
+  contentHash?: string;
+  /** Short excerpt of the source content. / ソースの要約 */
+  excerpt?: string;
+  /**
+   * Raw conversation JSON (required when kind="conversation").
+   * 会話 JSON（kind="conversation" のとき必須）
+   */
+  conversationJson?: string;
+  /** Target page id for "merge" action. / マージ先ページ ID */
+  targetPageId?: string;
+  /** Section anchor in the target page. / マージ先のセクションアンカー */
+  sectionAnchor?: string;
+  /** Citation text excerpt. / 引用テキスト */
+  citationText?: string;
+}
+
+/**
+ * POST /api/ingest/apply — Persist a source and link it to a page.
+ * ソースを保存し、ページに紐付ける。
+ */
+app.post("/apply", authRequired, rateLimit(), async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  let body: IngestApplyRequestBody;
+  try {
+    body = await c.req.json<IngestApplyRequestBody>();
+  } catch {
+    throw new HTTPException(400, { message: "Invalid JSON body" });
+  }
+
+  if (!body.kind || !["url", "conversation"].includes(body.kind)) {
+    throw new HTTPException(400, { message: "kind must be 'url' or 'conversation'" });
+  }
+  if (!body.title || typeof body.title !== "string") {
+    throw new HTTPException(400, { message: "title is required" });
+  }
+  if (body.kind === "url" && (typeof body.url !== "string" || !body.url.trim())) {
+    throw new HTTPException(400, { message: "url is required when kind is 'url'" });
+  }
+  if (
+    body.kind === "conversation" &&
+    (typeof body.conversationJson !== "string" || !body.conversationJson.trim())
+  ) {
+    throw new HTTPException(400, {
+      message: "conversationJson is required when kind is 'conversation'",
+    });
+  }
+
+  // Verify ownership of the target page before any write to prevent cross-user linking.
+  // クロスユーザーリンクを防ぐため、書き込み前に targetPageId のオーナー権を検証する。
+  if (body.targetPageId) {
+    const [targetPage] = await db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(
+        and(eq(pages.id, body.targetPageId), eq(pages.ownerId, userId), eq(pages.isDeleted, false)),
+      )
+      .limit(1);
+    if (!targetPage) {
+      throw new HTTPException(403, { message: "Target page not found or not owned by user" });
+    }
+  }
+
+  const now = new Date();
+
+  // Reuse existing source if an identical (owner, url, hash) row already exists; otherwise insert.
+  // 同一 (owner, url, hash) のソースが既にあれば再利用、無ければ作成する。
+  let sourceId: string | undefined;
+  if (body.contentHash) {
+    const [existing] = await db
+      .select({ id: sources.id })
+      .from(sources)
+      .where(
+        and(
+          eq(sources.ownerId, userId),
+          eq(sources.contentHash, body.contentHash),
+          body.url ? eq(sources.url, body.url) : eq(sources.kind, body.kind),
+        ),
+      )
+      .limit(1);
+    if (existing) sourceId = existing.id;
+  }
+
+  if (!sourceId) {
+    const [inserted] = await db
+      .insert(sources)
+      .values({
+        ownerId: userId,
+        kind: body.kind,
+        url: body.url ?? null,
+        title: body.title,
+        contentHash: body.contentHash ?? null,
+        excerpt: body.excerpt ?? body.conversationJson?.slice(0, 400) ?? null,
+        extractedAt: now,
+        createdAt: now,
+      })
+      .returning({ id: sources.id });
+    if (!inserted) {
+      throw new HTTPException(500, { message: "Failed to create source" });
+    }
+    sourceId = inserted.id;
+  }
+
+  // Link source to page (ownership already verified above).
+  if (body.targetPageId) {
+    await db
+      .insert(pageSources)
+      .values({
+        pageId: body.targetPageId,
+        sourceId,
+        sectionAnchor: body.sectionAnchor ?? "",
+        citationText: body.citationText ?? null,
+        createdAt: now,
+      })
+      .onConflictDoNothing();
+  }
+
+  return c.json({ sourceId, targetPageId: body.targetPageId ?? null });
 });
 
 export default app;

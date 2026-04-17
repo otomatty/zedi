@@ -56,6 +56,7 @@ export async function generateWikiContentStream(
   title: string,
   callbacks: WikiGeneratorCallbacks,
   abortSignal?: AbortSignal,
+  userSchema?: string,
 ): Promise<void> {
   try {
     const settings = await getAISettingsOrThrow();
@@ -64,7 +65,17 @@ export async function generateWikiContentStream(
 
     if (settings.provider === "claude-code" || effectiveMode === "api_server") {
       const { callAIService } = await import("@/lib/aiService");
-      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
+      const schemaBlock =
+        userSchema && userSchema.trim()
+          ? `## ユーザー定義スキーマ（構成・表記ルールなど。必ず従うこと）\n${userSchema.trim()}\n\n`
+          : "";
+      // Function replacers: prevents `String.replace` from reinterpreting
+      // `$&`, `$$`, etc. inside user-authored title or schema text.
+      // `$` 特殊パターンがユーザー入力で再解釈されないよう関数リプレーサーを使う。
+      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", () => title).replace(
+        "{{schema}}",
+        () => schemaBlock,
+      );
       let fullContent = "";
 
       await callAIService(
@@ -101,13 +112,13 @@ export async function generateWikiContentStream(
 
     switch (settings.provider) {
       case "openai":
-        await generateWithOpenAI(settings, title, callbacks, abortSignal);
+        await generateWithOpenAI(settings, title, callbacks, abortSignal, userSchema);
         break;
       case "anthropic":
-        await generateWithAnthropic(settings, title, callbacks, abortSignal);
+        await generateWithAnthropic(settings, title, callbacks, abortSignal, userSchema);
         break;
       case "google":
-        await generateWithGoogle(settings, title, callbacks, abortSignal);
+        await generateWithGoogle(settings, title, callbacks, abortSignal, userSchema);
         break;
       default: {
         const _exhaustive: never = settings.provider;
@@ -133,8 +144,9 @@ export async function generateWikiContentFromChatOutlineStream(
   conversationText: string,
   callbacks: WikiGeneratorCallbacks,
   abortSignal?: AbortSignal,
+  userSchema?: string,
 ): Promise<void> {
-  const userPrompt = buildChatPageWikiUserPrompt(title, outline, conversationText);
+  const userPrompt = buildChatPageWikiUserPrompt(title, outline, conversationText, userSchema);
   try {
     const settings = await getAISettingsOrThrow();
     // apiMode未設定時はapi_serverをデフォルトとする / Default to api_server when apiMode is unset.
