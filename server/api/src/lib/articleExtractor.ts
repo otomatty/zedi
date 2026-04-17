@@ -20,6 +20,9 @@ import Image from "@tiptap/extension-image";
 import { common, createLowlight } from "lowlight";
 import { createHash } from "node:crypto";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
+import { YouTubeEmbedServer } from "./youtubeEmbedServerExtension.js";
+import { extractYouTubeContent } from "./youtubeExtractor.js";
+import type { AIProviderType, TokenUsage } from "../types/index.js";
 
 export { ClipFetchBlockedError };
 
@@ -43,6 +46,7 @@ export const articleExtractorExtensions = [
   Link.configure({ openOnClick: false }),
   CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }),
   Image,
+  YouTubeEmbedServer,
 ];
 
 /**
@@ -83,6 +87,14 @@ export interface ExtractedArticle {
   tiptapJson: TiptapNode;
   contentText: string;
   contentHash: string;
+  /**
+   * AI 要約が実際に実行された場合のトークン使用量（YouTube のみ）。
+   * 通常の Readability 抽出では常に null。
+   *
+   * Token usage when AI summary was actually executed (YouTube only).
+   * Always null for regular Readability-based extraction.
+   */
+  aiUsage?: TokenUsage | null;
 }
 
 /**
@@ -103,6 +115,26 @@ export interface ExtractArticleInput {
   url: string;
   timeoutMs?: number;
   previewLength?: number;
+  /**
+   * YouTube Data API キー。YouTube URL の場合にメタデータ取得に使用。
+   * YouTube Data API key. Used for metadata retrieval when URL is a YouTube video.
+   */
+  youtubeApiKey?: string;
+  /**
+   * AI プロバイダー。YouTube URL の場合に要約生成に使用。
+   * AI provider for YouTube summary generation.
+   */
+  aiProvider?: AIProviderType;
+  /**
+   * AI モデル ID。YouTube URL の場合に要約生成に使用。
+   * AI model ID for YouTube summary generation.
+   */
+  aiModel?: string;
+  /**
+   * AI プロバイダーの API キー。YouTube URL の場合に要約生成に使用。
+   * AI provider API key for YouTube summary generation.
+   */
+  aiApiKey?: string;
 }
 
 /**
@@ -163,6 +195,23 @@ export function extractTextFromTiptap(node: TiptapNode | null): string {
 }
 
 /**
+ * YouTube URL から動画 ID を抽出する（サーバーサイド版）。
+ * Extracts a YouTube video ID from various YouTube URL formats (server-side).
+ */
+function extractYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i,
+    /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+    /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+/**
  * URL から記事を抽出して Tiptap JSON / プレビュー / コンテンツハッシュを返す。
  * Fetches a URL and extracts a Tiptap JSON document plus preview and content hash.
  *
@@ -171,6 +220,15 @@ export function extractTextFromTiptap(node: TiptapNode | null): string {
  * This helper is pure with respect to the database; it performs fetching and
  * parsing only.
  *
+ * YouTube URL（watch / youtu.be / embed）の場合は専用パイプライン
+ * ({@link extractYouTubeContent}) に委譲し、動画埋め込み + メタデータ + 任意の
+ * AI 要約を含む Tiptap JSON を返す。それ以外の URL は Readability による本文抽出。
+ *
+ * When the URL is a YouTube watch/short/embed link, delegates to the dedicated
+ * pipeline ({@link extractYouTubeContent}) which returns a Tiptap JSON doc with
+ * embed + metadata + optional AI summary. All other URLs are processed via
+ * Readability-based article extraction.
+ *
  * @param input - 抽出入力。Extraction input.
  * @returns 抽出された Tiptap JSON ドキュメントとメタデータ。Parsed article.
  * @throws URL が許可されない、fetch 失敗、Readability 抽出失敗時。
@@ -178,6 +236,20 @@ export function extractTextFromTiptap(node: TiptapNode | null): string {
  */
 export async function extractArticleFromUrl(input: ExtractArticleInput): Promise<ExtractedArticle> {
   const { url, timeoutMs = ARTICLE_FETCH_TIMEOUT_MS, previewLength = 200 } = input;
+
+  // YouTube URL の場合は専用パイプラインに委譲
+  // Delegate to YouTube-specific pipeline for YouTube URLs
+  const videoId = extractYouTubeVideoId(url);
+  if (videoId) {
+    return extractYouTubeContent({
+      videoId,
+      youtubeApiKey: input.youtubeApiKey,
+      aiProvider: input.aiProvider,
+      aiModel: input.aiModel,
+      aiApiKey: input.aiApiKey,
+      previewLength,
+    });
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

@@ -550,6 +550,43 @@ describe("apiClient", () => {
       expect(init.method).toBe("POST");
     });
 
+    it("clipYoutube sends POST with url and AI options", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              title: "YouTube Test",
+              thumbnailUrl: null,
+              tiptapJson: { type: "doc", content: [] },
+              contentText: "summary",
+              contentHash: "hash",
+              sourceUrl: "https://www.youtube.com/watch?v=abc12345678",
+            }),
+          ),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
+      await client.clipYoutube("https://youtu.be/abc12345678", {
+        provider: "openai",
+        model: "openai:gpt-5-mini",
+      });
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain("/api/clip/youtube");
+      expect(init.method).toBe("POST");
+      expect(init.body).toBe(
+        JSON.stringify({
+          url: "https://youtu.be/abc12345678",
+          provider: "openai",
+          model: "openai:gpt-5-mini",
+        }),
+      );
+    });
+
     it("searchSharedNotes returns empty for blank query", async () => {
       const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
       const result = await client.searchSharedNotes("   ");

@@ -14,6 +14,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
 import { buildArticleSchema, extractArticleFromUrl } from "./articleExtractor.js";
+import type { AIProviderType, TokenUsage } from "../types/index.js";
 
 const YDOC_FRAGMENT = "default";
 
@@ -29,6 +30,11 @@ export interface ClipAndCreateResult {
   page_id: string;
   title: string;
   thumbnail_url?: string | null;
+  /**
+   * AI 要約が実際に実行された場合のトークン使用量（YouTube のみ）。
+   * Token usage when AI summary was actually executed (YouTube only).
+   */
+  ai_usage?: TokenUsage | null;
 }
 
 /**
@@ -38,11 +44,19 @@ export interface ClipAndCreateResult {
  * @property url - クリップするソース URL（http/https のみ許可）。Source URL to clip (http/https only).
  * @property userId - リクエストユーザー ID。Requesting user ID.
  * @property db - Drizzle NodePgDatabase インスタンス。Drizzle NodePgDatabase instance.
+ * @property youtubeApiKey - YouTube Data API キー（任意）。YouTube Data API key (optional).
+ * @property aiProvider - AI プロバイダー（YouTube 要約用、任意）。AI provider for YouTube summary (optional).
+ * @property aiModel - AI モデル ID（任意）。AI model ID (optional).
+ * @property aiApiKey - AI プロバイダーの API キー（任意）。AI provider API key (optional).
  */
 export interface ClipAndCreateInput {
   url: string;
   userId: string;
   db: NodePgDatabase<typeof schema>;
+  youtubeApiKey?: string;
+  aiProvider?: AIProviderType;
+  aiModel?: string;
+  aiApiKey?: string;
 }
 
 /**
@@ -56,7 +70,13 @@ export interface ClipAndCreateInput {
 export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndCreateResult> {
   const { url, userId, db } = input;
 
-  const article = await extractArticleFromUrl({ url });
+  const article = await extractArticleFromUrl({
+    url,
+    youtubeApiKey: input.youtubeApiKey,
+    aiProvider: input.aiProvider,
+    aiModel: input.aiModel,
+    aiApiKey: input.aiApiKey,
+  });
 
   const tiptapSchema = buildArticleSchema();
   const ydoc = prosemirrorJSONToYDoc(tiptapSchema, article.tiptapJson, YDOC_FRAGMENT);
@@ -91,5 +111,6 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
     page_id: result.page.id,
     title: result.title,
     thumbnail_url: result.thumbnailUrl ?? null,
+    ai_usage: article.aiUsage ?? null,
   };
 }

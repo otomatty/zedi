@@ -76,6 +76,14 @@ Object.assign(nodeHandlers, {
     const title = (n.attrs?.title as string) || "";
     return title ? `![${alt}](${src} "${title}")\n\n` : `![${alt}](${src})\n\n`;
   },
+  youtubeEmbed: (n) => {
+    // 異常な videoId が Markdown 構文を壊さないよう、厳格に検証してからエンコードする
+    // Strictly validate videoId to prevent malformed Markdown; encode before embedding
+    const rawVideoId = (n.attrs?.videoId as string) || "";
+    const videoId = rawVideoId.trim();
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) return "";
+    return `[YouTube](https://www.youtube.com/watch?v=${encodeURIComponent(videoId)})\n\n`;
+  },
   link: (n) => convertChildren(n),
 });
 
