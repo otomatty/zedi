@@ -36,6 +36,7 @@ export async function runBrokenLinkRule(ownerId: string, db: Database): Promise<
           SELECT 1 FROM pages AS target
           WHERE target.id = ${links.targetId}
           AND target.is_deleted = true
+          AND target.owner_id = ${ownerId}
         )`,
       ),
     );

@@ -9,7 +9,10 @@ import type { LintRuleResult, LintFindingCandidate } from "../types.js";
  * Regex patterns for extracting numeric/date claims from content.
  */
 const DATE_PATTERN = /(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})[日]?/g;
-const NUMBER_PATTERN = /(\d[\d,.]+)\s*(km|m|kg|g|人|円|ドル|年|歳|万|億)/g;
+// `\d[\d,.]*` (not `+`) so single-digit claims like `3人` / `7km` / `5年` are
+// matched. `+` would require at least two numeric characters.
+// `+` だと 2 文字以上必要になり 1 桁の主張 (3人 等) を取りこぼすため `*` を使う。
+const NUMBER_PATTERN = /(\d[\d,.]*)\s*(km|m|kg|g|人|円|ドル|年|歳|万|億)/g;
 
 /**
  * テキストからファクト（数値・日付の主張）を抽出する。
