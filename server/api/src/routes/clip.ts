@@ -136,16 +136,17 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
       throw new HTTPException(429, { message: "Monthly budget exceeded" });
     }
 
+    // モデル情報から provider を上書き（DB 上の provider が正）
+    // Override provider from model info (DB is authoritative)
+    // API キーは上書き後の provider で取得する（provider 不一致バグ防止）
+    aiProvider = modelInfo.provider as AIProviderType;
+    aiModel = modelInfo.apiModelId;
+
     const apiKeyName = getProviderApiKeyName(aiProvider);
     aiApiKey = process.env[apiKeyName];
     if (!aiApiKey) {
       throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });
     }
-
-    // モデル情報から provider を上書き（DB 上の provider が正）
-    // Override provider from model info (DB is authoritative)
-    aiProvider = modelInfo.provider as AIProviderType;
-    aiModel = modelInfo.apiModelId;
   }
 
   try {
@@ -158,26 +159,32 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     });
 
     // 使用量記録 / Record usage (if AI was used)
+    // 記録失敗は非致命的 — 抽出結果を破棄しない
+    // Recording failure is non-fatal — don't discard the extraction result
     if (aiProvider && aiModel && body.model) {
-      const contentLen = JSON.stringify(result.tiptapJson).length;
-      const inputTokens = Math.ceil(contentLen / 4);
-      const outputTokens = Math.ceil((result.contentText?.length ?? 0) / 4);
-      const tier = await getUserTier(userId, db);
-      const modelInfo = await validateModelAccess(body.model, tier, db);
-      const costUnits = calculateCost(
-        { inputTokens, outputTokens },
-        modelInfo.inputCostUnits,
-        modelInfo.outputCostUnits,
-      );
-      await recordUsage(
-        userId,
-        body.model,
-        "youtube_summary",
-        { inputTokens, outputTokens },
-        costUnits,
-        "system",
-        db,
-      );
+      try {
+        const contentLen = JSON.stringify(result.tiptapJson).length;
+        const inputTokens = Math.ceil(contentLen / 4);
+        const outputTokens = Math.ceil((result.contentText?.length ?? 0) / 4);
+        const tier = await getUserTier(userId, db);
+        const modelInfo = await validateModelAccess(body.model, tier, db);
+        const costUnits = calculateCost(
+          { inputTokens, outputTokens },
+          modelInfo.inputCostUnits,
+          modelInfo.outputCostUnits,
+        );
+        await recordUsage(
+          userId,
+          body.model,
+          "youtube_summary",
+          { inputTokens, outputTokens },
+          costUnits,
+          "system",
+          db,
+        );
+      } catch (usageErr) {
+        console.error("YouTube usage recording failed (non-fatal):", usageErr);
+      }
     }
 
     return c.json({
