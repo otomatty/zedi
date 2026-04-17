@@ -251,22 +251,10 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
     });
   }
 
-  /**
-   *
-   */
   const controller = new AbortController();
-  /**
-   *
-   */
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  /**
-   *
-   */
   let html: string;
-  /**
-   *
-   */
   let finalUrl: string;
   try {
     try {
@@ -283,48 +271,21 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
     clearTimeout(timer);
   }
 
-  /**
-   *
-   */
   const dom = new JSDOM(html, { url: finalUrl });
-  /**
-   *
-   */
   const document = dom.window.document;
 
-  /**
-   *
-   */
   const reader = new Readability(document.cloneNode(true) as Document);
-  /**
-   *
-   */
   const article = reader.parse();
   if (!article) {
     throw new Error("Failed to extract article content");
   }
 
-  /**
-   *
-   */
   const ogImage = extractOgImage(document);
-  /**
-   *
-   */
   const thumbnailUrl = resolveUrl(finalUrl, ogImage);
 
-  /**
-   *
-   */
   const cleanContent = cleanupHtml(article.content ?? "", document);
 
-  /**
-   *
-   */
   const mainJson = await extractorDocMutex.runExclusive(async () => {
-    /**
-     *
-     */
     const prevDocument = (globalThis as { document?: Document }).document;
     (globalThis as { document?: Document }).document = document;
     try {
@@ -334,13 +295,7 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
     }
   });
 
-  /**
-   *
-   */
   const baseContent = Array.isArray(mainJson.content) ? mainJson.content : [];
-  /**
-   *
-   */
   const imageNode: TiptapNode | null = thumbnailUrl
     ? {
         type: "image",
@@ -350,30 +305,15 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
         },
       }
     : null;
-  /**
-   *
-   */
   const tiptapJson: TiptapNode = {
     type: "doc",
     content: imageNode ? [imageNode, ...baseContent] : baseContent,
   };
 
-  /**
-   *
-   */
   const rawText = extractTextFromTiptap(tiptapJson);
-  /**
-   *
-   */
   const contentText = rawText.slice(0, previewLength);
-  /**
-   *
-   */
   const title = article.title || "Untitled";
 
-  /**
-   *
-   */
   const contentHash = createHash("sha256").update(rawText).digest("hex");
 
   return {
