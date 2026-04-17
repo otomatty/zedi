@@ -69,9 +69,12 @@ export async function generateWikiContentStream(
         userSchema && userSchema.trim()
           ? `## ユーザー定義スキーマ（構成・表記ルールなど。必ず従うこと）\n${userSchema.trim()}\n\n`
           : "";
-      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title).replace(
+      // Function replacers: prevents `String.replace` from reinterpreting
+      // `$&`, `$$`, etc. inside user-authored title or schema text.
+      // `$` 特殊パターンがユーザー入力で再解釈されないよう関数リプレーサーを使う。
+      const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", () => title).replace(
         "{{schema}}",
-        schemaBlock,
+        () => schemaBlock,
       );
       let fullContent = "";
 

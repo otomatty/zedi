@@ -21,9 +21,14 @@ function buildSchemaBlock(userSchema?: string): string {
 /**
  * Interpolates `{{title}}` and `{{schema}}` in a prompt template.
  * プロンプトテンプレートの `{{title}}` と `{{schema}}` を置換する。
+ *
+ * Uses function replacers so `$`-sequences (e.g. `$&`, `$$`) in user-authored
+ * title or schema text are not reinterpreted by `String.prototype.replace`.
+ * ユーザー入力中の `$` パターンが置換側で再解釈されないように関数リプレーサーを使う。
  */
 function interpolatePrompt(template: string, title: string, userSchema?: string): string {
-  return template.replace("{{title}}", title).replace("{{schema}}", buildSchemaBlock(userSchema));
+  const schemaBlock = buildSchemaBlock(userSchema);
+  return template.replace("{{title}}", () => title).replace("{{schema}}", () => schemaBlock);
 }
 
 /**
