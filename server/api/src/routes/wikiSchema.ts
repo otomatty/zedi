@@ -15,6 +15,7 @@ import { eq, and } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
+import { recordActivity } from "../services/activityLogService.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -135,6 +136,14 @@ app.put("/", authRequired, async (c) => {
       target: pageContents.pageId,
       set: { contentText: content, updatedAt: now },
     });
+
+  await recordActivity(db, {
+    ownerId: userId,
+    kind: "wiki_schema_update",
+    actor: "user",
+    targetPageIds: [pageId],
+    detail: { title, contentLength: content.length },
+  });
 
   return c.json({ pageId, title, content });
 });

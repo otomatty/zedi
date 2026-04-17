@@ -36,6 +36,7 @@ import {
 } from "../services/ingestPlanner.js";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
+import { recordActivity } from "../services/activityLogService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -390,6 +391,24 @@ app.post("/apply", authRequired, rateLimit(), async (c) => {
       })
       .onConflictDoNothing();
   }
+
+  // Record the ingest action in activity_log.
+  // Chat promotion reuses this endpoint with kind="conversation"; branch the
+  // activity kind so the UI can distinguish "clip" vs "chat→wiki" flows.
+  // Chat → Wiki 昇格経路は本エンドポイントを kind="conversation" で再利用する。
+  // 活動ログ側の種別もそれに合わせて切り替える。
+  await recordActivity(db, {
+    ownerId: userId,
+    kind: body.kind === "conversation" ? "chat_promote" : "clip_ingest",
+    actor: "user",
+    targetPageIds: body.targetPageId ? [body.targetPageId] : [],
+    detail: {
+      sourceId,
+      sourceKind: body.kind,
+      title: body.title,
+      url: body.url ?? null,
+    },
+  });
 
   return c.json({ sourceId, targetPageId: body.targetPageId ?? null });
 });

@@ -6,6 +6,7 @@ import AiModels from "./pages/ai-models";
 import Users from "./pages/users";
 import AuditLogs from "./pages/audit-logs";
 import WikiHealth from "./pages/wiki-health";
+import ActivityLog from "./pages/ActivityLog";
 
 /**
  * Root component for the admin SPA: sets up routing and the admin auth guard.
@@ -31,6 +32,7 @@ function App() {
           <Route path="users" element={<Users />} />
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="wiki-health" element={<WikiHealth />} />
+          <Route path="activity-log" element={<ActivityLog />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

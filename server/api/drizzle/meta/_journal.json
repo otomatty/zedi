@@ -57,6 +57,27 @@
       "when": 1776556800000,
       "tag": "0008_add_lint_findings",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776643200000,
+      "tag": "0009_add_page_is_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776729600000,
+      "tag": "0010_add_activity_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1776816000000,
+      "tag": "0011_add_page_special_kind",
+      "breakpoints": true
     }
   ]
 }

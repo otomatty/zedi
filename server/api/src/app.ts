@@ -36,6 +36,7 @@ import webhookPolarRoutes from "./routes/webhooks/polar.js";
 import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 import lintRoutes from "./routes/lint.js";
+import activityRoutes from "./routes/activity.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -118,6 +119,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Lint (Wiki Health, P2)
   app.route("/api/lint", lintRoutes);
+
+  // Activity log + __index__ rebuild (LLM Wiki P4)
+  app.route("/api/activity", activityRoutes);
 
   // Chrome Extension (OAuth + clip-and-create)
   app.route("/api/ext", extRoutes);
