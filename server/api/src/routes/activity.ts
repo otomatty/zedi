@@ -3,14 +3,18 @@
  *
  * GET  /api/activity             — list entries for the authenticated user
  *                                  (filterable by kind / actor / date range).
+ * GET  /api/activity/index       — read-only fetch of the current `__index__`
+ *                                  summary. Does NOT rebuild or write to
+ *                                  activity_log.
  * POST /api/activity/index/rebuild — rebuild the `__index__` special page
  *                                     for the authenticated user.
  *
  * 認証ユーザー自身の活動ログを参照するエンドポイントと、
- * `__index__` 特殊ページを手動再構築するエンドポイント。
+ * `__index__` 特殊ページの現在状態取得 / 再構築エンドポイント。
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { and, eq } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
 import {
   listActivityForOwner,
@@ -19,7 +23,8 @@ import {
   ACTIVITY_LIST_MAX_LIMIT,
 } from "../services/activityLogService.js";
 import type { ActivityActor, ActivityKind } from "../schema/activityLog.js";
-import { rebuildIndexForOwner } from "../services/indexBuilder.js";
+import { buildIndexForOwner, rebuildIndexForOwner } from "../services/indexBuilder.js";
+import { pages } from "../schema/pages.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -130,6 +135,49 @@ app.get("/", async (c) => {
     })),
     total,
     limit: Math.min(Math.max(limit, 1), ACTIVITY_LIST_MAX_LIMIT),
+  });
+});
+
+/**
+ * GET /api/activity/index — Read the current `__index__` summary without
+ * triggering a rebuild. Returns the page ID (if one exists) along with a
+ * freshly-computed category summary derived from the user's current pages.
+ *
+ * Does NOT write to `pages` / `page_contents` or `activity_log`, so it is
+ * safe to call on every view. When no `__index__` page has been built yet,
+ * `pageId` is null and the summary reflects what a rebuild *would* produce.
+ *
+ * `__index__` 特殊ページの現在状態を取得する読み取り専用エンドポイント。
+ * DB への書き込みは一切行わないので、ページ表示のたびに呼んでも
+ * `activity_log` が膨らまない。`__index__` がまだ存在しない場合は
+ * `pageId=null` を返す。
+ */
+app.get("/index", async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  const document = await buildIndexForOwner(db, userId);
+
+  const [existing] = await db
+    .select({ id: pages.id, updatedAt: pages.updatedAt })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.ownerId, userId),
+        eq(pages.specialKind, "__index__"),
+        eq(pages.isDeleted, false),
+      ),
+    )
+    .limit(1);
+
+  return c.json({
+    pageId: existing?.id ?? null,
+    lastBuiltAt: existing?.updatedAt?.toISOString() ?? null,
+    totalPages: document.totalPages,
+    categories: document.categories.map((cat) => ({
+      label: cat.label,
+      count: cat.entries.length,
+    })),
   });
 });
 
