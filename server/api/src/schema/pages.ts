@@ -2,10 +2,11 @@ import { pgTable, uuid, text, timestamp, boolean, index } from "drizzle-orm/pg-c
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 
-export /**
- *
+/**
+ * Wiki pages table. Holds mutable Wiki entries owned by a user.
+ * 可変の Wiki ページテーブル（各ユーザーが所有）。
  */
-const pages = pgTable(
+export const pages = pgTable(
   "pages",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -36,11 +37,7 @@ const pages = pgTable(
   ],
 );
 
-/**
- *
- */
+/** Select type for the pages table. / pages テーブルの SELECT 型。 */
 export type Page = typeof pages.$inferSelect;
-/**
- *
- */
+/** Insert type for the pages table. / pages テーブルの INSERT 型。 */
 export type NewPage = typeof pages.$inferInsert;
