@@ -153,6 +153,7 @@ describe("generateWikiContentStream", () => {
       "SdkTitle",
       expect.any(Object),
       undefined,
+      undefined,
     );
     expect(generateWithAnthropic).not.toHaveBeenCalled();
     expect(generateWithGoogle).not.toHaveBeenCalled();
@@ -182,7 +183,7 @@ describe("generateWikiContentStream", () => {
         messages: [
           {
             role: "user",
-            content: WIKI_GENERATOR_PROMPT.replace("{{title}}", "Test"),
+            content: WIKI_GENERATOR_PROMPT.replace("{{title}}", "Test").replace("{{schema}}", ""),
           },
         ],
         options: expect.objectContaining({
@@ -266,7 +267,10 @@ describe("generateWikiContentStream", () => {
         messages: [
           {
             role: "user",
-            content: WIKI_GENERATOR_PROMPT.replace("{{title}}", "FallbackTitle"),
+            content: WIKI_GENERATOR_PROMPT.replace("{{title}}", "FallbackTitle").replace(
+              "{{schema}}",
+              "",
+            ),
           },
         ],
       }),

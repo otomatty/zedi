@@ -10,6 +10,23 @@ import { WIKI_GENERATOR_PROMPT, WIKI_GENERATOR_PROMPT_NO_SEARCH } from "./wikiGe
 import { extractWikiLinks, type WikiGeneratorCallbacks } from "./wikiGeneratorUtils";
 
 /**
+ * Builds the `{{schema}}` replacement block from optional user schema text.
+ * ユーザースキーマから `{{schema}}` プレースホルダー用ブロックを生成する。
+ */
+function buildSchemaBlock(userSchema?: string): string {
+  if (!userSchema || !userSchema.trim()) return "";
+  return `## ユーザー定義スキーマ（構成・表記ルールなど。必ず従うこと）\n${userSchema.trim()}\n\n`;
+}
+
+/**
+ * Interpolates `{{title}}` and `{{schema}}` in a prompt template.
+ * プロンプトテンプレートの `{{title}}` と `{{schema}}` を置換する。
+ */
+function interpolatePrompt(template: string, title: string, userSchema?: string): string {
+  return template.replace("{{title}}", title).replace("{{schema}}", buildSchemaBlock(userSchema));
+}
+
+/**
  * OpenAIでストリーミング生成（Web検索対応）
  */
 export async function generateWithOpenAI(
@@ -17,6 +34,7 @@ export async function generateWithOpenAI(
   title: string,
   callbacks: WikiGeneratorCallbacks,
   abortSignal?: AbortSignal,
+  userSchema?: string,
 ): Promise<void> {
   const client = new OpenAI({
     apiKey: settings.apiKey,
@@ -25,7 +43,7 @@ export async function generateWithOpenAI(
 
   const isSearchModel = settings.model.includes("search");
   const promptTemplate = isSearchModel ? WIKI_GENERATOR_PROMPT : WIKI_GENERATOR_PROMPT_NO_SEARCH;
-  const prompt = promptTemplate.replace("{{title}}", title);
+  const prompt = interpolatePrompt(promptTemplate, title, userSchema);
   const webSearchOptions = isSearchModel ? { search_context_size: "medium" as const } : undefined;
 
   const stream = await client.chat.completions.create(
@@ -85,11 +103,12 @@ export async function generateWithAnthropic(
   title: string,
   callbacks: WikiGeneratorCallbacks,
   abortSignal?: AbortSignal,
+  userSchema?: string,
 ): Promise<void> {
   const client = new Anthropic({ apiKey: settings.apiKey });
   const useWebSearch = isClaudeWebSearchSupported(settings.model);
   const promptTemplate = useWebSearch ? WIKI_GENERATOR_PROMPT : WIKI_GENERATOR_PROMPT_NO_SEARCH;
-  const prompt = promptTemplate.replace("{{title}}", title);
+  const prompt = interpolatePrompt(promptTemplate, title, userSchema);
 
   const requestParams: AnthropicStreamParams = {
     model: settings.model,
@@ -123,10 +142,11 @@ export async function generateWithGoogle(
   title: string,
   callbacks: WikiGeneratorCallbacks,
   abortSignal?: AbortSignal,
+  userSchema?: string,
 ): Promise<void> {
   const client = new GoogleGenAI({ apiKey: settings.apiKey });
   const googleSearchTool = { googleSearch: {} as const };
-  const prompt = WIKI_GENERATOR_PROMPT.replace("{{title}}", title);
+  const prompt = interpolatePrompt(WIKI_GENERATOR_PROMPT, title, userSchema);
 
   const response = await client.models.generateContentStream({
     model: settings.model,

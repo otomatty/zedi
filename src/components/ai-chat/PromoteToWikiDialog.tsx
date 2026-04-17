@@ -8,7 +8,7 @@
  * 3. User selects entities to create as wiki pages
  * 4. Selected entities are created as new pages via the existing create-page flow
  */
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Loader2, X } from "lucide-react";
 import { Button, useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -42,32 +42,52 @@ interface PromoteToWikiDialogProps {
   conversationId?: string;
 }
 
+type DialogBodyProps = Omit<PromoteToWikiDialogProps, "open">;
+
 /**
- * Dialog for extracting entities from chat and creating wiki pages.
- * チャットからエンティティを抽出し Wiki ページを作成するダイアログ。
+ * Outer wrapper that avoids running hooks (including `useNavigate`) when the
+ * dialog is closed — keeps non-Router callers and test environments working.
+ * ダイアログ非表示時はフック未実行にし、Router 非配下の呼び出しやテスト環境でも動くようにする。
  */
-export function PromoteToWikiDialog({
-  open,
-  onClose,
-  conversationText,
-  existingTitles,
-  conversationId,
-}: PromoteToWikiDialogProps) {
-  const { t } = useTranslation();
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const { mutateAsync: createPage } = useCreatePage();
-  const { data: schemaData } = useWikiSchema();
+export function PromoteToWikiDialog({ open, ...rest }: PromoteToWikiDialogProps) {
+  if (!open) return null;
+  return <PromoteToWikiDialogBody {...rest} />;
+}
 
-  const [entities, setEntities] = useState<ExtractedEntity[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+/**
+ * Builds a `callAIService`-compatible handler set that parses entities on completion.
+ * エンティティ抽出用のコールバックセットを組み立てる。
+ */
+function createExtractionHandlers(
+  onEntities: (entities: ExtractedEntity[]) => void,
+  onError: (err: Error) => void,
+) {
+  let result = "";
+  return {
+    onChunk: (chunk: string) => {
+      result += chunk;
+    },
+    onComplete: () => onEntities(parseExtractedEntities(result)),
+    onError,
+  };
+}
+
+/**
+ * Runs the extraction LLM call once per open cycle.
+ * ダイアログを開くたびに 1 回だけ抽出 LLM を呼ぶ。
+ */
+function useEntityExtraction(
+  conversationText: string,
+  existingTitles: string[],
+  onEntities: (entities: ExtractedEntity[]) => void,
+) {
   const [isExtracting, setIsExtracting] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const attemptedRef = useRef(false);
 
-  // Extract entities when dialog opens
   useEffect(() => {
-    if (!open || isExtracting || entities.length > 0) return;
+    if (attemptedRef.current) return;
+    attemptedRef.current = true;
 
     const extract = async () => {
       setIsExtracting(true);
@@ -75,10 +95,7 @@ export function PromoteToWikiDialog({
       try {
         const settings = await loadAISettings();
         if (!settings) throw new Error("AI not configured");
-
         const prompt = buildExtractEntitiesPrompt(conversationText, existingTitles);
-        let result = "";
-
         await callAIService(
           { ...settings, isConfigured: true },
           {
@@ -87,20 +104,7 @@ export function PromoteToWikiDialog({
             messages: [{ role: "user", content: prompt }],
             options: { maxTokens: 2000, temperature: 0.3, feature: "entity_extraction" },
           },
-          {
-            onChunk: (chunk) => {
-              result += chunk;
-            },
-            onComplete: () => {
-              const parsed = parseExtractedEntities(result);
-              setEntities(parsed);
-              // Select all by default
-              setSelected(new Set(parsed.map((_, i) => i)));
-            },
-            onError: (err) => {
-              setError(err.message);
-            },
-          },
+          createExtractionHandlers(onEntities, (err) => setError(err.message)),
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -110,7 +114,43 @@ export function PromoteToWikiDialog({
     };
 
     void extract();
-  }, [open, isExtracting, entities.length, conversationText, existingTitles]);
+  }, [conversationText, existingTitles, onEntities]);
+
+  return { isExtracting, error };
+}
+
+/**
+ * Inner dialog body — only mounted when `open=true`, so `useNavigate` and data
+ * hooks are only evaluated with a live Router / provider context.
+ * 本体コンポーネント。`open=true` のときのみマウントされるので、Router / プロバイダの実体が必ず存在する。
+ */
+
+function PromoteToWikiDialogBody({
+  onClose,
+  conversationText,
+  existingTitles,
+  conversationId,
+}: DialogBodyProps) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { mutateAsync: createPage } = useCreatePage();
+  const { data: schemaData } = useWikiSchema();
+
+  const [entities, setEntities] = useState<ExtractedEntity[]>([]);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleEntities = useCallback((parsed: ExtractedEntity[]) => {
+    setEntities(parsed);
+    setSelected(new Set(parsed.map((_, i) => i)));
+  }, []);
+
+  const { isExtracting, error } = useEntityExtraction(
+    conversationText,
+    existingTitles,
+    handleEntities,
+  );
 
   const toggleEntity = useCallback((index: number) => {
     setSelected((prev) => {
@@ -127,35 +167,30 @@ export function PromoteToWikiDialog({
 
     setIsCreating(true);
     try {
-      // Create the first selected entity as a page with streaming generation
-      const first = selectedEntities[0];
-      const page = await createPage({
-        title: first.title,
-        content: "",
-      });
+      // Create all pages in parallel before navigating so that navigation-induced
+      // unmount cannot interrupt in-flight creations.
+      // 並列でページ作成してから遷移する（遷移に伴うアンマウントで作成が中断されないように）。
+      const created = await Promise.all(
+        selectedEntities.map((entity) =>
+          createPage({ title: entity.title, content: "" }).catch(() => null),
+        ),
+      );
 
-      if (page?.id) {
-        const pending: PendingChatPageGenerationState = {
-          outline: `- ${first.summary}`,
-          conversationText,
-          userSchema: schemaData?.content,
-          conversationId,
-        };
-        navigate(`/page/${page.id}`, {
-          state: { pendingChatPageGeneration: pending },
-        });
-      }
+      const firstCreated = created.find((p): p is NonNullable<typeof p> => p != null);
+      if (!firstCreated?.id) throw new Error("no pages created");
 
-      // Create remaining entities as empty pages (can be generated later)
-      for (let i = 1; i < selectedEntities.length; i++) {
-        await createPage({
-          title: selectedEntities[i].title,
-          content: "",
-        });
-      }
-
+      const firstEntity = selectedEntities[created.indexOf(firstCreated)];
+      const pending: PendingChatPageGenerationState = {
+        outline: `- ${firstEntity.summary}`,
+        conversationText,
+        userSchema: schemaData?.content,
+        conversationId,
+      };
       toast({ title: t("aiChat.notifications.promoteSuccess") });
       onClose();
+      navigate(`/page/${firstCreated.id}`, {
+        state: { pendingChatPageGeneration: pending },
+      });
     } catch {
       toast({ title: t("aiChat.notifications.promoteFailed"), variant: "destructive" });
     } finally {
@@ -173,17 +208,6 @@ export function PromoteToWikiDialog({
     t,
     onClose,
   ]);
-
-  // Reset state when dialog closes
-  useEffect(() => {
-    if (!open) {
-      setEntities([]);
-      setSelected(new Set());
-      setError(null);
-    }
-  }, [open]);
-
-  if (!open) return null;
 
   return (
     <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">

@@ -95,32 +95,9 @@ app.put("/", authRequired, async (c) => {
   let pageId: string;
 
   if (existing) {
-    // Update existing schema page
     pageId = existing.id;
     await db.update(pages).set({ title, updatedAt: now }).where(eq(pages.id, pageId));
-
-    // Upsert page_contents (content_text stores the plain text for prompt injection)
-    const [existingContent] = await db
-      .select({ pageId: pageContents.pageId })
-      .from(pageContents)
-      .where(eq(pageContents.pageId, pageId))
-      .limit(1);
-
-    if (existingContent) {
-      await db
-        .update(pageContents)
-        .set({ contentText: content, updatedAt: now })
-        .where(eq(pageContents.pageId, pageId));
-    } else {
-      await db.insert(pageContents).values({
-        pageId,
-        ydocState: Buffer.alloc(0),
-        contentText: content,
-        updatedAt: now,
-      });
-    }
   } else {
-    // Create new schema page
     const [newPage] = await db
       .insert(pages)
       .values({
@@ -136,14 +113,22 @@ app.put("/", authRequired, async (c) => {
       throw new HTTPException(500, { message: "Failed to create schema page" });
     }
     pageId = newPage.id;
+  }
 
-    await db.insert(pageContents).values({
+  // Upsert page_contents in a single round-trip.
+  // page_contents を 1 回の往復で upsert する。
+  await db
+    .insert(pageContents)
+    .values({
       pageId,
       ydocState: Buffer.alloc(0),
       contentText: content,
       updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: pageContents.pageId,
+      set: { contentText: content, updatedAt: now },
     });
-  }
 
   return c.json({ pageId, title, content });
 });

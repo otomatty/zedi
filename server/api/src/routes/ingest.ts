@@ -311,34 +311,68 @@ app.post("/apply", authRequired, rateLimit(), async (c) => {
     throw new HTTPException(400, { message: "title is required" });
   }
 
-  const now = new Date();
-
-  // Insert or reuse source
-  const [source] = await db
-    .insert(sources)
-    .values({
-      ownerId: userId,
-      kind: body.kind,
-      url: body.url ?? null,
-      title: body.title,
-      contentHash: body.contentHash ?? null,
-      excerpt: body.excerpt ?? body.conversationJson?.slice(0, 400) ?? null,
-      extractedAt: now,
-      createdAt: now,
-    })
-    .returning({ id: sources.id });
-
-  if (!source) {
-    throw new HTTPException(500, { message: "Failed to create source" });
+  // Verify ownership of the target page before any write to prevent cross-user linking.
+  // クロスユーザーリンクを防ぐため、書き込み前に targetPageId のオーナー権を検証する。
+  if (body.targetPageId) {
+    const [targetPage] = await db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(
+        and(eq(pages.id, body.targetPageId), eq(pages.ownerId, userId), eq(pages.isDeleted, false)),
+      )
+      .limit(1);
+    if (!targetPage) {
+      throw new HTTPException(403, { message: "Target page not found or not owned by user" });
+    }
   }
 
-  // Link source to page if targetPageId is provided
+  const now = new Date();
+
+  // Reuse existing source if an identical (owner, url, hash) row already exists; otherwise insert.
+  // 同一 (owner, url, hash) のソースが既にあれば再利用、無ければ作成する。
+  let sourceId: string | undefined;
+  if (body.contentHash) {
+    const [existing] = await db
+      .select({ id: sources.id })
+      .from(sources)
+      .where(
+        and(
+          eq(sources.ownerId, userId),
+          eq(sources.contentHash, body.contentHash),
+          body.url ? eq(sources.url, body.url) : eq(sources.kind, body.kind),
+        ),
+      )
+      .limit(1);
+    if (existing) sourceId = existing.id;
+  }
+
+  if (!sourceId) {
+    const [inserted] = await db
+      .insert(sources)
+      .values({
+        ownerId: userId,
+        kind: body.kind,
+        url: body.url ?? null,
+        title: body.title,
+        contentHash: body.contentHash ?? null,
+        excerpt: body.excerpt ?? body.conversationJson?.slice(0, 400) ?? null,
+        extractedAt: now,
+        createdAt: now,
+      })
+      .returning({ id: sources.id });
+    if (!inserted) {
+      throw new HTTPException(500, { message: "Failed to create source" });
+    }
+    sourceId = inserted.id;
+  }
+
+  // Link source to page (ownership already verified above).
   if (body.targetPageId) {
     await db
       .insert(pageSources)
       .values({
         pageId: body.targetPageId,
-        sourceId: source.id,
+        sourceId,
         sectionAnchor: body.sectionAnchor ?? "",
         citationText: body.citationText ?? null,
         createdAt: now,
@@ -346,7 +380,7 @@ app.post("/apply", authRequired, rateLimit(), async (c) => {
       .onConflictDoNothing();
   }
 
-  return c.json({ sourceId: source.id, targetPageId: body.targetPageId ?? null });
+  return c.json({ sourceId, targetPageId: body.targetPageId ?? null });
 });
 
 export default app;

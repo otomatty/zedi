@@ -190,7 +190,7 @@ export default function AIChatDetail() {
         open={promote.open}
         onClose={promote.close}
         conversationText={promote.conversationText}
-        existingTitles={[]}
+        existingTitles={existingPageTitles}
         conversationId={conversationId}
       />
     </AppLayout>

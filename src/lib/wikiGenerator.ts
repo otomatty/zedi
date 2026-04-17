@@ -109,13 +109,13 @@ export async function generateWikiContentStream(
 
     switch (settings.provider) {
       case "openai":
-        await generateWithOpenAI(settings, title, callbacks, abortSignal);
+        await generateWithOpenAI(settings, title, callbacks, abortSignal, userSchema);
         break;
       case "anthropic":
-        await generateWithAnthropic(settings, title, callbacks, abortSignal);
+        await generateWithAnthropic(settings, title, callbacks, abortSignal, userSchema);
         break;
       case "google":
-        await generateWithGoogle(settings, title, callbacks, abortSignal);
+        await generateWithGoogle(settings, title, callbacks, abortSignal, userSchema);
         break;
       default: {
         const _exhaustive: never = settings.provider;
