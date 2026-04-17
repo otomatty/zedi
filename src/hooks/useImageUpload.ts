@@ -124,7 +124,13 @@ export function useImageUpload(): UseImageUploadReturn {
           },
           signal,
         });
-        throwIfAborted();
+        // NOTE: do NOT call `throwIfAborted()` here. The remote write has
+        // already completed at this point; throwing now would hide a
+        // successful upload from the caller and orphan the stored asset.
+        // Cancellation must propagate via the `signal` passed into the
+        // provider above, before the upload resolves.
+        // ここで throwIfAborted を呼ぶとアップロード完了済みのアセットが孤児化する。
+        // キャンセルは signal 経由で provider に伝えること。
 
         setState((prev) => ({
           ...prev,
