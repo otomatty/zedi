@@ -59,7 +59,14 @@ function resolveYouTubeClipOptions(aiSettings: AISettings | null): YouTubeClipOp
     return {};
   }
 
-  const modelId = settings.modelId || `${settings.provider}:${settings.model}`;
+  // modelId が空なら provider:model の形に組み立てる。ただし model が空の場合は
+  // "openai:" のような不完全な ID を送らないようにする（サーバー側で 400/403 になって
+  // ユーザーに混乱を与えるため）。
+  // If modelId is missing, fall back to provider:model — but skip entirely when
+  // settings.model is empty, since a malformed ID like "openai:" would otherwise
+  // reach the server and surface as a confusing 400/403.
+  const modelId =
+    settings.modelId || (settings.model ? `${settings.provider}:${settings.model}` : "");
   if (!modelId) {
     return {};
   }

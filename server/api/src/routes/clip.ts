@@ -122,12 +122,25 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
   let aiApiKey: string | undefined;
 
   const supportedProviders: AIProviderType[] = ["openai", "anthropic", "google"];
-  if (body.provider && body.model) {
-    if (!supportedProviders.includes(body.provider)) {
-      throw new HTTPException(400, { message: `unsupported provider: ${body.provider}` });
+
+  // provider/model は両方指定するか両方省略する必要がある（ext.ts の /clip-and-create と一致させる）
+  // provider/model must be specified together or both omitted (consistent with ext.ts /clip-and-create)
+  const hasProvider = typeof body.provider === "string" && body.provider.trim().length > 0;
+  const hasModel = typeof body.model === "string" && body.model.trim().length > 0;
+  if (hasProvider !== hasModel) {
+    throw new HTTPException(400, {
+      message: "provider and model must be specified together",
+    });
+  }
+
+  if (hasProvider && hasModel) {
+    const providerInput = (body.provider as string).trim() as AIProviderType;
+    const modelInput = (body.model as string).trim();
+    if (!supportedProviders.includes(providerInput)) {
+      throw new HTTPException(400, { message: `unsupported provider: ${providerInput}` });
     }
-    aiProvider = body.provider;
-    aiModel = body.model;
+    aiProvider = providerInput;
+    aiModel = modelInput;
 
     // モデルアクセス・利用量チェック / Model access & usage enforcement
     // 既知の検証エラーは HTTPException(400/403) として返す
