@@ -301,13 +301,19 @@ export async function extractYouTubeContent(input: ExtractYouTubeInput): Promise
   // 2. AI 要約を生成 / Generate AI summary
   // aiUsage は実際に AI が呼ばれて成功した場合のみ設定される（課金判定に使用）
   // aiUsage is only set when AI was actually called successfully (used for billing)
+  // 字幕が十分に長い場合のみ字幕を使用し、それ以外は description にフォールバック
+  // Use transcript only when it is long enough; otherwise fall back to description
+  const MIN_SUMMARY_SOURCE_LENGTH = 50;
   let summary: string | null = null;
   let aiUsage: TokenUsage | null = null;
   if (aiProvider && aiModel && aiApiKey) {
-    const textForSummary = ytContent.transcriptText || ytContent.metadata.description;
-    if (textForSummary && textForSummary.length > 50) {
+    const transcriptText = ytContent.transcriptText.trim();
+    const descriptionText = ytContent.metadata.description.trim();
+    const useTranscript = transcriptText.length > MIN_SUMMARY_SOURCE_LENGTH;
+    const textForSummary = useTranscript ? transcriptText : descriptionText;
+    if (textForSummary.length > MIN_SUMMARY_SOURCE_LENGTH) {
       try {
-        const isTranscript = Boolean(ytContent.transcriptText);
+        const isTranscript = useTranscript;
         const messages = buildSummaryPrompt(textForSummary, ytContent.metadata.title, isTranscript);
         const result = await callProvider(aiProvider, aiApiKey, aiModel, messages, {
           temperature: 0.3,

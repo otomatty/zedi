@@ -6,6 +6,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
 
+// youtube-transcript は CJS/ESM 互換性問題があるのでモック
+// Mock youtube-transcript (CJS/ESM compatibility workaround)
+vi.mock("youtube-transcript", () => ({
+  YoutubeTranscript: {
+    fetchTranscript: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 vi.mock("../../db/client.js", () => ({
   getDb: vi.fn(() => ({})),
 }));

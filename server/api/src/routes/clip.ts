@@ -9,6 +9,7 @@ import { authRequired } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
 import { extractYouTubeContent } from "../lib/youtubeExtractor.js";
+import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
 import { getProviderApiKeyName } from "../services/aiProviders.js";
 import { getUserTier } from "../services/subscriptionService.js";
 import {
@@ -129,8 +130,10 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     aiModel = body.model;
 
     // モデルアクセス・利用量チェック / Model access & usage enforcement
+    // 既知の検証エラーは HTTPException(400/403) として返す
+    // Known validation errors are translated to HTTPException(400/403)
     const tier = await getUserTier(userId, db);
-    const modelInfo = await validateModelAccess(aiModel, tier, db);
+    const modelInfo = await validateModelAccessOrThrow(aiModel, tier, db);
     const usageCheck = await checkUsage(userId, tier, db);
     if (!usageCheck.allowed) {
       throw new HTTPException(429, { message: "Monthly budget exceeded" });

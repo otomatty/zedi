@@ -158,6 +158,45 @@ describe("youtubeExtractor", () => {
     expect(transcriptHeadings.length).toBeGreaterThan(0);
   });
 
+  it("falls back to description when transcript is too short", async () => {
+    // 短い字幕（50 文字以下）+ 長い description の回帰テスト
+    // Regression: short transcript (<=50 chars) + long description should use description
+    const longDescription =
+      "This is a sufficiently long description text that exceeds the minimum fifty character requirement for AI summarization and contains useful content.";
+    mockFetchYouTubeContent.mockResolvedValueOnce({
+      metadata: { ...baseMetadata, description: longDescription },
+      transcript: [{ text: "short", offset: 0, duration: 1 }],
+      transcriptText: "short",
+    });
+
+    mockCallProvider.mockResolvedValueOnce({
+      content: "## 要約\n\n- 説明文からの要約",
+      usage: { inputTokens: 80, outputTokens: 40 },
+      finishReason: "stop",
+    });
+
+    const result = await extractYouTubeContent({
+      videoId: "abc12345678",
+      aiProvider: "openai",
+      aiModel: "gpt-4",
+      aiApiKey: "test-key",
+    });
+
+    // AI は description を使って呼ばれる（字幕が短すぎるため）
+    // AI should be called with description (transcript too short)
+    expect(mockCallProvider).toHaveBeenCalledOnce();
+    const callArgs = mockCallProvider.mock.calls[0];
+    // messages の user ロール側に description が含まれること
+    // user message should contain the long description
+    const messages = callArgs?.[3] as Array<{ role: string; content: string }>;
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain(longDescription);
+    // 動画説明文 (description) 扱いであることを示すラベルが含まれる
+    // The "description" label should be used (not "transcript")
+    expect(userMsg?.content).toContain("動画説明文");
+    expect(result.aiUsage).toEqual({ inputTokens: 80, outputTokens: 40 });
+  });
+
   it("generates proper content hash", async () => {
     mockFetchYouTubeContent.mockResolvedValueOnce({
       metadata: baseMetadata,

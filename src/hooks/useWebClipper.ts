@@ -117,6 +117,12 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
             // AI settings load failure is non-fatal (continue without summary)
           }
 
+          // loadAISettings() の await 中に reset() や新しい clip() が呼ばれていたら
+          // サーバーへのリクエストを発行せずに中止する（AI クオータ浪費防止）
+          // If reset() or a newer clip() occurred during loadAISettings(), abort
+          // before firing the server request to avoid wasting AI quota.
+          if (currentId !== clipIdRef.current) return null;
+
           const result = await api.clipYoutube(url, aiOptions);
 
           if (currentId !== clipIdRef.current) return null;

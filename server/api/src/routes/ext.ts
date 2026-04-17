@@ -19,6 +19,7 @@ import {
 } from "../lib/extAuth.js";
 import { clipAndCreate } from "../lib/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
+import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
 import { getProviderApiKeyName } from "../services/aiProviders.js";
 import { getUserTier } from "../services/subscriptionService.js";
 import {
@@ -150,7 +151,12 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const body = await c.req.json<{ url?: string; provider?: string; model?: string }>();
+  let body: { url?: string; provider?: string; model?: string };
+  try {
+    body = await c.req.json<{ url?: string; provider?: string; model?: string }>();
+  } catch {
+    throw new HTTPException(400, { message: "Invalid JSON body" });
+  }
   if (!body.url?.trim()) {
     throw new HTTPException(400, { message: "url is required" });
   }
@@ -181,14 +187,27 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
   // Original client-supplied model ID (before resolution) for usage recording
 
   const supportedProviders: AIProviderType[] = ["openai", "anthropic", "google"];
-  if (body.provider && body.model) {
+
+  // provider/model は両方指定するか両方省略する必要がある
+  // provider/model must be specified together or both omitted
+  const hasProvider = typeof body.provider === "string" && body.provider.trim().length > 0;
+  const hasModel = typeof body.model === "string" && body.model.trim().length > 0;
+  if (hasProvider !== hasModel) {
+    throw new HTTPException(400, {
+      message: "provider and model must be specified together",
+    });
+  }
+
+  if (hasProvider && hasModel) {
     if (!supportedProviders.includes(body.provider as AIProviderType)) {
       throw new HTTPException(400, { message: `unsupported provider: ${body.provider}` });
     }
 
     // モデルアクセス・利用量チェック / Model access & usage enforcement
+    // 既知の検証エラーは HTTPException(400/403) として返す
+    // Known validation errors are translated to HTTPException(400/403)
     const tier = await getUserTier(userId, db);
-    const modelInfo = await validateModelAccess(body.model, tier, db);
+    const modelInfo = await validateModelAccessOrThrow(body.model as string, tier, db);
     const usageCheck = await checkUsage(userId, tier, db);
     if (!usageCheck.allowed) {
       throw new HTTPException(429, { message: "Monthly budget exceeded" });

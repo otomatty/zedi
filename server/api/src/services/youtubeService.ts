@@ -10,6 +10,12 @@
  */
 import { YoutubeTranscript, type TranscriptResponse } from "youtube-transcript";
 
+/**
+ * YouTube 外部 API 呼び出しのデフォルトタイムアウト（ミリ秒）。
+ * Default timeout for outbound YouTube API calls, in milliseconds.
+ */
+export const YT_FETCH_TIMEOUT_MS = 10_000;
+
 // ── Types ─────────────────────────────────────────────────────────────────
 
 /**
@@ -69,12 +75,16 @@ export interface YouTubeContent {
  * @returns 人間が読みやすい形式 (e.g. "1:02:03") / Human-readable format
  */
 export function formatDuration(iso: string): string {
-  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  // ISO 8601 duration: P[nD]T[nH][nM][nS]
+  // 長時間配信アーカイブ等の day 表記にも対応する
+  // Support day-prefixed durations like "P1DT2H..." for long livestream VODs
+  const match = iso.match(/P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return iso;
 
-  const hours = Number.parseInt(match[1] || "0", 10);
-  const minutes = Number.parseInt(match[2] || "0", 10);
-  const seconds = Number.parseInt(match[3] || "0", 10);
+  const days = Number.parseInt(match[1] ?? "0", 10);
+  const hours = Number.parseInt(match[2] ?? "0", 10) + days * 24;
+  const minutes = Number.parseInt(match[3] ?? "0", 10);
+  const seconds = Number.parseInt(match[4] ?? "0", 10);
 
   if (hours > 0) {
     return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
@@ -94,13 +104,29 @@ export function formatDuration(iso: string): string {
 export async function fetchYouTubeMetadata(
   videoId: string,
   apiKey: string,
+  timeoutMs: number = YT_FETCH_TIMEOUT_MS,
 ): Promise<YouTubeMetadata> {
   const url = new URL("https://www.googleapis.com/youtube/v3/videos");
   url.searchParams.set("part", "snippet,contentDetails");
   url.searchParams.set("id", videoId);
   url.searchParams.set("key", apiKey);
 
-  const res = await fetch(url.toString());
+  // タイムアウト付きの fetch（上流の遅延で全体をブロックしないようにする）
+  // Fetch with abort-based timeout so slow upstream doesn't pin the request
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), { signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`YouTube Data API request timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -163,11 +189,46 @@ export async function fetchYouTubeMetadata(
  * @param videoId - YouTube 動画 ID / YouTube video ID
  * @returns 字幕セグメント配列 / Transcript segments (empty if unavailable)
  */
-export async function fetchYouTubeTranscript(videoId: string): Promise<TranscriptSegment[]> {
+/**
+ * Promise にタイムアウトを付与する。タイムアウト時は reject。
+ * Wraps a promise with a timeout. Rejects when timeout elapses.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      },
+    );
+  });
+}
+
+/**
+ *
+ */
+export async function fetchYouTubeTranscript(
+  videoId: string,
+  timeoutMs: number = YT_FETCH_TIMEOUT_MS,
+): Promise<TranscriptSegment[]> {
+  // youtube-transcript は signal を受け付けないため、タイムアウトは Promise.race で実装
+  // youtube-transcript does not accept a signal, so timeout is enforced via promise race
   try {
-    const transcriptItems: TranscriptResponse[] = await YoutubeTranscript.fetchTranscript(videoId, {
-      lang: "ja",
-    });
+    /**
+     *
+     */
+    const transcriptItems = await withTimeout<TranscriptResponse[]>(
+      YoutubeTranscript.fetchTranscript(videoId, { lang: "ja" }),
+      timeoutMs,
+      "YouTube transcript fetch (ja)",
+    );
 
     return transcriptItems.map((item) => ({
       text: item.text,
@@ -178,8 +239,14 @@ export async function fetchYouTubeTranscript(videoId: string): Promise<Transcrip
     // 日本語字幕が無い場合、言語指定なしで再試行
     // If Japanese subtitles unavailable, retry without language preference
     try {
-      const transcriptItems: TranscriptResponse[] =
-        await YoutubeTranscript.fetchTranscript(videoId);
+      /**
+       *
+       */
+      const transcriptItems = await withTimeout<TranscriptResponse[]>(
+        YoutubeTranscript.fetchTranscript(videoId),
+        timeoutMs,
+        "YouTube transcript fetch",
+      );
 
       return transcriptItems.map((item) => ({
         text: item.text,
@@ -217,21 +284,63 @@ export function joinTranscriptText(segments: TranscriptSegment[]): string {
  * @param youtubeApiKey - YouTube Data API キー（任意） / YouTube Data API key (optional)
  * @returns メタデータと字幕 / Metadata and transcript
  */
+/**
+ * API キー未指定時の最小限のメタデータを返す。
+ * Returns minimal metadata when the Data API key is missing or fails.
+ */
+function buildMinimalMetadata(videoId: string): YouTubeMetadata {
+  return {
+    title: `YouTube Video (${videoId})`,
+    description: "",
+    channelTitle: "",
+    publishedAt: "",
+    duration: "",
+    thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+    tags: [],
+  };
+}
+
+/**
+ *
+ */
 export async function fetchYouTubeContent(
   videoId: string,
   youtubeApiKey?: string,
 ): Promise<YouTubeContent> {
   // 字幕は常に取得を試みる（API キー不要）
   // Always attempt transcript fetch (no API key required)
+  /**
+   *
+   */
   const transcriptPromise = fetchYouTubeTranscript(videoId);
 
+  /**
+   *
+   */
   let metadata: YouTubeMetadata;
   if (youtubeApiKey) {
-    const [meta, transcript] = await Promise.all([
+    // メタデータ取得失敗（quota 超過・無効キー等）でも字幕 fallback を維持する
+    // Keep transcript-only fallback even when metadata fetch fails (quota, invalid key, etc.)
+    /**
+     *
+     */
+    const [metaResult, transcriptResult] = await Promise.allSettled([
       fetchYouTubeMetadata(videoId, youtubeApiKey),
       transcriptPromise,
     ]);
-    metadata = meta;
+    /**
+     *
+     */
+    const transcript = transcriptResult.status === "fulfilled" ? transcriptResult.value : [];
+    if (metaResult.status === "fulfilled") {
+      metadata = metaResult.value;
+    } else {
+      console.error("YouTube metadata fetch failed (falling back to minimal):", metaResult.reason);
+      metadata = buildMinimalMetadata(videoId);
+    }
+    /**
+     *
+     */
     const transcriptText = joinTranscriptText(transcript);
     return {
       metadata,
@@ -242,6 +351,9 @@ export async function fetchYouTubeContent(
 
   // API キーなし — 字幕のみ取得、メタデータは最小限
   // No API key — transcript only, minimal metadata
+  /**
+   *
+   */
   const transcript = await transcriptPromise;
   metadata = {
     title: `YouTube Video (${videoId})`,

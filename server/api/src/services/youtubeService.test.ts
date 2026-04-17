@@ -36,6 +36,16 @@ describe("youtubeService", () => {
       expect(formatDuration("invalid")).toBe("invalid");
     });
 
+    it("handles day-based durations for long livestream VODs", () => {
+      // P1DT2H3M4S → 1日 + 2時間 = 26時間 / 1 day + 2 hours = 26 hours
+      expect(formatDuration("P1DT2H3M4S")).toBe("26:03:04");
+    });
+
+    it("handles day-only durations", () => {
+      // P2DT (2 days) → 48時間 / 2 days → 48 hours
+      expect(formatDuration("P2DT0H0M0S")).toBe("48:00:00");
+    });
+
     it("handles zero values", () => {
       expect(formatDuration("PT0M0S")).toBe("0:00");
     });
