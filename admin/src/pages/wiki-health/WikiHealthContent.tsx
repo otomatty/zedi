@@ -105,7 +105,7 @@ export function WikiHealthContent({
 
       {/* サマリ表示 / Summary display */}
       {summary && (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
           {summary.map((s) => (
             <div key={s.rule} className="bg-muted/50 rounded border px-3 py-2">
               <div className="text-muted-foreground text-xs">{RULE_LABELS[s.rule]}</div>
