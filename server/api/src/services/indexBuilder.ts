@@ -284,26 +284,28 @@ export async function rebuildIndexForOwner(
     } else {
       // Partial unique index (`idx_pages_unique_special_kind_per_owner`) protects
       // against two concurrent rebuilds both passing the SELECT above and then
-      // racing to INSERT. On conflict, re-read the winner instead of failing.
-      // 並行再構築で SELECT を両方通過し INSERT が衝突した場合に備え、
-      // 一意インデックス違反を捕捉して勝者行を読み直す。
-      try {
-        const [newRow] = await tx
-          .insert(pages)
-          .values({
-            ownerId,
-            title: INDEX_PAGE_TITLE,
-            specialKind: "__index__",
-            createdAt: now,
-            updatedAt: now,
-          })
-          .returning({ id: pages.id });
-        if (!newRow) {
-          throw new Error("Failed to insert __index__ page");
-        }
+      // racing to INSERT. Use ON CONFLICT DO NOTHING + re-SELECT so the loser
+      // adopts the winner's row instead of aborting the whole transaction
+      // (a raw unique violation in Postgres marks the tx as failed, and a
+      // try/catch alone cannot recover without an explicit SAVEPOINT).
+      // 並行再構築で SELECT を両方通過した場合、生の一意制約違反は tx を失敗状態に
+      // するため、ON CONFLICT DO NOTHING + 再 SELECT で勝者行を採用する。
+      const inserted = await tx
+        .insert(pages)
+        .values({
+          ownerId,
+          title: INDEX_PAGE_TITLE,
+          specialKind: "__index__",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing()
+        .returning({ id: pages.id });
+      const newRow = inserted[0];
+      if (newRow) {
         pageId = newRow.id;
         created = true;
-      } catch (insertErr) {
+      } else {
         const [winner] = await tx
           .select({ id: pages.id })
           .from(pages)
@@ -314,9 +316,10 @@ export async function rebuildIndexForOwner(
               eq(pages.isDeleted, false),
             ),
           )
-          .for("update")
           .limit(1);
-        if (!winner) throw insertErr;
+        if (!winner) {
+          throw new Error("Failed to insert or locate __index__ page");
+        }
         pageId = winner.id;
         created = false;
       }

@@ -19,14 +19,10 @@ import { sources } from "../schema/sources.js";
 import { pageSources } from "../schema/pageSources.js";
 import { eq, and } from "drizzle-orm";
 import { extractArticleFromUrl } from "../lib/articleExtractor.js";
+import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
 import { callProvider, getProviderApiKeyName } from "../services/aiProviders.js";
 import { getUserTier } from "../services/subscriptionService.js";
-import {
-  checkUsage,
-  validateModelAccess,
-  calculateCost,
-  recordUsage,
-} from "../services/usageService.js";
+import { checkUsage, calculateCost, recordUsage } from "../services/usageService.js";
 import {
   createIngestLlmDriver,
   buildIngestPlannerPrompt,
@@ -153,21 +149,34 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
   if (!supportedProviders.includes(body.provider as AIProviderType)) {
     throw new HTTPException(400, { message: `unsupported provider: ${body.provider}` });
   }
-  const provider = body.provider as AIProviderType;
+  // NOTE: the client-supplied provider is *only* used for input validation /
+  // 4xx surfacing. The actual provider used for API key lookup and the
+  // upstream call is the one resolved from the DB (modelInfo.provider) below.
+  // クライアントの provider は入力バリデーションのみで使用し、実呼び出しは
+  // DB 上の modelInfo.provider に統一する。
   const model = body.model.trim();
 
   const rawLimit = Number(body.candidateLimit ?? 5);
   const candidateLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 10) : 5;
 
   // --- Model access & usage enforcement (mirrors /api/ai/chat) ---
+  // Use the *Throw variant so unknown / tier-gated models surface as 4xx
+  // instead of falling through the global handler as 500.
+  // 不明モデルや tier 制限を 4xx として返すため Throw 版を使う。
   const tier = await getUserTier(userId, db);
-  const modelInfo = await validateModelAccess(model, tier, db);
+  const modelInfo = await validateModelAccessOrThrow(model, tier, db);
   const usageCheck = await checkUsage(userId, tier, db);
   if (!usageCheck.allowed) {
     throw new HTTPException(429, { message: "Monthly budget exceeded" });
   }
 
-  const apiKeyName = getProviderApiKeyName(provider);
+  // API key lookup must use the DB-resolved provider, not the client-supplied one.
+  // Otherwise a stale client could pass `provider="google"` with an OpenAI model id
+  // and we would load the wrong credential and fail upstream auth.
+  // クライアント送信値ではなく DB 解決済みの provider で API キー名を引く。
+  // ズレると別プロバイダーの鍵で呼び出して認証失敗する。
+  const resolvedProvider = modelInfo.provider as AIProviderType;
+  const apiKeyName = getProviderApiKeyName(resolvedProvider);
   const apiKey = process.env[apiKeyName];
   if (!apiKey) {
     throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });

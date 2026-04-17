@@ -88,10 +88,12 @@ app.put("/", authRequired, async (c) => {
 
   // Wrap the read-modify-write in a transaction so concurrent PUTs from the
   // same user cannot both INSERT and race the (owner_id) WHERE is_schema=true
-  // unique index. A row-level lock (FOR UPDATE) on the existing row, or the
-  // unique index itself on insert, serializes the operation.
-  // 同一ユーザーの並行 PUT が両方 INSERT して一意インデックスで衝突するのを防ぐため、
-  // 読み書きをトランザクションで囲む。
+  // unique index, AND so that the pages row and its page_contents body are
+  // committed atomically (otherwise a partial failure could leave a schema
+  // page with no body / mismatched body).
+  // 同一ユーザーの並行 PUT が両方 INSERT して一意インデックスで衝突するのを防ぎ、
+  // かつ pages 行と page_contents 本体をアトミックにコミットするため、
+  // 全更新をトランザクションで囲む。
   const pageId = await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ id: pages.id })
@@ -100,42 +102,43 @@ app.put("/", authRequired, async (c) => {
       .for("update")
       .limit(1);
 
+    let resolvedPageId: string;
     if (existing) {
       await tx.update(pages).set({ title, updatedAt: now }).where(eq(pages.id, existing.id));
-      return existing.id;
+      resolvedPageId = existing.id;
+    } else {
+      const [newPage] = await tx
+        .insert(pages)
+        .values({
+          ownerId: userId,
+          title,
+          isSchema: true,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning({ id: pages.id });
+
+      if (!newPage) {
+        throw new HTTPException(500, { message: "Failed to create schema page" });
+      }
+      resolvedPageId = newPage.id;
     }
 
-    const [newPage] = await tx
-      .insert(pages)
+    await tx
+      .insert(pageContents)
       .values({
-        ownerId: userId,
-        title,
-        isSchema: true,
-        createdAt: now,
+        pageId: resolvedPageId,
+        ydocState: Buffer.alloc(0),
+        contentText: content,
         updatedAt: now,
       })
-      .returning({ id: pages.id });
+      .onConflictDoUpdate({
+        target: pageContents.pageId,
+        set: { contentText: content, updatedAt: now },
+      });
 
-    if (!newPage) {
-      throw new HTTPException(500, { message: "Failed to create schema page" });
-    }
-    return newPage.id;
+    return resolvedPageId;
   });
-
-  // Upsert page_contents in a single round-trip.
-  // page_contents を 1 回の往復で upsert する。
-  await db
-    .insert(pageContents)
-    .values({
-      pageId,
-      ydocState: Buffer.alloc(0),
-      contentText: content,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: pageContents.pageId,
-      set: { contentText: content, updatedAt: now },
-    });
 
   await recordActivity(db, {
     ownerId: userId,
