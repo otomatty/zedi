@@ -158,14 +158,16 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
       aiApiKey,
     });
 
-    // 使用量記録 / Record usage (if AI was used)
+    // 使用量記録 / Record usage
+    // result.aiUsage が null でない場合のみ課金（AI が実際に成功した場合）
     // 記録失敗は非致命的 — 抽出結果を破棄しない
+    // Bill only when AI actually ran successfully (result.aiUsage !== null)
     // Recording failure is non-fatal — don't discard the extraction result
-    if (aiProvider && aiModel && body.model) {
+    if (result.aiUsage && aiProvider && aiModel && body.model) {
       try {
-        const contentLen = JSON.stringify(result.tiptapJson).length;
-        const inputTokens = Math.ceil(contentLen / 4);
-        const outputTokens = Math.ceil((result.contentText?.length ?? 0) / 4);
+        // プロバイダーから返された実際のトークン数を使用（概算ではなく）
+        // Use actual token counts returned by the provider (not estimates)
+        const { inputTokens, outputTokens } = result.aiUsage;
         const tier = await getUserTier(userId, db);
         const modelInfo = await validateModelAccess(body.model, tier, db);
         const costUnits = calculateCost(

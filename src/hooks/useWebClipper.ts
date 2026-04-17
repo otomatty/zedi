@@ -6,7 +6,9 @@ import { useState, useCallback, useRef } from "react";
 import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/webClipper";
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
 import { isYouTubeUrl } from "@/components/editor/utils/urlTransform";
+import { getDefaultAISettings, loadAISettings } from "@/lib/aiSettings";
 import type { ApiClient } from "@/lib/api/apiClient";
+import type { AIProviderType, AISettings } from "@/types/ai";
 
 /**
  * Web Clipper のステータス。idle → fetching → extracting → completed | error の順に遷移する。
@@ -39,6 +41,35 @@ export interface UseWebClipperReturn {
   ) => string | null;
 }
 
+type YouTubeClipOptions = { provider?: AIProviderType; model?: string };
+
+function resolveYouTubeClipOptions(aiSettings: AISettings | null): YouTubeClipOptions {
+  const settings = aiSettings ?? getDefaultAISettings();
+  const apiMode = settings.apiMode ?? "api_server";
+  const isSupportedProvider =
+    settings.provider === "openai" ||
+    settings.provider === "anthropic" ||
+    settings.provider === "google";
+
+  if (!isSupportedProvider) {
+    return {};
+  }
+
+  if (apiMode !== "api_server" && !settings.isConfigured) {
+    return {};
+  }
+
+  const modelId = settings.modelId || `${settings.provider}:${settings.model}`;
+  if (!modelId) {
+    return {};
+  }
+
+  return {
+    provider: settings.provider,
+    model: modelId,
+  };
+}
+
 /**
  * Web ページクリッピング用カスタムフック。URL から Web ページを取り込み Tiptap JSON に変換する。
  * Custom hook for web page clipping. Fetches a web page from a URL and converts it to Tiptap JSON.
@@ -66,10 +97,27 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
 
       try {
         // YouTube URL の場合は専用サーバーサイドエンドポイントを使用
+        // ユーザーの AI 設定を読み込み、AI 要約を有効化する
         // Use dedicated server-side endpoint for YouTube URLs
+        // Load user AI settings to enable AI summary generation
         if (isYouTubeUrl(url) && api) {
           setStatus("extracting");
-          const result = await api.clipYoutube(url);
+
+          // AI 要約用の provider/model を取得（設定済みの場合のみ）
+          // Fetch provider/model for AI summary (only if configured)
+          // direct-API プロバイダー (openai/anthropic/google) のみ対応
+          // claude-code は iframe ベースなので対象外
+          // Only direct-API providers (openai/anthropic/google) are supported
+          // claude-code is iframe-based so excluded
+          let aiOptions: YouTubeClipOptions = {};
+          try {
+            aiOptions = resolveYouTubeClipOptions(await loadAISettings());
+          } catch {
+            // AI 設定の読み込み失敗は非致命的（要約なしで続行）
+            // AI settings load failure is non-fatal (continue without summary)
+          }
+
+          const result = await api.clipYoutube(url, aiOptions);
 
           if (currentId !== clipIdRef.current) return null;
 

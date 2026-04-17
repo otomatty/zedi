@@ -91,6 +91,7 @@ describe("youtubeExtractor", () => {
 
     // AI が呼ばれたことを確認 / Verify AI was called
     expect(mockCallProvider).toHaveBeenCalledOnce();
+    expect(result.aiUsage).toEqual({ inputTokens: 100, outputTokens: 50 });
 
     // 要約セクションが含まれること / Summary section exists
     const headings = (result.tiptapJson.content ?? []).filter(
@@ -109,6 +110,7 @@ describe("youtubeExtractor", () => {
     const result = await extractYouTubeContent({ videoId: "abc12345678" });
 
     expect(mockCallProvider).not.toHaveBeenCalled();
+    expect(result.aiUsage).toBeNull();
 
     // 要約セクションが含まれないこと / No summary section
     const summaryHeadings = (result.tiptapJson.content ?? []).filter(
@@ -137,6 +139,7 @@ describe("youtubeExtractor", () => {
     // エラーが throw されないこと / No error thrown
     expect(result.title).toBe("テスト動画");
     expect((result.tiptapJson.content ?? [])[0]?.type).toBe("youtubeEmbed");
+    expect(result.aiUsage).toBeNull();
   });
 
   it("includes transcript section when transcript is available", async () => {

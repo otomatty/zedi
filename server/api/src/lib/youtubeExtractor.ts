@@ -16,7 +16,7 @@ import {
 } from "../services/youtubeService.js";
 import { callProvider } from "../services/aiProviders.js";
 import type { TiptapNode } from "./articleExtractor.js";
-import type { AIProviderType, AIMessage } from "../types/index.js";
+import type { AIProviderType, AIMessage, TokenUsage } from "../types/index.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -50,6 +50,14 @@ export interface ExtractedYouTube {
   tiptapJson: TiptapNode;
   contentText: string;
   contentHash: string;
+  /**
+   * AI 要約が実際に実行された場合のトークン使用量。
+   * 呼ばれなかった、または失敗した場合は null。
+   *
+   * Token usage when AI summary was actually executed successfully.
+   * null when AI call was skipped (missing params / content too short) or failed.
+   */
+  aiUsage: TokenUsage | null;
 }
 
 // ── Summary Prompt ────────────────────────────────────────────────────────
@@ -291,7 +299,10 @@ export async function extractYouTubeContent(input: ExtractYouTubeInput): Promise
   const ytContent = await fetchYouTubeContent(videoId, youtubeApiKey);
 
   // 2. AI 要約を生成 / Generate AI summary
+  // aiUsage は実際に AI が呼ばれて成功した場合のみ設定される（課金判定に使用）
+  // aiUsage is only set when AI was actually called successfully (used for billing)
   let summary: string | null = null;
+  let aiUsage: TokenUsage | null = null;
   if (aiProvider && aiModel && aiApiKey) {
     const textForSummary = ytContent.transcriptText || ytContent.metadata.description;
     if (textForSummary && textForSummary.length > 50) {
@@ -303,10 +314,13 @@ export async function extractYouTubeContent(input: ExtractYouTubeInput): Promise
           maxTokens: 2048,
         });
         summary = result.content;
+        aiUsage = result.usage;
       } catch (err) {
         console.error("YouTube AI summary failed:", err);
         // 要約失敗はエラーにせず、要約なしで続行
+        // aiUsage は null のまま（課金しない）
         // Summary failure is non-fatal; continue without summary
+        // aiUsage stays null (don't bill for failed call)
       }
     }
   }
@@ -332,5 +346,6 @@ export async function extractYouTubeContent(input: ExtractYouTubeInput): Promise
     tiptapJson,
     contentText,
     contentHash,
+    aiUsage,
   };
 }

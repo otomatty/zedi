@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
 import { YouTubeEmbedServer } from "./youtubeEmbedServerExtension.js";
 import { extractYouTubeContent } from "./youtubeExtractor.js";
-import type { AIProviderType } from "../types/index.js";
+import type { AIProviderType, TokenUsage } from "../types/index.js";
 
 export { ClipFetchBlockedError };
 
@@ -87,6 +87,14 @@ export interface ExtractedArticle {
   tiptapJson: TiptapNode;
   contentText: string;
   contentHash: string;
+  /**
+   * AI 要約が実際に実行された場合のトークン使用量（YouTube のみ）。
+   * 通常の Readability 抽出では常に null。
+   *
+   * Token usage when AI summary was actually executed (YouTube only).
+   * Always null for regular Readability-based extraction.
+   */
+  aiUsage?: TokenUsage | null;
 }
 
 /**
