@@ -14,7 +14,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
 import { buildArticleSchema, extractArticleFromUrl } from "./articleExtractor.js";
-import type { AIProviderType } from "../types/index.js";
+import type { AIProviderType, TokenUsage } from "../types/index.js";
 
 const YDOC_FRAGMENT = "default";
 
@@ -30,6 +30,11 @@ export interface ClipAndCreateResult {
   page_id: string;
   title: string;
   thumbnail_url?: string | null;
+  /**
+   * AI 要約が実際に実行された場合のトークン使用量（YouTube のみ）。
+   * Token usage when AI summary was actually executed (YouTube only).
+   */
+  ai_usage?: TokenUsage | null;
 }
 
 /**
@@ -106,5 +111,6 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
     page_id: result.page.id,
     title: result.title,
     thumbnail_url: result.thumbnailUrl ?? null,
+    ai_usage: article.aiUsage ?? null,
   };
 }
