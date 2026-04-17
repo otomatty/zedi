@@ -203,6 +203,10 @@ function extractYouTubeVideoId(url: string): string | null {
     /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i,
     /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
     /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+    // YouTube Shorts: https://www.youtube.com/shorts/<id>
+    // Shorts は動画専用パイプラインに乗せたいので、watch / youtu.be / embed と
+    // 同じ抽出経路に含める。
+    /^https?:\/\/(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})(?:[/?][^\s]*)?$/i,
   ];
   for (const pattern of patterns) {
     const match = url.match(pattern);

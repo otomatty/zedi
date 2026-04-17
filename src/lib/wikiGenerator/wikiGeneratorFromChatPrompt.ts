@@ -9,6 +9,16 @@
  */
 
 /**
+ * Escapes a closing tag that would otherwise prematurely terminate the
+ * surrounding XML-like section block. Defensive only: `userSchema` is
+ * user-controlled text and could contain `</user_schema>`.
+ * 終了タグを混入されてセクション境界が破壊されるのを防ぐための防御的エスケープ。
+ */
+function escapeUserSchemaContent(input: string): string {
+  return input.replaceAll("</user_schema>", "<\\/user_schema>");
+}
+
+/**
  * Builds the user message for chat-page wiki generation from title, outline, and conversation.
  * タイトル・アウトライン・会話から、チャット由来ページ生成用ユーザープロンプトを組み立てる。
  */
@@ -25,7 +35,7 @@ export function buildChatPageWikiUserPrompt(
     userSchema && userSchema.trim()
       ? `\n## ユーザー定義スキーマ（構成・表記ルールなど。必ず従うこと）
 <user_schema>
-${userSchema.trim()}
+${escapeUserSchemaContent(userSchema.trim())}
 </user_schema>\n`
       : "";
 

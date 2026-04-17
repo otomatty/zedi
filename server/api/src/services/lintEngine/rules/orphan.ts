@@ -32,6 +32,7 @@ export async function runOrphanRule(ownerId: string, db: Database): Promise<Lint
           INNER JOIN pages AS src ON src.id = links.source_id
           WHERE links.target_id = ${pages.id}
           AND src.is_deleted = false
+          AND src.owner_id = ${ownerId}
         )`,
       ),
     );

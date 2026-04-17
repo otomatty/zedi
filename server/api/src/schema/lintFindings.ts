@@ -4,8 +4,20 @@ import { users } from "./users.js";
 /**
  * Lint ルール名の型。
  * Lint rule name type.
+ *
+ * `stale` は P4 で追加。ページが新しいソースで更新されたのに
+ * ページ本体が古いまま取り残されているケースを検出する。
+ *
+ * `stale` was added in P4 and flags pages whose linked sources have been
+ * re-extracted more recently than the page itself was updated.
  */
-export type LintRule = "orphan" | "ghost_many" | "title_similar" | "conflict" | "broken_link";
+export type LintRule =
+  | "orphan"
+  | "ghost_many"
+  | "title_similar"
+  | "conflict"
+  | "broken_link"
+  | "stale";
 
 /**
  * Lint 重要度の型。

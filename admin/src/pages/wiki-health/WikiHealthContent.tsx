@@ -26,6 +26,7 @@ const RULE_LABELS: Record<LintRule, string> = {
   title_similar: "タイトル類似 / Title Similar",
   conflict: "矛盾 / Conflict",
   broken_link: "リンク切れ / Broken Link",
+  stale: "古い情報 / Stale",
 };
 
 /**
@@ -104,7 +105,7 @@ export function WikiHealthContent({
 
       {/* サマリ表示 / Summary display */}
       {summary && (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
           {summary.map((s) => (
             <div key={s.rule} className="bg-muted/50 rounded border px-3 py-2">
               <div className="text-muted-foreground text-xs">{RULE_LABELS[s.rule]}</div>

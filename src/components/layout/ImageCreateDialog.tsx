@@ -163,6 +163,24 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
     };
   }, [clearPreviewUrl]);
 
+  // 親が直接 `open=false` にしたケース（DialogContent の Esc/オーバーレイ以外、
+  // たとえば外部状態で閉じる場合）に備え、`open` の遷移を監視して
+  // 進行中の OCR / describe を必ず中断し、内部状態をリセットする。
+  // Without this, closing via the parent could leave a previous run state
+  // (preview / progress) when the dialog reopens.
+  useEffect(() => {
+    if (open) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStep("source");
+    setSelectedImage(null);
+    clearPreviewUrl();
+    setProcessingMode("none");
+    setError(null);
+    setOcrProgress(null);
+    setIsProcessing(false);
+  }, [open, clearPreviewUrl]);
+
   // 画像選択
   /**
    *

@@ -16,6 +16,7 @@ import McpAuthorize from "./pages/McpAuthorize";
 import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
+import IndexPage from "./pages/IndexPage";
 import Pricing from "./pages/Pricing";
 import SubscriptionManagement from "./pages/SubscriptionManagement";
 import Donate from "./pages/Donate";
@@ -108,6 +109,7 @@ const App = () => (
                     <Route path="/page/:id" element={<PageEditorPage />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/wiki-schema" element={<WikiSchemaPage />} />
+                    <Route path="/index" element={<IndexPage />} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route
                       path="/subscription"

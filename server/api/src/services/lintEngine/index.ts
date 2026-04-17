@@ -1,5 +1,6 @@
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { lintFindings } from "../../schema/lintFindings.js";
+import { recordActivity } from "../activityLogService.js";
 import type { Database } from "../../types/index.js";
 import type { LintFindingCandidate, LintRuleResult } from "./types.js";
 import { runOrphanRule } from "./rules/orphan.js";
@@ -7,6 +8,7 @@ import { runGhostManyRule } from "./rules/ghostMany.js";
 import { runTitleSimilarRule } from "./rules/titleSimilar.js";
 import { runBrokenLinkRule } from "./rules/brokenLink.js";
 import { runConflictRule } from "./rules/conflict.js";
+import { runStaleRule } from "./rules/stale.js";
 
 export type { LintFindingCandidate, LintRuleResult } from "./types.js";
 
@@ -29,6 +31,7 @@ export async function runAllLintRules(ownerId: string, db: Database): Promise<Li
     runTitleSimilarRule(ownerId, db),
     runBrokenLinkRule(ownerId, db),
     runConflictRule(ownerId, db),
+    runStaleRule(ownerId, db),
   ]);
 
   // トランザクション内で既存の未解決 findings を削除し、最新結果のみ保持
@@ -51,6 +54,18 @@ export async function runAllLintRules(ownerId: string, db: Database): Promise<Li
         })),
       );
     }
+  });
+
+  // Record the run in activity_log (non-fatal on failure).
+  // 活動ログに Lint 実行を記録（失敗しても全体を巻き込まない）。
+  await recordActivity(db, {
+    ownerId,
+    kind: "lint_run",
+    actor: "user",
+    detail: {
+      total: allFindings.length,
+      summary: results.map((r) => ({ rule: r.rule, count: r.findings.length })),
+    },
   });
 
   return results;

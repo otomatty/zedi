@@ -8,7 +8,7 @@ export {
   type UserRole,
   type UserStatus,
 } from "./users.js";
-export { pages, type Page, type NewPage } from "./pages.js";
+export { pages, type Page, type NewPage, type PageSpecialKind } from "./pages.js";
 export {
   notes,
   notePages,
@@ -67,6 +67,13 @@ export {
   type LintRule,
   type LintSeverity,
 } from "./lintFindings.js";
+export {
+  activityLog,
+  type ActivityLog,
+  type NewActivityLog,
+  type ActivityKind,
+  type ActivityActor,
+} from "./activityLog.js";
 
 export {
   usersRelations,
@@ -88,4 +95,5 @@ export {
   sourcesRelations,
   pageSourcesRelations,
   lintFindingsRelations,
+  activityLogRelations,
 } from "./relations.js";

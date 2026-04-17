@@ -4,7 +4,13 @@ import { adminFetch } from "./client";
  * Lint ルール名の型。
  * Lint rule name type.
  */
-export type LintRule = "orphan" | "ghost_many" | "title_similar" | "conflict" | "broken_link";
+export type LintRule =
+  | "orphan"
+  | "ghost_many"
+  | "title_similar"
+  | "conflict"
+  | "broken_link"
+  | "stale";
 
 /**
  * Lint 重要度の型。

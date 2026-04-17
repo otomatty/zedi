@@ -15,7 +15,19 @@ export interface WikiSchemaData {
   content: string;
 }
 
-const WIKI_SCHEMA_KEY = ["wiki-schema"] as const;
+/**
+ * Builds a per-user React Query cache key for the wiki schema.
+ * ユーザーごとに分離されたキャッシュキーを構築する。
+ *
+ * Using a static key would let one user's schema bleed into another user's
+ * session after a logout/login until refetch finishes (and `setQueryData`
+ * would write back into the shared slot).
+ * 静的キーだと再フェッチ完了までユーザー間でデータが見える可能性があるため、
+ * userId を含めて分離する。
+ */
+function getWikiSchemaKey(userId: string | undefined) {
+  return ["wiki-schema", userId ?? "anonymous"] as const;
+}
 
 /**
  * Fetches the wiki schema page text from the API.
@@ -57,9 +69,10 @@ async function updateWikiSchema(body: {
 export function useWikiSchema() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const queryKey = getWikiSchemaKey(user?.id);
 
   const query = useQuery({
-    queryKey: WIKI_SCHEMA_KEY,
+    queryKey,
     queryFn: fetchWikiSchema,
     enabled: !!user,
     staleTime: 60_000,
@@ -68,7 +81,7 @@ export function useWikiSchema() {
   const mutation = useMutation({
     mutationFn: updateWikiSchema,
     onSuccess: (data) => {
-      queryClient.setQueryData(WIKI_SCHEMA_KEY, data);
+      queryClient.setQueryData(queryKey, data);
     },
   });
 
