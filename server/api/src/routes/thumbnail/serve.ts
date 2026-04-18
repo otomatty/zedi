@@ -99,8 +99,11 @@ app.delete("/:id", authRequired, async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  await db.delete(thumbnailObjects).where(eq(thumbnailObjects.id, objectId));
-
+  // ストレージ→DB の順で削除する。ストレージ側が失敗した場合に DB レコードだけ消えて
+  // オブジェクトが孤児化するのを防ぐため。NoSuchKey 等の冪等エラーは DB 削除まで進める。
+  //
+  // Delete storage object before the DB row so a storage failure cannot leave an
+  // orphaned object behind. Idempotent errors (NoSuchKey) still advance to DB delete.
   try {
     await s3.send(
       new DeleteObjectCommand({
@@ -109,9 +112,19 @@ app.delete("/:id", authRequired, async (c) => {
       }),
     );
   } catch (err) {
-    console.error("[thumbnail/serve] S3 DeleteObject failed:", err);
-    return c.json({ error: "Failed to delete object from storage" }, 502);
+    // NoSuchKey のみを冪等として扱う。NoSuchBucket 等、別の 404 応答は
+    // 本当の設定不整合なので 502 に倒して DB を残す。
+    //
+    // Only treat an explicit NoSuchKey as idempotent; other 404-class errors
+    // (e.g. NoSuchBucket) indicate real config failures — surface 502 and keep the DB row.
+    const s3Err = err as { name?: string } | null;
+    if (s3Err?.name !== "NoSuchKey") {
+      console.error("[thumbnail/serve] S3 DeleteObject failed:", err);
+      return c.json({ error: "Failed to delete object from storage" }, 502);
+    }
   }
+
+  await db.delete(thumbnailObjects).where(eq(thumbnailObjects.id, objectId));
 
   return c.json({ success: true });
 });
