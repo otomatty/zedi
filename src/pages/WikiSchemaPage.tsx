@@ -3,10 +3,10 @@
  * ユーザー定義の Wiki スキーマ（「憲法」）を編集するページ。
  */
 import React, { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 import { Button, useToast } from "@zedi/ui";
-import { Link } from "react-router-dom";
 import Container from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useTranslation } from "react-i18next";
 import { useWikiSchema } from "@/hooks/useWikiSchema";
 
@@ -54,17 +54,12 @@ const WikiSchemaPage: React.FC = () => {
   }, [title, content, updateSchema, toast, t]);
 
   return (
-    <div className="bg-background min-h-screen">
-      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
-        <Container className="flex h-16 items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <Button asChild variant="ghost" size="icon">
-              <Link to="/settings" aria-label={t("common.back")}>
-                <ArrowLeft className="h-5 w-5" aria-hidden />
-              </Link>
-            </Button>
-            <h1 className="truncate text-xl font-semibold">{t("wikiSchema.title")}</h1>
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader
+        title={t("wikiSchema.title")}
+        backTo="/settings"
+        backLabel={t("common.back")}
+        actions={
           <Button onClick={handleSave} disabled={!isDirty || isUpdating} size="sm">
             {isUpdating ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -73,10 +68,10 @@ const WikiSchemaPage: React.FC = () => {
             )}
             {t("wikiSchema.save")}
           </Button>
-        </Container>
-      </header>
+        }
+      />
 
-      <main className="py-6">
+      <main className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <div className="mx-auto max-w-2xl space-y-6">
             {isLoading ? (

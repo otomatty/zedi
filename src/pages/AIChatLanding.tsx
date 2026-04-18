@@ -4,7 +4,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { AIChatInput } from "@/components/ai-chat/AIChatInput";
 import { AIChatConversationListRow } from "@/components/ai-chat/AIChatConversationListRow";
@@ -67,7 +66,7 @@ export default function AIChatLanding() {
   const handleStopStreaming = useCallback(() => {}, []);
 
   return (
-    <AppLayout>
+    <>
       {/* Fill main below header (parent shell uses h-svh + overflow-hidden). / ヘッダー下のメイン領域を埋める */}
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
         {/* Input: vertically centered in the flex-1 region above history / 履歴より上の領域で縦中央 */}
@@ -132,6 +131,6 @@ export default function AIChatLanding() {
           </Container>
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

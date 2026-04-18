@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@zedi/ui";
@@ -153,71 +152,65 @@ const NotePageView: React.FC = () => {
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
     return (
-      <AppLayout>
-        <main className="min-h-0 flex-1 overflow-y-auto py-10">
-          <Container>
-            <p className="text-muted-foreground text-sm">読み込み中...</p>
-          </Container>
-        </main>
-      </AppLayout>
+      <main className="min-h-0 flex-1 overflow-y-auto py-10">
+        <Container>
+          <p className="text-muted-foreground text-sm">読み込み中...</p>
+        </Container>
+      </main>
     );
   }
   if (isNotFound) {
     return (
-      <AppLayout>
-        <main className="min-h-0 flex-1 overflow-y-auto py-10">
-          <Container>
-            <p className="text-muted-foreground text-sm">
-              ページが見つからないか、閲覧権限がありません。
-            </p>
-          </Container>
-        </main>
-      </AppLayout>
+      <main className="min-h-0 flex-1 overflow-y-auto py-10">
+        <Container>
+          <p className="text-muted-foreground text-sm">
+            ページが見つからないか、閲覧権限がありません。
+          </p>
+        </Container>
+      </main>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="border-border/60 shrink-0 border-b">
-          <Container className="flex h-10 items-center justify-between">
-            <Button variant="ghost" size="icon" onClick={handleBack}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
-          </Container>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <NoteWorkspaceProvider key={note.id} noteId={note.id}>
-            {canEdit ? (
-              <NotePageEditorEditable
-                key={page.id}
-                noteId={note.id}
-                page={page}
-                collaboration={collaboration}
-                isCollaborationEnabled={isCollaborationEnabled}
-              />
-            ) : (
-              <PageEditorContent
-                content={page?.content ?? ""}
-                title={page.title}
-                sourceUrl={page.sourceUrl}
-                currentPageId={page.id}
-                pageId={page.id}
-                isNewPage={false}
-                isWikiGenerating={false}
-                isReadOnly={true}
-                showLinkedPages={false}
-                showToolbar={false}
-                onContentChange={() => undefined}
-                onContentError={() => undefined}
-              />
-            )}
-          </NoteWorkspaceProvider>
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="border-border/60 shrink-0 border-b">
+        <Container className="flex h-10 items-center justify-between">
+          <Button variant="ghost" size="icon" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
+        </Container>
       </div>
-    </AppLayout>
+
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <NoteWorkspaceProvider key={note.id} noteId={note.id}>
+          {canEdit ? (
+            <NotePageEditorEditable
+              key={page.id}
+              noteId={note.id}
+              page={page}
+              collaboration={collaboration}
+              isCollaborationEnabled={isCollaborationEnabled}
+            />
+          ) : (
+            <PageEditorContent
+              content={page?.content ?? ""}
+              title={page.title}
+              sourceUrl={page.sourceUrl}
+              currentPageId={page.id}
+              pageId={page.id}
+              isNewPage={false}
+              isWikiGenerating={false}
+              isReadOnly={true}
+              showLinkedPages={false}
+              showToolbar={false}
+              onContentChange={() => undefined}
+              onContentError={() => undefined}
+            />
+          )}
+        </NoteWorkspaceProvider>
+      </div>
+    </div>
   );
 };
 

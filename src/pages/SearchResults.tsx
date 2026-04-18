@@ -1,6 +1,5 @@
 import { useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { SearchResultCard } from "@/components/search/SearchResultCard";
 import type { SearchResultCardItem } from "@/components/search/SearchResultCard";
@@ -112,56 +111,54 @@ export default function SearchResults() {
     item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
 
   return (
-    <AppLayout>
-      <main className="min-h-0 flex-1 overflow-y-auto py-6">
-        <Container>
-          <div className="mb-6">
-            {searchQuery ? (
-              <h1 className="text-lg font-medium">
-                「{searchQuery}」の検索結果
-                {!isLoading && (
-                  <span className="text-muted-foreground ml-2 text-sm font-normal">
-                    {results.length}件
-                  </span>
-                )}
-              </h1>
-            ) : (
-              <h1 className="text-muted-foreground text-lg font-medium">
-                検索キーワードを入力してください
-              </h1>
-            )}
+    <main className="min-h-0 flex-1 overflow-y-auto py-6">
+      <Container>
+        <div className="mb-6">
+          {searchQuery ? (
+            <h1 className="text-lg font-medium">
+              「{searchQuery}」の検索結果
+              {!isLoading && (
+                <span className="text-muted-foreground ml-2 text-sm font-normal">
+                  {results.length}件
+                </span>
+              )}
+            </h1>
+          ) : (
+            <h1 className="text-muted-foreground text-lg font-medium">
+              検索キーワードを入力してください
+            </h1>
+          )}
+        </div>
+
+        {isLoading && searchQuery.length >= 3 && <SearchResultsLoadingSkeleton />}
+
+        {searchQuery.length > 0 && searchQuery.length < 3 && (
+          <SearchResultsEmptyState description="3文字以上入力してください" />
+        )}
+
+        {!isLoading && searchQuery.length >= 3 && results.length === 0 && (
+          <SearchResultsEmptyState
+            title="検索結果が見つかりません"
+            description="別のキーワードで検索してみてください"
+          />
+        )}
+
+        {!isLoading && results.length > 0 && (
+          <div className="max-w-3xl space-y-3">
+            {results.map((item) => (
+              <SearchResultCard
+                key={resultKey(item)}
+                item={item}
+                onClick={() => handleResultClick(item)}
+              />
+            ))}
           </div>
+        )}
 
-          {isLoading && searchQuery.length >= 3 && <SearchResultsLoadingSkeleton />}
-
-          {searchQuery.length > 0 && searchQuery.length < 3 && (
-            <SearchResultsEmptyState description="3文字以上入力してください" />
-          )}
-
-          {!isLoading && searchQuery.length >= 3 && results.length === 0 && (
-            <SearchResultsEmptyState
-              title="検索結果が見つかりません"
-              description="別のキーワードで検索してみてください"
-            />
-          )}
-
-          {!isLoading && results.length > 0 && (
-            <div className="max-w-3xl space-y-3">
-              {results.map((item) => (
-                <SearchResultCard
-                  key={resultKey(item)}
-                  item={item}
-                  onClick={() => handleResultClick(item)}
-                />
-              ))}
-            </div>
-          )}
-
-          {!searchQuery && (
-            <SearchResultsEmptyState description="ヘッダーの検索バーからキーワードを入力してください" />
-          )}
-        </Container>
-      </main>
-    </AppLayout>
+        {!searchQuery && (
+          <SearchResultsEmptyState description="ヘッダーの検索バーからキーワードを入力してください" />
+        )}
+      </Container>
+    </main>
   );
 }
