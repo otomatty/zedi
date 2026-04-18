@@ -4,7 +4,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { AIChatInput } from "@/components/ai-chat/AIChatInput";
 import { AIChatConversationListRow } from "@/components/ai-chat/AIChatConversationListRow";
@@ -67,71 +66,69 @@ export default function AIChatLanding() {
   const handleStopStreaming = useCallback(() => {}, []);
 
   return (
-    <AppLayout>
-      {/* Fill main below header (parent shell uses h-svh + overflow-hidden). / ヘッダー下のメイン領域を埋める */}
-      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Input: vertically centered in the flex-1 region above history / 履歴より上の領域で縦中央 */}
-        <div className="bg-background flex min-h-0 flex-1 flex-col justify-center px-4 py-4">
-          <Container className="mx-auto w-full max-w-2xl">
-            <AIChatInput
-              onSendMessage={handleSendMessage}
-              onStopStreaming={handleStopStreaming}
-              placeholderOverride={t("aiChat.landing.placeholder")}
-              formClassName="p-3"
-              editorClassName="min-h-[120px] max-h-[min(40vh,280px)] text-base"
-              emptyOverlayClassName="text-base"
-            />
-          </Container>
-        </div>
-
-        {/* Recent chats (scrollable, capped height so the input area keeps vertical balance) / 履歴は高さ制限付きでスクロール */}
-        <div className="scrollbar-none bg-background max-h-[min(42vh,320px)] min-h-0 shrink-0 overflow-y-auto">
-          <Container className="mx-auto max-w-2xl pb-8">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                {t("aiChat.landing.recentChats")}
-              </h2>
-              {conversations.length > 0 && (
-                <Link
-                  to={AI_CHAT_HISTORY_PATH}
-                  className="text-primary hover:text-primary/80 text-xs transition-colors"
-                >
-                  {t("aiChat.landing.viewAll")}
-                </Link>
-              )}
-            </div>
-
-            {recentChats.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t("aiChat.landing.noRecentChats")}</p>
-            ) : (
-              <div className="flex max-w-2xl flex-col gap-2">
-                {recentChats.map((conv) => {
-                  const titleLabel =
-                    conv.title.trim().length > 0
-                      ? conv.title
-                      : t("nav.sidebarUntitledChat", "New chat");
-                  const dateLabel = formatDistanceToNow(new Date(conv.updatedAt), {
-                    addSuffix: true,
-                    locale: dateLocale,
-                  });
-                  return (
-                    <AIChatConversationListRow
-                      key={conv.id}
-                      conversation={conv}
-                      variant="page"
-                      borderless
-                      isActive={activeConversationId === conv.id}
-                      onOpen={() => navigate(aiChatConversationPath(conv.id))}
-                      dateLabel={dateLabel}
-                      titleLabel={titleLabel}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </Container>
-        </div>
+    // Fill main below header (parent shell uses h-svh + overflow-hidden). / ヘッダー下のメイン領域を埋める
+    <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+      {/* Input: vertically centered in the flex-1 region above history / 履歴より上の領域で縦中央 */}
+      <div className="bg-background flex min-h-0 flex-1 flex-col justify-center px-4 py-4">
+        <Container className="mx-auto w-full max-w-2xl">
+          <AIChatInput
+            onSendMessage={handleSendMessage}
+            onStopStreaming={handleStopStreaming}
+            placeholderOverride={t("aiChat.landing.placeholder")}
+            formClassName="p-3"
+            editorClassName="min-h-[120px] max-h-[min(40vh,280px)] text-base"
+            emptyOverlayClassName="text-base"
+          />
+        </Container>
       </div>
-    </AppLayout>
+
+      {/* Recent chats (scrollable, capped height so the input area keeps vertical balance) / 履歴は高さ制限付きでスクロール */}
+      <div className="scrollbar-none bg-background max-h-[min(42vh,320px)] min-h-0 shrink-0 overflow-y-auto">
+        <Container className="mx-auto max-w-2xl pb-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+              {t("aiChat.landing.recentChats")}
+            </h2>
+            {conversations.length > 0 && (
+              <Link
+                to={AI_CHAT_HISTORY_PATH}
+                className="text-primary hover:text-primary/80 text-xs transition-colors"
+              >
+                {t("aiChat.landing.viewAll")}
+              </Link>
+            )}
+          </div>
+
+          {recentChats.length === 0 ? (
+            <p className="text-muted-foreground text-sm">{t("aiChat.landing.noRecentChats")}</p>
+          ) : (
+            <div className="flex max-w-2xl flex-col gap-2">
+              {recentChats.map((conv) => {
+                const titleLabel =
+                  conv.title.trim().length > 0
+                    ? conv.title
+                    : t("nav.sidebarUntitledChat", "New chat");
+                const dateLabel = formatDistanceToNow(new Date(conv.updatedAt), {
+                  addSuffix: true,
+                  locale: dateLocale,
+                });
+                return (
+                  <AIChatConversationListRow
+                    key={conv.id}
+                    conversation={conv}
+                    variant="page"
+                    borderless
+                    isActive={activeConversationId === conv.id}
+                    onOpen={() => navigate(aiChatConversationPath(conv.id))}
+                    dateLabel={dateLabel}
+                    titleLabel={titleLabel}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </Container>
+      </div>
+    </main>
   );
 }

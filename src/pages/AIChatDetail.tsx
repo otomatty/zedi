@@ -1,6 +1,5 @@
 import { Suspense, lazy, useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { AIChatMessages } from "@/components/ai-chat/AIChatMessages";
 import { AIChatInput } from "@/components/ai-chat/AIChatInput";
@@ -137,10 +136,10 @@ export default function AIChatDetail() {
   );
 
   return (
-    <AppLayout>
+    <>
       {/* Fill SidebarInset (already below header). flex-1 + min-h-0 prevents page-level scroll.
           SidebarInset 内を埋める（ヘッダー下の高さは親が保証）。メッセージのみスクロール。 */}
-      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+      <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
         <div className="border-border shrink-0 border-b px-4 py-2">
           <AIChatViewTabs activeTab={activeViewTab} onTabChange={setActiveViewTab} />
         </div>
@@ -185,7 +184,7 @@ export default function AIChatDetail() {
             />
           </Container>
         </div>
-      </div>
+      </main>
       <PromoteToWikiDialog
         open={promote.open}
         onClose={promote.close}
@@ -193,6 +192,6 @@ export default function AIChatDetail() {
         existingTitles={existingPageTitles}
         conversationId={conversationId}
       />
-    </AppLayout>
+    </>
   );
 }

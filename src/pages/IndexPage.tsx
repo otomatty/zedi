@@ -13,9 +13,10 @@
  */
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Button, useToast } from "@zedi/ui";
 import Container from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 /**
  * Read-only response from GET /api/activity/index.
@@ -143,17 +144,12 @@ const IndexPage: React.FC = () => {
   const busy = loading || rebuilding;
 
   return (
-    <div className="bg-background min-h-screen">
-      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
-        <Container className="flex h-16 items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <Button asChild variant="ghost" size="icon">
-              <Link to="/home" aria-label="Back to home">
-                <ArrowLeft className="h-5 w-5" aria-hidden />
-              </Link>
-            </Button>
-            <h1 className="truncate text-xl font-semibold">Wiki Index / カテゴリ目次</h1>
-          </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader
+        title="Wiki Index / カテゴリ目次"
+        backTo="/home"
+        backLabel="Back to home"
+        actions={
           <Button onClick={() => void rebuild()} disabled={busy} size="sm">
             {rebuilding ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -162,10 +158,10 @@ const IndexPage: React.FC = () => {
             )}
             再構築 / Rebuild
           </Button>
-        </Container>
-      </header>
+        }
+      />
 
-      <main className="py-6">
+      <main className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <div className="mx-auto max-w-2xl space-y-6">
             <p className="text-muted-foreground text-sm">

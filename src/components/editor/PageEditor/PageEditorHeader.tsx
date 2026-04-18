@@ -9,15 +9,12 @@ import {
   DropdownMenuTrigger,
 } from "@zedi/ui";
 import Container from "@/components/layout/Container";
-import { HeaderSearchBar } from "@/components/layout/Header/HeaderSearchBar";
-import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
 import { useTranslation } from "react-i18next";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import { ConnectionIndicator } from "../ConnectionIndicator";
 import { UserAvatars } from "../UserAvatars";
 import type { ConnectionStatus } from "@/lib/collaboration/types";
 import type { UserPresence } from "@/lib/collaboration/types";
-import { AIChatButton } from "@/components/layout/Header/AIChatButton";
 
 interface PageEditorHeaderProps {
   lastSaved: number | null;
@@ -37,8 +34,12 @@ interface PageEditorHeaderProps {
 }
 
 /**
- * Header component for PageEditor
- * Contains search bar, action buttons, and dropdown menu
+ * Page-specific toolbar for PageEditor. Shown below the common `Header`
+ * (which already provides search / AI chat / UnifiedMenu), so this toolbar
+ * only contains editor-specific actions (back, collaboration status, more menu).
+ *
+ * PageEditor のページ固有ツールバー。検索・AI チャット・ユーザーメニューは
+ * 共通 `Header` 側で提供されるため、ここではエディタ固有の操作（戻る・コラボ・その他メニュー）のみ。
  */
 export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   lastSaved,
@@ -50,24 +51,13 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   collaboration,
 }) => {
   const { t } = useTranslation();
-  const searchContext = useGlobalSearchContextOptional();
-  const hasSearchContext = searchContext != null;
 
   return (
-    <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
-      <Container className="flex h-16 items-center gap-4">
+    <div className="border-border/60 bg-background/80 supports-[backdrop-filter]:bg-background/60 border-b backdrop-blur">
+      <Container className="flex h-12 items-center justify-between gap-4">
         <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
           <ArrowLeft className="h-5 w-5" />
         </Button>
-
-        {/* Center: Search bar */}
-        {hasSearchContext ? (
-          <div className="flex max-w-xl min-w-0 flex-1 justify-center">
-            <HeaderSearchBar />
-          </div>
-        ) : (
-          <div className="min-w-0 flex-1" aria-hidden="true" />
-        )}
 
         <div className="flex items-center gap-2">
           {/* リアルタイムコラボ: 接続状態・オンラインユーザー */}
@@ -82,7 +72,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
               <UserAvatars users={collaboration.onlineUsers} className="shrink-0" />
             </>
           )}
-          <AIChatButton />
           {lastSaved && (
             <span className="text-muted-foreground hidden text-xs sm:inline">
               {formatTimeAgo(lastSaved)}に保存
@@ -122,6 +111,6 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
           </DropdownMenu>
         </div>
       </Container>
-    </header>
+    </div>
   );
 };

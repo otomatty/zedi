@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { Button, useToast } from "@zedi/ui";
 import {
@@ -124,43 +123,41 @@ const NoteMembers: React.FC = () => {
   }
 
   return (
-    <AppLayout>
-      <main className="min-h-0 flex-1 overflow-y-auto py-8">
-        <Container>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-semibold">{t("notes.members")}</h1>
-              <p className="text-muted-foreground mt-1 truncate text-sm">
-                {note.title || t("notes.untitledNote")}
-              </p>
-            </div>
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
-            </Button>
-          </div>
-
-          {!canManageMembers ? (
-            <p className="text-muted-foreground mt-6 text-sm">
-              {t("notes.noPermissionToManageMembers")}
+    <main className="min-h-0 flex-1 overflow-y-auto py-8">
+      <Container>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold">{t("notes.members")}</h1>
+            <p className="text-muted-foreground mt-1 truncate text-sm">
+              {note.title || t("notes.untitledNote")}
             </p>
-          ) : (
-            <NoteMembersManageSection
-              members={members}
-              isMembersLoading={isMembersLoading}
-              memberEmail={memberEmail}
-              setMemberEmail={setMemberEmail}
-              memberRole={memberRole}
-              setMemberRole={setMemberRole}
-              roleOptions={memberRoleOptions}
-              onAddMember={handleAddMember}
-              onUpdateRole={handleUpdateMemberRole}
-              onRemoveMember={handleRemoveMember}
-              onResendInvitation={handleResendInvitation}
-            />
-          )}
-        </Container>
-      </main>
-    </AppLayout>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
+          </Button>
+        </div>
+
+        {!canManageMembers ? (
+          <p className="text-muted-foreground mt-6 text-sm">
+            {t("notes.noPermissionToManageMembers")}
+          </p>
+        ) : (
+          <NoteMembersManageSection
+            members={members}
+            isMembersLoading={isMembersLoading}
+            memberEmail={memberEmail}
+            setMemberEmail={setMemberEmail}
+            memberRole={memberRole}
+            setMemberRole={setMemberRole}
+            roleOptions={memberRoleOptions}
+            onAddMember={handleAddMember}
+            onUpdateRole={handleUpdateMemberRole}
+            onRemoveMember={handleRemoveMember}
+            onResendInvitation={handleResendInvitation}
+          />
+        )}
+      </Container>
+    </main>
   );
 };
 
