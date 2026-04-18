@@ -384,3 +384,103 @@ describe("GET /api/media/:id — proxy stream (no redirect to storage)", () => {
     expect(body.error).toBe("Failed to retrieve object");
   });
 });
+
+describe("DELETE /api/media/:id — storage-first deletion order", () => {
+  const s3Key = `users/${TEST_USER_ID}/media/${MEDIA_ID}/photo.png`;
+  const mediaRow = {
+    id: MEDIA_ID,
+    ownerId: TEST_USER_ID,
+    s3Key,
+    fileName: "photo.png",
+    contentType: "image/png",
+    fileSize: null as number | null,
+    pageId: null as string | null,
+    createdAt: new Date(),
+  };
+
+  it("deletes storage object before DB row when both succeed", async () => {
+    mockS3Send.mockResolvedValueOnce({});
+    const { db } = createMockDb([[mediaRow], []]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockS3Send).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps DB row and returns 502 when storage deletion fails with unexpected error", async () => {
+    mockS3Send.mockRejectedValueOnce(new Error("network down"));
+    const { db, chains } = createMockDb([[mediaRow]]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(502);
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(0);
+  });
+
+  it("proceeds to delete DB row when storage reports NoSuchKey (idempotent)", async () => {
+    mockS3Send.mockRejectedValueOnce({
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+    const { db, chains } = createMockDb([[mediaRow], []]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(1);
+  });
+
+  it("returns 403 when media belongs to another user (no storage call)", async () => {
+    const app = createMediaApp([[{ ...mediaRow, ownerId: ATTACKER_ID }]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(403);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when media row is missing (no storage call)", async () => {
+    const app = createMediaApp([[]]);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(404);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+});

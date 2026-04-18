@@ -240,8 +240,11 @@ app.delete("/:id", authRequired, async (c) => {
     throw new HTTPException(403, { message: "You can only delete your own media" });
   }
 
-  await db.delete(media).where(eq(media.id, mediaId));
-
+  // ストレージ→DB の順で削除する。ストレージ側が失敗した場合に DB レコードだけ消えて
+  // オブジェクトが孤児化するのを防ぐため。NoSuchKey 等の冪等エラーは DB 削除まで進める。
+  //
+  // Delete storage object before the DB row so a storage failure cannot leave an
+  // orphaned object behind. Idempotent errors (NoSuchKey) still advance to DB delete.
   try {
     await s3.send(
       new DeleteObjectCommand({
@@ -250,9 +253,17 @@ app.delete("/:id", authRequired, async (c) => {
       }),
     );
   } catch (err) {
-    console.error("[media] S3 DeleteObject failed:", err);
-    throw new HTTPException(502, { message: "Failed to delete object from storage" });
+    const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
+      ?.$metadata;
+    const code = meta?.httpStatusCode;
+    const name = (err as { name?: string }).name;
+    if (name !== "NoSuchKey" && code !== 404) {
+      console.error("[media] S3 DeleteObject failed:", err);
+      throw new HTTPException(502, { message: "Failed to delete object from storage" });
+    }
   }
+
+  await db.delete(media).where(eq(media.id, mediaId));
 
   return c.json({ success: true });
 });
