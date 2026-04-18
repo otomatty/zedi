@@ -125,6 +125,23 @@ describe("DELETE /api/thumbnail/serve/:id — storage-first deletion order", () 
     expect(deleteCalls).toHaveLength(1);
   });
 
+  it("keeps DB row and returns 502 for NoSuchBucket 404 (config failure, not idempotent)", async () => {
+    mockS3Send.mockRejectedValueOnce({
+      name: "NoSuchBucket",
+      $metadata: { httpStatusCode: 404 },
+    });
+    const { app, chains } = createServeApp([[thumbRow]]);
+
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(502);
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(0);
+  });
+
   it("returns 404 when DB row is missing or belongs to another user (no storage call)", async () => {
     const { app } = createServeApp([[]]);
 

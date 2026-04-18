@@ -112,11 +112,13 @@ app.delete("/:id", authRequired, async (c) => {
       }),
     );
   } catch (err) {
-    const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
-      ?.$metadata;
-    const code = meta?.httpStatusCode;
-    const name = (err as { name?: string }).name;
-    if (name !== "NoSuchKey" && code !== 404) {
+    // NoSuchKey のみを冪等として扱う。NoSuchBucket 等、別の 404 応答は
+    // 本当の設定不整合なので 502 に倒して DB を残す。
+    //
+    // Only treat an explicit NoSuchKey as idempotent; other 404-class errors
+    // (e.g. NoSuchBucket) indicate real config failures — surface 502 and keep the DB row.
+    const s3Err = err as { name?: string } | null;
+    if (s3Err?.name !== "NoSuchKey") {
       console.error("[thumbnail/serve] S3 DeleteObject failed:", err);
       return c.json({ error: "Failed to delete object from storage" }, 502);
     }

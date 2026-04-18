@@ -460,6 +460,29 @@ describe("DELETE /api/media/:id — storage-first deletion order", () => {
     expect(deleteCalls).toHaveLength(1);
   });
 
+  it("keeps DB row and returns 502 for NoSuchBucket 404 (config failure, not idempotent)", async () => {
+    mockS3Send.mockRejectedValueOnce({
+      name: "NoSuchBucket",
+      $metadata: { httpStatusCode: 404 },
+    });
+    const { db, chains } = createMockDb([[mediaRow]]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(502);
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(0);
+  });
+
   it("returns 403 when media belongs to another user (no storage call)", async () => {
     const app = createMediaApp([[{ ...mediaRow, ownerId: ATTACKER_ID }]]);
 
