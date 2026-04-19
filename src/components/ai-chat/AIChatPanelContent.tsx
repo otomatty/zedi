@@ -116,8 +116,13 @@ export function AIChatPanelContent({
       // 初回表示後はマウントを維持し、タブ切替で実行状態を失わない。
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-way latch from tab selection (not external sync)
       setKeepWorkflowMounted(true);
+    } else if (!workflowAvailable && activeViewTab === "workflow") {
+      // Web など workflow が利用できない環境では、選択状態が残っていても chat に戻して行き止まりを防ぐ。
+      // If workflow is unavailable (e.g. web), fall back to chat to avoid an empty dead-end UI.
+
+      setActiveViewTab("chat");
     }
-  }, [activeViewTab, workflowAvailable]);
+  }, [activeViewTab, setActiveViewTab, workflowAvailable]);
 
   return (
     <div className="bg-background relative flex h-full flex-col border-l">
