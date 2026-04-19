@@ -144,8 +144,14 @@ async function getInnertube(): Promise<Innertube> {
   if (!innertubePromise) {
     // retrieve_player: false でセッション初期化を高速化（字幕/メタデータ取得には player.js 不要）。
     // Skip JS player retrieval — it is only needed for stream deciphering.
+    // 初期化失敗時はキャッシュをクリアし、次回呼び出しで再試行できるようにする。
+    // Reset the cache on failure so transient initialisation errors don't
+    // permanently break the service for the rest of the process lifetime.
     innertubePromise = Innertube.create({
       retrieve_player: false,
+    }).catch((err) => {
+      innertubePromise = null;
+      throw err;
     });
   }
   return innertubePromise;
@@ -213,17 +219,17 @@ function extractMetadata(
   // basic_info.start_timestamp (Date) があればそちらを ISO に
   // Prefer PlayerMicroformat.publish_date (e.g. "2024-01-15"), fall back to start_timestamp.
   const microformat = info.page[0]?.microformat as PlayerMicroformat | undefined;
-  const publishedAt =
-    microformat?.publish_date ?? basic.start_timestamp?.toISOString() ?? "";
+  const publishedAt = microformat?.publish_date ?? basic.start_timestamp?.toISOString() ?? "";
 
-  // 再生時間: 秒数を ISO 8601 duration に変換
-  // Duration: convert seconds to ISO 8601 duration
-  const duration = secondsToIso8601Duration(basic.duration ?? 0);
+  // 再生時間: 値が無い場合は空文字（"PT0S" を捏造して "0:00" 表示にしない）
+  // Duration: leave as empty string when missing — avoid fabricating "PT0S"
+  // which would render as "0:00" downstream and misrepresent the metadata.
+  const duration = basic.duration != null ? secondsToIso8601Duration(basic.duration) : "";
 
   // サムネイル: 最大解像度のものを選択。配列が空なら hqdefault に fallback
   // Thumbnail: pick the largest by width; fall back to hqdefault when none returned.
-  const thumbnailUrl = pickLargestThumbnail(basic.thumbnail) ??
-    `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  const thumbnailUrl =
+    pickLargestThumbnail(basic.thumbnail) ?? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 
   // タグ: basic_info.tags / keywords どちらかが入る場合あり
   // Tags: basic_info.tags or basic_info.keywords (whichever is populated)
@@ -246,12 +252,13 @@ function extractMetadata(
  */
 function pickLargestThumbnail(thumbnails: Thumbnail[] | undefined | null): string | null {
   if (!thumbnails || thumbnails.length === 0) return null;
-  let best = thumbnails[0];
-  if (!best) return null;
+  // 配列内の null/undefined 要素をスキップしつつ最大幅を選ぶ
+  // Walk the entire list so a null/undefined first element doesn't drop later valid entries.
+  let best: Thumbnail | null = null;
   for (const t of thumbnails) {
-    if (t && t.width > best.width) best = t;
+    if (t && (!best || t.width > best.width)) best = t;
   }
-  return best.url;
+  return best?.url ?? null;
 }
 
 // ── Transcript extraction ─────────────────────────────────────────────────

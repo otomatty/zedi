@@ -210,6 +210,38 @@ describe("youtubeService", () => {
       expect(result.metadata.channelTitle).toBe("Author Name");
     });
 
+    it("leaves duration empty when basic_info.duration is missing (no fabricated 0:00)", async () => {
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: { title: "No duration" }, // no `duration` field
+          transcriptError: new Error("none"),
+        }),
+      );
+
+      const result = await fetchYouTubeContent("noDur123456");
+      expect(result.metadata.duration).toBe("");
+    });
+
+    it("picks the widest thumbnail even when earlier array entries are null", async () => {
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: {
+            title: "Sparse thumbs",
+            duration: 30,
+            thumbnail: [
+              null,
+              { url: "https://i.ytimg.com/vi/abc/small.jpg", width: 120, height: 90 },
+              { url: "https://i.ytimg.com/vi/abc/large.jpg", width: 1280, height: 720 },
+            ] as unknown[],
+          },
+          transcriptError: new Error("none"),
+        }),
+      );
+
+      const result = await fetchYouTubeContent("sparseThumb");
+      expect(result.metadata.thumbnailUrl).toBe("https://i.ytimg.com/vi/abc/large.jpg");
+    });
+
     it("uses hqdefault thumbnail when basic_info.thumbnail is empty", async () => {
       mockGetInfo.mockResolvedValueOnce(
         buildVideoInfoMock({
@@ -222,6 +254,27 @@ describe("youtubeService", () => {
       expect(result.metadata.thumbnailUrl).toBe(
         "https://img.youtube.com/vi/noThumb1234/hqdefault.jpg",
       );
+    });
+
+    it("retries Innertube.create after a transient initialisation failure", async () => {
+      // 1 回目: create が失敗 → キャッシュをクリアして再試行可能になることを保証
+      // First call rejects; the cache must clear so the next call retries Innertube.create.
+      mockCreate.mockReset();
+      mockCreate.mockRejectedValueOnce(new Error("transient init failure"));
+      mockCreate.mockResolvedValueOnce({ getInfo: mockGetInfo });
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: { title: "Recovered", duration: 30 },
+          transcriptError: new Error("none"),
+        }),
+      );
+
+      const first = await fetchYouTubeContent("retryTest12");
+      expect(first.metadata.title).toBe("YouTube Video (retryTest12)"); // minimal fallback
+
+      const second = await fetchYouTubeContent("retryTest12");
+      expect(second.metadata.title).toBe("Recovered");
+      expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
     it("skips transcript segments with empty text or invalid timestamps", async () => {
