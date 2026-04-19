@@ -131,6 +131,6 @@ describe("AIChatPanelContent", () => {
     );
 
     expect(mocks.setActiveViewTab).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("ai-chat-input")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ai-chat-input")).toBeInTheDocument();
   });
 });
