@@ -89,6 +89,27 @@ server/mcp/       # MCP サーバー (stdio / HTTP) — Claude Code 連携
 terraform/        # インフラ定義
 ```
 
+## ワークスペース構成とデプロイ / Workspaces layout and deploy
+
+- ルート `package.json` の `workspaces` は `packages/*` と `admin` のみを含む。`server/api`, `server/hocuspocus`, `server/mcp` は **意図的にルートの Bun workspace から外して**、個別の Bun プロジェクトとして管理する。  
+  _Root `workspaces` covers only `packages/*` and `admin`. The three `server/*` services (`api`, `hocuspocus`, `mcp`) are intentionally kept **outside** the root Bun workspace and managed as standalone Bun projects._
+- 理由 / Rationale:
+  - Railway の Dockerfile ビルドは「各サービスの Root Directory」を build context に取る (例: `server/mcp`)。ここからルート `bun.lock` を参照するのは面倒で、context をサービス単位に閉じるほうが再現性が高い。  
+    _Railway Dockerfile builds take each service's Root Directory as the build context. Scoping `bun.lock` per service keeps the build self-contained and reproducible._
+  - Bun workspace が Railway 上で安定して扱えるようになった時点で再検討する（`.github/workflows/ci.yml` の `api-typecheck` / `mcp-test` ジョブにも同じメモあり）。  
+    _Revisit when Bun workspaces are first-class on Railway (the same note lives in `ci.yml`)._
+- 運用上の影響 / Operational impact:
+  - ルートで `bun install` を実行しても `server/*` の依存は入らない。各サービスに入るには `cd server/<service> && bun install` する必要がある。  
+    _Running `bun install` at the repo root does **not** install `server/*` dependencies; run `bun install` inside each service directory._
+  - CI (`.github/workflows/ci.yml`) でも各サービスディレクトリで個別に `bun install` → typecheck / test を行う。  
+    _CI installs and tests each service individually._
+- デプロイ / Deploy:
+  - `server/api`, `server/hocuspocus`, `server/mcp` は Railway の GitHub 連携で自動デプロイされる (Root Directory をサービスディレクトリに設定)。CI (`deploy-dev.yml` / `deploy-prod.yml`) はフロントエンド (Cloudflare Pages) のデプロイと DB マイグレーションを担当する。  
+    _All three `server/*` services auto-deploy via Railway's GitHub integration (each Railway service is configured with the matching Root Directory). The `deploy-*.yml` workflows cover Cloudflare Pages deploys and DB migrations only._
+  - `server/mcp` は `/health` を Railway のヘルスチェックに使う (`server/mcp/railway.json`)。必須環境変数: `ZEDI_API_URL` (API の内部 URL、例: `http://api.railway.internal:3000`), `BETTER_AUTH_SECRET` (API と同値)。API サービス側には `MCP_REDIRECT_URI_ALLOW` を設定する。  
+    _`server/mcp` uses `/health` as its Railway healthcheck. Required env vars: `ZEDI_API_URL` (internal API URL), `BETTER_AUTH_SECRET` (must match the API service). The API service additionally requires `MCP_REDIRECT_URI_ALLOW`._
+  - 関連 Issue: [#564](https://github.com/otomatty/zedi/issues/564).
+
 ### ローカル専用メモ（`docs/`・Git 追跡外）
 
 クローン直後は `docs/` は存在しない。必要なら次で作成する（コミットされない）。

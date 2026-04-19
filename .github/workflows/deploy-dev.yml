@@ -32,7 +32,43 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  # Railway deploys api and hocuspocus via GitHub integration (configure in Railway Dashboard)
+  # Railway deploys server/api, server/hocuspocus, and server/mcp via GitHub integration
+  # (each Railway service is configured with the matching Root Directory).
+  # See AGENTS.md §「ワークスペース構成とデプロイ」and issue #564 for the full deployment notes.
+  # Required Railway env vars per service:
+  #   - server/api:        BETTER_AUTH_SECRET, MCP_REDIRECT_URI_ALLOW (required for MCP auth code flow)
+  #   - server/mcp:        ZEDI_API_URL (internal API URL), BETTER_AUTH_SECRET (must match the API service)
+  #   - server/hocuspocus: (see server/hocuspocus/README / existing setup)
+  verify-server-health:
+    name: Verify Server Health
+    needs:
+      - migrate
+    runs-on: ubuntu-latest
+    environment: development
+    if: ${{ vars.API_BASE_URL != '' }}
+    steps:
+      # Railway deploys asynchronously after the push event, so retry the
+      # health endpoints to give the platform time to roll out the new image.
+      # Railway は push を受けてから非同期にロールアウトするため、
+      # ヘルスエンドポイントはリトライ付きで検証する。
+      - name: Wait for API /api/health
+        uses: nick-fields/retry@v4
+        with:
+          max_attempts: 10
+          timeout_minutes: 2
+          retry_wait_seconds: 30
+          command: |
+            curl --fail --show-error --silent "${{ vars.API_BASE_URL }}/api/health"
+      - name: Wait for MCP /health
+        if: ${{ vars.MCP_BASE_URL != '' }}
+        uses: nick-fields/retry@v4
+        with:
+          max_attempts: 10
+          timeout_minutes: 2
+          retry_wait_seconds: 30
+          command: |
+            curl --fail --show-error --silent "${{ vars.MCP_BASE_URL }}/health"
+
   deploy-frontend:
     name: Deploy Frontend
     needs:
