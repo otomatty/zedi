@@ -15,6 +15,34 @@ const DATE_PATTERN = /(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})[日]?/g;
 const NUMBER_PATTERN = /(\d[\d,.]*)\s*(km|m|kg|g|人|円|ドル|年|歳|万|億)/g;
 
 /**
+ * 日付値を `YYYY-M-D` (パディングなし) に正規化する。`2026-04-19` と
+ * `2026/4/19`、`2026年4月19日` を同一として扱うため。
+ *
+ * Normalize a matched date string into `YYYY-M-D` so format-only variants
+ * (`2026-04-19` vs `2026/4/19` vs `2026年4月19日`) collapse to the same value
+ * and don't trigger false `conflict` findings.
+ */
+function normalizeDateValue(raw: string): string {
+  const m = raw.match(/(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})/);
+  if (!m) return raw;
+  const year = String(parseInt(m[1] ?? "0", 10));
+  const month = String(parseInt(m[2] ?? "0", 10));
+  const day = String(parseInt(m[3] ?? "0", 10));
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 数値値から区切り文字（カンマ・空白）を取り除き正規化する。
+ * `1,000円` と `1000円`、`1 000 円` を同値として扱う。
+ *
+ * Normalize a matched number+unit string so separator-only variants
+ * (`1,000円` vs `1000円` vs `1 000 円`) collapse to the same value.
+ */
+function normalizeNumberValue(raw: string): string {
+  return raw.replace(/[,\s]+/g, "").toLowerCase();
+}
+
+/**
  * テキストからファクト（数値・日付の主張）を抽出する。
  * Extracts factual claims (numbers, dates) from text content.
  *
@@ -31,7 +59,10 @@ export function extractFacts(text: string): Array<{ key: string; value: string }
     const context = text.substring(Math.max(0, match.index - 20), match.index).trim();
     const contextKey = context.split(/\s+/).slice(-3).join(" ");
     if (contextKey) {
-      facts.push({ key: contextKey, value: match[0] });
+      // 値は YYYY-M-D に正規化して保存し、format 違いで偽陽性が出ないようにする。
+      // Persist the normalized canonical value so format-only differences don't
+      // produce false `conflict` findings.
+      facts.push({ key: contextKey, value: normalizeDateValue(match[0]) });
     }
   }
 
@@ -41,7 +72,7 @@ export function extractFacts(text: string): Array<{ key: string; value: string }
     const context = text.substring(Math.max(0, match.index - 20), match.index).trim();
     const contextKey = context.split(/\s+/).slice(-3).join(" ");
     if (contextKey) {
-      facts.push({ key: contextKey, value: match[0] });
+      facts.push({ key: contextKey, value: normalizeNumberValue(match[0]) });
     }
   }
 

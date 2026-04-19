@@ -35,7 +35,28 @@ describe("extractFacts", () => {
     const text = "富士山の標高は 3,776m である。";
     const facts = extractFacts(text);
     expect(facts.length).toBeGreaterThanOrEqual(1);
-    expect(facts.some((f) => f.value.includes("3,776m"))).toBe(true);
+    // カンマは正規化で除去されるため `3776m` として保存される。
+    // Commas are normalized away so the canonical value is `3776m`.
+    expect(facts.some((f) => f.value === "3776m")).toBe(true);
+  });
+
+  it("カンマ・空白違いを同一値として正規化する / normalises separator-only variants", () => {
+    // `1,000円` と `1000円` は同じ事実なので、抽出後の value も同一文字列になる。
+    // `1,000円` and `1000円` represent the same fact and should normalize equal.
+    const a = extractFacts("月額料金は 1,000円 です。");
+    const b = extractFacts("月額料金は 1000円 です。");
+    expect(a[0]?.value).toBe("1000円");
+    expect(b[0]?.value).toBe("1000円");
+    expect(a[0]?.value).toBe(b[0]?.value);
+  });
+
+  it("日付の format 違いを同一値として正規化する / normalises date format variants", () => {
+    const a = extractFacts("リリース日は 2026-04-19 です。");
+    const b = extractFacts("リリース日は 2026/4/19 です。");
+    const c = extractFacts("リリース日は 2026年4月19日 です。");
+    expect(a[0]?.value).toBe("2026-4-19");
+    expect(b[0]?.value).toBe("2026-4-19");
+    expect(c[0]?.value).toBe("2026-4-19");
   });
 
   it("人口の数値を抽出する / extracts population numbers", () => {

@@ -67,11 +67,14 @@ export async function runTitleSimilarRule(ownerId: string, db: Database): Promis
       const titleA = (a.title ?? "").trim().toLowerCase();
       const titleB = (b.title ?? "").trim().toLowerCase();
 
-      if (titleA === titleB) continue; // exact dup handled elsewhere
-
       const minLen = Math.min(titleA.length, titleB.length);
       if (minLen === 0) continue;
 
+      // 完全一致 (distance=0) は最も強い類似ケースなので別ルールで握り潰さず
+      // ここで `info` として報告する。以前はコメントで「他で処理する」と書かれて
+      // いたが実際にはどこも見ていなかったため、完全一致が黙って素通りしていた。
+      // Treat exact-title pairs as the strongest title_similar case rather than
+      // assuming a separate rule handles them — there is no such rule today.
       const dist = levenshtein(titleA, titleB);
       const threshold = Math.max(1, Math.floor(minLen * SIMILARITY_RATIO));
 
