@@ -94,9 +94,14 @@ describe("BottomNav", () => {
     const { container } = renderAt("/home");
     const nav = container.querySelector("nav");
     expect(nav).toBeInTheDocument();
-    expect(nav?.className).toMatch(/fixed/);
-    expect(nav?.className).toMatch(/bottom-0/);
-    expect(nav?.className).toMatch(/safe-area-inset-bottom/);
+    // 個別のクラストークンで判定する。`className.match(/.../)` だと Tailwind
+    // が他の場所に同名サブストリングを含めたときに偽陽性／偽陰性になる。
+    // Assert per-class token via classList so substring matches in unrelated
+    // classes (or order changes) don't produce false positives or negatives.
+    expect(nav?.classList.contains("fixed")).toBe(true);
+    expect(nav?.classList.contains("bottom-0")).toBe(true);
+    expect(nav?.classList.contains("pb-[env(safe-area-inset-bottom)]")).toBe(true);
+    expect(nav?.getAttribute("style") ?? "").toContain("env(safe-area-inset-bottom)");
   });
 
   it("opens the Me sheet when the Me tab is clicked", async () => {

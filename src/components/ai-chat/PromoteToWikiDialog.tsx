@@ -95,6 +95,14 @@ function useEntityExtraction(
     if (attemptedRef.current) return;
     attemptedRef.current = true;
 
+    // ダイアログを閉じる／親がアンマウントされた場合に in-flight な抽出
+    // リクエストを中断する。abort せずに放置すると、無駄な LLM コストが
+    // 発生し、unmount 後に setState を試みて警告にもなる。
+    // Abort the in-flight extraction call when the dialog is closed or the
+    // parent unmounts, so we don't keep paying for an LLM run whose result
+    // is discarded (and don't try to setState after unmount).
+    const controller = new AbortController();
+
     const extract = async () => {
       setIsExtracting(true);
       setError(null);
@@ -115,16 +123,27 @@ function useEntityExtraction(
               feature: "entity_extraction",
             },
           },
-          createExtractionHandlers(onEntities, (err) => setError(err.message)),
+          createExtractionHandlers(onEntities, (err) => {
+            if (controller.signal.aborted) return;
+            setError(err.message);
+          }),
+          controller.signal,
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        if (controller.signal.aborted) return;
+        const message = err instanceof Error ? err.message : "Unknown error";
+        if (message === "ABORTED") return;
+        setError(message);
       } finally {
-        setIsExtracting(false);
+        if (!controller.signal.aborted) setIsExtracting(false);
       }
     };
 
     void extract();
+
+    return () => {
+      controller.abort();
+    };
   }, [conversationText, existingTitles, onEntities]);
 
   return { isExtracting, error };

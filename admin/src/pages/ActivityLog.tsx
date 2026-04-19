@@ -90,20 +90,29 @@ export default function ActivityLog() {
   const [actorFilter, setActorFilter] = useState<ActivityActor | undefined>(undefined);
 
   const mountedRef = useRef(true);
+  // フィルタ切り替え／連打などで複数のリクエストが in-flight になったとき、
+  // 古いリクエストが新しいリクエストの後に解決されると stale なテーブル内容で
+  // 上書きされる。requestIdRef で発行順を記録し、最新リクエスト以外の結果は
+  // 破棄することで out-of-order 上書きを防ぐ。
+  // Track in-flight request id so older listActivity responses cannot overwrite
+  // newer ones if the user toggles filters or taps reload before the previous
+  // request resolves.
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     if (mountedRef.current) setLoading(true);
     if (mountedRef.current) setError(null);
     try {
       const result = await listActivity({ kind: kindFilter, actor: actorFilter, limit: 100 });
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setEntries(result.entries);
       setTotal(result.total);
     } catch (e) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && requestId === requestIdRef.current) setLoading(false);
     }
   }, [kindFilter, actorFilter]);
 

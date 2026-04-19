@@ -74,8 +74,15 @@ jobs:
 
   deploy-frontend:
     name: Deploy Frontend
+    # `verify-server-health` をフロント公開のゲートにする。バックエンドの
+    # ロールアウトに失敗している状態で新しい UI を本番公開すると、ユーザーが
+    # 直撃する。`if: vars.API_BASE_URL != ''` で skip された場合も needs は
+    # 通過する（GitHub Actions は skipped を success 扱いで needs を満たす）。
+    # Gate prod frontend rollout on backend health so a failed backend deploy
+    # cannot still publish the new UI.
     needs:
       - migrate
+      - verify-server-health
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -123,8 +130,11 @@ jobs:
 
   deploy-admin:
     name: Deploy Admin
+    # 同様に admin の本番公開もバックエンドのヘルスチェック通過後にする。
+    # Gate admin rollout on backend health for the same reason as `deploy-frontend`.
     needs:
       - migrate
+      - verify-server-health
     runs-on: ubuntu-latest
     environment: production
     steps:

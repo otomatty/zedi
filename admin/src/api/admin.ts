@@ -1,4 +1,4 @@
-import { adminFetch } from "./client";
+import { adminFetch, getErrorMessage } from "./client";
 
 /** 現在ログイン中の管理者情報 / Current admin user info */
 export interface AdminMe {
@@ -38,11 +38,6 @@ export interface AiModelAdmin {
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
-}
-
-async function getErrorMessage(res: Response, fallback: string): Promise<string> {
-  const err = await res.json().catch(() => ({ message: res.statusText }));
-  return (err as { message?: string }).message ?? fallback;
 }
 
 /**

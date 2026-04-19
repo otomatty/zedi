@@ -71,8 +71,16 @@ jobs:
 
   deploy-frontend:
     name: Deploy Frontend
+    # `verify-server-health` をフロント公開のゲートにする。バックエンドが新版で
+    # ヘルスチェックを通らない状態のまま新しい UI を公開すると、ユーザーが壊れた
+    # API を直撃する。ヘルスチェックは `if: vars.API_BASE_URL != ''` 条件付きで
+    # スキップされうるので、ここでは hard dependency にしてもスキップ伝播で blocked
+    # にはならない（GitHub Actions は skipped を success として needs を通す）。
+    # Gate frontend rollout on backend health so the new UI never points at a
+    # backend that failed to roll out.
     needs:
       - migrate
+      - verify-server-health
     runs-on: ubuntu-latest
     environment: development
     steps:

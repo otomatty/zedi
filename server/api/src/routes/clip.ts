@@ -9,15 +9,9 @@ import { authRequired } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
 import { extractYouTubeContent } from "../lib/youtubeExtractor.js";
-import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
-import { getProviderApiKeyName } from "../services/aiProviders.js";
+import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
 import { getUserTier } from "../services/subscriptionService.js";
-import {
-  checkUsage,
-  validateModelAccess,
-  calculateCost,
-  recordUsage,
-} from "../services/usageService.js";
+import { validateModelAccess, calculateCost, recordUsage } from "../services/usageService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -116,54 +110,18 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
 
   const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
 
-  // AI 要約の設定 / AI summary configuration
-  let aiProvider: AIProviderType | undefined;
-  let aiModel: string | undefined;
-  let aiApiKey: string | undefined;
-
-  const supportedProviders: AIProviderType[] = ["openai", "anthropic", "google"];
-
-  // provider/model は両方指定するか両方省略する必要がある（ext.ts の /clip-and-create と一致させる）
-  // provider/model must be specified together or both omitted (consistent with ext.ts /clip-and-create)
-  const hasProvider = typeof body.provider === "string" && body.provider.trim().length > 0;
-  const hasModel = typeof body.model === "string" && body.model.trim().length > 0;
-  if (hasProvider !== hasModel) {
-    throw new HTTPException(400, {
-      message: "provider and model must be specified together",
-    });
-  }
-
-  if (hasProvider && hasModel) {
-    const providerInput = (body.provider as string).trim() as AIProviderType;
-    const modelInput = (body.model as string).trim();
-    if (!supportedProviders.includes(providerInput)) {
-      throw new HTTPException(400, { message: `unsupported provider: ${providerInput}` });
-    }
-    aiProvider = providerInput;
-    aiModel = modelInput;
-
-    // モデルアクセス・利用量チェック / Model access & usage enforcement
-    // 既知の検証エラーは HTTPException(400/403) として返す
-    // Known validation errors are translated to HTTPException(400/403)
-    const tier = await getUserTier(userId, db);
-    const modelInfo = await validateModelAccessOrThrow(aiModel, tier, db);
-    const usageCheck = await checkUsage(userId, tier, db);
-    if (!usageCheck.allowed) {
-      throw new HTTPException(429, { message: "Monthly budget exceeded" });
-    }
-
-    // モデル情報から provider を上書き（DB 上の provider が正）
-    // Override provider from model info (DB is authoritative)
-    // API キーは上書き後の provider で取得する（provider 不一致バグ防止）
-    aiProvider = modelInfo.provider as AIProviderType;
-    aiModel = modelInfo.apiModelId;
-
-    const apiKeyName = getProviderApiKeyName(aiProvider);
-    aiApiKey = process.env[apiKeyName];
-    if (!aiApiKey) {
-      throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });
-    }
-  }
+  // AI 要約の設定（ext.ts の /clip-and-create と検証ロジックを共通化）
+  // AI summary configuration (validation/access-control shared with
+  // ext.ts /clip-and-create via resolveAiConfigForRequest()).
+  const aiConfig = await resolveAiConfigForRequest({
+    userId,
+    db,
+    provider: body.provider,
+    model: body.model,
+  });
+  const aiProvider: AIProviderType | undefined = aiConfig?.provider;
+  const aiModel: string | undefined = aiConfig?.apiModelId;
+  const aiApiKey: string | undefined = aiConfig?.apiKey;
 
   try {
     const result = await extractYouTubeContent({

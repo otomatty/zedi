@@ -118,6 +118,11 @@ const App = () => (
                         path="/ai-chat/:conversationId"
                         element={<LegacyAIChatConversationRedirect />}
                       />
+                      {/* Bare `/ai-chat` is also a legacy path: redirect to `/ai`
+                          to avoid hitting the catch-all NotFound page.
+                          素の `/ai-chat` も旧パスなので `/ai` にリダイレクトする
+                          （catch-all で NotFound に落ちるのを防ぐ）。 */}
+                      <Route path="/ai-chat" element={<Navigate to="/ai" replace />} />
                       <Route path="/search" element={<SearchResults />} />
                       <Route path="/notes/discover" element={<NotesDiscover />} />
                       <Route path="/notes" element={<Notes />} />
