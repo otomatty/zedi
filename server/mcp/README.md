@@ -64,10 +64,10 @@ bun run scripts/issue-mcp-token.ts <userId> mcp:read,mcp:write
 
 必要な環境変数 (ルート `.env` から自動読込):
 
-| 変数                 | 用途                                         |
-| -------------------- | -------------------------------------------- |
-| `BETTER_AUTH_SECRET` | JWT 署名鍵 (必須)                            |
-| `MCP_JWT_EXP_DAYS`   | 有効期限 (日数、省略時 30)                   |
+| 変数                 | 用途                       |
+| -------------------- | -------------------------- |
+| `BETTER_AUTH_SECRET` | JWT 署名鍵 (必須)          |
+| `MCP_JWT_EXP_DAYS`   | 有効期限 (日数、省略時 30) |
 
 出力は JSON で、`access_token` フィールドに JWT が入っている。手動スクリプトは CI 用・運用者用。開発者本人が普段使うなら下の PKCE ログインを推奨する。
 
@@ -191,53 +191,53 @@ Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Au
 
 ### ユーザー
 
-| ツール名 | 概要 |
-| -------- | ---- |
+| ツール名                | 概要                                                |
+| ----------------------- | --------------------------------------------------- |
 | `zedi_get_current_user` | 認証済みユーザーの `id` / `email` / `name` を返す。 |
 
 ### ページ
 
-| ツール名 | 概要 |
-| -------- | ---- |
-| `zedi_get_page` | 単一ページの Y.Doc state と `content_text` を取得。 |
-| `zedi_create_page` | 新規ページを作成 (Y.Doc は空)。 |
+| ツール名                   | 概要                                                          |
+| -------------------------- | ------------------------------------------------------------- |
+| `zedi_get_page`            | 単一ページの Y.Doc state と `content_text` を取得。           |
+| `zedi_create_page`         | 新規ページを作成 (Y.Doc は空)。                               |
 | `zedi_update_page_content` | ページの Y.Doc state を `expected_version` で楽観ロック更新。 |
-| `zedi_delete_page` | ページをソフトデリートする。 |
+| `zedi_delete_page`         | ページをソフトデリートする。                                  |
 
 ### ノート
 
-| ツール名 | 概要 |
-| -------- | ---- |
-| `zedi_list_notes` | 自分がオーナーまたはメンバーのノート一覧。 |
-| `zedi_get_note` | ノート詳細 (ページ一覧・自分のロール含む) を返す。 |
-| `zedi_create_note` | 新規ノートを作成 (デフォルトは private + owner-only edit)。 |
+| ツール名           | 概要                                                               |
+| ------------------ | ------------------------------------------------------------------ |
+| `zedi_list_notes`  | 自分がオーナーまたはメンバーのノート一覧。                         |
+| `zedi_get_note`    | ノート詳細 (ページ一覧・自分のロール含む) を返す。                 |
+| `zedi_create_note` | 新規ノートを作成 (デフォルトは private + owner-only edit)。        |
 | `zedi_update_note` | ノートのメタデータ (title / visibility / edit_permission) を更新。 |
-| `zedi_delete_note` | ノートをソフトデリート。 |
+| `zedi_delete_note` | ノートをソフトデリート。                                           |
 
 ### ノート内ページ
 
-| ツール名 | 概要 |
-| -------- | ---- |
-| `zedi_list_note_pages` | ノート内ページを並び順で返す。 |
-| `zedi_add_page_to_note` | 既存ページをノートに追加、または新規ページを作成して追加。 |
-| `zedi_remove_page_from_note` | ノートからページをはずす (ページ自体は残る)。 |
-| `zedi_reorder_note_pages` | ノート内ページの並びを `page_ids` で全指定して並べ替え。 |
+| ツール名                     | 概要                                                       |
+| ---------------------------- | ---------------------------------------------------------- |
+| `zedi_list_note_pages`       | ノート内ページを並び順で返す。                             |
+| `zedi_add_page_to_note`      | 既存ページをノートに追加、または新規ページを作成して追加。 |
+| `zedi_remove_page_from_note` | ノートからページをはずす (ページ自体は残る)。              |
+| `zedi_reorder_note_pages`    | ノート内ページの並びを `page_ids` で全指定して並べ替え。   |
 
 ### ノートメンバー
 
-| ツール名 | 概要 |
-| -------- | ---- |
-| `zedi_list_note_members` | ノートメンバー一覧 (ロール・承諾ステータス付き)。 |
-| `zedi_add_note_member` | email でメンバーを招待。 |
-| `zedi_update_note_member` | メンバーのロールを更新。 |
-| `zedi_remove_note_member` | メンバーを削除。 |
+| ツール名                  | 概要                                              |
+| ------------------------- | ------------------------------------------------- |
+| `zedi_list_note_members`  | ノートメンバー一覧 (ロール・承諾ステータス付き)。 |
+| `zedi_add_note_member`    | email でメンバーを招待。                          |
+| `zedi_update_note_member` | メンバーのロールを更新。                          |
+| `zedi_remove_note_member` | メンバーを削除。                                  |
 
 ### 検索 / クリップ
 
-| ツール名 | 概要 |
-| -------- | ---- |
-| `zedi_search` | タイトルと本文で全文検索。`scope: own` or `shared`、`limit` を指定可能。 |
-| `zedi_clip_url` | 公開 URL を Readability で整形し、新規ページとして保存。 |
+| ツール名        | 概要                                                                     |
+| --------------- | ------------------------------------------------------------------------ |
+| `zedi_search`   | タイトルと本文で全文検索。`scope: own` or `shared`、`limit` を指定可能。 |
+| `zedi_clip_url` | 公開 URL を Readability で整形し、新規ページとして保存。                 |
 
 計 20 ツール。ツール名の一覧は `src/tools/index.ts` の `ALL_TOOL_NAMES` にも定義済み。
 

@@ -239,22 +239,22 @@ VITE_ZEDI_API_BASE_URL=https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.c
 
 ## 🛠 Tech Stack
 
-| Category       | Technology                                                |
-| -------------- | --------------------------------------------------------- |
-| **Frontend**   | React 19 + TypeScript                                     |
-| **Build Tool** | Vite                                                      |
-| **Desktop**    | Tauri 2.0 (Rust)                                          |
-| **Editor**     | Tiptap (ProseMirror)                                      |
-| **Styling**    | Tailwind CSS + shadcn/ui                                  |
-| **State**      | Zustand + TanStack Query                                  |
-| **Auth**       | Cognito (Google/GitHub OAuth)                             |
-| **Database**   | Aurora (PostgreSQL) via API / IndexedDB (local・ブラウザ) |
-| **Realtime**   | Hocuspocus (Y.js) — リアルタイム共同編集                  |
+| Category       | Technology                                                                             |
+| -------------- | -------------------------------------------------------------------------------------- |
+| **Frontend**   | React 19 + TypeScript                                                                  |
+| **Build Tool** | Vite                                                                                   |
+| **Desktop**    | Tauri 2.0 (Rust)                                                                       |
+| **Editor**     | Tiptap (ProseMirror)                                                                   |
+| **Styling**    | Tailwind CSS + shadcn/ui                                                               |
+| **State**      | Zustand + TanStack Query                                                               |
+| **Auth**       | Cognito (Google/GitHub OAuth)                                                          |
+| **Database**   | Aurora (PostgreSQL) via API / IndexedDB (local・ブラウザ)                              |
+| **Realtime**   | Hocuspocus (Y.js) — リアルタイム共同編集                                               |
 | **MCP**        | `server/mcp` — Claude Code 連携（詳細は [server/mcp/README.md](server/mcp/README.md)） |
-| **Billing**    | LemonSqueezy（Pro プラン）                                |
-| **AI**         | OpenAI / Anthropic / Google Gemini                        |
-| **Deploy**     | AWS (S3 + CloudFront, Lambda + API Gateway)               |
-| **Testing**    | Vitest + Playwright                                       |
+| **Billing**    | LemonSqueezy（Pro プラン）                                                             |
+| **AI**         | OpenAI / Anthropic / Google Gemini                                                     |
+| **Deploy**     | AWS (S3 + CloudFront, Lambda + API Gateway)                                            |
+| **Testing**    | Vitest + Playwright                                                                    |
 
 ---
 
