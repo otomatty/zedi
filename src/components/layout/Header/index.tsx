@@ -1,11 +1,12 @@
 import React from "react";
 import Container from "@/components/layout/Container";
-import { cn } from "@zedi/ui";
+import { cn, useIsMobile } from "@zedi/ui";
 import { HeaderLogo } from "./HeaderLogo";
 import { HeaderSearchBar } from "./HeaderSearchBar";
 import { NavigationMenu } from "./NavigationMenu";
 import { UnifiedMenu } from "./UnifiedMenu";
 import { AIChatButton } from "./AIChatButton";
+import { MobileHeader } from "../MobileHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
@@ -15,17 +16,27 @@ interface HeaderProps {
 }
 
 /**
- * Sticky app header. Hosts the logo, the search bar, the AI chat toggle, a
- * navigation dropdown (Home / Notes) and the user-only menu.
+ * Sticky app header. On desktop hosts the logo, the search bar, the AI
+ * chat toggle, a navigation dropdown (Home / Notes) and the user-only
+ * menu. On mobile delegates to {@link MobileHeader} — the mobile bar is a
+ * compact title with only a search icon; navigation / AI / account moved
+ * to the bottom nav.
  *
- * 固定ヘッダー。ロゴ、検索、AI チャット開閉に加え、機能ナビゲーション（Home / Notes）
- * のドロップダウンとユーザー専用メニューを並べる。
+ * 固定ヘッダー。デスクトップではロゴ・検索・AI チャット開閉・機能ナビゲーション
+ * （Home / Notes）・ユーザー専用メニューを並べる。モバイルでは {@link MobileHeader}
+ * にデリゲートし、コンパクトなタイトル + 検索アイコンだけを表示する（ナビ・AI・
+ * アカウントはボトムナビへ移譲）。
  */
 const Header: React.FC<HeaderProps> = ({ className }) => {
   const { isSignedIn } = useAuth();
   const { t } = useTranslation();
   const searchContext = useGlobalSearchContextOptional();
   const hasSearchContext = searchContext != null;
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return <MobileHeader className={className} />;
+  }
 
   return (
     <header

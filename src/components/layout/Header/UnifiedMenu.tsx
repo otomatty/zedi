@@ -101,7 +101,14 @@ interface MenuContentProps {
   onClose: () => void;
 }
 
-const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+/**
+ * User menu content for signed-in users. Exported so that other shell
+ * elements (e.g. the mobile bottom nav Me tab) can reuse the same list.
+ *
+ * サインイン済みユーザー向けのメニュー内容。モバイルボトムナビの Me タブ等、
+ * 他のシェル要素からも同じリストを再利用できるよう export している。
+ */
+export const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
   const { user } = useUser();
   const { signOut } = useAuth();
   const { displayName, avatarUrl } = useProfile();
@@ -203,7 +210,14 @@ const DesktopSignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => 
   );
 };
 
-const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+/**
+ * User menu content for signed-out (guest) users. Exported so that the
+ * mobile bottom nav Me tab can reuse the same list.
+ *
+ * 未サインインユーザー向けのメニュー内容。モバイルボトムナビの Me タブから
+ * 再利用できるよう export している。
+ */
+export const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
   const { t } = useTranslation();
   const items = useAccountActionItems();
 
