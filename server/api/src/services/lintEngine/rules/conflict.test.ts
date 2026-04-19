@@ -50,6 +50,36 @@ describe("extractFacts", () => {
     expect(a[0]?.value).toBe(b[0]?.value);
   });
 
+  it("空白区切りの thousand-grouping を正規化する / normalises whitespace-separated numbers", () => {
+    // `1 000 円` も `1,000円` / `1000円` と同じ事実として扱う。
+    // `1 000 円` must collapse to the same canonical value as other variants.
+    const a = extractFacts("月額料金は 1 000 円 です。");
+    const b = extractFacts("月額料金は 1,000円 です。");
+    expect(a[0]?.value).toBe("1000円");
+    expect(a[0]?.value).toBe(b[0]?.value);
+  });
+
+  it("百万単位の空白区切りを正規化する / normalises million-scale grouped numbers", () => {
+    const facts = extractFacts("年間売上は 1 000 000 円 です。");
+    expect(facts[0]?.value).toBe("1000000円");
+  });
+
+  it("末尾の小数ゼロを正規化する / normalises trailing decimal zeros", () => {
+    // `1000.0円` と `1000円` は同じ数値を指す。parseFloat で末尾ゼロを畳む。
+    // `1000.0円` and `1000円` denote the same number; parseFloat canonicalises.
+    const a = extractFacts("月額料金は 1000.0円 です。");
+    const b = extractFacts("月額料金は 1000円 です。");
+    expect(a[0]?.value).toBe("1000円");
+    expect(a[0]?.value).toBe(b[0]?.value);
+  });
+
+  it("小数を含む数値を正規化する / normalises decimal numbers", () => {
+    const a = extractFacts("富士山の標高は 3.776km である。");
+    const b = extractFacts("富士山の標高は 3.7760km である。");
+    expect(a[0]?.value).toBe("3.776km");
+    expect(a[0]?.value).toBe(b[0]?.value);
+  });
+
   it("日付の format 違いを同一値として正規化する / normalises date format variants", () => {
     const a = extractFacts("リリース日は 2026-04-19 です。");
     const b = extractFacts("リリース日は 2026/4/19 です。");
