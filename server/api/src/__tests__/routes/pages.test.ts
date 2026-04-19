@@ -92,6 +92,107 @@ describe("GET /api/pages/:id/content", () => {
   });
 });
 
+describe("GET /api/pages", () => {
+  it("returns 200 with paginated own pages by default", async () => {
+    const updatedAt = new Date("2026-01-01T00:00:00Z").toISOString();
+    const { app, chains } = createPagesAppWithChains([
+      {
+        rows: [
+          { id: "page-a", title: "A", content_preview: null, updated_at: updatedAt },
+          { id: "page-b", title: "B", content_preview: "preview", updated_at: updatedAt },
+        ],
+      },
+    ]);
+
+    const res = await app.request("/api/pages?limit=2&offset=0", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pages: Array<Record<string, unknown>> };
+    expect(body.pages).toHaveLength(2);
+    expect(body.pages[0]).toMatchObject({ id: "page-a", title: "A" });
+    expect(body.pages[1]).toMatchObject({ id: "page-b", title: "B" });
+    // 単一の execute 呼び出しで完結する。
+    // The endpoint resolves with a single execute() call.
+    expect(chains.filter((c) => c.startMethod === "execute")).toHaveLength(1);
+  });
+
+  it("returns 200 with empty array when caller has no pages", async () => {
+    const app = createPagesApp([{ rows: [] }]);
+
+    const res = await app.request("/api/pages", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pages: unknown[] };
+    expect(body.pages).toEqual([]);
+  });
+
+  it("returns 200 with shared pages when scope=shared", async () => {
+    const updatedAt = new Date("2026-02-01T00:00:00Z").toISOString();
+    const app = createPagesApp([
+      {
+        rows: [
+          {
+            id: "page-shared",
+            title: "Shared",
+            content_preview: null,
+            updated_at: updatedAt,
+          },
+        ],
+      },
+    ]);
+
+    const res = await app.request("/api/pages?scope=shared", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pages: Array<Record<string, unknown>> };
+    expect(body.pages).toHaveLength(1);
+    expect(body.pages[0]).toMatchObject({ id: "page-shared" });
+  });
+
+  it("returns 401 without auth header", async () => {
+    const app = createPagesApp([{ rows: [] }]);
+
+    const res = await app.request("/api/pages", { method: "GET" });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("clamps limit/offset to safe ranges", async () => {
+    const app = createPagesApp([{ rows: [] }]);
+
+    const res = await app.request("/api/pages?limit=999&offset=-5", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    // 不正な値でも 200 を返し、内部で clamp する。
+    // Even with out-of-range params, the endpoint clamps to safe defaults and returns 200.
+    expect(res.status).toBe(200);
+  });
+
+  it("falls back to defaults when limit/offset are non-numeric", async () => {
+    const app = createPagesApp([{ rows: [] }]);
+
+    // `Number("abc")` だと NaN が SQL に渡って失敗するため、`parseInt + || default` でガードしている。
+    // Guards against `NaN` reaching SQL when params can't be parsed as integers.
+    const res = await app.request("/api/pages?limit=abc&offset=xyz", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("PUT /api/pages/:id/content", () => {
   it("creates page_contents when expected_version is 0 and no row exists (aligns with GET version 0)", async () => {
     const ydocB64 = Buffer.from("hello").toString("base64");

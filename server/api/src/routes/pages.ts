@@ -1,6 +1,8 @@
 /**
  * /api/pages — ページ CRUD + コンテンツ管理
  *
+ * GET    /api/pages                — 自分 (own) のページ一覧、または共有 (shared) を含めた一覧をページネーション取得
+ *        — List the caller's pages (own, or own + shared via notes) with limit/offset pagination.
  * GET    /api/pages/:id/content — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
  *        — Retrieve Y.Doc content (200 + empty `ydoc_state` when no `page_contents` row).
  * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
@@ -52,6 +54,62 @@ async function applyPagesMetadataUpdate(
   set.updatedAt = new Date();
   await db.update(pages).set(set).where(eq(pages.id, pageId));
 }
+
+// ── GET /pages ──────────────────────────────────────────────────────────────
+// `scope=shared` の場合、`/api/search` と同じ認可ロジック (own + 受諾済みノートメンバー) を流用する。
+// When `scope=shared`, reuses the same authorization model as `/api/search`
+// (own pages + pages attached to notes the caller is a member of).
+app.get("/", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  // クエリパラメータは整数として明示的にパースする。`Number("abc")` だと NaN が SQL に渡るため。
+  // Parse query params as integers — `Number("abc")` would propagate NaN into SQL.
+  const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "20", 10) || 20, 1), 100);
+  const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
+  const scope = c.req.query("scope") === "shared" ? "shared" : "own";
+
+  // アクセス制御だけを変数化して SELECT 文の重複を避ける。
+  // `shared` は `services/pageAccessService.ts` と同じ正規の認可モデルを採用:
+  //   - notes が未削除であること
+  //   - note_members.status = 'accepted' (招待を受諾済み) であること
+  //   - note_members / note_pages が未削除であること
+  // 大規模データセットでもプランナーが効きやすい EXISTS + JOIN を使う。
+  // Vary only the access predicate to avoid duplicating the SELECT.
+  // `shared` mirrors the canonical authorization model from `services/pageAccessService.ts`:
+  //   the linked note must be active, the membership must be accepted, and the join rows
+  //   must not be soft-deleted. EXISTS + JOIN keeps the planner happy on large datasets.
+  const accessFilter =
+    scope === "shared"
+      ? sql`(
+          p.owner_id = ${userId}
+          OR EXISTS (
+            SELECT 1 FROM note_pages np
+            JOIN notes n ON n.id = np.note_id
+            JOIN note_members nm ON nm.note_id = np.note_id
+            JOIN "user" u ON u.email = nm.member_email
+            WHERE np.page_id = p.id
+              AND u.id = ${userId}
+              AND nm.status = 'accepted'
+              AND nm.is_deleted = false
+              AND np.is_deleted = false
+              AND n.is_deleted = false
+          )
+        )`
+      : sql`p.owner_id = ${userId}`;
+
+  const result = await db.execute(sql`
+    SELECT p.id, p.title, p.content_preview, p.updated_at
+    FROM pages p
+    WHERE p.is_deleted = false
+      AND ${accessFilter}
+    ORDER BY p.updated_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `);
+
+  return c.json({ pages: result.rows });
+});
 
 // ── GET /pages/:id/content ──────────────────────────────────────────────────
 app.get("/:id/content", authRequired, async (c) => {

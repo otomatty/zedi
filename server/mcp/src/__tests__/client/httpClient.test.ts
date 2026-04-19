@@ -59,6 +59,38 @@ describe("HttpZediClient request shaping", () => {
     expect(headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
   });
 
+  it("listPages GETs /api/pages with limit/offset/scope and unwraps pages array", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeJsonResponse(200, {
+        pages: [
+          {
+            id: "p1",
+            title: "Hello",
+            content_preview: null,
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        ],
+      }),
+    );
+    const list = await client.listPages({ limit: 10, offset: 5, scope: "shared" });
+    expect(list).toHaveLength(1);
+    expect(list[0]?.id).toBe("p1");
+    const url = callArgs(fetchMock as unknown as Mock)[0] as string;
+    expect(url).toContain(`${BASE}/api/pages?`);
+    expect(url).toContain("limit=10");
+    expect(url).toContain("offset=5");
+    expect(url).toContain("scope=shared");
+  });
+
+  it("listPages defaults to own scope and limit=20/offset=0", async () => {
+    fetchMock.mockResolvedValueOnce(makeJsonResponse(200, { pages: [] }));
+    await client.listPages();
+    const url = callArgs(fetchMock as unknown as Mock)[0] as string;
+    expect(url).toContain("limit=20");
+    expect(url).toContain("offset=0");
+    expect(url).toContain("scope=own");
+  });
+
   it("createPage sends POST with JSON body to /api/pages", async () => {
     const expected = {
       id: "p1",

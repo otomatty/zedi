@@ -15,6 +15,8 @@ import type {
   CreatePageInput,
   PageRow,
   PageContent,
+  PageListItem,
+  ListPagesParams,
   UpdatePageContentInput,
   CreateNoteInput,
   UpdateNoteInput,
@@ -131,6 +133,17 @@ export class HttpZediClient implements ZediClient {
   }
 
   // ── Pages ────────────────────────────────────────────────────────────────
+
+  /** {@inheritDoc ZediClient.listPages} */
+  async listPages(params: ListPagesParams = {}): Promise<PageListItem[]> {
+    const { limit = 20, offset = 0, scope = "own" } = params;
+    const result = await this.request<{ pages: PageListItem[] }>("GET", "/api/pages", undefined, {
+      limit,
+      offset,
+      scope,
+    });
+    return result.pages ?? [];
+  }
 
   /** {@inheritDoc ZediClient.getPageContent} */
   getPageContent(pageId: string): Promise<PageContent> {
