@@ -219,16 +219,32 @@ export async function issueMcpToken(
 }
 
 /**
- * 指定ユーザーの MCP トークンをすべて失効させるために、現在時刻 (UNIX 秒) を Redis に書き込む。
- * TTL は最長の JWT 有効期限に合わせて自動消滅する。戻り値は記録した失効時刻 (UNIX 秒)。
+ * 失効レコードの TTL (秒)。現在の設定値とデフォルト値の大きい方を使う。
+ * `MCP_JWT_EXP_DAYS` を後から短縮しても、旧設定で発行済みの長寿命トークンが
+ * Redis の失効キー消滅後に再び有効化されないよう、デフォルト (最大想定) を下限とする。
  *
- * Records a per-user MCP revocation timestamp (epoch seconds) in Redis.
- * TTL matches the longest possible JWT lifetime so the entry self-expires once no prior token can still be valid.
+ * Returns the TTL (seconds) for revocation entries: the greater of the current
+ * configured JWT lifetime and the default. This prevents a later reduction of
+ * `MCP_JWT_EXP_DAYS` from prematurely expiring the deny-list entry and
+ * re-validating tokens issued under the previous (longer) configuration.
+ */
+export function getMcpRevocationTtlSeconds(): number {
+  return Math.max(getMcpJwtExpiresInSeconds(), MCP_JWT_EXP_DAYS_DEFAULT * 24 * 60 * 60);
+}
+
+/**
+ * 指定ユーザーの MCP トークンをすべて失効させるために、現在時刻 (UNIX 秒) を Redis に書き込む。
+ * TTL は現在設定とデフォルトの大きい方とし、設定変更で失効情報が先に消えるのを防ぐ。
+ * 戻り値は記録した失効時刻 (UNIX 秒)。
+ *
+ * Records a per-user MCP revocation timestamp (epoch seconds) in Redis with a TTL
+ * that is at least as long as the maximum expected JWT lifetime, so the entry
+ * cannot expire before every previously issued token does.
  * Returns the stored revocation timestamp in epoch seconds.
  */
 export async function storeMcpRevocation(redis: Redis, userId: string): Promise<number> {
   const now = Math.floor(Date.now() / 1000);
-  await redis.setex(`${MCP_REVOKED_PREFIX}${userId}`, getMcpJwtExpiresInSeconds(), String(now));
+  await redis.setex(`${MCP_REVOKED_PREFIX}${userId}`, getMcpRevocationTtlSeconds(), String(now));
   return now;
 }
 
@@ -247,16 +263,50 @@ export async function getMcpRevocationTimestamp(
 }
 
 /**
+ * Deny-list 参照で発生した Redis 障害を JWT 検証失敗と区別するためのエラー型。
+ * 呼び出し側 (ミドルウェア) はこれを捕捉し、401 ではなく 503 で応答する。
+ *
+ * Dedicated error type raised when the revocation deny-list lookup itself fails
+ * (e.g. Redis outage). Lets callers map infrastructure errors to 503 instead of
+ * silently returning 401 "invalid token" for legitimately signed tokens.
+ */
+export class McpRevocationLookupError extends Error {
+  /**
+   * 指定メッセージと `cause` で `McpRevocationLookupError` を生成する。
+   * Constructs a new `McpRevocationLookupError` with an optional `cause`.
+   *
+   * @param message - 人間可読なエラーメッセージ / Human-readable message.
+   * @param options - `cause` に元の例外を添付できる / Optional `cause` for the original error.
+   */
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "McpRevocationLookupError";
+  }
+}
+
+/**
  * Bearer トークンを検証し、ペイロードを返す。audience と最低 1 つの MCP スコープを要求する。
  * `redis` を渡した場合は `mcp:revoked:<sub>` の失効時刻と `iat` を比較し、失効後に発行されたトークンのみ通す。
+ * 比較は `iat <= revokedAt` を失効扱いとし、秒精度で同一秒に発行された境界トークンも安全側で拒否する。
+ *
+ * JWT 自体の検証失敗 (署名不一致・audience 相違・形式不正など) は `null` を返す。
+ * 一方、deny-list の Redis 参照に失敗した場合は `McpRevocationLookupError` を投げ、
+ * ミドルウェアで 503 にマップできるようにする (インフラ障害を 401 と誤認させない)。
  *
  * Verifies MCP Bearer token and returns payload; requires `zedi-mcp` audience and at least one mcp:* scope.
- * When `redis` is provided, consults the deny-list: rejects tokens whose `iat` is earlier than the stored revocation timestamp.
+ * When `redis` is provided, consults the deny-list: rejects tokens whose `iat` is at or before the stored
+ * revocation timestamp (inclusive, to cover boundary tokens at second-precision).
+ *
+ * JWT verification failures (bad signature, wrong audience, malformed payload, etc.) return `null`.
+ * Deny-list lookup failures throw `McpRevocationLookupError` so callers can surface a 503 rather than
+ * misclassifying an infrastructure outage as an authentication error.
  */
 export async function verifyMcpToken(
   token: string,
   redis?: Redis | null,
 ): Promise<McpTokenPayload | null> {
+  let verified: McpTokenPayload;
+  let iat: number;
   try {
     const secret = getEnv("BETTER_AUTH_SECRET");
     const key = new TextEncoder().encode(secret);
@@ -271,20 +321,35 @@ export async function verifyMcpToken(
     if (!hasAnyMcpScope) return null;
     const aud = payload.aud;
     const exp = payload.exp;
-    const iat = payload.iat;
+    const maybeIat = payload.iat;
     if (typeof aud !== "string") return null;
     if (typeof exp !== "number") return null;
-    if (typeof iat !== "number") return null;
-
-    if (redis) {
-      const revokedAt = await getMcpRevocationTimestamp(redis, sub);
-      if (revokedAt !== null && iat < revokedAt) return null;
-    }
-
-    return { sub, scope, aud, exp };
+    if (typeof maybeIat !== "number") return null;
+    iat = maybeIat;
+    verified = { sub, scope, aud, exp };
   } catch {
     return null;
   }
+
+  // Deny-list lookup runs outside the JWT try/catch so Redis-side I/O errors
+  // are NOT silently swallowed as "invalid token". The caller must distinguish
+  // an infrastructure outage (→ 503) from an auth failure (→ 401).
+  //
+  // deny-list 参照は JWT 検証とは別の try で扱い、Redis 障害を誤って 401 に
+  // すり替えないようにする。呼び出し側でインフラ障害 (503) と認証失敗 (401) を分離する。
+  if (redis) {
+    let revokedAt: number | null;
+    try {
+      revokedAt = await getMcpRevocationTimestamp(redis, verified.sub);
+    } catch (err) {
+      throw new McpRevocationLookupError("Failed to consult MCP revocation deny-list", {
+        cause: err,
+      });
+    }
+    if (revokedAt !== null && iat <= revokedAt) return null;
+  }
+
+  return verified;
 }
 
 /**

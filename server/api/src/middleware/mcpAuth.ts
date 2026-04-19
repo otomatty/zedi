@@ -14,7 +14,13 @@
 import { eq } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { verifyMcpToken, MCP_SCOPE_READ, MCP_SCOPE_WRITE, hasScope } from "../lib/mcpAuth.js";
+import {
+  verifyMcpToken,
+  MCP_SCOPE_READ,
+  MCP_SCOPE_WRITE,
+  hasScope,
+  McpRevocationLookupError,
+} from "../lib/mcpAuth.js";
 import { users } from "../schema/users.js";
 import type { AppEnv } from "../types/index.js";
 
@@ -34,7 +40,18 @@ async function extractAndVerify(
     throw new HTTPException(401, { message: "Bearer token required" });
   }
   const token = parts[1];
-  const payload = await verifyMcpToken(token, redis);
+  let payload: Awaited<ReturnType<typeof verifyMcpToken>>;
+  try {
+    payload = await verifyMcpToken(token, redis);
+  } catch (err) {
+    if (err instanceof McpRevocationLookupError) {
+      // Redis 障害時はインフラ問題として 503 を返す。401 に潰すと正規トークンを誤って拒絶する。
+      // Redis outage must surface as 503, not 401, so legitimately signed tokens aren't misclassified.
+      console.error("[mcp] deny-list lookup failed", err);
+      throw new HTTPException(503, { message: "Token deny-list unavailable" });
+    }
+    throw err;
+  }
   if (!payload) {
     throw new HTTPException(401, { message: "Invalid or expired token" });
   }

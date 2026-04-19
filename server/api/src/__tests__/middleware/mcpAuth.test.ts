@@ -16,7 +16,12 @@ vi.mock("../../lib/mcpAuth.js", async (importOriginal) => {
 });
 
 import { mcpReadRequired, mcpWriteRequired } from "../../middleware/mcpAuth.js";
-import { MCP_JWT_AUDIENCE, MCP_SCOPE_READ, MCP_SCOPE_WRITE } from "../../lib/mcpAuth.js";
+import {
+  MCP_JWT_AUDIENCE,
+  MCP_SCOPE_READ,
+  MCP_SCOPE_WRITE,
+  McpRevocationLookupError,
+} from "../../lib/mcpAuth.js";
 
 type MockStatusRow = { status: "active" | "suspended" | "deleted" };
 
@@ -216,5 +221,21 @@ describe("redis deny-list wiring", () => {
     });
     expect(res.status).toBe(200);
     expect(mockVerifyMcpToken).toHaveBeenCalledWith("t", redisSentinel);
+  });
+
+  it("returns 503 (not 401) when the deny-list lookup itself fails", async () => {
+    // If Redis is unreachable, verifyMcpToken throws McpRevocationLookupError.
+    // The middleware must surface this as 503 so legitimate tokens are not
+    // misclassified as invalid during an infrastructure outage.
+    // Redis 障害時は 401 ではなく 503 を返し、正規トークンを誤認しないことを確認する。
+    mockVerifyMcpToken.mockRejectedValue(
+      new McpRevocationLookupError("redis offline", { cause: new Error("ECONNREFUSED") }),
+    );
+    const res = await createApp([{ status: "active" }]).request("/read", {
+      headers: { Authorization: "Bearer t" },
+    });
+    expect(res.status).toBe(503);
+    const text = await res.text();
+    expect(text).toMatch(/deny-list unavailable/i);
   });
 });

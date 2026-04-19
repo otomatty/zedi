@@ -418,3 +418,34 @@ describe("POST /api/mcp/revoke", () => {
     expect(mockStoreMcpRevocation).toHaveBeenCalledWith(mockRedis, "user-revoke-42");
   });
 });
+
+describe("POST /api/mcp/revoke-session", () => {
+  it("returns 401 when no Better Auth session is present", async () => {
+    // デバイス紛失等のユーザー操作用エンドポイント。セッションなしは 401。
+    // Session-protected endpoint for UI-driven revocation; no session → 401.
+    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/revoke-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(401);
+    expect(mockStoreMcpRevocation).not.toHaveBeenCalled();
+  });
+
+  it("records the revocation in Redis when called with a valid user session", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { ...mockSessionUser, id: "user-session-7" },
+    } as AuthSession);
+    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/revoke-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { revoked?: boolean };
+    expect(body.revoked).toBe(true);
+    expect(mockStoreMcpRevocation).toHaveBeenCalledOnce();
+    expect(mockStoreMcpRevocation).toHaveBeenCalledWith(mockRedis, "user-session-7");
+  });
+});

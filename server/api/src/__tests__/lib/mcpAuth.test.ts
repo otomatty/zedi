@@ -21,11 +21,13 @@ import {
   hasScope,
   storeMcpRevocation,
   getMcpRevocationTimestamp,
-  getMcpJwtExpiresInSeconds,
+  getMcpRevocationTtlSeconds,
+  McpRevocationLookupError,
   MCP_SCOPE_READ,
   MCP_SCOPE_WRITE,
   MCP_JWT_AUDIENCE,
   MCP_REVOKED_PREFIX,
+  MCP_JWT_EXP_DAYS_DEFAULT,
 } from "../../lib/mcpAuth.js";
 import { createHash } from "node:crypto";
 
@@ -243,7 +245,7 @@ describe("hasScope", () => {
 });
 
 describe("storeMcpRevocation / getMcpRevocationTimestamp", () => {
-  it("writes mcp:revoked:<userId> with current epoch seconds and JWT TTL", async () => {
+  it("writes mcp:revoked:<userId> with current epoch seconds and revocation TTL", async () => {
     const redis = createMockRedis();
     const before = Math.floor(Date.now() / 1000);
     const stored = await storeMcpRevocation(
@@ -260,8 +262,35 @@ describe("storeMcpRevocation / getMcpRevocationTimestamp", () => {
     if (!call) throw new Error("setex was not called");
     const [key, ttl, value] = call;
     expect(key).toBe(`${MCP_REVOKED_PREFIX}user-rev-1`);
-    expect(ttl).toBe(getMcpJwtExpiresInSeconds());
+    expect(ttl).toBe(getMcpRevocationTtlSeconds());
     expect(Number(value)).toBe(stored);
+  });
+
+  it("revocation TTL is never shorter than the default JWT lifetime even when MCP_JWT_EXP_DAYS is reduced", async () => {
+    // Simulate a later operator decision to shorten token lifetime. The deny-list
+    // entry must still outlive any token that was issued under the old (longer) setting.
+    // MCP_JWT_EXP_DAYS が短縮されても、旧設定で発行された長寿命トークンを覆えるよう TTL 下限を保証する。
+    const original = process.env.MCP_JWT_EXP_DAYS;
+    process.env.MCP_JWT_EXP_DAYS = "1";
+    try {
+      const ttl = getMcpRevocationTtlSeconds();
+      expect(ttl).toBe(MCP_JWT_EXP_DAYS_DEFAULT * 24 * 60 * 60);
+    } finally {
+      if (original === undefined) delete process.env.MCP_JWT_EXP_DAYS;
+      else process.env.MCP_JWT_EXP_DAYS = original;
+    }
+  });
+
+  it("revocation TTL grows with larger configured lifetimes", async () => {
+    const original = process.env.MCP_JWT_EXP_DAYS;
+    process.env.MCP_JWT_EXP_DAYS = "90";
+    try {
+      const ttl = getMcpRevocationTtlSeconds();
+      expect(ttl).toBe(90 * 24 * 60 * 60);
+    } finally {
+      if (original === undefined) delete process.env.MCP_JWT_EXP_DAYS;
+      else process.env.MCP_JWT_EXP_DAYS = original;
+    }
   });
 
   it("getMcpRevocationTimestamp returns null when no entry exists", async () => {
@@ -312,21 +341,38 @@ describe("verifyMcpToken deny-list round-trip", () => {
     expect(payload).toBeNull();
   });
 
-  it("accepts a token whose iat is at or after the stored revocation timestamp", async () => {
-    // revokedAt <= iat must still pass: the token was issued after (or exactly at) the revoke.
-    // revokedAt <= iat のトークンは、失効後に発行されたとみなして許可する。
+  it("rejects a token issued in the same second as the revocation (inclusive comparison)", async () => {
+    // Boundary case: a token with iat == revokedAt must be rejected to avoid a 1-second
+    // window where a pre-revoke token remains valid at second-precision.
+    // 秒精度の境界で、失効直前 (同一秒) に発行されたトークンが残らないよう iat == revokedAt は失効扱いとする。
     const redis = createMockRedis();
-    const { access_token } = await issueMcpToken("user-fresh-after-revoke", [MCP_SCOPE_READ]);
+    const { access_token } = await issueMcpToken("user-boundary", [MCP_SCOPE_READ]);
     const [, payloadB64] = access_token.split(".");
     if (!payloadB64) throw new Error("jwt has no payload segment");
     const iat = (
       JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { iat: number }
     ).iat;
-    await redis.setex(`${MCP_REVOKED_PREFIX}user-fresh-after-revoke`, 60, String(iat));
+    await redis.setex(`${MCP_REVOKED_PREFIX}user-boundary`, 60, String(iat));
+
+    const payload = await verifyMcpToken(access_token, redis as unknown as import("ioredis").Redis);
+    expect(payload).toBeNull();
+  });
+
+  it("accepts a token whose iat is strictly after the stored revocation timestamp", async () => {
+    // A token issued in a later second than the revoke remains valid.
+    // 失効後 (iat > revokedAt) に発行されたトークンは有効。
+    const redis = createMockRedis();
+    const { access_token } = await issueMcpToken("user-after-revoke", [MCP_SCOPE_READ]);
+    const [, payloadB64] = access_token.split(".");
+    if (!payloadB64) throw new Error("jwt has no payload segment");
+    const iat = (
+      JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { iat: number }
+    ).iat;
+    await redis.setex(`${MCP_REVOKED_PREFIX}user-after-revoke`, 60, String(iat - 1));
 
     const payload = await verifyMcpToken(access_token, redis as unknown as import("ioredis").Redis);
     expect(payload).not.toBeNull();
-    expect(payload?.sub).toBe("user-fresh-after-revoke");
+    expect(payload?.sub).toBe("user-after-revoke");
   });
 
   it("passes through verification when no revocation entry exists", async () => {
@@ -374,5 +420,27 @@ describe("verifyMcpToken deny-list round-trip", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("throws McpRevocationLookupError when the deny-list lookup fails (does not downgrade to 401)", async () => {
+    // Redis 障害を null (→401) にすり替えず、専用エラーで上位に伝播させることを確認する。
+    // Confirms Redis I/O errors during deny-list lookup propagate as McpRevocationLookupError
+    // rather than being silently converted into a null payload.
+    const { access_token } = await issueMcpToken("user-redis-outage", [MCP_SCOPE_READ]);
+    const brokenRedis = {
+      get: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+    } as unknown as import("ioredis").Redis;
+
+    await expect(verifyMcpToken(access_token, brokenRedis)).rejects.toBeInstanceOf(
+      McpRevocationLookupError,
+    );
+  });
+
+  it("still returns null (401-bound) for structurally invalid tokens even when redis is provided", async () => {
+    // JWT 検証失敗は従来どおり null を返し、401 扱いにすること (503 に波及させない)。
+    // JWT validation failures still return null (→ 401), independent of deny-list behavior.
+    const redis = createMockRedis();
+    const payload = await verifyMcpToken("not-a-jwt", redis as unknown as import("ioredis").Redis);
+    expect(payload).toBeNull();
   });
 });
