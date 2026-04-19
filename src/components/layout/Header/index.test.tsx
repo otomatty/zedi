@@ -54,14 +54,11 @@ vi.mock("@/components/layout/Container", () => ({
 }));
 
 vi.mock("./HeaderLogo", () => ({ HeaderLogo: () => <div data-testid="header-logo">Logo</div> }));
-vi.mock("./MonthNavigation", () => ({
-  MonthNavigation: () => <div data-testid="month-nav">Month</div>,
-}));
 vi.mock("./HeaderSearchBar", () => ({
   HeaderSearchBar: () => <div data-testid="header-search">Search</div>,
 }));
-vi.mock("./PrimaryNav", () => ({
-  PrimaryNav: () => <nav data-testid="primary-nav">PrimaryNav</nav>,
+vi.mock("./NavigationMenu", () => ({
+  NavigationMenu: () => <div data-testid="navigation-menu">NavigationMenu</div>,
 }));
 vi.mock("./UnifiedMenu", () => ({ UnifiedMenu: () => <div data-testid="unified-menu">Menu</div> }));
 vi.mock("./AIChatButton", () => ({
@@ -77,9 +74,9 @@ describe("Header", () => {
     vi.mocked(useAuth).mockReturnValue({ ...signedInAuth });
   });
 
-  it("renders the primary functional navigation", () => {
+  it("renders the navigation menu", () => {
     render(<Header />);
-    expect(screen.getByTestId("primary-nav")).toBeInTheDocument();
+    expect(screen.getByTestId("navigation-menu")).toBeInTheDocument();
   });
 
   it("does not render the legacy sidebar trigger", () => {
