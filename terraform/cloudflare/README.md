@@ -33,11 +33,11 @@ Terraform Cloud の Workspace 変数・トークン作成は [HashiCorp Terrafor
 `shared` スタックは Railway カスタムドメイン用の検証 TXT トークン（`api_railway_verify_txt` / `realtime_railway_verify_txt`）を必須変数として要求する。
 これらは機密値であり、リポジトリには平文で含めない。次のいずれかで渡すこと（**推奨は Terraform Cloud Workspace 変数**）。
 
-| 渡し方                                   | 設定例                                                                                       |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Terraform Cloud Workspace 変数（推奨）   | `cloudflare-shared` Workspace の Variables に **Sensitive** で登録                           |
-| 環境変数 `TF_VAR_*`                      | `export TF_VAR_api_railway_verify_txt="railway-verify=..."`                                  |
-| `terraform.tfvars`（gitignored）         | `terraform.tfvars.example` をコピーして記入                                                  |
+| 渡し方                                 | 設定例                                                             |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| Terraform Cloud Workspace 変数（推奨） | `cloudflare-shared` Workspace の Variables に **Sensitive** で登録 |
+| 環境変数 `TF_VAR_*`                    | `export TF_VAR_api_railway_verify_txt="railway-verify=..."`        |
+| `terraform.tfvars`（gitignored）       | `terraform.tfvars.example` をコピーして記入                        |
 
 値は Railway ダッシュボードの該当ドメイン設定画面（`api.zedi-note.app` / `realtime.zedi-note.app`）から取得する。
 **過去にリポジトリへ平文 commit されていたトークンはローテーションすること。**

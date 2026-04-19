@@ -25,6 +25,13 @@ variable "api_railway_verify_txt" {
   type        = string
   description = "TXT content for _railway-verify.api (Railway domain verification). Provide via Terraform Cloud workspace variable, TF_VAR_api_railway_verify_txt, or terraform.tfvars (gitignored)."
   sensitive   = true
+
+  # Guard against providing only the token without the required `railway-verify=` prefix.
+  # `railway-verify=` プレフィックスなしの生トークンを誤って指定することを防ぐ。
+  validation {
+    condition     = can(regex("^railway-verify=", var.api_railway_verify_txt))
+    error_message = "The api_railway_verify_txt value must start with 'railway-verify='."
+  }
 }
 
 variable "realtime_cname_target" {
@@ -37,4 +44,11 @@ variable "realtime_railway_verify_txt" {
   type        = string
   description = "TXT content for _railway-verify.realtime (Railway domain verification). Provide via Terraform Cloud workspace variable, TF_VAR_realtime_railway_verify_txt, or terraform.tfvars (gitignored)."
   sensitive   = true
+
+  # Guard against providing only the token without the required `railway-verify=` prefix.
+  # `railway-verify=` プレフィックスなしの生トークンを誤って指定することを防ぐ。
+  validation {
+    condition     = can(regex("^railway-verify=", var.realtime_railway_verify_txt))
+    error_message = "The realtime_railway_verify_txt value must start with 'railway-verify='."
+  }
 }
