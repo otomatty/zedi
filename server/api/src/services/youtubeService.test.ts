@@ -2,17 +2,59 @@
  * youtubeService の単体テスト。
  * Unit tests for YouTube service (metadata, transcript, utility functions).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// youtube-transcript パッケージをモック（CJS/ESM 互換性問題回避）
-// Mock youtube-transcript package (CJS/ESM compatibility workaround)
-vi.mock("youtube-transcript", () => ({
-  YoutubeTranscript: {
-    fetchTranscript: vi.fn().mockResolvedValue([]),
+// youtubei.js モック / Mock the Innertube client
+const mockGetInfo = vi.fn();
+const mockCreate = vi.fn();
+vi.mock("youtubei.js", () => ({
+  Innertube: {
+    create: (...args: unknown[]) => mockCreate(...args),
   },
 }));
 
-import { formatDuration, joinTranscriptText, type TranscriptSegment } from "./youtubeService.js";
+import {
+  formatDuration,
+  joinTranscriptText,
+  fetchYouTubeContent,
+  __resetInnertubeForTesting,
+  type TranscriptSegment,
+} from "./youtubeService.js";
+
+/**
+ * basic_info / page / getTranscript を持つ最小限の VideoInfo モックを生成する。
+ * Builds a minimal VideoInfo-like mock with basic_info, page, and getTranscript.
+ */
+function buildVideoInfoMock(opts: {
+  basicInfo?: Record<string, unknown>;
+  microformat?: Record<string, unknown>;
+  transcriptSegments?: Array<{ start_ms: string; end_ms: string; text: string }>;
+  transcriptError?: unknown;
+}) {
+  const transcriptInfo = opts.transcriptError
+    ? null
+    : {
+        transcript: {
+          content: {
+            body: {
+              initial_segments: (opts.transcriptSegments ?? []).map((s) => ({
+                start_ms: s.start_ms,
+                end_ms: s.end_ms,
+                snippet: { toString: () => s.text },
+              })),
+            },
+          },
+        },
+      };
+
+  return {
+    basic_info: opts.basicInfo ?? {},
+    page: [{ microformat: opts.microformat }],
+    getTranscript: vi.fn(() =>
+      opts.transcriptError ? Promise.reject(opts.transcriptError) : Promise.resolve(transcriptInfo),
+    ),
+  };
+}
 
 describe("youtubeService", () => {
   describe("formatDuration", () => {
@@ -71,73 +113,136 @@ describe("youtubeService", () => {
     });
   });
 
-  describe("fetchYouTubeMetadata", () => {
+  describe("fetchYouTubeContent", () => {
     beforeEach(() => {
-      vi.restoreAllMocks();
+      mockGetInfo.mockReset();
+      mockCreate.mockReset();
+      mockCreate.mockResolvedValue({ getInfo: mockGetInfo });
+      __resetInnertubeForTesting();
     });
 
-    it("throws on API error", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response("Not Found", { status: 404 }),
-      );
-
-      const { fetchYouTubeMetadata } = await import("./youtubeService.js");
-      await expect(fetchYouTubeMetadata("test123456_", "fake-key")).rejects.toThrow(
-        /YouTube Data API failed: 404/,
-      );
+    afterEach(() => {
+      __resetInnertubeForTesting();
     });
 
-    it("throws when video not found (empty items)", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify({ items: [] }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-
-      const { fetchYouTubeMetadata } = await import("./youtubeService.js");
-      await expect(fetchYouTubeMetadata("test123456_", "fake-key")).rejects.toThrow(
-        /YouTube video not found/,
-      );
-    });
-
-    it("parses valid API response", async () => {
-      const mockResponse = {
-        items: [
-          {
-            snippet: {
-              title: "Test Video",
-              description: "A test video description",
-              channelTitle: "Test Channel",
-              publishedAt: "2024-01-15T10:00:00Z",
-              thumbnails: {
-                high: { url: "https://i.ytimg.com/vi/test/hqdefault.jpg", width: 480, height: 360 },
-              },
-              tags: ["test", "video"],
-            },
-            contentDetails: {
-              duration: "PT10M30S",
-            },
+    it("returns metadata and transcript from a successful Innertube response", async () => {
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: {
+            title: "Test Video",
+            short_description: "A test video description",
+            channel: { id: "UCxxx", name: "Test Channel", url: "" },
+            duration: 630, // 10:30
+            thumbnail: [
+              { url: "https://i.ytimg.com/vi/abc/default.jpg", width: 120, height: 90 },
+              { url: "https://i.ytimg.com/vi/abc/maxres.jpg", width: 1280, height: 720 },
+            ],
+            tags: ["test", "video"],
           },
-        ],
-      };
-
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-        new Response(JSON.stringify(mockResponse), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
+          microformat: { publish_date: "2024-01-15" },
+          transcriptSegments: [
+            { start_ms: "0", end_ms: "1500", text: "Hello" },
+            { start_ms: "1500", end_ms: "3000", text: "world" },
+          ],
         }),
       );
 
-      const { fetchYouTubeMetadata } = await import("./youtubeService.js");
-      const result = await fetchYouTubeMetadata("test123456_", "fake-key");
+      const result = await fetchYouTubeContent("abc12345678");
 
-      expect(result.title).toBe("Test Video");
-      expect(result.description).toBe("A test video description");
-      expect(result.channelTitle).toBe("Test Channel");
-      expect(result.duration).toBe("PT10M30S");
-      expect(result.tags).toEqual(["test", "video"]);
-      expect(result.thumbnailUrl).toBe("https://i.ytimg.com/vi/test/hqdefault.jpg");
+      expect(result.metadata.title).toBe("Test Video");
+      expect(result.metadata.description).toBe("A test video description");
+      expect(result.metadata.channelTitle).toBe("Test Channel");
+      expect(result.metadata.publishedAt).toBe("2024-01-15");
+      expect(result.metadata.duration).toBe("PT10M30S");
+      expect(result.metadata.thumbnailUrl).toBe("https://i.ytimg.com/vi/abc/maxres.jpg");
+      expect(result.metadata.tags).toEqual(["test", "video"]);
+
+      expect(result.transcript).toEqual([
+        { text: "Hello", offset: 0, duration: 1.5 },
+        { text: "world", offset: 1.5, duration: 1.5 },
+      ]);
+      expect(result.transcriptText).toBe("Hello world");
+    });
+
+    it("returns transcript=null when captions are unavailable", async () => {
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: { title: "No Caps", duration: 60, channel: { name: "Ch", id: "", url: "" } },
+          transcriptError: new Error("Transcript is disabled on this video"),
+        }),
+      );
+
+      const result = await fetchYouTubeContent("noCaps12345");
+
+      expect(result.metadata.title).toBe("No Caps");
+      expect(result.transcript).toBeNull();
+      expect(result.transcriptText).toBe("");
+    });
+
+    it("falls back to minimal metadata when getInfo throws", async () => {
+      mockGetInfo.mockRejectedValueOnce(new Error("Video unavailable"));
+
+      const result = await fetchYouTubeContent("badvideoXYZ");
+
+      expect(result.metadata.title).toBe("YouTube Video (badvideoXYZ)");
+      expect(result.metadata.description).toBe("");
+      expect(result.metadata.thumbnailUrl).toBe(
+        "https://img.youtube.com/vi/badvideoXYZ/hqdefault.jpg",
+      );
+      expect(result.transcript).toBeNull();
+      expect(result.transcriptText).toBe("");
+    });
+
+    it("falls back to author when channel.name is missing", async () => {
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: {
+            title: "By author",
+            author: "Author Name",
+            channel: null,
+            duration: 30,
+          },
+          transcriptError: new Error("none"),
+        }),
+      );
+
+      const result = await fetchYouTubeContent("authorTest1");
+      expect(result.metadata.channelTitle).toBe("Author Name");
+    });
+
+    it("uses hqdefault thumbnail when basic_info.thumbnail is empty", async () => {
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: { title: "No thumb", duration: 30, thumbnail: [] },
+          transcriptError: new Error("none"),
+        }),
+      );
+
+      const result = await fetchYouTubeContent("noThumb1234");
+      expect(result.metadata.thumbnailUrl).toBe(
+        "https://img.youtube.com/vi/noThumb1234/hqdefault.jpg",
+      );
+    });
+
+    it("skips transcript segments with empty text or invalid timestamps", async () => {
+      mockGetInfo.mockResolvedValueOnce(
+        buildVideoInfoMock({
+          basicInfo: { title: "Filter", duration: 30 },
+          transcriptSegments: [
+            { start_ms: "0", end_ms: "1000", text: "good" },
+            { start_ms: "1000", end_ms: "2000", text: "   " },
+            { start_ms: "not-a-number", end_ms: "3000", text: "broken" },
+            { start_ms: "2000", end_ms: "3000", text: "alsoGood" },
+          ],
+        }),
+      );
+
+      const result = await fetchYouTubeContent("filter12345");
+      expect(result.transcript).toEqual([
+        { text: "good", offset: 0, duration: 1 },
+        { text: "alsoGood", offset: 2, duration: 1 },
+      ]);
+      expect(result.transcriptText).toBe("good alsoGood");
     });
   });
 });
