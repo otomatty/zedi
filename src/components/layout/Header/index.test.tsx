@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Header from "./index";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@zedi/ui";
 
 const { signedInAuth, signedOutAuth } = vi.hoisted(() => {
   /** Matches `useAuth` return shape (Better Auth) for typed mocks. */
@@ -45,6 +46,18 @@ vi.mock("@/contexts/GlobalSearchContext", () => ({
   useGlobalSearchContextOptional: () => null,
 }));
 
+vi.mock("@zedi/ui", async () => {
+  const actual = await vi.importActual<typeof import("@zedi/ui")>("@zedi/ui");
+  return {
+    ...actual,
+    useIsMobile: vi.fn(() => false),
+  };
+});
+
+vi.mock("../MobileHeader", () => ({
+  MobileHeader: () => <header data-testid="mobile-header">MobileHeader</header>,
+}));
+
 vi.mock("@/components/layout/Container", () => ({
   default: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={className} data-testid="container">
@@ -72,6 +85,7 @@ vi.mock("./AIChatButton", () => ({
 describe("Header", () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue({ ...signedInAuth });
+    vi.mocked(useIsMobile).mockReturnValue(false);
   });
 
   it("renders the navigation menu", () => {
@@ -110,5 +124,14 @@ describe("Header", () => {
     vi.mocked(useAuth).mockReturnValue({ ...signedOutAuth });
     render(<Header />);
     expect(screen.getByText("common.guestSyncPrompt")).toBeInTheDocument();
+  });
+
+  it("delegates to MobileHeader on mobile viewports", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    render(<Header />);
+    expect(screen.getByTestId("mobile-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("navigation-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("unified-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ai-chat-btn")).not.toBeInTheDocument();
   });
 });

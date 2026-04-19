@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
+import FloatingActionButton from "@/components/layout/FloatingActionButton";
+import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge, useToast } from "@zedi/ui";
 import {
@@ -127,49 +129,59 @@ const NoteView: React.FC = () => {
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto py-6">
-      <Container>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-semibold">
-                {note.title || t("notes.untitledNote")}
-              </h1>
-              <NoteVisibilityBadge visibility={note.visibility} />
-              {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}
-            </div>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {t("notes.pagesCount", { count: notePages.length })}
-            </p>
+    <ContentWithAIChat
+      floatingAction={
+        canEdit ? (
+          <div className="mr-4 mb-4">
+            <FloatingActionButton />
           </div>
-          <NoteViewHeaderActions
+        ) : null
+      }
+    >
+      <main className="min-h-0 flex-1 overflow-y-auto py-6">
+        <Container>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-xl font-semibold">
+                  {note.title || t("notes.untitledNote")}
+                </h1>
+                <NoteVisibilityBadge visibility={note.visibility} />
+                {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}
+              </div>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {t("notes.pagesCount", { count: notePages.length })}
+              </p>
+            </div>
+            <NoteViewHeaderActions
+              noteId={note.id}
+              canManageMembers={canManageMembers}
+              isSignedIn={isSignedIn}
+              canView={Boolean(access?.canView)}
+              canShowAddPage={canShowAddPage}
+              isAddPageOpen={isAddPageOpen}
+              setIsAddPageOpen={setIsAddPageOpen}
+              newPageTitle={newPageTitle}
+              setNewPageTitle={setNewPageTitle}
+              pageFilter={pageFilter}
+              setPageFilter={setPageFilter}
+              filteredPages={filteredPages}
+              canEdit={canEdit}
+              onAddByTitle={handleAddNewPageByTitle}
+              onAddByPageId={handleAddPage}
+              addPagePending={addPageMutation.isPending}
+            />
+          </div>
+          <NoteViewMainContent
             noteId={note.id}
-            canManageMembers={canManageMembers}
-            isSignedIn={isSignedIn}
-            canView={Boolean(access?.canView)}
-            canShowAddPage={canShowAddPage}
-            isAddPageOpen={isAddPageOpen}
-            setIsAddPageOpen={setIsAddPageOpen}
-            newPageTitle={newPageTitle}
-            setNewPageTitle={setNewPageTitle}
-            pageFilter={pageFilter}
-            setPageFilter={setPageFilter}
-            filteredPages={filteredPages}
-            canEdit={canEdit}
-            onAddByTitle={handleAddNewPageByTitle}
-            onAddByPageId={handleAddPage}
-            addPagePending={addPageMutation.isPending}
+            notePages={notePages}
+            isPagesLoading={isPagesLoading}
+            canDeletePage={canDeletePage}
+            onRemovePage={handleRemovePage}
           />
-        </div>
-        <NoteViewMainContent
-          noteId={note.id}
-          notePages={notePages}
-          isPagesLoading={isPagesLoading}
-          canDeletePage={canDeletePage}
-          onRemovePage={handleRemovePage}
-        />
-      </Container>
-    </main>
+        </Container>
+      </main>
+    </ContentWithAIChat>
   );
 };
 

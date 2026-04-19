@@ -91,7 +91,18 @@ export function ContentWithAIChat({
       <>
         {children}
         {floatingAction && (
-          <div className="pointer-events-none fixed right-0 bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]">
+          <div
+            className="pointer-events-none fixed right-0 bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)]"
+            style={{
+              // 親指リーチを確保し、かつボトムナビと重ならないよう safe-area +
+              // ボトムナビ高さ分だけ下余白を空ける。ボトムナビ非表示時は 0px に戻る。
+              // Offset the FAB above the bottom nav while respecting the
+              // device safe area. Falls back to 0px when the bottom nav is
+              // not mounted (desktop / pages without the nav).
+              paddingBottom:
+                "calc(env(safe-area-inset-bottom) + var(--app-bottom-nav-height, 0px) + 0.5rem)",
+            }}
+          >
             {floatingAction}
           </div>
         )}
