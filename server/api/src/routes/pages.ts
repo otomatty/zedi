@@ -63,41 +63,41 @@ app.get("/", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const limit = Math.min(Math.max(Number(c.req.query("limit") || 20), 1), 100);
-  const offset = Math.max(Number(c.req.query("offset") || 0), 0);
+  // クエリパラメータは整数として明示的にパースする。`Number("abc")` だと NaN が SQL に渡るため。
+  // Parse query params as integers — `Number("abc")` would propagate NaN into SQL.
+  const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "20", 10) || 20, 1), 100);
+  const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
   const scope = c.req.query("scope") === "shared" ? "shared" : "own";
 
-  const result =
+  // アクセス制御だけを変数化して SELECT 文の重複を避ける。
+  // `shared` は大規模データセットでもプランナーが効きやすい EXISTS + JOIN を採用する。
+  // Vary only the access predicate to avoid duplicating the SELECT.
+  // `shared` uses EXISTS + JOIN, which scales better than IN (SELECT ...) on large datasets.
+  const accessFilter =
     scope === "shared"
-      ? await db.execute(sql`
-          SELECT p.id, p.title, p.content_preview, p.updated_at
-          FROM pages p
-          WHERE p.is_deleted = false
-            AND (
-              p.owner_id = ${userId}
-              OR p.id IN (
-                SELECT np.page_id FROM note_pages np
-                JOIN note_members nm ON nm.note_id = np.note_id
-                WHERE nm.member_email IN (
-                  SELECT email FROM "user" WHERE id = ${userId}
-                )
-                AND nm.is_deleted = false
-                AND np.is_deleted = false
-              )
-            )
-          ORDER BY p.updated_at DESC
-          LIMIT ${limit}
-          OFFSET ${offset}
-        `)
-      : await db.execute(sql`
-          SELECT p.id, p.title, p.content_preview, p.updated_at
-          FROM pages p
-          WHERE p.is_deleted = false
-            AND p.owner_id = ${userId}
-          ORDER BY p.updated_at DESC
-          LIMIT ${limit}
-          OFFSET ${offset}
-        `);
+      ? sql`(
+          p.owner_id = ${userId}
+          OR EXISTS (
+            SELECT 1 FROM note_pages np
+            JOIN note_members nm ON nm.note_id = np.note_id
+            JOIN "user" u ON u.email = nm.member_email
+            WHERE np.page_id = p.id
+              AND u.id = ${userId}
+              AND nm.is_deleted = false
+              AND np.is_deleted = false
+          )
+        )`
+      : sql`p.owner_id = ${userId}`;
+
+  const result = await db.execute(sql`
+    SELECT p.id, p.title, p.content_preview, p.updated_at
+    FROM pages p
+    WHERE p.is_deleted = false
+      AND ${accessFilter}
+    ORDER BY p.updated_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `);
 
   return c.json({ pages: result.rows });
 });

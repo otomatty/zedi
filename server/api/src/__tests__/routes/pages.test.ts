@@ -178,6 +178,19 @@ describe("GET /api/pages", () => {
     // Even with out-of-range params, the endpoint clamps to safe defaults and returns 200.
     expect(res.status).toBe(200);
   });
+
+  it("falls back to defaults when limit/offset are non-numeric", async () => {
+    const app = createPagesApp([{ rows: [] }]);
+
+    // `Number("abc")` だと NaN が SQL に渡って失敗するため、`parseInt + || default` でガードしている。
+    // Guards against `NaN` reaching SQL when params can't be parsed as integers.
+    const res = await app.request("/api/pages?limit=abc&offset=xyz", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("PUT /api/pages/:id/content", () => {
