@@ -24,6 +24,8 @@ export interface UserAdmin {
   suspendedReason: string | null;
   suspendedBy: string | null;
   createdAt: string;
+  /** ユーザーに紐づくアクティブページ数 / Number of active pages owned by the user */
+  pageCount: number;
 }
 
 /** AI モデル管理用のモデル情報 / AI model info for admin */

@@ -9,8 +9,14 @@ import type { AppEnv } from "../../../types/index.js";
 import adminRoutes from "../../../routes/admin/index.js";
 import { createMockDb } from "../notes/setup.js";
 
-export const TEST_ADMIN_ID = "user-admin-001";
-export const TEST_ADMIN_EMAIL = "admin@example.com";
+export /**
+ *
+ */
+const TEST_ADMIN_ID = "user-admin-001";
+export /**
+ *
+ */
+const TEST_ADMIN_EMAIL = "admin@example.com";
 
 /** GET /users の select で返す行の形（camelCase） */
 export function createMockUserRow(overrides: Record<string, unknown> = {}) {
@@ -30,7 +36,8 @@ export function createMockUserRow(overrides: Record<string, unknown> = {}) {
  * 先頭に [{ role: 'admin' }] を置き、続けてハンドラ内のクエリ結果を並べる。
  *
  * 例 GET /users:
- *   [ adminRoleCheck, listRows, countRow ]
+ *   [ adminRoleCheck, listRows, countRow, pageCountRows ]
+ *   pageCountRows は省略可（listRows が空のときはクエリが発行されない）。
  * 例 PATCH /users/:id:
  *   [ adminRoleCheck, updateReturning ]
  */
@@ -47,6 +54,9 @@ export function createAdminTestApp(dbResults: unknown[]) {
   return { app, chains };
 }
 
+/**
+ *
+ */
 export function adminAuthHeaders(userId = TEST_ADMIN_ID, userEmail = TEST_ADMIN_EMAIL) {
   return {
     "x-test-user-id": userId,

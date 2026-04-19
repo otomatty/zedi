@@ -143,6 +143,7 @@ export function UsersContent({
                   <TableHead className="px-3 py-2">名前</TableHead>
                   <TableHead className="px-3 py-2">ステータス</TableHead>
                   <TableHead className="px-3 py-2">ロール</TableHead>
+                  <TableHead className="px-3 py-2">ページ数</TableHead>
                   <TableHead className="px-3 py-2">作成日</TableHead>
                   <TableHead className="px-3 py-2">操作</TableHead>
                 </TableRow>
@@ -187,6 +188,9 @@ export function UsersContent({
                           <SelectItem value="admin">admin</SelectItem>
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground px-3 py-2 tabular-nums">
+                      {u.pageCount.toLocaleString("ja-JP")}
                     </TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2">
                       {formatDate(u.createdAt)}
