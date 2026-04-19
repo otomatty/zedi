@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   S3Client,
   PutObjectCommand,
@@ -265,7 +265,11 @@ app.delete("/:id", authRequired, async (c) => {
     }
   }
 
-  await db.delete(media).where(eq(media.id, mediaId));
+  // 認可は SELECT 時にも検証済みだが、行所有権が読み取り後に変わる TOCTOU を防ぐため
+  // DELETE の WHERE にも `ownerId` を含めて、書き込み段階でも所有者スコープを保つ。
+  // Re-assert ownership in the DELETE predicate to close the read-then-delete TOCTOU
+  // window: rows whose ownership changed after the SELECT must not be removed here.
+  await db.delete(media).where(and(eq(media.id, mediaId), eq(media.ownerId, userId)));
 
   return c.json({ success: true });
 });

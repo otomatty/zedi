@@ -124,7 +124,13 @@ app.delete("/:id", authRequired, async (c) => {
     }
   }
 
-  await db.delete(thumbnailObjects).where(eq(thumbnailObjects.id, objectId));
+  // 認可は SELECT 時にも検証済みだが、所有権が読み取り後に変わる TOCTOU を防ぐため
+  // DELETE の WHERE にも `userId` を含めて、書き込み段階でも所有者スコープを保つ。
+  // Re-assert ownership in the DELETE predicate to close the read-then-delete TOCTOU
+  // window: rows whose ownership changed after the SELECT must not be removed here.
+  await db
+    .delete(thumbnailObjects)
+    .where(and(eq(thumbnailObjects.id, objectId), eq(thumbnailObjects.userId, userId)));
 
   return c.json({ success: true });
 });

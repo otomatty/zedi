@@ -2,7 +2,7 @@
  * `lib/auditLog.ts` のユニットテスト。
  * Unit tests for the audit-log helper (extractClientIp, recordAuditLog).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { extractClientIp, recordAuditLog } from "../../lib/auditLog.js";
@@ -30,7 +30,26 @@ function createMockContext(params: {
 }
 
 describe("extractClientIp", () => {
-  it("returns the leftmost IP from x-forwarded-for", () => {
+  // `extractClientIp` は TRUST_PROXY=true のときのみプロキシヘッダを採用する。
+  // テストでは getConnInfo が呼べないため、ヘッダ採用時は値が返り、それ以外は
+  // ソケット IP 取得が失敗して null になる、という挙動を検証する。
+  // Tests assume getConnInfo throws under the mock context; the helper falls
+  // back to socket IP only when proxy trust is enabled and headers are present.
+  const originalTrustProxy = process.env.TRUST_PROXY;
+
+  beforeEach(() => {
+    process.env.TRUST_PROXY = "true";
+  });
+
+  afterEach(() => {
+    if (originalTrustProxy === undefined) {
+      delete process.env.TRUST_PROXY;
+    } else {
+      process.env.TRUST_PROXY = originalTrustProxy;
+    }
+  });
+
+  it("returns the leftmost IP from x-forwarded-for when TRUST_PROXY=true", () => {
     const c = createMockContext({
       headers: { "x-forwarded-for": "203.0.113.10, 10.0.0.1, 172.16.0.1" },
     });
@@ -49,13 +68,29 @@ describe("extractClientIp", () => {
     expect(extractClientIp(c)).toBe("192.0.2.42");
   });
 
-  it("returns null when neither header is present", () => {
+  it("returns null (no socket info) when neither header is present", () => {
     const c = createMockContext({ headers: {} });
     expect(extractClientIp(c)).toBeNull();
   });
 
-  it("returns null when x-forwarded-for is empty", () => {
+  it("returns null (no socket info) when x-forwarded-for is empty", () => {
     const c = createMockContext({ headers: { "x-forwarded-for": "  " } });
+    expect(extractClientIp(c)).toBeNull();
+  });
+
+  it("ignores x-forwarded-for when TRUST_PROXY is not set", () => {
+    process.env.TRUST_PROXY = "false";
+    const c = createMockContext({
+      headers: { "x-forwarded-for": "203.0.113.10" },
+    });
+    // プロキシヘッダは無視され、テスト Context にはソケット情報がないので null。
+    // Spoofed XFF must not be trusted; without socket info the helper returns null.
+    expect(extractClientIp(c)).toBeNull();
+  });
+
+  it("ignores x-real-ip when TRUST_PROXY is not set", () => {
+    process.env.TRUST_PROXY = "false";
+    const c = createMockContext({ headers: { "x-real-ip": "192.0.2.42" } });
     expect(extractClientIp(c)).toBeNull();
   });
 });
@@ -78,8 +113,22 @@ function createFakeDb() {
 }
 
 describe("recordAuditLog", () => {
+  // recordAuditLog は extractClientIp を経由するため、IP を期待するテストでは
+  // TRUST_PROXY=true を有効にしてプロキシヘッダを採用させる。
+  // recordAuditLog uses extractClientIp; enable proxy trust where IP is asserted.
+  const originalTrustProxy = process.env.TRUST_PROXY;
+
   beforeEach(() => {
     vi.restoreAllMocks();
+    process.env.TRUST_PROXY = "true";
+  });
+
+  afterEach(() => {
+    if (originalTrustProxy === undefined) {
+      delete process.env.TRUST_PROXY;
+    } else {
+      process.env.TRUST_PROXY = originalTrustProxy;
+    }
   });
 
   it("inserts a row with actor, action, target, before/after, ip, and user-agent", async () => {
