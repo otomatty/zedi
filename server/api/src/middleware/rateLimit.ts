@@ -123,19 +123,26 @@ export function rateLimit(arg: string | RateLimitOptions = "free") {
         : String(currentWindowBucket(options.windowSec));
     const key = `ratelimit:${options.label}:${subject}:${windowToken}`;
 
-    const count = await redis.incr(key);
-    if (count === 1) {
-      // Give the key a small safety margin over the window so counts never
-      // outlive the bucket they belong to.
-      await redis.expire(key, Math.max(options.windowSec * 2, options.windowSec + 60));
-    }
+    // INCR と EXPIRE をトランザクションで発行することで、INCR 後にアプリが落ちても
+    // TTL 無しのキーが残り続けることを防ぐ。ioredis の `multi().exec()` は Redis
+    // の MULTI/EXEC を使うためサーバ側でアトミック。
+    // Wrap INCR + EXPIRE in a MULTI/EXEC transaction so a crash between the two
+    // commands cannot leave a TTL-less key lingering in Redis.
+    const ttl = Math.max(options.windowSec * 2, options.windowSec + 60);
+    const results = await redis.multi().incr(key).expire(key, ttl).exec();
+    const incrResult = results?.[0];
+    const count =
+      Array.isArray(incrResult) && typeof incrResult[1] === "number" ? incrResult[1] : 0;
 
     if (count > options.limit) {
-      // Remaining seconds until the current bucket rolls over.
-      const retryAfter =
-        options.windowSec === HOUR_WINDOW_SEC
-          ? 60
-          : Math.max(1, options.windowSec - (Math.floor(Date.now() / 1000) % options.windowSec));
+      // 現在のウィンドウが終わるまでの残り秒数。1h ウィンドウも実時間で計算する
+      // (固定 60 秒だと legacy tier の呼び出し元でリトライが早すぎた)。
+      // Remaining seconds until the current bucket rolls over — compute from
+      // wall-clock so legacy hourly callers get an accurate Retry-After too.
+      const retryAfter = Math.max(
+        1,
+        options.windowSec - (Math.floor(Date.now() / 1000) % options.windowSec),
+      );
       return c.json(
         {
           error: "RATE_LIMIT_EXCEEDED",

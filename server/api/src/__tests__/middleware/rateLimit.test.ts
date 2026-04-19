@@ -14,15 +14,36 @@ import type { Context } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { rateLimit } from "../../middleware/rateLimit.js";
 
+/**
+ * rateLimit ミドルウェアは `multi().incr(key).expire(key, ttl).exec()` を呼ぶため、
+ * その最低限の形を満たすインメモリ Redis を用意する。
+ * Minimal in-memory stand-in that mimics the subset of ioredis used by the middleware.
+ */
 function createMockRedis(): AppEnv["Variables"]["redis"] {
   const store = new Map<string, number>();
+  const incr = (key: string): number => {
+    const next = (store.get(key) ?? 0) + 1;
+    store.set(key, next);
+    return next;
+  };
   return {
-    incr: vi.fn(async (key: string) => {
-      const next = (store.get(key) ?? 0) + 1;
-      store.set(key, next);
-      return next;
+    multi: vi.fn(() => {
+      const ops: Array<() => unknown> = [];
+      const chain = {
+        incr(key: string) {
+          ops.push(() => incr(key));
+          return chain;
+        },
+        expire(_key: string, _ttl: number) {
+          ops.push(() => 1);
+          return chain;
+        },
+        async exec() {
+          return ops.map((op) => [null, op()]);
+        },
+      };
+      return chain;
     }),
-    expire: vi.fn(async () => 1),
   } as unknown as AppEnv["Variables"]["redis"];
 }
 
@@ -143,6 +164,62 @@ describe("rateLimit middleware", () => {
     const res = await app.request("/test");
     expect(res.status).toBe(200);
     expect(res.headers.get("X-RateLimit-Limit")).toBe("120");
+  });
+
+  it("hourly bucket reports remaining seconds, not a hardcoded 60s", async () => {
+    // 1h ウィンドウでも Retry-After は実時間で算出し、最大 1 時間まで広がる。
+    // Hourly windows should report actual remaining seconds — cap is 3600.
+    const app = appWith(
+      rateLimit({ limit: 1, windowSec: 60 * 60, keyBy: "user", label: "hour" }),
+      (c) => {
+        c.set("redis", redis);
+        c.set("userId", "user-hour");
+      },
+    );
+    expect((await app.request("/test")).status).toBe(200);
+    const limited = await app.request("/test");
+    expect(limited.status).toBe(429);
+    const retryAfter = Number.parseInt(limited.headers.get("Retry-After") ?? "0", 10);
+    expect(retryAfter).toBeGreaterThanOrEqual(1);
+    expect(retryAfter).toBeLessThanOrEqual(3600);
+  });
+
+  it("uses MULTI/EXEC so INCR and EXPIRE are issued atomically", async () => {
+    // MULTI/EXEC による原子性を保証するため、rateLimit は単独の incr / expire を呼ばない。
+    // The middleware should use `multi()` so a crash cannot leave a TTL-less key.
+    const multiSpy = vi.fn();
+    const fakeRedis = {
+      multi: () => {
+        multiSpy();
+        const chain = {
+          incr: () => chain,
+          expire: () => chain,
+          exec: async () => [
+            [null, 1],
+            [null, 1],
+          ],
+        };
+        return chain;
+      },
+      incr: vi.fn(),
+      expire: vi.fn(),
+    } as unknown as AppEnv["Variables"]["redis"];
+
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("redis", fakeRedis);
+      c.set("userId", "user-atomic");
+      await next();
+    });
+    app.get("/test", rateLimit({ limit: 5, windowSec: 60, keyBy: "user", label: "atomic" }), (c) =>
+      c.json({ ok: true }),
+    );
+    const res = await app.request("/test");
+    expect(res.status).toBe(200);
+    expect(multiSpy).toHaveBeenCalled();
+    expect(
+      (fakeRedis as unknown as { incr: ReturnType<typeof vi.fn> }).incr,
+    ).not.toHaveBeenCalled();
   });
 
   it("keyBy: user falls back to IP when no userId is set", async () => {

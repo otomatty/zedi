@@ -121,13 +121,31 @@ async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
  */
 function createMockRedis(): AppEnv["Variables"]["redis"] {
   const store = new Map<string, number>();
+  const incr = (key: string): number => {
+    const next = (store.get(key) ?? 0) + 1;
+    store.set(key, next);
+    return next;
+  };
   return {
-    incr: vi.fn(async (key: string) => {
-      const next = (store.get(key) ?? 0) + 1;
-      store.set(key, next);
-      return next;
+    // rateLimit ミドルウェアが使う MULTI/EXEC を満たす最小のチェインを返す。
+    // Minimal multi() chain: the rateLimit middleware only issues incr + expire.
+    multi: vi.fn(() => {
+      const ops: Array<() => unknown> = [];
+      const chain = {
+        incr(key: string) {
+          ops.push(() => incr(key));
+          return chain;
+        },
+        expire(_key: string, _ttl: number) {
+          ops.push(() => 1);
+          return chain;
+        },
+        async exec() {
+          return ops.map((op) => [null, op()]);
+        },
+      };
+      return chain;
     }),
-    expire: vi.fn(async () => 1),
     get: vi.fn(async (key: string) => {
       const v = store.get(key);
       return v === undefined ? null : String(v);
