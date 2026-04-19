@@ -1,6 +1,6 @@
 /**
  * IndexedDB-backed StorageAdapter for Web (§6.2 zedi-rearchitecture-spec.md).
- * C3-2: my_pages, y-indexeddb (zedi-doc-{pageId}), my_links, my_ghost_links, search_index, meta.
+ * C3-2: my_pages, y-indexeddb (zedi-doc-pageId), my_links, my_ghost_links, search_index, meta.
  */
 
 import * as Y from "yjs";
@@ -202,7 +202,60 @@ function setYDocVersion(pageId: string, version: number): Promise<void> {
 let adapterDb: IDBDatabase | null = null;
 let adapterUserId: string | null = null;
 
+/**
+ * Thrown when {@link IndexedDBStorageAdapter.resetDatabase} cannot enumerate
+ * the per-page Y.Doc databases before the main DB is deleted. Callers should
+ * surface this distinctly so the user understands that no data was deleted
+ * and they may retry safely.
+ *
+ * `resetDatabase` 実行時に Y.Doc DB 一覧の取得に失敗した場合に投げられる。
+ * UI は専用メッセージで通知し、ユーザーが安全に再試行できるようにする。
+ */
+export class ResetDatabasePageIdsReadError extends Error {
+  override readonly name = "ResetDatabasePageIdsReadError";
+  /**
+   * Underlying cause of the failure, normalized to an `Error` for diagnostics.
+   * 失敗の原因となった元の例外。診断のため `Error` に正規化される。
+   */
+  readonly originalError: Error | undefined;
+  /**
+   * Construct the error with a normalized {@link originalError}.
+   * `originalError` を正規化した形で保持する。
+   * @param cause - The underlying error or value that prevented reading page IDs.
+   *                Non-`Error` values (e.g. `DOMException` in some runtimes,
+   *                strings) are wrapped in `new Error(String(cause))`.
+   *                pageIds の読み取りを妨げた元のエラー / 値。
+   *                `Error` でない場合は `new Error(String(cause))` でラップする。
+   */
+  constructor(cause: unknown) {
+    super(
+      "IndexedDBStorageAdapter.resetDatabase: failed to read page IDs; aborting reset to avoid orphaned Y.Doc databases.",
+    );
+    this.originalError =
+      cause instanceof Error
+        ? cause
+        : cause === undefined || cause === null
+          ? undefined
+          : new Error(String(cause));
+  }
+}
+
+/**
+ * IndexedDB-backed implementation of {@link StorageAdapter} for the web platform.
+ * Maintains one main DB per user (`zedi-storage-{userId}`) plus one Y.Doc DB
+ * per page (`zedi-doc-{pageId}`) via `y-indexeddb`.
+ *
+ * Web 向けの IndexedDB ベース StorageAdapter 実装。ユーザーごとの主 DB と、
+ * `y-indexeddb` がページごとに作成する Y.Doc DB を管理する。
+ */
 export class IndexedDBStorageAdapter implements StorageAdapter {
+  /**
+   * Open (or reopen for a new user) the user's main IndexedDB.
+   * Must be called before any other method.
+   *
+   * 指定ユーザーの主 IndexedDB を開く（ユーザーが変わった場合は開き直す）。
+   * 他のメソッドを呼び出す前に必ず実行する。
+   */
   async initialize(userId: string): Promise<void> {
     if (adapterDb && adapterUserId === userId) return;
     if (adapterDb) {
@@ -214,6 +267,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     adapterUserId = userId;
   }
 
+  /**
+   * Close the main DB connection if open. Per-page Y.Doc DBs are not affected.
+   * 主 DB が開いていれば閉じる。ページごとの Y.Doc DB には影響しない。
+   */
   async close(): Promise<void> {
     if (adapterDb) {
       adapterDb.close();
@@ -222,12 +279,24 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     }
   }
 
+  /**
+   * Delete the user's main DB and every per-page Y.Doc DB.
+   *
+   * If the page-IDs read fails the method aborts without touching any DB and
+   * throws {@link ResetDatabasePageIdsReadError}, so the caller can retry
+   * without leaving orphaned Y.Doc databases (#608).
+   *
+   * 主 DB と全ページの Y.Doc DB を削除する。
+   * pageIds 取得に失敗した場合は何も削除せず {@link ResetDatabasePageIdsReadError}
+   * を throw し、Y.Doc DB の孤児を残さず再試行できるようにする (#608)。
+   */
   async resetDatabase(): Promise<void> {
     const userId = adapterUserId;
     if (!userId) throw new Error("IndexedDBStorageAdapter: not initialized.");
 
-    // Collect page IDs before closing so we can delete per-page Y.Doc databases
-    let pageIds: string[] = [];
+    // Collect page IDs first so we can delete per-page Y.Doc DBs after the main DB is gone.
+    // 主 DB を消した後でもページごとの Y.Doc DB を削除できるよう、先に pageIds を取得する。
+    let pageIds: string[];
     try {
       const db = await ensureDb();
       pageIds = await new Promise<string[]>((resolve, reject) => {
@@ -236,14 +305,14 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
         req.onsuccess = () => resolve((req.result as string[]) || []);
         req.onerror = () => reject(req.error);
       });
-    } catch {
-      // If we can't read pages, continue with main DB deletion
+    } catch (cause) {
+      // Abort before any deletion — see #608.
+      // 削除前に中断することで Y.Doc DB の孤児を防ぐ (#608)。
+      throw new ResetDatabasePageIdsReadError(cause);
     }
 
-    // Close the main database connection
     await this.close();
 
-    // Delete the main storage database
     await new Promise<void>((resolve, reject) => {
       const req = indexedDB.deleteDatabase(DB_NAME_PREFIX + userId);
       req.onsuccess = () => resolve();
@@ -256,7 +325,6 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
         );
     });
 
-    // Delete per-page Y.Doc databases (y-indexeddb creates one per page)
     const results = await Promise.allSettled(
       pageIds.map(
         (pageId) =>
@@ -282,7 +350,12 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     }
   }
 
-  // ── メタデータ ──
+  // ── メタデータ / Page metadata ──
+
+  /**
+   * Return all non-deleted pages, sorted by `updatedAt` descending.
+   * 削除されていないページを `updatedAt` 降順で返す。
+   */
   async getAllPages(): Promise<PageMetadata[]> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -298,6 +371,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Return a single page by id, or `null` when missing or soft-deleted.
+   * 指定 id のページを返す。存在しないか論理削除済みなら `null`。
+   */
   async getPage(pageId: string): Promise<PageMetadata | null> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -311,6 +388,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Insert or replace a page row keyed by `id`.
+   * `id` をキーにページ行を upsert する。
+   */
   async upsertPage(page: PageMetadata): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -321,6 +402,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Soft-delete the page (sets `isDeleted = true`); no-op if missing.
+   * ページを論理削除する（存在しない場合は何もしない）。
+   */
   async deletePage(pageId: string): Promise<void> {
     const page = await this.getPage(pageId);
     if (!page) return;
@@ -328,19 +413,37 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   // ── Y.Doc ──
+
+  /**
+   * Load the Y.Doc binary state for a page, or `null` if empty / absent.
+   * 指定ページの Y.Doc バイナリ状態を返す。空 / 未保存なら `null`。
+   */
   async getYDocState(pageId: string): Promise<Uint8Array | null> {
     return loadYDocState(pageId);
   }
 
+  /**
+   * Persist the Y.Doc binary state and record its monotonic version.
+   * Y.Doc バイナリ状態を保存し、単調増加のバージョンを記録する。
+   */
   async saveYDocState(pageId: string, state: Uint8Array, version: number): Promise<void> {
     await saveYDocStateToIdb(pageId, state, version);
   }
 
+  /**
+   * Return the stored Y.Doc version for a page (defaults to 1).
+   * 指定ページの Y.Doc バージョンを返す（既定は 1）。
+   */
   async getYDocVersion(pageId: string): Promise<number> {
     return getYDocVersionFromStore(pageId);
   }
 
-  // ── リンク ──
+  // ── リンク / Links ──
+
+  /**
+   * Return forward links emanating from the given page.
+   * 指定ページから出ているリンクを返す。
+   */
   async getLinks(pageId: string): Promise<Link[]> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -357,6 +460,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Return backlinks pointing at the given page.
+   * 指定ページに入ってくる被リンク（バックリンク）を返す。
+   */
   async getBacklinks(pageId: string): Promise<Link[]> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -373,6 +480,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Replace all forward links for a source page (delete existing then insert).
+   * 指定ソースページの forward links を全置換する（既存削除→新規追加）。
+   */
   async saveLinks(sourcePageId: string, links: Link[]): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -398,6 +509,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Return ghost links (unresolved wiki link targets) for a source page.
+   * 指定ソースページの ghost link（未解決リンク）を返す。
+   */
   async getGhostLinks(pageId: string): Promise<GhostLink[]> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -420,6 +535,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Replace all ghost links for a source page.
+   * 指定ソースページの ghost link を全置換する。
+   */
   async saveGhostLinks(sourcePageId: string, ghostLinks: GhostLink[]): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -447,7 +566,14 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
-  // ── 検索 ──
+  // ── 検索 / Search ──
+
+  /**
+   * Substring search over the local search index. Returns up to one result per
+   * matching page with a 200-char snippet.
+   * ローカル検索インデックスに対する部分一致検索。1 ページにつき最大 1 件、
+   * 200 文字までのスニペットを返す。
+   */
   async searchPages(query: string): Promise<SearchResult[]> {
     const q = query.trim().toLowerCase();
     if (!q) return [];
@@ -488,6 +614,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Upsert the search-index entry (`pageId` → `text`) used by `searchPages`.
+   * `searchPages` が参照する検索インデックス (`pageId` → `text`) を upsert する。
+   */
   async updateSearchIndex(pageId: string, text: string): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -498,7 +628,12 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
-  // ── 同期メタデータ ──
+  // ── 同期メタデータ / Sync metadata ──
+
+  /**
+   * Return the persisted `lastSyncTime` epoch ms (0 if never synced).
+   * 永続化された `lastSyncTime` を epoch ms で返す（未同期なら 0）。
+   */
   async getLastSyncTime(): Promise<number> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
@@ -509,6 +644,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   * Persist the `lastSyncTime` epoch ms used by the sync engine.
+   * 同期エンジンが利用する `lastSyncTime` (epoch ms) を保存する。
+   */
   async setLastSyncTime(time: number): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
