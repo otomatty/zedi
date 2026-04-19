@@ -29,6 +29,24 @@ import type {
   ClipResult,
 } from "./ZediClient.js";
 
+/**
+ * 429 応答から再試行秒数を取り出す (ヘッダ優先、次に JSON 本文)。
+ * Extracts a retry-after value in seconds from a 429 response.
+ */
+function extractRetryAfter(res: Response, parsed: unknown): number | null {
+  const header = res.headers.get("Retry-After");
+  if (header) {
+    // RFC 7231: HTTP-date or delta-seconds. 秒で来ているときだけ採用する。
+    const seconds = Number.parseInt(header, 10);
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds;
+  }
+  if (parsed && typeof parsed === "object" && "retry_after" in parsed) {
+    const raw = (parsed as { retry_after?: unknown }).retry_after;
+    if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
+  }
+  return null;
+}
+
 /** HttpZediClient のコンストラクタオプション / Options for HttpZediClient. */
 export interface HttpZediClientOptions {
   /** Zedi API の baseUrl。末尾スラッシュは正規化される。 Base URL for the Zedi API; trailing slashes are normalized. */
@@ -119,7 +137,8 @@ export class HttpZediClient implements ZediClient {
         (parsed && typeof parsed === "object" && "message" in parsed
           ? String((parsed as { message: unknown }).message)
           : null) ?? (typeof parsed === "string" ? parsed : `HTTP ${res.status}`);
-      throw new ZediApiError(res.status, message, parsed);
+      const retryAfterSec = res.status === 429 ? extractRetryAfter(res, parsed) : null;
+      throw new ZediApiError(res.status, message, parsed, retryAfterSec);
     }
 
     return parsed as T;

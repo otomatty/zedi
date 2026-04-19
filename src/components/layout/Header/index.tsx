@@ -2,9 +2,8 @@ import React from "react";
 import Container from "@/components/layout/Container";
 import { cn } from "@zedi/ui";
 import { HeaderLogo } from "./HeaderLogo";
-import { MonthNavigation } from "./MonthNavigation";
 import { HeaderSearchBar } from "./HeaderSearchBar";
-import { PrimaryNav } from "./PrimaryNav";
+import { NavigationMenu } from "./NavigationMenu";
 import { UnifiedMenu } from "./UnifiedMenu";
 import { AIChatButton } from "./AIChatButton";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,11 +15,11 @@ interface HeaderProps {
 }
 
 /**
- * Sticky app header. Hosts the logo, primary functional navigation
- * (Home / Notes), the search bar, the AI chat toggle and a user-only menu.
+ * Sticky app header. Hosts the logo, the search bar, the AI chat toggle, a
+ * navigation dropdown (Home / Notes) and the user-only menu.
  *
- * 固定ヘッダー。ロゴ、主要な機能ナビゲーション（Home / Notes）、検索、
- * AI チャットの開閉、そしてユーザー情報専用のメニューを並べる。
+ * 固定ヘッダー。ロゴ、検索、AI チャット開閉に加え、機能ナビゲーション（Home / Notes）
+ * のドロップダウンとユーザー専用メニューを並べる。
  */
 const Header: React.FC<HeaderProps> = ({ className }) => {
   const { isSignedIn } = useAuth();
@@ -37,14 +36,12 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
       )}
     >
       <Container className="flex h-[4.5rem] items-center justify-between gap-3 md:gap-4">
-        {/* Left: Logo, Month Navigation and primary functional nav (Home / Notes).
-            左: ロゴ・月ナビ・主要な機能ナビゲーション（Home / Notes）。 */}
+        {/* Left: Logo.
+            左: ロゴ。 */}
         <div className="flex min-w-0 shrink-0 items-center gap-2 md:gap-3">
           <div className="hidden items-center gap-3 md:flex">
             <HeaderLogo />
-            <MonthNavigation />
           </div>
-          <PrimaryNav />
         </div>
 
         {/* Center: Search bar & AI Chat button.
@@ -54,14 +51,18 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           <AIChatButton />
         </div>
 
-        {/* Right: User-only menu (account, sync status, sign in/out).
-            右: ユーザー専用メニュー（アカウント・同期状態・サインイン/アウト）。 */}
+        {/* Right: navigation dropdown and user-only menu.
+            右: 機能ナビゲーションのドロップダウンとユーザー専用メニュー。
+            Keep a slightly wider gap between the square nav trigger and the
+            circular avatar trigger to mitigate mis-taps.
+            四角いナビトリガーと丸いアバターの間にやや広めの gap を取り、誤タップを抑える。 */}
         <div className="flex shrink-0 items-center gap-2">
           {!isSignedIn && (
             <span className="text-muted-foreground hidden text-xs md:inline">
               {t("common.guestSyncPrompt")}
             </span>
           )}
+          <NavigationMenu />
           <UnifiedMenu />
         </div>
       </Container>

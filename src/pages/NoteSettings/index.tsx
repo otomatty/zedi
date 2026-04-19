@@ -52,13 +52,18 @@ const NoteSettings: React.FC = () => {
   });
 
   useEffect(() => {
-    if (note) {
-      queueMicrotask(() => {
-        setTitle(note.title);
-        setVisibility(note.visibility);
-        setEditPermission(note.editPermission);
-      });
-    }
+    if (!note) return;
+    // Sync local form state from the loaded note. Setters are called directly
+    // (no `queueMicrotask`) so a deferred callback cannot fire after `note`
+    // becomes null — that previously caused unhandled microtask exceptions
+    // surfaced as Stryker `# errors`, plus React `act()` warnings in tests.
+    // ロード済みノートからローカル状態を同期。`queueMicrotask` で遅延すると、
+    // `note` が null/入れ替わった後にコールバックが走って例外となり、
+    // mutation testing の RuntimeError や `act()` 警告の原因になっていた。
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot init from loaded note
+    setTitle(note.title);
+    setVisibility(note.visibility);
+    setEditPermission(note.editPermission);
   }, [note]);
 
   const noteUrl = useMemo(() => {

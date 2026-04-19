@@ -1,14 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  getMonthRange,
-  isTimestampInMonth,
-  getAvailableMonthsFromPages,
-  formatDateLabel,
-  getDateKey,
-  groupPagesByDate,
-  formatMonthYear,
-  formatTimeAgo,
-} from "./dateUtils";
+import { formatDateLabel, getDateKey, groupPagesByDate, formatTimeAgo } from "./dateUtils";
 import type { Page } from "@/types/page";
 
 function makePage(overrides: Partial<Page> = {}): Page {
@@ -23,51 +14,6 @@ function makePage(overrides: Partial<Page> = {}): Page {
     ...overrides,
   };
 }
-
-describe("getMonthRange", () => {
-  it("returns correct start/end for valid month", () => {
-    const { start, end } = getMonthRange("2024-03");
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    expect(startDate.getFullYear()).toBe(2024);
-    expect(startDate.getMonth()).toBe(2);
-    expect(startDate.getDate()).toBe(1);
-    expect(endDate.getFullYear()).toBe(2024);
-    expect(endDate.getMonth()).toBe(2);
-    expect(endDate.getDate()).toBe(31);
-  });
-
-  it("returns {0,0} for invalid month", () => {
-    expect(getMonthRange("invalid")).toEqual({ start: 0, end: 0 });
-    expect(getMonthRange("2024-13")).toEqual({ start: 0, end: 0 });
-    expect(getMonthRange("2024-00")).toEqual({ start: 0, end: 0 });
-  });
-});
-
-describe("isTimestampInMonth", () => {
-  it("returns true for timestamp in month", () => {
-    const ts = new Date(2024, 2, 15).getTime();
-    expect(isTimestampInMonth(ts, "2024-03")).toBe(true);
-  });
-
-  it("returns false for timestamp outside month", () => {
-    const ts = new Date(2024, 3, 1).getTime();
-    expect(isTimestampInMonth(ts, "2024-03")).toBe(false);
-  });
-});
-
-describe("getAvailableMonthsFromPages", () => {
-  it("returns unique months sorted desc", () => {
-    const pages = [
-      { updatedAt: new Date(2024, 0, 10).getTime() },
-      { updatedAt: new Date(2024, 2, 5).getTime() },
-      { updatedAt: new Date(2024, 0, 20).getTime() },
-      { updatedAt: new Date(2023, 11, 1).getTime() },
-    ];
-    const months = getAvailableMonthsFromPages(pages);
-    expect(months).toEqual(["2024-03", "2024-01", "2023-12"]);
-  });
-});
 
 describe("formatDateLabel", () => {
   beforeEach(() => {
@@ -124,13 +70,6 @@ describe("groupPagesByDate", () => {
     expect(groups[0].pages).toHaveLength(2);
     expect(groups[1].date).toBe("2024-06-14");
     expect(groups[1].pages).toHaveLength(1);
-  });
-});
-
-describe("formatMonthYear", () => {
-  it("returns yyyy年M月 format", () => {
-    const date = new Date(2024, 2, 1);
-    expect(formatMonthYear(date)).toBe("2024年3月");
   });
 });
 

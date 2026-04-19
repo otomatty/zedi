@@ -290,6 +290,46 @@ describe("HttpZediClient error normalization", () => {
     });
   });
 
+  it("tags 429 responses with isRateLimit and extracts Retry-After header", async () => {
+    // 429 はミドルウェア由来。Retry-After ヘッダを秒数として拾い isRateLimit を立てる。
+    // 429 comes from the rateLimit middleware; we pick up the header as seconds.
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", retry_after: 42 }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "42" },
+      }),
+    );
+    let error: unknown;
+    try {
+      await client.clipUrl("https://example.com/a");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ZediApiError);
+    const apiError = error as ZediApiError;
+    expect(apiError.status).toBe(429);
+    expect(apiError.isRateLimit).toBe(true);
+    expect(apiError.retryAfterSec).toBe(42);
+  });
+
+  it("falls back to body.retry_after when Retry-After header is absent", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", retry_after: 7 }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    let error: unknown;
+    try {
+      await client.clipUrl("https://example.com/a");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ZediApiError);
+    expect((error as ZediApiError).isRateLimit).toBe(true);
+    expect((error as ZediApiError).retryAfterSec).toBe(7);
+  });
+
   it("throws ZediApiError(status=0) for fetch network failure", async () => {
     fetchMock.mockRejectedValueOnce(new Error("ECONNREFUSED"));
     let error: unknown;
