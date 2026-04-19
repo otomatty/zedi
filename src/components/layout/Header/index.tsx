@@ -1,9 +1,10 @@
 import React from "react";
 import Container from "@/components/layout/Container";
-import { cn, SidebarTrigger, useIsMobile } from "@zedi/ui";
+import { cn } from "@zedi/ui";
 import { HeaderLogo } from "./HeaderLogo";
 import { MonthNavigation } from "./MonthNavigation";
 import { HeaderSearchBar } from "./HeaderSearchBar";
+import { PrimaryNav } from "./PrimaryNav";
 import { UnifiedMenu } from "./UnifiedMenu";
 import { AIChatButton } from "./AIChatButton";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,15 +16,17 @@ interface HeaderProps {
 }
 
 /**
- * Sticky app header. Hides the left sidebar trigger on mobile; navigation is available from the user menu sheet.
- * 固定ヘッダー。モバイルでは左サイドバートリガーを出さず、ナビはユーザーメニューのシートから利用。
+ * Sticky app header. Hosts the logo, primary functional navigation
+ * (Home / Notes), the search bar, the AI chat toggle and a user-only menu.
+ *
+ * 固定ヘッダー。ロゴ、主要な機能ナビゲーション（Home / Notes）、検索、
+ * AI チャットの開閉、そしてユーザー情報専用のメニューを並べる。
  */
 const Header: React.FC<HeaderProps> = ({ className }) => {
   const { isSignedIn } = useAuth();
   const { t } = useTranslation();
   const searchContext = useGlobalSearchContextOptional();
   const hasSearchContext = searchContext != null;
-  const isMobile = useIsMobile();
 
   return (
     <header
@@ -33,24 +36,26 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
         className,
       )}
     >
-      <Container className="flex h-[4.5rem] items-center justify-between gap-4">
-        {/* Left: Sidebar trigger (desktop only; mobile uses user-menu sheet for nav), Logo & Month Navigation */}
-        {/* 左: サイドバートリガー（デスクトップのみ。モバイルはユーザーメニューシートでナビ）・ロゴ・月ナビ */}
-        <div className="flex min-w-0 shrink-0 items-center gap-2 md:gap-4">
-          {!isMobile && <SidebarTrigger className="h-9 w-9" aria-label={t("nav.menu", "Menu")} />}
-          <div className="hidden items-center gap-4 md:flex">
+      <Container className="flex h-[4.5rem] items-center justify-between gap-3 md:gap-4">
+        {/* Left: Logo, Month Navigation and primary functional nav (Home / Notes).
+            左: ロゴ・月ナビ・主要な機能ナビゲーション（Home / Notes）。 */}
+        <div className="flex min-w-0 shrink-0 items-center gap-2 md:gap-3">
+          <div className="hidden items-center gap-3 md:flex">
             <HeaderLogo />
             <MonthNavigation />
           </div>
+          <PrimaryNav />
         </div>
 
-        {/* Center: Search bar & AI Chat button */}
+        {/* Center: Search bar & AI Chat button.
+            中央: 検索バーと AI チャットボタン。 */}
         <div className="flex max-w-xl min-w-0 flex-1 items-center justify-center gap-2 md:mx-2">
           {hasSearchContext && <HeaderSearchBar />}
           <AIChatButton />
         </div>
 
-        {/* Right: Unified menu */}
+        {/* Right: User-only menu (account, sync status, sign in/out).
+            右: ユーザー専用メニュー（アカウント・同期状態・サインイン/アウト）。 */}
         <div className="flex shrink-0 items-center gap-2">
           {!isSignedIn && (
             <span className="text-muted-foreground hidden text-xs md:inline">

@@ -11,8 +11,8 @@ import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
 
 /**
- * Full list of AI chat conversations (localStorage-backed). Open / delete like the sidebar.
- * AI チャット会話の一覧ページ（ローカル保存）。サイドバーと同様に開く・削除できる。
+ * Full list of AI chat conversations (localStorage-backed). Lets the user open or delete entries.
+ * AI チャット会話の一覧ページ（ローカル保存）。会話の起動・削除を行える。
  */
 export default function AIChatHistory() {
   const { t, i18n } = useTranslation();
@@ -54,9 +54,7 @@ export default function AIChatHistory() {
             ) : (
               sorted.map((conv) => {
                 const titleLabel =
-                  conv.title.trim().length > 0
-                    ? conv.title
-                    : t("nav.sidebarUntitledChat", "New chat");
+                  conv.title.trim().length > 0 ? conv.title : t("nav.untitledChat", "New chat");
                 const dateLabel = formatDistanceToNow(new Date(conv.updatedAt), {
                   addSuffix: true,
                   locale: dateLocale,
@@ -65,7 +63,6 @@ export default function AIChatHistory() {
                   <AIChatConversationListRow
                     key={conv.id}
                     conversation={conv}
-                    variant="page"
                     isActive={activeConversationId === conv.id}
                     onOpen={() => handleOpen(conv.id)}
                     dateLabel={dateLabel}

@@ -8,10 +8,10 @@ const WIDTH_5 = 880;
 
 /**
  * コンテナ幅からグリッド列数を算出する（2〜6）。
- * ビューポートではなくコンテナ幅で列数を変えるため、サイドバー開閉時も表示領域に追従する。
+ * ビューポートではなくコンテナ幅で列数を変えるため、AI ドックの開閉等で表示領域が変わっても列数が追従する。
  *
- * Derives grid column count (2–6) from container width so that opening/closing
- * sidebars updates the visible column count.
+ * Derives grid column count (2–6) from container width so that toggling adjacent
+ * panels (e.g. the AI dock) updates the visible column count.
  */
 export function widthToColumns(width: number): 2 | 3 | 4 | 5 | 6 {
   if (width < WIDTH_2) return 2;

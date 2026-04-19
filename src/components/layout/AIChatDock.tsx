@@ -6,8 +6,8 @@ import { useAIChatContext } from "@/contexts/AIChatContext";
 
 /**
  * Global AI chat dock placed at the layout layer.
- * Keeps left/right sidebars fixed width while center content stays flexible.
- * レイアウト層に配置するAIチャットドック。左右を固定幅にし、中央のみ可変にする。
+ * Reserves a fixed-width column on desktop while keeping the main content flexible.
+ * レイアウト層に配置するAIチャットドック。デスクトップでは固定幅、メイン領域は可変。
  */
 export function AIChatDock() {
   const isMobile = useIsMobile();

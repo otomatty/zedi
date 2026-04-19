@@ -11,7 +11,7 @@ interface NotesLayoutProps {
 
 /**
  * Tabbed layout for `/notes` routes (my notes / discover).
- * The shared `AppLayout`（ヘッダー・サイドバー・AI ドック）はルートレベルで適用されるため、ここではタブ＋本文のみを描画する。
+ * The shared `AppLayout`（ヘッダー・AI ドック）はルートレベルで適用されるため、ここではタブ＋本文のみを描画する。
  *
  * `/notes` 系のタブ付きレイアウト（マイノート / 発見）。共通 `AppLayout` は親ルートで適用される。
  */

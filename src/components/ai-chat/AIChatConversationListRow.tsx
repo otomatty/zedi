@@ -14,9 +14,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  SidebarMenuAction,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from "@zedi/ui";
 import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -24,13 +21,10 @@ import type { Conversation } from "@/types/aiChat";
 import { useDeleteAIConversation } from "@/hooks/useDeleteAIConversation";
 
 /**
- * Where the row is rendered: sidebar list vs full page history.
- * 行の表示コンテキスト（サイドバー一覧か履歴ページか）。
+ * AI conversation row props (page-level list).
+ * AI 会話行のプロパティ（ページ内一覧用）。
  */
-export type AIChatConversationListRowVariant = "sidebar" | "page";
-
-/** Shared props for both row variants. / 両バリアント共通のプロパティ */
-interface AIChatConversationListRowBaseProps {
+export interface AIChatConversationListRowProps {
   /** Conversation row data. / 会話行データ */
   conversation: Conversation;
   /** Whether this conversation is the active one in the chat panel. / チャットパネルで選択中か */
@@ -41,34 +35,25 @@ interface AIChatConversationListRowBaseProps {
   dateLabel: string;
   /** Display title (resolved untitled). / 表示タイトル */
   titleLabel: string;
+  /** When true, omit row border (e.g. landing list). / 行の枠線を付けない（ランディング等） */
+  borderless?: boolean;
 }
 
 /**
- * Row props: sidebar delegates delete confirm to parent; page variant can omit border.
- * 行のプロパティ。サイドバーは削除確認を親へ。ページ版は枠線なし可。
+ * One AI conversation row with overflow menu (delete) and an inline confirm dialog.
+ * Used in the AI chat history page and landing list (the sidebar variant has been removed).
+ *
+ * 削除メニューと確認ダイアログを内蔵した AI 会話行。AI チャット履歴ページとランディング一覧で利用する
+ * （旧サイドバー版は削除済み）。
  */
-export type AIChatConversationListRowProps =
-  | (AIChatConversationListRowBaseProps & {
-      variant: "sidebar";
-      /** Parent shows confirm dialog (keeps valid `ul` \> `li` only). / 親で確認ダイアログを出す */
-      onRequestDelete: () => void;
-    })
-  | (AIChatConversationListRowBaseProps & {
-      variant: "page";
-      /** When true, omit row border (e.g. landing list). / 行の枠線を付けない（ランディング等） */
-      borderless?: boolean;
-    });
-
-/**
- * One AI conversation row with overflow menu (delete). Page variant includes confirm dialog;
- * sidebar delegates confirmation to the parent so the menu stays valid HTML (`ul` \> `li` only).
- * 削除メニュー付き会話行。ページ版は確認ダイアログ内蔵。サイドバー版は親が確認（ul の構造を保つ）。
- */
-export function AIChatConversationListRow(props: AIChatConversationListRowProps) {
-  const { conversation, variant, isActive, onOpen, dateLabel, titleLabel } = props;
-  const borderless =
-    variant === "page" &&
-    Boolean((props as Extract<AIChatConversationListRowProps, { variant: "page" }>).borderless);
+export function AIChatConversationListRow({
+  conversation,
+  isActive,
+  onOpen,
+  dateLabel,
+  titleLabel,
+  borderless = false,
+}: AIChatConversationListRowProps) {
   const { t } = useTranslation();
   const deleteConversation = useDeleteAIConversation();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -83,96 +68,13 @@ export function AIChatConversationListRow(props: AIChatConversationListRowProps)
   const confirmDescription = t("aiChat.history.deleteConfirmDescription", "This cannot be undone.");
 
   /**
-   * Callback to open delete confirm (sidebar delegates to parent, page opens inline dialog).
-   * Deferred via `queueMicrotask` so the Radix dropdown closes before the alert dialog opens.
-   * 削除確認を開く。ドロップダウンが閉じ切ってから開くため queueMicrotask で遅延。
+   * Defer opening the confirm dialog via `queueMicrotask` so the Radix dropdown
+   * closes before the alert dialog opens (otherwise focus management collides).
+   * Radix のドロップダウンが閉じてから確認ダイアログを開くため queueMicrotask で遅延する。
    */
-  const requestDeleteConfirm =
-    variant === "sidebar"
-      ? (props as Extract<AIChatConversationListRowProps, { variant: "sidebar" }>).onRequestDelete
-      : () => setConfirmOpen(true);
-
   const scheduleOpenDeleteConfirm = () => {
-    queueMicrotask(requestDeleteConfirm);
+    queueMicrotask(() => setConfirmOpen(true));
   };
-
-  const menuTrigger = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        {variant === "sidebar" ? (
-          <SidebarMenuAction
-            type="button"
-            showOnHover
-            onClick={(e) => e.stopPropagation()}
-            aria-label={t("aiChat.history.openMenu", "Open menu")}
-          >
-            <MoreHorizontal className="size-4" />
-          </SidebarMenuAction>
-        ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            aria-label={t("aiChat.history.openMenu", "Open menu")}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="size-4" />
-          </Button>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onSelect={() => scheduleOpenDeleteConfirm()}
-        >
-          {deleteLabel}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  const alertDialog =
-    variant === "page" ? (
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{confirmDescription}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("aiChat.actions.cancel", "Cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleConfirmDelete}
-            >
-              {deleteLabel}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    ) : null;
-
-  if (variant === "sidebar") {
-    return (
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          type="button"
-          size="sm"
-          isActive={isActive}
-          tooltip={titleLabel}
-          className="h-auto min-h-8 flex-col items-stretch gap-0.5 py-1.5 pr-8"
-          onClick={onOpen}
-        >
-          <span className="w-full truncate text-left font-medium">{titleLabel}</span>
-          <span className="text-muted-foreground w-full truncate text-left text-[11px] font-normal">
-            {dateLabel}
-          </span>
-        </SidebarMenuButton>
-        {menuTrigger}
-      </SidebarMenuItem>
-    );
-  }
 
   return (
     <>
@@ -192,9 +94,48 @@ export function AIChatConversationListRow(props: AIChatConversationListRowProps)
           <span className="w-full truncate font-medium">{titleLabel}</span>
           <span className="text-muted-foreground w-full truncate text-xs">{dateLabel}</span>
         </button>
-        <div className="flex shrink-0 items-center pr-1">{menuTrigger}</div>
+        <div className="flex shrink-0 items-center pr-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                aria-label={t("aiChat.history.openMenu", "Open menu")}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => scheduleOpenDeleteConfirm()}
+              >
+                {deleteLabel}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-      {alertDialog}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("aiChat.actions.cancel", "Cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirmDelete}
+            >
+              {deleteLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

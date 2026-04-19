@@ -105,9 +105,7 @@ export default function AIChatLanding() {
             <div className="flex max-w-2xl flex-col gap-2">
               {recentChats.map((conv) => {
                 const titleLabel =
-                  conv.title.trim().length > 0
-                    ? conv.title
-                    : t("nav.sidebarUntitledChat", "New chat");
+                  conv.title.trim().length > 0 ? conv.title : t("nav.untitledChat", "New chat");
                 const dateLabel = formatDistanceToNow(new Date(conv.updatedAt), {
                   addSuffix: true,
                   locale: dateLocale,
@@ -116,7 +114,6 @@ export default function AIChatLanding() {
                   <AIChatConversationListRow
                     key={conv.id}
                     conversation={conv}
-                    variant="page"
                     borderless
                     isActive={activeConversationId === conv.id}
                     onOpen={() => navigate(aiChatConversationPath(conv.id))}

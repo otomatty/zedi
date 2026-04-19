@@ -51,10 +51,10 @@ function LegacyAIChatConversationRedirect() {
 }
 
 /**
- * Layout route that renders the shared `AppLayout` (header + sidebar + AI dock)
+ * Layout route that renders the shared `AppLayout` (header + AI dock)
  * around nested route elements via `<Outlet />`.
  *
- * ネストしたルート要素を共通 `AppLayout`（ヘッダー・サイドバー・AI ドック）でラップするレイアウトルート。
+ * ネストしたルート要素を共通 `AppLayout`（ヘッダー・AI ドック）でラップするレイアウトルート。
  */
 function AppShellRoute() {
   return (
@@ -102,8 +102,8 @@ const App = () => (
                     />
 
                     {/* App shell routes: wrapped with the shared AppLayout
-                        so every page gets the common Header + UnifiedMenu.
-                        共通 AppLayout（ヘッダー + UnifiedMenu + サイドバー）でラップ。 */}
+                        so every page gets the common Header + primary nav + user menu + AI dock.
+                        共通 AppLayout（ヘッダー + 機能ナビ + ユーザーメニュー + AI ドック）でラップ。 */}
                     <Route element={<AppShellRoute />}>
                       {/* Home and PageEditor: available without login (local-only mode) */}
                       <Route path="/home" element={<Home />} />
