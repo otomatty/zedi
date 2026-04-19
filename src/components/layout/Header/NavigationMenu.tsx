@@ -34,7 +34,7 @@ const NAV_ENTRIES: readonly NavEntry[] = [
 ] as const;
 
 const TILE_BASE_CLASS =
-  "flex flex-col items-center gap-2 rounded-lg p-3 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
+  "flex flex-col items-center gap-2 rounded-lg p-3 transition-colors hover:bg-muted data-[highlighted]:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
 const TILE_ACTIVE_CLASS = "bg-accent text-accent-foreground";
 const ICON_WRAP_CLASS = "bg-muted h-10 w-10 rounded-lg flex items-center justify-center";
 const LABEL_CLASS = "text-xs font-medium";
@@ -76,7 +76,7 @@ const NavTile: React.FC<NavTileProps> = ({ entry, label, active, onNavigate, as 
       <DropdownMenuItem
         asChild
         onSelect={onNavigate}
-        className={cn("cursor-pointer p-0 focus:bg-transparent")}
+        className={cn("cursor-pointer p-0 focus:bg-transparent focus:text-inherit")}
       >
         <Link to={entry.path} aria-label={label} className={className}>
           <span className={ICON_WRAP_CLASS}>

@@ -56,7 +56,7 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
             Keep a slightly wider gap between the square nav trigger and the
             circular avatar trigger to mitigate mis-taps.
             四角いナビトリガーと丸いアバターの間にやや広めの gap を取り、誤タップを抑える。 */}
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-2">
           {!isSignedIn && (
             <span className="text-muted-foreground hidden text-xs md:inline">
               {t("common.guestSyncPrompt")}
