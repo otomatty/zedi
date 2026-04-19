@@ -240,36 +240,53 @@ app.delete("/:id", authRequired, async (c) => {
     throw new HTTPException(403, { message: "You can only delete your own media" });
   }
 
-  // ストレージ→DB の順で削除する。ストレージ側が失敗した場合に DB レコードだけ消えて
-  // オブジェクトが孤児化するのを防ぐため。NoSuchKey 等の冪等エラーは DB 削除まで進める。
+  // DB 削除を先に行い、所有者スコープの WHERE が一致した場合のみ S3 を削除する。
+  // これにより (a) SELECT 後に所有権が変わった TOCTOU 窓では DB 削除が 0 行となり、
+  // 他人の行に属する S3 オブジェクトを誤って消すことがない、(b) DB 行と S3 オブジェクトの
+  // 不整合（行は残っているのにオブジェクトだけ消える）を回避できる。DB 削除後に S3 削除が
+  // 失敗した場合は孤立オブジェクトが残るが、これは後続の GC で回収可能なので DB 不整合より
+  // 安全側に倒している。
   //
-  // Delete storage object before the DB row so a storage failure cannot leave an
-  // orphaned object behind. Idempotent errors (NoSuchKey) still advance to DB delete.
+  // Delete the DB row first under an ownership-scoped WHERE, and only touch S3 when
+  // the row count confirms we owned it. If ownership changed after the SELECT the
+  // DELETE becomes a no-op (0 rows) and we surface 403 instead of silently wiping
+  // someone else's storage object. An orphaned S3 object from a post-DB failure is
+  // reclaimable by a background sweeper; an orphaned DB row pointing at missing
+  // storage is not — so we accept the former, not the latter.
+  const deleted = await db
+    .delete(media)
+    .where(and(eq(media.id, mediaId), eq(media.ownerId, userId)))
+    .returning({ s3Key: media.s3Key });
+
+  const deletedRow = deleted[0];
+  if (!deletedRow) {
+    // SELECT と DELETE の間で所有権が移動したか、並行して削除されたケース。
+    // Ownership changed (or the row was deleted concurrently) between SELECT and DELETE.
+    throw new HTTPException(403, { message: "You can only delete your own media" });
+  }
+
   try {
     await s3.send(
       new DeleteObjectCommand({
         Bucket: BUCKET,
-        Key: row.s3Key,
+        Key: deletedRow.s3Key,
       }),
     );
   } catch (err) {
-    // NoSuchKey のみを冪等として扱う。NoSuchBucket 等、別の 404 応答は
-    // 本当の設定不整合なので 502 に倒して DB を残す。
+    // DB 行は既に削除済み。NoSuchKey は冪等として無視し、それ以外の失敗は
+    // 孤立オブジェクトとして警告だけ残す（DB と storage の再同期は別経路に任せる）。
     //
-    // Only treat an explicit NoSuchKey as idempotent; other 404-class errors
-    // (e.g. NoSuchBucket) indicate real config failures — surface 502 and keep the DB row.
+    // DB row is already gone. Treat NoSuchKey as idempotent; log other failures
+    // so ops can sweep the orphaned S3 object — do NOT resurrect the DB row.
     const s3Err = err as { name?: string } | null;
     if (s3Err?.name !== "NoSuchKey") {
-      console.error("[media] S3 DeleteObject failed:", err);
-      throw new HTTPException(502, { message: "Failed to delete object from storage" });
+      console.error("[media] S3 DeleteObject failed after DB delete (orphaned object):", {
+        mediaId,
+        s3Key: deletedRow.s3Key,
+        err,
+      });
     }
   }
-
-  // 認可は SELECT 時にも検証済みだが、行所有権が読み取り後に変わる TOCTOU を防ぐため
-  // DELETE の WHERE にも `ownerId` を含めて、書き込み段階でも所有者スコープを保つ。
-  // Re-assert ownership in the DELETE predicate to close the read-then-delete TOCTOU
-  // window: rows whose ownership changed after the SELECT must not be removed here.
-  await db.delete(media).where(and(eq(media.id, mediaId), eq(media.ownerId, userId)));
 
   return c.json({ success: true });
 });

@@ -78,7 +78,7 @@ describe("extractClientIp", () => {
     expect(extractClientIp(c)).toBeNull();
   });
 
-  it("ignores x-forwarded-for when TRUST_PROXY is not set", () => {
+  it("ignores x-forwarded-for when TRUST_PROXY=false", () => {
     process.env.TRUST_PROXY = "false";
     const c = createMockContext({
       headers: { "x-forwarded-for": "203.0.113.10" },
@@ -88,7 +88,7 @@ describe("extractClientIp", () => {
     expect(extractClientIp(c)).toBeNull();
   });
 
-  it("ignores x-real-ip when TRUST_PROXY is not set", () => {
+  it("ignores x-real-ip when TRUST_PROXY=false", () => {
     process.env.TRUST_PROXY = "false";
     const c = createMockContext({ headers: { "x-real-ip": "192.0.2.42" } });
     expect(extractClientIp(c)).toBeNull();

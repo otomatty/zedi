@@ -31,14 +31,18 @@ export function isProxyTrusted(): boolean {
 }
 
 /**
- * `x-forwarded-for` の最左 IP を返す。空・無効な場合は null。
- * Return the leftmost IP from `x-forwarded-for`, or null when absent/empty.
+ * `x-forwarded-for` の最左の非空 IP を返す。先頭にカンマが並ぶ不正値も許容する。
+ * Return the leftmost non-empty IP from `x-forwarded-for`; tolerates
+ * malformed leading commas (e.g. `", 203.0.113.1"`).
  */
 function readForwardedFor(c: Context<AppEnv>): string | null {
   const xff = c.req.header("x-forwarded-for");
   if (!xff) return null;
-  const first = xff.split(",")[0]?.trim();
-  return first ? first : null;
+  const first = xff
+    .split(",")
+    .map((v) => v.trim())
+    .find((v) => v.length > 0);
+  return first ?? null;
 }
 
 /**

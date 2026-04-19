@@ -385,7 +385,14 @@ describe("GET /api/media/:id — proxy stream (no redirect to storage)", () => {
   });
 });
 
-describe("DELETE /api/media/:id — storage-first deletion order", () => {
+describe("DELETE /api/media/:id — DB-first deletion order", () => {
+  // DB 削除を先に行うのは、SELECT と DELETE の間に所有権が変わる TOCTOU 窓で
+  // 他人の行に紐づく S3 オブジェクトを消してしまわないため。DB 削除が 0 行だった
+  // 場合は S3 を触らずに 403 を返す。
+  //
+  // The handler deletes the DB row first under an ownership-scoped WHERE. Only
+  // after the DELETE returns a row do we touch S3, so a TOCTOU ownership change
+  // cannot trigger an S3 delete on someone else's object.
   const s3Key = `users/${TEST_USER_ID}/media/${MEDIA_ID}/photo.png`;
   const mediaRow = {
     id: MEDIA_ID,
@@ -398,9 +405,82 @@ describe("DELETE /api/media/:id — storage-first deletion order", () => {
     createdAt: new Date(),
   };
 
-  it("deletes storage object before DB row when both succeed", async () => {
+  it("deletes DB row before storage object when both succeed", async () => {
     mockS3Send.mockResolvedValueOnce({});
-    const { db } = createMockDb([[mediaRow], []]);
+    const { db, chains } = createMockDb([[mediaRow], [{ s3Key }]]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    // DB 削除が先に走り、その成功後に S3 を 1 回呼ぶ。
+    // DB DELETE runs first; S3 send runs exactly once, after the DB succeeds.
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(1);
+    expect(mockS3Send).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 403 without touching storage when DB delete matches no rows (TOCTOU)", async () => {
+    // SELECT 後に ownerId が変わった（並行削除・移管）シナリオ。
+    // Ownership changed between SELECT and DELETE; S3 must not be touched.
+    const { db, chains } = createMockDb([[mediaRow], []]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(403);
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(1);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it("still returns 200 when storage delete fails with unexpected error (orphan logged)", async () => {
+    // DB 行は既に削除済みなので、S3 側の失敗は孤立オブジェクトとして残すのみ。
+    // 呼び出し元から見れば削除は成功しているので 200 を返す。
+    // The DB row is already gone; a post-DB S3 failure cannot be rolled back.
+    // The orphan is logged for ops sweep, but the API still reports success.
+    mockS3Send.mockRejectedValueOnce(new Error("network down"));
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { db } = createMockDb([[mediaRow], [{ s3Key }]]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
+
+    const res = await app.request(`/api/media/${MEDIA_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(200);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("returns 200 when storage reports NoSuchKey (idempotent, DB already deleted)", async () => {
+    mockS3Send.mockRejectedValueOnce({
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+    const { db } = createMockDb([[mediaRow], [{ s3Key }]]);
     const app = new Hono<AppEnv>();
     app.use("*", async (c, next) => {
       c.set("db", db as unknown as AppEnv["Variables"]["db"]);
@@ -417,74 +497,14 @@ describe("DELETE /api/media/:id — storage-first deletion order", () => {
     expect(mockS3Send).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps DB row and returns 502 when storage deletion fails with unexpected error", async () => {
-    mockS3Send.mockRejectedValueOnce(new Error("network down"));
-    const { db, chains } = createMockDb([[mediaRow]]);
+  it("returns 403 when media belongs to another user (no storage call, no DB delete)", async () => {
+    const { chains, db } = createMockDb([[{ ...mediaRow, ownerId: ATTACKER_ID }]]);
     const app = new Hono<AppEnv>();
     app.use("*", async (c, next) => {
       c.set("db", db as unknown as AppEnv["Variables"]["db"]);
       await next();
     });
     app.route("/api/media", mediaRoutes);
-
-    const res = await app.request(`/api/media/${MEDIA_ID}`, {
-      method: "DELETE",
-      headers: { "x-test-user-id": TEST_USER_ID },
-    });
-
-    expect(res.status).toBe(502);
-    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
-    expect(deleteCalls).toHaveLength(0);
-  });
-
-  it("proceeds to delete DB row when storage reports NoSuchKey (idempotent)", async () => {
-    mockS3Send.mockRejectedValueOnce({
-      name: "NoSuchKey",
-      $metadata: { httpStatusCode: 404 },
-    });
-    const { db, chains } = createMockDb([[mediaRow], []]);
-    const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
-    app.route("/api/media", mediaRoutes);
-
-    const res = await app.request(`/api/media/${MEDIA_ID}`, {
-      method: "DELETE",
-      headers: { "x-test-user-id": TEST_USER_ID },
-    });
-
-    expect(res.status).toBe(200);
-    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
-    expect(deleteCalls).toHaveLength(1);
-  });
-
-  it("keeps DB row and returns 502 for NoSuchBucket 404 (config failure, not idempotent)", async () => {
-    mockS3Send.mockRejectedValueOnce({
-      name: "NoSuchBucket",
-      $metadata: { httpStatusCode: 404 },
-    });
-    const { db, chains } = createMockDb([[mediaRow]]);
-    const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
-    app.route("/api/media", mediaRoutes);
-
-    const res = await app.request(`/api/media/${MEDIA_ID}`, {
-      method: "DELETE",
-      headers: { "x-test-user-id": TEST_USER_ID },
-    });
-
-    expect(res.status).toBe(502);
-    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
-    expect(deleteCalls).toHaveLength(0);
-  });
-
-  it("returns 403 when media belongs to another user (no storage call)", async () => {
-    const app = createMediaApp([[{ ...mediaRow, ownerId: ATTACKER_ID }]]);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {
       method: "DELETE",
@@ -492,11 +512,19 @@ describe("DELETE /api/media/:id — storage-first deletion order", () => {
     });
 
     expect(res.status).toBe(403);
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(0);
     expect(mockS3Send).not.toHaveBeenCalled();
   });
 
-  it("returns 404 when media row is missing (no storage call)", async () => {
-    const app = createMediaApp([[]]);
+  it("returns 404 when media row is missing (no storage call, no DB delete)", async () => {
+    const { chains, db } = createMockDb([[]]);
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/media", mediaRoutes);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {
       method: "DELETE",
@@ -504,6 +532,8 @@ describe("DELETE /api/media/:id — storage-first deletion order", () => {
     });
 
     expect(res.status).toBe(404);
+    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
+    expect(deleteCalls).toHaveLength(0);
     expect(mockS3Send).not.toHaveBeenCalled();
   });
 });
