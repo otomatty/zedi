@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { MessageSquare, GitBranch, ListChecks } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@zedi/ui";
+import { isTauriDesktop } from "@/lib/platform";
 
 /**
  * Active AI chat panel view: threaded messages or branch tree.
@@ -22,9 +23,13 @@ interface AIChatViewTabsProps {
 /**
  * Segment control to switch between chat view and branch tree view.
  * チャットビューとブランチツリービューの切り替え用セグメントコントロール。
+ *
+ * Workflow タブは Claude Code を必要とするため、Tauri デスクトップ環境でのみ表示する。
+ * The workflow tab requires Claude Code, so it is only shown in the Tauri desktop app.
  */
 export function AIChatViewTabs({ activeTab, onTabChange }: AIChatViewTabsProps) {
   const { t } = useTranslation();
+  const showWorkflow = isTauriDesktop();
 
   return (
     <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as AIChatViewTab)}>
@@ -43,13 +48,15 @@ export function AIChatViewTabs({ activeTab, onTabChange }: AIChatViewTabsProps) 
           <GitBranch className="h-3.5 w-3.5" />
           {t("aiChat.viewTabs.branch")}
         </TabsTrigger>
-        <TabsTrigger
-          value="workflow"
-          className="flex h-7 items-center gap-1.5 px-3 text-xs data-[state=active]:shadow-sm"
-        >
-          <ListChecks className="h-3.5 w-3.5" />
-          {t("aiChat.viewTabs.workflow")}
-        </TabsTrigger>
+        {showWorkflow && (
+          <TabsTrigger
+            value="workflow"
+            className="flex h-7 items-center gap-1.5 px-3 text-xs data-[state=active]:shadow-sm"
+          >
+            <ListChecks className="h-3.5 w-3.5" />
+            {t("aiChat.viewTabs.workflow")}
+          </TabsTrigger>
+        )}
       </TabsList>
     </Tabs>
   );

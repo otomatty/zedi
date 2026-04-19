@@ -11,6 +11,7 @@ import { PromoteToWikiDialog } from "./PromoteToWikiDialog";
 import { useAIChatPanelContentLogic } from "@/hooks/useAIChatPanelContentLogic";
 import { useAIChatContext } from "@/contexts/AIChatContext";
 import { usePromoteToWiki } from "@/hooks/usePromoteToWiki";
+import { isTauriDesktop } from "@/lib/platform";
 
 const AIChatBranchTree = lazy(() =>
   import("./AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
@@ -96,18 +97,27 @@ export function AIChatPanelContent({
   const promote = usePromoteToWiki(messages);
   const existingTitles = pageContext?.recentPageTitles ?? [];
 
+  /**
+   * Workflow タブは Claude Code を必要とするため、Web 環境ではタブ自体を非表示にしている（{@link AIChatViewTabs}）。
+   * 万一 web で activeViewTab === "workflow" になった場合でも、ここでマウントを抑制して安全側に倒す。
+   *
+   * The workflow tab is hidden on web because it requires Claude Code (see {@link AIChatViewTabs}).
+   * As a defensive guard, also suppress mounting here if `activeViewTab` somehow becomes "workflow" on web.
+   */
+  const workflowAvailable = isTauriDesktop();
+
   /** After the workflow tab is visited once, keep the panel mounted so run state survives tab switches. / ワークフロータブを一度開いたらマウントを維持し、タブ切替で実行状態を失わない */
   const [keepWorkflowMounted, setKeepWorkflowMounted] = useState(
-    () => activeViewTab === "workflow",
+    () => workflowAvailable && activeViewTab === "workflow",
   );
   useLayoutEffect(() => {
-    if (activeViewTab === "workflow") {
+    if (workflowAvailable && activeViewTab === "workflow") {
       // Latch: after first visit to the workflow tab, keep the panel mounted so run/pause state survives tab switches.
       // 初回表示後はマウントを維持し、タブ切替で実行状態を失わない。
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-way latch from tab selection (not external sync)
       setKeepWorkflowMounted(true);
     }
-  }, [activeViewTab]);
+  }, [activeViewTab, workflowAvailable]);
 
   return (
     <div className="bg-background relative flex h-full flex-col border-l">
