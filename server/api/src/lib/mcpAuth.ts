@@ -36,6 +36,12 @@ export const MCP_SCOPE_WRITE = "mcp:write";
 /** Redis key prefix (extAuth の `ext:code:` と分離) / Redis namespace distinct from ext codes. */
 const REDIS_CODE_PREFIX = "mcp:code:";
 
+/**
+ * Redis key prefix for per-user MCP token revocation timestamps.
+ * ユーザー単位の MCP トークン失効時刻を保存する Redis キー prefix。
+ */
+export const MCP_REVOKED_PREFIX = "mcp:revoked:";
+
 // ── PKCE ────────────────────────────────────────────────────────────────────
 
 /** base64url encode (no padding). */
@@ -174,6 +180,17 @@ export interface McpTokenPayload {
 }
 
 /**
+ * MCP JWT の有効期限 (秒) を環境変数から算出する。不正・未設定時はデフォルトにフォールバック。
+ * Returns MCP JWT expiration (seconds) from env, falling back to default for invalid/missing values.
+ */
+export function getMcpJwtExpiresInSeconds(): number {
+  const expDays = Number(getOptionalEnv("MCP_JWT_EXP_DAYS", String(MCP_JWT_EXP_DAYS_DEFAULT)));
+  const effectiveDays =
+    Number.isFinite(expDays) && expDays > 0 ? expDays : MCP_JWT_EXP_DAYS_DEFAULT;
+  return effectiveDays * 24 * 60 * 60;
+}
+
+/**
  * MCP 用 JWT を発行する。
  * Issues JWT for MCP server with requested scopes.
  *
@@ -187,9 +204,7 @@ export async function issueMcpToken(
 ): Promise<{ access_token: string; expires_in: number }> {
   const secret = getEnv("BETTER_AUTH_SECRET");
   const key = new TextEncoder().encode(secret);
-  const expDays = Number(getOptionalEnv("MCP_JWT_EXP_DAYS", String(MCP_JWT_EXP_DAYS_DEFAULT)));
-  const expiresIn =
-    (Number.isFinite(expDays) && expDays > 0 ? expDays : MCP_JWT_EXP_DAYS_DEFAULT) * 24 * 60 * 60;
+  const expiresIn = getMcpJwtExpiresInSeconds();
   const exp = Math.floor(Date.now() / 1000) + expiresIn;
 
   const jwt = await new SignJWT({ scope: scopes })
@@ -204,10 +219,44 @@ export async function issueMcpToken(
 }
 
 /**
- * Bearer トークンを検証し、ペイロードを返す。audience と最低 1 つの MCP スコープを要求する。
- * Verifies MCP Bearer token and returns payload; requires `zedi-mcp` audience and at least one mcp:* scope.
+ * 指定ユーザーの MCP トークンをすべて失効させるために、現在時刻 (UNIX 秒) を Redis に書き込む。
+ * TTL は最長の JWT 有効期限に合わせて自動消滅する。戻り値は記録した失効時刻 (UNIX 秒)。
+ *
+ * Records a per-user MCP revocation timestamp (epoch seconds) in Redis.
+ * TTL matches the longest possible JWT lifetime so the entry self-expires once no prior token can still be valid.
+ * Returns the stored revocation timestamp in epoch seconds.
  */
-export async function verifyMcpToken(token: string): Promise<McpTokenPayload | null> {
+export async function storeMcpRevocation(redis: Redis, userId: string): Promise<number> {
+  const now = Math.floor(Date.now() / 1000);
+  await redis.setex(`${MCP_REVOKED_PREFIX}${userId}`, getMcpJwtExpiresInSeconds(), String(now));
+  return now;
+}
+
+/**
+ * 指定ユーザーの MCP トークン失効時刻 (UNIX 秒) を取得する。未登録または不正値なら null。
+ * Returns the stored MCP revocation timestamp (epoch seconds) for a user, or null if none / malformed.
+ */
+export async function getMcpRevocationTimestamp(
+  redis: Redis,
+  userId: string,
+): Promise<number | null> {
+  const raw = await redis.get(`${MCP_REVOKED_PREFIX}${userId}`);
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Bearer トークンを検証し、ペイロードを返す。audience と最低 1 つの MCP スコープを要求する。
+ * `redis` を渡した場合は `mcp:revoked:<sub>` の失効時刻と `iat` を比較し、失効後に発行されたトークンのみ通す。
+ *
+ * Verifies MCP Bearer token and returns payload; requires `zedi-mcp` audience and at least one mcp:* scope.
+ * When `redis` is provided, consults the deny-list: rejects tokens whose `iat` is earlier than the stored revocation timestamp.
+ */
+export async function verifyMcpToken(
+  token: string,
+  redis?: Redis | null,
+): Promise<McpTokenPayload | null> {
   try {
     const secret = getEnv("BETTER_AUTH_SECRET");
     const key = new TextEncoder().encode(secret);
@@ -222,8 +271,16 @@ export async function verifyMcpToken(token: string): Promise<McpTokenPayload | n
     if (!hasAnyMcpScope) return null;
     const aud = payload.aud;
     const exp = payload.exp;
+    const iat = payload.iat;
     if (typeof aud !== "string") return null;
     if (typeof exp !== "number") return null;
+    if (typeof iat !== "number") return null;
+
+    if (redis) {
+      const revokedAt = await getMcpRevocationTimestamp(redis, sub);
+      if (revokedAt !== null && iat < revokedAt) return null;
+    }
+
     return { sub, scope, aud, exp };
   } catch {
     return null;

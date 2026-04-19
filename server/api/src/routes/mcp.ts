@@ -18,6 +18,7 @@ import {
   isMcpRedirectUriAllowed,
   issueMcpToken,
   storeMcpCode,
+  storeMcpRevocation,
   verifyPKCE,
   MCP_SCOPE_READ,
   MCP_SCOPE_WRITE,
@@ -148,15 +149,20 @@ app.post("/session", async (c) => {
 });
 
 // ── POST /revoke ────────────────────────────────────────────────────────────
-// MCP JWT の失効登録 (best-effort)。Stateless JWT のため、Redis にブラックリスト登録する程度の実装。
-// MVP では成功応答のみ返し、将来的にデナイリストを追加する。
+// 呼び出し元ユーザーの MCP JWT を失効させる。Redis に `mcp:revoked:<userId>` として
+// 失効時刻 (UNIX 秒) を TTL=最長 JWT 有効期限で保存し、以降の `verifyMcpToken` は
+// `iat < revokedAt` のトークンを拒否する。現行スコープ粒度では per-user で十分。
 //
-// Best-effort revoke for stateless JWTs (MVP returns success; deny-list to be added).
+// Per-user MCP token revocation backed by a Redis deny-list. Subsequent `verifyMcpToken`
+// calls reject tokens whose `iat` predates the stored revocation timestamp.
 app.post("/revoke", mcpReadRequired, async (c) => {
+  const redis = c.get("redis");
+  if (!redis) {
+    throw new HTTPException(503, { message: "Redis unavailable" });
+  }
   const userId = c.get("userId");
-  // TODO: Persist a per-user revocation timestamp in Redis so verifyMcpToken can check `iat < revokedAt`.
-  // TODO: ユーザー単位の失効時刻を Redis に保存し、検証時に iat と比較してブロックする。
-  console.log(`[mcp] revoke requested for userId=${userId}`);
+  const revokedAt = await storeMcpRevocation(redis, userId);
+  console.log(`[mcp] revoke recorded for userId=${userId} revokedAt=${revokedAt}`);
   return c.json({ revoked: true });
 });
 

@@ -20,15 +20,21 @@ import type { AppEnv } from "../types/index.js";
 
 /**
  * Bearer トークンを検証し、ペイロードを返す。形式不正・検証失敗時は 401 を投げる。
+ * `redis` を渡した場合は deny-list を参照し、失効済みトークンを拒否する。
+ *
  * Verifies the Bearer token from request headers; throws HTTPException 401 on failure.
+ * When `redis` is provided, revoked tokens are rejected via the deny-list.
  */
-async function extractAndVerify(authHeader: string | undefined) {
+async function extractAndVerify(
+  authHeader: string | undefined,
+  redis: AppEnv["Variables"]["redis"] | undefined,
+) {
   const parts = authHeader?.trim().split(/\s+/) ?? [];
   if (parts.length !== 2 || parts[0]?.toLowerCase() !== "bearer" || !parts[1]) {
     throw new HTTPException(401, { message: "Bearer token required" });
   }
   const token = parts[1];
-  const payload = await verifyMcpToken(token);
+  const payload = await verifyMcpToken(token, redis);
   if (!payload) {
     throw new HTTPException(401, { message: "Invalid or expired token" });
   }
@@ -62,7 +68,7 @@ async function ensureActiveMcpUser(db: AppEnv["Variables"]["db"], userId: string
  * Auth middleware for read-only MCP routes; accepts `mcp:read` or `mcp:write` scope.
  */
 export const mcpReadRequired = createMiddleware<AppEnv>(async (c, next) => {
-  const payload = await extractAndVerify(c.req.header("Authorization"));
+  const payload = await extractAndVerify(c.req.header("Authorization"), c.get("redis"));
   if (!hasScope(payload, MCP_SCOPE_READ) && !hasScope(payload, MCP_SCOPE_WRITE)) {
     throw new HTTPException(403, { message: "mcp:read scope required" });
   }
@@ -76,7 +82,7 @@ export const mcpReadRequired = createMiddleware<AppEnv>(async (c, next) => {
  * Auth middleware for write MCP routes; requires `mcp:write` scope.
  */
 export const mcpWriteRequired = createMiddleware<AppEnv>(async (c, next) => {
-  const payload = await extractAndVerify(c.req.header("Authorization"));
+  const payload = await extractAndVerify(c.req.header("Authorization"), c.get("redis"));
   if (!hasScope(payload, MCP_SCOPE_WRITE)) {
     throw new HTTPException(403, { message: "mcp:write scope required" });
   }

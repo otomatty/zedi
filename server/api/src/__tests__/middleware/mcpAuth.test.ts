@@ -32,10 +32,14 @@ function createMockDb(statusRows: MockStatusRow[]) {
   } as unknown as AppEnv["Variables"]["db"];
 }
 
-function createApp(statusRows: MockStatusRow[] = [{ status: "active" }]) {
+function createApp(
+  statusRows: MockStatusRow[] = [{ status: "active" }],
+  redis?: AppEnv["Variables"]["redis"],
+) {
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("db", createMockDb(statusRows));
+    if (redis) c.set("redis", redis);
     await next();
   });
   app.get("/read", mcpReadRequired, (c) => c.json({ ok: true, userId: c.get("userId") }));
@@ -195,5 +199,22 @@ describe("mcpWriteRequired", () => {
       headers: { Authorization: "Bearer t" },
     });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("redis deny-list wiring", () => {
+  it("passes redis from context to verifyMcpToken so the deny-list is consulted", async () => {
+    mockVerifyMcpToken.mockResolvedValue({
+      sub: "user-rev",
+      scope: [MCP_SCOPE_READ],
+      aud: MCP_JWT_AUDIENCE,
+      exp: 0,
+    });
+    const redisSentinel = { tag: "redis-sentinel" } as unknown as AppEnv["Variables"]["redis"];
+    const res = await createApp([{ status: "active" }], redisSentinel).request("/read", {
+      headers: { Authorization: "Bearer t" },
+    });
+    expect(res.status).toBe(200);
+    expect(mockVerifyMcpToken).toHaveBeenCalledWith("t", redisSentinel);
   });
 });
