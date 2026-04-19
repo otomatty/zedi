@@ -202,7 +202,40 @@ function setYDocVersion(pageId: string, version: number): Promise<void> {
 let adapterDb: IDBDatabase | null = null;
 let adapterUserId: string | null = null;
 
+/**
+ * Thrown when {@link IndexedDBStorageAdapter.resetDatabase} cannot enumerate
+ * the per-page Y.Doc databases before the main DB is deleted. Callers should
+ * surface this distinctly so the user understands that no data was deleted
+ * and they may retry safely.
+ *
+ * `resetDatabase` 実行時に Y.Doc DB 一覧の取得に失敗した場合に投げられる。
+ * UI は専用メッセージで通知し、ユーザーが安全に再試行できるようにする。
+ */
+export class ResetDatabasePageIdsReadError extends Error {
+  override readonly name = "ResetDatabasePageIdsReadError";
+  /**
+   * Underlying cause of the failure.
+   * 失敗の原因となった元の例外。
+   */
+  readonly originalError: Error | undefined;
+  /**
+   *
+   */
+  constructor(cause: unknown) {
+    super(
+      "IndexedDBStorageAdapter.resetDatabase: failed to read page IDs; aborting reset to avoid orphaned Y.Doc databases.",
+    );
+    this.originalError = cause instanceof Error ? cause : undefined;
+  }
+}
+
+/**
+ *
+ */
 export class IndexedDBStorageAdapter implements StorageAdapter {
+  /**
+   *
+   */
   async initialize(userId: string): Promise<void> {
     if (adapterDb && adapterUserId === userId) return;
     if (adapterDb) {
@@ -214,6 +247,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     adapterUserId = userId;
   }
 
+  /**
+   *
+   */
   async close(): Promise<void> {
     if (adapterDb) {
       adapterDb.close();
@@ -222,22 +258,42 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     }
   }
 
+  /**
+   *
+   */
   async resetDatabase(): Promise<void> {
+    /**
+     *
+     */
     const userId = adapterUserId;
     if (!userId) throw new Error("IndexedDBStorageAdapter: not initialized.");
 
-    // Collect page IDs before closing so we can delete per-page Y.Doc databases
-    let pageIds: string[] = [];
+    // Collect page IDs before closing so we can delete per-page Y.Doc databases.
+    // 読み取りに失敗した場合は中断し、Y.Doc DB の孤児を残さないようにする (#608)。
+    // If the read fails, abort to avoid leaving orphaned per-page Y.Doc databases (#608).
+    /**
+     *
+     */
+    let pageIds: string[];
     try {
+      /**
+       *
+       */
       const db = await ensureDb();
       pageIds = await new Promise<string[]>((resolve, reject) => {
+        /**
+         *
+         */
         const tx = db.transaction("my_pages", "readonly");
+        /**
+         *
+         */
         const req = tx.objectStore("my_pages").getAllKeys();
         req.onsuccess = () => resolve((req.result as string[]) || []);
         req.onerror = () => reject(req.error);
       });
-    } catch {
-      // If we can't read pages, continue with main DB deletion
+    } catch (cause) {
+      throw new ResetDatabasePageIdsReadError(cause);
     }
 
     // Close the main database connection
@@ -245,6 +301,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
 
     // Delete the main storage database
     await new Promise<void>((resolve, reject) => {
+      /**
+       *
+       */
       const req = indexedDB.deleteDatabase(DB_NAME_PREFIX + userId);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
@@ -257,10 +316,16 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
 
     // Delete per-page Y.Doc databases (y-indexeddb creates one per page)
+    /**
+     *
+     */
     const results = await Promise.allSettled(
       pageIds.map(
         (pageId) =>
           new Promise<void>((resolve, reject) => {
+            /**
+             *
+             */
             const req = indexedDB.deleteDatabase(YDOC_NAME_PREFIX + pageId);
             req.onsuccess = () => resolve();
             req.onerror = () => reject(req.error);
@@ -273,6 +338,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
           }),
       ),
     );
+    /**
+     *
+     */
     const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
     if (failures.length > 0) {
       throw new AggregateError(
@@ -283,13 +351,31 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   // ── メタデータ ──
+  /**
+   *
+   */
   async getAllPages(): Promise<PageMetadata[]> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_pages", "readonly");
+      /**
+       *
+       */
       const req = tx.objectStore("my_pages").getAll();
       req.onsuccess = () => {
+        /**
+         *
+         */
         const rows = (req.result as StoredPage[]) || [];
+        /**
+         *
+         */
         const list = rows.filter((r) => !r.isDeleted).map(storedToPage);
         list.sort((a, b) => b.updatedAt - a.updatedAt);
         resolve(list);
@@ -298,12 +384,27 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   *
+   */
   async getPage(pageId: string): Promise<PageMetadata | null> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_pages", "readonly");
+      /**
+       *
+       */
       const req = tx.objectStore("my_pages").get(pageId);
       req.onsuccess = () => {
+        /**
+         *
+         */
         const row = req.result as StoredPage | undefined;
         resolve(row && !row.isDeleted ? storedToPage(row) : null);
       };
@@ -311,43 +412,88 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   *
+   */
   async upsertPage(page: PageMetadata): Promise<void> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_pages", "readwrite");
+      /**
+       *
+       */
       const req = tx.objectStore("my_pages").put(pageToStored(page));
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
   }
 
+  /**
+   *
+   */
   async deletePage(pageId: string): Promise<void> {
+    /**
+     *
+     */
     const page = await this.getPage(pageId);
     if (!page) return;
     await this.upsertPage({ ...page, isDeleted: true, updatedAt: Date.now() });
   }
 
   // ── Y.Doc ──
+  /**
+   *
+   */
   async getYDocState(pageId: string): Promise<Uint8Array | null> {
     return loadYDocState(pageId);
   }
 
+  /**
+   *
+   */
   async saveYDocState(pageId: string, state: Uint8Array, version: number): Promise<void> {
     await saveYDocStateToIdb(pageId, state, version);
   }
 
+  /**
+   *
+   */
   async getYDocVersion(pageId: string): Promise<number> {
     return getYDocVersionFromStore(pageId);
   }
 
   // ── リンク ──
+  /**
+   *
+   */
   async getLinks(pageId: string): Promise<Link[]> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_links", "readonly");
+      /**
+       *
+       */
       const index = tx.objectStore("my_links").index("by_source");
+      /**
+       *
+       */
       const req = index.getAll(pageId);
       req.onsuccess = () => {
+        /**
+         *
+         */
         const rows = (req.result as StoredLink[]) || [];
         resolve(
           rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })),
@@ -357,13 +503,31 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   *
+   */
   async getBacklinks(pageId: string): Promise<Link[]> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_links", "readonly");
+      /**
+       *
+       */
       const index = tx.objectStore("my_links").index("by_target");
+      /**
+       *
+       */
       const req = index.getAll(pageId);
       req.onsuccess = () => {
+        /**
+         *
+         */
         const rows = (req.result as StoredLink[]) || [];
         resolve(
           rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })),
@@ -373,16 +537,40 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   *
+   */
   async saveLinks(sourcePageId: string, links: Link[]): Promise<void> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_links", "readwrite");
+      /**
+       *
+       */
       const store = tx.objectStore("my_links");
+      /**
+       *
+       */
       const index = store.index("by_source");
+      /**
+       *
+       */
       const getAllReq = index.getAll(sourcePageId);
       getAllReq.onsuccess = () => {
+        /**
+         *
+         */
         const existing = getAllReq.result as StoredLink[];
         existing.forEach((r) => store.delete([r.sourceId, r.targetId]));
+        /**
+         *
+         */
         const now = Date.now();
         links.forEach((l) => {
           store.put({
@@ -398,13 +586,31 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   *
+   */
   async getGhostLinks(pageId: string): Promise<GhostLink[]> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_ghost_links", "readonly");
+      /**
+       *
+       */
       const index = tx.objectStore("my_ghost_links").index("by_source");
+      /**
+       *
+       */
       const req = index.getAll(pageId);
       req.onsuccess = () => {
+        /**
+         *
+         */
         const rows = (req.result as StoredGhostLink[]) || [];
         resolve(
           rows.map((r) => ({
@@ -420,16 +626,40 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   *
+   */
   async saveGhostLinks(sourcePageId: string, ghostLinks: GhostLink[]): Promise<void> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("my_ghost_links", "readwrite");
+      /**
+       *
+       */
       const store = tx.objectStore("my_ghost_links");
+      /**
+       *
+       */
       const index = store.index("by_source");
+      /**
+       *
+       */
       const getAllReq = index.getAll(sourcePageId);
       getAllReq.onsuccess = () => {
+        /**
+         *
+         */
         const existing = getAllReq.result as StoredGhostLink[];
         existing.forEach((r) => store.delete([r.linkText, r.sourcePageId]));
+        /**
+         *
+         */
         const now = Date.now();
         ghostLinks.forEach((g) => {
           store.put({
@@ -448,25 +678,61 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   // ── 検索 ──
+  /**
+   *
+   */
   async searchPages(query: string): Promise<SearchResult[]> {
+    /**
+     *
+     */
     const q = query.trim().toLowerCase();
     if (!q) return [];
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction(["search_index", "my_pages"], "readonly");
+      /**
+       *
+       */
       const searchStore = tx.objectStore("search_index");
+      /**
+       *
+       */
       const pagesStore = tx.objectStore("my_pages");
+      /**
+       *
+       */
       const req = searchStore.getAll();
       req.onsuccess = () => {
+        /**
+         *
+         */
         const entries = (req.result as Array<{ pageId: string; text: string }>) || [];
+        /**
+         *
+         */
         const matching = entries.filter((e) => e.text && e.text.toLowerCase().includes(q));
         if (matching.length === 0) {
           resolve([]);
           return;
         }
+        /**
+         *
+         */
         const results: SearchResult[] = new Array(matching.length);
+        /**
+         *
+         */
         let done = 0;
         matching.forEach((entry, i) => {
+          /**
+           *
+           */
           const r = pagesStore.get(entry.pageId);
           r.onsuccess = () => {
             results[i] = {
@@ -488,10 +754,22 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     });
   }
 
+  /**
+   *
+   */
   async updateSearchIndex(pageId: string, text: string): Promise<void> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("search_index", "readwrite");
+      /**
+       *
+       */
       const req = tx.objectStore("search_index").put({ pageId, text: text || "" });
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
@@ -499,20 +777,44 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   // ── 同期メタデータ ──
+  /**
+   *
+   */
   async getLastSyncTime(): Promise<number> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("meta", "readonly");
+      /**
+       *
+       */
       const req = tx.objectStore("meta").get("lastSyncTime");
       req.onsuccess = () => resolve((req.result as MetaRow | undefined)?.value ?? 0);
       req.onerror = () => reject(req.error);
     });
   }
 
+  /**
+   *
+   */
   async setLastSyncTime(time: number): Promise<void> {
+    /**
+     *
+     */
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
+      /**
+       *
+       */
       const tx = db.transaction("meta", "readwrite");
+      /**
+       *
+       */
       const req = tx.objectStore("meta").put({ key: "lastSyncTime", value: time });
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);

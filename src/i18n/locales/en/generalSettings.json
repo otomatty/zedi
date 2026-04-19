@@ -57,7 +57,8 @@
     "resetConfirmTitle": "Reset local database?",
     "resetConfirmDescription": "All locally cached data will be deleted. The latest data will be re-synced from the server. This does not affect your data on the server.",
     "resetSuccess": "Local database reset. Re-syncing...",
-    "resetFailed": "Failed to reset local database"
+    "resetFailed": "Failed to reset local database",
+    "resetAbortedPageIds": "Could not read the page list, so the reset was aborted. No local data was deleted; please try again."
   },
   "saved": "General settings saved",
   "saveFailed": "Failed to save general settings",
