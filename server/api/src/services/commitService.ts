@@ -71,12 +71,33 @@ async function fetchImageAsBuffer(
   return { buffer, mimeType, ext };
 }
 
+/**
+ * サムネイル画像を取得して S3 に保存し、プロキシ配信用の URL を返す。
+ * Fetches a thumbnail image, persists it to S3, and returns a proxy-serving URL.
+ *
+ * バケットは非公開のため、`/api/thumbnail/serve/:id` 経由でストリーミング配信する。
+ * The bucket is private, so the returned URL streams via `/api/thumbnail/serve/:id`.
+ *
+ * 必須環境変数 `BETTER_AUTH_URL` は、副作用（S3 アップロード・DB 挿入）より前に
+ * 検証する。未設定なら即座に throw し、オーファンなオブジェクトや行を残さない。
+ * The required env var `BETTER_AUTH_URL` is validated before any side effects
+ * (S3 upload, DB insert); if missing, we throw immediately so no orphan object
+ * or row is persisted.
+ *
+ * @throws `STORAGE_QUOTA_EXCEEDED` when the user's tier quota is exhausted.
+ * @throws `Missing required env var: BETTER_AUTH_URL` when the env var is unset.
+ */
 export async function commitImage(
   userId: string,
   sourceUrl: string,
   fallbackUrl: string | undefined,
   db: Database,
 ): Promise<{ imageUrl: string }> {
+  // BETTER_AUTH_URL は必須。S3 アップロードや DB 挿入より前に検証して fail-fast する。
+  // Validate BETTER_AUTH_URL before any side effects so a missing env var cannot
+  // leave orphan storage objects or DB rows.
+  const baseUrl = getEnv("BETTER_AUTH_URL").replace(/\/$/, "");
+
   let buffer: Buffer;
   let mimeType: string;
   let ext: string;
@@ -126,7 +147,5 @@ export async function commitImage(
     sizeBytes,
   });
 
-  // バケット非公開のため、API 経由でプロキシストリーミングする URL を返す
-  const baseUrl = process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
   return { imageUrl: `${baseUrl}/api/thumbnail/serve/${objectId}` };
 }
