@@ -250,6 +250,7 @@ VITE_ZEDI_API_BASE_URL=https://xxxxxxxxxx.execute-api.ap-northeast-1.amazonaws.c
 | **Auth**       | Cognito (Google/GitHub OAuth)                             |
 | **Database**   | Aurora (PostgreSQL) via API / IndexedDB (local・ブラウザ) |
 | **Realtime**   | Hocuspocus (Y.js) — リアルタイム共同編集                  |
+| **MCP**        | `server/mcp` — Claude Code 連携（詳細は [server/mcp/README.md](server/mcp/README.md)） |
 | **Billing**    | LemonSqueezy（Pro プラン）                                |
 | **AI**         | OpenAI / Anthropic / Google Gemini                        |
 | **Deploy**     | AWS (S3 + CloudFront, Lambda + API Gateway)               |
@@ -335,7 +336,8 @@ src-tauri/               # Tauri デスクトップバックエンド（Rust）
 
 server/
 ├── api/                 # API サーバー（Hono on Bun）
-└── hocuspocus/          # リアルタイム同期サーバー（Y.js）
+├── hocuspocus/          # リアルタイム同期サーバー（Y.js）
+└── mcp/                 # MCP サーバー — Claude Code 連携（stdio / HTTP）。詳細は [server/mcp/README.md](server/mcp/README.md)
 ```
 
 ---
