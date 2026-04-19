@@ -125,7 +125,7 @@ function buildMockApi(): Hono {
     const id = c.req.param("id");
     const page = pages.get(id);
     if (!page || page.is_deleted) return c.json({ message: "not found" }, 404);
-    const body = (await c.req.json()) as {
+    const body = (await c.req.json().catch(() => ({}))) as {
       ydoc_state?: unknown;
       expected_version?: unknown;
       content_text?: unknown;
