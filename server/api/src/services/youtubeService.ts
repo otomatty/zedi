@@ -1,14 +1,27 @@
 /**
- * YouTube Data API v3 + 字幕取得サービス。
- * YouTube Data API v3 metadata retrieval and transcript fetching service.
+ * YouTube メタデータ + 字幕取得サービス（youtubei.js ベース）。
+ * YouTube metadata and transcript fetching service (powered by youtubei.js).
  *
- * - メタデータ: YouTube Data API v3 (videos.list) を使用
- * - 字幕テキスト: youtube-transcript パッケージ（非公式、API キー不要）を使用
+ * 旧実装は YouTube Data API v3 + youtube-transcript の組み合わせだったが、
+ * - youtube-transcript@1.3.0 の ESM パッケージング不具合
+ * - YouTube Data API v3 のクォータ消費
+ * の 2 点を回避するため youtubei.js (Innertube クライアント) に統合。
  *
- * YouTube Data API の captions.download は OAuth2（動画オーナーのみ）が必要なため、
- * 公開字幕の取得には youtube-transcript を使用する。
+ * The previous implementation combined the YouTube Data API v3 and the
+ * youtube-transcript package. We migrated to youtubei.js (an InnerTube
+ * client) to avoid the ESM packaging bug in youtube-transcript@1.3.0 and
+ * to eliminate YouTube Data API quota consumption — both metadata and
+ * transcripts are fetched from a single Innertube session.
  */
-import { YoutubeTranscript, type TranscriptResponse } from "youtube-transcript";
+import { Innertube } from "youtubei.js";
+import type { YT, YTNodes, Misc } from "youtubei.js";
+
+// 公開エクスポートされた namespace 経由で型を取り出す。
+// Pull internal class types via the package's public namespace re-exports.
+type TranscriptInfo = YT.TranscriptInfo;
+type PlayerMicroformat = YTNodes.PlayerMicroformat;
+type TranscriptSegmentClass = YTNodes.TranscriptSegment;
+type Thumbnail = Misc.Thumbnail;
 
 /**
  * YouTube 外部 API 呼び出しのデフォルトタイムアウト（ミリ秒）。
@@ -20,7 +33,7 @@ export const YT_FETCH_TIMEOUT_MS = 10_000;
 
 /**
  * YouTube 動画メタデータ。
- * YouTube video metadata retrieved from the Data API.
+ * YouTube video metadata retrieved via Innertube.
  */
 export interface YouTubeMetadata {
   /** 動画タイトル / Video title */
@@ -29,9 +42,9 @@ export interface YouTubeMetadata {
   description: string;
   /** チャンネル名 / Channel name */
   channelTitle: string;
-  /** 公開日時 (ISO 8601) / Published date */
+  /** 公開日時 (YYYY-MM-DD またはそれに近い ISO 文字列) / Published date */
   publishedAt: string;
-  /** 再生時間 (ISO 8601 duration) / Duration */
+  /** 再生時間 (ISO 8601 duration, 例: "PT1H2M3S") / Duration as ISO 8601 */
   duration: string;
   /** サムネイル URL (最大解像度) / Thumbnail URL (max resolution) */
   thumbnailUrl: string;
@@ -65,7 +78,7 @@ export interface YouTubeContent {
   transcriptText: string;
 }
 
-// ── Metadata ──────────────────────────────────────────────────────────────
+// ── Duration helpers ──────────────────────────────────────────────────────
 
 /**
  * ISO 8601 duration (e.g. "PT1H2M3S") を人間が読みやすい形式に変換する。
@@ -93,91 +106,68 @@ export function formatDuration(iso: string): string {
 }
 
 /**
- * YouTube Data API v3 で動画メタデータを取得する。
- * Fetches video metadata from YouTube Data API v3.
+ * 秒数を ISO 8601 duration 文字列に変換する。
+ * Converts a number of seconds to an ISO 8601 duration string.
  *
- * @param videoId - YouTube 動画 ID / YouTube video ID
- * @param apiKey - YouTube Data API キー / YouTube Data API key
- * @returns メタデータ / Video metadata
- * @throws API エラーまたはレスポンス解析失敗時 / On API error or parse failure
+ * youtubei.js は再生時間を秒で返すが、`formatDuration` および下流コードは
+ * ISO 8601 形式 (例 "PT1H2M3S") を前提としているため変換する。
+ *
+ * youtubei.js exposes the duration in seconds, but `formatDuration` and
+ * downstream consumers expect ISO 8601 form (e.g. "PT1H2M3S").
  */
-export async function fetchYouTubeMetadata(
-  videoId: string,
-  apiKey: string,
-  timeoutMs: number = YT_FETCH_TIMEOUT_MS,
-): Promise<YouTubeMetadata> {
-  const url = new URL("https://www.googleapis.com/youtube/v3/videos");
-  url.searchParams.set("part", "snippet,contentDetails");
-  url.searchParams.set("id", videoId);
-  url.searchParams.set("key", apiKey);
-
-  // タイムアウト付きの fetch（上流の遅延で全体をブロックしないようにする）
-  // Fetch with abort-based timeout so slow upstream doesn't pin the request
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), { signal: controller.signal });
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new Error(`YouTube Data API request timed out after ${timeoutMs}ms`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`YouTube Data API failed: ${res.status} - ${text}`);
-  }
-
-  const data = (await res.json()) as {
-    items?: Array<{
-      snippet: {
-        title: string;
-        description: string;
-        channelTitle: string;
-        publishedAt: string;
-        thumbnails: Record<string, { url: string; width: number; height: number }>;
-        tags?: string[];
-      };
-      contentDetails: {
-        duration: string;
-      };
-    }>;
-  };
-
-  if (!data.items || data.items.length === 0) {
-    throw new Error(`YouTube video not found: ${videoId}`);
-  }
-
-  const item = data.items[0] as NonNullable<(typeof data.items)[number]>;
-  const snippet = item.snippet;
-  const thumbnails = snippet.thumbnails;
-
-  // 最大解像度のサムネイルを選択 / Select highest resolution thumbnail
-  const thumbnailUrl =
-    thumbnails.maxres?.url ||
-    thumbnails.standard?.url ||
-    thumbnails.high?.url ||
-    thumbnails.medium?.url ||
-    thumbnails.default?.url ||
-    `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-
-  return {
-    title: snippet.title,
-    description: snippet.description,
-    channelTitle: snippet.channelTitle,
-    publishedAt: snippet.publishedAt,
-    duration: item.contentDetails?.duration ?? "",
-    thumbnailUrl,
-    tags: snippet.tags ?? [],
-  };
+function secondsToIso8601Duration(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  let out = "PT";
+  if (hours > 0) out += `${hours}H`;
+  if (minutes > 0) out += `${minutes}M`;
+  // 0 秒の動画は事実上ないが、空文字 "PT" を避けるため秒を常に出力
+  // Always emit the seconds component to avoid producing a bare "PT".
+  if (seconds > 0 || (hours === 0 && minutes === 0)) out += `${seconds}S`;
+  return out;
 }
 
-// ── Transcript ────────────────────────────────────────────────────────────
+// ── Innertube singleton ───────────────────────────────────────────────────
+
+/**
+ * Innertube インスタンスは初期化に外部 HTTP リクエストを伴うため、
+ * プロセス内でシングルトンとしてキャッシュする。
+ *
+ * Innertube initialisation issues outbound HTTP requests, so the instance
+ * is memoised per process to amortise that cost across calls.
+ */
+let innertubePromise: Promise<Innertube> | null = null;
+
+async function getInnertube(): Promise<Innertube> {
+  if (!innertubePromise) {
+    // retrieve_player: false でセッション初期化を高速化（字幕/メタデータ取得には player.js 不要）。
+    // Skip JS player retrieval — it is only needed for stream deciphering.
+    // 初期化失敗時はキャッシュをクリアし、次回呼び出しで再試行できるようにする。
+    // Reset the cache on failure so transient initialisation errors don't
+    // permanently break the service for the rest of the process lifetime.
+    innertubePromise = Innertube.create({
+      retrieve_player: false,
+    }).catch((err) => {
+      innertubePromise = null;
+      throw err;
+    });
+  }
+  return innertubePromise;
+}
+
+/**
+ * テスト用に Innertube シングルトンキャッシュをリセットする。
+ * Resets the cached Innertube singleton (test-only helper).
+ *
+ * @internal
+ */
+export function __resetInnertubeForTesting(): void {
+  innertubePromise = null;
+}
+
+// ── Promise timeout helper ────────────────────────────────────────────────
 
 /**
  * Promise にタイムアウトを付与する。タイムアウト時は reject。
@@ -201,60 +191,115 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   });
 }
 
+// ── Metadata extraction ───────────────────────────────────────────────────
+
 /**
- * YouTube 動画の公開字幕テキストを取得する。
- * Fetches public captions/subtitles for a YouTube video.
- *
- * youtube-transcript パッケージを使用（非公式、API キー不要）。
- * 字幕が利用できない場合は空配列を返す（エラーは throw しない）。
- * 上流が応答しない場合に備え、各試行に `timeoutMs` のタイムアウトを適用する。
- *
- * Uses the youtube-transcript package (unofficial, no API key required).
- * Returns an empty array when captions are unavailable (never throws).
- * Each attempt is bounded by `timeoutMs` to avoid hanging on a slow upstream.
- *
- * @param videoId - YouTube 動画 ID / YouTube video ID
- * @param timeoutMs - 各フェッチ試行のタイムアウト (ms) / Per-attempt timeout in ms
- * @returns 字幕セグメント配列 / Transcript segments (empty if unavailable)
+ * Innertube `VideoInfo` からアプリ層が必要とするメタデータを抽出する。
+ * Extracts the metadata fields the app cares about from an Innertube `VideoInfo`.
  */
-export async function fetchYouTubeTranscript(
+function extractMetadata(
   videoId: string,
-  timeoutMs: number = YT_FETCH_TIMEOUT_MS,
-): Promise<TranscriptSegment[]> {
-  // youtube-transcript は signal を受け付けないため、タイムアウトは Promise.race で実装
-  // youtube-transcript does not accept a signal, so timeout is enforced via promise race
-  try {
-    const transcriptItems = await withTimeout<TranscriptResponse[]>(
-      YoutubeTranscript.fetchTranscript(videoId, { lang: "ja" }),
-      timeoutMs,
-      "YouTube transcript fetch (ja)",
-    );
+  info: Awaited<ReturnType<Innertube["getInfo"]>>,
+): YouTubeMetadata {
+  const basic = info.basic_info;
 
-    return transcriptItems.map((item) => ({
-      text: item.text,
-      offset: item.offset / 1000, // ms → sec
-      duration: item.duration / 1000, // ms → sec
-    }));
-  } catch {
-    // 日本語字幕が無い場合、言語指定なしで再試行
-    // If Japanese subtitles unavailable, retry without language preference
-    try {
-      const transcriptItems = await withTimeout<TranscriptResponse[]>(
-        YoutubeTranscript.fetchTranscript(videoId),
-        timeoutMs,
-        "YouTube transcript fetch",
-      );
+  // タイトル: basic_info を優先、なければ ID ベースのフォールバック
+  // Prefer basic_info.title, fall back to id-based label
+  const title = basic.title?.trim() || `YouTube Video (${videoId})`;
 
-      return transcriptItems.map((item) => ({
-        text: item.text,
-        offset: item.offset / 1000,
-        duration: item.duration / 1000,
-      }));
-    } catch {
-      // 字幕なし動画 — 空配列を返す / No captions available
-      return [];
-    }
+  // 説明文: basic_info.short_description が公式 description
+  // basic_info.short_description holds the canonical description string
+  const description = basic.short_description ?? "";
+
+  // チャンネル名: basic_info.channel.name → basic_info.author の順で fallback
+  // Channel name: prefer basic_info.channel.name, then basic_info.author
+  const channelTitle = basic.channel?.name ?? basic.author ?? "";
+
+  // 公開日時: PlayerMicroformat.publish_date (例 "2024-01-15") を優先
+  // basic_info.start_timestamp (Date) があればそちらを ISO に
+  // Prefer PlayerMicroformat.publish_date (e.g. "2024-01-15"), fall back to start_timestamp.
+  const microformat = info.page[0]?.microformat as PlayerMicroformat | undefined;
+  const publishedAt = microformat?.publish_date ?? basic.start_timestamp?.toISOString() ?? "";
+
+  // 再生時間: 値が無い場合は空文字（"PT0S" を捏造して "0:00" 表示にしない）
+  // Duration: leave as empty string when missing — avoid fabricating "PT0S"
+  // which would render as "0:00" downstream and misrepresent the metadata.
+  const duration = basic.duration != null ? secondsToIso8601Duration(basic.duration) : "";
+
+  // サムネイル: 最大解像度のものを選択。配列が空なら hqdefault に fallback
+  // Thumbnail: pick the largest by width; fall back to hqdefault when none returned.
+  const thumbnailUrl =
+    pickLargestThumbnail(basic.thumbnail) ?? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+
+  // タグ: basic_info.tags / keywords どちらかが入る場合あり
+  // Tags: basic_info.tags or basic_info.keywords (whichever is populated)
+  const tags = basic.tags ?? basic.keywords ?? [];
+
+  return {
+    title,
+    description,
+    channelTitle,
+    publishedAt,
+    duration,
+    thumbnailUrl,
+    tags,
+  };
+}
+
+/**
+ * サムネイル配列から最大幅の URL を選ぶ。空配列なら null。
+ * Returns the URL of the widest thumbnail, or null when the list is empty.
+ */
+function pickLargestThumbnail(thumbnails: Thumbnail[] | undefined | null): string | null {
+  if (!thumbnails || thumbnails.length === 0) return null;
+  // 配列内の null/undefined 要素をスキップしつつ最大幅を選ぶ
+  // Walk the entire list so a null/undefined first element doesn't drop later valid entries.
+  let best: Thumbnail | null = null;
+  for (const t of thumbnails) {
+    if (t && (!best || t.width > best.width)) best = t;
   }
+  return best?.url ?? null;
+}
+
+// ── Transcript extraction ─────────────────────────────────────────────────
+
+/**
+ * Innertube `TranscriptInfo` から `TranscriptSegment[]` を抽出する。
+ * Extracts plain `TranscriptSegment[]` from an Innertube `TranscriptInfo`.
+ */
+function extractTranscriptSegments(transcriptInfo: TranscriptInfo): TranscriptSegment[] {
+  const segments = transcriptInfo.transcript.content?.body?.initial_segments ?? [];
+  const out: TranscriptSegment[] = [];
+  for (const seg of segments) {
+    // セクションヘッダーは無視（字幕本文ではない）
+    // Skip section headers (they are not transcript content)
+    if (!isTranscriptSegment(seg)) continue;
+    const startMs = Number.parseInt(seg.start_ms, 10);
+    const endMs = Number.parseInt(seg.end_ms, 10);
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) continue;
+    const text = seg.snippet.toString().trim();
+    if (!text) continue;
+    out.push({
+      text,
+      offset: startMs / 1000,
+      duration: Math.max(0, (endMs - startMs) / 1000),
+    });
+  }
+  return out;
+}
+
+/**
+ * `TranscriptSegment | TranscriptSectionHeader` を識別する型ガード。
+ * Type guard distinguishing `TranscriptSegment` from `TranscriptSectionHeader`.
+ */
+function isTranscriptSegment(node: unknown): node is TranscriptSegmentClass {
+  return (
+    typeof node === "object" &&
+    node !== null &&
+    "start_ms" in node &&
+    "end_ms" in node &&
+    "snippet" in node
+  );
 }
 
 /**
@@ -268,11 +313,11 @@ export function joinTranscriptText(segments: TranscriptSegment[]): string {
   return segments.map((s) => s.text).join(" ");
 }
 
-// ── Combined ──────────────────────────────────────────────────────────────
+// ── Public entry point ────────────────────────────────────────────────────
 
 /**
- * API キー未指定時の最小限のメタデータを返す。
- * Returns minimal metadata when the Data API key is missing or fails.
+ * 最小限のメタデータ（取得失敗時のフォールバック）。
+ * Minimal metadata used as a fallback when Innertube fails entirely.
  */
 function buildMinimalMetadata(videoId: string): YouTubeMetadata {
   return {
@@ -290,66 +335,71 @@ function buildMinimalMetadata(videoId: string): YouTubeMetadata {
  * YouTube 動画のメタデータと字幕を一括取得する。
  * Fetches both metadata and transcript for a YouTube video.
  *
- * YouTube Data API キーが指定されていない場合、メタデータは最小限の情報のみ返す。
- * キーが指定されているがメタデータ取得に失敗した場合（quota 超過・無効キー等）も、
- * 字幕のみでフォールバックを提供する。
+ * Innertube の `getInfo()` 1 回でメタデータと字幕（`getTranscript()`）の
+ * 両方を取得する。字幕が利用できない動画では transcript フィールドが
+ * null になるが、メタデータ取得自体が失敗した場合でも最小限のメタデータで
+ * フォールバックを返す。
  *
- * When no API key is provided, returns minimal metadata (title from videoId only).
- * Even when a key is provided, a failing metadata request (quota exhausted,
- * invalid key, transient failure) is caught and replaced with minimal metadata
- * so the transcript-only fallback is preserved.
+ * Uses a single Innertube `getInfo()` call followed by `getTranscript()`.
+ * Returns transcript as null when captions are unavailable. Even when the
+ * upstream call fails entirely, returns a minimal metadata fallback so the
+ * caller never throws.
  *
  * @param videoId - YouTube 動画 ID / YouTube video ID
- * @param youtubeApiKey - YouTube Data API キー（任意） / YouTube Data API key (optional)
+ * @param _youtubeApiKey - 互換性のため残存（youtubei.js 移行で不要） / Retained for backward compatibility (no longer used)
  * @returns メタデータと字幕 / Metadata and transcript
  */
 export async function fetchYouTubeContent(
   videoId: string,
-  youtubeApiKey?: string,
+  _youtubeApiKey?: string,
 ): Promise<YouTubeContent> {
-  // 字幕は常に取得を試みる（API キー不要）
-  // Always attempt transcript fetch (no API key required)
-  const transcriptPromise = fetchYouTubeTranscript(videoId);
-
-  let metadata: YouTubeMetadata;
-  if (youtubeApiKey) {
-    // メタデータ取得失敗（quota 超過・無効キー等）でも字幕 fallback を維持する
-    // Keep transcript-only fallback even when metadata fetch fails (quota, invalid key, etc.)
-    const [metaResult, transcriptResult] = await Promise.allSettled([
-      fetchYouTubeMetadata(videoId, youtubeApiKey),
-      transcriptPromise,
-    ]);
-    const transcript = transcriptResult.status === "fulfilled" ? transcriptResult.value : [];
-    if (metaResult.status === "fulfilled") {
-      metadata = metaResult.value;
-    } else {
-      console.error("YouTube metadata fetch failed (falling back to minimal):", metaResult.reason);
-      metadata = buildMinimalMetadata(videoId);
-    }
-    const transcriptText = joinTranscriptText(transcript);
+  let info: Awaited<ReturnType<Innertube["getInfo"]>>;
+  try {
+    const yt = await getInnertube();
+    info = await withTimeout(yt.getInfo(videoId), YT_FETCH_TIMEOUT_MS, "youtubei.js getInfo");
+  } catch (err) {
+    // メタデータ取得失敗 — 最小フォールバックを返す（呼び出し側は throw しない契約）
+    // Metadata fetch failed — return minimal fallback (callers expect no throw).
+    console.error("youtubei.js getInfo failed (falling back to minimal):", err);
+    const fallback = buildMinimalMetadata(videoId);
     return {
-      metadata,
-      transcript: transcript.length > 0 ? transcript : null,
-      transcriptText,
+      metadata: fallback,
+      transcript: null,
+      transcriptText: "",
     };
   }
 
-  // API キーなし — 字幕のみ取得、メタデータは最小限
-  // No API key — transcript only, minimal metadata
-  const transcript = await transcriptPromise;
-  metadata = {
-    title: `YouTube Video (${videoId})`,
-    description: "",
-    channelTitle: "",
-    publishedAt: "",
-    duration: "",
-    thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-    tags: [],
-  };
+  // extractMetadata は `info` の想定形状に依存するため、youtubei.js が
+  // 予期せぬ構造を返した場合でも "throw しない" 契約を守るために包む。
+  // extractMetadata assumes a well-formed `info`; guard against unexpected
+  // upstream shapes so the documented "never throws" contract still holds.
+  let metadata: YouTubeMetadata;
+  try {
+    metadata = extractMetadata(videoId, info);
+  } catch (err) {
+    console.error("extractMetadata failed (falling back to minimal):", err);
+    metadata = buildMinimalMetadata(videoId);
+  }
+
+  // 字幕取得は失敗しても致命的ではないので個別 try/catch
+  // Transcript fetch is best-effort: missing captions must not throw.
+  let segments: TranscriptSegment[] = [];
+  try {
+    const transcriptInfo = await withTimeout(
+      info.getTranscript(),
+      YT_FETCH_TIMEOUT_MS,
+      "youtubei.js getTranscript",
+    );
+    segments = extractTranscriptSegments(transcriptInfo);
+  } catch {
+    // 字幕なし動画 / トランスクリプト無効化動画 — 空配列で続行
+    // No captions available or transcripts disabled — continue with empty list.
+    segments = [];
+  }
 
   return {
     metadata,
-    transcript: transcript.length > 0 ? transcript : null,
-    transcriptText: joinTranscriptText(transcript),
+    transcript: segments.length > 0 ? segments : null,
+    transcriptText: joinTranscriptText(segments),
   };
 }
