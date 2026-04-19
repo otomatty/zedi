@@ -369,7 +369,17 @@ export async function fetchYouTubeContent(
     };
   }
 
-  const metadata = extractMetadata(videoId, info);
+  // extractMetadata は `info` の想定形状に依存するため、youtubei.js が
+  // 予期せぬ構造を返した場合でも "throw しない" 契約を守るために包む。
+  // extractMetadata assumes a well-formed `info`; guard against unexpected
+  // upstream shapes so the documented "never throws" contract still holds.
+  let metadata: YouTubeMetadata;
+  try {
+    metadata = extractMetadata(videoId, info);
+  } catch (err) {
+    console.error("extractMetadata failed (falling back to minimal):", err);
+    metadata = buildMinimalMetadata(videoId);
+  }
 
   // 字幕取得は失敗しても致命的ではないので個別 try/catch
   // Transcript fetch is best-effort: missing captions must not throw.

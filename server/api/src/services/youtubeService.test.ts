@@ -210,6 +210,25 @@ describe("youtubeService", () => {
       expect(result.metadata.channelTitle).toBe("Author Name");
     });
 
+    it("falls back to minimal metadata when VideoInfo is malformed (contract: never throws)", async () => {
+      // basic_info を欠いた VideoInfo を返し、extractMetadata が TypeError で落ちる状況を再現。
+      // Simulate a malformed VideoInfo (missing basic_info) that makes
+      // extractMetadata throw — the caller must still get a graceful fallback.
+      mockGetInfo.mockResolvedValueOnce({
+        // basic_info is intentionally absent
+        page: [{}],
+        getTranscript: vi.fn().mockRejectedValue(new Error("none")),
+      });
+
+      const result = await fetchYouTubeContent("malformed12");
+      expect(result.metadata.title).toBe("YouTube Video (malformed12)");
+      expect(result.metadata.thumbnailUrl).toBe(
+        "https://img.youtube.com/vi/malformed12/hqdefault.jpg",
+      );
+      expect(result.transcript).toBeNull();
+      expect(result.transcriptText).toBe("");
+    });
+
     it("leaves duration empty when basic_info.duration is missing (no fabricated 0:00)", async () => {
       mockGetInfo.mockResolvedValueOnce(
         buildVideoInfoMock({
