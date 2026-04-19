@@ -11,7 +11,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
@@ -86,20 +86,21 @@ app.put("/", authRequired, async (c) => {
   const content = body.content;
   const now = new Date();
 
-  // Wrap the read-modify-write in a transaction so concurrent PUTs from the
-  // same user cannot both INSERT and race the (owner_id) WHERE is_schema=true
-  // unique index, AND so that the pages row and its page_contents body are
-  // committed atomically (otherwise a partial failure could leave a schema
-  // page with no body / mismatched body).
-  // 同一ユーザーの並行 PUT が両方 INSERT して一意インデックスで衝突するのを防ぎ、
-  // かつ pages 行と page_contents 本体をアトミックにコミットするため、
-  // 全更新をトランザクションで囲む。
+  // 同一ユーザーの並行 PUT を直列化するため、トランザクション内で advisory lock を
+  // 取得する。`SELECT ... FOR UPDATE` は対象行が無い初回作成時には何もロックできず、
+  // 2 つのトランザクションが両方 INSERT に進んで `idx_pages_unique_schema_per_owner`
+  // で衝突 → 片方が 500 になる窓があった。advisory_xact_lock は (owner_id) 空間で
+  // セマンティックに排他化するため、初回作成も後続更新もこの 1 つのロックで安全に
+  // 直列化できる。ロックはトランザクション終了で自動解放。
+  // pg_advisory_xact_lock serialises concurrent schema upserts per owner, closing
+  // the create-time race that `FOR UPDATE` cannot cover (no row to lock yet).
   const pageId = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`wiki_schema:${userId}`}))`);
+
     const [existing] = await tx
       .select({ id: pages.id })
       .from(pages)
       .where(and(eq(pages.ownerId, userId), eq(pages.isSchema, true), eq(pages.isDeleted, false)))
-      .for("update")
       .limit(1);
 
     let resolvedPageId: string;
@@ -140,13 +141,22 @@ app.put("/", authRequired, async (c) => {
     return resolvedPageId;
   });
 
-  await recordActivity(db, {
-    ownerId: userId,
-    kind: "wiki_schema_update",
-    actor: "user",
-    targetPageIds: [pageId],
-    detail: { title, contentLength: content.length },
-  });
+  // recordActivity の失敗で 500 を返すと、スキーマは既にコミット済みなのに
+  // クライアントには「失敗」と見えるパーシャル状態になる。activity ログは
+  // ベストエフォートで処理し、失敗はログだけ残してレスポンスは 200 を維持する。
+  // Activity logging is non-fatal: the schema commit already succeeded; surface
+  // failures via console.error only so callers don't see a misleading 500.
+  try {
+    await recordActivity(db, {
+      ownerId: userId,
+      kind: "wiki_schema_update",
+      actor: "user",
+      targetPageIds: [pageId],
+      detail: { title, contentLength: content.length },
+    });
+  } catch (err) {
+    console.error("[wikiSchema] recordActivity failed (non-fatal):", err);
+  }
 
   return c.json({ pageId, title, content });
 });

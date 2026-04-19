@@ -20,6 +20,17 @@
 import type { AIMessage, AIProviderType } from "../types/index.js";
 
 /**
+ * `userSchema` を system prompt に注入する際の最大文字数。
+ * 経験則として、article excerpt 4,000 chars + candidates と合算しても
+ * 大半のモデル context window に収まり、かつスキーマの主要セクションが
+ * 落ちにくいサイズとして 4,000 を採用。
+ *
+ * Hard cap on injected user-defined wiki schema to keep the planner system
+ * prompt within typical model context windows alongside article + candidates.
+ */
+const USER_SCHEMA_MAX_CHARS = 4_000;
+
+/**
  * Ingest プランが取れるアクション。
  * Possible actions an ingest plan can propose.
  */
@@ -144,8 +155,13 @@ export function buildIngestPlannerPrompt(input: BuildIngestPlannerPromptInput): 
 
   const systemParts = [SYSTEM_PROMPT_JA_EN];
   if (userSchema && userSchema.trim().length > 0) {
+    // article / candidate と同じく、ユーザースキーマも上限文字数で必ず切り詰める。
+    // 切り詰めずに system prompt へ流し込むと、長大なスキーマがプランナーの
+    // コンテキストを食い潰し、要約や候補比較が劣化したり 4xx になりうる。
+    // Bound user schema length so an oversized schema cannot crowd out article/
+    // candidate context or push the planner over the model context window.
     systemParts.push(
-      `User-defined wiki schema (apply when choosing titles and sections):\n${userSchema.trim()}`,
+      `User-defined wiki schema (apply when choosing titles and sections):\n${truncate(userSchema.trim(), USER_SCHEMA_MAX_CHARS)}`,
     );
   }
 

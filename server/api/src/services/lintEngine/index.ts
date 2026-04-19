@@ -57,16 +57,24 @@ export async function runAllLintRules(ownerId: string, db: Database): Promise<Li
   });
 
   // Record the run in activity_log (non-fatal on failure).
-  // 活動ログに Lint 実行を記録（失敗しても全体を巻き込まない）。
-  await recordActivity(db, {
-    ownerId,
-    kind: "lint_run",
-    actor: "user",
-    detail: {
-      total: allFindings.length,
-      summary: results.map((r) => ({ rule: r.rule, count: r.findings.length })),
-    },
-  });
+  // findings は既にコミット済みなので、activity_log への書き込み失敗で
+  // 戻り値を捨てさせるわけにはいかない。例外を try/catch で握って
+  // ログだけ残し、Lint 結果は呼び出し元へそのまま返す。
+  // findings have already been committed; swallow logging failures so a
+  // transient activity_log error doesn't turn a successful run into 500.
+  try {
+    await recordActivity(db, {
+      ownerId,
+      kind: "lint_run",
+      actor: "user",
+      detail: {
+        total: allFindings.length,
+        summary: results.map((r) => ({ rule: r.rule, count: r.findings.length })),
+      },
+    });
+  } catch (err) {
+    console.error("[lintEngine] recordActivity failed (non-fatal):", err);
+  }
 
   return results;
 }

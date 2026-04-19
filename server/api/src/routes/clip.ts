@@ -85,6 +85,11 @@ function extractVideoId(url: string): string | null {
     /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i,
     /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
     /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+    // YouTube Shorts (m. サブドメイン含む) は本流の抽出パイプラインで受理されるため、
+    // POST /api/clip/youtube だけが弾かないように同等のパターンを追加する。
+    // YouTube Shorts URLs are accepted by the main extraction pipeline; mirror
+    // them here so this endpoint doesn't reject them with a 400.
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})(?:[?#][^\s]*)?$/i,
   ];
   for (const p of patterns) {
     const m = url.match(p);
@@ -179,13 +184,20 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     // 記録失敗は非致命的 — 抽出結果を破棄しない
     // Bill only when AI actually ran successfully (result.aiUsage !== null)
     // Recording failure is non-fatal — don't discard the extraction result
-    if (result.aiUsage && aiProvider && aiModel && body.model) {
+    //
+    // ここではアクセス検証時にトリム済みの aiModel を使う。生の `body.model` には
+    // 前後空白や別表記が含まれうるため、`validateModelAccess` の再検証も
+    // recordUsage の保存値もトリム後の正規 model id (`aiModel`) で行わないと、
+    // 同一モデルが複数の正規化前文字列で記録され、使用量集計や請求がブレる。
+    // Use the already-trimmed `aiModel` for re-validation and accounting so usage
+    // records are stable for the same model regardless of input whitespace.
+    if (result.aiUsage && aiProvider && aiModel) {
       try {
         // プロバイダーから返された実際のトークン数を使用（概算ではなく）
         // Use actual token counts returned by the provider (not estimates)
         const { inputTokens, outputTokens } = result.aiUsage;
         const tier = await getUserTier(userId, db);
-        const modelInfo = await validateModelAccess(body.model, tier, db);
+        const modelInfo = await validateModelAccess(aiModel, tier, db);
         const costUnits = calculateCost(
           { inputTokens, outputTokens },
           modelInfo.inputCostUnits,
@@ -193,7 +205,7 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
         );
         await recordUsage(
           userId,
-          body.model,
+          aiModel,
           "youtube_summary",
           { inputTokens, outputTokens },
           costUnits,

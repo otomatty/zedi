@@ -222,6 +222,23 @@ describe("buildIngestPlannerPrompt", () => {
     expect(messages[0]?.content).not.toContain("User-defined wiki schema");
   });
 
+  it("truncates very long userSchema so it cannot crowd out article/candidate context", () => {
+    // 4,000 を超えるユーザースキーマは prompt 内で切り詰められるはず。
+    // truncate() は "…" を末尾に付けるため、ぴったり 4,000 ではなく 4,001 文字以内になる。
+    const hugeSchema = "X".repeat(20_000);
+    const messages = buildIngestPlannerPrompt({
+      article: sampleArticle,
+      candidates: sampleCandidates,
+      userSchema: hugeSchema,
+    });
+    const systemContent = messages[0]?.content ?? "";
+    expect(systemContent).toContain("User-defined wiki schema");
+    // X の連続が元の 20,000 文字より短くなっている (4,000 + ellipsis 程度)。
+    const xRun = systemContent.match(/X+/)?.[0] ?? "";
+    expect(xRun.length).toBeLessThanOrEqual(4_001);
+    expect(xRun.length).toBeLessThan(20_000);
+  });
+
   it("truncates very long excerpts to avoid prompt blow-up", () => {
     const hugeExcerpt = "A".repeat(10_000);
     const messages = buildIngestPlannerPrompt({
