@@ -1,24 +1,12 @@
 import React, { useMemo } from "react";
-import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useContainerColumns } from "@/hooks/useContainerColumns";
 import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
-import { Button, cn, Skeleton } from "@zedi/ui";
+import { cn, Skeleton } from "@zedi/ui";
 import { hasNeverSynced } from "@/lib/sync";
-import { isTimestampInMonth } from "@/lib/dateUtils";
 import type { PageSummary } from "@/types/page";
-
-function parseMonthParam(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const month = params.get("month");
-  if (!month || !/^\d{4}-\d{2}$/.test(month)) return null;
-  const [, m] = month.split("-").map(Number);
-  if (m < 1 || m > 12) return null;
-  return month;
-}
 
 const skeletonItems = Array.from({ length: 20 }, (_, index) => index);
 
@@ -55,73 +43,45 @@ const PageGridSkeleton: React.FC<{ columns: 2 | 3 | 4 | 5 | 6 }> = ({ columns })
   </div>
 );
 
-/** 月フィルタで0件のときの空状態（全期間を表示へ誘導） */
-const MonthFilterEmptyState: React.FC<{ onShowAll: () => void }> = ({ onShowAll }) => {
-  const { t } = useTranslation();
-  return (
-    <div className="flex flex-col items-center justify-center px-4 py-24 text-center">
-      <p className="text-muted-foreground mb-4">{t("home.monthFilter.empty")}</p>
-      <Button variant="outline" onClick={onShowAll}>
-        {t("home.monthFilter.showAll")}
-      </Button>
-    </div>
-  );
-};
-
 interface PageGridProps {
   isSeeding?: boolean;
 }
 
 /**
+ * Grid of recent pages for the home page. Shows a skeleton while the initial
+ * data is loading (including first-time sign-in syncs), an empty state when
+ * the user has no pages, and the actual grid otherwise.
  *
+ * ホーム用のページグリッド。初回同期などロード中はスケルトン、ページが無い場合は空状態、
+ * それ以外はグリッドを表示する 3 状態構成。
  */
 const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
   const { ref, columns } = useContainerColumns();
 
   const { data: pages = [], isLoading } = usePagesSummary();
   const syncStatus = useSyncStatus();
   const { isSignedIn } = useAuth();
 
-  const monthParam = parseMonthParam(searchParams.toString());
-
   const sortedPages = useMemo(() => {
     return [...pages].filter((p) => !p.isDeleted).sort((a, b) => b.updatedAt - a.updatedAt);
   }, [pages]);
-
-  const filteredPages = useMemo(() => {
-    if (!monthParam) return sortedPages;
-    return sortedPages.filter((p) => isTimestampInMonth(p.updatedAt, monthParam));
-  }, [sortedPages, monthParam]);
 
   const isInitialSyncPending = isSignedIn && hasNeverSynced() && syncStatus !== "error";
   const hasPages = sortedPages.length > 0;
   const shouldShowSkeleton =
     !hasPages && (isLoading || syncStatus === "syncing" || isInitialSyncPending || isSeeding);
 
-  const handleShowAll = () => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("month");
-    setSearchParams(next);
-  };
-
   return (
     <div ref={ref} className="pb-24">
       {shouldShowSkeleton && <PageGridSkeleton columns={columns} />}
       {!shouldShowSkeleton && sortedPages.length === 0 && <EmptyState />}
-      {!shouldShowSkeleton &&
-        sortedPages.length > 0 &&
-        monthParam &&
-        filteredPages.length === 0 && <MonthFilterEmptyState onShowAll={handleShowAll} />}
-      {!shouldShowSkeleton &&
-        sortedPages.length > 0 &&
-        (!monthParam || filteredPages.length > 0) && (
-          <div className={cn("grid gap-3", gridColsClass[columns])}>
-            {filteredPages.map((page: PageSummary, index: number) => (
-              <PageCard key={page.id} page={page} index={index} />
-            ))}
-          </div>
-        )}
+      {!shouldShowSkeleton && sortedPages.length > 0 && (
+        <div className={cn("grid gap-3", gridColsClass[columns])}>
+          {sortedPages.map((page: PageSummary, index: number) => (
+            <PageCard key={page.id} page={page} index={index} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
