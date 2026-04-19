@@ -118,4 +118,23 @@ describe("IndexedDBStorageAdapter.resetDatabase (issue #608)", () => {
       expect(original?.message).toBe("simulated transaction failure");
     }
   });
+
+  it("wraps non-Error causes (DOMException-like / strings) into Error for diagnostics", () => {
+    // DOMException 等が Error を継承していない実行環境でも `originalError` を
+    // Error に正規化することを確認する。Verify normalization to Error for
+    // runtimes where DOMException does not extend Error.
+    const stringCauseError = new ResetDatabasePageIdsReadError("disk quota exceeded");
+    expect(stringCauseError.originalError).toBeInstanceOf(Error);
+    expect(stringCauseError.originalError?.message).toBe("disk quota exceeded");
+
+    const objectCause = { code: 42, name: "QuotaExceededError" };
+    const objectCauseError = new ResetDatabasePageIdsReadError(objectCause);
+    expect(objectCauseError.originalError).toBeInstanceOf(Error);
+
+    const undefinedCauseError = new ResetDatabasePageIdsReadError(undefined);
+    expect(undefinedCauseError.originalError).toBeUndefined();
+
+    const nullCauseError = new ResetDatabasePageIdsReadError(null);
+    expect(nullCauseError.originalError).toBeUndefined();
+  });
 });
