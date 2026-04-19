@@ -2,7 +2,6 @@
  * AI chat conversation row: open and delete confirm call the delete hook.
  * AI 会話行: 開く・削除確認でフックが呼ばれる。
  */
-import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
