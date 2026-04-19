@@ -9,6 +9,7 @@ import { resolve } from "path";
 import { eq, asc } from "drizzle-orm";
 import { getDb } from "../src/db/client.js";
 import { aiModels } from "../src/schema/index.js";
+import { calculateBaseline } from "./inspect-ai-models-cost.lib.js";
 
 function loadEnvFromRoot() {
   const root = resolve(process.cwd(), "..", "..");
@@ -55,8 +56,9 @@ async function main() {
   );
   console.log("-".repeat(95));
 
-  const minInput = Math.min(...rows.map((r) => r.inputCostUnits).filter((v) => v > 0));
-  const baseline = minInput > 0 ? minInput : 1;
+  // baseline が Infinity になる問題 (#609) を避けるため、計算は `calculateBaseline` に委譲する。
+  // Delegate to `calculateBaseline` to avoid the `Infinity` baseline edge case (#609).
+  const baseline = calculateBaseline(rows.map((r) => r.inputCostUnits));
 
   for (const r of rows) {
     const mult = r.inputCostUnits > 0 ? Math.round(r.inputCostUnits / baseline) : 1;
