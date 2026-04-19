@@ -42,9 +42,8 @@ vi.mock("@/contexts/AIChatContext", () => ({
 vi.mock("@/hooks/usePromoteToWiki", () => ({
   usePromoteToWiki: () => ({
     handlePromote: vi.fn(),
-    isOpen: false,
-    candidate: null,
-    confirmPromote: vi.fn(),
+    open: false,
+    conversationText: "",
     close: vi.fn(),
   }),
 }));
