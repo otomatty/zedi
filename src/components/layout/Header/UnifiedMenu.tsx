@@ -1,8 +1,14 @@
 import React, { useState, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Settings, CreditCard, Receipt, LogOut, LogIn, User } from "lucide-react";
 import { Button, useIsMobile } from "@zedi/ui";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@zedi/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@zedi/ui";
 import { Sheet, SheetContent, SheetTitle } from "@zedi/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
@@ -37,7 +43,8 @@ function useAccountActionItems(): AccountActionItem[] {
 interface AccountActionsListProps {
   items: AccountActionItem[];
   isSignedIn: boolean;
-  onNavigate: (path: string) => void;
+  variant: "list" | "dropdown";
+  onClose: () => void;
 }
 
 /**
@@ -47,47 +54,59 @@ interface AccountActionsListProps {
 const AccountActionsList: React.FC<AccountActionsListProps> = ({
   items,
   isSignedIn,
-  onNavigate,
-}) => (
-  <div className="flex flex-col gap-1 p-2">
-    {items
-      .filter((item) => !item.signedInOnly || isSignedIn)
-      .map((item) => {
+  variant,
+  onClose,
+}) => {
+  const visibleItems = items.filter((item) => !item.signedInOnly || isSignedIn);
+
+  if (variant === "dropdown") {
+    return (
+      <>
+        {visibleItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <DropdownMenuItem key={item.path} asChild>
+              <Link to={item.path} onClick={onClose} className="gap-3 px-3 py-2">
+                <Icon className="text-muted-foreground h-4 w-4 shrink-0" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+      </>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 p-2">
+      {visibleItems.map((item) => {
         const Icon = item.icon;
         return (
-          <button
+          <Link
             key={item.path}
-            type="button"
-            onClick={() => onNavigate(item.path)}
+            to={item.path}
+            onClick={onClose}
             className="hover:bg-muted flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors"
           >
             <Icon className="text-muted-foreground h-4 w-4 shrink-0" />
             <span className="font-medium">{item.label}</span>
-          </button>
+          </Link>
         );
       })}
-  </div>
-);
+    </div>
+  );
+};
 
 interface MenuContentProps {
   onClose: () => void;
 }
 
 const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
-  const navigate = useNavigate();
   const { user } = useUser();
   const { signOut } = useAuth();
   const { displayName, avatarUrl } = useProfile();
   const { t } = useTranslation();
   const items = useAccountActionItems();
-
-  const handleNavigate = useCallback(
-    (path: string) => {
-      navigate(path);
-      onClose();
-    },
-    [navigate, onClose],
-  );
 
   const handleSignOut = useCallback(() => {
     void signOut();
@@ -117,8 +136,8 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
       </div>
 
       <hr className="border-border my-1" />
-      <AccountActionsList items={items} isSignedIn onNavigate={handleNavigate} />
-      <SyncStatusRow />
+      <AccountActionsList items={items} isSignedIn variant="list" onClose={onClose} />
+      <SyncStatusRow onClose={onClose} />
 
       <hr className="border-border my-1" />
       <div className="p-2">
@@ -135,22 +154,62 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
   );
 };
 
-const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
-  const navigate = useNavigate();
+const DesktopSignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+  const { user } = useUser();
+  const { signOut } = useAuth();
+  const { displayName, avatarUrl } = useProfile();
   const { t } = useTranslation();
   const items = useAccountActionItems();
 
-  const handleNavigate = useCallback(
-    (path: string) => {
-      navigate(path);
-      onClose();
-    },
-    [navigate, onClose],
-  );
+  const handleSignOut = useCallback(() => {
+    void signOut();
+    onClose();
+  }, [signOut, onClose]);
 
   return (
     <>
-      <AccountActionsList items={items} isSignedIn={false} onNavigate={handleNavigate} />
+      <div className="flex items-center gap-3 p-3">
+        <Avatar className="h-10 w-10 shrink-0">
+          <AvatarImage
+            src={avatarUrl || user?.imageUrl}
+            alt={displayName || user?.fullName || "User"}
+          />
+          <AvatarFallback>{(displayName || user?.firstName)?.charAt(0) ?? "U"}</AvatarFallback>
+        </Avatar>
+        <div className="flex min-w-0 flex-col space-y-0.5 leading-none">
+          {(displayName || user?.fullName) && (
+            <p className="truncate text-sm font-medium">{displayName || user?.fullName}</p>
+          )}
+          {user?.primaryEmailAddress && (
+            <p className="text-muted-foreground truncate text-xs">
+              {user.primaryEmailAddress.emailAddress}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <DropdownMenuSeparator />
+      <AccountActionsList items={items} isSignedIn variant="dropdown" onClose={onClose} />
+      <SyncStatusRow variant="dropdown" onClose={onClose} />
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        onSelect={handleSignOut}
+        className="text-destructive focus:text-destructive gap-3 px-3 py-2"
+      >
+        <LogOut className="h-4 w-4 shrink-0" />
+        <span className="font-medium">{t("nav.signOut")}</span>
+      </DropdownMenuItem>
+    </>
+  );
+};
+
+const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+  const { t } = useTranslation();
+  const items = useAccountActionItems();
+
+  return (
+    <>
+      <AccountActionsList items={items} isSignedIn={false} variant="list" onClose={onClose} />
       <hr className="border-border my-1" />
       <div className="p-2">
         <Link to="/sign-in" onClick={onClose}>
@@ -160,6 +219,24 @@ const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
           </Button>
         </Link>
       </div>
+    </>
+  );
+};
+
+const DesktopSignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+  const { t } = useTranslation();
+  const items = useAccountActionItems();
+
+  return (
+    <>
+      <AccountActionsList items={items} isSignedIn={false} variant="dropdown" onClose={onClose} />
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
+        <Link to="/sign-in" onClick={onClose} className="gap-2 px-3 py-2 font-medium">
+          <LogIn className="h-4 w-4 shrink-0" />
+          {t("nav.signIn")}
+        </Link>
+      </DropdownMenuItem>
     </>
   );
 };
@@ -233,7 +310,7 @@ const DesktopMenu: React.FC = () => {
             <AvatarTrigger />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={8} className="w-72 p-0">
-            <SignedInMenuContent onClose={close} />
+            <DesktopSignedInMenuContent onClose={close} />
           </DropdownMenuContent>
         </DropdownMenu>
       </SignedIn>
@@ -243,7 +320,7 @@ const DesktopMenu: React.FC = () => {
             <GuestTrigger />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={8} className="w-72 p-0">
-            <SignedOutMenuContent onClose={close} />
+            <DesktopSignedOutMenuContent onClose={close} />
           </DropdownMenuContent>
         </DropdownMenu>
       </SignedOut>
