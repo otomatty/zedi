@@ -71,23 +71,41 @@ async function fetchImageAsBuffer(
   return { buffer, mimeType, ext };
 }
 
+/**
+ *
+ */
 export async function commitImage(
   userId: string,
   sourceUrl: string,
   fallbackUrl: string | undefined,
   db: Database,
 ): Promise<{ imageUrl: string }> {
+  /**
+   *
+   */
   let buffer: Buffer;
+  /**
+   *
+   */
   let mimeType: string;
+  /**
+   *
+   */
   let ext: string;
 
   try {
+    /**
+     *
+     */
     const result = await fetchImageAsBuffer(sourceUrl);
     buffer = result.buffer;
     mimeType = result.mimeType;
     ext = result.ext;
   } catch (err) {
     if (fallbackUrl && fallbackUrl !== sourceUrl) {
+      /**
+       *
+       */
       const fallback = await fetchImageAsBuffer(fallbackUrl);
       buffer = fallback.buffer;
       mimeType = fallback.mimeType;
@@ -97,17 +115,38 @@ export async function commitImage(
     }
   }
 
+  /**
+   *
+   */
   const sizeBytes = buffer.length;
+  /**
+   *
+   */
   const tier = await getUserTier(userId, db);
+  /**
+   *
+   */
   const quotaBytes = await getStorageQuotaBytes(tier, db);
+  /**
+   *
+   */
   const usedBytes = await getStorageUsedBytes(userId, db);
 
   if (usedBytes + sizeBytes > quotaBytes) {
     throw new Error("STORAGE_QUOTA_EXCEEDED");
   }
 
+  /**
+   *
+   */
   const objectId = crypto.randomUUID();
+  /**
+   *
+   */
   const s3Key = `users/${userId}/thumbnails/${objectId}.${ext}`;
+  /**
+   *
+   */
   const bucketName = process.env.STORAGE_BUCKET_NAME;
 
   await s3.send(
@@ -127,6 +166,12 @@ export async function commitImage(
   });
 
   // バケット非公開のため、API 経由でプロキシストリーミングする URL を返す
-  const baseUrl = process.env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
+  // Return a proxy-streaming URL served via this API because the bucket is private.
+  // BETTER_AUTH_URL は必須。未設定なら fail-fast し、不正な相対 URL を返さない。
+  // BETTER_AUTH_URL is required; fail fast on missing value instead of returning a broken relative URL.
+  /**
+   *
+   */
+  const baseUrl = getEnv("BETTER_AUTH_URL").replace(/\/$/, "");
   return { imageUrl: `${baseUrl}/api/thumbnail/serve/${objectId}` };
 }
