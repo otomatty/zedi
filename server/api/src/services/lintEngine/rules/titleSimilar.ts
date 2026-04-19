@@ -83,15 +83,25 @@ export async function runTitleSimilarRule(ownerId: string, db: Database): Promis
         if (seen.has(key)) continue;
         seen.add(key);
 
+        // 完全一致 (distance=0) はリンクの曖昧さを生む深刻な重複なので
+        // `warn` に上げ、近似類似 (distance>0) は `info` のまま残す。
+        // Exact-title duplicates (distance=0) create link ambiguity and are
+        // more serious than near-matches, so escalate severity to `warn`.
+        const severity = dist === 0 ? "warn" : "info";
+        const suggestion =
+          dist === 0
+            ? "タイトルが完全に一致しています。統合またはリネームを検討してください / Titles are identical. Consider merging or renaming."
+            : "タイトルが類似しています。統合を検討してください / Titles are similar. Consider merging.";
+
         findings.push({
           rule: "title_similar",
-          severity: "info",
+          severity,
           pageIds: [a.id, b.id],
           detail: {
             titleA: a.title,
             titleB: b.title,
             distance: dist,
-            suggestion: `タイトルが類似しています。統合を検討してください / Titles are similar. Consider merging.`,
+            suggestion,
           },
         });
       }

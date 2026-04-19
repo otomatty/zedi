@@ -9,10 +9,20 @@ import type { LintRuleResult, LintFindingCandidate } from "../types.js";
  * Regex patterns for extracting numeric/date claims from content.
  */
 const DATE_PATTERN = /(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})[日]?/g;
-// `\d[\d,.]*` (not `+`) so single-digit claims like `3人` / `7km` / `5年` are
-// matched. `+` would require at least two numeric characters.
-// `+` だと 2 文字以上必要になり 1 桁の主張 (3人 等) を取りこぼすため `*` を使う。
-const NUMBER_PATTERN = /(\d[\d,.]*)\s*(km|m|kg|g|人|円|ドル|年|歳|万|億)/g;
+// 数値パターン:
+//   - `\d[\d,.]*` は `1`, `1,000`, `3.14` 等を吸収。`*` (not `+`) なので 1 桁
+//     の主張 `3人` / `7km` / `5年` も取りこぼさない。
+//   - `(?: \d{3})*` で「半角スペース + 3 桁」の繰り返しを許容し、thousand-
+//     grouping の別表記 `1 000 円` / `1 000 000 円` を吸収する。
+//     ASCII スペース以外は受けない（`100 3人` のような偽マッチを避けるため、
+//     3 桁ずつでないと拾わない）。
+// Numeric pattern:
+//   - `\d[\d,.]*` matches `1`, `1,000`, `3.14`, etc. Using `*` (not `+`) keeps
+//     single-digit claims (`3人` / `7km` / `5年`) from being dropped.
+//   - `(?: \d{3})*` accepts space-grouped thousands (`1 000 円` /
+//     `1 000 000 円`). Requiring exactly 3 digits after each space prevents
+//     false grouping like `100 3人` → `1003人`.
+const NUMBER_PATTERN = /(\d[\d,.]*(?: \d{3})*)\s*(km|m|kg|g|人|円|ドル|年|歳|万|億)/g;
 
 /**
  * 日付値を `YYYY-M-D` (パディングなし) に正規化する。`2026-04-19` と
@@ -32,14 +42,31 @@ function normalizeDateValue(raw: string): string {
 }
 
 /**
- * 数値値から区切り文字（カンマ・空白）を取り除き正規化する。
- * `1,000円` と `1000円`、`1 000 円` を同値として扱う。
+ * 数値値を canonical な `<number><unit>` 形式に正規化する。
+ * - 区切り文字（カンマ・空白）を除去
+ * - 単位を末尾から切り出して `parseFloat` で数値化し、末尾ゼロや `.0` を畳む
+ *   （`1,000円` / `1000円` / `1 000 円` / `1000.0円` → すべて `1000円`）
  *
- * Normalize a matched number+unit string so separator-only variants
- * (`1,000円` vs `1000円` vs `1 000 円`) collapse to the same value.
+ * Normalize a matched number+unit string to a canonical `<number><unit>` form.
+ * Thousands separators (comma/space) are stripped and the numeric portion is
+ * run through `parseFloat` so format-only variants — separators as well as
+ * trailing decimal zeros (`1000` vs `1000.0`) — all collapse to one value.
+ *
+ * NOTE: 入力は常に日本語 / 英語圏の表記 (`.` = 小数点、`,` = 千単位) を前提
+ * とする。ロケール別のカンマ=小数点は対象外（`lintEngine` は現状日本語
+ * コンテンツ向けのため）。
  */
 function normalizeNumberValue(raw: string): string {
-  return raw.replace(/[,\s]+/g, "").toLowerCase();
+  const stripped = raw.replace(/[,\s]+/g, "");
+  const unitMatch = stripped.match(/(km|m|kg|g|人|円|ドル|年|歳|万|億)$/);
+  if (!unitMatch) return stripped.toLowerCase();
+  const unit = unitMatch[0];
+  const numeric = stripped.slice(0, -unit.length);
+  const parsed = Number.parseFloat(numeric);
+  if (!Number.isFinite(parsed)) return stripped.toLowerCase();
+  // `String(Number)` は末尾ゼロを自動で落とす（例: `1000.0` → `1000`）。
+  // `String(Number)` naturally drops trailing decimal zeros.
+  return `${parsed}${unit.toLowerCase()}`;
 }
 
 /**
