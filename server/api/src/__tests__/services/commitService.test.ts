@@ -125,6 +125,22 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
     );
   });
 
+  it("BETTER_AUTH_URL 未設定時は S3 アップロード前に throw する / rejects before any S3 PUT when BETTER_AUTH_URL is unset", async () => {
+    setBaseEnv();
+    envMap.BETTER_AUTH_URL = undefined;
+
+    const { commitImage } = await importCommitService();
+    const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+
+    await expect(commitImage(TEST_USER_ID, DATA_URI, undefined, db)).rejects.toThrow(
+      /Missing required env var: BETTER_AUTH_URL/,
+    );
+
+    // オーファンオブジェクトを生まないために、S3 への PUT が一切発生していないこと。
+    // Verify we never hit S3 — otherwise a missing env leaves orphan objects.
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
   it("BETTER_AUTH_URL が設定されていれば絶対 URL を返す / returns an absolute URL when BETTER_AUTH_URL is set", async () => {
     setBaseEnv();
 
