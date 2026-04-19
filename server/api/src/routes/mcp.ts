@@ -14,6 +14,7 @@ import { HTTPException } from "hono/http-exception";
 import { randomBytes } from "node:crypto";
 import { authRequired } from "../middleware/auth.js";
 import { mcpReadRequired, mcpWriteRequired } from "../middleware/mcpAuth.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import {
   consumeMcpCode,
   isMcpRedirectUriAllowed,
@@ -30,6 +31,36 @@ import type { AppEnv } from "../types/index.js";
 
 const ALLOWED_SCOPES = new Set([MCP_SCOPE_READ, MCP_SCOPE_WRITE]);
 
+// ── Rate limit policies ─────────────────────────────────────────────────────
+// 意図:
+//  - `/authorize-code` はセッション有りで呼ばれるので per-user。CSRF 防止の観点で
+//    短いウィンドウに抑える。
+//  - `/session` は認証前 (code 交換) のため per-IP。PKCE ブルートフォース対策。
+//  - `/clip` は per-user の書き込み。スクレイピングを抑制するため分単位で制限。
+//
+// Rationale:
+//   authorize-code is called with a Better Auth session (per-user), /session is
+//   unauthenticated (per-IP, PKCE brute-force guard), /clip is the main MCP
+//   write path (per-user, throttle scraping).
+const authorizeCodeRateLimit = rateLimit({
+  limit: 20,
+  windowSec: 60,
+  keyBy: "user",
+  label: "mcp:authorize-code",
+});
+const sessionRateLimit = rateLimit({
+  limit: 10,
+  windowSec: 60,
+  keyBy: "ip",
+  label: "mcp:session",
+});
+const clipRateLimit = rateLimit({
+  limit: 30,
+  windowSec: 60,
+  keyBy: "user",
+  label: "mcp:clip",
+});
+
 const app = new Hono<AppEnv>();
 
 // ── POST /authorize-code ────────────────────────────────────────────────────
@@ -37,7 +68,7 @@ const app = new Hono<AppEnv>();
 // 後続で CLI / Web 側が `/session` に code + verifier を送って JWT に交換する。
 //
 // Issues a one-time PKCE code for an authenticated user; later exchanged at /session for a JWT.
-app.post("/authorize-code", authRequired, async (c) => {
+app.post("/authorize-code", authRequired, authorizeCodeRateLimit, async (c) => {
   const redis = c.get("redis");
   if (!redis) {
     throw new HTTPException(503, { message: "Redis unavailable" });
@@ -89,7 +120,7 @@ app.post("/authorize-code", authRequired, async (c) => {
 // ── POST /session ───────────────────────────────────────────────────────────
 // PKCE code + verifier を交換して MCP 用 JWT を発行する。
 // Exchanges a one-time code + PKCE verifier for an MCP-scoped JWT.
-app.post("/session", async (c) => {
+app.post("/session", sessionRateLimit, async (c) => {
   const redis = c.get("redis");
   if (!redis) {
     throw new HTTPException(503, { message: "Redis unavailable" });
@@ -194,7 +225,7 @@ app.post("/revoke-session", authRequired, async (c) => {
 // 本体ロジックは `clipAndCreate` を共有するため重複実装はしない。
 //
 // MCP-authenticated wrapper around clipAndCreate (shares the same implementation as /api/ext/clip-and-create).
-app.post("/clip", mcpWriteRequired, async (c) => {
+app.post("/clip", mcpWriteRequired, clipRateLimit, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 

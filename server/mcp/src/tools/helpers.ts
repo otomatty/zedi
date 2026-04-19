@@ -38,6 +38,16 @@ export async function wrapToolHandler<A>(
     return await handler(args);
   } catch (err) {
     if (err instanceof ZediApiError) {
+      if (err.isRateLimit) {
+        // レート制限は専用メッセージで Claude Code に再試行タイミングを伝える。
+        // Render a dedicated message so the MCP client can present retry guidance.
+        const retry =
+          err.retryAfterSec != null ? `retry in ${err.retryAfterSec} seconds` : "retry later";
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Rate limited, ${retry}.` }],
+        };
+      }
       const status = err.status === 0 ? "network" : `HTTP ${err.status}`;
       return {
         isError: true,

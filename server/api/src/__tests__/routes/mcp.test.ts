@@ -115,10 +115,33 @@ async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
   }
 }
 
-const mockRedis = {} as AppEnv["Variables"]["redis"];
+/**
+ * rateLimit ミドルウェアが `incr` / `expire` を呼ぶため、テスト用の最小 Redis を用意する。
+ * In-memory stand-in for the bits of ioredis that the rateLimit middleware exercises.
+ */
+function createMockRedis(): AppEnv["Variables"]["redis"] {
+  const store = new Map<string, number>();
+  return {
+    incr: vi.fn(async (key: string) => {
+      const next = (store.get(key) ?? 0) + 1;
+      store.set(key, next);
+      return next;
+    }),
+    expire: vi.fn(async () => 1),
+    get: vi.fn(async (key: string) => {
+      const v = store.get(key);
+      return v === undefined ? null : String(v);
+    }),
+    set: vi.fn(async () => "OK"),
+    del: vi.fn(async (key: string) => (store.delete(key) ? 1 : 0)),
+  } as unknown as AppEnv["Variables"]["redis"];
+}
+
+let mockRedis = createMockRedis();
 const mockDb = {} as AppEnv["Variables"]["db"];
 
 beforeEach(() => {
+  mockRedis = createMockRedis();
   vi.mocked(auth.api.getSession).mockResolvedValue(null);
   mockConsumeMcpCode.mockReset();
   mockVerifyPKCE.mockReset();
@@ -447,5 +470,136 @@ describe("POST /api/mcp/revoke-session", () => {
     expect(body.revoked).toBe(true);
     expect(mockStoreMcpRevocation).toHaveBeenCalledOnce();
     expect(mockStoreMcpRevocation).toHaveBeenCalledWith(mockRedis, "user-session-7");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rate limiting / レート制限
+//
+// MCP ルートは外部 Claude Code クライアントが叩くため、既定の tier リミットとは別に
+// エンドポイントごとの short-window な制限を掛ける (#562)。
+//
+// /api/mcp/* endpoints enforce per-endpoint short-window limits; exceeding them
+// yields 429 with Retry-After + a RATE_LIMIT_EXCEEDED body that MCP clients can
+// surface to the user.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("rate limiting (#562)", () => {
+  it("POST /api/mcp/clip returns 429 with Retry-After once the per-user limit is exceeded", async () => {
+    const app = createMcpApp(mockRedis, mockDb);
+    // 30/min/user. 30 回まで通して 31 回目で 429。
+    // Limit is 30/min/user; the 31st call in the window must fail.
+    let firstLimited: Response | null = null;
+    for (let i = 0; i < 31; i++) {
+      const res = await app.request("/api/mcp/clip", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer t",
+          "x-test-mcp-user-id": "user-ratelimit-clip",
+        },
+        body: JSON.stringify({ url: "https://example.com/a" }),
+      });
+      if (res.status === 429 && !firstLimited) {
+        firstLimited = res;
+        break;
+      }
+      expect(res.status).toBe(200);
+    }
+    if (!firstLimited) throw new Error("expected a 429 but never hit the limit");
+    expect(firstLimited.headers.get("Retry-After")).toMatch(/^\d+$/);
+    expect(firstLimited.headers.get("X-RateLimit-Limit")).toBe("30");
+    const body = (await firstLimited.json()) as {
+      error?: string;
+      retry_after?: number;
+      message?: string;
+    };
+    expect(body.error).toBe("RATE_LIMIT_EXCEEDED");
+    expect(typeof body.retry_after).toBe("number");
+    expect(body.message).toMatch(/retry in \d+ seconds/i);
+  });
+
+  it("POST /api/mcp/clip keeps separate buckets for different users", async () => {
+    const app = createMcpApp(mockRedis, mockDb);
+    // ユーザー A を上限まで使い切ってもユーザー B は影響を受けない。
+    // Burning user A's bucket must not bleed into user B's.
+    for (let i = 0; i < 30; i++) {
+      const res = await app.request("/api/mcp/clip", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer t",
+          "x-test-mcp-user-id": "user-a",
+        },
+        body: JSON.stringify({ url: "https://example.com/a" }),
+      });
+      expect(res.status).toBe(200);
+    }
+    const res = await app.request("/api/mcp/clip", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer t",
+        "x-test-mcp-user-id": "user-b",
+      },
+      body: JSON.stringify({ url: "https://example.com/a" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("POST /api/mcp/session returns 429 once the per-IP limit is exceeded", async () => {
+    mockIsMcpRedirectUriAllowed.mockReturnValue(true);
+    mockConsumeMcpCode.mockResolvedValue(null);
+    const app = createMcpApp(mockRedis, mockDb);
+    let firstLimited: Response | null = null;
+    // session は 10/min/IP。認証前ルートなので userId は無く IP でキー付けされる。
+    // /session is unauthenticated so the bucket is keyed by IP (10/min).
+    for (let i = 0; i < 11; i++) {
+      const res = await app.request("/api/mcp/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "203.0.113.7",
+        },
+        body: JSON.stringify({
+          grant_type: "authorization_code",
+          code: "c",
+          code_verifier: "v",
+          redirect_uri: "http://127.0.0.1:5173/cb",
+        }),
+      });
+      if (res.status === 429) {
+        firstLimited = res;
+        break;
+      }
+    }
+    expect(firstLimited).not.toBeNull();
+    expect(firstLimited?.headers.get("Retry-After")).toMatch(/^\d+$/);
+    expect(firstLimited?.headers.get("X-RateLimit-Limit")).toBe("10");
+  });
+
+  it("POST /api/mcp/authorize-code is rate limited per user", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
+    mockIsMcpRedirectUriAllowed.mockReturnValue(true);
+    const app = createMcpApp(mockRedis, mockDb);
+    let firstLimited: Response | null = null;
+    // authorize-code は 20/min/user。
+    // Limit: 20/min/user.
+    for (let i = 0; i < 21; i++) {
+      const res = await app.request("/api/mcp/authorize-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          redirect_uri: "http://127.0.0.1:5173/cb",
+          code_challenge: "ch",
+        }),
+      });
+      if (res.status === 429) {
+        firstLimited = res;
+        break;
+      }
+      expect(res.status).toBe(200);
+    }
+    expect(firstLimited).not.toBeNull();
+    expect(firstLimited?.headers.get("X-RateLimit-Limit")).toBe("20");
   });
 });
