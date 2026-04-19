@@ -4,9 +4,6 @@ export const AI_CHAT_BASE_PATH = "/ai";
 /** Full AI chat history list route. / AI チャット履歴一覧のパス */
 export const AI_CHAT_HISTORY_PATH = `${AI_CHAT_BASE_PATH}/history`;
 
-/** Max AI chat rows shown in the app sidebar. / サイドバーに表示する AI チャット履歴の最大件数 */
-export const SIDEBAR_AI_CHAT_RECENT_LIMIT = 5;
-
 /**
  * URL path for a single conversation on the full-page AI chat.
  * フルページ AI の会話詳細パス。

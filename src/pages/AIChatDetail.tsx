@@ -137,9 +137,9 @@ export default function AIChatDetail() {
 
   return (
     <>
-      {/* Fill SidebarInset (already below header). flex-1 + min-h-0 prevents page-level scroll.
-          SidebarInset 内を埋める（ヘッダー下の高さは親が保証）。メッセージのみスクロール。 */}
-      <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+      {/* Fill the AppLayout main area (already below header). flex-1 + min-h-0 prevents page-level scroll.
+          AppLayout のメイン領域を埋める（ヘッダー下の高さは親が保証）。メッセージのみスクロール。 */}
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
         <div className="border-border shrink-0 border-b px-4 py-2">
           <AIChatViewTabs activeTab={activeViewTab} onTabChange={setActiveViewTab} />
         </div>
@@ -184,7 +184,7 @@ export default function AIChatDetail() {
             />
           </Container>
         </div>
-      </main>
+      </div>
       <PromoteToWikiDialog
         open={promote.open}
         onClose={promote.close}
