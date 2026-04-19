@@ -38,6 +38,25 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
 
   // ── Pages ───────────────────────────────────────────────────────────────
   server.registerTool(
+    "zedi_list_pages",
+    {
+      title: "List pages",
+      description:
+        "Lists the caller's pages, paginated and ordered by `updated_at` DESC. Use `scope: own` for own pages or `shared` to also include pages attached to notes the caller is a member of. Returns `{ id, title, content_preview, updated_at }`.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(100).optional(),
+        offset: z.number().int().min(0).optional(),
+        scope: SearchScopeEnum.optional(),
+      },
+    },
+    async (args) =>
+      wrapToolHandler(async (input) => {
+        const pages = await client.listPages(input);
+        return jsonResult(pages);
+      }, args),
+  );
+
+  server.registerTool(
     "zedi_get_page",
     {
       title: "Get page content",
@@ -358,6 +377,7 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
 /** Zedi MCP サーバーが公開するツール名一覧 (テスト/UI 用)。 / List of all tool names exposed by the Zedi MCP server. */
 export const ALL_TOOL_NAMES = [
   "zedi_get_current_user",
+  "zedi_list_pages",
   "zedi_get_page",
   "zedi_create_page",
   "zedi_update_page_content",

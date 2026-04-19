@@ -43,6 +43,25 @@ export interface PageRow {
   is_deleted: boolean;
 }
 
+/** ページ一覧アイテム / Page list item returned by `GET /api/pages`. */
+export interface PageListItem {
+  id: string;
+  title: string | null;
+  content_preview: string | null;
+  updated_at: string;
+}
+
+/** `listPages` の入力 / Input for {@link ZediClient.listPages}. */
+export interface ListPagesParams {
+  /** 上限件数 (1-100, デフォルト 20) / Page size (1-100, default 20). */
+  limit?: number;
+  /** 取得開始位置 (>= 0, デフォルト 0) / Result offset (>= 0, default 0). */
+  offset?: number;
+  /** スコープ。"own" は自分のページのみ、"shared" は共有ノート経由で参加しているページも含む。
+   *  Scope: "own" lists only own pages; "shared" also includes pages from notes the caller is a member of. */
+  scope?: "own" | "shared";
+}
+
 /** ページ本文 (Y.Doc) / Page Y.Doc content. */
 export interface PageContent {
   ydoc_state: string;
@@ -157,6 +176,11 @@ export interface ZediClient {
   getCurrentUser(): Promise<CurrentUser>;
 
   // Pages
+  /**
+   * 自分のページ (own) または共有を含むページ (shared) を更新日時降順で一覧する。
+   * List the caller's pages — own only or own + shared via notes — ordered by `updated_at DESC`.
+   */
+  listPages(params?: ListPagesParams): Promise<PageListItem[]>;
   /** ページ本文 (Y.Doc) を取得する。Get page Y.Doc content. */
   getPageContent(pageId: string): Promise<PageContent>;
   /** 新規ページを作成する。Create a new page. */
