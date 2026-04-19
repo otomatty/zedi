@@ -141,22 +141,18 @@ app.put("/", authRequired, async (c) => {
     return resolvedPageId;
   });
 
-  // recordActivity の失敗で 500 を返すと、スキーマは既にコミット済みなのに
-  // クライアントには「失敗」と見えるパーシャル状態になる。activity ログは
-  // ベストエフォートで処理し、失敗はログだけ残してレスポンスは 200 を維持する。
-  // Activity logging is non-fatal: the schema commit already succeeded; surface
-  // failures via console.error only so callers don't see a misleading 500.
-  try {
-    await recordActivity(db, {
-      ownerId: userId,
-      kind: "wiki_schema_update",
-      actor: "user",
-      targetPageIds: [pageId],
-      detail: { title, contentLength: content.length },
-    });
-  } catch (err) {
-    console.error("[wikiSchema] recordActivity failed (non-fatal):", err);
-  }
+  // `recordActivity` は内部で例外を握り console.error でログするだけなので、
+  // ここでの try/catch は不要。スキーマコミット成功後にログ書き込みが失敗しても
+  // レスポンスは 200 のまま返り、運用は console.error で検知できる。
+  // `recordActivity` already swallows errors internally (logged via console.error),
+  // so wrapping it again here is unnecessary; the 200 response is preserved.
+  await recordActivity(db, {
+    ownerId: userId,
+    kind: "wiki_schema_update",
+    actor: "user",
+    targetPageIds: [pageId],
+    detail: { title, contentLength: content.length },
+  });
 
   return c.json({ pageId, title, content });
 });

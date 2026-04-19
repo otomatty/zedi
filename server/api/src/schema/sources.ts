@@ -59,6 +59,15 @@ export const sources = pgTable(
     uniqueIndex("uq_sources_owner_url_hash")
       .on(table.ownerId, table.url, table.contentHash)
       .where(sql`${table.url} IS NOT NULL`),
+    // URL が無いソース（kind="conversation" 等）は (owner, kind, content_hash) で
+    // 一意にする。これが無いと並行 ingest が同一 contentHash で同じ会話を二重に
+    // 挿入し、`onConflictDoNothing` での再 SELECT 経路が機能しない。
+    // Partial unique index for sources without a URL (e.g. kind="conversation"):
+    // ensures (owner, kind, content_hash) is unique so concurrent inserts
+    // converge via ON CONFLICT DO NOTHING + re-SELECT.
+    uniqueIndex("uq_sources_owner_kind_hash_when_url_null")
+      .on(table.ownerId, table.kind, table.contentHash)
+      .where(sql`${table.url} IS NULL AND ${table.contentHash} IS NOT NULL`),
   ],
 );
 
