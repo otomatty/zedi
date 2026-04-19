@@ -3,7 +3,8 @@
  *
  * - POST /authorize-code  Better Auth セッションで認証済みのユーザーがワンタイムコードを発行する
  * - POST /session         ワンタイムコード + PKCE verifier を JWT に交換する
- * - POST /revoke          MCP JWT を失効登録する (best-effort)
+ * - POST /revoke          MCP JWT (bearer) 経由で自分のトークンを失効させる
+ * - POST /revoke-session  ユーザーセッション (authRequired) 経由で自分の MCP トークンを失効させる
  * - POST /clip            MCP 権限で URL をクリップしてページを生成する (clipAndCreate ラッパ)
  *
  * MCP server routes: PKCE-based authorize/session, token revocation, and clip-and-create.
@@ -18,6 +19,7 @@ import {
   isMcpRedirectUriAllowed,
   issueMcpToken,
   storeMcpCode,
+  storeMcpRevocation,
   verifyPKCE,
   MCP_SCOPE_READ,
   MCP_SCOPE_WRITE,
@@ -147,16 +149,43 @@ app.post("/session", async (c) => {
   });
 });
 
+/**
+ * 共通: Redis に失効時刻を書き込むヘルパ。MCP bearer / ユーザーセッションの両経路から呼ぶ。
+ * Shared helper that writes a per-user revocation timestamp, used by both
+ * the MCP-bearer and session-protected revoke endpoints.
+ */
+async function recordMcpRevocation(
+  redis: AppEnv["Variables"]["redis"] | undefined,
+  userId: string,
+  source: "mcp" | "session",
+) {
+  if (!redis) {
+    throw new HTTPException(503, { message: "Redis unavailable" });
+  }
+  const revokedAt = await storeMcpRevocation(redis, userId);
+  console.log(`[mcp] revoke recorded via=${source} userId=${userId} revokedAt=${revokedAt}`);
+}
+
 // ── POST /revoke ────────────────────────────────────────────────────────────
-// MCP JWT の失効登録 (best-effort)。Stateless JWT のため、Redis にブラックリスト登録する程度の実装。
-// MVP では成功応答のみ返し、将来的にデナイリストを追加する。
+// 呼び出し元ユーザーの MCP JWT を失効させる。Redis に `mcp:revoked:<userId>` として
+// 失効時刻 (UNIX 秒) を保存し、以降の `verifyMcpToken` は `iat <= revokedAt` のトークンを拒否する。
+// 現行スコープ粒度では per-user で十分。
 //
-// Best-effort revoke for stateless JWTs (MVP returns success; deny-list to be added).
+// Per-user MCP token revocation backed by a Redis deny-list. Subsequent `verifyMcpToken`
+// calls reject tokens whose `iat` is at or before the stored revocation timestamp.
 app.post("/revoke", mcpReadRequired, async (c) => {
-  const userId = c.get("userId");
-  // TODO: Persist a per-user revocation timestamp in Redis so verifyMcpToken can check `iat < revokedAt`.
-  // TODO: ユーザー単位の失効時刻を Redis に保存し、検証時に iat と比較してブロックする。
-  console.log(`[mcp] revoke requested for userId=${userId}`);
+  await recordMcpRevocation(c.get("redis"), c.get("userId"), "mcp");
+  return c.json({ revoked: true });
+});
+
+// ── POST /revoke-session ────────────────────────────────────────────────────
+// ユーザー (Better Auth セッション) 経由で自分の MCP トークンをすべて失効させる。
+// 端末紛失や MCP トークン不明時のために、ブラウザから利用できる経路を提供する。
+//
+// Session-protected counterpart to POST /revoke. Lets users invalidate all their
+// MCP tokens from the web UI when the MCP token itself is unavailable (e.g. lost device).
+app.post("/revoke-session", authRequired, async (c) => {
+  await recordMcpRevocation(c.get("redis"), c.get("userId"), "session");
   return c.json({ revoked: true });
 });
 
