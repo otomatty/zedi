@@ -23,9 +23,8 @@ variable "api_cname_target" {
 
 variable "api_railway_verify_txt" {
   type        = string
-  description = "TXT content for _railway-verify.api (Railway domain verification)"
+  description = "TXT content for _railway-verify.api (Railway domain verification). Provide via Terraform Cloud workspace variable, TF_VAR_api_railway_verify_txt, or terraform.tfvars (gitignored)."
   sensitive   = true
-  default     = "railway-verify=railway-verify=97b0cf3ce5de53d394f30217a4788eec389f509a8ab5013a90a0c7c0d23cd629"
 }
 
 variable "realtime_cname_target" {
@@ -36,7 +35,6 @@ variable "realtime_cname_target" {
 
 variable "realtime_railway_verify_txt" {
   type        = string
-  description = "TXT content for _railway-verify.realtime (Railway domain verification)"
+  description = "TXT content for _railway-verify.realtime (Railway domain verification). Provide via Terraform Cloud workspace variable, TF_VAR_realtime_railway_verify_txt, or terraform.tfvars (gitignored)."
   sensitive   = true
-  default     = "railway-verify=railway-verify=b08709e7971274931c697417f9b8f8fc4d0ab61ef8a7690ababd25b8447d1a78"
 }
