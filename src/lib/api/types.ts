@@ -268,3 +268,17 @@ export interface AcceptInvitationResponse {
   role: string;
   status: "accepted";
 }
+
+/**
+ * POST /api/invite/:token/email-link response.
+ * 招待メール mismatch 時のマジックリンク送信結果。
+ * Response for the invitation rescue magic-link send endpoint.
+ */
+export interface SendInvitationEmailLinkResponse {
+  /** 送信を受理したか / Whether the send was accepted */
+  sent: true;
+  /** 送信先メールアドレス（招待先） / Recipient email (invited address) */
+  memberEmail: string;
+  /** 次回送信までの待機秒数（UI カウントダウン用）/ Seconds to wait before the next send (for countdown) */
+  retryAfterSec: number;
+}

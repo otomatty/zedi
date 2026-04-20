@@ -4,7 +4,11 @@
  */
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { createApiClient } from "@/lib/api";
-import type { InvitationInfoResponse, AcceptInvitationResponse } from "@/lib/api/types";
+import type {
+  InvitationInfoResponse,
+  AcceptInvitationResponse,
+  SendInvitationEmailLinkResponse,
+} from "@/lib/api/types";
 
 /** Query key factory for invitation queries. */
 export const invitationKeys = {
@@ -37,5 +41,20 @@ export function useAcceptInvitation() {
 
   return useMutation<AcceptInvitationResponse, Error, { token: string }>({
     mutationFn: ({ token }) => api.acceptInvitation(token),
+  });
+}
+
+/**
+ * Request a rescue magic link sent to the invited email address.
+ * 招待先メール宛にマジックリンクを送るよう依頼する。
+ *
+ * Used by the email-mismatch branch of the invitation page when the signed-in
+ * account differs from the invited address.
+ */
+export function useSendInvitationEmailLink() {
+  const api = createApiClient();
+
+  return useMutation<SendInvitationEmailLinkResponse, Error, { token: string }>({
+    mutationFn: ({ token }) => api.sendInvitationEmailLink(token),
   });
 }

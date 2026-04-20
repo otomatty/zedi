@@ -22,6 +22,7 @@ import type {
   ResendInvitationResponse,
   InvitationInfoResponse,
   AcceptInvitationResponse,
+  SendInvitationEmailLinkResponse,
 } from "./types";
 
 export type { NoteListItem };
@@ -445,6 +446,20 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<AcceptInvitationResponse>(
         "POST",
         `/api/invite/${encodeURIComponent(token)}/accept`,
+      );
+    },
+
+    /**
+     * POST /api/invite/:token/email-link — 招待先メール宛にマジックリンクを送る（認証任意）。
+     * Send a magic-link email to the invited address (no auth required).
+     *
+     * レート制限に触れた場合は ApiError (status 429) を投げる。
+     * Throws ApiError (status 429) when the server returns a rate-limit response.
+     */
+    async sendInvitationEmailLink(token: string): Promise<SendInvitationEmailLinkResponse> {
+      return reqOptionalAuth<SendInvitationEmailLinkResponse>(
+        "POST",
+        `/api/invite/${encodeURIComponent(token)}/email-link`,
       );
     },
   };

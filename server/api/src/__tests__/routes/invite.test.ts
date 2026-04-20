@@ -2,7 +2,7 @@
  * 招待受諾フロー API のテスト
  * Tests for invitation acceptance flow API
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
@@ -25,6 +25,22 @@ vi.mock("../../middleware/auth.js", () => ({
     if (userEmail) c.set("userEmail", userEmail);
     await next();
   },
+}));
+
+// ── Magic-link service mock ────────────────────────────────────────────────
+// 招待メール救済フローのマジックリンク送信を差し替える。
+// Replace the invitation rescue magic-link sender so tests don't hit Better Auth.
+interface MagicLinkResult {
+  sent: boolean;
+  status?: number;
+  error?: string;
+}
+const sendInvitationMagicLinkMock = vi.fn<(arg: unknown) => Promise<MagicLinkResult>>(async () => ({
+  sent: true,
+  status: 200,
+}));
+vi.mock("../../services/magicLinkService.js", () => ({
+  sendInvitationMagicLink: (arg: unknown) => sendInvitationMagicLinkMock(arg),
 }));
 
 import inviteRoutes from "../../routes/invite.js";
@@ -102,6 +118,79 @@ function createTestApp(dbResults: unknown[]) {
 
   app.use("*", async (c, next) => {
     c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+    await next();
+  });
+
+  app.onError(errorHandler);
+  app.route("/api/invite", inviteRoutes);
+  return { app, chains };
+}
+
+// ── In-memory Redis mock (only the subset we use) ──────────────────────────
+
+/**
+ * email-link エンドポイントで使う Redis の最小実装。INCR/EXPIRE/TTL のみ対応する。
+ * Minimal Redis mock covering INCR, EXPIRE, and TTL for the email-link endpoint.
+ */
+function createRedisMock() {
+  const counters = new Map<string, number>();
+  const ttls = new Map<string, number>();
+
+  const api = {
+    async incr(key: string): Promise<number> {
+      const next = (counters.get(key) ?? 0) + 1;
+      counters.set(key, next);
+      return next;
+    },
+    async expire(key: string, seconds: number): Promise<number> {
+      ttls.set(key, seconds);
+      return counters.has(key) ? 1 : 0;
+    },
+    async ttl(key: string): Promise<number> {
+      return ttls.get(key) ?? -2;
+    },
+    multi() {
+      const ops: Array<() => Promise<unknown>> = [];
+      const chain = {
+        incr(key: string) {
+          ops.push(() => api.incr(key));
+          return chain;
+        },
+        expire(key: string, seconds: number) {
+          ops.push(() => api.expire(key, seconds));
+          return chain;
+        },
+        async exec() {
+          const results: [null, unknown][] = [];
+          for (const op of ops) {
+            const value = await op();
+            results.push([null, value]);
+          }
+          return results;
+        },
+      };
+      return chain;
+    },
+    _reset() {
+      counters.clear();
+      ttls.clear();
+    },
+    _getCount(key: string): number {
+      return counters.get(key) ?? 0;
+    },
+  };
+  return api;
+}
+
+type RedisMock = ReturnType<typeof createRedisMock>;
+
+function createTestAppWithRedis(dbResults: unknown[], redis: RedisMock) {
+  const { db, chains } = createMockDb(dbResults);
+  const app = new Hono<AppEnv>();
+
+  app.use("*", async (c, next) => {
+    c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+    c.set("redis", redis as unknown as AppEnv["Variables"]["redis"]);
     await next();
   });
 
@@ -418,5 +507,202 @@ describe("POST /api/invite/:token/accept", () => {
     expect(body).toMatchObject({
       status: "accepted",
     });
+  });
+});
+
+// ── POST /api/invite/:token/email-link ─────────────────────────────────────
+
+describe("POST /api/invite/:token/email-link", () => {
+  beforeEach(() => {
+    sendInvitationMagicLinkMock.mockClear();
+    sendInvitationMagicLinkMock.mockResolvedValue({ sent: true, status: 200 });
+  });
+
+  function createInvitationRow(overrides: Record<string, unknown> = {}) {
+    return {
+      memberEmail: TEST_USER_EMAIL,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      usedAt: null,
+      locale: "ja" as const,
+      ...overrides,
+    };
+  }
+
+  it("202 を返し、招待先メール宛にマジックリンクを送信する", async () => {
+    const redis = createRedisMock();
+    // 6 回分の invitation select を積む（最初の1回だけ使う）
+    // Provide 6 invitation selects for the whole describe block's needs.
+    const { app } = createTestAppWithRedis([[createInvitationRow()]], redis);
+
+    const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      sent: true,
+      memberEmail: TEST_USER_EMAIL,
+      retryAfterSec: 5 * 60,
+    });
+    expect(sendInvitationMagicLinkMock).toHaveBeenCalledTimes(1);
+    expect(sendInvitationMagicLinkMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: TEST_USER_EMAIL,
+        callbackURL: expect.stringContaining(`/invite?token=${TEST_TOKEN}`),
+        locale: "ja",
+      }),
+    );
+  });
+
+  it("無効なトークンは 404 を返す", async () => {
+    const redis = createRedisMock();
+    const { app } = createTestAppWithRedis([[]], redis);
+
+    const res = await app.request("/api/invite/invalid-token/email-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).toBe(404);
+    expect(sendInvitationMagicLinkMock).not.toHaveBeenCalled();
+  });
+
+  it("期限切れトークンは 410 を返す（accept エンドポイントと同じ意味論）", async () => {
+    const redis = createRedisMock();
+    const invitation = createInvitationRow({
+      expiresAt: new Date("2020-01-01T00:00:00Z"),
+    });
+    const { app } = createTestAppWithRedis([[invitation]], redis);
+
+    const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).toBe(410);
+    expect(sendInvitationMagicLinkMock).not.toHaveBeenCalled();
+  });
+
+  it("使用済みトークンは 409 を返す", async () => {
+    const redis = createRedisMock();
+    const invitation = createInvitationRow({
+      usedAt: new Date("2026-01-01T00:00:00Z"),
+    });
+    const { app } = createTestAppWithRedis([[invitation]], redis);
+
+    const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).toBe(409);
+    expect(sendInvitationMagicLinkMock).not.toHaveBeenCalled();
+  });
+
+  it("5 分ウィンドウ内の 2 回目の呼び出しは 429 (short) を返し送信しない", async () => {
+    const redis = createRedisMock();
+    // 2 回分の invitation select を積む（毎回先頭の配列が消費される）
+    const { app } = createTestAppWithRedis(
+      [[createInvitationRow()], [createInvitationRow()]],
+      redis,
+    );
+
+    const first = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(first.status).toBe(202);
+
+    const second = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(second.status).toBe(429);
+    const body = (await second.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      error: "RATE_LIMIT_EXCEEDED",
+      scope: "short",
+    });
+    expect(second.headers.get("Retry-After")).toBe(String(5 * 60));
+    expect(sendInvitationMagicLinkMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("1 日 5 回の上限を超えた 6 回目は 429 (daily) を返す", async () => {
+    const redis = createRedisMock();
+    // 1日ウィンドウだけ 5 を超えるよう、短期ウィンドウは都度スキップ済みに見せかける。
+    // 短期ウィンドウのカウントを毎回リセットして「5 分ウィンドウは空」と想定する。
+    // Provide 6 invitation rows for 6 requests.
+    const rows: unknown[] = [];
+    for (let i = 0; i < 6; i++) rows.push([createInvitationRow()]);
+    const { app } = createTestAppWithRedis(rows, redis);
+
+    const shortKey = `ratelimit:invite-email-link:5min:${TEST_TOKEN}`;
+
+    // 1 回目〜5 回目は 202 を返す（各呼び出し前に短期ウィンドウをリセット）
+    for (let i = 0; i < 5; i++) {
+      redis._reset();
+      // 直前の呼び出しまでに累積した daily カウントを復元
+      // Restore the daily counter so rolling the short window doesn't reset it.
+      const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
+      for (let n = 0; n < i; n++) await redis.incr(dailyKey);
+
+      const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(res.status).toBe(202);
+      expect(redis._getCount(shortKey)).toBe(1);
+    }
+
+    // 6 回目: daily が 6 になり 429 (daily) を返す
+    redis._reset();
+    const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
+    for (let n = 0; n < 5; n++) await redis.incr(dailyKey);
+    const sixth = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(sixth.status).toBe(429);
+    const body = (await sixth.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      error: "RATE_LIMIT_EXCEEDED",
+      scope: "daily",
+    });
+    expect(sendInvitationMagicLinkMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("Redis が無い環境ではレート制限を適用せずに送信する", async () => {
+    const { app } = createTestApp([
+      [createInvitationRow()],
+      [createInvitationRow()],
+      [createInvitationRow()],
+    ]);
+
+    for (let i = 0; i < 3; i++) {
+      const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(res.status).toBe(202);
+    }
+    expect(sendInvitationMagicLinkMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("magicLinkService が失敗したら 502 を返す", async () => {
+    sendInvitationMagicLinkMock.mockResolvedValueOnce({
+      sent: false,
+      error: "simulated failure",
+    });
+    const redis = createRedisMock();
+    const { app } = createTestAppWithRedis([[createInvitationRow()]], redis);
+
+    const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).toBe(502);
   });
 });
