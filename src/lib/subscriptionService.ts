@@ -47,11 +47,15 @@ const FREE_FALLBACK_STATE: SubscriptionState = {
 
 /**
  * Return a fresh copy of the Free-plan fallback state so callers cannot mutate
- * the shared singleton and leak that mutation into subsequent requests.
+ * the shared singleton and leak that mutation into subsequent requests. This
+ * is also the canonical "no subscription" shape reused by {@link useSubscription}
+ * while the viewer is signed out.
+ *
  * 共有シングルトンを変異させて後続のリクエストに漏らさないよう、Free プランの
- * フォールバック状態を毎回新しいコピーとして返す。
+ * フォールバック状態を毎回新しいコピーとして返す。未サインイン時の
+ * {@link useSubscription} もこのコピーを「契約なし」の正準形として使う。
  */
-function freeFallbackCopy(): SubscriptionState {
+export function createFreeSubscriptionState(): SubscriptionState {
   return {
     ...FREE_FALLBACK_STATE,
     usage: { ...FREE_FALLBACK_STATE.usage },
@@ -79,7 +83,7 @@ function parseBillingInterval(raw: unknown): SubscriptionState["billingInterval"
 export async function fetchSubscription(): Promise<SubscriptionState> {
   const apiBaseUrl = getAIAPIBaseUrl();
   if (!apiBaseUrl) {
-    return freeFallbackCopy();
+    return createFreeSubscriptionState();
   }
 
   const response = await fetch(`${apiBaseUrl}/api/ai/subscription`, {

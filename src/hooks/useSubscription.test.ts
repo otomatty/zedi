@@ -21,6 +21,15 @@ const mockFetchSubscription = vi.fn();
 
 vi.mock("@/lib/subscriptionService", () => ({
   fetchSubscription: (...args: unknown[]) => mockFetchSubscription(...args),
+  createFreeSubscriptionState: (): SubscriptionState => ({
+    plan: "free",
+    status: "active",
+    billingInterval: null,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    externalId: null,
+    usage: { consumedUnits: 0, budgetUnits: 1500, remainingUnits: 1500, usagePercent: 0 },
+  }),
 }));
 
 describe("useSubscription", () => {

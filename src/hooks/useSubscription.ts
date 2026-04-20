@@ -6,7 +6,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchSubscription, type SubscriptionState } from "@/lib/subscriptionService";
+import {
+  createFreeSubscriptionState,
+  fetchSubscription,
+  type SubscriptionState,
+} from "@/lib/subscriptionService";
 
 /**
  * React Query cache key for the subscription state query.
@@ -98,16 +102,6 @@ export interface UseSubscriptionResult {
   invalidate: () => Promise<void>;
 }
 
-const FREE_FALLBACK: SubscriptionState = {
-  plan: "free",
-  status: "active",
-  billingInterval: null,
-  currentPeriodStart: null,
-  currentPeriodEnd: null,
-  externalId: null,
-  usage: { consumedUnits: 0, budgetUnits: 1500, remainingUnits: 1500, usagePercent: 0 },
-};
-
 /**
  * Read the current user's subscription plan, status, and usage.
  * ログイン中ユーザーのプラン・ステータス・使用量を取得する。
@@ -134,7 +128,9 @@ export function useSubscription(): UseSubscriptionResult {
     refetchOnWindowFocus: true, // ポータル/チェックアウトから戻ったときに表示を更新
   });
 
-  const state = isSignedIn ? (data ?? FREE_FALLBACK) : FREE_FALLBACK;
+  const state: SubscriptionState = isSignedIn
+    ? (data ?? createFreeSubscriptionState())
+    : createFreeSubscriptionState();
   const isProUser =
     state.plan === "pro" && (state.status === "active" || state.status === "trialing");
   const isCanceled = state.plan === "pro" && state.status === "canceled";
