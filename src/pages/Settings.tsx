@@ -1,9 +1,7 @@
 import React from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@zedi/ui";
-import { Link } from "react-router-dom";
 import Container from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useTranslation } from "react-i18next";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { SettingsHeaderNav } from "@/components/settings/SettingsHeaderNav";
@@ -45,22 +43,15 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="bg-background min-h-screen">
-      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
-        <Container className="flex h-16 items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <Button asChild variant="ghost" size="icon">
-              <Link to={backTo} aria-label={t("common.back")}>
-                <ArrowLeft className="h-5 w-5" aria-hidden />
-              </Link>
-            </Button>
-            <h1 className="truncate text-xl font-semibold">{t("settings.title")}</h1>
-          </div>
-          <SettingsHeaderNav value={currentSection} onChange={setSection} />
-        </Container>
-      </header>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader
+        title={t("settings.title")}
+        backTo={backTo}
+        backLabel={t("common.back")}
+        actions={<SettingsHeaderNav value={currentSection} onChange={setSection} />}
+      />
 
-      <main className="py-6">
+      <main className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <div className="mx-auto max-w-2xl space-y-6">
             <div>

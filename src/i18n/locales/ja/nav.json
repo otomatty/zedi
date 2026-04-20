@@ -3,16 +3,13 @@
   "signOut": "サインアウト",
   "settings": "設定",
   "plan": "プラン",
+  "subscription": "サブスクリプション",
   "support": "サポート",
   "home": "ホーム",
   "notes": "ノート",
   "ai": "AI",
+  "account": "アカウント",
+  "primary": "メインナビゲーション",
   "menu": "メニュー",
-  "sidebarMyNotes": "参加中のノート",
-  "sidebarAiChatHistory": "AIチャット履歴",
-  "sidebarSignInForNotes": "サインインすると一覧が表示されます",
-  "sidebarNoNotes": "ノートはまだありません",
-  "sidebarNoAiConversations": "会話履歴はありません",
-  "sidebarNotesLoading": "読み込み中…",
-  "sidebarUntitledChat": "新しい会話"
+  "untitledChat": "新しい会話"
 }

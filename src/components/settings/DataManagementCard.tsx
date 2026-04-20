@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { pageKeys } from "@/hooks/usePageQueries";
-import { createStorageAdapter } from "@/lib/storageAdapter";
+import { createStorageAdapter, ResetDatabasePageIdsReadError } from "@/lib/storageAdapter";
 import { runApiSync, resetSyncFailures } from "@/lib/sync";
 
 /**
@@ -45,7 +45,13 @@ export function DataManagementCard(): React.JSX.Element {
       toast.success(t("generalSettings.dataManagement.resetSuccess"));
     } catch (error) {
       console.error("Failed to reset database:", error);
-      toast.error(t("generalSettings.dataManagement.resetFailed"));
+      // pageIds 取得失敗時はローカル DB を一切削除していないため、専用メッセージで通知する。
+      // When pageIds read fails the local DB is left intact; surface a dedicated message.
+      if (error instanceof ResetDatabasePageIdsReadError) {
+        toast.error(t("generalSettings.dataManagement.resetAbortedPageIds"));
+      } else {
+        toast.error(t("generalSettings.dataManagement.resetFailed"));
+      }
     } finally {
       setIsResetting(false);
     }

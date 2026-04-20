@@ -8,6 +8,10 @@ import { pageSnapshots } from "./pageSnapshots.js";
 import { media } from "./media.js";
 import { subscriptions } from "./subscriptions.js";
 import { aiUsageLogs, aiMonthlyUsage } from "./aiModels.js";
+import { sources } from "./sources.js";
+import { pageSources } from "./pageSources.js";
+import { lintFindings } from "./lintFindings.js";
+import { activityLog } from "./activityLog.js";
 
 export /**
  *
@@ -228,6 +232,55 @@ export /**
 const aiMonthlyUsageRelations = relations(aiMonthlyUsage, ({ one }) => ({
   user: one(users, {
     fields: [aiMonthlyUsage.userId],
+    references: [users.id],
+  }),
+}));
+
+/**
+ * `sources` のリレーション定義。オーナー・ページ引用。
+ * Relations for `sources`: owner and citations from pages.
+ */
+export const sourcesRelations = relations(sources, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [sources.ownerId],
+    references: [users.id],
+  }),
+  citations: many(pageSources),
+}));
+
+/**
+ * `page_sources` のリレーション定義。ページとソースを両端に持つ。
+ * Relations for `page_sources`: page and source endpoints.
+ */
+export const pageSourcesRelations = relations(pageSources, ({ one }) => ({
+  page: one(pages, {
+    fields: [pageSources.pageId],
+    references: [pages.id],
+  }),
+  source: one(sources, {
+    fields: [pageSources.sourceId],
+    references: [sources.id],
+  }),
+}));
+
+/**
+ * `lint_findings` のリレーション定義。オーナーへの多対一。
+ * Relations for `lint_findings`: many-to-one to owner.
+ */
+export const lintFindingsRelations = relations(lintFindings, ({ one }) => ({
+  owner: one(users, {
+    fields: [lintFindings.ownerId],
+    references: [users.id],
+  }),
+}));
+
+/**
+ * `activity_log` のリレーション定義。オーナーへの多対一。
+ * Relations for `activity_log`: many-to-one to owner.
+ */
+export const activityLogRelations = relations(activityLog, ({ one }) => ({
+  owner: one(users, {
+    fields: [activityLog.ownerId],
     references: [users.id],
   }),
 }));

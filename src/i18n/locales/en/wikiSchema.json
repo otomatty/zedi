@@ -1,0 +1,10 @@
+{
+  "title": "Wiki Schema",
+  "description": "The wiki schema is a \"constitution\" that AI references when generating or ingesting pages. Define heading structure, naming conventions, citation rules, etc.",
+  "save": "Save",
+  "saved": "Schema saved",
+  "saveFailed": "Failed to save schema",
+  "titleLabel": "Schema name",
+  "contentLabel": "Schema content",
+  "placeholder": "Example:\n- Person pages: Overview, Career, Achievements, Influence\n- Tech pages: Overview, How it works, Usage, Ecosystem\n- Prefer SI units\n- Cite sources with inline links"
+}

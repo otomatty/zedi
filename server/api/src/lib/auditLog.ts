@@ -20,6 +20,7 @@
 import { randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { adminAuditLogs } from "../schema/auditLogs.js";
+import { extractClientIp as extractClientIpShared } from "./clientIp.js";
 import type { AppEnv, Database } from "../types/index.js";
 
 /**
@@ -40,25 +41,18 @@ export interface RecordAuditLogParams {
 }
 
 /**
- * x-forwarded-for ヘッダ（プロキシ経由）から最も左の IP を取得する。
- * Extract the leftmost IP from `x-forwarded-for` (proxy-aware), falling back
- * to `x-real-ip`, then `null`.
+ * クライアント IP を抽出する（{@link ../lib/clientIp.ts} の薄いラッパー）。
+ * `TRUST_PROXY=true` のときのみ `x-forwarded-for` / `x-real-ip` を採用し、
+ * それ以外はソケット由来の peer IP を返す。
+ *
+ * Re-exports the shared client-IP extractor so audit logging cannot trust
+ * spoofed proxy headers without explicit `TRUST_PROXY=true` opt-in.
  *
  * @param c - Hono Context
  * @returns Client IP string or null
  */
 export function extractClientIp(c: Context<AppEnv>): string | null {
-  const xff = c.req.header("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = c.req.header("x-real-ip");
-  if (realIp) {
-    const trimmed = realIp.trim();
-    if (trimmed) return trimmed;
-  }
-  return null;
+  return extractClientIpShared(c);
 }
 
 /**

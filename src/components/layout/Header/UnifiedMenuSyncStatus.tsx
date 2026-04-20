@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Cloud, CloudOff, Loader2, Check, DatabaseZap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
-import { cn } from "@zedi/ui";
+import { cn, DropdownMenuItem, DropdownMenuSeparator } from "@zedi/ui";
 
 type SyncStatusKey = "idle" | "syncing" | "synced" | "error" | "db-resuming";
 
@@ -63,20 +63,48 @@ function useSyncStatusConfig() {
   return configs;
 }
 
+interface SyncStatusRowProps {
+  /** Render in a dropdown menu or a regular stacked list. / ドロップダウンか通常リストか */
+  variant?: "list" | "dropdown";
+  /** Optional close callback for parent menu/sheet. / 親メニューを閉じるためのコールバック */
+  onClose?: () => void;
+}
+
 /**
  * Sync status row inside user menu (idle / syncing / synced / error / db-resuming).
  * ユーザーメニュー内の同期ステータス行。
  */
-export const SyncStatusRow: React.FC = () => {
+export const SyncStatusRow: React.FC<SyncStatusRowProps> = ({ variant = "list", onClose }) => {
   const { isSignedIn } = useAuth();
   const syncStatus = useSyncStatus();
   const { sync, isSyncing } = useSync();
   const configs = useSyncStatusConfig();
+  const isDisabled = isSyncing || syncStatus === "syncing";
+  const handleSync = useCallback(() => {
+    if (isDisabled) return;
+    sync();
+    onClose?.();
+  }, [isDisabled, onClose, sync]);
 
   if (!isSignedIn) return null;
 
   const config = configs[syncStatus];
   const Icon = config.icon;
+
+  if (variant === "dropdown") {
+    return (
+      <>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={isDisabled} onSelect={handleSync} className="gap-3 px-3 py-2">
+          <Icon className={cn("h-4 w-4 shrink-0", config.iconClassName)} />
+          <div className="flex min-w-0 flex-col items-start">
+            <span className="text-xs font-medium">{config.label}</span>
+            <span className="text-muted-foreground truncate text-[11px]">{config.description}</span>
+          </div>
+        </DropdownMenuItem>
+      </>
+    );
+  }
 
   return (
     <>
@@ -84,8 +112,8 @@ export const SyncStatusRow: React.FC = () => {
       <div className="px-2 py-1.5">
         <button
           type="button"
-          onClick={sync}
-          disabled={isSyncing || syncStatus === "syncing"}
+          onClick={handleSync}
+          disabled={isDisabled}
           className="hover:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Icon className={cn("h-4 w-4 shrink-0", config.iconClassName)} />

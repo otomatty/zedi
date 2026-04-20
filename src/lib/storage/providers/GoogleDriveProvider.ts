@@ -8,6 +8,12 @@ import {
   generateFileName,
 } from "../types";
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException("Image upload aborted", "AbortError");
+  }
+}
+
 /**
  * Google Drive API レスポンス
  */
@@ -40,6 +46,9 @@ export class GoogleDriveProvider implements StorageProviderInterface {
   private readonly apiUrl = "https://www.googleapis.com/upload/drive/v3/files";
   private readonly tokenUrl = "https://oauth2.googleapis.com/token";
 
+  /**
+   *
+   */
   constructor(config: {
     clientId: string;
     clientSecret: string;
@@ -61,6 +70,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
    * 画像をGoogle Driveにアップロード
    */
   async uploadImage(file: File, options?: UploadOptions): Promise<string> {
+    throwIfAborted(options?.signal);
     const fileName = options?.fileName || generateFileName(file);
 
     // メタデータ
@@ -81,6 +91,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
 
     // ファイルをArrayBufferに変換
     const fileBuffer = await file.arrayBuffer();
+    throwIfAborted(options?.signal);
 
     // マルチパートボディを構築
     const metadataPart =
@@ -107,13 +118,14 @@ export class GoogleDriveProvider implements StorageProviderInterface {
           Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": `multipart/related; boundary=${boundary}`,
         },
+        signal: options?.signal,
         body: requestBody,
       },
     );
 
     // トークンが期限切れの場合はリフレッシュして再試行
     if (response.status === 401 && this.refreshToken) {
-      await this.refreshAccessToken();
+      await this.refreshAccessToken(options?.signal);
       response = await fetch(
         `${this.apiUrl}?uploadType=multipart&fields=id,name,webViewLink,webContentLink`,
         {
@@ -122,6 +134,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
             Authorization: `Bearer ${this.accessToken}`,
             "Content-Type": `multipart/related; boundary=${boundary}`,
           },
+          signal: options?.signal,
           body: requestBody,
         },
       );
@@ -139,7 +152,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
     const data: GoogleDriveFileResponse = await response.json();
 
     // ファイルを公開設定にする
-    await this.makeFilePublic(data.id);
+    await this.makeFilePublic(data.id, options?.signal);
 
     // 直接アクセスできるURLを返す
     return `https://drive.google.com/uc?export=view&id=${data.id}`;
@@ -148,7 +161,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
   /**
    * ファイルを公開設定にする
    */
-  private async makeFilePublic(fileId: string): Promise<void> {
+  private async makeFilePublic(fileId: string, signal?: AbortSignal): Promise<void> {
     const url = `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`;
 
     await fetch(url, {
@@ -157,6 +170,7 @@ export class GoogleDriveProvider implements StorageProviderInterface {
         Authorization: `Bearer ${this.accessToken}`,
         "Content-Type": "application/json",
       },
+      signal,
       body: JSON.stringify({
         role: "reader",
         type: "anyone",
@@ -167,12 +181,13 @@ export class GoogleDriveProvider implements StorageProviderInterface {
   /**
    * アクセストークンをリフレッシュ
    */
-  private async refreshAccessToken(): Promise<void> {
+  private async refreshAccessToken(signal?: AbortSignal): Promise<void> {
     const response = await fetch(this.tokenUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
+      signal,
       body: new URLSearchParams({
         client_id: this.clientId,
         client_secret: this.clientSecret,

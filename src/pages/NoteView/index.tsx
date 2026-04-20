@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
+import FloatingActionButton from "@/components/layout/FloatingActionButton";
+import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge, useToast } from "@zedi/ui";
 import {
@@ -128,7 +129,15 @@ const NoteView: React.FC = () => {
   }
 
   return (
-    <AppLayout>
+    <ContentWithAIChat
+      floatingAction={
+        canEdit ? (
+          <div className="mr-4 mb-4">
+            <FloatingActionButton />
+          </div>
+        ) : null
+      }
+    >
       <main className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -172,7 +181,7 @@ const NoteView: React.FC = () => {
           />
         </Container>
       </main>
-    </AppLayout>
+    </ContentWithAIChat>
   );
 };
 

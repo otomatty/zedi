@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@zedi/ui/components/sonner";
 import { TooltipProvider } from "@zedi/ui";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Notes from "./pages/Notes";
@@ -15,6 +15,8 @@ import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
 import PageEditorPage from "./pages/PageEditor";
 import Settings from "./pages/Settings";
+import WikiSchemaPage from "./pages/WikiSchemaPage";
+import IndexPage from "./pages/IndexPage";
 import Pricing from "./pages/Pricing";
 import SubscriptionManagement from "./pages/SubscriptionManagement";
 import Donate from "./pages/Donate";
@@ -35,6 +37,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AIChatProvider } from "./contexts/AIChatContext";
 import { AIChatConversationsProvider } from "./hooks/useAIChatConversations";
 import { FilePreviewDialogHost } from "./components/note/FilePreviewDialogHost";
+import { AppLayout } from "./components/layout/AppLayout";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +48,20 @@ const queryClient = new QueryClient();
 function LegacyAIChatConversationRedirect() {
   const { conversationId } = useParams<{ conversationId: string }>();
   return <Navigate to={`/ai/${conversationId}`} replace />;
+}
+
+/**
+ * Layout route that renders the shared `AppLayout` (header + AI dock)
+ * around nested route elements via `<Outlet />`.
+ *
+ * ネストしたルート要素を共通 `AppLayout`（ヘッダー・AI ドック）でラップするレイアウトルート。
+ */
+function AppShellRoute() {
+  return (
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  );
 }
 
 /**
@@ -66,7 +83,8 @@ const App = () => (
               <GlobalShortcutsProvider>
                 <GlobalSearchProvider>
                   <Routes>
-                    {/* Public routes */}
+                    {/* Public / chrome-less routes: LP, auth flows, invites, onboarding
+                        ヘッダー非表示ルート: LP / 認証 / 招待 / オンボーディング */}
                     <Route path="/" element={<Landing />} />
                     <Route path="/sign-in/*" element={<SignIn />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
@@ -74,12 +92,6 @@ const App = () => (
                     <Route path="/auth/extension-callback" element={<ExtensionAuthCallback />} />
                     <Route path="/mcp/authorize" element={<McpAuthorize />} />
                     <Route path="/invite" element={<InvitePage />} />
-                    <Route path="/note/:noteId" element={<NoteView />} />
-                    <Route path="/note/:noteId/settings" element={<NoteSettings />} />
-                    <Route path="/note/:noteId/members" element={<NoteMembers />} />
-                    <Route path="/note/:noteId/page/:pageId" element={<NotePageView />} />
-
-                    {/* Protected routes - require authentication */}
                     <Route
                       path="/onboarding"
                       element={
@@ -88,34 +100,52 @@ const App = () => (
                         </ProtectedRoute>
                       }
                     />
-                    {/* Home and PageEditor: available without login (local-only mode) */}
-                    <Route path="/home" element={<Home />} />
-                    <Route path="/ai/history" element={<AIChatHistory />} />
-                    <Route path="/ai/:conversationId" element={<AIChatDetail />} />
-                    <Route path="/ai" element={<AIChatLanding />} />
-                    <Route
-                      path="/ai-chat/history"
-                      element={<Navigate to="/ai/history" replace />}
-                    />
-                    <Route
-                      path="/ai-chat/:conversationId"
-                      element={<LegacyAIChatConversationRedirect />}
-                    />
-                    <Route path="/search" element={<SearchResults />} />
-                    <Route path="/notes/discover" element={<NotesDiscover />} />
-                    <Route path="/notes" element={<Notes />} />
-                    <Route path="/page/:id" element={<PageEditorPage />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/pricing" element={<Pricing />} />
-                    <Route
-                      path="/subscription"
-                      element={
-                        <ProtectedRoute>
-                          <SubscriptionManagement />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="/donate" element={<Donate />} />
+
+                    {/* App shell routes: wrapped with the shared AppLayout
+                        so every page gets the common Header + primary nav + user menu + AI dock.
+                        共通 AppLayout（ヘッダー + 機能ナビ + ユーザーメニュー + AI ドック）でラップ。 */}
+                    <Route element={<AppShellRoute />}>
+                      {/* Home and PageEditor: available without login (local-only mode) */}
+                      <Route path="/home" element={<Home />} />
+                      <Route path="/ai/history" element={<AIChatHistory />} />
+                      <Route path="/ai/:conversationId" element={<AIChatDetail />} />
+                      <Route path="/ai" element={<AIChatLanding />} />
+                      <Route
+                        path="/ai-chat/history"
+                        element={<Navigate to="/ai/history" replace />}
+                      />
+                      <Route
+                        path="/ai-chat/:conversationId"
+                        element={<LegacyAIChatConversationRedirect />}
+                      />
+                      {/* Bare `/ai-chat` is also a legacy path: redirect to `/ai`
+                          to avoid hitting the catch-all NotFound page.
+                          素の `/ai-chat` も旧パスなので `/ai` にリダイレクトする
+                          （catch-all で NotFound に落ちるのを防ぐ）。 */}
+                      <Route path="/ai-chat" element={<Navigate to="/ai" replace />} />
+                      <Route path="/search" element={<SearchResults />} />
+                      <Route path="/notes/discover" element={<NotesDiscover />} />
+                      <Route path="/notes" element={<Notes />} />
+                      <Route path="/page/:id" element={<PageEditorPage />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/wiki-schema" element={<WikiSchemaPage />} />
+                      <Route path="/index" element={<IndexPage />} />
+                      <Route path="/pricing" element={<Pricing />} />
+                      <Route
+                        path="/subscription"
+                        element={
+                          <ProtectedRoute>
+                            <SubscriptionManagement />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route path="/donate" element={<Donate />} />
+                      <Route path="/note/:noteId" element={<NoteView />} />
+                      <Route path="/note/:noteId/settings" element={<NoteSettings />} />
+                      <Route path="/note/:noteId/members" element={<NoteMembers />} />
+                      <Route path="/note/:noteId/page/:pageId" element={<NotePageView />} />
+                    </Route>
+
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

@@ -42,6 +42,23 @@ vi.mock("@/components/layout/AppLayout", () => ({
     <div data-testid="app-layout">{children}</div>
   ),
 }));
+vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
+  ContentWithAIChat: ({
+    children,
+    floatingAction,
+  }: {
+    children: React.ReactNode;
+    floatingAction?: React.ReactNode;
+  }) => (
+    <div data-testid="content-with-ai-chat">
+      {children}
+      {floatingAction}
+    </div>
+  ),
+}));
+vi.mock("@/components/layout/FloatingActionButton", () => ({
+  default: () => <button data-testid="fab">FAB</button>,
+}));
 vi.mock("@/components/layout/Container", () => ({
   default: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="container">{children}</div>

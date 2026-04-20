@@ -8,7 +8,7 @@ export {
   type UserRole,
   type UserStatus,
 } from "./users.js";
-export { pages, type Page, type NewPage } from "./pages.js";
+export { pages, type Page, type NewPage, type PageSpecialKind } from "./pages.js";
 export {
   notes,
   notePages,
@@ -58,6 +58,22 @@ export {
   type NewThumbnailObject,
 } from "./thumbnails.js";
 export { adminAuditLogs, type AdminAuditLog, type NewAdminAuditLog } from "./auditLogs.js";
+export { sources, type Source, type NewSource } from "./sources.js";
+export { pageSources, type PageSource, type NewPageSource } from "./pageSources.js";
+export {
+  lintFindings,
+  type LintFinding,
+  type NewLintFinding,
+  type LintRule,
+  type LintSeverity,
+} from "./lintFindings.js";
+export {
+  activityLog,
+  type ActivityLog,
+  type NewActivityLog,
+  type ActivityKind,
+  type ActivityActor,
+} from "./activityLog.js";
 
 export {
   usersRelations,
@@ -76,4 +92,8 @@ export {
   subscriptionsRelations,
   aiUsageLogsRelations,
   aiMonthlyUsageRelations,
+  sourcesRelations,
+  pageSourcesRelations,
+  lintFindingsRelations,
+  activityLogRelations,
 } from "./relations.js";

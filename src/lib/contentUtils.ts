@@ -27,6 +27,8 @@ const SUPPORTED_NODE_TYPES = new Set([
   "mathBlock",
   // HTML Artifact (Claude interactive HTML)
   "htmlArtifact",
+  // YouTube 動画埋め込み
+  "youtubeEmbed",
 ]);
 
 // Supported mark types in zedi's Tiptap schema

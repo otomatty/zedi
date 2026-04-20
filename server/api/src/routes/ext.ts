@@ -17,9 +17,12 @@ import {
   issueExtensionToken,
   storeExtensionCode,
 } from "../lib/extAuth.js";
+import { extractYouTubeVideoId } from "../lib/articleExtractor.js";
 import { clipAndCreate } from "../lib/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
-import type { AppEnv } from "../types/index.js";
+import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
+import { calculateCost, recordUsage } from "../services/usageService.js";
+import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
 
@@ -142,7 +145,12 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const body = await c.req.json<{ url?: string }>();
+  let body: { url?: string; provider?: string; model?: string };
+  try {
+    body = await c.req.json<{ url?: string; provider?: string; model?: string }>();
+  } catch {
+    throw new HTTPException(400, { message: "Invalid JSON body" });
+  }
   if (!body.url?.trim()) {
     throw new HTTPException(400, { message: "url is required" });
   }
@@ -162,8 +170,67 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
     });
   }
 
+  // provider/model は YouTube 要約時だけ意味を持つため、通常の Web クリップでは
+  // AI 設定を解決しない。そうしないと非 YouTube 保存でも 403/429/503 を返しうる。
+  // provider/model only apply to the YouTube-summary path, so skip AI resolution
+  // for regular web clipping and avoid unrelated 403/429/503 failures.
+  const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
+  const isYouTubeUrl = extractYouTubeVideoId(url) !== null;
+
+  const aiConfig = isYouTubeUrl
+    ? await resolveAiConfigForRequest({
+        userId,
+        db,
+        provider: body.provider,
+        model: body.model,
+      })
+    : null;
+  const aiProvider: AIProviderType | undefined = aiConfig?.provider;
+  const aiModel: string | undefined = aiConfig?.apiModelId;
+  const aiApiKey: string | undefined = aiConfig?.apiKey;
+
   try {
-    const result = await clipAndCreate({ url, userId, db });
+    const result = await clipAndCreate({
+      url,
+      userId,
+      db,
+      youtubeApiKey,
+      aiProvider,
+      aiModel,
+      aiApiKey,
+    });
+
+    // 使用量記録 / Record usage
+    // result.ai_usage が null でない場合のみ課金（AI が実際に成功した場合）
+    // 記録失敗は非致命的
+    // resolveAiConfigForRequest() がアクセスチェック時に取得した tier / modelInfo
+    // をそのまま再利用し、同一リクエスト内での DB クエリ重複を避ける。
+    // Bill only when AI actually ran successfully (result.ai_usage !== null).
+    // Reuse the tier / modelInfo captured during resolveAiConfigForRequest()
+    // to avoid duplicate DB queries within the same request.
+    if (result.ai_usage && aiConfig) {
+      try {
+        const { inputTokens, outputTokens } = result.ai_usage;
+        const { modelInfo, internalModelId } = aiConfig;
+        const costUnits = calculateCost(
+          { inputTokens, outputTokens },
+          modelInfo.inputCostUnits,
+          modelInfo.outputCostUnits,
+        );
+        await recordUsage(
+          userId,
+          internalModelId,
+          "youtube_summary",
+          { inputTokens, outputTokens },
+          costUnits,
+          "system",
+          db,
+        );
+      } catch (usageErr) {
+        console.error("YouTube usage recording failed (non-fatal):", usageErr);
+      }
+    }
+
     return c.json({
       page_id: result.page_id,
       title: result.title,

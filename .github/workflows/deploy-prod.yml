@@ -35,11 +35,65 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  # Railway deploys api and hocuspocus via GitHub integration (configure in Railway Dashboard)
-  deploy-frontend:
-    name: Deploy Frontend
+  # Railway deploys server/api, server/hocuspocus, and server/mcp via GitHub integration
+  # (each Railway service is configured with the matching Root Directory).
+  # See AGENTS.md §「ワークスペース構成とデプロイ」and issue #564 for the full deployment notes.
+  # Required Railway env vars per service:
+  #   - server/api:        BETTER_AUTH_SECRET, MCP_REDIRECT_URI_ALLOW (required for MCP auth code flow)
+  #   - server/mcp:        ZEDI_API_URL (internal API URL), BETTER_AUTH_SECRET (must match the API service)
+  #   - server/hocuspocus: (see server/hocuspocus/README / existing setup)
+  verify-server-health:
+    name: Verify Server Health
     needs:
       - migrate
+    runs-on: ubuntu-latest
+    environment: production
+    if: ${{ vars.API_BASE_URL != '' }}
+    steps:
+      # Railway deploys asynchronously after the push event, so retry the
+      # health endpoints to give the platform time to roll out the new image.
+      # Railway は push を受けてから非同期にロールアウトするため、
+      # ヘルスエンドポイントはリトライ付きで検証する。
+      - name: Wait for API /api/health
+        uses: nick-fields/retry@v4
+        with:
+          max_attempts: 10
+          timeout_minutes: 2
+          retry_wait_seconds: 30
+          command: |
+            curl --fail --show-error --silent "${{ vars.API_BASE_URL }}/api/health"
+      - name: Wait for MCP /health
+        if: ${{ vars.MCP_BASE_URL != '' }}
+        uses: nick-fields/retry@v4
+        with:
+          max_attempts: 10
+          timeout_minutes: 2
+          retry_wait_seconds: 30
+          command: |
+            curl --fail --show-error --silent "${{ vars.MCP_BASE_URL }}/health"
+
+  deploy-frontend:
+    name: Deploy Frontend
+    # `verify-server-health` をフロント公開のゲートにする。バックエンドの
+    # ロールアウトに失敗している状態で新しい UI を本番公開すると、ユーザーが
+    # 直撃する。
+    #
+    # GitHub Actions は upstream が skipped の場合、downstream を既定で skip
+    # するため、`if: vars.API_BASE_URL != ''` 経由で health チェックが skip
+    # された環境では明示的に `skipped` を success と同等に扱う必要がある
+    # （参照: GitHub Docs "Using jobs in a workflow"）。
+    #
+    # Gate prod frontend rollout on backend health so a failed backend deploy
+    # cannot still publish the new UI. Explicitly allow the `skipped` result
+    # of `verify-server-health` because GitHub Actions skips downstream jobs
+    # by default when an upstream `needs` job is skipped.
+    needs:
+      - migrate
+      - verify-server-health
+    if: |
+      always()
+      && needs.migrate.result == 'success'
+      && (needs.verify-server-health.result == 'success' || needs.verify-server-health.result == 'skipped')
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -87,8 +141,17 @@ jobs:
 
   deploy-admin:
     name: Deploy Admin
+    # 同様に admin の本番公開もバックエンドのヘルスチェック通過後にする。
+    # `deploy-frontend` と同じ理由で skipped を許容する `if` を明示する。
+    # Gate admin rollout on backend health for the same reason as `deploy-frontend`.
+    # Apply the same explicit `if` to allow the skipped result.
     needs:
       - migrate
+      - verify-server-health
+    if: |
+      always()
+      && needs.migrate.result == 'success'
+      && (needs.verify-server-health.result == 'success' || needs.verify-server-health.result == 'skipped')
     runs-on: ubuntu-latest
     environment: production
     steps:

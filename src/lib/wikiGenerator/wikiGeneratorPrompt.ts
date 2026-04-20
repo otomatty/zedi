@@ -2,7 +2,10 @@
  * Wiki Generator 用プロンプトテンプレート
  */
 
-export const WIKI_GENERATOR_PROMPT = `あなたはWikipediaのような百科事典記事を執筆する専門家です。
+export /**
+ *
+ */
+const WIKI_GENERATOR_PROMPT = `あなたはWikipediaのような百科事典記事を執筆する専門家です。
 与えられたタイトル（キーワード）について、**初心者から中級者**が理解できる、包括的で教育的な解説記事を生成してください。
 
 ## あなたの役割
@@ -109,10 +112,13 @@ export const WIKI_GENERATOR_PROMPT = `あなたはWikipediaのような百科事
 Markdown形式で出力。コードブロックで囲まないこと。
 参考文献セクションは不要。出典は本文中にインラインリンクとして含める。
 
-## タイトル
+{{schema}}## タイトル
 {{title}}`;
 
-export const WIKI_GENERATOR_PROMPT_NO_SEARCH = WIKI_GENERATOR_PROMPT.replace(
+export /**
+ *
+ */
+const WIKI_GENERATOR_PROMPT_NO_SEARCH = WIKI_GENERATOR_PROMPT.replace(
   `### 4. 出典・参照元（インラインリンク形式）
 **最重要**: 記事の信頼性を担保するため、事実・データには必ず出典を明記すること。
 

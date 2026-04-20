@@ -1,10 +1,9 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Coffee, Heart, Sparkles, ExternalLink } from "lucide-react";
-import { Button } from "@zedi/ui";
+import { Coffee, Heart, Sparkles, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import Container from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 interface DonationOptionProps {
   icon: React.ReactNode;
@@ -56,21 +55,11 @@ const Donate: React.FC = () => {
   };
 
   return (
-    <div className="bg-background min-h-screen">
-      {/* Header */}
-      <header className="border-border bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 border-b backdrop-blur">
-        <Container className="flex h-16 items-center gap-4">
-          <Link to="/home">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <h1 className="text-xl font-semibold">{t("nav.support")}</h1>
-        </Container>
-      </header>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PageHeader title={t("nav.support")} backTo="/home" backLabel={t("common.back")} />
 
       {/* Content */}
-      <main className="py-8">
+      <main className="min-h-0 flex-1 overflow-y-auto py-8">
         <Container>
           <div className="mx-auto max-w-2xl">
             {/* Hero Section */}

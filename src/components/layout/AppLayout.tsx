@@ -1,39 +1,60 @@
 import React from "react";
-import { SidebarProvider, SidebarInset } from "@zedi/ui";
-import { AppSidebar } from "./AppSidebar";
+import { useIsMobile } from "@zedi/ui";
 import Header from "./Header";
 import { AIChatDock } from "./AIChatDock";
+import { BottomNav } from "./BottomNav";
 
 interface AppLayoutProps {
   children: React.ReactNode;
 }
 
 /**
- * Shared layout with sidebar and header (`--sidebar-width` from SidebarProvider).
- * Header is fixed at full width above the sidebar; sidebar opens below the header.
- * ヘッダーは全幅で固定、サイドバーはヘッダーの下で開閉する共通レイアウト。
+ * Shared layout: sticky header on top, main content, right-side AI dock
+ * (desktop only) and a mobile-only bottom navigation. The left sidebar has
+ * been removed; functional navigation lives in the header on desktop and
+ * in the bottom nav on mobile.
+ *
+ * 共通レイアウト。上部の固定ヘッダー、メインコンテンツ、右側 AI ドック
+ * （デスクトップのみ）、モバイル用のボトムナビで構成。左サイドバーは廃止し、
+ * 機能ナビゲーションはデスクトップではヘッダー、モバイルではボトムナビに集約した。
  */
 export function AppLayout({ children }: AppLayoutProps) {
+  const isMobile = useIsMobile();
   return (
-    <SidebarProvider
-      defaultOpen={false}
+    <div
       className="flex h-svh min-h-0 flex-col overflow-hidden"
       style={
         {
-          "--app-header-height": "4.5rem",
+          "--app-header-height": isMobile ? "3rem" : "4.5rem",
+          "--app-bottom-nav-height": isMobile ? "3.5rem" : "0px",
           "--ai-chat-width": "22rem",
         } as React.CSSProperties
       }
     >
       <Header />
-      {/* min-h-0: flex 子が親より伸びてページ全体がスクロールするのを防ぐ */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <AppSidebar />
-        <SidebarInset className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      {/* min-h-0: flex 子が親より伸びてページ全体がスクロールするのを防ぐ。
+          モバイルでは BottomNav が fixed で main の下端に被さるため、
+          padding-bottom で BottomNav 分（safe-area 含む）の余白を確保する。
+          On mobile, BottomNav is `position: fixed` and overlays the bottom of
+          `<main>`, so reserve that height (plus the safe-area inset) as
+          padding-bottom to keep page content scrollable past the nav. */}
+      <div
+        className="flex min-h-0 flex-1 overflow-hidden"
+        style={
+          isMobile
+            ? {
+                paddingBottom:
+                  "calc(var(--app-bottom-nav-height, 3.5rem) + env(safe-area-inset-bottom))",
+              }
+            : undefined
+        }
+      >
+        <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
-        </SidebarInset>
-        <AIChatDock />
+        </main>
+        {!isMobile && <AIChatDock />}
       </div>
-    </SidebarProvider>
+      {isMobile && <BottomNav />}
+    </div>
   );
 }

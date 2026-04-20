@@ -2,7 +2,6 @@
  * AI chat conversation row: open and delete confirm call the delete hook.
  * AI 会話行: 開く・削除確認でフックが呼ばれる。
  */
-import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -34,13 +33,12 @@ describe("AIChatConversationListRow", () => {
     vi.clearAllMocks();
   });
 
-  it("calls onOpen when the page variant main button is clicked", async () => {
+  it("calls onOpen when the main button is clicked", async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
     render(
       <AIChatConversationListRow
         conversation={baseConv}
-        variant="page"
         isActive={false}
         onOpen={onOpen}
         dateLabel="1 min ago"
@@ -51,12 +49,11 @@ describe("AIChatConversationListRow", () => {
     expect(onOpen).toHaveBeenCalled();
   });
 
-  it("calls delete hook when delete is confirmed in page variant", async () => {
+  it("calls delete hook when delete is confirmed", async () => {
     const user = userEvent.setup();
     render(
       <AIChatConversationListRow
         conversation={baseConv}
-        variant="page"
         isActive
         onOpen={vi.fn()}
         dateLabel="1 min ago"

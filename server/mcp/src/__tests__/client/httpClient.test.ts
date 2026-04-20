@@ -59,6 +59,38 @@ describe("HttpZediClient request shaping", () => {
     expect(headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
   });
 
+  it("listPages GETs /api/pages with limit/offset/scope and unwraps pages array", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeJsonResponse(200, {
+        pages: [
+          {
+            id: "p1",
+            title: "Hello",
+            content_preview: null,
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        ],
+      }),
+    );
+    const list = await client.listPages({ limit: 10, offset: 5, scope: "shared" });
+    expect(list).toHaveLength(1);
+    expect(list[0]?.id).toBe("p1");
+    const url = callArgs(fetchMock as unknown as Mock)[0] as string;
+    expect(url).toContain(`${BASE}/api/pages?`);
+    expect(url).toContain("limit=10");
+    expect(url).toContain("offset=5");
+    expect(url).toContain("scope=shared");
+  });
+
+  it("listPages defaults to own scope and limit=20/offset=0", async () => {
+    fetchMock.mockResolvedValueOnce(makeJsonResponse(200, { pages: [] }));
+    await client.listPages();
+    const url = callArgs(fetchMock as unknown as Mock)[0] as string;
+    expect(url).toContain("limit=20");
+    expect(url).toContain("offset=0");
+    expect(url).toContain("scope=own");
+  });
+
   it("createPage sends POST with JSON body to /api/pages", async () => {
     const expected = {
       id: "p1",
@@ -256,6 +288,46 @@ describe("HttpZediClient error normalization", () => {
       name: "ZediApiError",
       status: 500,
     });
+  });
+
+  it("tags 429 responses with isRateLimit and extracts Retry-After header", async () => {
+    // 429 はミドルウェア由来。Retry-After ヘッダを秒数として拾い isRateLimit を立てる。
+    // 429 comes from the rateLimit middleware; we pick up the header as seconds.
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", retry_after: 42 }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "42" },
+      }),
+    );
+    let error: unknown;
+    try {
+      await client.clipUrl("https://example.com/a");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ZediApiError);
+    const apiError = error as ZediApiError;
+    expect(apiError.status).toBe(429);
+    expect(apiError.isRateLimit).toBe(true);
+    expect(apiError.retryAfterSec).toBe(42);
+  });
+
+  it("falls back to body.retry_after when Retry-After header is absent", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "RATE_LIMIT_EXCEEDED", retry_after: 7 }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    let error: unknown;
+    try {
+      await client.clipUrl("https://example.com/a");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ZediApiError);
+    expect((error as ZediApiError).isRateLimit).toBe(true);
+    expect((error as ZediApiError).retryAfterSec).toBe(7);
   });
 
   it("throws ZediApiError(status=0) for fetch network failure", async () => {

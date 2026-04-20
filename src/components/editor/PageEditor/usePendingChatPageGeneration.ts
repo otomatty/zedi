@@ -161,6 +161,7 @@ export function usePendingChatPageGeneration({
         },
       },
       ac.signal,
+      pending.userSchema,
     );
 
     return () => {

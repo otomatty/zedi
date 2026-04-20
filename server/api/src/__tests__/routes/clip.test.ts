@@ -6,6 +6,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 type AuthSession = Awaited<ReturnType<typeof import("../../auth.js").auth.api.getSession>>;
 
+// youtube-transcript は CJS/ESM 互換性問題があるのでモック
+// Mock youtube-transcript (CJS/ESM compatibility workaround)
+vi.mock("youtube-transcript", () => ({
+  YoutubeTranscript: {
+    fetchTranscript: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 vi.mock("../../db/client.js", () => ({
   getDb: vi.fn(() => ({})),
 }));

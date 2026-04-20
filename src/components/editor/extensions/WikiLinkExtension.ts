@@ -3,12 +3,38 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 /**
  * Regex to match completed WikiLink patterns `[[Title]]` in pasted text.
- * Captures the title (non-empty, no `[` or `]` characters) inside the brackets.
  *
  * 貼り付けテキスト中の完成済み WikiLink パターン `[[Title]]` にマッチする正規表現。
- * ブラケット内のタイトル（空でなく `[` や `]` を含まない）をキャプチャする。
+ *
+ * Tiptap の `markPasteRule` は「最後のキャプチャグループ」の範囲にのみマークを適用し、
+ * それ以外を削除する仕様のため、括弧 `[[ ]]` を保持するには全体を単一キャプチャに
+ * 含めてマッチ全長をマーク対象とする必要がある。ここでは敢えてキャプチャグループを
+ * 使わず、マッチ全体（`match[0]`）が `markPasteRule` の captureGroup として扱われる
+ * ようにする。タイトルは `extractWikiLinkTitle` で後付け抽出する。
+ *
+ * Tiptap's `markPasteRule` only applies the mark to the *last* capture group
+ * and deletes everything outside of it. To preserve the `[[ ]]` brackets, we
+ * intentionally omit capture groups so that `match[match.length - 1]` equals
+ * `match[0]` (the full match), keeping brackets intact. The title is extracted
+ * afterwards via `extractWikiLinkTitle`.
  */
-export const WIKI_LINK_PASTE_REGEX = /\[\[([^[\]]+)\]\]/g;
+export const WIKI_LINK_PASTE_REGEX = /\[\[[^[\]]+\]\]/g;
+
+/**
+ * Regex capturing the title portion of a WikiLink (non-global, for title extraction).
+ * 内部タイトル抽出用の正規表現（非グローバル）。
+ */
+const WIKI_LINK_TITLE_REGEX = /\[\[([^[\]]+)\]\]/;
+
+/**
+ * Extract the trimmed title from a `[[Title]]` literal, or `null` if empty.
+ * `[[Title]]` 形式の文字列からトリム済みタイトルを取り出す。空なら `null`。
+ */
+function extractWikiLinkTitle(fullMatch: string): string | null {
+  const m = fullMatch.match(WIKI_LINK_TITLE_REGEX);
+  const title = (m?.[1] ?? "").trim();
+  return title || null;
+}
 
 /**
  * Options for the WikiLink mark extension.
@@ -111,7 +137,9 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
         find: WIKI_LINK_PASTE_REGEX,
         type: this.type,
         getAttributes: (match) => {
-          const title = (match[1] ?? "").trim();
+          // match[0] は `[[Title]]` 全体。ここからタイトルのみを取り出す。
+          // match[0] is the full `[[Title]]` literal; extract only the title.
+          const title = extractWikiLinkTitle(match[0] ?? "");
           if (!title) return false;
           return { title, exists: false, referenced: false };
         },

@@ -19,6 +19,7 @@ import { ZediApiError } from "../client/errors.js";
 function createMockClient(): ZediClient {
   return {
     getCurrentUser: vi.fn(),
+    listPages: vi.fn(),
     getPageContent: vi.fn(),
     createPage: vi.fn(),
     updatePageContent: vi.fn(),
@@ -79,6 +80,30 @@ describe("createMcpServer", () => {
     expect(content[0]?.type).toBe("text");
     const parsed = JSON.parse(content[0]?.text ?? "");
     expect(parsed.id).toBe("user-1");
+  });
+
+  it("zedi_list_pages forwards limit/offset/scope to client.listPages", async () => {
+    vi.mocked(mockClient.listPages).mockResolvedValue([
+      {
+        id: "p1",
+        title: "Hello",
+        content_preview: null,
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+    ]);
+    const result = await mcpClient.callTool({
+      name: "zedi_list_pages",
+      arguments: { limit: 5, offset: 0, scope: "shared" },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(mockClient.listPages).toHaveBeenCalledWith({
+      limit: 5,
+      offset: 0,
+      scope: "shared",
+    });
+    const content = result.content as Array<{ type: string; text?: string }>;
+    const parsed = JSON.parse(content[0]?.text ?? "");
+    expect(parsed[0].id).toBe("p1");
   });
 
   it("zedi_create_page forwards arguments to client.createPage", async () => {

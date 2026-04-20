@@ -1,8 +1,14 @@
 import React, { useState, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Home, FileText, Settings, CreditCard, LogOut, User } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Settings, CreditCard, Receipt, LogOut, LogIn, User } from "lucide-react";
 import { Button, useIsMobile } from "@zedi/ui";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@zedi/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@zedi/ui";
 import { Sheet, SheetContent, SheetTitle } from "@zedi/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
@@ -11,39 +17,113 @@ import { useTranslation } from "react-i18next";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { cn } from "@zedi/ui";
 import { SyncStatusRow, useSyncStatusDotColor } from "./UnifiedMenuSyncStatus";
-import { NavItems } from "./UnifiedMenuNavItems";
+
+interface AccountActionItem {
+  icon: React.FC<{ className?: string }>;
+  label: string;
+  path: string;
+  /** Show only when the user is signed in. / サインイン時のみ表示する。 */
+  signedInOnly?: boolean;
+}
+
+function useAccountActionItems(): AccountActionItem[] {
+  const { t } = useTranslation();
+  return [
+    { icon: Settings, label: t("nav.settings"), path: "/settings" },
+    { icon: CreditCard, label: t("nav.plan"), path: "/pricing" },
+    {
+      icon: Receipt,
+      label: t("nav.subscription", "Subscription"),
+      path: "/subscription",
+      signedInOnly: true,
+    },
+  ];
+}
+
+interface AccountActionsListProps {
+  items: AccountActionItem[];
+  isSignedIn: boolean;
+  variant: "list" | "dropdown";
+  onClose: () => void;
+}
+
+/**
+ * Vertical list of account-related actions inside the user menu.
+ * ユーザーメニュー内のアカウント関連アクションを縦並びで表示する。
+ */
+const AccountActionsList: React.FC<AccountActionsListProps> = ({
+  items,
+  isSignedIn,
+  variant,
+  onClose,
+}) => {
+  const visibleItems = items.filter((item) => !item.signedInOnly || isSignedIn);
+
+  if (variant === "dropdown") {
+    return (
+      <>
+        {visibleItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <DropdownMenuItem key={item.path} asChild>
+              <Link to={item.path} onClick={onClose} className="gap-3 px-3 py-2">
+                <Icon className="text-muted-foreground h-4 w-4 shrink-0" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+      </>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 p-2">
+      {visibleItems.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.path}
+            to={item.path}
+            onClick={onClose}
+            className="hover:bg-muted flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors"
+          >
+            <Icon className="text-muted-foreground h-4 w-4 shrink-0" />
+            <span className="font-medium">{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+};
 
 interface MenuContentProps {
   onClose: () => void;
-  layout?: "grid" | "list";
 }
 
-const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "grid" }) => {
-  const navigate = useNavigate();
+/**
+ * User menu content for signed-in users. Exported so that other shell
+ * elements (e.g. the mobile bottom nav Me tab) can reuse the same list.
+ *
+ * サインイン済みユーザー向けのメニュー内容。モバイルボトムナビの Me タブ等、
+ * 他のシェル要素からも同じリストを再利用できるよう export している。
+ */
+export const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
   const { user } = useUser();
   const { signOut } = useAuth();
   const { displayName, avatarUrl } = useProfile();
   const { t } = useTranslation();
+  const items = useAccountActionItems();
 
-  const navItems = [
-    { icon: Home, label: t("nav.home"), path: "/home" },
-    { icon: FileText, label: t("nav.notes"), path: "/notes" },
-    { icon: Settings, label: t("nav.settings"), path: "/settings" },
-    { icon: CreditCard, label: t("nav.plan"), path: "/pricing" },
-  ];
-
-  const handleNavigate = useCallback(
-    (path: string) => {
-      navigate(path);
-      onClose();
-    },
-    [navigate, onClose],
-  );
+  const handleSignOut = useCallback(() => {
+    void signOut();
+    onClose();
+  }, [signOut, onClose]);
 
   return (
     <>
-      <div className="flex items-center gap-3 p-2">
-        <Avatar className="h-9 w-9 shrink-0">
+      <div className="flex items-center gap-3 p-3">
+        <Avatar className="h-10 w-10 shrink-0">
           <AvatarImage
             src={avatarUrl || user?.imageUrl}
             alt={displayName || user?.fullName || "User"}
@@ -63,20 +143,17 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
       </div>
 
       <hr className="border-border my-1" />
-      <NavItems items={navItems} layout={layout} onNavigate={handleNavigate} />
-      <SyncStatusRow />
+      <AccountActionsList items={items} isSignedIn variant="list" onClose={onClose} />
+      <SyncStatusRow onClose={onClose} />
 
       <hr className="border-border my-1" />
       <div className="p-2">
         <button
           type="button"
-          onClick={() => {
-            signOut();
-            onClose();
-          }}
-          className="text-destructive hover:bg-destructive/10 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors"
+          onClick={handleSignOut}
+          className="text-destructive hover:bg-destructive/10 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-4 w-4 shrink-0" />
           {t("nav.signOut")}
         </button>
       </div>
@@ -84,36 +161,100 @@ const SignedInMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "gr
   );
 };
 
-const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose, layout = "grid" }) => {
-  const navigate = useNavigate();
+const DesktopSignedInMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+  const { user } = useUser();
+  const { signOut } = useAuth();
+  const { displayName, avatarUrl } = useProfile();
   const { t } = useTranslation();
+  const items = useAccountActionItems();
 
-  const navItems = [
-    { icon: Home, label: t("nav.home"), path: "/home" },
-    { icon: FileText, label: t("nav.notes"), path: "/notes" },
-    { icon: Settings, label: t("nav.settings"), path: "/settings" },
-    { icon: CreditCard, label: t("nav.plan"), path: "/pricing" },
-  ];
-
-  const handleNavigate = useCallback(
-    (path: string) => {
-      navigate(path);
-      onClose();
-    },
-    [navigate, onClose],
-  );
+  const handleSignOut = useCallback(() => {
+    void signOut();
+    onClose();
+  }, [signOut, onClose]);
 
   return (
     <>
-      <NavItems items={navItems} layout={layout} onNavigate={handleNavigate} />
+      <div className="flex items-center gap-3 p-3">
+        <Avatar className="h-10 w-10 shrink-0">
+          <AvatarImage
+            src={avatarUrl || user?.imageUrl}
+            alt={displayName || user?.fullName || "User"}
+          />
+          <AvatarFallback>{(displayName || user?.firstName)?.charAt(0) ?? "U"}</AvatarFallback>
+        </Avatar>
+        <div className="flex min-w-0 flex-col space-y-0.5 leading-none">
+          {(displayName || user?.fullName) && (
+            <p className="truncate text-sm font-medium">{displayName || user?.fullName}</p>
+          )}
+          {user?.primaryEmailAddress && (
+            <p className="text-muted-foreground truncate text-xs">
+              {user.primaryEmailAddress.emailAddress}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <DropdownMenuSeparator />
+      <AccountActionsList items={items} isSignedIn variant="dropdown" onClose={onClose} />
+      <SyncStatusRow variant="dropdown" onClose={onClose} />
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        onSelect={handleSignOut}
+        className="text-destructive focus:text-destructive gap-3 px-3 py-2"
+      >
+        <LogOut className="h-4 w-4 shrink-0" />
+        <span className="font-medium">{t("nav.signOut")}</span>
+      </DropdownMenuItem>
+    </>
+  );
+};
+
+/**
+ * User menu content for signed-out (guest) users. Exported so that the
+ * mobile bottom nav Me tab can reuse the same list.
+ *
+ * 未サインインユーザー向けのメニュー内容。モバイルボトムナビの Me タブから
+ * 再利用できるよう export している。
+ */
+export const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+  const { t } = useTranslation();
+  const items = useAccountActionItems();
+
+  return (
+    <>
+      <AccountActionsList items={items} isSignedIn={false} variant="list" onClose={onClose} />
       <hr className="border-border my-1" />
       <div className="p-2">
-        <Link to="/sign-in" onClick={onClose}>
-          <Button variant="outline" className="w-full">
+        {/* `<Link><Button>` だと <a> の中に <button> が入って不正な HTML に
+            なる。`Button asChild` で Link を Button としてレンダリングする。
+            Avoid nesting <button> inside <a>; render the Link as the button
+            via `asChild` so the markup stays valid (and a11y semantics work). */}
+        <Button asChild className="w-full gap-2">
+          <Link to="/sign-in" onClick={onClose}>
+            <LogIn className="h-4 w-4" />
             {t("nav.signIn")}
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
+    </>
+  );
+};
+
+const DesktopSignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) => {
+  const { t } = useTranslation();
+  const items = useAccountActionItems();
+
+  return (
+    <>
+      <AccountActionsList items={items} isSignedIn={false} variant="dropdown" onClose={onClose} />
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
+        <Link to="/sign-in" onClick={onClose} className="gap-2 px-3 py-2 font-medium">
+          <LogIn className="h-4 w-4 shrink-0" />
+          {t("nav.signIn")}
+        </Link>
+      </DropdownMenuItem>
     </>
   );
 };
@@ -124,10 +265,17 @@ const AvatarTrigger = React.forwardRef<
 >((props, ref) => {
   const { user } = useUser();
   const { displayName, avatarUrl } = useProfile();
+  const { t } = useTranslation();
   const dotColor = useSyncStatusDotColor();
 
   return (
-    <Button ref={ref} variant="ghost" className="relative h-9 w-9 rounded-full" {...props}>
+    <Button
+      ref={ref}
+      variant="ghost"
+      className="relative h-9 w-9 rounded-full"
+      aria-label={t("nav.account", "Account")}
+      {...props}
+    >
       <Avatar className="h-9 w-9">
         <AvatarImage
           src={avatarUrl || user?.imageUrl}
@@ -151,12 +299,21 @@ AvatarTrigger.displayName = "AvatarTrigger";
 const GuestTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ComponentPropsWithoutRef<typeof Button>
->((props, ref) => (
-  <Button ref={ref} variant="ghost" size="icon" className="h-9 w-9" {...props}>
-    <User className="h-5 w-5" />
-    <span className="sr-only">メニュー</span>
-  </Button>
-));
+>((props, ref) => {
+  const { t } = useTranslation();
+  return (
+    <Button
+      ref={ref}
+      variant="ghost"
+      size="icon"
+      className="h-9 w-9"
+      aria-label={t("nav.account", "Account")}
+      {...props}
+    >
+      <User className="h-5 w-5" />
+    </Button>
+  );
+});
 GuestTrigger.displayName = "GuestTrigger";
 
 const DesktopMenu: React.FC = () => {
@@ -170,8 +327,8 @@ const DesktopMenu: React.FC = () => {
           <DropdownMenuTrigger asChild>
             <AvatarTrigger />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={8} className="w-64 p-0">
-            <SignedInMenuContent onClose={close} />
+          <DropdownMenuContent align="end" sideOffset={8} className="w-72 p-0">
+            <DesktopSignedInMenuContent onClose={close} />
           </DropdownMenuContent>
         </DropdownMenu>
       </SignedIn>
@@ -180,8 +337,8 @@ const DesktopMenu: React.FC = () => {
           <DropdownMenuTrigger asChild>
             <GuestTrigger />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={8} className="w-64 p-0">
-            <SignedOutMenuContent onClose={close} />
+          <DropdownMenuContent align="end" sideOffset={8} className="w-72 p-0">
+            <DesktopSignedOutMenuContent onClose={close} />
           </DropdownMenuContent>
         </DropdownMenu>
       </SignedOut>
@@ -192,6 +349,8 @@ const DesktopMenu: React.FC = () => {
 const MobileMenu: React.FC = () => {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
+  const { t } = useTranslation();
+  const sheetTitle = t("nav.account", "Account");
 
   return (
     <>
@@ -200,9 +359,9 @@ const MobileMenu: React.FC = () => {
           <AvatarTrigger onClick={() => setOpen(true)} />
           <SheetContent side="right" className="w-3/4 max-w-sm p-4">
             <VisuallyHidden>
-              <SheetTitle>メニュー</SheetTitle>
+              <SheetTitle>{sheetTitle}</SheetTitle>
             </VisuallyHidden>
-            <SignedInMenuContent onClose={close} layout="list" />
+            <SignedInMenuContent onClose={close} />
           </SheetContent>
         </Sheet>
       </SignedIn>
@@ -211,9 +370,9 @@ const MobileMenu: React.FC = () => {
           <GuestTrigger onClick={() => setOpen(true)} />
           <SheetContent side="right" className="w-3/4 max-w-sm p-4">
             <VisuallyHidden>
-              <SheetTitle>メニュー</SheetTitle>
+              <SheetTitle>{sheetTitle}</SheetTitle>
             </VisuallyHidden>
-            <SignedOutMenuContent onClose={close} layout="list" />
+            <SignedOutMenuContent onClose={close} />
           </SheetContent>
         </Sheet>
       </SignedOut>
@@ -222,8 +381,12 @@ const MobileMenu: React.FC = () => {
 };
 
 /**
- * User menu: dropdown on `md+`, sheet on smaller viewports (same breakpoint as the app sidebar).
- * ユーザーメニュー: `md` 以上はドロップダウン、未満はシート（アプリサイドバーと同じ閾値）。
+ * User-only menu shown in the right-hand side of the header.
+ * Contains account actions (settings, plan, subscription), sync status and
+ * sign-in/out. Functional navigation lives in {@link PrimaryNav} now.
+ *
+ * ヘッダー右側のユーザー専用メニュー。アカウント設定・プラン・サブスクリプション・
+ * 同期ステータス・サインイン/アウトのみを扱う。機能ナビゲーションは {@link PrimaryNav} に分離した。
  */
 export const UnifiedMenu: React.FC = () => {
   const isMobile = useIsMobile();

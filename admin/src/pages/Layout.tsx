@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { Bot, Users, ScrollText } from "lucide-react";
+import { Bot, Users, ScrollText, HeartPulse, Activity } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -19,6 +19,8 @@ const navLinks = [
   { to: "/ai-models", label: "AI モデル", icon: Bot },
   { to: "/users", label: "ユーザー管理", icon: Users },
   { to: "/audit-logs", label: "監査ログ", icon: ScrollText },
+  { to: "/wiki-health", label: "Wiki Health", icon: HeartPulse },
+  { to: "/activity-log", label: "活動ログ", icon: Activity },
 ];
 
 /**

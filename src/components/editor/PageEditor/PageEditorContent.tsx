@@ -7,6 +7,7 @@ import type { CollaborationConfig } from "../TiptapEditor/types";
 import { SourceUrlBadge } from "../SourceUrlBadge";
 import { WikiGeneratorButton } from "../WikiGeneratorButton";
 import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
+import { LintSuggestions } from "@/components/page/LintSuggestions";
 import Container from "@/components/layout/Container";
 import { isContentNotEmpty } from "@/lib/contentUtils";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
@@ -179,6 +180,9 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
         {showLinkedPages && currentPageId && (
           <LinkedPagesSection pageId={currentPageId} isSyncingLinks={isSyncingLinks} />
         )}
+
+        {/* Lint Suggestions */}
+        {currentPageId && <LintSuggestions pageId={currentPageId} />}
       </Container>
     </main>
   );

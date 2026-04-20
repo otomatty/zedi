@@ -17,6 +17,8 @@ import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
+import ingestRoutes from "./routes/ingest.js";
+import wikiSchemaRoutes from "./routes/wikiSchema.js";
 import extRoutes from "./routes/ext.js";
 import mcpRoutes from "./routes/mcp.js";
 import inviteRoutes from "./routes/invite.js";
@@ -33,6 +35,8 @@ import thumbServeRoutes from "./routes/thumbnail/serve.js";
 import webhookPolarRoutes from "./routes/webhooks/polar.js";
 import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
+import lintRoutes from "./routes/lint.js";
+import activityRoutes from "./routes/activity.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -106,6 +110,18 @@ export function createApp(): Hono<AppEnv> {
 
   // Clip
   app.route("/api/clip", clipRoutes);
+
+  // Ingest (LLM Wiki pattern, P1)
+  app.route("/api/ingest", ingestRoutes);
+
+  // Wiki Schema (P3 — user-defined wiki "constitution")
+  app.route("/api/wiki-schema", wikiSchemaRoutes);
+
+  // Lint (Wiki Health, P2)
+  app.route("/api/lint", lintRoutes);
+
+  // Activity log + __index__ rebuild (LLM Wiki P4)
+  app.route("/api/activity", activityRoutes);
 
   // Chrome Extension (OAuth + clip-and-create)
   app.route("/api/ext", extRoutes);

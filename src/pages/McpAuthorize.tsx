@@ -75,8 +75,10 @@ const McpAuthorize: React.FC = () => {
       if (res.status === 401) {
         // Send the user through Better Auth and bring them back here.
         // 未ログインなら Better Auth のサインイン経由で戻ってくる。
-        const here = window.location.href;
-        window.location.href = `/sign-in?redirect=${encodeURIComponent(here)}`;
+        // Use path+search (not full URL) so SignIn's returnTo safety check accepts it.
+        // SignIn の returnTo 検査が通るよう、絶対 URL ではなくパス+クエリだけを渡す。
+        const here = `${window.location.pathname}${window.location.search}`;
+        window.location.href = `/sign-in?returnTo=${encodeURIComponent(here)}`;
         return;
       }
       if (!res.ok) {

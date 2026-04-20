@@ -76,6 +76,18 @@ Object.assign(nodeHandlers, {
     const title = (n.attrs?.title as string) || "";
     return title ? `![${alt}](${src} "${title}")\n\n` : `![${alt}](${src})\n\n`;
   },
+  youtubeEmbed: (n) => {
+    // 異常な videoId が Markdown 構文を壊さないよう、厳格に検証してからエンコードする
+    // Strictly validate videoId to prevent malformed Markdown; encode before embedding.
+    // Use `typeof === "string"` instead of `as string` because the `as` cast is
+    // a TypeScript-only hint; if the runtime value is e.g. an object, calling
+    // `.trim()` on it would throw and break export/copy.
+    // `as string` は実行時保護にならないため、`typeof` で確実に文字列チェックする。
+    const rawVideoId = n.attrs?.videoId;
+    const videoId = typeof rawVideoId === "string" ? rawVideoId.trim() : "";
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) return "";
+    return `[YouTube](https://www.youtube.com/watch?v=${encodeURIComponent(videoId)})\n\n`;
+  },
   link: (n) => convertChildren(n),
 });
 

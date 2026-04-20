@@ -4,7 +4,7 @@ import { usePageEditor } from "./PageEditor/usePageEditor";
 import { PageEditorLayout } from "./PageEditor/PageEditorLayout";
 
 const LoadingSpinner = () => (
-  <div className="bg-background flex min-h-screen items-center justify-center">
+  <div className="bg-background flex min-h-0 flex-1 items-center justify-center">
     <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
   </div>
 );

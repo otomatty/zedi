@@ -1,10 +1,11 @@
 import { Suspense, lazy, useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { AIChatMessages } from "@/components/ai-chat/AIChatMessages";
 import { AIChatInput } from "@/components/ai-chat/AIChatInput";
 import { AIChatViewTabs, type AIChatViewTab } from "@/components/ai-chat/AIChatViewTabs";
+import { PromoteToWikiDialog } from "@/components/ai-chat/PromoteToWikiDialog";
+import { usePromoteToWiki } from "@/hooks/usePromoteToWiki";
 
 const AIChatBranchTree = lazy(() =>
   import("@/components/ai-chat/AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
@@ -22,6 +23,7 @@ import { useAIChatDetailLifecycle } from "./useAIChatDetailLifecycle";
  * Messages fill available height and scroll; input is pinned to the bottom.
  * 会話詳細ページ（`/ai/:conversationId`）。メッセージは残り高さでスクロール、入力欄は下端固定。
  */
+// eslint-disable-next-line max-lines-per-function -- full-page chat with branch/workflow tabs
 export default function AIChatDetail() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
@@ -95,6 +97,8 @@ export default function AIChatDetail() {
     [editAndResend],
   );
 
+  const promote = usePromoteToWiki(messages);
+
   const [activeViewTab, setActiveViewTab] = useState<AIChatViewTab>("chat");
   const [inputPrefill, setInputPrefill] = useState<{ nonce: number; text: string } | null>(null);
   const [focusEditorNonce, setFocusEditorNonce] = useState(0);
@@ -132,9 +136,9 @@ export default function AIChatDetail() {
   );
 
   return (
-    <AppLayout>
-      {/* Fill SidebarInset (already below header). flex-1 + min-h-0 prevents page-level scroll.
-          SidebarInset 内を埋める（ヘッダー下の高さは親が保証）。メッセージのみスクロール。 */}
+    <>
+      {/* Fill the AppLayout main area (already below header). flex-1 + min-h-0 prevents page-level scroll.
+          AppLayout のメイン領域を埋める（ヘッダー下の高さは親が保証）。メッセージのみスクロール。 */}
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
         <div className="border-border shrink-0 border-b px-4 py-2">
           <AIChatViewTabs activeTab={activeViewTab} onTabChange={setActiveViewTab} />
@@ -150,6 +154,7 @@ export default function AIChatDetail() {
               onSuggestionClick={handleSendMessage}
               onExecuteAction={handleExecuteAction}
               onEditMessage={handleEditMessage}
+              onPromoteToWiki={promote.handlePromote}
               onSwitchBranch={switchBranch}
               isStreaming={isStreaming}
             />
@@ -180,6 +185,13 @@ export default function AIChatDetail() {
           </Container>
         </div>
       </div>
-    </AppLayout>
+      <PromoteToWikiDialog
+        open={promote.open}
+        onClose={promote.close}
+        conversationText={promote.conversationText}
+        existingTitles={existingPageTitles}
+        conversationId={conversationId}
+      />
+    </>
   );
 }

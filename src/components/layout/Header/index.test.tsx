@@ -1,14 +1,15 @@
 /**
- * Header: sidebar trigger on desktop only, sticky/backdrop, search & AI actions, right menu.
- * ヘッダー: デスクトップのみサイドバートリガー、sticky/backdrop、検索・AI・右メニュー。
+ * Header: primary functional nav, sticky/backdrop layout, search & AI actions, user-only menu.
+ * ヘッダー: 機能ナビゲーション、sticky/backdrop、検索・AI、ユーザー専用メニュー。
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Header from "./index";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@zedi/ui";
 
-const { mockUseIsMobile, signedInAuth, signedOutAuth } = vi.hoisted(() => {
+const { signedInAuth, signedOutAuth } = vi.hoisted(() => {
   /** Matches `useAuth` return shape (Better Auth) for typed mocks. */
   const signedInAuth = {
     isLoaded: true,
@@ -27,7 +28,7 @@ const { mockUseIsMobile, signedInAuth, signedOutAuth } = vi.hoisted(() => {
     userId: null,
     sessionId: null,
   };
-  return { mockUseIsMobile: vi.fn(() => false), signedInAuth, signedOutAuth };
+  return { signedInAuth, signedOutAuth };
 });
 
 vi.mock("react-i18next", () => ({
@@ -45,6 +46,18 @@ vi.mock("@/contexts/GlobalSearchContext", () => ({
   useGlobalSearchContextOptional: () => null,
 }));
 
+vi.mock("@zedi/ui", async () => {
+  const actual = await vi.importActual<typeof import("@zedi/ui")>("@zedi/ui");
+  return {
+    ...actual,
+    useIsMobile: vi.fn(() => false),
+  };
+});
+
+vi.mock("../MobileHeader", () => ({
+  MobileHeader: () => <header data-testid="mobile-header">MobileHeader</header>,
+}));
+
 vi.mock("@/components/layout/Container", () => ({
   default: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={className} data-testid="container">
@@ -53,25 +66,12 @@ vi.mock("@/components/layout/Container", () => ({
   ),
 }));
 
-vi.mock("@zedi/ui", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@zedi/ui")>();
-  return {
-    ...actual,
-    useIsMobile: () => mockUseIsMobile(),
-    SidebarTrigger: ({ "aria-label": ariaLabel }: { "aria-label"?: string }) => (
-      <button type="button" aria-label={ariaLabel} data-testid="sidebar-trigger">
-        Menu
-      </button>
-    ),
-  };
-});
-
 vi.mock("./HeaderLogo", () => ({ HeaderLogo: () => <div data-testid="header-logo">Logo</div> }));
-vi.mock("./MonthNavigation", () => ({
-  MonthNavigation: () => <div data-testid="month-nav">Month</div>,
-}));
 vi.mock("./HeaderSearchBar", () => ({
   HeaderSearchBar: () => <div data-testid="header-search">Search</div>,
+}));
+vi.mock("./NavigationMenu", () => ({
+  NavigationMenu: () => <div data-testid="navigation-menu">NavigationMenu</div>,
 }));
 vi.mock("./UnifiedMenu", () => ({ UnifiedMenu: () => <div data-testid="unified-menu">Menu</div> }));
 vi.mock("./AIChatButton", () => ({
@@ -84,18 +84,16 @@ vi.mock("./AIChatButton", () => ({
 
 describe("Header", () => {
   beforeEach(() => {
-    mockUseIsMobile.mockReturnValue(false);
     vi.mocked(useAuth).mockReturnValue({ ...signedInAuth });
+    vi.mocked(useIsMobile).mockReturnValue(false);
   });
 
-  it("renders sidebar trigger with accessible label (nav.menu)", () => {
+  it("renders the navigation menu", () => {
     render(<Header />);
-    const trigger = screen.getByTestId("sidebar-trigger");
-    expect(trigger).toHaveAttribute("aria-label", "Menu");
+    expect(screen.getByTestId("navigation-menu")).toBeInTheDocument();
   });
 
-  it("does not render sidebar trigger when useIsMobile is true", () => {
-    mockUseIsMobile.mockReturnValue(true);
+  it("does not render the legacy sidebar trigger", () => {
     render(<Header />);
     expect(screen.queryByTestId("sidebar-trigger")).not.toBeInTheDocument();
   });
@@ -126,5 +124,14 @@ describe("Header", () => {
     vi.mocked(useAuth).mockReturnValue({ ...signedOutAuth });
     render(<Header />);
     expect(screen.getByText("common.guestSyncPrompt")).toBeInTheDocument();
+  });
+
+  it("delegates to MobileHeader on mobile viewports", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    render(<Header />);
+    expect(screen.getByTestId("mobile-header")).toBeInTheDocument();
+    expect(screen.queryByTestId("navigation-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("unified-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ai-chat-btn")).not.toBeInTheDocument();
   });
 });

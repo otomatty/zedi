@@ -5,7 +5,10 @@
 import { useState, useCallback, useRef } from "react";
 import { clipWebPage, getClipErrorMessage, type ClippedContent } from "@/lib/webClipper";
 import { formatClippedContentAsTiptap } from "@/lib/htmlToTiptap";
+import { isYouTubeUrl } from "@/components/editor/utils/urlTransform";
+import { getDefaultAISettings, loadAISettings } from "@/lib/aiSettings";
 import type { ApiClient } from "@/lib/api/apiClient";
+import type { AIProviderType, AISettings } from "@/types/ai";
 
 /**
  * Web Clipper のステータス。idle → fetching → extracting → completed | error の順に遷移する。
@@ -38,6 +41,42 @@ export interface UseWebClipperReturn {
   ) => string | null;
 }
 
+type YouTubeClipOptions = { provider?: AIProviderType; model?: string };
+
+function resolveYouTubeClipOptions(aiSettings: AISettings | null): YouTubeClipOptions {
+  const settings = aiSettings ?? getDefaultAISettings();
+  const apiMode = settings.apiMode ?? "api_server";
+  const isSupportedProvider =
+    settings.provider === "openai" ||
+    settings.provider === "anthropic" ||
+    settings.provider === "google";
+
+  if (!isSupportedProvider) {
+    return {};
+  }
+
+  if (apiMode !== "api_server" && !settings.isConfigured) {
+    return {};
+  }
+
+  // modelId が空なら provider:model の形に組み立てる。ただし model が空の場合は
+  // "openai:" のような不完全な ID を送らないようにする（サーバー側で 400/403 になって
+  // ユーザーに混乱を与えるため）。
+  // If modelId is missing, fall back to provider:model — but skip entirely when
+  // settings.model is empty, since a malformed ID like "openai:" would otherwise
+  // reach the server and surface as a confusing 400/403.
+  const modelId =
+    settings.modelId || (settings.model ? `${settings.provider}:${settings.model}` : "");
+  if (!modelId) {
+    return {};
+  }
+
+  return {
+    provider: settings.provider,
+    model: modelId,
+  };
+}
+
 /**
  * Web ページクリッピング用カスタムフック。URL から Web ページを取り込み Tiptap JSON に変換する。
  * Custom hook for web page clipping. Fetches a web page from a URL and converts it to Tiptap JSON.
@@ -64,6 +103,52 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
       setClippedContent(null);
 
       try {
+        // YouTube URL の場合は専用サーバーサイドエンドポイントを使用
+        // ユーザーの AI 設定を読み込み、AI 要約を有効化する
+        // Use dedicated server-side endpoint for YouTube URLs
+        // Load user AI settings to enable AI summary generation
+        if (isYouTubeUrl(url) && api) {
+          setStatus("extracting");
+
+          // AI 要約用の provider/model を取得（設定済みの場合のみ）
+          // Fetch provider/model for AI summary (only if configured)
+          // direct-API プロバイダー (openai/anthropic/google) のみ対応
+          // claude-code は iframe ベースなので対象外
+          // Only direct-API providers (openai/anthropic/google) are supported
+          // claude-code is iframe-based so excluded
+          let aiOptions: YouTubeClipOptions = {};
+          try {
+            aiOptions = resolveYouTubeClipOptions(await loadAISettings());
+          } catch {
+            // AI 設定の読み込み失敗は非致命的（要約なしで続行）
+            // AI settings load failure is non-fatal (continue without summary)
+          }
+
+          // loadAISettings() の await 中に reset() や新しい clip() が呼ばれていたら
+          // サーバーへのリクエストを発行せずに中止する（AI クオータ浪費防止）
+          // If reset() or a newer clip() occurred during loadAISettings(), abort
+          // before firing the server request to avoid wasting AI quota.
+          if (currentId !== clipIdRef.current) return null;
+
+          const result = await api.clipYoutube(url, aiOptions);
+
+          if (currentId !== clipIdRef.current) return null;
+
+          const content: ClippedContent = {
+            title: result.title,
+            content: JSON.stringify(result.tiptapJson),
+            textContent: result.contentText,
+            excerpt: result.contentText,
+            byline: null,
+            sourceUrl: result.sourceUrl,
+            thumbnailUrl: result.thumbnailUrl,
+            siteName: "YouTube",
+          };
+          setClippedContent(content);
+          setStatus("completed");
+          return content;
+        }
+
         setStatus("extracting");
         const content = await clipWebPage(url, api ? fetchHtmlFn : undefined);
 
@@ -94,6 +179,22 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
   const getTiptapContent = useCallback(
     (thumbnailUrl?: string | null, storageProviderId?: string | null): string | null => {
       if (!clippedContent) return null;
+
+      // YouTube のコンテンツは既に Tiptap JSON 形式
+      // YouTube content is already in Tiptap JSON format
+      if (clippedContent.siteName === "YouTube") {
+        try {
+          // content が既に JSON オブジェクトの文字列かどうかチェック
+          // Check if content is already a JSON string
+          const parsed = JSON.parse(clippedContent.content);
+          if (parsed.type === "doc") {
+            return clippedContent.content;
+          }
+        } catch {
+          // JSON パース失敗 — 通常の HTML → Tiptap 変換にフォールバック
+          // Parse failure — fall through to normal HTML → Tiptap conversion
+        }
+      }
 
       const tiptapDoc = formatClippedContentAsTiptap(
         clippedContent.content,

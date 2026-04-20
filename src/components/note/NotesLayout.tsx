@@ -1,6 +1,5 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
 import Container from "@/components/layout/Container";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
@@ -11,8 +10,10 @@ interface NotesLayoutProps {
 }
 
 /**
- * Layout for `/notes` routes: App shell + tab navigation (my notes / discover).
- * `/notes` 系のタブ付きレイアウト（マイノート / 発見）。
+ * Tabbed layout for `/notes` routes (my notes / discover).
+ * The shared `AppLayout`（ヘッダー・AI ドック）はルートレベルで適用されるため、ここではタブ＋本文のみを描画する。
+ *
+ * `/notes` 系のタブ付きレイアウト（マイノート / 発見）。共通 `AppLayout` は親ルートで適用される。
  */
 export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
   const { t } = useTranslation();
@@ -31,37 +32,35 @@ export const NotesLayout: React.FC<NotesLayoutProps> = ({ children }) => {
   };
 
   return (
-    <AppLayout>
-      <main className="min-h-0 flex-1 overflow-y-auto py-6">
-        <Container>
-          <div className="border-border mb-6 flex border-b">
-            <Link
-              to="/notes"
-              onClick={handleMyNotesClick}
-              className={cn(
-                "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-                isMyNotes
-                  ? "border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground border-transparent",
-              )}
-            >
-              {t("notes.tabMyNotes")}
-            </Link>
-            <Link
-              to="/notes/discover"
-              className={cn(
-                "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-                isDiscover
-                  ? "border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground border-transparent",
-              )}
-            >
-              {t("notes.tabDiscover")}
-            </Link>
-          </div>
-          {children}
-        </Container>
-      </main>
-    </AppLayout>
+    <main className="min-h-0 flex-1 overflow-y-auto py-6">
+      <Container>
+        <div className="border-border mb-6 flex border-b">
+          <Link
+            to="/notes"
+            onClick={handleMyNotesClick}
+            className={cn(
+              "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              isMyNotes
+                ? "border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground border-transparent",
+            )}
+          >
+            {t("notes.tabMyNotes")}
+          </Link>
+          <Link
+            to="/notes/discover"
+            className={cn(
+              "-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              isDiscover
+                ? "border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground border-transparent",
+            )}
+          >
+            {t("notes.tabDiscover")}
+          </Link>
+        </div>
+        {children}
+      </Container>
+    </main>
   );
 };

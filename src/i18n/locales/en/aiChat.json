@@ -22,7 +22,8 @@
     "copiedCode": "Copied",
     "insertToNote": "Insert to note",
     "copyMessage": "Copy",
-    "copyFailed": "Failed to copy"
+    "copyFailed": "Failed to copy",
+    "promoteToWiki": "Save to Wiki"
   },
   "placeholders": {
     "default": "Type a message...",
@@ -63,6 +64,9 @@
     "wikiLinksAdded": "Added {{count}} wiki links",
     "noNewWikiLinks": "There are no new wiki links to add",
     "actionFailed": "Failed to execute the action",
+    "promoteStarted": "Extracting entities from conversation...",
+    "promoteSuccess": "Page created from conversation",
+    "promoteFailed": "Failed to create page from conversation",
     "insertSuccess": "Inserted into note",
     "insertUnavailable": "No editor available for insertion"
   },

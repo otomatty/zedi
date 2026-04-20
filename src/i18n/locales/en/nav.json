@@ -3,16 +3,13 @@
   "signOut": "Sign Out",
   "settings": "Settings",
   "plan": "Plan",
+  "subscription": "Subscription",
   "support": "Support",
   "home": "Home",
   "notes": "Notes",
   "ai": "AI",
+  "account": "Account",
+  "primary": "Primary navigation",
   "menu": "Menu",
-  "sidebarMyNotes": "Your notes",
-  "sidebarAiChatHistory": "AI chat history",
-  "sidebarSignInForNotes": "Sign in to see your notes",
-  "sidebarNoNotes": "No notes yet",
-  "sidebarNoAiConversations": "No conversations yet",
-  "sidebarNotesLoading": "Loading…",
-  "sidebarUntitledChat": "New chat"
+  "untitledChat": "New chat"
 }
