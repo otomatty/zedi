@@ -1,4 +1,4 @@
-import { adminFetch } from "./client";
+import { adminFetch, getErrorMessage } from "./client";
 
 /**
  * Lint ルール名の型。
@@ -39,11 +39,6 @@ export interface LintFindingItem {
 export interface LintRunSummaryItem {
   rule: LintRule;
   count: number;
-}
-
-async function getErrorMessage(res: Response, fallback: string): Promise<string> {
-  const err = await res.json().catch(() => ({ message: res.statusText }));
-  return (err as { message?: string }).message ?? fallback;
 }
 
 /**

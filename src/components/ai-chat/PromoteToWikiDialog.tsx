@@ -81,6 +81,27 @@ function createExtractionHandlers(
 /**
  * Runs the extraction LLM call once per open cycle.
  * ダイアログを開くたびに 1 回だけ抽出 LLM を呼ぶ。
+ *
+ * Effect deps を `[]` に固定する理由:
+ * - 親 (`AIChatPanelContent`) が `existingTitles = pageContext?.recentPageTitles ?? []`
+ *   のように毎レンダー新しい配列を生成しており、deps に含めると再レンダー毎に
+ *   cleanup が走り `controller.abort()` が in-flight 抽出を中断する。
+ * - 一方、再エントリは `attemptedRef` で防いでいるため、abort 後に新しい
+ *   抽出が始まらず、`isExtracting` が `true` で固定されたまま停止する。
+ * - ダイアログ open 中の `conversationText` / `existingTitles` / `onEntities`
+ *   は意味的に固定なので、最新値は ref 経由で取得するに留め、effect は
+ *   マウント時のみ実行する形に統一する。
+ *
+ * Why deps are pinned to `[]`:
+ * - The parent (`AIChatPanelContent`) recreates `existingTitles` each render
+ *   (`pageContext?.recentPageTitles ?? []`). Including it in deps caused the
+ *   cleanup to fire on every parent re-render, aborting the in-flight
+ *   extraction.
+ * - Re-entry is gated by `attemptedRef`, so after the abort no new extraction
+ *   ever starts, leaving `isExtracting` stuck at `true`.
+ * - The dialog body is mounted only while `open=true` and the extraction is
+ *   semantically tied to that open cycle, so we read the latest values via
+ *   refs and only run the effect on mount.
  */
 function useEntityExtraction(
   conversationText: string,
@@ -89,11 +110,29 @@ function useEntityExtraction(
 ) {
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const attemptedRef = useRef(false);
+
+  const conversationTextRef = useRef(conversationText);
+  const existingTitlesRef = useRef(existingTitles);
+  const onEntitiesRef = useRef(onEntities);
 
   useEffect(() => {
-    if (attemptedRef.current) return;
-    attemptedRef.current = true;
+    conversationTextRef.current = conversationText;
+  }, [conversationText]);
+  useEffect(() => {
+    existingTitlesRef.current = existingTitles;
+  }, [existingTitles]);
+  useEffect(() => {
+    onEntitiesRef.current = onEntities;
+  }, [onEntities]);
+
+  useEffect(() => {
+    // ダイアログを閉じる／親がアンマウントされた場合に in-flight な抽出
+    // リクエストを中断する。abort せずに放置すると、無駄な LLM コストが
+    // 発生し、unmount 後に setState を試みて警告にもなる。
+    // Abort the in-flight extraction call when the dialog is closed or the
+    // parent unmounts, so we don't keep paying for an LLM run whose result
+    // is discarded (and don't try to setState after unmount).
+    const controller = new AbortController();
 
     const extract = async () => {
       setIsExtracting(true);
@@ -101,7 +140,10 @@ function useEntityExtraction(
       try {
         const settings = await loadAISettings();
         if (!settings) throw new Error("AI not configured");
-        const prompt = buildExtractEntitiesPrompt(conversationText, existingTitles);
+        const prompt = buildExtractEntitiesPrompt(
+          conversationTextRef.current,
+          existingTitlesRef.current,
+        );
         await callAIService(
           { ...settings, isConfigured: true },
           {
@@ -115,17 +157,33 @@ function useEntityExtraction(
               feature: "entity_extraction",
             },
           },
-          createExtractionHandlers(onEntities, (err) => setError(err.message)),
+          createExtractionHandlers(
+            (entities) => onEntitiesRef.current(entities),
+            (err) => {
+              if (controller.signal.aborted) return;
+              setError(err.message);
+            },
+          ),
+          controller.signal,
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        if (controller.signal.aborted) return;
+        const message = err instanceof Error ? err.message : "Unknown error";
+        if (message === "ABORTED") return;
+        setError(message);
       } finally {
-        setIsExtracting(false);
+        if (!controller.signal.aborted) setIsExtracting(false);
       }
     };
 
     void extract();
-  }, [conversationText, existingTitles, onEntities]);
+
+    return () => {
+      controller.abort();
+    };
+
+    // run once per dialog open cycle; latest values are read via refs above.
+  }, []);
 
   return { isExtracting, error };
 }

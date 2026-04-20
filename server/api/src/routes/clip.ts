@@ -9,15 +9,8 @@ import { authRequired } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
 import { extractYouTubeContent } from "../lib/youtubeExtractor.js";
-import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
-import { getProviderApiKeyName } from "../services/aiProviders.js";
-import { getUserTier } from "../services/subscriptionService.js";
-import {
-  checkUsage,
-  validateModelAccess,
-  calculateCost,
-  recordUsage,
-} from "../services/usageService.js";
+import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
+import { calculateCost, recordUsage } from "../services/usageService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -124,70 +117,34 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
 
   const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
 
-  // AI 要約の設定 / AI summary configuration
-  // `aiModel` は `aiModels.id` (例: "openai:gpt-4o") を保持し、
-  // `validateModelAccess` / `recordUsage` のキーとして使う。
-  // `apiModelId` はプロバイダー API 呼び出し用の生モデル名 (例: "gpt-4o") で
-  // YouTube extractor 経由でプロバイダー SDK に渡す。
-  // `aiModel` keeps the catalog id (e.g. "openai:gpt-4o") used as the key for
-  // `validateModelAccess` / `recordUsage`. `apiModelId` is the provider-facing
-  // model name (e.g. "gpt-4o") forwarded to the provider SDK via the extractor.
-  let aiProvider: AIProviderType | undefined;
-  let aiModel: string | undefined;
-  let apiModelId: string | undefined;
-  let aiApiKey: string | undefined;
-
-  const supportedProviders: AIProviderType[] = ["openai", "anthropic", "google"];
-
-  // provider/model は両方指定するか両方省略する必要がある（ext.ts の /clip-and-create と一致させる）
-  // provider/model must be specified together or both omitted (consistent with ext.ts /clip-and-create)
-  const hasProvider = typeof body.provider === "string" && body.provider.trim().length > 0;
-  const hasModel = typeof body.model === "string" && body.model.trim().length > 0;
-  if (hasProvider !== hasModel) {
-    throw new HTTPException(400, {
-      message: "provider and model must be specified together",
-    });
-  }
-
-  if (hasProvider && hasModel) {
-    const providerInput = (body.provider as string).trim() as AIProviderType;
-    const modelInput = (body.model as string).trim();
-    if (!supportedProviders.includes(providerInput)) {
-      throw new HTTPException(400, { message: `unsupported provider: ${providerInput}` });
-    }
-    aiProvider = providerInput;
-    aiModel = modelInput;
-
-    // モデルアクセス・利用量チェック / Model access & usage enforcement
-    // 既知の検証エラーは HTTPException(400/403) として返す
-    // Known validation errors are translated to HTTPException(400/403)
-    const tier = await getUserTier(userId, db);
-    const modelInfo = await validateModelAccessOrThrow(aiModel, tier, db);
-    const usageCheck = await checkUsage(userId, tier, db);
-    if (!usageCheck.allowed) {
-      throw new HTTPException(429, { message: "Monthly budget exceeded" });
-    }
-
-    // モデル情報から provider を上書き（DB 上の provider が正）
-    // Override provider from model info (DB is authoritative)
-    // API キーは上書き後の provider で取得する（provider 不一致バグ防止）
-    // `aiModel` は catalog id のまま保持し、プロバイダー SDK 用に
-    // `apiModelId` を別変数で保持する。両者を混同すると validateModelAccess /
-    // recordUsage が apiModelId で aiModels.id を引いてしまい、catch に落ちて
-    // 課金記録が静かにスキップされる。
-    // Keep `aiModel` as the catalog id; expose `apiModelId` separately for the
-    // provider SDK. Mixing them silently breaks usage accounting because
-    // validateModelAccess looks up `aiModels.id` and the apiModelId form will
-    // not match, swallowed by the non-fatal catch below.
-    aiProvider = modelInfo.provider as AIProviderType;
-    apiModelId = modelInfo.apiModelId;
-
-    const apiKeyName = getProviderApiKeyName(aiProvider);
-    aiApiKey = process.env[apiKeyName];
-    if (!aiApiKey) {
-      throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });
-    }
-  }
+  // AI 要約の設定（ext.ts の /clip-and-create と検証ロジックを共通化）
+  // AI summary configuration (validation/access-control shared with
+  // ext.ts /clip-and-create via resolveAiConfigForRequest()).
+  //
+  // resolveAiConfigForRequest() は以下をまとめて担当する：
+  //  - provider/model は両方指定 or 両方省略の強制
+  //  - サポート provider のチェック
+  //  - tier ベースのモデルアクセス検証 + 月次予算チェック
+  //  - DB 上の provider/apiModelId を「正」として返す
+  //  - 対応する API キーの環境変数解決
+  // resolveAiConfigForRequest() centralizes: paired provider/model validation,
+  // supported-provider check, tier-based access + monthly budget enforcement,
+  // DB-canonical provider/apiModelId resolution, and API-key lookup.
+  const aiConfig = await resolveAiConfigForRequest({
+    userId,
+    db,
+    provider: body.provider,
+    model: body.model,
+  });
+  const aiProvider: AIProviderType | undefined = aiConfig?.provider;
+  // プロバイダー SDK 呼び出し用の生モデル名（例: "gpt-4o"）。
+  // catalog id (`aiModels.id`) は `aiConfig.internalModelId` に保持され、
+  // recordUsage 側で利用する。
+  // Provider-facing model name (e.g. "gpt-4o") for the SDK call. The catalog
+  // id (`aiModels.id`) lives on `aiConfig.internalModelId` and is used by
+  // recordUsage below.
+  const apiModelId: string | undefined = aiConfig?.apiModelId;
+  const aiApiKey: string | undefined = aiConfig?.apiKey;
 
   try {
     const result = await extractYouTubeContent({
@@ -203,22 +160,21 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     // 使用量記録 / Record usage
     // result.aiUsage が null でない場合のみ課金（AI が実際に成功した場合）
     // 記録失敗は非致命的 — 抽出結果を破棄しない
-    // Bill only when AI actually ran successfully (result.aiUsage !== null)
-    // Recording failure is non-fatal — don't discard the extraction result
     //
-    // ここではアクセス検証時にトリム済みの aiModel を使う。生の `body.model` には
-    // 前後空白や別表記が含まれうるため、`validateModelAccess` の再検証も
-    // recordUsage の保存値もトリム後の正規 model id (`aiModel`) で行わないと、
-    // 同一モデルが複数の正規化前文字列で記録され、使用量集計や請求がブレる。
-    // Use the already-trimmed `aiModel` for re-validation and accounting so usage
-    // records are stable for the same model regardless of input whitespace.
-    if (result.aiUsage && aiProvider && aiModel) {
+    // resolveAiConfigForRequest() がアクセスチェック時に取得した tier / modelInfo
+    // をそのまま再利用し、同一リクエスト内での DB クエリ重複を避ける。
+    // また `internalModelId` はトリム済みの正規 model id (`aiModels.id`) なので、
+    // 生の `body.model` を使った場合に起きる「同一モデルが複数表記で記録され、
+    // 使用量集計や請求がブレる」事象を防げる。
+    // Bill only when AI actually ran successfully (result.aiUsage !== null).
+    // Reuse the tier / modelInfo captured during resolveAiConfigForRequest()
+    // to avoid duplicate DB queries within the same request. `internalModelId`
+    // is the already-trimmed canonical `aiModels.id`, so usage records stay
+    // stable regardless of input whitespace / casing.
+    if (result.aiUsage && aiConfig) {
       try {
-        // プロバイダーから返された実際のトークン数を使用（概算ではなく）
-        // Use actual token counts returned by the provider (not estimates)
         const { inputTokens, outputTokens } = result.aiUsage;
-        const tier = await getUserTier(userId, db);
-        const modelInfo = await validateModelAccess(aiModel, tier, db);
+        const { modelInfo, internalModelId } = aiConfig;
         const costUnits = calculateCost(
           { inputTokens, outputTokens },
           modelInfo.inputCostUnits,
@@ -226,7 +182,7 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
         );
         await recordUsage(
           userId,
-          aiModel,
+          internalModelId,
           "youtube_summary",
           { inputTokens, outputTokens },
           costUnits,

@@ -198,7 +198,7 @@ export function extractTextFromTiptap(node: TiptapNode | null): string {
  * YouTube URL から動画 ID を抽出する（サーバーサイド版）。
  * Extracts a YouTube video ID from various YouTube URL formats (server-side).
  */
-function extractYouTubeVideoId(url: string): string | null {
+export function extractYouTubeVideoId(url: string): string | null {
   const patterns = [
     /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i,
     /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,

@@ -34,13 +34,45 @@ function getApiBaseUrl(): string {
 /**
  * 指定ページに関連する Lint findings を取得する。
  * Fetches lint findings related to a specific page.
+ *
+ * 認証エラー（401/403）はログイン未済を意味するので空配列を返してカードを
+ * 出さない。それ以外のサーバーエラーは throw して React Query の `error` に
+ * 流し、UI 側で「失敗 = findings が無い」と誤解されないようにする。
+ *
+ * 401/403 mean the user is not signed in; return an empty list so the card
+ * stays hidden. Any other non-OK response is thrown so React Query surfaces
+ * the failure instead of silently rendering an empty state.
  */
+/**
+ * Response からエラーメッセージを抽出する。`message` が空文字 / `statusText`
+ * が空のケースでも fallback に倒れるよう、`??` ではなくトリム後の長さで判定する。
+ *
+ * Extracts an error message from a Response, falling back to `fallback` when
+ * the body's `message` is empty/whitespace or `statusText` is empty. The check
+ * is intentionally non-empty-after-trim, not nullish coalescing.
+ */
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  const body: unknown = await res.json().catch(() => null);
+  const candidate =
+    typeof body === "object" &&
+    body !== null &&
+    "message" in body &&
+    typeof (body as { message?: unknown }).message === "string"
+      ? (body as { message: string }).message
+      : res.statusText;
+  const trimmed = candidate.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
 async function fetchPageFindings(pageId: string): Promise<LintFindingResponse[]> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/lint/findings/page/${encodeURIComponent(pageId)}`, {
     credentials: "include",
   });
-  if (!res.ok) return [];
+  if (res.status === 401 || res.status === 403) return [];
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Failed to fetch lint findings"));
+  }
   const data = (await res.json()) as { findings: LintFindingResponse[] };
   return data.findings;
 }
@@ -56,8 +88,7 @@ async function resolveFinding(findingId: string): Promise<void> {
     credentials: "include",
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((body as { message?: string }).message ?? "Failed to resolve finding");
+    throw new Error(await readErrorMessage(res, "Failed to resolve finding"));
   }
 }
 
@@ -150,7 +181,13 @@ interface LintSuggestionsProps {
 export function LintSuggestions({ pageId }: LintSuggestionsProps) {
   const queryClient = useQueryClient();
 
-  const { data: findings, isLoading } = useQuery({
+  const {
+    data: findings,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["lintFindings", pageId],
     queryFn: () => fetchPageFindings(pageId),
     staleTime: 1000 * 60, // 1 minute
@@ -168,6 +205,29 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
       <div className="mt-4 space-y-2">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-16 w-full" />
+      </div>
+    );
+  }
+
+  // findings 取得失敗を空状態と区別して表示する。空にしてしまうと「指摘なし」
+  // に見えてしまうので、明示的にエラーメッセージと再試行ボタンを出す。
+  // Surface API failures explicitly so an error is not mistaken for "no
+  // findings" (the previous behaviour collapsed silently to null).
+  if (isError) {
+    return (
+      // role="alert" でエラー発生をスクリーンリーダーに通知する。
+      // Announce the failure to assistive tech as a live error region.
+      <div role="alert" className="mt-6 space-y-3 border-t pt-6">
+        <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <span>Suggestions の取得に失敗しました</span>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          {error instanceof Error ? error.message : "Unknown error"}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+          再試行
+        </Button>
       </div>
     );
   }
@@ -200,6 +260,7 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
               className="shrink-0"
               onClick={() => resolveMutation.mutate(f.id)}
               disabled={resolveMutation.isPending}
+              aria-label="この Suggestion を解決済みにする / Mark suggestion as resolved"
             >
               <CheckCircle2 className="h-4 w-4" />
             </Button>

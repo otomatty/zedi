@@ -17,17 +17,11 @@ import {
   issueExtensionToken,
   storeExtensionCode,
 } from "../lib/extAuth.js";
+import { extractYouTubeVideoId } from "../lib/articleExtractor.js";
 import { clipAndCreate } from "../lib/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
-import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
-import { getProviderApiKeyName } from "../services/aiProviders.js";
-import { getUserTier } from "../services/subscriptionService.js";
-import {
-  checkUsage,
-  validateModelAccess,
-  calculateCost,
-  recordUsage,
-} from "../services/usageService.js";
+import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
+import { calculateCost, recordUsage } from "../services/usageService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -176,56 +170,24 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
     });
   }
 
-  // YouTube 要約用の AI パラメータ / AI params for YouTube summary
-  // clip.ts の /youtube と同じ検証・アクセス制御ロジックをミラーする
-  // Mirror the validation / access control logic from clip.ts /youtube
+  // provider/model は YouTube 要約時だけ意味を持つため、通常の Web クリップでは
+  // AI 設定を解決しない。そうしないと非 YouTube 保存でも 403/429/503 を返しうる。
+  // provider/model only apply to the YouTube-summary path, so skip AI resolution
+  // for regular web clipping and avoid unrelated 403/429/503 failures.
   const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
-  let aiProvider: AIProviderType | undefined;
-  let aiModel: string | undefined;
-  let aiApiKey: string | undefined;
-  const clientModelId = body.model; // 使用量記録に必要な元の（検証前の）モデル ID
-  // Original client-supplied model ID (before resolution) for usage recording
+  const isYouTubeUrl = extractYouTubeVideoId(url) !== null;
 
-  const supportedProviders: AIProviderType[] = ["openai", "anthropic", "google"];
-
-  // provider/model は両方指定するか両方省略する必要がある
-  // provider/model must be specified together or both omitted
-  const hasProvider = typeof body.provider === "string" && body.provider.trim().length > 0;
-  const hasModel = typeof body.model === "string" && body.model.trim().length > 0;
-  if (hasProvider !== hasModel) {
-    throw new HTTPException(400, {
-      message: "provider and model must be specified together",
-    });
-  }
-
-  if (hasProvider && hasModel) {
-    if (!supportedProviders.includes(body.provider as AIProviderType)) {
-      throw new HTTPException(400, { message: `unsupported provider: ${body.provider}` });
-    }
-
-    // モデルアクセス・利用量チェック / Model access & usage enforcement
-    // 既知の検証エラーは HTTPException(400/403) として返す
-    // Known validation errors are translated to HTTPException(400/403)
-    const tier = await getUserTier(userId, db);
-    const modelInfo = await validateModelAccessOrThrow(body.model as string, tier, db);
-    const usageCheck = await checkUsage(userId, tier, db);
-    if (!usageCheck.allowed) {
-      throw new HTTPException(429, { message: "Monthly budget exceeded" });
-    }
-
-    // モデル情報から provider を上書き（DB 上の provider が正）
-    // 内部 composite ID (例: "openai:gpt-4o") を API model ID (例: "gpt-4o") に解決
-    // Override provider from model info (DB is authoritative)
-    // Resolve internal composite ID (e.g. "openai:gpt-4o") to API model ID (e.g. "gpt-4o")
-    aiProvider = modelInfo.provider as AIProviderType;
-    aiModel = modelInfo.apiModelId;
-
-    const apiKeyName = getProviderApiKeyName(aiProvider);
-    aiApiKey = process.env[apiKeyName];
-    if (!aiApiKey) {
-      throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });
-    }
-  }
+  const aiConfig = isYouTubeUrl
+    ? await resolveAiConfigForRequest({
+        userId,
+        db,
+        provider: body.provider,
+        model: body.model,
+      })
+    : null;
+  const aiProvider: AIProviderType | undefined = aiConfig?.provider;
+  const aiModel: string | undefined = aiConfig?.apiModelId;
+  const aiApiKey: string | undefined = aiConfig?.apiKey;
 
   try {
     const result = await clipAndCreate({
@@ -241,13 +203,15 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
     // 使用量記録 / Record usage
     // result.ai_usage が null でない場合のみ課金（AI が実際に成功した場合）
     // 記録失敗は非致命的
-    // Bill only when AI actually ran successfully (result.ai_usage !== null)
-    // Recording failure is non-fatal
-    if (result.ai_usage && aiProvider && clientModelId) {
+    // resolveAiConfigForRequest() がアクセスチェック時に取得した tier / modelInfo
+    // をそのまま再利用し、同一リクエスト内での DB クエリ重複を避ける。
+    // Bill only when AI actually ran successfully (result.ai_usage !== null).
+    // Reuse the tier / modelInfo captured during resolveAiConfigForRequest()
+    // to avoid duplicate DB queries within the same request.
+    if (result.ai_usage && aiConfig) {
       try {
         const { inputTokens, outputTokens } = result.ai_usage;
-        const tier = await getUserTier(userId, db);
-        const modelInfo = await validateModelAccess(clientModelId, tier, db);
+        const { modelInfo, internalModelId } = aiConfig;
         const costUnits = calculateCost(
           { inputTokens, outputTokens },
           modelInfo.inputCostUnits,
@@ -255,7 +219,7 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
         );
         await recordUsage(
           userId,
-          clientModelId,
+          internalModelId,
           "youtube_summary",
           { inputTokens, outputTokens },
           costUnits,

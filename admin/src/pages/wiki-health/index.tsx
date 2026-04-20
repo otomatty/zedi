@@ -19,19 +19,26 @@ export default function WikiHealth() {
   const [ruleFilter, setRuleFilter] = useState<LintRule | undefined>(undefined);
 
   const isMountedRef = useRef(true);
+  // 連打や解決アクション直後の reload で複数の getLintFindings が同時に
+  // 走ることがある。requestId を発行して最新の応答以外を破棄しないと
+  // 古いリクエストの結果で findings が上書きされ、解決済み項目が再表示される。
+  // Track in-flight request id so older getLintFindings responses cannot
+  // overwrite a newer one (e.g. reload tapped twice or resolve+reload race).
+  const requestIdRef = useRef(0);
 
   const loadFindings = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     if (isMountedRef.current) setLoading(true);
     if (isMountedRef.current) setError(null);
     try {
       const result = await getLintFindings();
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
       setFindings(result.findings);
     } catch (e) {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      if (isMountedRef.current) setLoading(false);
+      if (isMountedRef.current && requestId === requestIdRef.current) setLoading(false);
     }
   }, []);
 

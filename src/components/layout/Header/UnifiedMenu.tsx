@@ -226,12 +226,16 @@ export const SignedOutMenuContent: React.FC<MenuContentProps> = ({ onClose }) =>
       <AccountActionsList items={items} isSignedIn={false} variant="list" onClose={onClose} />
       <hr className="border-border my-1" />
       <div className="p-2">
-        <Link to="/sign-in" onClick={onClose}>
-          <Button className="w-full gap-2">
+        {/* `<Link><Button>` だと <a> の中に <button> が入って不正な HTML に
+            なる。`Button asChild` で Link を Button としてレンダリングする。
+            Avoid nesting <button> inside <a>; render the Link as the button
+            via `asChild` so the markup stays valid (and a11y semantics work). */}
+        <Button asChild className="w-full gap-2">
+          <Link to="/sign-in" onClick={onClose}>
             <LogIn className="h-4 w-4" />
             {t("nav.signIn")}
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
     </>
   );

@@ -1,4 +1,4 @@
-import { adminFetch } from "./client";
+import { adminFetch, getErrorMessage } from "./client";
 
 /**
  * 活動ログの種別。
@@ -52,11 +52,6 @@ export interface ActivityListParams {
   to?: string;
   limit?: number;
   offset?: number;
-}
-
-async function getErrorMessage(res: Response, fallback: string): Promise<string> {
-  const err = await res.json().catch(() => ({ message: res.statusText }));
-  return (err as { message?: string }).message ?? fallback;
 }
 
 /**

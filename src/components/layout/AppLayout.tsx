@@ -32,8 +32,23 @@ export function AppLayout({ children }: AppLayoutProps) {
       }
     >
       <Header />
-      {/* min-h-0: flex 子が親より伸びてページ全体がスクロールするのを防ぐ */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* min-h-0: flex 子が親より伸びてページ全体がスクロールするのを防ぐ。
+          モバイルでは BottomNav が fixed で main の下端に被さるため、
+          padding-bottom で BottomNav 分（safe-area 含む）の余白を確保する。
+          On mobile, BottomNav is `position: fixed` and overlays the bottom of
+          `<main>`, so reserve that height (plus the safe-area inset) as
+          padding-bottom to keep page content scrollable past the nav. */}
+      <div
+        className="flex min-h-0 flex-1 overflow-hidden"
+        style={
+          isMobile
+            ? {
+                paddingBottom:
+                  "calc(var(--app-bottom-nav-height, 3.5rem) + env(safe-area-inset-bottom))",
+              }
+            : undefined
+        }
+      >
         <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {children}
         </main>
