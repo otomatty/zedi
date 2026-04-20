@@ -26,11 +26,20 @@ export const subscriptionQueryKey = ["subscription"] as const;
  * そのまま使える派生フラグをまとめて提供する。
  */
 export interface UseSubscriptionResult {
-  /** Current plan on the subscription contract ("pro" even while canceled). */
+  /**
+   * Current plan on the subscription contract ("pro" even while canceled).
+   * サブスクリプション契約上の現在のプラン（解約予約中の Pro でも `"pro"`）。
+   */
   plan: SubscriptionState["plan"];
-  /** Subscription status from backend ("active" | "canceled" | "past_due" | "trialing" | ...). */
+  /**
+   * Subscription status from backend ("active" | "canceled" | "past_due" | "trialing" | ...).
+   * バックエンドから返るステータス（"active" / "canceled" / "past_due" / "trialing" など）。
+   */
   status: string;
-  /** Current billing cadence, or null when no subscription exists. */
+  /**
+   * Current billing cadence, or null when no subscription exists.
+   * 現在の請求間隔。サブスクリプションが無ければ null。
+   */
   billingInterval: SubscriptionState["billingInterval"];
   /**
    * Current period start as an ISO date-time string, or null.
@@ -48,17 +57,35 @@ export interface UseSubscriptionResult {
    * Polar サブスクリプションの ID（ポータル／解約で使用）。なければ null。
    */
   externalId: string | null;
-  /** True when the viewer currently has a live Pro entitlement. */
+  /**
+   * True when the viewer currently has a live Pro entitlement.
+   * 現在 Pro の利用権を持っている場合 true。
+   */
   isProUser: boolean;
-  /** True when the Pro subscription is scheduled to cancel at period end. */
+  /**
+   * True when the Pro subscription is scheduled to cancel at period end.
+   * Pro サブスクリプションが期間末で解約予約されている場合 true。
+   */
   isCanceled: boolean;
-  /** Usage from the subscription API. */
+  /**
+   * Usage from the subscription API.
+   * サブスクリプション API から取得した使用量情報。
+   */
   usage: SubscriptionState["usage"];
-  /** Initial-fetch loading state (false when signed out). */
+  /**
+   * Initial-fetch loading state (false when signed out).
+   * 初回取得中のローディング状態（未サインイン時は常に false）。
+   */
   isLoading: boolean;
-  /** Error if the last fetch failed. */
+  /**
+   * Error if the last fetch failed.
+   * 直近の取得が失敗したときのエラー。
+   */
   error: Error | null;
-  /** Refetch subscription state (e.g. after returning from checkout). */
+  /**
+   * Refetch subscription state (e.g. after returning from checkout).
+   * サブスクリプション状態を再取得する（チェックアウトから戻った直後など）。
+   */
   refetch: () => void;
   /**
    * Invalidate the subscription query cache. Call this after mutations that
