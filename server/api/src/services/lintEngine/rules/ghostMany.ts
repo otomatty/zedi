@@ -22,13 +22,20 @@ const GHOST_LINK_THRESHOLD = 3;
  * @returns Ghost Link 過多の検出結果 / Ghost link excess findings
  */
 export async function runGhostManyRule(ownerId: string, db: Database): Promise<LintRuleResult> {
-  // owner_id でフィルタするため、ghost_links → pages を JOIN して owner を制限
-  // Join ghost_links → pages to filter by owner_id
+  // owner_id でフィルタするため、ghost_links → pages を JOIN して owner を制限。
+  // ルールの意図は「同じ link_text が N+ の **異なるソースページ** に登場する」こと。
+  // `count(*)` だと同一ページ内で同じ link_text が複数回現れるとそれを別件として
+  // 数えてしまい、実質 1 ページしか参照していなくても閾値を超える偽陽性が出る。
+  // `count(DISTINCT source_page_id)` と `array_agg(DISTINCT source_page_id)` で
+  // ページ単位の集計に揃え、HAVING も distinct count で判定する。
+  // Use distinct source page counts so multiple occurrences of the same link
+  // text inside one page are not double-counted as separate sources.
+  // Join ghost_links → pages to filter by owner_id.
   const rows = await db
     .select({
       linkText: ghostLinks.linkText,
-      count: sql<number>`count(*)::int`.as("cnt"),
-      sourcePageIds: sql<string[]>`array_agg(${ghostLinks.sourcePageId}::text)`.as(
+      count: sql<number>`count(DISTINCT ${ghostLinks.sourcePageId})::int`.as("cnt"),
+      sourcePageIds: sql<string[]>`array_agg(DISTINCT ${ghostLinks.sourcePageId}::text)`.as(
         "source_page_ids",
       ),
     })
@@ -36,7 +43,7 @@ export async function runGhostManyRule(ownerId: string, db: Database): Promise<L
     .innerJoin(pages, eq(ghostLinks.sourcePageId, pages.id))
     .where(and(eq(pages.ownerId, ownerId), eq(pages.isDeleted, false)))
     .groupBy(ghostLinks.linkText)
-    .having(sql`count(*) >= ${GHOST_LINK_THRESHOLD}`);
+    .having(sql`count(DISTINCT ${ghostLinks.sourcePageId}) >= ${GHOST_LINK_THRESHOLD}`);
 
   return {
     rule: "ghost_many",
