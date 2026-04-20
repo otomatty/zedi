@@ -1,395 +1,102 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Check, Sparkles, Zap } from "lucide-react";
-import { Button } from "@zedi/ui";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zedi/ui";
-import { Badge } from "@zedi/ui";
-import { Progress } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { cn } from "@zedi/ui";
+import {
+  BillingIntervalToggle,
+  PlanComparisonCards,
+  PlanStatusCard,
+  PricingAiInfo,
+  PricingFaq,
+  SubscriptionActions,
+} from "@/components/pricing";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { openProCheckout, type BillingInterval } from "@/lib/subscriptionService";
 
-interface PlanFeature {
-  text: string;
-  included: boolean;
-}
-
-interface PlanCardProps {
-  name: string;
-  description: string;
-  price: string;
-  priceNote?: string;
-  features: PlanFeature[];
-  buttonText: string;
-  buttonVariant?: "default" | "outline";
-  popular?: boolean;
-  icon: React.ReactNode;
-  onSelect?: () => void;
-  disabled?: boolean;
-  current?: boolean;
-  extraContent?: React.ReactNode;
-  /** ボタンに表示するアイコン（例: 外部リンク） */
-  buttonIcon?: React.ReactNode;
-  /** false のときフッターのボタンを表示しない（Free プラン用） */
-  showButton?: boolean;
-}
-
-const PlanCard: React.FC<PlanCardProps> = ({
-  name,
-  description,
-  price,
-  priceNote,
-  features,
-  buttonText,
-  buttonVariant = "default",
-  popular,
-  icon,
-  onSelect,
-  disabled,
-  current,
-  extraContent,
-  buttonIcon,
-  showButton = true,
-}) => {
-  const { t } = useTranslation();
-  return (
-    <Card className={cn("relative flex flex-col", popular && "border-primary shadow-lg")}>
-      {popular && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-          {t("pricing.recommended")}
-        </Badge>
-      )}
-      {current && (
-        <Badge variant="secondary" className="absolute top-3 right-3">
-          {t("pricing.currentPlan")}
-        </Badge>
-      )}
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
-            {icon}
-          </div>
-          <div>
-            <CardTitle className="text-lg">{name}</CardTitle>
-            <CardDescription>{description}</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-1">
-        <div className="mb-6">
-          <span className="text-3xl font-bold">{price}</span>
-          {priceNote && <span className="text-muted-foreground ml-2 text-sm">{priceNote}</span>}
-        </div>
-        <ul className="space-y-3">
-          {features.map((feature, index) => (
-            <li key={index} className="flex items-start gap-2">
-              <Check
-                className={cn(
-                  "mt-0.5 h-4 w-4 shrink-0",
-                  feature.included ? "text-primary" : "text-muted-foreground/30",
-                )}
-              />
-              <span
-                className={cn("text-sm", !feature.included && "text-muted-foreground line-through")}
-              >
-                {feature.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {extraContent && <div className="mt-4">{extraContent}</div>}
-      </CardContent>
-      {showButton && (
-        <CardFooter>
-          <Button className="w-full" variant={buttonVariant} onClick={onSelect} disabled={disabled}>
-            <span className="flex items-center justify-center gap-2">
-              {buttonText}
-              {buttonIcon ?? null}
-            </span>
-          </Button>
-        </CardFooter>
-      )}
-    </Card>
-  );
-};
-
-interface CurrentPlanStatusProps {
-  isSignedIn: boolean;
-  isProUser: boolean;
-  usage: { consumedUnits: number; budgetUnits: number; usagePercent: number } | null;
-}
-
-function CurrentPlanStatus({ isSignedIn, isProUser, usage }: CurrentPlanStatusProps) {
-  const { t } = useTranslation();
-
-  if (!isSignedIn) {
-    return (
-      <div className="mb-10 text-center">
-        <p className="text-muted-foreground">{t("pricing.signInPrompt")}</p>
-      </div>
-    );
-  }
-
-  const percent = usage ? Math.min(usage.usagePercent, 100) : 0;
-  const isWarning = percent >= 80;
-  const isDanger = percent >= 95;
-  const consumed = usage?.consumedUnits ?? 0;
-  const budget = usage?.budgetUnits ?? 0;
-  const yearMonth = new Date().toISOString().slice(0, 7);
-
-  return (
-    <div className="mx-auto mb-10">
-      <h2 className="mb-2 text-xl font-bold">{t("pricing.heading")}</h2>
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {isProUser ? (
-                <Zap className="text-primary h-5 w-5" />
-              ) : (
-                <Sparkles className="text-muted-foreground h-5 w-5" />
-              )}
-              <span className="text-lg font-semibold">
-                {isProUser ? t("pricing.status.proPlan") : t("pricing.status.freePlan")}
-              </span>
-            </div>
-            <span className="text-muted-foreground text-sm">{yearMonth}</span>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{t("pricing.status.aiUsage")}</span>
-              <span
-                className={cn(
-                  "font-medium tabular-nums",
-                  isDanger
-                    ? "text-destructive"
-                    : isWarning
-                      ? "text-yellow-600 dark:text-yellow-400"
-                      : "text-foreground",
-                )}
-              >
-                {percent.toFixed(1)}%
-              </span>
-            </div>
-            <Progress
-              value={percent}
-              className={cn(
-                "h-2.5",
-                isDanger && "[&>div]:bg-destructive",
-                isWarning && !isDanger && "[&>div]:bg-yellow-500",
-              )}
-            />
-            <div className="text-muted-foreground flex items-center justify-between text-xs">
-              <span>
-                {consumed.toLocaleString()} / {budget.toLocaleString()}{" "}
-                {t("pricing.status.costUnits")}
-              </span>
-              <span>
-                {t("pricing.status.remaining")}: {Math.max(0, budget - consumed).toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          {isDanger && (
-            <p className="text-destructive text-xs">{t("pricing.status.dangerWarning")}</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function PricingAiInfo() {
-  const { t } = useTranslation();
-  return (
-    <div className="mx-auto mt-12 max-w-3xl">
-      <h3 className="mb-4 text-center text-lg font-semibold">{t("pricing.aiInfo.title")}</h3>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border p-4">
-          <h4 className="mb-2 flex items-center gap-2 font-medium">
-            <Sparkles className="text-primary h-4 w-4" />
-            {t("pricing.aiInfo.freeTitle")}
-          </h4>
-          <ul className="text-muted-foreground space-y-1 text-sm">
-            <li>- {t("pricing.aiInfo.freeFeatures.models")}</li>
-            <li>- {t("pricing.aiInfo.freeFeatures.limit")}</li>
-            <li>- {t("pricing.aiInfo.freeFeatures.features")}</li>
-          </ul>
-        </div>
-        <div className="border-primary/20 bg-primary/5 rounded-lg border p-4">
-          <h4 className="mb-2 flex items-center gap-2 font-medium">
-            <Zap className="text-primary h-4 w-4" />
-            {t("pricing.aiInfo.proTitle")}
-          </h4>
-          <ul className="text-muted-foreground space-y-1 text-sm">
-            <li>- {t("pricing.aiInfo.proFeatures.models")}</li>
-            <li>- {t("pricing.aiInfo.proFeatures.limit")}</li>
-            <li>- {t("pricing.aiInfo.proFeatures.features")}</li>
-          </ul>
-        </div>
-      </div>
-      <p className="text-muted-foreground mt-4 text-center text-xs">
-        {t("pricing.aiInfo.ownApiKeyNote")}
-      </p>
-    </div>
-  );
-}
-
-function PricingFaq() {
-  const { t } = useTranslation();
-  const faqItems = [
-    "whatAreCostUnits",
-    "usageCalculation",
-    "budgetExceeded",
-    "apiKeyDifference",
-    "refundPolicy",
-  ] as const;
-  return (
-    <div className="mx-auto mt-12 max-w-3xl">
-      <h3 className="mb-4 text-center text-lg font-semibold">{t("pricing.faq.title")}</h3>
-      <div className="space-y-4">
-        {faqItems.map((key) => (
-          <div key={key} className="rounded-lg border p-4">
-            <h4 className="mb-1 font-medium">{t(`pricing.faq.${key}.question`)}</h4>
-            <p className="text-muted-foreground text-sm">{t(`pricing.faq.${key}.answer`)}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BillingIntervalToggle({
-  value,
-  onChange,
-}: {
-  value: BillingInterval;
-  onChange: (v: BillingInterval) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="mb-6 flex justify-center gap-2">
-      <Button
-        variant={value === "monthly" ? "default" : "outline"}
-        size="sm"
-        onClick={() => onChange("monthly")}
-      >
-        {t("pricing.billingMonthly")}
-      </Button>
-      <Button
-        variant={value === "yearly" ? "default" : "outline"}
-        size="sm"
-        onClick={() => onChange("yearly")}
-      >
-        {t("pricing.billingYearly")}
-      </Button>
-    </div>
-  );
-}
-
-interface PricingPlanCardsProps {
-  billingInterval: BillingInterval;
-  isProUser: boolean;
-  isSignedIn: boolean;
-  onSelectPro: () => Promise<void>;
-  onManageSubscription: () => Promise<void>;
-}
-
-function PricingPlanCards({
-  billingInterval,
-  isProUser,
-  isSignedIn,
-  onSelectPro,
-  onManageSubscription,
-}: PricingPlanCardsProps) {
-  const { t } = useTranslation();
-  return (
-    <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
-      <PlanCard
-        name={t("pricing.free.name")}
-        description={t("pricing.free.description")}
-        price={t("pricing.free.price")}
-        icon={<Sparkles className="h-5 w-5" />}
-        features={[
-          { text: t("pricing.free.features.pages"), included: true },
-          { text: t("pricing.free.features.cloudSync"), included: true },
-          { text: t("pricing.free.features.wikiLinks"), included: true },
-          { text: t("pricing.free.features.basicAI"), included: true },
-          { text: t("pricing.free.features.unlimitedPages"), included: false },
-          { text: t("pricing.free.features.advancedAI"), included: false },
-        ]}
-        buttonText={t("pricing.free.buttonText")}
-        buttonVariant="outline"
-        current={!isProUser}
-        showButton={false}
-      />
-      <PlanCard
-        name={t("pricing.pro.name")}
-        description={t("pricing.pro.description")}
-        price={
-          billingInterval === "yearly"
-            ? t("pricing.pro.priceYearlyDisplay")
-            : t("pricing.pro.priceMonthlyDisplay")
-        }
-        priceNote={
-          billingInterval === "yearly"
-            ? t("pricing.pro.priceYearlyNote")
-            : t("pricing.pro.priceMonthlyNote")
-        }
-        icon={<Zap className="h-5 w-5" />}
-        popular
-        features={[
-          { text: t("pricing.pro.features.unlimitedPages"), included: true },
-          { text: t("pricing.pro.features.cloudSync"), included: true },
-          { text: t("pricing.pro.features.wikiLinks"), included: true },
-          { text: t("pricing.pro.features.allAIModels"), included: true },
-          { text: t("pricing.pro.features.expandedUsage"), included: true },
-          { text: t("pricing.pro.features.ownApiKey"), included: true },
-        ]}
-        buttonText={
-          isProUser
-            ? t("pricing.pro.manageSubscription")
-            : billingInterval === "yearly"
-              ? t("pricing.pro.subscribeYearly")
-              : t("pricing.pro.subscribeMonthly")
-        }
-        onSelect={isProUser ? onManageSubscription : onSelectPro}
-        current={isProUser}
-        disabled={!isSignedIn}
-      />
-    </div>
-  );
+/**
+ * Scroll to the deep-linked `#manage` anchor once the subscription state has
+ * loaded so the element exists in the DOM. Runs only once per hash so the
+ * page scroll isn't hijacked on subsequent state updates.
+ *
+ * サブスク状態のロード後に `#manage` アンカーへスクロールする。ハッシュ毎に
+ * 1 回だけ実行するため、以降の状態更新でスクロールが奪われない。
+ */
+function useScrollToHashOnReady(ready: boolean) {
+  const { hash } = useLocation();
+  const lastScrolled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !hash) return;
+    if (lastScrolled.current === hash) return;
+    const el = document.getElementById(hash.replace(/^#/, ""));
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      lastScrolled.current = hash;
+    }
+  }, [ready, hash]);
 }
 
 /**
+ * Unified pricing page — combines the plan comparison (`/pricing`) and the
+ * subscription management (`/subscription`) UIs into a single page whose
+ * sections render conditionally based on auth and plan. See issue #671.
  *
+ * 統合版プランページ。ログイン状態とプランに応じてセクションを出し分け、
+ * `/pricing` と旧 `/subscription` の UI を 1 ページにまとめる。Issue #671 を参照。
  */
 const Pricing: React.FC = () => {
   const { t } = useTranslation();
   const { isSignedIn } = useAuth();
-  const { isProUser, usage, isLoading, refetch } = useSubscription();
-  const navigate = useNavigate();
+  const {
+    plan,
+    status,
+    billingInterval,
+    currentPeriodEnd,
+    isCanceled,
+    usage,
+    isLoading,
+    invalidate,
+  } = useSubscription();
 
-  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
+  const [selectedBillingInterval, setSelectedBillingInterval] =
+    useState<BillingInterval>("monthly");
 
-  useEffect(() => {
-    if (isSignedIn) refetch();
-  }, [isSignedIn, refetch]);
+  useScrollToHashOnReady(!isLoading);
 
   const handleSelectPro = async () => {
-    if (!isSignedIn) return;
-    await openProCheckout(billingInterval);
-    setTimeout(() => refetch(), 5000);
+    if (!isSignedIn || isLoading) return;
+    await openProCheckout(selectedBillingInterval);
+    // 5s delay keeps the UI responsive while the Polar webhook reconciles.
+    // 5 秒待つことで Polar の webhook 完了後に最新状態を反映しやすくする。
+    setTimeout(() => {
+      void invalidate();
+    }, 5000);
   };
 
-  const handleManageSubscription = async () => {
-    navigate("/subscription");
-  };
+  // Wait for the subscription query to settle before deciding whether to show
+  // acquisition UI (billing toggle, Pro CTA) vs. the management UI. Without
+  // this guard a still-loading Pro user briefly sees checkout controls for a
+  // plan they already own.
+  // サブスクリプションのクエリが確定するまで、checkout 系 UI と管理 UI の
+  // 出し分けを保留する。保留しないと、既に Pro のユーザーがロード中だけ
+  // 新規契約 UI を見てしまう。
+  const subscriptionReady = !isSignedIn || !isLoading;
+  const hasProSubscription = plan === "pro";
+  const showPlanStatusCard = isSignedIn && subscriptionReady;
+  // Pro subscribers (including those who scheduled cancellation) get the
+  // management section and skip the billing-cadence toggle — reactivation
+  // and interval changes live in SubscriptionActions instead.
+  // 解約予約中を含む Pro 契約中ユーザーには管理セクションを出し、請求間隔トグルは
+  // 省く。再開や間隔変更は SubscriptionActions 側で行うため。
+  const showSubscriptionActions = subscriptionReady && isSignedIn && hasProSubscription;
+  const showBillingToggle = subscriptionReady && !hasProSubscription;
+  // Comparison cards render for everyone once the query settles — Pro
+  // subscribers see the "current plan" badge without a checkout CTA; free /
+  // guest viewers see a live checkout CTA.
+  // 比較カードはクエリ確定後は常に描画する。Pro 契約中ユーザーには CTA を消して
+  // 「現在のプラン」バッジを、Free / ゲストには稼働中の CTA を見せる。
+  const showPlanComparisonCards = subscriptionReady;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -397,17 +104,52 @@ const Pricing: React.FC = () => {
 
       <main className="min-h-0 flex-1 overflow-y-auto py-8">
         <Container>
-          <CurrentPlanStatus isSignedIn={isSignedIn} isProUser={isProUser} usage={usage} />
+          {showPlanStatusCard && (
+            <section className="mx-auto mb-10">
+              <h2 className="mb-2 text-xl font-bold">{t("pricing.heading")}</h2>
+              <PlanStatusCard
+                plan={plan}
+                status={status}
+                billingInterval={billingInterval}
+                currentPeriodEnd={currentPeriodEnd}
+                usage={usage}
+              />
+            </section>
+          )}
 
-          <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
+          {!isSignedIn && (
+            <section className="mb-10 text-center">
+              <p className="text-muted-foreground">{t("pricing.signInPrompt")}</p>
+            </section>
+          )}
 
-          <PricingPlanCards
-            billingInterval={billingInterval}
-            isProUser={isProUser}
-            isSignedIn={isSignedIn}
-            onSelectPro={handleSelectPro}
-            onManageSubscription={handleManageSubscription}
-          />
+          {showSubscriptionActions && (
+            <section id="manage" className="mx-auto mb-10 scroll-mt-24">
+              <h2 className="mb-2 text-xl font-bold">{t("pricing.subscription.title")}</h2>
+              <SubscriptionActions
+                billingInterval={billingInterval}
+                isCanceled={isCanceled}
+                onMutated={invalidate}
+              />
+            </section>
+          )}
+
+          {showBillingToggle && (
+            <BillingIntervalToggle
+              className="mb-6"
+              value={selectedBillingInterval}
+              onChange={setSelectedBillingInterval}
+            />
+          )}
+
+          {showPlanComparisonCards && (
+            <PlanComparisonCards
+              billingInterval={selectedBillingInterval}
+              plan={plan}
+              isSignedIn={isSignedIn}
+              onSelectPro={handleSelectPro}
+            />
+          )}
 
           {isLoading && (
             <p className="text-muted-foreground mt-4 text-center text-sm">

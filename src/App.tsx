@@ -18,7 +18,6 @@ import Settings from "./pages/Settings";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
 import IndexPage from "./pages/IndexPage";
 import Pricing from "./pages/Pricing";
-import SubscriptionManagement from "./pages/SubscriptionManagement";
 import Donate from "./pages/Donate";
 import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
@@ -133,13 +132,14 @@ const App = () => (
                       <Route path="/wiki-schema" element={<WikiSchemaPage />} />
                       <Route path="/index" element={<IndexPage />} />
                       <Route path="/pricing" element={<Pricing />} />
+                      {/* Legacy /subscription path — the subscription management UI
+                          now lives under the /pricing#manage section after the
+                          pricing + subscription integration (issue #671).
+                          旧 /subscription パス。Issue #671 の統合で契約管理 UI は
+                          /pricing#manage セクションへ移動したためリダイレクトする。 */}
                       <Route
                         path="/subscription"
-                        element={
-                          <ProtectedRoute>
-                            <SubscriptionManagement />
-                          </ProtectedRoute>
-                        }
+                        element={<Navigate to="/pricing#manage" replace />}
                       />
                       <Route path="/donate" element={<Donate />} />
                       <Route path="/note/:noteId" element={<NoteView />} />
