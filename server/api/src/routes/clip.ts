@@ -10,8 +10,7 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
 import { extractYouTubeContent } from "../lib/youtubeExtractor.js";
 import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
-import { getUserTier } from "../services/subscriptionService.js";
-import { validateModelAccess, calculateCost, recordUsage } from "../services/usageService.js";
+import { calculateCost, recordUsage } from "../services/usageService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -135,15 +134,15 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     // 使用量記録 / Record usage
     // result.aiUsage が null でない場合のみ課金（AI が実際に成功した場合）
     // 記録失敗は非致命的 — 抽出結果を破棄しない
-    // Bill only when AI actually ran successfully (result.aiUsage !== null)
-    // Recording failure is non-fatal — don't discard the extraction result
-    if (result.aiUsage && aiProvider && aiModel && body.model) {
+    // resolveAiConfigForRequest() がアクセスチェック時に取得した tier / modelInfo
+    // をそのまま再利用し、同一リクエスト内での DB クエリ重複を避ける。
+    // Bill only when AI actually ran successfully (result.aiUsage !== null).
+    // Reuse the tier / modelInfo captured during resolveAiConfigForRequest()
+    // to avoid duplicate DB queries within the same request.
+    if (result.aiUsage && aiConfig) {
       try {
-        // プロバイダーから返された実際のトークン数を使用（概算ではなく）
-        // Use actual token counts returned by the provider (not estimates)
         const { inputTokens, outputTokens } = result.aiUsage;
-        const tier = await getUserTier(userId, db);
-        const modelInfo = await validateModelAccess(body.model, tier, db);
+        const { modelInfo, internalModelId } = aiConfig;
         const costUnits = calculateCost(
           { inputTokens, outputTokens },
           modelInfo.inputCostUnits,
@@ -151,7 +150,7 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
         );
         await recordUsage(
           userId,
-          body.model,
+          internalModelId,
           "youtube_summary",
           { inputTokens, outputTokens },
           costUnits,

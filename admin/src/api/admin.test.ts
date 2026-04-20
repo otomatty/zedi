@@ -11,9 +11,19 @@ import {
   syncAiModels,
 } from "./admin";
 
-vi.mock("./client", () => ({
-  adminFetch: vi.fn(),
-}));
+// `adminFetch` だけモックし、`getErrorMessage` は実装をそのまま使う
+// （admin.ts が getErrorMessage をインポートしているため、mock 不在だと
+// "No 'getErrorMessage' export is defined on the './client' mock" になる）。
+// Mock only `adminFetch` and reuse the real `getErrorMessage` implementation
+// (admin.ts imports it; without this we'd hit "No 'getErrorMessage' export
+// is defined on the './client' mock").
+vi.mock("./client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./client")>();
+  return {
+    ...actual,
+    adminFetch: vi.fn(),
+  };
+});
 
 const { adminFetch } = await import("./client");
 

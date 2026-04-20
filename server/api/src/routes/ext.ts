@@ -20,8 +20,7 @@ import {
 import { clipAndCreate } from "../lib/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
 import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
-import { getUserTier } from "../services/subscriptionService.js";
-import { validateModelAccess, calculateCost, recordUsage } from "../services/usageService.js";
+import { calculateCost, recordUsage } from "../services/usageService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -176,8 +175,6 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
   // Validation / access-control logic is shared with clip.ts /youtube via
   // resolveAiConfigForRequest().
   const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
-  const clientModelId = body.model; // 使用量記録用の元のモデル ID
-  // Original client-supplied model ID (before resolution) for usage recording
 
   const aiConfig = await resolveAiConfigForRequest({
     userId,
@@ -203,13 +200,15 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
     // 使用量記録 / Record usage
     // result.ai_usage が null でない場合のみ課金（AI が実際に成功した場合）
     // 記録失敗は非致命的
-    // Bill only when AI actually ran successfully (result.ai_usage !== null)
-    // Recording failure is non-fatal
-    if (result.ai_usage && aiProvider && clientModelId) {
+    // resolveAiConfigForRequest() がアクセスチェック時に取得した tier / modelInfo
+    // をそのまま再利用し、同一リクエスト内での DB クエリ重複を避ける。
+    // Bill only when AI actually ran successfully (result.ai_usage !== null).
+    // Reuse the tier / modelInfo captured during resolveAiConfigForRequest()
+    // to avoid duplicate DB queries within the same request.
+    if (result.ai_usage && aiConfig) {
       try {
         const { inputTokens, outputTokens } = result.ai_usage;
-        const tier = await getUserTier(userId, db);
-        const modelInfo = await validateModelAccess(clientModelId, tier, db);
+        const { modelInfo, internalModelId } = aiConfig;
         const costUnits = calculateCost(
           { inputTokens, outputTokens },
           modelInfo.inputCostUnits,
@@ -217,7 +216,7 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
         );
         await recordUsage(
           userId,
-          clientModelId,
+          internalModelId,
           "youtube_summary",
           { inputTokens, outputTokens },
           costUnits,

@@ -70,6 +70,30 @@ export interface ResolvedAiConfig {
   provider: AIProviderType;
   apiModelId: string;
   apiKey: string;
+  /**
+   * 内部 composite モデル ID（`aiModels.id`）。クライアント入力をトリムした後の値で、
+   * `aiUsageLogs.modelId` の FK に対応する。`recordUsage()` にはこちらを渡す。
+   *
+   * Internal composite model ID (`aiModels.id`) – the trimmed client input that
+   * matches the FK target of `aiUsageLogs.modelId`. Pass this to `recordUsage()`.
+   */
+  internalModelId: string;
+  /**
+   * 解決時に取得した呼び出しユーザーの tier。
+   * 呼び出し側で usage 記録のために再度 `getUserTier` を呼ばずに済むよう公開する。
+   *
+   * Caller's tier captured during resolution. Exposed so usage-recording paths
+   * don't need to re-query `getUserTier`.
+   */
+  tier: UserTier;
+  /**
+   * 解決時に取得したモデル情報（コスト単価など）。
+   * `validateModelAccess()` の戻り値そのもので、cost 計算に再利用できる。
+   *
+   * Model info captured during resolution (cost units, provider, etc.).
+   * Reused for cost calculation without re-calling `validateModelAccess`.
+   */
+  modelInfo: Awaited<ReturnType<typeof validateModelAccess>>;
 }
 
 /**
@@ -139,5 +163,8 @@ export async function resolveAiConfigForRequest(input: {
     provider: resolvedProvider,
     apiModelId: resolvedApiModelId,
     apiKey,
+    internalModelId: modelInput,
+    tier,
+    modelInfo,
   };
 }

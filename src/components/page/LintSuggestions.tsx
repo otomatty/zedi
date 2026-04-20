@@ -43,6 +43,27 @@ function getApiBaseUrl(): string {
  * stays hidden. Any other non-OK response is thrown so React Query surfaces
  * the failure instead of silently rendering an empty state.
  */
+/**
+ * Response からエラーメッセージを抽出する。`message` が空文字 / `statusText`
+ * が空のケースでも fallback に倒れるよう、`??` ではなくトリム後の長さで判定する。
+ *
+ * Extracts an error message from a Response, falling back to `fallback` when
+ * the body's `message` is empty/whitespace or `statusText` is empty. The check
+ * is intentionally non-empty-after-trim, not nullish coalescing.
+ */
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  const body: unknown = await res.json().catch(() => null);
+  const candidate =
+    typeof body === "object" &&
+    body !== null &&
+    "message" in body &&
+    typeof (body as { message?: unknown }).message === "string"
+      ? (body as { message: string }).message
+      : res.statusText;
+  const trimmed = candidate.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
 async function fetchPageFindings(pageId: string): Promise<LintFindingResponse[]> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/lint/findings/page/${encodeURIComponent(pageId)}`, {
@@ -50,8 +71,7 @@ async function fetchPageFindings(pageId: string): Promise<LintFindingResponse[]>
   });
   if (res.status === 401 || res.status === 403) return [];
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((body as { message?: string }).message ?? "Failed to fetch lint findings");
+    throw new Error(await readErrorMessage(res, "Failed to fetch lint findings"));
   }
   const data = (await res.json()) as { findings: LintFindingResponse[] };
   return data.findings;
@@ -68,8 +88,7 @@ async function resolveFinding(findingId: string): Promise<void> {
     credentials: "include",
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((body as { message?: string }).message ?? "Failed to resolve finding");
+    throw new Error(await readErrorMessage(res, "Failed to resolve finding"));
   }
 }
 
@@ -196,7 +215,9 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
   // findings" (the previous behaviour collapsed silently to null).
   if (isError) {
     return (
-      <div className="mt-6 space-y-3 border-t pt-6">
+      // role="alert" でエラー発生をスクリーンリーダーに通知する。
+      // Announce the failure to assistive tech as a live error region.
+      <div role="alert" className="mt-6 space-y-3 border-t pt-6">
         <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
           <span>Suggestions の取得に失敗しました</span>

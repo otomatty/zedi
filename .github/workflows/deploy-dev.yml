@@ -73,14 +73,25 @@ jobs:
     name: Deploy Frontend
     # `verify-server-health` をフロント公開のゲートにする。バックエンドが新版で
     # ヘルスチェックを通らない状態のまま新しい UI を公開すると、ユーザーが壊れた
-    # API を直撃する。ヘルスチェックは `if: vars.API_BASE_URL != ''` 条件付きで
-    # スキップされうるので、ここでは hard dependency にしてもスキップ伝播で blocked
-    # にはならない（GitHub Actions は skipped を success として needs を通す）。
+    # API を直撃する。
+    #
+    # ただし `verify-server-health` は `if: vars.API_BASE_URL != ''` で skip される
+    # 可能性があり、GitHub Actions は upstream が skipped の場合、downstream を
+    # 既定で skip する。そのため明示的に `if` で `success` または `skipped` を
+    # 許容する必要がある（参照: GitHub Docs "Using jobs in a workflow"）。
+    #
     # Gate frontend rollout on backend health so the new UI never points at a
-    # backend that failed to roll out.
+    # backend that failed to roll out. GitHub Actions skips downstream jobs by
+    # default when an upstream job is skipped, so explicitly allow the
+    # `skipped` result here when the health-check job is skipped because
+    # `vars.API_BASE_URL` is unset (current dev configuration).
     needs:
       - migrate
       - verify-server-health
+    if: |
+      always()
+      && needs.migrate.result == 'success'
+      && (needs.verify-server-health.result == 'success' || needs.verify-server-health.result == 'skipped')
     runs-on: ubuntu-latest
     environment: development
     steps:
