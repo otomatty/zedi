@@ -13,9 +13,9 @@
  * Simple Redis-based rate limiter. Supports the legacy string-tier call form
  * and a richer options object for per-endpoint limits (windowSec, keyBy, label).
  */
-import type { Context } from "hono";
 import type { Redis } from "ioredis";
 import { createMiddleware } from "hono/factory";
+import { extractClientIp } from "../lib/clientIp.js";
 import type { AppEnv } from "../types/index.js";
 
 const TIER_LIMITS: Record<string, number> = {
@@ -59,22 +59,6 @@ function currentHourWindow(): string {
 
 function currentWindowBucket(windowSec: number): number {
   return Math.floor(Date.now() / 1000 / windowSec);
-}
-
-/**
- * Hono の `c.req.header` からクライアント IP を抽出する。プロキシ背後では
- * `x-forwarded-for` の先頭、直結時は `x-real-ip` をフォールバックとして使う。
- * Extracts the best-effort client IP from common proxy headers.
- */
-function extractClientIp(c: Context<AppEnv>): string | null {
-  const forwarded = c.req.header("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const real = c.req.header("x-real-ip");
-  if (real) return real.trim();
-  return null;
 }
 
 /**

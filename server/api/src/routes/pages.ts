@@ -98,10 +98,23 @@ app.get("/", authRequired, async (c) => {
         )`
       : sql`p.owner_id = ${userId}`;
 
+  // Wiki の内部システムページ（`special_kind` が `__index__` / `__log__`、
+  // および `is_schema = true` のスキーマページ）は通常一覧から除外する。
+  // クライアントがそれらを編集するための専用 UI が別にあるため、`/api/pages`
+  // で返すと NotFound 化したり、ヘッダ付きカードの中に編集不能な行が混ざる。
+  // include_special=true を指定したクライアントのみオプトインで取得できる。
+  // Hide internal/system pages (special_kind set or is_schema=true) from the
+  // generic listing; clients that need them can opt in with include_special=true.
+  const includeSpecial = c.req.query("include_special") === "true";
+  const specialKindFilter = includeSpecial
+    ? sql`TRUE`
+    : sql`p.special_kind IS NULL AND p.is_schema = false`;
+
   const result = await db.execute(sql`
     SELECT p.id, p.title, p.content_preview, p.updated_at
     FROM pages p
     WHERE p.is_deleted = false
+      AND ${specialKindFilter}
       AND ${accessFilter}
     ORDER BY p.updated_at DESC
     LIMIT ${limit}

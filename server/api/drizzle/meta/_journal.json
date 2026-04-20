@@ -78,6 +78,13 @@
       "when": 1776816000000,
       "tag": "0011_add_page_special_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1776902400000,
+      "tag": "0012_add_sources_kind_hash_unique",
+      "breakpoints": true
     }
   ]
 }

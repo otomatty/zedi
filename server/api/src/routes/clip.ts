@@ -78,6 +78,14 @@ function extractVideoId(url: string): string | null {
     /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i,
     /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
     /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+    // YouTube Shorts (m. サブドメイン含む) は本流の抽出パイプラインで受理されるため、
+    // POST /api/clip/youtube だけが弾かないように同等のパターンを追加する。
+    // 11 文字 ID の後に `/` `?` `#` のいずれが来ても受理する（articleExtractor と整合）。
+    // YouTube Shorts URLs are accepted by the main extraction pipeline; mirror
+    // them here so this endpoint doesn't reject them with a 400. Allow `/`, `?`,
+    // or `#` after the 11-char ID to match articleExtractor's pattern (e.g.
+    // `/shorts/<id>/`, `/shorts/<id>?si=...`).
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})(?:[/?#][^\s]*)?$/i,
   ];
   for (const p of patterns) {
     const m = url.match(p);
@@ -112,6 +120,16 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
   // AI 要約の設定（ext.ts の /clip-and-create と検証ロジックを共通化）
   // AI summary configuration (validation/access-control shared with
   // ext.ts /clip-and-create via resolveAiConfigForRequest()).
+  //
+  // resolveAiConfigForRequest() は以下をまとめて担当する：
+  //  - provider/model は両方指定 or 両方省略の強制
+  //  - サポート provider のチェック
+  //  - tier ベースのモデルアクセス検証 + 月次予算チェック
+  //  - DB 上の provider/apiModelId を「正」として返す
+  //  - 対応する API キーの環境変数解決
+  // resolveAiConfigForRequest() centralizes: paired provider/model validation,
+  // supported-provider check, tier-based access + monthly budget enforcement,
+  // DB-canonical provider/apiModelId resolution, and API-key lookup.
   const aiConfig = await resolveAiConfigForRequest({
     userId,
     db,
@@ -119,7 +137,13 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     model: body.model,
   });
   const aiProvider: AIProviderType | undefined = aiConfig?.provider;
-  const aiModel: string | undefined = aiConfig?.apiModelId;
+  // プロバイダー SDK 呼び出し用の生モデル名（例: "gpt-4o"）。
+  // catalog id (`aiModels.id`) は `aiConfig.internalModelId` に保持され、
+  // recordUsage 側で利用する。
+  // Provider-facing model name (e.g. "gpt-4o") for the SDK call. The catalog
+  // id (`aiModels.id`) lives on `aiConfig.internalModelId` and is used by
+  // recordUsage below.
+  const apiModelId: string | undefined = aiConfig?.apiModelId;
   const aiApiKey: string | undefined = aiConfig?.apiKey;
 
   try {
@@ -127,18 +151,26 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
       videoId,
       youtubeApiKey,
       aiProvider,
-      aiModel,
+      // プロバイダー SDK には provider 側のモデル名を渡す。
+      // Pass the provider-facing model name to the SDK.
+      aiModel: apiModelId,
       aiApiKey,
     });
 
     // 使用量記録 / Record usage
     // result.aiUsage が null でない場合のみ課金（AI が実際に成功した場合）
     // 記録失敗は非致命的 — 抽出結果を破棄しない
+    //
     // resolveAiConfigForRequest() がアクセスチェック時に取得した tier / modelInfo
     // をそのまま再利用し、同一リクエスト内での DB クエリ重複を避ける。
+    // また `internalModelId` はトリム済みの正規 model id (`aiModels.id`) なので、
+    // 生の `body.model` を使った場合に起きる「同一モデルが複数表記で記録され、
+    // 使用量集計や請求がブレる」事象を防げる。
     // Bill only when AI actually ran successfully (result.aiUsage !== null).
     // Reuse the tier / modelInfo captured during resolveAiConfigForRequest()
-    // to avoid duplicate DB queries within the same request.
+    // to avoid duplicate DB queries within the same request. `internalModelId`
+    // is the already-trimmed canonical `aiModels.id`, so usage records stay
+    // stable regardless of input whitespace / casing.
     if (result.aiUsage && aiConfig) {
       try {
         const { inputTokens, outputTokens } = result.aiUsage;
