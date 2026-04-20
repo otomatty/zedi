@@ -172,3 +172,103 @@ export type NoteInvitation = typeof noteInvitations.$inferSelect;
  *
  */
 export type NewNoteInvitation = typeof noteInvitations.$inferInsert;
+
+/**
+ * ノート共有リンクテーブル（Phase 3: viewer 限定）
+ *
+ * メール招待とは別経路の「リンクを踏めば参加できる」導線。受諾は必ず
+ * `note_invite_link_redemptions` への INSERT を介することでオーバーカウントを
+ * 防ぐ。`revokedAt` は soft-revoke で、監査用に履歴を残すために物理削除しない。
+ *
+ * Note invite link table (Phase 3: viewer only).
+ *
+ * A share-by-URL alternative to email invites. Redemptions always flow through
+ * `note_invite_link_redemptions` so `usedCount` can't be over-counted on
+ * concurrent redeems. `revokedAt` is a soft-revoke so the audit trail remains.
+ */
+export const noteInviteLinks = pgTable(
+  "note_invite_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    /**
+     * `crypto.getRandomValues(32 bytes)` の hex（長さ 64）。
+     * `crypto.getRandomValues(32 bytes)` hex (64 chars).
+     */
+    token: text("token").notNull().unique(),
+    /**
+     * リンク経由で付与されるロール（Phase 3 は viewer 限定、editor は Phase 5）。
+     * Role granted through this link (Phase 3 enforces viewer only; editor is Phase 5).
+     */
+    role: text("role", { enum: ["viewer", "editor"] })
+      .notNull()
+      .default("viewer"),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    /** 有効期限（必須、無期限リンクは作れない） / Expiration (required; no forever links) */
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** 利用上限。null は無制限 / Max redemptions; null means unlimited */
+    maxUses: integer("max_uses"),
+    usedCount: integer("used_count").notNull().default(0),
+    /** 取り消し時刻。null は有効 / Revoke time; null means still valid */
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** サインインを必須とするか（Phase 3 では常に true の運用を想定） / Require sign-in before redeem */
+    requireSignIn: boolean("require_sign_in").notNull().default(true),
+    /** 棚卸し用ラベル（例: "Slack 共有用"） / Label for housekeeping */
+    label: text("label"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_note_invite_links_note_id").on(table.noteId),
+    index("idx_note_invite_links_created_by").on(table.createdByUserId),
+  ],
+);
+
+/**
+ * Row type for `note_invite_links` SELECT results.
+ */
+export type NoteInviteLink = typeof noteInviteLinks.$inferSelect;
+/**
+ * Row type for `note_invite_links` INSERT values.
+ */
+export type NewNoteInviteLink = typeof noteInviteLinks.$inferInsert;
+
+/**
+ * ノート共有リンクの受諾履歴。`(linkId, redeemedByUserId)` のユニーク制約により
+ * 同一ユーザーが同一リンクを複数回踏んでも `usedCount` が増えないようにする。
+ *
+ * Redemption log for note invite links. The composite unique constraint on
+ * `(linkId, redeemedByUserId)` is what prevents double-counting when a user
+ * opens the same link twice.
+ */
+export const noteInviteLinkRedemptions = pgTable(
+  "note_invite_link_redemptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    linkId: uuid("link_id")
+      .notNull()
+      .references(() => noteInviteLinks.id, { onDelete: "cascade" }),
+    redeemedByUserId: text("redeemed_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    /** 受諾時点のメールアドレス（監査用） / Email at the time of redemption */
+    redeemedEmail: text("redeemed_email").notNull(),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("uq_note_invite_link_redemptions_link_user").on(table.linkId, table.redeemedByUserId),
+    index("idx_note_invite_link_redemptions_link").on(table.linkId),
+  ],
+);
+
+/**
+ * Row type for `note_invite_link_redemptions` SELECT results.
+ */
+export type NoteInviteLinkRedemption = typeof noteInviteLinkRedemptions.$inferSelect;
+/**
+ * Row type for `note_invite_link_redemptions` INSERT values.
+ */
+export type NewNoteInviteLinkRedemption = typeof noteInviteLinkRedemptions.$inferInsert;

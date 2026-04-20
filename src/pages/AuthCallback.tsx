@@ -13,6 +13,17 @@ const SESSION_WAIT_TIMEOUT_MS = 15_000;
 const ALLOWED_RETURN_PATHS = ["/home", "/invite", "/mcp/authorize"] as const;
 
 /**
+ * 許可する「動的セグメントを 1 つ持つパス」のプレフィックス。`/invite-links/:token`
+ * のようにトークンを末尾に含むパスを安全に返せるようにする (#672 review P1:
+ * 共有リンクからの社認復帰でこのプレフィックスを見落とし、/home に落ちるバグ)。
+ *
+ * Allowlisted prefixes for single-dynamic-segment paths. The OAuth callback
+ * must forward `/invite-links/:token` back to the share-link flow; anything
+ * outside this shape still falls back to `/home` to prevent open redirects.
+ */
+const ALLOWED_RETURN_PREFIXES = ["/invite-links/"] as const;
+
+/**
  * returnTo を検証し、安全なリダイレクト先を返す。pathname は許可リストの定数のみ使用し CodeQL を満たす。
  * Validates returnTo and returns a safe redirect target; pathname comes only from allowlist constant (CodeQL).
  */
@@ -20,9 +31,22 @@ function getSafeReturnTarget(returnTo: string | null): string {
   if (!returnTo?.startsWith("/") || returnTo.startsWith("//")) return "/home";
   try {
     const parsed = new URL(returnTo, "http://dummy");
-    const allowedPathname = ALLOWED_RETURN_PATHS.find((p) => p === parsed.pathname);
-    if (!allowedPathname) return "/home";
-    return allowedPathname + (parsed.search ?? "") + (parsed.hash ?? "");
+    const exact = ALLOWED_RETURN_PATHS.find((p) => p === parsed.pathname);
+    if (exact) return exact + (parsed.search ?? "") + (parsed.hash ?? "");
+
+    // 許可プレフィックス + 1 セグメント（スラッシュを含まない）のみを許可する。
+    // 定数プレフィックスに `encodeURIComponent` 後の値を連結するため、CodeQL の
+    // オープンリダイレクト検出も満たせる。
+    // Match `<prefix>/<single-segment>` only, where the segment is rebuilt via
+    // encodeURIComponent to keep CodeQL happy and avoid open-redirect payloads.
+    for (const prefix of ALLOWED_RETURN_PREFIXES) {
+      if (!parsed.pathname.startsWith(prefix)) continue;
+      const rest = parsed.pathname.slice(prefix.length);
+      if (!rest || rest.includes("/")) continue;
+      const safeRest = encodeURIComponent(decodeURIComponent(rest));
+      return prefix + safeRest + (parsed.search ?? "") + (parsed.hash ?? "");
+    }
+    return "/home";
   } catch {
     return "/home";
   }

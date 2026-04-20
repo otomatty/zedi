@@ -6,11 +6,13 @@ import type { AppEnv } from "../../types/index.js";
 import crudRoutes from "./crud.js";
 import pageRoutes from "./pages.js";
 import memberRoutes from "./members.js";
+import inviteLinkRoutes from "./inviteLinks.js";
 
 const app = new Hono<AppEnv>();
 
 app.route("/", crudRoutes);
 app.route("/", pageRoutes);
 app.route("/", memberRoutes);
+app.route("/", inviteLinkRoutes);
 
 export default app;

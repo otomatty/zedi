@@ -23,6 +23,10 @@ import type {
   InvitationInfoResponse,
   AcceptInvitationResponse,
   SendInvitationEmailLinkResponse,
+  InviteLinkPreviewResponse,
+  InviteLinkRedeemResponse,
+  CreateInviteLinkBody,
+  InviteLinkRow,
 } from "./types";
 
 export type { NoteListItem };
@@ -466,6 +470,62 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return reqOptionalAuth<SendInvitationEmailLinkResponse>(
         "POST",
         `/api/invite/${encodeURIComponent(token)}/email-link`,
+      );
+    },
+
+    // ── Invite Links (share links — epic #657 / issue #660) ───────────────
+
+    /**
+     * GET /api/invite-links/:token — 共有リンクのプレビュー（認証不要）。
+     * Fetch share-link preview info (no auth required).
+     */
+    async getInviteLinkPreview(token: string): Promise<InviteLinkPreviewResponse> {
+      return reqOptionalAuth<InviteLinkPreviewResponse>(
+        "GET",
+        `/api/invite-links/${encodeURIComponent(token)}`,
+      );
+    },
+
+    /**
+     * POST /api/invite-links/:token/redeem — 共有リンクを受諾してノートに参加する（認証必須）。
+     * Redeem a share link to join the note (auth required).
+     */
+    async redeemInviteLink(token: string): Promise<InviteLinkRedeemResponse> {
+      return req<InviteLinkRedeemResponse>(
+        "POST",
+        `/api/invite-links/${encodeURIComponent(token)}/redeem`,
+      );
+    },
+
+    /**
+     * POST /api/notes/:noteId/invite-links — 共有リンクを発行する（オーナー）。
+     * Create a share link (owner only).
+     */
+    async createInviteLink(noteId: string, body: CreateInviteLinkBody): Promise<InviteLinkRow> {
+      return req<InviteLinkRow>("POST", `/api/notes/${encodeURIComponent(noteId)}/invite-links`, {
+        body,
+      });
+    },
+
+    /**
+     * GET /api/notes/:noteId/invite-links — 共有リンク一覧（owner / editor）。
+     * List share links for a note.
+     */
+    async listInviteLinks(noteId: string): Promise<InviteLinkRow[]> {
+      return req<InviteLinkRow[]>("GET", `/api/notes/${encodeURIComponent(noteId)}/invite-links`);
+    },
+
+    /**
+     * DELETE /api/notes/:noteId/invite-links/:linkId — リンクを取り消す（オーナー）。
+     * Revoke a share link (owner only).
+     */
+    async revokeInviteLink(
+      noteId: string,
+      linkId: string,
+    ): Promise<{ revoked: true; revokedAt: string }> {
+      return req<{ revoked: true; revokedAt: string }>(
+        "DELETE",
+        `/api/notes/${encodeURIComponent(noteId)}/invite-links/${encodeURIComponent(linkId)}`,
       );
     },
   };

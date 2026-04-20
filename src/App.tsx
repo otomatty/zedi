@@ -31,6 +31,7 @@ import AIChatHistory from "./pages/AIChatHistory";
 import AIChatLanding from "./pages/AIChatLanding";
 import AIChatDetail from "./pages/AIChatDetail";
 import InvitePage from "./pages/InvitePage";
+import InviteLinkPage from "./pages/InviteLinkPage";
 import { GlobalSearchProvider } from "./contexts/GlobalSearchContext";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -92,6 +93,7 @@ const App = () => (
                     <Route path="/auth/extension-callback" element={<ExtensionAuthCallback />} />
                     <Route path="/mcp/authorize" element={<McpAuthorize />} />
                     <Route path="/invite" element={<InvitePage />} />
+                    <Route path="/invite-links/:token" element={<InviteLinkPage />} />
                     <Route
                       path="/onboarding"
                       element={
