@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
-import { Link, useMatch } from "react-router-dom";
-import { Menu, Home, FileText } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Home, FileText } from "lucide-react";
 import {
   Button,
   cn,
@@ -24,37 +24,48 @@ interface NavEntry {
   path: string;
   icon: React.FC<{ className?: string }>;
   i18nKey: string;
-  /** Treat only exact `path` as active. / 完全一致のみアクティブ扱いにする。 */
-  exact?: boolean;
 }
 
 const NAV_ENTRIES: readonly NavEntry[] = [
-  { path: "/home", icon: Home, i18nKey: "nav.home", exact: true },
+  { path: "/home", icon: Home, i18nKey: "nav.home" },
   { path: "/notes", icon: FileText, i18nKey: "nav.notes" },
 ] as const;
 
 const TILE_BASE_CLASS =
   "flex flex-col items-center gap-2 rounded-lg p-3 transition-colors hover:bg-muted data-[highlighted]:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
-const TILE_ACTIVE_CLASS = "bg-accent text-accent-foreground";
 const ICON_WRAP_CLASS = "bg-muted h-10 w-10 rounded-lg flex items-center justify-center";
 const LABEL_CLASS = "text-xs font-medium";
 
 /**
- * Reads `useMatch` for a nav entry. Hooks-per-item is safe because the list is
- * static (length/order never change between renders).
+ * 9-dot grid icon used as the navigation menu trigger. Rendered as an
+ * inline SVG so spacing stays precise across viewports.
  *
- * ナビ項目ごとに `useMatch` を評価する。項目リストは静的なので、配列長・順序は
- * レンダー間で変わらず、Hook 呼び出し順は安定する。
+ * ナビゲーションメニューのトリガーに使う 9 点グリッドアイコン。
+ * ビューポートを跨いでも余白が崩れないよう、インライン SVG で描画する。
  */
-function useIsEntryActive(entry: NavEntry): boolean {
-  const match = useMatch({ path: entry.path, end: entry.exact ?? false });
-  return match != null;
-}
+const DotGridIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+    focusable="false"
+    className={className}
+  >
+    <circle cx="5" cy="5" r="1.75" />
+    <circle cx="12" cy="5" r="1.75" />
+    <circle cx="19" cy="5" r="1.75" />
+    <circle cx="5" cy="12" r="1.75" />
+    <circle cx="12" cy="12" r="1.75" />
+    <circle cx="19" cy="12" r="1.75" />
+    <circle cx="5" cy="19" r="1.75" />
+    <circle cx="12" cy="19" r="1.75" />
+    <circle cx="19" cy="19" r="1.75" />
+  </svg>
+);
 
 interface NavTileProps {
   entry: NavEntry;
   label: string;
-  active: boolean;
   onNavigate: () => void;
   as: "menuitem" | "link";
 }
@@ -67,9 +78,8 @@ interface NavTileProps {
  * 1 件のナビ項目を表すタイル。デスクトップは `DropdownMenuItem`（選択で閉じる）、
  * モバイルはシート内の通常の `<Link>` として描画する。
  */
-const NavTile: React.FC<NavTileProps> = ({ entry, label, active, onNavigate, as }) => {
+const NavTile: React.FC<NavTileProps> = ({ entry, label, onNavigate, as }) => {
   const Icon = entry.icon;
-  const className = cn(TILE_BASE_CLASS, active && TILE_ACTIVE_CLASS);
 
   if (as === "menuitem") {
     return (
@@ -78,9 +88,9 @@ const NavTile: React.FC<NavTileProps> = ({ entry, label, active, onNavigate, as 
         onSelect={onNavigate}
         className={cn("cursor-pointer p-0 focus:bg-transparent focus:text-inherit")}
       >
-        <Link to={entry.path} aria-label={label} className={className}>
+        <Link to={entry.path} className={TILE_BASE_CLASS}>
           <span className={ICON_WRAP_CLASS}>
-            <Icon className="text-muted-foreground h-5 w-5" />
+            <Icon aria-hidden="true" className="text-muted-foreground h-5 w-5" />
           </span>
           <span className={LABEL_CLASS}>{label}</span>
         </Link>
@@ -89,9 +99,9 @@ const NavTile: React.FC<NavTileProps> = ({ entry, label, active, onNavigate, as 
   }
 
   return (
-    <Link to={entry.path} onClick={onNavigate} aria-label={label} className={className}>
+    <Link to={entry.path} onClick={onNavigate} className={TILE_BASE_CLASS}>
       <span className={ICON_WRAP_CLASS}>
-        <Icon className="text-muted-foreground h-5 w-5" />
+        <Icon aria-hidden="true" className="text-muted-foreground h-5 w-5" />
       </span>
       <span className={LABEL_CLASS}>{label}</span>
     </Link>
@@ -112,7 +122,7 @@ const NavGrid: React.FC<NavGridProps> = ({ onNavigate, as }) => {
   return (
     <div className="grid grid-cols-3 gap-2 p-2">
       {NAV_ENTRIES.map((entry) => (
-        <NavGridEntry
+        <NavTile
           key={entry.path}
           entry={entry}
           label={t(entry.i18nKey)}
@@ -122,18 +132,6 @@ const NavGrid: React.FC<NavGridProps> = ({ onNavigate, as }) => {
       ))}
     </div>
   );
-};
-
-interface NavGridEntryProps {
-  entry: NavEntry;
-  label: string;
-  onNavigate: () => void;
-  as: "menuitem" | "link";
-}
-
-const NavGridEntry: React.FC<NavGridEntryProps> = ({ entry, label, onNavigate, as }) => {
-  const active = useIsEntryActive(entry);
-  return <NavTile entry={entry} label={label} active={active} onNavigate={onNavigate} as={as} />;
 };
 
 const NavTrigger = React.forwardRef<
@@ -150,7 +148,7 @@ const NavTrigger = React.forwardRef<
       aria-label={t("nav.menu")}
       {...props}
     >
-      <Menu className="h-5 w-5" />
+      <DotGridIcon className="h-5 w-5" />
     </Button>
   );
 });

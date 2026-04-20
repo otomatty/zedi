@@ -77,16 +77,37 @@ describe("NavigationMenu", () => {
     expect(notesLink).toHaveAttribute("href", "/notes");
   });
 
-  it("applies active styling to the item matching the current route", async () => {
+  it("does not vary item styling based on the current route", async () => {
     const user = userEvent.setup();
+
+    // Render at /home first, capture class names for both tiles.
+    // /home で描画し、両タイルの className を取得する。
+    const firstRender = renderAt("/home");
+    await user.click(screen.getByRole("button", { name: "メニュー" }));
+    const homeOnHome = await screen.findByRole("menuitem", { name: "ホーム" });
+    const notesOnHome = await screen.findByRole("menuitem", { name: "ノート" });
+    const homeClassOnHome = homeOnHome.className;
+    const notesClassOnHome = notesOnHome.className;
+    firstRender.unmount();
+
+    // Re-render at /notes and compare the same tiles.
+    // /notes で再描画し、同じタイル同士で比較する。
     renderAt("/notes");
     await user.click(screen.getByRole("button", { name: "メニュー" }));
 
-    const notesLink = await screen.findByRole("menuitem", { name: "ノート" });
-    const homeLink = await screen.findByRole("menuitem", { name: "ホーム" });
+    const notesOnNotes = await screen.findByRole("menuitem", { name: "ノート" });
+    const homeOnNotes = await screen.findByRole("menuitem", { name: "ホーム" });
 
-    expect(notesLink.className).toMatch(/bg-accent/);
-    expect(homeLink.className).not.toMatch(/bg-accent/);
+    // No active-state classes should be applied based on the current path.
+    // 現在のパスに応じたアクティブ状態のクラスが付与されていないことを確認する。
+    expect(notesOnNotes.className).not.toMatch(/bg-accent/);
+    expect(homeOnNotes.className).not.toMatch(/bg-accent/);
+
+    // Same tile renders with an identical className regardless of the route.
+    // 同一タイルの className がルートに関わらず一致することを保証する。
+    expect(homeOnNotes.className).toBe(homeClassOnHome);
+    expect(notesOnNotes.className).toBe(notesClassOnHome);
+    expect(notesOnNotes.className).toBe(homeOnNotes.className);
   });
 
   it("renders a Sheet-based menu on mobile", async () => {
