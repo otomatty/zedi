@@ -76,6 +76,29 @@ function renderModal(props: Partial<React.ComponentProps<typeof NoteShareModal>>
   );
 }
 
+function renderModalControlled(initialOpen: boolean) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function Harness({ open }: { open: boolean }) {
+    return <NoteShareModal open={open} onOpenChange={() => {}} note={baseNote} />;
+  }
+  const utils = render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <Harness open={initialOpen} />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const rerender = (nextOpen: boolean) =>
+    utils.rerender(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <Harness open={nextOpen} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  return { ...utils, rerender };
+}
+
 describe("NoteShareModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,5 +144,27 @@ describe("NoteShareModal", () => {
     renderModal({ note: { ...baseNote, visibility: "private" } });
     await user.click(screen.getByRole("tab", { name: "notes.shareTabVisibility" }));
     expect(screen.queryByLabelText("notes.shareLink")).not.toBeInTheDocument();
+  });
+
+  it("resets to members tab when the modal is re-opened", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderModalControlled(true);
+
+    // Switch to visibility tab while the modal is open.
+    await user.click(screen.getByRole("tab", { name: "notes.shareTabVisibility" }));
+    expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    // Close and re-open the modal; the modal component stays mounted, so we
+    // rely on the effect that resets `activeTab` when `open` transitions to true.
+    rerender(false);
+    rerender(true);
+
+    expect(screen.getByRole("tab", { name: "notes.shareTabMembers" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 });

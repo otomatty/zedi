@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -51,6 +51,27 @@ export function NoteShareModal({
 }: NoteShareModalProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("members");
+
+  useEffect(() => {
+    // モーダルが再び開かれたらメンバータブから表示する（Google Docs / Notion の挙動に合わせる）。
+    // Reset to the members tab whenever the modal re-opens, matching Google
+    // Docs / Notion behaviour. The modal stays mounted so `activeTab` would
+    // otherwise persist across open/close cycles.
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on open transition
+      setActiveTab("members");
+    }
+  }, [open]);
+
+  useEffect(() => {
+    // ドメインタブが非表示になったとき、その値が選択されたままだと空のタブパネルが表示されてしまう。
+    // Guard against pointing `activeTab` at a hidden tab (e.g. when the caller
+    // flips `showDomainsTab` off while the user sits on the domains tab).
+    if (!showDomainsTab && activeTab === "domains") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fall back to default when the selected tab disappears
+      setActiveTab("members");
+    }
+  }, [showDomainsTab, activeTab]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

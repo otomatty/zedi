@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button, Input, Label, RadioGroup, RadioGroupItem, useToast } from "@zedi/ui";
 import type { Note, NoteEditPermission, NoteVisibility } from "@/types/note";
 import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { PublicAnyLoggedInSaveAlertDialog } from "@/pages/NoteSettings/PublicAnyLoggedInSaveAlertDialog";
 import { useNoteSettingsSaveWithPublicConfirm } from "@/pages/NoteSettings/useNoteSettingsSaveWithPublicConfirm";
 
@@ -263,6 +264,10 @@ export function ShareModalVisibilityTab({ note, canEdit }: ShareModalVisibilityT
     title: note.title,
     visibility,
     editPermission,
+    // 共有モーダルはタイトル入力を持たないため、空タイトルのノートでも保存を通す。
+    // The share modal has no title input, so don't block owners of legacy notes
+    // whose title is empty/null from changing visibility or edit permission.
+    validateTitle: false,
   });
 
   const noteUrl = useMemo(() => {
@@ -271,13 +276,11 @@ export function ShareModalVisibilityTab({ note, canEdit }: ShareModalVisibilityT
   }, [note.id]);
 
   const handleCopyNoteUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(noteUrl);
-      toast({ title: t("notes.linkCopied") });
-    } catch (error) {
-      console.error("Failed to copy link:", error);
-      toast({ title: t("notes.linkCopyFailed"), variant: "destructive" });
-    }
+    const ok = await copyTextToClipboard(noteUrl);
+    toast({
+      title: ok ? t("notes.linkCopied") : t("notes.linkCopyFailed"),
+      variant: ok ? undefined : "destructive",
+    });
   };
 
   const isDirty = visibility !== note.visibility || editPermission !== note.editPermission;

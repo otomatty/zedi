@@ -29,6 +29,7 @@ import {
   useRevokeInviteLink,
 } from "@/hooks/useInviteLinks";
 import type { InviteLinkRow } from "@/lib/api/types";
+import { copyTextToClipboard } from "@/lib/clipboard";
 
 /**
  * 各有効期限プリセットの内部値（ms）。
@@ -67,35 +68,6 @@ function buildInviteLinkUrl(token: string): string {
 }
 
 /**
- * Copy-to-clipboard with a graceful fallback on older browsers.
- * 古いブラウザでも動くようにクリップボード API をフォールバックする。
- */
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // Fall through to execCommand path.
-  }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "absolute";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Section props.
  * セクションの Props。
  */
@@ -130,7 +102,7 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({ 
         requireSignIn: true,
       });
       const url = buildInviteLinkUrl(created.token);
-      const copied = await copyToClipboard(url);
+      const copied = await copyTextToClipboard(url);
       toast({
         title: copied ? t("notes.inviteLinkCreatedAndCopied") : t("notes.inviteLinkCreated"),
         description: url,
@@ -148,7 +120,7 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({ 
   const handleCopy = useCallback(
     async (token: string) => {
       const url = buildInviteLinkUrl(token);
-      const ok = await copyToClipboard(url);
+      const ok = await copyTextToClipboard(url);
       toast({
         title: ok ? t("notes.inviteLinkCopied") : t("notes.inviteLinkCopyFailed"),
         description: url,

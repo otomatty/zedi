@@ -11,6 +11,13 @@ type UseNoteSettingsSaveWithPublicConfirmArgs = {
   title: string;
   visibility: NoteVisibility;
   editPermission: NoteEditPermission;
+  /**
+   * 空タイトル時に保存を拒否するかどうか。タイトル入力欄がない UI（共有モーダル）では `false` を渡す。
+   * Whether to reject saves when `title` is blank. Callers that don't render a
+   * title input (e.g. the share modal's visibility tab) should pass `false` so
+   * notes with a legacy/empty title can still have their visibility changed.
+   */
+  validateTitle?: boolean;
 };
 
 /**
@@ -23,6 +30,7 @@ export function useNoteSettingsSaveWithPublicConfirm({
   title,
   visibility,
   editPermission,
+  validateTitle = true,
 }: UseNoteSettingsSaveWithPublicConfirmArgs) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -45,7 +53,7 @@ export function useNoteSettingsSaveWithPublicConfirm({
 
   const handleSaveNote = useCallback(() => {
     if (!noteId || !note) return;
-    if (!title.trim()) {
+    if (validateTitle && !title.trim()) {
       toast({
         title: t("notes.titleRequired"),
         variant: "destructive",
@@ -64,7 +72,7 @@ export function useNoteSettingsSaveWithPublicConfirm({
       return;
     }
     void performSaveNote();
-  }, [noteId, note, title, visibility, editPermission, performSaveNote, toast, t]);
+  }, [noteId, note, title, visibility, editPermission, validateTitle, performSaveNote, toast, t]);
 
   const handleConfirmPublicAnyLoggedInSave = useCallback(() => {
     setConfirmOpen(false);

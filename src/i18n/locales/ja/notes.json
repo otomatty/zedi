@@ -151,7 +151,7 @@
   "inviteLinkRevokeFailed": "共有リンクの取り消しに失敗しました",
   "share": "共有",
   "shareAria": "共有メニューを開く",
-  "shareMemberCountAria": "参加メンバー {{count}} 名",
+  "shareMemberCountAria": "参加済みメンバー {{count}} 名",
   "shareModalTitle": "このノートを共有",
   "shareModalDescription": "メンバーを招待したり、共有リンクを発行したり、公開範囲を変更できます。",
   "shareTabMembers": "メンバー",

@@ -31,22 +31,27 @@ export function ShareButton({ note, canManageMembers }: ShareButtonProps) {
   const { data: members = [] } = useNoteMembers(note.id, canManageMembers);
   const acceptedCount = members.filter((m) => m.status === "accepted").length;
 
+  // 参加人数が 1 人以上のときはアクセシブルネームにも件数を含める。
+  // When at least one member has joined, include the count in the button's
+  // accessible name so screen readers announce the badge text (aria-label on
+  // the button otherwise shadows the badge contents).
+  const buttonAriaLabel =
+    acceptedCount > 0
+      ? `${t("notes.shareAria")} — ${t("notes.shareMemberCountAria", { count: acceptedCount })}`
+      : t("notes.shareAria");
+
   return (
     <>
       <Button
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        aria-label={t("notes.shareAria")}
+        aria-label={buttonAriaLabel}
       >
         <Share2 className="mr-2 h-4 w-4" aria-hidden />
         {t("notes.share")}
         {acceptedCount > 0 ? (
-          <Badge
-            variant="secondary"
-            className="ml-2 h-5 min-w-5 px-1.5 text-xs"
-            aria-label={t("notes.shareMemberCountAria", { count: acceptedCount })}
-          >
+          <Badge variant="secondary" className="ml-2 h-5 min-w-5 px-1.5 text-xs" aria-hidden>
             {acceptedCount}
           </Badge>
         ) : null}

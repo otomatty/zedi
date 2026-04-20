@@ -94,16 +94,17 @@ describe("ShareButton", () => {
     vi.clearAllMocks();
   });
 
-  it("shows no badge when there are no accepted members", () => {
+  it("uses the bare share aria-label when there are no accepted members", () => {
     vi.mocked(useNoteMembers).mockReturnValue({
       data: [mockMember({ status: "pending" })],
       isLoading: false,
     } as never);
     renderButton();
-    expect(screen.queryByLabelText(/notes\.shareMemberCountAria/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "notes.shareAria" })).toBeInTheDocument();
+    expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
   });
 
-  it("shows the accepted-member count as a badge", () => {
+  it("composes accepted-member count into the button aria-label and shows a badge", () => {
     vi.mocked(useNoteMembers).mockReturnValue({
       data: [
         mockMember({ status: "accepted", memberEmail: "a@example.com" }),
@@ -113,7 +114,11 @@ describe("ShareButton", () => {
       isLoading: false,
     } as never);
     renderButton();
-    expect(screen.getByLabelText("notes.shareMemberCountAria(count=2)")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "notes.shareAria — notes.shareMemberCountAria(count=2)",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 });

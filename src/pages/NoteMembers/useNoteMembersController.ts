@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@zedi/ui";
 import {
@@ -53,13 +53,18 @@ export function useNoteMembersController(noteId: string, enabled: boolean): Note
 
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<NoteMemberRole>("viewer");
-  const roleOptions = (Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => ({
-    value,
-    label: t(memberRoleKeys[value]),
-  }));
 
-  const handleAddMember = async () => {
-    if (!noteId || !memberEmail.trim()) return;
+  const roleOptions = useMemo(
+    () =>
+      (Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => ({
+        value,
+        label: t(memberRoleKeys[value]),
+      })),
+    [t],
+  );
+
+  const handleAddMember = useCallback(async () => {
+    if (!noteId || !memberEmail.trim() || addMemberMutation.isPending) return;
     try {
       await addMemberMutation.mutateAsync({
         noteId,
@@ -73,60 +78,82 @@ export function useNoteMembersController(noteId: string, enabled: boolean): Note
       console.error("Failed to add member:", error);
       toast({ title: t("notes.memberAddFailed"), variant: "destructive" });
     }
-  };
+  }, [noteId, memberEmail, memberRole, addMemberMutation, toast, t]);
 
-  const handleUpdateMemberRole = async (email: string, role: NoteMemberRole) => {
-    if (!noteId) return;
-    try {
-      await updateMemberRoleMutation.mutateAsync({
-        noteId,
-        memberEmail: email,
-        role,
-      });
-      toast({ title: t("notes.roleUpdated") });
-    } catch (error) {
-      console.error("Failed to update member role:", error);
-      toast({ title: t("notes.roleUpdateFailed"), variant: "destructive" });
-    }
-  };
+  const handleUpdateMemberRole = useCallback(
+    async (email: string, role: NoteMemberRole) => {
+      if (!noteId) return;
+      try {
+        await updateMemberRoleMutation.mutateAsync({
+          noteId,
+          memberEmail: email,
+          role,
+        });
+        toast({ title: t("notes.roleUpdated") });
+      } catch (error) {
+        console.error("Failed to update member role:", error);
+        toast({ title: t("notes.roleUpdateFailed"), variant: "destructive" });
+      }
+    },
+    [noteId, updateMemberRoleMutation, toast, t],
+  );
 
-  const handleRemoveMember = async (email: string) => {
-    if (!noteId) return;
-    try {
-      await removeMemberMutation.mutateAsync({ noteId, memberEmail: email });
-      toast({ title: t("notes.memberRemoved") });
-    } catch (error) {
-      console.error("Failed to remove member:", error);
-      toast({ title: t("notes.memberRemoveFailed"), variant: "destructive" });
-    }
-  };
+  const handleRemoveMember = useCallback(
+    async (email: string) => {
+      if (!noteId) return;
+      try {
+        await removeMemberMutation.mutateAsync({ noteId, memberEmail: email });
+        toast({ title: t("notes.memberRemoved") });
+      } catch (error) {
+        console.error("Failed to remove member:", error);
+        toast({ title: t("notes.memberRemoveFailed"), variant: "destructive" });
+      }
+    },
+    [noteId, removeMemberMutation, toast, t],
+  );
 
-  const handleResendInvitation = async (email: string) => {
-    if (!noteId) return;
-    try {
-      const result = await resendInvitationMutation.mutateAsync({ noteId, memberEmail: email });
-      if (result.resent) {
-        toast({ title: t("notes.resendInvitationSuccess") });
-      } else {
+  const handleResendInvitation = useCallback(
+    async (email: string) => {
+      if (!noteId) return;
+      try {
+        const result = await resendInvitationMutation.mutateAsync({ noteId, memberEmail: email });
+        if (result.resent) {
+          toast({ title: t("notes.resendInvitationSuccess") });
+        } else {
+          toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });
+        }
+      } catch (error) {
+        console.error("Failed to resend invitation:", error);
         toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });
       }
-    } catch (error) {
-      console.error("Failed to resend invitation:", error);
-      toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });
-    }
-  };
+    },
+    [noteId, resendInvitationMutation, toast, t],
+  );
 
-  return {
-    members,
-    isMembersLoading,
-    memberEmail,
-    setMemberEmail,
-    memberRole,
-    setMemberRole,
-    roleOptions,
-    handleAddMember,
-    handleUpdateMemberRole,
-    handleRemoveMember,
-    handleResendInvitation,
-  };
+  return useMemo(
+    () => ({
+      members,
+      isMembersLoading,
+      memberEmail,
+      setMemberEmail,
+      memberRole,
+      setMemberRole,
+      roleOptions,
+      handleAddMember,
+      handleUpdateMemberRole,
+      handleRemoveMember,
+      handleResendInvitation,
+    }),
+    [
+      members,
+      isMembersLoading,
+      memberEmail,
+      memberRole,
+      roleOptions,
+      handleAddMember,
+      handleUpdateMemberRole,
+      handleRemoveMember,
+      handleResendInvitation,
+    ],
+  );
 }

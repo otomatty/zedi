@@ -151,7 +151,7 @@
   "inviteLinkRevokeFailed": "Failed to revoke share link",
   "share": "Share",
   "shareAria": "Open share menu",
-  "shareMemberCountAria": "{{count}} accepted member(s)",
+  "shareMemberCountAria": "{{count}} accepted member(s) joined",
   "shareModalTitle": "Share this note",
   "shareModalDescription": "Invite members, create share links, or change who can view this note.",
   "shareTabMembers": "Members",
