@@ -24,5 +24,21 @@
   "invalid": "Invalid invitation link.",
   "alreadyAccepted": "This invitation has already been accepted.",
   "acceptError": "Failed to accept invitation. Please try again.",
-  "goToNote": "Open Note"
+  "goToNote": "Open Note",
+  "linkTitle": "Invited via share link",
+  "linkNoteTitleLabel": "Note: {{title}}",
+  "linkInviterLabel": "Issued by: {{name}}",
+  "linkRoleLabel": "Role granted: {{role}}",
+  "linkExpiresLabel": "Expires: {{date}}",
+  "linkRemainingLabel": "{{count}} use(s) remaining",
+  "linkUnlimitedLabel": "Unlimited uses",
+  "linkJoinCta": "Join",
+  "linkJoining": "Joining...",
+  "linkStatusRevoked": "This link has been revoked.",
+  "linkStatusExpired": "This link has expired.",
+  "linkStatusExhausted": "This link has reached its use limit.",
+  "linkStatusInvalid": "Invalid share link.",
+  "linkAlreadyMember": "You are already a member of this note.",
+  "linkRedeemError": "Failed to redeem the link. Please try again.",
+  "linkSignInRequired": "Please sign in to redeem this link."
 }

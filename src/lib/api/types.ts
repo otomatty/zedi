@@ -282,3 +282,61 @@ export interface SendInvitationEmailLinkResponse {
   /** 次回送信までの待機秒数（UI カウントダウン用）/ Seconds to wait before the next send (for countdown) */
   retryAfterSec: number;
 }
+
+// ── Invite Links (share links — epic #657 / issue #660) ────────────────────
+
+/**
+ * 共有リンクの状態。`valid` 以外は UI でブロッキングメッセージを表示する。
+ * Share-link lifecycle status. Anything but `valid` triggers a blocking UI message.
+ */
+export type InviteLinkStatus = "valid" | "revoked" | "expired" | "exhausted";
+
+/** GET /api/invite-links/:token response — プレビュー情報 / Preview info. */
+export interface InviteLinkPreviewResponse {
+  status: InviteLinkStatus;
+  noteId: string;
+  noteTitle: string;
+  inviterName: string;
+  role: "viewer" | "editor";
+  expiresAt: string;
+  /** 残り利用可能回数（null = 無制限） / Remaining uses (null for unlimited) */
+  remainingUses: number | null;
+  maxUses: number | null;
+  usedCount: number;
+  requireSignIn: boolean;
+  label: string | null;
+}
+
+/** POST /api/invite-links/:token/redeem response — 受諾成功時 / On successful redeem. */
+export interface InviteLinkRedeemResponse {
+  noteId: string;
+  role: "viewer" | "editor";
+  isNewRedemption: boolean;
+  alreadyMember: boolean;
+  status: "accepted";
+}
+
+/** POST /api/notes/:noteId/invite-links body — 発行パラメータ / Creation params. */
+export interface CreateInviteLinkBody {
+  role?: "viewer";
+  expiresInMs?: number;
+  maxUses?: number | null;
+  label?: string | null;
+  requireSignIn?: boolean;
+}
+
+/** Invite link row (shared by list and create responses). */
+export interface InviteLinkRow {
+  id: string;
+  note_id: string;
+  token: string;
+  role: "viewer" | "editor";
+  created_by_user_id: string;
+  expires_at: string;
+  max_uses: number | null;
+  used_count: number;
+  revoked_at: string | null;
+  require_sign_in: boolean;
+  label: string | null;
+  created_at: string;
+}

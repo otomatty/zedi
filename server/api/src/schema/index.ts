@@ -14,6 +14,8 @@ export {
   notePages,
   noteMembers,
   noteInvitations,
+  noteInviteLinks,
+  noteInviteLinkRedemptions,
   type Note,
   type NewNote,
   type NotePage,
@@ -22,6 +24,10 @@ export {
   type NewNoteMember,
   type NoteInvitation,
   type NewNoteInvitation,
+  type NoteInviteLink,
+  type NewNoteInviteLink,
+  type NoteInviteLinkRedemption,
+  type NewNoteInviteLinkRedemption,
 } from "./notes.js";
 export {
   links,
@@ -84,6 +90,8 @@ export {
   notePagesRelations,
   noteMembersRelations,
   noteInvitationsRelations,
+  noteInviteLinksRelations,
+  noteInviteLinkRedemptionsRelations,
   linksRelations,
   ghostLinksRelations,
   pageContentsRelations,

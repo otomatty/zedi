@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
-import { Button, useToast } from "@zedi/ui";
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, useToast } from "@zedi/ui";
 import {
   useAddNoteMember,
   useNote,
@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { memberRoleKeys } from "./noteMembersConfig";
 import { NoteMembersLoadingOrDenied } from "./NoteMembersLoadingOrDenied";
 import { NoteMembersManageSection } from "./NoteMembersManageSection";
+import { NoteInviteLinksSection } from "./NoteInviteLinksSection";
 
 /**
  *
@@ -142,19 +143,30 @@ const NoteMembers: React.FC = () => {
             {t("notes.noPermissionToManageMembers")}
           </p>
         ) : (
-          <NoteMembersManageSection
-            members={members}
-            isMembersLoading={isMembersLoading}
-            memberEmail={memberEmail}
-            setMemberEmail={setMemberEmail}
-            memberRole={memberRole}
-            setMemberRole={setMemberRole}
-            roleOptions={memberRoleOptions}
-            onAddMember={handleAddMember}
-            onUpdateRole={handleUpdateMemberRole}
-            onRemoveMember={handleRemoveMember}
-            onResendInvitation={handleResendInvitation}
-          />
+          <Tabs defaultValue="members" className="mt-6">
+            <TabsList>
+              <TabsTrigger value="members">{t("notes.membersTabMembers")}</TabsTrigger>
+              <TabsTrigger value="share-links">{t("notes.membersTabShareLinks")}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="members">
+              <NoteMembersManageSection
+                members={members}
+                isMembersLoading={isMembersLoading}
+                memberEmail={memberEmail}
+                setMemberEmail={setMemberEmail}
+                memberRole={memberRole}
+                setMemberRole={setMemberRole}
+                roleOptions={memberRoleOptions}
+                onAddMember={handleAddMember}
+                onUpdateRole={handleUpdateMemberRole}
+                onRemoveMember={handleRemoveMember}
+                onResendInvitation={handleResendInvitation}
+              />
+            </TabsContent>
+            <TabsContent value="share-links">
+              <NoteInviteLinksSection noteId={noteId ?? ""} />
+            </TabsContent>
+          </Tabs>
         )}
       </Container>
     </main>

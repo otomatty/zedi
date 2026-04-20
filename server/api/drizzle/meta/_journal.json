@@ -85,6 +85,13 @@
       "when": 1776902400000,
       "tag": "0012_add_sources_kind_hash_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1776988800000,
+      "tag": "0013_add_note_invite_links",
+      "breakpoints": true
     }
   ]
 }

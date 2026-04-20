@@ -24,5 +24,21 @@
   "invalid": "無効な招待リンクです。",
   "alreadyAccepted": "この招待は既に承認されています。",
   "acceptError": "招待の承認に失敗しました。再度お試しください。",
-  "goToNote": "ノートを開く"
+  "goToNote": "ノートを開く",
+  "linkTitle": "共有リンクからの招待",
+  "linkNoteTitleLabel": "ノート: {{title}}",
+  "linkInviterLabel": "発行者: {{name}}",
+  "linkRoleLabel": "付与されるロール: {{role}}",
+  "linkExpiresLabel": "有効期限: {{date}}",
+  "linkRemainingLabel": "残り {{count}} 回",
+  "linkUnlimitedLabel": "回数無制限",
+  "linkJoinCta": "参加する",
+  "linkJoining": "処理中...",
+  "linkStatusRevoked": "このリンクは取り消されています。",
+  "linkStatusExpired": "このリンクは期限切れです。",
+  "linkStatusExhausted": "このリンクは利用上限に達しています。",
+  "linkStatusInvalid": "無効な共有リンクです。",
+  "linkAlreadyMember": "すでにこのノートのメンバーです。",
+  "linkRedeemError": "リンクの受諾に失敗しました。再度お試しください。",
+  "linkSignInRequired": "リンクを受諾するにはサインインが必要です。"
 }

@@ -22,6 +22,7 @@ import wikiSchemaRoutes from "./routes/wikiSchema.js";
 import extRoutes from "./routes/ext.js";
 import mcpRoutes from "./routes/mcp.js";
 import inviteRoutes from "./routes/invite.js";
+import inviteLinkRoutes from "./routes/inviteLinks.js";
 import aiChatRoutes from "./routes/ai/chat.js";
 import aiModelsRoutes from "./routes/ai/models.js";
 import aiUsageRoutes from "./routes/ai/usage.js";
@@ -116,6 +117,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Invitation acceptance (public + auth)
   app.route("/api/invite", inviteRoutes);
+
+  // Share link invite (public preview + auth redeem) — epic #657, issue #660
+  app.route("/api/invite-links", inviteLinkRoutes);
 
   // Search
   app.route("/api/search", searchRoutes);
