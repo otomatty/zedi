@@ -101,7 +101,7 @@ const NavTile: React.FC<NavTileProps> = ({ entry, label, onNavigate, as }) => {
   return (
     <Link to={entry.path} onClick={onNavigate} className={TILE_BASE_CLASS}>
       <span className={ICON_WRAP_CLASS}>
-        <Icon className="text-muted-foreground h-5 w-5" />
+        <Icon aria-hidden="true" className="text-muted-foreground h-5 w-5" />
       </span>
       <span className={LABEL_CLASS}>{label}</span>
     </Link>
