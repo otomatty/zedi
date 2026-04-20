@@ -7,16 +7,27 @@ import type { AppEnv } from "../../../types/index.js";
 
 // 共有リンク作成ルートはトランザクション内で監査ログを書く。
 // `recordAuditLog` は users テーブル JOIN 等を要するため、ルートテストでは
-// 呼び出しのみ検証するスパイに差し替える（副作用は不要）。
+// 呼び出しのみ検証するスパイに差し替える（副作用は不要）。スパイは `(c, db,
+// params)` の 3 引数シグネチャで型付けし、`mock.calls[0]?.[2]` で params を
+// 参照できるようにする。
 //
 // The invite-link create route records an audit log inside its transaction.
 // `recordAuditLog` depends on auth context that the route-test mock skips, so
 // replace it with a spy that records calls without touching the mock DB chain.
+// Type the spy with the real 3-arg shape so `mock.calls[0]?.[2]` is reachable
+// under `tsc --noEmit`.
+interface AuditLogParams {
+  action: string;
+  targetType: string;
+  targetId?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
 const { auditLogSpy } = vi.hoisted(() => ({
-  auditLogSpy: vi.fn(async () => {}),
+  auditLogSpy: vi.fn(async (_c: unknown, _db: unknown, _params: AuditLogParams) => {}),
 }));
 vi.mock("../../../lib/auditLog.js", () => ({
-  recordAuditLog: (...args: unknown[]) => auditLogSpy(...(args as Parameters<typeof auditLogSpy>)),
+  recordAuditLog: (c: unknown, db: unknown, params: AuditLogParams) => auditLogSpy(c, db, params),
   extractClientIp: () => null,
 }));
 
