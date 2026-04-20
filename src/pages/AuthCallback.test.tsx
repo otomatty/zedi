@@ -81,4 +81,46 @@ describe("AuthCallback returnTo handling", () => {
 
     expect(loc.assign).toHaveBeenCalledWith("/home");
   });
+
+  it("redirects to /invite-links/:token after social sign-in", () => {
+    // The share-link flow stashes `/invite-links/<token>` in returnTo.
+    // Regression for #672: this used to silently fall back to /home because
+    // `/invite-links/*` wasn't on the allowlist.
+    const token = "a".repeat(64);
+    const returnTo = `/invite-links/${token}`;
+    loc = stubLocation(`?returnTo=${encodeURIComponent(returnTo)}`);
+
+    render(
+      <MemoryRouter>
+        <AuthCallback />
+      </MemoryRouter>,
+    );
+
+    expect(loc.assign).toHaveBeenCalledWith(returnTo);
+  });
+
+  it("rejects an /invite-links path with extra segments", () => {
+    // Only single-segment tokens are allowlisted; nested paths must not leak.
+    loc = stubLocation(`?returnTo=${encodeURIComponent("/invite-links/abc/evil")}`);
+
+    render(
+      <MemoryRouter>
+        <AuthCallback />
+      </MemoryRouter>,
+    );
+
+    expect(loc.assign).toHaveBeenCalledWith("/home");
+  });
+
+  it("rejects a bare /invite-links/ with no token", () => {
+    loc = stubLocation(`?returnTo=${encodeURIComponent("/invite-links/")}`);
+
+    render(
+      <MemoryRouter>
+        <AuthCallback />
+      </MemoryRouter>,
+    );
+
+    expect(loc.assign).toHaveBeenCalledWith("/home");
+  });
 });

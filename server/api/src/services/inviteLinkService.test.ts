@@ -23,6 +23,7 @@ import {
   normalizeCreateInviteLinkInput,
   redeemInviteLink,
 } from "./inviteLinkService.js";
+import { noteInviteLinkRedemptions, noteInviteLinks, noteMembers } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 
 // ── generateInviteLinkToken ────────────────────────────────────────────────
@@ -161,11 +162,14 @@ interface FakeLinkRow {
   noteId: string;
   token: string;
   role: "viewer" | "editor";
+  createdByUserId: string;
   expiresAt: Date;
   revokedAt: Date | null;
   maxUses: number | null;
   usedCount: number;
   requireSignIn: boolean;
+  /** リンクが指すノートが論理削除済みかを模擬する（INNER JOIN のフィルタ相当） */
+  noteIsDeleted: boolean;
 }
 
 interface FakeRedemptionRow {
@@ -178,6 +182,8 @@ interface FakeMemberRow {
   noteId: string;
   memberEmail: string;
   role: "viewer" | "editor";
+  /** リンク経由の再受諾で更新されないか検証するために記録する */
+  invitedByUserId: string;
   status: "pending" | "accepted" | "declined";
   acceptedUserId: string | null;
   isDeleted: boolean;
@@ -198,31 +204,40 @@ interface FakeState {
  * so refactors within the service don't silently break the tests.
  */
 function createFakeDb(state: FakeState): Database {
+  type ChainOp =
+    | "select-link"
+    | "select-redemption"
+    | "insert-redemption"
+    | "insert-member"
+    | "update-link";
   type Chain = {
-    op: "select-link" | "insert-redemption" | "insert-member" | "update-link";
+    op: ChainOp;
     pendingToken?: string;
+    pendingLookupUserId?: string;
     pendingRedemption?: { linkId: string; userId: string; email: string };
     pendingMember?: {
       noteId: string;
       memberEmail: string;
       role: "viewer" | "editor";
-      userId: string;
+      invitedByUserId: string;
+      acceptedUserId: string;
     };
     pendingUpdate?: { linkId: string };
     resolve: () => Promise<unknown>;
   };
 
-  function makeSelect(): Chain {
+  function makeSelectLink(): Chain {
     const chain: Chain = {
       op: "select-link",
       resolve: async () => {
-        const link = state.links.find((l) => l.token === chain.pendingToken);
+        const link = state.links.find((l) => l.token === chain.pendingToken && !l.noteIsDeleted);
         return link
           ? [
               {
                 id: link.id,
                 noteId: link.noteId,
                 role: link.role,
+                createdByUserId: link.createdByUserId,
                 expiresAt: link.expiresAt,
                 maxUses: link.maxUses,
                 usedCount: link.usedCount,
@@ -236,8 +251,23 @@ function createFakeDb(state: FakeState): Database {
     return chain;
   }
 
-  function makeInsert(values: Record<string, unknown>): Chain {
-    if ("linkId" in values) {
+  function makeSelectRedemption(): Chain {
+    const chain: Chain = {
+      op: "select-redemption",
+      resolve: async () => {
+        const row = state.redemptions.find(
+          (r) =>
+            r.linkId === chain.pendingRedemption?.linkId &&
+            r.redeemedByUserId === chain.pendingLookupUserId,
+        );
+        return row ? [{ id: "r-existing" }] : [];
+      },
+    };
+    return chain;
+  }
+
+  function makeInsert(table: unknown, values: Record<string, unknown>): Chain {
+    if (table === noteInviteLinkRedemptions) {
       const chain: Chain = {
         op: "insert-redemption",
         pendingRedemption: {
@@ -271,14 +301,15 @@ function createFakeDb(state: FakeState): Database {
         noteId: String(values.noteId),
         memberEmail: String(values.memberEmail),
         role: values.role as "viewer" | "editor",
-        userId: String(values.invitedByUserId),
+        invitedByUserId: String(values.invitedByUserId),
+        acceptedUserId: String(values.acceptedUserId),
       },
       resolve: async () => [],
     };
     chain.resolve = async () => {
       const pending = chain.pendingMember;
       if (!pending) return [];
-      const { noteId, memberEmail, role, userId } = pending;
+      const { noteId, memberEmail, role, invitedByUserId, acceptedUserId } = pending;
       const existing = state.members.find(
         (m) => m.noteId === noteId && m.memberEmail === memberEmail,
       );
@@ -287,8 +318,9 @@ function createFakeDb(state: FakeState): Database {
           noteId,
           memberEmail,
           role,
+          invitedByUserId,
           status: "accepted",
-          acceptedUserId: userId,
+          acceptedUserId,
           isDeleted: false,
         };
         state.members.push(row);
@@ -298,7 +330,7 @@ function createFakeDb(state: FakeState): Database {
       const keepRole = existing.status === "accepted" && !existing.isDeleted;
       existing.role = keepRole ? existing.role : role;
       existing.status = "accepted";
-      existing.acceptedUserId = existing.acceptedUserId ?? userId;
+      existing.acceptedUserId = existing.acceptedUserId ?? acceptedUserId;
       existing.isDeleted = false;
       return [{ role: existing.role, status: existing.status }];
     };
@@ -338,9 +370,19 @@ function createFakeDb(state: FakeState): Database {
         if (prop === "where") {
           return (cond: unknown) => {
             if (chain.op === "select-link") {
-              const c = cond as { queryChunks?: unknown[] } | undefined;
-              const token = extractTokenFromEqSqlCondition(c);
+              const token = extractStringValueFromCondition(cond);
               if (token) chain.pendingToken = token;
+            }
+            if (chain.op === "select-redemption") {
+              const [linkId, userId] = extractAllStringValuesFromCondition(cond);
+              if (linkId) {
+                chain.pendingRedemption = {
+                  linkId,
+                  userId: userId ?? "",
+                  email: "",
+                };
+              }
+              if (userId) chain.pendingLookupUserId = userId;
             }
             if (chain.op === "update-link" && chain.pendingUpdate) {
               const linkId = extractLinkIdFromAndCondition(cond);
@@ -350,7 +392,8 @@ function createFakeDb(state: FakeState): Database {
           };
         }
         // Any other method (values/onConflictDoNothing/onConflictDoUpdate/
-        // for/limit/returning/set) is a no-op that keeps the chain.
+        // for/limit/returning/set/innerJoin/leftJoin) is a no-op that keeps
+        // the chain.
         return (..._args: unknown[]) => wrapChain(chain);
       },
     }) as unknown as Promise<unknown>;
@@ -358,22 +401,26 @@ function createFakeDb(state: FakeState): Database {
 
   const db: Record<string, unknown> = {
     transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(db),
-    select: () => ({
-      from: () => wrapChain(makeSelect()),
-    }),
-    insert: (_table: unknown) => ({
-      values: (values: Record<string, unknown>) => wrapChain(makeInsert(values)),
-    }),
-    update: (_table: unknown) => ({
-      set: (values: Record<string, unknown>) => {
-        const chain = makeUpdate();
-        // retain which link gets updated by sniffing the set payload shape
-        // (we only update usedCount in this service; the id comes from where())
-        void values;
-        return wrapChain(chain);
+    select: (_fields?: unknown) => ({
+      from: (table: unknown) => {
+        if (table === noteInviteLinkRedemptions) {
+          return wrapChain(makeSelectRedemption());
+        }
+        // Default: any other `.from(table)` including `select().from(noteInviteLinks)`
+        // is treated as a link lookup (the service only issues link + redemption
+        // selects, so this is deterministic).
+        void noteInviteLinks;
+        return wrapChain(makeSelectLink());
       },
     }),
+    insert: (table: unknown) => ({
+      values: (values: Record<string, unknown>) => wrapChain(makeInsert(table, values)),
+    }),
+    update: (_table: unknown) => ({
+      set: (_values: Record<string, unknown>) => wrapChain(makeUpdate()),
+    }),
   };
+  void noteMembers;
 
   return db as unknown as Database;
 }
@@ -385,18 +432,42 @@ function createFakeDb(state: FakeState): Database {
  * drizzle's `eq(col, value)` expands to an SQL chunks array; we only need the
  * string literal the caller bound for mock routing.
  */
-function extractTokenFromEqSqlCondition(cond: unknown): string | null {
-  if (!cond) return null;
-  // drizzle SQL クラスは queryChunks プロパティに値を載せる
-  const chunks = (cond as { queryChunks?: unknown[] }).queryChunks;
-  if (!Array.isArray(chunks)) return null;
-  for (const chunk of chunks) {
-    if (chunk && typeof chunk === "object") {
-      const param = (chunk as { value?: unknown }).value;
-      if (typeof param === "string") return param;
+/**
+ * drizzle の `eq` / `and` を走査し、含まれる最初の string パラメータ値を返す。
+ * Walk a drizzle SQL tree and return the first string parameter value.
+ */
+function extractStringValueFromCondition(cond: unknown): string | null {
+  const visit = (node: unknown): string | null => {
+    if (!node || typeof node !== "object") return null;
+    const value = (node as { value?: unknown }).value;
+    if (typeof value === "string") return value;
+    const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
+    if (Array.isArray(chunks)) {
+      for (const c of chunks) {
+        const found = visit(c);
+        if (found !== null) return found;
+      }
     }
-  }
-  return null;
+    return null;
+  };
+  return visit(cond);
+}
+
+/**
+ * drizzle の `and(eq(col, a), eq(col, b))` から、出現順に string 値を 2 つ拾う。
+ * Collect up to two string parameter values from an `and(eq, eq)` tree.
+ */
+function extractAllStringValuesFromCondition(cond: unknown): [string | null, string | null] {
+  const found: string[] = [];
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const value = (node as { value?: unknown }).value;
+    if (typeof value === "string") found.push(value);
+    const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
+    if (Array.isArray(chunks)) for (const c of chunks) visit(c);
+  };
+  visit(cond);
+  return [found[0] ?? null, found[1] ?? null];
 }
 
 function extractLinkIdFromAndCondition(cond: unknown): string | null {
@@ -418,17 +489,22 @@ function extractLinkIdFromAndCondition(cond: unknown): string | null {
   return visit(cond);
 }
 
+/** デフォルトの発行者 ID（受諾者と区別しやすい値にする） */
+const DEFAULT_LINK_CREATOR_ID = "creator-user";
+
 function makeLink(overrides: Partial<FakeLinkRow> = {}): FakeLinkRow {
   return {
     id: "00000000-0000-0000-0000-00000000aaaa",
     noteId: "11111111-1111-1111-1111-111111111111",
     token: "token-valid",
     role: "viewer",
+    createdByUserId: DEFAULT_LINK_CREATOR_ID,
     expiresAt: new Date(Date.now() + DEFAULT_INVITE_LINK_TTL_MS),
     revokedAt: null,
     maxUses: null,
     usedCount: 0,
     requireSignIn: true,
+    noteIsDeleted: false,
     ...overrides,
   };
 }
@@ -602,6 +678,7 @@ describe("redeemInviteLink", () => {
           noteId: "11111111-1111-1111-1111-111111111111",
           memberEmail: "u1@example.com",
           role: "editor",
+          invitedByUserId: "someone-else",
           status: "accepted",
           acceptedUserId: "u1",
           isDeleted: false,
@@ -623,5 +700,123 @@ describe("redeemInviteLink", () => {
       expect(result.role).toBe("editor");
     }
     expect(state.members[0]?.role).toBe("editor");
+  });
+
+  it("treats soft-deleted notes as not_found and never touches memberships", async () => {
+    const state: FakeState = {
+      links: [makeLink({ noteIsDeleted: true })],
+      redemptions: [],
+      members: [],
+    };
+    const db = createFakeDb(state);
+
+    const result = await redeemInviteLink({
+      db,
+      token: "token-valid",
+      redeemedByUserId: "u1",
+      redeemedEmail: "u1@example.com",
+    });
+
+    expect(result).toEqual({ ok: false, reason: "not_found" });
+    expect(state.redemptions).toHaveLength(0);
+    expect(state.members).toHaveLength(0);
+  });
+
+  it("records the link creator as invitedByUserId (audit trail, not self-invite)", async () => {
+    const state: FakeState = {
+      links: [makeLink({ createdByUserId: "alice" })],
+      redemptions: [],
+      members: [],
+    };
+    const db = createFakeDb(state);
+
+    const result = await redeemInviteLink({
+      db,
+      token: "token-valid",
+      redeemedByUserId: "bob",
+      redeemedEmail: "bob@example.com",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(state.members[0]?.invitedByUserId).toBe("alice");
+    expect(state.members[0]?.acceptedUserId).toBe("bob");
+  });
+
+  it(
+    "returns idempotent success when the same user redeems after maxUses is consumed " +
+      "(repeat click must not flip to exhausted)",
+    async () => {
+      const state: FakeState = {
+        links: [makeLink({ maxUses: 1, usedCount: 0 })],
+        redemptions: [],
+        members: [],
+      };
+      const db = createFakeDb(state);
+
+      const first = await redeemInviteLink({
+        db,
+        token: "token-valid",
+        redeemedByUserId: "u1",
+        redeemedEmail: "u1@example.com",
+      });
+      // After the first redeem the link is now "exhausted" for strangers.
+      const second = await redeemInviteLink({
+        db,
+        token: "token-valid",
+        redeemedByUserId: "u1",
+        redeemedEmail: "u1@example.com",
+      });
+
+      expect(first.ok).toBe(true);
+      if (first.ok) expect(first.isNewRedemption).toBe(true);
+      expect(second.ok).toBe(true);
+      if (second.ok) {
+        expect(second.isNewRedemption).toBe(false);
+        expect(second.alreadyMember).toBe(true);
+      }
+      expect(state.links[0]?.usedCount).toBe(1);
+      expect(state.redemptions).toHaveLength(1);
+    },
+  );
+
+  it("still blocks repeat redeem attempts when the link has been revoked", async () => {
+    const state: FakeState = {
+      links: [makeLink({ maxUses: 1, usedCount: 1, revokedAt: new Date("2026-01-01") })],
+      redemptions: [
+        {
+          linkId: "00000000-0000-0000-0000-00000000aaaa",
+          redeemedByUserId: "u1",
+          redeemedEmail: "u1@example.com",
+        },
+      ],
+      members: [],
+    };
+    const db = createFakeDb(state);
+
+    const result = await redeemInviteLink({
+      db,
+      token: "token-valid",
+      redeemedByUserId: "u1",
+      redeemedEmail: "u1@example.com",
+    });
+
+    // Even an already-redeemed user must not re-acquire membership through a
+    // revoked link. Only exhausted is relaxed for repeat redeems.
+    expect(result).toEqual({ ok: false, reason: "revoked" });
+  });
+});
+
+// ── normalizeCreateInviteLinkInput: Phase 3 auth ───────────────────────────
+
+describe("normalizeCreateInviteLinkInput — requireSignIn", () => {
+  it("rejects requireSignIn: false (Phase 3 is auth-only)", () => {
+    expect(() => normalizeCreateInviteLinkInput({ requireSignIn: false })).toThrow(
+      /must require sign-in/,
+    );
+  });
+
+  it("accepts omitted or explicit true as true", () => {
+    expect(normalizeCreateInviteLinkInput({}).requireSignIn).toBe(true);
+    expect(normalizeCreateInviteLinkInput({ requireSignIn: true }).requireSignIn).toBe(true);
   });
 });

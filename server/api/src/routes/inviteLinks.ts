@@ -8,7 +8,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { noteInviteLinks, notes, users } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import {
@@ -76,6 +76,11 @@ app.get("/:token", async (c) => {
   const token = c.req.param("token");
   const db = c.get("db");
 
+  // 論理削除されたノートのリンクは「不明」扱いにする（#672 review: soft-delete
+  // されたノートでプレビューが成立すると誤解を招く）。`notes` を INNER JOIN
+  // し `isDeleted = false` を条件に加える。
+  //
+  // Links whose note has been soft-deleted are treated as unknown tokens.
   const [row] = await db
     .select({
       id: noteInviteLinks.id,
@@ -91,9 +96,9 @@ app.get("/:token", async (c) => {
       inviterName: users.name,
     })
     .from(noteInviteLinks)
-    .leftJoin(notes, eq(notes.id, noteInviteLinks.noteId))
+    .innerJoin(notes, eq(notes.id, noteInviteLinks.noteId))
     .leftJoin(users, eq(users.id, noteInviteLinks.createdByUserId))
-    .where(eq(noteInviteLinks.token, token))
+    .where(and(eq(noteInviteLinks.token, token), eq(notes.isDeleted, false)))
     .limit(1);
 
   if (!row) {

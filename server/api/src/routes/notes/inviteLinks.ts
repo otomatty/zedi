@@ -86,7 +86,14 @@ app.get("/:noteId/invite-links", authRequired, async (c) => {
   const userEmail = c.get("userEmail");
   const db = c.get("db");
 
-  const { role } = await getNoteRole(noteId, userId, userEmail, db);
+  // `getNoteRole` は存在しないノートを `{ role: null, note: null }` で返すため、
+  // 先に `note` の有無を検査しないと 404 が 403 として出てしまう
+  // (#672 review #3109660808 — notes/members.ts と同じパターン)。
+  // Guard `!note` first so missing notes return 404 rather than 403.
+  const { role, note } = await getNoteRole(noteId, userId, userEmail, db);
+  if (!note) {
+    throw new HTTPException(404, { message: "Note not found" });
+  }
   if (role !== "owner" && role !== "editor") {
     throw new HTTPException(403, {
       message: "Only owner or editor can list invite links",

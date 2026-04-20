@@ -12,7 +12,7 @@
  * user cannot consume a second slot by reloading the link.
  */
 import { and, eq, sql } from "drizzle-orm";
-import { noteInviteLinkRedemptions, noteInviteLinks, noteMembers } from "../schema/index.js";
+import { noteInviteLinkRedemptions, noteInviteLinks, noteMembers, notes } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 
 /** 共有リンクのデフォルト TTL（7 日） / Default TTL (7 days). */
@@ -116,31 +116,40 @@ export interface RedeemInviteLinkParams {
 }
 
 /**
+ * redeem のエントリポイント。spec (#660) に従い:
+ *  - 受諾者の email 欠落は 400 相当
+ *  - 論理削除されたノートの link は `not_found` 相当
+ *  - 同一ユーザーによる再受諾は `usedCount` を増やさず idempotent に成功する
+ *    （`maxUses` に達していても）
  *
+ * Top-level redeem entry point. Honors the spec in #660:
+ *  - missing email → 400-class failure
+ *  - link pointing at a soft-deleted note → treated as `not_found`
+ *  - repeat redeem by the same user → idempotent success that does not bump
+ *    `usedCount`, even after the final slot is consumed
  */
 export async function redeemInviteLink(params: RedeemInviteLinkParams): Promise<RedeemResult> {
-  /**
-   *
-   */
   const { db, token, redeemedByUserId, redeemedEmail, now = new Date() } = params;
 
-  /**
-   *
-   */
   const trimmedEmail = redeemedEmail.trim().toLowerCase();
   if (!trimmedEmail) {
     return { ok: false, reason: "member_email_missing" };
   }
 
   return db.transaction(async (tx) => {
-    /**
-     *
-     */
+    // ノートが論理削除されている場合はリンクを「存在しない」扱いにする。
+    // `notes` を INNER JOIN + `isDeleted = false` でフィルタすることで
+    // 削除されたノートでは無条件に `not_found` を返す（soft-deleted note
+    // でアクセスが蘇生する穴を塞ぐ、#672 review comment #3109676220 ほか）。
+    //
+    // Soft-deleted notes are treated as missing. INNER JOIN + `isDeleted`
+    // filter so the service never restores membership on a deleted note.
     const [link] = await tx
       .select({
         id: noteInviteLinks.id,
         noteId: noteInviteLinks.noteId,
         role: noteInviteLinks.role,
+        createdByUserId: noteInviteLinks.createdByUserId,
         expiresAt: noteInviteLinks.expiresAt,
         maxUses: noteInviteLinks.maxUses,
         usedCount: noteInviteLinks.usedCount,
@@ -148,27 +157,45 @@ export async function redeemInviteLink(params: RedeemInviteLinkParams): Promise<
         requireSignIn: noteInviteLinks.requireSignIn,
       })
       .from(noteInviteLinks)
-      .where(eq(noteInviteLinks.token, token))
-      .for("update")
+      .innerJoin(notes, eq(notes.id, noteInviteLinks.noteId))
+      .where(and(eq(noteInviteLinks.token, token), eq(notes.isDeleted, false)))
+      .for("update", { of: noteInviteLinks })
       .limit(1);
 
     if (!link) return { ok: false, reason: "not_found" } as const;
 
-    /**
-     *
-     */
+    // 再受諾の idempotent 判定を、classification より先に行う。これにより
+    // maxUses 到達後の「既参加ユーザーによる再クリック」が `exhausted` に
+    // ならず、取り消し / 期限切れのみがブロッキングになる
+    // (#672 review #3109676220 / spec 「同一ユーザーの 2 回 redeem で
+    // usedCount が増えない（既参加扱い）」)。
+    //
+    // Look up the existing redemption before classifying: a previously
+    // redeemed user must see an idempotent success even after usedCount
+    // has reached maxUses. Only revoked / expired still block.
+    const [existingRedemption] = await tx
+      .select({ id: noteInviteLinkRedemptions.id })
+      .from(noteInviteLinkRedemptions)
+      .where(
+        and(
+          eq(noteInviteLinkRedemptions.linkId, link.id),
+          eq(noteInviteLinkRedemptions.redeemedByUserId, redeemedByUserId),
+        ),
+      )
+      .limit(1);
+
     const classification = classifyInviteLink(link, now);
-    if (classification !== "valid") {
+    if (classification === "revoked" || classification === "expired") {
       return { ok: false, reason: classification } as const;
+    }
+    if (classification === "exhausted" && !existingRedemption) {
+      return { ok: false, reason: "exhausted" } as const;
     }
 
     // 受諾履歴に INSERT。`(link_id, redeemed_by_user_id)` のユニーク制約で
     // 同一ユーザーの 2 回目以降は黙って無視される（returning が空）。
     // Insert into the redemption log. The unique constraint makes repeat
     // redeems a silent no-op (empty returning).
-    /**
-     *
-     */
     const inserted = await tx
       .insert(noteInviteLinkRedemptions)
       .values({
@@ -181,9 +208,6 @@ export async function redeemInviteLink(params: RedeemInviteLinkParams): Promise<
       })
       .returning({ id: noteInviteLinkRedemptions.id });
 
-    /**
-     *
-     */
     const isNewRedemption = inserted.length > 0;
 
     // 新規 redemption のみ usedCount を +1。maxUses に対する超過を避けるため
@@ -205,20 +229,18 @@ export async function redeemInviteLink(params: RedeemInviteLinkParams): Promise<
         );
     }
 
-    // note_members に upsert。既存 accepted は role を維持する（リンク経由の
-    // 昇格 / 降格を禁止）。取り消し済みフラグが立っていた場合は復活させる。
-    // Upsert into note_members. Preserve role for already-accepted members —
-    // link redeems must not upgrade or downgrade an existing membership.
-    /**
-     *
-     */
+    // note_members に upsert。`invitedByUserId` にはリンク作成者を記録する
+    // （#672 review #3109676205: 受諾者自身を inviter にすると自己招待になり
+    // 監査データが壊れる）。既存 accepted は role を維持する。
+    // Upsert into note_members. `invitedByUserId` uses the link creator so
+    // the audit trail shows the actual inviter, not the redeemer.
     const [member] = await tx
       .insert(noteMembers)
       .values({
         noteId: link.noteId,
         memberEmail: trimmedEmail,
         role: link.role,
-        invitedByUserId: redeemedByUserId,
+        invitedByUserId: link.createdByUserId,
         status: "accepted",
         acceptedUserId: redeemedByUserId,
       })
@@ -230,7 +252,7 @@ export async function redeemInviteLink(params: RedeemInviteLinkParams): Promise<
           status: sql`'accepted'`,
           acceptedUserId: sql`COALESCE(${noteMembers.acceptedUserId}, ${redeemedByUserId})`,
           isDeleted: false,
-          updatedAt: new Date(),
+          updatedAt: sql`now()`,
         },
       })
       .returning({
@@ -238,17 +260,12 @@ export async function redeemInviteLink(params: RedeemInviteLinkParams): Promise<
         status: noteMembers.status,
       });
 
-    /**
-     *
-     */
-    const alreadyMember = !isNewRedemption;
-
     return {
       ok: true,
       noteId: link.noteId,
       role: (member?.role ?? link.role) as InviteLinkRole,
       isNewRedemption,
-      alreadyMember,
+      alreadyMember: !isNewRedemption,
     } as const;
   });
 }
@@ -266,7 +283,8 @@ export interface CreateInviteLinkInput {
 }
 
 /**
- *
+ * Normalised creation input — bounds-checked and Phase-3 policy enforced.
+ * 入力検証後の発行パラメータ（Phase 3 ポリシーを適用済み）。
  */
 export interface NormalizedCreateInviteLinkInput {
   role: InviteLinkRole;
@@ -312,7 +330,15 @@ export function normalizeCreateInviteLinkInput(
 
   const trimmedLabel = input.label ? input.label.trim() : "";
   const label = trimmedLabel.length > 0 ? trimmedLabel.slice(0, 200) : null;
-  const requireSignIn = input.requireSignIn ?? true;
+  // Phase 3 ではサインイン必須。匿名 redeem は未実装のため、明示 false は拒否する
+  // （#672 review #3109676228: false を保存すると「匿名でも redeem できる」と
+  //  誤認されるが、実際のルートは常に 401 になる）。
+  // Phase 3 requires sign-in. Reject an explicit `false` so DB rows cannot
+  // advertise anonymous redemption that the auth-only route cannot honour.
+  if (input.requireSignIn === false) {
+    throw new Error("Phase 3 invite links must require sign-in");
+  }
+  const requireSignIn = true;
 
   return { role, expiresAt, maxUses, label, requireSignIn };
 }

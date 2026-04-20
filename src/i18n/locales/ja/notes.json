@@ -133,7 +133,7 @@
   "inviteLinksStatusActive": "有効",
   "inviteLinksStatusExpired": "期限切れ",
   "inviteLinksStatusExhausted": "上限到達",
-  "inviteLinksRoleViewer": "viewer",
+  "inviteLinksRoleViewer": "閲覧者",
   "inviteLinksUsage": "{{used}} / {{max}} 回使用",
   "inviteLinksUsageUnlimited": "{{used}} 回使用（無制限）",
   "inviteLinksExpiresAt": "期限: {{date}}",
