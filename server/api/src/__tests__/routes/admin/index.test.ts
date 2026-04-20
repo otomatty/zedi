@@ -48,22 +48,63 @@ describe("parseAdminUserStatusFilter", () => {
 });
 
 describe("GET /api/admin/users", () => {
-  it("returns 200 with users and total", async () => {
+  it("returns 200 with users, total, and page counts", async () => {
     const u1 = createMockUserRow({ id: "u1", email: "a@example.com", role: "user" });
     const u2 = createMockUserRow({ id: "u2", email: "b@example.com", role: "admin" });
-    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT, [u1, u2], [{ count: 2 }]]);
+    const { app } = createAdminTestApp([
+      ADMIN_ROLE_RESULT,
+      [u1, u2],
+      [{ count: 2 }],
+      [
+        { ownerId: "u1", count: 3 },
+        { ownerId: "u2", count: 7 },
+      ],
+    ]);
 
     const res = await app.request("/api/admin/users", {
       headers: adminAuthHeaders(),
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { users: Record<string, unknown>[]; total: number };
+    const body = (await res.json()) as {
+      users: { id: string; pageCount: number }[];
+      total: number;
+    };
     expect(body).toHaveProperty("users");
     expect(body).toHaveProperty("total", 2);
     expect(body.users).toHaveLength(2);
-    expect(body.users[0]).toMatchObject({ id: "u1", email: "a@example.com", role: "user" });
-    expect(body.users[1]).toMatchObject({ id: "u2", email: "b@example.com", role: "admin" });
+    expect(body.users[0]).toMatchObject({
+      id: "u1",
+      email: "a@example.com",
+      role: "user",
+      pageCount: 3,
+    });
+    expect(body.users[1]).toMatchObject({
+      id: "u2",
+      email: "b@example.com",
+      role: "admin",
+      pageCount: 7,
+    });
+  });
+
+  it("defaults pageCount to 0 when a user has no pages", async () => {
+    const u1 = createMockUserRow({ id: "u1" });
+    const u2 = createMockUserRow({ id: "u2" });
+    const { app } = createAdminTestApp([
+      ADMIN_ROLE_RESULT,
+      [u1, u2],
+      [{ count: 2 }],
+      [{ ownerId: "u1", count: 5 }], // u2 has no pages row
+    ]);
+
+    const res = await app.request("/api/admin/users", {
+      headers: adminAuthHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { users: { id: string; pageCount: number }[] };
+    expect(body.users[0]).toMatchObject({ id: "u1", pageCount: 5 });
+    expect(body.users[1]).toMatchObject({ id: "u2", pageCount: 0 });
   });
 
   it("returns empty list and total when no users", async () => {
@@ -81,7 +122,12 @@ describe("GET /api/admin/users", () => {
 
   it("honors limit and offset", async () => {
     const u1 = createMockUserRow({ id: "u1" });
-    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT, [u1], [{ count: 100 }]]);
+    const { app } = createAdminTestApp([
+      ADMIN_ROLE_RESULT,
+      [u1],
+      [{ count: 100 }],
+      [{ ownerId: "u1", count: 0 }],
+    ]);
 
     const res = await app.request("/api/admin/users?limit=10&offset=5", {
       headers: adminAuthHeaders(),

@@ -1,8 +1,9 @@
 import { Hono } from "hono";
-import { eq, like, desc, sql, and, ne } from "drizzle-orm";
+import { eq, like, desc, sql, and, ne, inArray } from "drizzle-orm";
 import { authRequired } from "../../middleware/auth.js";
 import { adminRequired } from "../../middleware/adminAuth.js";
 import { users, session } from "../../schema/users.js";
+import { pages } from "../../schema/pages.js";
 import { recordAuditLog } from "../../lib/auditLog.js";
 import { getUserImpact, anonymizeUser } from "../../lib/userDelete.js";
 import auditLogsRoutes from "./auditLogs.js";
@@ -98,6 +99,24 @@ app.get("/users", async (c) => {
 
   const total = countRow?.count ?? 0;
 
+  // 各ユーザーに紐づいているアクティブ（未削除）ページ数を取得する。
+  // Fetch active (non-deleted) page counts per user.
+  const userIds = rows.map((u) => u.id);
+  const pageCountMap = new Map<string, number>();
+  if (userIds.length > 0) {
+    const pageCounts = await db
+      .select({
+        ownerId: pages.ownerId,
+        count: sql<number>`cast(count(*) as integer)`,
+      })
+      .from(pages)
+      .where(and(inArray(pages.ownerId, userIds), eq(pages.isDeleted, false)))
+      .groupBy(pages.ownerId);
+    for (const row of pageCounts) {
+      pageCountMap.set(row.ownerId, row.count);
+    }
+  }
+
   return c.json({
     users: rows.map((u) => ({
       id: u.id,
@@ -109,6 +128,7 @@ app.get("/users", async (c) => {
       suspendedReason: u.suspendedReason,
       suspendedBy: u.suspendedBy,
       createdAt: u.createdAt,
+      pageCount: pageCountMap.get(u.id) ?? 0,
     })),
     total,
   });

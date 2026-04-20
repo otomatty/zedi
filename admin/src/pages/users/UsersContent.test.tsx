@@ -139,6 +139,7 @@ const mockUser: UserAdmin = {
   suspendedReason: null,
   suspendedBy: null,
   createdAt: "2026-01-01T00:00:00Z",
+  pageCount: 0,
 };
 
 const defaultProps = {
@@ -165,6 +166,14 @@ describe("UsersContent", () => {
     render(<UsersContent {...defaultProps} />);
 
     expect(screen.getByText(/1-1 件を表示 \/ 合計 1 件/)).toBeInTheDocument();
+  });
+
+  it("ユーザーのページ数を表示する / displays the user's page count", () => {
+    const userWithPages: UserAdmin = { ...mockUser, pageCount: 1234 };
+    render(<UsersContent {...defaultProps} users={[userWithPages]} />);
+
+    expect(screen.getByText("ページ数")).toBeInTheDocument();
+    expect(screen.getByText("1,234")).toBeInTheDocument();
   });
 
   it("shows pagination when total > pageSize and calls onPageChange when 次へ is clicked", async () => {
