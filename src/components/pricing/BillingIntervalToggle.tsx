@@ -4,11 +4,15 @@ import { Button, cn } from "@zedi/ui";
 import type { BillingInterval } from "@/lib/subscriptionService";
 
 /**
- *
+ * Props for {@link BillingIntervalToggle}.
+ * {@link BillingIntervalToggle} の props。
  */
 export interface BillingIntervalToggleProps {
+  /** Currently selected billing cadence. / 現在選択されている請求間隔。 */
   value: BillingInterval;
+  /** Called with the newly selected cadence. / 新しく選択された請求間隔を受け取るコールバック。 */
   onChange: (value: BillingInterval) => void;
+  /** Optional className forwarded to the wrapper element. */
   className?: string;
 }
 

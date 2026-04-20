@@ -53,7 +53,6 @@ const Pricing: React.FC = () => {
     status,
     billingInterval,
     currentPeriodEnd,
-    isProUser,
     isCanceled,
     usage,
     isLoading,
@@ -66,7 +65,7 @@ const Pricing: React.FC = () => {
   useScrollToHashOnReady(!isLoading);
 
   const handleSelectPro = async () => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || isLoading) return;
     await openProCheckout(selectedBillingInterval);
     // 5s delay keeps the UI responsive while the Polar webhook reconciles.
     // 5 秒待つことで Polar の webhook 完了後に最新状態を反映しやすくする。
@@ -75,10 +74,29 @@ const Pricing: React.FC = () => {
     }, 5000);
   };
 
-  const showPlanStatusCard = isSignedIn;
-  const showSubscriptionActions = isSignedIn && (isProUser || isCanceled);
-  const showBillingToggle = !isProUser;
-  const showPlanComparisonCards = !isProUser || isCanceled;
+  // Wait for the subscription query to settle before deciding whether to show
+  // acquisition UI (billing toggle, Pro CTA) vs. the management UI. Without
+  // this guard a still-loading Pro user briefly sees checkout controls for a
+  // plan they already own.
+  // サブスクリプションのクエリが確定するまで、checkout 系 UI と管理 UI の
+  // 出し分けを保留する。保留しないと、既に Pro のユーザーがロード中だけ
+  // 新規契約 UI を見てしまう。
+  const subscriptionReady = !isSignedIn || !isLoading;
+  const hasProSubscription = plan === "pro";
+  const showPlanStatusCard = isSignedIn && subscriptionReady;
+  // Pro subscribers (including those who scheduled cancellation) get the
+  // management section and skip the billing-cadence toggle — reactivation
+  // and interval changes live in SubscriptionActions instead.
+  // 解約予約中を含む Pro 契約中ユーザーには管理セクションを出し、請求間隔トグルは
+  // 省く。再開や間隔変更は SubscriptionActions 側で行うため。
+  const showSubscriptionActions = subscriptionReady && isSignedIn && hasProSubscription;
+  const showBillingToggle = subscriptionReady && !hasProSubscription;
+  // Comparison cards render for everyone once the query settles — Pro
+  // subscribers see the "current plan" badge without a checkout CTA; free /
+  // guest viewers see a live checkout CTA.
+  // 比較カードはクエリ確定後は常に描画する。Pro 契約中ユーザーには CTA を消して
+  // 「現在のプラン」バッジを、Free / ゲストには稼働中の CTA を見せる。
+  const showPlanComparisonCards = subscriptionReady;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -127,7 +145,7 @@ const Pricing: React.FC = () => {
           {showPlanComparisonCards && (
             <PlanComparisonCards
               billingInterval={selectedBillingInterval}
-              isProUser={isProUser}
+              plan={plan}
               isSignedIn={isSignedIn}
               onSelectPro={handleSelectPro}
             />

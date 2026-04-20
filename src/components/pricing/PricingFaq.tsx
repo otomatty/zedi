@@ -11,7 +11,7 @@ const FAQ_ITEMS = [
 
 /**
  * FAQ section shown at the bottom of `/pricing`.
- * / `/pricing` ページ下部の FAQ セクション。
+ * `/pricing` ページ下部の FAQ セクション。
  */
 export const PricingFaq: React.FC = () => {
   const { t } = useTranslation();

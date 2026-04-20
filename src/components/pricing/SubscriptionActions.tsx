@@ -26,20 +26,28 @@ import {
 } from "@/lib/subscriptionService";
 
 /**
- *
+ * Props for {@link SubscriptionActions}.
+ * {@link SubscriptionActions} の props。
  */
 export interface SubscriptionActionsProps {
-  /** Current billing interval ("monthly" | "yearly" | null for pending states). */
+  /**
+   * Current billing interval ("monthly" | "yearly" | null for pending states).
+   * 現在の請求間隔。未確定の場合は null。
+   */
   billingInterval: "monthly" | "yearly" | null;
-  /** True when the subscription is scheduled to cancel at period end. */
+  /**
+   * True when the subscription is scheduled to cancel at period end.
+   * 請求期間末で解約予約されている場合に true。
+   */
   isCanceled: boolean;
   /**
    * Called after any mutation (cancel / reactivate / change-plan) succeeds so
    * the page can refresh subscription state (typically
-   * `queryClient.invalidateQueries`).
+   * `queryClient.invalidateQueries`). May return a Promise.
    *
    * 解約 / 再開 / 請求間隔変更が成功したあとに呼ばれる。ページ側で
    * `queryClient.invalidateQueries` を行いサブスク状態を再取得する。
+   * Promise を返してもよい。
    */
   onMutated?: () => void | Promise<void>;
 }
@@ -62,12 +70,12 @@ export const SubscriptionActions: React.FC<SubscriptionActionsProps> = ({
   const { t } = useTranslation();
   const [actionLoading, setActionLoading] = useState(false);
 
-  const runAction = async (action: () => Promise<unknown>) => {
+  const runAction = async (action: () => Promise<unknown>, { refetch = true } = {}) => {
     setActionLoading(true);
     try {
       await action();
       toast.success(t("pricing.subscription.actionSuccess"));
-      await onMutated?.();
+      if (refetch) await onMutated?.();
     } catch {
       toast.error(t("pricing.subscription.actionFailed"));
     } finally {
@@ -79,6 +87,12 @@ export const SubscriptionActions: React.FC<SubscriptionActionsProps> = ({
   const handleReactivate = () => runAction(reactivateSubscription);
   const handleChangePlan = (interval: "monthly" | "yearly") =>
     runAction(() => changeBillingInterval(interval));
+  // Opening the Polar portal doesn't change backend state immediately, but we
+  // still want the loading / double-click guard and error toast that runAction
+  // provides. Skip the onMutated refetch since nothing has changed yet.
+  // Polar のポータルを開くだけでは即座にバックエンドの状態は変わらないが、
+  // 二重クリック防止とエラートーストの統一のため runAction を使う。refetch は不要。
+  const handleOpenPortal = () => runAction(openCustomerPortal, { refetch: false });
 
   return (
     <Card>
@@ -127,13 +141,7 @@ export const SubscriptionActions: React.FC<SubscriptionActionsProps> = ({
         <Button
           variant="outline"
           className="w-full justify-start"
-          onClick={async () => {
-            try {
-              await openCustomerPortal();
-            } catch {
-              toast.error(t("pricing.subscription.actionFailed"));
-            }
-          }}
+          onClick={handleOpenPortal}
           disabled={actionLoading}
         >
           <CreditCard className="mr-2 h-4 w-4" />

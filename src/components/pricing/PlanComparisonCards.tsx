@@ -110,16 +110,36 @@ const PlanCard: React.FC<PlanCardProps> = ({
 };
 
 /**
- *
+ * Props for {@link PlanComparisonCards}.
+ * {@link PlanComparisonCards} の props。
  */
 export interface PlanComparisonCardsProps {
-  /** Current billing interval used for the Pro card's price and CTA label. */
+  /**
+   * Current billing interval used for the Pro card's price and CTA label.
+   * Pro カードの価格表示と CTA ラベルに使う請求間隔。
+   */
   billingInterval: BillingInterval;
-  /** True when the current user has an active Pro subscription. */
-  isProUser: boolean;
-  /** True when the viewer is signed in (controls disabled state on the Pro CTA). */
+  /**
+   * The viewer's subscription plan. Drives which card gets the "current plan"
+   * badge and whether the Pro checkout CTA is shown. Pass the subscription's
+   * own plan (so a canceled-but-still-active Pro subscriber is treated as Pro).
+   *
+   * ユーザーのサブスクリプション上のプラン。どちらのカードに「現在のプラン」
+   * バッジを付けるか、Pro のチェックアウト CTA を出すかの判定に使う。
+   * 解約予約中でまだ期限内の Pro 契約も `"pro"` として渡す。
+   */
+  plan: "free" | "pro";
+  /**
+   * True when the viewer is signed in — controls the disabled state on the
+   * Pro CTA and whether the "current plan" badge is shown on the Free card.
+   * ログイン中かどうか。Pro CTA の非活性化と Free カードの「現在のプラン」
+   * バッジ表示を制御する。
+   */
   isSignedIn: boolean;
-  /** Called when the Pro CTA is clicked for a non-Pro user (checkout). */
+  /**
+   * Called when a non-Pro viewer clicks the Pro CTA (starts Polar checkout).
+   * Pro 以外のユーザーが Pro CTA を押したときに呼ばれる（Polar チェックアウトを開く）。
+   */
   onSelectPro: () => void;
   /** Optional className forwarded to the outer grid. */
   className?: string;
@@ -127,20 +147,23 @@ export interface PlanComparisonCardsProps {
 
 /**
  * Free / Pro plan comparison cards. The Pro card CTA is disabled when the
- * viewer is signed out, and is hidden entirely for existing Pro users (they
- * manage their plan in the subscription actions section instead).
+ * viewer is signed out, and is hidden entirely for existing Pro subscribers
+ * (they manage their plan via the subscription actions section instead —
+ * including subscribers who have scheduled cancellation).
  *
  * Free / Pro プラン比較カード。未ログイン時は Pro の CTA を非活性化し、既に
- * Pro のユーザーには CTA を表示しない（契約管理セクションで行うため）。
+ * Pro 契約中のユーザーには CTA を出さない（解約予約中も含め、契約管理セクション
+ * に誘導する）。
  */
 export const PlanComparisonCards: React.FC<PlanComparisonCardsProps> = ({
   billingInterval,
-  isProUser,
+  plan,
   isSignedIn,
   onSelectPro,
   className,
 }) => {
   const { t } = useTranslation();
+  const isProSubscriber = plan === "pro";
   return (
     <div className={cn("mx-auto grid max-w-4xl gap-6 md:grid-cols-2", className)}>
       <PlanCard
@@ -158,7 +181,12 @@ export const PlanComparisonCards: React.FC<PlanComparisonCardsProps> = ({
         ]}
         buttonText={t("pricing.free.buttonText")}
         buttonVariant="outline"
-        current={!isProUser}
+        // Only signed-in Free users see the "current plan" badge — guests have
+        // no known plan, and Pro subscribers (including canceled ones) are not
+        // on Free until the current period actually ends.
+        // 「現在のプラン」バッジはログイン中の Free ユーザーにだけ付ける。
+        // ゲストはプランが不明で、Pro の解約予約中ユーザーはまだ Free ではない。
+        current={isSignedIn && !isProSubscriber}
         showButton={false}
       />
       <PlanCard
@@ -190,9 +218,9 @@ export const PlanComparisonCards: React.FC<PlanComparisonCardsProps> = ({
             : t("pricing.pro.subscribeMonthly")
         }
         onSelect={onSelectPro}
-        current={isProUser}
+        current={isProSubscriber}
         disabled={!isSignedIn}
-        showButton={!isProUser}
+        showButton={!isProSubscriber}
       />
     </div>
   );

@@ -4,9 +4,9 @@ import { Sparkles, Zap } from "lucide-react";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import { UsageMeter } from "./UsageMeter";
 
-function formatDate(dateStr: string | null): string {
+function formatDate(dateStr: string | null, locale: string | undefined): string {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString(undefined, {
+  return new Date(dateStr).toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -22,6 +22,8 @@ function resolveStatusMeta(
 ): { label: string; variant: StatusVariant } | null {
   if (plan !== "pro") return null;
   switch (status) {
+    case "active":
+      return { label: t("pricing.subscription.statusActive"), variant: "default" };
     case "canceled":
       return { label: t("pricing.subscription.statusCanceled"), variant: "destructive" };
     case "past_due":
@@ -29,18 +31,28 @@ function resolveStatusMeta(
     case "trialing":
       return { label: t("pricing.subscription.statusTrialing"), variant: "outline" };
     default:
-      return { label: t("pricing.subscription.statusActive"), variant: "default" };
+      // Unknown statuses must not silently impersonate "active" — render a
+      // neutral fallback so the UI surfaces backend drift instead of hiding it.
+      // 未知のステータスを "active" として隠さず、中立的なフォールバックを返して
+      // バックエンドの差分を表に出す。
+      return { label: t("pricing.subscription.statusUnknown"), variant: "secondary" };
   }
 }
 
 /**
- *
+ * Props for {@link PlanStatusCard}.
+ * {@link PlanStatusCard} の props。
  */
 export interface PlanStatusCardProps {
+  /** Subscription plan on the contract ("pro" even while canceled). */
   plan: "free" | "pro";
+  /** Subscription status string from the backend. */
   status: string;
+  /** Current billing cadence (null when no subscription exists). */
   billingInterval: "monthly" | "yearly" | null;
+  /** Current period end as an ISO string, used for the next-billing date. */
   currentPeriodEnd: string | null;
+  /** Usage metrics displayed in the inline usage meter. */
   usage: {
     consumedUnits: number;
     budgetUnits: number;
@@ -70,7 +82,8 @@ export const PlanStatusCard: React.FC<PlanStatusCardProps> = ({
   usage,
   showCanceledNote = true,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const isPro = plan === "pro";
   const isCanceled = status === "canceled";
   const statusMeta = resolveStatusMeta(plan, status, t);
@@ -101,7 +114,7 @@ export const PlanStatusCard: React.FC<PlanStatusCardProps> = ({
         {isPro && isCanceled && currentPeriodEnd && showCanceledNote && (
           <CardDescription>
             {t("pricing.subscription.statusCanceledNote", {
-              date: formatDate(currentPeriodEnd),
+              date: formatDate(currentPeriodEnd, locale),
             })}
           </CardDescription>
         )}
@@ -119,7 +132,7 @@ export const PlanStatusCard: React.FC<PlanStatusCardProps> = ({
               <span className="text-muted-foreground">
                 {t("pricing.subscription.nextBillingLabel")}
               </span>
-              <p className="font-medium">{formatDate(currentPeriodEnd)}</p>
+              <p className="font-medium">{formatDate(currentPeriodEnd, locale)}</p>
             </div>
           </div>
         )}

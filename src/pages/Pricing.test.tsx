@@ -263,4 +263,27 @@ describe("Pricing page — Signed-in Pro user (canceled)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("pricing.pro.name")).toBeInTheDocument();
   });
+
+  it("hides the Pro checkout CTA and the billing-cadence toggle", () => {
+    renderPricing();
+    expect(
+      screen.queryByRole("button", { name: "pricing.pro.subscribeMonthly" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "pricing.pro.subscribeYearly" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "pricing.billingMonthly" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("puts the current-plan badge on Pro only (canceled Pro keeps Pro access)", () => {
+    renderPricing();
+    // Until the current billing period ends the user is still a Pro subscriber,
+    // so the "current plan" badge stays on Pro and must not appear on Free.
+    // 請求期間末までは Pro 契約中なので、「現在のプラン」バッジは Pro に付き、
+    // Free カードには付かないこと。
+    const currentBadges = screen.getAllByText("pricing.currentPlan");
+    expect(currentBadges).toHaveLength(1);
+  });
 });

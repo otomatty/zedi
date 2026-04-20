@@ -147,4 +147,69 @@ describe("useSubscription", () => {
 
     expect(result.current.isLoading).toBe(false);
   });
+
+  it("ignores cached Pro data when the user is signed out", async () => {
+    mockIsSignedIn = true;
+    mockFetchSubscription.mockResolvedValue({
+      plan: "pro",
+      status: "active",
+      billingInterval: "monthly",
+      currentPeriodStart: "2026-02-23T00:00:00Z",
+      currentPeriodEnd: "2026-03-23T00:00:00Z",
+      externalId: "sub_leak_test",
+      usage: { consumedUnits: 10, budgetUnits: 50000, remainingUnits: 49990, usagePercent: 0.02 },
+    } satisfies SubscriptionState);
+
+    const wrapper = createHookWrapper();
+    const { result, rerender } = renderHook(() => useSubscription(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isProUser).toBe(true);
+    });
+
+    mockIsSignedIn = false;
+    rerender();
+
+    expect(result.current.plan).toBe("free");
+    expect(result.current.isProUser).toBe(false);
+    expect(result.current.externalId).toBeNull();
+  });
+
+  it("invalidate() triggers a refetch with the latest fetcher result", async () => {
+    mockIsSignedIn = true;
+    mockFetchSubscription.mockResolvedValueOnce({
+      plan: "pro",
+      status: "active",
+      billingInterval: "monthly",
+      currentPeriodStart: "2026-02-23T00:00:00Z",
+      currentPeriodEnd: "2026-03-23T00:00:00Z",
+      externalId: "sub_inv_1",
+      usage: { consumedUnits: 0, budgetUnits: 50000, remainingUnits: 50000, usagePercent: 0 },
+    } satisfies SubscriptionState);
+
+    const { result } = renderHook(() => useSubscription(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("active");
+    });
+
+    mockFetchSubscription.mockResolvedValueOnce({
+      plan: "pro",
+      status: "canceled",
+      billingInterval: "monthly",
+      currentPeriodStart: "2026-02-23T00:00:00Z",
+      currentPeriodEnd: "2026-03-23T00:00:00Z",
+      externalId: "sub_inv_1",
+      usage: { consumedUnits: 0, budgetUnits: 50000, remainingUnits: 50000, usagePercent: 0 },
+    } satisfies SubscriptionState);
+
+    await result.current.invalidate();
+
+    await waitFor(() => {
+      expect(result.current.isCanceled).toBe(true);
+    });
+    expect(mockFetchSubscription).toHaveBeenCalledTimes(2);
+  });
 });

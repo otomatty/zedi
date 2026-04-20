@@ -3,16 +3,26 @@ import { useTranslation } from "react-i18next";
 import { Progress, cn } from "@zedi/ui";
 
 /**
- *
+ * Props for {@link UsageMeter}. Usage values are AI cost-units consumed during
+ * the current billing period.
+ * {@link UsageMeter} の props。値は現在の請求期間中に消費した AI Cost Units。
  */
 export interface UsageMeterProps {
+  /** Cost units already consumed this period. / 今期消費済みの Cost Units。 */
   consumedUnits: number;
+  /** Cost units allocated for the period. / 今期の予算 Cost Units。 */
   budgetUnits: number;
+  /** Remaining cost units (never rendered below zero). / 残り Cost Units（負値は 0 に丸める）。 */
   remainingUnits: number;
+  /** Usage percent in the 0-100 range; clamped to 100 for display. / 0〜100 の使用率。表示は 100 でクランプ。 */
   usagePercent: number;
   /** Optional className forwarded to the outer wrapper. */
   className?: string;
-  /** When true, shows the "approaching limit" warning copy below the bar. */
+  /**
+   * When true, shows the "approaching limit" warning copy below the bar once
+   * usage crosses the danger threshold. Defaults to true.
+   * true の場合、危険閾値を越えるとバー下に警告文を表示する。デフォルトは true。
+   */
   showDangerWarning?: boolean;
 }
 
