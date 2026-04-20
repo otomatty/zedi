@@ -220,6 +220,19 @@ export interface RestoreSnapshotResponse {
   snapshot_id: string;
 }
 
+/**
+ * 招待メールの送信状況（有効期限・最終送信日時・送信回数）。
+ * Invitation email delivery state (expiry, last-sent timestamp, send count).
+ */
+export interface NoteInvitationInfo {
+  /** 招待トークンの有効期限 / Token expiration timestamp (ISO 8601) */
+  expiresAt: string;
+  /** 直近の送信日時 / Timestamp of the most recent send (ISO 8601). null 初回送信前 */
+  lastEmailSentAt: string | null;
+  /** 送信回数（初回 + 再送の合計） / Total number of sends (initial + resends) */
+  emailSendCount: number;
+}
+
 /** GET /api/notes/:id/members response item. */
 export interface NoteMemberItem {
   note_id: string;
@@ -229,6 +242,8 @@ export interface NoteMemberItem {
   invited_by_user_id: string;
   created_at: string;
   updated_at: string;
+  /** 招待情報（accepted 済みで招待行が無い場合などは null）。 / Invitation info (null when no row exists). */
+  invitation?: NoteInvitationInfo | null;
 }
 
 /** POST /api/notes/:noteId/members/:email/resend response. */

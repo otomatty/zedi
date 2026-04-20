@@ -146,6 +146,15 @@ function apiPageToPage(p: GetNoteResponse["pages"][0]): Page {
 }
 
 function apiMemberToNoteMember(m: NoteMemberItem, noteId: string): NoteMember {
+  const invitation = m.invitation
+    ? {
+        expiresAt: parseTs(m.invitation.expiresAt),
+        lastEmailSentAt: m.invitation.lastEmailSentAt
+          ? parseTs(m.invitation.lastEmailSentAt)
+          : null,
+        emailSendCount: m.invitation.emailSendCount,
+      }
+    : null;
   return {
     noteId,
     memberEmail: m.member_email,
@@ -155,6 +164,7 @@ function apiMemberToNoteMember(m: NoteMemberItem, noteId: string): NoteMember {
     createdAt: parseTs(m.created_at),
     updatedAt: parseTs(m.updated_at),
     isDeleted: false,
+    invitation,
   };
 }
 
