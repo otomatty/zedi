@@ -9,7 +9,7 @@
  *
  * Tests for /api/mcp routes: PKCE code issuance, code exchange, revocation, and MCP clip endpoint.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
 
@@ -502,6 +502,24 @@ describe("POST /api/mcp/revoke-session", () => {
 // surface to the user.
 // ─────────────────────────────────────────────────────────────────────────────
 describe("rate limiting (#562)", () => {
+  // per-IP バケットの検証には x-forwarded-for を使うため、プロキシ信頼を
+  // このブロック内だけ有効化する（`extractClientIp` が XFF を採用する条件）。
+  // Enable proxy trust for this block so per-IP tests can drive the bucket
+  // via x-forwarded-for (extractClientIp reads the header only when trusted).
+  const originalTrustProxy = process.env.TRUST_PROXY;
+
+  beforeEach(() => {
+    process.env.TRUST_PROXY = "true";
+  });
+
+  afterEach(() => {
+    if (originalTrustProxy === undefined) {
+      delete process.env.TRUST_PROXY;
+    } else {
+      process.env.TRUST_PROXY = originalTrustProxy;
+    }
+  });
+
   it("POST /api/mcp/clip returns 429 with Retry-After once the per-user limit is exceeded", async () => {
     const app = createMcpApp(mockRedis, mockDb);
     // 30/min/user. 30 回まで通して 31 回目で 429。

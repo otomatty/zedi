@@ -8,7 +8,7 @@
  *
  * Unit tests for the rate limit middleware (#562).
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { AppEnv } from "../../types/index.js";
@@ -61,8 +61,23 @@ function appWith(middleware: ReturnType<typeof rateLimit>, setup: (c: Context<Ap
 describe("rateLimit middleware", () => {
   let redis: AppEnv["Variables"]["redis"];
 
+  // `extractClientIp` は TRUST_PROXY=true のときだけ x-forwarded-for を採用するため、
+  // IP ベースのバケットを検証するテスト中は明示的にプロキシ信頼を有効にする。
+  // `extractClientIp` only reads x-forwarded-for when TRUST_PROXY=true, so enable
+  // proxy trust for the duration of these tests to exercise IP-scoped buckets.
+  const originalTrustProxy = process.env.TRUST_PROXY;
+
   beforeEach(() => {
     redis = createMockRedis();
+    process.env.TRUST_PROXY = "true";
+  });
+
+  afterEach(() => {
+    if (originalTrustProxy === undefined) {
+      delete process.env.TRUST_PROXY;
+    } else {
+      process.env.TRUST_PROXY = originalTrustProxy;
+    }
   });
 
   it("passes through when no redis is bound (graceful degradation)", async () => {

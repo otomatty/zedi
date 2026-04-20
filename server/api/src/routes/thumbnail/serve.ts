@@ -99,32 +99,50 @@ app.delete("/:id", authRequired, async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
 
-  // ストレージ→DB の順で削除する。ストレージ側が失敗した場合に DB レコードだけ消えて
-  // オブジェクトが孤児化するのを防ぐため。NoSuchKey 等の冪等エラーは DB 削除まで進める。
+  // DB 削除を先に行い、所有者スコープの WHERE が一致した場合のみ S3 を削除する。
+  // これにより (a) SELECT 後に所有権が変わった TOCTOU 窓では DB 削除が 0 行となり、
+  // 他人の行に属する S3 オブジェクトを誤って消すことがない、(b) DB 行が残ったまま
+  // S3 だけ消える不整合を回避できる。S3 削除が失敗した孤立オブジェクトは GC で回収可能。
   //
-  // Delete storage object before the DB row so a storage failure cannot leave an
-  // orphaned object behind. Idempotent errors (NoSuchKey) still advance to DB delete.
+  // Delete the DB row first under an ownership-scoped WHERE and only touch S3 when
+  // the row count confirms we owned it. Ownership changes during the TOCTOU window
+  // show up as 0 rows deleted, so we surface 404 instead of wiping someone else's
+  // storage object. Orphaned S3 objects from a post-DB failure are reclaimable by a
+  // background sweeper — safer than the inverse (DB row pointing to missing blob).
+  const deleted = await db
+    .delete(thumbnailObjects)
+    .where(and(eq(thumbnailObjects.id, objectId), eq(thumbnailObjects.userId, userId)))
+    .returning({ s3Key: thumbnailObjects.s3Key });
+
+  const deletedRow = deleted[0];
+  if (!deletedRow) {
+    // SELECT と DELETE の間で所有権が移動したか、並行して削除された。
+    // Ownership changed (or the row was deleted concurrently) between SELECT and DELETE.
+    return c.json({ error: "Not found" }, 404);
+  }
+
   try {
     await s3.send(
       new DeleteObjectCommand({
         Bucket: BUCKET,
-        Key: row.s3Key,
+        Key: deletedRow.s3Key,
       }),
     );
   } catch (err) {
-    // NoSuchKey のみを冪等として扱う。NoSuchBucket 等、別の 404 応答は
-    // 本当の設定不整合なので 502 に倒して DB を残す。
+    // DB 行は既に削除済み。NoSuchKey は冪等として無視し、他の失敗は
+    // 孤立オブジェクトとしてログだけ残す（DB 行は復活させない）。
     //
-    // Only treat an explicit NoSuchKey as idempotent; other 404-class errors
-    // (e.g. NoSuchBucket) indicate real config failures — surface 502 and keep the DB row.
+    // DB row is already gone. Treat NoSuchKey as idempotent; log other failures
+    // so ops can sweep the orphaned S3 object — do NOT resurrect the DB row.
     const s3Err = err as { name?: string } | null;
     if (s3Err?.name !== "NoSuchKey") {
-      console.error("[thumbnail/serve] S3 DeleteObject failed:", err);
-      return c.json({ error: "Failed to delete object from storage" }, 502);
+      console.error("[thumbnail/serve] S3 DeleteObject failed after DB delete (orphaned object):", {
+        objectId,
+        s3Key: deletedRow.s3Key,
+        err,
+      });
     }
   }
-
-  await db.delete(thumbnailObjects).where(eq(thumbnailObjects.id, objectId));
 
   return c.json({ success: true });
 });

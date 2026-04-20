@@ -191,6 +191,41 @@ describe("GET /api/pages", () => {
 
     expect(res.status).toBe(200);
   });
+
+  it("filters out internal special pages (special_kind, is_schema) by default", async () => {
+    const { app, chains } = createPagesAppWithChains([{ rows: [] }]);
+
+    const res = await app.request("/api/pages", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    // execute() に渡された SQL チャンクに special_kind / is_schema の除外句が
+    // 含まれていることを検証する（Drizzle sql テンプレートの queryChunks を文字列化）。
+    // Verify the SQL passed to execute() contains the special-kind exclusion clause.
+    const executeChain = chains.find((chain) => chain.startMethod === "execute");
+    expect(executeChain).toBeDefined();
+    const serialised = JSON.stringify(executeChain?.startArgs);
+    expect(serialised).toContain("special_kind IS NULL");
+    expect(serialised).toContain("is_schema = false");
+  });
+
+  it("includes internal special pages when include_special=true", async () => {
+    const { app, chains } = createPagesAppWithChains([{ rows: [] }]);
+
+    const res = await app.request("/api/pages?include_special=true", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const executeChain = chains.find((chain) => chain.startMethod === "execute");
+    expect(executeChain).toBeDefined();
+    const serialised = JSON.stringify(executeChain?.startArgs);
+    expect(serialised).not.toContain("special_kind IS NULL");
+    expect(serialised).not.toContain("is_schema = false");
+  });
 });
 
 describe("PUT /api/pages/:id/content", () => {
