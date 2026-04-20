@@ -5,7 +5,7 @@
  * 招待受諾ページ — `/invite?token=xxx`。
  * 6 つの状態を管理: ローディング中、未ログイン、メール一致、メール不一致、期限切れ、無効。
  */
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -19,7 +19,11 @@ import {
 } from "@zedi/ui";
 import { signIn } from "@/lib/auth";
 import { useAuth, useUser } from "@/hooks/useAuth";
-import { useInvitation, useAcceptInvitation } from "@/hooks/useInvitation";
+import {
+  useInvitation,
+  useAcceptInvitation,
+  useSendInvitationEmailLink,
+} from "@/hooks/useInvitation";
 import { ApiError } from "@/lib/api/apiClient";
 import type { InvitationInfoResponse } from "@/lib/api/types";
 
@@ -137,6 +141,137 @@ const InviteMessage: React.FC<{ message: string; variant?: "default" | "error" }
 };
 
 /**
+ * Email-mismatch rescue panel — offers a magic-link resend and a re-sign-in option.
+ * Disables the resend button during the backend-declared cooldown and while waiting.
+ *
+ * メール不一致時の救済パネル — マジックリンク再送と別アカウント再サインインを提供する。
+ */
+const EmailMismatchSection: React.FC<{
+  token: string;
+  invitation: InvitationInfoResponse;
+  userEmail: string;
+  onSignOut: () => void;
+}> = ({ token, invitation, userEmail, onSignOut }) => {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const sendMutation = useSendInvitationEmailLink();
+  /**
+   * クールダウン状態（送信後 or レート制限）を 1 つの state で表現する。
+   * 派生値のみを参照することで、エフェクト内での連鎖的な setState を避ける。
+   *
+   * Encode both the success cooldown and the rate-limit cooldown as a single
+   * state object so nothing derived from it needs to be written back in an
+   * effect (avoiding cascading-render lint warnings).
+   */
+  const [cooldown, setCooldown] = useState<{ until: number; reason: "ok" | "rate-limit" } | null>(
+    null,
+  );
+  const [now, setNow] = useState<number>(() => Date.now());
+  const [sentOnce, setSentOnce] = useState(false);
+
+  // クールダウン中だけタイマーを回して `now` を更新する。`cooldown.until` に
+  // 達したらタイマー自身が `cooldown` を null に戻すので、以後 rerender が止まる
+  // （以前はタイマーが停止せず永続リレンダーのリークになっていた）。
+  // Tick `now` while a cooldown is active; the timer clears `cooldown` itself
+  // when time runs out so the component stops re-rendering (previously the
+  // interval leaked for the rest of the page's lifetime).
+  useEffect(() => {
+    if (cooldown === null) return;
+    const timer = window.setInterval(() => {
+      if (Date.now() >= cooldown.until) {
+        setCooldown(null);
+      } else {
+        setNow(Date.now());
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
+
+  const secondsLeft = cooldown === null ? 0 : Math.max(0, Math.ceil((cooldown.until - now) / 1000));
+  const rateLimited = cooldown?.reason === "rate-limit" && secondsLeft > 0;
+
+  const handleSend = useCallback(async () => {
+    try {
+      const result = await sendMutation.mutateAsync({ token });
+      setSentOnce(true);
+      setCooldown({ until: Date.now() + result.retryAfterSec * 1000, reason: "ok" });
+      setNow(Date.now());
+      toast({
+        description: t("invite.sendMagicLinkSent", { email: invitation.memberEmail }),
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) {
+        // 直近の試行が拒否されたので、以前の「送信済み」表示はクリアする。
+        // Clear the previous success banner so it doesn't reappear after the
+        // rate-limit cooldown — the latest attempt did *not* send an email.
+        setSentOnce(false);
+        // 構造化レスポンス (`retry_after`) から秒数を取得。未設定時のみ 5 分にフォールバック。
+        // Read retry seconds from the structured response body rather than
+        // parsing the human-readable message (which is brittle).
+        const body = (err.data ?? null) as { retry_after?: unknown } | null;
+        const retry =
+          typeof body?.retry_after === "number" && Number.isFinite(body.retry_after)
+            ? Math.max(1, Math.floor(body.retry_after))
+            : 300;
+        setCooldown({ until: Date.now() + retry * 1000, reason: "rate-limit" });
+        setNow(Date.now());
+        toast({
+          variant: "destructive",
+          description: t("invite.sendMagicLinkRateLimited", { seconds: retry }),
+        });
+        return;
+      }
+      toast({
+        variant: "destructive",
+        description: t("invite.sendMagicLinkError"),
+      });
+    }
+  }, [sendMutation, token, toast, t, invitation.memberEmail]);
+
+  const isPending = sendMutation.isPending;
+  const isDisabled = isPending || secondsLeft > 0;
+
+  let buttonLabel: string;
+  if (isPending) {
+    buttonLabel = t("invite.sendMagicLinkPending");
+  } else if (rateLimited && secondsLeft > 0) {
+    buttonLabel = t("invite.sendMagicLinkRateLimited", { seconds: secondsLeft });
+  } else if (secondsLeft > 0) {
+    buttonLabel = t("invite.sendMagicLinkResendCountdown", { seconds: secondsLeft });
+  } else {
+    buttonLabel = t("invite.sendMagicLinkCta", { email: invitation.memberEmail });
+  }
+
+  return (
+    <>
+      <CardHeader>
+        <CardTitle>{invitation.noteTitle}</CardTitle>
+        <CardDescription>
+          {t("invite.invitedBy", { inviterName: invitation.inviterName })}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-destructive text-sm">
+          {t("invite.emailMismatch", { email: invitation.memberEmail, userEmail })}
+        </p>
+        <p className="text-muted-foreground text-sm">{t("invite.emailMismatchHelp")}</p>
+        {sentOnce && !rateLimited && (
+          <p className="text-foreground/70 text-sm" role="status">
+            {t("invite.sendMagicLinkSent", { email: invitation.memberEmail })}
+          </p>
+        )}
+        <Button className="w-full" onClick={handleSend} disabled={isDisabled}>
+          {buttonLabel}
+        </Button>
+        <Button variant="outline" className="w-full" onClick={onSignOut}>
+          {t("invite.signOutAndRetry")}
+        </Button>
+      </CardContent>
+    </>
+  );
+};
+
+/**
  * Invitation detail content — renders the appropriate state view.
  * 招待詳細コンテンツ — 適切な状態ビューをレンダリングする。
  */
@@ -152,6 +287,7 @@ const InviteContent: React.FC<{
   onSocialSignIn: (provider: "google" | "github") => () => void;
 }> = ({
   invitation,
+  token,
   isSignedIn,
   userEmail,
   onSignOut,
@@ -215,25 +351,15 @@ const InviteContent: React.FC<{
     );
   }
 
-  // Email mismatch
+  // Email mismatch — offer a rescue magic link to the invited address.
   if (userEmail && userEmail.toLowerCase() !== invitation.memberEmail.toLowerCase()) {
     return (
-      <>
-        <CardHeader>
-          <CardTitle>{invitation.noteTitle}</CardTitle>
-          <CardDescription>
-            {t("invite.invitedBy", { inviterName: invitation.inviterName })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-destructive text-sm">
-            {t("invite.emailMismatch", { email: invitation.memberEmail })}
-          </p>
-          <Button variant="outline" className="w-full" onClick={onSignOut}>
-            {t("invite.signOutAndRetry")}
-          </Button>
-        </CardContent>
-      </>
+      <EmailMismatchSection
+        token={token}
+        invitation={invitation}
+        userEmail={userEmail}
+        onSignOut={onSignOut}
+      />
     );
   }
 

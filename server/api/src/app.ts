@@ -66,6 +66,21 @@ export function createApp(): Hono<AppEnv> {
   app.use("*", redisMiddleware);
   app.onError(errorHandler);
 
+  // Better Auth の magicLink プラグインは `POST /api/auth/sign-in/magic-link` を
+  // 自動で登録するが、これを公開すると招待トークン検証やレート制限を経由せずに
+  // 任意のメール宛へサインインリンクを送れてしまう（#668 レビュー指摘 P1）。
+  // 内部呼び出し (`magicLinkService` → `auth.handler(new Request(...))`) は
+  // この Hono ミドルウェアを通らないため、公開面だけ 404 にすれば良い。
+  //
+  // Block the public `POST /api/auth/sign-in/magic-link` route that the
+  // Better Auth magicLink plugin auto-registers. The rescue flow reaches the
+  // same endpoint via `auth.handler(new Request(...))`, which does not go
+  // through this Hono route, so internal calls still work. Verification path
+  // `/api/auth/magic-link/verify` remains public so email links keep working.
+  app.post("/api/auth/sign-in/magic-link", (c) =>
+    c.json({ error: "Not found", path: c.req.path, method: c.req.method }, 404),
+  );
+
   // Better Auth handler — use :path{.+} to match multi-segment paths (e.g. /api/auth/sign-in/social).
   // Hono's * only matches a single segment, so ** would not match sign-in/social.
   app.on(["POST", "GET"], "/api/auth/:path{.+}", (c) => {

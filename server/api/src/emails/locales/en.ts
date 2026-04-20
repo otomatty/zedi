@@ -21,4 +21,16 @@ export const en = {
     footer: "If you didn't expect this email, you can safely ignore it.",
     unsubscribe: "Email notifications from Zedi",
   },
+  inviteMagicLink: {
+    subject: () => `[Zedi] Sign-in link to accept your invitation`,
+    preview: () => `One-time sign-in link to accept your invitation`,
+    heading: "Sign in to accept the invitation",
+    greeting:
+      "Click the button below to sign in as the invited email address and return to the invitation page.",
+    toLabel: "To",
+    ctaButton: "Sign in and accept",
+    expiresNotice: "This link expires shortly. Please open it as soon as you receive the email.",
+    footer: "If you didn't expect this email, you can safely ignore it.",
+    unsubscribe: "Email notifications from Zedi",
+  },
 } as const;
