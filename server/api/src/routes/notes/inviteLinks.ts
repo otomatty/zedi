@@ -27,18 +27,23 @@ const app = new Hono<AppEnv>();
 
 /**
  * リクエストボディのスキーマ（JSON）。
- * - role:         'viewer' のみ許容（Phase 3）
+ * - role:         'viewer' | 'editor'（Phase 5 / #662 で editor を追加）
+ *                  editor は `editPermission='owner_only'` のノートでは 400 となり、
+ *                  1 ノートにつき同時 3 本までしか発行できない
  * - expiresInMs:  有効期限までのミリ秒（省略時 7 日、最大 90 日）
  * - maxUses:      利用上限 1..100（null = 無制限）
  * - label:        棚卸し用ラベル（任意）
- * - requireSignIn: サインイン必須フラグ（省略時 true）
+ * - requireSignIn: サインイン必須フラグ。viewer は `false` を拒否、editor は
+ *                   API 境界で常に `true` に上書きされる
  *
  * Request body schema:
- * - role:          only `'viewer'` is allowed in Phase 3
+ * - role:          `'viewer'` or `'editor'` (editor added in Phase 5 / #662).
+ *                  Editor is rejected with 400 when `editPermission='owner_only'`
+ *                  and capped at 3 concurrent active links per note.
  * - expiresInMs:   ms until expiry (default 7 days, max 90 days)
  * - maxUses:       redemption cap 1..100 (null = unlimited)
  * - label:         free-form housekeeping label (optional)
- * - requireSignIn: whether sign-in is required to redeem (default true)
+ * - requireSignIn: Viewer rejects `false`; editor silently coerces to `true`.
  */
 interface CreateInviteLinkBody {
   role?: string | null;

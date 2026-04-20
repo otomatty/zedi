@@ -39,6 +39,7 @@ import {
   useRevokeInviteLink,
 } from "@/hooks/useInviteLinks";
 import type { InviteLinkRow } from "@/lib/api/types";
+import type { NoteEditPermission } from "@/types/note";
 
 /**
  * 各有効期限プリセットの内部値（ms）。
@@ -121,11 +122,13 @@ export interface NoteInviteLinksSectionProps {
   now?: () => number;
   /**
    * ノートの編集権限ポリシー。`owner_only` の場合は editor リンクを発行できない
-   * （UI でも選択肢を無効化し、誤発行の余地を残さない）。
+   * （UI でも選択肢を無効化し、誤発行の余地を残さない）。ドメイン型を共有して
+   * ドリフトを防ぐ (#676 coderabbit)。
    * Edit permission of the note. When `owner_only`, editor links are disabled
-   * in the UI so they match the server-side 400 guard.
+   * in the UI so they match the server-side 400 guard. Reuses the shared
+   * `NoteEditPermission` domain type (#676 coderabbit).
    */
-  editPermission?: "owner_only" | "members_editors" | "any_logged_in";
+  editPermission?: NoteEditPermission;
 }
 
 /**
@@ -234,6 +237,25 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
   );
 
   const handleCreate = useCallback(async () => {
+    // 送信時ガード: 発行フォームが editor に留まったまま editPermission が
+    // `owner_only` に変わった場合でも UI でフェイルファストし、サーバーからの
+    // 400 に依存しない (#676 coderabbit)。想定外の状態遷移を検知するため、
+    // viewer に戻して次の発行を安全側にする。
+    //
+    // Submit-time guard: fail fast in the UI if `editPermission` was changed
+    // to `owner_only` while `role === 'editor'` was already selected, rather
+    // than relying on the backend 400 (#676 coderabbit). Reset to viewer so
+    // the next submit starts from a safe state.
+    if (role === "editor" && !canCreateEditorLink) {
+      toast({
+        title: t("notes.inviteLinksEditorUnavailableOwnerOnly"),
+        variant: "destructive",
+      });
+      acknowledgedJustNowRef.current = false;
+      setRole("viewer");
+      setEditorAcknowledged(false);
+      return;
+    }
     if (needsEditorAck) {
       // 万一 disabled 状態をバイパスされても、送信は確実にブロックする。
       // Defence-in-depth: never submit without the acknowledgement.
@@ -268,7 +290,17 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
         variant: "destructive",
       });
     }
-  }, [createMutation, expiryPreset, maxUsesPreset, label, toast, t, role, needsEditorAck]);
+  }, [
+    createMutation,
+    expiryPreset,
+    maxUsesPreset,
+    label,
+    toast,
+    t,
+    role,
+    needsEditorAck,
+    canCreateEditorLink,
+  ]);
 
   const handleCopy = useCallback(
     async (token: string) => {
