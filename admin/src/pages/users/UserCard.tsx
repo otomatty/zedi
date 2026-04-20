@@ -70,6 +70,9 @@ export function UserCard({
               <SelectItem value="admin">admin</SelectItem>
             </SelectContent>
           </Select>
+          <span className="text-xs text-slate-500">
+            ページ数: {user.pageCount.toLocaleString("ja-JP")}
+          </span>
           <span className="text-xs text-slate-500">{formatDate(user.createdAt)}</span>
           {!saving && user.status === "deleted" ? (
             <span className="text-muted-foreground text-xs">削除済み</span>

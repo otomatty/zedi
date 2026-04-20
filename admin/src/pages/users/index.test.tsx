@@ -88,6 +88,7 @@ const mockUsers = (n: number, offset: number) =>
     suspendedReason: null,
     suspendedBy: null,
     createdAt: "2026-01-01T00:00:00Z",
+    pageCount: 0,
   }));
 
 describe("Users (admin)", () => {
