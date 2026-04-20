@@ -43,11 +43,17 @@ export class ApiError extends Error {
   /**
    * API エラーを生成する。
    * Creates an API error with HTTP status and optional application code.
+   *
+   * @param data - サーバーから返された構造化レスポンスボディ。エラーメッセージ以外に
+   *   `retry_after` などの付帯情報を呼び出し側で参照したい場合に使う。
+   *   Parsed response body (structured) so callers can read extra fields such
+   *   as `retry_after` instead of parsing the human-readable message.
    */
   constructor(
     message: string,
     public status: number,
     public code?: string,
+    public data?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -85,7 +91,7 @@ function throwOnErrorResponse(data: unknown, res: Response): never {
   const legacy = data as { message?: string; code?: string } | null;
   const msg = envelope?.error?.message ?? legacy?.message ?? res.statusText;
   const code = envelope?.error?.code ?? legacy?.code;
-  throw new ApiError(msg, res.status, code);
+  throw new ApiError(msg, res.status, code, data);
 }
 
 function unwrapEnvelope<T>(data: unknown): T {

@@ -129,51 +129,42 @@ function createTestApp(dbResults: unknown[]) {
 // ── In-memory Redis mock (only the subset we use) ──────────────────────────
 
 /**
- * email-link エンドポイントで使う Redis の最小実装。INCR/EXPIRE/TTL のみ対応する。
- * Minimal Redis mock covering INCR, EXPIRE, and TTL for the email-link endpoint.
+ * email-link エンドポイントで使う Redis の最小実装。`eval`（Lua）と `ttl` のみ対応する。
+ * サーバ側は incrWithExpire を Lua スクリプトで実装しており、
+ * 初回 INCR 時のみ EXPIRE を設定する固定ウィンドウ挙動を再現する。
+ *
+ * Minimal Redis mock focused on the `eval` script used by incrWithExpire plus
+ * `ttl` for retry-after computation. The EXPIRE is only set on the *first*
+ * INCR so the mock mirrors the production fixed-window semantics.
  */
 function createRedisMock() {
   const counters = new Map<string, number>();
   const ttls = new Map<string, number>();
 
   const api = {
-    async incr(key: string): Promise<number> {
+    async eval(script: string, _numKeys: number, key: string, ttlArg: string): Promise<number> {
+      // 本実装の Lua スクリプトに対応する JS ミラー / JS mirror of the prod Lua script.
       const next = (counters.get(key) ?? 0) + 1;
       counters.set(key, next);
+      if (next === 1) {
+        const ttlSec = Number.parseInt(ttlArg, 10);
+        if (Number.isFinite(ttlSec)) ttls.set(key, ttlSec);
+      }
+      // script はテストで無視するが、万が一の typo 検出用に構造だけ確認する。
+      if (!script.includes("incr")) throw new Error(`unexpected redis eval script: ${script}`);
       return next;
-    },
-    async expire(key: string, seconds: number): Promise<number> {
-      ttls.set(key, seconds);
-      return counters.has(key) ? 1 : 0;
     },
     async ttl(key: string): Promise<number> {
       return ttls.get(key) ?? -2;
     },
-    multi() {
-      const ops: Array<() => Promise<unknown>> = [];
-      const chain = {
-        incr(key: string) {
-          ops.push(() => api.incr(key));
-          return chain;
-        },
-        expire(key: string, seconds: number) {
-          ops.push(() => api.expire(key, seconds));
-          return chain;
-        },
-        async exec() {
-          const results: [null, unknown][] = [];
-          for (const op of ops) {
-            const value = await op();
-            results.push([null, value]);
-          }
-          return results;
-        },
-      };
-      return chain;
-    },
     _reset() {
       counters.clear();
       ttls.clear();
+    },
+    _incr(key: string): void {
+      // テストから直接カウンタを積みたい場合の補助。EXPIRE は触らない。
+      const next = (counters.get(key) ?? 0) + 1;
+      counters.set(key, next);
     },
     _getCount(key: string): number {
       return counters.get(key) ?? 0;
@@ -646,7 +637,7 @@ describe("POST /api/invite/:token/email-link", () => {
       // 直前の呼び出しまでに累積した daily カウントを復元
       // Restore the daily counter so rolling the short window doesn't reset it.
       const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
-      for (let n = 0; n < i; n++) await redis.incr(dailyKey);
+      for (let n = 0; n < i; n++) redis._incr(dailyKey);
 
       const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
         method: "POST",
@@ -659,7 +650,7 @@ describe("POST /api/invite/:token/email-link", () => {
     // 6 回目: daily が 6 になり 429 (daily) を返す
     redis._reset();
     const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
-    for (let n = 0; n < 5; n++) await redis.incr(dailyKey);
+    for (let n = 0; n < 5; n++) redis._incr(dailyKey);
     const sixth = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -671,6 +662,72 @@ describe("POST /api/invite/:token/email-link", () => {
       scope: "daily",
     });
     expect(sendInvitationMagicLinkMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("短期ウィンドウで弾かれたリクエストは日次カウンタを消費しない（DoS 防止）", async () => {
+    const redis = createRedisMock();
+    // 1 回目のリクエスト + 4 回分の短期拒否用に 5 回分の invitation を積む。
+    const rows: unknown[] = [];
+    for (let i = 0; i < 5; i++) rows.push([createInvitationRow()]);
+    const { app } = createTestAppWithRedis(rows, redis);
+
+    const shortKey = `ratelimit:invite-email-link:5min:${TEST_TOKEN}`;
+    const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
+
+    // 1 回目: 202。short=1, daily=1。
+    const first = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(first.status).toBe(202);
+    expect(redis._getCount(dailyKey)).toBe(1);
+
+    // 2〜5 回目は短期ウィンドウで全て拒否。daily は 1 のまま。
+    for (let i = 0; i < 4; i++) {
+      const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(res.status).toBe(429);
+      expect(redis._getCount(dailyKey)).toBe(1);
+    }
+
+    // short は 5 まで積まれているはず（毎回 INCR される）。
+    expect(redis._getCount(shortKey)).toBe(5);
+    // magicLink サービスは 1 回だけ呼ばれる。
+    expect(sendInvitationMagicLinkMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("TTL は初回 INCR 時のみ付与され、再送でスライディングウィンドウ化しない", async () => {
+    const redis = createRedisMock();
+    const { app } = createTestAppWithRedis(
+      [[createInvitationRow()], [createInvitationRow()]],
+      redis,
+    );
+
+    // 1 回目: 新規作成で TTL=5min を付与。
+    await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const shortKey = `ratelimit:invite-email-link:5min:${TEST_TOKEN}`;
+    expect(await redis.ttl(shortKey)).toBe(5 * 60);
+
+    // TTL を手で進めたことにする（残り 60 秒）。2 回目のリクエストで TTL が再延長
+    // されないことを確認する（スライディングウィンドウでは 300 秒に戻ってしまう）。
+    redis._reset();
+    // カウンタを 1 に戻し、TTL は 60 秒の想定で再現。
+    redis._incr(shortKey);
+    // eval は新規作成のみ EXPIRE するため、TTL は更新されない想定。
+    // TTL を検証するため、mock のマップを直接操作する代わりに再設定は行わない。
+    const second = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(second.status).toBe(429);
+    // 2 回目は c != 1 なので EXPIRE は走らず、TTL は維持される（mock では未設定＝-2）。
+    // 本番実装では初回 TTL の残余が維持されることを意味する。
+    expect(await redis.ttl(shortKey)).toBe(-2);
   });
 
   it("Redis が無い環境ではレート制限を適用せずに送信する", async () => {

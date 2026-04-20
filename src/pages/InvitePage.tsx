@@ -169,13 +169,21 @@ const EmailMismatchSection: React.FC<{
   const [now, setNow] = useState<number>(() => Date.now());
   const [sentOnce, setSentOnce] = useState(false);
 
-  // クールダウン中だけタイマーを回して `now` を更新する。タイマー内以外で
-  // setState しないことで ESLint の cascading-render ルールを満たす。
-  // Tick `now` only while a cooldown is active, and never setState outside the
-  // timer callback (satisfies the cascading-render rule).
+  // クールダウン中だけタイマーを回して `now` を更新する。`cooldown.until` に
+  // 達したらタイマー自身が `cooldown` を null に戻すので、以後 rerender が止まる
+  // （以前はタイマーが停止せず永続リレンダーのリークになっていた）。
+  // Tick `now` while a cooldown is active; the timer clears `cooldown` itself
+  // when time runs out so the component stops re-rendering (previously the
+  // interval leaked for the rest of the page's lifetime).
   useEffect(() => {
     if (cooldown === null) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => {
+      if (Date.now() >= cooldown.until) {
+        setCooldown(null);
+      } else {
+        setNow(Date.now());
+      }
+    }, 1000);
     return () => window.clearInterval(timer);
   }, [cooldown]);
 
@@ -193,14 +201,19 @@ const EmailMismatchSection: React.FC<{
       });
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
-        // Parse retry seconds from the ApiError message (server includes "retry in N seconds").
-        const match = /(\d+)\s*seconds/.exec(err.message);
-        const seconds = match ? Math.max(1, parseInt(match[1] ?? "0", 10)) : 300;
-        setCooldown({ until: Date.now() + seconds * 1000, reason: "rate-limit" });
+        // 構造化レスポンス (`retry_after`) から秒数を取得。未設定時のみ 5 分にフォールバック。
+        // Read retry seconds from the structured response body rather than
+        // parsing the human-readable message (which is brittle).
+        const body = (err.data ?? null) as { retry_after?: unknown } | null;
+        const retry =
+          typeof body?.retry_after === "number" && Number.isFinite(body.retry_after)
+            ? Math.max(1, Math.floor(body.retry_after))
+            : 300;
+        setCooldown({ until: Date.now() + retry * 1000, reason: "rate-limit" });
         setNow(Date.now());
         toast({
           variant: "destructive",
-          description: t("invite.sendMagicLinkRateLimited", { seconds }),
+          description: t("invite.sendMagicLinkRateLimited", { seconds: retry }),
         });
         return;
       }

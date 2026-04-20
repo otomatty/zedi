@@ -28,13 +28,25 @@ const EMAIL_LINK_DAILY_WINDOW_SEC = 24 * 60 * 60; // 1 day
 const EMAIL_LINK_DAILY_WINDOW_LIMIT = 5;
 
 /**
- * INCR + EXPIRE を MULTI で原子的に実施し、現在値を返す。
- * Atomically INCR + EXPIRE a key and return the counter value.
+ * INCR し、新規作成時のみ EXPIRE を付与する（固定ウィンドウ）。
+ * Lua スクリプトで 1 ラウンドトリップに収め、サーバ側で原子的に実行する。
+ *
+ * Increment a counter and only set EXPIRE on the *first* INCR. Running this as
+ * a single Lua script keeps it atomic server-side and — crucially — prevents
+ * sliding-window behaviour where refreshing TTL on every call would let an
+ * attacker avoid the window boundary.
  */
+const INCR_WITH_EXPIRE_ON_CREATE =
+  "local c = redis.call('incr', KEYS[1]); if c == 1 then redis.call('expire', KEYS[1], ARGV[1]) end; return c";
+
 async function incrWithExpire(redis: Redis, key: string, ttlSec: number): Promise<number> {
-  const results = await redis.multi().incr(key).expire(key, ttlSec).exec();
-  const incrResult = results?.[0];
-  return Array.isArray(incrResult) && typeof incrResult[1] === "number" ? incrResult[1] : 0;
+  const result = await redis.eval(INCR_WITH_EXPIRE_ON_CREATE, 1, key, String(ttlSec));
+  if (typeof result === "number") return result;
+  if (typeof result === "string") {
+    const parsed = Number.parseInt(result, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
 
 /**
@@ -279,34 +291,21 @@ app.post("/:token/email-link", async (c) => {
 
   // レート制限は Redis がある場合のみ適用する。Redis 未設定の開発環境では無効化する。
   // Rate limits are enforced only when Redis is available (no-op in dev without Redis).
+  //
+  // 重要: 短期ウィンドウ → 日次ウィンドウの順に *逐次* カウントアップする。
+  // 並列に INCR すると、短期で弾かれたリクエストまで日次カウンタを消費してしまい、
+  // 攻撃者がトークンを連打することで正規ユーザーを 24h ロックアウトできる DoS になる。
+  //
+  // Critical: increment the short window first, check it, and only increment
+  // the daily counter when the short window passes. Parallel INCR would let a
+  // caller exhaust the daily budget from short-window rejections alone — a
+  // denial-of-service on the rescue flow (see otomatty/zedi#668 review).
   const redis = c.get("redis") as Redis | undefined;
   if (redis) {
     const shortKey = `ratelimit:invite-email-link:5min:${token}`;
     const dailyKey = `ratelimit:invite-email-link:day:${token}`;
 
-    const [shortCount, dailyCount] = await Promise.all([
-      incrWithExpire(redis, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC),
-      incrWithExpire(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC),
-    ]);
-
-    if (dailyCount > EMAIL_LINK_DAILY_WINDOW_LIMIT) {
-      const retryAfter = await getRetryAfter(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
-      return c.json(
-        {
-          error: "RATE_LIMIT_EXCEEDED",
-          message: `Rate limited (daily). Retry in ${retryAfter} seconds`,
-          retry_after: retryAfter,
-          scope: "daily",
-        },
-        429,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(EMAIL_LINK_DAILY_WINDOW_LIMIT),
-          "X-RateLimit-Remaining": "0",
-        },
-      );
-    }
-
+    const shortCount = await incrWithExpire(redis, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
     if (shortCount > EMAIL_LINK_SHORT_WINDOW_LIMIT) {
       const retryAfter = await getRetryAfter(redis, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
       return c.json(
@@ -320,6 +319,25 @@ app.post("/:token/email-link", async (c) => {
         {
           "Retry-After": String(retryAfter),
           "X-RateLimit-Limit": String(EMAIL_LINK_SHORT_WINDOW_LIMIT),
+          "X-RateLimit-Remaining": "0",
+        },
+      );
+    }
+
+    const dailyCount = await incrWithExpire(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
+    if (dailyCount > EMAIL_LINK_DAILY_WINDOW_LIMIT) {
+      const retryAfter = await getRetryAfter(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
+      return c.json(
+        {
+          error: "RATE_LIMIT_EXCEEDED",
+          message: `Rate limited (daily). Retry in ${retryAfter} seconds`,
+          retry_after: retryAfter,
+          scope: "daily",
+        },
+        429,
+        {
+          "Retry-After": String(retryAfter),
+          "X-RateLimit-Limit": String(EMAIL_LINK_DAILY_WINDOW_LIMIT),
           "X-RateLimit-Remaining": "0",
         },
       );
