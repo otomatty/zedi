@@ -31,7 +31,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({ className }) => {
         className,
       )}
     >
-      <Container className="flex h-12 items-center gap-3">
+      <Container className="flex h-12 items-center">
         {hasSearchContext && (
           <div className="min-w-0 flex-1">
             <HeaderSearchBar />
