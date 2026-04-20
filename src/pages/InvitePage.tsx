@@ -201,6 +201,10 @@ const EmailMismatchSection: React.FC<{
       });
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
+        // 直近の試行が拒否されたので、以前の「送信済み」表示はクリアする。
+        // Clear the previous success banner so it doesn't reappear after the
+        // rate-limit cooldown — the latest attempt did *not* send an email.
+        setSentOnce(false);
         // 構造化レスポンス (`retry_after`) から秒数を取得。未設定時のみ 5 分にフォールバック。
         // Read retry seconds from the structured response body rather than
         // parsing the human-readable message (which is brittle).

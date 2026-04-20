@@ -140,12 +140,19 @@ function createTestApp(dbResults: unknown[]) {
 function createRedisMock() {
   const counters = new Map<string, number>();
   const ttls = new Map<string, number>();
+  // 本番 Redis は「存在するが TTL 未設定」で `-1`、「キー不在」で `-2` を返す。
+  // モックで両者を区別するために存在チェック用の Set を別に持つ。
+  // Track key existence separately so `ttl()` can distinguish "key missing"
+  // (-2) from "key exists, no TTL set" (-1), matching production Redis
+  // semantics (see coderabbitai review on #668).
+  const keys = new Set<string>();
 
   const api = {
     async eval(script: string, _numKeys: number, key: string, ttlArg: string): Promise<number> {
       // 本実装の Lua スクリプトに対応する JS ミラー / JS mirror of the prod Lua script.
       const next = (counters.get(key) ?? 0) + 1;
       counters.set(key, next);
+      keys.add(key);
       if (next === 1) {
         const ttlSec = Number.parseInt(ttlArg, 10);
         if (Number.isFinite(ttlSec)) ttls.set(key, ttlSec);
@@ -155,16 +162,19 @@ function createRedisMock() {
       return next;
     },
     async ttl(key: string): Promise<number> {
-      return ttls.get(key) ?? -2;
+      if (!keys.has(key)) return -2;
+      return ttls.get(key) ?? -1;
     },
     _reset() {
       counters.clear();
       ttls.clear();
+      keys.clear();
     },
     _incr(key: string): void {
       // テストから直接カウンタを積みたい場合の補助。EXPIRE は触らない。
       const next = (counters.get(key) ?? 0) + 1;
       counters.set(key, next);
+      keys.add(key);
     },
     _getCount(key: string): number {
       return counters.get(key) ?? 0;
@@ -725,9 +735,12 @@ describe("POST /api/invite/:token/email-link", () => {
       headers: { "Content-Type": "application/json" },
     });
     expect(second.status).toBe(429);
-    // 2 回目は c != 1 なので EXPIRE は走らず、TTL は維持される（mock では未設定＝-2）。
-    // 本番実装では初回 TTL の残余が維持されることを意味する。
-    expect(await redis.ttl(shortKey)).toBe(-2);
+    // 2 回目は c != 1 なので EXPIRE は走らず、TTL は付与されない。モックは本番 Redis と
+    // 同様に「キー存在・TTL 未設定」で -1 を返すため、この値で TTL 未更新を検証する。
+    // Second INCR returns c != 1, so EXPIRE is skipped. The mock mirrors real
+    // Redis semantics: -1 for an existing key without TTL, confirming the
+    // window was not extended.
+    expect(await redis.ttl(shortKey)).toBe(-1);
   });
 
   it("Redis が無い環境ではレート制限を適用せずに送信する", async () => {
