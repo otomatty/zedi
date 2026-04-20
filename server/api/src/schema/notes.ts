@@ -148,6 +148,14 @@ export const noteInvitations = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
+    /** 招待メールの言語 / Email locale used for this invitation */
+    locale: text("locale", { enum: ["ja", "en"] })
+      .notNull()
+      .default("ja"),
+    /** 直近のメール送信日時 / Timestamp of the most recent send */
+    lastEmailSentAt: timestamp("last_email_sent_at", { withTimezone: true }),
+    /** メール送信回数（初回 + 再送の合計） / Total number of sends (initial + resends) */
+    emailSendCount: integer("email_send_count").notNull().default(0),
   },
   (table) => [
     unique().on(table.noteId, table.memberEmail),

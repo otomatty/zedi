@@ -47,6 +47,19 @@ export interface NoteSummary extends Note {
 }
 
 /**
+ * 招待状態（有効期限・最終送信・送信回数）。
+ * Invitation state for UI badges (expiry, last-sent, send count).
+ */
+export interface NoteMemberInvitation {
+  /** 有効期限（ミリ秒 epoch） / Expiration timestamp (ms since epoch) */
+  expiresAt: number;
+  /** 直近の送信日時（ミリ秒 epoch、未送信なら null） / Last-sent timestamp (ms since epoch), null if never sent */
+  lastEmailSentAt: number | null;
+  /** 送信回数 / Total number of sends */
+  emailSendCount: number;
+}
+
+/**
  *
  */
 export interface NoteMember {
@@ -58,6 +71,8 @@ export interface NoteMember {
   createdAt: number;
   updatedAt: number;
   isDeleted: boolean;
+  /** 招待行が存在する場合の送信状況。accepted 後も情報は保持される可能性がある。 / Invitation row info when present. */
+  invitation: NoteMemberInvitation | null;
 }
 
 /**

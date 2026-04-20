@@ -2,7 +2,7 @@
  * 招待サービス — トークン生成・メール送信
  * Invitation service — token generation & email sending
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { noteInvitations, notes, users } from "../schema/index.js";
 import { sendEmail } from "./emailService.js";
 import { renderInviteNoteEmail, getInviteNoteSubject } from "../emails/invite-note.js";
@@ -12,6 +12,38 @@ import type { Locale } from "../emails/locales/index.js";
 
 /** 招待トークンの有効期間（7日） / Invitation token TTL (7 days) */
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** サポートする招待メールロケール / Supported invitation email locales */
+const SUPPORTED_LOCALES: readonly Locale[] = ["ja", "en"];
+
+/**
+ * Accept-Language ヘッダからサポート対象の `Locale` を解決する。
+ * 一致しない場合は null を返す（呼び出し側でフォールバックを決定）。
+ *
+ * Resolve a supported `Locale` from an Accept-Language header.
+ * Returns null when no supported language matches (caller decides the fallback).
+ */
+export function resolveLocaleFromAcceptLanguage(header: string | undefined | null): Locale | null {
+  if (!header) return null;
+  const entries = header
+    .split(",")
+    .map((part) => {
+      const [tag, ...params] = part.trim().split(";");
+      if (!tag) return null;
+      const qParam = params.find((p) => p.trim().startsWith("q="));
+      const qRaw = qParam ? Number.parseFloat(qParam.trim().slice(2)) : 1;
+      const q = Number.isFinite(qRaw) ? qRaw : 0;
+      return { tag: tag.trim().toLowerCase(), q };
+    })
+    .filter((x): x is { tag: string; q: number } => x !== null && x.q > 0)
+    .sort((a, b) => b.q - a.q);
+
+  for (const { tag } of entries) {
+    const primary = tag.split("-")[0] as Locale;
+    if (SUPPORTED_LOCALES.includes(primary)) return primary;
+  }
+  return null;
+}
 
 /**
  * 暗号学的に安全なランダムトークンを生成する
@@ -42,6 +74,14 @@ export interface SendInvitationParams {
   role: string;
   /** 招待者のユーザー ID / Inviter's user ID */
   invitedByUserId: string;
+  /**
+   * 初回招待時に使用する言語。既存の招待行がある場合（再送時）は元のロケールを保持するため無視される。
+   * 指定がなければデフォルト 'ja'。
+   *
+   * Locale used for the initial invitation. Ignored on resend: the original
+   * invitation row's locale is preserved. Defaults to `'ja'` when omitted.
+   */
+  locale?: Locale;
 }
 
 /**
@@ -92,7 +132,7 @@ export type UpsertInvitationTokenResult =
 async function upsertInvitationTokenDbImpl(
   params: SendInvitationParams,
 ): Promise<InvitationEmailContext> {
-  const { db, noteId, memberEmail, role, invitedByUserId } = params;
+  const { db, noteId, memberEmail, role, invitedByUserId, locale: requestedLocale } = params;
 
   const [note] = await db
     .select({ title: notes.title })
@@ -110,18 +150,43 @@ async function upsertInvitationTokenDbImpl(
 
   const token = generateToken();
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
+  const now = new Date();
+  /**
+   * 新規 INSERT 時にのみ採用されるロケール（ON CONFLICT では上書きしない）。
+   * Locale applied only on INSERT; ON CONFLICT keeps the existing row's locale.
+   */
+  const insertLocale: Locale = requestedLocale ?? "ja";
 
-  await db
+  // 同一トランザクション（呼び出し側が tx を渡した場合）で upsert + 送信カウンタ更新を原子的に実施。
+  // Upsert and atomically bump send counters inside the caller's (optional) transaction.
+  const [upserted] = await db
     .insert(noteInvitations)
-    .values({ noteId, memberEmail, token, expiresAt })
+    .values({
+      noteId,
+      memberEmail,
+      token,
+      expiresAt,
+      locale: insertLocale,
+      lastEmailSentAt: now,
+      emailSendCount: 1,
+    })
     .onConflictDoUpdate({
       target: [noteInvitations.noteId, noteInvitations.memberEmail],
-      set: { token, expiresAt, usedAt: null },
-    });
+      set: {
+        token,
+        expiresAt,
+        usedAt: null,
+        // 再送では元招待の locale を保持するため、ここでは更新しない。
+        // Do not update `locale` on conflict so resends keep the original invite language.
+        lastEmailSentAt: now,
+        emailSendCount: sql`${noteInvitations.emailSendCount} + 1`,
+      },
+    })
+    .returning({ locale: noteInvitations.locale });
 
   const baseUrl = getOptionalEnv("APP_URL", "https://zedi-note.app");
   const inviteUrl = `${baseUrl}/invite?token=${token}`;
-  const locale: Locale = "ja";
+  const effectiveLocale: Locale = upserted?.locale ?? insertLocale;
 
   return {
     memberEmail,
@@ -129,7 +194,7 @@ async function upsertInvitationTokenDbImpl(
     inviteUrl,
     noteTitle,
     inviterName,
-    locale,
+    locale: effectiveLocale,
   };
 }
 
