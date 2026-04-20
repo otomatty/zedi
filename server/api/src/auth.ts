@@ -15,10 +15,11 @@ import type { Locale } from "./emails/locales/index.js";
 /** マジックリンクの有効期限（秒） / Magic-link TTL in seconds (5 minutes). */
 const MAGIC_LINK_EXPIRES_IN_SEC = 60 * 5;
 
-export /**
- *
+/**
+ * Better Auth インスタンス。Drizzle アダプタ + magicLink プラグインを設定する。
+ * Better Auth instance configured with the Drizzle adapter and magic-link plugin.
  */
-const auth = betterAuth({
+export const auth = betterAuth({
   database: drizzleAdapter(getDb(), {
     provider: "pg",
     schema: { user: users, session, account, verification },
@@ -84,37 +85,19 @@ const auth = betterAuth({
         // `ctx.request.headers` 経由でアクセスできる。Accept-Language でロケールを解決する。
         // Resolve the locale from Accept-Language on the endpoint context so the
         // invite rescue flow can deliver `ja` / `en` templates appropriately.
-        /**
-         *
-         */
         const headers =
           (ctx as { headers?: Headers } | undefined)?.headers ??
           (ctx as { request?: Request } | undefined)?.request?.headers ??
           null;
-        /**
-         *
-         */
         const acceptLanguage =
           headers && typeof headers.get === "function" ? headers.get("accept-language") : null;
-        /**
-         *
-         */
         const locale: Locale = resolveLocaleFromAcceptLanguage(acceptLanguage) ?? "ja";
-        /**
-         *
-         */
         const html = await renderInviteMagicLinkEmail({
           memberEmail: email,
           magicLinkUrl: url,
           locale,
         });
-        /**
-         *
-         */
         const subject = getInviteMagicLinkSubject({ locale });
-        /**
-         *
-         */
         const result = await sendEmail({ to: email, subject, html });
         if (!result.success) {
           // sendEmail 側でログ出力済み。ここでは例外を投げて Better Auth に失敗を伝える。
