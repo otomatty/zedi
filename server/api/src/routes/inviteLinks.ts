@@ -16,6 +16,7 @@ import {
   redeemInviteLink,
   type RedeemFailureReason,
 } from "../services/inviteLinkService.js";
+import { extractClientIp } from "../lib/clientIp.js";
 import type { AppEnv } from "../types/index.js";
 import type { Redis } from "ioredis";
 
@@ -49,16 +50,6 @@ async function incrWithExpire(redis: Redis, key: string, ttlSec: number): Promis
 async function getRetryAfter(redis: Redis, key: string, fallbackSec: number): Promise<number> {
   const ttl = await redis.ttl(key);
   return ttl > 0 ? ttl : fallbackSec;
-}
-
-/**
- * `x-forwarded-for` ヘッダの先頭ホップをクライアント IP として採用する。
- * Pick the leading `x-forwarded-for` hop as the client IP (fallback: "unknown").
- */
-function pickIp(headerValue: string | undefined): string {
-  if (!headerValue) return "unknown";
-  const [first] = headerValue.split(",");
-  return (first ?? "").trim() || "unknown";
 }
 
 // ── GET /invite-links/:token ───────────────────────────────────────────────
@@ -156,28 +147,47 @@ app.post("/:token/redeem", authRequired, async (c) => {
     });
   }
 
-  // レート制限: Redis がある場合のみ。IP ベース 30/分。
-  // IP-based 30/min rate limit, only enforced when Redis is configured.
+  // レート制限: Redis がある場合のみ。user + IP の複合キーで 30/分。
+  //
+  // IP は `extractClientIp` 経由で取得し、`TRUST_PROXY` が false のときは
+  // ソケット由来のアドレスのみを採用する（#672 review: 生の XFF を信じると
+  // ヘッダ偽装でレート制限を迂回できる）。IP が取れないときは `"unknown"`
+  // に畳むが、`userId` がキーに含まれるので匿名の大量投擲にはならない。
+  //
+  // Redis 呼び出しは best-effort: タイムアウトや一時的な障害で redeem 本体を
+  // 落とさないよう、全ての Redis 操作を try/catch に包み、失敗時はレート制限
+  // 無効のまま続行する（#672 review: Critical — outage で 500 にしない）。
+  //
+  // Rate limit is best-effort: combine authenticated user id with a trusted
+  // client IP (falling back to the socket peer when proxy headers are not
+  // trusted) and tolerate Redis outages so a transient failure cannot take
+  // down redeem. When the limiter can't evaluate, we let the request through.
   const redis = c.get("redis") as Redis | undefined;
   if (redis) {
-    const ip = pickIp(c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? undefined);
-    const key = `ratelimit:invite-link:redeem:${ip}`;
-    const count = await incrWithExpire(redis, key, REDEEM_WINDOW_SEC);
-    if (count > REDEEM_WINDOW_LIMIT) {
-      const retryAfter = await getRetryAfter(redis, key, REDEEM_WINDOW_SEC);
-      return c.json(
-        {
-          error: "RATE_LIMIT_EXCEEDED",
-          message: `Rate limited. Retry in ${retryAfter} seconds`,
-          retry_after: retryAfter,
-        },
-        429,
-        {
-          "Retry-After": String(retryAfter),
-          "X-RateLimit-Limit": String(REDEEM_WINDOW_LIMIT),
-          "X-RateLimit-Remaining": "0",
-        },
-      );
+    const ip = extractClientIp(c) ?? "unknown";
+    const key = `ratelimit:invite-link:redeem:${userId}:${ip}`;
+    try {
+      const count = await incrWithExpire(redis, key, REDEEM_WINDOW_SEC);
+      if (count > REDEEM_WINDOW_LIMIT) {
+        const retryAfter = await getRetryAfter(redis, key, REDEEM_WINDOW_SEC);
+        return c.json(
+          {
+            error: "RATE_LIMIT_EXCEEDED",
+            message: `Rate limited. Retry in ${retryAfter} seconds`,
+            retry_after: retryAfter,
+          },
+          429,
+          {
+            "Retry-After": String(retryAfter),
+            "X-RateLimit-Limit": String(REDEEM_WINDOW_LIMIT),
+            "X-RateLimit-Remaining": "0",
+          },
+        );
+      }
+    } catch (err) {
+      // レート制限は保護的機能でありコアロジックではない。失敗時はスキップする。
+      // Best-effort: a limiter outage must not block a valid redeem.
+      console.warn("[invite-links] rate-limit check skipped due to Redis error:", err);
     }
   }
 

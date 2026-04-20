@@ -473,6 +473,8 @@ function extractAllStringValuesFromCondition(cond: unknown): [string | null, str
 function extractLinkIdFromAndCondition(cond: unknown): string | null {
   // Drizzle の AND ノードはサブ条件を持つ。ここでは最も単純に、文字列値を
   // 再帰的に拾う（update の where には link.id を 1 つだけ束縛している）。
+  // Walk a Drizzle AND tree recursively and pick up the first UUID-shaped
+  // string parameter — update's where only binds link.id once.
   const visit = (node: unknown): string | null => {
     if (!node || typeof node !== "object") return null;
     const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
@@ -489,7 +491,10 @@ function extractLinkIdFromAndCondition(cond: unknown): string | null {
   return visit(cond);
 }
 
-/** デフォルトの発行者 ID（受諾者と区別しやすい値にする） */
+/**
+ * デフォルトの発行者 ID（受諾者と区別しやすい値にする）。
+ * Default link-creator ID; chosen so it's easy to distinguish from redeemers.
+ */
 const DEFAULT_LINK_CREATOR_ID = "creator-user";
 
 function makeLink(overrides: Partial<FakeLinkRow> = {}): FakeLinkRow {
@@ -651,7 +656,7 @@ describe("redeemInviteLink", () => {
     const db = createFakeDb(state);
 
     const users = ["u1", "u2", "u3", "u4"];
-    const results = [];
+    const results: Array<Awaited<ReturnType<typeof redeemInviteLink>>> = [];
     for (const u of users) {
       results.push(
         await redeemInviteLink({

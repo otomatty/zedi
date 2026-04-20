@@ -123,4 +123,19 @@ describe("AuthCallback returnTo handling", () => {
 
     expect(loc.assign).toHaveBeenCalledWith("/home");
   });
+
+  it("allows URL-encoded slashes inside the token and round-trips them safely", () => {
+    // The URL parser keeps `%2F` encoded inside pathname, so it stays a single
+    // segment and the allowlist accepts it. The implementation then re-encodes
+    // the decoded rest, which preserves the original %2F form (no injection).
+    loc = stubLocation(`?returnTo=${encodeURIComponent("/invite-links/abc%2Fevil")}`);
+
+    render(
+      <MemoryRouter>
+        <AuthCallback />
+      </MemoryRouter>,
+    );
+
+    expect(loc.assign).toHaveBeenCalledWith("/invite-links/abc%2Fevil");
+  });
 });

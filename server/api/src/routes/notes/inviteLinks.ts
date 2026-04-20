@@ -30,6 +30,13 @@ const app = new Hono<AppEnv>();
  * - maxUses:      利用上限 1..100（null = 無制限）
  * - label:        棚卸し用ラベル（任意）
  * - requireSignIn: サインイン必須フラグ（省略時 true）
+ *
+ * Request body schema:
+ * - role:          only `'viewer'` is allowed in Phase 3
+ * - expiresInMs:   ms until expiry (default 7 days, max 90 days)
+ * - maxUses:       redemption cap 1..100 (null = unlimited)
+ * - label:         free-form housekeeping label (optional)
+ * - requireSignIn: whether sign-in is required to redeem (default true)
  */
 interface CreateInviteLinkBody {
   role?: string | null;
@@ -46,7 +53,20 @@ app.post("/:noteId/invite-links", authRequired, async (c) => {
 
   await requireNoteOwner(db, noteId, userId, "Only the owner can create invite links");
 
-  const body = await c.req.json<CreateInviteLinkBody>().catch(() => ({}) as CreateInviteLinkBody);
+  // 空ボディは仕様上すべてデフォルト適用で OK だが、`{bad json}` のような不正な
+  // JSON までデフォルト扱いにすると、クライアントバグを静かに握り潰してしまう
+  // (#672 review: 'Invalid JSON body' は 400 として明示的に返す)。
+  // Allow empty bodies (defaults apply) but reject genuinely malformed JSON so
+  // client bugs surface as 400 instead of silently becoming an empty-body create.
+  let body: CreateInviteLinkBody = {};
+  const raw = await c.req.text();
+  if (raw.trim().length > 0) {
+    try {
+      body = JSON.parse(raw) as CreateInviteLinkBody;
+    } catch {
+      throw new HTTPException(400, { message: "Invalid JSON body" });
+    }
+  }
   let normalized;
   try {
     normalized = normalizeCreateInviteLinkInput(body);
