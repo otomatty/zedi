@@ -85,21 +85,24 @@ const FREE_FALLBACK: SubscriptionState = {
  * Read the current user's subscription plan, status, and usage.
  * ログイン中ユーザーのプラン・ステータス・使用量を取得する。
  *
- * When the viewer is signed out the hook returns the Free fallback state even
- * if a previous signed-in session left Pro data in the React Query cache.
- * This prevents the UI from leaking another user's plan after sign-out.
+ * The React Query cache is scoped by `userId` so switching from User A to
+ * User B (e.g. via sign-out + sign-in without a page reload) cannot surface
+ * User A's cached subscription to User B. While signed out the hook returns
+ * the Free fallback state regardless of any cached data from a prior session.
  *
- * サインアウト時は、前回のサインイン済みセッションが React Query キャッシュに
- * 残した Pro データに関係なく Free のフォールバックを返す。サインアウト後に
- * 前のユーザーのプランが UI に漏れないようにするため。
+ * React Query のキャッシュは `userId` でスコープする。A さんから B さんに
+ * 切り替わったとき（サインアウト→サインインをページリロード無しで行った場合など）
+ * にも A さんのキャッシュが B さんに見えないようにするため。サインアウト中は
+ * 前セッションのキャッシュに関わらず常に Free のフォールバックを返す。
  */
 export function useSubscription(): UseSubscriptionResult {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
   const queryClient = useQueryClient();
+  const scopedQueryKey = [...subscriptionQueryKey, userId ?? null] as const;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: subscriptionQueryKey,
+    queryKey: scopedQueryKey,
     queryFn: fetchSubscription,
-    enabled: isSignedIn === true,
+    enabled: isSignedIn === true && Boolean(userId),
     staleTime: 60 * 1000, // 1 minute
     refetchOnWindowFocus: true, // ポータル/チェックアウトから戻ったときに表示を更新
   });
@@ -109,6 +112,12 @@ export function useSubscription(): UseSubscriptionResult {
     state.plan === "pro" && (state.status === "active" || state.status === "trialing");
   const isCanceled = state.plan === "pro" && state.status === "canceled";
 
+  // Invalidating by the base key matches every scoped variant via React
+  // Query's prefix semantics, so mutations don't need to know which user they
+  // touched to force a refetch.
+  // 基本キーで invalidate すると React Query の前方一致セマンティクスで
+  // 全ユーザースコープのキャッシュにマッチするので、呼び出し側が userId を
+  // 知らなくても再取得を強制できる。
   const invalidate = useCallback(
     () => queryClient.invalidateQueries({ queryKey: subscriptionQueryKey }),
     [queryClient],

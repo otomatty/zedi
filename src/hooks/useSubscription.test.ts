@@ -5,12 +5,13 @@ import { createHookWrapper } from "@/test/testWrapper";
 import type { SubscriptionState } from "@/lib/subscriptionService";
 
 let mockIsSignedIn = false;
+let mockUserId: string | null = null;
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     isLoaded: true,
     isSignedIn: mockIsSignedIn,
-    userId: mockIsSignedIn ? "test-user-id" : null,
+    userId: mockIsSignedIn ? (mockUserId ?? "test-user-id") : null,
     getToken: vi.fn().mockResolvedValue(null),
     signOut: vi.fn(),
   }),
@@ -26,6 +27,7 @@ describe("useSubscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsSignedIn = false;
+    mockUserId = null;
   });
 
   it("returns free plan when not signed in", () => {
@@ -173,6 +175,69 @@ describe("useSubscription", () => {
     expect(result.current.plan).toBe("free");
     expect(result.current.isProUser).toBe(false);
     expect(result.current.externalId).toBeNull();
+  });
+
+  it("does not surface User A's cached data to User B after switching accounts", async () => {
+    // User A signs in and loads a Pro subscription.
+    mockIsSignedIn = true;
+    mockUserId = "user-a";
+    mockFetchSubscription.mockImplementationOnce(
+      async () =>
+        ({
+          plan: "pro",
+          status: "active",
+          billingInterval: "monthly",
+          currentPeriodStart: "2026-02-01T00:00:00Z",
+          currentPeriodEnd: "2026-03-01T00:00:00Z",
+          externalId: "sub_user_a",
+          usage: {
+            consumedUnits: 500,
+            budgetUnits: 50000,
+            remainingUnits: 49500,
+            usagePercent: 1,
+          },
+        }) satisfies SubscriptionState,
+    );
+
+    const wrapper = createHookWrapper();
+    const { result, rerender } = renderHook(() => useSubscription(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.externalId).toBe("sub_user_a");
+    });
+
+    // User B signs in (without User A clearing the React Query cache). User B
+    // must never see User A's plan, not even for the brief window before the
+    // new fetch resolves.
+    mockUserId = "user-b";
+    mockFetchSubscription.mockImplementationOnce(
+      async () =>
+        ({
+          plan: "free",
+          status: "active",
+          billingInterval: null,
+          currentPeriodStart: null,
+          currentPeriodEnd: null,
+          externalId: null,
+          usage: {
+            consumedUnits: 0,
+            budgetUnits: 1500,
+            remainingUnits: 1500,
+            usagePercent: 0,
+          },
+        }) satisfies SubscriptionState,
+    );
+    rerender();
+
+    // Before the new fetch resolves, the hook must fall back to Free rather
+    // than replay User A's cached Pro payload.
+    expect(result.current.externalId).not.toBe("sub_user_a");
+    expect(result.current.plan).toBe("free");
+
+    await waitFor(() => {
+      expect(result.current.externalId).toBeNull();
+    });
+    expect(result.current.plan).toBe("free");
   });
 
   it("invalidate() triggers a refetch with the latest fetcher result", async () => {
