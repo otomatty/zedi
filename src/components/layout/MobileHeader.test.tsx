@@ -118,12 +118,20 @@ describe("MobileHeader", () => {
       useGlobalSearchContextOptional: () => null,
     }));
     const { MobileHeader: FreshMobileHeader } = await import("./MobileHeader");
-    render(
+    const { container } = render(
       <MemoryRouter>
         <FreshMobileHeader />
       </MemoryRouter>,
     );
     expect(screen.queryByTestId("header-search")).not.toBeInTheDocument();
+    // スペーサーとしての `<header>` 自体はレンダリングされ続けることを担保し、
+    // コンポーネントが誤って `null` を返す退行を検出できるようにする。
+    // Ensure the spacer `<header>` shell still renders so a regression to
+    // returning `null` (which would also satisfy the assertion above) is
+    // caught.
+    const header = container.querySelector("header");
+    expect(header).toBeInTheDocument();
+    expect(header?.className).toMatch(/h-12/);
     vi.doUnmock("@/contexts/GlobalSearchContext");
   });
 });
