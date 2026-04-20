@@ -35,11 +35,11 @@ interface PageEditorHeaderProps {
 
 /**
  * Page-specific toolbar for PageEditor. Shown below the common `Header`
- * (which already provides search / AI chat / UnifiedMenu), so this toolbar
- * only contains editor-specific actions (back, collaboration status, more menu).
+ * (which already provides search / UnifiedMenu), so this toolbar only
+ * contains editor-specific actions (back, collaboration status, more menu).
  *
- * PageEditor のページ固有ツールバー。検索・AI チャット・ユーザーメニューは
- * 共通 `Header` 側で提供されるため、ここではエディタ固有の操作（戻る・コラボ・その他メニュー）のみ。
+ * PageEditor のページ固有ツールバー。検索・ユーザーメニューは共通 `Header`
+ * 側で提供されるため、ここではエディタ固有の操作（戻る・コラボ・その他メニュー）のみ。
  */
 export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   lastSaved,

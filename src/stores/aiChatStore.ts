@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ReferencedPage } from "../types/aiChat";
 import type { AIProviderType } from "../types/ai";
 
 interface SelectedModel {
@@ -18,8 +17,6 @@ interface AIChatUIState {
   isStreaming: boolean;
   contextEnabled: boolean;
   showConversationList: boolean;
-  /** コンテキストメニューなど外部からの参照追加リクエスト */
-  pendingPageToAdd: ReferencedPage | null;
   /** チャット欄で選択中のモデル */
   selectedModel: SelectedModel | null;
 
@@ -31,7 +28,6 @@ interface AIChatUIState {
   setStreaming: (isStreaming: boolean) => void;
   toggleContext: () => void;
   toggleConversationList: () => void;
-  setPendingPageToAdd: (page: ReferencedPage | null) => void;
   setSelectedModel: (model: SelectedModel | null) => void;
 }
 
@@ -47,7 +43,6 @@ export const useAIChatStore = create<AIChatUIState>()(
       isStreaming: false,
       contextEnabled: true,
       showConversationList: false,
-      pendingPageToAdd: null,
       selectedModel: null,
 
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
@@ -58,7 +53,6 @@ export const useAIChatStore = create<AIChatUIState>()(
       toggleContext: () => set((state) => ({ contextEnabled: !state.contextEnabled })),
       toggleConversationList: () =>
         set((state) => ({ showConversationList: !state.showConversationList })),
-      setPendingPageToAdd: (page) => set({ pendingPageToAdd: page }),
       setSelectedModel: (model) => set({ selectedModel: model }),
     }),
     {

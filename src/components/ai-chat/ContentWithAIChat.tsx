@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
 import { useAIChatStore } from "../../stores/aiChatStore";
-import { useAIChatContext } from "../../contexts/AIChatContext";
 import { AIChatPanel } from "./AIChatPanel";
 import { ZEDI_PAGE_MIME_TYPE } from "../../types/aiChat";
 import { Drawer, DrawerContent } from "@zedi/ui";
@@ -12,17 +11,17 @@ interface ContentWithAIChatProps {
   children: React.ReactNode;
   floatingAction?: React.ReactNode;
   /**
-   * Whether to render local AI panel within this component.
-   * true: Page-local right panel / drawer (used in standalone layouts like PageEditor).
-   * false: Use global layout-level dock (AppLayout).
-   * このコンポーネント内でAIパネルを描画するかどうか。
+   * Whether to render a page-local AI chat panel within this component
+   * (used by standalone layouts like PageEditor). When false, the wrapper
+   * only supplies the flex layout for children and the floating action.
+   * このコンポーネント内でページローカルなAIパネルを描画するかどうか。
    */
   useLocalPanel?: boolean;
 }
 
 /**
- * Layout wrapper that provides AI chat panel and optional FAB. Used by Home and Notes.
- * AIチャットパネルとオプションのFABを提供するレイアウト。Home・Notesで利用。
+ * Layout wrapper that optionally renders a page-local AI chat panel and a FAB.
+ * AIチャットパネル（ページローカル）とオプションのFABを提供するレイアウト。
  */
 export function ContentWithAIChat({
   children,
@@ -30,22 +29,14 @@ export function ContentWithAIChat({
   useLocalPanel = false,
 }: ContentWithAIChatProps) {
   const isMobile = useIsMobile();
-  const { isOpen, togglePanel, openPanel, closePanel } = useAIChatStore();
-  const { setAIChatAvailable } = useAIChatContext();
+  const { isOpen, openPanel, closePanel } = useAIChatStore();
   const { t } = useTranslation();
   const [isDraggingPage, setIsDraggingPage] = useState(false);
   const [isHoveringHint, setIsHoveringHint] = useState(false);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Local panel 利用時はグローバル dock を無効化し、それ以外では利用可能にする
-  // When using a local panel, disable the global dock; otherwise mark chat as available.
   useEffect(() => {
-    setAIChatAvailable(!useLocalPanel);
-    return () => setAIChatAvailable(false);
-  }, [setAIChatAvailable, useLocalPanel]);
-
-  // Detect page drag globally (for showing hint zone when panel is closed)
-  useEffect(() => {
+    if (!useLocalPanel) return;
     const handleGlobalDragStart = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes(ZEDI_PAGE_MIME_TYPE)) {
         setIsDraggingPage(true);
@@ -70,7 +61,7 @@ export function ContentWithAIChat({
       document.removeEventListener("drop", handleGlobalDrop);
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     };
-  }, []);
+  }, [useLocalPanel]);
 
   const handleHintDragEnter = useCallback(() => {
     hintTimerRef.current = setTimeout(() => {
@@ -131,8 +122,7 @@ export function ContentWithAIChat({
         <div
           className="pointer-events-none fixed bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)]"
           style={{
-            // Local / global のどちらでも開いているときはパネル幅ぶん左に寄せる
-            right: isOpen ? "var(--ai-chat-width)" : 0,
+            right: useLocalPanel && isOpen ? "var(--ai-chat-width)" : 0,
           }}
         >
           {floatingAction}
@@ -153,8 +143,8 @@ export function ContentWithAIChat({
         </div>
       )}
 
-      {/* Drop hint zone when panel is closed and user is dragging a page */}
-      {!isOpen && isDraggingPage && (
+      {/* Drop hint zone when a local panel is closed and user is dragging a page */}
+      {useLocalPanel && !isOpen && isDraggingPage && (
         <div
           className={cn(
             "fixed top-0 right-0 bottom-0 z-50 flex w-16 items-center justify-center transition-all duration-200",

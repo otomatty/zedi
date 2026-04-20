@@ -1,8 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCreateNewPage } from "./useCreateNewPage";
-import { useAIChatStore } from "../stores/aiChatStore";
-import { useAIChatContext } from "../contexts/AIChatContext";
 
 interface KeyboardShortcutsOptions {
   onShowShortcuts?: () => void;
@@ -16,8 +14,6 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
   const location = useLocation();
   const { onShowShortcuts } = options;
   const { createNewPage, isCreating } = useCreateNewPage();
-  const { togglePanel } = useAIChatStore();
-  const { aiChatAvailable } = useAIChatContext();
   const isCreatingRef = useRef(isCreating);
   useEffect(() => {
     isCreatingRef.current = isCreating;
@@ -49,13 +45,6 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
             onShowShortcuts?.();
           },
         },
-        {
-          match: Boolean(mod && e.shiftKey && key === "a" && aiChatAvailable),
-          handle: () => {
-            e.preventDefault();
-            togglePanel();
-          },
-        },
       ];
       for (const s of shortcuts) {
         if (s.match) {
@@ -64,7 +53,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         }
       }
     },
-    [navigate, location.pathname, createNewPage, onShowShortcuts, togglePanel, aiChatAvailable],
+    [navigate, location.pathname, createNewPage, onShowShortcuts],
   );
 
   useEffect(() => {
@@ -74,14 +63,18 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
 }
 
 /**
- * List of all keyboard shortcuts for display
+ * Metadata describing a single keyboard shortcut for the shortcuts dialog.
  */
 export interface ShortcutInfo {
   key: string;
   description: string;
-  category: "navigation" | "page" | "editor" | "ai";
+  category: "navigation" | "page" | "editor";
 }
 
+/**
+ * List of all keyboard shortcuts shown in the shortcuts dialog.
+ * ショートカット一覧ダイアログで表示する全キーボードショートカット。
+ */
 export const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
   // Navigation
   { key: "⌘K", description: "検索を開く", category: "navigation" },
@@ -95,9 +88,6 @@ export const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
 
   // Editor
   { key: "[[", description: "WikiLink を挿入", category: "editor" },
-
-  // AI
-  { key: "⌘⇧A", description: "AIチャットを開く", category: "ai" },
   { key: "# ", description: "見出し H1", category: "editor" },
   { key: "## ", description: "見出し H2", category: "editor" },
   { key: "### ", description: "見出し H3", category: "editor" },

@@ -40,7 +40,6 @@ function useAIChatInputChips() {
   const [pendingRefs, setPendingRefs] = useState<ReferencedPage[]>([]);
   const [isEmpty, setIsEmpty] = useState(true);
   const editorRef = useRef<HTMLDivElement>(null);
-  const { pendingPageToAdd, setPendingPageToAdd } = useAIChatStore();
 
   const syncRefsFromDOM = useCallback(() => {
     const editor = editorRef.current;
@@ -77,16 +76,6 @@ function useAIChatInputChips() {
     },
     [syncRefsFromDOM, checkEmpty],
   );
-
-  useEffect(() => {
-    if (!pendingPageToAdd) return;
-    const { id, title } = pendingPageToAdd;
-    setPendingPageToAdd(null);
-    const editor = editorRef.current;
-    if (editor?.querySelector(`[data-page-id="${CSS.escape(id)}"]`)) return;
-    if (editor?.querySelectorAll("[data-page-id]").length >= MAX_REFERENCED_PAGES) return;
-    insertChipAtCursor(id, title);
-  }, [pendingPageToAdd, setPendingPageToAdd, insertChipAtCursor]);
 
   const getEditorContent = useCallback(
     (): { text: string; refs: ReferencedPage[] } => getEditorContentFromEditor(editorRef.current),

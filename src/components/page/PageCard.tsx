@@ -1,14 +1,12 @@
 import React, { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Link2, Copy, Trash2, Sparkles } from "lucide-react";
+import { Link2, Copy, Trash2 } from "lucide-react";
 import type { PageSummary } from "@/types/page";
 import { ZEDI_PAGE_MIME_TYPE } from "@/types/aiChat";
 import { cn } from "@zedi/ui";
 import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
 import { useToast } from "@zedi/ui";
-import { useAIChatStore } from "@/stores/aiChatStore";
 import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
-import { useTranslation } from "react-i18next";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
 import {
   ContextMenu,
@@ -40,7 +38,6 @@ interface PageCardProps {
 const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t } = useTranslation();
   const createPageMutation = useCreatePage();
   const deletePageMutation = useDeletePage();
   const pageDetailQuery = usePage(page.id, { enabled: false });
@@ -48,7 +45,6 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
   const isMobile = useIsMobile();
-  const { openPanel, setPendingPageToAdd } = useAIChatStore();
 
   const preview = page.contentPreview ?? "";
   const { resolvedUrl: thumbnail, hasError: thumbnailError } = useAuthenticatedImageUrl(
@@ -83,12 +79,6 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
       isDraggingRef.current = false;
     }, 100);
   }, []);
-
-  const handleAddToAIChat = useCallback(() => {
-    const title = page.title || "無題のページ";
-    setPendingPageToAdd({ id: page.id, title });
-    openPanel();
-  }, [page.id, page.title, setPendingPageToAdd, openPanel]);
 
   const handleDuplicate = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -205,11 +195,6 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   // デスクトップ用メニューアイテム / Desktop menu items
   const menuItems = (
     <>
-      <ContextMenuItem onClick={handleAddToAIChat}>
-        <Sparkles className="mr-2 h-4 w-4" />
-        {t("aiChat.referencedPages.addToChat")}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
       <ContextMenuItem onClick={handleDuplicate} disabled={createPageMutation.isPending}>
         <Copy className="mr-2 h-4 w-4" />
         複製
