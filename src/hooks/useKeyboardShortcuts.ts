@@ -63,7 +63,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
 }
 
 /**
- * List of all keyboard shortcuts for display
+ * Metadata describing a single keyboard shortcut for the shortcuts dialog.
  */
 export interface ShortcutInfo {
   key: string;
@@ -71,10 +71,11 @@ export interface ShortcutInfo {
   category: "navigation" | "page" | "editor";
 }
 
-export /**
- *
+/**
+ * List of all keyboard shortcuts shown in the shortcuts dialog.
+ * ショートカット一覧ダイアログで表示する全キーボードショートカット。
  */
-const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
+export const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
   // Navigation
   { key: "⌘K", description: "検索を開く", category: "navigation" },
   { key: "⌘H", description: "ホームに戻る", category: "navigation" },
