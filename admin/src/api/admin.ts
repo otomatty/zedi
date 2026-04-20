@@ -13,8 +13,15 @@ export type UserRole = "user" | "admin";
 /** ユーザーアカウントステータス / User account status */
 export type UserStatus = "active" | "suspended" | "deleted";
 
-/** 管理者画面で表示するユーザー情報 / User info for admin UI */
-export interface UserAdmin {
+/**
+ * ミューテーション系エンドポイント（PATCH/POST/DELETE）が返すユーザー基本情報。
+ * `pageCount` のような一覧専用の集計フィールドは含まない。
+ *
+ * Basic user info returned by mutation endpoints (PATCH/POST/DELETE).
+ * Aggregate fields such as `pageCount` are excluded because they are
+ * only computed for the list endpoint.
+ */
+export interface UserAdminBase {
   id: string;
   name: string;
   email: string;
@@ -24,6 +31,13 @@ export interface UserAdmin {
   suspendedReason: string | null;
   suspendedBy: string | null;
   createdAt: string;
+}
+
+/**
+ * 管理者画面の一覧で表示するユーザー情報。
+ * User info for the admin user list UI (extends base with aggregate fields).
+ */
+export interface UserAdmin extends UserAdminBase {
   /** ユーザーに紐づくアクティブページ数 / Number of active pages owned by the user */
   pageCount: number;
 }
@@ -235,7 +249,7 @@ export async function getUsers(params?: GetUsersParams): Promise<{
  * @param role - 新しい役割 / New role
  * @returns 更新後のユーザー情報 / Updated user
  */
-export async function patchUserRole(id: string, role: UserRole): Promise<{ user: UserAdmin }> {
+export async function patchUserRole(id: string, role: UserRole): Promise<{ user: UserAdminBase }> {
   const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify({ role }),
@@ -254,7 +268,7 @@ export async function patchUserRole(id: string, role: UserRole): Promise<{ user:
  * @param reason - サスペンド理由（任意）/ Suspension reason (optional)
  * @returns 更新後のユーザー情報 / Updated user
  */
-export async function suspendUser(id: string, reason?: string): Promise<{ user: UserAdmin }> {
+export async function suspendUser(id: string, reason?: string): Promise<{ user: UserAdminBase }> {
   const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/suspend`, {
     method: "POST",
     body: JSON.stringify({ reason }),
@@ -272,7 +286,7 @@ export async function suspendUser(id: string, reason?: string): Promise<{ user: 
  * @param id - ユーザー ID / User ID
  * @returns 更新後のユーザー情報 / Updated user
  */
-export async function unsuspendUser(id: string): Promise<{ user: UserAdmin }> {
+export async function unsuspendUser(id: string): Promise<{ user: UserAdminBase }> {
   const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}/unsuspend`, {
     method: "POST",
   });
@@ -319,7 +333,7 @@ export async function getUserImpact(id: string): Promise<UserImpact> {
  * @param id - ユーザー ID / User ID
  * @returns 削除後のユーザー情報 / Deleted user info
  */
-export async function deleteUser(id: string): Promise<{ user: UserAdmin }> {
+export async function deleteUser(id: string): Promise<{ user: UserAdminBase }> {
   const res = await adminFetch(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
