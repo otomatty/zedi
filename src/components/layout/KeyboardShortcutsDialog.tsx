@@ -14,10 +14,9 @@ const categoryLabels: Record<ShortcutInfo["category"], string> = {
   navigation: "ナビゲーション",
   page: "ページ操作",
   editor: "エディタ",
-  ai: "AI 機能",
 };
 
-const categoryOrder: ShortcutInfo["category"][] = ["navigation", "page", "editor", "ai"];
+const categoryOrder: ShortcutInfo["category"][] = ["navigation", "page", "editor"];
 
 /**
  *
