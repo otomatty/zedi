@@ -11,7 +11,7 @@
  * confirmation modal and highlights them in red so operators can eyeball risky
  * rows at a glance.
  */
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Copy, Loader2, Plus, ShieldAlert, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -158,6 +158,17 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
   const [editorAcknowledged, setEditorAcknowledged] = useState(false);
   /** editor を選んだ直後に表示される確認モーダルの open 状態。 */
   const [editorConfirmOpen, setEditorConfirmOpen] = useState(false);
+  /**
+   * AlertDialog の `onOpenChange` は accept / cancel / outside-click を区別しない。
+   * accept ボタン押下時は role を `editor` のまま保持したいので、accept 経由での
+   * クローズかどうかを ref で記録し、onOpenChange 側で判定する (#676 codex/coderabbit)。
+   *
+   * Radix `AlertDialog` collapses accept / cancel / outside-click into a single
+   * `onOpenChange(false)` callback, so we can't tell them apart from state. A
+   * ref flipped to `true` inside the accept handler lets `onOpenChange`
+   * distinguish and skip the cancel-path reset when the user confirmed.
+   */
+  const acknowledgedJustNowRef = useRef(false);
 
   const canCreateEditorLink = editPermission !== "owner_only";
   const needsEditorAck = role === "editor" && !editorAcknowledged;
@@ -165,6 +176,12 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
   const handleRoleChange = useCallback(
     (value: string) => {
       const next = value === "editor" ? "editor" : "viewer";
+      // owner_only ノートで editor が選ばれた場合は UI 上の SelectItem も disabled
+      // だが、キーボード/a11y 経由のバイパス対策として handler 側でも弾く
+      // (#676 review gemini の defence-in-depth)。
+      // Defence-in-depth: the select item is disabled in owner_only notes, but
+      // ignore stray events (keyboard / a11y) at the handler level too.
+      if (next === "editor" && !canCreateEditorLink) return;
       setRole(next);
       if (next === "editor") {
         // まだ承諾していない場合のみモーダルを出す。
@@ -172,26 +189,49 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
         setEditorAcknowledged(false);
         setEditorConfirmOpen(true);
       } else {
+        acknowledgedJustNowRef.current = false;
         setEditorConfirmOpen(false);
         setEditorAcknowledged(false);
       }
     },
-    [setRole],
+    [canCreateEditorLink],
   );
 
   const handleEditorConfirmCancel = useCallback(() => {
     // キャンセルしたら viewer に戻して、未承諾のまま editor 発行できないようにする。
     // Revert to viewer on cancel so an unacknowledged editor link can never be
     // submitted.
+    acknowledgedJustNowRef.current = false;
     setEditorConfirmOpen(false);
     setEditorAcknowledged(false);
     setRole("viewer");
   }, []);
 
   const handleEditorConfirmAccept = useCallback(() => {
+    // ref 経由で「このクローズは accept 由来」であることを onOpenChange に伝える
+    // (#676 review: accept 後に直後の onOpenChange(false) が cancel を呼んでしまい
+    //  role が viewer に戻る問題の修正)。
+    // Flag the next close as accept-initiated so the generic onOpenChange
+    // handler does not fall through to the cancel path and reset the role.
+    acknowledgedJustNowRef.current = true;
     setEditorAcknowledged(true);
     setEditorConfirmOpen(false);
   }, []);
+
+  const handleEditorDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) return;
+      if (acknowledgedJustNowRef.current) {
+        // 直近の close は accept 由来。cancel のリセットは走らせない。
+        // Close caused by accept — swallow and do not reset.
+        acknowledgedJustNowRef.current = false;
+        setEditorConfirmOpen(false);
+        return;
+      }
+      handleEditorConfirmCancel();
+    },
+    [handleEditorConfirmCancel],
+  );
 
   const handleCreate = useCallback(async () => {
     if (needsEditorAck) {
@@ -218,6 +258,7 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
       // 発行後は viewer に戻して editor の再発行は都度確認を要するようにする。
       // Reset to viewer after a successful create so each editor issuance must
       // be re-acknowledged.
+      acknowledgedJustNowRef.current = false;
       setRole("viewer");
       setEditorAcknowledged(false);
     } catch (err) {
@@ -345,12 +386,7 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
         )}
       </div>
 
-      <AlertDialog
-        open={editorConfirmOpen}
-        onOpenChange={(open) => {
-          if (!open) handleEditorConfirmCancel();
-        }}
-      >
+      <AlertDialog open={editorConfirmOpen} onOpenChange={handleEditorDialogOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -362,9 +398,12 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleEditorConfirmCancel}>
-              {t("common.cancel")}
-            </AlertDialogCancel>
+            {/* AlertDialogCancel 内部のクローズが onOpenChange(false) を発火させ、
+                そこから handleEditorConfirmCancel に合流する。ここで onClick を
+                重ねると 2 回走るので付けない (#676 coderabbit)。
+                The cancel button's close already routes through onOpenChange;
+                avoid a redundant onClick that would fire the cancel handler twice. */}
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleEditorConfirmAccept}>
               {t("notes.inviteLinksEditorConfirmAcknowledge")}
             </AlertDialogAction>

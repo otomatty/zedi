@@ -117,9 +117,12 @@ describe("normalizeCreateInviteLinkInput", () => {
     expect(() => normalizeCreateInviteLinkInput({ role: "admin" }, now)).toThrow(/role/);
   });
 
-  it("forces requireSignIn=true for editor links even when caller explicitly sends true", () => {
-    // editor リンクは DB では toggle 可能だが API では常に true (#662 仕様)。
-    // requireSignIn flag is DB-mutable but the API always coerces editor links to true.
+  it("passes requireSignIn=true through for editor links (idempotent)", () => {
+    // editor リンクで requireSignIn=true を明示的に送っても結果は true。
+    // 実際の coerce 動作（false → true）は requireSignIn describe で検証する。
+    //
+    // Pass-through case: explicit `true` stays `true`. The actual false→true
+    // coercion lives in the dedicated requireSignIn describe block below.
     const result = normalizeCreateInviteLinkInput({ role: "editor", requireSignIn: true }, now);
     expect(result.requireSignIn).toBe(true);
   });

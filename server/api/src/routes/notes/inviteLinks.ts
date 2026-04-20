@@ -10,7 +10,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
-import { noteInviteLinks } from "../../schema/index.js";
+import { noteInviteLinks, notes } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
 import { recordAuditLog } from "../../lib/auditLog.js";
 import type { AppEnv } from "../../types/index.js";
@@ -78,52 +78,71 @@ app.post("/:noteId/invite-links", authRequired, async (c) => {
     });
   }
 
-  // editor リンクは追加の安全側チェックを課す (#662 / Phase 5):
-  //  1. `edit_permission = 'owner_only'` のノートではポリシーと整合しないので 400
-  //  2. 1 ノートにつき同時発行は最大 3 本（誤発行の被害を限定）
-  // editor リンクは `requireSignIn` も API 境界で必ず true に揃える（normalize 済み）。
+  // editor リンクは `edit_permission = 'owner_only'` のノートと整合しないので
+  // 事前に拒否する（ノート行は `requireNoteOwner` が取得済み）。
+  // 「1 ノートにつき 3 本まで」の上限チェックと count はトランザクション内で
+  // 行うため、ここでは editPermission の整合性だけ先に弾く。
   //
-  // Editor links enforce two extra safety rails from #662:
-  //   1. Reject when the note's `edit_permission` is `owner_only` (policy clash).
-  //   2. Cap concurrent active editor links at 3 per note to contain misuse.
-  // `requireSignIn` is already coerced to `true` inside `normalize...`.
-  if (normalized.role === "editor") {
-    if (note.editPermission === "owner_only") {
-      throw new HTTPException(400, {
-        message:
-          "Cannot create an editor invite link for a note whose edit permission is 'owner_only'",
-      });
-    }
-    const now = new Date();
-    const [countRow] = await db
-      .select({ count: sql<number>`cast(count(*) as integer)` })
-      .from(noteInviteLinks)
-      .where(
-        and(
-          eq(noteInviteLinks.noteId, noteId),
-          eq(noteInviteLinks.role, "editor"),
-          isNull(noteInviteLinks.revokedAt),
-          gt(noteInviteLinks.expiresAt, now),
-        ),
-      );
-    const activeEditorCount = countRow?.count ?? 0;
-    if (activeEditorCount >= MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE) {
-      throw new HTTPException(400, {
-        message: `A note can have at most ${MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE} active editor invite links`,
-      });
-    }
+  // Editor links clash with `edit_permission = 'owner_only'`; reject early so
+  // we don't even enter the transaction in that case. The 3-link cap is
+  // enforced atomically inside the transaction below.
+  if (normalized.role === "editor" && note.editPermission === "owner_only") {
+    throw new HTTPException(400, {
+      message:
+        "Cannot create an editor invite link for a note whose edit permission is 'owner_only'",
+    });
   }
 
   const token = generateInviteLinkToken();
 
-  // 発行と監査ログは同一トランザクションで記録し、失敗時に両方巻き戻るようにする。
-  // editor / viewer で別 action を使うことで、後追いで editor リンクだけ抽出できる
-  // (#662 監査ログ要件)。
+  // 発行・上限チェック・監査ログは同一トランザクションにまとめる。
   //
-  // Insert + audit log share a transaction so either both commit or both roll
-  // back. Separate actions for viewer / editor let ops filter editor creations
-  // later (#662 audit requirement).
+  // editor リンクの 3 本上限チェックはトランザクション内で行い、対象ノート行を
+  // `SELECT ... FOR UPDATE` でロックすることで、同時リクエスト間の TOCTOU を
+  // 防ぐ（#676 review: devin / codex / gemini / coderabbit）。ロックは同一ノート
+  // に対する editor リンク発行をシリアライズし、count → insert を原子的にする。
+  //
+  // count の where には「未取り消し・未期限切れ・未枯渇」を全て満たすリンクのみ
+  // を集計する。`maxUses` を使い切ったリンクは実質無効なので、カウントから外して
+  // オーナーが代替リンクを発行できるようにする（#676 review coderabbit）。
+  //
+  // Merge insert + audit + the cap check into one transaction. Acquire a
+  // `SELECT ... FOR UPDATE` on the note row so concurrent editor-link creation
+  // requests serialise on the same note and cannot both pass the count
+  // check. The count filter excludes revoked, expired, and exhausted links
+  // (`maxUses IS NULL OR usedCount < maxUses`) so unusable links do not block
+  // issuance of replacements.
   const created = await db.transaction(async (tx) => {
+    if (normalized.role === "editor") {
+      // ノート行を FOR UPDATE でロック。対象ノートに対する editor リンク作成が
+      // 直列化されるため、count → insert が競合しない。
+      // Lock the note row so concurrent editor-link creations on the same
+      // note are serialised.
+      await tx.select({ id: notes.id }).from(notes).where(eq(notes.id, noteId)).for("update");
+
+      const now = new Date();
+      const [countRow] = await tx
+        .select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(noteInviteLinks)
+        .where(
+          and(
+            eq(noteInviteLinks.noteId, noteId),
+            eq(noteInviteLinks.role, "editor"),
+            isNull(noteInviteLinks.revokedAt),
+            gt(noteInviteLinks.expiresAt, now),
+            // 枯渇したリンク（usedCount >= maxUses）は実質無効なのでカウント外。
+            // Exclude exhausted links from the cap.
+            sql`(${noteInviteLinks.maxUses} IS NULL OR ${noteInviteLinks.usedCount} < ${noteInviteLinks.maxUses})`,
+          ),
+        );
+      const activeEditorCount = countRow?.count ?? 0;
+      if (activeEditorCount >= MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE) {
+        throw new HTTPException(400, {
+          message: `A note can have at most ${MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE} active editor invite links`,
+        });
+      }
+    }
+
     const [row] = await tx
       .insert(noteInviteLinks)
       .values({

@@ -327,10 +327,17 @@ export interface CreateInviteLinkBody {
   maxUses?: number | null;
   label?: string | null;
   /**
-   * editor リンクは API が常に `true` に上書きするため、UI から送っても無効化される。
-   * Editor links always coerce this to `true`; the server ignores a `false` value.
+   * サインイン必須フラグ。サーバーは viewer では `false` を拒否し、editor では
+   * 黙って `true` に上書きするため、API が受け付ける値は実質 `true` のみ。型を
+   * `true` リテラルに絞ることでクライアント側のバグをコンパイル時に検出する
+   * (#676 review coderabbit)。省略可 — 省略時も `true` として扱われる。
+   *
+   * Sign-in requirement. The server rejects `false` for viewer links and
+   * silently coerces it to `true` for editor links, so the only supported
+   * value is literally `true`. Narrowed from `boolean` to catch client bugs
+   * at compile time (#676 review coderabbit). May be omitted.
    */
-  requireSignIn?: boolean;
+  requireSignIn?: true;
 }
 
 /** Invite link row (shared by list and create responses). */

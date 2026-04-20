@@ -153,14 +153,26 @@ describe("POST /api/notes/:noteId/invite-links", () => {
   it("creates an editor link when editPermission allows it and logs editor action", async () => {
     auditLogSpy.mockClear();
     const createdRow = createMockLinkRow({ role: "editor" });
+    // editor 発行フローは tx 内で以下の順にチェーンを消費する:
+    //  0: requireNoteOwner (findActiveNoteById)
+    //  1: SELECT notes FOR UPDATE (row lock for concurrency serialisation)
+    //  2: active editor link count (inside the tx)
+    //  3: insert ... returning
+    //
+    // The editor flow consumes four chains: owner check, row lock, cap count,
+    // insert.
     const { app } = createTestApp([
-      [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
+      [createMockNote({ editPermission: "members_editors" })],
+      [{ id: NOTE_ID }], // SELECT notes FOR UPDATE
       [{ count: 0 }], // active editor link count query
       [createdRow], // insert.returning
     ]);
     const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
       method: "POST",
       headers: authHeaders(),
+      // requireSignIn は型的には `true` のみ受理されるが、境界超えの挙動を
+      // 検証するため敢えて `false` を送る（API は true に coerce する）。
+      // Intentionally send `false` — the server must coerce to `true`.
       body: JSON.stringify({ role: "editor", requireSignIn: false }),
     });
     expect(res.status).toBe(201);
@@ -181,10 +193,14 @@ describe("POST /api/notes/:noteId/invite-links", () => {
 
   it("rejects a 4th active editor link for the same note (400)", async () => {
     // 1 ノートにつき同時に最大 3 本まで (#662)。4 本目は 400。
-    // One note may have at most 3 active editor links at a time (#662); the 4th
-    // must be rejected with 400.
+    // tx 内で FOR UPDATE → count の順にチェーンを消費し、count が 3 に達した
+    // 時点で throw する。
+    //
+    // The 4th editor link hits the cap after the FOR UPDATE row lock and the
+    // count query consume their chain slots.
     const { app } = createTestApp([
       [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
+      [{ id: NOTE_ID }], // SELECT notes FOR UPDATE
       [{ count: 3 }], // active editor link count query
     ]);
     const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
