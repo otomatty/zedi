@@ -31,6 +31,17 @@ vi.mock("../../../lib/auditLog.js", () => ({
   extractClientIp: () => null,
 }));
 
+/**
+ * `auditLogSpy.mock.calls[callIndex][2]` (params) の型付き取り出しヘルパー。
+ * テストで重複するキャスト/アクセスパターンを 1 箇所にまとめる (#676 coderabbit)。
+ *
+ * Helper to pull the audit-log `params` out of the spy's call record with a
+ * single type assertion so individual tests don't repeat the cast.
+ */
+function getAuditParams(callIndex = 0): AuditLogParams | undefined {
+  return auditLogSpy.mock.calls[callIndex]?.[2];
+}
+
 vi.mock("../../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
     const userId = c.req.header("x-test-user-id");
@@ -98,9 +109,7 @@ describe("POST /api/notes/:noteId/invite-links", () => {
     expect(typeof body.token).toBe("string");
     // 監査ログに viewer 作成として記録されている / Audit log records viewer creation.
     expect(auditLogSpy).toHaveBeenCalledTimes(1);
-    const auditParams = auditLogSpy.mock.calls[0]?.[2] as
-      | { action?: string; targetType?: string }
-      | undefined;
+    const auditParams = getAuditParams();
     expect(auditParams?.action).toBe("note.link.created.viewer");
     expect(auditParams?.targetType).toBe("note");
   });
@@ -166,15 +175,17 @@ describe("POST /api/notes/:noteId/invite-links", () => {
     const createdRow = createMockLinkRow({ role: "editor" });
     // editor 発行フローは tx 内で以下の順にチェーンを消費する:
     //  0: requireNoteOwner (findActiveNoteById)
-    //  1: SELECT notes FOR UPDATE (row lock for concurrency serialisation)
+    //  1: SELECT notes FOR UPDATE — {id, editPermission} (row lock + re-check)
     //  2: active editor link count (inside the tx)
     //  3: insert ... returning
     //
-    // The editor flow consumes four chains: owner check, row lock, cap count,
-    // insert.
+    // The editor flow consumes four chains: owner check, locked re-check of
+    // `editPermission`, cap count, insert.
     const { app } = createTestApp([
       [createMockNote({ editPermission: "members_editors" })],
-      [{ id: NOTE_ID }], // SELECT notes FOR UPDATE
+      // SELECT notes FOR UPDATE returns the row-locked editPermission. The
+      // route re-checks this to close the pre-tx snapshot race.
+      [{ id: NOTE_ID, editPermission: "members_editors" }],
       [{ count: 0 }], // active editor link count query
       [createdRow], // insert.returning
     ]);
@@ -192,9 +203,7 @@ describe("POST /api/notes/:noteId/invite-links", () => {
     // 監査ログは editor 用の別 action で記録される (#662)。
     // Audit log is filed under a dedicated editor action (#662).
     expect(auditLogSpy).toHaveBeenCalledTimes(1);
-    const auditParams = auditLogSpy.mock.calls[0]?.[2] as
-      | { action?: string; targetType?: string; after?: Record<string, unknown> }
-      | undefined;
+    const auditParams = getAuditParams();
     expect(auditParams?.action).toBe("note.link.created.editor");
     expect(auditParams?.targetType).toBe("note");
     // editor リンクは API 境界で常に requireSignIn=true に揃える。
@@ -211,7 +220,7 @@ describe("POST /api/notes/:noteId/invite-links", () => {
     // count query consume their chain slots.
     const { app } = createTestApp([
       [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
-      [{ id: NOTE_ID }], // SELECT notes FOR UPDATE
+      [{ id: NOTE_ID, editPermission: "members_editors" }], // SELECT notes FOR UPDATE
       [{ count: 3 }], // active editor link count query
     ]);
     const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
@@ -224,13 +233,43 @@ describe("POST /api/notes/:noteId/invite-links", () => {
     expect(body).toMatch(/editor.*link|3/i);
   });
 
-  it("does not count viewer links against the editor limit", async () => {
-    // viewer 側の本数は editor キャップに影響しない (#662)。
-    // Viewer link counts are independent of the editor-link cap.
+  it(
+    "rejects editor link when editPermission flips to 'owner_only' between the " +
+      "outer snapshot and the locked re-check (TOCTOU safety)",
+    async () => {
+      // 並行書き込みで editPermission が owner_only に変わる状況を模擬する:
+      // requireNoteOwner が返すスナップショットは members_editors のまま、
+      // tx 内の FOR UPDATE で得た行は owner_only になっている想定。
+      // in-tx re-check がこの race を捕まえて 400 に落とす (#676 coderabbit / devin)。
+      //
+      // Simulate a policy flip committed between the outer read and the row
+      // lock: the outer snapshot says `members_editors` (fast-fail passes) but
+      // the locked row says `owner_only`. The in-tx re-check must still reject.
+      const { app } = createTestApp([
+        [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
+        [{ id: NOTE_ID, editPermission: "owner_only" }], // SELECT notes FOR UPDATE — flipped
+      ]);
+      const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ role: "editor" }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.text();
+      expect(body).toMatch(/owner_only|edit permission/i);
+    },
+  );
+
+  it("creates a viewer link successfully (independent of editor-cap path)", async () => {
+    // viewer ロールでは FOR UPDATE / count の editor 専用パスをスキップする
+    // ことを確認する (#662 / #676 coderabbit: test name を実際の挙動に合わせる)。
+    //
+    // Verifies the viewer-role path does not go through the editor-only lock /
+    // cap queries. Test renamed to match the narrow behaviour it exercises.
     auditLogSpy.mockClear();
     const createdRow = createMockLinkRow();
     const { app } = createTestApp([
-      [createMockNote()], // requireNoteOwner (viewer — no count query)
+      [createMockNote()], // requireNoteOwner (viewer — no FOR UPDATE or count query)
       [createdRow], // insert.returning
     ]);
     const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {

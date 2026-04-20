@@ -84,13 +84,15 @@ app.post("/:noteId/invite-links", authRequired, async (c) => {
   }
 
   // editor リンクは `edit_permission = 'owner_only'` のノートと整合しないので
-  // 事前に拒否する（ノート行は `requireNoteOwner` が取得済み）。
-  // 「1 ノートにつき 3 本まで」の上限チェックと count はトランザクション内で
-  // 行うため、ここでは editPermission の整合性だけ先に弾く。
+  // 事前に高速失敗させる。ただしこれはプリトランザクション時点のスナップショット
+  // に対するチェックなので、tx 内でロック済みの行からもう一度読み直す（#676
+  // review coderabbit）。ここでの早期拒否はあくまで「よくある無効リクエストを
+  // 安いパスで返す」ための最適化。
   //
-  // Editor links clash with `edit_permission = 'owner_only'`; reject early so
-  // we don't even enter the transaction in that case. The 3-link cap is
-  // enforced atomically inside the transaction below.
+  // Fast-fail for the common owner_only case using the pre-transaction
+  // snapshot. The authoritative check happens inside the transaction against
+  // the row-locked copy to close the race where `edit_permission` flips to
+  // `owner_only` between this read and the insert (#676 review coderabbit).
   if (normalized.role === "editor" && note.editPermission === "owner_only") {
     throw new HTTPException(400, {
       message:
@@ -100,30 +102,47 @@ app.post("/:noteId/invite-links", authRequired, async (c) => {
 
   const token = generateInviteLinkToken();
 
-  // 発行・上限チェック・監査ログは同一トランザクションにまとめる。
+  // 発行・権限/上限チェック・監査ログは同一トランザクションにまとめる。
   //
-  // editor リンクの 3 本上限チェックはトランザクション内で行い、対象ノート行を
-  // `SELECT ... FOR UPDATE` でロックすることで、同時リクエスト間の TOCTOU を
-  // 防ぐ（#676 review: devin / codex / gemini / coderabbit）。ロックは同一ノート
-  // に対する editor リンク発行をシリアライズし、count → insert を原子的にする。
+  // editor リンクでは対象ノート行を `SELECT ... FOR UPDATE` でロックし、その行
+  // から `editPermission` を再読する。これにより、プリトランザクション時点の
+  // スナップショットが古くなっていても、ロック済みの最新値で権限をチェック
+  // できる（#676 review coderabbit）。同じロックで 3 本上限の count → insert も
+  // 直列化する（#676 review: devin / codex / gemini / coderabbit）。
   //
   // count の where には「未取り消し・未期限切れ・未枯渇」を全て満たすリンクのみ
   // を集計する。`maxUses` を使い切ったリンクは実質無効なので、カウントから外して
   // オーナーが代替リンクを発行できるようにする（#676 review coderabbit）。
   //
-  // Merge insert + audit + the cap check into one transaction. Acquire a
-  // `SELECT ... FOR UPDATE` on the note row so concurrent editor-link creation
-  // requests serialise on the same note and cannot both pass the count
-  // check. The count filter excludes revoked, expired, and exhausted links
-  // (`maxUses IS NULL OR usedCount < maxUses`) so unusable links do not block
-  // issuance of replacements.
+  // Inside the transaction, lock the note row and re-read `editPermission`
+  // from the locked copy so we can't race against a concurrent policy change
+  // (#676 review coderabbit). The same lock serialises the count → insert for
+  // the 3-link cap. The count filter excludes revoked, expired, and exhausted
+  // links so unusable ones do not block replacements.
   const created = await db.transaction(async (tx) => {
     if (normalized.role === "editor") {
-      // ノート行を FOR UPDATE でロック。対象ノートに対する editor リンク作成が
-      // 直列化されるため、count → insert が競合しない。
-      // Lock the note row so concurrent editor-link creations on the same
-      // note are serialised.
-      await tx.select({ id: notes.id }).from(notes).where(eq(notes.id, noteId)).for("update");
+      // ノート行を FOR UPDATE でロックしつつ `editPermission` を再取得。
+      // 行が消えていた場合は 404、`owner_only` に変わっていた場合は 400 に落とす。
+      // Lock the note row and re-read `editPermission` so the authoritative
+      // check runs against the row-locked copy, not the stale outer snapshot.
+      const [lockedNote] = await tx
+        .select({
+          id: notes.id,
+          editPermission: notes.editPermission,
+        })
+        .from(notes)
+        .where(eq(notes.id, noteId))
+        .for("update");
+
+      if (!lockedNote) {
+        throw new HTTPException(404, { message: "Note not found" });
+      }
+      if (lockedNote.editPermission === "owner_only") {
+        throw new HTTPException(400, {
+          message:
+            "Cannot create an editor invite link for a note whose edit permission is 'owner_only'",
+        });
+      }
 
       const now = new Date();
       const [countRow] = await tx
