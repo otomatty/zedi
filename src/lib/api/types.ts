@@ -318,11 +318,26 @@ export interface InviteLinkRedeemResponse {
 
 /** POST /api/notes/:noteId/invite-links body — 発行パラメータ / Creation params. */
 export interface CreateInviteLinkBody {
-  role?: "viewer";
+  /**
+   * リンク経由で付与するロール。Phase 5 (#662) 以降は `editor` も指定可能。
+   * Role granted through the link; `editor` is permitted from Phase 5 (#662).
+   */
+  role?: "viewer" | "editor";
   expiresInMs?: number;
   maxUses?: number | null;
   label?: string | null;
-  requireSignIn?: boolean;
+  /**
+   * サインイン必須フラグ。サーバーは viewer では `false` を拒否し、editor では
+   * 黙って `true` に上書きするため、API が受け付ける値は実質 `true` のみ。型を
+   * `true` リテラルに絞ることでクライアント側のバグをコンパイル時に検出する
+   * (#676 review coderabbit)。省略可 — 省略時も `true` として扱われる。
+   *
+   * Sign-in requirement. The server rejects `false` for viewer links and
+   * silently coerces it to `true` for editor links, so the only supported
+   * value is literally `true`. Narrowed from `boolean` to catch client bugs
+   * at compile time (#676 review coderabbit). May be omitted.
+   */
+  requireSignIn?: true;
 }
 
 /** Invite link row (shared by list and create responses). */

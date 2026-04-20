@@ -83,7 +83,7 @@ const NoteMembers: React.FC = () => {
               />
             </TabsContent>
             <TabsContent value="share-links">
-              <NoteInviteLinksSection noteId={noteId ?? ""} />
+              <NoteInviteLinksSection noteId={noteId ?? ""} editPermission={note.editPermission} />
             </TabsContent>
           </Tabs>
         )}

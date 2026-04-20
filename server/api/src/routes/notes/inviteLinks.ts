@@ -9,13 +9,15 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { and, desc, eq, isNull } from "drizzle-orm";
-import { noteInviteLinks } from "../../schema/index.js";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { noteInviteLinks, notes } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
+import { recordAuditLog } from "../../lib/auditLog.js";
 import type { AppEnv } from "../../types/index.js";
 import { getNoteRole, requireNoteOwner } from "./helpers.js";
 import {
   generateInviteLinkToken,
+  MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE,
   normalizeCreateInviteLinkInput,
 } from "../../services/inviteLinkService.js";
 
@@ -25,18 +27,23 @@ const app = new Hono<AppEnv>();
 
 /**
  * リクエストボディのスキーマ（JSON）。
- * - role:         'viewer' のみ許容（Phase 3）
+ * - role:         'viewer' | 'editor'（Phase 5 / #662 で editor を追加）
+ *                  editor は `editPermission='owner_only'` のノートでは 400 となり、
+ *                  1 ノートにつき同時 3 本までしか発行できない
  * - expiresInMs:  有効期限までのミリ秒（省略時 7 日、最大 90 日）
  * - maxUses:      利用上限 1..100（null = 無制限）
  * - label:        棚卸し用ラベル（任意）
- * - requireSignIn: サインイン必須フラグ（省略時 true）
+ * - requireSignIn: サインイン必須フラグ。viewer は `false` を拒否、editor は
+ *                   API 境界で常に `true` に上書きされる
  *
  * Request body schema:
- * - role:          only `'viewer'` is allowed in Phase 3
+ * - role:          `'viewer'` or `'editor'` (editor added in Phase 5 / #662).
+ *                  Editor is rejected with 400 when `editPermission='owner_only'`
+ *                  and capped at 3 concurrent active links per note.
  * - expiresInMs:   ms until expiry (default 7 days, max 90 days)
  * - maxUses:       redemption cap 1..100 (null = unlimited)
  * - label:         free-form housekeeping label (optional)
- * - requireSignIn: whether sign-in is required to redeem (default true)
+ * - requireSignIn: Viewer rejects `false`; editor silently coerces to `true`.
  */
 interface CreateInviteLinkBody {
   role?: string | null;
@@ -51,7 +58,7 @@ app.post("/:noteId/invite-links", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  await requireNoteOwner(db, noteId, userId, "Only the owner can create invite links");
+  const note = await requireNoteOwner(db, noteId, userId, "Only the owner can create invite links");
 
   // 空ボディは仕様上すべてデフォルト適用で OK だが、`{bad json}` のような不正な
   // JSON までデフォルト扱いにすると、クライアントバグを静かに握り潰してしまう
@@ -76,24 +83,126 @@ app.post("/:noteId/invite-links", authRequired, async (c) => {
     });
   }
 
-  const token = generateInviteLinkToken();
-  const [created] = await db
-    .insert(noteInviteLinks)
-    .values({
-      noteId,
-      token,
-      role: normalized.role,
-      createdByUserId: userId,
-      expiresAt: normalized.expiresAt,
-      maxUses: normalized.maxUses,
-      label: normalized.label,
-      requireSignIn: normalized.requireSignIn,
-    })
-    .returning();
-
-  if (!created) {
-    throw new HTTPException(500, { message: "Failed to create invite link" });
+  // editor リンクは `edit_permission = 'owner_only'` のノートと整合しないので
+  // 事前に高速失敗させる。ただしこれはプリトランザクション時点のスナップショット
+  // に対するチェックなので、tx 内でロック済みの行からもう一度読み直す（#676
+  // review coderabbit）。ここでの早期拒否はあくまで「よくある無効リクエストを
+  // 安いパスで返す」ための最適化。
+  //
+  // Fast-fail for the common owner_only case using the pre-transaction
+  // snapshot. The authoritative check happens inside the transaction against
+  // the row-locked copy to close the race where `edit_permission` flips to
+  // `owner_only` between this read and the insert (#676 review coderabbit).
+  if (normalized.role === "editor" && note.editPermission === "owner_only") {
+    throw new HTTPException(400, {
+      message:
+        "Cannot create an editor invite link for a note whose edit permission is 'owner_only'",
+    });
   }
+
+  const token = generateInviteLinkToken();
+
+  // 発行・権限/上限チェック・監査ログは同一トランザクションにまとめる。
+  //
+  // editor リンクでは対象ノート行を `SELECT ... FOR UPDATE` でロックし、その行
+  // から `editPermission` を再読する。これにより、プリトランザクション時点の
+  // スナップショットが古くなっていても、ロック済みの最新値で権限をチェック
+  // できる（#676 review coderabbit）。同じロックで 3 本上限の count → insert も
+  // 直列化する（#676 review: devin / codex / gemini / coderabbit）。
+  //
+  // count の where には「未取り消し・未期限切れ・未枯渇」を全て満たすリンクのみ
+  // を集計する。`maxUses` を使い切ったリンクは実質無効なので、カウントから外して
+  // オーナーが代替リンクを発行できるようにする（#676 review coderabbit）。
+  //
+  // Inside the transaction, lock the note row and re-read `editPermission`
+  // from the locked copy so we can't race against a concurrent policy change
+  // (#676 review coderabbit). The same lock serialises the count → insert for
+  // the 3-link cap. The count filter excludes revoked, expired, and exhausted
+  // links so unusable ones do not block replacements.
+  const created = await db.transaction(async (tx) => {
+    if (normalized.role === "editor") {
+      // ノート行を FOR UPDATE でロックしつつ `editPermission` を再取得。
+      // 行が消えていた場合は 404、`owner_only` に変わっていた場合は 400 に落とす。
+      // Lock the note row and re-read `editPermission` so the authoritative
+      // check runs against the row-locked copy, not the stale outer snapshot.
+      const [lockedNote] = await tx
+        .select({
+          id: notes.id,
+          editPermission: notes.editPermission,
+        })
+        .from(notes)
+        .where(eq(notes.id, noteId))
+        .for("update");
+
+      if (!lockedNote) {
+        throw new HTTPException(404, { message: "Note not found" });
+      }
+      if (lockedNote.editPermission === "owner_only") {
+        throw new HTTPException(400, {
+          message:
+            "Cannot create an editor invite link for a note whose edit permission is 'owner_only'",
+        });
+      }
+
+      const now = new Date();
+      const [countRow] = await tx
+        .select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(noteInviteLinks)
+        .where(
+          and(
+            eq(noteInviteLinks.noteId, noteId),
+            eq(noteInviteLinks.role, "editor"),
+            isNull(noteInviteLinks.revokedAt),
+            gt(noteInviteLinks.expiresAt, now),
+            // 枯渇したリンク（usedCount >= maxUses）は実質無効なのでカウント外。
+            // Exclude exhausted links from the cap.
+            sql`(${noteInviteLinks.maxUses} IS NULL OR ${noteInviteLinks.usedCount} < ${noteInviteLinks.maxUses})`,
+          ),
+        );
+      const activeEditorCount = countRow?.count ?? 0;
+      if (activeEditorCount >= MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE) {
+        throw new HTTPException(400, {
+          message: `A note can have at most ${MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE} active editor invite links`,
+        });
+      }
+    }
+
+    const [row] = await tx
+      .insert(noteInviteLinks)
+      .values({
+        noteId,
+        token,
+        role: normalized.role,
+        createdByUserId: userId,
+        expiresAt: normalized.expiresAt,
+        maxUses: normalized.maxUses,
+        label: normalized.label,
+        requireSignIn: normalized.requireSignIn,
+      })
+      .returning();
+
+    if (!row) {
+      throw new HTTPException(500, { message: "Failed to create invite link" });
+    }
+
+    const action =
+      normalized.role === "editor" ? "note.link.created.editor" : "note.link.created.viewer";
+    await recordAuditLog(c, tx, {
+      action,
+      targetType: "note",
+      targetId: noteId,
+      after: {
+        link_id: row.id,
+        role: row.role,
+        expires_at:
+          row.expiresAt instanceof Date ? row.expiresAt.toISOString() : String(row.expiresAt),
+        max_uses: row.maxUses,
+        require_sign_in: row.requireSignIn,
+        label: row.label,
+      },
+    });
+    return row;
+  });
 
   return c.json(serializeInviteLink(created), 201);
 });

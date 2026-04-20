@@ -5,6 +5,43 @@ import { describe, it, expect, vi } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
+// 共有リンク作成ルートはトランザクション内で監査ログを書く。
+// `recordAuditLog` は users テーブル JOIN 等を要するため、ルートテストでは
+// 呼び出しのみ検証するスパイに差し替える（副作用は不要）。スパイは `(c, db,
+// params)` の 3 引数シグネチャで型付けし、`mock.calls[0]?.[2]` で params を
+// 参照できるようにする。
+//
+// The invite-link create route records an audit log inside its transaction.
+// `recordAuditLog` depends on auth context that the route-test mock skips, so
+// replace it with a spy that records calls without touching the mock DB chain.
+// Type the spy with the real 3-arg shape so `mock.calls[0]?.[2]` is reachable
+// under `tsc --noEmit`.
+interface AuditLogParams {
+  action: string;
+  targetType: string;
+  targetId?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+}
+const { auditLogSpy } = vi.hoisted(() => ({
+  auditLogSpy: vi.fn(async (_c: unknown, _db: unknown, _params: AuditLogParams) => {}),
+}));
+vi.mock("../../../lib/auditLog.js", () => ({
+  recordAuditLog: (c: unknown, db: unknown, params: AuditLogParams) => auditLogSpy(c, db, params),
+  extractClientIp: () => null,
+}));
+
+/**
+ * `auditLogSpy.mock.calls[callIndex][2]` (params) の型付き取り出しヘルパー。
+ * テストで重複するキャスト/アクセスパターンを 1 箇所にまとめる (#676 coderabbit)。
+ *
+ * Helper to pull the audit-log `params` out of the spy's call record with a
+ * single type assertion so individual tests don't repeat the cast.
+ */
+function getAuditParams(callIndex = 0): AuditLogParams | undefined {
+  return auditLogSpy.mock.calls[callIndex]?.[2];
+}
+
 vi.mock("../../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
     const userId = c.req.header("x-test-user-id");
@@ -54,6 +91,7 @@ function createMockLinkRow(overrides: Record<string, unknown> = {}) {
 
 describe("POST /api/notes/:noteId/invite-links", () => {
   it("creates a viewer link with defaults when body is empty", async () => {
+    auditLogSpy.mockClear();
     const createdRow = createMockLinkRow();
     const { app } = createTestApp([
       [createMockNote()], // requireNoteOwner → findActiveNoteById
@@ -69,16 +107,21 @@ describe("POST /api/notes/:noteId/invite-links", () => {
     expect(body.role).toBe("viewer");
     expect(body.note_id).toBe(NOTE_ID);
     expect(typeof body.token).toBe("string");
+    // 監査ログに viewer 作成として記録されている / Audit log records viewer creation.
+    expect(auditLogSpy).toHaveBeenCalledTimes(1);
+    const auditParams = getAuditParams();
+    expect(auditParams?.action).toBe("note.link.created.viewer");
+    expect(auditParams?.targetType).toBe("note");
   });
 
-  it("rejects non-viewer roles in Phase 3 (400)", async () => {
+  it("rejects unknown roles with 400", async () => {
     const { app } = createTestApp([
       [createMockNote()], // requireNoteOwner
     ]);
     const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ role: "editor" }),
+      body: JSON.stringify({ role: "admin" }),
     });
     expect(res.status).toBe(400);
   });
@@ -105,6 +148,136 @@ describe("POST /api/notes/:noteId/invite-links", () => {
       body: JSON.stringify({ maxUses: 9999 }),
     });
     expect(res.status).toBe(400);
+  });
+
+  // ── Phase 5 (#662) — editor ロール対応 ───────────────────────────────────
+
+  it("rejects editor link creation when note.editPermission is 'owner_only' (400)", async () => {
+    // editPermission=owner_only のノートは「オーナー以外は編集不可」を宣言しており、
+    // editor リンクを発行すると編集権限ポリシーと整合しない (#662)。
+    // When editPermission is owner_only, issuing an editor link would contradict
+    // the note's own policy (#662).
+    const { app } = createTestApp([[createMockNote({ editPermission: "owner_only" })]]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "editor" }),
+    });
+    expect(res.status).toBe(400);
+    // HTTPException は text/plain のボディを返すため text() で読む。
+    // HTTPException returns plain text, so read via `text()`.
+    const body = await res.text();
+    expect(body).toMatch(/owner_only|edit permission/i);
+  });
+
+  it("creates an editor link when editPermission allows it and logs editor action", async () => {
+    auditLogSpy.mockClear();
+    const createdRow = createMockLinkRow({ role: "editor" });
+    // editor 発行フローは tx 内で以下の順にチェーンを消費する:
+    //  0: requireNoteOwner (findActiveNoteById)
+    //  1: SELECT notes FOR UPDATE — {id, editPermission} (row lock + re-check)
+    //  2: active editor link count (inside the tx)
+    //  3: insert ... returning
+    //
+    // The editor flow consumes four chains: owner check, locked re-check of
+    // `editPermission`, cap count, insert.
+    const { app } = createTestApp([
+      [createMockNote({ editPermission: "members_editors" })],
+      // SELECT notes FOR UPDATE returns the row-locked editPermission. The
+      // route re-checks this to close the pre-tx snapshot race.
+      [{ id: NOTE_ID, editPermission: "members_editors" }],
+      [{ count: 0 }], // active editor link count query
+      [createdRow], // insert.returning
+    ]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      // requireSignIn は型的には `true` のみ受理されるが、境界超えの挙動を
+      // 検証するため敢えて `false` を送る（API は true に coerce する）。
+      // Intentionally send `false` — the server must coerce to `true`.
+      body: JSON.stringify({ role: "editor", requireSignIn: false }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.role).toBe("editor");
+    // 監査ログは editor 用の別 action で記録される (#662)。
+    // Audit log is filed under a dedicated editor action (#662).
+    expect(auditLogSpy).toHaveBeenCalledTimes(1);
+    const auditParams = getAuditParams();
+    expect(auditParams?.action).toBe("note.link.created.editor");
+    expect(auditParams?.targetType).toBe("note");
+    // editor リンクは API 境界で常に requireSignIn=true に揃える。
+    // Editor links force requireSignIn=true at the API boundary.
+    expect(auditParams?.after?.require_sign_in).toBe(true);
+  });
+
+  it("rejects a 4th active editor link for the same note (400)", async () => {
+    // 1 ノートにつき同時に最大 3 本まで (#662)。4 本目は 400。
+    // tx 内で FOR UPDATE → count の順にチェーンを消費し、count が 3 に達した
+    // 時点で throw する。
+    //
+    // The 4th editor link hits the cap after the FOR UPDATE row lock and the
+    // count query consume their chain slots.
+    const { app } = createTestApp([
+      [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
+      [{ id: NOTE_ID, editPermission: "members_editors" }], // SELECT notes FOR UPDATE
+      [{ count: 3 }], // active editor link count query
+    ]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "editor" }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.text();
+    expect(body).toMatch(/editor.*link|3/i);
+  });
+
+  it(
+    "rejects editor link when editPermission flips to 'owner_only' between the " +
+      "outer snapshot and the locked re-check (TOCTOU safety)",
+    async () => {
+      // 並行書き込みで editPermission が owner_only に変わる状況を模擬する:
+      // requireNoteOwner が返すスナップショットは members_editors のまま、
+      // tx 内の FOR UPDATE で得た行は owner_only になっている想定。
+      // in-tx re-check がこの race を捕まえて 400 に落とす (#676 coderabbit / devin)。
+      //
+      // Simulate a policy flip committed between the outer read and the row
+      // lock: the outer snapshot says `members_editors` (fast-fail passes) but
+      // the locked row says `owner_only`. The in-tx re-check must still reject.
+      const { app } = createTestApp([
+        [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
+        [{ id: NOTE_ID, editPermission: "owner_only" }], // SELECT notes FOR UPDATE — flipped
+      ]);
+      const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ role: "editor" }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.text();
+      expect(body).toMatch(/owner_only|edit permission/i);
+    },
+  );
+
+  it("creates a viewer link successfully (independent of editor-cap path)", async () => {
+    // viewer ロールでは FOR UPDATE / count の editor 専用パスをスキップする
+    // ことを確認する (#662 / #676 coderabbit: test name を実際の挙動に合わせる)。
+    //
+    // Verifies the viewer-role path does not go through the editor-only lock /
+    // cap queries. Test renamed to match the narrow behaviour it exercises.
+    auditLogSpy.mockClear();
+    const createdRow = createMockLinkRow();
+    const { app } = createTestApp([
+      [createMockNote()], // requireNoteOwner (viewer — no FOR UPDATE or count query)
+      [createdRow], // insert.returning
+    ]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "viewer" }),
+    });
+    expect(res.status).toBe(201);
   });
 });
 
