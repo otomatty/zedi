@@ -1,9 +1,5 @@
-import React, { useState } from "react";
-import { Search } from "lucide-react";
-import { Button, Sheet, SheetContent, SheetDescription, SheetTitle, cn } from "@zedi/ui";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { useTranslation } from "react-i18next";
-import { HeaderLogo } from "./Header/HeaderLogo";
+import React from "react";
+import { cn } from "@zedi/ui";
 import { HeaderSearchBar } from "./Header/HeaderSearchBar";
 import Container from "@/components/layout/Container";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
@@ -13,21 +9,19 @@ interface MobileHeaderProps {
 }
 
 /**
- * Compact mobile title bar with the app logo on the left and a search icon
- * on the right. Navigation, AI toggle and the user menu have moved to the
- * bottom nav, so this bar stays deliberately minimal (h-12) to keep
- * thumb-reach space for the content beneath it.
+ * Compact mobile title bar that shows ONLY the search bar inline. Navigation,
+ * AI toggle, and the user menu have moved to the bottom nav, so this bar
+ * stays deliberately minimal (h-12) and surfaces the single most-used input
+ * without an extra tap through a Sheet.
  *
- * モバイル用のコンパクトなタイトルバー。左にロゴ、右に検索アイコンだけを置き、
- * ナビゲーション・AI 開閉・ユーザーメニューはボトムナビへ移譲した。片手操作での
- * 親指リーチを確保するため、あえて高さ h-12 に抑えている。
+ * モバイル用のコンパクトなタイトルバー。検索バーのみをインラインで表示する。
+ * ナビゲーション・AI 開閉・ユーザーメニューはボトムナビへ移譲済みのため、
+ * 高さ h-12 を維持しつつ、最も利用頻度の高い検索を Sheet を介さず直接操作で
+ * きるようにしている。
  */
 export const MobileHeader: React.FC<MobileHeaderProps> = ({ className }) => {
-  const { t } = useTranslation();
-  const [searchOpen, setSearchOpen] = useState(false);
   const searchContext = useGlobalSearchContextOptional();
   const hasSearchContext = searchContext != null;
-  const sheetTitle = t("nav.search", "Search");
 
   return (
     <header
@@ -37,31 +31,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({ className }) => {
         className,
       )}
     >
-      <Container className="flex h-12 items-center justify-between gap-3">
-        <div className="flex min-w-0 shrink-0 items-center gap-2">
-          <HeaderLogo />
-        </div>
+      <Container className="flex h-12 items-center gap-3">
         {hasSearchContext && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              aria-label={t("nav.search", "Search")}
-              onClick={() => setSearchOpen(true)}
-            >
-              <Search className="h-5 w-5" />
-            </Button>
-            <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
-              <SheetContent side="top" className="p-4">
-                <VisuallyHidden>
-                  <SheetTitle>{sheetTitle}</SheetTitle>
-                  <SheetDescription>{sheetTitle}</SheetDescription>
-                </VisuallyHidden>
-                <HeaderSearchBar />
-              </SheetContent>
-            </Sheet>
-          </>
+          <div className="min-w-0 flex-1">
+            <HeaderSearchBar />
+          </div>
         )}
       </Container>
     </header>

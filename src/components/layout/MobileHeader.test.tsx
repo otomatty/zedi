@@ -1,15 +1,16 @@
 /**
- * MobileHeader: compact h-12 title bar, search icon opens a Sheet, and the
- * legacy desktop widgets (AIChatButton / NavigationMenu / UnifiedMenu) must
- * NOT render — their roles moved to the bottom nav.
+ * MobileHeader: compact h-12 title bar that shows ONLY the search bar inline.
+ * The logo, the search-sheet toggle, and the legacy desktop widgets
+ * (AIChatButton / NavigationMenu / UnifiedMenu) must NOT render — their roles
+ * have moved to the bottom nav.
  *
- * モバイルヘッダー: h-12 のタイトルバー、検索アイコンから Sheet、そして
- * 既存のデスクトップウィジェット（AIChatButton / NavigationMenu / UnifiedMenu）
- * は描画されないことを検証する（役割はボトムナビへ移動）。
+ * モバイルヘッダー: h-12 のタイトルバーに検索バーのみをインラインで描画する。
+ * ロゴ・検索 Sheet のトグル・既存のデスクトップウィジェット（AIChatButton /
+ * NavigationMenu / UnifiedMenu）は描画されない（役割はボトムナビへ移動）。
  */
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { MobileHeader } from "./MobileHeader";
 
@@ -61,13 +62,31 @@ function renderHeader() {
 }
 
 describe("MobileHeader", () => {
-  it("renders a compact h-12 title bar with the logo", () => {
+  it("renders a compact h-12 sticky title bar", () => {
     const { container } = renderHeader();
     const header = container.querySelector("header");
     expect(header).toBeInTheDocument();
     expect(header?.className).toMatch(/h-12/);
     expect(header?.className).toMatch(/sticky/);
-    expect(screen.getByTestId("header-logo")).toBeInTheDocument();
+  });
+
+  it("renders the search bar inline as the only header content", () => {
+    renderHeader();
+    // 検索バーはインラインで表示されているべき（Sheet の背後ではない）。
+    // The search bar must be rendered inline, not behind a Sheet.
+    expect(screen.getByTestId("header-search")).toBeInTheDocument();
+  });
+
+  it("does not render the logo (mobile header is search-only)", () => {
+    renderHeader();
+    expect(screen.queryByTestId("header-logo")).not.toBeInTheDocument();
+  });
+
+  it("does not expose a search sheet toggle button", () => {
+    renderHeader();
+    // 検索アイコンボタン（Sheet オープン用）は存在しないこと。
+    // The search-sheet toggle icon button must not exist.
+    expect(screen.queryByRole("button", { name: /search/i })).not.toBeInTheDocument();
   });
 
   it("does not render the desktop-only widgets", () => {
@@ -88,10 +107,23 @@ describe("MobileHeader", () => {
     expect(unifiedMenuMock).not.toHaveBeenCalled();
   });
 
-  it("opens the search sheet when the search icon is tapped", async () => {
-    renderHeader();
-    const searchButton = screen.getByRole("button", { name: /search/i });
-    fireEvent.click(searchButton);
-    expect(await screen.findByTestId("header-search")).toBeInTheDocument();
+  it("omits the search bar when no search context is provided", async () => {
+    // When the global search context is not available (e.g. pre-auth
+    // screens), the mobile header should render nothing interactive so it
+    // behaves like a plain spacer.
+    // GlobalSearchContext が無い画面（ログイン前など）では検索バーを出さず、
+    // 単純なスペーサーのように振る舞うこと。
+    vi.resetModules();
+    vi.doMock("@/contexts/GlobalSearchContext", () => ({
+      useGlobalSearchContextOptional: () => null,
+    }));
+    const { MobileHeader: FreshMobileHeader } = await import("./MobileHeader");
+    render(
+      <MemoryRouter>
+        <FreshMobileHeader />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("header-search")).not.toBeInTheDocument();
+    vi.doUnmock("@/contexts/GlobalSearchContext");
   });
 });
