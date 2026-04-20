@@ -558,6 +558,7 @@ describe("GET /api/notes/:noteId/members", () => {
     const { app } = createTestApp([
       [privateNote], // getNoteRole (not owner)
       [], // member check (not a member, private → null)
+      [], // domain access check (no matching rule)
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/members`, {

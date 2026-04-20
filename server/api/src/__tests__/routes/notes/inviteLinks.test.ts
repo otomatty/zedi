@@ -310,6 +310,7 @@ describe("GET /api/notes/:noteId/invite-links", () => {
     const { app } = createTestApp([
       [note], // findActiveNoteById
       [], // noteMembers lookup → guest (public → guest role)
+      [], // noteDomainAccess lookup → no matching rule
     ]);
     const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
       method: "GET",

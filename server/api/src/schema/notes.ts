@@ -272,3 +272,56 @@ export type NoteInviteLinkRedemption = typeof noteInviteLinkRedemptions.$inferSe
  * Row type for `note_invite_link_redemptions` INSERT values.
  */
 export type NewNoteInviteLinkRedemption = typeof noteInviteLinkRedemptions.$inferInsert;
+
+/**
+ * ノートのドメイン招待テーブル（Phase 6: #663）。
+ *
+ * 「`@example.com` でサインインした人は自動で viewer/editor」のような
+ * ドメイン単位のアクセス権ルール。`note_members` を作らない（"在籍" ではなく
+ * "ルール" として扱う）ので `GET /notes/:noteId/members` には現れない。
+ *
+ * Domain-scoped access rules for a note (Phase 6 — issue #663).
+ *
+ * A rule like "anyone signed-in with `@example.com` becomes a viewer/editor".
+ * These rules intentionally do NOT create `note_members` rows — membership
+ * listings stay explicit, and domain removal can immediately cut access.
+ *
+ * - `domain`: 小文字・`@` 無し / lower-cased domain without leading `@`.
+ * - `verifiedAt`: v1 は未使用、v2 で DNS TXT による所有権検証を入れる余地。
+ *   Unused in v1; reserved for v2 DNS-TXT ownership verification.
+ */
+export const noteDomainAccess = pgTable(
+  "note_domain_access",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
+    /** 小文字化・`@` 無しのドメイン / Lower-cased domain without leading `@`. */
+    domain: text("domain").notNull(),
+    role: text("role", { enum: ["viewer", "editor"] })
+      .notNull()
+      .default("viewer"),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    /** DNS TXT などで所有権を検証した時刻。v1 では null のまま保存可。 / Time we verified ownership (DNS-TXT etc.). Stays null in v1. */
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    isDeleted: boolean("is_deleted").notNull().default(false),
+  },
+  (table) => [
+    unique("uq_note_domain_access_note_domain").on(table.noteId, table.domain),
+    index("idx_note_domain_access_note_id").on(table.noteId),
+    index("idx_note_domain_access_domain").on(table.domain),
+  ],
+);
+
+/**
+ * Row type for `note_domain_access` SELECT results.
+ */
+export type NoteDomainAccess = typeof noteDomainAccess.$inferSelect;
+/**
+ * Row type for `note_domain_access` INSERT values.
+ */
+export type NewNoteDomainAccess = typeof noteDomainAccess.$inferInsert;

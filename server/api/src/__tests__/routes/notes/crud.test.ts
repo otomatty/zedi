@@ -342,6 +342,7 @@ describe("GET /api/notes/:noteId", () => {
     const { app } = createTestApp([
       [publicNote], // getNoteRole → findActiveNoteById (not owner)
       [], // getNoteRole → member check (not a member)
+      [], // getNoteRole → domain access check (no matching rule)
       [], // viewCount update
       [], // pages query
     ]);
@@ -423,6 +424,7 @@ describe("GET /api/notes/:noteId", () => {
     const { app } = createTestApp([
       [privateNote], // getNoteRole → findActiveNoteById
       [], // getNoteRole → member check (not a member, private → null)
+      [], // getNoteRole → domain access check (no matching rule)
     ]);
 
     const res = await app.request(`/api/notes/${privateNote.id}`, {
