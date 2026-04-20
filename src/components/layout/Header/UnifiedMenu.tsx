@@ -272,11 +272,11 @@ const AvatarTrigger = React.forwardRef<
     <Button
       ref={ref}
       variant="ghost"
-      className="relative h-9 w-9 rounded-full"
+      className="relative h-12 w-12 rounded-full"
       aria-label={t("nav.account", "Account")}
       {...props}
     >
-      <Avatar className="h-9 w-9">
+      <Avatar className="h-12 w-12">
         <AvatarImage
           src={avatarUrl || user?.imageUrl}
           alt={displayName || user?.fullName || "User"}
@@ -286,7 +286,7 @@ const AvatarTrigger = React.forwardRef<
       {dotColor && (
         <span
           className={cn(
-            "border-background absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full border-2",
+            "border-background absolute right-0 bottom-0 h-3 w-3 rounded-full border-2",
             dotColor,
           )}
         />
@@ -306,11 +306,11 @@ const GuestTrigger = React.forwardRef<
       ref={ref}
       variant="ghost"
       size="icon"
-      className="h-9 w-9"
+      className="h-12 w-12"
       aria-label={t("nav.account", "Account")}
       {...props}
     >
-      <User className="h-5 w-5" />
+      <User className="h-6 w-6" />
     </Button>
   );
 });

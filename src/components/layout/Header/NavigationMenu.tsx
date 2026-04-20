@@ -144,11 +144,11 @@ const NavTrigger = React.forwardRef<
       ref={ref}
       variant="ghost"
       size="icon"
-      className="h-9 w-9"
+      className="h-12 w-12"
       aria-label={t("nav.menu")}
       {...props}
     >
-      <DotGridIcon className="h-5 w-5" />
+      <DotGridIcon className="h-6 w-6" />
     </Button>
   );
 });
