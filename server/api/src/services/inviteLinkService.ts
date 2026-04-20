@@ -23,8 +23,18 @@ export const MAX_INVITE_LINK_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 export const MAX_INVITE_LINK_USES = 100;
 
 /**
- * リンクのロール。Phase 3 では `viewer` のみ許可する。
- * Link role. Phase 3 only accepts `viewer`; `editor` is Phase 5.
+ * 1 ノートにつき同時に存在できる editor ロール共有リンクの上限。
+ * 誤発行による被害を限定するため安全側に倒し、#662 (Phase 5) で 3 本に固定する。
+ *
+ * Per-note cap on concurrently-active `editor` invite links. Issued #662 fixes
+ * this at 3 to limit blast radius from accidental over-issuance.
+ */
+export const MAX_ACTIVE_EDITOR_INVITE_LINKS_PER_NOTE = 3;
+
+/**
+ * リンクのロール。Phase 5 からは `viewer` と `editor` を許容する。
+ * Link role. `viewer` is the default; `editor` is permitted from Phase 5 (#662)
+ * subject to additional route-level checks (e.g. `editPermission !== 'owner_only'`).
  */
 export type InviteLinkRole = "viewer" | "editor";
 
@@ -295,16 +305,29 @@ export interface NormalizedCreateInviteLinkInput {
 }
 
 /**
- * Phase 3 の viewer 限定ポリシーと各フィールドの境界チェックをここで一元化する。
- * Centralise the Phase-3 viewer-only policy and bounds checking.
+ * 入力の境界チェックとロール / サインイン必須ポリシーをここで一元化する。
+ *
+ * - viewer リンクは Phase 3 と同じ挙動で `requireSignIn=false` を明示拒否する。
+ * - editor リンクは #662 の安全側制約として、常に `requireSignIn=true` に
+ *   サイレント上書きする（DB スキーマ上は toggle 可能だが、API 境界で揃える）。
+ * - `editPermission === 'owner_only'` のノートでは editor リンクを発行できない
+ *   が、この検証はノート行の取得が前提なのでルート層の責務とする。
+ *
+ * Centralise input bounds and role / sign-in policy:
+ *
+ * - Viewer links explicitly reject `requireSignIn=false` (Phase 3 behaviour).
+ * - Editor links silently force `requireSignIn=true` to match the safety rail
+ *   in #662. The column remains DB-mutable, but the API always writes `true`.
+ * - The `editPermission === 'owner_only'` guard requires a note lookup and is
+ *   enforced in the route layer, not here.
  */
 export function normalizeCreateInviteLinkInput(
   input: CreateInviteLinkInput,
   now: Date = new Date(),
 ): NormalizedCreateInviteLinkInput {
   const rawRole = input.role ?? "viewer";
-  if (rawRole !== "viewer") {
-    throw new Error("Phase 3 only allows the 'viewer' role for invite links");
+  if (rawRole !== "viewer" && rawRole !== "editor") {
+    throw new Error(`Unsupported invite-link role: ${String(rawRole)}`);
   }
   const role: InviteLinkRole = rawRole;
 
@@ -330,15 +353,23 @@ export function normalizeCreateInviteLinkInput(
 
   const trimmedLabel = input.label ? input.label.trim() : "";
   const label = trimmedLabel.length > 0 ? trimmedLabel.slice(0, 200) : null;
-  // Phase 3 ではサインイン必須。匿名 redeem は未実装のため、明示 false は拒否する
-  // （#672 review #3109676228: false を保存すると「匿名でも redeem できる」と
-  //  誤認されるが、実際のルートは常に 401 になる）。
-  // Phase 3 requires sign-in. Reject an explicit `false` so DB rows cannot
-  // advertise anonymous redemption that the auth-only route cannot honour.
-  if (input.requireSignIn === false) {
-    throw new Error("Phase 3 invite links must require sign-in");
+
+  // requireSignIn のポリシー:
+  // - editor は #662 の「常に true」を最優先し、明示 false も黙って上書きする。
+  // - viewer は Phase 3 と同じく明示 false を拒否する（匿名 redeem ルート不在）。
+  //
+  // requireSignIn policy:
+  // - Editor links always force true (silently overriding a client `false`).
+  // - Viewer links still reject an explicit `false` (no anonymous redeem route).
+  let requireSignIn: boolean;
+  if (role === "editor") {
+    requireSignIn = true;
+  } else {
+    if (input.requireSignIn === false) {
+      throw new Error("Phase 3 invite links must require sign-in");
+    }
+    requireSignIn = true;
   }
-  const requireSignIn = true;
 
   return { role, expiresAt, maxUses, label, requireSignIn };
 }

@@ -5,6 +5,21 @@ import { describe, it, expect, vi } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
+// 共有リンク作成ルートはトランザクション内で監査ログを書く。
+// `recordAuditLog` は users テーブル JOIN 等を要するため、ルートテストでは
+// 呼び出しのみ検証するスパイに差し替える（副作用は不要）。
+//
+// The invite-link create route records an audit log inside its transaction.
+// `recordAuditLog` depends on auth context that the route-test mock skips, so
+// replace it with a spy that records calls without touching the mock DB chain.
+const { auditLogSpy } = vi.hoisted(() => ({
+  auditLogSpy: vi.fn(async () => {}),
+}));
+vi.mock("../../../lib/auditLog.js", () => ({
+  recordAuditLog: (...args: unknown[]) => auditLogSpy(...(args as Parameters<typeof auditLogSpy>)),
+  extractClientIp: () => null,
+}));
+
 vi.mock("../../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
     const userId = c.req.header("x-test-user-id");
@@ -54,6 +69,7 @@ function createMockLinkRow(overrides: Record<string, unknown> = {}) {
 
 describe("POST /api/notes/:noteId/invite-links", () => {
   it("creates a viewer link with defaults when body is empty", async () => {
+    auditLogSpy.mockClear();
     const createdRow = createMockLinkRow();
     const { app } = createTestApp([
       [createMockNote()], // requireNoteOwner → findActiveNoteById
@@ -69,16 +85,23 @@ describe("POST /api/notes/:noteId/invite-links", () => {
     expect(body.role).toBe("viewer");
     expect(body.note_id).toBe(NOTE_ID);
     expect(typeof body.token).toBe("string");
+    // 監査ログに viewer 作成として記録されている / Audit log records viewer creation.
+    expect(auditLogSpy).toHaveBeenCalledTimes(1);
+    const auditParams = auditLogSpy.mock.calls[0]?.[2] as
+      | { action?: string; targetType?: string }
+      | undefined;
+    expect(auditParams?.action).toBe("note.link.created.viewer");
+    expect(auditParams?.targetType).toBe("note");
   });
 
-  it("rejects non-viewer roles in Phase 3 (400)", async () => {
+  it("rejects unknown roles with 400", async () => {
     const { app } = createTestApp([
       [createMockNote()], // requireNoteOwner
     ]);
     const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ role: "editor" }),
+      body: JSON.stringify({ role: "admin" }),
     });
     expect(res.status).toBe(400);
   });
@@ -105,6 +128,90 @@ describe("POST /api/notes/:noteId/invite-links", () => {
       body: JSON.stringify({ maxUses: 9999 }),
     });
     expect(res.status).toBe(400);
+  });
+
+  // ── Phase 5 (#662) — editor ロール対応 ───────────────────────────────────
+
+  it("rejects editor link creation when note.editPermission is 'owner_only' (400)", async () => {
+    // editPermission=owner_only のノートは「オーナー以外は編集不可」を宣言しており、
+    // editor リンクを発行すると編集権限ポリシーと整合しない (#662)。
+    // When editPermission is owner_only, issuing an editor link would contradict
+    // the note's own policy (#662).
+    const { app } = createTestApp([[createMockNote({ editPermission: "owner_only" })]]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "editor" }),
+    });
+    expect(res.status).toBe(400);
+    // HTTPException は text/plain のボディを返すため text() で読む。
+    // HTTPException returns plain text, so read via `text()`.
+    const body = await res.text();
+    expect(body).toMatch(/owner_only|edit permission/i);
+  });
+
+  it("creates an editor link when editPermission allows it and logs editor action", async () => {
+    auditLogSpy.mockClear();
+    const createdRow = createMockLinkRow({ role: "editor" });
+    const { app } = createTestApp([
+      [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
+      [{ count: 0 }], // active editor link count query
+      [createdRow], // insert.returning
+    ]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "editor", requireSignIn: false }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.role).toBe("editor");
+    // 監査ログは editor 用の別 action で記録される (#662)。
+    // Audit log is filed under a dedicated editor action (#662).
+    expect(auditLogSpy).toHaveBeenCalledTimes(1);
+    const auditParams = auditLogSpy.mock.calls[0]?.[2] as
+      | { action?: string; targetType?: string; after?: Record<string, unknown> }
+      | undefined;
+    expect(auditParams?.action).toBe("note.link.created.editor");
+    expect(auditParams?.targetType).toBe("note");
+    // editor リンクは API 境界で常に requireSignIn=true に揃える。
+    // Editor links force requireSignIn=true at the API boundary.
+    expect(auditParams?.after?.require_sign_in).toBe(true);
+  });
+
+  it("rejects a 4th active editor link for the same note (400)", async () => {
+    // 1 ノートにつき同時に最大 3 本まで (#662)。4 本目は 400。
+    // One note may have at most 3 active editor links at a time (#662); the 4th
+    // must be rejected with 400.
+    const { app } = createTestApp([
+      [createMockNote({ editPermission: "members_editors" })], // requireNoteOwner
+      [{ count: 3 }], // active editor link count query
+    ]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "editor" }),
+    });
+    expect(res.status).toBe(400);
+    const body = await res.text();
+    expect(body).toMatch(/editor.*link|3/i);
+  });
+
+  it("does not count viewer links against the editor limit", async () => {
+    // viewer 側の本数は editor キャップに影響しない (#662)。
+    // Viewer link counts are independent of the editor-link cap.
+    auditLogSpy.mockClear();
+    const createdRow = createMockLinkRow();
+    const { app } = createTestApp([
+      [createMockNote()], // requireNoteOwner (viewer — no count query)
+      [createdRow], // insert.returning
+    ]);
+    const res = await app.request(`/api/notes/${NOTE_ID}/invite-links`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ role: "viewer" }),
+    });
+    expect(res.status).toBe(201);
   });
 });
 

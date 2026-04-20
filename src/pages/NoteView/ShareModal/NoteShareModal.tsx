@@ -78,7 +78,7 @@ export function NoteShareModal({
           </TabsContent>
 
           <TabsContent value="links">
-            <NoteInviteLinksSection noteId={note.id} />
+            <NoteInviteLinksSection noteId={note.id} editPermission={note.editPermission} />
           </TabsContent>
 
           <TabsContent value="visibility">

@@ -5,7 +5,7 @@
  * 同時 redeem の integration テスト（Postgres 実行環境が必要）は
  * 別スコープとし、ここでは以下を検証する:
  *
- * - 入力バリデーション (Phase 3 は viewer 限定)
+ * - 入力バリデーション（Phase 5: viewer / editor 双方を許容）
  * - 状態判定 (valid / revoked / expired / exhausted)
  * - redeem のフロー制御 (取り消し・期限切れ・上限到達・再クリック・新規参加)
  *
@@ -105,10 +105,23 @@ describe("normalizeCreateInviteLinkInput", () => {
     expect(result.requireSignIn).toBe(true);
   });
 
-  it("rejects editor role (Phase 3 is viewer-only)", () => {
-    expect(() => normalizeCreateInviteLinkInput({ role: "editor" }, now)).toThrow(
-      /Phase 3.*viewer/,
-    );
+  it("accepts editor role (Phase 5)", () => {
+    const result = normalizeCreateInviteLinkInput({ role: "editor" }, now);
+    expect(result.role).toBe("editor");
+    // editor リンクは必ず requireSignIn=true にフォースされる (発行時の安全側制約)。
+    // editor links must be forced to requireSignIn=true at creation.
+    expect(result.requireSignIn).toBe(true);
+  });
+
+  it("rejects unknown roles", () => {
+    expect(() => normalizeCreateInviteLinkInput({ role: "admin" }, now)).toThrow(/role/);
+  });
+
+  it("forces requireSignIn=true for editor links even when caller explicitly sends true", () => {
+    // editor リンクは DB では toggle 可能だが API では常に true (#662 仕様)。
+    // requireSignIn flag is DB-mutable but the API always coerces editor links to true.
+    const result = normalizeCreateInviteLinkInput({ role: "editor", requireSignIn: true }, now);
+    expect(result.requireSignIn).toBe(true);
   });
 
   it("rejects non-positive or non-finite TTLs", () => {
@@ -811,13 +824,24 @@ describe("redeemInviteLink", () => {
   });
 });
 
-// ── normalizeCreateInviteLinkInput: Phase 3 auth ───────────────────────────
+// ── normalizeCreateInviteLinkInput: auth / requireSignIn ──────────────────
 
 describe("normalizeCreateInviteLinkInput — requireSignIn", () => {
-  it("rejects requireSignIn: false (Phase 3 is auth-only)", () => {
-    expect(() => normalizeCreateInviteLinkInput({ requireSignIn: false })).toThrow(
+  it("rejects requireSignIn: false for viewer (Phase 3 is auth-only)", () => {
+    expect(() => normalizeCreateInviteLinkInput({ role: "viewer", requireSignIn: false })).toThrow(
       /must require sign-in/,
     );
+  });
+
+  it("silently forces requireSignIn=true for editor links (Phase 5 safety)", () => {
+    // editor はユーザーが明示 false を送っても常に true に上書きする。
+    // 監査ログ / UI はこのフィールドを「editor リンクは必ずサインイン必須」と
+    // 表示するため、API 境界で必ず揃える。
+    //
+    // Editor links always force requireSignIn=true, silently overwriting an
+    // explicit `false` from the client (spec #662 safety rail).
+    const result = normalizeCreateInviteLinkInput({ role: "editor", requireSignIn: false });
+    expect(result.requireSignIn).toBe(true);
   });
 
   it("accepts omitted or explicit true as true", () => {

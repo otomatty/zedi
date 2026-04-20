@@ -318,10 +318,18 @@ export interface InviteLinkRedeemResponse {
 
 /** POST /api/notes/:noteId/invite-links body — 発行パラメータ / Creation params. */
 export interface CreateInviteLinkBody {
-  role?: "viewer";
+  /**
+   * リンク経由で付与するロール。Phase 5 (#662) 以降は `editor` も指定可能。
+   * Role granted through the link; `editor` is permitted from Phase 5 (#662).
+   */
+  role?: "viewer" | "editor";
   expiresInMs?: number;
   maxUses?: number | null;
   label?: string | null;
+  /**
+   * editor リンクは API が常に `true` に上書きするため、UI から送っても無効化される。
+   * Editor links always coerce this to `true`; the server ignores a `false` value.
+   */
   requireSignIn?: boolean;
 }
 
