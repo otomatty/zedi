@@ -58,12 +58,18 @@ vi.mock("../../lib/extAuth.js", () => ({
   storeExtensionCode: (...args: unknown[]) => mockStoreExtensionCode(...args),
 }));
 
+const mockClipAndCreate = vi.fn().mockResolvedValue({
+  page_id: "page-mock-001",
+  title: "Mock Title",
+  thumbnail_url: "https://example.com/thumb.png",
+});
 vi.mock("../../lib/clipAndCreate.js", () => ({
-  clipAndCreate: vi.fn().mockResolvedValue({
-    page_id: "page-mock-001",
-    title: "Mock Title",
-    thumbnail_url: "https://example.com/thumb.png",
-  }),
+  clipAndCreate: (...args: unknown[]) => mockClipAndCreate(...args),
+}));
+
+const mockResolveAiConfigForRequest = vi.fn();
+vi.mock("../../lib/aiAccessHelpers.js", () => ({
+  resolveAiConfigForRequest: (...args: unknown[]) => mockResolveAiConfigForRequest(...args),
 }));
 
 vi.mock("../../lib/clipUrlPolicy.js", async (importOriginal) => {
@@ -101,6 +107,12 @@ async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
 describe("POST /api/ext/clip-and-create", () => {
   const mockRedis = {} as AppEnv["Variables"]["redis"];
   const mockDb = {} as AppEnv["Variables"]["db"];
+
+  beforeEach(() => {
+    mockClipAndCreate.mockClear();
+    mockResolveAiConfigForRequest.mockReset();
+    mockResolveAiConfigForRequest.mockResolvedValue(null);
+  });
 
   it("returns 401 when Authorization Bearer is missing", async () => {
     const app = createExtApp(mockRedis, mockDb);
@@ -232,6 +244,81 @@ describe("POST /api/ext/clip-and-create", () => {
     expect(body.page_id).toBe("page-mock-001");
     expect(body.title).toBe("Mock Title");
     expect(body.thumbnail_url).toBe("https://example.com/thumb.png");
+  });
+
+  it("does not resolve AI config for non-YouTube URLs even when provider/model are present", async () => {
+    const app = createExtApp(mockRedis, mockDb);
+    const res = await app.request("/api/ext/clip-and-create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer fake-token",
+        "x-test-ext-user-id": "user-1",
+      },
+      body: JSON.stringify({
+        url: "https://example.com/article",
+        provider: "openai",
+        model: "openai:gpt-4o-mini",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockResolveAiConfigForRequest).not.toHaveBeenCalled();
+    expect(mockClipAndCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://example.com/article",
+        aiProvider: undefined,
+        aiModel: undefined,
+        aiApiKey: undefined,
+      }),
+    );
+  });
+
+  it("resolves AI config for YouTube URLs before clipAndCreate", async () => {
+    mockResolveAiConfigForRequest.mockResolvedValue({
+      provider: "openai",
+      apiModelId: "gpt-4o-mini",
+      apiKey: "test-api-key",
+      internalModelId: "openai:gpt-4o-mini",
+      tier: "free",
+      modelInfo: {
+        provider: "openai",
+        apiModelId: "gpt-4o-mini",
+        inputCostUnits: 1,
+        outputCostUnits: 1,
+      },
+    });
+
+    const app = createExtApp(mockRedis, mockDb);
+    const res = await app.request("/api/ext/clip-and-create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer fake-token",
+        "x-test-ext-user-id": "user-1",
+      },
+      body: JSON.stringify({
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        provider: "openai",
+        model: "openai:gpt-4o-mini",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockResolveAiConfigForRequest).toHaveBeenCalledWith({
+      userId: "user-1",
+      db: mockDb,
+      provider: "openai",
+      model: "openai:gpt-4o-mini",
+    });
+    expect(mockClipAndCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        aiProvider: "openai",
+        aiModel: "gpt-4o-mini",
+        aiApiKey: "test-api-key",
+      }),
+    );
   });
 });
 

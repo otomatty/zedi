@@ -17,6 +17,7 @@ import {
   issueExtensionToken,
   storeExtensionCode,
 } from "../lib/extAuth.js";
+import { extractYouTubeVideoId } from "../lib/articleExtractor.js";
 import { clipAndCreate } from "../lib/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
 import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
@@ -169,19 +170,21 @@ app.post("/clip-and-create", extAuthRequired, async (c) => {
     });
   }
 
-  // YouTube 要約用の AI パラメータ / AI params for YouTube summary
-  // 検証・アクセス制御は clip.ts の /youtube と共通化された
-  // resolveAiConfigForRequest() に委譲する。
-  // Validation / access-control logic is shared with clip.ts /youtube via
-  // resolveAiConfigForRequest().
+  // provider/model は YouTube 要約時だけ意味を持つため、通常の Web クリップでは
+  // AI 設定を解決しない。そうしないと非 YouTube 保存でも 403/429/503 を返しうる。
+  // provider/model only apply to the YouTube-summary path, so skip AI resolution
+  // for regular web clipping and avoid unrelated 403/429/503 failures.
   const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
+  const isYouTubeUrl = extractYouTubeVideoId(url) !== null;
 
-  const aiConfig = await resolveAiConfigForRequest({
-    userId,
-    db,
-    provider: body.provider,
-    model: body.model,
-  });
+  const aiConfig = isYouTubeUrl
+    ? await resolveAiConfigForRequest({
+        userId,
+        db,
+        provider: body.provider,
+        model: body.model,
+      })
+    : null;
   const aiProvider: AIProviderType | undefined = aiConfig?.provider;
   const aiModel: string | undefined = aiConfig?.apiModelId;
   const aiApiKey: string | undefined = aiConfig?.apiKey;
