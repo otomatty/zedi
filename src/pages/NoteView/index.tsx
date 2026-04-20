@@ -154,7 +154,7 @@ const NoteView: React.FC = () => {
               </p>
             </div>
             <NoteViewHeaderActions
-              noteId={note.id}
+              note={note}
               canManageMembers={canManageMembers}
               isSignedIn={isSignedIn}
               canView={Boolean(access?.canView)}

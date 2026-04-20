@@ -1,21 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link, useParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, useToast } from "@zedi/ui";
-import {
-  useAddNoteMember,
-  useNote,
-  useNoteMembers,
-  useRemoveNoteMember,
-  useResendInvitation,
-  useUpdateNoteMemberRole,
-} from "@/hooks/useNoteQueries";
-import type { NoteMemberRole } from "@/types/note";
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@zedi/ui";
+import { useNote } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
-import { memberRoleKeys } from "./noteMembersConfig";
 import { NoteMembersLoadingOrDenied } from "./NoteMembersLoadingOrDenied";
 import { NoteMembersManageSection } from "./NoteMembersManageSection";
 import { NoteInviteLinksSection } from "./NoteInviteLinksSection";
+import { useNoteMembersController } from "./useNoteMembersController";
 
 /**
  *
@@ -23,7 +15,6 @@ import { NoteInviteLinksSection } from "./NoteInviteLinksSection";
 const NoteMembers: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
-  const { toast } = useToast();
 
   const {
     note,
@@ -33,80 +24,8 @@ const NoteMembers: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const canManageMembers = Boolean(access?.canManageMembers && source === "local");
-  const { data: members = [], isLoading: isMembersLoading } = useNoteMembers(
-    noteId ?? "",
-    canManageMembers,
-  );
 
-  const addMemberMutation = useAddNoteMember();
-  const updateMemberRoleMutation = useUpdateNoteMemberRole();
-  const removeMemberMutation = useRemoveNoteMember();
-  const resendInvitationMutation = useResendInvitation();
-
-  const [memberEmail, setMemberEmail] = useState("");
-  const [memberRole, setMemberRole] = useState<NoteMemberRole>("viewer");
-  const memberRoleOptions = (Object.keys(memberRoleKeys) as NoteMemberRole[]).map((value) => ({
-    value,
-    label: t(memberRoleKeys[value]),
-  }));
-
-  const handleAddMember = async () => {
-    if (!noteId || !memberEmail.trim()) return;
-    try {
-      await addMemberMutation.mutateAsync({
-        noteId,
-        memberEmail: memberEmail.trim(),
-        role: memberRole,
-      });
-      setMemberEmail("");
-      setMemberRole("viewer");
-      toast({ title: t("notes.memberAdded") });
-    } catch (error) {
-      console.error("Failed to add member:", error);
-      toast({ title: t("notes.memberAddFailed"), variant: "destructive" });
-    }
-  };
-
-  const handleUpdateMemberRole = async (email: string, role: NoteMemberRole) => {
-    if (!noteId) return;
-    try {
-      await updateMemberRoleMutation.mutateAsync({
-        noteId,
-        memberEmail: email,
-        role,
-      });
-      toast({ title: t("notes.roleUpdated") });
-    } catch (error) {
-      console.error("Failed to update member role:", error);
-      toast({ title: t("notes.roleUpdateFailed"), variant: "destructive" });
-    }
-  };
-
-  const handleRemoveMember = async (email: string) => {
-    if (!noteId) return;
-    try {
-      await removeMemberMutation.mutateAsync({ noteId, memberEmail: email });
-      toast({ title: t("notes.memberRemoved") });
-    } catch (error) {
-      console.error("Failed to remove member:", error);
-      toast({ title: t("notes.memberRemoveFailed"), variant: "destructive" });
-    }
-  };
-
-  const handleResendInvitation = async (email: string) => {
-    if (!noteId) return;
-    try {
-      const result = await resendInvitationMutation.mutateAsync({ noteId, memberEmail: email });
-      if (result.resent) {
-        toast({ title: t("notes.resendInvitationSuccess") });
-      } else {
-        toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });
-      }
-    } catch (error) {
-      console.error("Failed to resend invitation:", error);
-      toast({ title: t("notes.resendInvitationFailed"), variant: "destructive" });
-    }
-  };
+  const controller = useNoteMembersController(noteId ?? "", canManageMembers);
 
   if (isNoteLoading) {
     return (
@@ -150,17 +69,17 @@ const NoteMembers: React.FC = () => {
             </TabsList>
             <TabsContent value="members">
               <NoteMembersManageSection
-                members={members}
-                isMembersLoading={isMembersLoading}
-                memberEmail={memberEmail}
-                setMemberEmail={setMemberEmail}
-                memberRole={memberRole}
-                setMemberRole={setMemberRole}
-                roleOptions={memberRoleOptions}
-                onAddMember={handleAddMember}
-                onUpdateRole={handleUpdateMemberRole}
-                onRemoveMember={handleRemoveMember}
-                onResendInvitation={handleResendInvitation}
+                members={controller.members}
+                isMembersLoading={controller.isMembersLoading}
+                memberEmail={controller.memberEmail}
+                setMemberEmail={controller.setMemberEmail}
+                memberRole={controller.memberRole}
+                setMemberRole={controller.setMemberRole}
+                roleOptions={controller.roleOptions}
+                onAddMember={controller.handleAddMember}
+                onUpdateRole={controller.handleUpdateMemberRole}
+                onRemoveMember={controller.handleRemoveMember}
+                onResendInvitation={controller.handleResendInvitation}
               />
             </TabsContent>
             <TabsContent value="share-links">
