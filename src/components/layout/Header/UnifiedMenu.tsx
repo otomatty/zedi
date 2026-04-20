@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Settings, CreditCard, Receipt, LogOut, LogIn, User } from "lucide-react";
+import { Settings, CreditCard, LogOut, LogIn, User } from "lucide-react";
 import { Button, useIsMobile } from "@zedi/ui";
 import {
   DropdownMenu,
@@ -28,15 +28,13 @@ interface AccountActionItem {
 
 function useAccountActionItems(): AccountActionItem[] {
   const { t } = useTranslation();
+  // Plan + subscription management now live on a single `/pricing` page
+  // (issue #671), so the separate "Subscription" menu item is no longer needed.
+  // Issue #671 の統合によりプランと契約管理が `/pricing` に一本化されたため、
+  // 別立てだった「サブスクリプション」項目は削除した。
   return [
     { icon: Settings, label: t("nav.settings"), path: "/settings" },
     { icon: CreditCard, label: t("nav.plan"), path: "/pricing" },
-    {
-      icon: Receipt,
-      label: t("nav.subscription", "Subscription"),
-      path: "/subscription",
-      signedInOnly: true,
-    },
   ];
 }
 
@@ -382,11 +380,11 @@ const MobileMenu: React.FC = () => {
 
 /**
  * User-only menu shown in the right-hand side of the header.
- * Contains account actions (settings, plan, subscription), sync status and
- * sign-in/out. Functional navigation lives in {@link PrimaryNav} now.
+ * Contains account actions (settings, plan), sync status and sign-in/out.
+ * Functional navigation lives in {@link PrimaryNav} now.
  *
- * ヘッダー右側のユーザー専用メニュー。アカウント設定・プラン・サブスクリプション・
- * 同期ステータス・サインイン/アウトのみを扱う。機能ナビゲーションは {@link PrimaryNav} に分離した。
+ * ヘッダー右側のユーザー専用メニュー。アカウント設定・プラン・同期ステータス・
+ * サインイン/アウトのみを扱う。機能ナビゲーションは {@link PrimaryNav} に分離した。
  */
 export const UnifiedMenu: React.FC = () => {
   const isMobile = useIsMobile();

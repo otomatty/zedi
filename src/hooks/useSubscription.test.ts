@@ -44,8 +44,15 @@ describe("useSubscription", () => {
       plan: "pro",
       status: "active",
       billingInterval: "monthly",
+      currentPeriodStart: "2026-02-23T00:00:00Z",
       currentPeriodEnd: "2026-03-23T00:00:00Z",
-      usage: { consumedUnits: 100, budgetUnits: 50000, usagePercent: 0.2 },
+      externalId: "sub_123",
+      usage: {
+        consumedUnits: 100,
+        budgetUnits: 50000,
+        remainingUnits: 49900,
+        usagePercent: 0.2,
+      },
     };
     mockFetchSubscription.mockResolvedValue(proState);
 
@@ -58,8 +65,12 @@ describe("useSubscription", () => {
     });
 
     expect(result.current.isProUser).toBe(true);
+    expect(result.current.isCanceled).toBe(false);
     expect(result.current.billingInterval).toBe("monthly");
+    expect(result.current.currentPeriodStart).toBe("2026-02-23T00:00:00Z");
+    expect(result.current.externalId).toBe("sub_123");
     expect(result.current.usage.consumedUnits).toBe(100);
+    expect(result.current.usage.remainingUnits).toBe(49900);
   });
 
   it("isProUser is true for pro/active subscription", async () => {
@@ -68,8 +79,10 @@ describe("useSubscription", () => {
       plan: "pro",
       status: "active",
       billingInterval: "yearly",
+      currentPeriodStart: "2026-02-23T00:00:00Z",
       currentPeriodEnd: "2027-02-23T00:00:00Z",
-      usage: { consumedUnits: 0, budgetUnits: 50000, usagePercent: 0 },
+      externalId: "sub_456",
+      usage: { consumedUnits: 0, budgetUnits: 50000, remainingUnits: 50000, usagePercent: 0 },
     } satisfies SubscriptionState);
 
     const { result } = renderHook(() => useSubscription(), {
@@ -81,14 +94,38 @@ describe("useSubscription", () => {
     });
   });
 
+  it("isCanceled is true for pro/canceled subscription", async () => {
+    mockIsSignedIn = true;
+    mockFetchSubscription.mockResolvedValue({
+      plan: "pro",
+      status: "canceled",
+      billingInterval: "monthly",
+      currentPeriodStart: "2026-02-23T00:00:00Z",
+      currentPeriodEnd: "2026-03-23T00:00:00Z",
+      externalId: "sub_789",
+      usage: { consumedUnits: 0, budgetUnits: 50000, remainingUnits: 50000, usagePercent: 0 },
+    } satisfies SubscriptionState);
+
+    const { result } = renderHook(() => useSubscription(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isCanceled).toBe(true);
+    });
+    expect(result.current.isProUser).toBe(false);
+  });
+
   it("isProUser is false for free plan", async () => {
     mockIsSignedIn = true;
     mockFetchSubscription.mockResolvedValue({
       plan: "free",
       status: "active",
       billingInterval: null,
+      currentPeriodStart: null,
       currentPeriodEnd: null,
-      usage: { consumedUnits: 0, budgetUnits: 1500, usagePercent: 0 },
+      externalId: null,
+      usage: { consumedUnits: 0, budgetUnits: 1500, remainingUnits: 1500, usagePercent: 0 },
     } satisfies SubscriptionState);
 
     const { result } = renderHook(() => useSubscription(), {

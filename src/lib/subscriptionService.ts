@@ -4,14 +4,26 @@
  * @see https://polar.sh/docs/features/checkout/session
  */
 
+/**
+ * Subscription state shared between `/pricing` page sections and the
+ * subscription management UI. Includes billing period boundaries and the
+ * Polar externalId needed for the customer portal / cancellation flow.
+ *
+ * `/pricing` ページと契約管理 UI で共有するサブスクリプション状態。
+ * 請求期間の開始/終了日と、Polar のキャンセル / カスタマーポータルで使う
+ * externalId を含む。
+ */
 export interface SubscriptionState {
   plan: "free" | "pro";
   status: string;
   billingInterval: "monthly" | "yearly" | null;
+  currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
+  externalId: string | null;
   usage: {
     consumedUnits: number;
     budgetUnits: number;
+    remainingUnits: number;
     usagePercent: number;
   };
 }
@@ -22,18 +34,31 @@ const getAIAPIBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "
 /**
  * Fetch current subscription state from the AI API (requires auth).
  */
+const FREE_FALLBACK_STATE: SubscriptionState = {
+  plan: "free",
+  status: "active",
+  billingInterval: null,
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
+  externalId: null,
+  usage: { consumedUnits: 0, budgetUnits: 1500, remainingUnits: 1500, usagePercent: 0 },
+};
+
+/**
+ *
+ */
 export async function fetchSubscription(): Promise<SubscriptionState> {
+  /**
+   *
+   */
   const apiBaseUrl = getAIAPIBaseUrl();
   if (!apiBaseUrl) {
-    return {
-      plan: "free",
-      status: "active",
-      billingInterval: null,
-      currentPeriodEnd: null,
-      usage: { consumedUnits: 0, budgetUnits: 1500, usagePercent: 0 },
-    };
+    return FREE_FALLBACK_STATE;
   }
 
+  /**
+   *
+   */
   const response = await fetch(`${apiBaseUrl}/api/ai/subscription`, {
     method: "GET",
     headers: {
@@ -50,36 +75,81 @@ export async function fetchSubscription(): Promise<SubscriptionState> {
     throw new Error("Failed to fetch subscription");
   }
 
+  /**
+   *
+   */
   const raw = (await response.json()) as {
     plan: "free" | "pro";
     subscription?: {
       status?: string;
       billingInterval?: "monthly" | "yearly" | null;
+      currentPeriodStart?: string | null;
       currentPeriodEnd?: string | null;
+      externalId?: string | null;
+      // Legacy snake_case fields kept for compatibility with older API responses.
+      // / 古い API レスポンスとの互換用に残しているスネークケースフィールド。
       billing_interval?: string | null;
+      current_period_start?: string | null;
       current_period_end?: string | null;
+      external_id?: string | null;
     } | null;
-    usage?: SubscriptionState["usage"];
+    usage?: Partial<SubscriptionState["usage"]>;
   };
 
+  /**
+   *
+   */
   const sub = raw.subscription;
+  /**
+   *
+   */
+  const currentPeriodStart = sub?.currentPeriodStart ?? sub?.current_period_start ?? null;
+  /**
+   *
+   */
   const currentPeriodEnd = sub?.currentPeriodEnd ?? sub?.current_period_end ?? null;
+  /**
+   *
+   */
+  const externalId = sub?.externalId ?? sub?.external_id ?? null;
+  /**
+   *
+   */
+  const billingInterval = (sub?.billingInterval ??
+    sub?.billing_interval ??
+    null) as SubscriptionState["billingInterval"];
+
+  /**
+   *
+   */
+  const budgetUnits = raw.usage?.budgetUnits ?? 0;
+  /**
+   *
+   */
+  const consumedUnits = raw.usage?.consumedUnits ?? 0;
+  /**
+   *
+   */
+  const remainingUnits = raw.usage?.remainingUnits ?? Math.max(0, budgetUnits - consumedUnits);
+  /**
+   *
+   */
+  const usagePercent = raw.usage?.usagePercent ?? 0;
 
   return {
     plan: raw.plan,
     status: sub?.status ?? "active",
-    billingInterval: (sub?.billingInterval ??
-      sub?.billing_interval ??
-      null) as SubscriptionState["billingInterval"],
+    billingInterval,
+    currentPeriodStart: currentPeriodStart != null ? String(currentPeriodStart) : null,
     currentPeriodEnd: currentPeriodEnd != null ? String(currentPeriodEnd) : null,
-    usage: raw.usage ?? {
-      consumedUnits: 0,
-      budgetUnits: 1500,
-      usagePercent: 0,
-    },
+    externalId,
+    usage: { consumedUnits, budgetUnits, remainingUnits, usagePercent },
   };
 }
 
+/**
+ *
+ */
 export type BillingInterval = "monthly" | "yearly";
 
 /**
@@ -162,22 +232,8 @@ export async function openCustomerPortal(): Promise<void> {
 
 // ---------------------------------------------------------------------------
 // Subscription management API (in-app management)
+// サブスクリプション管理 API（アプリ内での管理操作）
 // ---------------------------------------------------------------------------
-
-export interface SubscriptionDetails {
-  plan: "free" | "pro";
-  status: string;
-  billingInterval: string | null;
-  currentPeriodStart: string | null;
-  currentPeriodEnd: string | null;
-  externalId?: string;
-  usage: {
-    budgetUnits: number;
-    consumedUnits: number;
-    remainingUnits: number;
-    usagePercent: number;
-  };
-}
 
 async function subscriptionApiCall<T>(
   path: string,
@@ -202,18 +258,23 @@ async function subscriptionApiCall<T>(
   return (await response.json()) as T;
 }
 
-export async function fetchSubscriptionDetails(): Promise<SubscriptionDetails> {
-  return subscriptionApiCall<SubscriptionDetails>("/details");
-}
-
+/**
+ *
+ */
 export async function cancelSubscription(): Promise<{ success: boolean; message: string }> {
   return subscriptionApiCall("/cancel", "POST");
 }
 
+/**
+ *
+ */
 export async function reactivateSubscription(): Promise<{ success: boolean; message: string }> {
   return subscriptionApiCall("/reactivate", "POST");
 }
 
+/**
+ *
+ */
 export async function changeBillingInterval(
   billingInterval: BillingInterval,
 ): Promise<{ success: boolean; message: string }> {
