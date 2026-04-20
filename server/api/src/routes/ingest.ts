@@ -368,6 +368,13 @@ app.post("/apply", authRequired, rateLimit(), async (c) => {
   }
 
   if (!sourceId) {
+    // 上の preflight SELECT と本 INSERT の間に同一ペアが他リクエストから入ると、
+    // `uq_sources_owner_url_hash` (partial unique on owner_id+url+content_hash)
+    // で 1 つは衝突して 500 か重複行が発生する。`onConflictDoNothing` で衝突時は
+    // 何もしない返却にしてから、勝者の行を再 SELECT して採用する。
+    // Race-safe insert: pre-flight SELECT then INSERT can lose to a concurrent
+    // request and trip the partial unique index. ON CONFLICT DO NOTHING + re-SELECT
+    // converges on the winner without raising 500 / leaving a duplicate.
     const [inserted] = await db
       .insert(sources)
       .values({
@@ -380,11 +387,30 @@ app.post("/apply", authRequired, rateLimit(), async (c) => {
         extractedAt: now,
         createdAt: now,
       })
+      .onConflictDoNothing()
       .returning({ id: sources.id });
-    if (!inserted) {
+
+    if (inserted) {
+      sourceId = inserted.id;
+    } else if (body.contentHash) {
+      const [winner] = await db
+        .select({ id: sources.id })
+        .from(sources)
+        .where(
+          and(
+            eq(sources.ownerId, userId),
+            eq(sources.contentHash, body.contentHash),
+            body.url ? eq(sources.url, body.url) : eq(sources.kind, body.kind),
+          ),
+        )
+        .limit(1);
+      if (!winner) {
+        throw new HTTPException(500, { message: "Failed to create source" });
+      }
+      sourceId = winner.id;
+    } else {
       throw new HTTPException(500, { message: "Failed to create source" });
     }
-    sourceId = inserted.id;
   }
 
   // Link source to page (ownership already verified above).

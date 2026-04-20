@@ -56,8 +56,10 @@ export async function runAllLintRules(ownerId: string, db: Database): Promise<Li
     }
   });
 
-  // Record the run in activity_log (non-fatal on failure).
-  // 活動ログに Lint 実行を記録（失敗しても全体を巻き込まない）。
+  // `recordActivity` は内部で例外を握る (activityLogService.ts) ため、
+  // 呼び出し側で改めて try/catch する必要はない。findings コミット後にログ
+  // 書き込みが失敗しても、Lint 結果はそのまま呼び出し元へ返る。
+  // `recordActivity` swallows errors internally; no wrapper try/catch needed.
   await recordActivity(db, {
     ownerId,
     kind: "lint_run",

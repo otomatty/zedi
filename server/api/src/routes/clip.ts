@@ -85,6 +85,14 @@ function extractVideoId(url: string): string | null {
     /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^&]+&)*v=([a-zA-Z0-9_-]{11})(?:&[^\s]*)?$/i,
     /^https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
     /^https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:\?[^\s]*)?$/i,
+    // YouTube Shorts (m. サブドメイン含む) は本流の抽出パイプラインで受理されるため、
+    // POST /api/clip/youtube だけが弾かないように同等のパターンを追加する。
+    // 11 文字 ID の後に `/` `?` `#` のいずれが来ても受理する（articleExtractor と整合）。
+    // YouTube Shorts URLs are accepted by the main extraction pipeline; mirror
+    // them here so this endpoint doesn't reject them with a 400. Allow `/`, `?`,
+    // or `#` after the 11-char ID to match articleExtractor's pattern (e.g.
+    // `/shorts/<id>/`, `/shorts/<id>?si=...`).
+    /^https?:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})(?:[/?#][^\s]*)?$/i,
   ];
   for (const p of patterns) {
     const m = url.match(p);
@@ -117,8 +125,16 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
   const youtubeApiKey = process.env.YOUTUBE_DATA_API_KEY;
 
   // AI 要約の設定 / AI summary configuration
+  // `aiModel` は `aiModels.id` (例: "openai:gpt-4o") を保持し、
+  // `validateModelAccess` / `recordUsage` のキーとして使う。
+  // `apiModelId` はプロバイダー API 呼び出し用の生モデル名 (例: "gpt-4o") で
+  // YouTube extractor 経由でプロバイダー SDK に渡す。
+  // `aiModel` keeps the catalog id (e.g. "openai:gpt-4o") used as the key for
+  // `validateModelAccess` / `recordUsage`. `apiModelId` is the provider-facing
+  // model name (e.g. "gpt-4o") forwarded to the provider SDK via the extractor.
   let aiProvider: AIProviderType | undefined;
   let aiModel: string | undefined;
+  let apiModelId: string | undefined;
   let aiApiKey: string | undefined;
 
   const supportedProviders: AIProviderType[] = ["openai", "anthropic", "google"];
@@ -155,8 +171,16 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     // モデル情報から provider を上書き（DB 上の provider が正）
     // Override provider from model info (DB is authoritative)
     // API キーは上書き後の provider で取得する（provider 不一致バグ防止）
+    // `aiModel` は catalog id のまま保持し、プロバイダー SDK 用に
+    // `apiModelId` を別変数で保持する。両者を混同すると validateModelAccess /
+    // recordUsage が apiModelId で aiModels.id を引いてしまい、catch に落ちて
+    // 課金記録が静かにスキップされる。
+    // Keep `aiModel` as the catalog id; expose `apiModelId` separately for the
+    // provider SDK. Mixing them silently breaks usage accounting because
+    // validateModelAccess looks up `aiModels.id` and the apiModelId form will
+    // not match, swallowed by the non-fatal catch below.
     aiProvider = modelInfo.provider as AIProviderType;
-    aiModel = modelInfo.apiModelId;
+    apiModelId = modelInfo.apiModelId;
 
     const apiKeyName = getProviderApiKeyName(aiProvider);
     aiApiKey = process.env[apiKeyName];
@@ -170,7 +194,9 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
       videoId,
       youtubeApiKey,
       aiProvider,
-      aiModel,
+      // プロバイダー SDK には provider 側のモデル名を渡す。
+      // Pass the provider-facing model name to the SDK.
+      aiModel: apiModelId,
       aiApiKey,
     });
 
@@ -179,13 +205,20 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     // 記録失敗は非致命的 — 抽出結果を破棄しない
     // Bill only when AI actually ran successfully (result.aiUsage !== null)
     // Recording failure is non-fatal — don't discard the extraction result
-    if (result.aiUsage && aiProvider && aiModel && body.model) {
+    //
+    // ここではアクセス検証時にトリム済みの aiModel を使う。生の `body.model` には
+    // 前後空白や別表記が含まれうるため、`validateModelAccess` の再検証も
+    // recordUsage の保存値もトリム後の正規 model id (`aiModel`) で行わないと、
+    // 同一モデルが複数の正規化前文字列で記録され、使用量集計や請求がブレる。
+    // Use the already-trimmed `aiModel` for re-validation and accounting so usage
+    // records are stable for the same model regardless of input whitespace.
+    if (result.aiUsage && aiProvider && aiModel) {
       try {
         // プロバイダーから返された実際のトークン数を使用（概算ではなく）
         // Use actual token counts returned by the provider (not estimates)
         const { inputTokens, outputTokens } = result.aiUsage;
         const tier = await getUserTier(userId, db);
-        const modelInfo = await validateModelAccess(body.model, tier, db);
+        const modelInfo = await validateModelAccess(aiModel, tier, db);
         const costUnits = calculateCost(
           { inputTokens, outputTokens },
           modelInfo.inputCostUnits,
@@ -193,7 +226,7 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
         );
         await recordUsage(
           userId,
-          body.model,
+          aiModel,
           "youtube_summary",
           { inputTokens, outputTokens },
           costUnits,
