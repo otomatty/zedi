@@ -182,7 +182,9 @@ const NotePageView: React.FC = () => {
         </Container>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      {/* モバイルは `ContentWithAIChat` が独自のスクロール領域を持たないため、ここをスクロールコンテナにする。
+          On mobile, `ContentWithAIChat` lacks its own scroll viewport, so this div must scroll. */}
+      <div className="min-h-0 flex-1 overflow-y-auto md:overflow-hidden">
         <NoteWorkspaceProvider key={note.id} noteId={note.id}>
           {canEdit ? (
             <NotePageEditorEditable
