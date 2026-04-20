@@ -77,16 +77,20 @@ describe("NavigationMenu", () => {
     expect(notesLink).toHaveAttribute("href", "/notes");
   });
 
-  it("applies active styling to the item matching the current route", async () => {
+  it("does not vary item styling based on the current route", async () => {
     const user = userEvent.setup();
+
     renderAt("/notes");
     await user.click(screen.getByRole("button", { name: "メニュー" }));
 
-    const notesLink = await screen.findByRole("menuitem", { name: "ノート" });
-    const homeLink = await screen.findByRole("menuitem", { name: "ホーム" });
+    const notesOnNotes = await screen.findByRole("menuitem", { name: "ノート" });
+    const homeOnNotes = await screen.findByRole("menuitem", { name: "ホーム" });
 
-    expect(notesLink.className).toMatch(/bg-accent/);
-    expect(homeLink.className).not.toMatch(/bg-accent/);
+    // No active-state classes should be applied based on the current path.
+    // 現在のパスに応じたアクティブ状態のクラスが付与されていないことを確認する。
+    expect(notesOnNotes.className).not.toMatch(/bg-accent/);
+    expect(homeOnNotes.className).not.toMatch(/bg-accent/);
+    expect(notesOnNotes.className).toBe(homeOnNotes.className);
   });
 
   it("renders a Sheet-based menu on mobile", async () => {
