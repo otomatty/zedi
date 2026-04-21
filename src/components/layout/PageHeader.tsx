@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button, cn } from "@zedi/ui";
+import { Button } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 
 /**
@@ -42,13 +42,24 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   className,
 }) => {
   return (
-    <div className={cn("border-border/60 border-b", className)}>
+    <div className={className}>
       <Container className="flex min-h-14 flex-wrap items-center justify-between gap-3 py-2">
         <div className="flex min-w-0 items-center gap-3">
           {backTo && (
-            <Button asChild variant="ghost" size="icon" className="shrink-0">
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              // Override `size="icon"` (h-10 w-10) and the base `[&_svg]:size-4`
+              // so the back button is a touch larger and easier to tap on
+              // mobile without dwarfing neighbouring controls.
+              // `size="icon"`（h-10 w-10）と基底の `[&_svg]:size-4` を上書きし、
+              // 戻るボタンを少し大きくしてモバイルでもタップしやすくする。
+              // ただし周囲のコントロールを圧倒しない程度に抑える。
+              className="h-11 w-11 shrink-0 [&_svg]:size-6"
+            >
               <Link to={backTo} aria-label={backLabel}>
-                <ArrowLeft className="h-5 w-5" aria-hidden />
+                <ArrowLeft aria-hidden />
               </Link>
             </Button>
           )}

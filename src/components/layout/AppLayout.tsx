@@ -24,7 +24,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       className="flex h-svh min-h-0 flex-col overflow-hidden"
       style={
         {
-          "--app-header-height": isMobile ? "3rem" : "4.5rem",
+          "--app-header-height": isMobile ? "3.5rem" : "4.5rem",
           "--app-bottom-nav-height": isMobile ? "3.5rem" : "0px",
           "--ai-chat-width": "22rem",
         } as React.CSSProperties
