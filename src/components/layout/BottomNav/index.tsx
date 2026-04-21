@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { useMatch } from "react-router-dom";
-import { Home, FileText, Sparkles } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, cn } from "@zedi/ui";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
@@ -8,26 +7,25 @@ import { useTranslation } from "react-i18next";
 import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSyncStatusDotColor } from "../Header/UnifiedMenuSyncStatus";
+import { PRIMARY_NAV_ITEMS, isPrimaryNavActive } from "../navigationItems";
 import { SignedInMenuContent, SignedOutMenuContent } from "./BottomNavMeContent";
 import { BottomNavTab } from "./BottomNavTab";
 
 /**
- * Mobile bottom navigation with four tabs (Home / Notes / AI / Me). The Me
- * tab opens a sheet that reuses the signed-in / signed-out menu content from
- * {@link UnifiedMenu}, keeping the two surfaces in sync.
+ * Mobile bottom navigation. Renders the shared {@link PRIMARY_NAV_ITEMS} as
+ * tabs followed by a Me tab. The Me tab opens a sheet that reuses the
+ * signed-in / signed-out menu content from {@link UnifiedMenu}, so the
+ * account surfaces stay in sync; the primary tabs stay in sync with the
+ * header dropdown because both read from the same config.
  *
- * モバイル用のボトムナビゲーション（Home / Notes / AI / Me の 4 タブ）。
- * Me タブは {@link UnifiedMenu} と共通のメニュー内容を Sheet で表示するので、
- * デスクトップとモバイルのアカウントメニューが二重実装にならない。
+ * モバイル用のボトムナビゲーション。共通の {@link PRIMARY_NAV_ITEMS} をタブとして描画し、
+ * 末尾に Me タブを追加する。Me タブは {@link UnifiedMenu} と同じメニュー内容を Sheet で
+ * 表示しアカウント UI の二重実装を避ける。プライマリタブはヘッダーのドロップダウンと
+ * 同じ配列を参照するので表示項目が常に一致する。
  */
 export const BottomNav: React.FC = () => {
   const { t } = useTranslation();
-  const homeMatch = useMatch({ path: "/home", end: true });
-  const notesMatch = useMatch({ path: "/notes" });
-  const aiMatch = useMatch({ path: "/ai" });
-  const aiDetailMatch = useMatch({ path: "/ai/:conversationId" });
-  const aiHistoryMatch = useMatch({ path: "/ai/history" });
-  const aiActive = aiMatch != null || aiDetailMatch != null || aiHistoryMatch != null;
+  const { pathname } = useLocation();
   const [meOpen, setMeOpen] = useState(false);
   const closeMe = useCallback(() => setMeOpen(false), []);
   const sheetTitle = t("nav.account", "Account");
@@ -42,19 +40,15 @@ export const BottomNav: React.FC = () => {
       style={{ height: "calc(var(--app-bottom-nav-height, 3.5rem) + env(safe-area-inset-bottom))" }}
     >
       <ul className="mx-auto flex h-[var(--app-bottom-nav-height,3.5rem)] max-w-md items-stretch">
-        <BottomNavTab
-          to="/home"
-          icon={Home}
-          label={t("nav.home", "Home")}
-          active={homeMatch != null}
-        />
-        <BottomNavTab
-          to="/notes"
-          icon={FileText}
-          label={t("nav.notes", "Notes")}
-          active={notesMatch != null}
-        />
-        <BottomNavTab to="/ai" icon={Sparkles} label={t("nav.ai", "AI")} active={aiActive} />
+        {PRIMARY_NAV_ITEMS.map((item) => (
+          <BottomNavTab
+            key={item.path}
+            to={item.path}
+            icon={item.icon}
+            label={t(item.i18nKey)}
+            active={isPrimaryNavActive(item, pathname)}
+          />
+        ))}
         <li className="flex-1">
           <MeTab open={meOpen} onOpenChange={setMeOpen} />
         </li>
