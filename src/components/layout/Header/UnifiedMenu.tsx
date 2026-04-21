@@ -308,7 +308,7 @@ const GuestTrigger = React.forwardRef<
       // navigation menu trigger size instead of being shrunk to 16px.
       // Button の基底 `[&_svg]:size-4` を上書きし、ナビゲーションメニューと
       // 揃ったサイズでユーザーアイコンを表示する。
-      className="h-12 w-12 [&_svg]:size-7"
+      className="h-12 w-12 [&_svg]:size-6"
       aria-label={t("nav.account", "Account")}
       {...props}
     >
