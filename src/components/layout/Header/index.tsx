@@ -9,6 +9,7 @@ import { MobileHeader } from "../MobileHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
+import { useHeaderActions } from "@/contexts/HeaderActionsContext";
 
 interface HeaderProps {
   className?: string;
@@ -30,6 +31,7 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
   const searchContext = useGlobalSearchContextOptional();
   const hasSearchContext = searchContext != null;
   const isMobile = useIsMobile();
+  const headerActions = useHeaderActions();
 
   if (isMobile) {
     return <MobileHeader className={className} />;
@@ -52,10 +54,20 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           </div>
         </div>
 
-        {/* Center: Search bar.
-            中央: 検索バー。 */}
+        {/* Center: Search bar with optional left/right action slots wrapping it.
+            中央: 検索バー。両脇にページ固有アクション用のスロットを確保する。 */}
         <div className="flex max-w-xl min-w-0 flex-1 items-center justify-center gap-2 md:mx-2">
+          <div
+            ref={headerActions?.setLeftSlot ?? null}
+            className="flex shrink-0 items-center gap-1 empty:hidden"
+            data-testid="header-left-slot"
+          />
           {hasSearchContext && <HeaderSearchBar />}
+          <div
+            ref={headerActions?.setRightSlot ?? null}
+            className="flex shrink-0 items-center gap-1 empty:hidden"
+            data-testid="header-right-slot"
+          />
         </div>
 
         {/* Right: navigation dropdown and user-only menu.
