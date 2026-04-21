@@ -304,11 +304,15 @@ const GuestTrigger = React.forwardRef<
       ref={ref}
       variant="ghost"
       size="icon"
-      className="h-12 w-12"
+      // Override Button's base `[&_svg]:size-4` so the user icon matches the
+      // navigation menu trigger size instead of being shrunk to 16px.
+      // Button の基底 `[&_svg]:size-4` を上書きし、ナビゲーションメニューと
+      // 揃ったサイズでユーザーアイコンを表示する。
+      className="h-12 w-12 [&_svg]:size-7"
       aria-label={t("nav.account", "Account")}
       {...props}
     >
-      <User className="h-6 w-6" />
+      <User />
     </Button>
   );
 });
