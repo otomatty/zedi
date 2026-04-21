@@ -99,6 +99,13 @@
       "when": 1777075200000,
       "tag": "0014_add_note_domain_access",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1777161600000,
+      "tag": "0015_add_note_members_status_accepted_user",
+      "breakpoints": true
     }
   ]
 }
