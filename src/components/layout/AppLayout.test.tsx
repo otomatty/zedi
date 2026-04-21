@@ -93,4 +93,45 @@ describe("AppLayout", () => {
     expect(style).toContain("--app-bottom-nav-height");
     expect(style).toContain("3.5rem");
   });
+
+  /**
+   * Regression: on mobile, the bottom-nav + safe-area padding must live on
+   * `<main>` (the scroll container), not on an intermediate wrapper. Putting
+   * it on the wrapper clips the scroll region at the top edge of the
+   * translucent BottomNav, which defeats its `backdrop-blur`.
+   *
+   * 回帰防止: モバイルでは BottomNav + safe-area 分の padding-bottom を
+   * スクロールコンテナである `<main>` 自身に持たせる。ラッパー側に置くと
+   * スクロール領域が BottomNav 上端で切り詰められ、`backdrop-blur` が機能
+   * しなくなる。
+   */
+  it("puts bottom-nav + safe-area padding on <main> (scroll container), not on its wrapper, on mobile", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    render(
+      <AppLayout>
+        <p>Main content</p>
+      </AppLayout>,
+    );
+    const main = screen.getByRole("main");
+    const mainStyle = main.getAttribute("style") ?? "";
+    expect(mainStyle).toContain("padding-bottom");
+    expect(mainStyle).toContain("--app-bottom-nav-height");
+    expect(mainStyle).toContain("env(safe-area-inset-bottom)");
+
+    const wrapper = main.parentElement;
+    const wrapperStyle = wrapper?.getAttribute("style") ?? "";
+    expect(wrapperStyle).not.toContain("padding-bottom");
+  });
+
+  it("does not set an inline padding-bottom on <main> on desktop", () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    render(
+      <AppLayout>
+        <p>Main content</p>
+      </AppLayout>,
+    );
+    const main = screen.getByRole("main");
+    const mainStyle = main.getAttribute("style") ?? "";
+    expect(mainStyle).not.toContain("padding-bottom");
+  });
 });
