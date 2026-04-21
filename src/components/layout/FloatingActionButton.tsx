@@ -69,7 +69,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
               // fills the FAB instead of being shrunk to 16px.
               // Button 基底の `[&_svg]:size-4` を上書きし、+ / × アイコンが
               // 16px に縮まらず FAB に見合うサイズで表示されるようにする。
-              "[&_svg]:size-10",
+              "[&_svg]:size-8",
               isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground",
             )}
           >
