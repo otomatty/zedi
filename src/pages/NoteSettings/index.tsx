@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Button, useToast } from "@zedi/ui";
 import { useDeleteNote, useNote } from "@/hooks/useNoteQueries";
@@ -96,21 +97,17 @@ const NoteSettings: React.FC = () => {
 
   if (isNoteLoading) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
-        </Container>
-      </div>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
+      </PageLoadingOrDenied>
     );
   }
 
   if (!note || !access?.canView) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
-        </Container>
-      </div>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
+      </PageLoadingOrDenied>
     );
   }
 

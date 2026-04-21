@@ -4,7 +4,7 @@ import Container from "@/components/layout/Container";
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@zedi/ui";
 import { useNote } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
-import { NoteMembersLoadingOrDenied } from "./NoteMembersLoadingOrDenied";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteMembersManageSection } from "./NoteMembersManageSection";
 import { NoteInviteLinksSection } from "./NoteInviteLinksSection";
 import { useNoteMembersController } from "./useNoteMembersController";
@@ -29,16 +29,16 @@ const NoteMembers: React.FC = () => {
 
   if (isNoteLoading) {
     return (
-      <NoteMembersLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
-      </NoteMembersLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
   if (!note || !access?.canView) {
     return (
-      <NoteMembersLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
-      </NoteMembersLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
 

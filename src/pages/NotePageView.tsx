@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Container from "@/components/layout/Container";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@zedi/ui";
 import { useNote, useNotePage } from "@/hooks/useNoteQueries";
@@ -152,22 +153,18 @@ const NotePageView: React.FC = () => {
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">読み込み中...</p>
-        </Container>
-      </div>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">読み込み中...</p>
+      </PageLoadingOrDenied>
     );
   }
   if (isNotFound) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">
-            ページが見つからないか、閲覧権限がありません。
-          </p>
-        </Container>
-      </div>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">
+          ページが見つからないか、閲覧権限がありません。
+        </p>
+      </PageLoadingOrDenied>
     );
   }
 

@@ -15,7 +15,7 @@ import {
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
-import { NoteViewLoadingOrDenied } from "./NoteViewLoadingOrDenied";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import { NoteViewMainContent } from "./NoteViewMainContent";
 
@@ -115,16 +115,16 @@ const NoteView: React.FC = () => {
 
   if (isLoading) {
     return (
-      <NoteViewLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
-      </NoteViewLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
   if (isNotFound) {
     return (
-      <NoteViewLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
-      </NoteViewLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
 
