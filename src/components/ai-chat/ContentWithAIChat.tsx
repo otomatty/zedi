@@ -80,7 +80,13 @@ export function ContentWithAIChat({
   if (isMobile) {
     return (
       <>
-        {children}
+        {/* モバイル用スクロールコンテナ。PageEditorLayout が overflow-hidden の
+            flex-col であるため、ここで overflow-y-auto を付けないと TipTap など
+            の子コンテンツがクリップされ、タッチスクロールが効かなくなる。
+            Mobile scroll container. PageEditorLayout is a flex-col with
+            overflow-hidden, so without this wrapper child content (e.g. the
+            TipTap editor) gets clipped and touch scrolling does not engage. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
         {floatingAction && (
           <div
             className="pointer-events-none fixed right-0 bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)]"
