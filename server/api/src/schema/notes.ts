@@ -304,7 +304,7 @@ export const noteDomainAccess = pgTable(
       .default("viewer"),
     createdByUserId: text("created_by_user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "no action" }),
     /** DNS TXT などで所有権を検証した時刻。v1 では null のまま保存可。 / Time we verified ownership (DNS-TXT etc.). Stays null in v1. */
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
