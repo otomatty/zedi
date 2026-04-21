@@ -30,9 +30,19 @@
 -- these columns, but no migration ever added them, so production hit
 -- `42703 column "status" of relation "note_members" does not exist` on
 -- every `POST /api/notes`.
+--
+-- このマイグレーションは冪等 (`IF NOT EXISTS` / 制約存在チェック) になっている。
+-- 一部の環境 (特に dev) では本マイグレーション追加前に `note_members.status` /
+-- `note_members.accepted_user_id` カラムを手動で追加していたため、素朴な
+-- `ALTER TABLE ... ADD COLUMN` だと `42701 column ... already exists` で
+-- `bunx drizzle-kit migrate` が落ち、`Deploy Development` が継続的に失敗していた。
+-- This migration is idempotent (`IF NOT EXISTS` and constraint existence check).
+-- The dev DB had `status` / `accepted_user_id` added manually before this
+-- migration was committed, which made the original `ALTER TABLE ... ADD COLUMN`
+-- crash with `42701` and broke `Deploy Development` on every push.
 
-ALTER TABLE "note_members" ADD COLUMN "status" text DEFAULT 'pending' NOT NULL;--> statement-breakpoint
-ALTER TABLE "note_members" ADD COLUMN "accepted_user_id" text;--> statement-breakpoint
+ALTER TABLE "note_members" ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'pending' NOT NULL;--> statement-breakpoint
+ALTER TABLE "note_members" ADD COLUMN IF NOT EXISTS "accepted_user_id" text;--> statement-breakpoint
 UPDATE "note_members" AS nm
 SET
     "status" = 'accepted',
@@ -42,7 +52,18 @@ SET
         WHERE LOWER(u."email") = LOWER(nm."member_email")
         LIMIT 1
     )
-WHERE nm."is_deleted" = false;--> statement-breakpoint
-ALTER TABLE "note_members"
-    ADD CONSTRAINT "note_members_accepted_user_id_user_id_fk"
-    FOREIGN KEY ("accepted_user_id") REFERENCES "user"("id") ON DELETE set null ON UPDATE no action;
+WHERE nm."is_deleted" = false
+  AND nm."status" = 'pending'
+  AND nm."accepted_user_id" IS NULL;--> statement-breakpoint
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'note_members_accepted_user_id_user_id_fk'
+    ) THEN
+        ALTER TABLE "note_members"
+            ADD CONSTRAINT "note_members_accepted_user_id_user_id_fk"
+            FOREIGN KEY ("accepted_user_id") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+    END IF;
+END$$;
