@@ -152,27 +152,27 @@ const NotePageView: React.FC = () => {
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
+      <div className="min-h-0 flex-1 overflow-y-auto py-10">
         <Container>
           <p className="text-muted-foreground text-sm">読み込み中...</p>
         </Container>
-      </main>
+      </div>
     );
   }
   if (isNotFound) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
+      <div className="min-h-0 flex-1 overflow-y-auto py-10">
         <Container>
           <p className="text-muted-foreground text-sm">
             ページが見つからないか、閲覧権限がありません。
           </p>
         </Container>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="border-border/60 shrink-0 border-b">
         <Container className="flex h-10 items-center justify-between">
           <Button variant="ghost" size="icon" onClick={handleBack}>
@@ -212,7 +212,7 @@ const NotePageView: React.FC = () => {
           )}
         </NoteWorkspaceProvider>
       </div>
-    </main>
+    </div>
   );
 };
 

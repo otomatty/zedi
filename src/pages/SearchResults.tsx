@@ -111,7 +111,7 @@ export default function SearchResults() {
     item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto py-6">
+    <div className="min-h-0 flex-1 overflow-y-auto py-6">
       <Container>
         <div className="mb-6">
           {searchQuery ? (
@@ -159,6 +159,6 @@ export default function SearchResults() {
           <SearchResultsEmptyState description="ヘッダーの検索バーからキーワードを入力してください" />
         )}
       </Container>
-    </main>
+    </div>
   );
 }

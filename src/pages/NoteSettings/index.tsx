@@ -96,26 +96,26 @@ const NoteSettings: React.FC = () => {
 
   if (isNoteLoading) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
+      <div className="min-h-0 flex-1 overflow-y-auto py-10">
         <Container>
           <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
         </Container>
-      </main>
+      </div>
     );
   }
 
   if (!note || !access?.canView) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
+      <div className="min-h-0 flex-1 overflow-y-auto py-10">
         <Container>
           <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
         </Container>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto py-8">
+    <div className="min-h-0 flex-1 overflow-y-auto py-8">
       <Container>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -164,7 +164,7 @@ const NoteSettings: React.FC = () => {
           </>
         )}
       </Container>
-    </main>
+    </div>
   );
 };
 

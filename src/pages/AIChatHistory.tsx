@@ -35,7 +35,7 @@ export default function AIChatHistory() {
 
   return (
     <ContentWithAIChat>
-      <main className="min-h-0 flex-1 overflow-y-auto py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto py-6">
         <Container>
           <h1 className="text-foreground text-2xl font-semibold tracking-tight">
             {t("aiChat.history.pageTitle", "AI chat history")}
@@ -73,7 +73,7 @@ export default function AIChatHistory() {
             )}
           </div>
         </Container>
-      </main>
+      </div>
     </ContentWithAIChat>
   );
 }

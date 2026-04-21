@@ -8,8 +8,8 @@ import Container from "@/components/layout/Container";
  */
 export function NoteViewLoadingOrDenied({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto py-10">
+    <div className="min-h-0 flex-1 overflow-y-auto py-10">
       <Container>{children}</Container>
-    </main>
+    </div>
   );
 }
