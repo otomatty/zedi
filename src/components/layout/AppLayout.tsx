@@ -48,7 +48,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             : undefined
         }
       >
-        <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
           {children}
         </main>
       </div>
