@@ -304,7 +304,7 @@ export const noteDomainAccess = pgTable(
       .default("viewer"),
     createdByUserId: text("created_by_user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "no action" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     /** DNS TXT などで所有権を検証した時刻。v1 では null のまま保存可。 / Time we verified ownership (DNS-TXT etc.). Stays null in v1. */
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -318,10 +318,12 @@ export const noteDomainAccess = pgTable(
 );
 
 /**
+ * `note_domain_access` の SELECT 結果の行型。
  * Row type for `note_domain_access` SELECT results.
  */
 export type NoteDomainAccess = typeof noteDomainAccess.$inferSelect;
 /**
+ * `note_domain_access` の INSERT 値の型。
  * Row type for `note_domain_access` INSERT values.
  */
 export type NewNoteDomainAccess = typeof noteDomainAccess.$inferInsert;

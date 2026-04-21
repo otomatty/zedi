@@ -29,7 +29,7 @@ ALTER TABLE "note_domain_access"
 --> statement-breakpoint
 ALTER TABLE "note_domain_access"
     ADD CONSTRAINT "note_domain_access_created_by_user_id_user_id_fk"
-    FOREIGN KEY ("created_by_user_id") REFERENCES "user"("id") ON DELETE no action ON UPDATE no action;
+    FOREIGN KEY ("created_by_user_id") REFERENCES "user"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 CREATE INDEX "idx_note_domain_access_note_id" ON "note_domain_access" ("note_id");
 --> statement-breakpoint
