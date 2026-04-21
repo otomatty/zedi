@@ -8,6 +8,7 @@ import {
   noteInvitations,
   noteInviteLinks,
   noteInviteLinkRedemptions,
+  noteDomainAccess,
 } from "./notes.js";
 import { links, ghostLinks } from "./links.js";
 import { pageContents } from "./pageContents.js";
@@ -94,6 +95,7 @@ const notesRelations = relations(notes, ({ one, many }) => ({
   noteMembers: many(noteMembers),
   noteInvitations: many(noteInvitations),
   noteInviteLinks: many(noteInviteLinks),
+  noteDomainAccess: many(noteDomainAccess),
 }));
 
 export /**
@@ -177,6 +179,21 @@ export const noteInviteLinkRedemptionsRelations = relations(
     }),
   }),
 );
+
+/**
+ * Relations for `note_domain_access`: note and creator.
+ * `note_domain_access` のリレーション: ノートと発行者。
+ */
+export const noteDomainAccessRelations = relations(noteDomainAccess, ({ one }) => ({
+  note: one(notes, {
+    fields: [noteDomainAccess.noteId],
+    references: [notes.id],
+  }),
+  createdBy: one(users, {
+    fields: [noteDomainAccess.createdByUserId],
+    references: [users.id],
+  }),
+}));
 
 export /**
  *

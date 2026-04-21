@@ -214,6 +214,7 @@ describe("POST /api/notes/:noteId/pages", () => {
     const { app } = createTestApp([
       [privateNote], // getNoteRole → findActiveNoteById (not owner)
       [], // getNoteRole → member check (not a member, private → null)
+      [], // getNoteRole → domain access check (no matching rule)
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
@@ -267,6 +268,7 @@ describe("DELETE /api/notes/:noteId/pages/:pageId", () => {
     const { app } = createTestApp([
       [privateNote], // getNoteRole (not owner)
       [], // member check (not a member)
+      [], // domain access check (no matching rule)
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/pages/pg-001`, {
@@ -389,6 +391,7 @@ describe("GET /api/notes/:noteId/pages", () => {
     const { app } = createTestApp([
       [privateNote], // getNoteRole (not owner)
       [], // member check (not a member)
+      [], // domain access check (no matching rule)
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
