@@ -1,6 +1,6 @@
 [package]
 name = "zedi"
-version = "0.15.1"
+version = "0.15.2"
 description = "Zero-Friction Knowledge Network"
 authors = ["Zedi Team"]
 edition = "2021"
