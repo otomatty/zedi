@@ -61,15 +61,13 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             disabled={isCreating}
             className={cn(
-              "h-20 w-20 rounded-full",
+              "h-16 w-16 rounded-full",
               "shadow-elevated",
               "transition-all duration-300 ease-in-out",
               "hover:bg-primary hover:scale-105",
-              // Override Button's base `[&_svg]:size-4` so the + / × icon
-              // fills the FAB instead of being shrunk to 16px.
-              // Button 基底の `[&_svg]:size-4` を上書きし、+ / × アイコンが
-              // 16px に縮まらず FAB に見合うサイズで表示されるようにする。
-              "[&_svg]:size-8",
+              // FAB の + / × を 16px（Tailwind size-4）で表示する。
+              // Button 基底も [&_svg]:size-4 だが、意図を明示するため付与する。
+              "[&_svg]:size-4",
               isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground",
             )}
           >
