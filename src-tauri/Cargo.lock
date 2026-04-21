@@ -5566,7 +5566,7 @@ dependencies = [
 
 [[package]]
 name = "zedi"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "dirs 5.0.1",
  "serde",
