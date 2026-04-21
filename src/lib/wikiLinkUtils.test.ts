@@ -339,6 +339,10 @@ describe("updateWikiLinkAttributes", () => {
     });
     const result = updateWikiLinkAttributes(content, new Set(["page a"]), new Set());
     expect(result.hasChanges).toBe(false);
+    // テスト名の「byte-for-byte」を字義どおり検証する。
+    // Pins the exact-string return so a regression that rewrites `result.content`
+    // while still flagging hasChanges=false would surface here.
+    expect(result.content).toBe(content);
   });
 
   it("normalizes the title by lowercasing and trimming before membership check", () => {
