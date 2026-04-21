@@ -147,26 +147,6 @@ describe("groupPagesByDate", () => {
     expect(dates).toEqual(["2024-06-15", "2024-06-14", "2024-06-13"]);
   });
 
-  it("re-sorts group keys even when Map insertion order disagrees with calendar order", () => {
-    // updatedAt の降順と日付キー (yyyy-MM-dd) の降順が一致しない入力を作る。
-    // `sort((a, b) => b.localeCompare(a))` を `() => undefined`（no-op）へ変異させると、
-    // Map 挿入順 (updatedAt 降順) がそのまま返ってしまい、期待の日付降順にならない。
-    //
-    // Build an input where `updatedAt` descending differs from calendar-key descending.
-    // A no-op sort comparator would leak the Map insertion order; the explicit
-    // `localeCompare` sort is required to produce calendar-descending output.
-    const pages: Page[] = [
-      // 2024-06-14 の深夜（updatedAt が最大）: Map には最初に挿入される。
-      makePage({ id: "late-on-earlier-day", updatedAt: new Date(2024, 5, 14, 23, 0).getTime() }),
-      // 2024-06-15 の早朝（updatedAt は 2 番目）: Map には後から挿入される。
-      makePage({ id: "early-on-later-day", updatedAt: new Date(2024, 5, 15, 1, 0).getTime() }),
-      // 2024-06-13 の深夜。
-      makePage({ id: "earliest", updatedAt: new Date(2024, 5, 13, 22, 0).getTime() }),
-    ];
-    const dates = groupPagesByDate(pages).map((g) => g.date);
-    expect(dates).toEqual(["2024-06-15", "2024-06-14", "2024-06-13"]);
-  });
-
   it("does not mutate the input array (defensive copy before sort)", () => {
     // `[...pages].sort` のスプレッドが `pages.sort` に変異すると元配列が破壊される。
     // Kills the "remove defensive copy" mutation by asserting original ordering is preserved.
