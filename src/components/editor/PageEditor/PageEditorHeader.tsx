@@ -58,7 +58,7 @@ function findScrollableDescendant(el: HTMLElement): HTMLElement | null {
  */
 function findScrollContainer(headerEl: HTMLElement): HTMLElement | Window {
   let el: HTMLElement | null = headerEl.parentElement;
-  while (el && el !== document.body) {
+  while (el) {
     if (isScrollableElement(el)) return el;
     el = el.parentElement;
   }
@@ -150,7 +150,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
     >
       <Container className="flex items-center justify-between gap-4 py-2">
         <Button variant="ghost" size="icon" onClick={onBack} className="h-12 w-12 shrink-0">
-          <ArrowLeft />
+          <ArrowLeft className="h-5 w-5" />
         </Button>
 
         <div className="flex items-center gap-2">

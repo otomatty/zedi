@@ -21,30 +21,27 @@ interface HeaderActionsContextValue {
 const HeaderActionsContext = createContext<HeaderActionsContextValue | null>(null);
 
 /**
+ * ヘッダーの左右スロットを管理する Provider。`Header` / `MobileHeader`
+ * が `setLeftSlot` / `setRightSlot` で DOM 要素を登録し、ページ側は
+ * `useHeaderActions` 経由で取得した要素に `createPortal` でアクションを
+ * 注入する想定。`AppLayout` 直下に置き、アプリ全体で 1 インスタンスを
+ * 共有する。
  *
+ * Provider that manages the left/right header action slots. `Header` /
+ * `MobileHeader` register DOM nodes via `setLeftSlot` / `setRightSlot`,
+ * and pages portal content into the exposed slot elements obtained via
+ * `useHeaderActions`. Mounted once at the `AppLayout` root and shared
+ * across the whole app.
+ *
+ * @param children - Provider 配下にレンダーする要素 / React subtree to render under the provider.
  */
 export function HeaderActionsProvider({ children }: { children: ReactNode }) {
-  /**
-   *
-   */
   const [leftSlot, setLeftSlotState] = useState<HTMLElement | null>(null);
-  /**
-   *
-   */
   const [rightSlot, setRightSlotState] = useState<HTMLElement | null>(null);
 
-  /**
-   *
-   */
   const setLeftSlot = useCallback((el: HTMLElement | null) => setLeftSlotState(el), []);
-  /**
-   *
-   */
   const setRightSlot = useCallback((el: HTMLElement | null) => setRightSlotState(el), []);
 
-  /**
-   *
-   */
   const value: HeaderActionsContextValue = {
     leftSlot,
     rightSlot,
