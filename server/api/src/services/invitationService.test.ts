@@ -18,7 +18,7 @@ vi.mock("../emails/invite-note.js", () => ({
   getInviteNoteSubject: (...args: unknown[]) => mockGetSubject(...args),
 }));
 
-const { sendInvitation } = await import("./invitationService.js");
+const { sendInvitation, resolveLocaleFromAcceptLanguage } = await import("./invitationService.js");
 
 // ── Mock DB helper ──────────────────────────────────────────────────────────
 
@@ -172,5 +172,73 @@ describe("sendInvitation", () => {
 
     const renderCall = mockRender.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(renderCall.inviteUrl).toMatch(/\/invite\?token=[a-f0-9]{64}$/);
+  });
+
+  it("params.locale が 'en' なら INSERT ロケールとしてテンプレートへ渡す", async () => {
+    // 初回 INSERT 時は呼び出し元から渡された locale がそのまま使われる。
+    // On INSERT the explicit locale is applied and used for rendering.
+    const db = createMockDb([
+      [{ title: "Note" }],
+      [{ name: "User" }],
+      [{ locale: "en" }], // .returning({ locale })
+    ]);
+
+    await sendInvitation({
+      db: db as never,
+      noteId: "note-1",
+      memberEmail: "guest@example.com",
+      role: "viewer",
+      invitedByUserId: "user-1",
+      locale: "en",
+    });
+
+    expect(mockRender).toHaveBeenCalledWith(expect.objectContaining({ locale: "en" }));
+    expect(mockGetSubject).toHaveBeenCalledWith(expect.objectContaining({ locale: "en" }));
+  });
+
+  it("再送時は DB の既存ロケールが優先される（元招待の言語を保持）", async () => {
+    // 呼び出し側が 'en' を渡しても、ON CONFLICT で既存行の locale ('ja') が返り、
+    // そちらを効果的ロケールとして採用する。
+    // Even if caller passes 'en', ON CONFLICT returns the existing row's locale ('ja');
+    // that value wins so the resend keeps the original invite language.
+    const db = createMockDb([
+      [{ title: "Note" }],
+      [{ name: "User" }],
+      [{ locale: "ja" }], // returning — existing row locale preserved
+    ]);
+
+    await sendInvitation({
+      db: db as never,
+      noteId: "note-1",
+      memberEmail: "guest@example.com",
+      role: "viewer",
+      invitedByUserId: "user-1",
+      locale: "en",
+    });
+
+    expect(mockRender).toHaveBeenCalledWith(expect.objectContaining({ locale: "ja" }));
+  });
+});
+
+describe("resolveLocaleFromAcceptLanguage", () => {
+  it("空ヘッダは null を返す", () => {
+    expect(resolveLocaleFromAcceptLanguage(undefined)).toBeNull();
+    expect(resolveLocaleFromAcceptLanguage(null)).toBeNull();
+    expect(resolveLocaleFromAcceptLanguage("")).toBeNull();
+  });
+
+  it("最優先のサポート言語を返す（品質値の降順）", () => {
+    expect(resolveLocaleFromAcceptLanguage("en-US,en;q=0.9,ja;q=0.5")).toBe("en");
+    expect(resolveLocaleFromAcceptLanguage("ja,en-US;q=0.8")).toBe("ja");
+    expect(resolveLocaleFromAcceptLanguage("ja-JP")).toBe("ja");
+  });
+
+  it("q 値が高いものを優先する", () => {
+    expect(resolveLocaleFromAcceptLanguage("ja;q=0.3,en;q=0.9")).toBe("en");
+  });
+
+  it("非サポート言語は無視しフォールバックを適用する", () => {
+    expect(resolveLocaleFromAcceptLanguage("fr-FR,de;q=0.7")).toBeNull();
+    expect(resolveLocaleFromAcceptLanguage("fr-FR,de;q=0.7,en;q=0.1")).toBe("en");
   });
 });

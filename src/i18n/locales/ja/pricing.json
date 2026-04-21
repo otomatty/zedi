@@ -76,6 +76,7 @@
     "statusCanceledNote": "{{date}} まで利用可能",
     "statusPastDue": "支払い遅延",
     "statusTrialing": "トライアル",
+    "statusUnknown": "不明",
     "monthly": "月額",
     "yearly": "年額",
     "cancelSubscription": "サブスクリプションを解約",

@@ -1,6 +1,6 @@
 /**
- * Header: primary functional nav, sticky/backdrop layout, search & AI actions, user-only menu.
- * ヘッダー: 機能ナビゲーション、sticky/backdrop、検索・AI、ユーザー専用メニュー。
+ * Header: primary functional nav, sticky/backdrop layout, search action, user-only menu.
+ * ヘッダー: 機能ナビゲーション、sticky/backdrop、検索、ユーザー専用メニュー。
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -74,13 +74,6 @@ vi.mock("./NavigationMenu", () => ({
   NavigationMenu: () => <div data-testid="navigation-menu">NavigationMenu</div>,
 }));
 vi.mock("./UnifiedMenu", () => ({ UnifiedMenu: () => <div data-testid="unified-menu">Menu</div> }));
-vi.mock("./AIChatButton", () => ({
-  AIChatButton: () => (
-    <button type="button" data-testid="ai-chat-btn">
-      AI
-    </button>
-  ),
-}));
 
 describe("Header", () => {
   beforeEach(() => {
@@ -132,6 +125,5 @@ describe("Header", () => {
     expect(screen.getByTestId("mobile-header")).toBeInTheDocument();
     expect(screen.queryByTestId("navigation-menu")).not.toBeInTheDocument();
     expect(screen.queryByTestId("unified-menu")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ai-chat-btn")).not.toBeInTheDocument();
   });
 });

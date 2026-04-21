@@ -5,7 +5,6 @@ import { HeaderLogo } from "./HeaderLogo";
 import { HeaderSearchBar } from "./HeaderSearchBar";
 import { NavigationMenu } from "./NavigationMenu";
 import { UnifiedMenu } from "./UnifiedMenu";
-import { AIChatButton } from "./AIChatButton";
 import { MobileHeader } from "../MobileHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
@@ -16,16 +15,14 @@ interface HeaderProps {
 }
 
 /**
- * Sticky app header. On desktop hosts the logo, the search bar, the AI
- * chat toggle, a navigation dropdown (Home / Notes) and the user-only
- * menu. On mobile delegates to {@link MobileHeader} — the mobile bar is a
- * compact title with only a search icon; navigation / AI / account moved
- * to the bottom nav.
+ * Sticky app header. On desktop hosts the logo, the search bar, a
+ * navigation dropdown (Home / Notes) and the user-only menu. On mobile
+ * delegates to {@link MobileHeader} — the mobile bar is a compact title
+ * with only a search icon; navigation / account moved to the bottom nav.
  *
- * 固定ヘッダー。デスクトップではロゴ・検索・AI チャット開閉・機能ナビゲーション
- * （Home / Notes）・ユーザー専用メニューを並べる。モバイルでは {@link MobileHeader}
- * にデリゲートし、コンパクトなタイトル + 検索アイコンだけを表示する（ナビ・AI・
- * アカウントはボトムナビへ移譲）。
+ * 固定ヘッダー。デスクトップではロゴ・検索・機能ナビゲーション（Home / Notes）・
+ * ユーザー専用メニューを並べる。モバイルでは {@link MobileHeader} にデリゲートし、
+ * コンパクトなタイトル + 検索アイコンだけを表示する（ナビ・アカウントはボトムナビへ移譲）。
  */
 const Header: React.FC<HeaderProps> = ({ className }) => {
   const { isSignedIn } = useAuth();
@@ -55,11 +52,10 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
           </div>
         </div>
 
-        {/* Center: Search bar & AI Chat button.
-            中央: 検索バーと AI チャットボタン。 */}
+        {/* Center: Search bar.
+            中央: 検索バー。 */}
         <div className="flex max-w-xl min-w-0 flex-1 items-center justify-center gap-2 md:mx-2">
           {hasSearchContext && <HeaderSearchBar />}
-          <AIChatButton />
         </div>
 
         {/* Right: navigation dropdown and user-only menu.

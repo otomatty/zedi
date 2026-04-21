@@ -17,6 +17,7 @@ import type { NoteMemberRole } from "./types.js";
 import { requireNoteOwner, getNoteRole } from "./helpers.js";
 import {
   deliverInvitationEmail,
+  resolveLocaleFromAcceptLanguage,
   sendInvitation,
   upsertInvitationTokenInDbThrowing,
 } from "../../services/invitationService.js";
@@ -85,6 +86,14 @@ app.post("/:noteId/members", authRequired, async (c) => {
 
   // 招待メールをバックグラウンドで送信（レスポンスをブロックしない）
   // Send invitation email in the background (non-blocking)
+  //
+  // 初回招待ではリクエスタの Accept-Language を採用する。解決できなければ
+  // invitationService 側のデフォルト（'ja'）にフォールバックする。再送は
+  // upsert が locale を保持するためここでロケールを考慮する必要はない。
+  // Use the requester's Accept-Language for the initial invite. Falls back to
+  // the service default ('ja') when no supported language matches. Resends do
+  // not need locale resolution here — upsert preserves the original locale.
+  const inviterLocale = resolveLocaleFromAcceptLanguage(c.req.header("accept-language"));
   let invitationSent = false;
   if (member.status === "pending") {
     sendInvitation({
@@ -93,6 +102,7 @@ app.post("/:noteId/members", authRequired, async (c) => {
       memberEmail,
       role: memberRole,
       invitedByUserId: userId,
+      locale: inviterLocale ?? undefined,
     })
       .then((result) => {
         if (!result.sent) {
@@ -261,6 +271,8 @@ app.get("/:noteId/members", authRequired, async (c) => {
     throw new HTTPException(403, { message: "Forbidden" });
   }
 
+  // 招待状況（有効期限・最終送信・送信回数）を UI から可視化するため LEFT JOIN で付与。
+  // LEFT JOIN invitations so the UI can show expiry, last-sent, and send count.
   const result = await db
     .select({
       noteId: noteMembers.noteId,
@@ -270,8 +282,18 @@ app.get("/:noteId/members", authRequired, async (c) => {
       invitedByUserId: noteMembers.invitedByUserId,
       createdAt: noteMembers.createdAt,
       updatedAt: noteMembers.updatedAt,
+      invitationExpiresAt: noteInvitations.expiresAt,
+      invitationLastEmailSentAt: noteInvitations.lastEmailSentAt,
+      invitationEmailSendCount: noteInvitations.emailSendCount,
     })
     .from(noteMembers)
+    .leftJoin(
+      noteInvitations,
+      and(
+        eq(noteInvitations.noteId, noteMembers.noteId),
+        eq(noteInvitations.memberEmail, noteMembers.memberEmail),
+      ),
+    )
     .where(and(eq(noteMembers.noteId, noteId), eq(noteMembers.isDeleted, false)))
     .orderBy(asc(noteMembers.createdAt));
 
@@ -284,6 +306,13 @@ app.get("/:noteId/members", authRequired, async (c) => {
       invited_by_user_id: m.invitedByUserId,
       created_at: m.createdAt,
       updated_at: m.updatedAt,
+      invitation: m.invitationExpiresAt
+        ? {
+            expiresAt: m.invitationExpiresAt,
+            lastEmailSentAt: m.invitationLastEmailSentAt,
+            emailSendCount: m.invitationEmailSendCount ?? 0,
+          }
+        : null,
     })),
   );
 });

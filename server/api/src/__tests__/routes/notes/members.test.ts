@@ -33,11 +33,14 @@ const mockUpsertInvitationTokenInDbThrowing = vi.fn().mockResolvedValue({
   locale: "ja",
 });
 const mockDeliverInvitationEmail = vi.fn().mockResolvedValue({ sent: true });
+const mockResolveLocaleFromAcceptLanguage = vi.fn().mockReturnValue(null);
 vi.mock("../../../services/invitationService.js", () => ({
   sendInvitation: (...args: unknown[]) => mockSendInvitation(...args),
   upsertInvitationTokenInDbThrowing: (...args: unknown[]) =>
     mockUpsertInvitationTokenInDbThrowing(...args),
   deliverInvitationEmail: (...args: unknown[]) => mockDeliverInvitationEmail(...args),
+  resolveLocaleFromAcceptLanguage: (...args: unknown[]) =>
+    mockResolveLocaleFromAcceptLanguage(...args),
 }));
 
 import {
@@ -179,6 +182,54 @@ describe("POST /api/notes/:noteId/members", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+
+  it("should forward Accept-Language derived locale to sendInvitation", async () => {
+    // Accept-Language → 'en' を解決してサービスに伝搬することを検証。
+    // Verify Accept-Language resolves to 'en' and is forwarded to the service.
+    mockSendInvitation.mockClear();
+    mockResolveLocaleFromAcceptLanguage.mockReturnValueOnce("en");
+    const mockNote = createMockNote();
+    const addedMember = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: OTHER_USER_EMAIL,
+      status: "pending",
+    });
+    const { app } = createTestApp([[mockNote], [addedMember]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/members`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Accept-Language": "en-US,en;q=0.9,ja;q=0.5" },
+      body: JSON.stringify({ member_email: OTHER_USER_EMAIL }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockResolveLocaleFromAcceptLanguage).toHaveBeenCalledWith("en-US,en;q=0.9,ja;q=0.5");
+    expect(mockSendInvitation).toHaveBeenCalledWith(expect.objectContaining({ locale: "en" }));
+  });
+
+  it("should omit locale when Accept-Language has no supported match", async () => {
+    // ヘッダが解決できない場合、サービス側デフォルト（'ja'）に委ねるため locale は undefined。
+    // When no match, leave locale undefined so the service applies its default.
+    mockSendInvitation.mockClear();
+    mockResolveLocaleFromAcceptLanguage.mockReturnValueOnce(null);
+    const mockNote = createMockNote();
+    const addedMember = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: OTHER_USER_EMAIL,
+      status: "pending",
+    });
+    const { app } = createTestApp([[mockNote], [addedMember]]);
+
+    await app.request(`/api/notes/${NOTE_ID}/members`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Accept-Language": "fr-FR" },
+      body: JSON.stringify({ member_email: OTHER_USER_EMAIL }),
+    });
+
+    const call = mockSendInvitation.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(call).toBeDefined();
+    expect(call.locale).toBeUndefined();
   });
 });
 
@@ -507,6 +558,7 @@ describe("GET /api/notes/:noteId/members", () => {
     const { app } = createTestApp([
       [privateNote], // getNoteRole (not owner)
       [], // member check (not a member, private → null)
+      [], // domain access check (no matching rule)
     ]);
 
     const res = await app.request(`/api/notes/${NOTE_ID}/members`, {
@@ -524,5 +576,54 @@ describe("GET /api/notes/:noteId/members", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+
+  it("should include invitation info when present via LEFT JOIN", async () => {
+    // LEFT JOIN で期限・最終送信・送信回数を付与して UI から可視化できるようにする。
+    // Verify invitation metadata is exposed for the UI via LEFT JOIN.
+    const mockNote = createMockNote();
+    const expiresAt = new Date("2026-05-01T00:00:00Z");
+    const lastSentAt = new Date("2026-04-20T12:00:00Z");
+    const memberWithInvitation = {
+      ...createMockMember({
+        noteId: NOTE_ID,
+        memberEmail: OTHER_USER_EMAIL,
+        role: "editor",
+      }),
+      invitationExpiresAt: expiresAt,
+      invitationLastEmailSentAt: lastSentAt,
+      invitationEmailSendCount: 3,
+    };
+
+    const { app } = createTestApp([[mockNote], [memberWithInvitation]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/members`, {
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    expect(body[0]?.invitation).toEqual({
+      expiresAt: expiresAt.toISOString(),
+      lastEmailSentAt: lastSentAt.toISOString(),
+      emailSendCount: 3,
+    });
+  });
+
+  it("should set invitation to null when no invitation row joined", async () => {
+    const mockNote = createMockNote();
+    const memberNoInvitation = createMockMember({
+      noteId: NOTE_ID,
+      memberEmail: OTHER_USER_EMAIL,
+    });
+    const { app } = createTestApp([[mockNote], [memberNoInvitation]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/members`, {
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    expect(body[0]?.invitation).toBeNull();
   });
 });

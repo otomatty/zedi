@@ -22,6 +22,11 @@ import type {
   ResendInvitationResponse,
   InvitationInfoResponse,
   AcceptInvitationResponse,
+  SendInvitationEmailLinkResponse,
+  InviteLinkPreviewResponse,
+  InviteLinkRedeemResponse,
+  CreateInviteLinkBody,
+  InviteLinkRow,
 } from "./types";
 
 export type { NoteListItem };
@@ -42,11 +47,17 @@ export class ApiError extends Error {
   /**
    * API エラーを生成する。
    * Creates an API error with HTTP status and optional application code.
+   *
+   * @param data - サーバーから返された構造化レスポンスボディ。エラーメッセージ以外に
+   *   `retry_after` などの付帯情報を呼び出し側で参照したい場合に使う。
+   *   Parsed response body (structured) so callers can read extra fields such
+   *   as `retry_after` instead of parsing the human-readable message.
    */
   constructor(
     message: string,
     public status: number,
     public code?: string,
+    public data?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -84,7 +95,7 @@ function throwOnErrorResponse(data: unknown, res: Response): never {
   const legacy = data as { message?: string; code?: string } | null;
   const msg = envelope?.error?.message ?? legacy?.message ?? res.statusText;
   const code = envelope?.error?.code ?? legacy?.code;
-  throw new ApiError(msg, res.status, code);
+  throw new ApiError(msg, res.status, code, data);
 }
 
 function unwrapEnvelope<T>(data: unknown): T {
@@ -445,6 +456,76 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<AcceptInvitationResponse>(
         "POST",
         `/api/invite/${encodeURIComponent(token)}/accept`,
+      );
+    },
+
+    /**
+     * POST /api/invite/:token/email-link — 招待先メール宛にマジックリンクを送る（認証任意）。
+     * Send a magic-link email to the invited address (no auth required).
+     *
+     * レート制限に触れた場合は ApiError (status 429) を投げる。
+     * Throws ApiError (status 429) when the server returns a rate-limit response.
+     */
+    async sendInvitationEmailLink(token: string): Promise<SendInvitationEmailLinkResponse> {
+      return reqOptionalAuth<SendInvitationEmailLinkResponse>(
+        "POST",
+        `/api/invite/${encodeURIComponent(token)}/email-link`,
+      );
+    },
+
+    // ── Invite Links (share links — epic #657 / issue #660) ───────────────
+
+    /**
+     * GET /api/invite-links/:token — 共有リンクのプレビュー（認証不要）。
+     * Fetch share-link preview info (no auth required).
+     */
+    async getInviteLinkPreview(token: string): Promise<InviteLinkPreviewResponse> {
+      return reqOptionalAuth<InviteLinkPreviewResponse>(
+        "GET",
+        `/api/invite-links/${encodeURIComponent(token)}`,
+      );
+    },
+
+    /**
+     * POST /api/invite-links/:token/redeem — 共有リンクを受諾してノートに参加する（認証必須）。
+     * Redeem a share link to join the note (auth required).
+     */
+    async redeemInviteLink(token: string): Promise<InviteLinkRedeemResponse> {
+      return req<InviteLinkRedeemResponse>(
+        "POST",
+        `/api/invite-links/${encodeURIComponent(token)}/redeem`,
+      );
+    },
+
+    /**
+     * POST /api/notes/:noteId/invite-links — 共有リンクを発行する（オーナー）。
+     * Create a share link (owner only).
+     */
+    async createInviteLink(noteId: string, body: CreateInviteLinkBody): Promise<InviteLinkRow> {
+      return req<InviteLinkRow>("POST", `/api/notes/${encodeURIComponent(noteId)}/invite-links`, {
+        body,
+      });
+    },
+
+    /**
+     * GET /api/notes/:noteId/invite-links — 共有リンク一覧（owner / editor）。
+     * List share links for a note.
+     */
+    async listInviteLinks(noteId: string): Promise<InviteLinkRow[]> {
+      return req<InviteLinkRow[]>("GET", `/api/notes/${encodeURIComponent(noteId)}/invite-links`);
+    },
+
+    /**
+     * DELETE /api/notes/:noteId/invite-links/:linkId — リンクを取り消す（オーナー）。
+     * Revoke a share link (owner only).
+     */
+    async revokeInviteLink(
+      noteId: string,
+      linkId: string,
+    ): Promise<{ revoked: true; revokedAt: string }> {
+      return req<{ revoked: true; revokedAt: string }>(
+        "DELETE",
+        `/api/notes/${encodeURIComponent(noteId)}/invite-links/${encodeURIComponent(linkId)}`,
       );
     },
   };

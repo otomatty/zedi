@@ -220,6 +220,19 @@ export interface RestoreSnapshotResponse {
   snapshot_id: string;
 }
 
+/**
+ * 招待メールの送信状況（有効期限・最終送信日時・送信回数）。
+ * Invitation email delivery state (expiry, last-sent timestamp, send count).
+ */
+export interface NoteInvitationInfo {
+  /** 招待トークンの有効期限 / Token expiration timestamp (ISO 8601) */
+  expiresAt: string;
+  /** 直近の送信日時 / Timestamp of the most recent send (ISO 8601). null 初回送信前 */
+  lastEmailSentAt: string | null;
+  /** 送信回数（初回 + 再送の合計） / Total number of sends (initial + resends) */
+  emailSendCount: number;
+}
+
 /** GET /api/notes/:id/members response item. */
 export interface NoteMemberItem {
   note_id: string;
@@ -229,6 +242,8 @@ export interface NoteMemberItem {
   invited_by_user_id: string;
   created_at: string;
   updated_at: string;
+  /** 招待情報（accepted 済みで招待行が無い場合などは null）。 / Invitation info (null when no row exists). */
+  invitation?: NoteInvitationInfo | null;
 }
 
 /** POST /api/notes/:noteId/members/:email/resend response. */
@@ -252,4 +267,91 @@ export interface AcceptInvitationResponse {
   noteId: string;
   role: string;
   status: "accepted";
+}
+
+/**
+ * POST /api/invite/:token/email-link response.
+ * 招待メール mismatch 時のマジックリンク送信結果。
+ * Response for the invitation rescue magic-link send endpoint.
+ */
+export interface SendInvitationEmailLinkResponse {
+  /** 送信を受理したか / Whether the send was accepted */
+  sent: true;
+  /** 送信先メールアドレス（招待先） / Recipient email (invited address) */
+  memberEmail: string;
+  /** 次回送信までの待機秒数（UI カウントダウン用）/ Seconds to wait before the next send (for countdown) */
+  retryAfterSec: number;
+}
+
+// ── Invite Links (share links — epic #657 / issue #660) ────────────────────
+
+/**
+ * 共有リンクの状態。`valid` 以外は UI でブロッキングメッセージを表示する。
+ * Share-link lifecycle status. Anything but `valid` triggers a blocking UI message.
+ */
+export type InviteLinkStatus = "valid" | "revoked" | "expired" | "exhausted";
+
+/** GET /api/invite-links/:token response — プレビュー情報 / Preview info. */
+export interface InviteLinkPreviewResponse {
+  status: InviteLinkStatus;
+  noteId: string;
+  noteTitle: string;
+  inviterName: string;
+  role: "viewer" | "editor";
+  expiresAt: string;
+  /** 残り利用可能回数（null = 無制限） / Remaining uses (null for unlimited) */
+  remainingUses: number | null;
+  maxUses: number | null;
+  usedCount: number;
+  requireSignIn: boolean;
+  label: string | null;
+}
+
+/** POST /api/invite-links/:token/redeem response — 受諾成功時 / On successful redeem. */
+export interface InviteLinkRedeemResponse {
+  noteId: string;
+  role: "viewer" | "editor";
+  isNewRedemption: boolean;
+  alreadyMember: boolean;
+  status: "accepted";
+}
+
+/** POST /api/notes/:noteId/invite-links body — 発行パラメータ / Creation params. */
+export interface CreateInviteLinkBody {
+  /**
+   * リンク経由で付与するロール。Phase 5 (#662) 以降は `editor` も指定可能。
+   * Role granted through the link; `editor` is permitted from Phase 5 (#662).
+   */
+  role?: "viewer" | "editor";
+  expiresInMs?: number;
+  maxUses?: number | null;
+  label?: string | null;
+  /**
+   * サインイン必須フラグ。サーバーは viewer では `false` を拒否し、editor では
+   * 黙って `true` に上書きするため、API が受け付ける値は実質 `true` のみ。型を
+   * `true` リテラルに絞ることでクライアント側のバグをコンパイル時に検出する
+   * (#676 review coderabbit)。省略可 — 省略時も `true` として扱われる。
+   *
+   * Sign-in requirement. The server rejects `false` for viewer links and
+   * silently coerces it to `true` for editor links, so the only supported
+   * value is literally `true`. Narrowed from `boolean` to catch client bugs
+   * at compile time (#676 review coderabbit). May be omitted.
+   */
+  requireSignIn?: true;
+}
+
+/** Invite link row (shared by list and create responses). */
+export interface InviteLinkRow {
+  id: string;
+  note_id: string;
+  token: string;
+  role: "viewer" | "editor";
+  created_by_user_id: string;
+  expires_at: string;
+  max_uses: number | null;
+  used_count: number;
+  revoked_at: string | null;
+  require_sign_in: boolean;
+  label: string | null;
+  created_at: string;
 }

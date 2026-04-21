@@ -1,7 +1,15 @@
 import { relations } from "drizzle-orm";
 import { users, session, account } from "./users.js";
 import { pages } from "./pages.js";
-import { notes, notePages, noteMembers, noteInvitations } from "./notes.js";
+import {
+  notes,
+  notePages,
+  noteMembers,
+  noteInvitations,
+  noteInviteLinks,
+  noteInviteLinkRedemptions,
+  noteDomainAccess,
+} from "./notes.js";
 import { links, ghostLinks } from "./links.js";
 import { pageContents } from "./pageContents.js";
 import { pageSnapshots } from "./pageSnapshots.js";
@@ -86,6 +94,8 @@ const notesRelations = relations(notes, ({ one, many }) => ({
   notePages: many(notePages),
   noteMembers: many(noteMembers),
   noteInvitations: many(noteInvitations),
+  noteInviteLinks: many(noteInviteLinks),
+  noteDomainAccess: many(noteDomainAccess),
 }));
 
 export /**
@@ -133,6 +143,55 @@ const noteInvitationsRelations = relations(noteInvitations, ({ one }) => ({
   note: one(notes, {
     fields: [noteInvitations.noteId],
     references: [notes.id],
+  }),
+}));
+
+/**
+ * Relations for `note_invite_links`: note, creator, and many redemptions.
+ * `note_invite_links` のリレーション: ノート・発行者・受諾履歴（多）。
+ */
+export const noteInviteLinksRelations = relations(noteInviteLinks, ({ one, many }) => ({
+  note: one(notes, {
+    fields: [noteInviteLinks.noteId],
+    references: [notes.id],
+  }),
+  createdBy: one(users, {
+    fields: [noteInviteLinks.createdByUserId],
+    references: [users.id],
+  }),
+  redemptions: many(noteInviteLinkRedemptions),
+}));
+
+/**
+ * Relations for `note_invite_link_redemptions`: link and user.
+ * `note_invite_link_redemptions` のリレーション: リンク・受諾ユーザー。
+ */
+export const noteInviteLinkRedemptionsRelations = relations(
+  noteInviteLinkRedemptions,
+  ({ one }) => ({
+    link: one(noteInviteLinks, {
+      fields: [noteInviteLinkRedemptions.linkId],
+      references: [noteInviteLinks.id],
+    }),
+    redeemedBy: one(users, {
+      fields: [noteInviteLinkRedemptions.redeemedByUserId],
+      references: [users.id],
+    }),
+  }),
+);
+
+/**
+ * Relations for `note_domain_access`: note and creator.
+ * `note_domain_access` のリレーション: ノートと発行者。
+ */
+export const noteDomainAccessRelations = relations(noteDomainAccess, ({ one }) => ({
+  note: one(notes, {
+    fields: [noteDomainAccess.noteId],
+    references: [notes.id],
+  }),
+  createdBy: one(users, {
+    fields: [noteDomainAccess.createdByUserId],
+    references: [users.id],
   }),
 }));
 

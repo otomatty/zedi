@@ -2,17 +2,61 @@
  * 招待受諾フロー API
  * Invitation acceptance flow API
  *
- * GET  /invite/:token        — トークン検証 + 招待情報取得（認証不要）
- * POST /invite/:token/accept — 招待承認（認証必須）
+ * GET  /invite/:token             — トークン検証 + 招待情報取得（認証不要）
+ * POST /invite/:token/accept      — 招待承認（認証必須）
+ * POST /invite/:token/email-link  — 招待先メール宛のマジックリンク再送（認証任意）
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, isNull, gt } from "drizzle-orm";
 import { noteInvitations, noteMembers, notes, users } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
+import { sendInvitationMagicLink } from "../services/magicLinkService.js";
+import { getOptionalEnv } from "../lib/env.js";
 import type { AppEnv } from "../types/index.js";
+import type { Redis } from "ioredis";
 
 const app = new Hono<AppEnv>();
+
+/**
+ * マジックリンク救済フローのレート制限定義。
+ * Rate-limit thresholds for the magic-link rescue flow.
+ */
+const EMAIL_LINK_SHORT_WINDOW_SEC = 5 * 60; // 5 minutes
+const EMAIL_LINK_SHORT_WINDOW_LIMIT = 1;
+const EMAIL_LINK_DAILY_WINDOW_SEC = 24 * 60 * 60; // 1 day
+const EMAIL_LINK_DAILY_WINDOW_LIMIT = 5;
+
+/**
+ * INCR し、新規作成時のみ EXPIRE を付与する（固定ウィンドウ）。
+ * Lua スクリプトで 1 ラウンドトリップに収め、サーバ側で原子的に実行する。
+ *
+ * Increment a counter and only set EXPIRE on the *first* INCR. Running this as
+ * a single Lua script keeps it atomic server-side and — crucially — prevents
+ * sliding-window behaviour where refreshing TTL on every call would let an
+ * attacker avoid the window boundary.
+ */
+const INCR_WITH_EXPIRE_ON_CREATE =
+  "local c = redis.call('incr', KEYS[1]); if c == 1 then redis.call('expire', KEYS[1], ARGV[1]) end; return c";
+
+async function incrWithExpire(redis: Redis, key: string, ttlSec: number): Promise<number> {
+  const result = await redis.eval(INCR_WITH_EXPIRE_ON_CREATE, 1, key, String(ttlSec));
+  if (typeof result === "number") return result;
+  if (typeof result === "string") {
+    const parsed = Number.parseInt(result, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+/**
+ * 残りの再試行待ち秒数を算出する（現時点での TTL ベース）。
+ * Compute the retry-after seconds based on the current TTL.
+ */
+async function getRetryAfter(redis: Redis, key: string, fallbackSec: number): Promise<number> {
+  const ttl = await redis.ttl(key);
+  return ttl > 0 ? ttl : fallbackSec;
+}
 
 // ── GET /invite/:token ─────────────────────────────────────────────────────
 
@@ -193,6 +237,137 @@ app.post("/:token/accept", authRequired, async (c) => {
     role: updatedMember.role,
     status: "accepted",
   });
+});
+
+// ── POST /invite/:token/email-link ─────────────────────────────────────────
+
+/**
+ * 招待先メール宛にワンクリックでサインインできるマジックリンクを送る。
+ * 認証任意（未サインインでも mismatch ユーザーでも呼べる）。
+ *
+ * Send a one-click sign-in magic link to the invited email. No authentication
+ * is required — both signed-out visitors and mismatch users can trigger it.
+ *
+ * トークン状態:
+ * - 有効な pending トークン → 202 でメール送信を受理
+ * - 期限切れ → 410
+ * - 使用済み → 409
+ * - 不明 → 404
+ *
+ * レート制限（同一 token あたり）:
+ * - 5 分に 1 回
+ * - 1 日に 5 回
+ */
+app.post("/:token/email-link", async (c) => {
+  const token = c.req.param("token");
+  const db = c.get("db");
+
+  // トークン + ノートタイトル (optional) を取得 / Fetch invitation + note title
+  const [invitation] = await db
+    .select({
+      memberEmail: noteInvitations.memberEmail,
+      expiresAt: noteInvitations.expiresAt,
+      usedAt: noteInvitations.usedAt,
+      locale: noteInvitations.locale,
+    })
+    .from(noteInvitations)
+    .where(eq(noteInvitations.token, token))
+    .limit(1);
+
+  if (!invitation) {
+    throw new HTTPException(404, { message: "Invalid invitation link" });
+  }
+
+  // 使用済み → 409 (accept エンドポイントと同じ意味論)
+  // Already used → 409 (same semantics as /accept)
+  if (invitation.usedAt !== null) {
+    throw new HTTPException(409, { message: "Invitation already accepted" });
+  }
+
+  // 期限切れ → 410 / Expired → 410
+  if (invitation.expiresAt < new Date()) {
+    throw new HTTPException(410, { message: "Invitation has expired" });
+  }
+
+  // レート制限は Redis がある場合のみ適用する。Redis 未設定の開発環境では無効化する。
+  // Rate limits are enforced only when Redis is available (no-op in dev without Redis).
+  //
+  // 重要: 短期ウィンドウ → 日次ウィンドウの順に *逐次* カウントアップする。
+  // 並列に INCR すると、短期で弾かれたリクエストまで日次カウンタを消費してしまい、
+  // 攻撃者がトークンを連打することで正規ユーザーを 24h ロックアウトできる DoS になる。
+  //
+  // Critical: increment the short window first, check it, and only increment
+  // the daily counter when the short window passes. Parallel INCR would let a
+  // caller exhaust the daily budget from short-window rejections alone — a
+  // denial-of-service on the rescue flow (see otomatty/zedi#668 review).
+  const redis = c.get("redis") as Redis | undefined;
+  if (redis) {
+    const shortKey = `ratelimit:invite-email-link:5min:${token}`;
+    const dailyKey = `ratelimit:invite-email-link:day:${token}`;
+
+    const shortCount = await incrWithExpire(redis, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
+    if (shortCount > EMAIL_LINK_SHORT_WINDOW_LIMIT) {
+      const retryAfter = await getRetryAfter(redis, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
+      return c.json(
+        {
+          error: "RATE_LIMIT_EXCEEDED",
+          message: `Rate limited (short window). Retry in ${retryAfter} seconds`,
+          retry_after: retryAfter,
+          scope: "short",
+        },
+        429,
+        {
+          "Retry-After": String(retryAfter),
+          "X-RateLimit-Limit": String(EMAIL_LINK_SHORT_WINDOW_LIMIT),
+          "X-RateLimit-Remaining": "0",
+        },
+      );
+    }
+
+    const dailyCount = await incrWithExpire(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
+    if (dailyCount > EMAIL_LINK_DAILY_WINDOW_LIMIT) {
+      const retryAfter = await getRetryAfter(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
+      return c.json(
+        {
+          error: "RATE_LIMIT_EXCEEDED",
+          message: `Rate limited (daily). Retry in ${retryAfter} seconds`,
+          retry_after: retryAfter,
+          scope: "daily",
+        },
+        429,
+        {
+          "Retry-After": String(retryAfter),
+          "X-RateLimit-Limit": String(EMAIL_LINK_DAILY_WINDOW_LIMIT),
+          "X-RateLimit-Remaining": "0",
+        },
+      );
+    }
+  }
+
+  // マジックリンクの callbackURL は、既存の招待受諾 URL を使う。
+  // The magic-link callback lands the user back on the invitation page.
+  const baseUrl = getOptionalEnv("APP_URL", "https://zedi-note.app").replace(/\/$/, "");
+  const callbackURL = `${baseUrl}/invite?token=${encodeURIComponent(token)}`;
+
+  const sendResult = await sendInvitationMagicLink({
+    email: invitation.memberEmail,
+    callbackURL,
+    locale: invitation.locale,
+  });
+
+  if (!sendResult.sent) {
+    console.error("[invite email-link] Magic-link send failed:", sendResult.error);
+    throw new HTTPException(502, { message: "Failed to send sign-in email" });
+  }
+
+  return c.json(
+    {
+      sent: true,
+      memberEmail: invitation.memberEmail,
+      retryAfterSec: EMAIL_LINK_SHORT_WINDOW_SEC,
+    },
+    202,
+  );
 });
 
 export default app;

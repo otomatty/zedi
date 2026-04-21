@@ -2,14 +2,16 @@ import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogTrigger } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
+import type { Note } from "@/types/note";
 import type { NotePageSummary } from "./noteViewHelpers";
 import { NoteViewAddPageDialogContent } from "./NoteViewAddPageDialogContent";
+import { ShareButton } from "./ShareModal/ShareButton";
 
 /**
  *
  */
 export interface NoteViewHeaderActionsProps {
-  noteId: string;
+  note: Note;
   canManageMembers: boolean;
   isSignedIn: boolean;
   canView: boolean;
@@ -31,7 +33,7 @@ export interface NoteViewHeaderActionsProps {
  *
  */
 export function NoteViewHeaderActions({
-  noteId,
+  note,
   canManageMembers,
   isSignedIn,
   canView,
@@ -56,11 +58,9 @@ export function NoteViewHeaderActions({
     <div className="flex items-center gap-2">
       {canManageMembers && (
         <>
+          <ShareButton note={note} canManageMembers={canManageMembers} />
           <Button asChild variant="outline" size="sm">
-            <Link to={`/note/${noteId}/members`}>{t("notes.members")}</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link to={`/note/${noteId}/settings`}>{t("notes.settings")}</Link>
+            <Link to={`/note/${note.id}/settings`}>{t("notes.settings")}</Link>
           </Button>
         </>
       )}

@@ -22,6 +22,7 @@ import wikiSchemaRoutes from "./routes/wikiSchema.js";
 import extRoutes from "./routes/ext.js";
 import mcpRoutes from "./routes/mcp.js";
 import inviteRoutes from "./routes/invite.js";
+import inviteLinkRoutes from "./routes/inviteLinks.js";
 import aiChatRoutes from "./routes/ai/chat.js";
 import aiModelsRoutes from "./routes/ai/models.js";
 import aiUsageRoutes from "./routes/ai/usage.js";
@@ -66,6 +67,21 @@ export function createApp(): Hono<AppEnv> {
   app.use("*", redisMiddleware);
   app.onError(errorHandler);
 
+  // Better Auth の magicLink プラグインは `POST /api/auth/sign-in/magic-link` を
+  // 自動で登録するが、これを公開すると招待トークン検証やレート制限を経由せずに
+  // 任意のメール宛へサインインリンクを送れてしまう（#668 レビュー指摘 P1）。
+  // 内部呼び出し (`magicLinkService` → `auth.handler(new Request(...))`) は
+  // この Hono ミドルウェアを通らないため、公開面だけ 404 にすれば良い。
+  //
+  // Block the public `POST /api/auth/sign-in/magic-link` route that the
+  // Better Auth magicLink plugin auto-registers. The rescue flow reaches the
+  // same endpoint via `auth.handler(new Request(...))`, which does not go
+  // through this Hono route, so internal calls still work. Verification path
+  // `/api/auth/magic-link/verify` remains public so email links keep working.
+  app.post("/api/auth/sign-in/magic-link", (c) =>
+    c.json({ error: "Not found", path: c.req.path, method: c.req.method }, 404),
+  );
+
   // Better Auth handler — use :path{.+} to match multi-segment paths (e.g. /api/auth/sign-in/social).
   // Hono's * only matches a single segment, so ** would not match sign-in/social.
   app.on(["POST", "GET"], "/api/auth/:path{.+}", (c) => {
@@ -101,6 +117,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Invitation acceptance (public + auth)
   app.route("/api/invite", inviteRoutes);
+
+  // Share link invite (public preview + auth redeem) — epic #657, issue #660
+  app.route("/api/invite-links", inviteLinkRoutes);
 
   // Search
   app.route("/api/search", searchRoutes);

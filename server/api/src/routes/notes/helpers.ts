@@ -4,10 +4,18 @@
  */
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import { notes, notePages, noteMembers, pages, users } from "../../schema/index.js";
+import {
+  notes,
+  notePages,
+  noteMembers,
+  noteDomainAccess,
+  pages,
+  users,
+} from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import type { Database } from "../../types/index.js";
 import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
+import { extractEmailDomain } from "../../lib/freeEmailDomains.js";
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
@@ -143,6 +151,28 @@ export async function getActiveMemberCounts(
 /**
  * Resolves the caller's role for a note (owner, member, guest, or none).
  * 呼び出し元のノートに対するロール（owner / メンバー / guest / なし）を解決する。
+ *
+ * 解決順は以下で固定する (#663):
+ * 1. owner          (`notes.owner_id`)
+ * 2. member         (`note_members` with `status='accepted'`)
+ * 3. domain access  (`note_domain_access` where domain = userEmail の `@` 以降)
+ * 4. visibility     (`public` / `unlisted` → `guest`)
+ * 5. none
+ *
+ * Resolution order (#663):
+ * 1. owner         (`notes.owner_id`)
+ * 2. member        (`note_members` where `status='accepted'`)
+ * 3. domain access (`note_domain_access` matching the caller's email domain)
+ * 4. visibility    (`public` / `unlisted` → `guest`)
+ * 5. none
+ *
+ * ドメイン経由のアクセスは `note_members` を作らない（"在籍" ではなく
+ * "ルール" として扱う）。そのため `GET /notes/:noteId/members` には出ず、
+ * ドメイン削除は即座にアクセスを失効させる（キャッシュなし）。
+ *
+ * Domain rules do not spawn `note_members` rows — they are pure rules, so
+ * listing members never surfaces domain callers, and deleting a domain rule
+ * immediately cuts off anyone who was relying on it.
  */
 export async function getNoteRole(
   noteId: string,
@@ -155,14 +185,23 @@ export async function getNoteRole(
 
   if (userId && note.ownerId === userId) return { role: "owner", note };
 
-  if (userEmail) {
+  const normalizedEmail = typeof userEmail === "string" ? userEmail.trim().toLowerCase() : "";
+
+  if (normalizedEmail.length > 0) {
+    // メンバーは大文字小文字を区別せずに突合する。schema 側では lower-case で
+    // 保存する運用だが、古い行や手動挿入の取りこぼしを避けるため `LOWER(...)`
+    // で比較する。ヒットした場合はドメインルールより強い（= メンバー昇格済み）。
+    //
+    // Match members case-insensitively. Rows should already be lower-cased by
+    // `members.ts`, but compare via `LOWER(...)` to cover legacy / manual data.
+    // A member match outranks any domain rule (they were explicitly upgraded).
     const member = await db
       .select({ role: noteMembers.role })
       .from(noteMembers)
       .where(
         and(
           eq(noteMembers.noteId, noteId),
-          eq(noteMembers.memberEmail, userEmail),
+          sql`LOWER(${noteMembers.memberEmail}) = ${normalizedEmail}`,
           eq(noteMembers.isDeleted, false),
           eq(noteMembers.status, "accepted"),
         ),
@@ -172,6 +211,32 @@ export async function getNoteRole(
     const firstMember = member[0];
     if (firstMember) {
       return { role: firstMember.role as NoteMemberRole, note };
+    }
+
+    // ドメイン招待ルール: `user@EXAMPLE.com` のドメイン部 `example.com` で一致
+    // した最強ロールを返す（editor > viewer）。該当ルール削除は即反映するため
+    // キャッシュせず DB を都度引く。
+    //
+    // Domain rule: pick the strongest role (editor beats viewer) among active
+    // rules matching the caller's email domain. We always query live so that
+    // revoking a rule takes effect immediately.
+    const domain = extractEmailDomain(normalizedEmail);
+    if (domain) {
+      const rules = await db
+        .select({ role: noteDomainAccess.role })
+        .from(noteDomainAccess)
+        .where(
+          and(
+            eq(noteDomainAccess.noteId, noteId),
+            eq(noteDomainAccess.domain, domain),
+            eq(noteDomainAccess.isDeleted, false),
+          ),
+        );
+
+      if (rules.length > 0) {
+        const hasEditor = rules.some((r) => r.role === "editor");
+        return { role: hasEditor ? "editor" : "viewer", note };
+      }
     }
   }
 

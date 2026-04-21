@@ -16,7 +16,16 @@ app.get("/", authRequired, async (c) => {
 
   return c.json({
     plan: tier,
-    subscription,
+    subscription: subscription
+      ? {
+          plan: subscription.plan,
+          status: subscription.status,
+          billingInterval: subscription.billingInterval,
+          currentPeriodStart: subscription.currentPeriodStart,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          externalId: subscription.externalId,
+        }
+      : null,
     usage: {
       budgetUnits: usage.budgetUnits,
       consumedUnits: usage.consumedUnits,

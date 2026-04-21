@@ -76,6 +76,7 @@
     "statusCanceledNote": "Access remains until {{date}}",
     "statusPastDue": "Past due",
     "statusTrialing": "Trial",
+    "statusUnknown": "Unknown",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "cancelSubscription": "Cancel Subscription",

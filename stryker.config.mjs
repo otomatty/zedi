@@ -17,7 +17,6 @@ export default {
     "src/lib/**/*.{ts,tsx}",
     "src/hooks/**/*.{ts,tsx}",
     "src/pages/NoteView/noteViewHelpers.ts",
-    "src/components/layout/AIChatDock.tsx",
     "src/components/layout/AppLayout.tsx",
     "src/pages/NoteView/index.tsx",
     "src/pages/NoteSettings/index.tsx",
