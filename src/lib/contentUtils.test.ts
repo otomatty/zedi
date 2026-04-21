@@ -6,6 +6,7 @@ import {
   getContentPreview,
   generateAutoTitle,
   buildContentErrorMessage,
+  isContentNotEmpty,
   type SanitizeResult,
 } from "./contentUtils";
 
@@ -476,7 +477,9 @@ describe("getContentPreview", () => {
     expect(getContentPreview(content)).toBe("Short text");
   });
 
-  it("should truncate long content", () => {
+  it("should truncate long content to exactly maxLength + '...'", () => {
+    // 長さ 200 の文字列を maxLength=50 で切った場合の完全一致を検証する。
+    // Exact string match kills "omit slice", "change ellipsis", and "drop trailing trim" mutations.
     const longText = "A".repeat(200);
     const content = JSON.stringify({
       type: "doc",
@@ -484,8 +487,72 @@ describe("getContentPreview", () => {
     });
 
     const preview = getContentPreview(content, 50);
-    expect(preview.length).toBeLessThanOrEqual(53); // 50 + "..."
-    expect(preview.endsWith("...")).toBe(true);
+    expect(preview).toBe("A".repeat(50) + "...");
+  });
+
+  it("returns the full text as-is when length is exactly maxLength (<= boundary)", () => {
+    // 境界 `trimmed.length <= maxLength` を厳密に検証する。
+    // Pins the `<=` comparison at the equality boundary (mutation to `<` would truncate).
+    const text = "A".repeat(50);
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(getContentPreview(content, 50)).toBe(text);
+  });
+
+  it("truncates when length is exactly maxLength + 1 (> boundary)", () => {
+    // 境界直後で必ず省略記号が付くことを検証する。
+    // Pins the `<=` right-hand edge; a mutation to `<=` vs `<` surfaces here.
+    const text = "A".repeat(51);
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(getContentPreview(content, 50)).toBe("A".repeat(50) + "...");
+  });
+
+  it("collapses runs of whitespace (including newlines / tabs) to a single space", () => {
+    // `.replace(/\s+/g, " ")` の削除変異を殺す。
+    // Kills the whitespace-collapse mutation by observing the exact output.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "a   b\t\tc\nd" }] }],
+    });
+    expect(getContentPreview(content)).toBe("a b c d");
+  });
+
+  it("trims leading and trailing whitespace", () => {
+    // `plainText.trim()` の削除変異を殺す。
+    // Kills the `.trim()` removal mutation on the plain text.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "   hello   " }] }],
+    });
+    expect(getContentPreview(content)).toBe("hello");
+  });
+
+  it("defaults maxLength to 100 when not specified", () => {
+    // 既定値 `maxLength = 100` を検証する。
+    // Pins the literal `100` default; a mutation to e.g. `0` would truncate the fresh 101-char output.
+    const text = "A".repeat(101);
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(getContentPreview(content)).toBe("A".repeat(100) + "...");
+  });
+
+  it("trims trailing whitespace from the sliced segment before appending the ellipsis", () => {
+    // スライス結果の末尾が空白になるケースを用意し、`trimmed.slice(0, maxLength).trim()` の `.trim()` の削除変異を殺す。
+    // When the slice boundary lands on a space, the trailing `.trim()` must strip it
+    // before the ellipsis — otherwise the preview shows "... ..." instead of "...".
+    const text = "A".repeat(49) + " BBB";
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(getContentPreview(content, 50)).toBe("A".repeat(49) + "...");
   });
 });
 
@@ -503,19 +570,77 @@ describe("generateAutoTitle", () => {
     expect(generateAutoTitle(content)).toBe("First line Second line");
   });
 
-  it("should return default title for empty content", () => {
+  it('returns the default "無題のページ" for empty content', () => {
+    // 既定値の日本語文字列を厳密一致で検証する。
+    // Kills any string-literal mutation on the default title fallback.
     expect(generateAutoTitle("")).toBe("無題のページ");
   });
 
-  it("should truncate long first line", () => {
+  it('returns the default "無題のページ" when plain text is only whitespace', () => {
+    // `plainText.split("\n")[0]?.trim() || ""` が空になり !firstLine 分岐を通ることを検証する。
+    // Covers the `!firstLine` branch so the default-title fallback is not NoCoverage.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "   " }] }],
+    });
+    expect(generateAutoTitle(content)).toBe("無題のページ");
+  });
+
+  it("truncates long first line to exactly 40 chars + '...'", () => {
+    // 40+"..." の完全一致を検証する（スライス長・区切り文字列のミューテーションを殺す）。
+    // Exact match kills "slice length off-by-one" and ellipsis-mutation survivors.
     const longText = "A".repeat(100);
     const content = JSON.stringify({
       type: "doc",
       content: [{ type: "paragraph", content: [{ type: "text", text: longText }] }],
     });
+    expect(generateAutoTitle(content)).toBe("A".repeat(40) + "...");
+  });
 
-    const title = generateAutoTitle(content);
-    expect(title.length).toBeLessThanOrEqual(43); // 40 + "..."
+  it("returns the whole first line as-is when length is exactly 40 (<= boundary)", () => {
+    // `firstLine.length <= 40` の境界を検証する。
+    // Kills `<=` → `<` and `<=` → `>=` mutations at the 40-char boundary.
+    const text = "A".repeat(40);
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(generateAutoTitle(content)).toBe(text);
+  });
+
+  it("truncates when first-line length is exactly 41 (> boundary)", () => {
+    // 境界値 41 文字での省略挙動を検証する。
+    const text = "A".repeat(41);
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(generateAutoTitle(content)).toBe("A".repeat(40) + "...");
+  });
+
+  it("trims whitespace before length check (short title is not padded)", () => {
+    // `.trim()` の削除変異で前後空白が残ると 40 文字制限の挙動も変わる。
+    // Pins the pre-length `.trim()` so leading/trailing whitespace cannot leak through.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "   hi   " }] }],
+    });
+    // extractPlainText は前後空白を保持し、generateAutoTitle 内の trim が除去する。
+    // extractPlainText keeps the spaces; the trim inside generateAutoTitle removes them.
+    expect(generateAutoTitle(content)).toBe("hi");
+  });
+
+  it("trims trailing whitespace from the sliced title before appending the ellipsis", () => {
+    // 40 文字目のちょうど直前がスペースになる入力を用意し、
+    // `.slice(0, 40).trim()` の `.trim()` 削除変異を殺す。
+    // Mirrors the getContentPreview boundary test: a trailing space inside the slice
+    // must be stripped before the ellipsis.
+    const text = "A".repeat(39) + " BBB";
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    expect(generateAutoTitle(content)).toBe("A".repeat(39) + "...");
   });
 });
 
@@ -570,6 +695,47 @@ describe("buildContentErrorMessage", () => {
     expect(message).toContain("未対応のノード: unsupportedNode");
     expect(message).toContain("未対応のマーク: unsupportedMark");
     expect(message).toContain("移行データに問題があります");
+  });
+
+  it("joins node and mark sections with the Japanese comma `、` separator", () => {
+    // `parts.join("、")` の separator を検証する。
+    // Kills the `join("、")` → `join("")` StringLiteral mutation; without the separator,
+    // the two sections would collapse into one run without the Japanese comma.
+    const result: SanitizeResult = {
+      content: '{"type":"doc","content":[]}',
+      hadErrors: true,
+      removedNodeTypes: ["nodeA"],
+      removedMarkTypes: ["markA"],
+    };
+    const message = buildContentErrorMessage(result);
+    expect(message).toContain("未対応のノード: nodeA、未対応のマーク: markA");
+  });
+
+  it("joins multiple node types within a section with ', ' (ascii comma)", () => {
+    // 内側の `join(", ")` separator を検証する。
+    // Pins the inner join with ", "; separate from the outer "、" separator.
+    const result: SanitizeResult = {
+      content: '{"type":"doc","content":[]}',
+      hadErrors: true,
+      removedNodeTypes: ["a", "b", "c"],
+      removedMarkTypes: [],
+    };
+    const message = buildContentErrorMessage(result);
+    expect(message).toContain("未対応のノード: a, b, c");
+  });
+
+  it("wraps the message with the fixed Japanese preamble and suffix", () => {
+    // 固定文字列 "移行データに問題があります。" および "自動的に修正されました。" を個別に検証する。
+    // Pins the surrounding literals so string-literal mutations on either side are caught.
+    const result: SanitizeResult = {
+      content: '{"type":"doc","content":[]}',
+      hadErrors: true,
+      removedNodeTypes: ["x"],
+      removedMarkTypes: [],
+    };
+    const message = buildContentErrorMessage(result);
+    expect(message.startsWith("移行データに問題があります。")).toBe(true);
+    expect(message.endsWith("が含まれていたため自動的に修正されました。")).toBe(true);
   });
 });
 
@@ -793,5 +959,102 @@ describe("sanitizeTiptapContent - wikiLink promotion", () => {
     expect(nodes[0].text).toBe("[[not a link]]");
     expect(nodes[0].marks).toHaveLength(1);
     expect(nodes[0].marks[0].type).toBe("code");
+  });
+});
+
+describe("isContentNotEmpty", () => {
+  it("returns false for an empty string", () => {
+    expect(isContentNotEmpty("")).toBe(false);
+  });
+
+  it("returns false when parsed doc has no content property", () => {
+    // `!parsed.content` の分岐を検証する。
+    // Covers the `!parsed.content` side of the OR; mutation to `&&` would short-circuit.
+    expect(isContentNotEmpty(JSON.stringify({ type: "doc" }))).toBe(false);
+  });
+
+  it("returns false when parsed content array is empty", () => {
+    // `parsed.content.length === 0` の境界を検証する。
+    // Kills `=== 0` → `!== 0` and `length` → falsy mutation paths.
+    expect(isContentNotEmpty(JSON.stringify({ type: "doc", content: [] }))).toBe(false);
+  });
+
+  it("returns false for an empty paragraph (only `type: paragraph` without content)", () => {
+    // `node.content && node.content.length > 0` の左辺 falsy ケースを検証する。
+    // Kills the `&&` → `||` LogicalOperator mutation by exercising the missing-content paragraph path.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph" }],
+    });
+    expect(isContentNotEmpty(content)).toBe(false);
+  });
+
+  it("returns false for a paragraph with an empty content array", () => {
+    // `node.content.length > 0` の境界を殺す（`>= 0` mutation は 0 を true にしてしまう）。
+    // Pins the `> 0` comparison at the zero-length boundary.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [] }],
+    });
+    expect(isContentNotEmpty(content)).toBe(false);
+  });
+
+  it("returns true for a paragraph that actually has a text child", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "hi" }] }],
+    });
+    expect(isContentNotEmpty(content)).toBe(true);
+  });
+
+  it("returns true for non-paragraph nodes regardless of their content (e.g. heading, image)", () => {
+    // `return true` の分岐（段落以外のノード）を検証する。
+    // Pins the else branch: non-paragraph nodes always count as real content.
+    expect(
+      isContentNotEmpty(
+        JSON.stringify({
+          type: "doc",
+          content: [{ type: "heading", attrs: { level: 1 } }],
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isContentNotEmpty(
+        JSON.stringify({
+          type: "doc",
+          content: [{ type: "image", attrs: { src: "x" } }],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("returns true when any node is non-empty (`some` semantics, not `every`)", () => {
+    // `.some(...)` → `.every(...)` 変異を殺す。
+    // With `every`, this case (empty paragraph + real heading) would return false.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "paragraph", content: [] }, { type: "heading" }],
+    });
+    expect(isContentNotEmpty(content)).toBe(true);
+  });
+
+  it("returns false when every node is an empty paragraph (`some` returns false)", () => {
+    // `some` の false 側も検証する。
+    // Symmetric case: every paragraph is empty, so some returns false.
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [] },
+        { type: "paragraph", content: [] },
+      ],
+    });
+    expect(isContentNotEmpty(content)).toBe(false);
+  });
+
+  it("falls back to trimmed-string check when JSON is invalid", () => {
+    // try/catch のフォールバック経路を検証する。
+    // `contentJson.trim().length > 0` の境界を検証。
+    expect(isContentNotEmpty("not json")).toBe(true);
+    expect(isContentNotEmpty("   ")).toBe(false);
   });
 });
