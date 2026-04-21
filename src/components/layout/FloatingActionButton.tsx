@@ -65,10 +65,15 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
               "shadow-elevated",
               "transition-all duration-300 ease-in-out",
               "hover:bg-primary hover:scale-105",
+              // Override Button's base `[&_svg]:size-4` so the + / × icon
+              // fills the FAB instead of being shrunk to 16px.
+              // Button 基底の `[&_svg]:size-4` を上書きし、+ / × アイコンが
+              // 16px に縮まらず FAB に見合うサイズで表示されるようにする。
+              "[&_svg]:size-8",
               isMenuOpen && "bg-muted-foreground hover:bg-muted-foreground",
             )}
           >
-            {isMenuOpen ? <X className="h-12 w-12" /> : <Plus className="h-12 w-12" />}
+            {isMenuOpen ? <X /> : <Plus />}
           </Button>
         </TooltipTrigger>
         {!isMenuOpen && <TooltipContent side="left">{t("common.createPageAction")}</TooltipContent>}

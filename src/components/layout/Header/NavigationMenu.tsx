@@ -144,11 +144,15 @@ const NavTrigger = React.forwardRef<
       ref={ref}
       variant="ghost"
       size="icon"
-      className="h-12 w-12"
+      // Override Button's base `[&_svg]:size-4` so the trigger icon renders at
+      // its intended size instead of being shrunk to 16px.
+      // Button の基底クラス `[&_svg]:size-4` を上書きして、トリガーアイコンを
+      // 16px に縮められないよう本来のサイズで表示する。
+      className="h-12 w-12 [&_svg]:size-6"
       aria-label={t("nav.menu")}
       {...props}
     >
-      <DotGridIcon className="h-6 w-6" />
+      <DotGridIcon />
     </Button>
   );
 });
