@@ -1,10 +1,10 @@
 /**
- * MobileHeader: compact h-14 title bar that shows ONLY the search bar inline.
+ * MobileHeader: compact h-16 title bar that shows ONLY the search bar inline.
  * The logo, the search-sheet toggle, and the legacy desktop widgets
  * (NavigationMenu / UnifiedMenu) must NOT render — their roles have moved
  * to the bottom nav.
  *
- * モバイルヘッダー: h-14 のタイトルバーに検索バーのみをインラインで描画する。
+ * モバイルヘッダー: h-16 のタイトルバーに検索バーのみをインラインで描画する。
  * ロゴ・検索 Sheet のトグル・既存のデスクトップウィジェット（NavigationMenu /
  * UnifiedMenu）は描画されない（役割はボトムナビへ移動）。
  */
@@ -58,11 +58,11 @@ function renderHeader() {
 }
 
 describe("MobileHeader", () => {
-  it("renders a compact h-14 sticky title bar", () => {
+  it("renders a compact h-16 sticky title bar", () => {
     const { container } = renderHeader();
     const header = container.querySelector("header");
     expect(header).toBeInTheDocument();
-    expect(header?.className).toMatch(/h-14/);
+    expect(header?.className).toMatch(/h-16/);
     expect(header?.className).toMatch(/sticky/);
   });
 
@@ -124,7 +124,7 @@ describe("MobileHeader", () => {
     // caught.
     const header = container.querySelector("header");
     expect(header).toBeInTheDocument();
-    expect(header?.className).toMatch(/h-14/);
+    expect(header?.className).toMatch(/h-16/);
     vi.doUnmock("@/contexts/GlobalSearchContext");
   });
 });
