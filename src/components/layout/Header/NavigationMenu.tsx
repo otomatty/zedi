@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
-import { Home, FileText } from "lucide-react";
 import {
   Button,
   cn,
@@ -15,21 +14,7 @@ import {
 } from "@zedi/ui";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useTranslation } from "react-i18next";
-
-/**
- * One entry in the navigation grid inside the header dropdown / sheet.
- * ヘッダーのナビグリッドに並ぶ 1 項目。
- */
-interface NavEntry {
-  path: string;
-  icon: React.FC<{ className?: string }>;
-  i18nKey: string;
-}
-
-const NAV_ENTRIES: readonly NavEntry[] = [
-  { path: "/home", icon: Home, i18nKey: "nav.home" },
-  { path: "/notes", icon: FileText, i18nKey: "nav.notes" },
-] as const;
+import { PRIMARY_NAV_ITEMS, type PrimaryNavItem } from "../navigationItems";
 
 const TILE_BASE_CLASS =
   "flex flex-col items-center gap-2 rounded-lg p-3 transition-colors hover:bg-muted data-[highlighted]:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
@@ -64,7 +49,7 @@ const DotGridIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 interface NavTileProps {
-  entry: NavEntry;
+  entry: PrimaryNavItem;
   label: string;
   onNavigate: () => void;
   as: "menuitem" | "link";
@@ -121,7 +106,7 @@ const NavGrid: React.FC<NavGridProps> = ({ onNavigate, as }) => {
   const { t } = useTranslation();
   return (
     <div className="grid grid-cols-3 gap-2 p-2">
-      {NAV_ENTRIES.map((entry) => (
+      {PRIMARY_NAV_ITEMS.map((entry) => (
         <NavTile
           key={entry.path}
           entry={entry}
@@ -193,13 +178,14 @@ const MobileNavigationMenu: React.FC = () => {
 };
 
 /**
- * Consolidated header navigation. Presents Home / Notes (and future entries)
- * as an icon-plus-label tile grid inside a dropdown on desktop and a sheet on
- * mobile. Replaces the previous always-visible `PrimaryNav`.
+ * Consolidated header navigation. Renders the shared
+ * {@link PRIMARY_NAV_ITEMS} as an icon-plus-label tile grid inside a dropdown
+ * on desktop and a sheet on mobile, so it stays in sync with the mobile
+ * bottom navigation that consumes the same list.
  *
- * ヘッダーの機能ナビゲーションを集約したメニュー。Home / Notes（および将来追加分）を
- * 「アイコン+ラベル」のタイルとしてグリッド表示する。デスクトップはドロップダウン、
- * モバイルはシートで開く。常時表示だった従来の `PrimaryNav` を置き換える。
+ * ヘッダーの機能ナビゲーションを集約したメニュー。共通の {@link PRIMARY_NAV_ITEMS} を
+ * 「アイコン+ラベル」のタイルとしてグリッド表示し、デスクトップはドロップダウン、
+ * モバイルはシートで開く。モバイルのボトムナビと同じ配列を参照するため表示項目が常に一致する。
  */
 export const NavigationMenu: React.FC = () => {
   const isMobile = useIsMobile();
