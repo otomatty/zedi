@@ -14,7 +14,7 @@ import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandle
 /**
  * FAB 共通プロパティ。`noteId` が指定されるとノート配下ページとして作成・遷移する。
  * Common FAB props. When `noteId` is supplied the FAB creates pages scoped to
- * that note and routes to `/notes/:noteId/pages/:pageId` instead of the
+ * that note and routes to `/notes/:noteId/:pageId` instead of the
  * standalone `/pages/:id`.
  *
  * When initialClipUrl is provided, onClipDialogClosedWithInitialUrl is required

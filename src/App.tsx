@@ -80,13 +80,23 @@ function LegacyNoteRedirect({ suffix }: { suffix?: "settings" | "members" }) {
 }
 
 /**
- * Redirect `/note/:noteId/page/:pageId` to `/notes/:noteId/pages/:pageId`.
- * 旧パス `/note/:noteId/page/:pageId` を複数形ルートへリダイレクト。
+ * Redirect `/note/:noteId/page/:pageId` to `/notes/:noteId/:pageId`.
+ * 旧パス `/note/:noteId/page/:pageId` を新ルートへリダイレクト。
  */
 function LegacyNotePageRedirect() {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const { search, hash } = useLocation();
-  return <Navigate to={`/notes/${noteId}/pages/${pageId}${search}${hash}`} replace />;
+  return <Navigate to={`/notes/${noteId}/${pageId}${search}${hash}`} replace />;
+}
+
+/**
+ * Redirect `/notes/:noteId/pages/:pageId` to `/notes/:noteId/:pageId`.
+ * 旧パス `/notes/:noteId/pages/:pageId` を新しい短縮パスへリダイレクト。
+ */
+function LegacyNotePagesRedirect() {
+  const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
+  const { search, hash } = useLocation();
+  return <Navigate to={`/notes/${noteId}/${pageId}${search}${hash}`} replace />;
 }
 
 /**
@@ -187,7 +197,14 @@ const App = () => (
                       <Route path="/notes/:noteId" element={<NoteView />} />
                       <Route path="/notes/:noteId/settings" element={<NoteSettings />} />
                       <Route path="/notes/:noteId/members" element={<NoteMembers />} />
-                      <Route path="/notes/:noteId/pages/:pageId" element={<NotePageView />} />
+                      <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
+                      {/* Legacy path — redirect `/notes/:noteId/pages/:pageId` to
+                          the shorter `/notes/:noteId/:pageId`.
+                          旧パス `/notes/:noteId/pages/:pageId` を短縮形にリダイレクト。 */}
+                      <Route
+                        path="/notes/:noteId/pages/:pageId"
+                        element={<LegacyNotePagesRedirect />}
+                      />
                       {/* Legacy singular paths — redirect to plural.
                           旧単数形パス — 複数形にリダイレクト。 */}
                       <Route path="/note/:noteId" element={<LegacyNoteRedirect />} />

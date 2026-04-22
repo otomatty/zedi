@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
-import { Button } from "@zedi/ui";
-import { useNote, useNotePage } from "@/hooks/useNoteQueries";
+import { Button, useToast } from "@zedi/ui";
+import { useNote, useNotePage, noteKeys } from "@/hooks/useNoteQueries";
+import { useUpdatePage } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
@@ -15,6 +17,8 @@ import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { Page } from "@/types/page";
+
+const TITLE_SAVE_DEBOUNCE_MS = 500;
 
 function canEditPage(
   access: { canEdit?: boolean; canView?: boolean } | undefined,
@@ -27,6 +31,21 @@ function canEditPage(
 }
 
 /**
+ * タイトル更新 API (`PUT /api/pages/:id/content` 経由) はページ所有者しか
+ * 成功しない。ノート編集権限があってもページ所有者でなければタイトル欄は
+ * 閲覧専用として表示し、サイレントフェイルを避ける。
+ * The title-update path (`PUT /api/pages/:id/content`) only succeeds for the
+ * page owner. Even with note-level edit rights, non-owners get a read-only
+ * title rendering so we do not silently drop their keystrokes.
+ */
+function canEditTitle(
+  userId: string | undefined,
+  page: { ownerUserId?: string } | null | undefined,
+): boolean {
+  return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
+}
+
+/**
  * Uses `key` on the parent so page switches reset local editor state.
  * `editorContent` の初期値は `page.content` から。
  */
@@ -35,17 +54,27 @@ function NotePageEditorEditable({
   noteId,
   collaboration,
   isCollaborationEnabled,
+  isTitleEditable,
 }: {
   page: Page;
   noteId: string;
   collaboration: UseCollaborationReturn;
   isCollaborationEnabled: boolean;
+  /** ページ所有者のみタイトル編集可。Only the page owner can edit the title. */
+  isTitleEditable: boolean;
 }): React.JSX.Element {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
+  const [title, setTitle] = useState(page.title);
   const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
+  const updatePageMutation = useUpdatePage();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTitleRef = useRef<string | null>(null);
+  const isSavingTitleRef = useRef(false);
 
   useEffect(() => {
     setPageContext({
@@ -53,11 +82,11 @@ function NotePageEditorEditable({
       pageId: page.id,
       noteId,
       claudeWorkspaceRoot: workspaceRoot ?? undefined,
-      pageTitle: page.title,
+      pageTitle: title,
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-  }, [page.id, page.title, editorContent, setPageContext, noteId, workspaceRoot]);
+  }, [page.id, title, editorContent, setPageContext, noteId, workspaceRoot]);
 
   useEffect(() => {
     return () => setPageContext(null);
@@ -86,12 +115,101 @@ function NotePageEditorEditable({
     };
   }, [insertAtCursorRef]);
 
+  // 最新の persistTitle をミュータブルな ref に退避する。useMutation の戻り値は
+  // 状態遷移（idle → pending → success）ごとに identity が変わるため、直接
+  // useCallback の依存に入れるとアンマウント用 effect の cleanup が過剰発火し、
+  // 保留中の保存が debounce を待たずに走ってしまう。ref 経由なら effect 側は
+  // 安定した参照だけを見て済む。
+  // Keep the latest persistTitle in a mutable ref. `useMutation()` returns a new
+  // object on every state transition (idle → pending → success), so referencing
+  // the mutation directly in a `useCallback` dep array would cause the unmount
+  // flush effect's cleanup to fire mid-typing and flush the debounce early.
+  const persistTitleRef = useRef<(nextTitle: string) => Promise<void>>(async () => {});
+  persistTitleRef.current = async (nextTitle: string) => {
+    try {
+      await updatePageMutation.mutateAsync({
+        pageId: page.id,
+        updates: { title: nextTitle },
+      });
+      // `useUpdatePage` updates `pageKeys.*` caches, but the note page list and
+      // detail are held under `noteKeys.*`. Invalidate those so the new title
+      // propagates to the note view and sidebar.
+      // `useUpdatePage` は `pageKeys.*` を更新するが、ノート側のキャッシュは
+      // `noteKeys.*` にあるため、タイトル変更をノート表示やサイドバーに反映
+      // させるには明示的に無効化する必要がある。
+      queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(noteId) });
+    } catch (error) {
+      console.error("Failed to save page title:", error);
+      toast({
+        title: "タイトルの保存に失敗しました",
+        description: "通信環境を確認し、再度お試しください。",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  // タイトル保存を直列化する。保存中なら何もせず、完了後に pending があれば
+  // 追随保存する。これにより「古いリクエストが遅延完了して新しい値を上書きする」
+  // 先祖返りを防止する。
+  // Serialize title saves: skip while a save is in-flight, and re-run once it
+  // completes if a newer title is pending. This prevents an out-of-order
+  // response from overwriting a more recent edit.
+  const flushPendingTitleRef = useRef<() => void>(() => {});
+  flushPendingTitleRef.current = () => {
+    if (isSavingTitleRef.current) return;
+    const pending = pendingTitleRef.current;
+    if (pending === null) return;
+    pendingTitleRef.current = null;
+    isSavingTitleRef.current = true;
+    void (async () => {
+      try {
+        await persistTitleRef.current(pending);
+      } catch {
+        // persistTitleRef で toast + console.error 済み。ここは coalesce 継続のため握る。
+        // Already logged + toasted inside persistTitleRef; swallow so we keep coalescing.
+      } finally {
+        isSavingTitleRef.current = false;
+        if (pendingTitleRef.current !== null) {
+          flushPendingTitleRef.current();
+        }
+      }
+    })();
+  };
+
+  const handleTitleChange = useCallback((newTitle: string) => {
+    setTitle(newTitle);
+    pendingTitleRef.current = newTitle;
+    if (titleSaveTimerRef.current) {
+      clearTimeout(titleSaveTimerRef.current);
+    }
+    titleSaveTimerRef.current = setTimeout(() => {
+      titleSaveTimerRef.current = null;
+      flushPendingTitleRef.current();
+    }, TITLE_SAVE_DEBOUNCE_MS);
+  }, []);
+
+  // アンマウント時に debounce 中のタイトル保存を即時フラッシュし、遷移で失われないようにする。
+  // deps は空配列 — ref 経由のみで参照しているため、mutation 状態遷移で cleanup が走らない。
+  // Flush any debounced title save on unmount so navigation does not drop it.
+  // Empty deps: we only read refs, so cleanup does not fire on mutation state transitions.
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimerRef.current) {
+        clearTimeout(titleSaveTimerRef.current);
+        titleSaveTimerRef.current = null;
+      }
+      flushPendingTitleRef.current();
+    };
+  }, []);
+
   return (
     <ContentWithAIChat>
       <NoteWorkspaceToolbar />
       <PageEditorContent
         content={editorContent}
-        title={page.title}
+        title={title}
         sourceUrl={page.sourceUrl}
         currentPageId={page.id}
         pageId={page.id}
@@ -102,6 +220,7 @@ function NotePageEditorEditable({
         showToolbar
         onContentChange={setEditorContent}
         onContentError={() => undefined}
+        onTitleChange={isTitleEditable ? handleTitleChange : undefined}
         collaboration={isCollaborationEnabled ? collaboration : undefined}
         insertAtCursorRef={editorInsertRef}
       />
@@ -141,6 +260,7 @@ const NotePageView: React.FC = () => {
   }, [navigate, noteId]);
 
   const canEdit = canEditPage(access, userId, page);
+  const isTitleEditable = canEdit && canEditTitle(userId, page);
   const collaborationPageId = page?.id ?? "";
   const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
   const collaboration = useCollaboration({
@@ -207,6 +327,7 @@ const NotePageView: React.FC = () => {
               page={page}
               collaboration={collaboration}
               isCollaborationEnabled={isCollaborationEnabled}
+              isTitleEditable={isTitleEditable}
             />
           ) : (
             <PageEditorContent
