@@ -145,6 +145,19 @@ BEGIN
     -- `COALESCE` preserves any preexisting `accepted_user_id` value so we
     -- never overwrite real data with a (possibly-NULL) email lookup result.
     IF NOT (status_existed AND accepted_user_id_existed) THEN
+        IF EXISTS (
+            SELECT 1
+            FROM "note_members" AS nm
+            JOIN "user" AS u
+              ON LOWER(u."email") = LOWER(nm."member_email")
+            WHERE nm."is_deleted" = false
+            GROUP BY LOWER(nm."member_email")
+            HAVING COUNT(DISTINCT u."id") > 1
+        ) THEN
+            RAISE EXCEPTION
+                '0015_add_note_members_status_accepted_user found multiple users for the same lowercase email; normalize duplicate user.email values before running this migration.';
+        END IF;
+
         UPDATE "note_members" AS nm
         SET
             "status" = 'accepted',
@@ -158,6 +171,9 @@ BEGIN
                 )
             )
         WHERE nm."is_deleted" = false;
+    ELSE
+        RAISE WARNING
+            '0015_add_note_members_status_accepted_user skipped the legacy backfill because both columns already existed; run the documented manual backfill if this environment still has pre-migration note_members rows.';
     END IF;
 
     -- PostgreSQL has no `ADD CONSTRAINT IF NOT EXISTS`, so check `pg_constraint`

@@ -138,7 +138,7 @@ const NoteView: React.FC = () => {
         ) : null
       }
     >
-      <div className="min-h-0 flex-1 overflow-y-auto py-6">
+      <div className="min-h-0 flex-1 py-6">
         <Container>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">

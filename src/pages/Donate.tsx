@@ -59,7 +59,7 @@ const Donate: React.FC = () => {
       <PageHeader title={t("nav.support")} backTo="/home" backLabel={t("common.back")} />
 
       {/* Content */}
-      <div className="min-h-0 flex-1 overflow-y-auto py-8">
+      <div className="min-h-0 flex-1 py-8">
         <Container>
           <div className="mx-auto max-w-2xl">
             {/* Hero Section */}

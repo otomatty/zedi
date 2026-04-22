@@ -16,7 +16,7 @@ export interface PrimaryNavItem {
   /** Link target. 遷移先パス。*/
   path: string;
   /** Icon component rendered in the tile / tab. タイルやタブに描画するアイコン。*/
-  icon: React.FC<{ className?: string }>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   /** i18n key for the label. ラベルの i18n キー。*/
   i18nKey: string;
   /**
@@ -39,7 +39,12 @@ export interface PrimaryNavItem {
  */
 export const PRIMARY_NAV_ITEMS: readonly PrimaryNavItem[] = [
   { path: "/home", icon: Home, i18nKey: "nav.home" },
-  { path: "/notes", icon: FileText, i18nKey: "nav.notes" },
+  {
+    path: "/notes",
+    icon: FileText,
+    i18nKey: "nav.notes",
+    matchPaths: ["/notes", "/notes/discover"],
+  },
   {
     path: "/ai",
     icon: Sparkles,

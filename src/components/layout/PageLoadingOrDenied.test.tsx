@@ -12,10 +12,10 @@ describe("PageLoadingOrDenied", () => {
     expect(screen.getByTestId("msg")).toBeInTheDocument();
   });
 
-  it("applies the expected scroll-container classes on the wrapper", () => {
-    // Wrapper carries the flex / overflow / padding utilities so nested
-    // AppLayout routes share the same loading-state layout.
-    // Wrapper は AppLayout 配下でローディング表示のレイアウトを揃える役割。
+  it("applies the expected layout classes on the wrapper", () => {
+    // Wrapper carries the flex / padding utilities while the surrounding
+    // layout owns the scroll container.
+    // Wrapper は flex / padding を担い、スクロール責務は外側レイアウトに委譲する。
     const { container } = render(
       <PageLoadingOrDenied>
         <p>loading...</p>
@@ -25,7 +25,6 @@ describe("PageLoadingOrDenied", () => {
     expect(root).not.toBeNull();
     expect(root?.className).toContain("min-h-0");
     expect(root?.className).toContain("flex-1");
-    expect(root?.className).toContain("overflow-y-auto");
     expect(root?.className).toContain("py-10");
   });
 
