@@ -203,7 +203,7 @@ const IndexPage: React.FC = () => {
                   {data.pageId && (
                     <div className="mt-2">
                       <Link
-                        to={`/page/${data.pageId}`}
+                        to={`/pages/${data.pageId}`}
                         className="text-primary text-sm underline underline-offset-2"
                       >
                         __index__ ページを開く / Open __index__ page

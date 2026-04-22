@@ -3,7 +3,15 @@ import { Toaster as Sonner } from "@zedi/ui/components/sonner";
 import { TooltipProvider } from "@zedi/ui";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Notes from "./pages/Notes";
@@ -48,6 +56,37 @@ const queryClient = new QueryClient();
 function LegacyAIChatConversationRedirect() {
   const { conversationId } = useParams<{ conversationId: string }>();
   return <Navigate to={`/ai/${conversationId}`} replace />;
+}
+
+/**
+ * Redirect singular `/page/:id` to plural `/pages/:id` while preserving search/hash.
+ * 旧パス `/page/:id` を複数形 `/pages/:id` にリダイレクト（search/hash は保持）。
+ */
+function LegacyPageRedirect() {
+  const { id } = useParams<{ id: string }>();
+  const { search, hash } = useLocation();
+  return <Navigate to={`/pages/${id}${search}${hash}`} replace />;
+}
+
+/**
+ * Redirect singular `/note/:noteId` (and sub-routes) to plural `/notes/:noteId/...`.
+ * 旧パス `/note/:noteId` 系を複数形 `/notes/:noteId/...` にリダイレクト。
+ */
+function LegacyNoteRedirect({ suffix }: { suffix?: "settings" | "members" }) {
+  const { noteId } = useParams<{ noteId: string }>();
+  const { search, hash } = useLocation();
+  const tail = suffix ? `/${suffix}` : "";
+  return <Navigate to={`/notes/${noteId}${tail}${search}${hash}`} replace />;
+}
+
+/**
+ * Redirect `/note/:noteId/page/:pageId` to `/notes/:noteId/pages/:pageId`.
+ * 旧パス `/note/:noteId/page/:pageId` を複数形ルートへリダイレクト。
+ */
+function LegacyNotePageRedirect() {
+  const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
+  const { search, hash } = useLocation();
+  return <Navigate to={`/notes/${noteId}/pages/${pageId}${search}${hash}`} replace />;
 }
 
 /**
@@ -127,7 +166,10 @@ const App = () => (
                       <Route path="/search" element={<SearchResults />} />
                       <Route path="/notes/discover" element={<NotesDiscover />} />
                       <Route path="/notes" element={<Notes />} />
-                      <Route path="/page/:id" element={<PageEditorPage />} />
+                      <Route path="/pages/:id" element={<PageEditorPage />} />
+                      {/* Legacy singular path — redirect to plural.
+                          旧単数形パス — 複数形にリダイレクト。 */}
+                      <Route path="/page/:id" element={<LegacyPageRedirect />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/wiki-schema" element={<WikiSchemaPage />} />
                       <Route path="/index" element={<IndexPage />} />
@@ -142,10 +184,25 @@ const App = () => (
                         element={<Navigate to="/pricing#manage" replace />}
                       />
                       <Route path="/donate" element={<Donate />} />
-                      <Route path="/note/:noteId" element={<NoteView />} />
-                      <Route path="/note/:noteId/settings" element={<NoteSettings />} />
-                      <Route path="/note/:noteId/members" element={<NoteMembers />} />
-                      <Route path="/note/:noteId/page/:pageId" element={<NotePageView />} />
+                      <Route path="/notes/:noteId" element={<NoteView />} />
+                      <Route path="/notes/:noteId/settings" element={<NoteSettings />} />
+                      <Route path="/notes/:noteId/members" element={<NoteMembers />} />
+                      <Route path="/notes/:noteId/pages/:pageId" element={<NotePageView />} />
+                      {/* Legacy singular paths — redirect to plural.
+                          旧単数形パス — 複数形にリダイレクト。 */}
+                      <Route path="/note/:noteId" element={<LegacyNoteRedirect />} />
+                      <Route
+                        path="/note/:noteId/settings"
+                        element={<LegacyNoteRedirect suffix="settings" />}
+                      />
+                      <Route
+                        path="/note/:noteId/members"
+                        element={<LegacyNoteRedirect suffix="members" />}
+                      />
+                      <Route
+                        path="/note/:noteId/page/:pageId"
+                        element={<LegacyNotePageRedirect />}
+                      />
                     </Route>
 
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

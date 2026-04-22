@@ -83,7 +83,7 @@ async function seedBlankPage(page: Page, title: string) {
 
 async function createPageWithGhostWikiLink(page: Page, sourceTitle: string) {
   const pageId = await seedBlankPage(page, sourceTitle);
-  await page.goto(`/page/${pageId}`);
+  await page.goto(`/pages/${pageId}`);
   await page.waitForLoadState("networkidle");
   await expect(page.getByRole("textbox", { name: "タイトル" })).toHaveValue(sourceTitle);
 

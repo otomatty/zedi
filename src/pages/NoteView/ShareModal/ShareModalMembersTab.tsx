@@ -41,7 +41,7 @@ export function ShareModalMembersTab({ noteId, enabled, onNavigate }: ShareModal
       />
       <div className="mt-3 flex justify-end">
         <Button asChild variant="link" size="sm" onClick={onNavigate}>
-          <Link to={`/note/${noteId}/members`}>
+          <Link to={`/notes/${noteId}/members`}>
             <ExternalLink className="mr-1 h-3 w-3" />
             {t("notes.shareOpenMembersPage")}
           </Link>

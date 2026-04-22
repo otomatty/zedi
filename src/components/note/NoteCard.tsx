@@ -40,7 +40,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
    *
    */
   const handleClick = () => {
-    navigate(`/note/${note.id}`);
+    navigate(`/notes/${note.id}`);
   };
 
   return (

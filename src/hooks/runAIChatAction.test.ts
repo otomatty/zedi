@@ -64,7 +64,7 @@ describe("runAIChatAction — create", () => {
       title: "Wiki Topic",
       content: "",
     });
-    expect(navigate).toHaveBeenCalledWith("/page/new-page-1", {
+    expect(navigate).toHaveBeenCalledWith("/pages/new-page-1", {
       state: {
         pendingChatPageGeneration: {
           outline: "- A\n- B",
@@ -97,7 +97,7 @@ describe("runAIChatAction — create", () => {
     });
 
     expect(createPageMutateAsync).toHaveBeenCalledTimes(2);
-    expect(navigate).toHaveBeenCalledWith("/page/p1", {
+    expect(navigate).toHaveBeenCalledWith("/pages/p1", {
       state: {
         pendingChatPageGeneration: {
           outline: "- o1",
@@ -129,7 +129,7 @@ describe("runAIChatAction — create", () => {
       reason: "multi",
     });
 
-    expect(navigate).toHaveBeenCalledWith("/page/p1", {
+    expect(navigate).toHaveBeenCalledWith("/pages/p1", {
       state: {
         pendingChatPageGeneration: {
           outline: "- from-second",

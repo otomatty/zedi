@@ -58,7 +58,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
       isDraggingRef.current = false;
       return;
     }
-    navigate(`/page/${page.id}`);
+    navigate(`/pages/${page.id}`);
   };
 
   const handleDragStart = useCallback(
@@ -100,7 +100,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
         title: "複製しました",
         description: `「${newTitle}」を作成しました`,
       });
-      navigate(`/page/${newPage.id}`);
+      navigate(`/pages/${newPage.id}`);
     } catch (error) {
       console.error("Failed to duplicate page:", error);
       toast({

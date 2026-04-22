@@ -267,7 +267,7 @@ export function ShareModalVisibilityTab({ note, canEdit }: ShareModalVisibilityT
 
   const noteUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
-    return `${window.location.origin}/note/${note.id}`;
+    return `${window.location.origin}/notes/${note.id}`;
   }, [note.id]);
 
   const handleCopyNoteUrl = async () => {

@@ -59,7 +59,7 @@ async function handleCreatePage(
     content: "",
   });
   if (result?.id) {
-    deps.navigate(`/page/${result.id}`, {
+    deps.navigate(`/pages/${result.id}`, {
       state: { pendingChatPageGeneration: pending },
     });
   }
@@ -96,7 +96,7 @@ async function handleCreateMultiplePages(
       outline: firstOutline,
       conversationText,
     };
-    deps.navigate(`/page/${firstCreatedId}`, {
+    deps.navigate(`/pages/${firstCreatedId}`, {
       state: { pendingChatPageGeneration: pending },
     });
   }

@@ -312,7 +312,7 @@ const InviteContent: React.FC<{
         <CardContent className="space-y-4">
           <p className="text-muted-foreground">{t("invite.alreadyAccepted")}</p>
           <Button className="w-full" asChild>
-            <Link to={`/note/${invitation.noteId}`}>{t("invite.goToNote")}</Link>
+            <Link to={`/notes/${invitation.noteId}`}>{t("invite.goToNote")}</Link>
           </Button>
         </CardContent>
       </>
@@ -428,7 +428,7 @@ const InvitePage: React.FC = () => {
     if (!token) return;
     try {
       const result = await acceptMutation.mutateAsync({ token });
-      navigate(`/note/${result.noteId}`);
+      navigate(`/notes/${result.noteId}`);
     } catch {
       // Error is handled via acceptMutation.error
     }

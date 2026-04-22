@@ -69,7 +69,7 @@ const NoteSettings: React.FC = () => {
 
   const noteUrl = useMemo(() => {
     if (!noteId) return "";
-    return `${window.location.origin}/note/${noteId}`;
+    return `${window.location.origin}/notes/${noteId}`;
   }, [noteId]);
 
   const handleCopyLink = async () => {
@@ -125,7 +125,7 @@ const NoteSettings: React.FC = () => {
             </p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
+            <Link to={`/notes/${note.id}`}>{t("notes.backToNote")}</Link>
           </Button>
         </div>
 
