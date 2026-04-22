@@ -163,7 +163,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
       ref={wrapperRef}
       aria-hidden={hidden || undefined}
       className={cn(
-        "bg-background/70 supports-backdrop-filter:bg-background/50 sticky top-0 z-20 backdrop-blur transition-transform duration-300 ease-in-out",
+        "bg-background/70 supports-[backdrop-filter]:bg-background/50 sticky top-0 z-20 backdrop-blur transition-transform duration-300 ease-in-out",
         hidden ? "pointer-events-none -translate-y-full" : "translate-y-0",
       )}
     >
