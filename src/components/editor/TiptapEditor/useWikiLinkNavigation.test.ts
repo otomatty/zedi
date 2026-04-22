@@ -81,7 +81,7 @@ describe("useWikiLinkNavigation", () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/page/existing-id", {
+      expect(mockNavigate).toHaveBeenCalledWith("/pages/existing-id", {
         replace: false,
         flushSync: true,
       });
@@ -150,7 +150,7 @@ describe("useWikiLinkNavigation", () => {
       title: "New Page Title",
       content: "",
     });
-    expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id", {
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id", {
       replace: false,
       flushSync: true,
     });
@@ -194,7 +194,7 @@ describe("useWikiLinkNavigation", () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id", {
+      expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id", {
         replace: false,
         flushSync: true,
       });

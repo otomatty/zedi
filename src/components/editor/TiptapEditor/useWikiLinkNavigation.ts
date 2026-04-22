@@ -54,7 +54,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
 
       if (foundPage) {
         // 既存ページが見つかった場合はそのページに移動
-        navigate(`/page/${foundPage.id}`, { replace: false, flushSync: true });
+        navigate(`/pages/${foundPage.id}`, { replace: false, flushSync: true });
       } else {
         // ページが見つからなかった場合は確認ダイアログを表示
         setPendingCreatePageTitle(title);
@@ -80,7 +80,7 @@ export function useWikiLinkNavigation(): UseWikiLinkNavigationReturn {
       });
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
-      navigate(`/page/${newPage.id}`, { replace: false, flushSync: true });
+      navigate(`/pages/${newPage.id}`, { replace: false, flushSync: true });
     } catch (error) {
       console.error("Failed to create page:", error);
     }

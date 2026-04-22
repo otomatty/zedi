@@ -129,7 +129,7 @@ export function usePageDeletion({
 
   const handleOpenDuplicatePage = useCallback(
     (targetPageId: string) => {
-      const targetPath = `/page/${targetPageId}`;
+      const targetPath = `/pages/${targetPageId}`;
 
       // 現在のページがまだ作成されていない場合は削除不要でそのまま遷移
       // No current page persisted yet — just navigate.

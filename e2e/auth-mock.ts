@@ -28,7 +28,7 @@ const helpers = {
 
   /**
    * Create a new page and return its ID.
-   * Uses the home FAB (「新規作成」): `/page/new` is no longer a creation entry (editor redirects to /home).
+   * Uses the home FAB (「新規作成」): `/pages/new` is no longer a creation entry (editor redirects to /home).
    */
   async createNewPage(page: Page): Promise<string> {
     await page.goto("/home");
@@ -37,10 +37,10 @@ const helpers = {
     await page.locator('[data-tour-id="tour-fab"]').click();
     await page.getByRole("button", { name: "新規作成" }).click();
 
-    await page.waitForURL(/\/page\/(?!new).+/, { timeout: 15000 });
+    await page.waitForURL(/\/pages\/(?!new).+/, { timeout: 15000 });
 
     const url = page.url();
-    const match = url.match(/\/page\/([^/]+)/);
+    const match = url.match(/\/pages\/([^/]+)/);
     if (!match) {
       throw new Error(`Failed to extract page ID from URL: ${url}`);
     }

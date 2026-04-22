@@ -49,9 +49,9 @@ vi.mock("./NoteMembersManageSection", () => ({
 
 function renderNoteMembers(noteId: string) {
   return render(
-    <MemoryRouter initialEntries={[`/note/${noteId}/members`]}>
+    <MemoryRouter initialEntries={[`/notes/${noteId}/members`]}>
       <Routes>
-        <Route path="/note/:noteId/members" element={<NoteMembers />} />
+        <Route path="/notes/:noteId/members" element={<NoteMembers />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -102,7 +102,7 @@ describe("NoteMembers", () => {
     expect(screen.getByRole("heading", { name: "notes.members" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "notes.backToNote" })).toHaveAttribute(
       "href",
-      "/note/n1",
+      "/notes/n1",
     );
   });
 

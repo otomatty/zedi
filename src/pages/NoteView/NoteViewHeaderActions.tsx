@@ -60,7 +60,7 @@ export function NoteViewHeaderActions({
         <>
           <ShareButton note={note} canManageMembers={canManageMembers} />
           <Button asChild variant="outline" size="sm">
-            <Link to={`/note/${note.id}/settings`}>{t("notes.settings")}</Link>
+            <Link to={`/notes/${note.id}/settings`}>{t("notes.settings")}</Link>
           </Button>
         </>
       )}

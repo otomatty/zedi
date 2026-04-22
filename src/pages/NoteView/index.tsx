@@ -133,7 +133,7 @@ const NoteView: React.FC = () => {
       floatingAction={
         canEdit ? (
           <div className="mr-4 mb-4">
-            <FloatingActionButton />
+            <FloatingActionButton noteId={note.id} />
           </div>
         ) : null
       }

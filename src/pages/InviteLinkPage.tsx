@@ -258,7 +258,7 @@ const InviteLinkPage: React.FC = () => {
     if (!token) return;
     try {
       const result = await redeemMutation.mutateAsync({ token });
-      navigate(`/note/${result.noteId}`);
+      navigate(`/notes/${result.noteId}`);
     } catch {
       // 表示側で redeemMutation.error を描画するため何もしない。
       // Surface the error through redeemMutation.error rather than throwing here.

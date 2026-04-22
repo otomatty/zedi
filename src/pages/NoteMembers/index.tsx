@@ -53,7 +53,7 @@ const NoteMembers: React.FC = () => {
             </p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
+            <Link to={`/notes/${note.id}`}>{t("notes.backToNote")}</Link>
           </Button>
         </div>
 

@@ -145,7 +145,7 @@ describe("LinkedPagesSection", () => {
 
     await user.click(screen.getByText("Target Page"));
 
-    expect(mockNavigate).toHaveBeenCalledWith("/page/target-page");
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/target-page");
   });
 
   it("should navigate to source page when link group source is clicked", async () => {
@@ -173,7 +173,7 @@ describe("LinkedPagesSection", () => {
 
     await user.click(screen.getByText("Source Page"));
 
-    expect(mockNavigate).toHaveBeenCalledWith("/page/source-page");
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/source-page");
   });
 
   it("should navigate to child page when child card is clicked", async () => {
@@ -201,7 +201,7 @@ describe("LinkedPagesSection", () => {
 
     await user.click(screen.getByText("Child Page"));
 
-    expect(mockNavigate).toHaveBeenCalledWith("/page/child-page");
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/child-page");
   });
 
   it("should create page and navigate when ghost link is clicked", async () => {
@@ -218,7 +218,7 @@ describe("LinkedPagesSection", () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id", {
+      expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id", {
         flushSync: true,
       });
     });

@@ -73,9 +73,9 @@ vi.mock("./NoteViewMainContent", () => ({
 
 function renderNoteView(noteId: string) {
   return render(
-    <MemoryRouter initialEntries={[`/note/${noteId}`]}>
+    <MemoryRouter initialEntries={[`/notes/${noteId}`]}>
       <Routes>
-        <Route path="/note/:noteId" element={<NoteView />} />
+        <Route path="/notes/:noteId" element={<NoteView />} />
       </Routes>
     </MemoryRouter>,
   );

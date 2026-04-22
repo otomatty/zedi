@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useCreatePage } from "@/hooks/usePageQueries";
+import { useAddPageToNote } from "@/hooks/useNoteQueries";
 import { useToast } from "@zedi/ui";
 import type { FABMenuOption } from "./FABMenu";
 
@@ -14,6 +15,12 @@ export interface UseFloatingActionButtonHandlersOptions {
   createNewPage: () => Promise<void>;
   setIsWebClipperOpen: (open: boolean) => void;
   setIsImageDialogOpen: (open: boolean) => void;
+  /**
+   * 指定したノート配下でページを作成する場合のノート ID。
+   * When set, newly created pages are linked to this note and routed to
+   * `/notes/:noteId/pages/:pageId` instead of the standalone `/pages/:id`.
+   */
+  noteId?: string;
 }
 
 /** FAB ハンドラ hook の戻り値。Return type of useFloatingActionButtonHandlers. */
@@ -39,11 +46,37 @@ export interface UseFloatingActionButtonHandlersResult {
 export function useFloatingActionButtonHandlers(
   options: UseFloatingActionButtonHandlersOptions,
 ): UseFloatingActionButtonHandlersResult {
-  const { createNewPage, setIsWebClipperOpen, setIsImageDialogOpen } = options;
+  const { createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, noteId } = options;
   const { t } = useTranslation();
   const navigate = useNavigate();
   const createPageMutation = useCreatePage();
+  const addPageToNoteMutation = useAddPageToNote();
   const { toast } = useToast();
+
+  /**
+   * 作成済みページをノートに紐づけ、ノート配下のパスに遷移する。
+   * Link the created page to the current note (if any) and navigate into it.
+   */
+  const linkAndNavigate = useCallback(
+    async (pageId: string, navState?: Record<string, unknown>): Promise<void> => {
+      if (noteId) {
+        try {
+          await addPageToNoteMutation.mutateAsync({ noteId, pageId });
+        } catch (error) {
+          // 紐づけ失敗時はスタンドアロンページとして遷移させ、ユーザー操作を止めない。
+          // If linking fails, fall back to the standalone page so the user
+          // can still see and edit their newly created page.
+          console.error("Failed to attach page to note:", error);
+          navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
+          return;
+        }
+        navigate(`/notes/${noteId}/pages/${pageId}`, navState ? { state: navState } : undefined);
+        return;
+      }
+      navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
+    },
+    [addPageToNoteMutation, navigate, noteId],
+  );
 
   const handleMenuSelect = useCallback(
     async (option: FABMenuOption) => {
@@ -83,9 +116,7 @@ export function useFloatingActionButtonHandlers(
           sourceUrl,
           thumbnailUrl,
         });
-        navigate(`/page/${newPage.id}`, {
-          state: { initialContent: content },
-        });
+        await linkAndNavigate(newPage.id, { initialContent: content });
       } catch (error) {
         console.error("Failed to create page from URL:", error);
         toast({
@@ -94,7 +125,7 @@ export function useFloatingActionButtonHandlers(
         });
       }
     },
-    [createPageMutation, navigate, toast, t],
+    [createPageMutation, linkAndNavigate, toast, t],
   );
 
   const handleImageCreated = useCallback(
@@ -121,7 +152,7 @@ export function useFloatingActionButtonHandlers(
           title: "",
           content,
         });
-        navigate(`/page/${newPage.id}`);
+        await linkAndNavigate(newPage.id);
       } catch (error) {
         console.error("Failed to create page from image:", error);
         toast({
@@ -130,7 +161,7 @@ export function useFloatingActionButtonHandlers(
         });
       }
     },
-    [createPageMutation, navigate, toast, t],
+    [createPageMutation, linkAndNavigate, toast, t],
   );
 
   return {

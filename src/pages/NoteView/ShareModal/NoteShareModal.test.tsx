@@ -103,7 +103,7 @@ describe("NoteShareModal", () => {
     renderModal();
     expect(screen.getByRole("link", { name: /notes\.shareOpenMembersPage/ })).toHaveAttribute(
       "href",
-      "/note/note-1/members",
+      "/notes/note-1/members",
     );
   });
 
@@ -113,7 +113,7 @@ describe("NoteShareModal", () => {
     await user.click(screen.getByRole("tab", { name: "notes.shareTabVisibility" }));
     const urlInputs = screen.getAllByLabelText("notes.shareLink");
     expect(urlInputs.length).toBeGreaterThan(0);
-    expect(urlInputs[0]).toHaveValue(`${window.location.origin}/note/note-1`);
+    expect(urlInputs[0]).toHaveValue(`${window.location.origin}/notes/note-1`);
   });
 
   it("does not render the share URL field on visibility tab when note is private", async () => {

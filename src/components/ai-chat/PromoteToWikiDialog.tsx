@@ -257,7 +257,7 @@ function PromoteToWikiDialogBody({
       };
       toast({ title: t("aiChat.notifications.promoteSuccess") });
       onClose();
-      navigate(`/page/${firstCreated.id}`, {
+      navigate(`/pages/${firstCreated.id}`, {
         state: { pendingChatPageGeneration: pending },
       });
     } catch {

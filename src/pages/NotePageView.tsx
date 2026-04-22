@@ -134,7 +134,7 @@ const NotePageView: React.FC = () => {
 
   const handleBack = useCallback(() => {
     if (noteId) {
-      navigate(`/note/${noteId}`);
+      navigate(`/notes/${noteId}`);
     } else {
       navigate("/home");
     }

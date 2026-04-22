@@ -110,7 +110,7 @@ describe("useAIChatActions", () => {
       title: "New Page",
       content: "Content",
     });
-    expect(mockNavigate).toHaveBeenCalledWith("/page/new-page-id");
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id");
   });
 
   it("append-to-page without pageContext shows pageContextRequired toast", async () => {
