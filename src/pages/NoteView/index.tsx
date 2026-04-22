@@ -1,18 +1,12 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge, useToast } from "@zedi/ui";
-import {
-  useAddPageToNote,
-  useNote,
-  useNoteApi,
-  useNotePages,
-  useRemovePageFromNote,
-} from "@/hooks/useNoteQueries";
-import { usePagesSummary } from "@/hooks/usePageQueries";
+import { NoteAddPageDialog } from "./NoteAddPageDialog";
+import { useNote, useNoteApi, useNotePages, useRemovePageFromNote } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
@@ -57,37 +51,8 @@ const NoteView: React.FC = () => {
     Boolean(access?.canView),
   );
 
-  const { data: allPages = [] } = usePagesSummary();
-
-  const addPageMutation = useAddPageToNote();
   const removePageMutation = useRemovePageFromNote();
-
   const [isAddPageOpen, setIsAddPageOpen] = useState(false);
-  const [pageFilter, setPageFilter] = useState("");
-  const [newPageTitle, setNewPageTitle] = useState("");
-
-  const notePageIds = useMemo(() => new Set(notePages.map((page) => page.id)), [notePages]);
-
-  const availablePages = useMemo(() => {
-    return allPages.filter((page) => !notePageIds.has(page.id));
-  }, [allPages, notePageIds]);
-
-  const filteredPages = useMemo(() => {
-    const query = pageFilter.trim().toLowerCase();
-    if (!query) return availablePages;
-    return availablePages.filter((page) => (page.title || "").toLowerCase().includes(query));
-  }, [availablePages, pageFilter]);
-
-  const handleAddPage = async (pageId: string) => {
-    if (!noteId) return;
-    try {
-      await addPageMutation.mutateAsync({ noteId, pageId });
-      toast({ title: t("notes.pageAdded") });
-    } catch (error) {
-      console.error("Failed to add page:", error);
-      toast({ title: t("notes.pageAddFailed"), variant: "destructive" });
-    }
-  };
 
   const handleRemovePage = async (pageId: string) => {
     if (!noteId) return;
@@ -97,19 +62,6 @@ const NoteView: React.FC = () => {
     } catch (error) {
       console.error("Failed to remove page:", error);
       toast({ title: t("notes.pageRemoveFailed"), variant: "destructive" });
-    }
-  };
-
-  const handleAddNewPageByTitle = async () => {
-    if (!noteId || !newPageTitle.trim()) return;
-    try {
-      await addPageMutation.mutateAsync({ noteId, title: newPageTitle.trim() });
-      toast({ title: t("notes.pageAdded") });
-      setNewPageTitle("");
-      setIsAddPageOpen(false);
-    } catch (error) {
-      console.error("Failed to add page:", error);
-      toast({ title: t("notes.pageAddFailed"), variant: "destructive" });
     }
   };
 
@@ -131,9 +83,13 @@ const NoteView: React.FC = () => {
   return (
     <ContentWithAIChat
       floatingAction={
-        canEdit ? (
+        canEdit || canShowAddPage ? (
           <div className="mr-4 mb-4">
-            <FloatingActionButton noteId={note.id} />
+            <FloatingActionButton
+              noteId={note.id}
+              onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
+              hiddenOptions={canEdit ? undefined : ["blank", "url", "image"]}
+            />
           </div>
         ) : null
       }
@@ -158,18 +114,6 @@ const NoteView: React.FC = () => {
               canManageMembers={canManageMembers}
               isSignedIn={isSignedIn}
               canView={Boolean(access?.canView)}
-              canShowAddPage={canShowAddPage}
-              isAddPageOpen={isAddPageOpen}
-              setIsAddPageOpen={setIsAddPageOpen}
-              newPageTitle={newPageTitle}
-              setNewPageTitle={setNewPageTitle}
-              pageFilter={pageFilter}
-              setPageFilter={setPageFilter}
-              filteredPages={filteredPages}
-              canEdit={canEdit}
-              onAddByTitle={handleAddNewPageByTitle}
-              onAddByPageId={handleAddPage}
-              addPagePending={addPageMutation.isPending}
             />
           </div>
           <NoteViewMainContent
@@ -181,6 +125,15 @@ const NoteView: React.FC = () => {
           />
         </Container>
       </div>
+      {canShowAddPage && (
+        <NoteAddPageDialog
+          open={isAddPageOpen}
+          onOpenChange={setIsAddPageOpen}
+          noteId={note.id}
+          notePages={notePages}
+          canEdit={canEdit}
+        />
+      )}
     </ContentWithAIChat>
   );
 };

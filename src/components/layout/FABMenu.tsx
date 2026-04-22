@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, Link2, Image } from "lucide-react";
+import { FileText, FilePlus, Link2, Image } from "lucide-react";
 import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
  * FAB メニューで選択できるオプションの種類。
  * Option type selectable from the FAB menu.
  */
-export type FABMenuOption = "blank" | "url" | "image" | "template" | "voice";
+export type FABMenuOption = "blank" | "url" | "image" | "template" | "voice" | "addExisting";
 
 interface FABMenuItemProps {
   icon: React.ElementType;
@@ -62,6 +62,14 @@ interface FABMenuProps {
   trigger: React.ReactNode;
   /** Options to hide from the menu (e.g. auth-gated features for guests) */
   hiddenOptions?: FABMenuOption[];
+  /**
+   * Options to show in addition to the default create items. Used to expose
+   * note-scoped actions (e.g. attach an existing page) only when relevant.
+   *
+   * 既定の作成項目に追加で表示するオプション。ノート配下でのみ意味を持つ
+   * 操作（既存ページの紐付けなど）を必要な時だけ出すために使う。
+   */
+  extraOptions?: FABMenuOption[];
 }
 
 /**
@@ -80,6 +88,7 @@ export const FABMenu: React.FC<FABMenuProps> = ({
   onSelect,
   trigger,
   hiddenOptions,
+  extraOptions,
 }) => {
   const { t } = useTranslation();
   const handleSelect = (option: FABMenuOption) => {
@@ -87,7 +96,24 @@ export const FABMenu: React.FC<FABMenuProps> = ({
     onOpenChange(false);
   };
 
-  const allItems: Array<{
+  // 先頭に来る項目ほど展開後の位置が下（FAB に近い側）に表示される。
+  // Items earlier in the array render closer to the FAB when expanded.
+  const extraItems: Array<{
+    icon: React.ElementType;
+    label: string;
+    option: FABMenuOption;
+    disabled?: boolean;
+  }> = [];
+
+  if (extraOptions?.includes("addExisting")) {
+    extraItems.push({
+      icon: FilePlus,
+      label: t("notes.addExistingPage"),
+      option: "addExisting",
+    });
+  }
+
+  const baseItems: Array<{
     icon: React.ElementType;
     label: string;
     option: FABMenuOption;
@@ -97,6 +123,8 @@ export const FABMenu: React.FC<FABMenuProps> = ({
     { icon: Link2, label: t("common.createFromUrl"), option: "url" },
     { icon: FileText, label: t("common.createNew"), option: "blank" },
   ];
+
+  const allItems = [...extraItems, ...baseItems];
 
   const menuItems = hiddenOptions
     ? allItems.filter((item) => !hiddenOptions.includes(item.option))
