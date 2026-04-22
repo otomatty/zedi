@@ -21,9 +21,18 @@ export function useCreateNewPage(options?: { noteId?: string }) {
   const addPageToNoteMutation = useAddPageToNote();
   const { toast } = useToast();
 
+  // ページ作成〜ノート紐づけの一連の処理全体を「作成中」として扱う。
+  // どちらかが進行中の間は FAB を再タップしても新規作成を開始しないことで、
+  // 低速回線でノート配下での重複ページ作成が発生するのを防ぐ。
+  //
+  // Treat the whole create-then-link sequence as busy. Guarding on either
+  // mutation being in flight prevents a second tap from starting another
+  // create flow (which would produce duplicate blank pages under a note on
+  // slow networks).
+  const isCreating = createPageMutation.isPending || addPageToNoteMutation.isPending;
+
   const createNewPage = useCallback(async () => {
-    // 既に作成中の場合はスキップ
-    if (createPageMutation.isPending) {
+    if (isCreating) {
       return;
     }
 
@@ -53,10 +62,10 @@ export function useCreateNewPage(options?: { noteId?: string }) {
         variant: "destructive",
       });
     }
-  }, [addPageToNoteMutation, createPageMutation, navigate, noteId, toast]);
+  }, [addPageToNoteMutation, createPageMutation, isCreating, navigate, noteId, toast]);
 
   return {
     createNewPage,
-    isCreating: createPageMutation.isPending,
+    isCreating,
   };
 }
