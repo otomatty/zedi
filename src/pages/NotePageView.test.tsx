@@ -70,6 +70,7 @@ vi.mock("@zedi/ui", () => ({
       {children}
     </button>
   ),
+  useToast: () => ({ toast: vi.fn() }),
 }));
 
 vi.mock("@/components/layout/AppLayout", () => ({
