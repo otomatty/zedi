@@ -118,17 +118,23 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
 
   return (
     <div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageEditorHeader
-        lastSaved={displayLastSaved}
-        onBack={onBack}
-        onDelete={onDelete}
-        onExportMarkdown={onExportMarkdown}
-        onCopyMarkdown={onCopyMarkdown}
-        onOpenHistory={handleOpenHistory}
-        collaboration={undefined}
-      />
-
       <ContentWithAIChat useLocalPanel>
+        {/* スクロールコンテナの最上部にヘッダーを配置し、`sticky` で
+            エディタ領域の上端に貼り付ける。スクロール方向に応じて
+            PageEditorHeader 側でスライド表示/非表示を切り替える。
+            Place the header at the top of the scroll container so that
+            `sticky` pins it to the top of the editor area. The header
+            handles slide-in/out based on scroll direction. */}
+        <PageEditorHeader
+          lastSaved={displayLastSaved}
+          onBack={onBack}
+          onDelete={onDelete}
+          onExportMarkdown={onExportMarkdown}
+          onCopyMarkdown={onCopyMarkdown}
+          onOpenHistory={handleOpenHistory}
+          collaboration={undefined}
+        />
+
         <PageEditorAlerts
           duplicatePage={duplicatePage}
           errorMessage={errorMessage}
