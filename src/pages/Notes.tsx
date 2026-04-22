@@ -146,7 +146,7 @@ const Notes: React.FC = () => {
       setTitle("");
       setVisibility("private");
       setEditPermission("owner_only");
-      navigate(`/note/${newNote.id}`);
+      navigate(`/notes/${newNote.id}`);
     } catch (error) {
       console.error("Failed to create note:", error);
       setIsPublicAnyLoggedInCreateConfirmOpen(false);

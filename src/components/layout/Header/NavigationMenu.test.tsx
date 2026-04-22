@@ -1,10 +1,13 @@
 /**
  * Tests for {@link NavigationMenu}, the header dropdown that consolidates the
- * functional navigation (Home / Notes) into a single trigger with a grid of
- * icon-plus-label tiles.
+ * primary navigation (Home / Notes / AI) into a single trigger with a grid of
+ * icon-plus-label tiles. The entries come from the shared
+ * {@link PRIMARY_NAV_ITEMS} config so the header and the mobile bottom
+ * navigation stay in sync.
  *
- * ヘッダーの機能ナビゲーション（Home / Notes）を 1 つのドロップダウンに集約した
- * {@link NavigationMenu} のテスト。タイル型（アイコン + ラベル）を検証する。
+ * ヘッダーの機能ナビゲーション（Home / Notes / AI）を 1 つのドロップダウンに集約した
+ * {@link NavigationMenu} のテスト。項目は共通の {@link PRIMARY_NAV_ITEMS} を参照し、
+ * ヘッダーとモバイルボトムナビの表示項目が常に一致することを保証する。
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -20,6 +23,7 @@ vi.mock("react-i18next", () => ({
         "nav.menu": "メニュー",
         "nav.home": "ホーム",
         "nav.notes": "ノート",
+        "nav.ai": "AI",
       };
       return table[key] ?? fallback ?? key;
     },
@@ -63,18 +67,21 @@ describe("NavigationMenu", () => {
     renderAt("/home");
     expect(screen.queryByRole("link", { name: "ホーム" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "ノート" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "AI" })).not.toBeInTheDocument();
   });
 
-  it("reveals Home and Notes links after opening", async () => {
+  it("reveals Home, Notes, and AI links after opening", async () => {
     const user = userEvent.setup();
     renderAt("/home");
     await user.click(screen.getByRole("button", { name: "メニュー" }));
 
     const homeLink = await screen.findByRole("menuitem", { name: "ホーム" });
     const notesLink = await screen.findByRole("menuitem", { name: "ノート" });
+    const aiLink = await screen.findByRole("menuitem", { name: "AI" });
 
     expect(homeLink).toHaveAttribute("href", "/home");
     expect(notesLink).toHaveAttribute("href", "/notes");
+    expect(aiLink).toHaveAttribute("href", "/ai");
   });
 
   it("does not vary item styling based on the current route", async () => {

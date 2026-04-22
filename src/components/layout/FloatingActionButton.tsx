@@ -11,8 +11,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/
 import { useAuth } from "@/hooks/useAuth";
 import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandlers";
 
-/** When initialClipUrl is provided, onClipDialogClosedWithInitialUrl is required so the dialog can be closed and URL cleared. */
-type FloatingActionButtonProps =
+/**
+ * FAB 共通プロパティ。`noteId` が指定されるとノート配下ページとして作成・遷移する。
+ * Common FAB props. When `noteId` is supplied the FAB creates pages scoped to
+ * that note and routes to `/notes/:noteId/pages/:pageId` instead of the
+ * standalone `/pages/:id`.
+ *
+ * When initialClipUrl is provided, onClipDialogClosedWithInitialUrl is required
+ * so the dialog can be closed and URL cleared.
+ */
+type FloatingActionButtonProps = { noteId?: string } & (
   | {
       initialClipUrl?: null;
       onClipDialogClosedWithInitialUrl?: never;
@@ -20,18 +28,21 @@ type FloatingActionButtonProps =
   | {
       initialClipUrl: string;
       onClipDialogClosedWithInitialUrl: () => void;
-    };
+    }
+);
 
 /**
- * ホーム用フローティングアクションボタン。新規・URL・画像作成メニューを表示する。
- * FAB for home: shows menu for new page, URL clip, image create.
+ * ホーム／ノート詳細用フローティングアクションボタン。新規・URL・画像作成メニューを表示する。
+ * FAB for home and note detail: shows menu for new page, URL clip, image create.
+ * When `noteId` is supplied the created page is linked to that note.
  */
 const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   initialClipUrl,
   onClipDialogClosedWithInitialUrl,
+  noteId,
 }) => {
   const { t } = useTranslation();
-  const { createNewPage, isCreating } = useCreateNewPage();
+  const { createNewPage, isCreating } = useCreateNewPage({ noteId });
   const { isSignedIn } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -50,6 +61,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     createNewPage,
     setIsWebClipperOpen,
     setIsImageDialogOpen,
+    noteId,
   });
 
   const fabButton = (

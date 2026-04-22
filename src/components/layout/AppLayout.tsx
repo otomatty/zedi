@@ -2,6 +2,7 @@ import React from "react";
 import { useIsMobile } from "@zedi/ui";
 import Header from "./Header";
 import { BottomNav } from "./BottomNav";
+import { HeaderActionsProvider } from "@/contexts/HeaderActionsContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -20,39 +21,46 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const isMobile = useIsMobile();
   return (
-    <div
-      className="flex h-svh min-h-0 flex-col overflow-hidden"
-      style={
-        {
-          "--app-header-height": isMobile ? "3rem" : "4.5rem",
-          "--app-bottom-nav-height": isMobile ? "3.5rem" : "0px",
-          "--ai-chat-width": "22rem",
-        } as React.CSSProperties
-      }
-    >
-      <Header />
-      {/* min-h-0: flex 子が親より伸びてページ全体がスクロールするのを防ぐ。
-          モバイルでは BottomNav が fixed で main の下端に被さるため、
-          padding-bottom で BottomNav 分（safe-area 含む）の余白を確保する。
-          On mobile, BottomNav is `position: fixed` and overlays the bottom of
-          `<main>`, so reserve that height (plus the safe-area inset) as
-          padding-bottom to keep page content scrollable past the nav. */}
+    <HeaderActionsProvider>
       <div
-        className="flex min-h-0 flex-1 overflow-hidden"
+        className="flex h-svh min-h-0 flex-col overflow-hidden"
         style={
-          isMobile
-            ? {
-                paddingBottom:
-                  "calc(var(--app-bottom-nav-height, 3.5rem) + env(safe-area-inset-bottom))",
-              }
-            : undefined
+          {
+            "--app-header-height": isMobile ? "4rem" : "4.5rem",
+            "--app-bottom-nav-height": isMobile ? "3.5rem" : "0px",
+            "--ai-chat-width": "22rem",
+          } as React.CSSProperties
         }
       >
-        <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {children}
-        </main>
+        <Header />
+        {/* min-h-0: flex 子が親より伸びてページ全体がスクロールするのを防ぐ。
+            BottomNav は fixed で `<main>` の下端に被さる。ラッパーで
+            padding-bottom を確保するとスクロール領域が BottomNav の上端で
+            切り詰められ、backdrop-blur の下にコンテンツが流れ込まない。
+            スクロール範囲はビューポート下端まで伸ばし、最終行が nav に
+            常時隠れないよう `<main>` 側に padding-bottom を持たせる。
+            `<main>` is the scroll container; keep its scroll range running
+            all the way to the viewport bottom so content passes under the
+            translucent BottomNav and gets blurred. Put the bottom-nav +
+            safe-area padding on `<main>` itself so the last line still
+            settles above the nav instead of being clipped behind it. */}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <main
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain"
+            style={
+              isMobile
+                ? {
+                    paddingBottom:
+                      "calc(var(--app-bottom-nav-height, 3.5rem) + env(safe-area-inset-bottom))",
+                  }
+                : undefined
+            }
+          >
+            {children}
+          </main>
+        </div>
+        {isMobile && <BottomNav />}
       </div>
-      {isMobile && <BottomNav />}
-    </div>
+    </HeaderActionsProvider>
   );
 }

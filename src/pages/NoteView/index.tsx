@@ -15,7 +15,7 @@ import {
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
-import { NoteViewLoadingOrDenied } from "./NoteViewLoadingOrDenied";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import { NoteViewMainContent } from "./NoteViewMainContent";
 
@@ -115,16 +115,16 @@ const NoteView: React.FC = () => {
 
   if (isLoading) {
     return (
-      <NoteViewLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
-      </NoteViewLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
   if (isNotFound) {
     return (
-      <NoteViewLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
-      </NoteViewLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
 
@@ -133,12 +133,12 @@ const NoteView: React.FC = () => {
       floatingAction={
         canEdit ? (
           <div className="mr-4 mb-4">
-            <FloatingActionButton />
+            <FloatingActionButton noteId={note.id} />
           </div>
         ) : null
       }
     >
-      <main className="min-h-0 flex-1 overflow-y-auto py-6">
+      <div className="min-h-0 flex-1 py-6">
         <Container>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -180,7 +180,7 @@ const NoteView: React.FC = () => {
             onRemovePage={handleRemovePage}
           />
         </Container>
-      </main>
+      </div>
     </ContentWithAIChat>
   );
 };

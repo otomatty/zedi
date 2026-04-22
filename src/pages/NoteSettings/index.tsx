@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Button, useToast } from "@zedi/ui";
 import { useDeleteNote, useNote } from "@/hooks/useNoteQueries";
@@ -68,7 +69,7 @@ const NoteSettings: React.FC = () => {
 
   const noteUrl = useMemo(() => {
     if (!noteId) return "";
-    return `${window.location.origin}/note/${noteId}`;
+    return `${window.location.origin}/notes/${noteId}`;
   }, [noteId]);
 
   const handleCopyLink = async () => {
@@ -96,26 +97,22 @@ const NoteSettings: React.FC = () => {
 
   if (isNoteLoading) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
-        </Container>
-      </main>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
+      </PageLoadingOrDenied>
     );
   }
 
   if (!note || !access?.canView) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
-        </Container>
-      </main>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
+      </PageLoadingOrDenied>
     );
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto py-8">
+    <div className="min-h-0 flex-1 py-8">
       <Container>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -128,7 +125,7 @@ const NoteSettings: React.FC = () => {
             </p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
+            <Link to={`/notes/${note.id}`}>{t("notes.backToNote")}</Link>
           </Button>
         </div>
 
@@ -164,7 +161,7 @@ const NoteSettings: React.FC = () => {
           </>
         )}
       </Container>
-    </main>
+    </div>
   );
 };
 

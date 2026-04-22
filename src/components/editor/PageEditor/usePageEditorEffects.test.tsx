@@ -60,7 +60,7 @@ function createBaseOptions(
     wikiStatus: "idle",
     throttledTiptapContent: null,
     navigate: vi.fn(),
-    location: mockLocation("/page/page-1", null),
+    location: mockLocation("/pages/page-1", null),
     initialize: vi.fn(),
     setContent: vi.fn(),
     setWikiContentForCollab: vi.fn(),
@@ -96,7 +96,7 @@ describe("usePageEditorEffects", () => {
               page: null,
               title: "",
               navigate: mockNavigate,
-              location: mockLocation("/page/new", null),
+              location: mockLocation("/pages/new", null),
               setContent: mockSetContent,
               toast: mockToast,
             }),
@@ -135,7 +135,7 @@ describe("usePageEditorEffects", () => {
               isInitialized: false,
               page,
               title: "Test",
-              location: mockLocation("/page/1", null),
+              location: mockLocation("/pages/1", null),
               initialize,
               navigate: mockNavigate,
               setContent: mockSetContent,
@@ -252,7 +252,7 @@ describe("usePageEditorEffects", () => {
             createBaseOptions({
               currentPageId: "page-1",
               isInitialized: true,
-              location: mockLocation("/page/page-1", { initialContent: "<p>from-url</p>" }),
+              location: mockLocation("/pages/page-1", { initialContent: "<p>from-url</p>" }),
               setPendingInitialContent,
               navigate,
               setContent: mockSetContent,
@@ -263,7 +263,7 @@ describe("usePageEditorEffects", () => {
       );
 
       expect(setPendingInitialContent).toHaveBeenCalledWith("<p>from-url</p>");
-      expect(navigate).toHaveBeenCalledWith("/page/page-1", { replace: true, state: null });
+      expect(navigate).toHaveBeenCalledWith("/pages/page-1", { replace: true, state: null });
     });
 
     it("does not apply location.state when not initialized", () => {
@@ -275,7 +275,7 @@ describe("usePageEditorEffects", () => {
           usePageEditorEffects(
             createBaseOptions({
               isInitialized: false,
-              location: mockLocation("/page/page-1", { initialContent: "x" }),
+              location: mockLocation("/pages/page-1", { initialContent: "x" }),
               setPendingInitialContent,
               navigate,
               setContent: mockSetContent,
@@ -298,7 +298,7 @@ describe("usePageEditorEffects", () => {
             createBaseOptions({
               currentPageId: null,
               isInitialized: true,
-              location: mockLocation("/page/new", { initialContent: "x" }),
+              location: mockLocation("/pages/new", { initialContent: "x" }),
               setPendingInitialContent,
               navigate: mockNavigate,
               setContent: mockSetContent,
@@ -321,7 +321,7 @@ describe("usePageEditorEffects", () => {
           usePageEditorEffects(
             createBaseOptions({
               isInitialized: true,
-              location: mockLocation("/page/page-1", {
+              location: mockLocation("/pages/page-1", {
                 sourceUrl: "https://example.com",
                 thumbnailUrl: "https://cdn.example.com/t.png",
               }),
@@ -343,7 +343,7 @@ describe("usePageEditorEffects", () => {
           thumbnailUrl: "https://cdn.example.com/t.png",
         },
       });
-      expect(navigate).toHaveBeenCalledWith("/page/page-1", { replace: true, state: null });
+      expect(navigate).toHaveBeenCalledWith("/pages/page-1", { replace: true, state: null });
     });
 
     it("handles thumbnail-only state with empty sourceUrl passed to setSourceUrl", () => {
@@ -355,7 +355,7 @@ describe("usePageEditorEffects", () => {
           usePageEditorEffects(
             createBaseOptions({
               isInitialized: true,
-              location: mockLocation("/page/page-1", { thumbnailUrl: "https://img/t.png" }),
+              location: mockLocation("/pages/page-1", { thumbnailUrl: "https://img/t.png" }),
               setSourceUrl,
               navigate: mockNavigate,
               updatePageMutation: { mutate, mutateAsync: vi.fn() } as never,
@@ -385,7 +385,7 @@ describe("usePageEditorEffects", () => {
           usePageEditorEffects(
             createBaseOptions({
               isInitialized: true,
-              location: mockLocation("/page/page-1", {}),
+              location: mockLocation("/pages/page-1", {}),
               setSourceUrl,
               navigate: mockNavigate,
               updatePageMutation: { mutate, mutateAsync: vi.fn() } as never,
@@ -419,18 +419,18 @@ describe("usePageEditorEffects", () => {
           ),
         {
           wrapper,
-          initialProps: { loc: mockLocation("/page/page-1", null) },
+          initialProps: { loc: mockLocation("/pages/page-1", null) },
         },
       );
 
       expect(setPendingInitialContent).not.toHaveBeenCalled();
 
       rerender({
-        loc: mockLocation("/page/page-1", { initialContent: "<p>deferred</p>" }),
+        loc: mockLocation("/pages/page-1", { initialContent: "<p>deferred</p>" }),
       });
 
       expect(setPendingInitialContent).toHaveBeenCalledWith("<p>deferred</p>");
-      expect(navigate).toHaveBeenCalledWith("/page/page-1", { replace: true, state: null });
+      expect(navigate).toHaveBeenCalledWith("/pages/page-1", { replace: true, state: null });
     });
   });
 

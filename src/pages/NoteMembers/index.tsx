@@ -4,7 +4,7 @@ import Container from "@/components/layout/Container";
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@zedi/ui";
 import { useNote } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
-import { NoteMembersLoadingOrDenied } from "./NoteMembersLoadingOrDenied";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteMembersManageSection } from "./NoteMembersManageSection";
 import { NoteInviteLinksSection } from "./NoteInviteLinksSection";
 import { useNoteMembersController } from "./useNoteMembersController";
@@ -29,21 +29,21 @@ const NoteMembers: React.FC = () => {
 
   if (isNoteLoading) {
     return (
-      <NoteMembersLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
-      </NoteMembersLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
   if (!note || !access?.canView) {
     return (
-      <NoteMembersLoadingOrDenied>
+      <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
-      </NoteMembersLoadingOrDenied>
+      </PageLoadingOrDenied>
     );
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto py-8">
+    <div className="min-h-0 flex-1 py-8">
       <Container>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -53,7 +53,7 @@ const NoteMembers: React.FC = () => {
             </p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to={`/note/${note.id}`}>{t("notes.backToNote")}</Link>
+            <Link to={`/notes/${note.id}`}>{t("notes.backToNote")}</Link>
           </Button>
         </div>
 
@@ -88,7 +88,7 @@ const NoteMembers: React.FC = () => {
           </Tabs>
         )}
       </Container>
-    </main>
+    </div>
   );
 };
 

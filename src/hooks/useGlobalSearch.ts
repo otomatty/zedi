@@ -12,6 +12,9 @@ import {
 } from "@/lib/searchUtils";
 import type { Page } from "@/types/page";
 
+/**
+ *
+ */
 export interface SearchResult {
   page: Page;
   matchedText: string;
@@ -23,7 +26,7 @@ export interface SearchResult {
 /** Unified item for global search (personal + shared). C3-8. */
 export interface GlobalSearchResultItem {
   pageId: string;
-  /** Set for shared-note results; navigate to /note/:noteId/page/:pageId */
+  /** Set for shared-note results; navigate to /notes/:noteId/pages/:pageId */
   noteId?: string;
   title: string;
   highlightedText: string;

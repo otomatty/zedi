@@ -67,7 +67,7 @@ export default function AIChatLanding() {
 
   return (
     // Fill main below header (parent shell uses h-svh + overflow-hidden). / ヘッダー下のメイン領域を埋める
-    <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
       {/* Input: vertically centered in the flex-1 region above history / 履歴より上の領域で縦中央 */}
       <div className="bg-background flex min-h-0 flex-1 flex-col justify-center px-4 py-4">
         <Container className="mx-auto w-full max-w-2xl">
@@ -126,6 +126,6 @@ export default function AIChatLanding() {
           )}
         </Container>
       </div>
-    </main>
+    </div>
   );
 }

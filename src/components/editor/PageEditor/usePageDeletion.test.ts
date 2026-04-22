@@ -58,7 +58,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
     act(() => result.current.handleOpenDuplicatePage("target-id"));
 
     expect(mockMutate).not.toHaveBeenCalled();
-    expect(mockNavigate).toHaveBeenCalledWith("/page/target-id");
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/target-id");
     expect(result.current.deleteConfirmOpen).toBe(false);
   });
 
@@ -75,7 +75,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
     act(() => result.current.handleOpenDuplicatePage("target-id"));
 
     expect(mockMutate).toHaveBeenCalledWith("dup-id");
-    expect(mockNavigate).toHaveBeenCalledWith("/page/target-id");
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/target-id");
     expect(mockToast).toHaveBeenCalledWith({
       title: "重複するタイトルのため、ページを削除しました",
     });
@@ -117,7 +117,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
     expect(mockToast).toHaveBeenCalledWith({
       title: "重複するタイトルのページを削除しました",
     });
-    expect(mockNavigate).toHaveBeenCalledWith("/page/target-id");
+    expect(mockNavigate).toHaveBeenCalledWith("/pages/target-id");
     expect(result.current.deleteConfirmOpen).toBe(false);
   });
 

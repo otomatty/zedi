@@ -21,32 +21,65 @@ interface GlobalSearchContextValue {
 
 const GlobalSearchContext = createContext<GlobalSearchContextValue | null>(null);
 
+/**
+ *
+ */
 export function GlobalSearchProvider({ children }: { children: ReactNode }) {
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const { query, setQuery, searchResults, hasQuery } = useGlobalSearch();
+  /**
+   *
+   */
   const [isOpen, setOpen] = useState(false);
+  /**
+   *
+   */
   const open = useCallback(() => setOpen(true), []);
+  /**
+   *
+   */
   const close = useCallback(() => setOpen(false), []);
 
+  /**
+   *
+   */
   const handleSelect = useCallback(
     (pageId: string, noteId?: string) => {
       if (noteId) {
-        navigate(`/note/${noteId}/page/${pageId}`);
+        navigate(`/notes/${noteId}/pages/${pageId}`);
       } else {
-        navigate(`/page/${pageId}`);
+        navigate(`/pages/${pageId}`);
       }
     },
     [navigate],
   );
 
+  /**
+   *
+   */
   const handleSearchSubmit = useCallback(() => {
+    /**
+     *
+     */
     const q = query.trim();
     if (q) {
       navigate(`/search?q=${encodeURIComponent(q)}`);
     }
   }, [query, navigate]);
 
+  /**
+   *
+   */
   const focusSearchInput = useCallback(() => {
+    /**
+     *
+     */
     const el = document.getElementById("header-search-input") as HTMLInputElement | null;
     if (el) {
       el.focus();
@@ -54,6 +87,9 @@ export function GlobalSearchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   *
+   */
   const value: GlobalSearchContextValue = {
     query,
     setQuery,
@@ -70,7 +106,13 @@ export function GlobalSearchProvider({ children }: { children: ReactNode }) {
   return <GlobalSearchContext.Provider value={value}>{children}</GlobalSearchContext.Provider>;
 }
 
+/**
+ *
+ */
 export function useGlobalSearchContext(): GlobalSearchContextValue {
+  /**
+   *
+   */
   const ctx = useContext(GlobalSearchContext);
   if (!ctx) {
     throw new Error("useGlobalSearchContext must be used within GlobalSearchProvider");
@@ -78,6 +120,9 @@ export function useGlobalSearchContext(): GlobalSearchContextValue {
   return ctx;
 }
 
+/**
+ *
+ */
 export function useGlobalSearchContextOptional(): GlobalSearchContextValue | null {
   return useContext(GlobalSearchContext);
 }

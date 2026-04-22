@@ -80,7 +80,17 @@ export function ContentWithAIChat({
   if (isMobile) {
     return (
       <>
-        {children}
+        {/* モバイル用スクロールコンテナ。親が overflow-hidden の flex-col の
+            場合に子コンテンツ（エディタ等）がクリップされるのを防ぎ、タッチ
+            スクロールを可能にする。`relative` は絶対位置指定された子要素
+            （BubbleMenu 等）のコンテナイングブロックとするために付与し、
+            デスクトップ分岐とも揃える。
+            Mobile scroll container. Prevents child content (e.g. the editor)
+            from being clipped when the parent is an overflow-hidden flex-col,
+            and enables touch scrolling. `relative` makes this the containing
+            block for absolutely-positioned descendants (e.g. the BubbleMenu),
+            matching the desktop branch. */}
+        <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
         {floatingAction && (
           <div
             className="pointer-events-none fixed right-0 bottom-0 z-40 flex flex-col items-end gap-1 p-2 pr-[env(safe-area-inset-right)]"

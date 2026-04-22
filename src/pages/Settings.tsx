@@ -51,7 +51,7 @@ const Settings: React.FC = () => {
         actions={<SettingsHeaderNav value={currentSection} onChange={setSection} />}
       />
 
-      <main className="min-h-0 flex-1 overflow-y-auto py-6">
+      <div className="min-h-0 flex-1 py-6">
         <Container>
           <div className="mx-auto max-w-2xl space-y-6">
             <div>
@@ -85,7 +85,7 @@ const Settings: React.FC = () => {
             </div>
           </div>
         </Container>
-      </main>
+      </div>
     </div>
   );
 };

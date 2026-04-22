@@ -78,7 +78,7 @@ describe("usePendingChatPageGeneration", () => {
         <MemoryRouter
           initialEntries={[
             {
-              pathname: "/page/page-1",
+              pathname: "/pages/page-1",
               state: { pendingChatPageGeneration: defaultPending },
             },
           ]}
@@ -100,7 +100,7 @@ describe("usePendingChatPageGeneration", () => {
         <MemoryRouter
           initialEntries={[
             {
-              pathname: "/page/page-1",
+              pathname: "/pages/page-1",
               state: { pendingChatPageGeneration: defaultPending },
             },
           ]}
@@ -125,7 +125,7 @@ describe("usePendingChatPageGeneration", () => {
         }),
       );
       return (
-        <button type="button" data-testid="go-p2" onClick={() => navigate("/page/page-2")}>
+        <button type="button" data-testid="go-p2" onClick={() => navigate("/pages/page-2")}>
           go
         </button>
       );
@@ -137,13 +137,13 @@ describe("usePendingChatPageGeneration", () => {
       <MemoryRouter
         initialEntries={[
           {
-            pathname: "/page/page-1",
+            pathname: "/pages/page-1",
             state: { pendingChatPageGeneration: defaultPending },
           },
         ]}
       >
         <Routes>
-          <Route path="/page/:id" element={<Subject />} />
+          <Route path="/pages/:id" element={<Subject />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -180,7 +180,7 @@ describe("usePendingChatPageGeneration", () => {
           <MemoryRouter
             initialEntries={[
               {
-                pathname: "/page/page-1",
+                pathname: "/pages/page-1",
                 state: { pendingChatPageGeneration: defaultPending },
               },
             ]}
@@ -223,7 +223,7 @@ describe("usePendingChatPageGeneration", () => {
         <MemoryRouter
           initialEntries={[
             {
-              pathname: "/page/page-1",
+              pathname: "/pages/page-1",
               state: { pendingChatPageGeneration: defaultPending },
             },
           ]}
@@ -265,7 +265,7 @@ describe("usePendingChatPageGeneration", () => {
         <MemoryRouter
           initialEntries={[
             {
-              pathname: "/page/page-1",
+              pathname: "/pages/page-1",
               state: { pendingChatPageGeneration: defaultPending },
             },
           ]}
@@ -292,7 +292,7 @@ describe("usePendingChatPageGeneration", () => {
           <MemoryRouter
             initialEntries={[
               {
-                pathname: "/page/page-1",
+                pathname: "/pages/page-1",
                 state: { pendingChatPageGeneration: defaultPending },
               },
             ]}
@@ -321,7 +321,7 @@ describe("usePendingChatPageGeneration", () => {
         <MemoryRouter
           initialEntries={[
             {
-              pathname: "/page/page-1",
+              pathname: "/pages/page-1",
               state: { pendingChatPageGeneration: defaultPending },
             },
           ]}
@@ -368,7 +368,7 @@ describe("usePendingChatPageGeneration", () => {
           <MemoryRouter
             initialEntries={[
               {
-                pathname: "/page/page-1",
+                pathname: "/pages/page-1",
                 state: { pendingChatPageGeneration: defaultPending },
               },
             ]}

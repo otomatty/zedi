@@ -74,7 +74,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
    *
    */
   const handlePageClick = (id: string) => {
-    navigate(`/page/${id}`);
+    navigate(`/pages/${id}`);
   };
 
   /**
@@ -87,7 +87,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
        *
        */
       const newPage = await createPageMutation.mutateAsync({ title });
-      navigate(`/page/${newPage.id}`, { flushSync: true });
+      navigate(`/pages/${newPage.id}`, { flushSync: true });
     } catch (error) {
       console.error("Failed to create page:", error);
     }

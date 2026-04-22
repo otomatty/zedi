@@ -80,13 +80,13 @@ const Home: React.FC = () => {
           </>
         }
       >
-        <main className="min-h-0 flex-1 overflow-y-auto py-6">
+        <div className="min-h-0 flex-1 py-6">
           <Container>
             <div data-tour-id="tour-home-page-grid" className="min-h-[200px]">
               <PageGrid isSeeding={isSeeding} />
             </div>
           </Container>
-        </main>
+        </div>
       </ContentWithAIChat>
     </div>
   );

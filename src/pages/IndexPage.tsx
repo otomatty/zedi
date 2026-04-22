@@ -161,7 +161,7 @@ const IndexPage: React.FC = () => {
         }
       />
 
-      <main className="min-h-0 flex-1 overflow-y-auto py-6">
+      <div className="min-h-0 flex-1 py-6">
         <Container>
           <div className="mx-auto max-w-2xl space-y-6">
             <p className="text-muted-foreground text-sm">
@@ -203,7 +203,7 @@ const IndexPage: React.FC = () => {
                   {data.pageId && (
                     <div className="mt-2">
                       <Link
-                        to={`/page/${data.pageId}`}
+                        to={`/pages/${data.pageId}`}
                         className="text-primary text-sm underline underline-offset-2"
                       >
                         __index__ ページを開く / Open __index__ page
@@ -231,7 +231,7 @@ const IndexPage: React.FC = () => {
             )}
           </div>
         </Container>
-      </main>
+      </div>
     </div>
   );
 };

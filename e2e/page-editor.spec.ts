@@ -16,10 +16,10 @@ test.describe("Page Editor", () => {
       await expect(page.getByPlaceholder("タイトル")).toBeVisible();
     });
 
-    test("redirects /page/new to home (direct /page/new is not a creation entry)", async ({
+    test("redirects /pages/new to home (direct /pages/new is not a creation entry)", async ({
       page,
     }) => {
-      await page.goto("/page/new");
+      await page.goto("/pages/new");
       await expect(page).toHaveURL(/\/home/, { timeout: 10000 });
     });
   });

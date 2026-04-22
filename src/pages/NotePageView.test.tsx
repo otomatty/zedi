@@ -64,10 +64,10 @@ vi.mock("@/components/layout/AppLayout", () => ({
 
 function renderNotePageView() {
   return render(
-    <MemoryRouter initialEntries={[`/note/note-1/page/page-1`]}>
+    <MemoryRouter initialEntries={[`/notes/note-1/pages/page-1`]}>
       <AIChatProvider>
         <Routes>
-          <Route path="/note/:noteId/page/:pageId" element={<NotePageView />} />
+          <Route path="/notes/:noteId/pages/:pageId" element={<NotePageView />} />
         </Routes>
       </AIChatProvider>
     </MemoryRouter>,

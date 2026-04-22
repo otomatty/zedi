@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Trash2, MoreHorizontal, Download, Copy, History } from "lucide-react";
-import { Button } from "@zedi/ui";
+import { Button, cn } from "@zedi/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,67 @@ import { ConnectionIndicator } from "../ConnectionIndicator";
 import { UserAvatars } from "../UserAvatars";
 import type { ConnectionStatus } from "@/lib/collaboration/types";
 import type { UserPresence } from "@/lib/collaboration/types";
+
+/**
+ * 上下スクロール判定で誤反応を避けるための最小デルタ(px)。
+ * Minimum scroll delta (px) before toggling header visibility.
+ */
+const SCROLL_DELTA_THRESHOLD = 6;
+/**
+ * この値以下のスクロール位置では常にヘッダーを表示する。
+ * Always show the header when the scroll position is within this many px from top.
+ */
+const SHOW_AT_TOP_PX = 8;
+
+function isScrollableElement(el: HTMLElement): boolean {
+  const overflowY = window.getComputedStyle(el).overflowY;
+  return overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay";
+}
+
+/**
+ * 与えた要素配下から、実際にスクロール可能な要素を深さ優先で探す。
+ * Depth-first search for an actually-scrollable descendant element.
+ */
+function findScrollableDescendant(el: HTMLElement): HTMLElement | null {
+  if (isScrollableElement(el) && el.scrollHeight > el.clientHeight) return el;
+  for (const child of Array.from(el.children)) {
+    if (!(child instanceof HTMLElement)) continue;
+    const found = findScrollableDescendant(child);
+    if (found) return found;
+  }
+  if (isScrollableElement(el)) return el;
+  return null;
+}
+
+/**
+ * ヘッダーのスクロール監視対象を解決する。
+ * 祖先 → 兄弟要素配下 → window の順で最も近いスクロールコンテナを返す。
+ * 通常は `ContentWithAIChat` 内の overflow-y-auto なラッパー（祖先）に該当する。
+ *
+ * Resolve the scroll container for the header. Walks ancestors first
+ * (the typical case: the overflow-y-auto wrapper inside ContentWithAIChat),
+ * then sibling subtrees, then falls back to the window.
+ */
+function findScrollContainer(headerEl: HTMLElement): HTMLElement | Window {
+  let el: HTMLElement | null = headerEl.parentElement;
+  while (el) {
+    if (isScrollableElement(el)) return el;
+    el = el.parentElement;
+  }
+  const parent = headerEl.parentElement;
+  if (parent) {
+    for (const sibling of Array.from(parent.children)) {
+      if (sibling === headerEl || !(sibling instanceof HTMLElement)) continue;
+      const found = findScrollableDescendant(sibling);
+      if (found) return found;
+    }
+  }
+  return window;
+}
+
+function getScrollTop(target: HTMLElement | Window): number {
+  return target instanceof Window ? window.scrollY : target.scrollTop;
+}
 
 interface PageEditorHeaderProps {
   lastSaved: number | null;
@@ -51,11 +112,69 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   collaboration,
 }) => {
   const { t } = useTranslation();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const target = findScrollContainer(el);
+    let anchorY = getScrollTop(target);
+
+    const handleScroll = () => {
+      const current = getScrollTop(target);
+      if (current <= SHOW_AT_TOP_PX) {
+        setHidden(false);
+        anchorY = current;
+        return;
+      }
+
+      const delta = current - anchorY;
+      if (delta > SCROLL_DELTA_THRESHOLD) {
+        setHidden(true);
+        anchorY = current;
+      } else if (delta < -SCROLL_DELTA_THRESHOLD) {
+        setHidden(false);
+        anchorY = current;
+      }
+    };
+
+    target.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      target.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    el.inert = hidden;
+    if (!hidden) return;
+
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement && el.contains(activeElement)) {
+      activeElement.blur();
+    }
+  }, [hidden]);
 
   return (
-    <div className="border-border/60 bg-background/80 supports-[backdrop-filter]:bg-background/60 border-b backdrop-blur">
-      <Container className="flex h-12 items-center justify-between gap-4">
-        <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+    <div
+      ref={wrapperRef}
+      aria-hidden={hidden || undefined}
+      className={cn(
+        "bg-background/70 supports-[backdrop-filter]:bg-background/50 sticky top-0 z-20 backdrop-blur transition-transform duration-300 ease-in-out",
+        hidden ? "pointer-events-none -translate-y-full" : "translate-y-0",
+      )}
+    >
+      <Container className="flex items-center justify-between gap-4 py-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onBack}
+          aria-label={t("common.back", "Back")}
+          className="h-12 w-12 shrink-0"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
@@ -80,7 +199,12 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t("common.moreActions", "More actions")}
+                className="h-12 w-12"
+              >
                 <MoreHorizontal className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>

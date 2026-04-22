@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Container from "@/components/layout/Container";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@zedi/ui";
 import { useNote, useNotePage } from "@/hooks/useNoteQueries";
@@ -133,7 +134,7 @@ const NotePageView: React.FC = () => {
 
   const handleBack = useCallback(() => {
     if (noteId) {
-      navigate(`/note/${noteId}`);
+      navigate(`/notes/${noteId}`);
     } else {
       navigate("/home");
     }
@@ -152,27 +153,23 @@ const NotePageView: React.FC = () => {
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">読み込み中...</p>
-        </Container>
-      </main>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">読み込み中...</p>
+      </PageLoadingOrDenied>
     );
   }
   if (isNotFound) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">
-            ページが見つからないか、閲覧権限がありません。
-          </p>
-        </Container>
-      </main>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">
+          ページが見つからないか、閲覧権限がありません。
+        </p>
+      </PageLoadingOrDenied>
     );
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="border-border/60 shrink-0 border-b">
         <Container className="flex h-10 items-center justify-between">
           <Button variant="ghost" size="icon" onClick={handleBack}>
@@ -182,9 +179,26 @@ const NotePageView: React.FC = () => {
         </Container>
       </div>
 
-      {/* モバイルは `ContentWithAIChat` が独自のスクロール領域を持たないため、ここをスクロールコンテナにする。
-          On mobile, `ContentWithAIChat` lacks its own scroll viewport, so this div must scroll. */}
-      <div className="min-h-0 flex-1 overflow-y-auto md:overflow-hidden">
+      {/* 編集時は `ContentWithAIChat` 側がスクロールを管理するため、このラッパーでは
+          二重スクロールを避ける。閲覧専用時は従来どおりここで本文をスクロールさせる。
+          When editing, `ContentWithAIChat` owns the scroll container, so keep
+          this wrapper non-scrollable to avoid nested scroll regions. In
+          read-only mode, this wrapper still scrolls the page body. */}
+      {/* 編集時は ContentWithAIChat 内のモバイルスクロールラッパー（flex-1 +
+          overflow-y-auto）に高さを伝搬させるため、このラッパーも flex 列にする。
+          ブロックレイアウトのままだと子の `flex-1` が効かず、スクロールラッパーが
+          コンテンツ高さに張り付き overflow-y-auto が発火しない。
+          When editing, this wrapper must be a flex column so the bounded height
+          propagates down to ContentWithAIChat's mobile scroll wrapper (which
+          relies on flex-1). Without `flex flex-col`, the child's `flex-1` is a
+          no-op in block layout and `overflow-y-auto` never engages. */}
+      <div
+        className={
+          canEdit
+            ? "flex min-h-0 flex-1 flex-col md:overflow-hidden"
+            : "min-h-0 flex-1 overflow-y-auto md:overflow-hidden"
+        }
+      >
         <NoteWorkspaceProvider key={note.id} noteId={note.id}>
           {canEdit ? (
             <NotePageEditorEditable
@@ -212,7 +226,7 @@ const NotePageView: React.FC = () => {
           )}
         </NoteWorkspaceProvider>
       </div>
-    </main>
+    </div>
   );
 };
 

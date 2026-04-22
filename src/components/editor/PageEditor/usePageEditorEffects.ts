@@ -76,7 +76,7 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
 
   const { setPageContext, contentAppendHandlerRef } = useAIChatContext();
 
-  // /page/new への直接アクセスはホームへリダイレクト
+  // /pages/new への直接アクセスはホームへリダイレクト
   useEffect(() => {
     if (isNewPage) {
       navigate("/home", { replace: true });

@@ -54,9 +54,9 @@ vi.mock("./NoteSettingsDeleteSection", () => ({
 
 function renderNoteSettings(noteId: string) {
   return render(
-    <MemoryRouter initialEntries={[`/note/${noteId}/settings`]}>
+    <MemoryRouter initialEntries={[`/notes/${noteId}/settings`]}>
       <Routes>
-        <Route path="/note/:noteId/settings" element={<NoteSettings />} />
+        <Route path="/notes/:noteId/settings" element={<NoteSettings />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -106,7 +106,7 @@ describe("NoteSettings", () => {
     expect(screen.getByRole("heading", { name: "notes.noteSettings" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "notes.backToNote" })).toHaveAttribute(
       "href",
-      "/note/n1",
+      "/notes/n1",
     );
   });
 

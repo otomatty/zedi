@@ -28,7 +28,16 @@ const { signedInAuth } = vi.hoisted(() => {
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? key,
+    t: (key: string, fallback?: string) => {
+      const table: Record<string, string> = {
+        "nav.home": "Home",
+        "nav.notes": "Notes",
+        "nav.ai": "AI",
+        "nav.account": "Account",
+        "nav.primary": "Primary navigation",
+      };
+      return table[key] ?? fallback ?? key;
+    },
     i18n: { language: "ja" },
   }),
 }));
@@ -88,6 +97,15 @@ describe("BottomNav", () => {
     renderAt("/ai");
     const aiLink = screen.getByRole("link", { name: /^ai$/i });
     expect(aiLink).toHaveAttribute("aria-current", "page");
+  });
+
+  it("marks the AI tab as aria-current on /ai/:conversationId and /ai/history", () => {
+    const detail = renderAt("/ai/conv-123");
+    expect(screen.getByRole("link", { name: /^ai$/i })).toHaveAttribute("aria-current", "page");
+    detail.unmount();
+
+    renderAt("/ai/history");
+    expect(screen.getByRole("link", { name: /^ai$/i })).toHaveAttribute("aria-current", "page");
   });
 
   it("fixes the nav at the bottom with safe-area padding", () => {

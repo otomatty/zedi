@@ -20,31 +20,73 @@ import {
 } from "@/lib/aiChatActionHelpers";
 import { extractWikiLinksFromContent } from "@/lib/wikiLinkUtils";
 
+/**
+ *
+ */
 export interface UseAIChatActionsOptions {
   pageContext: PageContext | null;
 }
 
+/**
+ *
+ */
 export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
+  /**
+   *
+   */
   const { t } = useTranslation();
+  /**
+   *
+   */
   const { toast } = useToast();
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const { contentAppendHandlerRef } = useAIChatContext();
+  /**
+   *
+   */
   const createPageMutation = useCreatePage();
+  /**
+   *
+   */
   const updatePageMutation = useUpdatePage();
+  /**
+   *
+   */
   const { syncLinks } = useSyncWikiLinks();
 
+  /**
+   *
+   */
   const latestPageContentRef = useRef(pageContext?.pageFullContent ?? "");
 
   useEffect(() => {
     latestPageContentRef.current = pageContext?.pageFullContent ?? "";
   }, [pageContext?.pageFullContent]);
 
+  /**
+   *
+   */
   const appendContentToCurrentPage = useCallback(
     async (markdown: string): Promise<boolean> => {
+      /**
+       *
+       */
       const currentPageId = pageContext?.pageId;
       if (!currentPageId) return false;
 
+      /**
+       *
+       */
       const previousContent = latestPageContentRef.current;
+      /**
+       *
+       */
       const nextContent = appendMarkdownToTiptapContent(latestPageContentRef.current, markdown);
       await updatePageMutation.mutateAsync({
         pageId: currentPageId,
@@ -78,28 +120,49 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
     [pageContext?.pageId, syncLinks, updatePageMutation, contentAppendHandlerRef],
   );
 
+  /**
+   *
+   */
   const handleExecuteAction = useCallback(
     async (action: ChatAction) => {
       try {
         if (action.type === "create-page") {
+          /**
+           *
+           */
           const pageAction = action as CreatePageAction;
+          /**
+           *
+           */
           const result = await createPageMutation.mutateAsync({
             title: pageAction.title,
             content: pageAction.content,
           });
           if (result?.id) {
-            navigate(`/page/${result.id}`);
+            navigate(`/pages/${result.id}`);
           }
         } else if (action.type === "create-multiple-pages") {
+          /**
+           *
+           */
           const multiAction = action as CreateMultiplePagesAction;
-          for (const page of multiAction.pages) {
+          for (/**
+           *
+           */
+          const page of multiAction.pages) {
             await createPageMutation.mutateAsync({
               title: page.title,
               content: page.content,
             });
           }
         } else if (action.type === "append-to-page") {
+          /**
+           *
+           */
           const appendAction = action as AppendToPageAction;
+          /**
+           *
+           */
           const currentPageTitle = pageContext?.pageTitle ?? "";
 
           if (!pageContext?.pageId) {
@@ -125,6 +188,9 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
             }),
           });
         } else if (action.type === "suggest-wiki-links") {
+          /**
+           *
+           */
           const wikiLinkAction = action as SuggestWikiLinksAction;
 
           if (!pageContext?.pageId) {
@@ -135,10 +201,16 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
             return;
           }
 
+          /**
+           *
+           */
           const targetTitles = wikiLinkAction.links
             .map((link) => link.existingPageTitle ?? link.keyword)
             .map((title) => title.trim())
             .filter(Boolean);
+          /**
+           *
+           */
           const missingTitles = getMissingSuggestedWikiLinkTitles(
             latestPageContentRef.current,
             targetTitles,
