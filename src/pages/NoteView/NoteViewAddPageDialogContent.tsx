@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Button, DialogFooter, DialogHeader, DialogTitle, Input } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import type { NotePageSummary } from "./noteViewHelpers";
+import type { PageSummary } from "@/types/page";
 
 /**
  * Dialog body: add page by title and optional search list (when canEdit).
@@ -12,7 +12,7 @@ export interface NoteViewAddPageDialogContentProps {
   setNewPageTitle: (v: string) => void;
   pageFilter: string;
   setPageFilter: (v: string) => void;
-  filteredPages: NotePageSummary[];
+  filteredPages: PageSummary[];
   canEdit: boolean;
   onAddByTitle: () => Promise<void>;
   onAddByPageId: (pageId: string) => Promise<void>;

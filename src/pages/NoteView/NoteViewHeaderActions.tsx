@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { MoreHorizontal, Settings, Share2 } from "lucide-react";
 import {
   Badge,
@@ -42,7 +42,6 @@ export function NoteViewHeaderActions({
   canView,
 }: NoteViewHeaderActionsProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [isShareOpen, setIsShareOpen] = useState(false);
 
   const { data: members = [] } = useNoteMembers(note.id, canManageMembers);
@@ -93,9 +92,11 @@ export function NoteViewHeaderActions({
               </Badge>
             ) : null}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => navigate(`/notes/${note.id}/settings`)}>
-            <Settings className="mr-2 h-4 w-4" aria-hidden />
-            <span>{t("notes.settings")}</span>
+          <DropdownMenuItem asChild>
+            <Link to={`/notes/${note.id}/settings`} className="flex w-full items-center">
+              <Settings className="mr-2 h-4 w-4" aria-hidden />
+              <span>{t("notes.settings")}</span>
+            </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, useToast } from "@zedi/ui";
 import { useAddPageToNote } from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { NoteViewAddPageDialogContent } from "./NoteViewAddPageDialogContent";
-import type { NotePageSummary } from "./noteViewHelpers";
+import type { PageSummary } from "@/types/page";
 
 /**
  * Props for the controlled add-page dialog.
@@ -14,7 +14,7 @@ export interface NoteAddPageDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   noteId: string;
-  notePages: NotePageSummary[];
+  notePages: PageSummary[];
   canEdit: boolean;
 }
 
@@ -53,21 +53,9 @@ export function NoteAddPageDialog({
     return availablePages.filter((p) => (p.title || "").toLowerCase().includes(query));
   }, [availablePages, pageFilter]);
 
-  const handleAddByPageId = async (pageId: string) => {
+  const runAddPage = async (params: { pageId: string } | { title: string }) => {
     try {
-      await addPageMutation.mutateAsync({ noteId, pageId });
-      toast({ title: t("notes.pageAdded") });
-    } catch (error) {
-      console.error("Failed to add page:", error);
-      toast({ title: t("notes.pageAddFailed"), variant: "destructive" });
-    }
-  };
-
-  const handleAddByTitle = async () => {
-    const title = newPageTitle.trim();
-    if (!title) return;
-    try {
-      await addPageMutation.mutateAsync({ noteId, title });
+      await addPageMutation.mutateAsync({ noteId, ...params });
       toast({ title: t("notes.pageAdded") });
       setNewPageTitle("");
       onOpenChange(false);
@@ -75,6 +63,14 @@ export function NoteAddPageDialog({
       console.error("Failed to add page:", error);
       toast({ title: t("notes.pageAddFailed"), variant: "destructive" });
     }
+  };
+
+  const handleAddByPageId = (pageId: string) => runAddPage({ pageId });
+
+  const handleAddByTitle = async () => {
+    const title = newPageTitle.trim();
+    if (!title) return;
+    await runAddPage({ title });
   };
 
   return (
