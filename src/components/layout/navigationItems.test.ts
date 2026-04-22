@@ -7,7 +7,7 @@
  * モバイルのボトムナビが同じ配列を参照するため、型と項目内容の単一ソースを保証する。
  */
 import { describe, it, expect } from "vitest";
-import { PRIMARY_NAV_ITEMS, isPrimaryNavActive, type PrimaryNavItem } from "./navigationItems";
+import { PRIMARY_NAV_ITEMS, isPrimaryNavActive } from "./navigationItems";
 
 describe("PRIMARY_NAV_ITEMS", () => {
   it("exposes Home, Notes, and AI as the canonical primary entries", () => {
@@ -38,8 +38,13 @@ describe("PRIMARY_NAV_ITEMS", () => {
 });
 
 describe("isPrimaryNavActive", () => {
-  const homeItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/home") as PrimaryNavItem;
-  const aiItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/ai") as PrimaryNavItem;
+  const homeItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/home");
+  const notesItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/notes");
+  const aiItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/ai");
+
+  if (!homeItem || !notesItem || !aiItem) {
+    throw new Error("PRIMARY_NAV_ITEMS must include /home, /notes, and /ai");
+  }
 
   it("returns true when any matchPath matches the current pathname", () => {
     expect(isPrimaryNavActive(aiItem, "/ai")).toBe(true);
@@ -50,6 +55,11 @@ describe("isPrimaryNavActive", () => {
   it("falls back to an exact path match when matchPaths is not provided", () => {
     expect(isPrimaryNavActive(homeItem, "/home")).toBe(true);
     expect(isPrimaryNavActive(homeItem, "/home/anything")).toBe(false);
+  });
+
+  it("treats /notes/discover as part of the Notes section", () => {
+    expect(isPrimaryNavActive(notesItem, "/notes")).toBe(true);
+    expect(isPrimaryNavActive(notesItem, "/notes/discover")).toBe(true);
   });
 
   it("returns false for unrelated pathnames", () => {

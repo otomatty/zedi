@@ -112,7 +112,7 @@ const NoteSettings: React.FC = () => {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto py-8">
+    <div className="min-h-0 flex-1 py-8">
       <Container>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">

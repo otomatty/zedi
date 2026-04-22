@@ -154,7 +154,13 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
       )}
     >
       <Container className="flex items-center justify-between gap-4 py-2">
-        <Button variant="ghost" size="icon" onClick={onBack} className="h-12 w-12 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onBack}
+          aria-label={t("common.back", "Back")}
+          className="h-12 w-12 shrink-0"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
@@ -179,7 +185,12 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-12 w-12">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t("common.moreActions", "More actions")}
+                className="h-12 w-12"
+              >
                 <MoreHorizontal className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
