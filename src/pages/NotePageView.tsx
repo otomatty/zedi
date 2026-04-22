@@ -184,10 +184,18 @@ const NotePageView: React.FC = () => {
           When editing, `ContentWithAIChat` owns the scroll container, so keep
           this wrapper non-scrollable to avoid nested scroll regions. In
           read-only mode, this wrapper still scrolls the page body. */}
+      {/* 編集時は ContentWithAIChat 内のモバイルスクロールラッパー（flex-1 +
+          overflow-y-auto）に高さを伝搬させるため、このラッパーも flex 列にする。
+          ブロックレイアウトのままだと子の `flex-1` が効かず、スクロールラッパーが
+          コンテンツ高さに張り付き overflow-y-auto が発火しない。
+          When editing, this wrapper must be a flex column so the bounded height
+          propagates down to ContentWithAIChat's mobile scroll wrapper (which
+          relies on flex-1). Without `flex flex-col`, the child's `flex-1` is a
+          no-op in block layout and `overflow-y-auto` never engages. */}
       <div
         className={
           canEdit
-            ? "min-h-0 flex-1 md:overflow-hidden"
+            ? "flex min-h-0 flex-1 flex-col md:overflow-hidden"
             : "min-h-0 flex-1 overflow-y-auto md:overflow-hidden"
         }
       >
