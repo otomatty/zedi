@@ -119,19 +119,24 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
     const el = wrapperRef.current;
     if (!el) return;
     const target = findScrollContainer(el);
-    let lastY = getScrollTop(target);
+    let anchorY = getScrollTop(target);
 
     const handleScroll = () => {
       const current = getScrollTop(target);
-      const delta = current - lastY;
       if (current <= SHOW_AT_TOP_PX) {
         setHidden(false);
-      } else if (delta > SCROLL_DELTA_THRESHOLD) {
+        anchorY = current;
+        return;
+      }
+
+      const delta = current - anchorY;
+      if (delta > SCROLL_DELTA_THRESHOLD) {
         setHidden(true);
+        anchorY = current;
       } else if (delta < -SCROLL_DELTA_THRESHOLD) {
         setHidden(false);
+        anchorY = current;
       }
-      lastY = current;
     };
 
     target.addEventListener("scroll", handleScroll, { passive: true });
