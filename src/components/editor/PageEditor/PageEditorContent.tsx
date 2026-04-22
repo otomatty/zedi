@@ -115,7 +115,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   const showEditor = useCollaborationMode || !collaboration;
 
   return (
-    <main className="flex-1 pt-6 pb-32">
+    <div className="flex-1 pt-6 pb-32">
       <Container>
         {/* ページタイトルと Wiki 生成ボタン（同一行） */}
         <div className="flex items-start gap-3 pt-6 pb-2">
@@ -184,6 +184,6 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
         {/* Lint Suggestions */}
         {currentPageId && <LintSuggestions pageId={currentPageId} />}
       </Container>
-    </main>
+    </div>
   );
 };

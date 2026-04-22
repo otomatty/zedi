@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import Container from "@/components/layout/Container";
+import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@zedi/ui";
 import { useNote, useNotePage } from "@/hooks/useNoteQueries";
@@ -152,27 +153,23 @@ const NotePageView: React.FC = () => {
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">読み込み中...</p>
-        </Container>
-      </main>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">読み込み中...</p>
+      </PageLoadingOrDenied>
     );
   }
   if (isNotFound) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto py-10">
-        <Container>
-          <p className="text-muted-foreground text-sm">
-            ページが見つからないか、閲覧権限がありません。
-          </p>
-        </Container>
-      </main>
+      <PageLoadingOrDenied>
+        <p className="text-muted-foreground text-sm">
+          ページが見つからないか、閲覧権限がありません。
+        </p>
+      </PageLoadingOrDenied>
     );
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="border-border/60 shrink-0 border-b">
         <Container className="flex h-10 items-center justify-between">
           <Button variant="ghost" size="icon" onClick={handleBack}>
@@ -212,7 +209,7 @@ const NotePageView: React.FC = () => {
           )}
         </NoteWorkspaceProvider>
       </div>
-    </main>
+    </div>
   );
 };
 

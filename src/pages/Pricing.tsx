@@ -102,7 +102,7 @@ const Pricing: React.FC = () => {
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title={t("pricing.pageTitle")} backTo="/home" backLabel={t("common.back")} />
 
-      <main className="min-h-0 flex-1 overflow-y-auto py-8">
+      <div className="min-h-0 flex-1 overflow-y-auto py-8">
         <Container>
           {showPlanStatusCard && (
             <section className="mx-auto mb-10">
@@ -160,7 +160,7 @@ const Pricing: React.FC = () => {
           <PricingAiInfo />
           <PricingFaq />
         </Container>
-      </main>
+      </div>
     </div>
   );
 };
