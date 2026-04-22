@@ -117,7 +117,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
   const ydoc = collaboration?.ydoc ?? null;
 
   return (
-    <main className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="bg-background flex min-h-0 flex-1 flex-col overflow-hidden">
       <ContentWithAIChat useLocalPanel>
         {/* スクロールコンテナの最上部にヘッダーを配置し、`sticky` で
             エディタ領域の上端に貼り付ける。スクロール方向に応じて
@@ -192,6 +192,6 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
           onRestored={handleRestored}
         />
       )}
-    </main>
+    </div>
   );
 };
