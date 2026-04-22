@@ -96,7 +96,7 @@ export default function SearchResults() {
    */
   const handleResultClick = (item: SearchResultItem) => {
     if (item.noteId) {
-      navigate(`/notes/${item.noteId}/pages/${item.pageId}`);
+      navigate(`/notes/${item.noteId}/${item.pageId}`);
     } else {
       navigate(`/pages/${item.pageId}`);
     }

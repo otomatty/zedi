@@ -6,11 +6,11 @@ import { useToast } from "@zedi/ui";
 
 /**
  * 新規ページを作成して対応するエディタへ遷移するフック。
- * `noteId` が指定された場合はノートに紐づけ、`/notes/:noteId/pages/:pageId` へ遷移する。
+ * `noteId` が指定された場合はノートに紐づけ、`/notes/:noteId/:pageId` へ遷移する。
  *
  * Hook to create a new page and navigate to it. When `noteId` is provided the
  * page is linked to that note and the caller is routed into the note-scoped
- * path `/notes/:noteId/pages/:pageId`; otherwise the standalone `/pages/:id`
+ * path `/notes/:noteId/:pageId`; otherwise the standalone `/pages/:id`
  * route is used. Centralizing the create-then-navigate flow avoids race
  * conditions between page creation and navigation.
  */
@@ -51,7 +51,7 @@ export function useCreateNewPage(options?: { noteId?: string }) {
           navigate(`/pages/${newPage.id}`);
           return;
         }
-        navigate(`/notes/${noteId}/pages/${newPage.id}`);
+        navigate(`/notes/${noteId}/${newPage.id}`);
         return;
       }
       navigate(`/pages/${newPage.id}`);

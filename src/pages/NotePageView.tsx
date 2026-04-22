@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import { Button } from "@zedi/ui";
-import { useNote, useNotePage } from "@/hooks/useNoteQueries";
+import { useNote, useNotePage, noteKeys } from "@/hooks/useNoteQueries";
+import { useUpdatePage } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
@@ -15,6 +17,8 @@ import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { Page } from "@/types/page";
+
+const TITLE_SAVE_DEBOUNCE_MS = 500;
 
 function canEditPage(
   access: { canEdit?: boolean; canView?: boolean } | undefined,
@@ -42,10 +46,15 @@ function NotePageEditorEditable({
   isCollaborationEnabled: boolean;
 }): React.JSX.Element {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
+  const [title, setTitle] = useState(page.title);
   const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
+  const updatePageMutation = useUpdatePage();
+  const queryClient = useQueryClient();
+  const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTitleRef = useRef<string | null>(null);
 
   useEffect(() => {
     setPageContext({
@@ -53,11 +62,11 @@ function NotePageEditorEditable({
       pageId: page.id,
       noteId,
       claudeWorkspaceRoot: workspaceRoot ?? undefined,
-      pageTitle: page.title,
+      pageTitle: title,
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-  }, [page.id, page.title, editorContent, setPageContext, noteId, workspaceRoot]);
+  }, [page.id, title, editorContent, setPageContext, noteId, workspaceRoot]);
 
   useEffect(() => {
     return () => setPageContext(null);
@@ -86,12 +95,69 @@ function NotePageEditorEditable({
     };
   }, [insertAtCursorRef]);
 
+  const persistTitle = useCallback(
+    async (nextTitle: string) => {
+      try {
+        await updatePageMutation.mutateAsync({
+          pageId: page.id,
+          updates: { title: nextTitle },
+        });
+        // `useUpdatePage` updates `pageKeys.*` caches, but the note page list and
+        // detail are held under `noteKeys.*`. Invalidate those so the new title
+        // propagates to the note view and sidebar.
+        // `useUpdatePage` は `pageKeys.*` を更新するが、ノート側のキャッシュは
+        // `noteKeys.*` にあるため、タイトル変更をノート表示やサイドバーに反映
+        // させるには明示的に無効化する必要がある。
+        queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
+        queryClient.invalidateQueries({ queryKey: noteKeys.pageList(noteId) });
+      } catch (error) {
+        console.error("Failed to save page title:", error);
+      }
+    },
+    [noteId, page.id, queryClient, updatePageMutation],
+  );
+
+  const handleTitleChange = useCallback(
+    (newTitle: string) => {
+      setTitle(newTitle);
+      pendingTitleRef.current = newTitle;
+      if (titleSaveTimerRef.current) {
+        clearTimeout(titleSaveTimerRef.current);
+      }
+      titleSaveTimerRef.current = setTimeout(() => {
+        titleSaveTimerRef.current = null;
+        const pending = pendingTitleRef.current;
+        pendingTitleRef.current = null;
+        if (pending !== null) {
+          void persistTitle(pending);
+        }
+      }, TITLE_SAVE_DEBOUNCE_MS);
+    },
+    [persistTitle],
+  );
+
+  // アンマウント時に debounce 中のタイトル保存を即時フラッシュし、遷移で失われないようにする。
+  // Flush any debounced title save on unmount so navigation does not drop it.
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimerRef.current) {
+        clearTimeout(titleSaveTimerRef.current);
+        titleSaveTimerRef.current = null;
+        const pending = pendingTitleRef.current;
+        pendingTitleRef.current = null;
+        if (pending !== null) {
+          void persistTitle(pending);
+        }
+      }
+    };
+  }, [persistTitle]);
+
   return (
     <ContentWithAIChat>
       <NoteWorkspaceToolbar />
       <PageEditorContent
         content={editorContent}
-        title={page.title}
+        title={title}
         sourceUrl={page.sourceUrl}
         currentPageId={page.id}
         pageId={page.id}
@@ -102,6 +168,7 @@ function NotePageEditorEditable({
         showToolbar
         onContentChange={setEditorContent}
         onContentError={() => undefined}
+        onTitleChange={handleTitleChange}
         collaboration={isCollaborationEnabled ? collaboration : undefined}
         insertAtCursorRef={editorInsertRef}
       />

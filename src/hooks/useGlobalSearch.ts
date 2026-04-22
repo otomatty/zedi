@@ -26,7 +26,7 @@ export interface SearchResult {
 /** Unified item for global search (personal + shared). C3-8. */
 export interface GlobalSearchResultItem {
   pageId: string;
-  /** Set for shared-note results; navigate to /notes/:noteId/pages/:pageId */
+  /** Set for shared-note results; navigate to /notes/:noteId/:pageId */
   noteId?: string;
   title: string;
   highlightedText: string;

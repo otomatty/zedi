@@ -18,7 +18,23 @@ vi.mock("react-router-dom", async (importOriginal) => {
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNotePage: vi.fn(),
+  noteKeys: {
+    page: (noteId: string, pageId: string) => ["notes", "pages", noteId, pageId],
+    pageList: (noteId: string) => ["notes", "pages", noteId],
+  },
 }));
+
+vi.mock("@/hooks/usePageQueries", () => ({
+  useUpdatePage: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({ skipped: false }) })),
+}));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-query")>();
+  return {
+    ...actual,
+    useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
+  };
+});
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
@@ -64,10 +80,10 @@ vi.mock("@/components/layout/AppLayout", () => ({
 
 function renderNotePageView() {
   return render(
-    <MemoryRouter initialEntries={[`/notes/note-1/pages/page-1`]}>
+    <MemoryRouter initialEntries={[`/notes/note-1/page-1`]}>
       <AIChatProvider>
         <Routes>
-          <Route path="/notes/:noteId/pages/:pageId" element={<NotePageView />} />
+          <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
         </Routes>
       </AIChatProvider>
     </MemoryRouter>,

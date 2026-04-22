@@ -18,7 +18,7 @@ export interface UseFloatingActionButtonHandlersOptions {
   /**
    * 指定したノート配下でページを作成する場合のノート ID。
    * When set, newly created pages are linked to this note and routed to
-   * `/notes/:noteId/pages/:pageId` instead of the standalone `/pages/:id`.
+   * `/notes/:noteId/:pageId` instead of the standalone `/pages/:id`.
    */
   noteId?: string;
 }
@@ -70,7 +70,7 @@ export function useFloatingActionButtonHandlers(
           navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
           return;
         }
-        navigate(`/notes/${noteId}/pages/${pageId}`, navState ? { state: navState } : undefined);
+        navigate(`/notes/${noteId}/${pageId}`, navState ? { state: navState } : undefined);
         return;
       }
       navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
