@@ -21,6 +21,14 @@ export interface UseFloatingActionButtonHandlersOptions {
    * `/notes/:noteId/:pageId` instead of the standalone `/pages/:id`.
    */
   noteId?: string;
+  /**
+   * 既存ページをノートへ追加するアクション。FAB に「既存のページを追加」
+   * メニュー項目が表示されている場合に呼び出される。
+   *
+   * Action to attach an existing page to the current note. Invoked when the
+   * user selects the "Add existing page" entry from the FAB menu.
+   */
+  onAddExistingPage?: () => void;
 }
 
 /** FAB ハンドラ hook の戻り値。Return type of useFloatingActionButtonHandlers. */
@@ -46,7 +54,8 @@ export interface UseFloatingActionButtonHandlersResult {
 export function useFloatingActionButtonHandlers(
   options: UseFloatingActionButtonHandlersOptions,
 ): UseFloatingActionButtonHandlersResult {
-  const { createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, noteId } = options;
+  const { createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, noteId, onAddExistingPage } =
+    options;
   const { t } = useTranslation();
   const navigate = useNavigate();
   const createPageMutation = useCreatePage();
@@ -90,6 +99,9 @@ export function useFloatingActionButtonHandlers(
         case "image":
           setIsImageDialogOpen(true);
           break;
+        case "addExisting":
+          onAddExistingPage?.();
+          break;
         case "template":
           toast({
             title: t("common.comingSoon"),
@@ -104,7 +116,7 @@ export function useFloatingActionButtonHandlers(
           break;
       }
     },
-    [createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, toast, t],
+    [createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, onAddExistingPage, toast, t],
   );
 
   const handleWebClipped = useCallback(
