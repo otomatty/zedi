@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PageEditorHeader } from "./PageEditorHeader";
 
@@ -162,6 +162,37 @@ describe("PageEditorHeader", () => {
       });
       await user.click(screen.getByTestId("connection-indicator"));
       expect(onReconnect).toHaveBeenCalledTimes(1);
+    });
+
+    it("スクロールで非表示になったヘッダーはフォーカス対象から外れる", async () => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <div style={{ overflowY: "auto" }}>
+          <PageEditorHeader {...defaultProps} />
+        </div>,
+      );
+
+      const backButton = screen.getByRole("button", { name: /back|common\.back/i });
+      const scrollContainer = container.firstElementChild as HTMLElement | null;
+      const header = scrollContainer?.firstElementChild as HTMLElement | null;
+      expect(scrollContainer).not.toBeNull();
+      expect(header).not.toBeNull();
+
+      backButton.focus();
+      expect(backButton).toHaveFocus();
+
+      if (!scrollContainer) {
+        throw new Error("scroll container not found");
+      }
+      await act(async () => {
+        scrollContainer.scrollTop = 24;
+        scrollContainer.dispatchEvent(new Event("scroll"));
+      });
+
+      await waitFor(() => {
+        expect(header).toHaveAttribute("aria-hidden", "true");
+      });
+      expect(backButton).not.toHaveFocus();
     });
   });
 });

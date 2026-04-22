@@ -145,12 +145,26 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    el.inert = hidden;
+    if (!hidden) return;
+
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement && el.contains(activeElement)) {
+      activeElement.blur();
+    }
+  }, [hidden]);
+
   return (
     <div
       ref={wrapperRef}
+      aria-hidden={hidden || undefined}
       className={cn(
         "bg-background/70 supports-[backdrop-filter]:bg-background/50 sticky top-0 z-20 backdrop-blur transition-transform duration-300 ease-in-out",
-        hidden ? "-translate-y-full" : "translate-y-0",
+        hidden ? "pointer-events-none -translate-y-full" : "translate-y-0",
       )}
     >
       <Container className="flex items-center justify-between gap-4 py-2">
