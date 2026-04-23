@@ -41,12 +41,16 @@ app.get("/", authRequired, async (c) => {
   const limit = Math.min(Math.max(Number(c.req.query("limit") || 20), 1), 100);
   const pattern = `%${escapeLike(query)}%`;
 
+  // 両スコープで返す列は同一なので共有する。`p.note_id` は呼び出し側のスコープ判定用。
+  // Both scopes return the same columns; `p.note_id` lets callers distinguish scopes.
+  const searchColumns = sql`p.id, p.title, p.content_preview, p.updated_at, p.note_id,
+             pc.content_text`;
+
   let results;
 
   if (scope === "shared") {
     results = await db.execute(sql`
-      SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id,
-             pc.content_text
+      SELECT ${searchColumns}
       FROM pages p
       LEFT JOIN page_contents pc ON pc.page_id = p.id
       WHERE p.is_deleted = false
@@ -71,8 +75,7 @@ app.get("/", authRequired, async (c) => {
     `);
   } else {
     results = await db.execute(sql`
-      SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id,
-             pc.content_text
+      SELECT ${searchColumns}
       FROM pages p
       LEFT JOIN page_contents pc ON pc.page_id = p.id
       WHERE p.is_deleted = false
