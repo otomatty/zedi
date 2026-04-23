@@ -99,7 +99,7 @@ describe("POST /api/notes/:noteId/pages", () => {
     expect(body).toHaveProperty("added", true);
   });
 
-  it("should create a new page when title is provided without page_id", async () => {
+  it("should create a note-native page when title is provided without page_id (issue #713)", async () => {
     const mockNote = createMockNote();
     const { app, chains } = createTestApp([
       [mockNote], // getNoteRole
@@ -124,10 +124,44 @@ describe("POST /api/notes/:noteId/pages", () => {
     const pageInsert = insertCalls[0];
     expect(pageInsert).toBeDefined();
     const valuesOp = pageInsert?.ops.find((op) => op.method === "values");
+    // タイトル経路ではノートネイティブページとして作成されるため `noteId` が
+    // 必ず埋まり、個人 /home（`note_id IS NULL` フィルタ）には現れない。
+    // The title path creates a note-native page; `noteId` must be set so it
+    // never appears on personal /home (which filters `note_id IS NULL`).
     expect(valuesOp?.args[0]).toMatchObject({
       ownerId: TEST_USER_ID,
+      noteId: NOTE_ID,
       title: "New Page",
     });
+  });
+
+  it("should NOT set noteId when linking an existing personal page via page_id (issue #713)", async () => {
+    const mockNote = createMockNote();
+    const { app, chains } = createTestApp([
+      [mockNote], // getNoteRole → findActiveNoteById (owner)
+      [{ id: "pg-existing", ownerId: TEST_USER_ID }], // page exists check
+      [{ max: 0 }], // maxOrder query
+      [], // insert notePages
+      [], // update notes.updatedAt
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ page_id: "pg-existing" }),
+    });
+
+    expect(res.status).toBe(200);
+    // `page_id` 経路は既存個人ページをノートに「リンク」するだけで、ページ
+    // 自体のスコープは変わらない。Phase 1 では pages テーブルへの insert は
+    // 走らない（note_pages へのリンクのみ）。Phase 3 で copy エンドポイント
+    // を別途追加する。
+    // The `page_id` path only links an existing personal page into the note;
+    // the page itself stays personal. In Phase 1 there is no insert into the
+    // `pages` table — only the `note_pages` link row is touched. Phase 3
+    // will add a separate copy endpoint.
+    const insertCalls = chains.filter((c) => c.startMethod === "insert");
+    expect(insertCalls).toHaveLength(1); // note_pages link only, no pages insert
   });
 
   it("should return 400 when neither page_id nor title is provided", async () => {

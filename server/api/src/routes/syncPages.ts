@@ -6,7 +6,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, gt, inArray } from "drizzle-orm";
+import { eq, and, gt, inArray, isNull, sql } from "drizzle-orm";
 import { pages, links, ghostLinks } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
@@ -14,10 +14,19 @@ import type { AppEnv } from "../types/index.js";
 const app = new Hono<AppEnv>();
 
 // ── GET /sync/pages ─────────────────────────────────────────────────────────
+// 個人ページ同期はクライアントの IndexedDB と個人ページ (`pages.note_id IS
+// NULL`) のみを対象にする。ノートネイティブページ（issue #713）はサーバー側
+// で管理され、ノート画面/共同編集経由でのみアクセスする。
+//
+// Personal-page sync only mirrors personal pages (`pages.note_id IS NULL`)
+// into the client's IndexedDB. Note-native pages (issue #713) live solely on
+// the server and are accessed through the note view / collaborative editor.
 app.get("/", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
   const since = c.req.query("since");
+
+  const personalPageFilter = and(eq(pages.ownerId, userId), isNull(pages.noteId));
 
   let query = db
     .select({
@@ -33,11 +42,11 @@ app.get("/", authRequired, async (c) => {
       updated_at: pages.updatedAt,
     })
     .from(pages)
-    .where(eq(pages.ownerId, userId))
+    .where(personalPageFilter)
     .$dynamic();
 
   if (since) {
-    query = query.where(and(eq(pages.ownerId, userId), gt(pages.updatedAt, new Date(since))));
+    query = query.where(and(personalPageFilter, gt(pages.updatedAt, new Date(since))));
   }
 
   const rows = await query.orderBy(pages.updatedAt);
@@ -111,18 +120,38 @@ app.post("/", authRequired, async (c) => {
 
   const results: Array<{ id: string; action: string }> = [];
 
-  // ページごとに LWW (Last Write Wins) 同期
+  // ページごとに LWW (Last Write Wins) 同期。
+  // 同期対象は個人ページ（`pages.note_id IS NULL`）のみ。ノートネイティブ
+  // ページ（issue #713）は対象外で、もし同 ID の行がノートに存在する場合は
+  // ガードのため skipped 扱いとする（クライアント側 IndexedDB が note 行を
+  // 持っているはずがないが防御）。
+  //
+  // LWW sync runs only against personal pages (`pages.note_id IS NULL`).
+  // Note-native pages (issue #713) are excluded — if a row with the same id
+  // happens to be note-native, it is skipped defensively (clients should not
+  // hold note-native rows in IndexedDB).
   for (const p of body.pages) {
     const existing = await db
       .select({ id: pages.id, updatedAt: pages.updatedAt, ownerId: pages.ownerId })
       .from(pages)
-      .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId)))
+      .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)))
       .limit(1);
 
     const clientTime = new Date(p.updated_at);
 
     if (existing.length === 0) {
-      // 新規作成
+      // 既存の同 ID ページがノートネイティブだった場合は無視する
+      // Skip if a same-id page exists but is note-native
+      const noteNativeCheck = await db
+        .select({ id: pages.id })
+        .from(pages)
+        .where(and(eq(pages.id, p.id), sql`${pages.noteId} IS NOT NULL`))
+        .limit(1);
+      if (noteNativeCheck.length > 0) {
+        results.push({ id: p.id, action: "skipped" });
+        continue;
+      }
+
       await db.insert(pages).values({
         id: p.id,
         ownerId: userId,
@@ -151,7 +180,7 @@ app.post("/", authRequired, async (c) => {
             isDeleted: p.is_deleted ?? false,
             updatedAt: clientTime,
           })
-          .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId)));
+          .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)));
         results.push({ id: p.id, action: "updated" });
       } else {
         results.push({ id: p.id, action: "skipped" });
@@ -159,13 +188,14 @@ app.post("/", authRequired, async (c) => {
     }
   }
 
-  // リンク同期
+  // リンク同期 — 個人ページ間のみ
+  // Link sync — personal pages only
   if (body.links?.length) {
     const sourceIds = [...new Set(body.links.map((l) => l.source_id))];
     const ownedPages = await db
       .select({ id: pages.id })
       .from(pages)
-      .where(and(eq(pages.ownerId, userId), inArray(pages.id, sourceIds)));
+      .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
     const ownedIds = new Set(ownedPages.map((r) => r.id));
     for (const sourceId of sourceIds) {
       if (!ownedIds.has(sourceId)) continue;
@@ -184,13 +214,14 @@ app.post("/", authRequired, async (c) => {
     }
   }
 
-  // ゴーストリンク同期
+  // ゴーストリンク同期 — 個人ページ間のみ
+  // Ghost link sync — personal pages only
   if (body.ghost_links?.length) {
     const sourceIds = [...new Set(body.ghost_links.map((g) => g.source_page_id))];
     const ownedGhostPages = await db
       .select({ id: pages.id })
       .from(pages)
-      .where(and(eq(pages.ownerId, userId), inArray(pages.id, sourceIds)));
+      .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
     const ownedGhostIds = new Set(ownedGhostPages.map((r) => r.id));
     for (const sourceId of sourceIds) {
       if (!ownedGhostIds.has(sourceId)) continue;

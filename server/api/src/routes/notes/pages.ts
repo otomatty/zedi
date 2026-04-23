@@ -95,10 +95,19 @@ app.post("/:noteId/pages", authRequired, async (c) => {
     sortOrder = result.sortOrder;
   } else {
     const result = await db.transaction(async (tx) => {
+      // 「タイトルだけで新規作成」経路はノートネイティブページを直接作る。
+      // `note_id` を埋めることで個人ホーム (note_id IS NULL フィルタ) には現れず、
+      // ノート削除時に ON DELETE CASCADE で一緒に消える。Issue #713 を参照。
+      //
+      // The "create from title" path generates a note-native page directly.
+      // Setting `note_id` keeps it out of the personal-home listing
+      // (`note_id IS NULL` filter) and lets ON DELETE CASCADE remove it
+      // alongside the note. See issue #713.
       const created = await tx
         .insert(pages)
         .values({
           ownerId: userId,
+          noteId,
           title: title ?? null,
         })
         .returning();
