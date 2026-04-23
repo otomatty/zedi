@@ -244,6 +244,55 @@ describe("GET /api/notes/:noteId/search", () => {
     expect(serialised).not.toContain("500");
   });
 
+  it("falls back to the default limit when the value is non-numeric", async () => {
+    // `?limit=abc` → `Number("abc") = NaN` を素通しすると `LIMIT NaN` で
+    // SQL が 500 になる。非数値は黙って既定値 20 に落として、クエリが壊れた
+    // クライアントでもエラーにならないようにする。
+    //
+    // `?limit=abc` would previously flow through as `NaN`, breaking the SQL
+    // with `LIMIT NaN` and 500-ing the request. Non-numeric input must fall
+    // back to the default 20 so a malformed client query stays safe.
+    const mockNote = createMockNote();
+    const { app, chains } = createTestApp([
+      [mockNote], // getNoteRole → owner
+      { rows: [] }, // execute search
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/search?q=hello&limit=abc`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const executeChain = chains.find((chain) => chain.startMethod === "execute");
+    const serialised = JSON.stringify(executeChain?.startArgs);
+    expect(serialised).not.toContain("NaN");
+    expect(serialised).toContain("20");
+  });
+
+  it("truncates fractional limits to an integer before clamping", async () => {
+    // 小数（`?limit=1.5`）がバインドされると Postgres の LIMIT は整数必須で
+    // クエリが落ちる可能性がある。`Math.trunc` で整数化してから範囲に収める。
+    //
+    // Postgres `LIMIT` requires an integer, so a fractional value could error
+    // out at the DB layer. Truncate before clamping to keep it a safe integer.
+    const mockNote = createMockNote();
+    const { app, chains } = createTestApp([
+      [mockNote], // getNoteRole → owner
+      { rows: [] }, // execute search
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/search?q=hello&limit=1.9`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const executeChain = chains.find((chain) => chain.startMethod === "execute");
+    const serialised = JSON.stringify(executeChain?.startArgs);
+    expect(serialised).not.toContain("1.9");
+  });
+
   it("passes noteId into the WHERE clause so the scope cannot be bypassed", async () => {
     // URL に入ってきた noteId が SQL パラメータとして渡され、別ノートの
     // ページが混ざるような自由なクエリビルドになっていないことを確認する。

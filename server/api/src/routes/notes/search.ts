@@ -40,6 +40,22 @@ function escapeLike(input: string): string {
   return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
+/**
+ * クエリ文字列の `limit` を有限の整数に正規化し、1〜100 の範囲へクランプする。
+ * 非数値（`?limit=abc`）や `NaN` / 小数は既定値 20 にフォールバックさせて
+ * `LIMIT NaN` による SQL エラーを防ぐ。
+ *
+ * Normalizes the `limit` query param to a finite integer clamped to 1..100.
+ * Non-numeric inputs (`?limit=abc`) and non-finite / fractional values fall
+ * back to the default 20 so a malformed query can't emit `LIMIT NaN` and 500
+ * the request.
+ */
+function clampLimit(raw: string | undefined): number {
+  const parsed = raw === undefined ? 20 : Number(raw);
+  const safe = Number.isFinite(parsed) ? Math.trunc(parsed) : 20;
+  return Math.min(Math.max(safe, 1), 100);
+}
+
 const app = new Hono<AppEnv>();
 
 app.get("/:noteId/search", authRequired, async (c) => {
@@ -63,7 +79,7 @@ app.get("/:noteId/search", authRequired, async (c) => {
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
 
-  const limit = Math.min(Math.max(Number(c.req.query("limit") || 20), 1), 100);
+  const limit = clampLimit(c.req.query("limit"));
   const pattern = `%${escapeLike(query)}%`;
 
   // `note_pages` に書かれている = このノートで表示対象のページ。ノートネイティブ
