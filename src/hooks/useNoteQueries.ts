@@ -128,6 +128,14 @@ function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
   return {
     id: p.id,
     ownerUserId: p.owner_id,
+    // GET /api/notes/:id は現状 `note_id` を返さない（Phase 1 対象外）。
+    // ノート画面で消費されるため personal /home フィルタには影響しないが、
+    // note-native か個人ページかの厳密区別が必要になる Phase 3 でサーバー
+    // レスポンスを拡張する。Issue #713。
+    // GET /api/notes/:id does not surface `note_id` yet; this consumer is the
+    // note view, so personal /home filtering is unaffected. Phase 3 will
+    // extend the server response when the distinction is needed. Issue #713.
+    noteId: null,
     title: p.title ?? "",
     contentPreview: p.content_preview ?? undefined,
     thumbnailUrl: p.thumbnail_url ?? undefined,

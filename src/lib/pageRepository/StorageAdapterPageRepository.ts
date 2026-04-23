@@ -17,6 +17,7 @@ function metadataToPage(m: PageMetadata): Page {
   return {
     id: m.id,
     ownerUserId: m.ownerId,
+    noteId: m.noteId ?? null,
     title: m.title ?? "",
     content: "", // Y.Doc; load via adapter.getYDocState or API
     contentPreview: m.contentPreview ?? undefined,
@@ -32,6 +33,7 @@ function metadataToPageSummary(m: PageMetadata): PageSummary {
   return {
     id: m.id,
     ownerUserId: m.ownerId,
+    noteId: m.noteId ?? null,
     title: m.title ?? "",
     contentPreview: m.contentPreview ?? undefined,
     thumbnailUrl: m.thumbnailUrl ?? undefined,
@@ -42,12 +44,21 @@ function metadataToPageSummary(m: PageMetadata): PageSummary {
   };
 }
 
+/**
+ *
+ */
 export class StorageAdapterPageRepository {
+  /**
+   *
+   */
   constructor(
     private adapter: StorageAdapter,
     private api: ApiClient,
   ) {}
 
+  /**
+   *
+   */
   async createPage(
     userId: string,
     title: string = "",
@@ -65,12 +76,27 @@ export class StorageAdapterPageRepository {
     content: string,
     options?: CreatePageOptions,
   ): Promise<Page> {
+    /**
+     *
+     */
     const contentPreview = getPageListPreview(content);
+    /**
+     *
+     */
     const now = Date.now();
+    /**
+     *
+     */
     const id = crypto.randomUUID();
+    /**
+     *
+     */
     const meta: PageMetadata = {
       id,
       ownerId: LOCAL_USER_ID,
+      // ローカル (ゲスト) で作るのは個人ページのみ。Issue #713。
+      // Local (guest) creation always produces a personal page. Issue #713.
+      noteId: null,
       sourcePageId: null,
       title: title || null,
       contentPreview: contentPreview || null,
@@ -89,16 +115,32 @@ export class StorageAdapterPageRepository {
     content: string,
     options?: CreatePageOptions,
   ): Promise<Page> {
+    /**
+     *
+     */
     const contentPreview = getPageListPreview(content);
+    /**
+     *
+     */
     const created = await this.api.createPage({
       title: title || undefined,
       content_preview: contentPreview || undefined,
       source_url: options?.sourceUrl ?? undefined,
       thumbnail_url: options?.thumbnailUrl ?? undefined,
     });
+    /**
+     *
+     */
     const meta: PageMetadata = {
       id: created.id,
       ownerId: created.owner_id,
+      // POST /api/pages は個人ページしか作らないので `null`。サーバーが将来
+      // ノート所属を返すようになっても (`note_id` は SyncPageItem で optional)
+      // 値があればそのまま採用する。Issue #713。
+      // POST /api/pages only ever creates personal pages, so default to `null`.
+      // If the server ever surfaces `note_id` (it's optional on `SyncPageItem`)
+      // we honor it. Issue #713.
+      noteId: created.note_id ?? null,
       sourcePageId: created.source_page_id ?? null,
       title: created.title ?? null,
       contentPreview: created.content_preview ?? null,
@@ -112,58 +154,121 @@ export class StorageAdapterPageRepository {
     return metadataToPage(meta);
   }
 
+  /**
+   *
+   */
   async getPage(_userId: string, pageId: string): Promise<Page | null> {
+    /**
+     *
+     */
     const m = await this.adapter.getPage(pageId);
     return m ? metadataToPage(m) : null;
   }
 
+  /**
+   *
+   */
   async getPages(_userId: string): Promise<Page[]> {
+    /**
+     *
+     */
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPage);
   }
 
+  /**
+   *
+   */
   async getPagesSummary(_userId: string): Promise<PageSummary[]> {
+    /**
+     *
+     */
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPageSummary);
   }
 
+  /**
+   *
+   */
   async getPagesByIds(_userId: string, pageIds: string[]): Promise<Page[]> {
     if (pageIds.length === 0) return [];
+    /**
+     *
+     */
     const list = await this.adapter.getAllPages();
+    /**
+     *
+     */
     const idSet = new Set(pageIds);
     return list.filter((m) => idSet.has(m.id)).map(metadataToPage);
   }
 
+  /**
+   *
+   */
   async getPageByTitle(_userId: string, title: string): Promise<Page | null> {
+    /**
+     *
+     */
     const trimmed = title.trim();
     if (!trimmed) return null;
+    /**
+     *
+     */
     const list = await this.adapter.getAllPages();
+    /**
+     *
+     */
     const m = list.find((p) => (p.title ?? "").trim() === trimmed);
     return m ? metadataToPage(m) : null;
   }
 
+  /**
+   *
+   */
   async checkDuplicateTitle(
     _userId: string,
     title: string,
     excludePageId?: string,
   ): Promise<Page | null> {
+    /**
+     *
+     */
     const trimmed = title.trim();
     if (!trimmed) return null;
+    /**
+     *
+     */
     const list = await this.adapter.getAllPages();
+    /**
+     *
+     */
     const m = list.find(
       (p) => (p.title ?? "").trim() === trimmed && (!excludePageId || p.id !== excludePageId),
     );
     return m ? metadataToPage(m) : null;
   }
 
+  /**
+   *
+   */
   async updatePage(
     _userId: string,
     pageId: string,
     updates: Partial<Pick<Page, "title" | "content" | "thumbnailUrl" | "sourceUrl">>,
   ): Promise<void> {
+    /**
+     *
+     */
     const existing = await this.adapter.getPage(pageId);
     if (!existing) return;
+    /**
+     *
+     */
     const now = Date.now();
+    /**
+     *
+     */
     const meta: PageMetadata = {
       ...existing,
       title: updates.title !== undefined ? updates.title : existing.title,
@@ -179,13 +284,25 @@ export class StorageAdapterPageRepository {
     await this.adapter.upsertPage(meta);
     // タイトルまたはコンテンツが変更された場合、検索インデックスを更新
     if (updates.title !== undefined || updates.content !== undefined) {
+      /**
+       *
+       */
       const titleText = meta.title ?? "";
+      /**
+       *
+       */
       const contentText = updates.content ? extractPlainText(updates.content) : "";
+      /**
+       *
+       */
       const searchText = [titleText, contentText].filter(Boolean).join(" ");
       await this.adapter.updateSearchIndex(pageId, searchText);
     }
   }
 
+  /**
+   *
+   */
   async deletePage(userId: string, pageId: string): Promise<void> {
     await this.adapter.deletePage(pageId);
     if (userId !== LOCAL_USER_ID) {
@@ -193,24 +310,54 @@ export class StorageAdapterPageRepository {
     }
   }
 
+  /**
+   *
+   */
   async searchPages(_userId: string, query: string): Promise<Page[]> {
+    /**
+     *
+     */
     const results = await this.adapter.searchPages(query);
+    /**
+     *
+     */
     const pages: Page[] = [];
-    for (const r of results) {
+    for (/**
+     *
+     */
+    const r of results) {
+      /**
+       *
+       */
       const m = await this.adapter.getPage(r.pageId);
       if (m) pages.push(metadataToPage(m));
     }
     return pages;
   }
 
+  /**
+   *
+   */
   async addLink(sourceId: string, targetId: string): Promise<void> {
+    /**
+     *
+     */
     const links = await this.adapter.getLinks(sourceId);
+    /**
+     *
+     */
     const now = Date.now();
     if (links.some((l) => l.targetId === targetId)) return;
     await this.adapter.saveLinks(sourceId, [...links, { sourceId, targetId, createdAt: now }]);
   }
 
+  /**
+   *
+   */
   async removeLink(sourceId: string, targetId: string): Promise<void> {
+    /**
+     *
+     */
     const links = await this.adapter.getLinks(sourceId);
     await this.adapter.saveLinks(
       sourceId,
@@ -218,28 +365,64 @@ export class StorageAdapterPageRepository {
     );
   }
 
+  /**
+   *
+   */
   async getOutgoingLinks(pageId: string): Promise<string[]> {
+    /**
+     *
+     */
     const links = await this.adapter.getLinks(pageId);
     return links.map((l) => l.targetId);
   }
 
+  /**
+   *
+   */
   async getBacklinks(pageId: string): Promise<string[]> {
+    /**
+     *
+     */
     const links = await this.adapter.getBacklinks(pageId);
     return links.map((l) => l.sourceId);
   }
 
+  /**
+   *
+   */
   async getLinks(_userId: string): Promise<Link[]> {
+    /**
+     *
+     */
     const pages = await this.adapter.getAllPages();
+    /**
+     *
+     */
     const all: Link[] = [];
-    for (const p of pages) {
+    for (/**
+     *
+     */
+    const p of pages) {
+      /**
+       *
+       */
       const links = await this.adapter.getLinks(p.id);
       all.push(...links);
     }
     return all;
   }
 
+  /**
+   *
+   */
   async addGhostLink(linkText: string, sourcePageId: string): Promise<void> {
+    /**
+     *
+     */
     const ghosts = await this.adapter.getGhostLinks(sourcePageId);
+    /**
+     *
+     */
     const now = Date.now();
     if (ghosts.some((g) => g.linkText === linkText)) return;
     await this.adapter.saveGhostLinks(sourcePageId, [
@@ -248,7 +431,13 @@ export class StorageAdapterPageRepository {
     ]);
   }
 
+  /**
+   *
+   */
   async removeGhostLink(linkText: string, sourcePageId: string): Promise<void> {
+    /**
+     *
+     */
     const ghosts = await this.adapter.getGhostLinks(sourcePageId);
     await this.adapter.saveGhostLinks(
       sourcePageId,
@@ -256,20 +445,50 @@ export class StorageAdapterPageRepository {
     );
   }
 
+  /**
+   *
+   */
   async getGhostLinkSources(linkText: string): Promise<string[]> {
+    /**
+     *
+     */
     const pages = await this.adapter.getAllPages();
+    /**
+     *
+     */
     const sources: string[] = [];
-    for (const p of pages) {
+    for (/**
+     *
+     */
+    const p of pages) {
+      /**
+       *
+       */
       const ghosts = await this.adapter.getGhostLinks(p.id);
       if (ghosts.some((g) => g.linkText === linkText)) sources.push(p.id);
     }
     return sources;
   }
 
+  /**
+   *
+   */
   async getGhostLinks(_userId: string): Promise<GhostLink[]> {
+    /**
+     *
+     */
     const pages = await this.adapter.getAllPages();
+    /**
+     *
+     */
     const all: GhostLink[] = [];
-    for (const p of pages) {
+    for (/**
+     *
+     */
+    const p of pages) {
+      /**
+       *
+       */
       const ghosts = await this.adapter.getGhostLinks(p.id);
       all.push(
         ...ghosts.map((g) => ({
@@ -282,16 +501,34 @@ export class StorageAdapterPageRepository {
     return all;
   }
 
+  /**
+   *
+   */
   async getGhostLinksBySourcePage(sourcePageId: string): Promise<string[]> {
+    /**
+     *
+     */
     const ghosts = await this.adapter.getGhostLinks(sourcePageId);
     return ghosts.map((g) => g.linkText);
   }
 
+  /**
+   *
+   */
   async promoteGhostLink(userId: string, linkText: string): Promise<Page | null> {
+    /**
+     *
+     */
     const sources = await this.getGhostLinkSources(linkText);
     if (sources.length < 2) return null;
+    /**
+     *
+     */
     const newPage = await this.createPage(userId, linkText, "");
-    for (const sourceId of sources) {
+    for (/**
+     *
+     */
+    const sourceId of sources) {
       await this.addLink(sourceId, newPage.id);
       await this.removeGhostLink(linkText, sourceId);
     }

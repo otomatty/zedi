@@ -28,7 +28,10 @@ const LOCAL_USER_ID = "local-user";
 const initialSyncRequestedForUser = new Set<string>();
 
 // Query keys
-export const pageKeys = {
+export /**
+ *
+ */
+const pageKeys = {
   all: ["pages"] as const,
   lists: () => [...pageKeys.all, "list"] as const,
   list: (userId: string) => [...pageKeys.lists(), userId] as const,
@@ -228,13 +231,28 @@ type UsePageOptions = {
   enabled?: boolean;
 };
 
+/**
+ *
+ */
 export function usePage(pageId: string, options?: UsePageOptions) {
+  /**
+   *
+   */
   const { getRepository, userId, isLoaded } = useRepository();
+  /**
+   *
+   */
   const isEnabled = (options?.enabled ?? true) && isLoaded && !!pageId;
 
+  /**
+   *
+   */
   const query = useQuery({
     queryKey: pageKeys.detail(userId, pageId),
     queryFn: async () => {
+      /**
+       *
+       */
       const repo = await getRepository();
       return repo.getPage(userId, pageId);
     },
@@ -348,6 +366,9 @@ export function useCreatePage() {
       const newSummary: PageSummary = {
         id: newPage.id,
         ownerUserId: newPage.ownerUserId,
+        // useCreatePage は個人ページ作成しか経由しないので常に `null`。Issue #713。
+        // useCreatePage only creates personal pages, so noteId is always null.
+        noteId: newPage.noteId,
         title: newPage.title,
         contentPreview: newPage.contentPreview,
         thumbnailUrl: newPage.thumbnailUrl,

@@ -34,7 +34,10 @@ interface PageStore {
   searchPages: (query: string) => Page[];
 }
 
-export const usePageStore = create<PageStore>()(
+export /**
+ *
+ */
+const usePageStore = create<PageStore>()(
   persist(
     (set, get) => ({
       pages: [],
@@ -42,10 +45,19 @@ export const usePageStore = create<PageStore>()(
       ghostLinks: [],
 
       createPage: (title = "", content = "") => {
+        /**
+         *
+         */
         const now = Date.now();
+        /**
+         *
+         */
         const newPage: Page = {
           id: uuidv4(),
           ownerUserId: "local-user",
+          // ローカル zustand ストアは個人ページ専用。Issue #713。
+          // The local zustand store only holds personal pages. Issue #713.
+          noteId: null,
           title,
           content,
           createdAt: now,
@@ -80,6 +92,9 @@ export const usePageStore = create<PageStore>()(
       },
 
       getPageByTitle: (title) => {
+        /**
+         *
+         */
         const normalizedTitle = title.toLowerCase().trim();
         return get().pages.find(
           (page) => page.title.toLowerCase().trim() === normalizedTitle && !page.isDeleted,
@@ -87,6 +102,9 @@ export const usePageStore = create<PageStore>()(
       },
 
       addLink: (sourceId, targetId) => {
+        /**
+         *
+         */
         const exists = get().links.some(
           (link) => link.sourceId === sourceId && link.targetId === targetId,
         );
@@ -118,6 +136,9 @@ export const usePageStore = create<PageStore>()(
       },
 
       addGhostLink: (linkText, sourcePageId) => {
+        /**
+         *
+         */
         const exists = get().ghostLinks.some(
           (gl) => gl.linkText === linkText && gl.sourcePageId === sourcePageId,
         );
@@ -143,9 +164,15 @@ export const usePageStore = create<PageStore>()(
       },
 
       promoteGhostLink: (linkText) => {
+        /**
+         *
+         */
         const sources = get().getGhostLinkSources(linkText);
         if (sources.length >= 2) {
           // Create a new page from the ghost link
+          /**
+           *
+           */
           const newPage = get().createPage(linkText);
 
           // Convert ghost links to real links
@@ -164,13 +191,22 @@ export const usePageStore = create<PageStore>()(
       },
 
       searchPages: (query) => {
+        /**
+         *
+         */
         const normalizedQuery = query.toLowerCase().trim();
         if (!normalizedQuery) return [];
 
         return get().pages.filter((page) => {
           if (page.isDeleted) return false;
 
+          /**
+           *
+           */
           const titleMatch = page.title.toLowerCase().includes(normalizedQuery);
+          /**
+           *
+           */
           const contentMatch = page.content.toLowerCase().includes(normalizedQuery);
 
           return titleMatch || contentMatch;

@@ -113,6 +113,7 @@ describe("StorageAdapterPageRepository", () => {
       const meta: PageMetadata = {
         id: "page-1",
         ownerId: LOCAL_USER_ID,
+        noteId: null,
         sourcePageId: null,
         title: "Hello",
         contentPreview: "preview",
@@ -144,6 +145,7 @@ describe("StorageAdapterPageRepository", () => {
         {
           id: "p1",
           ownerId: LOCAL_USER_ID,
+          noteId: null,
           sourcePageId: null,
           title: "A",
           contentPreview: null,
@@ -156,6 +158,7 @@ describe("StorageAdapterPageRepository", () => {
         {
           id: "p2",
           ownerId: LOCAL_USER_ID,
+          noteId: null,
           sourcePageId: null,
           title: "B",
           contentPreview: null,
@@ -180,6 +183,7 @@ describe("StorageAdapterPageRepository", () => {
       const existing: PageMetadata = {
         id: "page-1",
         ownerId: LOCAL_USER_ID,
+        noteId: null,
         sourcePageId: null,
         title: "Old Title",
         contentPreview: null,
@@ -283,6 +287,7 @@ describe("StorageAdapterPageRepository", () => {
       {
         id: "p1",
         ownerId: LOCAL_USER_ID,
+        noteId: null,
         sourcePageId: null,
         title: "Unique Title",
         contentPreview: null,
@@ -295,6 +300,7 @@ describe("StorageAdapterPageRepository", () => {
       {
         id: "p2",
         ownerId: LOCAL_USER_ID,
+        noteId: null,
         sourcePageId: null,
         title: "Another Title",
         contentPreview: null,
@@ -323,6 +329,87 @@ describe("StorageAdapterPageRepository", () => {
       (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValue(pages);
       const dup = await repo.checkDuplicateTitle(LOCAL_USER_ID, "Nonexistent Title");
       expect(dup).toBeNull();
+    });
+  });
+
+  describe("noteId passthrough (issue #713 Phase 2)", () => {
+    // 個人ページ作成 (`createPage`) は常に `noteId = null` のメタデータを書き、
+    // 取得系は adapter から渡された `noteId` をそのまま `Page` / `PageSummary`
+    // に伝播させる。ノートネイティブページは `note-native` の値を保つ。
+    //
+    // `createPage` always writes personal-page metadata (`noteId = null`); read
+    // paths surface whatever `noteId` the adapter returns into `Page` /
+    // `PageSummary` unchanged so callers can scope behaviour without re-querying.
+
+    it("createPage (local) writes noteId: null to the adapter", async () => {
+      await repo.createPage(LOCAL_USER_ID, "Personal", "");
+      const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
+      expect(upsertMock).toHaveBeenCalledOnce();
+      const stored = upsertMock.mock.calls[0][0] as PageMetadata;
+      expect(stored.noteId).toBeNull();
+    });
+
+    it("createPage (remote) defaults noteId to null when API omits it", async () => {
+      const now = new Date().toISOString();
+      (api.createPage as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "api-page-1",
+        owner_id: AUTH_USER_ID,
+        title: "API Page",
+        content_preview: null,
+        source_page_id: null,
+        thumbnail_url: null,
+        source_url: null,
+        created_at: now,
+        updated_at: now,
+        is_deleted: false,
+      });
+      const page = await repo.createPage(AUTH_USER_ID, "API Page");
+      expect(page.noteId).toBeNull();
+      const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
+      const stored = upsertMock.mock.calls[0][0] as PageMetadata;
+      expect(stored.noteId).toBeNull();
+    });
+
+    it("getPage / getPagesSummary forward adapter noteId verbatim", async () => {
+      const personal: PageMetadata = {
+        id: "p1",
+        ownerId: LOCAL_USER_ID,
+        noteId: null,
+        sourcePageId: null,
+        title: "Personal",
+        contentPreview: null,
+        thumbnailUrl: null,
+        sourceUrl: null,
+        createdAt: 1000,
+        updatedAt: 2000,
+        isDeleted: false,
+      };
+      const noteNative: PageMetadata = {
+        id: "p2",
+        ownerId: LOCAL_USER_ID,
+        noteId: "note-1",
+        sourcePageId: null,
+        title: "Note-native",
+        contentPreview: null,
+        thumbnailUrl: null,
+        sourceUrl: null,
+        createdAt: 1000,
+        updatedAt: 2000,
+        isDeleted: false,
+      };
+
+      (adapter.getPage as ReturnType<typeof vi.fn>).mockResolvedValueOnce(noteNative);
+      const fetched = await repo.getPage(LOCAL_USER_ID, "p2");
+      expect(fetched?.noteId).toBe("note-1");
+
+      (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+        personal,
+        noteNative,
+      ]);
+      const summaries = await repo.getPagesSummary(LOCAL_USER_ID);
+      const byId = new Map(summaries.map((s) => [s.id, s]));
+      expect(byId.get("p1")?.noteId).toBeNull();
+      expect(byId.get("p2")?.noteId).toBe("note-1");
     });
   });
 });
