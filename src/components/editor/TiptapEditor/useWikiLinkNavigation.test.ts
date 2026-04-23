@@ -16,9 +16,14 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/hooks/usePageQueries", () => ({
   usePageByTitle: vi.fn(),
+  usePagesSummary: vi.fn(() => ({ data: [], isLoading: false, isFetched: true })),
   useCreatePage: () => ({
     mutateAsync: mockMutateAsync,
   }),
+}));
+
+vi.mock("@/hooks/useNoteQueries", () => ({
+  useNotePages: vi.fn(() => ({ data: [], isLoading: false, isFetched: true })),
 }));
 
 import { usePageByTitle } from "@/hooks/usePageQueries";

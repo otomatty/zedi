@@ -56,6 +56,13 @@ function useEditorControllers(args: {
   workspaceRoot: string | null;
   /** Note id for Tauri workspace registry (Issue #461). */
   noteId: string | null;
+  /**
+   * 編集中ページの noteId。WikiLink 存在確認のスコープに使用する
+   * （Issue #713 Phase 4）。
+   * Owning note ID of the page being edited; scopes WikiLink existence
+   * checks (issue #713 Phase 4).
+   */
+  pageNoteId: string | null;
 }) {
   const { editor, handleInsertMermaid, isEditorInitializedRef } = useEditorSetup({
     content: args.content,
@@ -112,6 +119,7 @@ function useEditorControllers(args: {
     onWikiContentApplied: args.onWikiContentApplied,
     handleImageUpload: args.handleImageUpload,
     isEditorInitializedRef,
+    pageNoteId: args.pageNoteId,
   });
 
   return { editor, handleInsertMermaid, ...suggestionUi };
@@ -221,6 +229,7 @@ export function useTiptapEditorController({
     handleImageUpload: imageUpload.handleImageUpload,
     workspaceRoot,
     noteId: noteIdForWorkspace,
+    pageNoteId,
   });
   const { handleInsertThumbnailImage } = useThumbnailController(
     editorRef,

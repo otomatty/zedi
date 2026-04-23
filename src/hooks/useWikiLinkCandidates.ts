@@ -31,7 +31,11 @@ export function useWikiLinkCandidates(
   pageNoteId: string | null | undefined,
 ): WikiLinkCandidatesResult {
   const noteId = pageNoteId ?? null;
-  const personal = usePagesSummary();
+  // ノートスコープでは個人ページを取りに行かない（IndexedDB への不要な
+  // アクセスを避ける）。`enabled` は react-query で queryFn を抑止する。
+  // In note scope, skip the personal pages lookup to avoid unnecessary
+  // IndexedDB access; `enabled` suppresses the react-query queryFn.
+  const personal = usePagesSummary({ enabled: noteId === null });
   const notePages = useNotePages(noteId ?? "", undefined, Boolean(noteId));
 
   return useMemo<WikiLinkCandidatesResult>(() => {

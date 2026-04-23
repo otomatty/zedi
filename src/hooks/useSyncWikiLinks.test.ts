@@ -359,5 +359,30 @@ describe("syncLinksWithRepo", () => {
       expect(addGhostLink).toHaveBeenCalledTimes(1);
       expect(addGhostLink).toHaveBeenCalledWith("Unknown", sourcePageId);
     });
+
+    // CodeRabbit / Codex が指摘: ノートスコープで `notePages` が空のとき、
+    // 旧 outgoing link が候補マップに乗らず削除されないとグラフに残骸が残る。
+    // 候補マップに無い targetId は「スコープから外れた」として常に removeLink
+    // されることを担保する（Issue #713 Phase 4 リグレッションガード）。
+    // Regression guard for issue #713 Phase 4: when note scope is active but
+    // `notePages` is empty/unavailable, any stale outgoing link targetId
+    // should still be treated as out-of-scope and removed, otherwise the
+    // link graph would accumulate dangling edges.
+    it("pageNoteId 指定で notePages が空でも、既存の outgoing link は removeLink で掃除される", async () => {
+      const removeLink = vi.fn().mockResolvedValue(undefined);
+
+      const repo = createMockRepo({
+        getOutgoingLinks: vi.fn().mockResolvedValue(["stale-target-id"]),
+        getGhostLinksBySourcePage: vi.fn().mockResolvedValue([]),
+        removeLink,
+      });
+
+      await syncLinksWithRepo(repo, userId, sourcePageId, [], {
+        pageNoteId: noteId,
+      });
+
+      expect(removeLink).toHaveBeenCalledTimes(1);
+      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "stale-target-id");
+    });
   });
 });

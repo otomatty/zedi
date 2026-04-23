@@ -44,36 +44,33 @@ interface WikiLinkSuggestionProps {
 }
 
 /**
- *
+ * `onKeyDown` が `true` を返すと呼び出し元は既定のキーハンドラを抑止する。
+ * Imperative handle exposing `onKeyDown`; returning `true` tells the caller
+ * to suppress the default key handling.
  */
 export interface WikiLinkSuggestionHandle {
   onKeyDown: (event: KeyboardEvent) => boolean;
 }
 
-export /**
+/**
+ * WikiLink サジェストポップアップ。`pages` で受け取った候補のうちクエリに
+ * マッチするものを最大 5 件表示し、完全一致が無ければ「新規作成」項目も出す。
+ * Issue #713 Phase 4（スコープは呼び出し側で事前に絞る）。
  *
+ * WikiLink suggestion popup. Renders up to five candidates matching the
+ * query and, when there is no exact match, a "create new" option. Scope
+ * filtering (personal vs. same-note) is expected to happen in the caller
+ * before pages are passed in (see issue #713 Phase 4).
  */
-const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
+export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
   ({ query, onSelect, onClose, pages }, ref) => {
-    /**
-     *
-     */
     const [selectedIndex, setSelectedIndex] = useState(0);
 
     // Get matching pages
-    /**
-     *
-     */
     const getItems = useCallback((): SuggestionItem[] => {
-      /**
-       *
-       */
       const normalizedQuery = query.toLowerCase().trim();
 
       // Get existing pages that match
-      /**
-       *
-       */
       const matchingPages = pages
         .filter((p) => !p.isDeleted && p.title.toLowerCase().includes(normalizedQuery))
         .slice(0, 5)
@@ -84,16 +81,10 @@ const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggesti
         }));
 
       // If query doesn't match any existing page exactly, add create option
-      /**
-       *
-       */
       const exactMatch = pages.find(
         (p) => !p.isDeleted && p.title.toLowerCase() === normalizedQuery,
       );
 
-      /**
-       *
-       */
       const items: SuggestionItem[] = [...matchingPages];
 
       if (query.trim() && !exactMatch) {
@@ -107,9 +98,6 @@ const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggesti
       return items;
     }, [query, pages]);
 
-    /**
-     *
-     */
     const items = getItems();
 
     // Reset selection when items change
@@ -117,14 +105,8 @@ const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggesti
       queueMicrotask(() => setSelectedIndex(0));
     }, [query]);
 
-    /**
-     *
-     */
     const selectItem = useCallback(
       (index: number) => {
-        /**
-         *
-         */
         const item = items[index];
         if (item) {
           onSelect(item);

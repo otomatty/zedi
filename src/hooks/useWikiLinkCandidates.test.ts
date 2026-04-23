@@ -62,6 +62,8 @@ describe("useWikiLinkCandidates", () => {
     const { result } = renderHook(() => useWikiLinkCandidates(null));
 
     expect(result.current.pages).toEqual([{ id: "p-1", title: "Alpha", isDeleted: false }]);
+    // 個人スコープでは個人ページ取得を有効化する。
+    expect(mockUsePagesSummary).toHaveBeenCalledWith({ enabled: true });
     // useNotePages は noteId が空 + enabled=false で呼ばれる（実データは取りに行かない）。
     expect(mockUseNotePages).toHaveBeenCalledWith("", undefined, false);
   });
@@ -85,6 +87,8 @@ describe("useWikiLinkCandidates", () => {
       { id: "n-2", title: "Design", isDeleted: false },
     ]);
     expect(mockUseNotePages).toHaveBeenCalledWith(noteId, undefined, true);
+    // ノートスコープでは個人ページ取得を抑止して IndexedDB アクセスを避ける。
+    expect(mockUsePagesSummary).toHaveBeenCalledWith({ enabled: false });
     // 個人ページがスコープを越えて紛れ込まないこと。
     expect(result.current.pages.find((p) => p.id === "p-1")).toBeUndefined();
   });

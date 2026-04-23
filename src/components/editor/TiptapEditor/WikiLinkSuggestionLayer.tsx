@@ -27,12 +27,15 @@ interface WikiLinkSuggestionLayerProps {
 }
 
 /**
+ * WikiLink サジェスト UI のフローティング層。`useWikiLinkCandidates` で
+ * スコープ（個人 / ノート）に応じた候補ページを取得し、`WikiLinkSuggestion`
+ * に渡す。Issue #713 Phase 4。
  *
+ * Floating layer for the WikiLink suggestion popup. Fetches scope-aware
+ * candidate pages via `useWikiLinkCandidates` and forwards them to
+ * `WikiLinkSuggestion`. See issue #713 Phase 4.
  */
-export /**
- *
- */
-const WikiLinkSuggestionLayer: React.FC<WikiLinkSuggestionLayerProps> = ({
+export const WikiLinkSuggestionLayer: React.FC<WikiLinkSuggestionLayerProps> = ({
   editor,
   suggestionState,
   position,
@@ -41,9 +44,6 @@ const WikiLinkSuggestionLayer: React.FC<WikiLinkSuggestionLayerProps> = ({
   onClose,
   pageNoteId,
 }) => {
-  /**
-   *
-   */
   const { pages } = useWikiLinkCandidates(pageNoteId);
 
   if (!suggestionState?.active || !suggestionState.range || !position || !editor) return null;

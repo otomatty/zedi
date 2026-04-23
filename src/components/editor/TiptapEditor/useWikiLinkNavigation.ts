@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePageByTitle, useCreatePage } from "@/hooks/usePageQueries";
+import { usePageByTitle, usePagesSummary, useCreatePage } from "@/hooks/usePageQueries";
 import { useNotePages } from "@/hooks/useNoteQueries";
 
 interface UseWikiLinkNavigationOptions {
@@ -45,13 +45,51 @@ export function useWikiLinkNavigation(
   const createPageMutation = useCreatePage();
   const [linkTitleToFind, setLinkTitleToFind] = useState<string | null>(null);
 
-  // 個人スコープ: IndexedDB / 個人ページに対するタイトル検索
-  // Personal scope: title lookup against IndexedDB / personal pages.
+  // 個人スコープ: 個人ページに対する大小文字を無視したタイトル検索。
+  // `usePageByTitle` は完全一致 (`trim` のみ) しか返さないため、既存キャッシュ
+  // ヒット時はそれを使い、そうでなければ `usePagesSummary` の結果を大小文字
+  // 無視で走査する。`syncLinksWithRepo` と `WikiLinkSuggestion` が `toLowerCase`
+  // で解決しているので、ナビゲーションもスコープ間で揃える。Issue #713 Phase 4。
+  //
+  // Personal scope: case-insensitive title lookup over personal pages.
+  // `usePageByTitle` is case-sensitive, so we prefer its cache when it hits
+  // and otherwise fall back to a case-insensitive scan of `usePagesSummary`
+  // to mirror the normalization already used by `syncLinksWithRepo` and the
+  // suggestion UI. See issue #713 Phase 4.
   const shouldQueryPersonal = pageNoteId === null && !!linkTitleToFind;
   const personalLookup = usePageByTitle(shouldQueryPersonal ? linkTitleToFind || "" : "");
+  const personalSummary = usePagesSummary({ enabled: shouldQueryPersonal });
 
-  // ノートスコープ: そのノートに所属するページ一覧に対する完全一致検索
-  // Note scope: title lookup against the note's page list.
+  const personalResolved = useMemo(() => {
+    if (!shouldQueryPersonal || !linkTitleToFind) {
+      return { data: null as { id: string; title: string } | null, isFetched: true };
+    }
+    if (personalLookup.data) {
+      return {
+        data: { id: personalLookup.data.id, title: personalLookup.data.title },
+        isFetched: personalLookup.isFetched,
+      };
+    }
+    const normalized = linkTitleToFind.trim().toLowerCase();
+    const list = personalSummary.data ?? [];
+    const found = list.find(
+      (p) => !p.isDeleted && (p.title ?? "").trim().toLowerCase() === normalized,
+    );
+    return {
+      data: found ? { id: found.id, title: found.title } : null,
+      isFetched: personalLookup.isFetched && !personalSummary.isLoading,
+    };
+  }, [
+    shouldQueryPersonal,
+    linkTitleToFind,
+    personalLookup.data,
+    personalLookup.isFetched,
+    personalSummary.data,
+    personalSummary.isLoading,
+  ]);
+
+  // ノートスコープ: そのノートに所属するページ一覧に対する大小文字無視の検索。
+  // Note scope: case-insensitive title lookup against the note's page list.
   const shouldQueryNote = pageNoteId !== null && !!linkTitleToFind;
   const notePagesQuery = useNotePages(pageNoteId ?? "", undefined, Boolean(pageNoteId));
 
@@ -68,8 +106,8 @@ export function useWikiLinkNavigation(
     };
   }, [shouldQueryNote, linkTitleToFind, notePagesQuery.data, notePagesQuery.isFetched]);
 
-  const foundPage = pageNoteId === null ? personalLookup.data : noteLookup.data;
-  const isFetched = pageNoteId === null ? personalLookup.isFetched : noteLookup.isFetched;
+  const foundPage = pageNoteId === null ? personalResolved.data : noteLookup.data;
+  const isFetched = pageNoteId === null ? personalResolved.isFetched : noteLookup.isFetched;
 
   // Pending link action
   const pendingLinkActionRef = useRef<{ title: string } | null>(null);

@@ -74,10 +74,17 @@ export async function syncLinksWithRepo(
   wikiLinks: WikiLinkForSync[],
   options: SyncLinksOptions = {},
 ): Promise<void> {
+  // `pageNoteId` は `null` / 文字列の 2 値契約。`pageNoteId ? ... : ...` は
+  // 空文字列 ("") の場合も個人スコープに倒れるため、明示的に `!== null` で
+  // 判別する。`null` なら個人 (`repo.getPagesSummary`)、文字列なら
+  // `options.notePages` を使う。
+  //
+  // `pageNoteId` is a null | string contract. Using truthiness would treat
+  // an empty string as personal scope; compare to `null` explicitly so the
+  // scope switch follows the documented contract.
   const pageNoteId = options.pageNoteId ?? null;
-  const candidateSource: Array<Pick<PageSummary, "id" | "title">> = pageNoteId
-    ? (options.notePages ?? [])
-    : await repo.getPagesSummary(userId);
+  const candidateSource: Array<Pick<PageSummary, "id" | "title">> =
+    pageNoteId !== null ? (options.notePages ?? []) : await repo.getPagesSummary(userId);
 
   const pageTitleToId = new Map(candidateSource.map((p) => [p.title.toLowerCase().trim(), p.id]));
   const idToNormalizedTitle = new Map(
@@ -85,14 +92,21 @@ export async function syncLinksWithRepo(
   );
   const currentNormalizedTitles = new Set(wikiLinks.map((l) => l.title.toLowerCase().trim()));
 
-  // Delta: remove links that are no longer in content
+  // Delta: remove links that are no longer in content.
+  // 候補ソースにマッピングが無い `targetId` は「現在のスコープから外れた」
+  // リンクとして古いエッジを削除する。`idToNormalizedTitle` が空（ノート
+  // スコープで `notePages` 未提供など）でも古い links を残さないようにする。
+  //
+  // If the candidate source does not know the `targetId`, the link is out of
+  // the current scope: remove the stale edge so we do not accumulate dangling
+  // graph entries when `notePages` is empty.
   const [oldOutgoingTargetIds, oldGhostTexts] = await Promise.all([
     repo.getOutgoingLinks(sourcePageId),
     repo.getGhostLinksBySourcePage(sourcePageId),
   ]);
   for (const targetId of oldOutgoingTargetIds) {
     const norm = idToNormalizedTitle.get(targetId);
-    if (norm !== undefined && !currentNormalizedTitles.has(norm)) {
+    if (norm === undefined || !currentNormalizedTitles.has(norm)) {
       await repo.removeLink(sourcePageId, targetId);
     }
   }
