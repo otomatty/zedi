@@ -394,6 +394,14 @@ describe("POST /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 P
       version: 1,
       contentText: "body text",
     });
+    // Y.js 本文（バイナリ）が欠落すると `contentText` だけ正しく見えてしまうので、
+    // `ydocState` が元と一致することも明示的に検証する（CodeRabbit Major 指摘）。
+    // Verify the binary Y.js state is preserved too — otherwise a regression
+    // that drops the buffer would silently pass because `contentText` copies
+    // correctly. (CodeRabbit Major.)
+    expect((contentsValues?.args[0] as { ydocState: Buffer }).ydocState).toEqual(
+      Buffer.from([1, 2, 3]),
+    );
   });
 
   it("should skip page_contents insert when the source page has no content row yet", async () => {
@@ -607,6 +615,22 @@ describe("POST /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Pha
     });
     // `noteId` must be null for personal pages (`note_id IS NULL` filter relies on this).
     expect(values.noteId).toBeNull();
+
+    // Y.js 本文（`ydocState`）も元からコピー先にそのまま移ることを保証する。
+    // バイナリが欠落してもテキストだけ正しく見えてしまう回帰を防ぐ（CodeRabbit Major）。
+    // Assert the binary Y.js state is also carried to the destination — this
+    // guards against regressions that drop the buffer while `contentText`
+    // still copies correctly. (CodeRabbit Major.)
+    const contentsInsert = insertCalls[1];
+    const contentsValues = contentsInsert?.ops.find((op) => op.method === "values");
+    expect(contentsValues?.args[0]).toMatchObject({
+      pageId: "pg-personal-copy",
+      version: 1,
+      contentText: "note body",
+    });
+    expect((contentsValues?.args[0] as { ydocState: Buffer }).ydocState).toEqual(
+      Buffer.from([9, 9]),
+    );
 
     // 個人ページはノートリストに入らないので `notePages` / `notes.updatedAt` は触らない。
     // Personal copies do not join the note list, so no notePages/notes update.

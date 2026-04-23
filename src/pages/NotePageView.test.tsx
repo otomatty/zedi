@@ -15,6 +15,18 @@ vi.mock("react-router-dom", async (importOriginal) => {
   };
 });
 
+// i18n: テストで「生キーが DOM に出る」前提に依存したくないので、`t(key, fallback)`
+// の仕様を明示的にモックする。共通セットアップが将来実ロケールを読み込むように
+// なっても、ここでの期待値が壊れないようにする（CodeRabbit 指摘）。
+// Mock `useTranslation` so these tests don't rely on the raw-key fallback of a
+// bare setup. Makes the test robust if the shared setup ever starts loading
+// real locale data. (CodeRabbit.)
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback ?? key,
+  }),
+}));
+
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNotePage: vi.fn(),
@@ -175,11 +187,10 @@ describe("NotePageView", () => {
 
   it("shows copy-to-personal action for note-native pages (issue #713 Phase 3)", () => {
     // `page.noteId === noteId` → ノートネイティブ。サインイン済みなら「個人に取り込み」
-    // を出す。ここでは "copyToPersonal" の翻訳キーがそのまま表示されるので
-    // （i18next mock が提供されていない）、キー文字列が DOM にあるかを確認する。
+    // を出す。i18n モックは `t(key)` が生キーを返す実装なので、キー文字列で DOM を引く。
     // A note-native page (`page.noteId === noteId`) surfaces the menu item for
-    // signed-in viewers. The i18n mock passes the key through, so we assert on
-    // the raw key appearing in the DOM. Issue #713 Phase 3.
+    // signed-in viewers. `useTranslation` is mocked to echo the key, so we
+    // assert on the raw key string. Issue #713 Phase 3.
     vi.mocked(useNote).mockReturnValue({
       note: { id: "note-1" },
       access: { canView: true, canEdit: false },

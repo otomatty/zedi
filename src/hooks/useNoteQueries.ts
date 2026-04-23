@@ -491,7 +491,23 @@ export function useCopyNotePageToPersonal() {
       // the new row up to IDB. (Issue #713 Phase 3, Codex P1.)
       try {
         const repo = await getRepository();
-        await repo.importPersonalPageFromApi(result.page);
+        const imported = await repo.importPersonalPageFromApi(result.page);
+        // `importPersonalPageFromApi` は個人ページ（`note_id: null`）以外を
+        // 防御的に拒否して `null` を返す。通常ルートでは copy-to-personal の
+        // サーバー応答は必ず個人ページなのでここを通らないが、契約ドリフト
+        // （例: サーバーが誤って `note_id` を埋めた）を早期に検知できるよう
+        // 警告を残す。成功パス扱いは維持する（`/home` は次回 sync で追随）。
+        // The defensive guard in `importPersonalPageFromApi` returns `null`
+        // for non-personal rows. In a healthy world the copy-to-personal
+        // response is always personal, so this is effectively a contract
+        // canary — log it loudly but do not fail the mutation (the next
+        // syncWithApi pass will reconcile `/home`).
+        if (!imported) {
+          console.warn(
+            "[useCopyNotePageToPersonal] Server returned a non-personal page; skipped IDB write-through:",
+            result.page,
+          );
+        }
       } catch (error) {
         console.warn(
           "[useCopyNotePageToPersonal] Failed to write copied page to IndexedDB:",

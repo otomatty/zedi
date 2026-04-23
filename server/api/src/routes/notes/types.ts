@@ -93,10 +93,14 @@ export interface NotePageApiItem {
 }
 
 /**
- * `GET /api/notes/:id` のレスポンス。呼び出し元の解決ロールと、このノートに
- * 所属する全ページを含む。
- * `GET /api/notes/:id` response: caller's resolved role plus the pages that
- * belong to this note.
+ * `GET /api/notes/:id` のレスポンス。呼び出し元の解決ロールと、このノート
+ * 表示に含まれる全ページ（リンクされた個人ページ + ノートネイティブ）を含む。
+ * `note_id` が NULL の行はリンクされた個人ページ（所有者の /home にも出る）、
+ * 値ありの行はこのノートに所属するノートネイティブページ。
+ * `GET /api/notes/:id` response: caller's resolved role plus every page shown
+ * in this note view (linked personal + note-native). A `note_id` of `null`
+ * means a linked personal page (also on the owner's `/home`); a non-null
+ * value means a note-native page owned by this note.
  */
 export interface NoteDetailApiResponse extends NoteApiFields {
   current_user_role: NonNullable<NoteRole>;
