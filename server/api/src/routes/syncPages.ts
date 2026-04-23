@@ -135,8 +135,36 @@ app.post("/", authRequired, async (c) => {
   // Bulk-load to avoid N+1: fetch every incoming id in one query, then classify
   // in memory as "missing", "owned personal", or "other (note-native or
   // someone else's)". Only after that do we issue per-row DML.
-  const incomingIds = [...new Set(body.pages.map((p) => p.id))];
-  const existingRows =
+  // クライアント側のリトライや誤ったペイロードで `body.pages` に同じ id が
+  // 複数入る場合がある。bulk-fetch で得たスナップショットは「リクエスト到着前
+  // の DB 状態」なので、ループ内で更新せず無加工に流すと:
+  //   - 新規 id の 2 回目の occurrence で再度 insert → PK 衝突 (500)
+  //   - 既存 id の 2 回目以降は古い updatedAt と比較 → LWW の順序が崩れる
+  // 対策として (1) 入力を id ごとに updated_at 最新のものへ畳み込み、
+  // (2) DML を発行するたび existingMap も更新して in-request の状態を保つ。
+  //
+  // Duplicate ids in `body.pages` (client retries / bad payloads) would break
+  // the bulk-prefetched snapshot: a new id would re-insert and collide on PK
+  // (500), and an existing id would be compared against a stale `updatedAt`,
+  // breaking LWW ordering. Defend by (1) collapsing duplicates to the newest
+  // `updated_at` per id, and (2) updating `existingMap` after every DML so the
+  // in-request state stays consistent.
+  const latestIncomingById = new Map<string, (typeof body.pages)[number]>();
+  for (const p of body.pages) {
+    const prev = latestIncomingById.get(p.id);
+    if (!prev || new Date(p.updated_at) > new Date(prev.updated_at)) {
+      latestIncomingById.set(p.id, p);
+    }
+  }
+
+  const incomingIds = [...latestIncomingById.keys()];
+  type ExistingRow = {
+    id: string;
+    ownerId: string;
+    noteId: string | null;
+    updatedAt: Date;
+  };
+  const existingRows: ExistingRow[] =
     incomingIds.length > 0
       ? await db
           .select({
@@ -148,9 +176,9 @@ app.post("/", authRequired, async (c) => {
           .from(pages)
           .where(inArray(pages.id, incomingIds))
       : [];
-  const existingMap = new Map(existingRows.map((row) => [row.id, row]));
+  const existingMap = new Map<string, ExistingRow>(existingRows.map((row) => [row.id, row]));
 
-  for (const p of body.pages) {
+  for (const p of latestIncomingById.values()) {
     const existing = existingMap.get(p.id);
     const clientTime = new Date(p.updated_at);
 
@@ -165,6 +193,15 @@ app.post("/", authRequired, async (c) => {
         sourcePageId: p.source_page_id ?? null,
         isDeleted: p.is_deleted ?? false,
         createdAt: clientTime,
+        updatedAt: clientTime,
+      });
+      // 後続イテレーション（同 id の重複が dedupe をすり抜けた場合の保険）が
+      // 再 insert に走らないようマップを更新しておく。
+      // Track the just-inserted row so any later iteration sees current state.
+      existingMap.set(p.id, {
+        id: p.id,
+        ownerId: userId,
+        noteId: null,
         updatedAt: clientTime,
       });
       results.push({ id: p.id, action: "created" });
@@ -191,6 +228,7 @@ app.post("/", authRequired, async (c) => {
           updatedAt: clientTime,
         })
         .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)));
+      existingMap.set(p.id, { ...existing, updatedAt: clientTime });
       results.push({ id: p.id, action: "updated" });
     } else {
       results.push({ id: p.id, action: "skipped" });

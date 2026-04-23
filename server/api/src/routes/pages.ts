@@ -82,12 +82,22 @@ app.get("/", authRequired, async (c) => {
   //   must not be soft-deleted. EXISTS + JOIN keeps the planner happy on large datasets.
   // `own` スコープは個人ページ（`pages.note_id IS NULL`）のみを返す。
   // ノートネイティブページ（issue #713）は、ノート画面または `scope=shared`
-  // 経由でのみアクセスする。`shared` 経由の場合は note メンバーシップで
-  // ノートネイティブページが含まれる。
+  // 経由でのみアクセスする。`shared` 経由の場合は (a) note_members 経由の
+  // メンバーシップ、または (b) `notes.owner_id = userId` 経由のオーナーシップで
+  // 含まれる。オーナー経路を明示しておかないと、ノートオーナーは通常 note_members
+  // 行を持たないため、自分が作った note-native page が listing から消える
+  // （閲覧は assertPageViewAccess / getNoteRole 経由で可能だが listing で見えなく
+  // なる）という非対称が起きる。`getNoteRole` の解決順 (owner → member → ...) と
+  // listing predicate を揃える。
   //
   // The `own` scope returns personal pages only (`pages.note_id IS NULL`).
   // Note-native pages (issue #713) are accessed via the note view or
-  // `scope=shared` (which already includes them through note membership).
+  // `scope=shared`. `shared` includes them either through (a) `note_members`
+  // membership or (b) `notes.owner_id = userId` ownership. The owner branch is
+  // mandatory because note owners typically have no `note_members` row, so
+  // omitting it would let owners view their note-native pages via
+  // `assertPageViewAccess` / `getNoteRole` while hiding them from the listing
+  // — keep the predicate aligned with `getNoteRole`'s resolution order.
   const accessFilter =
     scope === "shared"
       ? sql`(
@@ -103,6 +113,15 @@ app.get("/", authRequired, async (c) => {
               AND nm.is_deleted = false
               AND np.is_deleted = false
               AND n.is_deleted = false
+          )
+          OR (
+            p.note_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM notes n
+              WHERE n.id = p.note_id
+                AND n.owner_id = ${userId}
+                AND n.is_deleted = false
+            )
           )
         )`
       : sql`p.owner_id = ${userId} AND p.note_id IS NULL`;
