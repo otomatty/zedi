@@ -1,5 +1,6 @@
 /**
- *
+ * Wiki ページ本体（エディタで扱う永続化済みコンテンツを含む）。
+ * Wiki page including persisted editor content.
  */
 export interface Page {
   id: string;
@@ -51,7 +52,8 @@ export interface PageSummary {
 }
 
 /**
- *
+ * ページ間のリンク（source → target）。
+ * Link between two pages (source → target).
  */
 export interface Link {
   sourceId: string;
@@ -60,7 +62,8 @@ export interface Link {
 }
 
 /**
- *
+ * 対象ページがまだ存在しない WikiLink（未解決リンク）。
+ * Unresolved WikiLink whose target page does not yet exist.
  */
 export interface GhostLink {
   linkText: string;
@@ -69,7 +72,8 @@ export interface GhostLink {
 }
 
 /**
- *
+ * 前方リンク・被リンク ID を付加したページ（グラフ系 UI 用）。
+ * Page augmented with outgoing/incoming link IDs for graph-style UIs.
  */
 export interface PageWithLinks extends Page {
   outgoingLinks: string[]; // Page IDs
@@ -77,7 +81,8 @@ export interface PageWithLinks extends Page {
 }
 
 /**
- *
+ * 日付ごとにまとめたページグループ（ホーム画面の日付別表示用）。
+ * Pages grouped by date (used by the home date-based view).
  */
 export type DateGroup = {
   date: string; // YYYY-MM-DD

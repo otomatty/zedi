@@ -3,6 +3,13 @@ import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
 import type { Page, Link, GhostLink } from "@/types/page";
 
+/**
+ * ゲストセッション向けのインメモリページストアのインターフェース。
+ * 認証済みユーザーの正規パスは `StorageAdapterPageRepository` 側。
+ *
+ * Shape of the in-memory page store used by guest sessions. Authenticated
+ * users go through `StorageAdapterPageRepository` instead.
+ */
 interface PageStore {
   pages: Page[];
   links: Link[];
@@ -34,10 +41,14 @@ interface PageStore {
   searchPages: (query: string) => Page[];
 }
 
-export /**
+/**
+ * localStorage に永続化されるゲスト用ページストア。サインイン前後の一時編集や
+ * オンボーディング時のデータ保持に使う（個人ページのみ、Issue #713）。
  *
+ * Guest-mode page store persisted in localStorage. Holds personal pages only
+ * (issue #713) for pre-sign-in drafts and onboarding flows.
  */
-const usePageStore = create<PageStore>()(
+export const usePageStore = create<PageStore>()(
   persist(
     (set, get) => ({
       pages: [],
@@ -45,13 +56,7 @@ const usePageStore = create<PageStore>()(
       ghostLinks: [],
 
       createPage: (title = "", content = "") => {
-        /**
-         *
-         */
         const now = Date.now();
-        /**
-         *
-         */
         const newPage: Page = {
           id: uuidv4(),
           ownerUserId: "local-user",
@@ -92,9 +97,6 @@ const usePageStore = create<PageStore>()(
       },
 
       getPageByTitle: (title) => {
-        /**
-         *
-         */
         const normalizedTitle = title.toLowerCase().trim();
         return get().pages.find(
           (page) => page.title.toLowerCase().trim() === normalizedTitle && !page.isDeleted,
@@ -102,9 +104,6 @@ const usePageStore = create<PageStore>()(
       },
 
       addLink: (sourceId, targetId) => {
-        /**
-         *
-         */
         const exists = get().links.some(
           (link) => link.sourceId === sourceId && link.targetId === targetId,
         );
@@ -136,9 +135,6 @@ const usePageStore = create<PageStore>()(
       },
 
       addGhostLink: (linkText, sourcePageId) => {
-        /**
-         *
-         */
         const exists = get().ghostLinks.some(
           (gl) => gl.linkText === linkText && gl.sourcePageId === sourcePageId,
         );
@@ -164,15 +160,9 @@ const usePageStore = create<PageStore>()(
       },
 
       promoteGhostLink: (linkText) => {
-        /**
-         *
-         */
         const sources = get().getGhostLinkSources(linkText);
         if (sources.length >= 2) {
           // Create a new page from the ghost link
-          /**
-           *
-           */
           const newPage = get().createPage(linkText);
 
           // Convert ghost links to real links
@@ -191,22 +181,13 @@ const usePageStore = create<PageStore>()(
       },
 
       searchPages: (query) => {
-        /**
-         *
-         */
         const normalizedQuery = query.toLowerCase().trim();
         if (!normalizedQuery) return [];
 
         return get().pages.filter((page) => {
           if (page.isDeleted) return false;
 
-          /**
-           *
-           */
           const titleMatch = page.title.toLowerCase().includes(normalizedQuery);
-          /**
-           *
-           */
           const contentMatch = page.content.toLowerCase().includes(normalizedQuery);
 
           return titleMatch || contentMatch;

@@ -37,7 +37,8 @@ export interface SyncPageItem {
 }
 
 /**
- *
+ * WikiLink グラフのリンク行。`/api/sync/pages` 応答内で使われる。
+ * Link row in the wiki-link graph, returned by `/api/sync/pages`.
  */
 export interface SyncLinkItem {
   source_id: string;
@@ -46,7 +47,8 @@ export interface SyncLinkItem {
 }
 
 /**
- *
+ * 未解決 WikiLink（ゴーストリンク）の行。`/api/sync/pages` で同期される。
+ * Ghost-link (unresolved WikiLink) row synced via `/api/sync/pages`.
  */
 export interface SyncGhostLinkItem {
   link_text: string;
@@ -149,7 +151,9 @@ export interface DiscoverResponse {
 }
 
 /**
- *
+ * `GET /api/notes/discover` のノート行。閲覧数・ページ数などの発見用メタ情報を含む。
+ * Row in the `/api/notes/discover` response, carrying discover-oriented
+ * metadata such as view count and page count.
  */
 export interface DiscoverNoteItem {
   id: string;

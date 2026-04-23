@@ -13,10 +13,11 @@ import type { Page, PageSummary } from "@/types/page";
 /** Page in a note with who added it (for canDeletePage). */
 export type NotePageSummary = PageSummary & { addedByUserId: string };
 
-export /**
- *
+/**
+ * Note 関連クエリ・ミューテーションで共有する React Query キー群。
+ * React Query key factory shared by note-related queries and mutations.
  */
-const noteKeys = {
+export const noteKeys = {
   all: ["notes"] as const,
   lists: () => [...noteKeys.all, "list"] as const,
   list: (userId: string, userEmail?: string) =>
@@ -196,23 +197,15 @@ export function useNoteApi() {
 }
 
 /**
- *
+ * 認証済みユーザーが所属する全 Note のサマリ一覧を取得するフック。
+ * React Query hook that fetches the current user's note summaries.
  */
 export function useNotes() {
-  /**
-   *
-   */
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
-  /**
-   *
-   */
   const query = useQuery({
     queryKey: noteKeys.list(userId, userEmail),
     queryFn: async () => {
-      /**
-       *
-       */
       const list = await api.getNotes();
       return list.map(apiNoteToNoteSummary);
     },
@@ -229,40 +222,23 @@ export function useNotes() {
 type UseNoteOptions = { allowRemote?: boolean };
 
 /**
- *
+ * 単一の Note とアクセス権情報を取得するフック。
+ * Hook that fetches a single Note alongside the caller's access context.
  */
 export function useNote(noteId: string, _options?: UseNoteOptions) {
-  /**
-   *
-   */
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
-  /**
-   *
-   */
   const query = useQuery({
     queryKey: noteKeys.detail(noteId, userId, userEmail),
     queryFn: async (): Promise<NoteWithAccess> => {
-      /**
-       *
-       */
       const res = await api.getNote(noteId);
-      /**
-       *
-       */
       const note = apiNoteToNote(res);
-      /**
-       *
-       */
       const access = buildAccessFromApi(note, res.current_user_role, userId);
       return { note, access };
     },
     enabled: isLoaded && !!noteId,
   });
 
-  /**
-   *
-   */
   const noteWithAccess = query.data ?? null;
 
   return {
@@ -275,12 +251,10 @@ export function useNote(noteId: string, _options?: UseNoteOptions) {
 }
 
 /**
- *
+ * 公開ノートの発見（Discover）向け一覧を取得するフック。
+ * Hook that fetches the public Discover listing of notes.
  */
 export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 20, offset = 0) {
-  /**
-   *
-   */
   const { api } = useNoteApi();
   return useQuery({
     queryKey: noteKeys.publicList(sort, limit, offset),
@@ -292,24 +266,19 @@ export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 
 }
 
 /**
- *
+ * 指定ノートに含まれるページ一覧（ノート画面用）を取得するフック。
+ * Hook that fetches pages belonging to the given note for the note view.
  */
 export function useNotePages(
   noteId: string,
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  /**
-   *
-   */
   const { api, isLoaded } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.pageList(noteId),
     queryFn: async (): Promise<NotePageSummary[]> => {
-      /**
-       *
-       */
       const res = await api.getNote(noteId);
       return res.pages.map((p) => ({
         ...apiPageToPageSummary(p),
@@ -321,7 +290,8 @@ export function useNotePages(
 }
 
 /**
- *
+ * ノート内の単一ページ（noteId + pageId）を取得するフック。
+ * Hook that fetches a single page within a note by noteId + pageId.
  */
 export function useNotePage(
   noteId: string,
@@ -329,21 +299,12 @@ export function useNotePage(
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  /**
-   *
-   */
   const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.page(noteId, pageId),
     queryFn: async (): Promise<Page | null> => {
-      /**
-       *
-       */
       const res = await api.getNote(noteId);
-      /**
-       *
-       */
       const p = res.pages.find((x) => x.id === pageId);
       return p ? apiPageToPage(p) : null;
     },
@@ -352,20 +313,15 @@ export function useNotePage(
 }
 
 /**
- *
+ * ノートの招待済み・参加中メンバー一覧を取得するフック。
+ * Hook that fetches invited / joined members of a note.
  */
 export function useNoteMembers(noteId: string, enabled: boolean = true) {
-  /**
-   *
-   */
   const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.memberList(noteId),
     queryFn: async (): Promise<NoteMember[]> => {
-      /**
-       *
-       */
       const list = await api.getNoteMembers(noteId);
       return list.map((m) => apiMemberToNoteMember(m, noteId));
     },
@@ -374,16 +330,11 @@ export function useNoteMembers(noteId: string, enabled: boolean = true) {
 }
 
 /**
- *
+ * 新規ノート作成のミューテーションフック。成功時にノート系キャッシュを無効化する。
+ * Mutation hook for creating a new note; invalidates note caches on success.
  */
 export function useCreateNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -396,9 +347,6 @@ export function useCreateNote() {
       visibility: Note["visibility"];
       editPermission?: Note["editPermission"];
     }) => {
-      /**
-       *
-       */
       const created = await api.createNote({
         title,
         visibility,
@@ -413,16 +361,11 @@ export function useCreateNote() {
 }
 
 /**
- *
+ * ノートの title / visibility / editPermission を更新するミューテーションフック。
+ * Mutation hook for updating a note's title / visibility / editPermission.
  */
 export function useUpdateNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -450,16 +393,11 @@ export function useUpdateNote() {
 }
 
 /**
- *
+ * ノートを削除するミューテーションフック。
+ * Mutation hook for deleting a note.
  */
 export function useDeleteNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -474,16 +412,11 @@ export function useDeleteNote() {
 }
 
 /**
- *
+ * ノートにページを追加するミューテーションフック（既存ページの参照またはタイトル指定作成）。
+ * Mutation hook for attaching a page to a note (reference or title-based create).
  */
 export function useAddPageToNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -506,16 +439,11 @@ export function useAddPageToNote() {
 }
 
 /**
- *
+ * ノートからページを外すミューテーションフック。
+ * Mutation hook for detaching a page from a note.
  */
 export function useRemovePageFromNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -530,16 +458,11 @@ export function useRemovePageFromNote() {
 }
 
 /**
- *
+ * ノートにメンバー（viewer / editor）を招待するミューテーションフック。
+ * Mutation hook for inviting a member (viewer / editor) to a note.
  */
 export function useAddNoteMember() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -562,16 +485,11 @@ export function useAddNoteMember() {
 }
 
 /**
- *
+ * 既存メンバーのロールを viewer ↔ editor で更新するミューテーションフック。
+ * Mutation hook for updating an existing member's role (viewer ↔ editor).
  */
 export function useUpdateNoteMemberRole() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -594,16 +512,11 @@ export function useUpdateNoteMemberRole() {
 }
 
 /**
- *
+ * ノートからメンバーを外す（招待取り消し／強制脱退）ミューテーションフック。
+ * Mutation hook for removing a member from a note (revoke invite / kick).
  */
 export function useRemoveNoteMember() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({

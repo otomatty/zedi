@@ -67,7 +67,8 @@ let consecutiveFailures = 0;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const PAGE_PUSH_CHUNK_SIZE = 100;
 /**
- *
+ * 同期エンジンの現在ステータス。UI の SyncIndicator などで表示に使う。
+ * Current status of the sync engine; surfaced by the SyncIndicator UI.
  */
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "db-resuming";
 let syncStatus: SyncStatus = "idle";
@@ -79,7 +80,8 @@ function setSyncStatus(status: SyncStatus) {
 }
 
 /**
- *
+ * 現在の同期ステータスを返す。
+ * Return the current sync status.
  */
 export function getSyncStatus(): SyncStatus {
   return syncStatus;
@@ -91,7 +93,8 @@ export function hasNeverSynced(): boolean {
 }
 
 /**
- *
+ * 同期ステータスの変化を購読する。返り値は購読解除関数。
+ * Subscribe to sync status changes; returns an unsubscribe function.
  */
 export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () => void {
   syncStatusListeners.add(listener);
@@ -107,7 +110,8 @@ if (typeof window !== "undefined") {
 }
 
 /**
- *
+ * 同期処理が進行中かどうかを返す。
+ * Return whether a sync run is currently in progress.
  */
 export function isSyncInProgress(): boolean {
   return syncInProgress;
@@ -124,7 +128,8 @@ export function resetSyncFailures(): void {
 }
 
 /**
- *
+ * `syncWithApi` / `runApiSync` のオプション。
+ * Options for {@link syncWithApi} and {@link runApiSync}.
  */
 export type SyncWithApiOptions = {
   /** When true and local has 0 pages, do a full pull (since=omit). */
@@ -435,28 +440,20 @@ export async function syncWithApi(
 }
 
 /**
+ * StorageAdapter と ApiClient を組み立てて `syncWithApi` を実行する高レベル API。
+ * アプリ起動時の初回同期や手動再同期から呼ばれる。
  *
+ * High-level wrapper that builds a StorageAdapter + ApiClient and delegates to
+ * {@link syncWithApi}. Used by initial load and manual re-sync paths.
  */
 export async function runApiSync(
   userId: string,
   getToken: () => Promise<string | null>,
   options?: SyncWithApiOptions & { force?: boolean },
 ): Promise<void> {
-  /**
-   *
-   */
   const { createStorageAdapter } = await import("@/lib/storageAdapter");
-  /**
-   *
-   */
   const { createApiClient } = await import("@/lib/api");
-  /**
-   *
-   */
   const adapter = createStorageAdapter();
-  /**
-   *
-   */
   const api = createApiClient({ getToken });
   await syncWithApi(adapter, api, userId, options);
 }

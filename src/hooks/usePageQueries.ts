@@ -27,11 +27,11 @@ const LOCAL_USER_ID = "local-user";
  */
 const initialSyncRequestedForUser = new Set<string>();
 
-// Query keys
-export /**
- *
+/**
+ * ページ系クエリ・ミューテーションが共有する React Query キー群。
+ * React Query key factory shared by page-related queries and mutations.
  */
-const pageKeys = {
+export const pageKeys = {
   all: ["pages"] as const,
   lists: () => [...pageKeys.all, "list"] as const,
   list: (userId: string) => [...pageKeys.lists(), userId] as const,
@@ -225,34 +225,24 @@ export function usePagesSummary() {
 }
 
 /**
- * Hook to fetch a single page by ID
+ * `usePage` のオプション。`enabled: false` でリクエストを抑止できる。
+ * Options for {@link usePage}; pass `enabled: false` to suppress the request.
  */
 type UsePageOptions = {
   enabled?: boolean;
 };
 
 /**
- *
+ * ID 指定で単一ページを取得するフック。取得前は `data = undefined`。
+ * Hook that fetches a single page by ID; `data` is `undefined` until loaded.
  */
 export function usePage(pageId: string, options?: UsePageOptions) {
-  /**
-   *
-   */
   const { getRepository, userId, isLoaded } = useRepository();
-  /**
-   *
-   */
   const isEnabled = (options?.enabled ?? true) && isLoaded && !!pageId;
 
-  /**
-   *
-   */
   const query = useQuery({
     queryKey: pageKeys.detail(userId, pageId),
     queryFn: async () => {
-      /**
-       *
-       */
       const repo = await getRepository();
       return repo.getPage(userId, pageId);
     },

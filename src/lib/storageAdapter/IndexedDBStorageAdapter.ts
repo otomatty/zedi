@@ -405,6 +405,18 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
    * Return all non-deleted personal pages (`noteId === null`), sorted by
    * `updatedAt` descending. Note-native pages (issue #713) are not expected
    * to land in IndexedDB but are filtered defensively if they do.
+   *
+   * NOTE: `by_note` index は `noteId = null` の行をインデックスから除外する
+   * （IndexedDB 仕様: キー値が null の場合レコードは index に含まれない）。
+   * そのため `index("by_note").getAll(IDBKeyRange.only(null))` は 0 件しか
+   * 返せず、ここでは使えない。`by_note` index は将来ノートネイティブページを
+   * 扱う実装（Phase 3 以降）で noteId 指定クエリ側に使う想定。
+   *
+   * NOTE: the `by_note` index excludes rows whose `noteId` is null (per the
+   * IndexedDB spec, records are dropped from an index when the key value is
+   * null). `index("by_note").getAll(IDBKeyRange.only(null))` therefore returns
+   * zero rows and cannot replace this scan. The index is reserved for future
+   * note-scoped queries once note-native pages are fetched into IDB.
    */
   async getAllPages(): Promise<PageMetadata[]> {
     const db = await ensureDb();
