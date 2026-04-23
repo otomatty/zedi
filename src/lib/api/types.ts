@@ -146,11 +146,23 @@ export interface CopyNotePageToPersonalResponse {
   page: SyncPageItem;
 }
 
-/** GET /api/search?q=&scope=shared response. */
+/**
+ * GET /api/search?q=&scope=shared のレスポンス。
+ *
+ * `note_id` は個人ページ (`note_id IS NULL`) も結果に含まれ得るため null になり得る
+ * (Issue #718 Phase 5-1)。呼び出し側はノートネイティブと個人を区別する必要がある場合
+ * このフィールドで判定する。
+ *
+ * Response of GET /api/search?q=&scope=shared.
+ *
+ * `note_id` may be null because personal pages (`note_id IS NULL`) can also
+ * appear in shared search results (Issue #718 Phase 5-1). Callers that need to
+ * distinguish note-native from personal pages should branch on this field.
+ */
 export interface SearchSharedResponse {
   results: Array<{
     id: string;
-    note_id: string;
+    note_id: string | null;
     owner_id: string;
     title: string | null;
     content_preview: string | null;
