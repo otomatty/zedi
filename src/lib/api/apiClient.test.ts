@@ -610,5 +610,122 @@ describe("apiClient", () => {
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(init.method).toBe("DELETE");
     });
+
+    it("copyPersonalPageToNote POSTs to /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 Phase 3)", async () => {
+      // レスポンスには `page` (SyncPageItem) が必ず同梱される想定。
+      // `useCopyPersonalPageToNote` は invalidate しかしないが、API 契約として
+      // `page` を落とすとフロント全般（sync 契約変更を含む）に波及するため、
+      // テストで明示的に返却形状を固定する。
+      // Lock the response envelope shape: clients rely on `page` being present
+      // (`useCopyPersonalPageToNote` uses it indirectly via cache keys tied to
+      // `note_id`), so a regression that drops the field should fail here.
+      const copiedPage = {
+        id: "pg-new",
+        owner_id: "user-1",
+        note_id: "note-1",
+        source_page_id: "pg-src",
+        title: "Copied",
+        content_preview: "preview",
+        thumbnail_url: null,
+        source_url: null,
+        created_at: "2026-04-23T00:00:00.000Z",
+        updated_at: "2026-04-23T00:00:00.000Z",
+        is_deleted: false,
+      };
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              ok: true,
+              data: { created: true, page_id: "pg-new", sort_order: 3, page: copiedPage },
+            }),
+          ),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.copyPersonalPageToNote("note-1", "pg-src");
+
+      expect(result).toMatchObject({ created: true, page_id: "pg-new", sort_order: 3 });
+      // `page` 本体も検証する（envelope unwrapping でフィールドが落ちないこと）。
+      // Assert the page payload round-trips through envelope unwrapping intact.
+      expect(result.page).toEqual(copiedPage);
+      expect(result.page.note_id).toBe("note-1");
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(
+        "https://api.test.example.com/api/notes/note-1/pages/copy-from-personal/pg-src",
+      );
+      expect(init.method).toBe("POST");
+      // `id` 引数の encodeURIComponent を検証（パスインジェクション対策）。
+      // Verifies encodeURIComponent on ids (path-injection guard).
+      const result2 = await client.copyPersonalPageToNote("note/weird", "pg src");
+      const [url2] = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(url2).toBe(
+        "https://api.test.example.com/api/notes/note%2Fweird/pages/copy-from-personal/pg%20src",
+      );
+      expect(result2.created).toBe(true);
+    });
+
+    it("copyNotePageToPersonal POSTs to /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Phase 3)", async () => {
+      // `useCopyNotePageToPersonal` は `result.page` を IDB へ書き戻すため、
+      // API が `page` を返し切ることを契約として固定する（回帰防止）。
+      // Lock the response contract: `useCopyNotePageToPersonal` writes
+      // `result.page` through to IndexedDB, so dropping the field here would
+      // break `/home` reflection — this test catches that regression.
+      const copiedPage = {
+        id: "pg-c",
+        owner_id: "user-1",
+        note_id: null,
+        source_page_id: "pg-note-native",
+        title: "Copied",
+        content_preview: "preview",
+        thumbnail_url: null,
+        source_url: null,
+        created_at: "2026-04-23T00:00:00.000Z",
+        updated_at: "2026-04-23T00:00:00.000Z",
+        is_deleted: false,
+      };
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              ok: true,
+              data: { created: true, page_id: "pg-c", page: copiedPage },
+            }),
+          ),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.copyNotePageToPersonal("note-a", "pg-note-native");
+
+      expect(result).toMatchObject({ created: true, page_id: "pg-c" });
+      // 個人スコープへのコピーなので `note_id` は null であること。
+      // Personal-scope copy → `note_id` must be null.
+      expect(result.page).toEqual(copiedPage);
+      expect(result.page.note_id).toBeNull();
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(
+        "https://api.test.example.com/api/notes/note-a/pages/pg-note-native/copy-to-personal",
+      );
+      expect(init.method).toBe("POST");
+
+      // 予約文字（`/` / 空白）を含む ID もパスセグメントとして encodeURIComponent
+      // される（copyPersonalPageToNote 側と同じパスインジェクション対策）。
+      // Reserved characters (`/`, space) in IDs must be encodeURIComponent'd
+      // per segment — mirrors the guard already asserted for copyPersonalPageToNote.
+      const result2 = await client.copyNotePageToPersonal("note/weird", "pg src");
+      const [url2] = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(url2).toBe(
+        "https://api.test.example.com/api/notes/note%2Fweird/pages/pg%20src/copy-to-personal",
+      );
+      expect(result2.created).toBe(true);
+    });
   });
 });

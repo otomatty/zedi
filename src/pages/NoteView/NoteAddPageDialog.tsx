@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, useToast } from "@zedi/ui";
-import { useAddPageToNote } from "@/hooks/useNoteQueries";
+import { useAddPageToNote, useCopyPersonalPageToNote } from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { NoteViewAddPageDialogContent } from "./NoteViewAddPageDialogContent";
 import type { PageSummary } from "@/types/page";
@@ -37,6 +37,7 @@ export function NoteAddPageDialog({
   const { t } = useTranslation();
   const { toast } = useToast();
   const addPageMutation = useAddPageToNote();
+  const copyPersonalMutation = useCopyPersonalPageToNote();
   const { data: allPages = [] } = usePagesSummary();
 
   const [pageFilter, setPageFilter] = useState("");
@@ -73,6 +74,26 @@ export function NoteAddPageDialog({
     await runAddPage({ title });
   };
 
+  /**
+   * 個人ページをコピーしてノートネイティブページを新規作成する (issue #713 Phase 3)。
+   * 元ページは個人 /home に残り、コピーのみがノートに出る。
+   *
+   * Copy a personal page into the note as a fresh note-native page; the
+   * original stays on `/home` and only the copy surfaces inside the note.
+   */
+  const handleCopyByPageId = async (sourcePageId: string) => {
+    try {
+      await copyPersonalMutation.mutateAsync({ noteId, sourcePageId });
+      toast({ title: t("notes.pageCopiedToNote") });
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to copy personal page to note:", error);
+      toast({ title: t("notes.pageCopyToNoteFailed"), variant: "destructive" });
+    }
+  };
+
+  const isPending = addPageMutation.isPending || copyPersonalMutation.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -85,7 +106,8 @@ export function NoteAddPageDialog({
           canEdit={canEdit}
           onAddByTitle={handleAddByTitle}
           onAddByPageId={handleAddByPageId}
-          isPending={addPageMutation.isPending}
+          onCopyByPageId={handleCopyByPageId}
+          isPending={isPending}
           onClose={() => onOpenChange(false)}
         />
       </DialogContent>

@@ -1,12 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download, MoreHorizontal } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
-import { Button, useToast } from "@zedi/ui";
-import { useNote, useNotePage, noteKeys } from "@/hooks/useNoteQueries";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  useToast,
+} from "@zedi/ui";
+import { useTranslation } from "react-i18next";
+import { useNote, useNotePage, noteKeys, useCopyNotePageToPersonal } from "@/hooks/useNoteQueries";
 import { useUpdatePage } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
@@ -236,6 +244,9 @@ const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
   const { isSignedIn, userId } = useAuth();
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const copyToPersonalMutation = useCopyNotePageToPersonal();
 
   const {
     note,
@@ -269,6 +280,44 @@ const NotePageView: React.FC = () => {
     mode: "collaborative",
   });
 
+  // ノートネイティブページを自分の個人ページにコピーする (issue #713 Phase 3)。
+  // 元のノートページはノートに残り、コピーのみが呼び出し元の /home に現れる。
+  // 成功時はトーストで新しい個人ページへ誘導する。
+  // Copy this note-native page into the caller's personal pages. Source stays
+  // in the note; only the copy lands on /home. Toast offers to jump to it.
+  const handleCopyToPersonal = async () => {
+    if (!noteId || !page?.id) return;
+    try {
+      const result = await copyToPersonalMutation.mutateAsync({
+        noteId,
+        sourcePageId: page.id,
+      });
+      // サーバーへのコピーは成功だが、ローカル IDB への書き戻しが失敗/スキップ
+      // された場合は `localImported: false`。その状態で「開く」CTA を押すと
+      // `/pages/:id` は IDB を読むので空に着地してしまうため、成功トースト自体
+      // は出すが CTA は外して次回 sync まで待つ。
+      //
+      // If the server-side copy succeeded but the IndexedDB write-through did
+      // not (`localImported: false`), navigating `/pages/:id` would land on
+      // an empty read because the page grid reads IDB. Keep the success toast
+      // but drop the "Open" CTA; the next sync will reconcile `/home`.
+      toast({
+        title: t("notes.pageCopiedToPersonal"),
+        action: result.localImported ? (
+          <Button size="sm" variant="ghost" onClick={() => navigate(`/pages/${result.page_id}`)}>
+            {t("common.open", "開く")}
+          </Button>
+        ) : undefined,
+      });
+    } catch (error) {
+      console.error("Failed to copy note page to personal:", error);
+      toast({
+        title: t("notes.pageCopyToPersonalFailed"),
+        variant: "destructive",
+      });
+    }
+  };
+
   const isLoading = isNoteLoading || isPageLoading;
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
@@ -295,7 +344,45 @@ const NotePageView: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
+          <div className="flex items-center gap-2">
+            {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
+            {/*
+              「個人に取り込み」はノートネイティブページ (`page.noteId === noteId`) だけに出す。
+              このノートにリンクされているだけの個人ページ (`page.noteId === null`) は、
+              所有者ならすでに /home にあり、他メンバーにはサーバーがコピーを拒否する
+              （`Page does not belong to this note`）ため、メニューに出すと決め打ちで
+              失敗するアクションになる。両方の意味でリンク済みページでは出さない。
+              Issue #713 Phase 3 / Codex P2。
+
+              Gate "copy to personal" to note-native pages (`page.noteId === noteId`).
+              Linked personal pages (`page.noteId === null`) are already on the
+              owner's /home and, for other members, the server rejects the copy
+              (`Page does not belong to this note`). Showing the action for them
+              is a guaranteed-fail path, so hide it. Issue #713 Phase 3 / Codex P2.
+            */}
+            {isSignedIn && page.noteId === noteId && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("common.moreActions", "More actions")}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleCopyToPersonal}
+                    disabled={copyToPersonalMutation.isPending}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {t("notes.copyToPersonal")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </Container>
       </div>
 

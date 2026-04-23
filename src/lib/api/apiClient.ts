@@ -11,6 +11,8 @@ import type {
   PutPageContentBody,
   CreatePageBody,
   CreatePageResponse,
+  CopyPersonalPageToNoteResponse,
+  CopyNotePageToPersonalResponse,
   SearchSharedResponse,
   NoteListItem,
   GetNoteResponse,
@@ -360,6 +362,51 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req(
         "DELETE",
         `/api/notes/${encodeURIComponent(noteId)}/pages/${encodeURIComponent(pageId)}`,
+      );
+    },
+
+    /**
+     * `POST /api/notes/:noteId/pages/copy-from-personal/:pageId`
+     *
+     * 個人ページをコピーして、指定ノート配下のノートネイティブページを新規作成する。
+     * 元の個人ページは `/home` に残り、新しいコピーだけがノートに出る (issue #713 Phase 3)。
+     *
+     * Copy a personal page into the given note as a fresh note-native page.
+     * The original stays on the caller's `/home`; only the copy surfaces
+     * inside the note. See issue #713 Phase 3.
+     */
+    async copyPersonalPageToNote(
+      noteId: string,
+      sourcePageId: string,
+    ): Promise<CopyPersonalPageToNoteResponse> {
+      return req<CopyPersonalPageToNoteResponse>(
+        "POST",
+        `/api/notes/${encodeURIComponent(noteId)}/pages/copy-from-personal/${encodeURIComponent(
+          sourcePageId,
+        )}`,
+      );
+    },
+
+    /**
+     * `POST /api/notes/:noteId/pages/:pageId/copy-to-personal`
+     *
+     * ノートネイティブページをコピーして、呼び出し元の個人ページを新規作成する。
+     * 元のノートページはノート内に残り、コピーだけが呼び出し元の `/home` に加わる。
+     * ノート脱退後もコピーは残る (issue #713 Phase 3)。
+     *
+     * Copy a note-native page into the caller's personal pages. The original
+     * note page stays in the note; only the copy lands on `/home`, and it
+     * survives any later change in note membership. See issue #713 Phase 3.
+     */
+    async copyNotePageToPersonal(
+      noteId: string,
+      sourcePageId: string,
+    ): Promise<CopyNotePageToPersonalResponse> {
+      return req<CopyNotePageToPersonalResponse>(
+        "POST",
+        `/api/notes/${encodeURIComponent(noteId)}/pages/${encodeURIComponent(
+          sourcePageId,
+        )}/copy-to-personal`,
       );
     },
 

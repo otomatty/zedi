@@ -21,6 +21,10 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNotePages: vi.fn(() => ({ data: [], isLoading: false })),
   useAddPageToNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCopyPersonalPageToNote: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ created: true, page_id: "pg", sort_order: 1 }),
+    isPending: false,
+  }),
   useRemovePageFromNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useNoteApi: vi.fn(() => ({ isSignedIn: true })),
 }));

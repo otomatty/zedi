@@ -6,6 +6,8 @@
   "reset": "Reset",
   "retry": "Retry",
   "back": "Back",
+  "open": "Open",
+  "moreActions": "More actions",
   "goToSettings": "Go to settings",
   "loading": "Loading...",
   "error": "Error",

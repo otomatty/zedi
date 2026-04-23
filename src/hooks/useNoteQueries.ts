@@ -6,9 +6,11 @@ import type {
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
+  CopyNotePageToPersonalResponse,
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
+import { pageKeys, useRepository } from "@/hooks/usePageQueries";
 
 /** Page in a note with who added it (for canDeletePage). */
 export type NotePageSummary = PageSummary & { addedByUserId: string };
@@ -129,14 +131,14 @@ function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
   return {
     id: p.id,
     ownerUserId: p.owner_id,
-    // GET /api/notes/:id は現状 `note_id` を返さない（Phase 1 対象外）。
-    // ノート画面で消費されるため personal /home フィルタには影響しないが、
-    // note-native か個人ページかの厳密区別が必要になる Phase 3 でサーバー
-    // レスポンスを拡張する。Issue #713。
-    // GET /api/notes/:id does not surface `note_id` yet; this consumer is the
-    // note view, so personal /home filtering is unaffected. Phase 3 will
-    // extend the server response when the distinction is needed. Issue #713.
-    noteId: null,
+    // Phase 3 でサーバー側が `note_id` を返すようになった（issue #713）。
+    // `null` ならこのノートにリンクされているだけの個人ページ、値ありなら
+    // ノートネイティブ。note-native 限定の UI（「個人に取り込み」など）は
+    // これを見て出し分ける。
+    // Phase 3 surfaced `note_id` on the server (issue #713). `null` means a
+    // linked personal page; a non-null value means a note-native page.
+    // Note-native-only UI (e.g. "copy to personal") gates on this.
+    noteId: p.note_id ?? null,
     title: p.title ?? "",
     contentPreview: p.content_preview ?? undefined,
     thumbnailUrl: p.thumbnail_url ?? undefined,
@@ -434,6 +436,109 @@ export function useAddPageToNote() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+    },
+  });
+}
+
+/**
+ * 個人ページをコピーしてノートネイティブページを作るミューテーションフック (issue #713 Phase 3)。
+ * 元の個人ページは `/home` に残り、新しいコピーだけがノートに出る。
+ *
+ * Mutation hook that copies a personal page into a note as a fresh
+ * note-native page. The original stays on `/home`; only the copy surfaces
+ * inside the note. See issue #713 Phase 3.
+ */
+export function useCopyPersonalPageToNote() {
+  const { api } = useNoteApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noteId, sourcePageId }: { noteId: string; sourcePageId: string }) => {
+      return api.copyPersonalPageToNote(noteId, sourcePageId);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+    },
+  });
+}
+
+/**
+ * ノートネイティブページをコピーして個人ページにするミューテーションフック (issue #713 Phase 3)。
+ * 元のノートページはノートに残り、コピーだけが呼び出し元の `/home` に加わる。
+ *
+ * Mutation hook that copies a note-native page into the caller's personal
+ * pages. The source stays in the note; only the copy lands on `/home`.
+ * See issue #713 Phase 3.
+ */
+export function useCopyNotePageToPersonal() {
+  const { api, userId } = useNoteApi();
+  const { getRepository } = useRepository();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      noteId,
+      sourcePageId,
+    }: {
+      noteId: string;
+      sourcePageId: string;
+    }): Promise<CopyNotePageToPersonalResponse & { localImported: boolean }> => {
+      const result = await api.copyNotePageToPersonal(noteId, sourcePageId);
+      // Codex P1 対応: `/home` は IndexedDB を直接読む（React Query の裏に adapter
+      // がいる）ので、単にキャッシュ無効化しても新ページは現れない。サーバーが
+      // 返した `result.page`（SyncPageItem）を IDB に書き戻し、その成否を
+      // `localImported` フラグで呼び出し側に返す。失敗は non-fatal（次回 sync で
+      // 拾われる）だが、呼び出し側が「いま開く」のような即時遷移 CTA を出すか
+      // どうかをこのフラグで切り替えられる。
+      //
+      // `/home` reads directly from IndexedDB via the storage adapter, so
+      // invalidating React Query alone would just re-read stale IDB. Write the
+      // server response through to IDB and report whether it stuck, so callers
+      // can gate an immediate-navigation CTA (e.g. toast "Open") on local
+      // success. A write-through miss is non-fatal — the next sync pass will
+      // still reconcile `/home` — but the UI should not promise an instant
+      // jump to a page the local store does not yet have.
+      // (Issue #713 Phase 3, Codex P1 / CodeRabbit follow-up.)
+      let localImported = false;
+      try {
+        const repo = await getRepository();
+        const imported = await repo.importPersonalPageFromApi(result.page);
+        if (imported) {
+          localImported = true;
+        } else {
+          // `importPersonalPageFromApi` は個人ページ（`note_id: null`）以外を
+          // 防御的に拒否して `null` を返す。通常ルートでは copy-to-personal の
+          // サーバー応答は必ず個人ページなのでここを通らないが、契約ドリフト
+          // （例: サーバーが誤って `note_id` を埋めた）を早期に検知できるよう
+          // 警告を残す。成功扱いは維持し、UI は `localImported` で分岐する。
+          //
+          // Defensive guard: the helper returns `null` for non-personal rows.
+          // In a healthy flow this never fires — logged as a contract canary.
+          console.warn(
+            "[useCopyNotePageToPersonal] Server returned a non-personal page; skipped IDB write-through:",
+            result.page,
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "[useCopyNotePageToPersonal] Failed to write copied page to IndexedDB:",
+          error,
+        );
+      }
+      return { ...result, localImported };
+    },
+    onSuccess: () => {
+      // 書き戻しが終わってから無効化するので、`usePagesSummary` などの再取得で
+      // 新ページが確実に並ぶ（ネットワーク状況に依存しない即時反映）。
+      // We invalidate after the write-through, so any refetch from
+      // `usePagesSummary` etc. picks up the new row deterministically.
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: pageKeys.list(userId) });
+        queryClient.invalidateQueries({ queryKey: pageKeys.summary(userId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      }
     },
   });
 }
