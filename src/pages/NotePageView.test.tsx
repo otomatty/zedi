@@ -18,6 +18,10 @@ vi.mock("react-router-dom", async (importOriginal) => {
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNotePage: vi.fn(),
+  useCopyNotePageToPersonal: vi.fn(() => ({
+    mutateAsync: vi.fn().mockResolvedValue({ created: true, page_id: "pg-copy" }),
+    isPending: false,
+  })),
   noteKeys: {
     page: (noteId: string, pageId: string) => ["notes", "pages", noteId, pageId],
     pageList: (noteId: string) => ["notes", "pages", noteId],
@@ -66,6 +70,20 @@ vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
 
 vi.mock("@zedi/ui", () => ({
   Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
+    <button type="button" onClick={onClick}>
+      {children}
+    </button>
+  ),
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuItem: ({
+    children,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => (
     <button type="button" onClick={onClick}>
       {children}
     </button>

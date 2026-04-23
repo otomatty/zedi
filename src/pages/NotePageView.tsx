@@ -1,12 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download, MoreHorizontal } from "lucide-react";
 import Container from "@/components/layout/Container";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
-import { Button, useToast } from "@zedi/ui";
-import { useNote, useNotePage, noteKeys } from "@/hooks/useNoteQueries";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  useToast,
+} from "@zedi/ui";
+import { useTranslation } from "react-i18next";
+import { useNote, useNotePage, noteKeys, useCopyNotePageToPersonal } from "@/hooks/useNoteQueries";
 import { useUpdatePage } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
@@ -236,6 +244,9 @@ const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
   const { isSignedIn, userId } = useAuth();
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const copyToPersonalMutation = useCopyNotePageToPersonal();
 
   const {
     note,
@@ -269,6 +280,35 @@ const NotePageView: React.FC = () => {
     mode: "collaborative",
   });
 
+  // ノートネイティブページを自分の個人ページにコピーする (issue #713 Phase 3)。
+  // 元のノートページはノートに残り、コピーのみが呼び出し元の /home に現れる。
+  // 成功時はトーストで新しい個人ページへ誘導する。
+  // Copy this note-native page into the caller's personal pages. Source stays
+  // in the note; only the copy lands on /home. Toast offers to jump to it.
+  const handleCopyToPersonal = async () => {
+    if (!noteId || !page?.id) return;
+    try {
+      const result = await copyToPersonalMutation.mutateAsync({
+        noteId,
+        sourcePageId: page.id,
+      });
+      toast({
+        title: t("notes.pageCopiedToPersonal"),
+        action: (
+          <Button size="sm" variant="ghost" onClick={() => navigate(`/pages/${result.page_id}`)}>
+            {t("common.open", "開く")}
+          </Button>
+        ),
+      });
+    } catch (error) {
+      console.error("Failed to copy note page to personal:", error);
+      toast({
+        title: t("notes.pageCopyToPersonalFailed"),
+        variant: "destructive",
+      });
+    }
+  };
+
   const isLoading = isNoteLoading || isPageLoading;
   const isNotFound = !note || !access?.canView || !page;
   if (isLoading) {
@@ -295,7 +335,41 @@ const NotePageView: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
+          <div className="flex items-center gap-2">
+            {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
+            {/*
+              ノートネイティブページに対するアクションメニュー。サインインしていれば
+              閲覧のみの相手（guest / viewer / ドメインアクセス）でも「個人に取り込み」で
+              自分の /home へコピーできる。元ページはノート側に残り、脱退後もコピーは
+              独立して生き残る（issue #713 Phase 3）。
+              Action menu for a note-native page. Any signed-in viewer (guest /
+              viewer / domain) can take a personal copy via "copy to personal":
+              the source stays in the note and the copy survives membership
+              changes. See issue #713 Phase 3.
+            */}
+            {isSignedIn && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("common.moreActions", "More actions")}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleCopyToPersonal}
+                    disabled={copyToPersonalMutation.isPending}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {t("notes.copyToPersonal")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </Container>
       </div>
 

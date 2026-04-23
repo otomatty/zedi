@@ -113,6 +113,31 @@ export interface CreatePageBody {
 /** POST /api/pages response (same shape as SyncPageItem). */
 export type CreatePageResponse = SyncPageItem;
 
+/**
+ * `POST /api/notes/:noteId/pages/copy-from-personal/:pageId` のレスポンス。
+ * 個人ページを元にノートネイティブページを新規作成した結果を返す。
+ *
+ * Response from `POST /api/notes/:noteId/pages/copy-from-personal/:pageId`.
+ * Returns the newly-created note-native page derived from a personal page.
+ */
+export interface CopyPersonalPageToNoteResponse {
+  created: true;
+  page_id: string;
+  sort_order: number;
+}
+
+/**
+ * `POST /api/notes/:noteId/pages/:pageId/copy-to-personal` のレスポンス。
+ * ノートネイティブページから作成された個人ページの ID を返す。
+ *
+ * Response from `POST /api/notes/:noteId/pages/:pageId/copy-to-personal`.
+ * Returns the personal page ID that was copied from the note-native page.
+ */
+export interface CopyNotePageToPersonalResponse {
+  created: true;
+  page_id: string;
+}
+
 /** GET /api/search?q=&scope=shared response. */
 export interface SearchSharedResponse {
   results: Array<{

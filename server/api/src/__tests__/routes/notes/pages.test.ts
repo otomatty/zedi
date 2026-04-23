@@ -299,6 +299,338 @@ describe("POST /api/notes/:noteId/pages", () => {
   });
 });
 
+// ── POST /api/notes/:noteId/pages/copy-from-personal/:pageId ────────────────
+
+describe("POST /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 Phase 3)", () => {
+  const SOURCE_PAGE_ID = "pg-source-personal";
+
+  it("should copy a personal page into the note as a note-native page with sourcePageId set", async () => {
+    const mockNote = createMockNote();
+    const { app, chains } = createTestApp([
+      [mockNote], // getNoteRole → owner
+      [
+        {
+          id: SOURCE_PAGE_ID,
+          ownerId: TEST_USER_ID,
+          noteId: null,
+          title: "Source Title",
+          contentPreview: "preview",
+          thumbnailUrl: "https://example.com/thumb.png",
+          sourceUrl: "https://example.com/src",
+        },
+      ], // source page lookup
+      [{ id: "pg-copy-001" }], // insert pages → returning
+      [{ ydocState: Buffer.from([1, 2, 3]), contentText: "body text" }], // source page_contents lookup
+      [], // insert page_contents for new page
+      [{ max: 4 }], // maxOrder notePages
+      [], // insert notePages
+      [], // update notes.updatedAt
+    ]);
+
+    const res = await app.request(
+      `/api/notes/${NOTE_ID}/pages/copy-from-personal/${SOURCE_PAGE_ID}`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toEqual({ created: true, page_id: "pg-copy-001", sort_order: 5 });
+
+    // コピーされた pages 行は destination ノート下のノートネイティブページで、
+    // `sourcePageId` が出自を指す。`noteId = NULL` のまま個人ホームに漏れない。
+    // The copied pages row is a note-native page under the destination note,
+    // with `sourcePageId` recording provenance. It never leaks to personal /home.
+    const insertCalls = chains.filter((c) => c.startMethod === "insert");
+    const pagesInsert = insertCalls[0];
+    const pagesValues = pagesInsert?.ops.find((op) => op.method === "values");
+    expect(pagesValues?.args[0]).toMatchObject({
+      ownerId: TEST_USER_ID,
+      noteId: NOTE_ID,
+      sourcePageId: SOURCE_PAGE_ID,
+      title: "Source Title",
+      contentPreview: "preview",
+      thumbnailUrl: "https://example.com/thumb.png",
+      sourceUrl: "https://example.com/src",
+    });
+
+    // page_contents も同一トランザクションで新ページに複製される。
+    // The page_contents row is duplicated into the new page in the same tx.
+    const contentsInsert = insertCalls[1];
+    const contentsValues = contentsInsert?.ops.find((op) => op.method === "values");
+    expect(contentsValues?.args[0]).toMatchObject({
+      pageId: "pg-copy-001",
+      version: 1,
+      contentText: "body text",
+    });
+  });
+
+  it("should skip page_contents insert when the source page has no content row yet", async () => {
+    const mockNote = createMockNote();
+    const { app, chains } = createTestApp([
+      [mockNote], // getNoteRole
+      [
+        {
+          id: SOURCE_PAGE_ID,
+          ownerId: TEST_USER_ID,
+          noteId: null,
+          title: "Empty Page",
+          contentPreview: null,
+          thumbnailUrl: null,
+          sourceUrl: null,
+        },
+      ], // source page
+      [{ id: "pg-copy-empty" }], // insert pages
+      [], // source page_contents lookup → empty
+      [{ max: 0 }], // maxOrder
+      [], // insert notePages
+      [], // update notes
+    ]);
+
+    const res = await app.request(
+      `/api/notes/${NOTE_ID}/pages/copy-from-personal/${SOURCE_PAGE_ID}`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+
+    expect(res.status).toBe(200);
+
+    // page_contents への insert は走らない（元行なし）。insert は pages + notePages の 2 回だけ。
+    // No page_contents insert when source has none; total inserts = pages + notePages.
+    const insertCalls = chains.filter((c) => c.startMethod === "insert");
+    expect(insertCalls).toHaveLength(2);
+  });
+
+  it("should return 403 when caller is not the owner of the source personal page", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([
+      [mockNote], // getNoteRole → owner of note
+      [
+        {
+          id: SOURCE_PAGE_ID,
+          ownerId: OTHER_USER_ID, // someone else's personal page
+          noteId: null,
+          title: "Not Yours",
+          contentPreview: null,
+          thumbnailUrl: null,
+          sourceUrl: null,
+        },
+      ],
+    ]);
+
+    const res = await app.request(
+      `/api/notes/${NOTE_ID}/pages/copy-from-personal/${SOURCE_PAGE_ID}`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should return 400 when the source page is note-native (not a personal page)", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([
+      [mockNote], // getNoteRole
+      [
+        {
+          id: SOURCE_PAGE_ID,
+          ownerId: TEST_USER_ID,
+          noteId: "another-note-id", // already note-native
+          title: "Note-Native",
+          contentPreview: null,
+          thumbnailUrl: null,
+          sourceUrl: null,
+        },
+      ],
+    ]);
+
+    const res = await app.request(
+      `/api/notes/${NOTE_ID}/pages/copy-from-personal/${SOURCE_PAGE_ID}`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("personal page");
+  });
+
+  it("should return 403 when caller cannot edit the destination note", async () => {
+    const privateNote = createMockNote({
+      ownerId: OTHER_USER_ID,
+      visibility: "private",
+    });
+    const { app } = createTestApp([
+      [privateNote], // findActiveNoteById
+      [], // member check
+      [], // domain access
+    ]);
+
+    const res = await app.request(
+      `/api/notes/${NOTE_ID}/pages/copy-from-personal/${SOURCE_PAGE_ID}`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+
+    expect(res.status).toBe(403);
+  });
+});
+
+// ── POST /api/notes/:noteId/pages/:pageId/copy-to-personal ──────────────────
+
+describe("POST /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Phase 3)", () => {
+  const NOTE_PAGE_ID = "pg-note-native";
+
+  it("should copy a note-native page into the caller's personal pages (noteId = NULL, sourcePageId set)", async () => {
+    const mockNote = createMockNote();
+    const { app, chains } = createTestApp([
+      [mockNote], // getNoteRole → owner of the note
+      [
+        {
+          id: NOTE_PAGE_ID,
+          noteId: NOTE_ID,
+          title: "Shared Note Page",
+          contentPreview: "snippet",
+          thumbnailUrl: null,
+          sourceUrl: null,
+        },
+      ], // source page
+      [{ id: "pg-personal-copy" }], // insert pages
+      [{ ydocState: Buffer.from([9, 9]), contentText: "note body" }], // source page_contents
+      [], // insert page_contents for new page
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages/${NOTE_PAGE_ID}/copy-to-personal`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toEqual({ created: true, page_id: "pg-personal-copy" });
+
+    // 個人ページとして作成されるため `noteId` は未設定（DB デフォルト NULL）で、
+    // `sourcePageId` に出自のノートネイティブページ ID が入る。
+    // Creates a personal page: `noteId` is absent (DB default NULL), with
+    // `sourcePageId` pointing back to the source note-native page.
+    const insertCalls = chains.filter((c) => c.startMethod === "insert");
+    const pagesInsert = insertCalls[0];
+    const pagesValues = pagesInsert?.ops.find((op) => op.method === "values");
+    const values = pagesValues?.args[0] as Record<string, unknown>;
+    expect(values).toMatchObject({
+      ownerId: TEST_USER_ID,
+      sourcePageId: NOTE_PAGE_ID,
+      title: "Shared Note Page",
+      contentPreview: "snippet",
+    });
+    // `noteId` must not be set for personal pages.
+    expect(values.noteId).toBeUndefined();
+
+    // 個人ページはノートリストに入らないので `notePages` / `notes.updatedAt` は触らない。
+    // Personal copies do not join the note list, so no notePages/notes update.
+    expect(insertCalls).toHaveLength(2); // pages + page_contents only
+    const updateCalls = chains.filter((c) => c.startMethod === "update");
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  it("should return 400 when the source page belongs to a different note", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([
+      [mockNote], // getNoteRole
+      [
+        {
+          id: NOTE_PAGE_ID,
+          noteId: "other-note-id", // mismatch with URL noteId
+          title: "Foreign Page",
+          contentPreview: null,
+          thumbnailUrl: null,
+          sourceUrl: null,
+        },
+      ],
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages/${NOTE_PAGE_ID}/copy-to-personal`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("does not belong");
+  });
+
+  it("should return 403 when caller has no role on the note (e.g. private / not a member)", async () => {
+    const privateNote = createMockNote({
+      ownerId: OTHER_USER_ID,
+      visibility: "private",
+    });
+    const { app } = createTestApp([
+      [privateNote], // findActiveNoteById
+      [], // member check
+      [], // domain access
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages/${NOTE_PAGE_ID}/copy-to-personal`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should succeed for a guest role on public notes (any resolved role may copy to personal)", async () => {
+    // 公開ノートでは `role = 'guest'` として解決されるため、閲覧できる以上
+    // 個人コピーも許可する。脱退後も各自の個人コピーは残る、という仕様を反映。
+    // Public notes resolve the caller to `guest`; since they can already view,
+    // they are allowed to take a personal copy. Matches the spec that personal
+    // copies outlive any later membership change.
+    const publicNote = createMockNote({
+      ownerId: OTHER_USER_ID,
+      visibility: "public",
+    });
+    const { app, chains } = createTestApp([
+      [publicNote], // getNoteRole → findActiveNoteById
+      [], // getNoteRole → member check (not a member)
+      [], // getNoteRole → domain access check (no matching rule)
+      [
+        {
+          id: NOTE_PAGE_ID,
+          noteId: NOTE_ID,
+          title: "Public Page",
+          contentPreview: null,
+          thumbnailUrl: null,
+          sourceUrl: null,
+        },
+      ], // source page lookup inside tx
+      [{ id: "pg-guest-copy" }], // insert pages
+      [], // source page_contents lookup → empty
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages/${NOTE_PAGE_ID}/copy-to-personal`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ created: true, page_id: "pg-guest-copy" });
+
+    // 元の note 側は更新しない：個人コピーは完全に独立したエンティティ。
+    // The source note is untouched: the personal copy is wholly independent.
+    expect(chains.filter((c) => c.startMethod === "update")).toHaveLength(0);
+  });
+});
+
 // ── DELETE /api/notes/:noteId/pages/:pageId ─────────────────────────────────
 
 describe("DELETE /api/notes/:noteId/pages/:pageId", () => {

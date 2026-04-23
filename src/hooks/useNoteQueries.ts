@@ -9,6 +9,7 @@ import type {
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
+import { pageKeys } from "@/hooks/usePageQueries";
 
 /** Page in a note with who added it (for canDeletePage). */
 export type NotePageSummary = PageSummary & { addedByUserId: string };
@@ -434,6 +435,61 @@ export function useAddPageToNote() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+    },
+  });
+}
+
+/**
+ * 個人ページをコピーしてノートネイティブページを作るミューテーションフック (issue #713 Phase 3)。
+ * 元の個人ページは `/home` に残り、新しいコピーだけがノートに出る。
+ *
+ * Mutation hook that copies a personal page into a note as a fresh
+ * note-native page. The original stays on `/home`; only the copy surfaces
+ * inside the note. See issue #713 Phase 3.
+ */
+export function useCopyPersonalPageToNote() {
+  const { api } = useNoteApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noteId, sourcePageId }: { noteId: string; sourcePageId: string }) => {
+      return api.copyPersonalPageToNote(noteId, sourcePageId);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+    },
+  });
+}
+
+/**
+ * ノートネイティブページをコピーして個人ページにするミューテーションフック (issue #713 Phase 3)。
+ * 元のノートページはノートに残り、コピーだけが呼び出し元の `/home` に加わる。
+ *
+ * Mutation hook that copies a note-native page into the caller's personal
+ * pages. The source stays in the note; only the copy lands on `/home`.
+ * See issue #713 Phase 3.
+ */
+export function useCopyNotePageToPersonal() {
+  const { api, userId } = useNoteApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noteId, sourcePageId }: { noteId: string; sourcePageId: string }) => {
+      return api.copyNotePageToPersonal(noteId, sourcePageId);
+    },
+    onSuccess: () => {
+      // 新しい個人ページが `/home` のグリッドに現れるよう、ページ一覧系キャッシュを
+      // すべて無効化する。IndexedDB 経由の sync 呼び出しは別途 `syncWithApi` が
+      // 拾う（次回 sync で新ページを pull する）。
+      // Invalidate personal-page caches so the copy appears on `/home`. The
+      // IndexedDB mirror picks up the new row on the next `syncWithApi` pull.
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: pageKeys.list(userId) });
+        queryClient.invalidateQueries({ queryKey: pageKeys.summary(userId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      }
     },
   });
 }

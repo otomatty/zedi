@@ -610,5 +610,57 @@ describe("apiClient", () => {
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(init.method).toBe("DELETE");
     });
+
+    it("copyPersonalPageToNote POSTs to /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 Phase 3)", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({ ok: true, data: { created: true, page_id: "pg-new", sort_order: 3 } }),
+          ),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.copyPersonalPageToNote("note-1", "pg-src");
+
+      expect(result).toEqual({ created: true, page_id: "pg-new", sort_order: 3 });
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(
+        "https://api.test.example.com/api/notes/note-1/pages/copy-from-personal/pg-src",
+      );
+      expect(init.method).toBe("POST");
+      // `id` 引数の encodeURIComponent を検証（パスインジェクション対策）。
+      // Verifies encodeURIComponent on ids (path-injection guard).
+      const result2 = await client.copyPersonalPageToNote("note/weird", "pg src");
+      const [url2] = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(url2).toBe(
+        "https://api.test.example.com/api/notes/note%2Fweird/pages/copy-from-personal/pg%20src",
+      );
+      expect(result2.created).toBe(true);
+    });
+
+    it("copyNotePageToPersonal POSTs to /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Phase 3)", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(JSON.stringify({ ok: true, data: { created: true, page_id: "pg-c" } })),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.copyNotePageToPersonal("note-a", "pg-note-native");
+
+      expect(result).toEqual({ created: true, page_id: "pg-c" });
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe(
+        "https://api.test.example.com/api/notes/note-a/pages/pg-note-native/copy-to-personal",
+      );
+      expect(init.method).toBe("POST");
+    });
   });
 });

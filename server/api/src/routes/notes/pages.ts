@@ -1,15 +1,17 @@
 /**
  * ノートページ管理ルート
  *
- * POST   /:noteId/pages          — ページ追加
- * DELETE /:noteId/pages/:pageId  — ページ削除
- * PUT    /:noteId/pages          — ページ並び替え
- * GET    /:noteId/pages          — ノートのページ一覧
+ * POST   /:noteId/pages                               — ページ追加（リンク or タイトル新規）
+ * POST   /:noteId/pages/copy-from-personal/:pageId    — 個人ページをノートにコピー
+ * POST   /:noteId/pages/:pageId/copy-to-personal      — ノートページを個人にコピー
+ * DELETE /:noteId/pages/:pageId                       — ページ削除
+ * PUT    /:noteId/pages                               — ページ並び替え
+ * GET    /:noteId/pages                               — ノートのページ一覧
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, asc, sql } from "drizzle-orm";
-import { notes, notePages, pages } from "../../schema/index.js";
+import { notes, notePages, pages, pageContents } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
 import { getNoteRole, canEdit } from "./helpers.js";
@@ -164,6 +166,211 @@ app.post("/:noteId/pages", authRequired, async (c) => {
   }
 
   return c.json({ added: true, sort_order: sortOrder });
+});
+
+// ── POST /:noteId/pages/copy-from-personal/:pageId ──────────────────────────
+// 個人ページ（`pages.note_id IS NULL`）をコピーし、指定ノート配下のノート
+// ネイティブページ（`note_id = :noteId`, `source_page_id = :pageId`）を作る。
+// 元ページは個人 /home に残り、新しいコピーだけがノートに出る。Issue #713 Phase 3。
+//
+// Copy a personal page (`pages.note_id IS NULL`) into the note as a fresh
+// note-native page (`note_id = :noteId`, `source_page_id = :pageId`). The
+// original stays on the caller's /home; only the copy lives inside the note.
+// See issue #713 Phase 3.
+app.post("/:noteId/pages/copy-from-personal/:pageId", authRequired, async (c) => {
+  const noteId = c.req.param("noteId");
+  const sourcePageId = c.req.param("pageId");
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+  const db = c.get("db");
+
+  const { role, note } = await getNoteRole(noteId, userId, userEmail, db);
+  if (!note) throw new HTTPException(404, { message: "Note not found" });
+  if (!role || !canEdit(role, note)) {
+    throw new HTTPException(403, { message: "Forbidden" });
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const sourceRows = await tx
+      .select({
+        id: pages.id,
+        ownerId: pages.ownerId,
+        noteId: pages.noteId,
+        title: pages.title,
+        contentPreview: pages.contentPreview,
+        thumbnailUrl: pages.thumbnailUrl,
+        sourceUrl: pages.sourceUrl,
+      })
+      .from(pages)
+      .where(and(eq(pages.id, sourcePageId), eq(pages.isDeleted, false)))
+      .limit(1);
+
+    const source = sourceRows[0];
+    if (!source) throw new HTTPException(404, { message: "Source page not found" });
+    // 個人ページのみコピー元に許す。他人の個人ページや、すでにノートネイティブな
+    // ページは Phase 3 の「個人 → ノート」スコープ外（別ノートからの取り込みは別 API）。
+    // Only the caller's own personal page can be the source for
+    // copy-from-personal. Cross-note adoption needs a different endpoint.
+    if (source.ownerId !== userId) {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
+    if (source.noteId !== null) {
+      throw new HTTPException(400, { message: "Source page must be a personal page" });
+    }
+
+    const inserted = await tx
+      .insert(pages)
+      .values({
+        ownerId: userId,
+        noteId,
+        sourcePageId: source.id,
+        title: source.title ?? null,
+        contentPreview: source.contentPreview ?? null,
+        thumbnailUrl: source.thumbnailUrl ?? null,
+        sourceUrl: source.sourceUrl ?? null,
+      })
+      .returning({ id: pages.id });
+
+    const newPage = inserted[0];
+    if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
+    const newPageId = newPage.id;
+
+    // Y.js 本文のコピー。`page_contents` は（初回保存前なら）存在しないことが
+    // あるため、行がないときはスキップ。コピー先の最初の保存時に通常ルートで
+    // `page_contents` 行が作られる。
+    // Copy the live Y.js document. `page_contents` may not exist yet if the
+    // source has never been saved; in that case skip — the destination will
+    // create its own row on first save via the usual PUT content path.
+    const sourceContent = await tx
+      .select({ ydocState: pageContents.ydocState, contentText: pageContents.contentText })
+      .from(pageContents)
+      .where(eq(pageContents.pageId, sourcePageId))
+      .limit(1);
+
+    const contentRow = sourceContent[0];
+    if (contentRow) {
+      await tx.insert(pageContents).values({
+        pageId: newPageId,
+        ydocState: contentRow.ydocState,
+        version: 1,
+        contentText: contentRow.contentText ?? null,
+      });
+    }
+
+    const maxOrder = await tx
+      .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
+      .from(notePages)
+      .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
+
+    const order = (maxOrder[0]?.max ?? 0) + 1;
+
+    await tx.insert(notePages).values({
+      noteId,
+      pageId: newPageId,
+      addedByUserId: userId,
+      sortOrder: order,
+    });
+
+    await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+
+    return { pageId: newPageId, sortOrder: order };
+  });
+
+  return c.json({ created: true, page_id: result.pageId, sort_order: result.sortOrder });
+});
+
+// ── POST /:noteId/pages/:pageId/copy-to-personal ────────────────────────────
+// ノートネイティブページ（`pages.note_id = :noteId`）の内容をコピーして
+// 呼び出し元の個人ページ（`note_id = NULL`, `source_page_id = :pageId`）を作る。
+// 元ページはノートに残り、コピーだけが個人 /home に出る。脱退後もコピーは残る。
+// Issue #713 Phase 3。
+//
+// Copy a note-native page (`pages.note_id = :noteId`) into the caller's
+// personal pages as a fresh row (`note_id = NULL`, `source_page_id = :pageId`).
+// The original stays in the note; only the copy lands on the caller's /home,
+// and the copy survives if the caller later leaves the note. See issue #713.
+app.post("/:noteId/pages/:pageId/copy-to-personal", authRequired, async (c) => {
+  const noteId = c.req.param("noteId");
+  const sourcePageId = c.req.param("pageId");
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+  const db = c.get("db");
+
+  // 呼び出し元がノートを閲覧できることを確認する。`role` が解決できれば
+  // owner / member / domain / guest のいずれかに該当し、対応する個人コピーの
+  // 作成を許可する。`getNoteRole` 内部で `findActiveNoteById` まで引くので
+  // note 存在チェックを兼ねる。
+  //
+  // Verify the caller can read this note (any resolved role — owner / member /
+  // domain / guest — is sufficient to take a personal copy). `getNoteRole`
+  // internally hits `findActiveNoteById`, which doubles as the 404 guard.
+  const { role, note } = await getNoteRole(noteId, userId, userEmail, db);
+  if (!note) throw new HTTPException(404, { message: "Note not found" });
+  if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  const result = await db.transaction(async (tx) => {
+    const sourceRows = await tx
+      .select({
+        id: pages.id,
+        noteId: pages.noteId,
+        title: pages.title,
+        contentPreview: pages.contentPreview,
+        thumbnailUrl: pages.thumbnailUrl,
+        sourceUrl: pages.sourceUrl,
+      })
+      .from(pages)
+      .where(and(eq(pages.id, sourcePageId), eq(pages.isDeleted, false)))
+      .limit(1);
+
+    const source = sourceRows[0];
+    if (!source) throw new HTTPException(404, { message: "Source page not found" });
+    // URL のノート ID と実際のページ所属が食い違う場合は拒否する。これによって、
+    // 別ノートのページ ID を使ってこのノートの閲覧権で取り込もうとする行為を封じる。
+    // Reject if the URL note and the page's own note diverge. Otherwise a caller
+    // with access to note A could pass a page id from note B and launder its
+    // contents into their personal /home.
+    if (source.noteId !== noteId) {
+      throw new HTTPException(400, { message: "Page does not belong to this note" });
+    }
+
+    const inserted = await tx
+      .insert(pages)
+      .values({
+        ownerId: userId,
+        // noteId は undefined（= DB デフォルト NULL）に倒して個人ページとして作成。
+        // 明示的に null を渡しても良いが、スキーマ定義が `nullable` なので省略形で統一。
+        sourcePageId: source.id,
+        title: source.title ?? null,
+        contentPreview: source.contentPreview ?? null,
+        thumbnailUrl: source.thumbnailUrl ?? null,
+        sourceUrl: source.sourceUrl ?? null,
+      })
+      .returning({ id: pages.id });
+
+    const newPage = inserted[0];
+    if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
+    const newPageId = newPage.id;
+
+    const sourceContent = await tx
+      .select({ ydocState: pageContents.ydocState, contentText: pageContents.contentText })
+      .from(pageContents)
+      .where(eq(pageContents.pageId, sourcePageId))
+      .limit(1);
+
+    const contentRow = sourceContent[0];
+    if (contentRow) {
+      await tx.insert(pageContents).values({
+        pageId: newPageId,
+        ydocState: contentRow.ydocState,
+        version: 1,
+        contentText: contentRow.contentText ?? null,
+      });
+    }
+
+    return { pageId: newPageId };
+  });
+
+  return c.json({ created: true, page_id: result.pageId });
 });
 
 // ── DELETE /:noteId/pages/:pageId ───────────────────────────────────────────
