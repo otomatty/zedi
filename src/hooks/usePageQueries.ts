@@ -201,11 +201,25 @@ export function usePages() {
 }
 
 /**
+ * `usePagesSummary` のオプション。`enabled: false` を渡すと IndexedDB への
+ * 問い合わせをスキップできる（ノートスコープ編集時に個人ページを取りに
+ * 行かないように抑止するなど。Issue #713 Phase 4）。
+ * Options for {@link usePagesSummary}; pass `enabled: false` to skip the
+ * IndexedDB lookup (e.g. in note scope where personal pages are irrelevant,
+ * see issue #713 Phase 4).
+ */
+type UsePagesSummaryOptions = {
+  enabled?: boolean;
+};
+
+/**
  * Hook to fetch page summaries for the current user (without content)
  * Use this for list views to minimize data transfer
  */
-export function usePagesSummary() {
+export function usePagesSummary(options?: UsePagesSummaryOptions) {
   const { getRepository, userId, isLoaded } = useRepository();
+  const callerEnabled = options?.enabled ?? true;
+  const isEnabled = callerEnabled && isLoaded;
 
   const query = useQuery({
     queryKey: pageKeys.summary(userId),
@@ -213,13 +227,13 @@ export function usePagesSummary() {
       const repo = await getRepository();
       return repo.getPagesSummary(userId);
     },
-    enabled: isLoaded,
+    enabled: isEnabled,
     staleTime: 1000 * 60, // 1 minute
   });
 
   return {
     ...query,
-    isLoading: query.isLoading || !isLoaded,
+    isLoading: callerEnabled && (query.isLoading || !isLoaded),
     isRepositoryReady: isLoaded,
   };
 }
@@ -664,15 +678,41 @@ export function usePromoteGhostLink() {
 }
 
 /**
+ * `useSyncWikiLinks` のオプション。WikiLink 同期のスコープを個人ページと
+ * ノートネイティブページで切り替える（Issue #713 Phase 4）。
+ *
+ * - `pageNoteId === null` / 省略: 個人スコープ。`repo.getPagesSummary()`
+ *   が返す個人ページのみを解決候補にする。
+ * - `pageNoteId !== null`: ノートスコープ。呼び出し側は同じノートに所属する
+ *   ページ一覧（`useNotePages` で取得）を `notePages` に渡す。
+ *
+ * Options for {@link useSyncWikiLinks}. Switches sync scope between personal
+ * and note-native pages. When `pageNoteId` is set, callers must supply
+ * `notePages` (typically from `useNotePages`) because the repository does
+ * not hold note-native page summaries locally. See issue #713 Phase 4.
+ */
+export type UseSyncWikiLinksOptions = {
+  pageNoteId?: string | null;
+  notePages?: Array<Pick<PageSummary, "id" | "title">>;
+};
+
+/**
  * Hook to sync WikiLinks when saving a page (delta update).
  * - Removes links/ghost_links that are no longer in content.
  * - Adds or updates links for current content (existing pages → links, others → ghost_links).
  *
  * Only touches the saved page; no full-scan of all pages.
  * OPTIMIZED: Uses getPagesSummary() for title↔id resolution (no content).
+ *
+ * `options.pageNoteId` を文字列で渡すとノートスコープで同期する。ノート内の
+ * ページ一覧 (`options.notePages`) を呼び出し側が用意する必要がある。
+ * 個人ページ（既定）では従来どおり `repo.getPagesSummary(userId)` を使う。
+ * Issue #713 Phase 4。
  */
-export function useSyncWikiLinks() {
+export function useSyncWikiLinks(options: UseSyncWikiLinksOptions = {}) {
   const { getRepository, userId } = useRepository();
+  const pageNoteId = options.pageNoteId ?? null;
+  const notePages = options.notePages;
 
   const syncLinks = useCallback(
     async (
@@ -680,22 +720,58 @@ export function useSyncWikiLinks() {
       wikiLinks: Array<{ title: string; exists: boolean }>,
     ): Promise<void> => {
       const repo = await getRepository();
-      await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks);
+      await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks, {
+        pageNoteId,
+        notePages,
+      });
     },
-    [getRepository, userId],
+    [getRepository, userId, pageNoteId, notePages],
   );
 
   return { syncLinks };
 }
 
 /**
+ * `useWikiLinkExistsChecker` のオプション。WikiLink の解決スコープを
+ * 個人ページとノートネイティブページで切り替える（Issue #713 Phase 4）。
+ *
+ * Options for {@link useWikiLinkExistsChecker}. Switches WikiLink resolution
+ * scope between personal pages and note-native pages. See issue #713 Phase 4.
+ */
+export type UseWikiLinkExistsCheckerOptions = {
+  /**
+   * 編集中ページの noteId。`null`（既定）は個人ページ、文字列は
+   * ノートネイティブページ。
+   *
+   * Owning note ID. `null` (default) → personal scope; string → note scope.
+   */
+  pageNoteId?: string | null;
+  /**
+   * `pageNoteId !== null` のときに使う候補ページ一覧。IndexedDB には
+   * ノートネイティブページが載らないため、API 経由で取得したノート配下の
+   * ページ一覧を呼び出し側が渡す。
+   *
+   * Candidate pages used when `pageNoteId` is a string. IndexedDB does not
+   * hold note-native pages, so callers must supply the note's page list
+   * (typically from `useNotePages`).
+   */
+  notePages?: Array<Pick<PageSummary, "id" | "title">>;
+};
+
+/**
  * Hook to get data needed to update WikiLink exists status
  * Returns a function that checks if pages exist by their titles
  *
+ * スコープ（個人 / ノート）に応じて候補ソースを切り替える。Issue #713 Phase 4：
+ * - `pageNoteId === null` / 省略: `repo.getPagesSummary()`（個人ページ）
+ * - `pageNoteId !== null`: `notePages`（呼び出し側が `useNotePages` から渡す）
+ *
  * OPTIMIZED: Uses getPagesSummary() instead of getPages() to reduce Rows Read
  */
-export function useWikiLinkExistsChecker() {
+export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOptions = {}) {
   const { getRepository, userId, isLoaded } = useRepository();
+  const pageNoteId = options.pageNoteId ?? null;
+  const notePages = options.notePages;
 
   const checkExistence = useCallback(
     async (
@@ -711,12 +787,33 @@ export function useWikiLinkExistsChecker() {
 
       const repo = await getRepository();
 
-      // OPTIMIZED: Use summary (no content) to check existence
-      const pages = await repo.getPagesSummary(userId);
-      const pageTitles = new Set(pages.map((p) => p.title.toLowerCase().trim()));
+      // スコープに応じて候補ソースを切り替える（Issue #713 Phase 4）。
+      // ノートスコープで `notePages` が未到着のときは空集合で返し、誤って
+      // 「存在しない」と判定して WikiLink を壊さないようにする。
+      //
+      // Select the candidate source based on scope (issue #713 Phase 4).
+      // If note-scope candidates have not loaded yet, return empty sets so
+      // we do not mis-classify valid same-note links as missing on this pass.
+      let pageTitles: Set<string>;
+      if (pageNoteId !== null) {
+        if (notePages === undefined) {
+          return { pageTitles: new Set(), referencedTitles: new Set() };
+        }
+        pageTitles = new Set(notePages.map((p) => p.title.toLowerCase().trim()));
+      } else {
+        const pages = await repo.getPagesSummary(userId);
+        pageTitles = new Set(pages.map((p) => p.title.toLowerCase().trim()));
+      }
 
-      // Get ghost links to check referenced status
-      const ghostLinks = await repo.getGhostLinks(userId);
+      // Get ghost links to check referenced status. ノートスコープのゴースト
+      // リンク追跡は未整備（backend 側の管轄）のため、v1 では個人ゴーストのみ
+      // を参照する。Note-scope ghost links are handled by the server for now;
+      // only personal ghost links contribute to `referencedTitles` in v1.
+      // TODO(issue #713 Phase 5+): クライアント側でもノートスコープのゴースト
+      // リンクを扱えるようにする（検索・MCP の整備と合わせて別 issue で対応）。
+      // TODO(issue #713 Phase 5+): surface note-scope ghost links on the
+      // client (tracked with the search / MCP scoping work in a follow-up).
+      const ghostLinks = pageNoteId === null ? await repo.getGhostLinks(userId) : [];
       const referencedTitles = new Set<string>();
 
       // Group ghost links by link_text
@@ -740,7 +837,7 @@ export function useWikiLinkExistsChecker() {
 
       return { pageTitles, referencedTitles };
     },
-    [getRepository, userId, isLoaded],
+    [getRepository, userId, isLoaded, pageNoteId, notePages],
   );
 
   return { checkExistence, isLoaded };

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Editor } from "@tiptap/react";
 import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
 import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
+import { useNotePages } from "@/hooks/useNoteQueries";
 
 interface UseWikiLinkStatusSyncOptions {
   editor: Editor | null;
@@ -10,6 +11,16 @@ interface UseWikiLinkStatusSyncOptions {
   onChange: (content: string) => void;
   /** true の間は同期をスキップ（Wiki生成中のリンクスタイルちらつき防止） */
   skipSync?: boolean;
+  /**
+   * 編集中ページの noteId。`null`（既定）は個人ページ、文字列値なら
+   * ノートネイティブページ。存在確認のスコープを切り替えるために使う。
+   * Issue #713 Phase 4。
+   *
+   * Owning note ID of the page being edited. `null` (default) scopes
+   * existence checks to personal pages; a string scopes them to the given
+   * note's pages (fetched via `useNotePages`). See issue #713 Phase 4.
+   */
+  pageNoteId?: string | null;
 }
 
 /**
@@ -18,6 +29,16 @@ interface UseWikiLinkStatusSyncOptions {
  * 以下のタイミングでWikiLinkのexists/referenced属性を更新する:
  * 1. ページ読み込み時（pageIdの変更）
  * 2. WikiLinkの数が増加した時（Wiki生成後など）
+ *
+ * `pageNoteId` が指定された場合は、`useNotePages` から取得したノート配下の
+ * ページ一覧を存在判定の候補にする（Issue #713 Phase 4）。これにより、
+ * ノートネイティブページ内で同じノートの WikiLink が「存在しない」と
+ * 誤判定されて壊れた表示に倒れる問題を防ぐ。
+ *
+ * When `pageNoteId` is provided, note-scoped existence checks use the
+ * `useNotePages(pageNoteId)` result instead of personal-only IndexedDB
+ * summaries. This keeps same-note WikiLinks rendering as existing after
+ * subsequent sync passes (issue #713 Phase 4).
  */
 export function useWikiLinkStatusSync({
   editor,
@@ -25,8 +46,13 @@ export function useWikiLinkStatusSync({
   pageId,
   onChange,
   skipSync = false,
+  pageNoteId = null,
 }: UseWikiLinkStatusSyncOptions): void {
-  const { checkExistence } = useWikiLinkExistsChecker();
+  const notePagesQuery = useNotePages(pageNoteId ?? "", undefined, Boolean(pageNoteId));
+  const { checkExistence } = useWikiLinkExistsChecker({
+    pageNoteId,
+    notePages: pageNoteId ? notePagesQuery.data : undefined,
+  });
 
   // 最後にチェックした状態を追跡
   const lastCheckedRef = useRef<{

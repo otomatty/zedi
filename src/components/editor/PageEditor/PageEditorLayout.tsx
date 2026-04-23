@@ -168,6 +168,16 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
           }}
           wikiContentForCollab={wikiContentForCollab}
           onWikiContentApplied={onWikiContentApplied}
+          /*
+           * `/pages/:id` は個人ページ専用のルート（IndexedDB には
+           * `note_id IS NULL` のページしか入らない）。そのため WikiLink の
+           * スコープは常に個人 (`null`)。Issue #713 Phase 4 を参照。
+           *
+           * `/pages/:id` only serves personal pages (IndexedDB only stores
+           * rows with `note_id IS NULL`), so the WikiLink scope is always
+           * personal (`null`). See issue #713 Phase 4.
+           */
+          pageNoteId={null}
         />
       </ContentWithAIChat>
 

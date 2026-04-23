@@ -52,6 +52,17 @@ export interface TiptapEditorProps {
   /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied を呼ぶ */
   wikiContentForCollab?: string | null;
   onWikiContentApplied?: () => void;
+  /**
+   * 編集中ページが所属するノート ID。`null` は個人ページ、文字列値はノート
+   * ネイティブページ。WikiLink のサジェスト・解決候補をノート／個人スコープに
+   * 絞るために使用する。Issue #713 Phase 4 を参照。
+   *
+   * Owning note ID of the page being edited. `null` is a personal page; a
+   * string identifies a note-native page. Used to scope WikiLink suggestions
+   * and resolution to the same note (or personal pages). See issue #713
+   * Phase 4.
+   */
+  pageNoteId?: string | null;
 }
 
 /**

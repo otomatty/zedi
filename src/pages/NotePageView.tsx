@@ -231,6 +231,7 @@ function NotePageEditorEditable({
         onTitleChange={isTitleEditable ? handleTitleChange : undefined}
         collaboration={isCollaborationEnabled ? collaboration : undefined}
         insertAtCursorRef={editorInsertRef}
+        pageNoteId={page.noteId ?? null}
       />
     </ContentWithAIChat>
   );
@@ -430,6 +431,7 @@ const NotePageView: React.FC = () => {
               showToolbar={false}
               onContentChange={() => undefined}
               onContentError={() => undefined}
+              pageNoteId={page.noteId ?? null}
             />
           )}
         </NoteWorkspaceProvider>
