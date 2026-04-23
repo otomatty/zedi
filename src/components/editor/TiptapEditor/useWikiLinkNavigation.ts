@@ -11,7 +11,7 @@ interface UseWikiLinkNavigationOptions {
    *
    * Owning note ID of the page being edited. `null` scopes resolution to
    * personal pages and navigates to `/pages/:id`; a string scopes resolution
-   * to same-note pages and navigates to `/notes/:noteId/pages/:id`. See
+   * to same-note pages and navigates to `/notes/:noteId/:pageId`. See
    * issue #713 Phase 4.
    */
   pageNoteId: string | null;
@@ -33,7 +33,7 @@ interface UseWikiLinkNavigationReturn {
  * WikiLink クリック時、`pageNoteId` に応じて候補スコープを切り替える。
  * - `pageNoteId === null` → 個人ページのみを検索し、`/pages/:id` に遷移。
  * - `pageNoteId !== null` → そのノート内のページのみを検索し、
- *   `/notes/:pageNoteId/pages/:id` に遷移。
+ *   canonical ルート `/notes/:pageNoteId/:id` に遷移。
  *
  * Issue #713 Phase 4。
  */

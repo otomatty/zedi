@@ -209,15 +209,16 @@ describe("useWikiLinkNavigation", () => {
   });
 
   // Issue #713 Phase 4: `pageNoteId` を指定したときは同一ノートのページを
-  // 解決候補にし、遷移先は `/notes/:noteId/pages/:id`。個人ページの検索
-  // (`usePageByTitle`) は呼ばれないため、ここではモック応答の有無にかかわらず
-  // 同一ノート内のマッチだけが採用される。
-  // Note-scoped branch (issue #713 Phase 4): navigation targets the note
-  // URL and personal lookups must not leak into the resolved page.
+  // 解決候補にし、遷移先は canonical ルート `/notes/:noteId/:pageId`。
+  // 個人ページの検索 (`usePageByTitle`) は呼ばれないため、ここではモック応答の
+  // 有無にかかわらず同一ノート内のマッチだけが採用される。
+  // Note-scoped branch (issue #713 Phase 4): navigation targets the
+  // canonical `/notes/:noteId/:pageId` route and personal lookups must
+  // not leak into the resolved page.
   describe("ノートスコープ (pageNoteId 指定)", () => {
     const noteId = "note-42";
 
-    it("同一ノート内のページにマッチしたら /notes/:noteId/pages/:id に遷移する", async () => {
+    it("同一ノート内のページにマッチしたら /notes/:noteId/:pageId に遷移する", async () => {
       vi.mocked(useNotePages).mockReturnValue({
         data: [
           {
