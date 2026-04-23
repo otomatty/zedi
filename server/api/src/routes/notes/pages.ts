@@ -55,7 +55,7 @@ app.post("/:noteId/pages", authRequired, async (c) => {
   if (pageId) {
     const result = await db.transaction(async (tx) => {
       const page = await tx
-        .select({ id: pages.id, ownerId: pages.ownerId })
+        .select({ id: pages.id, ownerId: pages.ownerId, noteId: pages.noteId })
         .from(pages)
         .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
         .limit(1);
@@ -63,6 +63,23 @@ app.post("/:noteId/pages", authRequired, async (c) => {
       const firstPage = page[0];
       if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
       if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+      // 既にノートネイティブのページ（別ノートに所属）を `page_id` 経由で別ノートに
+      // リンクできてしまうと、`/api/pages/:id/content` の認可は元ノート側のロールで
+      // 解決されるため、リンク先メンバーから見ると「リストには出るが開けない」
+      // 壊れたカードになる。Phase 1 では個人ページ（`note_id IS NULL`）のみリンク可。
+      // ノート間の取り込みは Phase 3 で導入予定の copy エンドポイントで扱う。
+      //
+      // Reject note-native pages in the `page_id` linking path. If we let a page
+      // already scoped to note A be linked into note B, then `/api/pages/:id/content`
+      // still authorizes via the original `pages.note_id` → note B members would see
+      // a tile they cannot open (403). In Phase 1 only personal pages
+      // (`note_id IS NULL`) are linkable; cross-note adoption arrives with the
+      // Phase 3 copy endpoint. See issue #713.
+      if (firstPage.noteId !== null) {
+        throw new HTTPException(400, {
+          message: "Only personal pages can be linked via page_id",
+        });
+      }
       const resolvedPageId = firstPage.id;
 
       const maxOrder = await tx
@@ -163,12 +180,42 @@ app.delete("/:noteId/pages/:pageId", authRequired, async (c) => {
     throw new HTTPException(403, { message: "Forbidden" });
   }
 
-  await db
-    .update(notePages)
-    .set({ isDeleted: true, updatedAt: new Date() })
-    .where(and(eq(notePages.noteId, noteId), eq(notePages.pageId, pageId)));
+  // ノートからページを外す。ノートネイティブページ（`pages.note_id = noteId`）の場合は
+  // `note_pages` の論理削除だけだと `pages` 行が残り、`/api/pages/:id/content` などが
+  // ノートロール経由で引き続き認可してしまう（孤児化）。同一トランザクション内で
+  // `pages` 自体も論理削除して整合性を保つ。
+  // 個人ページ（`pages.note_id IS NULL`）のリンク解除は従来どおり `note_pages` だけを
+  // 落とし、ページ自体は所有者の個人 /home に残す。
+  //
+  // Detach a page from a note. For note-native pages
+  // (`pages.note_id = noteId`), tombstoning only `note_pages` would leave the
+  // `pages` row alive and still authorized via the note role on
+  // `/api/pages/:id/content`, etc. Soft-delete the `pages` row in the same
+  // transaction so the orphan goes away. For personal pages (`note_id IS NULL`)
+  // we still only drop the link row so the page stays on the owner's /home.
+  // See issue #713.
+  await db.transaction(async (tx) => {
+    const pageRow = await tx
+      .select({ id: pages.id, noteId: pages.noteId })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+      .limit(1);
 
-  await db.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+    await tx
+      .update(notePages)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(and(eq(notePages.noteId, noteId), eq(notePages.pageId, pageId)));
+
+    const page = pageRow[0];
+    if (page && page.noteId === noteId) {
+      await tx
+        .update(pages)
+        .set({ isDeleted: true, updatedAt: new Date() })
+        .where(eq(pages.id, pageId));
+    }
+
+    await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+  });
 
   return c.json({ removed: true });
 });

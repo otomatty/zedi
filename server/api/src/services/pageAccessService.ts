@@ -3,7 +3,7 @@
  * Shared page access authorization service.
  */
 import { HTTPException } from "hono/http-exception";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { pages, users, notes, notePages, noteMembers } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 import { getNoteRole, canEdit } from "../routes/notes/helpers.js";
@@ -91,7 +91,16 @@ export async function assertPageViewAccess(
       noteMembers,
       and(
         eq(noteMembers.noteId, notePages.noteId),
-        eq(noteMembers.memberEmail, userEmail),
+        // 大文字小文字を区別せずに突合する。`getUserEmailLowercase` で正規化済み
+        // のメールに対し、DB 側でも `LOWER(...)` を適用して旧来データや手動挿入
+        // で大文字混じりの行を取りこぼさない。`helpers.ts` の `getNoteRole` と
+        // 同じ慣用に揃える。
+        //
+        // Match case-insensitively. `getUserEmailLowercase` already lower-cases
+        // the input; apply `LOWER(...)` on the column too so legacy or manually
+        // inserted mixed-case rows still match. Mirrors `getNoteRole` in
+        // `helpers.ts`.
+        sql`LOWER(${noteMembers.memberEmail}) = ${userEmail}`,
         eq(noteMembers.isDeleted, false),
         eq(noteMembers.status, "accepted"),
       ),

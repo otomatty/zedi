@@ -41,7 +41,7 @@ describe("POST /api/notes/:noteId/pages", () => {
     const mockNote = createMockNote();
     const { app } = createTestApp([
       [mockNote], // getNoteRole → findActiveNoteById (owner)
-      [{ id: "pg-new", ownerId: TEST_USER_ID }], // page exists check
+      [{ id: "pg-new", ownerId: TEST_USER_ID, noteId: null }], // page exists check
       [{ max: 2 }], // maxOrder query
       [], // insert notePages
       [], // update notes.updatedAt
@@ -62,7 +62,7 @@ describe("POST /api/notes/:noteId/pages", () => {
     const mockNote = createMockNote();
     const { app } = createTestApp([
       [mockNote],
-      [{ id: "pg-new", ownerId: TEST_USER_ID }],
+      [{ id: "pg-new", ownerId: TEST_USER_ID, noteId: null }],
       [{ max: 5 }],
       [],
       [],
@@ -82,7 +82,7 @@ describe("POST /api/notes/:noteId/pages", () => {
     const mockNote = createMockNote();
     const { app } = createTestApp([
       [mockNote], // getNoteRole → findActiveNoteById (owner)
-      [{ id: "pg-camel", ownerId: TEST_USER_ID }], // page exists check
+      [{ id: "pg-camel", ownerId: TEST_USER_ID, noteId: null }], // page exists check
       [{ max: 0 }], // maxOrder query
       [], // insert notePages
       [], // update notes.updatedAt
@@ -139,7 +139,7 @@ describe("POST /api/notes/:noteId/pages", () => {
     const mockNote = createMockNote();
     const { app, chains } = createTestApp([
       [mockNote], // getNoteRole → findActiveNoteById (owner)
-      [{ id: "pg-existing", ownerId: TEST_USER_ID }], // page exists check
+      [{ id: "pg-existing", ownerId: TEST_USER_ID, noteId: null }], // page exists check
       [{ max: 0 }], // maxOrder query
       [], // insert notePages
       [], // update notes.updatedAt
@@ -240,6 +240,32 @@ describe("POST /api/notes/:noteId/pages", () => {
     expect(res.status).toBe(404);
   });
 
+  it("should return 400 when page_id refers to a note-native page (issue #713)", async () => {
+    // 別ノートに所属するノートネイティブページを `page_id` 経由で別ノートに
+    // リンクできてしまうと壊れたカード（list には出るが open すると 403）に
+    // なるため拒否する。Phase 1 では個人ページ（`note_id IS NULL`）のみ
+    // リンク可能。Phase 3 のコピーエンドポイントで取り込みを実装する。
+    //
+    // Reject note-native pages on the `page_id` link path (issue #713).
+    // Otherwise a page already scoped to note A would surface in note B but
+    // remain unauthorized for B's members. Only personal pages are linkable.
+    const mockNote = createMockNote();
+    const { app } = createTestApp([
+      [mockNote], // getNoteRole (owner)
+      [{ id: "pg-native", ownerId: TEST_USER_ID, noteId: "another-note-id" }], // page exists, but note-native
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ page_id: "pg-native" }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("Only personal pages can be linked");
+  });
+
   it("should return 403 when user has no edit permission", async () => {
     const privateNote = createMockNote({
       ownerId: OTHER_USER_ID,
@@ -276,10 +302,11 @@ describe("POST /api/notes/:noteId/pages", () => {
 // ── DELETE /api/notes/:noteId/pages/:pageId ─────────────────────────────────
 
 describe("DELETE /api/notes/:noteId/pages/:pageId", () => {
-  it("should remove a page and return { removed: true }", async () => {
+  it("should detach a personal page (note_id IS NULL) without deleting the pages row", async () => {
     const mockNote = createMockNote();
-    const { app } = createTestApp([
+    const { app, chains } = createTestApp([
       [mockNote], // getNoteRole (owner)
+      [{ id: "pg-001", noteId: null }], // page lookup inside tx
       [], // update notePages (soft delete)
       [], // update notes.updatedAt
     ]);
@@ -292,6 +319,42 @@ describe("DELETE /api/notes/:noteId/pages/:pageId", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toEqual({ removed: true });
+
+    // 個人ページは `note_pages` リンクと `notes.updatedAt` だけ更新する。
+    // `pages` 自体は所有者の個人 /home に残るので update しない。
+    // Personal page: only `note_pages` and `notes.updatedAt` get updated;
+    // the `pages` row itself stays alive on the owner's /home.
+    const updateCalls = chains.filter((c) => c.startMethod === "update");
+    expect(updateCalls).toHaveLength(2);
+  });
+
+  it("should also tombstone the pages row when removing a note-native page (issue #713)", async () => {
+    // ノートネイティブページ（`pages.note_id = noteId`）を `note_pages` だけ
+    // 論理削除すると `pages` 行が孤児として残り、`/api/pages/:id/content` が
+    // ノートロール経由で引き続き認可してしまう。同じトランザクションで
+    // `pages.is_deleted = true` まで進めることを検証する。
+    //
+    // For note-native pages, tombstoning only `note_pages` would leave the
+    // `pages` row alive and still authorized via the note role. Verify the
+    // route updates `pages.is_deleted = true` in the same transaction.
+    const mockNote = createMockNote();
+    const { app, chains } = createTestApp([
+      [mockNote], // getNoteRole (owner)
+      [{ id: "pg-native", noteId: NOTE_ID }], // page lookup → note-native
+      [], // update notePages (soft delete)
+      [], // update pages (soft delete the orphan)
+      [], // update notes.updatedAt
+    ]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages/pg-native`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+
+    const updateCalls = chains.filter((c) => c.startMethod === "update");
+    expect(updateCalls).toHaveLength(3); // note_pages + pages + notes
   });
 
   it("should return 403 when user cannot edit", async () => {

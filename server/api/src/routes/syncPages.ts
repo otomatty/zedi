@@ -6,7 +6,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, gt, inArray, isNull, sql } from "drizzle-orm";
+import { eq, and, gt, inArray, isNull } from "drizzle-orm";
 import { pages, links, ghostLinks } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
@@ -122,36 +122,39 @@ app.post("/", authRequired, async (c) => {
 
   // ページごとに LWW (Last Write Wins) 同期。
   // 同期対象は個人ページ（`pages.note_id IS NULL`）のみ。ノートネイティブ
-  // ページ（issue #713）は対象外で、もし同 ID の行がノートに存在する場合は
-  // ガードのため skipped 扱いとする（クライアント側 IndexedDB が note 行を
-  // 持っているはずがないが防御）。
+  // ページ（issue #713）や他人の個人ページは衝突回避のため `skipped` 扱い。
+  //
+  // バルク取得で N+1 を避ける: クライアントから来た全 ID を一括で引き、
+  // メモリ上で「未存在 / 自分の個人ページ / それ以外（ノートネイティブ or
+  // 他人）」に振り分けてから個別の DML を発行する。
   //
   // LWW sync runs only against personal pages (`pages.note_id IS NULL`).
-  // Note-native pages (issue #713) are excluded — if a row with the same id
-  // happens to be note-native, it is skipped defensively (clients should not
-  // hold note-native rows in IndexedDB).
-  for (const p of body.pages) {
-    const existing = await db
-      .select({ id: pages.id, updatedAt: pages.updatedAt, ownerId: pages.ownerId })
-      .from(pages)
-      .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)))
-      .limit(1);
+  // Note-native pages (issue #713) and other users' personal pages are skipped
+  // to avoid ID collisions and IDOR.
+  //
+  // Bulk-load to avoid N+1: fetch every incoming id in one query, then classify
+  // in memory as "missing", "owned personal", or "other (note-native or
+  // someone else's)". Only after that do we issue per-row DML.
+  const incomingIds = [...new Set(body.pages.map((p) => p.id))];
+  const existingRows =
+    incomingIds.length > 0
+      ? await db
+          .select({
+            id: pages.id,
+            ownerId: pages.ownerId,
+            noteId: pages.noteId,
+            updatedAt: pages.updatedAt,
+          })
+          .from(pages)
+          .where(inArray(pages.id, incomingIds))
+      : [];
+  const existingMap = new Map(existingRows.map((row) => [row.id, row]));
 
+  for (const p of body.pages) {
+    const existing = existingMap.get(p.id);
     const clientTime = new Date(p.updated_at);
 
-    if (existing.length === 0) {
-      // 既存の同 ID ページがノートネイティブだった場合は無視する
-      // Skip if a same-id page exists but is note-native
-      const noteNativeCheck = await db
-        .select({ id: pages.id })
-        .from(pages)
-        .where(and(eq(pages.id, p.id), sql`${pages.noteId} IS NOT NULL`))
-        .limit(1);
-      if (noteNativeCheck.length > 0) {
-        results.push({ id: p.id, action: "skipped" });
-        continue;
-      }
-
+    if (!existing) {
       await db.insert(pages).values({
         id: p.id,
         ownerId: userId,
@@ -165,26 +168,32 @@ app.post("/", authRequired, async (c) => {
         updatedAt: clientTime,
       });
       results.push({ id: p.id, action: "created" });
+      continue;
+    }
+
+    // ノートネイティブ or 他人の個人ページは触らない
+    // Skip note-native rows or rows owned by another user
+    if (existing.noteId !== null || existing.ownerId !== userId) {
+      results.push({ id: p.id, action: "skipped" });
+      continue;
+    }
+
+    if (clientTime > existing.updatedAt) {
+      await db
+        .update(pages)
+        .set({
+          title: p.title ?? null,
+          contentPreview: p.content_preview ?? null,
+          thumbnailUrl: p.thumbnail_url ?? null,
+          sourceUrl: p.source_url ?? null,
+          sourcePageId: p.source_page_id ?? null,
+          isDeleted: p.is_deleted ?? false,
+          updatedAt: clientTime,
+        })
+        .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)));
+      results.push({ id: p.id, action: "updated" });
     } else {
-      const existingRow = existing[0];
-      if (existingRow && clientTime > existingRow.updatedAt) {
-        // クライアント側が新しい: 更新
-        await db
-          .update(pages)
-          .set({
-            title: p.title ?? null,
-            contentPreview: p.content_preview ?? null,
-            thumbnailUrl: p.thumbnail_url ?? null,
-            sourceUrl: p.source_url ?? null,
-            sourcePageId: p.source_page_id ?? null,
-            isDeleted: p.is_deleted ?? false,
-            updatedAt: clientTime,
-          })
-          .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)));
-        results.push({ id: p.id, action: "updated" });
-      } else {
-        results.push({ id: p.id, action: "skipped" });
-      }
+      results.push({ id: p.id, action: "skipped" });
     }
   }
 
