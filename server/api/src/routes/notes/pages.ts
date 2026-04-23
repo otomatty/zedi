@@ -13,10 +13,123 @@ import { HTTPException } from "hono/http-exception";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { notes, notePages, pages, pageContents } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
-import type { AppEnv } from "../../types/index.js";
+import type { AppEnv, Database } from "../../types/index.js";
 import { getNoteRole, canEdit } from "./helpers.js";
 
 const app = new Hono<AppEnv>();
+
+/**
+ * コピー時に引き継ぐページメタデータのサブセット。
+ * Source-page metadata subset that copy endpoints duplicate into the new row.
+ */
+interface CopyablePageMetadata {
+  title: string | null;
+  contentPreview: string | null;
+  thumbnailUrl: string | null;
+  sourceUrl: string | null;
+}
+
+/**
+ * コピーで作られた新ページ行をレスポンスに載せるときの形。クライアントは
+ * これを IndexedDB に書き戻して `/home` に即反映する（`copy-to-personal`）。
+ * Shape of a copied page row in copy endpoint responses. Clients write it
+ * through to IndexedDB so the new page surfaces on `/home` without waiting
+ * for the next sync.
+ */
+interface CopiedPageApiItem {
+  id: string;
+  owner_id: string;
+  note_id: string | null;
+  source_page_id: string | null;
+  title: string | null;
+  content_preview: string | null;
+  thumbnail_url: string | null;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+}
+
+/**
+ * ページ行と `page_contents` を新しい `pages` 行へコピーする共通ヘルパー。
+ *
+ * `copy-from-personal`（個人 → ノート）と `copy-to-personal`（ノート → 個人）の
+ * 両エンドポイントで共有する。呼び出し側でスコープ判定とソース取得を済ませ、
+ * ここでは「新しい行を作る」部分だけに責務を絞る。`page_contents` がない
+ * （= 初回保存前の）ソースはスキップし、コピー先の初回保存時に通常ルートで
+ * 作成させる。新しい行は `RETURNING *` で取り出してレスポンスに載せられる
+ * 形で返すので、クライアントはサーバー再問い合わせなしにローカルストレージへ
+ * 書き戻せる。
+ *
+ * Shared helper that clones the page row + `page_contents` into a brand new
+ * `pages` row. Shared between `copy-from-personal` and `copy-to-personal` so
+ * the two endpoints stop duplicating this block. The caller handles
+ * authorization / source fetching; this helper only performs the insert. If
+ * the source has no `page_contents` row (never saved), that step is skipped
+ * and the destination creates its own row on first save via the usual PUT
+ * content path. The helper returns the full new row so endpoints can include
+ * it in the response and clients can write through to local storage without
+ * a follow-up round trip. See issue #713 Phase 3.
+ */
+async function copyPageRowWithContent(
+  tx: Database,
+  params: {
+    ownerId: string;
+    /** `null` で個人ページ、UUID でそのノートのノートネイティブページ */
+    destinationNoteId: string | null;
+    sourcePageId: string;
+    sourceMetadata: CopyablePageMetadata;
+  },
+): Promise<{ pageId: string; page: CopiedPageApiItem }> {
+  const inserted = await tx
+    .insert(pages)
+    .values({
+      ownerId: params.ownerId,
+      noteId: params.destinationNoteId,
+      sourcePageId: params.sourcePageId,
+      title: params.sourceMetadata.title ?? null,
+      contentPreview: params.sourceMetadata.contentPreview ?? null,
+      thumbnailUrl: params.sourceMetadata.thumbnailUrl ?? null,
+      sourceUrl: params.sourceMetadata.sourceUrl ?? null,
+    })
+    .returning();
+
+  const newPage = inserted[0];
+  if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
+  const newPageId = newPage.id;
+
+  const sourceContent = await tx
+    .select({ ydocState: pageContents.ydocState, contentText: pageContents.contentText })
+    .from(pageContents)
+    .where(eq(pageContents.pageId, params.sourcePageId))
+    .limit(1);
+
+  const contentRow = sourceContent[0];
+  if (contentRow) {
+    await tx.insert(pageContents).values({
+      pageId: newPageId,
+      ydocState: contentRow.ydocState,
+      version: 1,
+      contentText: contentRow.contentText ?? null,
+    });
+  }
+
+  const pageApi: CopiedPageApiItem = {
+    id: newPage.id,
+    owner_id: newPage.ownerId,
+    note_id: newPage.noteId,
+    source_page_id: newPage.sourcePageId,
+    title: newPage.title,
+    content_preview: newPage.contentPreview,
+    thumbnail_url: newPage.thumbnailUrl,
+    source_url: newPage.sourceUrl,
+    created_at: newPage.createdAt.toISOString(),
+    updated_at: newPage.updatedAt.toISOString(),
+    is_deleted: newPage.isDeleted,
+  };
+
+  return { pageId: newPageId, page: pageApi };
+}
 
 // ── POST /:noteId/pages ─────────────────────────────────────────────────────
 app.post("/:noteId/pages", authRequired, async (c) => {
@@ -218,44 +331,12 @@ app.post("/:noteId/pages/copy-from-personal/:pageId", authRequired, async (c) =>
       throw new HTTPException(400, { message: "Source page must be a personal page" });
     }
 
-    const inserted = await tx
-      .insert(pages)
-      .values({
-        ownerId: userId,
-        noteId,
-        sourcePageId: source.id,
-        title: source.title ?? null,
-        contentPreview: source.contentPreview ?? null,
-        thumbnailUrl: source.thumbnailUrl ?? null,
-        sourceUrl: source.sourceUrl ?? null,
-      })
-      .returning({ id: pages.id });
-
-    const newPage = inserted[0];
-    if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
-    const newPageId = newPage.id;
-
-    // Y.js 本文のコピー。`page_contents` は（初回保存前なら）存在しないことが
-    // あるため、行がないときはスキップ。コピー先の最初の保存時に通常ルートで
-    // `page_contents` 行が作られる。
-    // Copy the live Y.js document. `page_contents` may not exist yet if the
-    // source has never been saved; in that case skip — the destination will
-    // create its own row on first save via the usual PUT content path.
-    const sourceContent = await tx
-      .select({ ydocState: pageContents.ydocState, contentText: pageContents.contentText })
-      .from(pageContents)
-      .where(eq(pageContents.pageId, sourcePageId))
-      .limit(1);
-
-    const contentRow = sourceContent[0];
-    if (contentRow) {
-      await tx.insert(pageContents).values({
-        pageId: newPageId,
-        ydocState: contentRow.ydocState,
-        version: 1,
-        contentText: contentRow.contentText ?? null,
-      });
-    }
+    const { pageId: newPageId, page: newPage } = await copyPageRowWithContent(tx, {
+      ownerId: userId,
+      destinationNoteId: noteId,
+      sourcePageId: source.id,
+      sourceMetadata: source,
+    });
 
     const maxOrder = await tx
       .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
@@ -273,10 +354,15 @@ app.post("/:noteId/pages/copy-from-personal/:pageId", authRequired, async (c) =>
 
     await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
 
-    return { pageId: newPageId, sortOrder: order };
+    return { pageId: newPageId, sortOrder: order, page: newPage };
   });
 
-  return c.json({ created: true, page_id: result.pageId, sort_order: result.sortOrder });
+  return c.json({
+    created: true,
+    page_id: result.pageId,
+    sort_order: result.sortOrder,
+    page: result.page,
+  });
 });
 
 // ── POST /:noteId/pages/:pageId/copy-to-personal ────────────────────────────
@@ -333,44 +419,15 @@ app.post("/:noteId/pages/:pageId/copy-to-personal", authRequired, async (c) => {
       throw new HTTPException(400, { message: "Page does not belong to this note" });
     }
 
-    const inserted = await tx
-      .insert(pages)
-      .values({
-        ownerId: userId,
-        // noteId は undefined（= DB デフォルト NULL）に倒して個人ページとして作成。
-        // 明示的に null を渡しても良いが、スキーマ定義が `nullable` なので省略形で統一。
-        sourcePageId: source.id,
-        title: source.title ?? null,
-        contentPreview: source.contentPreview ?? null,
-        thumbnailUrl: source.thumbnailUrl ?? null,
-        sourceUrl: source.sourceUrl ?? null,
-      })
-      .returning({ id: pages.id });
-
-    const newPage = inserted[0];
-    if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
-    const newPageId = newPage.id;
-
-    const sourceContent = await tx
-      .select({ ydocState: pageContents.ydocState, contentText: pageContents.contentText })
-      .from(pageContents)
-      .where(eq(pageContents.pageId, sourcePageId))
-      .limit(1);
-
-    const contentRow = sourceContent[0];
-    if (contentRow) {
-      await tx.insert(pageContents).values({
-        pageId: newPageId,
-        ydocState: contentRow.ydocState,
-        version: 1,
-        contentText: contentRow.contentText ?? null,
-      });
-    }
-
-    return { pageId: newPageId };
+    return copyPageRowWithContent(tx, {
+      ownerId: userId,
+      destinationNoteId: null,
+      sourcePageId: source.id,
+      sourceMetadata: source,
+    });
   });
 
-  return c.json({ created: true, page_id: result.pageId });
+  return c.json({ created: true, page_id: result.pageId, page: result.page });
 });
 
 // ── DELETE /:noteId/pages/:pageId ───────────────────────────────────────────

@@ -661,6 +661,17 @@ describe("apiClient", () => {
         "https://api.test.example.com/api/notes/note-a/pages/pg-note-native/copy-to-personal",
       );
       expect(init.method).toBe("POST");
+
+      // 予約文字（`/` / 空白）を含む ID もパスセグメントとして encodeURIComponent
+      // される（copyPersonalPageToNote 側と同じパスインジェクション対策）。
+      // Reserved characters (`/`, space) in IDs must be encodeURIComponent'd
+      // per segment — mirrors the guard already asserted for copyPersonalPageToNote.
+      const result2 = await client.copyNotePageToPersonal("note/weird", "pg src");
+      const [url2] = fetchMock.mock.calls[1] as [string, RequestInit];
+      expect(url2).toBe(
+        "https://api.test.example.com/api/notes/note%2Fweird/pages/pg%20src/copy-to-personal",
+      );
+      expect(result2.created).toBe(true);
     });
   });
 });

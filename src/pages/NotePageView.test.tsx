@@ -172,4 +172,61 @@ describe("NotePageView", () => {
     expect(screen.getByTestId("content-with-ai-chat")).toBeInTheDocument();
     expect(screen.getByTestId("page-editor")).toBeInTheDocument();
   });
+
+  it("shows copy-to-personal action for note-native pages (issue #713 Phase 3)", () => {
+    // `page.noteId === noteId` → ノートネイティブ。サインイン済みなら「個人に取り込み」
+    // を出す。ここでは "copyToPersonal" の翻訳キーがそのまま表示されるので
+    // （i18next mock が提供されていない）、キー文字列が DOM にあるかを確認する。
+    // A note-native page (`page.noteId === noteId`) surfaces the menu item for
+    // signed-in viewers. The i18n mock passes the key through, so we assert on
+    // the raw key appearing in the DOM. Issue #713 Phase 3.
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Note-native",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1", // note-native: scope matches current note
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    expect(screen.getByText("notes.copyToPersonal")).toBeInTheDocument();
+  });
+
+  it("hides copy-to-personal action for linked personal pages (Codex P2)", () => {
+    // `page.noteId === null` はノートにリンクされている個人ページ。サーバーは
+    // copy-to-personal を 400 で弾くため、UI からは出さない。
+    // A linked personal page (`page.noteId === null`) would be rejected by the
+    // server (`Page does not belong to this note`), so hide the UI entry to
+    // avoid a guaranteed-fail click. Codex P2.
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Linked personal",
+        content: "{}",
+        ownerUserId: "user-1",
+        noteId: null, // linked personal page
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    expect(screen.queryByText("notes.copyToPersonal")).not.toBeInTheDocument();
+  });
 });

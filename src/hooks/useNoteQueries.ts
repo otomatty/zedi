@@ -9,7 +9,7 @@ import type {
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
-import { pageKeys } from "@/hooks/usePageQueries";
+import { pageKeys, useRepository } from "@/hooks/usePageQueries";
 
 /** Page in a note with who added it (for canDeletePage). */
 export type NotePageSummary = PageSummary & { addedByUserId: string };
@@ -130,14 +130,14 @@ function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
   return {
     id: p.id,
     ownerUserId: p.owner_id,
-    // GET /api/notes/:id は現状 `note_id` を返さない（Phase 1 対象外）。
-    // ノート画面で消費されるため personal /home フィルタには影響しないが、
-    // note-native か個人ページかの厳密区別が必要になる Phase 3 でサーバー
-    // レスポンスを拡張する。Issue #713。
-    // GET /api/notes/:id does not surface `note_id` yet; this consumer is the
-    // note view, so personal /home filtering is unaffected. Phase 3 will
-    // extend the server response when the distinction is needed. Issue #713.
-    noteId: null,
+    // Phase 3 でサーバー側が `note_id` を返すようになった（issue #713）。
+    // `null` ならこのノートにリンクされているだけの個人ページ、値ありなら
+    // ノートネイティブ。note-native 限定の UI（「個人に取り込み」など）は
+    // これを見て出し分ける。
+    // Phase 3 surfaced `note_id` on the server (issue #713). `null` means a
+    // linked personal page; a non-null value means a note-native page.
+    // Note-native-only UI (e.g. "copy to personal") gates on this.
+    noteId: p.note_id ?? null,
     title: p.title ?? "",
     contentPreview: p.content_preview ?? undefined,
     thumbnailUrl: p.thumbnail_url ?? undefined,
@@ -472,18 +472,39 @@ export function useCopyPersonalPageToNote() {
  */
 export function useCopyNotePageToPersonal() {
   const { api, userId } = useNoteApi();
+  const { getRepository } = useRepository();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ noteId, sourcePageId }: { noteId: string; sourcePageId: string }) => {
-      return api.copyNotePageToPersonal(noteId, sourcePageId);
+      const result = await api.copyNotePageToPersonal(noteId, sourcePageId);
+      // Codex P1 対応: `/home` は IndexedDB を直接読む（React Query の裏に adapter
+      // がいる）ので、単にキャッシュ無効化しても新ページは現れない。サーバーが
+      // 返した `result.page`（SyncPageItem）を IDB に書き戻しておき、続く
+      // invalidate で取り直しに来たとき即座に表示できるようにする。失敗は
+      // non-fatal（次回 sync で確実に拾われる）。
+      // `/home` reads directly from IndexedDB via the storage adapter, so
+      // invalidating React Query alone wouldn't surface the new page — the
+      // refetch would just re-read stale IDB. Write the server response
+      // through to IDB first so invalidation yields the newly inserted row.
+      // A write-through failure is non-fatal: the next sync will still catch
+      // the new row up to IDB. (Issue #713 Phase 3, Codex P1.)
+      try {
+        const repo = await getRepository();
+        await repo.importPersonalPageFromApi(result.page);
+      } catch (error) {
+        console.warn(
+          "[useCopyNotePageToPersonal] Failed to write copied page to IndexedDB:",
+          error,
+        );
+      }
+      return result;
     },
     onSuccess: () => {
-      // 新しい個人ページが `/home` のグリッドに現れるよう、ページ一覧系キャッシュを
-      // すべて無効化する。IndexedDB 経由の sync 呼び出しは別途 `syncWithApi` が
-      // 拾う（次回 sync で新ページを pull する）。
-      // Invalidate personal-page caches so the copy appears on `/home`. The
-      // IndexedDB mirror picks up the new row on the next `syncWithApi` pull.
+      // 書き戻しが終わってから無効化するので、`usePagesSummary` などの再取得で
+      // 新ページが確実に並ぶ（ネットワーク状況に依存しない即時反映）。
+      // We invalidate after the write-through, so any refetch from
+      // `usePagesSummary` etc. picks up the new row deterministically.
       if (userId) {
         queryClient.invalidateQueries({ queryKey: pageKeys.list(userId) });
         queryClient.invalidateQueries({ queryKey: pageKeys.summary(userId) });

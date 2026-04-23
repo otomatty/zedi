@@ -7,11 +7,41 @@
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
 import type { PageMetadata } from "@/lib/storageAdapter/types";
 import type { ApiClient } from "@/lib/api/apiClient";
+import type { SyncPageItem } from "@/lib/api/types";
 import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
 import type { CreatePageOptions } from "@/lib/pageRepository";
 import { getPageListPreview, extractPlainText } from "@/lib/contentUtils";
 
 const LOCAL_USER_ID = "local-user";
+
+/**
+ * サーバー API の `SyncPageItem` 形のページ行を、ローカル `PageMetadata` に
+ * 変換する。作成系 API（`POST /api/pages` / `copy-*`）の成功後に IndexedDB へ
+ * 即時書き戻すための共通化。`sync/syncWithApi.ts` の `syncPageToMetadata` と
+ * 意味を揃えつつ、こちらはリポジトリ層の write-through 用途なので別物として
+ * ローカルに持つ（呼び出し箇所もスコープも違う）。
+ *
+ * Convert a server-side `SyncPageItem` row into the local `PageMetadata`
+ * shape. Used by creation / copy endpoints to write the new page through to
+ * IndexedDB immediately. Mirrors `syncPageToMetadata` in `sync/syncWithApi.ts`
+ * in intent; kept separate because its caller and scope differ
+ * (per-request write-through vs. batch pull).
+ */
+function syncPageItemToMetadata(row: SyncPageItem): PageMetadata {
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    noteId: row.note_id ?? null,
+    sourcePageId: row.source_page_id ?? null,
+    title: row.title ?? null,
+    contentPreview: row.content_preview ?? null,
+    thumbnailUrl: row.thumbnail_url ?? null,
+    sourceUrl: row.source_url ?? null,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+    isDeleted: row.is_deleted === true,
+  };
+}
 
 function metadataToPage(m: PageMetadata): Page {
   return {
@@ -118,25 +148,27 @@ export class StorageAdapterPageRepository {
       source_url: options?.sourceUrl ?? undefined,
       thumbnail_url: options?.thumbnailUrl ?? undefined,
     });
-    const meta: PageMetadata = {
-      id: created.id,
-      ownerId: created.owner_id,
-      // POST /api/pages は個人ページしか作らないので `null`。サーバーが将来
-      // ノート所属を返すようになっても (`note_id` は SyncPageItem で optional)
-      // 値があればそのまま採用する。Issue #713。
-      // POST /api/pages only ever creates personal pages, so default to `null`.
-      // If the server ever surfaces `note_id` (it's optional on `SyncPageItem`)
-      // we honor it. Issue #713.
-      noteId: created.note_id ?? null,
-      sourcePageId: created.source_page_id ?? null,
-      title: created.title ?? null,
-      contentPreview: created.content_preview ?? null,
-      thumbnailUrl: created.thumbnail_url ?? null,
-      sourceUrl: created.source_url ?? null,
-      createdAt: new Date(created.created_at).getTime(),
-      updatedAt: new Date(created.updated_at).getTime(),
-      isDeleted: created.is_deleted === true,
-    };
+    const meta = syncPageItemToMetadata(created);
+    await this.adapter.upsertPage(meta);
+    return metadataToPage(meta);
+  }
+
+  /**
+   * サーバーから取得済みの個人ページ行（`SyncPageItem`）を、API 呼び出しなしで
+   * ローカル IndexedDB に書き戻す。「ノート → 個人に取り込み」など、サーバー側で
+   * 既に作成済みのページを `/home` へ即時反映させたい場合に使う。
+   * `note_id !== null` のノートネイティブページは個人 `/home` のスコープに入れない
+   * ため、呼び出し側で弾く（ここでは書き込みを行わず `null` を返す）。
+   *
+   * Write-through for a page row that was already created on the server.
+   * Used after "copy to personal" so the new personal page shows up on `/home`
+   * without a full sync. Note-native pages (`note_id !== null`) belong to a
+   * note, not the caller's personal `/home`, so they are rejected here (no
+   * IDB write; returns `null`). See issue #713 Phase 3.
+   */
+  async importPersonalPageFromApi(page: SyncPageItem): Promise<Page | null> {
+    if (page.note_id != null) return null;
+    const meta = syncPageItemToMetadata(page);
     await this.adapter.upsertPage(meta);
     return metadataToPage(meta);
   }

@@ -338,16 +338,20 @@ const NotePageView: React.FC = () => {
           <div className="flex items-center gap-2">
             {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
             {/*
-              ノートネイティブページに対するアクションメニュー。サインインしていれば
-              閲覧のみの相手（guest / viewer / ドメインアクセス）でも「個人に取り込み」で
-              自分の /home へコピーできる。元ページはノート側に残り、脱退後もコピーは
-              独立して生き残る（issue #713 Phase 3）。
-              Action menu for a note-native page. Any signed-in viewer (guest /
-              viewer / domain) can take a personal copy via "copy to personal":
-              the source stays in the note and the copy survives membership
-              changes. See issue #713 Phase 3.
+              「個人に取り込み」はノートネイティブページ (`page.noteId === noteId`) だけに出す。
+              このノートにリンクされているだけの個人ページ (`page.noteId === null`) は、
+              所有者ならすでに /home にあり、他メンバーにはサーバーがコピーを拒否する
+              （`Page does not belong to this note`）ため、メニューに出すと決め打ちで
+              失敗するアクションになる。両方の意味でリンク済みページでは出さない。
+              Issue #713 Phase 3 / Codex P2。
+
+              Gate "copy to personal" to note-native pages (`page.noteId === noteId`).
+              Linked personal pages (`page.noteId === null`) are already on the
+              owner's /home and, for other members, the server rejects the copy
+              (`Page does not belong to this note`). Showing the action for them
+              is a guaranteed-fail path, so hide it. Issue #713 Phase 3 / Codex P2.
             */}
-            {isSignedIn && (
+            {isSignedIn && page.noteId === noteId && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

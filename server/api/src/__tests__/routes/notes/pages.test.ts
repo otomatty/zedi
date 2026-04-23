@@ -306,6 +306,8 @@ describe("POST /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 P
 
   it("should copy a personal page into the note as a note-native page with sourcePageId set", async () => {
     const mockNote = createMockNote();
+    const createdAt = new Date("2026-04-23T00:00:00Z");
+    const updatedAt = new Date("2026-04-23T00:00:01Z");
     const { app, chains } = createTestApp([
       [mockNote], // getNoteRole → owner
       [
@@ -319,7 +321,21 @@ describe("POST /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 P
           sourceUrl: "https://example.com/src",
         },
       ], // source page lookup
-      [{ id: "pg-copy-001" }], // insert pages → returning
+      [
+        {
+          id: "pg-copy-001",
+          ownerId: TEST_USER_ID,
+          noteId: NOTE_ID,
+          sourcePageId: SOURCE_PAGE_ID,
+          title: "Source Title",
+          contentPreview: "preview",
+          thumbnailUrl: "https://example.com/thumb.png",
+          sourceUrl: "https://example.com/src",
+          createdAt,
+          updatedAt,
+          isDeleted: false,
+        },
+      ], // insert pages → returning (full row, used in response payload)
       [{ ydocState: Buffer.from([1, 2, 3]), contentText: "body text" }], // source page_contents lookup
       [], // insert page_contents for new page
       [{ max: 4 }], // maxOrder notePages
@@ -337,7 +353,20 @@ describe("POST /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 P
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body).toEqual({ created: true, page_id: "pg-copy-001", sort_order: 5 });
+    expect(body).toMatchObject({ created: true, page_id: "pg-copy-001", sort_order: 5 });
+    // レスポンスにはクライアントが IDB に書き戻せる完全な新ページ行を含める
+    // (issue #713 Phase 3 / Codex P1)。note_id は destination ノートを指す。
+    // The response carries the full new page row so clients can write through
+    // to IDB without a follow-up round trip. Issue #713 Phase 3 / Codex P1.
+    expect(body).toHaveProperty("page");
+    expect(body.page).toMatchObject({
+      id: "pg-copy-001",
+      owner_id: TEST_USER_ID,
+      note_id: NOTE_ID,
+      source_page_id: SOURCE_PAGE_ID,
+      title: "Source Title",
+      is_deleted: false,
+    });
 
     // コピーされた pages 行は destination ノート下のノートネイティブページで、
     // `sourcePageId` が出自を指す。`noteId = NULL` のまま個人ホームに漏れない。
@@ -382,7 +411,21 @@ describe("POST /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 P
           sourceUrl: null,
         },
       ], // source page
-      [{ id: "pg-copy-empty" }], // insert pages
+      [
+        {
+          id: "pg-copy-empty",
+          ownerId: TEST_USER_ID,
+          noteId: NOTE_ID,
+          sourcePageId: SOURCE_PAGE_ID,
+          title: "Empty Page",
+          contentPreview: null,
+          thumbnailUrl: null,
+          sourceUrl: null,
+          createdAt: new Date("2026-04-23T00:00:00Z"),
+          updatedAt: new Date("2026-04-23T00:00:00Z"),
+          isDeleted: false,
+        },
+      ], // insert pages → returning (full row)
       [], // source page_contents lookup → empty
       [{ max: 0 }], // maxOrder
       [], // insert notePages
@@ -493,6 +536,8 @@ describe("POST /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Pha
 
   it("should copy a note-native page into the caller's personal pages (noteId = NULL, sourcePageId set)", async () => {
     const mockNote = createMockNote();
+    const createdAt = new Date("2026-04-23T00:00:00Z");
+    const updatedAt = new Date("2026-04-23T00:00:01Z");
     const { app, chains } = createTestApp([
       [mockNote], // getNoteRole → owner of the note
       [
@@ -505,7 +550,21 @@ describe("POST /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Pha
           sourceUrl: null,
         },
       ], // source page
-      [{ id: "pg-personal-copy" }], // insert pages
+      [
+        {
+          id: "pg-personal-copy",
+          ownerId: TEST_USER_ID,
+          noteId: null,
+          sourcePageId: NOTE_PAGE_ID,
+          title: "Shared Note Page",
+          contentPreview: "snippet",
+          thumbnailUrl: null,
+          sourceUrl: null,
+          createdAt,
+          updatedAt,
+          isDeleted: false,
+        },
+      ], // insert pages → returning (full row, used in response payload)
       [{ ydocState: Buffer.from([9, 9]), contentText: "note body" }], // source page_contents
       [], // insert page_contents for new page
     ]);
@@ -517,12 +576,25 @@ describe("POST /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Pha
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body).toEqual({ created: true, page_id: "pg-personal-copy" });
+    expect(body).toMatchObject({ created: true, page_id: "pg-personal-copy" });
+    // レスポンスに完全な新ページ行が含まれ、クライアントは IDB に書き戻せる
+    // (issue #713 Phase 3 / Codex P1)。個人ページなので note_id は null。
+    // The full new page row is carried so the client can write it through to
+    // IDB immediately. Issue #713 Phase 3 / Codex P1. Personal page → note_id is null.
+    expect(body.page).toMatchObject({
+      id: "pg-personal-copy",
+      owner_id: TEST_USER_ID,
+      note_id: null,
+      source_page_id: NOTE_PAGE_ID,
+      title: "Shared Note Page",
+      content_preview: "snippet",
+      is_deleted: false,
+    });
 
-    // 個人ページとして作成されるため `noteId` は未設定（DB デフォルト NULL）で、
+    // 個人ページとして作成されるため `noteId` は明示的に `null`（個人スコープ）で、
     // `sourcePageId` に出自のノートネイティブページ ID が入る。
-    // Creates a personal page: `noteId` is absent (DB default NULL), with
-    // `sourcePageId` pointing back to the source note-native page.
+    // Creates a personal page: `noteId` is explicitly `null` (personal scope),
+    // with `sourcePageId` pointing back to the source note-native page.
     const insertCalls = chains.filter((c) => c.startMethod === "insert");
     const pagesInsert = insertCalls[0];
     const pagesValues = pagesInsert?.ops.find((op) => op.method === "values");
@@ -533,8 +605,8 @@ describe("POST /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Pha
       title: "Shared Note Page",
       contentPreview: "snippet",
     });
-    // `noteId` must not be set for personal pages.
-    expect(values.noteId).toBeUndefined();
+    // `noteId` must be null for personal pages (`note_id IS NULL` filter relies on this).
+    expect(values.noteId).toBeNull();
 
     // 個人ページはノートリストに入らないので `notePages` / `notes.updatedAt` は触らない。
     // Personal copies do not join the note list, so no notePages/notes update.
@@ -612,7 +684,21 @@ describe("POST /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Pha
           sourceUrl: null,
         },
       ], // source page lookup inside tx
-      [{ id: "pg-guest-copy" }], // insert pages
+      [
+        {
+          id: "pg-guest-copy",
+          ownerId: TEST_USER_ID,
+          noteId: null,
+          sourcePageId: NOTE_PAGE_ID,
+          title: "Public Page",
+          contentPreview: null,
+          thumbnailUrl: null,
+          sourceUrl: null,
+          createdAt: new Date("2026-04-23T00:00:00Z"),
+          updatedAt: new Date("2026-04-23T00:00:00Z"),
+          isDeleted: false,
+        },
+      ], // insert pages → returning (full row)
       [], // source page_contents lookup → empty
     ]);
 

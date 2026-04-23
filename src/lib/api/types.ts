@@ -116,26 +116,34 @@ export type CreatePageResponse = SyncPageItem;
 /**
  * `POST /api/notes/:noteId/pages/copy-from-personal/:pageId` のレスポンス。
  * 個人ページを元にノートネイティブページを新規作成した結果を返す。
+ * `page` には新ページの完全な行情報（`note_id` 含む）を含めるので、クライアント
+ * はノート詳細の再取得なしに即座に UI を反映できる。
  *
  * Response from `POST /api/notes/:noteId/pages/copy-from-personal/:pageId`.
- * Returns the newly-created note-native page derived from a personal page.
+ * Returns the newly-created note-native page plus the full row (including
+ * `note_id`) so clients can update caches without refetching the note detail.
  */
 export interface CopyPersonalPageToNoteResponse {
   created: true;
   page_id: string;
   sort_order: number;
+  page: SyncPageItem;
 }
 
 /**
  * `POST /api/notes/:noteId/pages/:pageId/copy-to-personal` のレスポンス。
- * ノートネイティブページから作成された個人ページの ID を返す。
+ * ノートネイティブページから作成された個人ページの完全な行情報を返す。
+ * クライアントはこれを使って IndexedDB / zustand の個人ページストアへ
+ * 書き戻し、`/home` に即反映できる (issue #713 Phase 3 / Codex P1)。
  *
  * Response from `POST /api/notes/:noteId/pages/:pageId/copy-to-personal`.
- * Returns the personal page ID that was copied from the note-native page.
+ * Returns the full new personal page row so the client can write it through
+ * to IndexedDB / zustand and show it on `/home` without a full sync.
  */
 export interface CopyNotePageToPersonalResponse {
   created: true;
   page_id: string;
+  page: SyncPageItem;
 }
 
 /** GET /api/search?q=&scope=shared response. */
@@ -210,6 +218,18 @@ export interface GetNoteResponse {
   pages: Array<{
     id: string;
     owner_id: string;
+    /**
+     * ページのスコープ。`null` ならこのノートに「リンク」されているだけの個人
+     * ページ（所有者の /home にも現れる）、値ありならこのノートに所属する
+     * ノートネイティブページ。クライアントはこれを見て note-native 限定の
+     * アクション（例: 「個人に取り込み」）を出し分ける。Issue #713 Phase 3。
+     *
+     * Page scope. `null` → a linked personal page (also visible on the
+     * owner's /home). A non-null value → a note-native page owned by this
+     * note. Clients gate note-native-only actions such as "copy to personal"
+     * on this. See issue #713 Phase 3.
+     */
+    note_id: string | null;
     source_page_id: string | null;
     title: string | null;
     content_preview: string | null;

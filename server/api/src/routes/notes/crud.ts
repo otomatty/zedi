@@ -304,6 +304,7 @@ app.get("/:noteId", authOptional, async (c) => {
     .select({
       id: pages.id,
       ownerId: pages.ownerId,
+      noteId: pages.noteId,
       sourcePageId: pages.sourcePageId,
       title: pages.title,
       contentPreview: pages.contentPreview,
@@ -330,6 +331,13 @@ app.get("/:noteId", authOptional, async (c) => {
       (p): NotePageApiItem => ({
         id: p.id,
         owner_id: p.ownerId,
+        // `note_id` は「リンクされた個人ページ」か「ノートネイティブページ」かを
+        // 区別する。note-native だけに有効なアクション（例: 「個人に取り込み」）
+        // をクライアント側で出し分けるため、Phase 3 から明示的に返す。
+        // Surface `note_id` so clients can distinguish linked personal pages
+        // (null) from note-native pages (non-null). Phase 3 needs this to gate
+        // note-native-only actions such as "copy to personal".
+        note_id: p.noteId,
         source_page_id: p.sourcePageId,
         title: p.title,
         content_preview: p.contentPreview,
