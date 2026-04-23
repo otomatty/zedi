@@ -1,16 +1,28 @@
 import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
 import { Editor } from "@tiptap/core";
-import { usePageStore } from "@/stores/pageStore";
 import { cn } from "@zedi/ui";
 import { FileText, Plus } from "lucide-react";
 
 /**
- *
+ * WikiLink サジェストに表示する 1 アイテム。`exists=true` は既存ページ、
+ * `exists=false` は「このタイトルで新規作成」オプションを示す。
+ * One item rendered in the WikiLink suggestion dropdown; `exists=false` marks
+ * the "create new" option.
  */
 export interface SuggestionItem {
   id: string;
   title: string;
   exists: boolean;
+}
+
+/**
+ * `WikiLinkSuggestion` が候補リストの組み立てに使う最小ページ情報。
+ * Minimal page shape consumed by `WikiLinkSuggestion`.
+ */
+export interface WikiLinkSuggestionPage {
+  id: string;
+  title: string;
+  isDeleted?: boolean;
 }
 
 interface WikiLinkSuggestionProps {
@@ -19,6 +31,16 @@ interface WikiLinkSuggestionProps {
   range: { from: number; to: number };
   onSelect: (item: SuggestionItem) => void;
   onClose: () => void;
+  /**
+   * サジェスト候補として渡されるページ一覧。呼び出し側で WikiLink のスコープ
+   * （個人ページ / 同じノート内のページ）に合わせて絞り込んで渡す。
+   * Issue #713 Phase 4。
+   *
+   * Candidate pages supplied by the caller. The caller is responsible for
+   * scoping (personal-only vs. same-note) so this component can stay a pure
+   * presentation layer. See issue #713 Phase 4.
+   */
+  pages: WikiLinkSuggestionPage[];
 }
 
 /**
@@ -32,15 +54,11 @@ export /**
  *
  */
 const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
-  ({ query, onSelect, onClose }, ref) => {
+  ({ query, onSelect, onClose, pages }, ref) => {
     /**
      *
      */
     const [selectedIndex, setSelectedIndex] = useState(0);
-    /**
-     *
-     */
-    const { pages } = usePageStore();
 
     // Get matching pages
     /**

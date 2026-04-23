@@ -138,6 +138,7 @@ export function useTiptapEditorController({
   isWikiGenerating = false,
   wikiContentForCollab,
   onWikiContentApplied,
+  pageNoteId = null,
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
   const noteWorkspace = useNoteWorkspaceOptional();
@@ -152,7 +153,7 @@ export function useTiptapEditorController({
     pendingCreatePageTitle,
     handleConfirmCreate,
     handleCancelCreate,
-  } = useWikiLinkNavigation();
+  } = useWikiLinkNavigation({ pageNoteId });
   const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
   const {
     storageSettings,
@@ -265,5 +266,6 @@ export function useTiptapEditorController({
     onSlashAgentBusyChange: setSlashAgentBusy,
     claudeWorkspaceRoot: noteWorkspace?.workspaceRoot ?? null,
     claudeWorkspaceNoteId: noteWorkspace?.noteId ?? null,
+    pageNoteId,
   };
 }

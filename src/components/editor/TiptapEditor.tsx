@@ -43,6 +43,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   isWikiGenerating = false,
   wikiContentForCollab,
   onWikiContentApplied,
+  pageNoteId = null,
 }) => {
   const { t } = useTranslation();
   const {
@@ -83,6 +84,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     onSlashAgentBusyChange,
     claudeWorkspaceRoot,
     claudeWorkspaceNoteId,
+    pageNoteId: resolvedPageNoteId,
   } = useTiptapEditorController({
     content,
     onChange,
@@ -100,6 +102,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     isWikiGenerating,
     wikiContentForCollab,
     onWikiContentApplied,
+    pageNoteId,
   });
 
   return (
@@ -142,6 +145,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         suggestionRef={suggestionRef}
         onSelect={handleSuggestionSelect}
         onClose={handleSuggestionClose}
+        pageNoteId={resolvedPageNoteId}
       />
       <WikiLinkHoverCardLayer
         editor={editor}
