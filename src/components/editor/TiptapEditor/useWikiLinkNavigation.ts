@@ -148,11 +148,16 @@ export function useWikiLinkNavigation(
 
       if (foundPage) {
         // 既存ページが見つかった場合はそのページに移動。ノートスコープ時は
-        // ノート URL へ、個人スコープ時は従来どおり `/pages/:id` へ遷移する。
-        // Existing page: route to `/notes/:noteId/pages/:id` under a note
-        // scope, otherwise to `/pages/:id`.
+        // 短縮形の `/notes/:noteId/:pageId`（App.tsx の canonical ルート）に
+        // 直接遷移して、旧パス `/notes/:noteId/pages/:pageId` のリダイレクトを
+        // 踏まないようにする。個人スコープ時は従来どおり `/pages/:id`。
+        //
+        // Existing page: route to `/notes/:noteId/:pageId` (the canonical
+        // note page route defined in `App.tsx`) to avoid the legacy
+        // `/notes/:noteId/pages/:pageId` redirect hop. Personal scope uses
+        // `/pages/:id` as before.
         const target = pageNoteId
-          ? `/notes/${pageNoteId}/pages/${foundPage.id}`
+          ? `/notes/${pageNoteId}/${foundPage.id}`
           : `/pages/${foundPage.id}`;
         navigate(target, { replace: false, flushSync: true });
       } else {

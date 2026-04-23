@@ -247,7 +247,10 @@ describe("useWikiLinkNavigation", () => {
       });
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith(`/notes/${noteId}/pages/note-page-1`, {
+        // 旧パス `/notes/:noteId/pages/:pageId` はリダイレクト用に残って
+        // いるが、canonical ルート（App.tsx）は `/notes/:noteId/:pageId`。
+        // Use the canonical short route to avoid the legacy redirect hop.
+        expect(mockNavigate).toHaveBeenCalledWith(`/notes/${noteId}/note-page-1`, {
           replace: false,
           flushSync: true,
         });

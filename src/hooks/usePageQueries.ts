@@ -809,6 +809,10 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
       // リンク追跡は未整備（backend 側の管轄）のため、v1 では個人ゴーストのみ
       // を参照する。Note-scope ghost links are handled by the server for now;
       // only personal ghost links contribute to `referencedTitles` in v1.
+      // TODO(issue #713 Phase 5+): クライアント側でもノートスコープのゴースト
+      // リンクを扱えるようにする（検索・MCP の整備と合わせて別 issue で対応）。
+      // TODO(issue #713 Phase 5+): surface note-scope ghost links on the
+      // client (tracked with the search / MCP scoping work in a follow-up).
       const ghostLinks = pageNoteId === null ? await repo.getGhostLinks(userId) : [];
       const referencedTitles = new Set<string>();
 
