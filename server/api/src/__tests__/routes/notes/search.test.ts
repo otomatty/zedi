@@ -271,18 +271,22 @@ describe("GET /api/notes/:noteId/search", () => {
   });
 
   it("truncates fractional limits to an integer before clamping", async () => {
-    // 小数（`?limit=1.5`）がバインドされると Postgres の LIMIT は整数必須で
+    // 小数（`?limit=99.7`）がバインドされると Postgres の LIMIT は整数必須で
     // クエリが落ちる可能性がある。`Math.trunc` で整数化してから範囲に収める。
+    // 既定値 20 への安易なフォールバックにすり替わっても検出できるよう、
+    // 結果側に truncate 後の値 (99) が確かに出ていることまで検証する。
     //
     // Postgres `LIMIT` requires an integer, so a fractional value could error
     // out at the DB layer. Truncate before clamping to keep it a safe integer.
+    // Positively assert the truncated value (99) lands in the query so a
+    // silent fallback to the default 20 would be caught.
     const mockNote = createMockNote();
     const { app, chains } = createTestApp([
       [mockNote], // getNoteRole → owner
       { rows: [] }, // execute search
     ]);
 
-    const res = await app.request(`/api/notes/${NOTE_ID}/search?q=hello&limit=1.9`, {
+    const res = await app.request(`/api/notes/${NOTE_ID}/search?q=hello&limit=99.7`, {
       method: "GET",
       headers: authHeaders(),
     });
@@ -290,7 +294,13 @@ describe("GET /api/notes/:noteId/search", () => {
     expect(res.status).toBe(200);
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).not.toContain("1.9");
+    // 小数部は破棄され、整数の 99 が LIMIT に渡る。
+    // Fractional part is dropped; integer 99 lands in LIMIT.
+    expect(serialised).toContain("99");
+    expect(serialised).not.toContain("99.7");
+    // 既定値 20 へのフォールバックになっていないことも併せて確認する。
+    // Also assert no silent fallback to the default 20.
+    expect(serialised).not.toContain("20");
   });
 
   it("passes noteId into the WHERE clause so the scope cannot be bypassed", async () => {
