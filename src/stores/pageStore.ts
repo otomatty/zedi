@@ -196,6 +196,29 @@ export const usePageStore = create<PageStore>()(
     }),
     {
       name: "zedi-pages",
+      // v2: `Page.noteId` (Issue #713 / Phase 2) を必須化したため、v1 で
+      // localStorage に保存された `noteId` 未設定のページを `null` に寄せる。
+      // これをしないと deserialize 後 `page.noteId === undefined` となり、
+      // `noteId === null` を期待するコード（個人ページ判定）で取りこぼす。
+      //
+      // v2: persisted pages from v1 (pre-#713) lack `noteId`. Backfill them to
+      // `null` on load so the `Page` type contract (`noteId: string | null`)
+      // holds. Otherwise `page.noteId === undefined` would slip past any
+      // `noteId === null` check intended to identify personal pages.
+      version: 2,
+      migrate: (persistedState: unknown, version: number) => {
+        if (
+          version < 2 &&
+          persistedState &&
+          typeof persistedState === "object" &&
+          "pages" in persistedState &&
+          Array.isArray((persistedState as { pages: unknown }).pages)
+        ) {
+          const state = persistedState as { pages: Array<Record<string, unknown>> };
+          state.pages = state.pages.map((p) => ({ ...p, noteId: p.noteId ?? null }));
+        }
+        return persistedState;
+      },
     },
   ),
 );
