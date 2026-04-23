@@ -31,7 +31,9 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNotePage: vi.fn(),
   useCopyNotePageToPersonal: vi.fn(() => ({
-    mutateAsync: vi.fn().mockResolvedValue({ created: true, page_id: "pg-copy" }),
+    mutateAsync: vi
+      .fn()
+      .mockResolvedValue({ created: true, page_id: "pg-copy", localImported: true }),
     isPending: false,
   })),
   noteKeys: {

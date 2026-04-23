@@ -292,13 +292,22 @@ const NotePageView: React.FC = () => {
         noteId,
         sourcePageId: page.id,
       });
+      // サーバーへのコピーは成功だが、ローカル IDB への書き戻しが失敗/スキップ
+      // された場合は `localImported: false`。その状態で「開く」CTA を押すと
+      // `/pages/:id` は IDB を読むので空に着地してしまうため、成功トースト自体
+      // は出すが CTA は外して次回 sync まで待つ。
+      //
+      // If the server-side copy succeeded but the IndexedDB write-through did
+      // not (`localImported: false`), navigating `/pages/:id` would land on
+      // an empty read because the page grid reads IDB. Keep the success toast
+      // but drop the "Open" CTA; the next sync will reconcile `/home`.
       toast({
         title: t("notes.pageCopiedToPersonal"),
-        action: (
+        action: result.localImported ? (
           <Button size="sm" variant="ghost" onClick={() => navigate(`/pages/${result.page_id}`)}>
             {t("common.open", "開く")}
           </Button>
-        ),
+        ) : undefined,
       });
     } catch (error) {
       console.error("Failed to copy note page to personal:", error);

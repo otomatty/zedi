@@ -6,6 +6,7 @@ import type {
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
+  CopyNotePageToPersonalResponse,
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
@@ -476,33 +477,44 @@ export function useCopyNotePageToPersonal() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ noteId, sourcePageId }: { noteId: string; sourcePageId: string }) => {
+    mutationFn: async ({
+      noteId,
+      sourcePageId,
+    }: {
+      noteId: string;
+      sourcePageId: string;
+    }): Promise<CopyNotePageToPersonalResponse & { localImported: boolean }> => {
       const result = await api.copyNotePageToPersonal(noteId, sourcePageId);
       // Codex P1 対応: `/home` は IndexedDB を直接読む（React Query の裏に adapter
       // がいる）ので、単にキャッシュ無効化しても新ページは現れない。サーバーが
-      // 返した `result.page`（SyncPageItem）を IDB に書き戻しておき、続く
-      // invalidate で取り直しに来たとき即座に表示できるようにする。失敗は
-      // non-fatal（次回 sync で確実に拾われる）。
+      // 返した `result.page`（SyncPageItem）を IDB に書き戻し、その成否を
+      // `localImported` フラグで呼び出し側に返す。失敗は non-fatal（次回 sync で
+      // 拾われる）だが、呼び出し側が「いま開く」のような即時遷移 CTA を出すか
+      // どうかをこのフラグで切り替えられる。
+      //
       // `/home` reads directly from IndexedDB via the storage adapter, so
-      // invalidating React Query alone wouldn't surface the new page — the
-      // refetch would just re-read stale IDB. Write the server response
-      // through to IDB first so invalidation yields the newly inserted row.
-      // A write-through failure is non-fatal: the next sync will still catch
-      // the new row up to IDB. (Issue #713 Phase 3, Codex P1.)
+      // invalidating React Query alone would just re-read stale IDB. Write the
+      // server response through to IDB and report whether it stuck, so callers
+      // can gate an immediate-navigation CTA (e.g. toast "Open") on local
+      // success. A write-through miss is non-fatal — the next sync pass will
+      // still reconcile `/home` — but the UI should not promise an instant
+      // jump to a page the local store does not yet have.
+      // (Issue #713 Phase 3, Codex P1 / CodeRabbit follow-up.)
+      let localImported = false;
       try {
         const repo = await getRepository();
         const imported = await repo.importPersonalPageFromApi(result.page);
-        // `importPersonalPageFromApi` は個人ページ（`note_id: null`）以外を
-        // 防御的に拒否して `null` を返す。通常ルートでは copy-to-personal の
-        // サーバー応答は必ず個人ページなのでここを通らないが、契約ドリフト
-        // （例: サーバーが誤って `note_id` を埋めた）を早期に検知できるよう
-        // 警告を残す。成功パス扱いは維持する（`/home` は次回 sync で追随）。
-        // The defensive guard in `importPersonalPageFromApi` returns `null`
-        // for non-personal rows. In a healthy world the copy-to-personal
-        // response is always personal, so this is effectively a contract
-        // canary — log it loudly but do not fail the mutation (the next
-        // syncWithApi pass will reconcile `/home`).
-        if (!imported) {
+        if (imported) {
+          localImported = true;
+        } else {
+          // `importPersonalPageFromApi` は個人ページ（`note_id: null`）以外を
+          // 防御的に拒否して `null` を返す。通常ルートでは copy-to-personal の
+          // サーバー応答は必ず個人ページなのでここを通らないが、契約ドリフト
+          // （例: サーバーが誤って `note_id` を埋めた）を早期に検知できるよう
+          // 警告を残す。成功扱いは維持し、UI は `localImported` で分岐する。
+          //
+          // Defensive guard: the helper returns `null` for non-personal rows.
+          // In a healthy flow this never fires — logged as a contract canary.
           console.warn(
             "[useCopyNotePageToPersonal] Server returned a non-personal page; skipped IDB write-through:",
             result.page,
@@ -514,7 +526,7 @@ export function useCopyNotePageToPersonal() {
           error,
         );
       }
-      return result;
+      return { ...result, localImported };
     },
     onSuccess: () => {
       // 書き戻しが終わってから無効化するので、`usePagesSummary` などの再取得で
