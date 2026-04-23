@@ -12,6 +12,7 @@ import type {
 } from "@/types/aiChat";
 import type { PageContext } from "@/types/aiChat";
 import { useCreatePage, useUpdatePage, useSyncWikiLinks } from "@/hooks/usePageQueries";
+import { useNotePages } from "@/hooks/useNoteQueries";
 import {
   appendMarkdownToTiptapContent,
   buildSuggestedWikiLinksMarkdown,
@@ -55,10 +56,21 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
    *
    */
   const updatePageMutation = useUpdatePage();
-  /**
-   *
-   */
-  const { syncLinks } = useSyncWikiLinks();
+  // 編集対象ページが所属するノート（`pageContext.noteId`）に応じて WikiLink
+  // 同期のスコープを切り替える（Issue #713 Phase 4）。ノート内のページ一覧は
+  // `useNotePages` から取得し、`syncLinks` が同一ノート内のタイトルを正しく
+  // 解決できるようにする。`noteId` が空のときは fetch しない。
+  //
+  // Switch WikiLink sync scope based on the current page's owning note
+  // (`pageContext.noteId`, issue #713 Phase 4). The note's page list is
+  // fetched via `useNotePages` and fed into `useSyncWikiLinks` so same-note
+  // references resolve to real links instead of ghost entries.
+  const scopeNoteId = pageContext?.noteId ?? null;
+  const notePagesQuery = useNotePages(scopeNoteId ?? "", undefined, Boolean(scopeNoteId));
+  const { syncLinks } = useSyncWikiLinks({
+    pageNoteId: scopeNoteId,
+    notePages: scopeNoteId ? notePagesQuery.data : undefined,
+  });
 
   /**
    *

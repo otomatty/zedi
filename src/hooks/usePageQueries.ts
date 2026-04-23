@@ -678,15 +678,41 @@ export function usePromoteGhostLink() {
 }
 
 /**
+ * `useSyncWikiLinks` のオプション。WikiLink 同期のスコープを個人ページと
+ * ノートネイティブページで切り替える（Issue #713 Phase 4）。
+ *
+ * - `pageNoteId === null` / 省略: 個人スコープ。`repo.getPagesSummary()`
+ *   が返す個人ページのみを解決候補にする。
+ * - `pageNoteId !== null`: ノートスコープ。呼び出し側は同じノートに所属する
+ *   ページ一覧（`useNotePages` で取得）を `notePages` に渡す。
+ *
+ * Options for {@link useSyncWikiLinks}. Switches sync scope between personal
+ * and note-native pages. When `pageNoteId` is set, callers must supply
+ * `notePages` (typically from `useNotePages`) because the repository does
+ * not hold note-native page summaries locally. See issue #713 Phase 4.
+ */
+export type UseSyncWikiLinksOptions = {
+  pageNoteId?: string | null;
+  notePages?: Array<Pick<PageSummary, "id" | "title">>;
+};
+
+/**
  * Hook to sync WikiLinks when saving a page (delta update).
  * - Removes links/ghost_links that are no longer in content.
  * - Adds or updates links for current content (existing pages → links, others → ghost_links).
  *
  * Only touches the saved page; no full-scan of all pages.
  * OPTIMIZED: Uses getPagesSummary() for title↔id resolution (no content).
+ *
+ * `options.pageNoteId` を文字列で渡すとノートスコープで同期する。ノート内の
+ * ページ一覧 (`options.notePages`) を呼び出し側が用意する必要がある。
+ * 個人ページ（既定）では従来どおり `repo.getPagesSummary(userId)` を使う。
+ * Issue #713 Phase 4。
  */
-export function useSyncWikiLinks() {
+export function useSyncWikiLinks(options: UseSyncWikiLinksOptions = {}) {
   const { getRepository, userId } = useRepository();
+  const pageNoteId = options.pageNoteId ?? null;
+  const notePages = options.notePages;
 
   const syncLinks = useCallback(
     async (
@@ -694,9 +720,12 @@ export function useSyncWikiLinks() {
       wikiLinks: Array<{ title: string; exists: boolean }>,
     ): Promise<void> => {
       const repo = await getRepository();
-      await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks);
+      await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks, {
+        pageNoteId,
+        notePages,
+      });
     },
-    [getRepository, userId],
+    [getRepository, userId, pageNoteId, notePages],
   );
 
   return { syncLinks };

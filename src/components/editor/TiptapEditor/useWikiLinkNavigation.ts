@@ -99,7 +99,13 @@ export function useWikiLinkNavigation(
     }
     const normalized = linkTitleToFind.trim().toLowerCase();
     const list = notePagesQuery.data ?? [];
-    const found = list.find((p) => (p.title ?? "").trim().toLowerCase() === normalized);
+    // 削除済みページは候補から外す（個人スコープのフォールバックが
+    // `!p.isDeleted` を見ているので挙動を揃える。Issue #713 Phase 4）。
+    // Exclude deleted pages to match the personal fallback and avoid
+    // navigating to a tombstone instead of showing the create dialog.
+    const found = list.find(
+      (p) => !p.isDeleted && (p.title ?? "").trim().toLowerCase() === normalized,
+    );
     return {
       data: found ? { id: found.id, title: found.title } : null,
       isFetched: notePagesQuery.isFetched,

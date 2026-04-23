@@ -27,6 +27,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
 }));
 
 import { usePageByTitle } from "@/hooks/usePageQueries";
+import { useNotePages } from "@/hooks/useNoteQueries";
 
 describe("useWikiLinkNavigation", () => {
   beforeEach(() => {
@@ -205,5 +206,120 @@ describe("useWikiLinkNavigation", () => {
       });
     });
     expect(result.current.createPageDialogOpen).toBe(false);
+  });
+
+  // Issue #713 Phase 4: `pageNoteId` を指定したときは同一ノートのページを
+  // 解決候補にし、遷移先は `/notes/:noteId/pages/:id`。個人ページの検索
+  // (`usePageByTitle`) は呼ばれないため、ここではモック応答の有無にかかわらず
+  // 同一ノート内のマッチだけが採用される。
+  // Note-scoped branch (issue #713 Phase 4): navigation targets the note
+  // URL and personal lookups must not leak into the resolved page.
+  describe("ノートスコープ (pageNoteId 指定)", () => {
+    const noteId = "note-42";
+
+    it("同一ノート内のページにマッチしたら /notes/:noteId/pages/:id に遷移する", async () => {
+      vi.mocked(useNotePages).mockReturnValue({
+        data: [
+          {
+            id: "note-page-1",
+            ownerUserId: "user-1",
+            noteId,
+            title: "Note Page A",
+            contentPreview: undefined,
+            thumbnailUrl: undefined,
+            sourceUrl: undefined,
+            createdAt: 0,
+            updatedAt: 0,
+            isDeleted: false,
+            addedByUserId: "user-1",
+          },
+        ],
+        isFetched: true,
+        isLoading: false,
+      } as unknown as ReturnType<typeof useNotePages>);
+
+      const { result } = renderHook(() => useWikiLinkNavigation({ pageNoteId: noteId }), {
+        wrapper: createHookWrapper(),
+      });
+
+      act(() => {
+        result.current.handleLinkClick("Note Page A");
+      });
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith(`/notes/${noteId}/pages/note-page-1`, {
+          replace: false,
+          flushSync: true,
+        });
+      });
+      expect(result.current.createPageDialogOpen).toBe(false);
+    });
+
+    it("ノート内で一致しないタイトルをクリックするとダイアログを開き、handleConfirmCreate は新規作成 API を呼ばずに閉じる", async () => {
+      vi.mocked(useNotePages).mockReturnValue({
+        data: [],
+        isFetched: true,
+        isLoading: false,
+      } as unknown as ReturnType<typeof useNotePages>);
+
+      const { result } = renderHook(() => useWikiLinkNavigation({ pageNoteId: noteId }), {
+        wrapper: createHookWrapper(),
+      });
+
+      act(() => {
+        result.current.handleLinkClick("Nonexistent");
+      });
+
+      await waitFor(() => {
+        expect(result.current.createPageDialogOpen).toBe(true);
+        expect(result.current.pendingCreatePageTitle).toBe("Nonexistent");
+      });
+
+      await act(async () => {
+        await result.current.handleConfirmCreate();
+      });
+
+      // 個人用作成ミューテーションはノートスコープでは呼ばない（別フロー）。
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(result.current.createPageDialogOpen).toBe(false);
+      expect(result.current.pendingCreatePageTitle).toBe(null);
+    });
+
+    it("削除済みノートページと同一タイトルのクリックでは、ダイアログを開いて新規作成フローに入る", async () => {
+      vi.mocked(useNotePages).mockReturnValue({
+        data: [
+          {
+            id: "tombstone",
+            ownerUserId: "user-1",
+            noteId,
+            title: "Archived",
+            contentPreview: undefined,
+            thumbnailUrl: undefined,
+            sourceUrl: undefined,
+            createdAt: 0,
+            updatedAt: 0,
+            isDeleted: true,
+            addedByUserId: "user-1",
+          },
+        ],
+        isFetched: true,
+        isLoading: false,
+      } as unknown as ReturnType<typeof useNotePages>);
+
+      const { result } = renderHook(() => useWikiLinkNavigation({ pageNoteId: noteId }), {
+        wrapper: createHookWrapper(),
+      });
+
+      act(() => {
+        result.current.handleLinkClick("Archived");
+      });
+
+      await waitFor(() => {
+        expect(result.current.createPageDialogOpen).toBe(true);
+        expect(result.current.pendingCreatePageTitle).toBe("Archived");
+      });
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 });
