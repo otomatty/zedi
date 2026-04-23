@@ -1,6 +1,7 @@
 import { pgTable, uuid, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
+import { notes } from "./notes.js";
 
 /**
  * Special page kinds that stand apart from normal wiki entries.
@@ -26,6 +27,18 @@ export const pages = pgTable(
     ownerId: text("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * 所属ノート ID。NULL は個人ページ、値ありはそのノートに所属するノート
+     * ネイティブページ。ノートネイティブページは個人ホーム（`note_id IS NULL`
+     * フィルタ）には現れず、ノート削除時に `ON DELETE CASCADE` で一緒に消える。
+     * Issue #713 を参照。
+     *
+     * Owning note ID. NULL means a personal page; a non-null value identifies
+     * a note-native page that lives only inside that note. Personal-home
+     * queries filter on `note_id IS NULL`, and note deletion cascades to
+     * note-native pages. See issue #713.
+     */
+    noteId: uuid("note_id").references(() => notes.id, { onDelete: "cascade" }),
     sourcePageId: uuid("source_page_id"),
     title: text("title"),
     contentPreview: text("content_preview"),
@@ -56,6 +69,13 @@ export const pages = pgTable(
       .on(table.ownerId)
       .where(sql`NOT ${table.isDeleted}`),
     index("idx_pages_owner_special_kind").on(table.ownerId, table.specialKind),
+    /**
+     * Lookup of pages owned by a particular note (and an efficient predicate
+     * for "personal pages only" via `note_id IS NULL` / `IS NOT NULL`).
+     * 特定のノートに所属するページの引きと、`note_id IS NULL`/`IS NOT NULL` の
+     * 部分述語に効くインデックス。
+     */
+    index("idx_pages_note_id").on(table.noteId),
   ],
 );
 

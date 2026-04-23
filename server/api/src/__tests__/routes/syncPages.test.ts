@@ -47,8 +47,8 @@ describe("POST /api/sync/pages — IDOR protection", () => {
   it("skips link insertion when source_id is not owned by the user", async () => {
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const { app, chains } = createSyncApp([
-      // 1: page existence check
-      [{ id: OWNED_PAGE, updatedAt: oldDate, ownerId: TEST_USER_ID }],
+      // 1: bulk page fetch (LWW pre-load)
+      [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
       // 2: page update
       undefined,
       // 3: owned pages query for links
@@ -82,8 +82,8 @@ describe("POST /api/sync/pages — IDOR protection", () => {
   it("skips ghost_link insertion when source_page_id is not owned by the user", async () => {
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const { app, chains } = createSyncApp([
-      // 1: page existence check
-      [{ id: OWNED_PAGE, updatedAt: oldDate, ownerId: TEST_USER_ID }],
+      // 1: bulk page fetch (LWW pre-load)
+      [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
       // 2: page update
       undefined,
       // 3: owned pages query for ghost_links
@@ -112,11 +112,81 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     expect(insertChains.length).toBe(1);
   });
 
+  it("skips a page id that resolves to a note-native row on the server (issue #713)", async () => {
+    // クライアント側 IndexedDB が個人ページとして持っている ID と同じ ID が、
+    // サーバー側ではノートネイティブページ（`pages.note_id != null`）として
+    // 存在するケースの防御。`update` も `insert` も走らないことを検証する。
+    //
+    // Defensive case: a client tries to LWW-sync an id that on the server is a
+    // note-native page. Neither update nor insert should fire.
+    const oldDate = new Date("2024-01-01T00:00:00Z");
+    const { app, chains } = createSyncApp([
+      // 1: bulk fetch returns a note-native row for the requested id
+      [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: "some-note", updatedAt: oldDate }],
+    ]);
+
+    const res = await app.request("/api/sync/pages", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        pages: [{ id: OWNED_PAGE, title: "client copy", updated_at: "2025-06-01T00:00:00Z" }],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: { id: string; action: string }[] };
+    expect(body.results).toEqual([{ id: OWNED_PAGE, action: "skipped" }]);
+
+    expect(chains.filter((c) => c.startMethod === "insert")).toHaveLength(0);
+    expect(chains.filter((c) => c.startMethod === "update")).toHaveLength(0);
+  });
+
+  it("collapses duplicate page ids in body to a single insert with the latest updated_at (PR #714 review)", async () => {
+    // クライアントのリトライ等で同じ id が複数届いても、bulk-fetch スナップショット
+    // を信じてループに無加工で流すと、新規 id の 2 回目で再 insert → PK 衝突 (500) や
+    // 古い updated_at で順序逆転が起きる。dedupe + マップ更新で防ぐ。
+    //
+    // Duplicate ids in the payload must collapse to a single DML and pick the
+    // latest `updated_at`, otherwise we either crash on PK conflict or
+    // out-of-order LWW updates land on the row.
+    const { app, chains } = createSyncApp([
+      // 1: bulk fetch returns nothing (treat as new id)
+      [],
+      // 2: insert (the deduped occurrence)
+      undefined,
+    ]);
+
+    const res = await app.request("/api/sync/pages", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        pages: [
+          { id: OWNED_PAGE, title: "older", updated_at: "2025-06-01T00:00:00Z" },
+          { id: OWNED_PAGE, title: "newer", updated_at: "2025-06-02T00:00:00Z" },
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: { id: string; action: string }[] };
+    // 重複は畳み込まれるため、結果は 1 件のみ。
+    // Duplicates collapse: results contain a single entry.
+    expect(body.results).toEqual([{ id: OWNED_PAGE, action: "created" }]);
+
+    const insertChains = chains.filter((c) => c.startMethod === "insert");
+    expect(insertChains).toHaveLength(1);
+    // 最新の `updated_at` (= "newer") が採用されることを確認する。
+    // Newer payload (`title: "newer"`) wins via dedupe.
+    const valuesOp = (insertChains[0]?.ops ?? []).find((op) => op.method === "values");
+    const inserted = valuesOp?.args?.[0] as { title: string } | undefined;
+    expect(inserted?.title).toBe("newer");
+  });
+
   it("skips both links and ghost_links for non-owned pages in combined request", async () => {
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const { app, chains } = createSyncApp([
-      // 1: page existence check
-      [{ id: OWNED_PAGE, updatedAt: oldDate, ownerId: TEST_USER_ID }],
+      // 1: bulk page fetch (LWW pre-load)
+      [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
       // 2: page update
       undefined,
       // 3: owned pages query for links

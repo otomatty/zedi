@@ -12,7 +12,7 @@ import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { pages, pageContents, pageSnapshots, users } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
-import { assertPageViewAccess } from "../services/pageAccessService.js";
+import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
 import { pruneSnapshotsExceedingLimitSql } from "../services/snapshotService.js";
 
 const app = new Hono<AppEnv>();
@@ -174,13 +174,24 @@ app.get("/:id/snapshots/:snapshotId", authRequired, async (c) => {
 /**
  * POST /:id/snapshots/:snapshotId/restore
  *
- * スナップショットを復元する。復元はページオーナーのみが実行可能。
- * 共同編集者（ノートメンバー）には復元権限がない。これは意図的な仕様制限であり、
- * オーナーが明示的に承認した状態のみが復元されることを保証する。
+ * スナップショットを復元する。編集権限を持つユーザーのみが実行可能で、判定は
+ * 他のページ書き込み系エンドポイント（`PUT /api/pages/:id/content` など）と
+ * 同じく `assertPageEditAccess` に委譲する。
  *
- * Restore a snapshot. Only the page owner can perform a restore.
- * Note members (collaborators) are intentionally excluded from this operation
- * to ensure only owner-approved states are restored.
+ * - 個人ページ（`pages.note_id IS NULL`）: `pages.ownerId` 一致のみ
+ * - ノートネイティブページ（`pages.note_id IS NOT NULL`）: ノートロール +
+ *   `editPermission` の `canEdit` 評価（issue #713）。これにより、ノートを抜けた
+ *   元作成者が restore を継続できてしまう問題と、ノートオーナーが他メンバー作成
+ *   ページを restore できない問題の両方が解消される。
+ *
+ * Restore a snapshot. Edit permission is required and is now delegated to
+ * `assertPageEditAccess`, the same helper used by `PUT /api/pages/:id/content`.
+ *
+ * - Personal page (`pages.note_id IS NULL`): only the `pages.ownerId` user.
+ * - Note-native page (`pages.note_id IS NOT NULL`): the caller's note role
+ *   must satisfy `canEdit` against the note's `editPermission` (issue #713).
+ *   This both prevents removed members from continuing to restore and lets
+ *   note owners restore snapshots on pages created by other editors.
  *
  * **Collaboration / コラボレーション**: This endpoint acquires a DB row lock for `page_contents`
  * and then asks Hocuspocus to invalidate the live document after commit. Configure
@@ -194,16 +205,9 @@ app.post("/:id/snapshots/:snapshotId/restore", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  // 復元は編集権限が必要（所有者のみ） / Restore requires owner permission
-  const page = await db
-    .select({ id: pages.id, ownerId: pages.ownerId })
-    .from(pages)
-    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
-    .limit(1);
-
-  const pageRow = page[0];
-  if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
-  if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  // 編集権限チェック（個人ページは所有者のみ、ノートネイティブはノートロール経由）
+  // Edit-permission check (owner for personal pages, note-role aware for note-native).
+  await assertPageEditAccess(db, pageId, userId);
 
   // 復元対象のスナップショットを取得
   const snapRows = await db

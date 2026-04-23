@@ -158,6 +158,27 @@ describe("GET /api/pages", () => {
     expect(body.pages[0]).toMatchObject({ id: "page-shared" });
   });
 
+  it("scope=shared predicate also includes note-native pages owned by the caller via notes.owner_id", async () => {
+    const { app, chains } = createPagesAppWithChains([{ rows: [] }]);
+
+    const res = await app.request("/api/pages?scope=shared", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    // ノートオーナーは通常 note_members 行を持たないため、shared predicate に
+    // `notes.owner_id = userId` 経路を入れて listing と getNoteRole を整合させる
+    // （Issue #713 / PR #714 レビュー対応）。SQL チャンクから直接検証する。
+    // Verify the shared predicate contains the note-owner branch so listing
+    // matches `getNoteRole` for owners who lack a `note_members` row.
+    const executeChain = chains.find((chain) => chain.startMethod === "execute");
+    expect(executeChain).toBeDefined();
+    const serialised = JSON.stringify(executeChain?.startArgs);
+    expect(serialised).toContain("p.note_id IS NOT NULL");
+    expect(serialised).toContain("n.owner_id");
+  });
+
   it("returns 401 without auth header", async () => {
     const app = createPagesApp([{ rows: [] }]);
 
