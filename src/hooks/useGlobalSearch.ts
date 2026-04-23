@@ -123,7 +123,9 @@ export function useGlobalSearch() {
       const highlightedText = highlightKeywords(preview, keywords);
       return {
         pageId: r.id,
-        noteId: r.note_id,
+        // `note_id` は個人ページが混ざると null になり得るので undefined に正規化する。
+        // `note_id` may be null when personal pages are mixed into shared results.
+        noteId: r.note_id ?? undefined,
         title: r.title ?? "無題のページ",
         highlightedText: highlightedText || "（共有ノート）",
         matchType: "content" as MatchType,

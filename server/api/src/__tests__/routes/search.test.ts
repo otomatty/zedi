@@ -156,8 +156,24 @@ describe("GET /api/search", () => {
     expect(serialised).toContain("p.note_id");
   });
 
-  it("scope=own SELECT list also exposes p.note_id", async () => {
-    const { app, chains } = createSearchApp([{ rows: [] }]);
+  it("scope=own SELECT list exposes p.note_id and response surfaces note_id: null", async () => {
+    // SQL の SELECT に note_id が含まれること、かつ JSON ペイロード上も
+    // note_id (個人ページなので null) が露出することを併せて契約する。
+    // Pin both the SQL projection and the JSON payload contract: scope=own
+    // surfaces note_id (null for personal pages) on each result row.
+    const { app, chains } = createSearchApp([
+      {
+        rows: [
+          {
+            id: "page-own",
+            title: "Own page",
+            content_preview: null,
+            updated_at: new Date("2026-04-01T00:00:00Z").toISOString(),
+            note_id: null,
+          },
+        ],
+      },
+    ]);
 
     const res = await app.request("/api/search?q=hello&scope=own", {
       method: "GET",
@@ -165,6 +181,10 @@ describe("GET /api/search", () => {
     });
 
     expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<Record<string, unknown>> };
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0]).toHaveProperty("note_id", null);
+
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     const serialised = JSON.stringify(executeChain?.startArgs);
     expect(serialised).toContain("p.note_id");
