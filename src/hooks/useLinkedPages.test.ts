@@ -9,6 +9,7 @@ function createTestPage(id: string, title: string, content: string, options?: Pa
   return {
     id,
     ownerUserId: "test-user-id",
+    noteId: null,
     title,
     content,
     createdAt: now,
@@ -510,6 +511,7 @@ function createTestSummary(id: string, title: string, options?: Partial<PageSumm
   return {
     id,
     ownerUserId: "user-1",
+    noteId: null,
     title,
     contentPreview: undefined,
     thumbnailUrl: undefined,

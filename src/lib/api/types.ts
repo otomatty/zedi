@@ -12,11 +12,20 @@ export interface SyncPagesResponse {
 }
 
 /**
+ * `/api/sync/pages` etc. が返すページ行。`note_id` が `null` または未指定の場合は
+ * 個人ページ（issue #713）。GET `/api/sync/pages` は個人ページのみを返すため
+ * 実運用では常に `null` だが、新規エンドポイントでも同じ型を再利用できるよう
+ * 任意フィールドとして表現している。
  *
+ * Page row from `/api/sync/pages` and friends. `note_id` `null` or missing
+ * means a personal page (issue #713). GET `/api/sync/pages` only ever returns
+ * personal pages, but the field is optional so the same type can describe
+ * note-native rows from future endpoints.
  */
 export interface SyncPageItem {
   id: string;
   owner_id: string;
+  note_id?: string | null;
   source_page_id: string | null;
   title: string | null;
   content_preview: string | null;
@@ -28,7 +37,8 @@ export interface SyncPageItem {
 }
 
 /**
- *
+ * WikiLink グラフのリンク行。`/api/sync/pages` 応答内で使われる。
+ * Link row in the wiki-link graph, returned by `/api/sync/pages`.
  */
 export interface SyncLinkItem {
   source_id: string;
@@ -37,7 +47,8 @@ export interface SyncLinkItem {
 }
 
 /**
- *
+ * 未解決 WikiLink（ゴーストリンク）の行。`/api/sync/pages` で同期される。
+ * Ghost-link (unresolved WikiLink) row synced via `/api/sync/pages`.
  */
 export interface SyncGhostLinkItem {
   link_text: string;
@@ -140,7 +151,9 @@ export interface DiscoverResponse {
 }
 
 /**
- *
+ * `GET /api/notes/discover` のノート行。閲覧数・ページ数などの発見用メタ情報を含む。
+ * Row in the `/api/notes/discover` response, carrying discover-oriented
+ * metadata such as view count and page count.
  */
 export interface DiscoverNoteItem {
   id: string;

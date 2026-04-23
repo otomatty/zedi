@@ -27,7 +27,10 @@ const LOCAL_USER_ID = "local-user";
  */
 const initialSyncRequestedForUser = new Set<string>();
 
-// Query keys
+/**
+ * ページ系クエリ・ミューテーションが共有する React Query キー群。
+ * React Query key factory shared by page-related queries and mutations.
+ */
 export const pageKeys = {
   all: ["pages"] as const,
   lists: () => [...pageKeys.all, "list"] as const,
@@ -222,12 +225,17 @@ export function usePagesSummary() {
 }
 
 /**
- * Hook to fetch a single page by ID
+ * `usePage` のオプション。`enabled: false` でリクエストを抑止できる。
+ * Options for {@link usePage}; pass `enabled: false` to suppress the request.
  */
 type UsePageOptions = {
   enabled?: boolean;
 };
 
+/**
+ * ID 指定で単一ページを取得するフック。取得前は `data = undefined`。
+ * Hook that fetches a single page by ID; `data` is `undefined` until loaded.
+ */
 export function usePage(pageId: string, options?: UsePageOptions) {
   const { getRepository, userId, isLoaded } = useRepository();
   const isEnabled = (options?.enabled ?? true) && isLoaded && !!pageId;
@@ -348,6 +356,9 @@ export function useCreatePage() {
       const newSummary: PageSummary = {
         id: newPage.id,
         ownerUserId: newPage.ownerUserId,
+        // useCreatePage は個人ページ作成しか経由しないので常に `null`。Issue #713。
+        // useCreatePage only creates personal pages, so noteId is always null.
+        noteId: newPage.noteId,
         title: newPage.title,
         contentPreview: newPage.contentPreview,
         thumbnailUrl: newPage.thumbnailUrl,

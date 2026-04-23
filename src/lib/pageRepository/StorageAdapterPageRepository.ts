@@ -17,6 +17,7 @@ function metadataToPage(m: PageMetadata): Page {
   return {
     id: m.id,
     ownerUserId: m.ownerId,
+    noteId: m.noteId ?? null,
     title: m.title ?? "",
     content: "", // Y.Doc; load via adapter.getYDocState or API
     contentPreview: m.contentPreview ?? undefined,
@@ -32,6 +33,7 @@ function metadataToPageSummary(m: PageMetadata): PageSummary {
   return {
     id: m.id,
     ownerUserId: m.ownerId,
+    noteId: m.noteId ?? null,
     title: m.title ?? "",
     contentPreview: m.contentPreview ?? undefined,
     thumbnailUrl: m.thumbnailUrl ?? undefined,
@@ -42,12 +44,29 @@ function metadataToPageSummary(m: PageMetadata): PageSummary {
   };
 }
 
+/**
+ * ローカル IndexedDB (StorageAdapter) と REST API (ApiClient) を束ねる
+ * ページリポジトリ。ゲスト (`LOCAL_USER_ID`) は adapter のみを使い、
+ * 認証済みユーザーは adapter + API の両方を使って CRUD を行う。
+ *
+ * Page repository that bridges the local IndexedDB (StorageAdapter) with the
+ * REST API (ApiClient). Guest users (`LOCAL_USER_ID`) go through the adapter
+ * only, while authenticated users read/write via adapter + API.
+ */
 export class StorageAdapterPageRepository {
+  /**
+   * @param adapter ローカルストレージ実装 / local storage backend
+   * @param api REST API クライアント / REST API client
+   */
   constructor(
     private adapter: StorageAdapter,
     private api: ApiClient,
   ) {}
 
+  /**
+   * 新しいページを作成する。ゲストはローカルのみ、認証済みは API 経由で作成。
+   * Create a new page. Guest users stay local; authenticated users hit the API.
+   */
   async createPage(
     userId: string,
     title: string = "",
@@ -71,6 +90,9 @@ export class StorageAdapterPageRepository {
     const meta: PageMetadata = {
       id,
       ownerId: LOCAL_USER_ID,
+      // ローカル (ゲスト) で作るのは個人ページのみ。Issue #713。
+      // Local (guest) creation always produces a personal page. Issue #713.
+      noteId: null,
       sourcePageId: null,
       title: title || null,
       contentPreview: contentPreview || null,
@@ -99,6 +121,13 @@ export class StorageAdapterPageRepository {
     const meta: PageMetadata = {
       id: created.id,
       ownerId: created.owner_id,
+      // POST /api/pages は個人ページしか作らないので `null`。サーバーが将来
+      // ノート所属を返すようになっても (`note_id` は SyncPageItem で optional)
+      // 値があればそのまま採用する。Issue #713。
+      // POST /api/pages only ever creates personal pages, so default to `null`.
+      // If the server ever surfaces `note_id` (it's optional on `SyncPageItem`)
+      // we honor it. Issue #713.
+      noteId: created.note_id ?? null,
       sourcePageId: created.source_page_id ?? null,
       title: created.title ?? null,
       contentPreview: created.content_preview ?? null,
@@ -112,21 +141,37 @@ export class StorageAdapterPageRepository {
     return metadataToPage(meta);
   }
 
+  /**
+   * ID 指定で単一ページを取得する（論理削除済みは `null`）。
+   * Fetch a single page by ID; `null` if missing or soft-deleted.
+   */
   async getPage(_userId: string, pageId: string): Promise<Page | null> {
     const m = await this.adapter.getPage(pageId);
     return m ? metadataToPage(m) : null;
   }
 
+  /**
+   * ユーザーの個人ページ一覧を返す（ノートネイティブページは除外）。
+   * Return all personal pages for the user (note-native pages excluded).
+   */
   async getPages(_userId: string): Promise<Page[]> {
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPage);
   }
 
+  /**
+   * 一覧表示用の軽量ページサマリを返す（本文なし、個人ページのみ）。
+   * Return lightweight page summaries (no content, personal only) for listing.
+   */
   async getPagesSummary(_userId: string): Promise<PageSummary[]> {
     const list = await this.adapter.getAllPages();
     return list.map(metadataToPageSummary);
   }
 
+  /**
+   * 複数 ID のページをまとめて取得する。存在しない ID は結果に含まれない。
+   * Fetch multiple pages by ID; missing IDs are silently dropped.
+   */
   async getPagesByIds(_userId: string, pageIds: string[]): Promise<Page[]> {
     if (pageIds.length === 0) return [];
     const list = await this.adapter.getAllPages();
@@ -134,6 +179,10 @@ export class StorageAdapterPageRepository {
     return list.filter((m) => idSet.has(m.id)).map(metadataToPage);
   }
 
+  /**
+   * タイトル完全一致でページを 1 件検索する。
+   * Find one page by exact title match.
+   */
   async getPageByTitle(_userId: string, title: string): Promise<Page | null> {
     const trimmed = title.trim();
     if (!trimmed) return null;
@@ -142,6 +191,10 @@ export class StorageAdapterPageRepository {
     return m ? metadataToPage(m) : null;
   }
 
+  /**
+   * `excludePageId` 以外で同一タイトルのページが存在するか検査する。
+   * Return a page with the same title (excluding `excludePageId`), or `null`.
+   */
   async checkDuplicateTitle(
     _userId: string,
     title: string,
@@ -156,6 +209,12 @@ export class StorageAdapterPageRepository {
     return m ? metadataToPage(m) : null;
   }
 
+  /**
+   * ページメタデータ (title / content / thumbnail / sourceUrl) を更新し、
+   * 検索インデックスもタイトル・本文変更時は更新する。
+   *
+   * Update page metadata and refresh the search index when title/content change.
+   */
   async updatePage(
     _userId: string,
     pageId: string,
@@ -186,6 +245,10 @@ export class StorageAdapterPageRepository {
     }
   }
 
+  /**
+   * ページを論理削除する。認証済みユーザーは API 経由でも削除を通知。
+   * Soft-delete a page; authenticated users also notify the API.
+   */
   async deletePage(userId: string, pageId: string): Promise<void> {
     await this.adapter.deletePage(pageId);
     if (userId !== LOCAL_USER_ID) {
@@ -193,6 +256,10 @@ export class StorageAdapterPageRepository {
     }
   }
 
+  /**
+   * ローカルの検索インデックス越しにページを全文検索する。
+   * Full-text search over the local search index.
+   */
   async searchPages(_userId: string, query: string): Promise<Page[]> {
     const results = await this.adapter.searchPages(query);
     const pages: Page[] = [];
@@ -203,6 +270,10 @@ export class StorageAdapterPageRepository {
     return pages;
   }
 
+  /**
+   * 2 ページ間のリンクを追加する（重複追加はスキップ）。
+   * Add a link between two pages; duplicate inserts are a no-op.
+   */
   async addLink(sourceId: string, targetId: string): Promise<void> {
     const links = await this.adapter.getLinks(sourceId);
     const now = Date.now();
@@ -210,6 +281,10 @@ export class StorageAdapterPageRepository {
     await this.adapter.saveLinks(sourceId, [...links, { sourceId, targetId, createdAt: now }]);
   }
 
+  /**
+   * 2 ページ間のリンクを削除する。
+   * Remove a link between two pages.
+   */
   async removeLink(sourceId: string, targetId: string): Promise<void> {
     const links = await this.adapter.getLinks(sourceId);
     await this.adapter.saveLinks(
@@ -218,16 +293,28 @@ export class StorageAdapterPageRepository {
     );
   }
 
+  /**
+   * 指定ページから出ているリンクの target ID 一覧を返す。
+   * Return target IDs of outgoing links for a page.
+   */
   async getOutgoingLinks(pageId: string): Promise<string[]> {
     const links = await this.adapter.getLinks(pageId);
     return links.map((l) => l.targetId);
   }
 
+  /**
+   * 指定ページへの被リンク（バックリンク）の source ID 一覧を返す。
+   * Return source IDs of backlinks pointing at the page.
+   */
   async getBacklinks(pageId: string): Promise<string[]> {
     const links = await this.adapter.getBacklinks(pageId);
     return links.map((l) => l.sourceId);
   }
 
+  /**
+   * ユーザー配下の全ページに対する全リンクを集めて返す。
+   * Collect every link across all pages owned by the user.
+   */
   async getLinks(_userId: string): Promise<Link[]> {
     const pages = await this.adapter.getAllPages();
     const all: Link[] = [];
@@ -238,6 +325,10 @@ export class StorageAdapterPageRepository {
     return all;
   }
 
+  /**
+   * ゴーストリンク（未解決 WikiLink）を追加する。重複は無視。
+   * Add a ghost link (unresolved WikiLink); duplicates are ignored.
+   */
   async addGhostLink(linkText: string, sourcePageId: string): Promise<void> {
     const ghosts = await this.adapter.getGhostLinks(sourcePageId);
     const now = Date.now();
@@ -248,6 +339,10 @@ export class StorageAdapterPageRepository {
     ]);
   }
 
+  /**
+   * ゴーストリンクを削除する。
+   * Remove a ghost link from a source page.
+   */
   async removeGhostLink(linkText: string, sourcePageId: string): Promise<void> {
     const ghosts = await this.adapter.getGhostLinks(sourcePageId);
     await this.adapter.saveGhostLinks(
@@ -256,6 +351,10 @@ export class StorageAdapterPageRepository {
     );
   }
 
+  /**
+   * 指定リンクテキストのゴーストを持つページ ID 一覧を返す。
+   * Return IDs of pages that carry a ghost link for the given text.
+   */
   async getGhostLinkSources(linkText: string): Promise<string[]> {
     const pages = await this.adapter.getAllPages();
     const sources: string[] = [];
@@ -266,6 +365,10 @@ export class StorageAdapterPageRepository {
     return sources;
   }
 
+  /**
+   * ユーザー配下の全ページについてゴーストリンクを集めて返す。
+   * Aggregate every ghost link across all pages owned by the user.
+   */
   async getGhostLinks(_userId: string): Promise<GhostLink[]> {
     const pages = await this.adapter.getAllPages();
     const all: GhostLink[] = [];
@@ -282,11 +385,22 @@ export class StorageAdapterPageRepository {
     return all;
   }
 
+  /**
+   * 単一ソースページに属するゴーストリンクのリンクテキスト一覧を返す（差分同期用）。
+   * Return ghost-link texts for a single source page (used by delta sync).
+   */
   async getGhostLinksBySourcePage(sourcePageId: string): Promise<string[]> {
     const ghosts = await this.adapter.getGhostLinks(sourcePageId);
     return ghosts.map((g) => g.linkText);
   }
 
+  /**
+   * 2 箇所以上から参照されているゴーストリンクを、実在ページとして昇格させる。
+   * 新規ページを作成し、各ソースからのリンクへ置き換える。
+   *
+   * Promote a ghost link referenced by two or more source pages into a real
+   * page, rewiring each source to link into the new page.
+   */
   async promoteGhostLink(userId: string, linkText: string): Promise<Page | null> {
     const sources = await this.getGhostLinkSources(linkText);
     if (sources.length < 2) return null;

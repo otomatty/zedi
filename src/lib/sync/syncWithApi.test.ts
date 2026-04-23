@@ -124,6 +124,7 @@ describe("syncWithApi", () => {
       getPage: vi.fn().mockResolvedValue({
         id: "p1",
         ownerId: TEST_USER_ID,
+        noteId: null,
         sourcePageId: null,
         title: "Local Version",
         contentPreview: null,
@@ -218,6 +219,7 @@ describe("syncWithApi", () => {
     const localPage: PageMetadata = {
       id: "p1",
       ownerId: TEST_USER_ID,
+      noteId: null,
       sourcePageId: null,
       title: "Page with thumbnail",
       contentPreview: "preview",
@@ -269,6 +271,7 @@ describe("syncWithApi", () => {
     const localPage: PageMetadata = {
       id: "p1",
       ownerId: TEST_USER_ID,
+      noteId: null,
       sourcePageId: null,
       title: "Page",
       contentPreview: null,
@@ -322,6 +325,7 @@ describe("syncWithApi", () => {
     const localPage: PageMetadata = {
       id: "local-1",
       ownerId: TEST_USER_ID,
+      noteId: null,
       sourcePageId: null,
       title: "Local Page",
       contentPreview: null,
@@ -348,6 +352,7 @@ describe("syncWithApi", () => {
     const manyPages: PageMetadata[] = Array.from({ length: PAGE_PUSH_CHUNK_SIZE + 1 }, (_, i) => ({
       id: `page-${i}`,
       ownerId: TEST_USER_ID,
+      noteId: null,
       sourcePageId: null,
       title: `Page ${i}`,
       contentPreview: null,
@@ -394,6 +399,111 @@ describe("syncWithApi", () => {
     expect(secondCall[0].pages).toHaveLength(1);
     expect(secondCall[0].links).toBeDefined();
     expect(secondCall[0].ghost_links).toBeDefined();
+  });
+
+  it("excludes note-native pages from push (issue #713 Phase 2 defensive filter)", async () => {
+    // ノートネイティブページ（`noteId !== null`）は POST /api/sync/pages の LWW
+    // 対象外。サーバー側でも skip されるが、フロント側でも push 前に除外することで
+    // 余計なリクエストを発生させない。Issue #713 Phase 2。
+    // Note-native rows (`noteId !== null`) are not part of personal-page sync.
+    // Filter them out client-side too so we never put them on the wire even
+    // when the server would skip them. Issue #713 Phase 2.
+    const personalPage: PageMetadata = {
+      id: "personal-1",
+      ownerId: TEST_USER_ID,
+      noteId: null,
+      sourcePageId: null,
+      title: "Personal",
+      contentPreview: null,
+      thumbnailUrl: null,
+      sourceUrl: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      isDeleted: false,
+    };
+    const noteNativePage: PageMetadata = {
+      id: "note-native-1",
+      ownerId: TEST_USER_ID,
+      noteId: "note-1",
+      sourcePageId: null,
+      title: "Note-native (should not be pushed)",
+      contentPreview: null,
+      thumbnailUrl: null,
+      sourceUrl: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      isDeleted: false,
+    };
+
+    const adapter = createMockAdapter({
+      getLastSyncTime: vi.fn().mockResolvedValue(Date.now() - 60_000),
+      getAllPages: vi.fn().mockResolvedValue([personalPage, noteNativePage]),
+    });
+    const postSyncPages = vi
+      .fn()
+      .mockResolvedValue({ server_time: new Date().toISOString(), conflicts: [] });
+    const api = createMockApi({ postSyncPages });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    expect(postSyncPages).toHaveBeenCalledTimes(1);
+    const pushedIds = postSyncPages.mock.calls[0][0].pages.map((p: { id: string }) => p.id);
+    expect(pushedIds).toEqual(["personal-1"]);
+    expect(pushedIds).not.toContain("note-native-1");
+  });
+
+  it("propagates note_id from SyncPageItem into PageMetadata (defensive read)", async () => {
+    // GET /api/sync/pages は現状個人ページしか返さないが、将来 `note_id` が
+    // ワイヤに乗った場合に `PageMetadata.noteId` までそのまま伝わることを保証する。
+    // Issue #713 Phase 2。
+    // GET /api/sync/pages currently only returns personal pages, but if the
+    // wire ever surfaces `note_id` we want it to land on `PageMetadata.noteId`
+    // without further plumbing. Issue #713 Phase 2.
+    const adapter = createMockAdapter();
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [
+          {
+            id: "p1",
+            owner_id: TEST_USER_ID,
+            note_id: null,
+            source_page_id: null,
+            title: "Personal",
+            content_preview: null,
+            thumbnail_url: null,
+            source_url: null,
+            created_at: "2025-01-01T00:00:00Z",
+            updated_at: "2025-05-01T00:00:00Z",
+            is_deleted: false,
+          },
+          {
+            id: "p2",
+            owner_id: TEST_USER_ID,
+            note_id: "note-1",
+            source_page_id: null,
+            title: "Note-native (hypothetical)",
+            content_preview: null,
+            thumbnail_url: null,
+            source_url: null,
+            created_at: "2025-01-01T00:00:00Z",
+            updated_at: "2025-05-01T00:00:00Z",
+            is_deleted: false,
+          },
+        ],
+        links: [],
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
+    const upsertedById = new Map<string, PageMetadata>(
+      upsertMock.mock.calls.map(([m]: [PageMetadata]) => [m.id, m]),
+    );
+    expect(upsertedById.get("p1")?.noteId).toBeNull();
+    expect(upsertedById.get("p2")?.noteId).toBe("note-1");
   });
 
   it("skips push on initial sync when local was empty", async () => {

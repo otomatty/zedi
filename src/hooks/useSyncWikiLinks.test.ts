@@ -47,6 +47,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -92,6 +93,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -140,6 +142,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -151,6 +154,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-b",
           ownerUserId: userId,
+          noteId: null,
           title: "Page B",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -186,6 +190,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -222,6 +227,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: sourcePageId,
           ownerUserId: userId,
+          noteId: null,
           title: "My Page",
           contentPreview: undefined,
           thumbnailUrl: undefined,
