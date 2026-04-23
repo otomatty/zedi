@@ -8,6 +8,7 @@ import pageRoutes from "./pages.js";
 import memberRoutes from "./members.js";
 import inviteLinkRoutes from "./inviteLinks.js";
 import domainAccessRoutes from "./domainAccess.js";
+import searchRoutes from "./search.js";
 
 const app = new Hono<AppEnv>();
 
@@ -16,5 +17,6 @@ app.route("/", pageRoutes);
 app.route("/", memberRoutes);
 app.route("/", inviteLinkRoutes);
 app.route("/", domainAccessRoutes);
+app.route("/", searchRoutes);
 
 export default app;
