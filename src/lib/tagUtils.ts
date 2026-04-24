@@ -164,6 +164,14 @@ export function updateTagAttributes(
     };
 
     const updated = traverse(parsed);
+    // 変更が無いときは元の文字列をそのまま返し、等価だが整形が違う JSON で
+    // 書き直して余計な差分を呼び出し側に伝播させないようにする。
+    // When nothing changed, return the original content unchanged instead of
+    // re-stringifying into a potentially minified equivalent; avoids spurious
+    // "content changed" signals for downstream consumers.
+    if (!hasChanges) {
+      return { content, hasChanges: false };
+    }
     return {
       content: JSON.stringify(updated),
       hasChanges,
