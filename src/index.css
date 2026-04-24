@@ -61,6 +61,13 @@
     --link-referenced: 200 70% 60%;
     --link-ghost: 35 80% 60%;
 
+    /* Callout foreground colors (shared dark/light)
+     * コールアウト前景色（ダーク/ライト共通） */
+    --callout-info-fg: 175 60% 50%;
+    --callout-warn-fg: 35 80% 60%;
+    --callout-success-fg: 145 55% 55%;
+    --callout-error-fg: 0 65% 60%;
+
     /* Shadows */
     --shadow-subtle: 0 2px 8px -2px hsl(220 30% 5% / 0.6);
     --shadow-elevated: 0 8px 24px -4px hsl(220 30% 5% / 0.8);
@@ -194,138 +201,409 @@
     @apply ring-primary/20 ring-offset-background ring-2 ring-offset-2;
   }
 
-  /* Tiptap editor styles (Zenn-like spacing) */
+  /* ============================================================
+   * Tiptap editor — Current Refined typography (Japanese-first)
+   * Tiptap エディタ: 日本語主体の洗練タイポグラフィ
+   * Spec: design_handoff_editor_typography/README.md
+   * ============================================================ */
   .tiptap-editor {
-    @apply min-h-[200px] outline-none;
-
+    min-height: 200px;
+    outline: none;
+    font-family: "DM Sans", "Hiragino Sans", "Yu Gothic UI", sans-serif;
     font-size: var(--editor-font-size, 16px);
+    line-height: 1.8;
+    font-feature-settings: "palt" 1;
+    color: hsl(var(--foreground));
   }
 
-  .tiptap-editor p {
-    @apply mb-4 leading-[1.8];
-  }
-
+  /* Headings — H1 is for the title block; section breaks start at H2 */
   .tiptap-editor h1 {
-    @apply mt-10 mb-5 text-2xl font-bold first:mt-0;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
+    color: hsl(var(--foreground));
+  }
+
+  .tiptap-editor h1:first-child {
+    margin-top: 0;
   }
 
   .tiptap-editor h2 {
-    @apply mt-8 mb-4 text-xl font-semibold first:mt-0;
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 40px 0 16px;
+    padding-top: 8px;
+    border-top: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+  }
+
+  .tiptap-editor h2:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
   }
 
   .tiptap-editor h3 {
-    @apply mt-6 mb-3 text-lg font-medium first:mt-0;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.5;
+    margin: 28px 0 12px;
+    color: hsl(var(--foreground));
   }
 
-  .tiptap-editor ul,
-  .tiptap-editor ol {
-    @apply mb-4 pl-6;
+  .tiptap-editor h3:first-child {
+    margin-top: 0;
   }
 
+  .tiptap-editor p {
+    margin: 0 0 18px;
+    line-height: 1.8;
+  }
+
+  /* Inline marks */
+  .tiptap-editor strong {
+    font-weight: 700;
+    color: hsl(var(--foreground));
+  }
+
+  .tiptap-editor em {
+    font-style: italic;
+    color: hsl(175 45% 70%);
+  }
+
+  .tiptap-editor s {
+    text-decoration: line-through;
+  }
+
+  .tiptap-editor u {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .tiptap-editor mark {
+    background: hsl(48 90% 65% / 0.22);
+    padding: 1px 2px;
+    border-radius: 2px;
+  }
+
+  .tiptap-editor kbd {
+    background: hsl(220 18% 14%);
+    border: 1px solid hsl(220 15% 22%);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82em;
+  }
+
+  /* Inline code */
+  .tiptap-editor code {
+    background: hsl(220 15% 18%);
+    color: hsl(48 90% 75%);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88em;
+  }
+
+  /* Standard anchor (non-wiki) */
+  .tiptap-editor a {
+    color: hsl(var(--link-color));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--link-color) / 0.35);
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tiptap-editor a:hover {
+    text-decoration-color: hsl(var(--link-color));
+  }
+
+  /* Unordered lists — disc → circle → square */
   .tiptap-editor ul {
-    @apply list-disc;
+    list-style: disc;
+    padding-left: 24px;
+    margin: 0 0 18px;
   }
 
+  .tiptap-editor ul ul {
+    list-style: circle;
+    padding-left: 24px;
+    margin: 6px 0;
+  }
+
+  .tiptap-editor ul ul ul {
+    list-style: square;
+  }
+
+  /* Ordered lists */
   .tiptap-editor ol {
-    @apply list-decimal;
+    list-style: decimal;
+    padding-left: 24px;
+    margin: 0 0 18px;
+  }
+
+  .tiptap-editor ol ol {
+    margin: 6px 0;
+  }
+
+  .tiptap-editor ul::marker,
+  .tiptap-editor ol::marker {
+    color: hsl(var(--muted-foreground));
   }
 
   .tiptap-editor li {
-    @apply mb-2;
+    margin-bottom: 6px;
   }
 
-  .tiptap-editor blockquote {
-    @apply border-primary/40 text-muted-foreground mb-4 border-l-2 pl-4 italic;
-  }
-
-  .tiptap-editor code {
-    @apply bg-muted rounded px-1.5 py-0.5 font-mono text-sm;
-  }
-
-  .tiptap-editor pre {
-    @apply bg-muted mb-4 overflow-x-auto rounded-lg p-4 font-mono text-sm;
-  }
-
-  .tiptap-editor pre code {
-    @apply bg-transparent p-0;
-  }
-
-  /* Task list styles */
+  /* Task list — custom 18x18 checkbox */
   .tiptap-editor ul[data-type="taskList"] {
-    @apply mb-4 list-none pl-0;
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 18px;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] {
-    @apply mb-2 flex items-start gap-2;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 6px;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > label {
-    @apply mt-1 flex shrink-0 items-center;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-top: 3px;
+    cursor: pointer;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > label input[type="checkbox"] {
-    @apply border-border accent-primary h-4 w-4 cursor-pointer rounded;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid hsl(220 15% 30%);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .tiptap-editor
+    ul[data-type="taskList"]
+    li[data-type="taskItem"]
+    > label
+    input[type="checkbox"]:checked {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+  }
+
+  .tiptap-editor
+    ul[data-type="taskList"]
+    li[data-type="taskItem"]
+    > label
+    input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0.5px;
+    width: 5px;
+    height: 10px;
+    border: solid hsl(var(--primary-foreground));
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > div {
-    @apply min-w-0 flex-1;
+    flex: 1 1 0%;
+    min-width: 0;
   }
 
   .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div {
-    @apply text-muted-foreground line-through;
+    color: hsl(var(--muted-foreground));
+    text-decoration: line-through;
   }
 
-  /* Nested task lists */
   .tiptap-editor ul[data-type="taskList"] ul[data-type="taskList"] {
-    @apply mt-1 ml-6;
+    margin-top: 6px;
+    margin-left: 28px;
   }
 
-  /* Highlight styles */
-  .tiptap-editor mark {
-    @apply rounded-sm bg-yellow-300/40 px-0.5;
+  /* Blockquote — thin teal left border, no italics (feels off in Japanese) */
+  .tiptap-editor blockquote {
+    border-left: 2px solid hsl(175 60% 50% / 0.5);
+    padding: 4px 16px;
+    margin: 20px 0;
+    color: hsl(45 10% 80%);
+    font-style: normal;
   }
 
-  /* Table styles */
-  .tiptap-editor .tableWrapper {
-    @apply mb-4 overflow-x-auto;
+  /* Code block — darker than body background */
+  .tiptap-editor pre {
+    position: relative;
+    background: hsl(220 18% 6%);
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 18px 0;
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+    tab-size: 2;
   }
 
-  .tiptap-editor table {
-    @apply w-full border-collapse;
+  .tiptap-editor pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    border-radius: 0;
   }
 
-  .tiptap-editor th,
-  .tiptap-editor td {
-    @apply border-border min-w-[80px] border px-3 py-2 text-left align-top;
-  }
-
-  .tiptap-editor th {
-    @apply bg-muted font-semibold;
-  }
-
-  .tiptap-editor td > p,
-  .tiptap-editor th > p {
-    @apply mb-0;
-  }
-
-  /* Table cell selection */
-  .tiptap-editor .selectedCell {
-    @apply bg-accent/40;
-  }
-
-  /* Code block syntax highlight - override hljs background to use our theme */
   .tiptap-editor pre code.hljs {
     background: transparent;
     padding: 0;
   }
 
-  .tiptap-editor pre {
-    position: relative;
+  /* Code block language label (top-right) */
+  .tiptap-editor pre .code-block-language {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: hsl(220 18% 14%);
+    color: hsl(var(--muted-foreground));
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 3px;
   }
 
-  /* Code block language label */
-  .tiptap-editor pre .code-block-language {
-    @apply bg-muted/80 text-muted-foreground absolute top-2 right-2 rounded px-2 py-0.5 text-xs;
+  /* Tables — rounded outer wrapper, horizontal rules only (no vertical) */
+  .tiptap-editor .tableWrapper {
+    overflow-x: auto;
+    margin: 20px 0;
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+  }
+
+  .tiptap-editor table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  .tiptap-editor thead th {
+    background: hsl(220 18% 12%);
+    font-weight: 600;
+    font-size: 13px;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid hsl(var(--border));
+    letter-spacing: 0.02em;
+  }
+
+  .tiptap-editor tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid hsl(220 15% 14%);
+    vertical-align: top;
+  }
+
+  .tiptap-editor tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .tiptap-editor tbody tr:hover td {
+    background: hsl(220 18% 10%);
+  }
+
+  .tiptap-editor td > p,
+  .tiptap-editor th > p {
+    margin-bottom: 0;
+  }
+
+  .tiptap-editor .selectedCell {
+    background: hsl(var(--accent) / 0.4);
+  }
+
+  /* Figure / image */
+  .tiptap-editor figure {
+    margin: 20px 0 24px;
+  }
+
+  .tiptap-editor figure img,
+  .tiptap-editor img {
+    display: block;
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid hsl(var(--border));
+  }
+
+  .tiptap-editor figcaption {
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+    font-size: 13px;
+    margin-top: 10px;
+  }
+
+  /* Horizontal rule */
+  .tiptap-editor hr {
+    border: 0;
+    height: 1px;
+    background: hsl(var(--border));
+    margin: 32px 0;
+  }
+
+  /* Footnotes */
+  .tiptap-editor .fnref {
+    color: hsl(var(--link-color));
+    font-size: 0.78em;
+    vertical-align: super;
+    text-decoration: none;
+    margin-left: 2px;
+    padding: 0 3px;
+    border: 1px solid hsl(var(--link-color) / 0.3);
+    border-radius: 3px;
+  }
+
+  .tiptap-editor .footnotes {
+    margin-top: 40px;
+    border-top: 1px solid hsl(220 15% 16%);
+    padding-top: 16px;
+    font-size: 13px;
+    color: hsl(220 10% 65%);
+  }
+
+  .tiptap-editor .footnotes ol {
+    padding-left: 20px;
+    margin-bottom: 0;
+  }
+
+  .tiptap-editor .footnotes li {
+    margin-bottom: 4px;
+  }
+
+  /* Page meta line (date · tags · read time) */
+  .tiptap-editor .page-meta {
+    display: flex;
+    gap: 10px;
+    color: hsl(var(--muted-foreground));
+    font-size: 13px;
+    margin: -8px 0 24px;
+  }
+
+  .tiptap-editor .page-meta .dot {
+    opacity: 0.5;
   }
 
   /* Light mode: override hljs token colors for better readability */
@@ -373,73 +651,257 @@
     color: #6f42c1;
   }
 
-  /* Light mode: highlight mark */
-  .light .tiptap-editor mark {
-    @apply bg-yellow-200/60;
-  }
-
-  /* Mathematics (KaTeX) styles */
+  /* Mathematics (KaTeX) */
   .tiptap-editor .Tiptap-mathematics-editor {
-    @apply border-border bg-muted rounded border px-2 py-1 font-mono text-sm;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--muted));
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 14px;
   }
 
   .tiptap-editor .Tiptap-mathematics-render {
-    @apply cursor-pointer;
+    cursor: pointer;
   }
 
   .tiptap-editor .Tiptap-mathematics-render--editable:hover {
-    @apply bg-accent/30 rounded;
+    background: hsl(var(--accent) / 0.3);
+    border-radius: 4px;
   }
 
   .tiptap-editor .Tiptap-mathematics-editor--active {
-    @apply ring-primary/50 ring-2;
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.5);
+  }
+
+  .tiptap-editor .Tiptap-mathematics-render[data-type="block-math"] {
+    background: hsl(220 18% 10%);
+    border: 1px solid hsl(220 15% 16%);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 18px 0;
+    text-align: center;
   }
 
   /* Slash command typing state */
   .slash-command-typing {
-    @apply text-muted-foreground;
+    color: hsl(var(--muted-foreground));
   }
 
+  /* Placeholder */
   .tiptap-editor .is-editor-empty:first-child::before {
-    @apply text-muted-foreground pointer-events-none float-left h-0;
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+    float: left;
+    height: 0;
     content: attr(data-placeholder);
   }
 
-  /* Wiki link styling */
+  /* ============================================================
+   * Callouts — 4 variants (info / warn / success / error)
+   * コールアウト 4 種
+   * ============================================================ */
+  .callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    margin: 18px 0;
+    border-radius: 8px;
+    border: 1px solid;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .callout-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: hsl(var(--background));
+  }
+
+  .callout-body p:first-child {
+    margin-top: 0;
+  }
+
+  .callout-body p:last-child {
+    margin-bottom: 0;
+  }
+
+  .callout-info {
+    background: hsl(var(--callout-info-fg) / 0.07);
+    border-color: hsl(var(--callout-info-fg) / 0.35);
+  }
+
+  .callout-info .callout-icon {
+    background: hsl(var(--callout-info-fg));
+  }
+
+  .callout-warn {
+    background: hsl(var(--callout-warn-fg) / 0.08);
+    border-color: hsl(var(--callout-warn-fg) / 0.35);
+  }
+
+  .callout-warn .callout-icon {
+    background: hsl(var(--callout-warn-fg));
+  }
+
+  .callout-success {
+    background: hsl(var(--callout-success-fg) / 0.08);
+    border-color: hsl(var(--callout-success-fg) / 0.35);
+  }
+
+  .callout-success .callout-icon {
+    background: hsl(var(--callout-success-fg));
+  }
+
+  .callout-error {
+    background: hsl(var(--callout-error-fg) / 0.07);
+    border-color: hsl(var(--callout-error-fg) / 0.35);
+  }
+
+  .callout-error .callout-icon {
+    background: hsl(var(--callout-error-fg));
+  }
+
+  /* ============================================================
+   * WikiLink — 3 variants
+   * 実体あり / 参照あり未作成 / ゴースト
+   * ============================================================ */
   .wiki-link {
-    @apply text-link -mx-0.5 cursor-pointer rounded px-0.5 font-medium transition-colors duration-200 hover:underline;
+    color: hsl(var(--link-color));
     background: hsl(var(--link-color) / 0.1);
+    padding: 1px 4px;
+    margin: 0 -2px;
+    border-radius: 3px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
   }
 
   .wiki-link:hover {
     background: hsl(var(--link-color) / 0.2);
   }
 
-  /* Referenced link - exists in other pages but no page created yet */
+  /* Referenced — exists in other pages but not yet created */
   .wiki-link-referenced {
-    @apply text-link-referenced -mx-0.5 cursor-pointer rounded border-b border-dashed border-current px-0.5 font-medium transition-colors duration-200 hover:border-solid;
+    color: hsl(var(--link-referenced));
     background: hsl(var(--link-referenced) / 0.1);
+    border-bottom: 1px dashed currentColor;
+    padding: 1px 4px;
+    margin: 0 -2px;
+    border-radius: 3px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
   }
 
   .wiki-link-referenced:hover {
     background: hsl(var(--link-referenced) / 0.2);
+    border-bottom-style: solid;
   }
 
-  /* Ghost link - new link, not referenced elsewhere */
+  /* Ghost — new / unreferenced */
   .wiki-link-ghost {
-    @apply border-ghost-link/50 text-ghost-link hover:border-ghost-link -mx-0.5 cursor-pointer rounded border-b border-dashed px-0.5 font-medium transition-colors duration-200;
+    color: hsl(var(--link-ghost));
     background: hsl(var(--link-ghost) / 0.1);
+    border-bottom: 1px dashed currentColor;
+    padding: 1px 4px;
+    margin: 0 -2px;
+    border-radius: 3px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
   }
 
   .wiki-link-ghost:hover {
     background: hsl(var(--link-ghost) / 0.2);
+    border-bottom-style: solid;
   }
 
   /* Wiki link typing state */
   .wiki-link-typing {
-    @apply text-primary;
+    color: hsl(var(--primary));
     background: hsl(var(--primary) / 0.15);
     border-radius: 2px;
+  }
+
+  /* ============================================================
+   * Light mode overrides for hard-coded HSL values
+   * ライトモード: 固定 HSL 値の上書き
+   * ============================================================ */
+  .light .tiptap-editor pre {
+    background: hsl(220 15% 96%);
+    border-color: hsl(var(--border));
+  }
+
+  .light .tiptap-editor code {
+    background: hsl(220 15% 92%);
+    color: hsl(220 40% 35%);
+  }
+
+  .light .tiptap-editor pre code {
+    background: transparent;
+    color: inherit;
+  }
+
+  .light .tiptap-editor pre .code-block-language {
+    background: hsl(220 15% 88%);
+  }
+
+  .light .tiptap-editor thead th {
+    background: hsl(220 15% 94%);
+  }
+
+  .light .tiptap-editor tbody td {
+    border-bottom-color: hsl(220 15% 88%);
+  }
+
+  .light .tiptap-editor tbody tr:hover td {
+    background: hsl(220 15% 96%);
+  }
+
+  .light .tiptap-editor blockquote {
+    color: hsl(220 20% 30%);
+  }
+
+  .light .tiptap-editor kbd {
+    background: hsl(220 15% 96%);
+    border-color: hsl(220 15% 85%);
+  }
+
+  .light .tiptap-editor em {
+    color: hsl(175 45% 35%);
+  }
+
+  .light
+    .tiptap-editor
+    ul[data-type="taskList"]
+    li[data-type="taskItem"]
+    > label
+    input[type="checkbox"] {
+    border-color: hsl(220 15% 70%);
+  }
+
+  .light .tiptap-editor .Tiptap-mathematics-render[data-type="block-math"] {
+    background: hsl(220 15% 96%);
+    border-color: hsl(220 15% 88%);
+  }
+
+  .light .tiptap-editor .footnotes {
+    border-top-color: hsl(220 15% 88%);
+    color: hsl(220 10% 40%);
+  }
+
+  .light .callout-icon {
+    color: hsl(0 0% 100%);
   }
 
   /* AI Chat: Markdown in message bubbles – readable, compact */
