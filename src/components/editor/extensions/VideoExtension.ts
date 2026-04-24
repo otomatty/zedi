@@ -14,7 +14,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 
 /**
- *
+ * Options accepted by {@link VideoExtension} (passed via `.configure()`).
  */
 export interface VideoOptions {
   HTMLAttributes: Record<string, unknown>;

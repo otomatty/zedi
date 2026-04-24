@@ -22,7 +22,7 @@ import { MediaPlaceholderNodeView } from "../MediaPlaceholderNodeView.tsx";
 export type MediaPlaceholderMode = "image" | "video";
 
 /**
- *
+ * Options accepted by {@link MediaPlaceholderExtension} (via `.configure()`).
  */
 export interface MediaPlaceholderOptions {
   HTMLAttributes: Record<string, unknown>;
@@ -40,10 +40,11 @@ declare module "@tiptap/core" {
   }
 }
 
-export /**
- *
+/**
+ * Tiptap node extension for the unified media insertion placeholder.
+ * `/image` と `/video` スラッシュコマンドから挿入される統一プレースホルダーの Tiptap 拡張。
  */
-const MediaPlaceholderExtension = Node.create<MediaPlaceholderOptions>({
+export const MediaPlaceholderExtension = Node.create<MediaPlaceholderOptions>({
   name: "mediaPlaceholder",
 
   group: "block",
@@ -65,9 +66,6 @@ const MediaPlaceholderExtension = Node.create<MediaPlaceholderOptions>({
       mode: {
         default: "image" as MediaPlaceholderMode,
         parseHTML: (element) => {
-          /**
-           *
-           */
           const raw = element.getAttribute("data-mode");
           return raw === "video" ? "video" : "image";
         },

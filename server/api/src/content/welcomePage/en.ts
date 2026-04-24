@@ -4,10 +4,10 @@
  */
 import type { TiptapNode } from "../../lib/articleExtractor.js";
 
-export /**
- *
+/**
+ * English welcome page Tiptap document shown at `/pages/:welcomeId`.
  */
-const welcomePageEn: TiptapNode = {
+export const welcomePageEn: TiptapNode = {
   type: "doc",
   content: [
     {
