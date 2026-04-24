@@ -7,7 +7,13 @@
 import type { PageMetadata, Link, GhostLink, LinkType, SearchResult } from "./types";
 
 /**
+ * ストレージアダプタインターフェース (§6.1 zedi-rearchitecture-spec.md)。
+ * メタデータ、Y.Doc、リンク、検索、同期タイムスタンプのプラットフォーム抽象化。
+ * Web は `IndexedDBStorageAdapter`、Tauri は `TauriStorageAdapter` (Phase D)。
  *
+ * Platform abstraction for metadata, Y.Doc, links, search, and sync timestamp
+ * (§6.1 zedi-rearchitecture-spec.md). Web is backed by `IndexedDBStorageAdapter`;
+ * Tauri will use `TauriStorageAdapter` (Phase D).
  */
 export interface StorageAdapter {
   // ── メタデータ ──
