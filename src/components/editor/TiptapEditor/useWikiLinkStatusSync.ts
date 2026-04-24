@@ -53,12 +53,22 @@ export function useWikiLinkStatusSync({
     pageNoteId,
     notePages: pageNoteId ? notePagesQuery.data : undefined,
   });
+  const pageScopeSignature =
+    pageNoteId === null
+      ? "personal"
+      : notePagesQuery.data === undefined
+        ? `note:${pageNoteId}:loading`
+        : `note:${pageNoteId}:${notePagesQuery.data
+            .map((page) => `${page.id}:${page.title.trim().toLowerCase()}`)
+            .sort()
+            .join("|")}`;
 
   // 最後にチェックした状態を追跡
   const lastCheckedRef = useRef<{
     pageId: string | null;
     wikiLinkCount: number;
-  }>({ pageId: null, wikiLinkCount: 0 });
+    pageScopeSignature: string | null;
+  }>({ pageId: null, wikiLinkCount: 0, pageScopeSignature: null });
 
   useEffect(() => {
     if (skipSync || !editor || !content || !pageId) {
@@ -72,15 +82,17 @@ export function useWikiLinkStatusSync({
     // チェックが必要かどうかを判定
     const isNewPage = lastCheckedRef.current.pageId !== pageId;
     const hasMoreWikiLinks = currentCount > lastCheckedRef.current.wikiLinkCount;
+    const hasScopeChanged = lastCheckedRef.current.pageScopeSignature !== pageScopeSignature;
 
-    // ページが変わった場合、またはWikiLinkが増えた場合のみ再チェック
-    if (!isNewPage && !hasMoreWikiLinks) {
+    // ページ/リンク数/解決スコープのいずれも変わらないときだけスキップする。
+    // Re-run when the resolution scope changes, even if the page id and count stay the same.
+    if (!isNewPage && !hasMoreWikiLinks && !hasScopeChanged) {
       return;
     }
 
     const updateWikiLinkStatus = async () => {
       if (currentWikiLinks.length === 0) {
-        lastCheckedRef.current = { pageId, wikiLinkCount: 0 };
+        lastCheckedRef.current = { pageId, wikiLinkCount: 0, pageScopeSignature };
         return;
       }
 
@@ -99,7 +111,7 @@ export function useWikiLinkStatusSync({
       const updates = collectWikiLinkUpdates(editor, pageTitles, referencedTitles);
 
       // チェック完了を記録
-      lastCheckedRef.current = { pageId, wikiLinkCount: currentCount };
+      lastCheckedRef.current = { pageId, wikiLinkCount: currentCount, pageScopeSignature };
 
       // 更新を適用
       if (updates.length > 0) {
@@ -114,7 +126,7 @@ export function useWikiLinkStatusSync({
     // コンテンツ反映を待ってから実行
     const timer = setTimeout(updateWikiLinkStatus, 150);
     return () => clearTimeout(timer);
-  }, [skipSync, editor, content, checkExistence, pageId, onChange]);
+  }, [skipSync, editor, content, checkExistence, pageId, onChange, pageScopeSignature]);
 }
 
 // --- ヘルパー関数 ---

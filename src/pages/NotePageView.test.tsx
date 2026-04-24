@@ -20,13 +20,14 @@ import { AIChatProvider } from "@/contexts/AIChatContext";
 // can see them. Required because `vi.mock` hoists above normal `const`s. The
 // shared `mockToast` lets tests inspect what `toast({...})` was called with
 // — in particular whether the `action` (toast CTA) was supplied.
-const { mockToast, mockUpdatePageMutateAsync, mockApi } = vi.hoisted(() => ({
+const { mockToast, mockUpdatePageMutateAsync, mockApi, mockSetPageContext } = vi.hoisted(() => ({
   mockToast: vi.fn(),
   mockUpdatePageMutateAsync: vi.fn().mockResolvedValue({ skipped: false }),
   mockApi: {
     getPageContent: vi.fn(),
     putPageContent: vi.fn(),
   },
+  mockSetPageContext: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -85,6 +86,15 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
+}));
+
+vi.mock("@/contexts/AIChatContext", () => ({
+  AIChatProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAIChatContext: () => ({
+    setPageContext: mockSetPageContext,
+    contentAppendHandlerRef: { current: null },
+    insertAtCursorRef: { current: null },
+  }),
 }));
 
 vi.mock("@/hooks/useCollaboration", () => ({
@@ -169,6 +179,7 @@ describe("NotePageView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockToast.mockReset();
+    mockSetPageContext.mockReset();
     mockUpdatePageMutateAsync.mockResolvedValue({ skipped: false });
     mockApi.getPageContent.mockReset();
     mockApi.putPageContent.mockReset();
@@ -351,6 +362,91 @@ describe("NotePageView", () => {
     expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
     expect(mockApi.putPageContent).not.toHaveBeenCalled();
     expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps note-native pages read-only for owners without note edit permission", async () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-1",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+    vi.advanceTimersByTime(500);
+    await Promise.resolve();
+
+    expect(screen.getByText("閲覧専用")).toBeInTheDocument();
+    expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
+    expect(mockApi.putPageContent).not.toHaveBeenCalled();
+    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("passes the owning note id to AI chat for note-native pages", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Note-native",
+        content: "{}",
+        ownerUserId: "user-1",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    expect(mockSetPageContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageId: "page-1",
+        noteId: "note-1",
+      }),
+    );
+  });
+
+  it("keeps AI chat on personal scope for linked personal pages", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Linked personal",
+        content: "{}",
+        ownerUserId: "user-1",
+        noteId: null,
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    expect(mockSetPageContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageId: "page-1",
+        noteId: undefined,
+      }),
+    );
   });
 
   it("shows copy-to-personal action for note-native pages (issue #713 Phase 3)", () => {

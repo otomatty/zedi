@@ -536,6 +536,7 @@ export function useCopyNotePageToPersonal() {
       if (userId) {
         queryClient.invalidateQueries({ queryKey: pageKeys.list(userId) });
         queryClient.invalidateQueries({ queryKey: pageKeys.summary(userId) });
+        queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
       } else {
         queryClient.invalidateQueries({ queryKey: pageKeys.all });
       }
