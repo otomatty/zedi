@@ -134,8 +134,13 @@ app.get("/", authRequired, async (c) => {
     ? sql`TRUE`
     : sql`p.special_kind IS NULL AND p.is_schema = false`;
 
+  // `note_id` を返すことで、`scope=shared` で混在 listing を受け取った
+  // クライアントが個人ページ（`note_id IS NULL`）とノートネイティブページを
+  // 区別できる。MCP の `zedi_list_pages` ツールはこれに依存している。
+  // Surface `note_id` so callers receiving mixed `scope=shared` results (e.g.
+  // the `zedi_list_pages` MCP tool) can distinguish personal vs note-native.
   const result = await db.execute(sql`
-    SELECT p.id, p.title, p.content_preview, p.updated_at
+    SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id
     FROM pages p
     WHERE p.is_deleted = false
       AND ${specialKindFilter}

@@ -214,6 +214,26 @@ describe("GET /api/pages", () => {
     expect(res.status).toBe(200);
   });
 
+  it("selects p.note_id so callers can distinguish personal vs note-native pages in mixed listings", async () => {
+    const { app, chains } = createPagesAppWithChains([{ rows: [] }]);
+
+    const res = await app.request("/api/pages?scope=shared", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    // `scope=shared` は note-native ページも返すため、`zedi_list_pages` MCP ツールや
+    // クライアントは行ごとに `note_id` を見て個人 / ノートネイティブを判別する。
+    // SELECT に `p.note_id` が残っていることを保証する（PR #727 / #719 リグレッション）。
+    // The mixed `scope=shared` listing must surface `note_id` so callers (e.g. the
+    // `zedi_list_pages` MCP tool) can bucket personal vs note-native rows.
+    const executeChain = chains.find((chain) => chain.startMethod === "execute");
+    expect(executeChain).toBeDefined();
+    const serialised = JSON.stringify(executeChain?.startArgs);
+    expect(serialised).toContain("p.note_id");
+  });
+
   it("filters out internal special pages (special_kind, is_schema) by default", async () => {
     const { app, chains } = createPagesAppWithChains([{ rows: [] }]);
 

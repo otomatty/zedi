@@ -37,9 +37,12 @@ const TITLE_SAVE_DEBOUNCE_MS = 500;
 function canEditPage(
   access: { canEdit?: boolean; canView?: boolean } | undefined,
   userId: string | undefined,
-  page: { ownerUserId?: string } | null | undefined,
+  page: { ownerUserId?: string; noteId?: string | null } | null | undefined,
 ): boolean {
-  if (!access?.canView) return false;
+  if (!access?.canView || !page) return false;
+  if (page.noteId !== null && page.noteId !== undefined) {
+    return Boolean(access.canEdit);
+  }
   if (access.canEdit) return true;
   return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
 }
@@ -95,13 +98,13 @@ function NotePageEditorEditable({
     setPageContext({
       type: "editor",
       pageId: page.id,
-      noteId,
+      noteId: page.noteId ?? undefined,
       claudeWorkspaceRoot: workspaceRoot ?? undefined,
       pageTitle: title,
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-  }, [page.id, title, editorContent, setPageContext, noteId, workspaceRoot]);
+  }, [page.id, page.noteId, title, editorContent, setPageContext, workspaceRoot]);
 
   useEffect(() => {
     return () => setPageContext(null);
@@ -294,7 +297,8 @@ const NotePageView: React.FC = () => {
   }, [navigate, noteId]);
 
   const canEdit = canEditPage(access, userId, page);
-  const isTitleEditable = canEdit && (page?.noteId != null || canEditTitle(userId, page));
+  const isTitleEditable =
+    page?.noteId != null ? Boolean(access?.canEdit) : canEdit && canEditTitle(userId, page);
   const collaborationPageId = page?.id ?? "";
   const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
   const collaboration = useCollaboration({

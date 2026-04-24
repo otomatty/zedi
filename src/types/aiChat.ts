@@ -161,8 +161,10 @@ export interface PageContext {
   type: "editor" | "home" | "search" | "other";
   pageId?: string;
   /**
-   * Parent note id when editing a page inside a note (local metadata only).
-   * ノート内ページ編集中の親ノート ID（ローカルメタデータのみ）。
+   * Owning note id of the page being edited (local metadata only).
+   * Linked personal pages inside a note keep this undefined.
+   * 編集中ページ自身の所属ノート ID（ローカルメタデータのみ）。
+   * ノート内に表示している linked personal page は `undefined` のままにする。
    */
   noteId?: string;
   /**

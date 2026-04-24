@@ -68,6 +68,7 @@ describe("HttpZediClient request shaping", () => {
             title: "Hello",
             content_preview: null,
             updated_at: "2026-01-01T00:00:00Z",
+            note_id: null,
           },
         ],
       }),

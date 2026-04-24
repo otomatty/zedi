@@ -49,6 +49,13 @@ export interface PageListItem {
   title: string | null;
   content_preview: string | null;
   updated_at: string;
+  /**
+   * スコープ判別用。`null` は個人ページ、文字列ならノートネイティブページのノート ID。
+   * `scope: shared` 経由で混在 listing を受け取ったクライアントはこれで仕分けする。
+   * Scope discriminator: `null` for personal pages, string for note-native pages.
+   * Callers receiving the mixed `scope: shared` listing rely on this to bucket rows.
+   */
+  note_id: string | null;
 }
 
 /** `listPages` の入力 / Input for {@link ZediClient.listPages}. */

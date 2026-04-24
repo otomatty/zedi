@@ -42,7 +42,7 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     {
       title: "List pages",
       description:
-        "Lists the caller's personal pages (note_id IS NULL), paginated and ordered by `updated_at` DESC. `scope: own` returns personal pages only; `scope: shared` additionally includes pages attached to notes the caller is a member of (mixed scope — inspect each row's `note_id` to distinguish personal vs note-native). To list pages of a specific note, use `zedi_list_note_pages` instead. Returns `{ id, title, content_preview, updated_at }`.",
+        "Lists the caller's personal pages (note_id IS NULL), paginated and ordered by `updated_at` DESC. `scope: own` returns personal pages only; `scope: shared` additionally includes pages attached to notes the caller is a member of (mixed scope — inspect each row's `note_id` to distinguish personal vs note-native). To list pages of a specific note, use `zedi_list_note_pages` instead. Returns `{ id, title, content_preview, updated_at, note_id }`.",
       inputSchema: {
         limit: z.number().int().min(1).max(100).optional(),
         offset: z.number().int().min(0).optional(),
