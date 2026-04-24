@@ -55,7 +55,7 @@ describe("useEditorAutoSave", () => {
       expect(syncWikiLinks).toHaveBeenCalledWith(pageId, expectedWikiLinks);
     });
 
-    it("WikiLink が含まれない content では syncWikiLinks は呼ばれない（保存は行う）", async () => {
+    it("WikiLink が含まれない content でも syncWikiLinks は空配列で呼ばれる（stale cleanup のため、issue #725 Phase 1 レビュー指摘）", async () => {
       const plainContent = JSON.stringify({
         type: "doc",
         content: [{ type: "paragraph", content: [{ type: "text", text: "No links" }] }],
@@ -84,7 +84,119 @@ describe("useEditorAutoSave", () => {
 
       expect(onSave).toHaveBeenCalledTimes(1);
       expect(extractWikiLinksFromContent(plainContent)).toHaveLength(0);
-      expect(syncWikiLinks).not.toHaveBeenCalled();
+      // issue #725 Phase 1 レビュー指摘: Mark が無くても同期呼び出しは走らせて
+      // サーバ側の stale エッジを空配列 delta で削除させる。
+      // Always call sync with an empty array so stale edges cleared on save.
+      expect(syncWikiLinks).toHaveBeenCalledTimes(1);
+      expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
+    });
+
+    it("tag marks あり + syncTags 指定時は syncTags が呼ばれ、重複タグは getUniqueTagNames で畳まれる (issue #725 Phase 1)", async () => {
+      // 同じタグ名 `#tech` を 2 回出しても `getUniqueTagNames` で 1 件に畳まれて
+      // `syncTags` が呼ばれることを検証（CodeRabbit のレビュー指摘）。
+      // Duplicate `#tech` marks must collapse via `getUniqueTagNames` so
+      // `syncTags` is called once with a single entry (CodeRabbit review).
+      const tagContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
+                text: "#tech",
+              },
+              { type: "text", text: " " },
+              {
+                type: "text",
+                marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
+                text: "#tech",
+              },
+            ],
+          },
+        ],
+      });
+      const syncWikiLinks = vi.fn().mockResolvedValue(undefined);
+      const syncTags = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue(true);
+      const onSaveContentOnly = vi.fn().mockResolvedValue(true);
+
+      const { result } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 0,
+          onSave,
+          onSaveContentOnly,
+          syncWikiLinks,
+          syncTags,
+        }),
+      );
+
+      act(() => {
+        result.current.saveChanges("Title", tagContent);
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // dedupe 後の 1 件だけが渡ることを確認。
+      // Only the deduped single entry should reach `syncTags`.
+      expect(syncTags).toHaveBeenCalledTimes(1);
+      expect(syncTags).toHaveBeenCalledWith(pageId, [{ name: "tech" }]);
+      // Wiki マークは無いが、stale cleanup のため空配列で 1 回呼ぶ契約。
+      // No wiki marks, but we still call syncWikiLinks with `[]` so stale
+      // wiki edges get delta-deleted (issue #725 Phase 1 review feedback).
+      expect(syncWikiLinks).toHaveBeenCalledTimes(1);
+      expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
+    });
+
+    it("syncTags 未指定ならタグがあっても呼ばれない (backward compat)", async () => {
+      const tagContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
+                text: "#tech",
+              },
+            ],
+          },
+        ],
+      });
+      const syncWikiLinks = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue(true);
+      const onSaveContentOnly = vi.fn().mockResolvedValue(true);
+
+      const { result } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 0,
+          onSave,
+          onSaveContentOnly,
+          syncWikiLinks,
+        }),
+      );
+
+      act(() => {
+        result.current.saveChanges("Title", tagContent);
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // syncTags prop が無ければタグ同期はスキップ。一方 syncWikiLinks は
+      // 空配列（wiki マーク無し）でも呼んで stale cleanup を走らせる。
+      // Without a `syncTags` prop, tag sync is skipped; meanwhile
+      // `syncWikiLinks` is still called (with an empty array when no wiki
+      // marks exist) so stale wiki edges get delta-cleaned.
+      expect(syncWikiLinks).toHaveBeenCalledTimes(1);
+      expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
     });
 
     it("保存がスキップ（didSave false）でも syncWikiLinks は呼ばれる", async () => {
@@ -113,6 +225,60 @@ describe("useEditorAutoSave", () => {
       const expectedWikiLinks = extractWikiLinksFromContent(contentWithLinks);
       expect(syncWikiLinks).toHaveBeenCalledTimes(1);
       expect(syncWikiLinks).toHaveBeenCalledWith(pageId, expectedWikiLinks);
+    });
+
+    it("保存がスキップ（didSave false）でも syncTags は呼ばれる (issue #725 Phase 1)", async () => {
+      // Mirror of the WikiLink didSave=false test, covering the tag-sync
+      // contract: save may fail but the link-graph sync still runs so the
+      // server's stale edges get delta-updated.
+      // WikiLink 版と対になる契約テスト。保存が skipped でも tag 同期は
+      // 走らせる。
+      const tagContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
+                text: "#tech",
+              },
+            ],
+          },
+        ],
+      });
+      const syncWikiLinks = vi.fn().mockResolvedValue(undefined);
+      const syncTags = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue(false); // skipped
+      const onSaveContentOnly = vi.fn().mockResolvedValue(false);
+
+      const { result } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 0,
+          onSave,
+          onSaveContentOnly,
+          syncWikiLinks,
+          syncTags,
+        }),
+      );
+
+      act(() => {
+        result.current.saveChanges("Title", tagContent);
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      expect(syncTags).toHaveBeenCalledTimes(1);
+      expect(syncTags).toHaveBeenCalledWith(pageId, [{ name: "tech" }]);
+      // 並列で WikiLink 側も空配列で 1 回呼ばれる（stale cleanup 契約）。
+      // `syncWikiLinks` is still called once with an empty array to clear
+      // any stale wiki edges.
+      expect(syncWikiLinks).toHaveBeenCalledTimes(1);
+      expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
     });
   });
 

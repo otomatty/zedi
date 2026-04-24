@@ -28,17 +28,30 @@ export interface PageMetadata {
   isDeleted: boolean;
 }
 
-/** Link between two pages (source → target). */
+/**
+ * `links` / `ghost_links` の種別識別子。サーバ側 `link_type` カラムに対応。
+ * `'wiki'` は既存 WikiLink、`'tag'` は issue #725 で追加されたタグ記法。
+ *
+ * Discriminator shared by `links` / `ghost_links`; mirrors server `link_type`.
+ */
+export type LinkType = "wiki" | "tag";
+
+/** Link between two pages (source → target). `linkType` distinguishes wiki vs. tag edges. */
 export interface Link {
   sourceId: string;
   targetId: string;
+  linkType: LinkType;
   createdAt: number;
 }
 
-/** Ghost link (unresolved wiki link). C2-6: optional original_target_page_id / original_note_id. */
+/**
+ * Ghost link (unresolved wiki link or tag). C2-6: optional original_target_page_id /
+ * original_note_id. `linkType` distinguishes WikiLink vs. tag (issue #725 Phase 1).
+ */
 export interface GhostLink {
   linkText: string;
   sourcePageId: string;
+  linkType: LinkType;
   createdAt: number;
   originalTargetPageId?: string | null;
   originalNoteId?: string | null;

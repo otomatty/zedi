@@ -6,18 +6,25 @@
 import * as Y from "yjs";
 import { IndexeddbPersistence } from "y-indexeddb";
 import type { StorageAdapter } from "./StorageAdapter";
-import type { PageMetadata, Link, GhostLink, SearchResult } from "./types";
+import type { PageMetadata, Link, GhostLink, LinkType, SearchResult } from "./types";
 
 const DB_NAME_PREFIX = "zedi-storage-";
 // v2: add `noteId` column on `my_pages` to mirror Aurora `pages.note_id`
 //     (issue #713). v1 rows are upgraded in place by `onupgradeneeded` —
 //     existing rows are personal pages, so `noteId = null` is the correct
 //     backfill value.
+// v3: add `linkType` to `my_links` / `my_ghost_links` (issue #725 Phase 1).
+//     Key paths change to include `linkType` so the same (source, target)
+//     pair can hold independent wiki and tag edges. Existing rows are
+//     backfilled to `linkType: 'wiki'` — see `migrateLinksToV3`.
 //
 // v2: `pages.note_id` (issue #713) を反映するため `my_pages` に `noteId` 列を
 // 追加。v1 の既存行は全て個人ページなので、`onupgradeneeded` で `noteId = null`
 // を埋めれば移行完了。
-const DB_VERSION = 2;
+// v3: `my_links` / `my_ghost_links` に `linkType` を追加（issue #725 Phase 1）。
+// 同一 (source, target) ペアでも WikiLink エッジとタグエッジを独立に保持できる
+// よう、キーパスに `linkType` を含める。既存行は `linkType: 'wiki'` で埋め直す。
+const DB_VERSION = 3;
 const YDOC_NAME_PREFIX = "zedi-doc-";
 
 /** Stored page row (camelCase for consistency with PageMetadata). */
@@ -42,17 +49,19 @@ interface StoredPage {
   isDeleted: boolean;
 }
 
-/** Stored link row. */
+/** Stored link row. `linkType` added in v3 (issue #725 Phase 1). */
 interface StoredLink {
   sourceId: string;
   targetId: string;
+  linkType: LinkType;
   createdAt: number;
 }
 
-/** Stored ghost link row. */
+/** Stored ghost link row. `linkType` added in v3 (issue #725 Phase 1). */
 interface StoredGhostLink {
   linkText: string;
   sourcePageId: string;
+  linkType: LinkType;
   createdAt: number;
   originalTargetPageId?: string | null;
   originalNoteId?: string | null;
@@ -108,15 +117,19 @@ function openDb(userId: string): Promise<IDBDatabase> {
         pages.createIndex("created_at", "createdAt", { unique: false });
       }
       if (!db.objectStoreNames.contains("my_links")) {
-        const links = db.createObjectStore("my_links", { keyPath: ["sourceId", "targetId"] });
+        const links = db.createObjectStore("my_links", {
+          keyPath: ["sourceId", "targetId", "linkType"],
+        });
         links.createIndex("by_source", "sourceId", { unique: false });
         links.createIndex("by_target", "targetId", { unique: false });
+        links.createIndex("by_source_type", ["sourceId", "linkType"], { unique: false });
       }
       if (!db.objectStoreNames.contains("my_ghost_links")) {
         const ghost = db.createObjectStore("my_ghost_links", {
-          keyPath: ["linkText", "sourcePageId"],
+          keyPath: ["linkText", "sourcePageId", "linkType"],
         });
         ghost.createIndex("by_source", "sourcePageId", { unique: false });
+        ghost.createIndex("by_source_type", ["sourcePageId", "linkType"], { unique: false });
       }
       if (!db.objectStoreNames.contains("search_index")) {
         db.createObjectStore("search_index", { keyPath: "pageId" });
@@ -150,8 +163,106 @@ function openDb(userId: string): Promise<IDBDatabase> {
           cursor.continue();
         };
       }
+
+      // v3 (issue #725 Phase 1): recreate `my_links` / `my_ghost_links` with a
+      // wider key path (`linkType` appended) and backfill existing rows with
+      // `linkType: 'wiki'`. IndexedDB cannot mutate an existing keyPath, so we
+      // read, delete, recreate, and re-insert.
+      //
+      // v3 (issue #725 Phase 1): `my_links` / `my_ghost_links` のキーパスに
+      // `linkType` を足す必要があるが、IndexedDB はキーパスを変えられないので、
+      // 一旦読み出し → ストア再作成 → `linkType: 'wiki'` で書き戻す。
+      if (event.oldVersion < 3 && tx) {
+        migrateLinkStoreToV3(db, tx, "my_links", ["sourceId", "targetId"], (row) => ({
+          store: "my_links",
+          keyPath: ["sourceId", "targetId", "linkType"],
+          indexes: [
+            { name: "by_source", keyPath: "sourceId" },
+            { name: "by_target", keyPath: "targetId" },
+            { name: "by_source_type", keyPath: ["sourceId", "linkType"] },
+          ],
+          value: { ...row, linkType: "wiki" as LinkType },
+        }));
+        migrateLinkStoreToV3(db, tx, "my_ghost_links", ["linkText", "sourcePageId"], (row) => ({
+          store: "my_ghost_links",
+          keyPath: ["linkText", "sourcePageId", "linkType"],
+          indexes: [
+            { name: "by_source", keyPath: "sourcePageId" },
+            { name: "by_source_type", keyPath: ["sourcePageId", "linkType"] },
+          ],
+          value: { ...row, linkType: "wiki" as LinkType },
+        }));
+      }
     };
   });
+}
+
+interface V3StoreSpec<TRow> {
+  store: string;
+  keyPath: string[];
+  indexes: { name: string; keyPath: string | string[] }[];
+  value: TRow;
+}
+
+/**
+ * Read all rows from `storeName`, drop the store, recreate it with the wider
+ * v3 key path and backfill-derived rows. Runs inside `onupgradeneeded`'s
+ * version change transaction so the entire recreation is atomic.
+ *
+ * `storeName` の全行を読み出し、ストアを作り直して `mapRow` が返す新 keyPath と
+ * インデックスで再生成する。version-change transaction 内で完結させることで、
+ * 中途半端な状態が残らないようにする。
+ */
+function migrateLinkStoreToV3<TRow extends Record<string, unknown>>(
+  db: IDBDatabase,
+  tx: IDBTransaction,
+  storeName: string,
+  _oldKeyPath: string[],
+  mapRow: (row: TRow) => V3StoreSpec<TRow>,
+): void {
+  if (!db.objectStoreNames.contains(storeName)) return;
+  const oldStore = tx.objectStore(storeName);
+  const getAllReq = oldStore.getAll();
+  getAllReq.onsuccess = () => {
+    const rows = (getAllReq.result as TRow[]) ?? [];
+    const firstRow = rows[0];
+    const spec = firstRow !== undefined ? mapRow(firstRow) : undefined;
+
+    db.deleteObjectStore(storeName);
+    const newStore = db.createObjectStore(
+      storeName,
+      spec
+        ? { keyPath: spec.keyPath }
+        : // Empty store: use hard-coded v3 shape keyed per `storeName`.
+          // 行が 1 件も無い場合は mapRow を呼べないため、ストア名から v3 の
+          // keyPath を決め打ちで作る。
+          {
+            keyPath:
+              storeName === "my_links"
+                ? ["sourceId", "targetId", "linkType"]
+                : ["linkText", "sourcePageId", "linkType"],
+          },
+    );
+    const indexSpecs: { name: string; keyPath: string | string[] }[] =
+      spec?.indexes ??
+      (storeName === "my_links"
+        ? [
+            { name: "by_source", keyPath: "sourceId" },
+            { name: "by_target", keyPath: "targetId" },
+            { name: "by_source_type", keyPath: ["sourceId", "linkType"] },
+          ]
+        : [
+            { name: "by_source", keyPath: "sourcePageId" },
+            { name: "by_source_type", keyPath: ["sourcePageId", "linkType"] },
+          ]);
+    for (const idx of indexSpecs) {
+      newStore.createIndex(idx.name, idx.keyPath, { unique: false });
+    }
+    for (const row of rows) {
+      const migrated = mapRow(row);
+      newStore.put(migrated.value);
+    }
+  };
 }
 
 /** Load Y.Doc from y-indexeddb, return state, then destroy. Doc name must match CollaborationManager. */
@@ -506,18 +617,27 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
 
   /**
    * Return forward links emanating from the given page.
-   * 指定ページから出ているリンクを返す。
+   * When `linkType` is provided, scope to that type only (issue #725 Phase 1).
+   *
+   * 指定ページから出ているリンクを返す。`linkType` 指定時はその種別のみ返す。
    */
-  async getLinks(pageId: string): Promise<Link[]> {
+  async getLinks(pageId: string, linkType?: LinkType): Promise<Link[]> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("my_links", "readonly");
-      const index = tx.objectStore("my_links").index("by_source");
-      const req = index.getAll(pageId);
+      const store = tx.objectStore("my_links");
+      const index =
+        linkType !== undefined ? store.index("by_source_type") : store.index("by_source");
+      const req = linkType !== undefined ? index.getAll([pageId, linkType]) : index.getAll(pageId);
       req.onsuccess = () => {
         const rows = (req.result as StoredLink[]) || [];
         resolve(
-          rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })),
+          rows.map((r) => ({
+            sourceId: r.sourceId,
+            targetId: r.targetId,
+            linkType: r.linkType,
+            createdAt: r.createdAt,
+          })),
         );
       };
       req.onerror = () => reject(req.error);
@@ -526,9 +646,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
 
   /**
    * Return backlinks pointing at the given page.
-   * 指定ページに入ってくる被リンク（バックリンク）を返す。
+   * 指定ページに入ってくる被リンク（バックリンク）を返す。`linkType` 指定で絞る。
    */
-  async getBacklinks(pageId: string): Promise<Link[]> {
+  async getBacklinks(pageId: string, linkType?: LinkType): Promise<Link[]> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("my_links", "readonly");
@@ -536,8 +656,15 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
       const req = index.getAll(pageId);
       req.onsuccess = () => {
         const rows = (req.result as StoredLink[]) || [];
+        const filtered =
+          linkType !== undefined ? rows.filter((r) => r.linkType === linkType) : rows;
         resolve(
-          rows.map((r) => ({ sourceId: r.sourceId, targetId: r.targetId, createdAt: r.createdAt })),
+          filtered.map((r) => ({
+            sourceId: r.sourceId,
+            targetId: r.targetId,
+            linkType: r.linkType,
+            createdAt: r.createdAt,
+          })),
         );
       };
       req.onerror = () => reject(req.error);
@@ -545,24 +672,29 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   /**
-   * Replace all forward links for a source page (delete existing then insert).
-   * 指定ソースページの forward links を全置換する（既存削除→新規追加）。
+   * Replace all forward links of a single `linkType` for a source page
+   * (delete existing of that type, then insert). Rows of other link types are
+   * left untouched so that e.g. tag sync cannot wipe wiki edges.
+   *
+   * 指定ソースページの forward links を `linkType` スコープで全置換する。
+   * 他種別のエッジには触れない（issue #725 Phase 1）。
    */
-  async saveLinks(sourcePageId: string, links: Link[]): Promise<void> {
+  async saveLinks(sourcePageId: string, links: Link[], linkType: LinkType): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("my_links", "readwrite");
       const store = tx.objectStore("my_links");
-      const index = store.index("by_source");
-      const getAllReq = index.getAll(sourcePageId);
+      const index = store.index("by_source_type");
+      const getAllReq = index.getAll([sourcePageId, linkType]);
       getAllReq.onsuccess = () => {
         const existing = getAllReq.result as StoredLink[];
-        existing.forEach((r) => store.delete([r.sourceId, r.targetId]));
+        existing.forEach((r) => store.delete([r.sourceId, r.targetId, r.linkType]));
         const now = Date.now();
         links.forEach((l) => {
           store.put({
             sourceId: l.sourceId,
             targetId: l.targetId,
+            linkType,
             createdAt: l.createdAt ?? now,
           });
         });
@@ -574,21 +706,24 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   /**
-   * Return ghost links (unresolved wiki link targets) for a source page.
-   * 指定ソースページの ghost link（未解決リンク）を返す。
+   * Return ghost links (unresolved wiki link / tag targets) for a source page.
+   * 指定ソースページの ghost link を返す。`linkType` 指定で種別ごとに絞る。
    */
-  async getGhostLinks(pageId: string): Promise<GhostLink[]> {
+  async getGhostLinks(pageId: string, linkType?: LinkType): Promise<GhostLink[]> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("my_ghost_links", "readonly");
-      const index = tx.objectStore("my_ghost_links").index("by_source");
-      const req = index.getAll(pageId);
+      const store = tx.objectStore("my_ghost_links");
+      const index =
+        linkType !== undefined ? store.index("by_source_type") : store.index("by_source");
+      const req = linkType !== undefined ? index.getAll([pageId, linkType]) : index.getAll(pageId);
       req.onsuccess = () => {
         const rows = (req.result as StoredGhostLink[]) || [];
         resolve(
           rows.map((r) => ({
             linkText: r.linkText,
             sourcePageId: r.sourcePageId,
+            linkType: r.linkType,
             createdAt: r.createdAt,
             originalTargetPageId: r.originalTargetPageId ?? null,
             originalNoteId: r.originalNoteId ?? null,
@@ -600,24 +735,32 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   /**
-   * Replace all ghost links for a source page.
-   * 指定ソースページの ghost link を全置換する。
+   * Replace all ghost links of a single `linkType` for a source page. Rows of
+   * other link types are preserved so tag-ghost and wiki-ghost can coexist.
+   *
+   * 指定ソースページの ghost link を `linkType` スコープで全置換する。他種別の
+   * ゴーストは残る（issue #725 Phase 1）。
    */
-  async saveGhostLinks(sourcePageId: string, ghostLinks: GhostLink[]): Promise<void> {
+  async saveGhostLinks(
+    sourcePageId: string,
+    ghostLinks: GhostLink[],
+    linkType: LinkType,
+  ): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("my_ghost_links", "readwrite");
       const store = tx.objectStore("my_ghost_links");
-      const index = store.index("by_source");
-      const getAllReq = index.getAll(sourcePageId);
+      const index = store.index("by_source_type");
+      const getAllReq = index.getAll([sourcePageId, linkType]);
       getAllReq.onsuccess = () => {
         const existing = getAllReq.result as StoredGhostLink[];
-        existing.forEach((r) => store.delete([r.linkText, r.sourcePageId]));
+        existing.forEach((r) => store.delete([r.linkText, r.sourcePageId, r.linkType]));
         const now = Date.now();
         ghostLinks.forEach((g) => {
           store.put({
             linkText: g.linkText,
             sourcePageId: g.sourcePageId,
+            linkType,
             createdAt: g.createdAt ?? now,
             originalTargetPageId: g.originalTargetPageId ?? null,
             originalNoteId: g.originalNoteId ?? null,

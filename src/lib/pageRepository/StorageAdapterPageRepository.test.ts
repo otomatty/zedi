@@ -225,21 +225,62 @@ describe("StorageAdapterPageRepository", () => {
   });
 
   describe("addLink / removeLink", () => {
-    it("adds a link via adapter", async () => {
+    it("adds a link via adapter (defaults linkType to 'wiki')", async () => {
       (adapter.getLinks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
       await repo.addLink("source-1", "target-1");
 
       expect(adapter.saveLinks).toHaveBeenCalledOnce();
-      const saved = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock.calls[0][1] as Link[];
+      const call = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock.calls[0];
+      const saved = call[1] as Link[];
+      const linkType = call[2] as string;
       expect(saved).toHaveLength(1);
       expect(saved[0].sourceId).toBe("source-1");
       expect(saved[0].targetId).toBe("target-1");
+      expect(saved[0].linkType).toBe("wiki");
+      expect(linkType).toBe("wiki");
+    });
+
+    it("adds a tag edge when linkType='tag' is passed (issue #725 Phase 1)", async () => {
+      (adapter.getLinks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      await repo.addLink("source-1", "target-1", "tag");
+
+      expect(adapter.getLinks).toHaveBeenCalledWith("source-1", "tag");
+      const call = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock.calls[0];
+      const saved = call[1] as Link[];
+      const linkType = call[2] as string;
+      expect(saved[0].linkType).toBe("tag");
+      expect(linkType).toBe("tag");
+    });
+
+    it("addLink(wiki) does not wipe an existing tag edge on the same pair", async () => {
+      // adapter.getLinks("source-1", "wiki") returns only the wiki row; the tag
+      // row is in a separate linkType bucket so it is never read or written by
+      // this call. 一方で tag バケットは触れない。
+      (adapter.getLinks as ReturnType<typeof vi.fn>).mockImplementation((_src, type) => {
+        if (type === "wiki")
+          return Promise.resolve([
+            { sourceId: "s", targetId: "t", linkType: "wiki", createdAt: 1 },
+          ]);
+        return Promise.resolve([]);
+      });
+
+      await repo.addLink("s", "t", "wiki");
+
+      // saveLinks called only for 'wiki' bucket (idempotent since row exists),
+      // or not called if duplicate detection kicks in. Either way 'tag' bucket
+      // is never touched. getLinks for 'tag' must not have been called from
+      // this addLink.
+      const tagCalls = (adapter.getLinks as ReturnType<typeof vi.fn>).mock.calls.filter(
+        (c: unknown[]) => c[1] === "tag",
+      );
+      expect(tagCalls).toHaveLength(0);
     });
 
     it("does not add duplicate link", async () => {
       (adapter.getLinks as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { sourceId: "source-1", targetId: "target-1", createdAt: 1000 },
+        { sourceId: "source-1", targetId: "target-1", linkType: "wiki", createdAt: 1000 },
       ]);
 
       await repo.addLink("source-1", "target-1");
@@ -248,8 +289,8 @@ describe("StorageAdapterPageRepository", () => {
 
     it("removes a link via adapter", async () => {
       (adapter.getLinks as ReturnType<typeof vi.fn>).mockResolvedValue([
-        { sourceId: "s1", targetId: "t1", createdAt: 1000 },
-        { sourceId: "s1", targetId: "t2", createdAt: 2000 },
+        { sourceId: "s1", targetId: "t1", linkType: "wiki", createdAt: 1000 },
+        { sourceId: "s1", targetId: "t2", linkType: "wiki", createdAt: 2000 },
       ]);
 
       await repo.removeLink("s1", "t1");

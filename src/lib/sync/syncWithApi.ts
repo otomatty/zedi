@@ -5,9 +5,22 @@
  */
 
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
-import type { PageMetadata, GhostLink } from "@/lib/storageAdapter/types";
+import type { PageMetadata, GhostLink, Link, LinkType } from "@/lib/storageAdapter/types";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { SyncPageItem, SyncLinkItem, SyncGhostLinkItem } from "@/lib/api/types";
+
+/**
+ * `SyncLinkItem.link_type` / `SyncGhostLinkItem.link_type` のラベルを
+ * `LinkType` に正規化する。未指定および未知の値は `'wiki'` にフォールバック
+ * し、サーバ migration 前の旧データと互換を保つ (issue #725 Phase 1)。
+ *
+ * Normalize wire-format `link_type` into the adapter's `LinkType`. Unknown /
+ * missing values fall back to `'wiki'` so legacy rows remain readable while
+ * the v3 migration rolls out.
+ */
+function normalizeWireLinkType(value: "wiki" | "tag" | undefined | null): LinkType {
+  return value === "tag" ? "tag" : "wiki";
+}
 
 function syncPageToMetadata(row: SyncPageItem): PageMetadata {
   return {
@@ -212,25 +225,42 @@ function computeSince(
   return lastSync ? new Date(lastSync).toISOString() : undefined;
 }
 
-/** links/ghost_links を source ごとにグループ化し、pulledPageIds を含む全 source に対して保存する（stale クリア含む） */
+/**
+ * links / ghost_links を `(source, linkType)` ごとにグループ化し、
+ * pulledPageIds × 全 linkType を含む組に対して保存する（stale クリア含む）。
+ * issue #725 Phase 1 で linkType 次元を追加。
+ *
+ * Group links / ghost_links by `(source, linkType)` and persist every
+ * `pulledPageIds × linkType` pair so stale edges of any type get cleared
+ * even when the server returns nothing for that slot (issue #725 Phase 1).
+ */
 async function applyRelatedItems<T, U>(
   items: T[],
   pulledPageIds: Set<string>,
+  linkTypes: readonly LinkType[],
   getSourceId: (item: T) => string,
+  getLinkType: (item: T) => LinkType,
   mapToLocal: (items: T[]) => U[],
-  saveFn: (sourceId: string, localItems: U[]) => Promise<void>,
+  saveFn: (sourceId: string, localItems: U[], linkType: LinkType) => Promise<void>,
 ): Promise<void> {
-  const bySource = new Map<string, T[]>();
+  const bySourceType = new Map<string, T[]>();
+  const key = (sid: string, t: LinkType) => `${sid} ${t}`;
+  const presentSourceIds = new Set<string>();
   for (const item of items) {
     const sid = getSourceId(item);
-    const list = bySource.get(sid) ?? [];
+    const t = getLinkType(item);
+    presentSourceIds.add(sid);
+    const k = key(sid, t);
+    const list = bySourceType.get(k) ?? [];
     list.push(item);
-    bySource.set(sid, list);
+    bySourceType.set(k, list);
   }
-  const allSourceIds = new Set([...pulledPageIds, ...bySource.keys()]);
+  const allSourceIds = new Set([...pulledPageIds, ...presentSourceIds]);
   for (const sourceId of allSourceIds) {
-    const sourceItems = bySource.get(sourceId) ?? [];
-    await saveFn(sourceId, mapToLocal(sourceItems));
+    for (const t of linkTypes) {
+      const bucket = bySourceType.get(key(sourceId, t)) ?? [];
+      await saveFn(sourceId, mapToLocal(bucket), t);
+    }
   }
 }
 
@@ -258,34 +288,70 @@ async function applyPull(
     await adapter.upsertPage(meta);
   }
 
-  await applyRelatedItems(
+  // issue #725 Phase 1: `link_type` を明示的に含むクライアント/サーバの組み合わせ
+  // でのみ tag バケットの stale クリアを走らせる。pre-#725 のサーバやキャッシュ
+  // された旧レスポンスは `link_type` を含まないため、そうした payload で tag
+  // バケットを強制的に空保存するとローカルの tag エッジを誤って消してしまう。
+  // そこで「レスポンス全体（links or ghost_links いずれか）に 1 行でも explicit
+  // な `link_type` があれば wire が link_type を理解している」とみなし、その
+  // 場合は links / ghost_links 両方で全種別を対象にする。links と ghost_links
+  // を独立に判定すると、片方が空（例: `ghost_links: []`）のときに tag バケット
+  // のクリアが発動せず、stale なタグゴーストが残る問題があった（PR #733 レビュー）。
+  //
+  // Only clear the `'tag'` bucket when the payload proves the server speaks
+  // `link_type` (issue #725 Phase 1). A pre-#725 server or cached legacy
+  // response omits `link_type`, and enumerating all link types would otherwise
+  // silently erase local tag edges during mixed-version rollout. If **any**
+  // row across the whole response carries an explicit `link_type`, we trust
+  // the wire for both links and ghost_links. Checking them independently
+  // left stale tag ghost edges behind when the ghost_links array happened to
+  // be empty (PR #733 review: Devin).
+  const hasExplicitLinkType = (items: Array<{ link_type?: "wiki" | "tag" }>): boolean =>
+    items.some((row) => row.link_type !== undefined);
+  const serverSpeaksLinkType =
+    hasExplicitLinkType(res.links) || hasExplicitLinkType(res.ghost_links);
+  const linkTypesForLinks: readonly LinkType[] = serverSpeaksLinkType
+    ? (["wiki", "tag"] as const)
+    : (["wiki"] as const);
+  const linkTypesForGhosts: readonly LinkType[] = serverSpeaksLinkType
+    ? (["wiki", "tag"] as const)
+    : (["wiki"] as const);
+
+  await applyRelatedItems<SyncLinkItem, Link>(
     res.links,
     pulledPageIds,
+    linkTypesForLinks,
     (l) => l.source_id,
+    (l) => normalizeWireLinkType(l.link_type),
     (items) =>
       items.map((l) => ({
         sourceId: l.source_id,
         targetId: l.target_id,
+        linkType: normalizeWireLinkType(l.link_type),
         createdAt:
           typeof l.created_at === "string" ? new Date(l.created_at).getTime() : l.created_at,
       })),
-    (sourceId, links) => adapter.saveLinks(sourceId, links),
+    (sourceId, links, linkType) => adapter.saveLinks(sourceId, links, linkType),
   );
 
-  await applyRelatedItems(
+  await applyRelatedItems<SyncGhostLinkItem, GhostLink>(
     res.ghost_links,
     pulledPageIds,
+    linkTypesForGhosts,
     (g) => g.source_page_id,
+    (g) => normalizeWireLinkType(g.link_type),
     (items) =>
       items.map((g) => ({
         linkText: g.link_text,
         sourcePageId: g.source_page_id,
+        linkType: normalizeWireLinkType(g.link_type),
         createdAt:
           typeof g.created_at === "string" ? new Date(g.created_at).getTime() : g.created_at,
         originalTargetPageId: g.original_target_page_id ?? null,
         originalNoteId: g.original_note_id ?? null,
       })),
-    (sourcePageId, ghostLinks) => adapter.saveGhostLinks(sourcePageId, ghostLinks),
+    (sourcePageId, ghostLinks, linkType) =>
+      adapter.saveGhostLinks(sourcePageId, ghostLinks, linkType),
   );
 }
 
@@ -330,10 +396,16 @@ function finishSyncIfNoPushNeeded(
 async function pushPagesToApi(
   api: ApiClient,
   pushPages: PostSyncPageItem[],
-  pushLinks: Array<{ source_id: string; target_id: string; created_at: string }>,
+  pushLinks: Array<{
+    source_id: string;
+    target_id: string;
+    link_type: LinkType;
+    created_at: string;
+  }>,
   pushGhostLinks: Array<{
     link_text: string;
     source_page_id: string;
+    link_type: LinkType;
     created_at: string;
     original_target_page_id: string | null;
     original_note_id: string | null;
@@ -397,9 +469,13 @@ export async function syncWithApi(
     }
 
     const pushPages: PostSyncPageItem[] = pagesForPush.map(metadataToSyncPage);
-    const allLinks: Array<{ sourceId: string; targetId: string; createdAt: number }> = [];
-    const allGhostLinks: Array<GhostLink> = [];
+    const allLinks: Link[] = [];
+    const allGhostLinks: GhostLink[] = [];
     for (const p of pagesForPush) {
+      // 全種別をまとめて引く（linkType 指定なし = すべて）。サーバ側で
+      // `(source_id, link_type)` ペア単位に DELETE/INSERT される。
+      // Read every linkType; the server applies DELETE/INSERT scoped per
+      // `(source_id, link_type)` pair (issue #725 Phase 1).
       const links = await adapter.getLinks(p.id);
       allLinks.push(...links);
       const ghosts = await adapter.getGhostLinks(p.id);
@@ -408,11 +484,13 @@ export async function syncWithApi(
     const pushLinks = allLinks.map((l) => ({
       source_id: l.sourceId,
       target_id: l.targetId,
+      link_type: l.linkType,
       created_at: new Date(l.createdAt).toISOString(),
     }));
     const pushGhostLinks = allGhostLinks.map((g) => ({
       link_text: g.linkText,
       source_page_id: g.sourcePageId,
+      link_type: g.linkType,
       created_at: new Date(g.createdAt).toISOString(),
       original_target_page_id: g.originalTargetPageId ?? null,
       original_note_id: g.originalNoteId ?? null,

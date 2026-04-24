@@ -723,12 +723,39 @@ export function useSyncWikiLinks(options: UseSyncWikiLinksOptions = {}) {
       await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks, {
         pageNoteId,
         notePages,
+        linkType: "wiki",
       });
     },
     [getRepository, userId, pageNoteId, notePages],
   );
 
-  return { syncLinks };
+  /**
+   * タグ (`#name`) を `link_type='tag'` バケットで同期する (issue #725 Phase 1)。
+   * 解決ロジックは WikiLink と同一（タイトル正規化で一致 → `links`、不一致 →
+   * `ghost_links`）。呼び出し側は `extractTagsFromContent` で `{ name }` 配列を
+   * 作って `{ title: name, exists: false }` 形に詰め替える。
+   *
+   * Sync tags in the `link_type='tag'` bucket (issue #725 Phase 1). The
+   * resolution strategy matches WikiLinks (normalized-title match → `links`,
+   * miss → `ghost_links`). Callers feed `extractTagsFromContent` results in
+   * as `{ title: name }` entries so we can reuse one resolver.
+   */
+  const syncTags = useCallback(
+    async (sourcePageId: string, tags: Array<{ name: string }>): Promise<void> => {
+      const repo = await getRepository();
+      // tag の `name` は WikiLink の `title` に等価なので同じ resolver に流す。
+      // The tag name is title-equivalent for resolution purposes.
+      const asLinks = tags.map((t) => ({ title: t.name, exists: false }));
+      await syncLinksWithRepo(repo, userId, sourcePageId, asLinks, {
+        pageNoteId,
+        notePages,
+        linkType: "tag",
+      });
+    },
+    [getRepository, userId, pageNoteId, notePages],
+  );
+
+  return { syncLinks, syncTags };
 }
 
 /**
