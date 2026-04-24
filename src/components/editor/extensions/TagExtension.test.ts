@@ -8,9 +8,25 @@ import { Tag, TAG_PASTE_REGEX, extractTagName, isExcludedTagName } from "./TagEx
  * See issue #725 (Phase 1). The regex is intentionally broad; fine-grained
  * exclusions (numeric-only, hex colors) are enforced in `getAttributes` via
  * `isExcludedTagName` so that reject reasons are colocated with the data shape.
+ *
+ * `TAG_PASTE_REGEX` intentionally has no capture group so Tiptap's
+ * `markPasteRule` applies the mark to the full `#name` literal (the same
+ * contract as `WIKI_LINK_PASTE_REGEX`). Tests below assert the full match
+ * includes the leading `#` and that no capture group is introduced.
  */
 describe("TagExtension paste rule", () => {
   describe("TAG_PASTE_REGEX", () => {
+    it("has no capture group — full match preserves the leading `#`", () => {
+      // `markPasteRule` が最後のキャプチャグループを優先する仕様を悪用しない
+      // ように、正規表現全体を単一の一致として扱う。
+      // Guards against a regression where a capture group is reintroduced and
+      // `markPasteRule` strips the leading `#` from pasted text.
+      const matches = [..."#tech".matchAll(TAG_PASTE_REGEX)];
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toHaveLength(1);
+      expect(matches[0][0]).toBe("#tech");
+    });
+
     it("matches a basic #tag pattern", () => {
       const text = "I like #tech";
       const matches = [...text.matchAll(TAG_PASTE_REGEX)];
@@ -171,19 +187,19 @@ describe("TagExtension paste rule", () => {
       expect(extractTagName("tech")).toBeNull();
     });
   });
+});
 
-  describe("Tag extension configuration", () => {
-    it("has addPasteRules defined", () => {
-      const extension = Tag.configure({});
-      expect(extension.config.addPasteRules).toBeDefined();
-      expect(typeof extension.config.addPasteRules).toBe("function");
-    });
+describe("Tag extension configuration", () => {
+  it("has addPasteRules defined", () => {
+    const extension = Tag.configure({});
+    expect(extension.config.addPasteRules).toBeDefined();
+    expect(typeof extension.config.addPasteRules).toBe("function");
+  });
 
-    it("keeps existing functionality (parseHTML, renderHTML, addAttributes)", () => {
-      const extension = Tag.configure({});
-      expect(extension.config.parseHTML).toBeDefined();
-      expect(extension.config.renderHTML).toBeDefined();
-      expect(extension.config.addAttributes).toBeDefined();
-    });
+  it("keeps existing functionality (parseHTML, renderHTML, addAttributes)", () => {
+    const extension = Tag.configure({});
+    expect(extension.config.parseHTML).toBeDefined();
+    expect(extension.config.renderHTML).toBeDefined();
+    expect(extension.config.addAttributes).toBeDefined();
   });
 });

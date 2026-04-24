@@ -445,9 +445,10 @@
   /* Tag styling — shares the WikiLink color scheme so existing/referenced/ghost
      states are visually consistent across both mark types. See issue #725. */
   /* タグのスタイル。WikiLink と同じ色系列を共有し、existing / referenced /
-     ghost の 3 状態を両マーク共通で表現する。Issue #725 を参照。*/
+     ghost の 3 状態を両マーク共通で表現する。Issue #725 を参照。 */
   .tag {
     @apply text-link -mx-0.5 cursor-pointer rounded px-0.5 font-medium transition-colors duration-200 hover:underline;
+
     background: hsl(var(--link-color) / 0.1);
   }
 
@@ -457,6 +458,7 @@
 
   .tag-referenced {
     @apply text-link-referenced -mx-0.5 cursor-pointer rounded border-b border-dashed border-current px-0.5 font-medium transition-colors duration-200 hover:border-solid;
+
     background: hsl(var(--link-referenced) / 0.1);
   }
 
@@ -466,6 +468,7 @@
 
   .tag-ghost {
     @apply border-ghost-link/50 text-ghost-link hover:border-ghost-link -mx-0.5 cursor-pointer rounded border-b border-dashed px-0.5 font-medium transition-colors duration-200;
+
     background: hsl(var(--link-ghost) / 0.1);
   }
 
@@ -476,6 +479,7 @@
   /* Tag typing state (while the user is composing `#name`). */
   .tag-typing {
     @apply text-primary;
+
     background: hsl(var(--primary) / 0.15);
     border-radius: 2px;
   }

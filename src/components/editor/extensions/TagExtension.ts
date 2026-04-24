@@ -13,21 +13,26 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
  *   Hiragana, Katakana, or CJK Unified/Extension A characters.
  * - Trailing punctuation (`、。,.!?:;` 等) terminates the name.
  *
+ * Tiptap's `markPasteRule` applies the mark to the *last* capture group and
+ * deletes the rest of the match — the same caveat `WikiLinkExtension`
+ * documents. To keep the leading `#` inside the mark we intentionally omit
+ * capture groups so `match[match.length - 1]` equals `match[0]` (the full
+ * `#name` literal). The tag name is extracted afterwards via
+ * {@link extractTagName}.
+ *
+ * Tiptap の `markPasteRule` は最後のキャプチャグループにのみマークを適用し、
+ * それ以外を削除する仕様（`WikiLinkExtension` と同様）。先頭の `#` を
+ * マーク範囲に含めるため、敢えてキャプチャグループを使わず `match[0]` を
+ * そのままマーク対象とし、タグ名は {@link extractTagName} で後付け抽出する。
+ *
  * Fine-grained exclusions (numeric-only, 6/8-char hex colors) are applied in
  * `getAttributes` via {@link isExcludedTagName} so reject reasons sit next to
  * the data shape rather than in regex alternations.
  *
- * マッチ成立条件:
- * - `#` の直前が単語文字・`/`・別の `#` ではないこと（`abc#tag`、URL
- *   フラグメント `/page#anchor`、`##` を除外）。
- * - タグ名は英数字・アンダースコア・ハイフンおよびひらがな・カタカナ・
- *   漢字（CJK Unified／Extension A）で構成される。
- * - 句読点（`、。,.!?:;` 等）で終端する。
- *
  * 数字のみ・6/8 桁純 hex のような細かな除外は {@link isExcludedTagName} で
  * 行い、理由とデータ形状をまとめて管理する。
  */
-export const TAG_PASTE_REGEX = /(?<![\w/#])#([A-Za-z0-9_\-぀-ヿ㐀-鿿]+)/g;
+export const TAG_PASTE_REGEX = /(?<![\w/#])#[A-Za-z0-9_\-぀-ヿ㐀-鿿]+/g;
 
 /**
  * Regex for extracting a tag name from a single `#name` literal (non-global).
@@ -93,19 +98,10 @@ export interface TagOptions {
 // - exists=false, referenced=true: No page yet, but the same tag is used elsewhere
 // - exists=false, referenced=false: Brand-new tag, ghost-only
 
-declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
-    tag: {
-      setTag: (attributes: { name: string; exists: boolean }) => ReturnType;
-      unsetTag: () => ReturnType;
-    };
-  }
-}
-
 /**
  * Tiptap mark extension for hashtags (`#name`). Shares the underlying data
- * model with {@link WikiLink}; `linkType` is set to `'tag'` when syncing to
- * the `links` / `ghost_links` tables. See issue #725.
+ * model with `WikiLink`; `linkType` is set to `'tag'` when syncing to the
+ * `links` / `ghost_links` tables. See issue #725.
  *
  * ハッシュタグ（`#name`）用の Tiptap マーク拡張。データモデルは WikiLink と
  * 共有し、`links` / `ghost_links` 同期時に `linkType = 'tag'` として扱う。
@@ -193,11 +189,13 @@ export const Tag = Mark.create<TagOptions>({
         find: TAG_PASTE_REGEX,
         type: this.type,
         getAttributes: (match) => {
-          // `match[1]` はタグ名（`#` を除いた部分）。除外ルールに該当する
-          // 名前の場合はマーク付与を中止する。
-          // `match[1]` is the tag name without the leading `#`. Reject if the
-          // name hits an exclusion rule.
-          const name = (match[1] ?? "").trim();
+          // `match[0]` は `#name` 全体。ここからタグ名のみを取り出し、除外
+          // ルールに該当するものはマーク付与を中止する。キャプチャグループを
+          // 使わないのは `markPasteRule` が最後のキャプチャだけをマーク範囲に
+          // するため（先頭 `#` が外れないように全一致を対象にする）。
+          // `match[0]` is the full `#name` literal. Extract the name (stripping
+          // the leading `#`) and reject when it hits an exclusion rule.
+          const name = extractTagName(match[0] ?? "");
           if (!name || isExcludedTagName(name)) return false;
           return { name, exists: false, referenced: false };
         },
@@ -215,10 +213,13 @@ export const Tag = Mark.create<TagOptions>({
           handleClick: (_view, _pos, event) => {
             if (!onTagClick) return false;
 
-            const target = event.target as HTMLElement;
+            // `event.target` は `EventTarget | null` でありテキストノード等
+            // `Element` 以外も取り得るため、`closest` 呼び出し前にガードする。
+            // `event.target` may not be an `Element`; guard before `closest`.
+            if (!(event.target instanceof Element)) return false;
 
             // Check if clicked on a tag element
-            const tagElement = target.closest("[data-tag]") as HTMLElement | null;
+            const tagElement = event.target.closest("[data-tag]") as HTMLElement | null;
             if (!tagElement) return false;
 
             const name = tagElement.getAttribute("data-name");

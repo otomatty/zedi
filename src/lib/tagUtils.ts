@@ -25,6 +25,20 @@ export interface TagInfo {
 }
 
 /**
+ * Return the trimmed tag name when the raw attribute is a non-empty string,
+ * otherwise `null`. Guards against non-string or whitespace-only `attrs.name`
+ * values slipping into downstream `.toLowerCase()` calls.
+ *
+ * `attrs.name` が非空文字列のときにトリム済みの値を、それ以外のとき `null`
+ * を返す。`.toLowerCase()` など後続処理が落ちないよう型ガードとして使う。
+ */
+function normalizeTagNameAttr(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
  * Extract tag marks from a Tiptap JSON string.
  * Tiptap JSON 文字列からタグマークを抽出する。
  *
@@ -54,11 +68,12 @@ export function extractTagsFromContent(content: string): TagInfo[] {
             const attrs = (mark as Record<string, unknown>).attrs as
               | Record<string, unknown>
               | undefined;
-            if (attrs?.name) {
+            const name = normalizeTagNameAttr(attrs?.name);
+            if (name) {
               tags.push({
-                name: attrs.name as string,
-                exists: Boolean(attrs.exists),
-                referenced: Boolean(attrs.referenced),
+                name,
+                exists: Boolean(attrs?.exists),
+                referenced: Boolean(attrs?.referenced),
               });
             }
           }
@@ -118,8 +133,9 @@ export function updateTagAttributes(
             const attrs = (mark as Record<string, unknown>).attrs as
               | Record<string, unknown>
               | undefined;
-            if (attrs?.name) {
-              const normalizedName = (attrs.name as string).toLowerCase().trim();
+            const name = normalizeTagNameAttr(attrs?.name);
+            if (name && attrs) {
+              const normalizedName = name.toLowerCase();
               const newExists = pageTitles.has(normalizedName);
               const newReferenced = referencedTitles.has(normalizedName);
 

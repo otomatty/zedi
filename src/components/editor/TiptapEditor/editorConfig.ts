@@ -30,7 +30,6 @@ import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
 } from "../extensions/wikiLinkSuggestionPlugin";
-import { TagSuggestionPlugin, type TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 import {
   SlashSuggestionPlugin,
   type SlashSuggestionState,
@@ -110,12 +109,6 @@ export interface EditorExtensionsOptions {
    */
   onTagClick?: (name: string) => void;
   onStateChange: (state: WikiLinkSuggestionState) => void;
-  /**
-   * Notifier for tag suggestion state changes (typing `#name`). Optional so
-   * callers that have not yet wired the UI can fall back to a no-op.
-   * タグサジェストの状態変化通知（`#name` 入力中）。未接続なら no-op。
-   */
-  onTagStateChange?: (state: TagSuggestionState) => void;
   onSlashStateChange: (state: SlashSuggestionState) => void;
   imageUploadOptions: Partial<ImageUploadOptions>;
   imageOptions: Partial<StorageImageOptions>;
@@ -136,7 +129,6 @@ interface CommonEditorExtensionsOptions {
   onLinkClick: (title: string) => void;
   onTagClick?: (name: string) => void;
   onStateChange?: (state: WikiLinkSuggestionState) => void;
-  onTagStateChange?: (state: TagSuggestionState) => void;
   onSlashStateChange?: (state: SlashSuggestionState) => void;
   imageUploadOptions?: Partial<ImageUploadOptions>;
   imageOptions?: Partial<StorageImageOptions>;
@@ -247,9 +239,6 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
           WikiLinkSuggestionPlugin.configure({
             onStateChange: options.onStateChange ?? (() => undefined),
           }),
-          TagSuggestionPlugin.configure({
-            onStateChange: options.onTagStateChange ?? (() => undefined),
-          }),
           // --- Phase 0: Slash Command ---
           SlashSuggestionPlugin.configure({
             onStateChange: options.onSlashStateChange ?? (() => undefined),
@@ -309,7 +298,6 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     onLinkClick: options.onLinkClick,
     onTagClick: options.onTagClick,
     onStateChange: options.onStateChange,
-    onTagStateChange: options.onTagStateChange,
     onSlashStateChange: options.onSlashStateChange,
     imageUploadOptions: options.imageUploadOptions,
     imageOptions: options.imageOptions,
