@@ -324,8 +324,7 @@ app.get("/:id", authRequired, async (c) => {
 
   // S3 が部分応答を返した場合は 206 でそのまま返す。
   // Relay S3's partial-content responses as HTTP 206.
-  const isPartial = response.ContentRange !== undefined || rangeHeader !== undefined;
-  const status = isPartial && response.ContentRange ? 206 : 200;
+  const status = response.ContentRange ? 206 : 200;
 
   return new Response(webStream as BodyInit, {
     status,
