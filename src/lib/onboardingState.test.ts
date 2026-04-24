@@ -123,4 +123,27 @@ describe("onboardingState", () => {
       expect(getOnboardingCache(USER_A)).toEqual({ hasCompletedSetupWizard: true });
     });
   });
+
+  describe("legacy migration", () => {
+    it("promotes the legacy `zedi-onboarding` flag into the per-user cache", () => {
+      localStorage.setItem(PRE_V2_LEGACY_KEY, JSON.stringify({ hasCompletedSetupWizard: true }));
+      expect(getOnboardingCache(USER_A)).toEqual({ hasCompletedSetupWizard: true });
+      // After migration the per-user key holds the flag, and legacy keys are gone.
+      expect(JSON.parse(localStorage.getItem(keyFor(USER_A)) ?? "{}")).toEqual({
+        hasCompletedSetupWizard: true,
+      });
+      expect(localStorage.getItem(PRE_V2_LEGACY_KEY)).toBeNull();
+    });
+
+    it("does not recurse infinitely when both legacy keys are populated (regression #728)", () => {
+      // 旧 global key と pre-v2 key の両方に値がある状態でも getOnboardingCache が
+      // 終了することを確認する（setOnboardingCache 経由での無限再帰回帰テスト）。
+      localStorage.setItem(LEGACY_GLOBAL_KEY, JSON.stringify({ hasCompletedSetupWizard: true }));
+      localStorage.setItem(PRE_V2_LEGACY_KEY, JSON.stringify({ hasCompletedSetupWizard: true }));
+      expect(() => getOnboardingCache(USER_A)).not.toThrow();
+      expect(getOnboardingCache(USER_A)).toEqual({ hasCompletedSetupWizard: true });
+      expect(localStorage.getItem(LEGACY_GLOBAL_KEY)).toBeNull();
+      expect(localStorage.getItem(PRE_V2_LEGACY_KEY)).toBeNull();
+    });
+  });
 });

@@ -80,9 +80,12 @@ app.post("/complete", authRequired, async (c) => {
       })
       .where(eq(users.id, userId));
 
-    // 2. ウェルカムページを生成（まだ無い場合）。
-    //    Generate the welcome page if one does not yet exist.
-    const welcome = await insertWelcomePage(tx, userId, locale);
+    // 2. ウェルカムページを生成（まだ無い場合）。requested_locale と同じ
+    //    正規化値を渡し、リトライ時との整合性を担保する。
+    //    Generate the welcome page if one does not yet exist. Pass the already
+    //    normalized locale so a later retry — which reads `requested_locale`
+    //    verbatim — produces the same language.
+    const welcome = await insertWelcomePage(tx, userId, normalizedLocale);
 
     // 3. user_onboarding_status を upsert。setup_completed_at は今回初めて
     //    確定し、welcome_page_id はページ生成時のみ上書きする（既存ページが

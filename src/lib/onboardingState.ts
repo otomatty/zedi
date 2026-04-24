@@ -94,11 +94,18 @@ export function getOnboardingCache(userId: string | null | undefined): Onboardin
   }
   // 新キーに値が無いので旧キーを覗く（互換レイヤー）。マイグレーション完了後に
   // 旧キーを掃除し、次回以降はファストパスで完結させる。
-  // Fall back to the legacy keys (compat layer). After promoting the flag to
-  // the per-user key, drop the legacy entries so the fast path wins next time.
+  // setOnboardingCache は getOnboardingCache を呼び出して merge するため、ここで
+  // 使うと無限再帰になる（新キーが無く、旧キーも生きているため毎回 fallback に
+  // 戻ってきてしまう）。直接 localStorage.setItem で書くことで循環を断つ。
+  //
+  // Fall back to the legacy keys (compat layer) and promote the flag to the
+  // per-user key. Write directly to `localStorage` instead of going through
+  // `setOnboardingCache` — that path re-enters this function to merge the
+  // current value and would recurse forever while the legacy keys are still
+  // present.
   if (readLegacyCompletion()) {
-    setOnboardingCache(userId, { hasCompletedSetupWizard: true });
     try {
+      localStorage.setItem(key, JSON.stringify({ hasCompletedSetupWizard: true }));
       localStorage.removeItem(LEGACY_GLOBAL_KEY);
       localStorage.removeItem(PRE_V2_LEGACY_KEY);
     } catch {
