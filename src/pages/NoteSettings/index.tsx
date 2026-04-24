@@ -88,6 +88,14 @@ const NoteSettings: React.FC = () => {
       await deleteNoteMutation.mutateAsync(noteId);
       toast({ title: t("notes.noteDeleted") });
       setIsDeleteDialogOpen(false);
+      // ノート（コンテナ）削除後はノート一覧 (`/notes`) へ戻す。個人ページ削除
+      // (`usePageDeletion` / `NotePageView`) がホーム (`/home`) へ戻すのは、
+      // 削除対象がページであり個人ホームに属しているため。両者は対象が異なる
+      // ので遷移先も異なる（PR #719 CodeRabbit の指摘への明示）。
+      // After deleting a note (the container), return to the notes index
+      // (`/notes`). Page-level deletes go to `/home` because the deleted
+      // entity belongs to the personal home—different entities, different
+      // landing pages by design (clarified per PR #719 review feedback).
       navigate("/notes");
     } catch (error) {
       console.error("Failed to delete note:", error);
