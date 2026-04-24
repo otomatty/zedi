@@ -468,7 +468,7 @@ describe("syncWithApi", () => {
     expect(secondCall[0].links[0]).toMatchObject({ link_type: "wiki" });
   });
 
-  it("includes link_type='tag' on push when local has tag edges (issue #725 Phase 1)", async () => {
+  it("ローカルにタグエッジがある場合、push に link_type='tag' を含める / includes link_type='tag' on push when local has tag edges (issue #725 Phase 1)", async () => {
     const localPage: PageMetadata = {
       id: "p1",
       ownerId: TEST_USER_ID,

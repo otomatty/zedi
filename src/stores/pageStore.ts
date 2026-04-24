@@ -129,21 +129,15 @@ export const usePageStore = create<PageStore>()(
         }));
       },
 
-      getOutgoingLinks: (pageId, linkType) => {
+      getOutgoingLinks: (pageId, linkType = "wiki") => {
         return get()
-          .links.filter(
-            (link) =>
-              link.sourceId === pageId && (linkType === undefined || link.linkType === linkType),
-          )
+          .links.filter((link) => link.sourceId === pageId && link.linkType === linkType)
           .map((link) => link.targetId);
       },
 
-      getBacklinks: (pageId, linkType) => {
+      getBacklinks: (pageId, linkType = "wiki") => {
         return get()
-          .links.filter(
-            (link) =>
-              link.targetId === pageId && (linkType === undefined || link.linkType === linkType),
-          )
+          .links.filter((link) => link.targetId === pageId && link.linkType === linkType)
           .map((link) => link.sourceId);
       },
 
@@ -177,16 +171,15 @@ export const usePageStore = create<PageStore>()(
         }));
       },
 
-      getGhostLinkSources: (linkText, linkType) => {
+      getGhostLinkSources: (linkText, linkType = "wiki") => {
         return get()
-          .ghostLinks.filter(
-            (gl) =>
-              gl.linkText === linkText && (linkType === undefined || gl.linkType === linkType),
-          )
+          .ghostLinks.filter((gl) => gl.linkText === linkText && gl.linkType === linkType)
           .map((gl) => gl.sourcePageId);
       },
 
       promoteGhostLink: (linkText) => {
+        // ゴースト昇格は WikiLink 限定。タグゴーストは通常のタグ同期で解決する
+        // 想定のため、多元ソース昇格の対象外（issue #725 Phase 1）。
         // Promotion is wiki-only; tag ghosts are resolved via tag sync, not
         // multi-source promotion (issue #725 Phase 1).
         const sources = get().getGhostLinkSources(linkText, "wiki");

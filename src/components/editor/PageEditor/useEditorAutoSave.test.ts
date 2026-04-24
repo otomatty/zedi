@@ -91,13 +91,23 @@ describe("useEditorAutoSave", () => {
       expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
     });
 
-    it("tag marks あり + syncTags 指定時は syncTags が呼ばれる (issue #725 Phase 1)", async () => {
+    it("tag marks あり + syncTags 指定時は syncTags が呼ばれ、重複タグは getUniqueTagNames で畳まれる (issue #725 Phase 1)", async () => {
+      // 同じタグ名 `#tech` を 2 回出しても `getUniqueTagNames` で 1 件に畳まれて
+      // `syncTags` が呼ばれることを検証（CodeRabbit のレビュー指摘）。
+      // Duplicate `#tech` marks must collapse via `getUniqueTagNames` so
+      // `syncTags` is called once with a single entry (CodeRabbit review).
       const tagContent = JSON.stringify({
         type: "doc",
         content: [
           {
             type: "paragraph",
             content: [
+              {
+                type: "text",
+                marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
+                text: "#tech",
+              },
+              { type: "text", text: " " },
               {
                 type: "text",
                 marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
@@ -131,6 +141,8 @@ describe("useEditorAutoSave", () => {
         await vi.runAllTimersAsync();
       });
 
+      // dedupe 後の 1 件だけが渡ることを確認。
+      // Only the deduped single entry should reach `syncTags`.
       expect(syncTags).toHaveBeenCalledTimes(1);
       expect(syncTags).toHaveBeenCalledWith("page-1", [{ name: "tech" }]);
       // Wiki マークは無いが、stale cleanup のため空配列で 1 回呼ぶ契約。
@@ -180,6 +192,9 @@ describe("useEditorAutoSave", () => {
 
       // syncTags prop が無ければタグ同期はスキップ。一方 syncWikiLinks は
       // 空配列（wiki マーク無し）でも呼んで stale cleanup を走らせる。
+      // Without a `syncTags` prop, tag sync is skipped; meanwhile
+      // `syncWikiLinks` is still called (with an empty array when no wiki
+      // marks exist) so stale wiki edges get delta-cleaned.
       expect(syncWikiLinks).toHaveBeenCalledTimes(1);
       expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
     });
