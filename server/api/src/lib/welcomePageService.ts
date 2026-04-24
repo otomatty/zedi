@@ -53,6 +53,16 @@ const welcomePageExtensions = [
 ];
 
 /**
+ * Tiptap スキーマはウェルカムページ生成のたびに組み立てる必要がない
+ * （拡張セットは不変）。モジュールロード時に一度だけ `getSchema` を実行して
+ * ウォームパスのコストを削減する。
+ *
+ * The Tiptap schema is invariant for welcome-page generation, so build it
+ * once at module load instead of per call to keep the hot path cheap.
+ */
+const welcomePageSchema = getSchema(welcomePageExtensions);
+
+/**
  * Drizzle のトランザクション型。サービスを route 側のトランザクションに参加
  * させるため型を抽出する。
  *
@@ -124,8 +134,7 @@ export async function insertWelcomePage(
   const title = WELCOME_PAGE_TITLE[locale];
   const contentPreview = extractPreviewText(doc);
 
-  const schema = getSchema(welcomePageExtensions);
-  const ydoc = prosemirrorJSONToYDoc(schema, doc, YDOC_FRAGMENT);
+  const ydoc = prosemirrorJSONToYDoc(welcomePageSchema, doc, YDOC_FRAGMENT);
   const ydocState = Y.encodeStateAsUpdate(ydoc);
 
   const [page] = await tx

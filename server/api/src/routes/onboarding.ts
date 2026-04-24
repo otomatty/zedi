@@ -13,7 +13,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { users, userOnboardingStatus } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
@@ -89,7 +89,11 @@ app.post("/complete", authRequired, async (c) => {
       .onConflictDoUpdate({
         target: userOnboardingStatus.userId,
         set: {
-          setupCompletedAt: now,
+          // `setupCompletedAt` は「初回完了時刻」を保持する値なので、
+          // 既存レコードの値がある場合は上書きしない（ユーザーが完了 API を
+          // 複数回叩いても初回時刻は保たれる）。
+          // Preserve the first completion time: existing values win over `now`.
+          setupCompletedAt: sql`COALESCE(${userOnboardingStatus.setupCompletedAt}, ${now})`,
           updatedAt: now,
           ...(welcome
             ? {

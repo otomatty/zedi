@@ -1,14 +1,46 @@
-import { useCallback, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 import { useTranslation } from "react-i18next";
 import { FileImage, FileVideo, Link as LinkIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { Button, Input } from "@zedi/ui";
-import { ApiError } from "@/lib/api/apiClient";
 import type { MediaPlaceholderMode } from "./extensions/MediaPlaceholderExtension";
 
-const IMAGE_MIME_ACCEPT = "image/*";
-const VIDEO_MIME_ACCEPT = "video/webm,video/mp4";
+/**
+ * サーバーの `ALLOWED_UPLOAD_TYPES`（server/api/src/routes/media.ts）と一致させた
+ * クライアント側の許可 MIME セット。ここが緩いとサーバーに弾かれて生の HTTP 415
+ * 文字列がユーザーに見えてしまうため、二重定義してでも同期させる。
+ *
+ * Mirror of the server's `ALLOWED_UPLOAD_TYPES` so we surface the friendly
+ * localized error before the request hits the server.
+ */
+const ALLOWED_IMAGE_MIME = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/apng",
+  "image/bmp",
+  "image/x-ms-bmp",
+]);
+const ALLOWED_VIDEO_MIME = new Set(["video/webm", "video/mp4"]);
+
+const IMAGE_MIME_ACCEPT = [...ALLOWED_IMAGE_MIME].join(",");
+const VIDEO_MIME_ACCEPT = [...ALLOWED_VIDEO_MIME].join(",");
 const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
+
+/**
+ * VITE_API_BASE_URL で分離構成される本番環境でも `/api/media/*` が正しい API
+ * オリジンへ飛ぶよう、ベース URL を解決する。フロントエンド = API のときは空文字で
+ * フォールバックし、相対 URL のまま発行する。
+ *
+ * Resolves the API origin so split deployments with `VITE_API_BASE_URL`
+ * route `/api/media/*` to the correct host.
+ */
+function resolveApiBaseUrl(): string {
+  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+  return base.replace(/\/$/, "");
+}
 
 /**
  * ファイル名から代替テキストを自動生成する（拡張子を外し、記号を空白に変換して
@@ -30,14 +62,35 @@ function deriveAltFromFileName(fileName: string): string {
  * Validates that a file's MIME type matches the placeholder mode.
  */
 function isMimeAllowedForMode(mime: string, mode: MediaPlaceholderMode): boolean {
-  if (mode === "image") return mime.startsWith("image/");
-  return mime === "video/webm" || mime === "video/mp4";
+  const normalized = mime.toLowerCase();
+  if (mode === "image") return ALLOWED_IMAGE_MIME.has(normalized);
+  return ALLOWED_VIDEO_MIME.has(normalized);
 }
 
 type UploadState =
   | { kind: "idle" }
   | { kind: "uploading"; progress: number }
   | { kind: "error"; message: string };
+
+/**
+ * レスポンスから人間向けエラーメッセージを抽出する。サーバーは
+ * `{ ok: false, error: { message } }` または `{ message }` を返す。
+ *
+ * Extracts a human-readable message from an API error response; both the
+ * envelope shape and the legacy `{ message }` shape are accepted.
+ */
+async function extractErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = (await response.json()) as {
+      ok?: boolean;
+      error?: { message?: string };
+      message?: string;
+    } | null;
+    return data?.error?.message ?? data?.message ?? `${fallback} (HTTP ${response.status})`;
+  } catch {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+}
 
 /**
  * MediaPlaceholder の NodeView。File 選択 / URL 入力 / ドラッグ＆ドロップを
@@ -60,6 +113,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
 
   const targetNodeType = mode === "video" ? "video" : "image";
   const acceptAttr = mode === "video" ? VIDEO_MIME_ACCEPT : IMAGE_MIME_ACCEPT;
+  const apiBaseUrl = useMemo(() => resolveApiBaseUrl(), []);
 
   /**
    * プレースホルダーを指定属性の最終ノードで置き換える。
@@ -81,10 +135,13 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
 
   /**
    * /api/media/upload → PUT → /api/media/confirm の 2 段アップロードを行い、
-   * 完了したら自分を最終ノードに置き換える。
+   * 完了したら自分を最終ノードに置き換える。confirm が失敗した場合は壊れた
+   * メディアノードを残さず、エラー表示に留める。
    *
    * Presigned upload flow: POST /api/media/upload → PUT to S3 → POST
    * /api/media/confirm → replace placeholder with the final media node.
+   * A failed confirm aborts before any replacement so the user does not end
+   * up with a broken media node pointing at a non-existent DB row.
    */
   const handleFileUpload = useCallback(
     async (file: File) => {
@@ -105,7 +162,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
 
       setUploadState({ kind: "uploading", progress: 0 });
       try {
-        const presign = await fetch("/api/media/upload", {
+        const presign = await fetch(`${apiBaseUrl}/api/media/upload`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -115,7 +172,11 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
             file_size: file.size,
           }),
         });
-        if (!presign.ok) throw new Error(`presign failed: HTTP ${presign.status}`);
+        if (!presign.ok) {
+          throw new Error(
+            await extractErrorMessage(presign, t("editor.media.errors.uploadFailed")),
+          );
+        }
         const { upload_url, media_id, s3_key } = (await presign.json()) as {
           upload_url: string;
           media_id: string;
@@ -127,9 +188,11 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
           body: file,
           headers: { "Content-Type": file.type },
         });
-        if (!put.ok) throw new Error(`upload failed: HTTP ${put.status}`);
+        if (!put.ok) {
+          throw new Error(`${t("editor.media.errors.uploadFailed")} (HTTP ${put.status})`);
+        }
 
-        await fetch("/api/media/confirm", {
+        const confirm = await fetch(`${apiBaseUrl}/api/media/confirm`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -141,23 +204,24 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
             file_size: file.size,
           }),
         });
+        if (!confirm.ok) {
+          throw new Error(
+            await extractErrorMessage(confirm, t("editor.media.errors.uploadFailed")),
+          );
+        }
 
         const derivedAlt = altValue.trim() || deriveAltFromFileName(file.name);
         replaceWithMediaNode({
-          src: `/api/media/${media_id}`,
+          src: `${apiBaseUrl}/api/media/${media_id}`,
           alt: derivedAlt,
         });
       } catch (error) {
         const message =
-          error instanceof ApiError
-            ? error.message
-            : error instanceof Error
-              ? error.message
-              : t("editor.media.errors.uploadFailed");
+          error instanceof Error ? error.message : t("editor.media.errors.uploadFailed");
         setUploadState({ kind: "error", message });
       }
     },
-    [altValue, mode, replaceWithMediaNode, t],
+    [altValue, apiBaseUrl, mode, replaceWithMediaNode, t],
   );
 
   const handleFileInputChange = useCallback(
@@ -172,15 +236,17 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
   const handleUrlSubmit = useCallback(() => {
     const trimmed = urlValue.trim();
     if (!trimmed) return;
+    // `javascript:` などのスキームを排除するため、相対 URL もベース付きで new URL を通す。
+    // Route everything — including relative URLs — through `new URL` so we
+    // explicitly reject schemes like `javascript:` that start with "ja".
+    let parsed: URL;
     try {
-      // 相対 URL（/api/media/...）も受け入れるため、プロトコル無しは new URL を通さない。
-      // Accept relative URLs (e.g. /api/media/...) by parsing against a safe base.
-      const parsed = trimmed.startsWith("http") ? new URL(trimmed) : null;
-      if (parsed && parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        setUploadState({ kind: "error", message: t("editor.media.errors.invalidUrl") });
-        return;
-      }
+      parsed = new URL(trimmed, window.location.origin);
     } catch {
+      setUploadState({ kind: "error", message: t("editor.media.errors.invalidUrl") });
+      return;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       setUploadState({ kind: "error", message: t("editor.media.errors.invalidUrl") });
       return;
     }
