@@ -42,11 +42,12 @@
  */
 
 import * as Y from "yjs";
-import { and, eq, sql, ne } from "drizzle-orm";
-import { links, ghostLinks, pageContents } from "../schema/index.js";
+import { and, eq, sql, ne, inArray, isNull } from "drizzle-orm";
+import { links, ghostLinks, pageContents, pages } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 import { rewriteTitleRefsInDoc, type RewriteResult } from "./ydocRenameRewrite.js";
 import { invalidateHocuspocusDocument } from "../lib/hocuspocusInvalidation.js";
+import { buildContentPreview, extractTextFromYXml } from "../lib/extractPlainTextFromYXml.js";
 
 /**
  * `propagateTitleRename` の結果カウンタ。ログ出力・監視用。
@@ -160,23 +161,56 @@ async function rewriteSourcePage(
     }
 
     const encodedState = Buffer.from(Y.encodeStateAsUpdate(doc));
+    // リネーム後の Y.Doc からプレーンテキストとプレビューを取り直し、
+    // `page_contents.content_text` / `pages.content_preview` が古い
+    // タイトルのまま取り残されないようにする（PR #736 レビュー参照）。
+    // Derive the new plain text / preview from the rewritten Y.Doc and
+    // persist them atomically with `ydoc_state` so search, listing, and
+    // snapshot metadata stay consistent. See PR #736 review.
+    const newContentText = extractTextFromYXml(doc.getXmlFragment("default"));
+    const newContentPreview = buildContentPreview(newContentText);
     await tx
       .update(pageContents)
       .set({
         ydocState: encodedState,
         version: sql`${pageContents.version} + 1`,
+        contentText: newContentText,
         updatedAt: new Date(),
       })
       .where(eq(pageContents.pageId, sourcePageId));
+
+    await tx
+      .update(pages)
+      .set({ contentPreview: newContentPreview, updatedAt: new Date() })
+      .where(eq(pages.id, sourcePageId));
 
     return { changed: true, rewrite };
   });
 }
 
 /**
- * 新タイトルと一致するゴーストリンクを検索し、実体リンクへ昇格させる。
- * Delete matching `ghost_links` rows and insert real `links` rows pointing
- * at the renamed page. Self-references are skipped to respect the DB CHECK.
+ * 新タイトルと一致するゴーストリンクを、リネーム対象と同一スコープ内でのみ
+ * 実体リンクへ昇格させる。スコープはリネーム対象の `pages.note_id` と
+ * `pages.owner_id` から決定する:
+ *
+ *   - リネーム対象がノートネイティブ (`note_id` 非 NULL): ソースの `note_id`
+ *     が同一の場合のみ昇格。
+ *   - リネーム対象が個人ページ (`note_id` NULL): ソースも個人 (`note_id` NULL)
+ *     かつオーナーが同一の場合のみ昇格。
+ *
+ * これにより、別テナント／別ノートで同一テキストを持つ `ghost_links` が
+ * 誤って消費されることを防ぐ（PR #736 P1 レビュー参照）。
+ *
+ * Promote ghost-link rows matching the new title — but only within the
+ * renamed page's ownership / note scope. Without this filter, a rename in
+ * one tenant would silently consume unrelated ghost rows elsewhere that
+ * happen to share the same text, creating cross-tenant link edges
+ * (reviewed as P1 on PR #736).
+ *
+ *   - Note-native target (`note_id != null`): only promote ghosts whose
+ *     source page is in the same `note_id`.
+ *   - Personal target (`note_id = null`): only promote ghosts whose source
+ *     is also personal (`note_id = null`) and has the same `owner_id`.
  */
 async function promoteGhostLinks(
   db: Database,
@@ -184,38 +218,66 @@ async function promoteGhostLinks(
   newTitle: string,
 ): Promise<number> {
   return db.transaction(async (tx) => {
-    const promoted = await tx
-      .delete(ghostLinks)
+    // 1. Resolve the scope of the renamed page. Missing row → nothing to do.
+    //    リネーム対象のスコープを解決。行が無ければ何もしない。
+    const scopeRows = await tx
+      .select({ noteId: pages.noteId, ownerId: pages.ownerId })
+      .from(pages)
+      .where(eq(pages.id, renamedPageId))
+      .limit(1);
+    const scope = scopeRows[0];
+    if (!scope) return 0;
+
+    // 2. 同一スコープかつテキスト一致のゴースト行を列挙する。
+    //    Find in-scope ghost rows whose text matches the new title.
+    const scopePredicate =
+      scope.noteId !== null
+        ? eq(pages.noteId, scope.noteId)
+        : and(isNull(pages.noteId), eq(pages.ownerId, scope.ownerId));
+
+    const candidates = await tx
+      .select({
+        sourcePageId: ghostLinks.sourcePageId,
+        linkType: ghostLinks.linkType,
+      })
+      .from(ghostLinks)
+      .innerJoin(pages, eq(pages.id, ghostLinks.sourcePageId))
       .where(
         and(
           sql`LOWER(TRIM(${ghostLinks.linkText})) = LOWER(TRIM(${newTitle}))`,
           ne(ghostLinks.sourcePageId, renamedPageId),
+          scopePredicate,
         ),
-      )
-      .returning({
-        sourcePageId: ghostLinks.sourcePageId,
-        linkType: ghostLinks.linkType,
-        linkText: ghostLinks.linkText,
-      });
+      );
 
-    if (promoted.length === 0) return 0;
+    if (candidates.length === 0) return 0;
+
+    // 3. Delete the matching in-scope ghost rows and insert real links.
+    //    同一スコープのゴースト行だけ削除し、本物のリンクを挿入する。
+    const scopedSourceIds = Array.from(new Set(candidates.map((c) => c.sourcePageId)));
+    await tx
+      .delete(ghostLinks)
+      .where(
+        and(
+          sql`LOWER(TRIM(${ghostLinks.linkText})) = LOWER(TRIM(${newTitle}))`,
+          inArray(ghostLinks.sourcePageId, scopedSourceIds),
+        ),
+      );
 
     await tx
       .insert(links)
       .values(
-        promoted.map((row) => ({
+        candidates.map((row) => ({
           sourceId: row.sourcePageId,
           targetId: renamedPageId,
           linkType: row.linkType,
         })),
       )
-      // 競合（既に同じエッジがある場合）は無視する。削除した ghost は
-      // 回復不能だが、既に本物のリンクが存在するので問題にならない。
-      // Conflicts (a real edge already exists) are harmless — the ghost
-      // row is gone but the authoritative edge is still present.
+      // 競合（既に同じエッジがある場合）は無視する。
+      // Conflicts (an authoritative edge already exists) are harmless.
       .onConflictDoNothing();
 
-    return promoted.length;
+    return candidates.length;
   });
 }
 

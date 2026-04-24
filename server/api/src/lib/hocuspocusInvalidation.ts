@@ -44,11 +44,19 @@ export async function invalidateHocuspocusDocument(
   const prefix = opts?.logPrefix ?? "[Hocuspocus]";
 
   if (!baseUrl || !internalSecret) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn(
-        `${prefix} Skipped invalidation for page ${pageId}: internal URL or secret is missing.`,
-      );
-    }
+    // Always log — silent skipping in production hides misconfiguration
+    // until stale Y.Docs start winning against committed writes. List which
+    // envs are missing so operators can diagnose. 本番で silent に無効化
+    // すると古い Y.Doc が勝ち続ける原因調査が難しくなるため、常にログを残す。
+    const missing = [
+      baseUrl ? null : "HOCUSPOCUS_INTERNAL_URL",
+      internalSecret ? null : "BETTER_AUTH_SECRET",
+    ]
+      .filter((v): v is string => v !== null)
+      .join(", ");
+    console.warn(
+      `${prefix} Skipped invalidation for page ${pageId}: missing env var(s): ${missing}`,
+    );
     return;
   }
 

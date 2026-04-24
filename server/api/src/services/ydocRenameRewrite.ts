@@ -212,9 +212,14 @@ function walk(
   allowTagRewrite: boolean,
   result: RewriteResult,
 ): void {
-  const total = node.length;
-  for (let i = 0; i < total; i++) {
-    const child = node.get(i) as XmlNode;
+  // `node.get(i)` は Yjs の連結リストを頭から辿るため O(i)。インデックス
+  // ループにすると N 要素で O(N^2) になる。`toArray()` で一度だけ O(N)
+  // 走査して配列化し、その後は通常のイテレーションに切り替える。
+  // `node.get(i)` walks Yjs' linked list from the head (O(i)), so an
+  // index-based loop is O(N^2) in the number of children. `toArray()` does
+  // a single O(N) pass; iterate the resulting array instead.
+  const children = node.toArray() as XmlNode[];
+  for (const child of children) {
     if (child instanceof Y.XmlText) {
       rewriteText(child, oldTitle, newTitle, allowTagRewrite, result);
     } else if (child instanceof Y.XmlElement) {

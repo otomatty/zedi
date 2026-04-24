@@ -44,6 +44,10 @@ function decodeYdocWikiLinkTitle(buffer: Buffer): string | null {
 
 const PAGE_ID = "11111111-aaaa-bbbb-cccc-000000000001";
 const SOURCE_PAGE_ID = "11111111-aaaa-bbbb-cccc-000000000002";
+const OWNER_ID = "owner-user-1";
+
+/** Default scope result: personal page owned by OWNER_ID. 個人ページ既定スコープ。 */
+const PERSONAL_SCOPE_ROW = [{ noteId: null, ownerId: OWNER_ID }];
 
 describe("propagateTitleRename", () => {
   it("returns a zero result and skips all DB work when oldTitle or newTitle is missing", async () => {
@@ -84,22 +88,25 @@ describe("propagateTitleRename", () => {
     expect(invalidate).not.toHaveBeenCalled();
   });
 
-  it("rewrites matching wikiLink marks in each source page and invalidates each doc", async () => {
+  it("rewrites matching wikiLink marks, updates contentText/preview, and invalidates the doc", async () => {
     const originalYdoc = makeYdocWithWikiLink("Foo");
 
     // Query plan:
-    //   1. SELECT sourceId FROM links WHERE targetId = ...   → [{ sourceId }]
-    //   2. TX: SELECT 1 ... FOR UPDATE                       → (ignored result)
-    //   3. TX: SELECT * FROM page_contents                   → [{ version: 7, ydocState: ... }]
-    //   4. TX: UPDATE page_contents ...                      → [{ version: 8 }]
-    //   5. DELETE FROM ghost_links ... RETURNING             → []
-    //   (no INSERT when no ghosts)
+    //   1. SELECT sourceId FROM links WHERE targetId = ...   → sources
+    //   2. TX: SELECT 1 ... FOR UPDATE                       → (ignored)
+    //   3. TX: SELECT * FROM page_contents                   → row with old ydoc
+    //   4. TX: UPDATE page_contents                          → (ignored)
+    //   5. TX: UPDATE pages (content_preview)                → (ignored)
+    //   6. TX (promote): SELECT pages scope                  → personal scope
+    //   7. TX (promote): SELECT candidates (join)            → [] (no ghosts)
     const { db, chains } = createMockDb([
       [{ sourceId: SOURCE_PAGE_ID }], // 1
-      [], // 2 — FOR UPDATE lock
+      [], // 2 — FOR UPDATE
       [{ pageId: SOURCE_PAGE_ID, ydocState: originalYdoc, version: 7 }], // 3
       [{ version: 8 }], // 4
-      [], // 5 — ghost delete (none)
+      [], // 5
+      PERSONAL_SCOPE_ROW, // 6
+      [], // 7 — no candidates
     ]);
     const invalidate = vi.fn().mockResolvedValue(undefined);
 
@@ -115,16 +122,43 @@ describe("propagateTitleRename", () => {
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect(invalidate).toHaveBeenCalledWith(SOURCE_PAGE_ID);
 
-    // UPDATE chain should carry a new ydoc_state whose wiki-link title is "Bar".
-    // UPDATE チェーンに新しい ydoc_state（wikiLink.title = "Bar"）が入っていること。
-    const updateChain = chains.find((c) => c.startMethod === "update");
-    expect(updateChain).toBeTruthy();
-    const setCall = updateChain?.ops.find((op) => op.method === "set");
-    const setArg = setCall?.args[0] as { ydocState: Buffer } | undefined;
-    expect(setArg?.ydocState).toBeInstanceOf(Buffer);
-    if (setArg?.ydocState) {
-      expect(decodeYdocWikiLinkTitle(setArg.ydocState)).toBe("Bar");
+    // UPDATE page_contents carries ydoc_state (wikiLink title → "Bar") and
+    // the freshly-extracted contentText. UPDATE pages carries content_preview.
+    // UPDATE page_contents は ydoc_state と contentText を更新し、UPDATE pages は
+    // content_preview を更新する。
+    const updateChains = chains.filter((c) => c.startMethod === "update");
+    expect(updateChains.length).toBe(2);
+    const pageContentsUpdate = updateChains.find((c) => {
+      const setArg = c.ops.find((op) => op.method === "set")?.args[0] as
+        | Record<string, unknown>
+        | undefined;
+      return setArg && "ydocState" in setArg;
+    });
+    expect(pageContentsUpdate).toBeTruthy();
+    const pcSetArg = pageContentsUpdate?.ops.find((op) => op.method === "set")?.args[0] as
+      | { ydocState: Buffer; contentText: string }
+      | undefined;
+    expect(pcSetArg?.ydocState).toBeInstanceOf(Buffer);
+    // `extractTextFromYXml` appends a newline after block-level XmlElements
+    // (e.g. paragraph), so the raw plain text is `"Bar\n"`.
+    // `extractTextFromYXml` はブロック要素 (paragraph 等) の後に改行を付けるため、
+    // プレーンテキストは末尾に改行が付く。
+    expect(pcSetArg?.contentText).toBe("Bar\n");
+    if (pcSetArg?.ydocState) {
+      expect(decodeYdocWikiLinkTitle(pcSetArg.ydocState)).toBe("Bar");
     }
+
+    const pagesUpdate = updateChains.find((c) => {
+      const setArg = c.ops.find((op) => op.method === "set")?.args[0] as
+        | Record<string, unknown>
+        | undefined;
+      return setArg && "contentPreview" in setArg;
+    });
+    expect(pagesUpdate).toBeTruthy();
+    const pagesSetArg = pagesUpdate?.ops.find((op) => op.method === "set")?.args[0] as
+      | { contentPreview: string }
+      | undefined;
+    expect(pagesSetArg?.contentPreview).toBe("Bar");
   });
 
   it("skips rewriting when the source page has no page_contents row", async () => {
@@ -132,7 +166,8 @@ describe("propagateTitleRename", () => {
       [{ sourceId: SOURCE_PAGE_ID }], // sources
       [], // FOR UPDATE
       [], // page_contents empty
-      [], // ghost delete (none)
+      PERSONAL_SCOPE_ROW, // ghost scope
+      [], // ghost candidates (none)
     ]);
     const invalidate = vi.fn();
 
@@ -158,7 +193,8 @@ describe("propagateTitleRename", () => {
       [{ sourceId: SOURCE_PAGE_ID }],
       [], // FOR UPDATE
       [{ pageId: SOURCE_PAGE_ID, ydocState: unrelatedYdoc, version: 1 }],
-      [], // ghost delete (none)
+      PERSONAL_SCOPE_ROW, // ghost scope
+      [], // ghost candidates (none)
     ]);
     const invalidate = vi.fn();
 
@@ -172,17 +208,19 @@ describe("propagateTitleRename", () => {
     expect(invalidate).not.toHaveBeenCalled();
   });
 
-  it("promotes ghost links whose text matches the new title and inserts real link rows", async () => {
+  it("promotes in-scope ghost links whose text matches the new title", async () => {
     const GHOST_SOURCE = "11111111-aaaa-bbbb-cccc-000000000003";
 
     const { db, chains } = createMockDb([
       [], // no real link sources
-      // ghost delete RETURNING promoted rows
+      PERSONAL_SCOPE_ROW, // renamed-page scope (personal)
+      // in-scope ghost candidates (SELECT … INNER JOIN pages)
       [
-        { sourcePageId: GHOST_SOURCE, linkType: "wiki", linkText: "Bar" },
-        { sourcePageId: GHOST_SOURCE, linkType: "tag", linkText: "bar" },
+        { sourcePageId: GHOST_SOURCE, linkType: "wiki" },
+        { sourcePageId: GHOST_SOURCE, linkType: "tag" },
       ],
-      [], // insert links (no result needed)
+      [], // DELETE ghost_links (result ignored)
+      [], // INSERT links (result ignored)
     ]);
     const invalidate = vi.fn();
 
@@ -192,13 +230,12 @@ describe("propagateTitleRename", () => {
 
     expect(result.ghostPromotionsCount).toBe(2);
 
-    // Delete chain on ghost_links exists
+    // Delete on ghost_links and Insert on links should both be present.
+    // 削除と挿入の両方が行われる。
     const deleteChain = chains.find((c) => c.startMethod === "delete");
     expect(deleteChain).toBeTruthy();
-    // Insert chain on links exists when promotions happened
     const insertChain = chains.find((c) => c.startMethod === "insert");
     expect(insertChain).toBeTruthy();
-    // Insert should carry a values() call with N rows
     const valuesCall = insertChain?.ops.find((op) => op.method === "values");
     const valuesArg = valuesCall?.args[0] as Array<{
       sourceId: string;
@@ -209,10 +246,11 @@ describe("propagateTitleRename", () => {
     expect(valuesArg?.every((v) => v.targetId === PAGE_ID)).toBe(true);
   });
 
-  it("does not issue the INSERT when the ghost delete returned no rows", async () => {
+  it("does not issue DELETE or INSERT when no in-scope ghost candidates match", async () => {
     const { db, chains } = createMockDb([
       [], // no sources
-      [], // ghost delete — nothing promoted
+      PERSONAL_SCOPE_ROW, // scope
+      [], // candidates (empty)
     ]);
     const invalidate = vi.fn();
 
@@ -221,6 +259,31 @@ describe("propagateTitleRename", () => {
     });
 
     expect(result.ghostPromotionsCount).toBe(0);
+    expect(chains.find((c) => c.startMethod === "delete")).toBeUndefined();
+    expect(chains.find((c) => c.startMethod === "insert")).toBeUndefined();
+  });
+
+  it("skips ghost promotion when the renamed page's scope row is missing", async () => {
+    // The renamed page was deleted between the title change and the background
+    // propagation run. Without a scope row we can't decide which ghosts belong
+    // to the same tenant, so we skip promotion entirely.
+    // リネーム対象の pages 行が消えた場合はスコープ判定が出来ないため、
+    // ゴースト昇格はスキップする（PR #736 P1 レビュー対応）。
+    const { db, chains } = createMockDb([
+      [], // no sources
+      [], // pages scope — empty
+    ]);
+    const invalidate = vi.fn();
+
+    const result = await propagateTitleRename(db as never, PAGE_ID, "Foo", "Bar", {
+      invalidateDocument: invalidate,
+    });
+
+    expect(result.ghostPromotionsCount).toBe(0);
+    // Only the initial "sources" select + the scope select should have run.
+    // 初期の sources SELECT とスコープ SELECT のみ。
+    expect(chains.filter((c) => c.startMethod === "select")).toHaveLength(2);
+    expect(chains.find((c) => c.startMethod === "delete")).toBeUndefined();
     expect(chains.find((c) => c.startMethod === "insert")).toBeUndefined();
   });
 
@@ -228,15 +291,10 @@ describe("propagateTitleRename", () => {
     // 1st source: FOR UPDATE rejects with an error → counted as failure.
     //   ただしベストエフォート方針で後続処理（ghost 昇格）は続行する。
     // Best-effort: a per-source failure must not abort ghost promotion.
-    const chainIndexFailure = 0;
-    void chainIndexFailure;
-
-    // Simulate the tx by constructing db where the FOR UPDATE execute throws.
-    // We can't easily throw from createMockDb, so we override the execute method
-    // for this specific test by wrapping db.
     const baseResults = [
       [{ sourceId: SOURCE_PAGE_ID }], // sources
-      [], // ghost delete (none)
+      PERSONAL_SCOPE_ROW, // promote scope
+      [], // promote candidates (none)
     ];
     const base = createMockDb(baseResults);
     let forUpdateCallCount = 0;
