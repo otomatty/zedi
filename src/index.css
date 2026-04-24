@@ -527,7 +527,9 @@
     font-size: 14px;
   }
 
-  .tiptap-editor thead th {
+  /* TipTap's Table renders <tbody> only (no <thead>), so target th directly
+   * TipTap のテーブルは <thead> を生成しないため th 単独で指定 */
+  .tiptap-editor th {
     background: hsl(220 18% 12%);
     font-weight: 600;
     font-size: 13px;
@@ -882,7 +884,7 @@
     background: hsl(220 15% 88%);
   }
 
-  .light .tiptap-editor thead th {
+  .light .tiptap-editor th {
     background: hsl(220 15% 94%);
   }
 
