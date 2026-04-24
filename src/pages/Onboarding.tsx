@@ -10,46 +10,27 @@ import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { ProfileFormFields } from "@/components/settings/ProfileFormFields";
 import { LanguageSelectField } from "@/components/settings/LanguageSelectField";
 
-const STEPS = [1, 2, 3] as const;
+const STEPS = [1, 2] as const;
 type StepNum = (typeof STEPS)[number];
-
-/** Back/Next navigation for onboarding steps 1 and 2. / オンボーディングステップ1・2の戻る・次へナビゲーション。 */
-const OnboardingStepNav: React.FC<{
-  step: StepNum;
-  onBack: () => void;
-  onNext: () => void;
-  isNextDisabled: boolean;
-}> = ({ step, onBack, onNext, isNextDisabled }) => {
-  const { t } = useTranslation();
-  if (step !== 1 && step !== 2) return null;
-  return (
-    <div className="flex gap-3 pt-4">
-      {step > 1 && (
-        <Button variant="outline" onClick={onBack} className="flex-1">
-          {t("onboarding.action.back")}
-        </Button>
-      )}
-      <Button
-        onClick={onNext}
-        className={step === 1 ? "w-full" : "flex-1"}
-        disabled={isNextDisabled}
-      >
-        {t("onboarding.action.next")}
-      </Button>
-    </div>
-  );
-};
 
 /**
  * Initial setup wizard page.
  * Step 1: Profile (display name, avatar)
- * Step 2: Language
- * Step 3: Guide tour (start or skip)
+ * Step 2: Language + completion
+ *
+ * セットアップ完了時に POST /api/onboarding/complete を呼び、プロフィール更新・
+ * ウェルカムページ自動生成・セットアップ完了フラグをまとめてサーバーに記録する。
+ *
+ * Completion calls POST /api/onboarding/complete which atomically updates
+ * the profile, creates the welcome page, and records the setup-completed
+ * flag on the server.
  */
 const Onboarding: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [step, setStep] = useState<StepNum>(1);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   const { needsSetupWizard, completeSetupWizard } = useOnboarding();
   const {
@@ -57,7 +38,6 @@ const Onboarding: React.FC = () => {
     isLoading: isProfileLoading,
     isSaving: isProfileSaving,
     updateProfile,
-    save: saveProfile,
     displayName,
     avatarUrl,
   } = useProfile();
@@ -68,32 +48,44 @@ const Onboarding: React.FC = () => {
     updateProfile,
   );
 
-  const handleNext = useCallback(async () => {
-    if (step === 1) {
-      await saveProfile();
-      setStep(2);
-    } else if (step === 2) {
-      setStep(3);
-    }
-  }, [step, saveProfile]);
+  const displayNameInvalid = profile.displayName.trim() === "";
+
+  const handleNext = useCallback(() => {
+    if (step === 1 && !displayNameInvalid) setStep(2);
+  }, [step, displayNameInvalid]);
 
   const handleBack = useCallback(() => {
     if (step === 2) setStep(1);
-    else if (step === 3) setStep(2);
   }, [step]);
 
-  const handleCompleteWithTour = useCallback(() => {
-    completeSetupWizard();
-    navigate("/home", { replace: true, state: { startTour: true } });
-  }, [completeSetupWizard, navigate]);
-
-  const handleCompleteSkip = useCallback(() => {
-    completeSetupWizard();
-    navigate("/home", { replace: true });
-  }, [completeSetupWizard, navigate]);
+  const handleComplete = useCallback(async () => {
+    if (isCompleting) return;
+    setIsCompleting(true);
+    setCompleteError(null);
+    try {
+      const response = await completeSetupWizard({
+        displayName: profile.displayName.trim(),
+        avatarUrl: profile.avatarUrl || null,
+        locale: settings.locale === "en" ? "en" : "ja",
+      });
+      const target = response.welcome_page_id ? `/pages/${response.welcome_page_id}` : "/home";
+      navigate(target, { replace: true });
+    } catch (error) {
+      console.error("[Onboarding] completion failed:", error);
+      setCompleteError(t("onboarding.action.completeError"));
+      setIsCompleting(false);
+    }
+  }, [
+    isCompleting,
+    completeSetupWizard,
+    profile.displayName,
+    profile.avatarUrl,
+    settings.locale,
+    navigate,
+    t,
+  ]);
 
   const isLoading = isProfileLoading || isSettingsLoading;
-  const displayNameInvalid = profile.displayName.trim() === "";
 
   if (!needsSetupWizard) {
     return <Navigate to="/home" replace />;
@@ -151,7 +143,7 @@ const Onboarding: React.FC = () => {
             </>
           )}
 
-          {/* Step 2: Language */}
+          {/* Step 2: Language + completion */}
           {step === 2 && (
             <>
               <div className="space-y-1 text-center">
@@ -166,38 +158,44 @@ const Onboarding: React.FC = () => {
                 id="onboarding-locale"
                 labelId="onboarding-locale-label"
               />
+              {completeError && (
+                <p className="text-destructive text-sm" role="alert">
+                  {completeError}
+                </p>
+              )}
             </>
           )}
 
-          {/* Step 3: Tour choice */}
-          {step === 3 && (
-            <>
-              <div className="space-y-1 text-center">
-                <h2 className="text-xl font-medium">{t("onboarding.tour.heading")}</h2>
-                <p className="text-muted-foreground text-sm">{t("onboarding.tour.description")}</p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Button onClick={handleCompleteWithTour} size="lg" className="w-full">
-                  {t("onboarding.tour.startTour")}
-                </Button>
-                <Button
-                  onClick={handleCompleteSkip}
-                  variant="ghost"
-                  size="lg"
-                  className="text-muted-foreground w-full"
-                >
-                  {t("onboarding.tour.skip")}
-                </Button>
-              </div>
-            </>
-          )}
-
-          <OnboardingStepNav
-            step={step}
-            onBack={handleBack}
-            onNext={handleNext}
-            isNextDisabled={step === 1 && (displayNameInvalid || isProfileSaving)}
-          />
+          <div className="flex gap-3 pt-4">
+            {step === 2 && (
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                className="flex-1"
+                disabled={isCompleting}
+              >
+                {t("onboarding.action.back")}
+              </Button>
+            )}
+            {step === 1 && (
+              <Button
+                onClick={handleNext}
+                className="w-full"
+                disabled={displayNameInvalid || isProfileSaving}
+              >
+                {t("onboarding.action.next")}
+              </Button>
+            )}
+            {step === 2 && (
+              <Button onClick={handleComplete} className="flex-1" disabled={isCompleting}>
+                {isCompleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  t("onboarding.action.complete")
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </main>
     </div>

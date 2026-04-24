@@ -18,6 +18,8 @@ import { CodeBlockWithCopy } from "../extensions/CodeBlockWithCopyExtension";
 import { ExecutableCodeBlock } from "../extensions/ExecutableCodeBlockExtension";
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
+import { VideoExtension } from "../extensions/VideoExtension";
+import { MediaPlaceholderExtension } from "../extensions/MediaPlaceholderExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
 import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
@@ -243,6 +245,16 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
       },
       ...options.imageOptions,
     }),
+    // --- Video (HTML5 native playback) ---
+    // --- ビデオ（HTML5 ネイティブ再生） ---
+    VideoExtension.configure({
+      HTMLAttributes: {
+        class: "tiptap-video w-full max-w-full h-auto rounded-lg my-4",
+      },
+    }),
+    // --- Unified media insertion placeholder (/image, /video slash commands) ---
+    // --- 統合メディア挿入プレースホルダー（/image、/video スラッシュコマンド） ---
+    MediaPlaceholderExtension,
     Mermaid,
     // --- YouTube Embed ---
     YouTubeEmbed,

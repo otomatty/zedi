@@ -332,7 +332,7 @@ test.describe("Page Editor", () => {
       await expect(page).toHaveURL("/home");
       await expect(card).toHaveCount(0);
 
-      const fab = page.locator("[data-tour-id=tour-fab]");
+      const fab = page.locator('[data-testid="home-fab"]');
       await fab.click();
       await expect(page.getByRole("button", { name: /新規作成/ })).toBeVisible({ timeout: 3000 });
     });

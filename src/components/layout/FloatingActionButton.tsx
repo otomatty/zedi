@@ -96,7 +96,8 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            data-tour-id="tour-fab"
+            data-testid="home-fab"
+            aria-label={t("common.createPageAction")}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             disabled={isCreating}
             className={cn(

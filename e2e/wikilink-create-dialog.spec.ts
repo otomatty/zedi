@@ -3,12 +3,6 @@ import { test, expect } from "./auth-mock";
 import { MOCK_USER_ID } from "../src/components/auth/MockAuthProvider";
 
 const GHOST_TITLE = "生産手段";
-const COMPLETED_ONBOARDING_STATE = {
-  hasCompletedSetupWizard: true,
-  hasCompletedTour: false,
-  completedSteps: [],
-  dismissedHints: [],
-};
 
 async function seedBlankPage(page: Page, title: string) {
   const pageId = crypto.randomUUID();
@@ -120,9 +114,12 @@ test.describe("WikiLink create-page dialog", () => {
   test.setTimeout(60000);
 
   test.beforeEach(async ({ page, helpers }) => {
-    await page.addInitScript((state) => {
-      localStorage.setItem("zedi-onboarding", JSON.stringify(state));
-    }, COMPLETED_ONBOARDING_STATE);
+    // auth-mock の page fixture が既に同じ per-user onboarding cache を seed
+    // しているため、ここでは goToHome のみ。重複 seed があるとキー変更時に
+    // ずれる可能性があるので単一責務にまとめる。
+    // The auth-mock page fixture already seeds the same per-user onboarding
+    // cache; keep seeding centralized there to avoid drift when the key
+    // changes.
     await helpers.goToHome(page);
   });
 

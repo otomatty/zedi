@@ -31,6 +31,33 @@
   },
   "slashPathCompletionAriaLabel": "Path suggestions",
   "slashPathCompletionHint": "Workspace path suggestions",
+  "media": {
+    "image": { "title": "Insert image" },
+    "video": { "title": "Insert video" },
+    "actions": {
+      "pickFile": "Choose file",
+      "enterUrl": "Insert from URL",
+      "insert": "Insert",
+      "cancel": "Cancel",
+      "remove": "Remove placeholder"
+    },
+    "placeholders": {
+      "url": "https://example.com/image.png",
+      "alt": "Alt text (optional)"
+    },
+    "dropzone": {
+      "hint": "You can also drop a file here to upload."
+    },
+    "status": {
+      "uploading": "Uploading…"
+    },
+    "errors": {
+      "unsupportedType": "This file type is not supported.",
+      "tooLarge": "File is larger than the 50MB upload limit.",
+      "invalidUrl": "Please enter a valid URL.",
+      "uploadFailed": "Upload failed. Please try again in a moment."
+    }
+  },
   "htmlArtifact": {
     "editHeading": "Edit HTML artifact",
     "emptyState": "This HTML artifact is empty.",
@@ -105,8 +132,13 @@
     },
     "image": {
       "title": "Image",
-      "description": "Upload image",
-      "aliases": "image,img"
+      "description": "Insert an image (upload or URL)",
+      "aliases": "image,img,picture,photo"
+    },
+    "video": {
+      "title": "Video",
+      "description": "Insert a video (upload or URL)",
+      "aliases": "video,vid,movie"
     },
     "camera": {
       "title": "Camera",
