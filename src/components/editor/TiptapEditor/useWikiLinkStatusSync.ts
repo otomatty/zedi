@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Editor } from "@tiptap/react";
 import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
 import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
@@ -53,15 +53,21 @@ export function useWikiLinkStatusSync({
     pageNoteId,
     notePages: pageNoteId ? notePagesQuery.data : undefined,
   });
-  const pageScopeSignature =
-    pageNoteId === null
-      ? "personal"
-      : notePagesQuery.data === undefined
-        ? `note:${pageNoteId}:loading`
-        : `note:${pageNoteId}:${notePagesQuery.data
-            .map((page) => `${page.id}:${page.title.trim().toLowerCase()}`)
-            .sort()
-            .join("|")}`;
+  // editor の content 変更で頻繁に再レンダーされるため、map+sort+join の O(n log n)
+  // をメモ化して打鍵時のコストを抑える。`notePagesQuery.data` の参照が変わったときのみ
+  // 再計算される（React Query は同一データなら参照を保つ）。
+  // Memoize the signature so keystroke-driven re-renders don't repeat the
+  // O(n log n) map/sort/join over the note's page list. React Query keeps a
+  // stable reference for unchanged data, so this only re-computes on real changes.
+  const notePagesData = notePagesQuery.data;
+  const pageScopeSignature = useMemo(() => {
+    if (pageNoteId === null) return "personal";
+    if (notePagesData === undefined) return `note:${pageNoteId}:loading`;
+    return `note:${pageNoteId}:${notePagesData
+      .map((page) => `${page.id}:${page.title.trim().toLowerCase()}`)
+      .sort()
+      .join("|")}`;
+  }, [pageNoteId, notePagesData]);
 
   // 最後にチェックした状態を追跡
   const lastCheckedRef = useRef<{
