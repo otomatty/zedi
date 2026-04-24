@@ -87,6 +87,94 @@ describe("useEditorAutoSave", () => {
       expect(syncWikiLinks).not.toHaveBeenCalled();
     });
 
+    it("tag marks あり + syncTags 指定時は syncTags が呼ばれる (issue #725 Phase 1)", async () => {
+      const tagContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
+                text: "#tech",
+              },
+            ],
+          },
+        ],
+      });
+      const syncWikiLinks = vi.fn().mockResolvedValue(undefined);
+      const syncTags = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue(true);
+      const onSaveContentOnly = vi.fn().mockResolvedValue(true);
+
+      const { result } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 0,
+          onSave,
+          onSaveContentOnly,
+          syncWikiLinks,
+          syncTags,
+        }),
+      );
+
+      act(() => {
+        result.current.saveChanges("Title", tagContent);
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      expect(syncTags).toHaveBeenCalledTimes(1);
+      expect(syncTags).toHaveBeenCalledWith("page-1", [{ name: "tech" }]);
+      // Wiki マークは無いので syncWikiLinks は呼ばれない
+      expect(syncWikiLinks).not.toHaveBeenCalled();
+    });
+
+    it("syncTags 未指定ならタグがあっても呼ばれない (backward compat)", async () => {
+      const tagContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                marks: [{ type: "tag", attrs: { name: "tech", exists: false, referenced: false } }],
+                text: "#tech",
+              },
+            ],
+          },
+        ],
+      });
+      const syncWikiLinks = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue(true);
+      const onSaveContentOnly = vi.fn().mockResolvedValue(true);
+
+      const { result } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 0,
+          onSave,
+          onSaveContentOnly,
+          syncWikiLinks,
+        }),
+      );
+
+      act(() => {
+        result.current.saveChanges("Title", tagContent);
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      // syncTags prop が無ければタグ同期はスキップ
+      expect(syncWikiLinks).not.toHaveBeenCalled();
+    });
+
     it("保存がスキップ（didSave false）でも syncWikiLinks は呼ばれる", async () => {
       const contentWithLinks = createWikiLinkContent(["Page A"]);
       const syncWikiLinks = vi.fn().mockResolvedValue(undefined);

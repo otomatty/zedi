@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { syncLinksWithRepo } from "@/lib/syncWikiLinks";
 import type { IPageRepository } from "@/lib/pageRepository";
-import type { PageSummary } from "@/types/page";
+import type { PageSummary, LinkType } from "@/types/page";
 
 function createMockRepo(overrides: {
   getPagesSummary?: () => Promise<PageSummary[]>;
@@ -78,12 +78,12 @@ describe("syncLinksWithRepo", () => {
       ]);
 
       expect(addLink).toHaveBeenCalledTimes(1);
-      expect(addLink).toHaveBeenCalledWith(sourcePageId, "page-a");
+      expect(addLink).toHaveBeenCalledWith(sourcePageId, "page-a", "wiki");
       expect(addGhostLink).toHaveBeenCalledTimes(1);
-      expect(addGhostLink).toHaveBeenCalledWith("Non Existing", sourcePageId);
+      expect(addGhostLink).toHaveBeenCalledWith("Non Existing", sourcePageId, "wiki");
       expect(removeLink).not.toHaveBeenCalled();
       // 既存ページへの add 時に ghost を消すため removeGhostLink("Page A") が1回呼ばれる
-      expect(removeGhostLink).toHaveBeenCalledWith("Page A", sourcePageId);
+      expect(removeGhostLink).toHaveBeenCalledWith("Page A", sourcePageId, "wiki");
     });
   });
 
@@ -117,7 +117,7 @@ describe("syncLinksWithRepo", () => {
       await syncLinksWithRepo(repo, userId, sourcePageId, []);
 
       expect(removeLink).toHaveBeenCalledTimes(1);
-      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "page-a");
+      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "page-a", "wiki");
       expect(removeGhostLink).not.toHaveBeenCalled();
     });
 
@@ -134,7 +134,7 @@ describe("syncLinksWithRepo", () => {
       await syncLinksWithRepo(repo, userId, sourcePageId, []);
 
       expect(removeGhostLink).toHaveBeenCalledTimes(1);
-      expect(removeGhostLink).toHaveBeenCalledWith("Old Ghost", sourcePageId);
+      expect(removeGhostLink).toHaveBeenCalledWith("Old Ghost", sourcePageId, "wiki");
     });
 
     it("古いリンク1件のとき、wikiLinks を別のリンクだけに変更すると remove 1回 + add 1回が呼ばれる", async () => {
@@ -178,9 +178,9 @@ describe("syncLinksWithRepo", () => {
       await syncLinksWithRepo(repo, userId, sourcePageId, [{ title: "Page B", exists: true }]);
 
       expect(removeLink).toHaveBeenCalledTimes(1);
-      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "page-a");
+      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "page-a", "wiki");
       expect(addLink).toHaveBeenCalledTimes(1);
-      expect(addLink).toHaveBeenCalledWith(sourcePageId, "page-b");
+      expect(addLink).toHaveBeenCalledWith(sourcePageId, "page-b", "wiki");
     });
   });
 
@@ -216,7 +216,7 @@ describe("syncLinksWithRepo", () => {
       ]);
 
       // 正規化で同一タイトルになるため addLink は1回（重複は追加されない実装に依存。StorageAdapterPageRepository は既存なら skip）
-      expect(addLink).toHaveBeenCalledWith(sourcePageId, "page-a");
+      expect(addLink).toHaveBeenCalledWith(sourcePageId, "page-a", "wiki");
       expect(addLink.mock.calls.length).toBeLessThanOrEqual(3);
     });
   });
@@ -305,7 +305,7 @@ describe("syncLinksWithRepo", () => {
       expect(getPagesSummary).not.toHaveBeenCalled();
       expect(addLink).not.toHaveBeenCalled();
       expect(addGhostLink).toHaveBeenCalledTimes(1);
-      expect(addGhostLink).toHaveBeenCalledWith("Personal A", sourcePageId);
+      expect(addGhostLink).toHaveBeenCalledWith("Personal A", sourcePageId, "wiki");
     });
 
     it("pageNoteId + notePages 指定時、同じノート内のページへのリンクは addLink で解決される", async () => {
@@ -336,7 +336,7 @@ describe("syncLinksWithRepo", () => {
       );
 
       expect(addLink).toHaveBeenCalledTimes(1);
-      expect(addLink).toHaveBeenCalledWith(sourcePageId, "note-page-1");
+      expect(addLink).toHaveBeenCalledWith(sourcePageId, "note-page-1", "wiki");
       expect(addGhostLink).not.toHaveBeenCalled();
     });
 
@@ -357,7 +357,7 @@ describe("syncLinksWithRepo", () => {
 
       expect(addLink).not.toHaveBeenCalled();
       expect(addGhostLink).toHaveBeenCalledTimes(1);
-      expect(addGhostLink).toHaveBeenCalledWith("Unknown", sourcePageId);
+      expect(addGhostLink).toHaveBeenCalledWith("Unknown", sourcePageId, "wiki");
     });
 
     // CodeRabbit / Codex が指摘: ノートスコープで `notePages` が空のとき、
@@ -382,7 +382,83 @@ describe("syncLinksWithRepo", () => {
       });
 
       expect(removeLink).toHaveBeenCalledTimes(1);
-      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "stale-target-id");
+      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "stale-target-id", "wiki");
+    });
+  });
+
+  // Issue #725 Phase 1: linkType オプションでタグエッジを独立に同期する。
+  // `linkType: 'tag'` の同期では WikiLink 用の outgoing / ghost は読まれず、
+  // 書き込みもタグスコープに閉じる。逆も同様。
+  // Issue #725 Phase 1: tag sync operates in its own `linkType` bucket and
+  // never reads or writes WikiLink edges, and vice versa.
+  describe("linkType オプション（issue #725 Phase 1）", () => {
+    it("linkType='tag' 指定時は repo.getOutgoingLinks / addLink / addGhostLink に 'tag' が渡る", async () => {
+      const summaries: PageSummary[] = [
+        {
+          id: "tag-target",
+          ownerUserId: userId,
+          noteId: null,
+          title: "Foo",
+          contentPreview: undefined,
+          thumbnailUrl: undefined,
+          sourceUrl: undefined,
+          createdAt: 0,
+          updatedAt: 0,
+          isDeleted: false,
+        },
+      ];
+      const getOutgoingLinks = vi.fn().mockResolvedValue([]);
+      const getGhostLinksBySourcePage = vi.fn().mockResolvedValue([]);
+      const addLink = vi.fn().mockResolvedValue(undefined);
+      const addGhostLink = vi.fn().mockResolvedValue(undefined);
+      const removeGhostLink = vi.fn().mockResolvedValue(undefined);
+
+      const repo = createMockRepo({
+        getPagesSummary: vi.fn().mockResolvedValue(summaries),
+        getOutgoingLinks,
+        getGhostLinksBySourcePage,
+        addLink,
+        addGhostLink,
+        removeGhostLink,
+      });
+
+      await syncLinksWithRepo(
+        repo,
+        userId,
+        sourcePageId,
+        [
+          { title: "Foo", exists: true },
+          { title: "Unknown", exists: false },
+        ],
+        { linkType: "tag" satisfies LinkType },
+      );
+
+      expect(getOutgoingLinks).toHaveBeenCalledWith(sourcePageId, "tag");
+      expect(getGhostLinksBySourcePage).toHaveBeenCalledWith(sourcePageId, "tag");
+      expect(addLink).toHaveBeenCalledWith(sourcePageId, "tag-target", "tag");
+      expect(addGhostLink).toHaveBeenCalledWith("Unknown", sourcePageId, "tag");
+    });
+
+    it("linkType='wiki' (既定) では wiki スコープで同期し tag バケットには触れない", async () => {
+      const getOutgoingLinks = vi.fn().mockResolvedValue([]);
+      const getGhostLinksBySourcePage = vi.fn().mockResolvedValue([]);
+      const addGhostLink = vi.fn().mockResolvedValue(undefined);
+
+      const repo = createMockRepo({
+        getPagesSummary: vi.fn().mockResolvedValue([]),
+        getOutgoingLinks,
+        getGhostLinksBySourcePage,
+        addGhostLink,
+      });
+
+      await syncLinksWithRepo(repo, userId, sourcePageId, [{ title: "Unknown", exists: false }]);
+
+      expect(getOutgoingLinks).toHaveBeenCalledWith(sourcePageId, "wiki");
+      expect(getGhostLinksBySourcePage).toHaveBeenCalledWith(sourcePageId, "wiki");
+      expect(addGhostLink).toHaveBeenCalledWith("Unknown", sourcePageId, "wiki");
+      // 'tag' 呼び出しが無いことを確認（wiki スコープに閉じる）
+      const tagCalls = getOutgoingLinks.mock.calls.filter((c: unknown[]) => c[1] === "tag");
+      expect(tagCalls).toHaveLength(0);
     });
   });
 });

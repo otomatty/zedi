@@ -9,16 +9,34 @@ interface UsePageEditorAutoSaveWithMutationOptions {
   updateLastSaved: (timestamp: number) => void;
 }
 
+/**
+ *
+ */
 export function usePageEditorAutoSaveWithMutation({
   currentPageId,
   shouldBlockSave,
   updateLastSaved,
 }: UsePageEditorAutoSaveWithMutationOptions) {
+  /**
+   *
+   */
   const queryClient = useQueryClient();
+  /**
+   *
+   */
   const { userId } = useRepository();
+  /**
+   *
+   */
   const updatePageMutation = useUpdatePage();
-  const { syncLinks } = useSyncWikiLinks();
+  /**
+   *
+   */
+  const { syncLinks, syncTags } = useSyncWikiLinks();
 
+  /**
+   *
+   */
   const {
     saveChanges,
     lastSaved: autoSaveLastSaved,
@@ -29,7 +47,13 @@ export function usePageEditorAutoSaveWithMutation({
     shouldBlockSave,
     onSave: async (updates) => {
       if (!currentPageId) return false;
+      /**
+       *
+       */
       const thumbnailUrl = extractFirstImage(updates.content) || undefined;
+      /**
+       *
+       */
       const result = await updatePageMutation.mutateAsync({
         pageId: currentPageId,
         updates: { ...updates, thumbnailUrl },
@@ -38,7 +62,13 @@ export function usePageEditorAutoSaveWithMutation({
     },
     onSaveContentOnly: async (content) => {
       if (!currentPageId) return false;
+      /**
+       *
+       */
       const thumbnailUrl = extractFirstImage(content) || undefined;
+      /**
+       *
+       */
       const result = await updatePageMutation.mutateAsync({
         pageId: currentPageId,
         updates: { content, thumbnailUrl },
@@ -46,6 +76,7 @@ export function usePageEditorAutoSaveWithMutation({
       return !result.skipped;
     },
     syncWikiLinks: syncLinks,
+    syncTags,
     onSaveSuccess: () => {
       updateLastSaved(Date.now());
       if (currentPageId && userId) {
