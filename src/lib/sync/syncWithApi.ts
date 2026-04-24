@@ -288,12 +288,32 @@ async function applyPull(
     await adapter.upsertPage(meta);
   }
 
-  const LINK_TYPES_ALL: readonly LinkType[] = ["wiki", "tag"] as const;
+  // issue #725 Phase 1: `link_type` を明示的に含むクライアント/サーバの組み合わせ
+  // でのみ tag バケットの stale クリアを走らせる。pre-#725 のサーバやキャッシュ
+  // された旧レスポンスは `link_type` を含まないため、そうした payload で tag
+  // バケットを強制的に空保存するとローカルの tag エッジを誤って消してしまう。
+  // そこで「ペイロード全体に 1 行でも explicit な `link_type` があれば wire が
+  // link_type を理解している」とみなし、その場合のみ全種別を対象にする。
+  //
+  // Only clear the `'tag'` bucket when the payload proves the server speaks
+  // `link_type` (issue #725 Phase 1). A pre-#725 server or any cached legacy
+  // response omits `link_type`, and enumerating all link types would otherwise
+  // silently erase local tag edges during a mixed-version rollout. If at least
+  // one row carries an explicit `link_type`, we trust the wire to cover every
+  // bucket; otherwise we only touch `'wiki'`.
+  const hasExplicitLinkType = (items: Array<{ link_type?: "wiki" | "tag" }>): boolean =>
+    items.some((row) => row.link_type !== undefined);
+  const linkTypesForLinks: readonly LinkType[] = hasExplicitLinkType(res.links)
+    ? (["wiki", "tag"] as const)
+    : (["wiki"] as const);
+  const linkTypesForGhosts: readonly LinkType[] = hasExplicitLinkType(res.ghost_links)
+    ? (["wiki", "tag"] as const)
+    : (["wiki"] as const);
 
   await applyRelatedItems<SyncLinkItem, Link>(
     res.links,
     pulledPageIds,
-    LINK_TYPES_ALL,
+    linkTypesForLinks,
     (l) => l.source_id,
     (l) => normalizeWireLinkType(l.link_type),
     (items) =>
@@ -310,7 +330,7 @@ async function applyPull(
   await applyRelatedItems<SyncGhostLinkItem, GhostLink>(
     res.ghost_links,
     pulledPageIds,
-    LINK_TYPES_ALL,
+    linkTypesForGhosts,
     (g) => g.source_page_id,
     (g) => normalizeWireLinkType(g.link_type),
     (items) =>

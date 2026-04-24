@@ -55,7 +55,7 @@ describe("useEditorAutoSave", () => {
       expect(syncWikiLinks).toHaveBeenCalledWith(pageId, expectedWikiLinks);
     });
 
-    it("WikiLink が含まれない content では syncWikiLinks は呼ばれない（保存は行う）", async () => {
+    it("WikiLink が含まれない content でも syncWikiLinks は空配列で呼ばれる（stale cleanup のため、issue #725 Phase 1 レビュー指摘）", async () => {
       const plainContent = JSON.stringify({
         type: "doc",
         content: [{ type: "paragraph", content: [{ type: "text", text: "No links" }] }],
@@ -84,7 +84,11 @@ describe("useEditorAutoSave", () => {
 
       expect(onSave).toHaveBeenCalledTimes(1);
       expect(extractWikiLinksFromContent(plainContent)).toHaveLength(0);
-      expect(syncWikiLinks).not.toHaveBeenCalled();
+      // issue #725 Phase 1 レビュー指摘: Mark が無くても同期呼び出しは走らせて
+      // サーバ側の stale エッジを空配列 delta で削除させる。
+      // Always call sync with an empty array so stale edges cleared on save.
+      expect(syncWikiLinks).toHaveBeenCalledTimes(1);
+      expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
     });
 
     it("tag marks あり + syncTags 指定時は syncTags が呼ばれる (issue #725 Phase 1)", async () => {
@@ -129,8 +133,11 @@ describe("useEditorAutoSave", () => {
 
       expect(syncTags).toHaveBeenCalledTimes(1);
       expect(syncTags).toHaveBeenCalledWith("page-1", [{ name: "tech" }]);
-      // Wiki マークは無いので syncWikiLinks は呼ばれない
-      expect(syncWikiLinks).not.toHaveBeenCalled();
+      // Wiki マークは無いが、stale cleanup のため空配列で 1 回呼ぶ契約。
+      // No wiki marks, but we still call syncWikiLinks with `[]` so stale
+      // wiki edges get delta-deleted (issue #725 Phase 1 review feedback).
+      expect(syncWikiLinks).toHaveBeenCalledTimes(1);
+      expect(syncWikiLinks).toHaveBeenCalledWith("page-1", []);
     });
 
     it("syncTags 未指定ならタグがあっても呼ばれない (backward compat)", async () => {
@@ -171,8 +178,10 @@ describe("useEditorAutoSave", () => {
         await vi.runAllTimersAsync();
       });
 
-      // syncTags prop が無ければタグ同期はスキップ
-      expect(syncWikiLinks).not.toHaveBeenCalled();
+      // syncTags prop が無ければタグ同期はスキップ。一方 syncWikiLinks は
+      // 空配列（wiki マーク無し）でも呼んで stale cleanup を走らせる。
+      expect(syncWikiLinks).toHaveBeenCalledTimes(1);
+      expect(syncWikiLinks).toHaveBeenCalledWith(pageId, []);
     });
 
     it("保存がスキップ（didSave false）でも syncWikiLinks は呼ばれる", async () => {

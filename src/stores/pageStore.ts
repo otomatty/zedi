@@ -232,22 +232,45 @@ export const usePageStore = create<PageStore>()(
       // これをしないと deserialize 後 `page.noteId === undefined` となり、
       // `noteId === null` を期待するコード（個人ページ判定）で取りこぼす。
       //
+      // v3: `Link.linkType` / `GhostLink.linkType` (Issue #725 Phase 1) を必須化
+      // したため、v2 以前で永続化された `linkType` 未設定の行を `'wiki'` に寄せる。
+      // これをしないと `addLink` / `removeLink` 等の `linkType === linkType` 比較
+      // が失敗し、重複 insert や削除漏れが起きる（IndexedDB 側は `migrateLinkStoreToV3`
+      // で対処済、その対応物をゲストストアでも実行する）。
+      //
       // v2: persisted pages from v1 (pre-#713) lack `noteId`. Backfill them to
-      // `null` on load so the `Page` type contract (`noteId: string | null`)
-      // holds. Otherwise `page.noteId === undefined` would slip past any
-      // `noteId === null` check intended to identify personal pages.
-      version: 2,
+      // `null` on load so the `Page` type contract (`noteId: string | null`) holds.
+      // v3: persisted links / ghost links from v1–v2 lack `linkType` (issue
+      // #725 Phase 1). Backfill to `'wiki'` so the new `linkType === linkType`
+      // comparisons in `addLink` / `removeLink` don't silently drop to the
+      // `undefined === 'wiki'` branch. Mirrors the IndexedDB v3 migration.
+      version: 3,
       migrate: (persistedState: unknown, version: number) => {
-        if (
-          version < 2 &&
-          persistedState &&
-          typeof persistedState === "object" &&
-          "pages" in persistedState &&
-          Array.isArray((persistedState as { pages: unknown }).pages)
-        ) {
-          const state = persistedState as { pages: Array<Record<string, unknown>> };
+        if (!persistedState || typeof persistedState !== "object") {
+          return persistedState;
+        }
+        const state = persistedState as {
+          pages?: Array<Record<string, unknown>>;
+          links?: Array<Record<string, unknown>>;
+          ghostLinks?: Array<Record<string, unknown>>;
+        };
+
+        if (version < 2 && Array.isArray(state.pages)) {
           state.pages = state.pages.map((p) => ({ ...p, noteId: p.noteId ?? null }));
         }
+
+        if (version < 3) {
+          if (Array.isArray(state.links)) {
+            state.links = state.links.map((l) => ({ ...l, linkType: l.linkType ?? "wiki" }));
+          }
+          if (Array.isArray(state.ghostLinks)) {
+            state.ghostLinks = state.ghostLinks.map((g) => ({
+              ...g,
+              linkType: g.linkType ?? "wiki",
+            }));
+          }
+        }
+
         return persistedState;
       },
     },

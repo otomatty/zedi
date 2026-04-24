@@ -217,10 +217,59 @@ describe("syncWithApi", () => {
 
     await syncWithApi(adapter, api, TEST_USER_ID);
 
-    // Issue #725 Phase 1: ページの pull で link_type 方向にもスタレのクリア
-    // が走る。wiki / tag それぞれで empty save が発行されることを検証。
-    // Pull triggers empty saveLinks per linkType so stale edges of any type
-    // get cleaned up.
+    // Issue #725 Phase 1 + ロールアウト安全: レスポンスに 1 行も `link_type`
+    // が含まれない（pre-#725 のサーバ or レガシーキャッシュ）ときは wiki
+    // バケットのみを touch し、tag バケットは保持する。tag バケットまで空保存
+    // するとローカルの tag エッジを誤って消してしまう。
+    //
+    // Safety: when the pull payload carries no `link_type` at all (pre-#725
+    // server / cached legacy response), only clear the `'wiki'` bucket. Tag
+    // edges must be preserved so we do not wipe them during mixed-version
+    // rollout.
+    expect(adapter.saveLinks).toHaveBeenCalledWith("p1", [], "wiki");
+    expect(adapter.saveLinks).not.toHaveBeenCalledWith("p1", [], "tag");
+  });
+
+  it("clears both wiki and tag buckets when response proves link_type is on the wire (issue #725 Phase 1 rollout safety)", async () => {
+    // `res.links` に 1 行でも explicit な `link_type` があれば「サーバは link_type
+    // を理解している」とみなし、同じページの他 linkType バケットも stale
+    // クリアの対象にする。ここでは `link_type='tag'` の 1 行を別ソースで混ぜ、
+    // `p1` については links 無しでも wiki / tag 両方が空保存されることを確認。
+    //
+    // If any row in the response carries an explicit `link_type`, we trust the
+    // wire for every bucket and clear stale edges in all of them for every
+    // pulled page, including pages whose slice happens to be empty.
+    const serverPage = {
+      id: "p1",
+      owner_id: TEST_USER_ID,
+      source_page_id: null,
+      title: "Page",
+      content_preview: null,
+      thumbnail_url: null,
+      source_url: null,
+      created_at: "2025-01-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+      is_deleted: false,
+    };
+    const adapter = createMockAdapter();
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [serverPage],
+        links: [
+          {
+            source_id: "other-page",
+            target_id: "x",
+            link_type: "tag",
+            created_at: "2025-01-01T00:00:00Z",
+          },
+        ],
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
     expect(adapter.saveLinks).toHaveBeenCalledWith("p1", [], "wiki");
     expect(adapter.saveLinks).toHaveBeenCalledWith("p1", [], "tag");
   });

@@ -61,26 +61,22 @@ export function useEditorAutoSave({
         const pending = pendingRef.current;
         if (pending && pageId) {
           const syncGraphFromContent = async (contentToSync: string) => {
+            // unmount フラッシュでも `saveChanges` と同じ契約で同期する。
+            // 空配列で呼ぶことで「最後の Mark を消して /home に戻った」ケースの
+            // stale cleanup がサーバ側まで届く。失敗は下の catch で握りつぶす。
+            // Use the same contract as `saveChanges` here: call each bucket
+            // with an empty array when no marks exist so removing the last
+            // mark and navigating away still clears stale edges. Errors bubble
+            // to the best-effort try/catch below.
             const wikiLinks = extractWikiLinksFromContent(contentToSync);
-            // issue #725 Phase 1: wiki と tag は独立バケットなので、content に
-            // 片方のマークしかなくても両方の同期を（空配列で）呼んで stale を掃除
-            // したいところだが、unmount 時フラッシュは best-effort に留めるため
-            // 存在する分だけ同期する（コスト最小）。
-            // Best-effort on unmount: only sync buckets that actually have
-            // marks. Stale cleanup for absent types happens on the next
-            // full save when the editor remounts.
-            if (wikiLinks.length > 0) {
-              await syncWikiLinks(pageId, wikiLinks);
-            }
+            await syncWikiLinks(pageId, wikiLinks);
             if (syncTags) {
               const tags = extractTagsFromContent(contentToSync);
-              if (tags.length > 0) {
-                const uniqueNames = getUniqueTagNames(tags);
-                await syncTags(
-                  pageId,
-                  uniqueNames.map((name) => ({ name })),
-                );
-              }
+              const uniqueNames = getUniqueTagNames(tags);
+              await syncTags(
+                pageId,
+                uniqueNames.map((name) => ({ name })),
+              );
             }
           };
           const saveAction = pending.contentOnly
@@ -110,29 +106,29 @@ export function useEditorAutoSave({
       /**
        * Extract WikiLinks + tags from the editor content and sync each to its
        * dedicated `link_type` bucket. Tag sync is only wired when `syncTags`
-       * is provided (issue #725 Phase 1). To keep the wire traffic minimal,
-       * we skip the call when the content carries no marks of that type —
-       * existing behavior for WikiLinks, now mirrored for tags.
+       * is provided (issue #725 Phase 1). **Both buckets are synced on every
+       * save**, including with empty arrays — `syncLinksWithRepo` relies on
+       * the empty-input delta to clear stale links/ghosts, so skipping the
+       * call when the editor has no marks of that type would leave orphaned
+       * edges in the DB after the user removes the last mark.
        *
        * WikiLink とタグを Tiptap コンテンツから抽出し、それぞれ独立の
-       * `link_type` バケットへ同期する。タグ同期は `syncTags` が与えられた
-       * ときだけ（issue #725 Phase 1）。どちらも Mark が無ければ呼ばないのは
-       * 既存の WikiLink 仕様と同じ方針。
+       * `link_type` バケットへ同期する（issue #725 Phase 1）。**Mark が
+       * 空でも毎回呼ぶ**: `syncLinksWithRepo` は空配列を delta として受け
+       * 取って既存エッジを削除する設計のため、ガードで弾くと「最後の Mark
+       * を消しても DB に残る」挙動になる。`syncTags` が渡らない旧呼び出し
+       * 元ではタグ同期のみスキップする。
        */
       const syncGraphFromContent = async (contentToSync: string) => {
         const wikiLinks = extractWikiLinksFromContent(contentToSync);
-        if (wikiLinks.length > 0) {
-          await syncWikiLinks(pageId, wikiLinks);
-        }
+        await syncWikiLinks(pageId, wikiLinks);
         if (syncTags) {
           const tags = extractTagsFromContent(contentToSync);
-          if (tags.length > 0) {
-            const uniqueNames = getUniqueTagNames(tags);
-            await syncTags(
-              pageId,
-              uniqueNames.map((name) => ({ name })),
-            );
-          }
+          const uniqueNames = getUniqueTagNames(tags);
+          await syncTags(
+            pageId,
+            uniqueNames.map((name) => ({ name })),
+          );
         }
       };
 
