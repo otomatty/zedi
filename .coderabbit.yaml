@@ -2,13 +2,13 @@
 # https://docs.coderabbit.ai/guides/configure-coderabbit
 #
 # 自動レビューの対象とする base ブランチを指定する。
-# default branch (main) は常に含まれるため、ここでは追加ブランチのみ指定する。
-# Configure the base branches for auto review. The default branch (main)
+# default branch (develop) は常に含まれるため、ここでは追加ブランチのみ指定する。
+# Configure the base branches for auto review. The default branch (develop)
 # is always included, so only list additional branches here.
 reviews:
   auto_review:
     enabled: true
     base_branches:
-      - "develop"
+      - "main"
       - "release/.*"
       - "feature/.*"
