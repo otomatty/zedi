@@ -1,6 +1,7 @@
 import { pgTable, uuid, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
+import { notes } from "./notes.js";
 
 /**
  * Special page kinds that stand apart from normal wiki entries.
@@ -16,6 +17,18 @@ import { users } from "./users.js";
 export type PageSpecialKind = "__index__" | "__log__";
 
 /**
+ * ページの種別分類。`user` は通常のユーザー作成ページ、`welcome` は新規
+ * ユーザー向けに自動生成される「Zedi (ツェディ) の使い方」ページ（オーナー
+ * あたり最大 1 件）、`update_notice` は機能追加時に自動配信される更新情報
+ * ページ。
+ *
+ * Page classification. `user` is a normal user-created page, `welcome` is the
+ * auto-generated onboarding page (at most one per owner), and `update_notice`
+ * is an auto-delivered release note.
+ */
+export type PageKind = "user" | "welcome" | "update_notice";
+
+/**
  * Wiki pages table. Holds mutable Wiki entries owned by a user.
  * 可変の Wiki ページテーブル（各ユーザーが所有）。
  */
@@ -26,6 +39,18 @@ export const pages = pgTable(
     ownerId: text("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * 所属ノート ID。NULL は個人ページ、値ありはそのノートに所属するノート
+     * ネイティブページ。ノートネイティブページは個人ホーム（`note_id IS NULL`
+     * フィルタ）には現れず、ノート削除時に `ON DELETE CASCADE` で一緒に消える。
+     * Issue #713 を参照。
+     *
+     * Owning note ID. NULL means a personal page; a non-null value identifies
+     * a note-native page that lives only inside that note. Personal-home
+     * queries filter on `note_id IS NULL`, and note deletion cascades to
+     * note-native pages. See issue #713.
+     */
+    noteId: uuid("note_id").references(() => notes.id, { onDelete: "cascade" }),
     sourcePageId: uuid("source_page_id"),
     title: text("title"),
     contentPreview: text("content_preview"),
@@ -47,6 +72,15 @@ export const pages = pgTable(
      * 部分ユニークインデックスによりオーナーごとに各 kind 最大 1 行。
      */
     specialKind: text("special_kind").$type<PageSpecialKind>(),
+    /**
+     * ページ種別の分類。通常は `user`。セットアップ完了時に自動生成される
+     * ウェルカムページは `welcome`、機能追加時に自動配信される更新情報は
+     * `update_notice`。
+     *
+     * Page classification. Defaults to `user`. Auto-generated onboarding
+     * pages are `welcome`, and release-note pages are `update_notice`.
+     */
+    kind: text("kind").$type<PageKind>().notNull().default("user"),
   },
   (table) => [
     index("idx_pages_owner_id").on(table.ownerId),
@@ -56,6 +90,14 @@ export const pages = pgTable(
       .on(table.ownerId)
       .where(sql`NOT ${table.isDeleted}`),
     index("idx_pages_owner_special_kind").on(table.ownerId, table.specialKind),
+    index("idx_pages_owner_kind").on(table.ownerId, table.kind),
+    /**
+     * Lookup of pages owned by a particular note (and an efficient predicate
+     * for "personal pages only" via `note_id IS NULL` / `IS NOT NULL`).
+     * 特定のノートに所属するページの引きと、`note_id IS NULL`/`IS NOT NULL` の
+     * 部分述語に効くインデックス。
+     */
+    index("idx_pages_note_id").on(table.noteId),
   ],
 );
 

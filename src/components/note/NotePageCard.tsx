@@ -41,7 +41,7 @@ const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
    *
    */
   const handleClick = () => {
-    navigate(`/notes/${noteId}/pages/${page.id}`);
+    navigate(`/notes/${noteId}/${page.id}`);
   };
 
   return (

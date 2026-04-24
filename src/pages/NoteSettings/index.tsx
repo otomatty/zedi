@@ -88,7 +88,7 @@ const NoteSettings: React.FC = () => {
       await deleteNoteMutation.mutateAsync(noteId);
       toast({ title: t("notes.noteDeleted") });
       setIsDeleteDialogOpen(false);
-      navigate("/home");
+      navigate("/notes");
     } catch (error) {
       console.error("Failed to delete note:", error);
       toast({ title: t("notes.noteDeleteFailed"), variant: "destructive" });

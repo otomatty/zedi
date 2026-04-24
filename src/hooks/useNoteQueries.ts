@@ -6,17 +6,20 @@ import type {
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
+  CopyNotePageToPersonalResponse,
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
+import { pageKeys, useRepository } from "@/hooks/usePageQueries";
 
 /** Page in a note with who added it (for canDeletePage). */
 export type NotePageSummary = PageSummary & { addedByUserId: string };
 
-export /**
- *
+/**
+ * Note 関連クエリ・ミューテーションで共有する React Query キー群。
+ * React Query key factory shared by note-related queries and mutations.
  */
-const noteKeys = {
+export const noteKeys = {
   all: ["notes"] as const,
   lists: () => [...noteKeys.all, "list"] as const,
   list: (userId: string, userEmail?: string) =>
@@ -128,6 +131,14 @@ function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
   return {
     id: p.id,
     ownerUserId: p.owner_id,
+    // Phase 3 でサーバー側が `note_id` を返すようになった（issue #713）。
+    // `null` ならこのノートにリンクされているだけの個人ページ、値ありなら
+    // ノートネイティブ。note-native 限定の UI（「個人に取り込み」など）は
+    // これを見て出し分ける。
+    // Phase 3 surfaced `note_id` on the server (issue #713). `null` means a
+    // linked personal page; a non-null value means a note-native page.
+    // Note-native-only UI (e.g. "copy to personal") gates on this.
+    noteId: p.note_id ?? null,
     title: p.title ?? "",
     contentPreview: p.content_preview ?? undefined,
     thumbnailUrl: p.thumbnail_url ?? undefined,
@@ -188,23 +199,15 @@ export function useNoteApi() {
 }
 
 /**
- *
+ * 認証済みユーザーが所属する全 Note のサマリ一覧を取得するフック。
+ * React Query hook that fetches the current user's note summaries.
  */
 export function useNotes() {
-  /**
-   *
-   */
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
-  /**
-   *
-   */
   const query = useQuery({
     queryKey: noteKeys.list(userId, userEmail),
     queryFn: async () => {
-      /**
-       *
-       */
       const list = await api.getNotes();
       return list.map(apiNoteToNoteSummary);
     },
@@ -221,40 +224,23 @@ export function useNotes() {
 type UseNoteOptions = { allowRemote?: boolean };
 
 /**
- *
+ * 単一の Note とアクセス権情報を取得するフック。
+ * Hook that fetches a single Note alongside the caller's access context.
  */
 export function useNote(noteId: string, _options?: UseNoteOptions) {
-  /**
-   *
-   */
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
-  /**
-   *
-   */
   const query = useQuery({
     queryKey: noteKeys.detail(noteId, userId, userEmail),
     queryFn: async (): Promise<NoteWithAccess> => {
-      /**
-       *
-       */
       const res = await api.getNote(noteId);
-      /**
-       *
-       */
       const note = apiNoteToNote(res);
-      /**
-       *
-       */
       const access = buildAccessFromApi(note, res.current_user_role, userId);
       return { note, access };
     },
     enabled: isLoaded && !!noteId,
   });
 
-  /**
-   *
-   */
   const noteWithAccess = query.data ?? null;
 
   return {
@@ -267,12 +253,10 @@ export function useNote(noteId: string, _options?: UseNoteOptions) {
 }
 
 /**
- *
+ * 公開ノートの発見（Discover）向け一覧を取得するフック。
+ * Hook that fetches the public Discover listing of notes.
  */
 export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 20, offset = 0) {
-  /**
-   *
-   */
   const { api } = useNoteApi();
   return useQuery({
     queryKey: noteKeys.publicList(sort, limit, offset),
@@ -284,24 +268,19 @@ export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 
 }
 
 /**
- *
+ * 指定ノートに含まれるページ一覧（ノート画面用）を取得するフック。
+ * Hook that fetches pages belonging to the given note for the note view.
  */
 export function useNotePages(
   noteId: string,
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  /**
-   *
-   */
   const { api, isLoaded } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.pageList(noteId),
     queryFn: async (): Promise<NotePageSummary[]> => {
-      /**
-       *
-       */
       const res = await api.getNote(noteId);
       return res.pages.map((p) => ({
         ...apiPageToPageSummary(p),
@@ -313,7 +292,8 @@ export function useNotePages(
 }
 
 /**
- *
+ * ノート内の単一ページ（noteId + pageId）を取得するフック。
+ * Hook that fetches a single page within a note by noteId + pageId.
  */
 export function useNotePage(
   noteId: string,
@@ -321,21 +301,12 @@ export function useNotePage(
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  /**
-   *
-   */
   const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.page(noteId, pageId),
     queryFn: async (): Promise<Page | null> => {
-      /**
-       *
-       */
       const res = await api.getNote(noteId);
-      /**
-       *
-       */
       const p = res.pages.find((x) => x.id === pageId);
       return p ? apiPageToPage(p) : null;
     },
@@ -344,20 +315,15 @@ export function useNotePage(
 }
 
 /**
- *
+ * ノートの招待済み・参加中メンバー一覧を取得するフック。
+ * Hook that fetches invited / joined members of a note.
  */
 export function useNoteMembers(noteId: string, enabled: boolean = true) {
-  /**
-   *
-   */
   const { api, isLoaded, isSignedIn } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.memberList(noteId),
     queryFn: async (): Promise<NoteMember[]> => {
-      /**
-       *
-       */
       const list = await api.getNoteMembers(noteId);
       return list.map((m) => apiMemberToNoteMember(m, noteId));
     },
@@ -366,16 +332,11 @@ export function useNoteMembers(noteId: string, enabled: boolean = true) {
 }
 
 /**
- *
+ * 新規ノート作成のミューテーションフック。成功時にノート系キャッシュを無効化する。
+ * Mutation hook for creating a new note; invalidates note caches on success.
  */
 export function useCreateNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -388,9 +349,6 @@ export function useCreateNote() {
       visibility: Note["visibility"];
       editPermission?: Note["editPermission"];
     }) => {
-      /**
-       *
-       */
       const created = await api.createNote({
         title,
         visibility,
@@ -405,16 +363,11 @@ export function useCreateNote() {
 }
 
 /**
- *
+ * ノートの title / visibility / editPermission を更新するミューテーションフック。
+ * Mutation hook for updating a note's title / visibility / editPermission.
  */
 export function useUpdateNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -442,16 +395,11 @@ export function useUpdateNote() {
 }
 
 /**
- *
+ * ノートを削除するミューテーションフック。
+ * Mutation hook for deleting a note.
  */
 export function useDeleteNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -466,16 +414,11 @@ export function useDeleteNote() {
 }
 
 /**
- *
+ * ノートにページを追加するミューテーションフック（既存ページの参照またはタイトル指定作成）。
+ * Mutation hook for attaching a page to a note (reference or title-based create).
  */
 export function useAddPageToNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -498,16 +441,115 @@ export function useAddPageToNote() {
 }
 
 /**
+ * 個人ページをコピーしてノートネイティブページを作るミューテーションフック (issue #713 Phase 3)。
+ * 元の個人ページは `/home` に残り、新しいコピーだけがノートに出る。
  *
+ * Mutation hook that copies a personal page into a note as a fresh
+ * note-native page. The original stays on `/home`; only the copy surfaces
+ * inside the note. See issue #713 Phase 3.
+ */
+export function useCopyPersonalPageToNote() {
+  const { api } = useNoteApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noteId, sourcePageId }: { noteId: string; sourcePageId: string }) => {
+      return api.copyPersonalPageToNote(noteId, sourcePageId);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+    },
+  });
+}
+
+/**
+ * ノートネイティブページをコピーして個人ページにするミューテーションフック (issue #713 Phase 3)。
+ * 元のノートページはノートに残り、コピーだけが呼び出し元の `/home` に加わる。
+ *
+ * Mutation hook that copies a note-native page into the caller's personal
+ * pages. The source stays in the note; only the copy lands on `/home`.
+ * See issue #713 Phase 3.
+ */
+export function useCopyNotePageToPersonal() {
+  const { api, userId } = useNoteApi();
+  const { getRepository } = useRepository();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      noteId,
+      sourcePageId,
+    }: {
+      noteId: string;
+      sourcePageId: string;
+    }): Promise<CopyNotePageToPersonalResponse & { localImported: boolean }> => {
+      const result = await api.copyNotePageToPersonal(noteId, sourcePageId);
+      // Codex P1 対応: `/home` は IndexedDB を直接読む（React Query の裏に adapter
+      // がいる）ので、単にキャッシュ無効化しても新ページは現れない。サーバーが
+      // 返した `result.page`（SyncPageItem）を IDB に書き戻し、その成否を
+      // `localImported` フラグで呼び出し側に返す。失敗は non-fatal（次回 sync で
+      // 拾われる）だが、呼び出し側が「いま開く」のような即時遷移 CTA を出すか
+      // どうかをこのフラグで切り替えられる。
+      //
+      // `/home` reads directly from IndexedDB via the storage adapter, so
+      // invalidating React Query alone would just re-read stale IDB. Write the
+      // server response through to IDB and report whether it stuck, so callers
+      // can gate an immediate-navigation CTA (e.g. toast "Open") on local
+      // success. A write-through miss is non-fatal — the next sync pass will
+      // still reconcile `/home` — but the UI should not promise an instant
+      // jump to a page the local store does not yet have.
+      // (Issue #713 Phase 3, Codex P1 / CodeRabbit follow-up.)
+      let localImported = false;
+      try {
+        const repo = await getRepository();
+        const imported = await repo.importPersonalPageFromApi(result.page);
+        if (imported) {
+          localImported = true;
+        } else {
+          // `importPersonalPageFromApi` は個人ページ（`note_id: null`）以外を
+          // 防御的に拒否して `null` を返す。通常ルートでは copy-to-personal の
+          // サーバー応答は必ず個人ページなのでここを通らないが、契約ドリフト
+          // （例: サーバーが誤って `note_id` を埋めた）を早期に検知できるよう
+          // 警告を残す。成功扱いは維持し、UI は `localImported` で分岐する。
+          //
+          // Defensive guard: the helper returns `null` for non-personal rows.
+          // In a healthy flow this never fires — logged as a contract canary.
+          console.warn(
+            "[useCopyNotePageToPersonal] Server returned a non-personal page; skipped IDB write-through:",
+            result.page,
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "[useCopyNotePageToPersonal] Failed to write copied page to IndexedDB:",
+          error,
+        );
+      }
+      return { ...result, localImported };
+    },
+    onSuccess: () => {
+      // 書き戻しが終わってから無効化するので、`usePagesSummary` などの再取得で
+      // 新ページが確実に並ぶ（ネットワーク状況に依存しない即時反映）。
+      // We invalidate after the write-through, so any refetch from
+      // `usePagesSummary` etc. picks up the new row deterministically.
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: pageKeys.list(userId) });
+        queryClient.invalidateQueries({ queryKey: pageKeys.summary(userId) });
+        queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
+      } else {
+        queryClient.invalidateQueries({ queryKey: pageKeys.all });
+      }
+    },
+  });
+}
+
+/**
+ * ノートからページを外すミューテーションフック。
+ * Mutation hook for detaching a page from a note.
  */
 export function useRemovePageFromNote() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -522,16 +564,11 @@ export function useRemovePageFromNote() {
 }
 
 /**
- *
+ * ノートにメンバー（viewer / editor）を招待するミューテーションフック。
+ * Mutation hook for inviting a member (viewer / editor) to a note.
  */
 export function useAddNoteMember() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -554,16 +591,11 @@ export function useAddNoteMember() {
 }
 
 /**
- *
+ * 既存メンバーのロールを viewer ↔ editor で更新するミューテーションフック。
+ * Mutation hook for updating an existing member's role (viewer ↔ editor).
  */
 export function useUpdateNoteMemberRole() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -586,16 +618,11 @@ export function useUpdateNoteMemberRole() {
 }
 
 /**
- *
+ * ノートからメンバーを外す（招待取り消し／強制脱退）ミューテーションフック。
+ * Mutation hook for removing a member from a note (revoke invite / kick).
  */
 export function useRemoveNoteMember() {
-  /**
-   *
-   */
   const { api } = useNoteApi();
-  /**
-   *
-   */
   const queryClient = useQueryClient();
 
   return useMutation({

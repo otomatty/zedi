@@ -47,6 +47,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -92,6 +93,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -140,6 +142,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -151,6 +154,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-b",
           ownerUserId: userId,
+          noteId: null,
           title: "Page B",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -186,6 +190,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
+          noteId: null,
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -222,6 +227,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: sourcePageId,
           ownerUserId: userId,
+          noteId: null,
           title: "My Page",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -246,6 +252,137 @@ describe("syncLinksWithRepo", () => {
 
       expect(addLink).not.toHaveBeenCalled();
       expect(addGhostLink).not.toHaveBeenCalled();
+    });
+  });
+
+  // Issue #713 Phase 4: ノートネイティブページを source にする場合は
+  // `repo.getPagesSummary` を使わず、呼び出し側が `options.notePages` で
+  // 渡したノート内ページだけを解決候補にする。個人ページは候補に入らない。
+  // Note-native scope: `syncLinksWithRepo` must skip `repo.getPagesSummary`
+  // and only use `options.notePages` as candidates so personal pages never
+  // bleed into note-native resolution.
+  describe("スコープ: ノートネイティブページ（pageNoteId 指定）", () => {
+    const noteId = "note-1";
+
+    it("pageNoteId を渡すと repo.getPagesSummary は呼ばれず、notePages のみを解決候補にする", async () => {
+      const getPagesSummary = vi.fn().mockResolvedValue([
+        {
+          id: "personal-a",
+          ownerUserId: userId,
+          noteId: null,
+          title: "Personal A",
+          contentPreview: undefined,
+          thumbnailUrl: undefined,
+          sourceUrl: undefined,
+          createdAt: 0,
+          updatedAt: 0,
+          isDeleted: false,
+        } satisfies PageSummary,
+      ]);
+      const addLink = vi.fn().mockResolvedValue(undefined);
+      const addGhostLink = vi.fn().mockResolvedValue(undefined);
+
+      const repo = createMockRepo({
+        getPagesSummary,
+        getOutgoingLinks: vi.fn().mockResolvedValue([]),
+        getGhostLinksBySourcePage: vi.fn().mockResolvedValue([]),
+        addLink,
+        addGhostLink,
+      });
+
+      // 同じタイトル "Personal A" でも、notePages に含まれていないのでゴースト扱いになる
+      await syncLinksWithRepo(
+        repo,
+        userId,
+        sourcePageId,
+        [{ title: "Personal A", exists: false }],
+        {
+          pageNoteId: noteId,
+          notePages: [{ id: "note-page-1", title: "Note Page 1" }],
+        },
+      );
+
+      expect(getPagesSummary).not.toHaveBeenCalled();
+      expect(addLink).not.toHaveBeenCalled();
+      expect(addGhostLink).toHaveBeenCalledTimes(1);
+      expect(addGhostLink).toHaveBeenCalledWith("Personal A", sourcePageId);
+    });
+
+    it("pageNoteId + notePages 指定時、同じノート内のページへのリンクは addLink で解決される", async () => {
+      const addLink = vi.fn().mockResolvedValue(undefined);
+      const addGhostLink = vi.fn().mockResolvedValue(undefined);
+      const removeGhostLink = vi.fn().mockResolvedValue(undefined);
+
+      const repo = createMockRepo({
+        getOutgoingLinks: vi.fn().mockResolvedValue([]),
+        getGhostLinksBySourcePage: vi.fn().mockResolvedValue([]),
+        addLink,
+        addGhostLink,
+        removeGhostLink,
+      });
+
+      await syncLinksWithRepo(
+        repo,
+        userId,
+        sourcePageId,
+        [{ title: "Note Page 1", exists: true }],
+        {
+          pageNoteId: noteId,
+          notePages: [
+            { id: "note-page-1", title: "Note Page 1" },
+            { id: "note-page-2", title: "Note Page 2" },
+          ],
+        },
+      );
+
+      expect(addLink).toHaveBeenCalledTimes(1);
+      expect(addLink).toHaveBeenCalledWith(sourcePageId, "note-page-1");
+      expect(addGhostLink).not.toHaveBeenCalled();
+    });
+
+    it("pageNoteId 指定で notePages を渡さないと、全てゴーストリンクになる", async () => {
+      const addLink = vi.fn().mockResolvedValue(undefined);
+      const addGhostLink = vi.fn().mockResolvedValue(undefined);
+
+      const repo = createMockRepo({
+        getOutgoingLinks: vi.fn().mockResolvedValue([]),
+        getGhostLinksBySourcePage: vi.fn().mockResolvedValue([]),
+        addLink,
+        addGhostLink,
+      });
+
+      await syncLinksWithRepo(repo, userId, sourcePageId, [{ title: "Unknown", exists: false }], {
+        pageNoteId: noteId,
+      });
+
+      expect(addLink).not.toHaveBeenCalled();
+      expect(addGhostLink).toHaveBeenCalledTimes(1);
+      expect(addGhostLink).toHaveBeenCalledWith("Unknown", sourcePageId);
+    });
+
+    // CodeRabbit / Codex が指摘: ノートスコープで `notePages` が空のとき、
+    // 旧 outgoing link が候補マップに乗らず削除されないとグラフに残骸が残る。
+    // 候補マップに無い targetId は「スコープから外れた」として常に removeLink
+    // されることを担保する（Issue #713 Phase 4 リグレッションガード）。
+    // Regression guard for issue #713 Phase 4: when note scope is active but
+    // `notePages` is empty/unavailable, any stale outgoing link targetId
+    // should still be treated as out-of-scope and removed, otherwise the
+    // link graph would accumulate dangling edges.
+    it("pageNoteId 指定で notePages が空でも、既存の outgoing link は removeLink で掃除される", async () => {
+      const removeLink = vi.fn().mockResolvedValue(undefined);
+
+      const repo = createMockRepo({
+        getOutgoingLinks: vi.fn().mockResolvedValue(["stale-target-id"]),
+        getGhostLinksBySourcePage: vi.fn().mockResolvedValue([]),
+        removeLink,
+      });
+
+      await syncLinksWithRepo(repo, userId, sourcePageId, [], {
+        pageNoteId: noteId,
+      });
+
+      expect(removeLink).toHaveBeenCalledTimes(1);
+      expect(removeLink).toHaveBeenCalledWith(sourcePageId, "stale-target-id");
     });
   });
 });

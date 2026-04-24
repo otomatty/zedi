@@ -3,7 +3,7 @@ import { Plus, X } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { cn } from "@zedi/ui";
 import { useCreateNewPage } from "@/hooks/useCreateNewPage";
-import { FABMenu } from "./FABMenu";
+import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
@@ -14,13 +14,29 @@ import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandle
 /**
  * FAB 共通プロパティ。`noteId` が指定されるとノート配下ページとして作成・遷移する。
  * Common FAB props. When `noteId` is supplied the FAB creates pages scoped to
- * that note and routes to `/notes/:noteId/pages/:pageId` instead of the
+ * that note and routes to `/notes/:noteId/:pageId` instead of the
  * standalone `/pages/:id`.
  *
  * When initialClipUrl is provided, onClipDialogClosedWithInitialUrl is required
  * so the dialog can be closed and URL cleared.
+ *
+ * `onAddExistingPage` が渡されたとき、FAB メニューに「既存のページを追加」
+ * 項目が表示される。`noteId` とあわせて渡すことを想定している。
+ * When `onAddExistingPage` is provided, the FAB menu exposes an "add existing
+ * page" entry that invokes it. Intended to be paired with `noteId`.
  */
-type FloatingActionButtonProps = { noteId?: string } & (
+type FloatingActionButtonProps = {
+  noteId?: string;
+  onAddExistingPage?: () => void;
+  /**
+   * 追加で非表示にするメニュー項目。未ログイン時の `url` 非表示ロジックは
+   * 内部で自動適用されるため、重ねて渡す必要はない。
+   *
+   * Additional menu options to hide. The built-in `url` hide rule for guests is
+   * applied automatically, so callers don't need to re-specify it.
+   */
+  hiddenOptions?: FABMenuOption[];
+} & (
   | {
       initialClipUrl?: null;
       onClipDialogClosedWithInitialUrl?: never;
@@ -40,6 +56,8 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   initialClipUrl,
   onClipDialogClosedWithInitialUrl,
   noteId,
+  onAddExistingPage,
+  hiddenOptions: extraHiddenOptions,
 }) => {
   const { t } = useTranslation();
   const { createNewPage, isCreating } = useCreateNewPage({ noteId });
@@ -62,14 +80,24 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     setIsWebClipperOpen,
     setIsImageDialogOpen,
     noteId,
+    onAddExistingPage,
   });
+
+  const mergedHidden: FABMenuOption[] = [
+    ...(isSignedIn ? [] : (["url"] as FABMenuOption[])),
+    ...(extraHiddenOptions ?? []),
+  ];
+  const hiddenOptions: FABMenuOption[] | undefined =
+    mergedHidden.length > 0 ? mergedHidden : undefined;
+  const extraOptions: FABMenuOption[] | undefined = onAddExistingPage ? ["addExisting"] : undefined;
 
   const fabButton = (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            data-tour-id="tour-fab"
+            data-testid="home-fab"
+            aria-label={t("common.createPageAction")}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             disabled={isCreating}
             className={cn(
@@ -98,7 +126,8 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
         onOpenChange={setIsMenuOpen}
         onSelect={handlers.handleMenuSelect}
         trigger={fabButton}
-        hiddenOptions={isSignedIn ? undefined : ["url"]}
+        hiddenOptions={hiddenOptions}
+        extraOptions={extraOptions}
       />
 
       {isSignedIn && (

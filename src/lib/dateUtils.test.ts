@@ -10,6 +10,7 @@ function makePage(overrides: Partial<Page> = {}): Page {
   return {
     id: overrides.id ?? "p1",
     ownerUserId: "u1",
+    noteId: null,
     title: overrides.title ?? "Test",
     content: "{}",
     createdAt: overrides.createdAt ?? Date.now(),

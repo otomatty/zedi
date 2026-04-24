@@ -1,16 +1,28 @@
 import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
 import { Editor } from "@tiptap/core";
-import { usePageStore } from "@/stores/pageStore";
 import { cn } from "@zedi/ui";
 import { FileText, Plus } from "lucide-react";
 
 /**
- *
+ * WikiLink サジェストに表示する 1 アイテム。`exists=true` は既存ページ、
+ * `exists=false` は「このタイトルで新規作成」オプションを示す。
+ * One item rendered in the WikiLink suggestion dropdown; `exists=false` marks
+ * the "create new" option.
  */
 export interface SuggestionItem {
   id: string;
   title: string;
   exists: boolean;
+}
+
+/**
+ * `WikiLinkSuggestion` が候補リストの組み立てに使う最小ページ情報。
+ * Minimal page shape consumed by `WikiLinkSuggestion`.
+ */
+export interface WikiLinkSuggestionPage {
+  id: string;
+  title: string;
+  isDeleted?: boolean;
 }
 
 interface WikiLinkSuggestionProps {
@@ -19,43 +31,46 @@ interface WikiLinkSuggestionProps {
   range: { from: number; to: number };
   onSelect: (item: SuggestionItem) => void;
   onClose: () => void;
+  /**
+   * サジェスト候補として渡されるページ一覧。呼び出し側で WikiLink のスコープ
+   * （個人ページ / 同じノート内のページ）に合わせて絞り込んで渡す。
+   * Issue #713 Phase 4。
+   *
+   * Candidate pages supplied by the caller. The caller is responsible for
+   * scoping (personal-only vs. same-note) so this component can stay a pure
+   * presentation layer. See issue #713 Phase 4.
+   */
+  pages: WikiLinkSuggestionPage[];
 }
 
 /**
- *
+ * `onKeyDown` が `true` を返すと呼び出し元は既定のキーハンドラを抑止する。
+ * Imperative handle exposing `onKeyDown`; returning `true` tells the caller
+ * to suppress the default key handling.
  */
 export interface WikiLinkSuggestionHandle {
   onKeyDown: (event: KeyboardEvent) => boolean;
 }
 
-export /**
+/**
+ * WikiLink サジェストポップアップ。`pages` で受け取った候補のうちクエリに
+ * マッチするものを最大 5 件表示し、完全一致が無ければ「新規作成」項目も出す。
+ * Issue #713 Phase 4（スコープは呼び出し側で事前に絞る）。
  *
+ * WikiLink suggestion popup. Renders up to five candidates matching the
+ * query and, when there is no exact match, a "create new" option. Scope
+ * filtering (personal vs. same-note) is expected to happen in the caller
+ * before pages are passed in (see issue #713 Phase 4).
  */
-const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
-  ({ query, onSelect, onClose }, ref) => {
-    /**
-     *
-     */
+export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggestionProps>(
+  ({ query, onSelect, onClose, pages }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
-    /**
-     *
-     */
-    const { pages } = usePageStore();
 
     // Get matching pages
-    /**
-     *
-     */
     const getItems = useCallback((): SuggestionItem[] => {
-      /**
-       *
-       */
       const normalizedQuery = query.toLowerCase().trim();
 
       // Get existing pages that match
-      /**
-       *
-       */
       const matchingPages = pages
         .filter((p) => !p.isDeleted && p.title.toLowerCase().includes(normalizedQuery))
         .slice(0, 5)
@@ -66,16 +81,10 @@ const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggesti
         }));
 
       // If query doesn't match any existing page exactly, add create option
-      /**
-       *
-       */
       const exactMatch = pages.find(
         (p) => !p.isDeleted && p.title.toLowerCase() === normalizedQuery,
       );
 
-      /**
-       *
-       */
       const items: SuggestionItem[] = [...matchingPages];
 
       if (query.trim() && !exactMatch) {
@@ -89,9 +98,6 @@ const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggesti
       return items;
     }, [query, pages]);
 
-    /**
-     *
-     */
     const items = getItems();
 
     // Reset selection when items change
@@ -99,14 +105,8 @@ const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkSuggesti
       queueMicrotask(() => setSelectedIndex(0));
     }, [query]);
 
-    /**
-     *
-     */
     const selectItem = useCallback(
       (index: number) => {
-        /**
-         *
-         */
         const item = items[index];
         if (item) {
           onSelect(item);

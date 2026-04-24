@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Button, DialogFooter, DialogHeader, DialogTitle, Input } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import type { NotePageSummary } from "./noteViewHelpers";
+import type { PageSummary } from "@/types/page";
 
 /**
  * Dialog body: add page by title and optional search list (when canEdit).
@@ -12,10 +12,18 @@ export interface NoteViewAddPageDialogContentProps {
   setNewPageTitle: (v: string) => void;
   pageFilter: string;
   setPageFilter: (v: string) => void;
-  filteredPages: NotePageSummary[];
+  filteredPages: PageSummary[];
   canEdit: boolean;
   onAddByTitle: () => Promise<void>;
   onAddByPageId: (pageId: string) => Promise<void>;
+  /**
+   * 個人ページをコピーしてノートネイティブページを新規作成する。元ページは
+   * 個人 /home に残り、新しいコピーのみノートに出る (issue #713 Phase 3)。
+   *
+   * Copy a personal page into the note as a fresh note-native page; the source
+   * stays on personal /home and only the copy surfaces inside the note.
+   */
+  onCopyByPageId: (pageId: string) => Promise<void>;
   isPending: boolean;
   onClose: () => void;
 }
@@ -33,6 +41,7 @@ export function NoteViewAddPageDialogContent({
   canEdit,
   onAddByTitle,
   onAddByPageId,
+  onCopyByPageId,
   isPending,
   onClose,
 }: NoteViewAddPageDialogContentProps) {
@@ -84,15 +93,39 @@ export function NoteViewAddPageDialogContent({
                   <p className="text-muted-foreground text-sm">{t("notes.noPagesToAdd")}</p>
                 ) : (
                   filteredPages.map((page) => (
-                    <button
+                    <div
                       key={page.id}
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => onAddByPageId(page.id)}
-                      className="border-border/50 hover:border-border w-full rounded-md border px-3 py-2 text-left text-sm disabled:pointer-events-none disabled:opacity-50"
+                      className="border-border/50 flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
                     >
-                      {page.title || t("notes.untitledPage")}
-                    </button>
+                      <span className="flex-1 truncate">
+                        {page.title || t("notes.untitledPage")}
+                      </span>
+                      {/*
+                        リンク: 個人ページをそのままノートに参照登録する（note_id IS NULL のまま）。
+                        コピー: 個人ページのスナップショットをノートネイティブページとして複製する（note_id = noteId, sourcePageId = 元）。
+                        Link: reference the existing personal page (still `note_id IS NULL`, visible on /home).
+                        Copy: clone the page into the note as a note-native copy (`note_id = noteId`, `sourcePageId = original`).
+                        See issue #713 Phase 3.
+                      */}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isPending}
+                        onClick={() => onAddByPageId(page.id)}
+                      >
+                        {t("notes.linkToNote")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={isPending}
+                        onClick={() => onCopyByPageId(page.id)}
+                      >
+                        {t("notes.copyToNote")}
+                      </Button>
+                    </div>
                   ))
                 )}
               </div>

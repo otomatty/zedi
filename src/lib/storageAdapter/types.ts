@@ -8,6 +8,16 @@
 export interface PageMetadata {
   id: string;
   ownerId: string;
+  /**
+   * 所属ノート ID。`null` は個人ページ、文字列値はそのノートに所属する
+   * ノートネイティブページ。Web の IndexedDB は個人ページのみを保持する
+   * 想定だが、将来の混在に備えてフィールドだけは持たせている。Issue #713 を参照。
+   *
+   * Owning note ID. `null` is a personal page; a string identifies a
+   * note-native page. The web IndexedDB is expected to hold only personal
+   * pages, but the field is carried for forward compatibility. See issue #713.
+   */
+  noteId: string | null;
   sourcePageId: string | null;
   title: string | null;
   contentPreview: string | null;

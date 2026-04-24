@@ -16,6 +16,7 @@ import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Notes from "./pages/Notes";
 import NotesDiscover from "./pages/NotesDiscover";
+import OfficialGuidePlaceholder from "./pages/OfficialGuidePlaceholder";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
 import ExtensionAuth from "./pages/ExtensionAuth";
@@ -80,13 +81,23 @@ function LegacyNoteRedirect({ suffix }: { suffix?: "settings" | "members" }) {
 }
 
 /**
- * Redirect `/note/:noteId/page/:pageId` to `/notes/:noteId/pages/:pageId`.
- * 旧パス `/note/:noteId/page/:pageId` を複数形ルートへリダイレクト。
+ * Redirect `/note/:noteId/page/:pageId` to `/notes/:noteId/:pageId`.
+ * 旧パス `/note/:noteId/page/:pageId` を新ルートへリダイレクト。
  */
 function LegacyNotePageRedirect() {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const { search, hash } = useLocation();
-  return <Navigate to={`/notes/${noteId}/pages/${pageId}${search}${hash}`} replace />;
+  return <Navigate to={`/notes/${noteId}/${pageId}${search}${hash}`} replace />;
+}
+
+/**
+ * Redirect `/notes/:noteId/pages/:pageId` to `/notes/:noteId/:pageId`.
+ * 旧パス `/notes/:noteId/pages/:pageId` を新しい短縮パスへリダイレクト。
+ */
+function LegacyNotePagesRedirect() {
+  const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
+  const { search, hash } = useLocation();
+  return <Navigate to={`/notes/${noteId}/${pageId}${search}${hash}`} replace />;
 }
 
 /**
@@ -165,6 +176,12 @@ const App = () => (
                       <Route path="/ai-chat" element={<Navigate to="/ai" replace />} />
                       <Route path="/search" element={<SearchResults />} />
                       <Route path="/notes/discover" element={<NotesDiscover />} />
+                      {/* Placeholder for the official user guide note; the
+                          real implementation lands in a follow-up PR but we
+                          reserve the URL to keep welcome-page links stable.
+                          公式ガイドノートのプレースホルダー。ウェルカム
+                          ページのリンクが 404 にならないよう URL を確保する。 */}
+                      <Route path="/notes/official-guide" element={<OfficialGuidePlaceholder />} />
                       <Route path="/notes" element={<Notes />} />
                       <Route path="/pages/:id" element={<PageEditorPage />} />
                       {/* Legacy singular path — redirect to plural.
@@ -187,7 +204,14 @@ const App = () => (
                       <Route path="/notes/:noteId" element={<NoteView />} />
                       <Route path="/notes/:noteId/settings" element={<NoteSettings />} />
                       <Route path="/notes/:noteId/members" element={<NoteMembers />} />
-                      <Route path="/notes/:noteId/pages/:pageId" element={<NotePageView />} />
+                      <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
+                      {/* Legacy path — redirect `/notes/:noteId/pages/:pageId` to
+                          the shorter `/notes/:noteId/:pageId`.
+                          旧パス `/notes/:noteId/pages/:pageId` を短縮形にリダイレクト。 */}
+                      <Route
+                        path="/notes/:noteId/pages/:pageId"
+                        element={<LegacyNotePagesRedirect />}
+                      />
                       {/* Legacy singular paths — redirect to plural.
                           旧単数形パス — 複数形にリダイレクト。 */}
                       <Route path="/note/:noteId" element={<LegacyNoteRedirect />} />

@@ -114,10 +114,18 @@ export const slashCommandItems: SlashCommandItem[] = [
   {
     id: "image",
     icon: "ImagePlus",
-    action: (editor, range) => {
-      editor.chain().focus().deleteRange(range).run();
-      window.dispatchEvent(new CustomEvent("slash-command-insert-image"));
-    },
+    isAvailable: (editor) =>
+      !!editor.extensionManager.extensions.find((e) => e.name === "mediaPlaceholder"),
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertMediaPlaceholder({ mode: "image" }).run(),
+  },
+  {
+    id: "video",
+    icon: "FileVideo",
+    isAvailable: (editor) =>
+      !!editor.extensionManager.extensions.find((e) => e.name === "mediaPlaceholder"),
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertMediaPlaceholder({ mode: "video" }).run(),
   },
   {
     id: "camera",

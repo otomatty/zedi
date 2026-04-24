@@ -74,7 +74,9 @@ export default function SearchResults() {
       const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
       return {
         pageId: r.id,
-        noteId: r.note_id,
+        // `note_id` は個人ページが混ざると null になり得るので undefined に正規化する。
+        // `note_id` may be null when personal pages are mixed into shared results.
+        noteId: r.note_id ?? undefined,
         title: r.title ?? "無題のページ",
         snippet,
         highlightedSnippet,
@@ -96,7 +98,7 @@ export default function SearchResults() {
    */
   const handleResultClick = (item: SearchResultItem) => {
     if (item.noteId) {
-      navigate(`/notes/${item.noteId}/pages/${item.pageId}`);
+      navigate(`/notes/${item.noteId}/${item.pageId}`);
     } else {
       navigate(`/pages/${item.pageId}`);
     }

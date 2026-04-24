@@ -12,11 +12,20 @@ export interface SyncPagesResponse {
 }
 
 /**
+ * `/api/sync/pages` etc. が返すページ行。`note_id` が `null` または未指定の場合は
+ * 個人ページ（issue #713）。GET `/api/sync/pages` は個人ページのみを返すため
+ * 実運用では常に `null` だが、新規エンドポイントでも同じ型を再利用できるよう
+ * 任意フィールドとして表現している。
  *
+ * Page row from `/api/sync/pages` and friends. `note_id` `null` or missing
+ * means a personal page (issue #713). GET `/api/sync/pages` only ever returns
+ * personal pages, but the field is optional so the same type can describe
+ * note-native rows from future endpoints.
  */
 export interface SyncPageItem {
   id: string;
   owner_id: string;
+  note_id?: string | null;
   source_page_id: string | null;
   title: string | null;
   content_preview: string | null;
@@ -28,7 +37,8 @@ export interface SyncPageItem {
 }
 
 /**
- *
+ * WikiLink グラフのリンク行。`/api/sync/pages` 応答内で使われる。
+ * Link row in the wiki-link graph, returned by `/api/sync/pages`.
  */
 export interface SyncLinkItem {
   source_id: string;
@@ -37,7 +47,8 @@ export interface SyncLinkItem {
 }
 
 /**
- *
+ * 未解決 WikiLink（ゴーストリンク）の行。`/api/sync/pages` で同期される。
+ * Ghost-link (unresolved WikiLink) row synced via `/api/sync/pages`.
  */
 export interface SyncGhostLinkItem {
   link_text: string;
@@ -80,13 +91,17 @@ export interface PostSyncPagesResponse {
 export interface PageContentResponse {
   ydoc_state: string; // base64
   version: number;
+  content_text?: string | null;
+  updated_at?: string;
 }
 
 /** PUT /api/pages/:id/content body. */
 export interface PutPageContentBody {
   ydoc_state: string; // base64
   content_text?: string;
-  version?: number;
+  content_preview?: string;
+  title?: string;
+  expected_version?: number;
 }
 
 /** POST /api/pages body. */
@@ -102,11 +117,56 @@ export interface CreatePageBody {
 /** POST /api/pages response (same shape as SyncPageItem). */
 export type CreatePageResponse = SyncPageItem;
 
-/** GET /api/search?q=&scope=shared response. */
+/**
+ * `POST /api/notes/:noteId/pages/copy-from-personal/:pageId` のレスポンス。
+ * 個人ページを元にノートネイティブページを新規作成した結果を返す。
+ * `page` には新ページの完全な行情報（`note_id` 含む）を含めるので、クライアント
+ * はノート詳細の再取得なしに即座に UI を反映できる。
+ *
+ * Response from `POST /api/notes/:noteId/pages/copy-from-personal/:pageId`.
+ * Returns the newly-created note-native page plus the full row (including
+ * `note_id`) so clients can update caches without refetching the note detail.
+ */
+export interface CopyPersonalPageToNoteResponse {
+  created: true;
+  page_id: string;
+  sort_order: number;
+  page: SyncPageItem;
+}
+
+/**
+ * `POST /api/notes/:noteId/pages/:pageId/copy-to-personal` のレスポンス。
+ * ノートネイティブページから作成された個人ページの完全な行情報を返す。
+ * クライアントはこれを使って IndexedDB / zustand の個人ページストアへ
+ * 書き戻し、`/home` に即反映できる (issue #713 Phase 3 / Codex P1)。
+ *
+ * Response from `POST /api/notes/:noteId/pages/:pageId/copy-to-personal`.
+ * Returns the full new personal page row so the client can write it through
+ * to IndexedDB / zustand and show it on `/home` without a full sync.
+ */
+export interface CopyNotePageToPersonalResponse {
+  created: true;
+  page_id: string;
+  page: SyncPageItem;
+}
+
+/**
+ * GET /api/search?q=&scope=shared のレスポンス。
+ *
+ * `note_id` は個人ページ (`note_id IS NULL`) も結果に含まれ得るため null になり得る
+ * (Issue #718 Phase 5-1)。呼び出し側はノートネイティブと個人を区別する必要がある場合
+ * このフィールドで判定する。
+ *
+ * Response of GET /api/search?q=&scope=shared.
+ *
+ * `note_id` may be null because personal pages (`note_id IS NULL`) can also
+ * appear in shared search results (Issue #718 Phase 5-1). Callers that need to
+ * distinguish note-native from personal pages should branch on this field.
+ */
 export interface SearchSharedResponse {
   results: Array<{
     id: string;
-    note_id: string;
+    note_id: string | null;
     owner_id: string;
     title: string | null;
     content_preview: string | null;
@@ -140,7 +200,9 @@ export interface DiscoverResponse {
 }
 
 /**
- *
+ * `GET /api/notes/discover` のノート行。閲覧数・ページ数などの発見用メタ情報を含む。
+ * Row in the `/api/notes/discover` response, carrying discover-oriented
+ * metadata such as view count and page count.
  */
 export interface DiscoverNoteItem {
   id: string;
@@ -172,6 +234,18 @@ export interface GetNoteResponse {
   pages: Array<{
     id: string;
     owner_id: string;
+    /**
+     * ページのスコープ。`null` ならこのノートに「リンク」されているだけの個人
+     * ページ（所有者の /home にも現れる）、値ありならこのノートに所属する
+     * ノートネイティブページ。クライアントはこれを見て note-native 限定の
+     * アクション（例: 「個人に取り込み」）を出し分ける。Issue #713 Phase 3。
+     *
+     * Page scope. `null` → a linked personal page (also visible on the
+     * owner's /home). A non-null value → a note-native page owned by this
+     * note. Clients gate note-native-only actions such as "copy to personal"
+     * on this. See issue #713 Phase 3.
+     */
+    note_id: string | null;
     source_page_id: string | null;
     title: string | null;
     content_preview: string | null;

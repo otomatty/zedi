@@ -5,14 +5,15 @@
  * which causes the app to use MockAuthProvider.
  */
 import { test as base, expect, Page } from "@playwright/test";
+import { MOCK_USER_ID } from "../src/components/auth/MockAuthProvider";
 
 /** Default onboarding so signed-in E2E users stay on /home (not redirected to /onboarding). */
 const E2E_DEFAULT_ONBOARDING = {
   hasCompletedSetupWizard: true,
-  hasCompletedTour: false,
-  completedSteps: [] as string[],
-  dismissedHints: [] as string[],
 };
+
+/** per-user cache key matching `src/lib/onboardingState.ts`. */
+const E2E_ONBOARDING_CACHE_KEY = `zedi-onboarding-cache:${MOCK_USER_ID}`;
 
 /**
  * Helper functions for E2E tests.
@@ -34,7 +35,9 @@ const helpers = {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.locator('[data-tour-id="tour-fab"]').click();
+    // ホーム右下の FAB を開き、新規作成メニューを起動する。
+    // Open the home FAB and pick the "新規作成" action to create a blank page.
+    await page.locator('[data-testid="home-fab"]').click();
     await page.getByRole("button", { name: "新規作成" }).click();
 
     // `^/pages/<id>$` のみを許容し、`/notes/.../pages/<id>` のようなノート配下ルートに
@@ -85,9 +88,12 @@ const helpers = {
  */
 export const test = base.extend<{ helpers: typeof helpers }>({
   page: async ({ page }, continueFixture) => {
-    await page.addInitScript((onboarding: typeof E2E_DEFAULT_ONBOARDING) => {
-      localStorage.setItem("zedi-onboarding", JSON.stringify(onboarding));
-    }, E2E_DEFAULT_ONBOARDING);
+    await page.addInitScript(
+      ({ key, onboarding }) => {
+        localStorage.setItem(key, JSON.stringify(onboarding));
+      },
+      { key: E2E_ONBOARDING_CACHE_KEY, onboarding: E2E_DEFAULT_ONBOARDING },
+    );
     await continueFixture(page);
   },
   /** Depends on `page` only to satisfy Playwright's destructuring requirement (no empty `{}`). */

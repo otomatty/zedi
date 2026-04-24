@@ -31,6 +31,33 @@
   },
   "slashPathCompletionAriaLabel": "パス候補",
   "slashPathCompletionHint": "ワークスペース内のパス候補",
+  "media": {
+    "image": { "title": "画像を挿入" },
+    "video": { "title": "動画を挿入" },
+    "actions": {
+      "pickFile": "ファイルを選択",
+      "enterUrl": "URL で挿入",
+      "insert": "挿入",
+      "cancel": "キャンセル",
+      "remove": "プレースホルダーを削除"
+    },
+    "placeholders": {
+      "url": "https://example.com/image.png",
+      "alt": "代替テキスト（省略可）"
+    },
+    "dropzone": {
+      "hint": "ここにファイルをドロップしてもアップロードできます。"
+    },
+    "status": {
+      "uploading": "アップロード中…"
+    },
+    "errors": {
+      "unsupportedType": "このファイル形式は対応していません。",
+      "tooLarge": "ファイルサイズが 50MB を超えています。",
+      "invalidUrl": "有効な URL を入力してください。",
+      "uploadFailed": "アップロードに失敗しました。時間を置いて再度お試しください。"
+    }
+  },
   "htmlArtifact": {
     "editHeading": "HTML アーティファクトを編集",
     "emptyState": "HTML アーティファクトが空です",
@@ -105,8 +132,13 @@
     },
     "image": {
       "title": "画像",
-      "description": "画像をアップロード",
+      "description": "画像を挿入（アップロード / URL）",
       "aliases": "画像,image,img,写真"
+    },
+    "video": {
+      "title": "動画",
+      "description": "動画を挿入（アップロード / URL）",
+      "aliases": "動画,video,vid,映像"
     },
     "camera": {
       "title": "カメラ",

@@ -9,13 +9,29 @@ import type { StorageAdapter } from "./StorageAdapter";
 import type { PageMetadata, Link, GhostLink, SearchResult } from "./types";
 
 const DB_NAME_PREFIX = "zedi-storage-";
-const DB_VERSION = 1;
+// v2: add `noteId` column on `my_pages` to mirror Aurora `pages.note_id`
+//     (issue #713). v1 rows are upgraded in place by `onupgradeneeded` —
+//     existing rows are personal pages, so `noteId = null` is the correct
+//     backfill value.
+//
+// v2: `pages.note_id` (issue #713) を反映するため `my_pages` に `noteId` 列を
+// 追加。v1 の既存行は全て個人ページなので、`onupgradeneeded` で `noteId = null`
+// を埋めれば移行完了。
+const DB_VERSION = 2;
 const YDOC_NAME_PREFIX = "zedi-doc-";
 
 /** Stored page row (camelCase for consistency with PageMetadata). */
 interface StoredPage {
   id: string;
   ownerId: string;
+  /**
+   * 所属ノート ID。`null` は個人ページ、文字列値はノートネイティブページ。
+   * Web 版の同期パスは個人ページしか持ち込まないので、実運用では常に `null`。
+   *
+   * Owning note ID; `null` is a personal page. The web sync path only ever
+   * imports personal pages, so this is always `null` in practice.
+   */
+  noteId: string | null;
   sourcePageId: string | null;
   title: string | null;
   contentPreview: string | null;
@@ -52,6 +68,7 @@ function pageToStored(p: PageMetadata): StoredPage {
   return {
     id: p.id,
     ownerId: p.ownerId,
+    noteId: p.noteId ?? null,
     sourcePageId: p.sourcePageId ?? null,
     title: p.title ?? null,
     contentPreview: p.contentPreview ?? null,
@@ -64,7 +81,11 @@ function pageToStored(p: PageMetadata): StoredPage {
 }
 
 function storedToPage(s: StoredPage): PageMetadata {
-  return { ...s };
+  // v1 で永続化された行は `noteId` を持たない。`null` を返して個人ページ扱いに
+  // 揃える。Issue #713。
+  // Rows persisted under v1 lack `noteId`; coerce to `null` so they read as
+  // personal pages. Issue #713.
+  return { ...s, noteId: s.noteId ?? null };
 }
 
 function ensureDb(): Promise<IDBDatabase> {
@@ -80,6 +101,7 @@ function openDb(userId: string): Promise<IDBDatabase> {
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const tx = (event.target as IDBOpenDBRequest).transaction;
       if (!db.objectStoreNames.contains("my_pages")) {
         const pages = db.createObjectStore("my_pages", { keyPath: "id" });
         pages.createIndex("updated_at", "updatedAt", { unique: false });
@@ -104,6 +126,29 @@ function openDb(userId: string): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("ydoc_versions")) {
         db.createObjectStore("ydoc_versions", { keyPath: "pageId" });
+      }
+
+      // v2 (issue #713): backfill `noteId = null` on existing rows and add a
+      // `by_note` index so future queries can scope by note. v1 only ever
+      // stored personal pages, so `null` is the correct historical value.
+      //
+      // v2 (issue #713): 既存行は全て個人ページなので `noteId = null` を埋め、
+      // 将来のクエリで note 単位に絞れるよう `by_note` index を作る。
+      if (event.oldVersion < 2 && tx) {
+        const pagesStore = tx.objectStore("my_pages");
+        if (!pagesStore.indexNames.contains("by_note")) {
+          pagesStore.createIndex("by_note", "noteId", { unique: false });
+        }
+        const cursorReq = pagesStore.openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return;
+          const row = cursor.value as Partial<StoredPage>;
+          if (row.noteId === undefined) {
+            cursor.update({ ...row, noteId: null });
+          }
+          cursor.continue();
+        };
       }
     };
   });
@@ -353,8 +398,25 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   // ── メタデータ / Page metadata ──
 
   /**
-   * Return all non-deleted pages, sorted by `updatedAt` descending.
-   * 削除されていないページを `updatedAt` 降順で返す。
+   * 削除されていない個人ページ（`noteId === null`）を `updatedAt` 降順で返す。
+   * ノートネイティブページ（issue #713）はサーバー API 経由でのみ表示するため
+   * IndexedDB には基本的に持ち込まれないが、混入時もここで除外する。
+   *
+   * Return all non-deleted personal pages (`noteId === null`), sorted by
+   * `updatedAt` descending. Note-native pages (issue #713) are not expected
+   * to land in IndexedDB but are filtered defensively if they do.
+   *
+   * NOTE: `by_note` index は `noteId = null` の行をインデックスから除外する
+   * （IndexedDB 仕様: キー値が null の場合レコードは index に含まれない）。
+   * そのため `index("by_note").getAll(IDBKeyRange.only(null))` は 0 件しか
+   * 返せず、ここでは使えない。`by_note` index は将来ノートネイティブページを
+   * 扱う実装（Phase 3 以降）で noteId 指定クエリ側に使う想定。
+   *
+   * NOTE: the `by_note` index excludes rows whose `noteId` is null (per the
+   * IndexedDB spec, records are dropped from an index when the key value is
+   * null). `index("by_note").getAll(IDBKeyRange.only(null))` therefore returns
+   * zero rows and cannot replace this scan. The index is reserved for future
+   * note-scoped queries once note-native pages are fetched into IDB.
    */
   async getAllPages(): Promise<PageMetadata[]> {
     const db = await ensureDb();
@@ -363,7 +425,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
       const req = tx.objectStore("my_pages").getAll();
       req.onsuccess = () => {
         const rows = (req.result as StoredPage[]) || [];
-        const list = rows.filter((r) => !r.isDeleted).map(storedToPage);
+        const list = rows
+          .filter((r) => !r.isDeleted && (r.noteId ?? null) === null)
+          .map(storedToPage);
         list.sort((a, b) => b.updatedAt - a.updatedAt);
         resolve(list);
       };

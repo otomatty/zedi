@@ -52,7 +52,7 @@ export function GlobalSearchProvider({ children }: { children: ReactNode }) {
   const handleSelect = useCallback(
     (pageId: string, noteId?: string) => {
       if (noteId) {
-        navigate(`/notes/${noteId}/pages/${pageId}`);
+        navigate(`/notes/${noteId}/${pageId}`);
       } else {
         navigate(`/pages/${pageId}`);
       }

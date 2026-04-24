@@ -54,7 +54,11 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
     [onTitleChange],
   );
 
-  if (isReadOnly) {
+  // ハンドラが渡されない場合は表示専用 `<h1>` にフォールバックし、制御 input の
+  // value 固定で「入力できない」状態にならないようにする。
+  // When no handler is supplied, render a static `<h1>` so the controlled input
+  // does not appear editable while silently dropping keystrokes.
+  if (isReadOnly || !onTitleChange) {
     return (
       <div ref={titleRef} className="pt-6 pb-2">
         <h1 className="text-2xl font-semibold break-words whitespace-normal">

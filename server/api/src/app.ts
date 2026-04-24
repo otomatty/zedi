@@ -38,6 +38,7 @@ import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 import lintRoutes from "./routes/lint.js";
 import activityRoutes from "./routes/activity.js";
+import onboardingRoutes from "./routes/onboarding.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -102,6 +103,10 @@ export function createApp(): Hono<AppEnv> {
 
   // Users
   app.route("/api/users", userRoutes);
+
+  // Onboarding wizard completion + status
+  // セットアップウィザード完了・状況取得
+  app.route("/api/onboarding", onboardingRoutes);
 
   // Pages
   app.route("/api/pages", pageRoutes);

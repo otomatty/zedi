@@ -39,6 +39,9 @@ const SUPPORTED_MARK_TYPES = new Set([
   "code",
   "link",
   "wikiLink",
+  // Hashtag syntax `#name` — shares the WikiLink data model. See issue #725.
+  // `#name` 記法のタグマーク。WikiLink と同じデータモデルを共有する。
+  "tag",
   // Phase 1: ハイライト・下線
   "highlight",
   "underline",

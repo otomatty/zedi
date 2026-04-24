@@ -16,6 +16,7 @@ import { pages, pageContents } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { maybeCreateSnapshot } from "../services/snapshotService.js";
+import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
 
 /**
  * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
@@ -56,9 +57,10 @@ async function applyPagesMetadataUpdate(
 }
 
 // ── GET /pages ──────────────────────────────────────────────────────────────
-// `scope=shared` の場合、`/api/search` と同じ認可ロジック (own + 受諾済みノートメンバー) を流用する。
+// `scope=shared` の場合、`/api/search` と同じ認可ロジック
+// (own + 受諾済みノートメンバー + note owner) を流用する。
 // When `scope=shared`, reuses the same authorization model as `/api/search`
-// (own pages + pages attached to notes the caller is a member of).
+// (own pages + accepted note members + note owners).
 app.get("/", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
@@ -79,10 +81,24 @@ app.get("/", authRequired, async (c) => {
   // `shared` mirrors the canonical authorization model from `services/pageAccessService.ts`:
   //   the linked note must be active, the membership must be accepted, and the join rows
   //   must not be soft-deleted. EXISTS + JOIN keeps the planner happy on large datasets.
+  // `own` スコープは個人ページ（`pages.note_id IS NULL`）のみを返す。
+  // ノートネイティブページ（issue #713）は、ノート画面または `scope=shared`
+  // 経由でのみアクセスする。`shared` 経由の場合は (a) note_members 経由の
+  // メンバーシップ、または (b) `note_pages -> notes.owner_id = userId` 経由の
+  // オーナーシップで含まれる。オーナー経路を note-native page だけに限定すると、
+  // linked personal page が listing から消えて `assertPageViewAccess` と非対称になる。
+  // `getNoteRole` の解決順 (owner → member → ...) と listing predicate を揃える。
+  //
+  // The `own` scope returns personal pages only (`pages.note_id IS NULL`).
+  // Note-native pages (issue #713) are accessed via the note view or
+  // `scope=shared`. `shared` includes them either through (a) `note_members`
+  // membership or (b) note ownership reached through `note_pages`. That owner
+  // branch must cover linked personal pages too; otherwise owners could open
+  // them via `assertPageViewAccess` while the listing hides them.
   const accessFilter =
     scope === "shared"
       ? sql`(
-          p.owner_id = ${userId}
+          (p.owner_id = ${userId} AND p.note_id IS NULL)
           OR EXISTS (
             SELECT 1 FROM note_pages np
             JOIN notes n ON n.id = np.note_id
@@ -95,8 +111,16 @@ app.get("/", authRequired, async (c) => {
               AND np.is_deleted = false
               AND n.is_deleted = false
           )
+          OR EXISTS (
+            SELECT 1 FROM note_pages np
+            JOIN notes n ON n.id = np.note_id
+            WHERE np.page_id = p.id
+              AND np.is_deleted = false
+              AND n.owner_id = ${userId}
+              AND n.is_deleted = false
+          )
         )`
-      : sql`p.owner_id = ${userId}`;
+      : sql`p.owner_id = ${userId} AND p.note_id IS NULL`;
 
   // Wiki の内部システムページ（`special_kind` が `__index__` / `__log__`、
   // および `is_schema = true` のスキーマページ）は通常一覧から除外する。
@@ -110,8 +134,13 @@ app.get("/", authRequired, async (c) => {
     ? sql`TRUE`
     : sql`p.special_kind IS NULL AND p.is_schema = false`;
 
+  // `note_id` を返すことで、`scope=shared` で混在 listing を受け取った
+  // クライアントが個人ページ（`note_id IS NULL`）とノートネイティブページを
+  // 区別できる。MCP の `zedi_list_pages` ツールはこれに依存している。
+  // Surface `note_id` so callers receiving mixed `scope=shared` results (e.g.
+  // the `zedi_list_pages` MCP tool) can distinguish personal vs note-native.
   const result = await db.execute(sql`
-    SELECT p.id, p.title, p.content_preview, p.updated_at
+    SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id
     FROM pages p
     WHERE p.is_deleted = false
       AND ${specialKindFilter}
@@ -130,16 +159,11 @@ app.get("/:id/content", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  // ページ所有者確認
-  const page = await db
-    .select({ id: pages.id, ownerId: pages.ownerId })
-    .from(pages)
-    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
-    .limit(1);
-
-  const pageRow = page[0];
-  if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
-  if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  // 個人ページは所有者のみ、ノートネイティブページはノートのロール解決
+  // （member / domain / public guest）が成立すれば閲覧可。Issue #713 を参照。
+  // Personal pages: owner only. Note-native pages: any resolved note role
+  // (member / domain / public guest) may view. See issue #713.
+  await assertPageViewAccess(db, pageId, userId);
 
   // コンテンツ取得
   const content = await db
@@ -191,16 +215,11 @@ app.put("/:id/content", authRequired, async (c) => {
     throw new HTTPException(400, { message: "ydoc_state is required" });
   }
 
-  // ページ所有者確認
-  const page = await db
-    .select({ id: pages.id, ownerId: pages.ownerId })
-    .from(pages)
-    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
-    .limit(1);
-
-  const pageRow = page[0];
-  if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
-  if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  // 個人ページは所有者のみ、ノートネイティブページは note ロール / editPermission
+  // で判定する。Issue #713 を参照。
+  // Personal pages: owner only. Note-native pages: note role + editPermission
+  // (`canEdit`). See issue #713.
+  await assertPageEditAccess(db, pageId, userId);
 
   const ydocBuffer = Buffer.from(body.ydoc_state, "base64");
 
@@ -375,15 +394,10 @@ app.delete("/:id", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const page = await db
-    .select({ id: pages.id, ownerId: pages.ownerId })
-    .from(pages)
-    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
-    .limit(1);
-
-  const pageRow = page[0];
-  if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
-  if (pageRow.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
+  // ノートネイティブページの削除はノート編集権限で判定する。
+  // Note-native page deletion is governed by the note's edit permission.
+  // See issue #713.
+  await assertPageEditAccess(db, pageId, userId);
 
   await db
     .update(pages)

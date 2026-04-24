@@ -2,8 +2,7 @@
   "title": "初期設定",
   "step": {
     "profile": "プロフィール",
-    "language": "言語",
-    "tour": "ガイドツアー"
+    "language": "言語"
   },
   "profile": {
     "heading": "あなたのプロフィール",
@@ -12,17 +11,12 @@
   },
   "language": {
     "heading": "使用言語",
-    "description": "UIの表示言語を選んでください"
-  },
-  "tour": {
-    "heading": "クイックツアー",
-    "description": "アプリの使い方を案内します。スキップしても後から設定で確認できます。",
-    "startTour": "クイックツアーを見る",
-    "skip": "スキップして始める"
+    "description": "UI の表示言語を選んでください"
   },
   "action": {
     "next": "次へ",
     "back": "戻る",
-    "complete": "設定を完了してホームへ"
+    "complete": "設定を完了してウェルカムページへ",
+    "completeError": "初期設定の完了に失敗しました。時間を置いて再度お試しください。"
   }
 }

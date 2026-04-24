@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Editor } from "@tiptap/react";
 import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
 import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
+import { useNotePages } from "@/hooks/useNoteQueries";
 
 interface UseWikiLinkStatusSyncOptions {
   editor: Editor | null;
@@ -10,6 +11,16 @@ interface UseWikiLinkStatusSyncOptions {
   onChange: (content: string) => void;
   /** true の間は同期をスキップ（Wiki生成中のリンクスタイルちらつき防止） */
   skipSync?: boolean;
+  /**
+   * 編集中ページの noteId。`null`（既定）は個人ページ、文字列値なら
+   * ノートネイティブページ。存在確認のスコープを切り替えるために使う。
+   * Issue #713 Phase 4。
+   *
+   * Owning note ID of the page being edited. `null` (default) scopes
+   * existence checks to personal pages; a string scopes them to the given
+   * note's pages (fetched via `useNotePages`). See issue #713 Phase 4.
+   */
+  pageNoteId?: string | null;
 }
 
 /**
@@ -18,6 +29,16 @@ interface UseWikiLinkStatusSyncOptions {
  * 以下のタイミングでWikiLinkのexists/referenced属性を更新する:
  * 1. ページ読み込み時（pageIdの変更）
  * 2. WikiLinkの数が増加した時（Wiki生成後など）
+ *
+ * `pageNoteId` が指定された場合は、`useNotePages` から取得したノート配下の
+ * ページ一覧を存在判定の候補にする（Issue #713 Phase 4）。これにより、
+ * ノートネイティブページ内で同じノートの WikiLink が「存在しない」と
+ * 誤判定されて壊れた表示に倒れる問題を防ぐ。
+ *
+ * When `pageNoteId` is provided, note-scoped existence checks use the
+ * `useNotePages(pageNoteId)` result instead of personal-only IndexedDB
+ * summaries. This keeps same-note WikiLinks rendering as existing after
+ * subsequent sync passes (issue #713 Phase 4).
  */
 export function useWikiLinkStatusSync({
   editor,
@@ -25,14 +46,35 @@ export function useWikiLinkStatusSync({
   pageId,
   onChange,
   skipSync = false,
+  pageNoteId = null,
 }: UseWikiLinkStatusSyncOptions): void {
-  const { checkExistence } = useWikiLinkExistsChecker();
+  const notePagesQuery = useNotePages(pageNoteId ?? "", undefined, Boolean(pageNoteId));
+  const { checkExistence } = useWikiLinkExistsChecker({
+    pageNoteId,
+    notePages: pageNoteId ? notePagesQuery.data : undefined,
+  });
+  // editor の content 変更で頻繁に再レンダーされるため、map+sort+join の O(n log n)
+  // をメモ化して打鍵時のコストを抑える。`notePagesQuery.data` の参照が変わったときのみ
+  // 再計算される（React Query は同一データなら参照を保つ）。
+  // Memoize the signature so keystroke-driven re-renders don't repeat the
+  // O(n log n) map/sort/join over the note's page list. React Query keeps a
+  // stable reference for unchanged data, so this only re-computes on real changes.
+  const notePagesData = notePagesQuery.data;
+  const pageScopeSignature = useMemo(() => {
+    if (pageNoteId === null) return "personal";
+    if (notePagesData === undefined) return `note:${pageNoteId}:loading`;
+    return `note:${pageNoteId}:${notePagesData
+      .map((page) => `${page.id}:${page.title.trim().toLowerCase()}`)
+      .sort()
+      .join("|")}`;
+  }, [pageNoteId, notePagesData]);
 
   // 最後にチェックした状態を追跡
   const lastCheckedRef = useRef<{
     pageId: string | null;
     wikiLinkCount: number;
-  }>({ pageId: null, wikiLinkCount: 0 });
+    pageScopeSignature: string | null;
+  }>({ pageId: null, wikiLinkCount: 0, pageScopeSignature: null });
 
   useEffect(() => {
     if (skipSync || !editor || !content || !pageId) {
@@ -46,15 +88,17 @@ export function useWikiLinkStatusSync({
     // チェックが必要かどうかを判定
     const isNewPage = lastCheckedRef.current.pageId !== pageId;
     const hasMoreWikiLinks = currentCount > lastCheckedRef.current.wikiLinkCount;
+    const hasScopeChanged = lastCheckedRef.current.pageScopeSignature !== pageScopeSignature;
 
-    // ページが変わった場合、またはWikiLinkが増えた場合のみ再チェック
-    if (!isNewPage && !hasMoreWikiLinks) {
+    // ページ/リンク数/解決スコープのいずれも変わらないときだけスキップする。
+    // Re-run when the resolution scope changes, even if the page id and count stay the same.
+    if (!isNewPage && !hasMoreWikiLinks && !hasScopeChanged) {
       return;
     }
 
     const updateWikiLinkStatus = async () => {
       if (currentWikiLinks.length === 0) {
-        lastCheckedRef.current = { pageId, wikiLinkCount: 0 };
+        lastCheckedRef.current = { pageId, wikiLinkCount: 0, pageScopeSignature };
         return;
       }
 
@@ -73,7 +117,7 @@ export function useWikiLinkStatusSync({
       const updates = collectWikiLinkUpdates(editor, pageTitles, referencedTitles);
 
       // チェック完了を記録
-      lastCheckedRef.current = { pageId, wikiLinkCount: currentCount };
+      lastCheckedRef.current = { pageId, wikiLinkCount: currentCount, pageScopeSignature };
 
       // 更新を適用
       if (updates.length > 0) {
@@ -88,7 +132,7 @@ export function useWikiLinkStatusSync({
     // コンテンツ反映を待ってから実行
     const timer = setTimeout(updateWikiLinkStatus, 150);
     return () => clearTimeout(timer);
-  }, [skipSync, editor, content, checkExistence, pageId, onChange]);
+  }, [skipSync, editor, content, checkExistence, pageId, onChange, pageScopeSignature]);
 }
 
 // --- ヘルパー関数 ---

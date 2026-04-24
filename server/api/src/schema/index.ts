@@ -8,7 +8,12 @@ export {
   type UserRole,
   type UserStatus,
 } from "./users.js";
-export { pages, type Page, type NewPage, type PageSpecialKind } from "./pages.js";
+export { pages, type Page, type NewPage, type PageSpecialKind, type PageKind } from "./pages.js";
+export {
+  userOnboardingStatus,
+  type UserOnboardingStatus,
+  type NewUserOnboardingStatus,
+} from "./userOnboardingStatus.js";
 export {
   notes,
   notePages,

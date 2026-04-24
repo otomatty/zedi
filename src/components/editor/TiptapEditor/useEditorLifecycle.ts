@@ -25,6 +25,13 @@ interface UseEditorLifecycleOptions {
   onWikiContentApplied: TiptapEditorProps["onWikiContentApplied"];
   handleImageUpload: (files: FileList | File[]) => void;
   isEditorInitializedRef: React.MutableRefObject<boolean>;
+  /**
+   * 編集中ページの noteId。WikiLink 存在確認のスコープを切り替える
+   * （Issue #713 Phase 4）。
+   * Owning note ID of the page being edited; scopes WikiLink existence
+   * checks (issue #713 Phase 4).
+   */
+  pageNoteId: TiptapEditorProps["pageNoteId"];
 }
 
 /**
@@ -50,6 +57,7 @@ export function useEditorLifecycle({
   onWikiContentApplied,
   handleImageUpload,
   isEditorInitializedRef,
+  pageNoteId,
 }: UseEditorLifecycleOptions) {
   const initialContentAppliedRef = useRef(false);
 
@@ -151,5 +159,6 @@ export function useEditorLifecycle({
     pageId: pageId || undefined,
     onChange,
     skipSync: isWikiGenerating,
+    pageNoteId: pageNoteId ?? null,
   });
 }

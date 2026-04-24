@@ -71,6 +71,16 @@ interface PageEditorContentProps {
    * Ref to insert content at the editor's cursor. Forwarded to TiptapEditor.
    */
   insertAtCursorRef?: MutableRefObject<((content: unknown) => boolean) | null>;
+  /**
+   * 編集中ページの noteId。WikiLink 候補・解決のスコープを決定する。
+   * `null` は個人ページ、文字列値はそのノートに所属するノートネイティブ
+   * ページ。Issue #713 Phase 4 を参照。
+   *
+   * Owning note ID of the page being edited. Determines WikiLink scope:
+   * `null` limits candidates to personal pages, a string limits them to the
+   * same note. See issue #713 Phase 4.
+   */
+  pageNoteId?: string | null;
 }
 
 /**
@@ -101,6 +111,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   wikiContentForCollab = null,
   onWikiContentApplied,
   insertAtCursorRef,
+  pageNoteId = null,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
   const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
@@ -171,6 +182,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 onInitialContentApplied={onInitialContentApplied}
                 wikiContentForCollab={wikiContentForCollab ?? undefined}
                 onWikiContentApplied={onWikiContentApplied}
+                pageNoteId={pageNoteId}
               />
             </>
           )}

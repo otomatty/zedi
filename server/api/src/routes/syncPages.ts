@@ -6,7 +6,7 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, gt, inArray } from "drizzle-orm";
+import { eq, and, gt, inArray, isNull } from "drizzle-orm";
 import { pages, links, ghostLinks } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
@@ -14,10 +14,19 @@ import type { AppEnv } from "../types/index.js";
 const app = new Hono<AppEnv>();
 
 // ── GET /sync/pages ─────────────────────────────────────────────────────────
+// 個人ページ同期はクライアントの IndexedDB と個人ページ (`pages.note_id IS
+// NULL`) のみを対象にする。ノートネイティブページ（issue #713）はサーバー側
+// で管理され、ノート画面/共同編集経由でのみアクセスする。
+//
+// Personal-page sync only mirrors personal pages (`pages.note_id IS NULL`)
+// into the client's IndexedDB. Note-native pages (issue #713) live solely on
+// the server and are accessed through the note view / collaborative editor.
 app.get("/", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
   const since = c.req.query("since");
+
+  const personalPageFilter = and(eq(pages.ownerId, userId), isNull(pages.noteId));
 
   let query = db
     .select({
@@ -33,11 +42,11 @@ app.get("/", authRequired, async (c) => {
       updated_at: pages.updatedAt,
     })
     .from(pages)
-    .where(eq(pages.ownerId, userId))
+    .where(personalPageFilter)
     .$dynamic();
 
   if (since) {
-    query = query.where(and(eq(pages.ownerId, userId), gt(pages.updatedAt, new Date(since))));
+    query = query.where(and(personalPageFilter, gt(pages.updatedAt, new Date(since))));
   }
 
   const rows = await query.orderBy(pages.updatedAt);
@@ -111,18 +120,69 @@ app.post("/", authRequired, async (c) => {
 
   const results: Array<{ id: string; action: string }> = [];
 
-  // ページごとに LWW (Last Write Wins) 同期
+  // ページごとに LWW (Last Write Wins) 同期。
+  // 同期対象は個人ページ（`pages.note_id IS NULL`）のみ。ノートネイティブ
+  // ページ（issue #713）や他人の個人ページは衝突回避のため `skipped` 扱い。
+  //
+  // バルク取得で N+1 を避ける: クライアントから来た全 ID を一括で引き、
+  // メモリ上で「未存在 / 自分の個人ページ / それ以外（ノートネイティブ or
+  // 他人）」に振り分けてから個別の DML を発行する。
+  //
+  // LWW sync runs only against personal pages (`pages.note_id IS NULL`).
+  // Note-native pages (issue #713) and other users' personal pages are skipped
+  // to avoid ID collisions and IDOR.
+  //
+  // Bulk-load to avoid N+1: fetch every incoming id in one query, then classify
+  // in memory as "missing", "owned personal", or "other (note-native or
+  // someone else's)". Only after that do we issue per-row DML.
+  // クライアント側のリトライや誤ったペイロードで `body.pages` に同じ id が
+  // 複数入る場合がある。bulk-fetch で得たスナップショットは「リクエスト到着前
+  // の DB 状態」なので、ループ内で更新せず無加工に流すと:
+  //   - 新規 id の 2 回目の occurrence で再度 insert → PK 衝突 (500)
+  //   - 既存 id の 2 回目以降は古い updatedAt と比較 → LWW の順序が崩れる
+  // 対策として (1) 入力を id ごとに updated_at 最新のものへ畳み込み、
+  // (2) DML を発行するたび existingMap も更新して in-request の状態を保つ。
+  //
+  // Duplicate ids in `body.pages` (client retries / bad payloads) would break
+  // the bulk-prefetched snapshot: a new id would re-insert and collide on PK
+  // (500), and an existing id would be compared against a stale `updatedAt`,
+  // breaking LWW ordering. Defend by (1) collapsing duplicates to the newest
+  // `updated_at` per id, and (2) updating `existingMap` after every DML so the
+  // in-request state stays consistent.
+  const latestIncomingById = new Map<string, (typeof body.pages)[number]>();
   for (const p of body.pages) {
-    const existing = await db
-      .select({ id: pages.id, updatedAt: pages.updatedAt, ownerId: pages.ownerId })
-      .from(pages)
-      .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId)))
-      .limit(1);
+    const prev = latestIncomingById.get(p.id);
+    if (!prev || new Date(p.updated_at) > new Date(prev.updated_at)) {
+      latestIncomingById.set(p.id, p);
+    }
+  }
 
+  const incomingIds = [...latestIncomingById.keys()];
+  type ExistingRow = {
+    id: string;
+    ownerId: string;
+    noteId: string | null;
+    updatedAt: Date;
+  };
+  const existingRows: ExistingRow[] =
+    incomingIds.length > 0
+      ? await db
+          .select({
+            id: pages.id,
+            ownerId: pages.ownerId,
+            noteId: pages.noteId,
+            updatedAt: pages.updatedAt,
+          })
+          .from(pages)
+          .where(inArray(pages.id, incomingIds))
+      : [];
+  const existingMap = new Map<string, ExistingRow>(existingRows.map((row) => [row.id, row]));
+
+  for (const p of latestIncomingById.values()) {
+    const existing = existingMap.get(p.id);
     const clientTime = new Date(p.updated_at);
 
-    if (existing.length === 0) {
-      // 新規作成
+    if (!existing) {
       await db.insert(pages).values({
         id: p.id,
         ownerId: userId,
@@ -135,37 +195,54 @@ app.post("/", authRequired, async (c) => {
         createdAt: clientTime,
         updatedAt: clientTime,
       });
+      // 後続イテレーション（同 id の重複が dedupe をすり抜けた場合の保険）が
+      // 再 insert に走らないようマップを更新しておく。
+      // Track the just-inserted row so any later iteration sees current state.
+      existingMap.set(p.id, {
+        id: p.id,
+        ownerId: userId,
+        noteId: null,
+        updatedAt: clientTime,
+      });
       results.push({ id: p.id, action: "created" });
+      continue;
+    }
+
+    // ノートネイティブ or 他人の個人ページは触らない
+    // Skip note-native rows or rows owned by another user
+    if (existing.noteId !== null || existing.ownerId !== userId) {
+      results.push({ id: p.id, action: "skipped" });
+      continue;
+    }
+
+    if (clientTime > existing.updatedAt) {
+      await db
+        .update(pages)
+        .set({
+          title: p.title ?? null,
+          contentPreview: p.content_preview ?? null,
+          thumbnailUrl: p.thumbnail_url ?? null,
+          sourceUrl: p.source_url ?? null,
+          sourcePageId: p.source_page_id ?? null,
+          isDeleted: p.is_deleted ?? false,
+          updatedAt: clientTime,
+        })
+        .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)));
+      existingMap.set(p.id, { ...existing, updatedAt: clientTime });
+      results.push({ id: p.id, action: "updated" });
     } else {
-      const existingRow = existing[0];
-      if (existingRow && clientTime > existingRow.updatedAt) {
-        // クライアント側が新しい: 更新
-        await db
-          .update(pages)
-          .set({
-            title: p.title ?? null,
-            contentPreview: p.content_preview ?? null,
-            thumbnailUrl: p.thumbnail_url ?? null,
-            sourceUrl: p.source_url ?? null,
-            sourcePageId: p.source_page_id ?? null,
-            isDeleted: p.is_deleted ?? false,
-            updatedAt: clientTime,
-          })
-          .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId)));
-        results.push({ id: p.id, action: "updated" });
-      } else {
-        results.push({ id: p.id, action: "skipped" });
-      }
+      results.push({ id: p.id, action: "skipped" });
     }
   }
 
-  // リンク同期
+  // リンク同期 — 個人ページ間のみ
+  // Link sync — personal pages only
   if (body.links?.length) {
     const sourceIds = [...new Set(body.links.map((l) => l.source_id))];
     const ownedPages = await db
       .select({ id: pages.id })
       .from(pages)
-      .where(and(eq(pages.ownerId, userId), inArray(pages.id, sourceIds)));
+      .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
     const ownedIds = new Set(ownedPages.map((r) => r.id));
     for (const sourceId of sourceIds) {
       if (!ownedIds.has(sourceId)) continue;
@@ -184,13 +261,14 @@ app.post("/", authRequired, async (c) => {
     }
   }
 
-  // ゴーストリンク同期
+  // ゴーストリンク同期 — 個人ページ間のみ
+  // Ghost link sync — personal pages only
   if (body.ghost_links?.length) {
     const sourceIds = [...new Set(body.ghost_links.map((g) => g.source_page_id))];
     const ownedGhostPages = await db
       .select({ id: pages.id })
       .from(pages)
-      .where(and(eq(pages.ownerId, userId), inArray(pages.id, sourceIds)));
+      .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
     const ownedGhostIds = new Set(ownedGhostPages.map((r) => r.id));
     for (const sourceId of sourceIds) {
       if (!ownedGhostIds.has(sourceId)) continue;
