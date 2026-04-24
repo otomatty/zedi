@@ -45,15 +45,16 @@ async function getUserEmailLowercase(db: Database, userId: string): Promise<stri
  * ページへの閲覧権限を確認する。
  *
  * - 個人ページ (`pages.note_id IS NULL`): 所有者本人、または当該ページが
- *   `note_pages` 経由で登録されているノートの受諾済みメンバー
+ *   `note_pages` 経由で登録されているノートの受諾済みメンバー / ノート所有者
  * - ノートネイティブページ (`pages.note_id IS NOT NULL`): そのノートに対する
  *   ロール解決（owner / member / domain / public guest）が成立すれば閲覧可。
  *   `pages.ownerId` の一致では許可しない（脱退後に閲覧権が残るのを防ぐ）
  *
  * Verify the user can view the page.
  *
- * - Personal page (`pages.note_id IS NULL`): owner of the page row, or an
- *   accepted member of any note this page is attached to via `note_pages`
+ * - Personal page (`pages.note_id IS NULL`): owner of the page row, an accepted
+ *   member of any note this page is attached to via `note_pages`, or the owner
+ *   of such a note
  * - Note-native page (`pages.note_id IS NOT NULL`): caller must resolve to a
  *   role (owner / member / domain / public guest) on that note. Owning the
  *   underlying `pages` row is intentionally NOT enough — that would let a
@@ -109,6 +110,22 @@ export async function assertPageViewAccess(
     .limit(1);
 
   if (noteMembership[0]) return;
+
+  // ノートオーナーは通常 `note_members` 行を持たないため、linked personal page でも
+  // `note_pages -> notes.owner_id` 経路で閲覧を許可する。Issue #713 / PR #719 review.
+  // Note owners usually do not have a `note_members` row. Allow linked personal
+  // pages through the `note_pages -> notes.owner_id` path too.
+  const noteOwnership = await db
+    .select({ noteId: notePages.noteId })
+    .from(notePages)
+    .innerJoin(
+      notes,
+      and(eq(notes.id, notePages.noteId), eq(notes.ownerId, userId), eq(notes.isDeleted, false)),
+    )
+    .where(and(eq(notePages.pageId, pageId), eq(notePages.isDeleted, false)))
+    .limit(1);
+
+  if (noteOwnership[0]) return;
 
   throw new HTTPException(403, { message: "Forbidden" });
 }

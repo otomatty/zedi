@@ -35,10 +35,21 @@ describe("assertPageViewAccess (issue #713)", () => {
       [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: null }], // getPageOwnership
       [{ email: USER_EMAIL }], // getUserEmailLowercase
       [], // notePages JOIN — no membership
+      [], // note_pages -> notes.owner_id fallback
     ]);
     await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 403,
     });
+  });
+
+  it("allows note owner on a linked personal page even without a note_members row", async () => {
+    const { db } = createMockDb([
+      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: null }], // getPageOwnership
+      [{ email: USER_EMAIL }], // getUserEmailLowercase
+      [], // notePages JOIN — no membership
+      [{ noteId: NOTE_ID }], // note_pages -> notes.owner_id fallback
+    ]);
+    await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
   });
 
   it("denies note-native page when caller has no role on the note", async () => {

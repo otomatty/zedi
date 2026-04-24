@@ -158,7 +158,7 @@ describe("GET /api/pages", () => {
     expect(body.pages[0]).toMatchObject({ id: "page-shared" });
   });
 
-  it("scope=shared predicate also includes note-native pages owned by the caller via notes.owner_id", async () => {
+  it("scope=shared predicate includes note-owner access through note_pages for linked personal pages too", async () => {
     const { app, chains } = createPagesAppWithChains([{ rows: [] }]);
 
     const res = await app.request("/api/pages?scope=shared", {
@@ -167,15 +167,16 @@ describe("GET /api/pages", () => {
     });
 
     expect(res.status).toBe(200);
-    // ノートオーナーは通常 note_members 行を持たないため、shared predicate に
-    // `notes.owner_id = userId` 経路を入れて listing と getNoteRole を整合させる
-    // （Issue #713 / PR #714 レビュー対応）。SQL チャンクから直接検証する。
-    // Verify the shared predicate contains the note-owner branch so listing
-    // matches `getNoteRole` for owners who lack a `note_members` row.
+    // ノートオーナーは通常 note_members 行を持たないため、shared predicate には
+    // `note_pages -> notes.owner_id` 経路が必要。これで note-native page だけでなく
+    // linked personal page も listing と `assertPageViewAccess` で整合する。
+    // Verify the shared predicate contains the note-owner branch via note_pages,
+    // so linked personal pages remain visible to note owners too.
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("p.note_id IS NOT NULL");
+    expect(serialised).toContain("note_pages");
+    expect(serialised).toContain("np.page_id = p.id");
     expect(serialised).toContain("n.owner_id");
   });
 
