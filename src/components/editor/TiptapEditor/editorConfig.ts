@@ -21,6 +21,7 @@ import { StorageImage, type StorageImageOptions } from "../extensions/StorageIma
 import { VideoExtension } from "../extensions/VideoExtension";
 import { MediaPlaceholderExtension } from "../extensions/MediaPlaceholderExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
+import { Tag } from "../extensions/TagExtension";
 import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
@@ -103,6 +104,12 @@ export interface CollaborationExtensionsOptions {
 export interface EditorExtensionsOptions {
   placeholder: string;
   onLinkClick: (title: string) => void;
+  /**
+   * Click handler for tag marks (`#name`). Receives the tag name without `#`
+   * so the caller can navigate to the corresponding page. See issue #725.
+   * タグマーク（`#name`）のクリックハンドラ。`#` を除いた名前を受け取る。
+   */
+  onTagClick?: (name: string) => void;
   onStateChange: (state: WikiLinkSuggestionState) => void;
   onSlashStateChange: (state: SlashSuggestionState) => void;
   imageUploadOptions: Partial<ImageUploadOptions>;
@@ -122,6 +129,7 @@ export interface EditorExtensionsOptions {
 interface CommonEditorExtensionsOptions {
   placeholder?: string;
   onLinkClick: (title: string) => void;
+  onTagClick?: (name: string) => void;
   onStateChange?: (state: WikiLinkSuggestionState) => void;
   onSlashStateChange?: (state: SlashSuggestionState) => void;
   imageUploadOptions?: Partial<ImageUploadOptions>;
@@ -217,6 +225,13 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     WikiLink.configure({
       onLinkClick: options.onLinkClick,
     }),
+    // --- Tag (`#name`) ---
+    // タグはクリック時にページ遷移し、ゴースト/参照状態の表示も WikiLink と揃える。
+    // Tags share the WikiLink data model; clicking navigates to the target page.
+    // See issue #725 (Phase 1).
+    Tag.configure({
+      onTagClick: options.onTagClick ?? options.onLinkClick,
+    }),
     FileReference.configure({
       getWorkspaceRoot: options.fileReference?.getWorkspaceRoot ?? (() => null),
       getNoteId: options.fileReference?.getNoteId ?? (() => null),
@@ -293,6 +308,7 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
   return createCommonEditorExtensions({
     placeholder: options.placeholder,
     onLinkClick: options.onLinkClick,
+    onTagClick: options.onTagClick,
     onStateChange: options.onStateChange,
     onSlashStateChange: options.onSlashStateChange,
     imageUploadOptions: options.imageUploadOptions,
