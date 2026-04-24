@@ -1,0 +1,174 @@
+/**
+ * Utilities for extracting and updating tag marks inside Tiptap JSON content.
+ * Mirrors {@link ./wikiLinkUtils.ts} since tag marks share the same data
+ * model (`links` / `ghost_links` tables with `link_type = 'tag'`). See
+ * issue #725 (Phase 1).
+ *
+ * Tiptap JSON 内のタグマークを抽出・更新するユーティリティ。タグと
+ * WikiLink はデータモデル（`links` / `ghost_links` の `link_type = 'tag'`）
+ * を共有するため、実装は {@link ./wikiLinkUtils.ts} と対をなす。Issue #725。
+ */
+
+/**
+ *
+ */
+export interface TagInfo {
+  name: string;
+  exists: boolean;
+  referenced: boolean;
+}
+
+/**
+ * Extract tag marks from a Tiptap JSON string.
+ * Tiptap JSON 文字列からタグマークを抽出する。
+ *
+ * Returns an empty array when the input is empty, not valid JSON, or contains
+ * no `tag` marks. Traversal order follows document order so callers can rely
+ * on stable positioning when displaying results.
+ */
+export function extractTagsFromContent(content: string): TagInfo[] {
+  if (!content) return [];
+
+  try {
+    const parsed = JSON.parse(content);
+    const tags: TagInfo[] = [];
+
+    const traverse = (node: unknown) => {
+      if (!node || typeof node !== "object") return;
+
+      const n = node as Record<string, unknown>;
+
+      if (Array.isArray(n.marks)) {
+        for (const mark of n.marks) {
+          if (
+            mark &&
+            typeof mark === "object" &&
+            (mark as Record<string, unknown>).type === "tag"
+          ) {
+            const attrs = (mark as Record<string, unknown>).attrs as
+              | Record<string, unknown>
+              | undefined;
+            if (attrs?.name) {
+              tags.push({
+                name: attrs.name as string,
+                exists: Boolean(attrs.exists),
+                referenced: Boolean(attrs.referenced),
+              });
+            }
+          }
+        }
+      }
+
+      if (Array.isArray(n.content)) {
+        for (const child of n.content) {
+          traverse(child);
+        }
+      }
+    };
+
+    traverse(parsed);
+    return tags;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Update `exists` / `referenced` attributes on every tag mark inside the
+ * given Tiptap JSON. `pageTitles` and `referencedTitles` are pre-normalized
+ * (lowercased + trimmed) sets of page titles that the caller has resolved
+ * against the repository.
+ *
+ * 指定した Tiptap JSON 内の全タグマークについて `exists` / `referenced`
+ * 属性を更新する。`pageTitles` / `referencedTitles` は呼び出し側で解決済みの
+ * ページタイトル集合（小文字・トリム正規化済み）。
+ *
+ * @returns 更新後の JSON と、属性変更が発生したかどうか。
+ *          The updated JSON and a flag indicating whether any mark changed.
+ */
+export function updateTagAttributes(
+  content: string,
+  pageTitles: Set<string>,
+  referencedTitles: Set<string>,
+): { content: string; hasChanges: boolean } {
+  if (!content) return { content, hasChanges: false };
+
+  try {
+    const parsed = JSON.parse(content);
+    let hasChanges = false;
+
+    const traverse = (node: unknown): unknown => {
+      if (!node || typeof node !== "object") return node;
+
+      const n = { ...(node as Record<string, unknown>) };
+
+      if (Array.isArray(n.marks)) {
+        n.marks = n.marks.map((mark) => {
+          if (
+            mark &&
+            typeof mark === "object" &&
+            (mark as Record<string, unknown>).type === "tag"
+          ) {
+            const attrs = (mark as Record<string, unknown>).attrs as
+              | Record<string, unknown>
+              | undefined;
+            if (attrs?.name) {
+              const normalizedName = (attrs.name as string).toLowerCase().trim();
+              const newExists = pageTitles.has(normalizedName);
+              const newReferenced = referencedTitles.has(normalizedName);
+
+              if (attrs.exists !== newExists || attrs.referenced !== newReferenced) {
+                hasChanges = true;
+                return {
+                  ...mark,
+                  attrs: {
+                    ...attrs,
+                    exists: newExists,
+                    referenced: newReferenced,
+                  },
+                };
+              }
+            }
+          }
+          return mark;
+        });
+      }
+
+      if (Array.isArray(n.content)) {
+        n.content = n.content.map(traverse);
+      }
+
+      return n;
+    };
+
+    const updated = traverse(parsed);
+    return {
+      content: JSON.stringify(updated),
+      hasChanges,
+    };
+  } catch {
+    return { content, hasChanges: false };
+  }
+}
+
+/**
+ * Deduplicate tag names case-insensitively while preserving the casing of the
+ * first occurrence and the original insertion order.
+ *
+ * タグ名リストから大文字小文字を区別せず重複を除き、最初の出現時の表記と
+ * 挿入順を保ったままユニーク化する。
+ */
+export function getUniqueTagNames(tags: TagInfo[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const tag of tags) {
+    const normalized = tag.name.toLowerCase().trim();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(tag.name);
+    }
+  }
+
+  return result;
+}

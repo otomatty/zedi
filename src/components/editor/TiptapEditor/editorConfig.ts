@@ -19,6 +19,7 @@ import { ExecutableCodeBlock } from "../extensions/ExecutableCodeBlockExtension"
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
+import { Tag } from "../extensions/TagExtension";
 import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
@@ -29,6 +30,7 @@ import {
   WikiLinkSuggestionPlugin,
   type WikiLinkSuggestionState,
 } from "../extensions/wikiLinkSuggestionPlugin";
+import { TagSuggestionPlugin, type TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 import {
   SlashSuggestionPlugin,
   type SlashSuggestionState,
@@ -101,7 +103,19 @@ export interface CollaborationExtensionsOptions {
 export interface EditorExtensionsOptions {
   placeholder: string;
   onLinkClick: (title: string) => void;
+  /**
+   * Click handler for tag marks (`#name`). Receives the tag name without `#`
+   * so the caller can navigate to the corresponding page. See issue #725.
+   * タグマーク（`#name`）のクリックハンドラ。`#` を除いた名前を受け取る。
+   */
+  onTagClick?: (name: string) => void;
   onStateChange: (state: WikiLinkSuggestionState) => void;
+  /**
+   * Notifier for tag suggestion state changes (typing `#name`). Optional so
+   * callers that have not yet wired the UI can fall back to a no-op.
+   * タグサジェストの状態変化通知（`#name` 入力中）。未接続なら no-op。
+   */
+  onTagStateChange?: (state: TagSuggestionState) => void;
   onSlashStateChange: (state: SlashSuggestionState) => void;
   imageUploadOptions: Partial<ImageUploadOptions>;
   imageOptions: Partial<StorageImageOptions>;
@@ -120,7 +134,9 @@ export interface EditorExtensionsOptions {
 interface CommonEditorExtensionsOptions {
   placeholder?: string;
   onLinkClick: (title: string) => void;
+  onTagClick?: (name: string) => void;
   onStateChange?: (state: WikiLinkSuggestionState) => void;
+  onTagStateChange?: (state: TagSuggestionState) => void;
   onSlashStateChange?: (state: SlashSuggestionState) => void;
   imageUploadOptions?: Partial<ImageUploadOptions>;
   imageOptions?: Partial<StorageImageOptions>;
@@ -215,6 +231,13 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     WikiLink.configure({
       onLinkClick: options.onLinkClick,
     }),
+    // --- Tag (`#name`) ---
+    // タグはクリック時にページ遷移し、ゴースト/参照状態の表示も WikiLink と揃える。
+    // Tags share the WikiLink data model; clicking navigates to the target page.
+    // See issue #725 (Phase 1).
+    Tag.configure({
+      onTagClick: options.onTagClick ?? options.onLinkClick,
+    }),
     FileReference.configure({
       getWorkspaceRoot: options.fileReference?.getWorkspaceRoot ?? (() => null),
       getNoteId: options.fileReference?.getNoteId ?? (() => null),
@@ -223,6 +246,9 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
       ? [
           WikiLinkSuggestionPlugin.configure({
             onStateChange: options.onStateChange ?? (() => undefined),
+          }),
+          TagSuggestionPlugin.configure({
+            onStateChange: options.onTagStateChange ?? (() => undefined),
           }),
           // --- Phase 0: Slash Command ---
           SlashSuggestionPlugin.configure({
@@ -281,7 +307,9 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
   return createCommonEditorExtensions({
     placeholder: options.placeholder,
     onLinkClick: options.onLinkClick,
+    onTagClick: options.onTagClick,
     onStateChange: options.onStateChange,
+    onTagStateChange: options.onTagStateChange,
     onSlashStateChange: options.onSlashStateChange,
     imageUploadOptions: options.imageUploadOptions,
     imageOptions: options.imageOptions,
