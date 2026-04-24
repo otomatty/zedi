@@ -274,6 +274,55 @@ describe("syncWithApi", () => {
     expect(adapter.saveLinks).toHaveBeenCalledWith("p1", [], "tag");
   });
 
+  it("links の link_type を根拠に ghost_links 側も tag バケットをクリアする（ghost_links が空のとき stale タグゴーストが残らないこと） / clears tag ghost bucket using evidence from links even when ghost_links is empty (issue #725 Phase 1; Devin review)", async () => {
+    // Devin review: links と ghost_links を独立に判定すると、`links` に
+    // `link_type='tag'` があっても `ghost_links: []` のレスポンスでは
+    // ghost の tag バケットがクリアされず stale が残る。レスポンス全体から
+    // server の link_type サポートを推定し、両方のバケットで tag もクリア
+    // 対象に含める必要がある。
+    //
+    // When `res.links` proves the server speaks `link_type`, the ghost_links
+    // path must also clear the tag bucket — otherwise an empty ghost_links
+    // array leaves stale local tag ghosts untouched.
+    const serverPage = {
+      id: "p1",
+      owner_id: TEST_USER_ID,
+      source_page_id: null,
+      title: "Page",
+      content_preview: null,
+      thumbnail_url: null,
+      source_url: null,
+      created_at: "2025-01-01T00:00:00Z",
+      updated_at: "2025-05-01T00:00:00Z",
+      is_deleted: false,
+    };
+    const adapter = createMockAdapter();
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [serverPage],
+        links: [
+          {
+            source_id: "other-page",
+            target_id: "x",
+            link_type: "tag",
+            created_at: "2025-01-01T00:00:00Z",
+          },
+        ],
+        // ghost_links は空（この配列単独では link_type 非対応に見える）
+        // ghost_links empty (looks legacy on its own)
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    // saveGhostLinks も tag バケットで呼ばれることを検証。
+    // saveGhostLinks must also be called for the tag bucket.
+    expect(adapter.saveGhostLinks).toHaveBeenCalledWith("p1", [], "wiki");
+    expect(adapter.saveGhostLinks).toHaveBeenCalledWith("p1", [], "tag");
+  });
+
   it("preserves local thumbnailUrl when server returns null", async () => {
     const localPage: PageMetadata = {
       id: "p1",

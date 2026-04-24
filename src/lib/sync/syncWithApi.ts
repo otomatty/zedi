@@ -292,21 +292,28 @@ async function applyPull(
   // でのみ tag バケットの stale クリアを走らせる。pre-#725 のサーバやキャッシュ
   // された旧レスポンスは `link_type` を含まないため、そうした payload で tag
   // バケットを強制的に空保存するとローカルの tag エッジを誤って消してしまう。
-  // そこで「ペイロード全体に 1 行でも explicit な `link_type` があれば wire が
-  // link_type を理解している」とみなし、その場合のみ全種別を対象にする。
+  // そこで「レスポンス全体（links or ghost_links いずれか）に 1 行でも explicit
+  // な `link_type` があれば wire が link_type を理解している」とみなし、その
+  // 場合は links / ghost_links 両方で全種別を対象にする。links と ghost_links
+  // を独立に判定すると、片方が空（例: `ghost_links: []`）のときに tag バケット
+  // のクリアが発動せず、stale なタグゴーストが残る問題があった（PR #733 レビュー）。
   //
   // Only clear the `'tag'` bucket when the payload proves the server speaks
-  // `link_type` (issue #725 Phase 1). A pre-#725 server or any cached legacy
+  // `link_type` (issue #725 Phase 1). A pre-#725 server or cached legacy
   // response omits `link_type`, and enumerating all link types would otherwise
-  // silently erase local tag edges during a mixed-version rollout. If at least
-  // one row carries an explicit `link_type`, we trust the wire to cover every
-  // bucket; otherwise we only touch `'wiki'`.
+  // silently erase local tag edges during mixed-version rollout. If **any**
+  // row across the whole response carries an explicit `link_type`, we trust
+  // the wire for both links and ghost_links. Checking them independently
+  // left stale tag ghost edges behind when the ghost_links array happened to
+  // be empty (PR #733 review: Devin).
   const hasExplicitLinkType = (items: Array<{ link_type?: "wiki" | "tag" }>): boolean =>
     items.some((row) => row.link_type !== undefined);
-  const linkTypesForLinks: readonly LinkType[] = hasExplicitLinkType(res.links)
+  const serverSpeaksLinkType =
+    hasExplicitLinkType(res.links) || hasExplicitLinkType(res.ghost_links);
+  const linkTypesForLinks: readonly LinkType[] = serverSpeaksLinkType
     ? (["wiki", "tag"] as const)
     : (["wiki"] as const);
-  const linkTypesForGhosts: readonly LinkType[] = hasExplicitLinkType(res.ghost_links)
+  const linkTypesForGhosts: readonly LinkType[] = serverSpeaksLinkType
     ? (["wiki", "tag"] as const)
     : (["wiki"] as const);
 
