@@ -91,13 +91,17 @@ export interface PostSyncPagesResponse {
 export interface PageContentResponse {
   ydoc_state: string; // base64
   version: number;
+  content_text?: string | null;
+  updated_at?: string;
 }
 
 /** PUT /api/pages/:id/content body. */
 export interface PutPageContentBody {
   ydoc_state: string; // base64
   content_text?: string;
-  version?: number;
+  content_preview?: string;
+  title?: string;
+  expected_version?: number;
 }
 
 /** POST /api/pages body. */

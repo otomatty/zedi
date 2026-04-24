@@ -26,6 +26,12 @@ function escapeLike(input: string): string {
   return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
+function clampLimit(raw: string | undefined): number {
+  const parsed = raw === undefined ? 20 : Number(raw);
+  const safe = Number.isFinite(parsed) ? Math.trunc(parsed) : 20;
+  return Math.min(Math.max(safe, 1), 100);
+}
+
 const app = new Hono<AppEnv>();
 
 app.get("/", authRequired, async (c) => {
@@ -38,7 +44,7 @@ app.get("/", authRequired, async (c) => {
   }
 
   const scope = c.req.query("scope") || "own";
-  const limit = Math.min(Math.max(Number(c.req.query("limit") || 20), 1), 100);
+  const limit = clampLimit(c.req.query("limit"));
   const pattern = `%${escapeLike(query)}%`;
 
   // 両スコープで返す列は同一なので共有する。`p.note_id` は呼び出し側のスコープ判定用。
@@ -55,15 +61,28 @@ app.get("/", authRequired, async (c) => {
       LEFT JOIN page_contents pc ON pc.page_id = p.id
       WHERE p.is_deleted = false
         AND (
-          p.owner_id = ${userId}
-          OR p.id IN (
-            SELECT np.page_id FROM note_pages np
+          (p.owner_id = ${userId} AND p.note_id IS NULL)
+          OR EXISTS (
+            SELECT 1
+            FROM note_pages np
+            JOIN notes n ON n.id = np.note_id
             JOIN note_members nm ON nm.note_id = np.note_id
-            WHERE nm.member_email IN (
-              SELECT email FROM "user" WHERE id = ${userId}
-            )
-            AND nm.is_deleted = false
-            AND np.is_deleted = false
+            JOIN "user" u ON u.email = nm.member_email
+            WHERE np.page_id = p.id
+              AND u.id = ${userId}
+              AND nm.status = 'accepted'
+              AND nm.is_deleted = false
+              AND np.is_deleted = false
+              AND n.is_deleted = false
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM note_pages np
+            JOIN notes n ON n.id = np.note_id
+            WHERE np.page_id = p.id
+              AND np.is_deleted = false
+              AND n.owner_id = ${userId}
+              AND n.is_deleted = false
           )
         )
         AND (
