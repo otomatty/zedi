@@ -297,6 +297,8 @@
     padding: 1px 6px;
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.82em;
+    /* Reset inherited palt — monospace alignment / 等幅揃え */
+    font-feature-settings: normal;
   }
 
   /* Inline code */
@@ -307,6 +309,8 @@
     padding: 2px 6px;
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.88em;
+    /* Reset inherited palt — monospace alignment / 等幅揃え */
+    font-feature-settings: normal;
   }
 
   /* Standard anchor (non-wiki) */
@@ -351,8 +355,7 @@
     margin: 6px 0;
   }
 
-  .tiptap-editor ul::marker,
-  .tiptap-editor ol::marker {
+  .tiptap-editor li::marker {
     color: hsl(var(--muted-foreground));
   }
 
@@ -459,6 +462,8 @@
     line-height: 1.7;
     overflow-x: auto;
     tab-size: 2;
+    /* Reset inherited palt — monospace alignment / 等幅揃え */
+    font-feature-settings: normal;
   }
 
   .tiptap-editor pre code {
@@ -794,7 +799,7 @@
   .wiki-link-referenced {
     color: hsl(var(--link-referenced));
     background: hsl(var(--link-referenced) / 0.1);
-    border-bottom: 1px dashed currentColor;
+    border-bottom: 1px dashed currentcolor;
     padding: 1px 4px;
     margin: 0 -2px;
     border-radius: 3px;
@@ -812,7 +817,7 @@
   .wiki-link-ghost {
     color: hsl(var(--link-ghost));
     background: hsl(var(--link-ghost) / 0.1);
-    border-bottom: 1px dashed currentColor;
+    border-bottom: 1px dashed currentcolor;
     padding: 1px 4px;
     margin: 0 -2px;
     border-radius: 3px;
@@ -898,6 +903,12 @@
   .light .tiptap-editor .footnotes {
     border-top-color: hsl(220 15% 88%);
     color: hsl(220 10% 40%);
+  }
+
+  .light .tiptap-editor mark {
+    /* Higher opacity for visibility on near-white bg
+     * ライト背景でも視認できる濃度 */
+    background: hsl(48 90% 55% / 0.45);
   }
 
   .light .callout-icon {
