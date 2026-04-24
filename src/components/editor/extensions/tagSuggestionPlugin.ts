@@ -27,11 +27,11 @@ export interface TagSuggestionOptions {
 
 /**
  * Live-detection plugin for hashtag typing (`#name`). Mirrors
- * {@link ./wikiLinkSuggestionPlugin.ts} but triggers on `#` + allowed tag
+ * `./wikiLinkSuggestionPlugin.ts` but triggers on `#` + allowed tag
  * characters rather than `[[`. See issue #725 (Phase 1).
  *
  * `#name` のライブ検出プラグイン。`[[` の代わりに `#` と許可文字で発火する
- * 点以外は {@link ./wikiLinkSuggestionPlugin.ts} と同じ構造。Issue #725。
+ * 点以外は `./wikiLinkSuggestionPlugin.ts` と同じ構造。Issue #725。
  *
  * Trigger rules / 発火条件:
  * - `#` must be at the start of input or preceded by whitespace/punctuation

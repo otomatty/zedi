@@ -21,10 +21,19 @@ export type LinkType = "wiki" | "tag";
  */
 export const LINK_TYPES: readonly LinkType[] = ["wiki", "tag"] as const;
 
-export /**
+/**
+ * Directed page-to-page reference graph. Rows represent `[[WikiLink]]` or
+ * `#tag` edges depending on `link_type`. The composite primary key is
+ * `(source_id, target_id, link_type)` so a page pair can carry independent
+ * wiki and tag edges simultaneously. Self-references are rejected via a
+ * CHECK constraint.
  *
+ * ページ間の有向参照グラフ。`link_type` により `[[WikiLink]]` と `#tag` の
+ * 両方を同じテーブルに格納する。主キーは `(source_id, target_id, link_type)`
+ * とし、同一ページ対でも種別ごとに独立したエッジを持てる。自己参照は CHECK
+ * 制約で拒否する。
  */
-const links = pgTable(
+export const links = pgTable(
   "links",
   {
     sourceId: uuid("source_id")
@@ -54,19 +63,23 @@ const links = pgTable(
   ],
 );
 
-/**
- *
- */
+/** Row type for SELECT queries against `links`. / `links` の SELECT 行型。 */
 export type Link = typeof links.$inferSelect;
-/**
- *
- */
+/** Row type for INSERT into `links`. / `links` への INSERT 行型。 */
 export type NewLink = typeof links.$inferInsert;
 
-export /**
+/**
+ * Unresolved link/tag references (ghost edges). Rows are written when the
+ * target text does not yet map to a page in the source's scope. They are
+ * upgraded to `links` rows once a matching page appears. `link_type` mirrors
+ * the `links` table so wiki-link and tag ghosts are tracked independently.
  *
+ * 未解決のリンク／タグ参照（ゴーストエッジ）。対象テキストが同スコープの
+ * ページに解決できないときに登録し、一致するページが現れたら `links` に
+ * 昇格する。`link_type` は `links` と対応し、WikiLink とタグのゴーストを
+ * 独立に追跡する。
  */
-const ghostLinks = pgTable(
+export const ghostLinks = pgTable(
   "ghost_links",
   {
     linkText: text("link_text").notNull(),
@@ -94,11 +107,7 @@ const ghostLinks = pgTable(
   ],
 );
 
-/**
- *
- */
+/** Row type for SELECT queries against `ghost_links`. / `ghost_links` の SELECT 行型。 */
 export type GhostLink = typeof ghostLinks.$inferSelect;
-/**
- *
- */
+/** Row type for INSERT into `ghost_links`. / `ghost_links` への INSERT 行型。 */
 export type NewGhostLink = typeof ghostLinks.$inferInsert;

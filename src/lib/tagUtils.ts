@@ -1,16 +1,22 @@
 /**
  * Utilities for extracting and updating tag marks inside Tiptap JSON content.
- * Mirrors {@link ./wikiLinkUtils.ts} since tag marks share the same data
+ * Mirrors `./wikiLinkUtils.ts` since tag marks share the same data
  * model (`links` / `ghost_links` tables with `link_type = 'tag'`). See
  * issue #725 (Phase 1).
  *
  * Tiptap JSON 内のタグマークを抽出・更新するユーティリティ。タグと
  * WikiLink はデータモデル（`links` / `ghost_links` の `link_type = 'tag'`）
- * を共有するため、実装は {@link ./wikiLinkUtils.ts} と対をなす。Issue #725。
+ * を共有するため、実装は `./wikiLinkUtils.ts` と対をなす。Issue #725。
  */
 
 /**
+ * Minimal shape of a tag mark consumed by sync/render flows. `exists`
+ * indicates whether a page named after the tag resolves in the current scope;
+ * `referenced` tracks whether the same tag appears on other pages.
  *
+ * 同期・描画フローで扱うタグマークの最小形。`exists` はタグ名と同名のページが
+ * 現在のスコープで解決できるか、`referenced` は他ページでも同じタグが使われて
+ * いるかを表す。
  */
 export interface TagInfo {
   name: string;
