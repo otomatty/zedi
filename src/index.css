@@ -400,6 +400,17 @@
       border-color 0.2s ease;
   }
 
+  /* Keyboard focus ring — appearance:none removes the native one
+   * キーボード操作時のフォーカス可視化 */
+  .tiptap-editor
+    ul[data-type="taskList"]
+    li[data-type="taskItem"]
+    > label
+    input[type="checkbox"]:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
   .tiptap-editor
     ul[data-type="taskList"]
     li[data-type="taskItem"]
@@ -430,7 +441,15 @@
     min-width: 0;
   }
 
-  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div {
+  /* Reset inherited paragraph margin so task rows keep the 6px rhythm
+   * 段落マージンをリセットして 6px 間隔を維持 */
+  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"] > div > p {
+    margin: 0;
+  }
+
+  /* Scope strike-through to the text block only, not nested subtasks
+   * 子タスクに打ち消しが波及しないよう段落のみに適用 */
+  .tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div > p {
     color: hsl(var(--muted-foreground));
     text-decoration: line-through;
   }
@@ -664,6 +683,8 @@
     padding: 4px 8px;
     font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 14px;
+    /* Reset inherited palt — monospace alignment / 等幅揃え */
+    font-feature-settings: normal;
   }
 
   .tiptap-editor .Tiptap-mathematics-render {
