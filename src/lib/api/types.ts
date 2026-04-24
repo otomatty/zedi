@@ -37,22 +37,28 @@ export interface SyncPageItem {
 }
 
 /**
- * WikiLink グラフのリンク行。`/api/sync/pages` 応答内で使われる。
- * Link row in the wiki-link graph, returned by `/api/sync/pages`.
+ * WikiLink / タググラフのリンク行。`/api/sync/pages` 応答内で使われる。
+ * `link_type` は issue #725 Phase 1 で追加。未提供クライアント互換のため任意。
+ *
+ * Link row in the wiki/tag link graph returned by `/api/sync/pages`.
+ * `link_type` was added in issue #725 Phase 1; optional so legacy clients
+ * without the field still parse.
  */
 export interface SyncLinkItem {
   source_id: string;
   target_id: string;
+  link_type?: "wiki" | "tag";
   created_at: string;
 }
 
 /**
- * 未解決 WikiLink（ゴーストリンク）の行。`/api/sync/pages` で同期される。
- * Ghost-link (unresolved WikiLink) row synced via `/api/sync/pages`.
+ * 未解決 WikiLink / タグ（ゴーストリンク）の行。`/api/sync/pages` で同期される。
+ * Ghost-link row (unresolved WikiLink or tag) synced via `/api/sync/pages`.
  */
 export interface SyncGhostLinkItem {
   link_text: string;
   source_page_id: string;
+  link_type?: "wiki" | "tag";
   created_at: string;
   original_target_page_id?: string | null;
   original_note_id?: string | null;
@@ -71,10 +77,21 @@ export interface PostSyncPagesBody {
     updated_at: string;
     is_deleted?: boolean;
   }>;
-  links?: Array<{ source_id: string; target_id: string; created_at?: string }>;
+  links?: Array<{
+    source_id: string;
+    target_id: string;
+    /**
+     * `'wiki'` | `'tag'`。未指定はサーバー側で `'wiki'` にフォールバック
+     * (issue #725 Phase 1)。Omit → server defaults to `'wiki'`.
+     */
+    link_type?: "wiki" | "tag";
+    created_at?: string;
+  }>;
   ghost_links?: Array<{
     link_text: string;
     source_page_id: string;
+    /** 同上 / Same contract as above. */
+    link_type?: "wiki" | "tag";
     created_at?: string;
     original_target_page_id?: string | null;
     original_note_id?: string | null;

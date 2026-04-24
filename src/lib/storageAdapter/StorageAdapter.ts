@@ -4,8 +4,11 @@
  * Web: IndexedDBStorageAdapter. Tauri: TauriStorageAdapter (Phase D).
  */
 
-import type { PageMetadata, Link, GhostLink, SearchResult } from "./types";
+import type { PageMetadata, Link, GhostLink, LinkType, SearchResult } from "./types";
 
+/**
+ *
+ */
 export interface StorageAdapter {
   // ── メタデータ ──
   getAllPages(): Promise<PageMetadata[]>;
@@ -18,12 +21,21 @@ export interface StorageAdapter {
   saveYDocState(pageId: string, state: Uint8Array, version: number): Promise<void>;
   getYDocVersion(pageId: string): Promise<number>;
 
-  // ── リンク ──
-  getLinks(pageId: string): Promise<Link[]>;
-  getBacklinks(pageId: string): Promise<Link[]>;
-  saveLinks(sourcePageId: string, links: Link[]): Promise<void>;
-  getGhostLinks(pageId: string): Promise<GhostLink[]>;
-  saveGhostLinks(sourcePageId: string, ghostLinks: GhostLink[]): Promise<void>;
+  // ── リンク / Links ──
+  //
+  // `linkType` 省略時は全種別 (`'wiki'` + `'tag'`) を対象にする。Issue #725 Phase 1
+  // で `link_type` を導入して以降、書き込み系 (`saveLinks` / `saveGhostLinks`) は
+  // `linkType` を明示して「その種別のみを全置換」させる契約。未指定だった既存
+  // 呼び出し元は段階的に移行する。
+  //
+  // When `linkType` is omitted, read methods return rows of any type. Write
+  // methods require an explicit `linkType` (issue #725) and replace only that
+  // type's rows for the given source — they never wipe edges of other types.
+  getLinks(pageId: string, linkType?: LinkType): Promise<Link[]>;
+  getBacklinks(pageId: string, linkType?: LinkType): Promise<Link[]>;
+  saveLinks(sourcePageId: string, links: Link[], linkType: LinkType): Promise<void>;
+  getGhostLinks(pageId: string, linkType?: LinkType): Promise<GhostLink[]>;
+  saveGhostLinks(sourcePageId: string, ghostLinks: GhostLink[], linkType: LinkType): Promise<void>;
 
   // ── 検索 ──
   searchPages(query: string): Promise<SearchResult[]>;

@@ -8,7 +8,7 @@ import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
 import type { PageMetadata } from "@/lib/storageAdapter/types";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { SyncPageItem } from "@/lib/api/types";
-import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
+import type { Page, PageSummary, Link, GhostLink, LinkType } from "@/types/page";
 import type { CreatePageOptions } from "@/lib/pageRepository";
 import { getPageListPreview, extractPlainText } from "@/lib/contentUtils";
 
@@ -304,33 +304,41 @@ export class StorageAdapterPageRepository {
 
   /**
    * 2 ページ間のリンクを追加する（重複追加はスキップ）。
-   * Add a link between two pages; duplicate inserts are a no-op.
+   * `linkType` 省略時は `'wiki'`（issue #725 Phase 1）。
+   *
+   * Add a link between two pages; duplicate inserts are a no-op. Defaults
+   * `linkType` to `'wiki'` for legacy call sites.
    */
-  async addLink(sourceId: string, targetId: string): Promise<void> {
-    const links = await this.adapter.getLinks(sourceId);
+  async addLink(sourceId: string, targetId: string, linkType: LinkType = "wiki"): Promise<void> {
+    const links = await this.adapter.getLinks(sourceId, linkType);
     const now = Date.now();
     if (links.some((l) => l.targetId === targetId)) return;
-    await this.adapter.saveLinks(sourceId, [...links, { sourceId, targetId, createdAt: now }]);
+    await this.adapter.saveLinks(
+      sourceId,
+      [...links, { sourceId, targetId, linkType, createdAt: now }],
+      linkType,
+    );
   }
 
   /**
    * 2 ページ間のリンクを削除する。
-   * Remove a link between two pages.
+   * Remove a link between two pages. `linkType` scopes the removal.
    */
-  async removeLink(sourceId: string, targetId: string): Promise<void> {
-    const links = await this.adapter.getLinks(sourceId);
+  async removeLink(sourceId: string, targetId: string, linkType: LinkType = "wiki"): Promise<void> {
+    const links = await this.adapter.getLinks(sourceId, linkType);
     await this.adapter.saveLinks(
       sourceId,
       links.filter((l) => l.targetId !== targetId),
+      linkType,
     );
   }
 
   /**
    * 指定ページから出ているリンクの target ID 一覧を返す。
-   * Return target IDs of outgoing links for a page.
+   * Return target IDs of outgoing links for a page. `linkType` scopes results.
    */
-  async getOutgoingLinks(pageId: string): Promise<string[]> {
-    const links = await this.adapter.getLinks(pageId);
+  async getOutgoingLinks(pageId: string, linkType: LinkType = "wiki"): Promise<string[]> {
+    const links = await this.adapter.getLinks(pageId, linkType);
     return links.map((l) => l.targetId);
   }
 
@@ -338,14 +346,14 @@ export class StorageAdapterPageRepository {
    * 指定ページへの被リンク（バックリンク）の source ID 一覧を返す。
    * Return source IDs of backlinks pointing at the page.
    */
-  async getBacklinks(pageId: string): Promise<string[]> {
-    const links = await this.adapter.getBacklinks(pageId);
+  async getBacklinks(pageId: string, linkType: LinkType = "wiki"): Promise<string[]> {
+    const links = await this.adapter.getBacklinks(pageId, linkType);
     return links.map((l) => l.sourceId);
   }
 
   /**
-   * ユーザー配下の全ページに対する全リンクを集めて返す。
-   * Collect every link across all pages owned by the user.
+   * ユーザー配下の全ページに対する全リンクを集めて返す（全種別）。
+   * Collect every link across all pages owned by the user (all link types).
    */
   async getLinks(_userId: string): Promise<Link[]> {
     const pages = await this.adapter.getAllPages();
@@ -358,28 +366,38 @@ export class StorageAdapterPageRepository {
   }
 
   /**
-   * ゴーストリンク（未解決 WikiLink）を追加する。重複は無視。
-   * Add a ghost link (unresolved WikiLink); duplicates are ignored.
+   * ゴーストリンク（未解決 WikiLink / タグ）を追加する。重複は無視。
+   * Add a ghost link (unresolved WikiLink or tag); duplicates are ignored.
    */
-  async addGhostLink(linkText: string, sourcePageId: string): Promise<void> {
-    const ghosts = await this.adapter.getGhostLinks(sourcePageId);
+  async addGhostLink(
+    linkText: string,
+    sourcePageId: string,
+    linkType: LinkType = "wiki",
+  ): Promise<void> {
+    const ghosts = await this.adapter.getGhostLinks(sourcePageId, linkType);
     const now = Date.now();
     if (ghosts.some((g) => g.linkText === linkText)) return;
-    await this.adapter.saveGhostLinks(sourcePageId, [
-      ...ghosts,
-      { linkText, sourcePageId, createdAt: now },
-    ]);
+    await this.adapter.saveGhostLinks(
+      sourcePageId,
+      [...ghosts, { linkText, sourcePageId, linkType, createdAt: now }],
+      linkType,
+    );
   }
 
   /**
    * ゴーストリンクを削除する。
-   * Remove a ghost link from a source page.
+   * Remove a ghost link from a source page, scoped by `linkType`.
    */
-  async removeGhostLink(linkText: string, sourcePageId: string): Promise<void> {
-    const ghosts = await this.adapter.getGhostLinks(sourcePageId);
+  async removeGhostLink(
+    linkText: string,
+    sourcePageId: string,
+    linkType: LinkType = "wiki",
+  ): Promise<void> {
+    const ghosts = await this.adapter.getGhostLinks(sourcePageId, linkType);
     await this.adapter.saveGhostLinks(
       sourcePageId,
       ghosts.filter((g) => g.linkText !== linkText),
+      linkType,
     );
   }
 
@@ -387,32 +405,26 @@ export class StorageAdapterPageRepository {
    * 指定リンクテキストのゴーストを持つページ ID 一覧を返す。
    * Return IDs of pages that carry a ghost link for the given text.
    */
-  async getGhostLinkSources(linkText: string): Promise<string[]> {
+  async getGhostLinkSources(linkText: string, linkType: LinkType = "wiki"): Promise<string[]> {
     const pages = await this.adapter.getAllPages();
     const sources: string[] = [];
     for (const p of pages) {
-      const ghosts = await this.adapter.getGhostLinks(p.id);
+      const ghosts = await this.adapter.getGhostLinks(p.id, linkType);
       if (ghosts.some((g) => g.linkText === linkText)) sources.push(p.id);
     }
     return sources;
   }
 
   /**
-   * ユーザー配下の全ページについてゴーストリンクを集めて返す。
-   * Aggregate every ghost link across all pages owned by the user.
+   * ユーザー配下の全ページについて全種別のゴーストリンクを集めて返す。
+   * Aggregate every ghost link (all link types) across pages owned by the user.
    */
   async getGhostLinks(_userId: string): Promise<GhostLink[]> {
     const pages = await this.adapter.getAllPages();
     const all: GhostLink[] = [];
     for (const p of pages) {
       const ghosts = await this.adapter.getGhostLinks(p.id);
-      all.push(
-        ...ghosts.map((g) => ({
-          linkText: g.linkText,
-          sourcePageId: g.sourcePageId,
-          createdAt: g.createdAt,
-        })),
-      );
+      all.push(...ghosts);
     }
     return all;
   }
@@ -421,25 +433,30 @@ export class StorageAdapterPageRepository {
    * 単一ソースページに属するゴーストリンクのリンクテキスト一覧を返す（差分同期用）。
    * Return ghost-link texts for a single source page (used by delta sync).
    */
-  async getGhostLinksBySourcePage(sourcePageId: string): Promise<string[]> {
-    const ghosts = await this.adapter.getGhostLinks(sourcePageId);
+  async getGhostLinksBySourcePage(
+    sourcePageId: string,
+    linkType: LinkType = "wiki",
+  ): Promise<string[]> {
+    const ghosts = await this.adapter.getGhostLinks(sourcePageId, linkType);
     return ghosts.map((g) => g.linkText);
   }
 
   /**
    * 2 箇所以上から参照されているゴーストリンクを、実在ページとして昇格させる。
-   * 新規ページを作成し、各ソースからのリンクへ置き換える。
+   * 新規ページを作成し、各ソースからのリンクへ置き換える。WikiLink 種別限定。
    *
-   * Promote a ghost link referenced by two or more source pages into a real
-   * page, rewiring each source to link into the new page.
+   * Promote a WikiLink ghost link referenced by two or more source pages into
+   * a real page, rewiring each source to link into the new page. Tag ghosts
+   * stay as-is (tag promotion is handled via normal tag sync, not multi-source
+   * promotion).
    */
   async promoteGhostLink(userId: string, linkText: string): Promise<Page | null> {
-    const sources = await this.getGhostLinkSources(linkText);
+    const sources = await this.getGhostLinkSources(linkText, "wiki");
     if (sources.length < 2) return null;
     const newPage = await this.createPage(userId, linkText, "");
     for (const sourceId of sources) {
-      await this.addLink(sourceId, newPage.id);
-      await this.removeGhostLink(linkText, sourceId);
+      await this.addLink(sourceId, newPage.id, "wiki");
+      await this.removeGhostLink(linkText, sourceId, "wiki");
     }
     return newPage;
   }

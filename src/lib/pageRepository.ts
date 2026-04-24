@@ -1,4 +1,4 @@
-import type { Page, PageSummary, Link, GhostLink } from "@/types/page";
+import type { Page, PageSummary, Link, GhostLink, LinkType } from "@/types/page";
 
 /**
  * C3-7: Common interface for page repository implementations.
@@ -10,6 +10,16 @@ export interface CreatePageOptions {
   thumbnailUrl?: string | null;
 }
 
+/**
+ * Repository interface for pages + their link graph.
+ *
+ * Link-related methods accept an optional `linkType` (`'wiki'` | `'tag'`)
+ * introduced in issue #725 Phase 1. Legacy call sites may omit it; the
+ * implementation defaults to `'wiki'` for backward compatibility.
+ *
+ * ページとリンクグラフのリポジトリ。リンク系メソッドの `linkType` は
+ * issue #725 Phase 1 で追加。省略時は `'wiki'` にフォールバック。
+ */
 export interface IPageRepository {
   createPage(
     userId: string,
@@ -30,17 +40,17 @@ export interface IPageRepository {
   ): Promise<void>;
   deletePage(userId: string, pageId: string): Promise<void>;
   searchPages(userId: string, query: string): Promise<Page[]>;
-  addLink(sourceId: string, targetId: string): Promise<void>;
-  removeLink(sourceId: string, targetId: string): Promise<void>;
-  getOutgoingLinks(pageId: string): Promise<string[]>;
-  getBacklinks(pageId: string): Promise<string[]>;
+  addLink(sourceId: string, targetId: string, linkType?: LinkType): Promise<void>;
+  removeLink(sourceId: string, targetId: string, linkType?: LinkType): Promise<void>;
+  getOutgoingLinks(pageId: string, linkType?: LinkType): Promise<string[]>;
+  getBacklinks(pageId: string, linkType?: LinkType): Promise<string[]>;
   getLinks(userId: string): Promise<Link[]>;
-  addGhostLink(linkText: string, sourcePageId: string): Promise<void>;
-  removeGhostLink(linkText: string, sourcePageId: string): Promise<void>;
-  getGhostLinkSources(linkText: string): Promise<string[]>;
+  addGhostLink(linkText: string, sourcePageId: string, linkType?: LinkType): Promise<void>;
+  removeGhostLink(linkText: string, sourcePageId: string, linkType?: LinkType): Promise<void>;
+  getGhostLinkSources(linkText: string, linkType?: LinkType): Promise<string[]>;
   getGhostLinks(userId: string): Promise<GhostLink[]>;
   /** Link texts (titles) for ghost links from a single source page. Used for delta sync. */
-  getGhostLinksBySourcePage(sourcePageId: string): Promise<string[]>;
+  getGhostLinksBySourcePage(sourcePageId: string, linkType?: LinkType): Promise<string[]>;
   promoteGhostLink(userId: string, linkText: string): Promise<Page | null>;
 }
 

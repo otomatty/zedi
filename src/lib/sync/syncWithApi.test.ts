@@ -178,12 +178,17 @@ describe("syncWithApi", () => {
 
     await syncWithApi(adapter, api, TEST_USER_ID);
 
+    // Issue #725 Phase 1: saveLinks は (sourceId, links, linkType) の 3 引数で
+    // 呼ばれる。wiki 種別の pull を確認する。
+    // saveLinks takes `(sourceId, links, linkType)` since issue #725 Phase 1;
+    // assert the wiki bucket specifically.
     expect(adapter.saveLinks).toHaveBeenCalledWith(
       "p1",
       expect.arrayContaining([
-        expect.objectContaining({ sourceId: "p1", targetId: "p2" }),
-        expect.objectContaining({ sourceId: "p1", targetId: "p3" }),
+        expect.objectContaining({ sourceId: "p1", targetId: "p2", linkType: "wiki" }),
+        expect.objectContaining({ sourceId: "p1", targetId: "p3", linkType: "wiki" }),
       ]),
+      "wiki",
     );
   });
 
@@ -212,7 +217,12 @@ describe("syncWithApi", () => {
 
     await syncWithApi(adapter, api, TEST_USER_ID);
 
-    expect(adapter.saveLinks).toHaveBeenCalledWith("p1", []);
+    // Issue #725 Phase 1: ページの pull で link_type 方向にもスタレのクリア
+    // が走る。wiki / tag それぞれで empty save が発行されることを検証。
+    // Pull triggers empty saveLinks per linkType so stale edges of any type
+    // get cleaned up.
+    expect(adapter.saveLinks).toHaveBeenCalledWith("p1", [], "wiki");
+    expect(adapter.saveLinks).toHaveBeenCalledWith("p1", [], "tag");
   });
 
   it("preserves local thumbnailUrl when server returns null", async () => {
@@ -366,13 +376,18 @@ describe("syncWithApi", () => {
     const adapter = createMockAdapter({
       getLastSyncTime: vi.fn().mockResolvedValue(0),
       getAllPages: vi.fn().mockResolvedValue(manyPages),
-      getLinks: vi
-        .fn()
-        .mockImplementation((pageId: string) =>
-          pageId === "page-0"
-            ? Promise.resolve([{ sourceId: "page-0", targetId: "page-1", createdAt: Date.now() }])
-            : Promise.resolve([]),
-        ),
+      getLinks: vi.fn().mockImplementation((pageId: string) =>
+        pageId === "page-0"
+          ? Promise.resolve([
+              {
+                sourceId: "page-0",
+                targetId: "page-1",
+                linkType: "wiki",
+                createdAt: Date.now(),
+              },
+            ])
+          : Promise.resolve([]),
+      ),
       getGhostLinks: vi.fn().mockResolvedValue([]),
     });
     const postSyncPages = vi.fn().mockResolvedValue({
@@ -399,6 +414,56 @@ describe("syncWithApi", () => {
     expect(secondCall[0].pages).toHaveLength(1);
     expect(secondCall[0].links).toBeDefined();
     expect(secondCall[0].ghost_links).toBeDefined();
+    // Issue #725 Phase 1: push payload carries `link_type` per link row.
+    // Issue #725 Phase 1: push に `link_type` を含める。
+    expect(secondCall[0].links[0]).toMatchObject({ link_type: "wiki" });
+  });
+
+  it("includes link_type='tag' on push when local has tag edges (issue #725 Phase 1)", async () => {
+    const localPage: PageMetadata = {
+      id: "p1",
+      ownerId: TEST_USER_ID,
+      noteId: null,
+      sourcePageId: null,
+      title: "Local",
+      contentPreview: null,
+      thumbnailUrl: null,
+      sourceUrl: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      isDeleted: false,
+    };
+    const adapter = createMockAdapter({
+      getLastSyncTime: vi.fn().mockResolvedValue(Date.now() - 60_000),
+      getAllPages: vi.fn().mockResolvedValue([localPage]),
+      getLinks: vi.fn().mockResolvedValue([
+        { sourceId: "p1", targetId: "w", linkType: "wiki", createdAt: 1 },
+        { sourceId: "p1", targetId: "t", linkType: "tag", createdAt: 2 },
+      ]),
+      getGhostLinks: vi
+        .fn()
+        .mockResolvedValue([
+          { linkText: "NewTag", sourcePageId: "p1", linkType: "tag", createdAt: 3 },
+        ]),
+    });
+    const postSyncPages = vi
+      .fn()
+      .mockResolvedValue({ server_time: new Date().toISOString(), conflicts: [] });
+    const api = createMockApi({ postSyncPages });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    expect(postSyncPages).toHaveBeenCalledTimes(1);
+    const body = postSyncPages.mock.calls[0][0];
+    expect(body.links).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source_id: "p1", target_id: "w", link_type: "wiki" }),
+        expect.objectContaining({ source_id: "p1", target_id: "t", link_type: "tag" }),
+      ]),
+    );
+    expect(body.ghost_links).toEqual(
+      expect.arrayContaining([expect.objectContaining({ link_text: "NewTag", link_type: "tag" })]),
+    );
   });
 
   it("excludes note-native pages from push (issue #713 Phase 2 defensive filter)", async () => {

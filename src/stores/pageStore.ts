@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
-import type { Page, Link, GhostLink } from "@/types/page";
+import type { Page, Link, GhostLink, LinkType } from "@/types/page";
 
 /**
  * ゲストセッション向けのインメモリページストアのインターフェース。
@@ -25,16 +25,17 @@ interface PageStore {
   getPage: (id: string) => Page | undefined;
   getPageByTitle: (title: string) => Page | undefined;
 
-  // Link operations
-  addLink: (sourceId: string, targetId: string) => void;
-  removeLink: (sourceId: string, targetId: string) => void;
-  getOutgoingLinks: (pageId: string) => string[];
-  getBacklinks: (pageId: string) => string[];
+  // Link operations. `linkType` は issue #725 Phase 1 で追加。未指定は `'wiki'`。
+  // `linkType` added in issue #725 Phase 1; defaults to `'wiki'`.
+  addLink: (sourceId: string, targetId: string, linkType?: LinkType) => void;
+  removeLink: (sourceId: string, targetId: string, linkType?: LinkType) => void;
+  getOutgoingLinks: (pageId: string, linkType?: LinkType) => string[];
+  getBacklinks: (pageId: string, linkType?: LinkType) => string[];
 
   // Ghost link operations
-  addGhostLink: (linkText: string, sourcePageId: string) => void;
-  removeGhostLink: (linkText: string, sourcePageId: string) => void;
-  getGhostLinkSources: (linkText: string) => string[];
+  addGhostLink: (linkText: string, sourcePageId: string, linkType?: LinkType) => void;
+  removeGhostLink: (linkText: string, sourcePageId: string, linkType?: LinkType) => void;
+  getGhostLinkSources: (linkText: string, linkType?: LinkType) => string[];
   promoteGhostLink: (linkText: string) => Page | null;
 
   // Search
@@ -103,76 +104,106 @@ export const usePageStore = create<PageStore>()(
         );
       },
 
-      addLink: (sourceId, targetId) => {
+      addLink: (sourceId, targetId, linkType = "wiki") => {
         const exists = get().links.some(
-          (link) => link.sourceId === sourceId && link.targetId === targetId,
+          (link) =>
+            link.sourceId === sourceId && link.targetId === targetId && link.linkType === linkType,
         );
         if (!exists) {
           set((state) => ({
-            links: [...state.links, { sourceId, targetId, createdAt: Date.now() }],
+            links: [...state.links, { sourceId, targetId, linkType, createdAt: Date.now() }],
           }));
         }
       },
 
-      removeLink: (sourceId, targetId) => {
+      removeLink: (sourceId, targetId, linkType = "wiki") => {
         set((state) => ({
           links: state.links.filter(
-            (link) => !(link.sourceId === sourceId && link.targetId === targetId),
+            (link) =>
+              !(
+                link.sourceId === sourceId &&
+                link.targetId === targetId &&
+                link.linkType === linkType
+              ),
           ),
         }));
       },
 
-      getOutgoingLinks: (pageId) => {
+      getOutgoingLinks: (pageId, linkType) => {
         return get()
-          .links.filter((link) => link.sourceId === pageId)
+          .links.filter(
+            (link) =>
+              link.sourceId === pageId && (linkType === undefined || link.linkType === linkType),
+          )
           .map((link) => link.targetId);
       },
 
-      getBacklinks: (pageId) => {
+      getBacklinks: (pageId, linkType) => {
         return get()
-          .links.filter((link) => link.targetId === pageId)
+          .links.filter(
+            (link) =>
+              link.targetId === pageId && (linkType === undefined || link.linkType === linkType),
+          )
           .map((link) => link.sourceId);
       },
 
-      addGhostLink: (linkText, sourcePageId) => {
+      addGhostLink: (linkText, sourcePageId, linkType = "wiki") => {
         const exists = get().ghostLinks.some(
-          (gl) => gl.linkText === linkText && gl.sourcePageId === sourcePageId,
+          (gl) =>
+            gl.linkText === linkText &&
+            gl.sourcePageId === sourcePageId &&
+            gl.linkType === linkType,
         );
         if (!exists) {
           set((state) => ({
-            ghostLinks: [...state.ghostLinks, { linkText, sourcePageId, createdAt: Date.now() }],
+            ghostLinks: [
+              ...state.ghostLinks,
+              { linkText, sourcePageId, linkType, createdAt: Date.now() },
+            ],
           }));
         }
       },
 
-      removeGhostLink: (linkText, sourcePageId) => {
+      removeGhostLink: (linkText, sourcePageId, linkType = "wiki") => {
         set((state) => ({
           ghostLinks: state.ghostLinks.filter(
-            (gl) => !(gl.linkText === linkText && gl.sourcePageId === sourcePageId),
+            (gl) =>
+              !(
+                gl.linkText === linkText &&
+                gl.sourcePageId === sourcePageId &&
+                gl.linkType === linkType
+              ),
           ),
         }));
       },
 
-      getGhostLinkSources: (linkText) => {
+      getGhostLinkSources: (linkText, linkType) => {
         return get()
-          .ghostLinks.filter((gl) => gl.linkText === linkText)
+          .ghostLinks.filter(
+            (gl) =>
+              gl.linkText === linkText && (linkType === undefined || gl.linkType === linkType),
+          )
           .map((gl) => gl.sourcePageId);
       },
 
       promoteGhostLink: (linkText) => {
-        const sources = get().getGhostLinkSources(linkText);
+        // Promotion is wiki-only; tag ghosts are resolved via tag sync, not
+        // multi-source promotion (issue #725 Phase 1).
+        const sources = get().getGhostLinkSources(linkText, "wiki");
         if (sources.length >= 2) {
           // Create a new page from the ghost link
           const newPage = get().createPage(linkText);
 
           // Convert ghost links to real links
           sources.forEach((sourceId) => {
-            get().addLink(sourceId, newPage.id);
+            get().addLink(sourceId, newPage.id, "wiki");
           });
 
           // Remove ghost links
           set((state) => ({
-            ghostLinks: state.ghostLinks.filter((gl) => gl.linkText !== linkText),
+            ghostLinks: state.ghostLinks.filter(
+              (gl) => !(gl.linkText === linkText && gl.linkType === "wiki"),
+            ),
           }));
 
           return newPage;
