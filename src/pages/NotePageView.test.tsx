@@ -1,9 +1,14 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import NotePageView from "./NotePageView";
-import { useNote, useNotePage, useCopyNotePageToPersonal } from "@/hooks/useNoteQueries";
+import {
+  useNote,
+  useNotePage,
+  useCopyNotePageToPersonal,
+  useNoteApi,
+} from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { AIChatProvider } from "@/contexts/AIChatContext";
 
@@ -15,8 +20,14 @@ import { AIChatProvider } from "@/contexts/AIChatContext";
 // can see them. Required because `vi.mock` hoists above normal `const`s. The
 // shared `mockToast` lets tests inspect what `toast({...})` was called with
 // — in particular whether the `action` (toast CTA) was supplied.
-const { mockToast } = vi.hoisted(() => ({
+const { mockToast, mockUpdatePageMutateAsync, mockApi, mockSetPageContext } = vi.hoisted(() => ({
   mockToast: vi.fn(),
+  mockUpdatePageMutateAsync: vi.fn().mockResolvedValue({ skipped: false }),
+  mockApi: {
+    getPageContent: vi.fn(),
+    putPageContent: vi.fn(),
+  },
+  mockSetPageContext: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -42,6 +53,13 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNotePage: vi.fn(),
+  useNoteApi: vi.fn(() => ({
+    api: mockApi,
+    userId: "user-1",
+    userEmail: undefined,
+    isSignedIn: true,
+    isLoaded: true,
+  })),
   useCopyNotePageToPersonal: vi.fn(() => ({
     mutateAsync: vi
       .fn()
@@ -55,7 +73,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
 }));
 
 vi.mock("@/hooks/usePageQueries", () => ({
-  useUpdatePage: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({ skipped: false }) })),
+  useUpdatePage: vi.fn(() => ({ mutateAsync: mockUpdatePageMutateAsync })),
 }));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
@@ -68,6 +86,15 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
+}));
+
+vi.mock("@/contexts/AIChatContext", () => ({
+  AIChatProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAIChatContext: () => ({
+    setPageContext: mockSetPageContext,
+    contentAppendHandlerRef: { current: null },
+    insertAtCursorRef: { current: null },
+  }),
 }));
 
 vi.mock("@/hooks/useCollaboration", () => ({
@@ -85,7 +112,20 @@ vi.mock("@/components/layout/Container", () => ({
 }));
 
 vi.mock("@/components/editor/PageEditor/PageEditorContent", () => ({
-  PageEditorContent: () => <div data-testid="page-editor">PageEditorContent</div>,
+  PageEditorContent: ({
+    title,
+    onTitleChange,
+  }: {
+    title: string;
+    onTitleChange?: (title: string) => void;
+  }) => (
+    <div data-testid="page-editor">
+      <div data-testid="page-title">{title}</div>
+      <button type="button" onClick={() => onTitleChange?.("Edited title")}>
+        change-title
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
@@ -139,8 +179,24 @@ describe("NotePageView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockToast.mockReset();
+    mockSetPageContext.mockReset();
+    mockUpdatePageMutateAsync.mockResolvedValue({ skipped: false });
+    mockApi.getPageContent.mockReset();
+    mockApi.putPageContent.mockReset();
     vi.mocked(useParams).mockReturnValue({ noteId: "note-1", pageId: "page-1" });
     vi.mocked(useAuth).mockReturnValue({ isSignedIn: true, userId: "user-1" } as never);
+    vi.mocked(useNoteApi).mockReturnValue({
+      api: mockApi,
+      userId: "user-1",
+      userEmail: undefined,
+      isSignedIn: true,
+      isLoaded: true,
+    } as never);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows loading state when note or page is loading", () => {
@@ -198,6 +254,199 @@ describe("NotePageView", () => {
 
     expect(screen.getByTestId("content-with-ai-chat")).toBeInTheDocument();
     expect(screen.getByTestId("page-editor")).toBeInTheDocument();
+  });
+
+  it("saves note-native page titles through the page-content API for note editors", async () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+    mockApi.getPageContent.mockResolvedValue({
+      ydoc_state: "AQ==",
+      version: 3,
+      content_text: "body",
+    });
+    mockApi.putPageContent.mockResolvedValue({ version: 4 });
+
+    renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+    await vi.advanceTimersByTimeAsync(500);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mockApi.putPageContent).toHaveBeenCalledTimes(1);
+    expect(mockApi.putPageContent).toHaveBeenCalledWith("page-1", {
+      ydoc_state: "AQ==",
+      content_text: "body",
+      expected_version: 3,
+      title: "Edited title",
+    });
+    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("rolls back the visible title when a note-native title save fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+    mockApi.getPageContent.mockResolvedValue({
+      ydoc_state: "AQ==",
+      version: 3,
+      content_text: "body",
+    });
+    mockApi.putPageContent.mockRejectedValue(new Error("save failed"));
+
+    renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+    expect(screen.getByTestId("page-title")).toHaveTextContent("Edited title");
+
+    await vi.advanceTimersByTimeAsync(500);
+    vi.useRealTimers();
+    await waitFor(() => {
+      expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
+    });
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "タイトルの保存に失敗しました", variant: "destructive" }),
+    );
+    consoleError.mockRestore();
+  });
+
+  it("keeps linked personal page titles read-only for non-owners", async () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: null,
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+    vi.advanceTimersByTime(500);
+    await Promise.resolve();
+
+    expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
+    expect(mockApi.putPageContent).not.toHaveBeenCalled();
+    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps note-native pages read-only for owners without note edit permission", async () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-1",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+    vi.advanceTimersByTime(500);
+    await Promise.resolve();
+
+    expect(screen.getByText("閲覧専用")).toBeInTheDocument();
+    expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
+    expect(mockApi.putPageContent).not.toHaveBeenCalled();
+    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("passes the owning note id to AI chat for note-native pages", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Note-native",
+        content: "{}",
+        ownerUserId: "user-1",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    expect(mockSetPageContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageId: "page-1",
+        noteId: "note-1",
+      }),
+    );
+  });
+
+  it("keeps AI chat on personal scope for linked personal pages", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Linked personal",
+        content: "{}",
+        ownerUserId: "user-1",
+        noteId: null,
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    expect(mockSetPageContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageId: "page-1",
+        noteId: undefined,
+      }),
+    );
   });
 
   it("shows copy-to-personal action for note-native pages (issue #713 Phase 3)", () => {

@@ -14,7 +14,13 @@ import {
   useToast,
 } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import { useNote, useNotePage, noteKeys, useCopyNotePageToPersonal } from "@/hooks/useNoteQueries";
+import {
+  useNote,
+  useNotePage,
+  noteKeys,
+  useCopyNotePageToPersonal,
+  useNoteApi,
+} from "@/hooks/useNoteQueries";
 import { useUpdatePage } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
@@ -31,20 +37,22 @@ const TITLE_SAVE_DEBOUNCE_MS = 500;
 function canEditPage(
   access: { canEdit?: boolean; canView?: boolean } | undefined,
   userId: string | undefined,
-  page: { ownerUserId?: string } | null | undefined,
+  page: { ownerUserId?: string; noteId?: string | null } | null | undefined,
 ): boolean {
-  if (!access?.canView) return false;
+  if (!access?.canView || !page) return false;
+  if (page.noteId !== null && page.noteId !== undefined) {
+    return Boolean(access.canEdit);
+  }
   if (access.canEdit) return true;
   return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
 }
 
 /**
- * タイトル更新 API (`PUT /api/pages/:id/content` 経由) はページ所有者しか
- * 成功しない。ノート編集権限があってもページ所有者でなければタイトル欄は
- * 閲覧専用として表示し、サイレントフェイルを避ける。
- * The title-update path (`PUT /api/pages/:id/content`) only succeeds for the
- * page owner. Even with note-level edit rights, non-owners get a read-only
- * title rendering so we do not silently drop their keystrokes.
+ * リンク済み個人ページ (`noteId === null`) のタイトル更新はページ所有者だけに許す。
+ * ノートネイティブページ (`noteId !== null`) はノート権限 (`canEdit`) 側で別判定する。
+ * For linked personal pages (`noteId === null`), only the page owner may edit
+ * the title. Note-native pages (`noteId !== null`) are gated separately by
+ * note-level edit permission.
  */
 function canEditTitle(
   userId: string | undefined,
@@ -73,6 +81,7 @@ function NotePageEditorEditable({
 }): React.JSX.Element {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
   const [title, setTitle] = useState(page.title);
+  const { api } = useNoteApi();
   const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
@@ -83,18 +92,19 @@ function NotePageEditorEditable({
   const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTitleRef = useRef<string | null>(null);
   const isSavingTitleRef = useRef(false);
+  const lastSavedTitleRef = useRef(page.title);
 
   useEffect(() => {
     setPageContext({
       type: "editor",
       pageId: page.id,
-      noteId,
+      noteId: page.noteId ?? undefined,
       claudeWorkspaceRoot: workspaceRoot ?? undefined,
       pageTitle: title,
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-  }, [page.id, title, editorContent, setPageContext, noteId, workspaceRoot]);
+  }, [page.id, page.noteId, title, editorContent, setPageContext, workspaceRoot]);
 
   useEffect(() => {
     return () => setPageContext(null);
@@ -134,11 +144,23 @@ function NotePageEditorEditable({
   // flush effect's cleanup to fire mid-typing and flush the debounce early.
   const persistTitleRef = useRef<(nextTitle: string) => Promise<void>>(async () => {});
   persistTitleRef.current = async (nextTitle: string) => {
+    const previousTitle = lastSavedTitleRef.current;
     try {
-      await updatePageMutation.mutateAsync({
-        pageId: page.id,
-        updates: { title: nextTitle },
-      });
+      if (page.noteId !== null) {
+        const current = await api.getPageContent(page.id);
+        await api.putPageContent(page.id, {
+          ydoc_state: current.ydoc_state,
+          content_text: current.content_text ?? undefined,
+          expected_version: current.version,
+          title: nextTitle,
+        });
+      } else {
+        await updatePageMutation.mutateAsync({
+          pageId: page.id,
+          updates: { title: nextTitle },
+        });
+      }
+      lastSavedTitleRef.current = nextTitle;
       // `useUpdatePage` updates `pageKeys.*` caches, but the note page list and
       // detail are held under `noteKeys.*`. Invalidate those so the new title
       // propagates to the note view and sidebar.
@@ -148,6 +170,9 @@ function NotePageEditorEditable({
       queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
       queryClient.invalidateQueries({ queryKey: noteKeys.pageList(noteId) });
     } catch (error) {
+      if (pendingTitleRef.current === null) {
+        setTitle(previousTitle);
+      }
       console.error("Failed to save page title:", error);
       toast({
         title: "タイトルの保存に失敗しました",
@@ -272,7 +297,8 @@ const NotePageView: React.FC = () => {
   }, [navigate, noteId]);
 
   const canEdit = canEditPage(access, userId, page);
-  const isTitleEditable = canEdit && canEditTitle(userId, page);
+  const isTitleEditable =
+    page?.noteId != null ? Boolean(access?.canEdit) : canEdit && canEditTitle(userId, page);
   const collaborationPageId = page?.id ?? "";
   const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
   const collaboration = useCollaboration({

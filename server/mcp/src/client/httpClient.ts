@@ -25,6 +25,7 @@ import type {
   AddPageToNoteInput,
   AddNoteMemberInput,
   NoteMemberRole,
+  SearchParams,
   SearchResultItem,
   ClipResult,
 } from "./ZediClient.js";
@@ -277,11 +278,23 @@ export class HttpZediClient implements ZediClient {
   // ── Search ───────────────────────────────────────────────────────────────
 
   /** {@inheritDoc ZediClient.search} */
-  async search(
-    query: string,
-    scope: "own" | "shared" = "own",
-    limit = 20,
-  ): Promise<SearchResultItem[]> {
+  async search(params: SearchParams): Promise<SearchResultItem[]> {
+    const { query, noteId, scope = "own", limit = 20 } = params;
+
+    // `noteId` 指定時は Phase 5-2 の note-scoped エンドポイントを叩く。`scope` は
+    // 意味を持たないので送らない（サーバー側もノート配下の権限チェックのみ実施）。
+    // When `noteId` is set, hit the Phase 5-2 note-scoped endpoint. `scope` is
+    // meaningless here and is intentionally not forwarded.
+    if (noteId) {
+      const result = await this.request<{ results: SearchResultItem[] }>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/search`,
+        undefined,
+        { q: query, limit },
+      );
+      return result.results ?? [];
+    }
+
     const result = await this.request<{ results: SearchResultItem[] }>(
       "GET",
       "/api/search",

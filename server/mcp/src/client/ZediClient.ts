@@ -49,6 +49,13 @@ export interface PageListItem {
   title: string | null;
   content_preview: string | null;
   updated_at: string;
+  /**
+   * スコープ判別用。`null` は個人ページ、文字列ならノートネイティブページのノート ID。
+   * `scope: shared` 経由で混在 listing を受け取ったクライアントはこれで仕分けする。
+   * Scope discriminator: `null` for personal pages, string for note-native pages.
+   * Callers receiving the mixed `scope: shared` listing rely on this to bucket rows.
+   */
+  note_id: string | null;
 }
 
 /** `listPages` の入力 / Input for {@link ZediClient.listPages}. */
@@ -152,6 +159,36 @@ export interface SearchResultItem {
   content_preview: string | null;
   updated_at: string;
   content_text?: string | null;
+  /**
+   * スコープ判定用。`null` なら個人ページ、文字列ならノート ID を表す。
+   * Scope discriminator: `null` for personal pages, string for note-native pages.
+   * See issue #718 Phase 5.
+   */
+  note_id?: string | null;
+}
+
+/**
+ * `search` の入力 / Input for {@link ZediClient.search}.
+ *
+ * `noteId` を指定すると Phase 5-2 で追加された `/api/notes/:noteId/search` を叩き、
+ * そのノートに紐づくページのみを返す。このとき `scope` は無視される。`noteId` 省略時は
+ * 個人スコープ (`own`) または共有スコープ (`shared`) の `/api/search` を叩く。
+ *
+ * When `noteId` is set, the note-scoped endpoint added in Phase 5-2 is used and
+ * `scope` is ignored. Without `noteId`, the shared `/api/search` endpoint is
+ * used with the provided `scope` ("own" or "shared").
+ */
+export interface SearchParams {
+  /** 検索文字列 / Search query. */
+  query: string;
+  /** 全体スコープ。`noteId` 指定時は無視される。
+   *  Global scope; ignored when `noteId` is set. */
+  scope?: "own" | "shared";
+  /** 上限件数 (1〜100, デフォルト 20)。 Result limit (1..100, default 20). */
+  limit?: number;
+  /** ノート ID。指定時はそのノートに属するページのみが返る。
+   *  Note ID; when set, restricts results to pages belonging to that note. */
+  noteId?: string;
 }
 
 // ── Clip ────────────────────────────────────────────────────────────────────
@@ -225,12 +262,19 @@ export interface ZediClient {
   // Search
   /**
    * 全文検索を行う。
-   * @param query - 検索文字列。
-   * @param scope - "own" (自分のページ) または "shared" (共有を含む)。
-   * @param limit - 上限件数。
-   * Full-text search across own/shared pages.
+   *
+   * `params.noteId` を指定するとノートスコープ検索 (`/api/notes/:noteId/search`) を
+   * 使い、そのノート配下のページのみが返る。未指定の場合は `scope`（既定 `own`、
+   * `shared` も指定可）で `/api/search` を叩く。結果には必ず `note_id` が含まれる
+   * ので、呼び出し側は個人ページとノートネイティブページを判別できる。
+   *
+   * Full-text search. When `params.noteId` is provided the note-scoped endpoint
+   * is used and results are restricted to pages of that note; otherwise the
+   * shared endpoint is used with the given `scope` (default `own`). Results
+   * always include `note_id` so callers can distinguish personal from
+   * note-native pages.
    */
-  search(query: string, scope?: "own" | "shared", limit?: number): Promise<SearchResultItem[]>;
+  search(params: SearchParams): Promise<SearchResultItem[]>;
 
   // Clip
   /** URL をクリップしてページを生成する。Clip a URL into a new page. */

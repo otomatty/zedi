@@ -105,9 +105,9 @@ describe("GET /api/search", () => {
     expect(serialised).toContain("p.note_id IS NULL");
   });
 
-  it("scope=shared does NOT force p.note_id IS NULL (keeps cross-scope behavior)", async () => {
-    // shared は個人 + 参加ノートの混在検索を維持する。
-    // `shared` retains existing cross-scope behavior and must not restrict to personal pages.
+  it("scope=shared keeps non-personal access branches alongside the personal ownership guard", async () => {
+    // shared は個人ページの owner 分岐を残しつつ、note_pages 経由の共有アクセスも併せ持つ。
+    // `shared` keeps the personal-owner guard but must still include note-based branches.
     const { app, chains } = createSearchApp([{ rows: [] }]);
 
     const res = await app.request("/api/search?q=hello&scope=shared", {
@@ -119,7 +119,39 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).not.toContain("p.note_id IS NULL");
+    expect(serialised).toContain("p.note_id IS NULL");
+    expect(serialised).toContain("note_pages");
+    expect(serialised).toContain("OR EXISTS");
+  });
+
+  it("falls back to the default limit when the limit query is non-numeric", async () => {
+    const { app } = createSearchApp([{ rows: [] }]);
+
+    const res = await app.request("/api/search?q=hello&scope=shared&limit=abc", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("scope=shared keeps personal ownership limited to personal pages and adds note-owner access via note_pages", async () => {
+    const { app, chains } = createSearchApp([{ rows: [] }]);
+
+    const res = await app.request("/api/search?q=hello&scope=shared", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const executeChain = chains.find((chain) => chain.startMethod === "execute");
+    expect(executeChain).toBeDefined();
+    const serialised = JSON.stringify(executeChain?.startArgs);
+    expect(serialised).toContain("p.owner_id");
+    expect(serialised).toContain("p.note_id IS NULL");
+    expect(serialised).toContain("note_pages");
+    expect(serialised).toContain("np.page_id = p.id");
+    expect(serialised).toContain("n.owner_id");
   });
 
   it("response rows include note_id so callers can distinguish personal vs note-native", async () => {

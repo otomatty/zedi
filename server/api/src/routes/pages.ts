@@ -57,9 +57,10 @@ async function applyPagesMetadataUpdate(
 }
 
 // ── GET /pages ──────────────────────────────────────────────────────────────
-// `scope=shared` の場合、`/api/search` と同じ認可ロジック (own + 受諾済みノートメンバー) を流用する。
+// `scope=shared` の場合、`/api/search` と同じ認可ロジック
+// (own + 受諾済みノートメンバー + note owner) を流用する。
 // When `scope=shared`, reuses the same authorization model as `/api/search`
-// (own pages + pages attached to notes the caller is a member of).
+// (own pages + accepted note members + note owners).
 app.get("/", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
@@ -83,21 +84,17 @@ app.get("/", authRequired, async (c) => {
   // `own` スコープは個人ページ（`pages.note_id IS NULL`）のみを返す。
   // ノートネイティブページ（issue #713）は、ノート画面または `scope=shared`
   // 経由でのみアクセスする。`shared` 経由の場合は (a) note_members 経由の
-  // メンバーシップ、または (b) `notes.owner_id = userId` 経由のオーナーシップで
-  // 含まれる。オーナー経路を明示しておかないと、ノートオーナーは通常 note_members
-  // 行を持たないため、自分が作った note-native page が listing から消える
-  // （閲覧は assertPageViewAccess / getNoteRole 経由で可能だが listing で見えなく
-  // なる）という非対称が起きる。`getNoteRole` の解決順 (owner → member → ...) と
-  // listing predicate を揃える。
+  // メンバーシップ、または (b) `note_pages -> notes.owner_id = userId` 経由の
+  // オーナーシップで含まれる。オーナー経路を note-native page だけに限定すると、
+  // linked personal page が listing から消えて `assertPageViewAccess` と非対称になる。
+  // `getNoteRole` の解決順 (owner → member → ...) と listing predicate を揃える。
   //
   // The `own` scope returns personal pages only (`pages.note_id IS NULL`).
   // Note-native pages (issue #713) are accessed via the note view or
   // `scope=shared`. `shared` includes them either through (a) `note_members`
-  // membership or (b) `notes.owner_id = userId` ownership. The owner branch is
-  // mandatory because note owners typically have no `note_members` row, so
-  // omitting it would let owners view their note-native pages via
-  // `assertPageViewAccess` / `getNoteRole` while hiding them from the listing
-  // — keep the predicate aligned with `getNoteRole`'s resolution order.
+  // membership or (b) note ownership reached through `note_pages`. That owner
+  // branch must cover linked personal pages too; otherwise owners could open
+  // them via `assertPageViewAccess` while the listing hides them.
   const accessFilter =
     scope === "shared"
       ? sql`(
@@ -114,14 +111,13 @@ app.get("/", authRequired, async (c) => {
               AND np.is_deleted = false
               AND n.is_deleted = false
           )
-          OR (
-            p.note_id IS NOT NULL
-            AND EXISTS (
-              SELECT 1 FROM notes n
-              WHERE n.id = p.note_id
-                AND n.owner_id = ${userId}
-                AND n.is_deleted = false
-            )
+          OR EXISTS (
+            SELECT 1 FROM note_pages np
+            JOIN notes n ON n.id = np.note_id
+            WHERE np.page_id = p.id
+              AND np.is_deleted = false
+              AND n.owner_id = ${userId}
+              AND n.is_deleted = false
           )
         )`
       : sql`p.owner_id = ${userId} AND p.note_id IS NULL`;
@@ -138,8 +134,13 @@ app.get("/", authRequired, async (c) => {
     ? sql`TRUE`
     : sql`p.special_kind IS NULL AND p.is_schema = false`;
 
+  // `note_id` を返すことで、`scope=shared` で混在 listing を受け取った
+  // クライアントが個人ページ（`note_id IS NULL`）とノートネイティブページを
+  // 区別できる。MCP の `zedi_list_pages` ツールはこれに依存している。
+  // Surface `note_id` so callers receiving mixed `scope=shared` results (e.g.
+  // the `zedi_list_pages` MCP tool) can distinguish personal vs note-native.
   const result = await db.execute(sql`
-    SELECT p.id, p.title, p.content_preview, p.updated_at
+    SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id
     FROM pages p
     WHERE p.is_deleted = false
       AND ${specialKindFilter}
