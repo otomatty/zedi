@@ -5,11 +5,15 @@
  * which causes the app to use MockAuthProvider.
  */
 import { test as base, expect, Page } from "@playwright/test";
+import { MOCK_USER_ID } from "../src/components/auth/MockAuthProvider";
 
 /** Default onboarding so signed-in E2E users stay on /home (not redirected to /onboarding). */
 const E2E_DEFAULT_ONBOARDING = {
   hasCompletedSetupWizard: true,
 };
+
+/** per-user cache key matching `src/lib/onboardingState.ts`. */
+const E2E_ONBOARDING_CACHE_KEY = `zedi-onboarding-cache:${MOCK_USER_ID}`;
 
 /**
  * Helper functions for E2E tests.
@@ -84,9 +88,12 @@ const helpers = {
  */
 export const test = base.extend<{ helpers: typeof helpers }>({
   page: async ({ page }, continueFixture) => {
-    await page.addInitScript((onboarding: typeof E2E_DEFAULT_ONBOARDING) => {
-      localStorage.setItem("zedi-onboarding-cache", JSON.stringify(onboarding));
-    }, E2E_DEFAULT_ONBOARDING);
+    await page.addInitScript(
+      ({ key, onboarding }) => {
+        localStorage.setItem(key, JSON.stringify(onboarding));
+      },
+      { key: E2E_ONBOARDING_CACHE_KEY, onboarding: E2E_DEFAULT_ONBOARDING },
+    );
     await continueFixture(page);
   },
   /** Depends on `page` only to satisfy Playwright's destructuring requirement (no empty `{}`). */

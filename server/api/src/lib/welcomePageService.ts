@@ -15,7 +15,7 @@ import { getSchema } from "@tiptap/core";
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
-import { and, eq, isNull, isNotNull } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import { pages, pageContents, userOnboardingStatus } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 import { VideoServer } from "./videoServerExtension.js";
@@ -101,15 +101,45 @@ function extractPreviewText(doc: TiptapNode, maxLength = 200): string {
 }
 
 /**
- * トランザクション内でウェルカムページ 1 件を作成し、pages / page_contents を
- * 挿入する。既に `user_onboarding_status.welcome_page_id` が埋まっている場合は
- * 何もせず null を返す（べき等）。呼び出し側で `user_onboarding_status` の
- * welcome_page_id・welcome_page_created_at を更新すること。
+ * 生きている（未削除の）ウェルカムページが既にあればその ID と kind を返す。
+ * DB 側の部分ユニーク index `idx_pages_unique_welcome_per_owner` と
+ * 整合する、アプリケーションレイヤー側のルックアップ。
  *
- * Creates one welcome page inside the given transaction (inserts pages and
- * page_contents). Idempotent: returns null if a welcome_page_id is already
- * recorded for this user. The caller is responsible for upserting
- * `user_onboarding_status.welcome_page_id` / `.welcome_page_created_at`.
+ * Returns the existing live welcome page for the user, if any. Mirrors the
+ * partial unique index `idx_pages_unique_welcome_per_owner` and lets callers
+ * recover gracefully from concurrent inserts.
+ */
+async function findExistingWelcomePage(tx: DbOrTx, userId: string): Promise<string | null> {
+  const rows = await tx
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.ownerId, userId), eq(pages.kind, "welcome"), eq(pages.isDeleted, false)))
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * トランザクション内でウェルカムページ 1 件を作成し、pages / page_contents を
+ * 挿入する。既に `user_onboarding_status.welcome_page_id` が埋まっている場合、
+ * または並行リクエストが先にウェルカムページを作っていた場合は null を返す
+ * （べき等）。呼び出し側で `user_onboarding_status` の welcome_page_id と
+ * welcome_page_created_at を更新すること。
+ *
+ * 並行安全性: pages への INSERT に `ON CONFLICT DO NOTHING` を付け、部分ユニーク
+ * index `idx_pages_unique_welcome_per_owner` に衝突した場合は 0 行返す（例外で
+ * トランザクションを abort させない）。0 行ならば既存のウェルカムページを
+ * 再取得して ID を返す。
+ *
+ * Creates one welcome page inside the given transaction. Idempotent: returns
+ * null when a welcome page already exists — either because
+ * `user_onboarding_status.welcome_page_id` is set or a concurrent request
+ * raced us.
+ *
+ * Concurrency: the pages INSERT uses `ON CONFLICT DO NOTHING` keyed on the
+ * partial unique index `idx_pages_unique_welcome_per_owner`, so a racing
+ * insert does not abort the transaction (as raising SQLSTATE 23505 would).
+ * When the RETURNING set is empty we read back the existing welcome page and
+ * return its id.
  *
  * @param tx - Drizzle transaction / Drizzle transaction
  * @param userId - 対象ユーザー / Target user ID
@@ -137,7 +167,11 @@ export async function insertWelcomePage(
   const ydoc = prosemirrorJSONToYDoc(welcomePageSchema, doc, YDOC_FRAGMENT);
   const ydocState = Y.encodeStateAsUpdate(ydoc);
 
-  const [page] = await tx
+  // 部分ユニーク index と同じ述語 (`kind='welcome' AND is_deleted=false`) を
+  // ON CONFLICT に指定する。並行リクエストで衝突すると INSERT は 0 行返す。
+  // Match the partial unique index predicate so a concurrent insert is a
+  // no-op instead of aborting the transaction.
+  const inserted = await tx
     .insert(pages)
     .values({
       ownerId: userId,
@@ -145,8 +179,19 @@ export async function insertWelcomePage(
       contentPreview,
       kind: "welcome",
     })
+    .onConflictDoNothing({
+      target: pages.ownerId,
+      where: sql`${pages.kind} = 'welcome' AND ${pages.isDeleted} = false`,
+    })
     .returning({ id: pages.id });
-  if (!page) throw new Error("Failed to insert welcome page");
+  const page = inserted[0];
+  if (!page) {
+    // 並行リクエストが先に作成した。そのページを引いて返す。
+    // Someone else inserted first; look up their page.
+    const existingId = await findExistingWelcomePage(tx, userId);
+    if (existingId) return { pageId: existingId, locale };
+    throw new Error("Welcome page conflict but no existing page found");
+  }
 
   await tx.insert(pageContents).values({
     pageId: page.id,
@@ -172,6 +217,7 @@ export async function retryWelcomePageIfNeeded(db: Database, userId: string): Pr
     const pending = await db
       .select({
         userId: userOnboardingStatus.userId,
+        requestedLocale: userOnboardingStatus.requestedLocale,
       })
       .from(userOnboardingStatus)
       .where(
@@ -182,10 +228,15 @@ export async function retryWelcomePageIfNeeded(db: Database, userId: string): Pr
         ),
       )
       .limit(1);
-    if (pending.length === 0) return;
+    const pendingRow = pending[0];
+    if (!pendingRow) return;
 
     await db.transaction(async (tx) => {
-      const created = await insertWelcomePage(tx, userId, null);
+      // ウィザードで選択されたロケールを尊重する。未保存時のみ `resolveWelcomePageLocale`
+      // のデフォルト（ja）にフォールバックする。
+      // Honor the locale the user originally picked; fall back to the resolver
+      // default (`ja`) only when we never persisted one.
+      const created = await insertWelcomePage(tx, userId, pendingRow.requestedLocale);
       if (!created) return;
       const now = new Date();
       await tx

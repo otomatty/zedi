@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, uuid, boolean, index } from "drizzle-orm/pg-core";
+// `text` imported above is reused for requested_locale.
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { pages } from "./pages.js";
@@ -26,6 +27,14 @@ export const userOnboardingStatus = pgTable(
     welcomePageId: uuid("welcome_page_id").references(() => pages.id, {
       onDelete: "set null",
     }),
+    /**
+     * セットアップウィザードで選択したロケール。ログイン時リトライが
+     * ユーザーの意図した言語でウェルカムページを生成できるように残す。
+     *
+     * Locale selected at the setup wizard. Retained so the login-time retry
+     * regenerates the welcome page in the user's originally chosen language.
+     */
+    requestedLocale: text("requested_locale").$type<"ja" | "en">(),
     homeSlidesShownAt: timestamp("home_slides_shown_at", { withTimezone: true }),
     autoCreateUpdateNotice: boolean("auto_create_update_notice").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

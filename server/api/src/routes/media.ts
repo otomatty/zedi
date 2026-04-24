@@ -7,6 +7,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { media } from "../schema/index.js";
@@ -179,6 +180,41 @@ app.post("/confirm", authRequired, async (c) => {
     throw new HTTPException(403, { message: "Invalid S3 key" });
   }
 
+  // クライアントから渡される `file_size` は偽装可能なので、実際に S3 にアップロード
+  // された ContentLength を HeadObject で検証する。制限超過なら DB に記録する前に
+  // オブジェクトを削除して 413 を返す。
+  //
+  // `body.file_size` is client-supplied and therefore trust-boundary violating
+  // on its own. Verify the true upload size via HeadObject and delete the
+  // oversized object before persisting it to the DB, so an attacker who lies
+  // about `file_size` cannot leave >50MB blobs attached to their account.
+  let verifiedSize: number | null = null;
+  try {
+    const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.s3_key }));
+    const length = typeof head.ContentLength === "number" ? head.ContentLength : null;
+    if (length !== null && length > MAX_UPLOAD_SIZE_BYTES) {
+      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: body.s3_key })).catch((err) => {
+        console.warn("[media] failed to delete oversized upload", {
+          s3Key: body.s3_key,
+          err,
+        });
+      });
+      throw new HTTPException(413, { message: "File exceeds 50MB upload limit" });
+    }
+    verifiedSize = length;
+  } catch (err) {
+    if (err instanceof HTTPException) throw err;
+    const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
+      ?.$metadata;
+    const code = meta?.httpStatusCode;
+    const name = (err as { name?: string }).name;
+    if (name === "NotFound" || name === "NoSuchKey" || code === 404) {
+      throw new HTTPException(400, { message: "Upload was not completed (object not found)" });
+    }
+    console.error("[media] HeadObject failed on /confirm:", err);
+    throw new HTTPException(502, { message: "Failed to verify upload" });
+  }
+
   const result = await db
     .insert(media)
     .values({
@@ -187,7 +223,9 @@ app.post("/confirm", authRequired, async (c) => {
       s3Key: body.s3_key,
       fileName: body.file_name ?? null,
       contentType: body.content_type ?? null,
-      fileSize: body.file_size ?? null,
+      // クライアント申告ではなく HeadObject で確認した実サイズを記録する。
+      // Persist the verified size from HeadObject, not the client-supplied value.
+      fileSize: verifiedSize ?? body.file_size ?? null,
       pageId: body.page_id ?? null,
     })
     .returning();
@@ -216,9 +254,26 @@ app.get("/:id", authRequired, async (c) => {
     throw new HTTPException(403, { message: "You can only access your own media" });
   }
 
+  // 動画の再生・シークは Range リクエスト（206 応答）を前提とするため、
+  // クライアントが送ってきた `Range` ヘッダをそのまま S3 へ転送し、S3 が返した
+  // ContentRange / ContentLength / 206 ステータスをそのままブラウザへ中継する。
+  // 画像については Range を受けても元のまま（200）を返す。
+  //
+  // Video playback and seeking rely on Range requests (HTTP 206). Forward any
+  // incoming `Range` header to S3 and relay the resulting Content-Range /
+  // Content-Length / 206 status back to the browser. Images ignore Range and
+  // continue to serve the full 200 response.
+  const rangeHeader = c.req.raw.headers.get("Range") ?? undefined;
+
   let response;
   try {
-    response = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }));
+    response = await s3.send(
+      new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: row.s3Key,
+        ...(rangeHeader ? { Range: rangeHeader } : {}),
+      }),
+    );
   } catch (err) {
     const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
       ?.$metadata;
@@ -226,6 +281,9 @@ app.get("/:id", authRequired, async (c) => {
     const name = (err as { name?: string }).name;
     if (name === "NoSuchKey" || code === 404) {
       return c.json({ error: "Object not found" }, 404);
+    }
+    if (name === "InvalidRange" || code === 416) {
+      return c.json({ error: "Requested range not satisfiable" }, 416);
     }
     console.error("[media] S3 GetObject failed:", err);
     return c.json({ error: "Failed to retrieve object" }, 502);
@@ -249,6 +307,9 @@ app.get("/:id", authRequired, async (c) => {
     "Cache-Control": "private, no-store",
     Vary: "Cookie",
     "X-Content-Type-Options": "nosniff",
+    // ブラウザが seek 時に Range を送ってよいことを示す。画像にも付けても害は無い。
+    // Signals that the browser may issue Range requests (harmless on images).
+    "Accept-Ranges": "bytes",
   };
   if (contentDisposition) {
     headers["Content-Disposition"] = contentDisposition;
@@ -257,9 +318,17 @@ app.get("/:id", authRequired, async (c) => {
   if (typeof len === "number" && len >= 0) {
     headers["Content-Length"] = String(len);
   }
+  if (response.ContentRange) {
+    headers["Content-Range"] = response.ContentRange;
+  }
+
+  // S3 が部分応答を返した場合は 206 でそのまま返す。
+  // Relay S3's partial-content responses as HTTP 206.
+  const isPartial = response.ContentRange !== undefined || rangeHeader !== undefined;
+  const status = isPartial && response.ContentRange ? 206 : 200;
 
   return new Response(webStream as BodyInit, {
-    status: 200,
+    status,
     headers,
   });
 });

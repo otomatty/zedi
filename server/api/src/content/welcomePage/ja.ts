@@ -5,6 +5,7 @@
 import type { TiptapNode } from "../../lib/articleExtractor.js";
 
 /**
+ * `/pages/:welcomeId` に表示される日本語版ウェルカムページの Tiptap ドキュメント。
  * Japanese welcome page Tiptap document shown at `/pages/:welcomeId`.
  */
 export const welcomePageJa: TiptapNode = {

@@ -67,6 +67,18 @@ function isMimeAllowedForMode(mime: string, mode: MediaPlaceholderMode): boolean
   return ALLOWED_VIDEO_MIME.has(normalized);
 }
 
+/**
+ * `node.attrs.mode` の実行時値を安全に正規化する。想定外の値が入ってきた場合は
+ * デフォルトで `"image"` に寄せる（UI は画像フローのまま、サーバー側の
+ * 許可 MIME もそれに対応）。
+ *
+ * Runtime normalization of `node.attrs.mode`. Unknown values coerce to
+ * `"image"` so the UI, MIME guard, and resulting node type stay aligned.
+ */
+function normalizeMode(raw: unknown): MediaPlaceholderMode {
+  return raw === "video" ? "video" : "image";
+}
+
 type UploadState =
   | { kind: "idle" }
   | { kind: "uploading"; progress: number }
@@ -103,8 +115,14 @@ async function extractErrorMessage(response: Response, fallback: string): Promis
  */
 export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: NodeViewProps) {
   const { t } = useTranslation();
-  const mode = (node.attrs.mode ?? "image") as MediaPlaceholderMode;
+  const mode = normalizeMode(node.attrs.mode);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // アップロード中に削除されたかを追跡する。awaits の後にこの ref を見て、
+  // 削除済みなら replaceWithMediaNode を呼ばず早期リターンする。
+  // Tracks whether the placeholder was removed mid-upload; each await step
+  // checks this before proceeding so we never replace a node that no longer
+  // exists.
+  const removedRef = useRef(false);
   const [urlMode, setUrlMode] = useState(false);
   const [urlValue, setUrlValue] = useState("");
   const [altValue, setAltValue] = useState("");
@@ -114,6 +132,18 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
   const targetNodeType = mode === "video" ? "video" : "image";
   const acceptAttr = mode === "video" ? VIDEO_MIME_ACCEPT : IMAGE_MIME_ACCEPT;
   const apiBaseUrl = useMemo(() => resolveApiBaseUrl(), []);
+
+  /**
+   * 削除ボタンのハンドラ。先にフラグを立ててから deleteNode() を呼び、
+   * 進行中の handleFileUpload が復帰後に置換処理を続行しないようにする。
+   *
+   * Delete handler: set the flag before calling deleteNode() so any
+   * in-flight upload exits its async chain without replacing the node.
+   */
+  const handleRemoveClick = useCallback(() => {
+    removedRef.current = true;
+    deleteNode();
+  }, [deleteNode]);
 
   /**
    * プレースホルダーを指定属性の最終ノードで置き換える。
@@ -177,6 +207,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
             await extractErrorMessage(presign, t("editor.media.errors.uploadFailed")),
           );
         }
+        if (removedRef.current) return;
         const { upload_url, media_id, s3_key } = (await presign.json()) as {
           upload_url: string;
           media_id: string;
@@ -191,6 +222,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
         if (!put.ok) {
           throw new Error(`${t("editor.media.errors.uploadFailed")} (HTTP ${put.status})`);
         }
+        if (removedRef.current) return;
 
         const confirm = await fetch(`${apiBaseUrl}/api/media/confirm`, {
           method: "POST",
@@ -209,6 +241,13 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
             await extractErrorMessage(confirm, t("editor.media.errors.uploadFailed")),
           );
         }
+        // confirm 成功後に placeholder が消されていたら、メディアは DB に残るが
+        // ノードは挿入しない（ユーザーの削除意思を優先する）。DB 側のゴミは
+        // 個別のクリーンアップジョブで回収可能。
+        // If the placeholder was deleted after confirm succeeded, skip the
+        // node replacement — the user asked to remove it. The confirmed media
+        // row becomes a sweepable orphan that later GC can reclaim.
+        if (removedRef.current) return;
 
         const derivedAlt = altValue.trim() || deriveAltFromFileName(file.name);
         replaceWithMediaNode({
@@ -216,6 +255,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
           alt: derivedAlt,
         });
       } catch (error) {
+        if (removedRef.current) return;
         const message =
           error instanceof Error ? error.message : t("editor.media.errors.uploadFailed");
         setUploadState({ kind: "error", message });
@@ -298,7 +338,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
             variant="ghost"
             size="sm"
             aria-label={t("editor.media.actions.remove")}
-            onClick={() => deleteNode()}
+            onClick={handleRemoveClick}
           >
             <Trash2 className="h-4 w-4" />
           </Button>

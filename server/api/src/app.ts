@@ -105,6 +105,7 @@ export function createApp(): Hono<AppEnv> {
   app.route("/api/users", userRoutes);
 
   // Onboarding wizard completion + status
+  // セットアップウィザード完了・状況取得
   app.route("/api/onboarding", onboardingRoutes);
 
   // Pages

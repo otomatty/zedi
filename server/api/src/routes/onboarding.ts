@@ -30,19 +30,40 @@ app.post("/complete", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const body = await c.req.json<{
-    display_name?: string;
-    avatar_url?: string | null;
-    locale?: string;
-  }>();
+  // JSON 解析失敗と型の食い違いを 500 ではなく 400 として返すため、
+  // `c.req.json()` を try/catch で囲み、各フィールドに typeof ガードを入れる。
+  // Wrap `c.req.json()` so malformed JSON becomes 400, and typeof-guard every
+  // field so `{"display_name": 123}` does not blow up on `.trim()`.
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    badRequest("invalid JSON body");
+  }
+  if (!rawBody || typeof rawBody !== "object") {
+    badRequest("invalid request body");
+  }
+  const body = rawBody as {
+    display_name?: unknown;
+    avatar_url?: unknown;
+    locale?: unknown;
+  };
 
-  const displayName = (body.display_name ?? "").trim();
+  const displayName = typeof body.display_name === "string" ? body.display_name.trim() : "";
   if (!displayName) badRequest("display_name is required");
   if (displayName.length > 120) badRequest("display_name is too long");
 
   const avatarUrl =
-    typeof body.avatar_url === "string" && body.avatar_url.length > 0 ? body.avatar_url : null;
+    typeof body.avatar_url === "string" && body.avatar_url.trim().length > 0
+      ? body.avatar_url.trim()
+      : null;
   const locale = typeof body.locale === "string" ? body.locale : null;
+  // requested_locale には ja/en のどちらかだけを永続化（null は "未選択"）。
+  // CHECK 制約に揃え、リトライ時の再現性を担保する。
+  // Persist only ja/en for requested_locale (null = unspecified). Matches the
+  // DB CHECK constraint and makes retries deterministic.
+  const normalizedLocale: "ja" | "en" | null =
+    locale === "en" ? "en" : locale === "ja" ? "ja" : null;
 
   const result = await db.transaction(async (tx) => {
     // 1. users テーブルのプロフィールを更新する。better-auth 経由のキャッシュは
@@ -73,6 +94,7 @@ app.post("/complete", authRequired, async (c) => {
     const baseValues = {
       userId,
       setupCompletedAt: now,
+      requestedLocale: normalizedLocale,
       updatedAt: now,
     };
     const withPage = welcome
@@ -94,6 +116,9 @@ app.post("/complete", authRequired, async (c) => {
           // 複数回叩いても初回時刻は保たれる）。
           // Preserve the first completion time: existing values win over `now`.
           setupCompletedAt: sql`COALESCE(${userOnboardingStatus.setupCompletedAt}, ${now})`,
+          // requested_locale は「初回選択」を優先。空なら今回のリクエストで埋める。
+          // Prefer the first-captured locale; backfill only when still null.
+          requestedLocale: sql`COALESCE(${userOnboardingStatus.requestedLocale}, ${normalizedLocale})`,
           updatedAt: now,
           ...(welcome
             ? {

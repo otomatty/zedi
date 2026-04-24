@@ -5,6 +5,7 @@
 import type { TiptapNode } from "../../lib/articleExtractor.js";
 
 /**
+ * `/pages/:welcomeId` に表示される英語版ウェルカムページの Tiptap ドキュメント。
  * English welcome page Tiptap document shown at `/pages/:welcomeId`.
  */
 export const welcomePageEn: TiptapNode = {
@@ -161,6 +162,7 @@ export const welcomePageEn: TiptapNode = {
 };
 
 /**
+ * Markdown 記法 → 効果の 1 行を bullet list 項目として組み立てるヘルパー。
  * Helper building a bullet-list item mapping a Markdown syntax to its effect.
  */
 function markdownRow(code: string, effect: string): TiptapNode {
