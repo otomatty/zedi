@@ -42,7 +42,7 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     {
       title: "List pages",
       description:
-        "Lists the caller's pages, paginated and ordered by `updated_at` DESC. Use `scope: own` for own pages or `shared` to also include pages attached to notes the caller is a member of. Returns `{ id, title, content_preview, updated_at }`.",
+        "Lists the caller's personal pages (note_id IS NULL), paginated and ordered by `updated_at` DESC. `scope: own` returns personal pages only; `scope: shared` additionally includes pages attached to notes the caller is a member of (mixed scope — inspect each row's `note_id` to distinguish personal vs note-native). To list pages of a specific note, use `zedi_list_note_pages` instead. Returns `{ id, title, content_preview, updated_at }`.",
       inputSchema: {
         limit: z.number().int().min(1).max(100).optional(),
         offset: z.number().int().min(0).optional(),
@@ -75,7 +75,8 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     "zedi_create_page",
     {
       title: "Create page",
-      description: "Creates a new empty page (no Y.Doc body). Returns the created page metadata.",
+      description:
+        "Creates a new empty personal page (no Y.Doc body, `note_id = NULL`). Always creates a personal page — to create a note-native page, call `zedi_add_page_to_note` (new page in a note) or `zedi_add_page_to_note` with an existing `page_id` to link a personal page. Returns the created page metadata.",
       inputSchema: {
         title: z.string().optional(),
         content_preview: z.string().optional(),
@@ -213,7 +214,8 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     "zedi_list_note_pages",
     {
       title: "List pages in a note",
-      description: "Lists pages currently attached to a note in their sort order.",
+      description:
+        "Lists pages currently attached to a note in their sort order. Includes both note-native pages (`note_id = :noteId`) and linked personal pages (`note_id IS NULL`). Use this instead of `zedi_list_pages` when you want the note-scoped view; inspect each row's `note_id` to tell the two apart. For personal-only or `shared` mixed listings, use `zedi_list_pages`.",
       inputSchema: { note_id: z.string().min(1) },
     },
     async (args) =>
@@ -225,7 +227,7 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     {
       title: "Add page to note",
       description:
-        "Adds an existing page to a note (by page_id) or creates a new page in the note.",
+        "Attaches a page to a note. Pass `page_id` to link an existing personal page (stays `note_id = NULL` — use the dedicated `copy-from-personal` API when you need a note-native copy). Omit `page_id` to create a fresh note-native page (`note_id = :noteId`) with the given title/source_url. Cross-note adoption (moving a note-native page to another note) is not supported.",
       inputSchema: {
         note_id: z.string().min(1),
         page_id: z.string().optional(),
@@ -343,16 +345,22 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     {
       title: "Full-text search",
       description:
-        "Searches pages by title and content. Use `scope: own` for own pages or `shared` to include shared notes.",
+        "Searches pages by title and content. Pass `note_id` to restrict results to a single note (Phase 5-2 note-scoped endpoint); in that case `scope` is ignored. Without `note_id`, use `scope: own` for personal pages only (`note_id IS NULL`) or `scope: shared` to also include pages from notes the caller is a member of. Results always include `note_id` so callers can distinguish personal vs note-native hits.",
       inputSchema: {
         query: z.string().min(1),
         scope: SearchScopeEnum.optional(),
         limit: z.number().int().min(1).max(100).optional(),
+        note_id: z.string().min(1).optional(),
       },
     },
     async (args) =>
-      wrapToolHandler(async ({ query, scope, limit }) => {
-        const results = await client.search(query, scope, limit);
+      wrapToolHandler(async ({ query, scope, limit, note_id }) => {
+        const results = await client.search({
+          query,
+          scope,
+          limit,
+          noteId: note_id,
+        });
         return jsonResult(results);
       }, args),
   );

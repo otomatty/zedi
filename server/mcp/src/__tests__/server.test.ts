@@ -129,14 +129,51 @@ describe("createMcpServer", () => {
 
   it("zedi_search forwards query, scope, and limit", async () => {
     vi.mocked(mockClient.search).mockResolvedValue([
-      { id: "p1", title: "match", content_preview: null, updated_at: "2026-01-01T00:00:00Z" },
+      {
+        id: "p1",
+        title: "match",
+        content_preview: null,
+        updated_at: "2026-01-01T00:00:00Z",
+        note_id: null,
+      },
     ]);
     const result = await mcpClient.callTool({
       name: "zedi_search",
       arguments: { query: "hello", scope: "shared", limit: 10 },
     });
     expect(result.isError).toBeFalsy();
-    expect(mockClient.search).toHaveBeenCalledWith("hello", "shared", 10);
+    expect(mockClient.search).toHaveBeenCalledWith({
+      query: "hello",
+      scope: "shared",
+      limit: 10,
+    });
+  });
+
+  it("zedi_search forwards note_id to client.search as noteId", async () => {
+    // MCP の tool 引数 (snake_case) は ZediClient の `noteId` (camelCase) に正しく
+    // マップされる必要がある。クロスリーク対策として Phase 5-2 の note-scoped API
+    // に届く経路を検証する。
+    // The snake_case tool arg must map to the camelCase `noteId` option on
+    // ZediClient so the Phase 5-2 note-scoped endpoint actually gets used.
+    vi.mocked(mockClient.search).mockResolvedValue([
+      {
+        id: "p2",
+        title: "in-note",
+        content_preview: null,
+        updated_at: "2026-01-01T00:00:00Z",
+        note_id: "note-1",
+      },
+    ]);
+    const result = await mcpClient.callTool({
+      name: "zedi_search",
+      arguments: { query: "hello", note_id: "note-1", limit: 5 },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(mockClient.search).toHaveBeenCalledWith({
+      query: "hello",
+      noteId: "note-1",
+      limit: 5,
+    });
   });
 
   it("zedi_update_page_content includes expected_version", async () => {

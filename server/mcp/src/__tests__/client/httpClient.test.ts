@@ -245,12 +245,48 @@ describe("HttpZediClient request shaping", () => {
 
   it("search GETs /api/search with q, scope, limit", async () => {
     fetchMock.mockResolvedValueOnce(makeJsonResponse(200, { results: [] }));
-    await client.search("hello world", "shared", 50);
+    await client.search({ query: "hello world", scope: "shared", limit: 50 });
     const url = callArgs(fetchMock as unknown as Mock)[0] as string;
     expect(url).toContain(`${BASE}/api/search?`);
     expect(url).toContain("q=hello+world");
     expect(url).toContain("scope=shared");
     expect(url).toContain("limit=50");
+  });
+
+  it("search GETs /api/notes/:noteId/search when noteId is provided (scope is ignored)", async () => {
+    // noteId 指定時は note-scoped エンドポイントに切り替え、`scope` は無視される。
+    // When noteId is set, we hit /api/notes/:noteId/search and ignore `scope`.
+    fetchMock.mockResolvedValueOnce(makeJsonResponse(200, { results: [] }));
+    await client.search({
+      query: "hello",
+      noteId: "note 1",
+      scope: "shared",
+      limit: 25,
+    });
+    const url = callArgs(fetchMock as unknown as Mock)[0] as string;
+    expect(url).toContain(`${BASE}/api/notes/${encodeURIComponent("note 1")}/search?`);
+    expect(url).toContain("q=hello");
+    expect(url).toContain("limit=25");
+    expect(url).not.toContain("scope=");
+  });
+
+  it("search unwraps the results array and preserves note_id", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeJsonResponse(200, {
+        results: [
+          {
+            id: "p1",
+            title: "match",
+            content_preview: null,
+            updated_at: "2026-01-01T00:00:00Z",
+            note_id: "n1",
+          },
+        ],
+      }),
+    );
+    const rows = await client.search({ query: "m", noteId: "n1" });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.note_id).toBe("n1");
   });
 
   it("clipUrl POSTs /api/mcp/clip with the URL", async () => {
