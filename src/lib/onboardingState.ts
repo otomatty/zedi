@@ -1,105 +1,80 @@
 /**
- * Onboarding state management
- * Tracks user's progress through the onboarding flow
+ * オンボーディング状態のクライアント側キャッシュ。
+ * Client-side cache for onboarding state.
+ *
+ * サーバー側の `user_onboarding_status` が真の情報源。ここではセットアップ
+ * 完了フラグだけを localStorage にキャッシュして、アプリロード時の API 往復を
+ * 避けるために使用する。フラグが立っていても、ログイン中はサーバー側の
+ * GET /api/onboarding/status で裏付けをとる（`useOnboarding` 参照）。
+ *
+ * The server's `user_onboarding_status` table is the source of truth. This
+ * module caches only the setup-completion flag in localStorage so the app can
+ * decide routing synchronously on load; the flag is corroborated in the
+ * background by GET /api/onboarding/status (see `useOnboarding`).
  */
 
-const STORAGE_KEY = "zedi-onboarding";
+const STORAGE_KEY = "zedi-onboarding-cache";
 
-export interface OnboardingState {
+interface OnboardingCache {
   hasCompletedSetupWizard: boolean;
-  hasCompletedTour: boolean;
-  completedSteps: string[];
-  dismissedHints: string[];
 }
 
-const DEFAULT_STATE: OnboardingState = {
+const DEFAULT_CACHE: OnboardingCache = {
   hasCompletedSetupWizard: false,
-  hasCompletedTour: false,
-  completedSteps: [],
-  dismissedHints: [],
 };
 
 /**
- * Get the current onboarding state from localStorage
+ * localStorage から直近のキャッシュを取得する。失敗時はデフォルト値を返す。
+ * Reads the local cache; returns defaults when storage is unavailable.
  */
-export function getOnboardingState(): OnboardingState {
+export function getOnboardingCache(): OnboardingCache {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return { ...DEFAULT_STATE, ...JSON.parse(stored) };
-    }
+    if (!stored) return DEFAULT_CACHE;
+    const parsed = JSON.parse(stored) as Partial<OnboardingCache>;
+    return {
+      hasCompletedSetupWizard: parsed.hasCompletedSetupWizard === true,
+    };
   } catch (error) {
-    console.error("Failed to parse onboarding state:", error);
+    console.warn("[onboardingState] Failed to read cache:", error);
+    return DEFAULT_CACHE;
   }
-  return DEFAULT_STATE;
 }
 
 /**
- * Save the onboarding state to localStorage
+ * キャッシュを書き換える。部分更新対応。
+ * Persists a partial update to the local cache.
  */
-export function saveOnboardingState(state: Partial<OnboardingState>): void {
+export function setOnboardingCache(patch: Partial<OnboardingCache>): void {
   try {
-    const currentState = getOnboardingState();
-    const newState = { ...currentState, ...state };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+    const current = getOnboardingCache();
+    const next = { ...current, ...patch };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch (error) {
-    console.error("Failed to save onboarding state:", error);
+    console.warn("[onboardingState] Failed to persist cache:", error);
   }
 }
 
 /**
- * Mark the setup wizard as completed
+ * セットアップウィザード完了フラグをキャッシュに立てる。
+ * Marks the local setup-completion flag.
  */
-export function markSetupWizardCompleted(): void {
-  saveOnboardingState({
-    hasCompletedSetupWizard: true,
-  });
+export function markSetupWizardCompletedCache(): void {
+  setOnboardingCache({ hasCompletedSetupWizard: true });
 }
 
 /**
- * Mark the tour as completed
+ * ローカルキャッシュをクリアする。旧バージョンの localStorage キー
+ * (`zedi-onboarding`) も同時に破棄して残骸が残らないようにする。
+ *
+ * Clears the local cache. Also drops the legacy `zedi-onboarding` key so
+ * leftovers from the pre-server-backed flow do not linger.
  */
-export function markTourCompleted(): void {
-  saveOnboardingState({
-    hasCompletedTour: true,
-  });
-}
-
-/**
- * Mark a specific step as completed
- */
-export function markStepCompleted(stepId: string): void {
-  const state = getOnboardingState();
-  if (!state.completedSteps.includes(stepId)) {
-    saveOnboardingState({
-      completedSteps: [...state.completedSteps, stepId],
-    });
+export function clearOnboardingCache(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem("zedi-onboarding");
+  } catch (error) {
+    console.warn("[onboardingState] Failed to clear cache:", error);
   }
-}
-
-/**
- * Dismiss a hint so it won't show again
- */
-export function dismissHint(hintId: string): void {
-  const state = getOnboardingState();
-  if (!state.dismissedHints.includes(hintId)) {
-    saveOnboardingState({
-      dismissedHints: [...state.dismissedHints, hintId],
-    });
-  }
-}
-
-/**
- * Check if a hint should be shown
- */
-export function shouldShowHint(hintId: string): boolean {
-  const state = getOnboardingState();
-  return !state.dismissedHints.includes(hintId);
-}
-
-/**
- * Reset the onboarding state (for testing)
- */
-export function resetOnboardingState(): void {
-  localStorage.removeItem(STORAGE_KEY);
 }

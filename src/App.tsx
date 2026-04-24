@@ -16,6 +16,7 @@ import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import Notes from "./pages/Notes";
 import NotesDiscover from "./pages/NotesDiscover";
+import OfficialGuidePlaceholder from "./pages/OfficialGuidePlaceholder";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
 import ExtensionAuth from "./pages/ExtensionAuth";
@@ -175,6 +176,12 @@ const App = () => (
                       <Route path="/ai-chat" element={<Navigate to="/ai" replace />} />
                       <Route path="/search" element={<SearchResults />} />
                       <Route path="/notes/discover" element={<NotesDiscover />} />
+                      {/* Placeholder for the official user guide note; the
+                          real implementation lands in a follow-up PR but we
+                          reserve the URL to keep welcome-page links stable.
+                          公式ガイドノートのプレースホルダー。ウェルカム
+                          ページのリンクが 404 にならないよう URL を確保する。 */}
+                      <Route path="/notes/official-guide" element={<OfficialGuidePlaceholder />} />
                       <Route path="/notes" element={<Notes />} />
                       <Route path="/pages/:id" element={<PageEditorPage />} />
                       {/* Legacy singular path — redirect to plural.

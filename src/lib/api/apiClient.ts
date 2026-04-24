@@ -575,6 +575,46 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
         `/api/notes/${encodeURIComponent(noteId)}/invite-links/${encodeURIComponent(linkId)}`,
       );
     },
+
+    // ── Onboarding ───────────────────────────────────────────────────────
+
+    /**
+     * POST /api/onboarding/complete — セットアップウィザード完了 API。
+     * プロフィール更新・セットアップ完了フラグ・ウェルカムページ生成を 1 回で行う。
+     *
+     * Atomic wizard completion endpoint: updates profile, records
+     * setup_completed_at, and creates the welcome page.
+     */
+    async completeOnboarding(body: {
+      display_name: string;
+      avatar_url?: string | null;
+      locale: "ja" | "en";
+    }): Promise<{
+      setup_completed_at: string | null;
+      welcome_page_id: string | null;
+      welcome_page_created_at: string | null;
+      welcome_page_locale: "ja" | "en" | null;
+    }> {
+      return req("POST", "/api/onboarding/complete", { body });
+    },
+
+    /**
+     * GET /api/onboarding/status — 呼び出し元のオンボーディング状況。
+     * セットアップ完了済みでウェルカムページ未生成ならバックグラウンドで生成をリトライする。
+     *
+     * Returns the caller's onboarding status. Triggers a login-time retry to
+     * regenerate the welcome page when setup is complete but the page is
+     * missing.
+     */
+    async getOnboardingStatus(): Promise<{
+      setup_completed_at: string | null;
+      welcome_page_id: string | null;
+      welcome_page_created_at: string | null;
+      home_slides_shown_at: string | null;
+      auto_create_update_notice: boolean;
+    }> {
+      return req("GET", "/api/onboarding/status");
+    },
   };
 }
 

@@ -47,6 +47,22 @@ const SAFE_INLINE_IMAGE_TYPES = new Set([
 ]);
 
 /**
+ * `<video>` タグで安全にインライン再生できる動画 MIME。
+ * Safe video MIME types for inline `<video>` playback.
+ */
+const SAFE_INLINE_VIDEO_TYPES = new Set(["video/webm", "video/mp4"]);
+
+/**
+ * アップロードを許可する MIME（画像 + 動画）。
+ * Allowlisted MIME types for upload (images + videos).
+ */
+const ALLOWED_UPLOAD_TYPES = new Set([...SAFE_INLINE_IMAGE_TYPES, ...SAFE_INLINE_VIDEO_TYPES]);
+
+/** 最大アップロードサイズ（バイト）。動画も含め 50MB まで。 */
+/** Maximum upload size in bytes (50MB), applies to images and videos alike. */
+const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
+
+/**
  * MIME 文字列からセミコロンより前の部分だけを小文字で返す。
  *
  * Returns the part before `;`, lowercased (e.g. `image/png; charset=binary` → `image/png`).
@@ -70,7 +86,10 @@ function resolveProxyContentHeaders(
   fileName: string | null | undefined,
 ): { contentType: string; contentDisposition?: string } {
   const declared = normalizeMimeBase(rowContentType) ?? normalizeMimeBase(s3ContentType);
-  if (declared && SAFE_INLINE_IMAGE_TYPES.has(declared)) {
+  if (
+    declared &&
+    (SAFE_INLINE_IMAGE_TYPES.has(declared) || SAFE_INLINE_VIDEO_TYPES.has(declared))
+  ) {
     return { contentType: declared };
   }
   const safeFile =
@@ -98,6 +117,15 @@ app.post("/upload", authRequired, async (c) => {
 
   if (!body.file_name || !body.content_type) {
     throw new HTTPException(400, { message: "file_name and content_type are required" });
+  }
+
+  const normalizedMime = normalizeMimeBase(body.content_type);
+  if (!normalizedMime || !ALLOWED_UPLOAD_TYPES.has(normalizedMime)) {
+    throw new HTTPException(415, { message: "Unsupported media type" });
+  }
+
+  if (typeof body.file_size === "number" && body.file_size > MAX_UPLOAD_SIZE_BYTES) {
+    throw new HTTPException(413, { message: "File exceeds 50MB upload limit" });
   }
 
   const mediaId = crypto.randomUUID();
@@ -131,6 +159,15 @@ app.post("/confirm", authRequired, async (c) => {
 
   if (!body.media_id || !body.s3_key) {
     throw new HTTPException(400, { message: "media_id and s3_key are required" });
+  }
+
+  const normalizedMime = normalizeMimeBase(body.content_type);
+  if (!normalizedMime || !ALLOWED_UPLOAD_TYPES.has(normalizedMime)) {
+    throw new HTTPException(415, { message: "Unsupported media type" });
+  }
+
+  if (typeof body.file_size === "number" && body.file_size > MAX_UPLOAD_SIZE_BYTES) {
+    throw new HTTPException(413, { message: "File exceeds 50MB upload limit" });
   }
 
   const expectedPrefix = `users/${userId}/media/${body.media_id}/`;

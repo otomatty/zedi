@@ -5,9 +5,6 @@ import { MOCK_USER_ID } from "../src/components/auth/MockAuthProvider";
 const GHOST_TITLE = "生産手段";
 const COMPLETED_ONBOARDING_STATE = {
   hasCompletedSetupWizard: true,
-  hasCompletedTour: false,
-  completedSteps: [],
-  dismissedHints: [],
 };
 
 async function seedBlankPage(page: Page, title: string) {
@@ -121,7 +118,7 @@ test.describe("WikiLink create-page dialog", () => {
 
   test.beforeEach(async ({ page, helpers }) => {
     await page.addInitScript((state) => {
-      localStorage.setItem("zedi-onboarding", JSON.stringify(state));
+      localStorage.setItem("zedi-onboarding-cache", JSON.stringify(state));
     }, COMPLETED_ONBOARDING_STATE);
     await helpers.goToHome(page);
   });

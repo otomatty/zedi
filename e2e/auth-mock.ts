@@ -9,9 +9,6 @@ import { test as base, expect, Page } from "@playwright/test";
 /** Default onboarding so signed-in E2E users stay on /home (not redirected to /onboarding). */
 const E2E_DEFAULT_ONBOARDING = {
   hasCompletedSetupWizard: true,
-  hasCompletedTour: false,
-  completedSteps: [] as string[],
-  dismissedHints: [] as string[],
 };
 
 /**
@@ -34,7 +31,9 @@ const helpers = {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
-    await page.locator('[data-tour-id="tour-fab"]').click();
+    // ホーム右下の FAB を開き、新規作成メニューを起動する。
+    // Open the home FAB and pick the "新規作成" action to create a blank page.
+    await page.locator('[data-testid="home-fab"]').click();
     await page.getByRole("button", { name: "新規作成" }).click();
 
     // `^/pages/<id>$` のみを許容し、`/notes/.../pages/<id>` のようなノート配下ルートに
@@ -86,7 +85,7 @@ const helpers = {
 export const test = base.extend<{ helpers: typeof helpers }>({
   page: async ({ page }, continueFixture) => {
     await page.addInitScript((onboarding: typeof E2E_DEFAULT_ONBOARDING) => {
-      localStorage.setItem("zedi-onboarding", JSON.stringify(onboarding));
+      localStorage.setItem("zedi-onboarding-cache", JSON.stringify(onboarding));
     }, E2E_DEFAULT_ONBOARDING);
     await continueFixture(page);
   },

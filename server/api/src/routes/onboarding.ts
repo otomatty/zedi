@@ -1,0 +1,164 @@
+/**
+ * /api/onboarding — セットアップウィザード完了エンドポイント
+ * /api/onboarding — setup wizard completion endpoint
+ *
+ * POST /api/onboarding/complete
+ *   プロフィール更新 + セットアップ完了フラグ + ウェルカムページ生成を
+ *   1 トランザクションで処理する。呼び出し側（フロントエンド）はこの API を
+ *   1 回呼ぶだけでウィザードを完了できる。
+ *
+ *   Atomically updates the user profile, records the setup-completed
+ *   timestamp, and creates the welcome page. A single call from the wizard
+ *   drives the whole completion flow.
+ */
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { eq } from "drizzle-orm";
+import { users, userOnboardingStatus } from "../schema/index.js";
+import { authRequired } from "../middleware/auth.js";
+import type { AppEnv } from "../types/index.js";
+import { insertWelcomePage, retryWelcomePageIfNeeded } from "../lib/welcomePageService.js";
+
+const app = new Hono<AppEnv>();
+
+/** 入力バリデーションエラーを 400 で返すヘルパー。Throws 400 on invalid input. */
+function badRequest(message: string): never {
+  throw new HTTPException(400, { message });
+}
+
+app.post("/complete", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  const body = await c.req.json<{
+    display_name?: string;
+    avatar_url?: string | null;
+    locale?: string;
+  }>();
+
+  const displayName = (body.display_name ?? "").trim();
+  if (!displayName) badRequest("display_name is required");
+  if (displayName.length > 120) badRequest("display_name is too long");
+
+  const avatarUrl =
+    typeof body.avatar_url === "string" && body.avatar_url.length > 0 ? body.avatar_url : null;
+  const locale = typeof body.locale === "string" ? body.locale : null;
+
+  const result = await db.transaction(async (tx) => {
+    // 1. users テーブルのプロフィールを更新する。better-auth 経由のキャッシュは
+    //    最大 5 分で refresh されるため、次回セッション読み込み時に新しい値が
+    //    反映される。
+    //    Update the users row. Better Auth's cookie cache refreshes within
+    //    ~5 minutes, so the new values surface on the next session load.
+    await tx
+      .update(users)
+      .set({
+        name: displayName,
+        image: avatarUrl,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    // 2. ウェルカムページを生成（まだ無い場合）。
+    //    Generate the welcome page if one does not yet exist.
+    const welcome = await insertWelcomePage(tx, userId, locale);
+
+    // 3. user_onboarding_status を upsert。setup_completed_at は今回初めて
+    //    確定し、welcome_page_id はページ生成時のみ上書きする（既存ページが
+    //    あれば welcome は null で、既存レコードを尊重する）。
+    //    Upsert user_onboarding_status. setup_completed_at is set here for
+    //    the first time; welcome_page_id is only assigned when we actually
+    //    created a new welcome page (otherwise the existing row is preserved).
+    const now = new Date();
+    const baseValues = {
+      userId,
+      setupCompletedAt: now,
+      updatedAt: now,
+    };
+    const withPage = welcome
+      ? {
+          ...baseValues,
+          welcomePageCreatedAt: now,
+          welcomePageId: welcome.pageId,
+        }
+      : baseValues;
+
+    await tx
+      .insert(userOnboardingStatus)
+      .values(withPage)
+      .onConflictDoUpdate({
+        target: userOnboardingStatus.userId,
+        set: {
+          setupCompletedAt: now,
+          updatedAt: now,
+          ...(welcome
+            ? {
+                welcomePageCreatedAt: now,
+                welcomePageId: welcome.pageId,
+              }
+            : {}),
+        },
+      });
+
+    // 最終状態を 1 行読み返してレスポンスに含める。
+    // Read the final row so the response includes the canonical state.
+    const finalRow = await tx
+      .select()
+      .from(userOnboardingStatus)
+      .where(eq(userOnboardingStatus.userId, userId))
+      .limit(1);
+
+    return {
+      row: finalRow[0],
+      welcome,
+    };
+  });
+
+  const row = result.row;
+  if (!row) {
+    throw new HTTPException(500, { message: "Failed to record onboarding status" });
+  }
+
+  return c.json(
+    {
+      setup_completed_at: row.setupCompletedAt?.toISOString() ?? null,
+      welcome_page_id: row.welcomePageId ?? null,
+      welcome_page_created_at: row.welcomePageCreatedAt?.toISOString() ?? null,
+      welcome_page_locale: result.welcome?.locale ?? null,
+    },
+    200,
+  );
+});
+
+/**
+ * GET /api/onboarding/status — 呼び出し元ユーザーのオンボーディング状況を返す。
+ * Returns the caller's onboarding status. Used to decide whether to show the
+ * setup wizard and/or re-trigger welcome page creation.
+ */
+app.get("/status", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  // ログイン時のベストエフォートリトライ: セットアップ完了済みでウェルカム
+  // ページが未生成のユーザーを拾って生成する。失敗しても status 応答は返す。
+  // Login-time best-effort retry: regenerate the welcome page if the user
+  // previously completed setup but welcome page creation failed.
+  await retryWelcomePageIfNeeded(db, userId);
+
+  const rows = await db
+    .select()
+    .from(userOnboardingStatus)
+    .where(eq(userOnboardingStatus.userId, userId))
+    .limit(1);
+  const row = rows[0];
+
+  return c.json({
+    setup_completed_at: row?.setupCompletedAt?.toISOString() ?? null,
+    welcome_page_id: row?.welcomePageId ?? null,
+    welcome_page_created_at: row?.welcomePageCreatedAt?.toISOString() ?? null,
+    home_slides_shown_at: row?.homeSlidesShownAt?.toISOString() ?? null,
+    auto_create_update_notice: row?.autoCreateUpdateNotice ?? true,
+  });
+});
+
+export default app;
