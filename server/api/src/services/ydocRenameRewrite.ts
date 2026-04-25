@@ -325,13 +325,17 @@ function walk(
 export interface RewriteTitleRefsOptions {
   /**
    * リネーム対象ページの UUID。マークが `targetId` 属性を持つ場合は ID 一致で
-   * のみ書き換える（同名ページの誤書き換えを防ぐ）。`null` / 省略時は従来の
-   * タイトル一致のみで判定する（既存挙動）。
+   * のみ書き換える（同名ページの誤書き換えを防ぐ）。`null` / 省略時は、
+   * `targetId` を **持たない** マークだけがタイトル一致 fallback で書き換わる。
+   * 一方、`targetId` を持つマークは検証手段が無いため安全側に倒して **書き換え
+   * ない**（誤書き換え防止 / issue #737）。
    *
    * UUID of the renamed page. When provided, marks carrying a `targetId`
    * attribute are rewritten only on id match — preventing same-title pages
-   * from being rewritten in lockstep. When `null`/omitted, falls back to the
-   * legacy title-only behaviour for every mark.
+   * from being rewritten in lockstep. When `null`/omitted, only marks
+   * **without** a usable `targetId` fall back to legacy title-only matching;
+   * marks that already carry a `targetId` are **skipped** because their
+   * target cannot be verified safely (issue #737).
    */
   renamedPageId?: string | null;
   /**
@@ -363,18 +367,39 @@ export interface RewriteTitleRefsOptions {
  * issue #737). Marks without a `targetId` continue to match by title
  * (legacy / lazy migration).
  *
+ * 後方互換 / Backward compatibility:
+ * 第 4 引数は旧 API では `fragmentName: string` だった。文字列を渡された場合は
+ * `{ fragmentName }` として解釈し、issue #737 以前の呼び出し元が静かに既定
+ * フラグメントへ書き換わってしまうのを防ぐ。
+ * The fourth argument used to be a `fragmentName` string. When a string is
+ * passed it is interpreted as `{ fragmentName }`, so pre-issue-#737 callers
+ * are not silently retargeted at the default fragment.
+ *
  * @param doc - 書き換え対象の Y.Doc / the Y.Doc to mutate.
  * @param oldTitle - 旧ページタイトル / previous page title.
  * @param newTitle - 新ページタイトル / new page title.
- * @param options - 任意オプション / optional settings, see {@link RewriteTitleRefsOptions}.
+ * @param optionsOrFragmentName - 任意オプション、または旧 API の fragmentName
+ *   文字列 / either the new options object or the legacy `fragmentName`
+ *   string (kept for backward compatibility).
  * @returns 書き換え件数 / counts of what was rewritten.
  */
 export function rewriteTitleRefsInDoc(
   doc: Y.Doc,
   oldTitle: string,
   newTitle: string,
-  options: RewriteTitleRefsOptions = {},
+  optionsOrFragmentName: RewriteTitleRefsOptions | string = {},
 ): RewriteResult {
+  // 旧 4-arg 形式 (`fragmentName` 文字列) を `{ fragmentName }` に正規化する。
+  // 文字列をそのまま `options` として読むと `"foo".fragmentName` が undefined
+  // になり、既定フラグメントを書き換えてしまう静かな破壊が発生する。
+  // Normalize the legacy 4-arg form (`fragmentName` string) into the options
+  // shape. Reading a raw string as `options` would silently retarget the
+  // default fragment because `"foo".fragmentName === undefined`.
+  const options: RewriteTitleRefsOptions =
+    typeof optionsOrFragmentName === "string"
+      ? { fragmentName: optionsOrFragmentName }
+      : optionsOrFragmentName;
+
   const result: RewriteResult = {
     wikiLinkMarksUpdated: 0,
     wikiLinkTextUpdated: 0,

@@ -445,6 +445,63 @@ describe("rewriteTitleRefsInDoc", () => {
     });
   });
 
+  describe("Backward-compat for legacy 4-arg fragmentName form", () => {
+    // 旧 API では第 4 引数が `fragmentName: string` だった。文字列をそのまま
+    // 受け取って `{ fragmentName }` として解釈できることを固定する
+    // （CodeRabbit レビュー指摘）。これにより、issue #737 以前のスナップショット
+    // から拾い上げられた呼び出し元が静かに既定フラグメントへ書き換わる事故
+    // を防ぐ。
+    // Pre-issue-#737 callers passed the fourth arg as a `fragmentName`
+    // string. Lock in that the function still accepts that shape so legacy
+    // callers do not silently retarget the default fragment (CodeRabbit).
+    it("treats a string fourth argument as fragmentName", () => {
+      const doc = new Y.Doc();
+      const fragment = doc.getXmlFragment("custom");
+      const paragraph = new Y.XmlElement("paragraph");
+      fragment.insert(0, [paragraph]);
+      const text = new Y.XmlText();
+      paragraph.insert(0, [text]);
+      text.insert(0, "Foo", { wikiLink: { title: "Foo", exists: true, referenced: false } });
+
+      const result = rewriteTitleRefsInDoc(doc, "Foo", "Bar", "custom");
+
+      expect(result.wikiLinkMarksUpdated).toBe(1);
+      expect(plainText(text)).toBe("Bar");
+    });
+
+    it("does not touch the default fragment when only `custom` is asked for", () => {
+      // 旧 API の呼び出しがオプション形へ自動変換され、誤って default フラグ
+      // メントを書き換えてしまわないことを担保する。
+      // Guard against a regression where the legacy form is parsed as
+      // options and silently rewrites the default fragment instead.
+      const doc = new Y.Doc();
+      const defaultFragment = doc.getXmlFragment("default");
+      const defaultPara = new Y.XmlElement("paragraph");
+      defaultFragment.insert(0, [defaultPara]);
+      const defaultText = new Y.XmlText();
+      defaultPara.insert(0, [defaultText]);
+      defaultText.insert(0, "Foo", {
+        wikiLink: { title: "Foo", exists: true, referenced: false },
+      });
+
+      const customFragment = doc.getXmlFragment("custom");
+      const customPara = new Y.XmlElement("paragraph");
+      customFragment.insert(0, [customPara]);
+      const customText = new Y.XmlText();
+      customPara.insert(0, [customText]);
+      customText.insert(0, "Foo", {
+        wikiLink: { title: "Foo", exists: true, referenced: false },
+      });
+
+      rewriteTitleRefsInDoc(doc, "Foo", "Bar", "custom");
+
+      // 既定フラグメントは触らず、`custom` のみが書き換わる。
+      // The default fragment is left untouched; only `custom` rewrites.
+      expect(plainText(defaultText)).toBe("Foo");
+      expect(plainText(customText)).toBe("Bar");
+    });
+  });
+
   describe("Guards and edge cases", () => {
     it("is a no-op when oldTitle and newTitle normalize to the same value", () => {
       const { doc, text } = buildDocWithParagraph([
