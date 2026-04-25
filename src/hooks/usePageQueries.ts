@@ -271,14 +271,34 @@ export function usePage(pageId: string, options?: UsePageOptions) {
 }
 
 /**
- * Hook to search pages (personal; StorageAdapter)
+ * 個人スコープ専用のページ検索フック（IndexedDB 経由）。
+ *
+ * **スコープ契約 (Issue #718 Phase 5-4)**:
+ * - 返すのは `noteId === null` の個人ページのみ。
+ * - 実装は `IndexedDBStorageAdapter.searchPages` に委ねており、IDB には個人
+ *   ページしか永続化されない（`getAllPages` も `noteId === null` で防御的に
+ *   フィルタしている）。ノートネイティブページは API 経由で取得する。
+ * - ノート配下の検索が必要な場合は `useSearchSharedNotes`（混在）か、将来
+ *   実装される note-scoped 検索フック（Phase 5-2 の
+ *   `GET /api/notes/:noteId/search` を呼ぶ）を使うこと。
+ *
+ * Personal-scope-only page search (via IndexedDB).
+ *
+ * **Scope contract (Issue #718 Phase 5-4)**: returns only personal pages
+ * (`noteId === null`). The implementation delegates to
+ * `IndexedDBStorageAdapter.searchPages`, which only ever holds personal pages.
+ * For note-native results, callers must reach for `useSearchSharedNotes` (mixed
+ * scope) or a future note-scoped hook backed by Phase 5-2's
+ * `GET /api/notes/:noteId/search` endpoint.
+ *
+ * @returns React Query result whose `data` is `Page[]` of personal pages.
  */
 export function useSearchPages(query: string) {
   const { getRepository, userId, isLoaded } = useRepository();
 
   return useQuery({
     queryKey: pageKeys.search(userId, query),
-    queryFn: async () => {
+    queryFn: async (): Promise<Page[]> => {
       if (!query.trim()) return [];
       try {
         const repo = await getRepository();
@@ -298,7 +318,24 @@ export function useSearchPages(query: string) {
 }
 
 /**
- * Hook to search shared notes (API: GET /api/search?q=&scope=shared). C3-8.
+ * 混在スコープのページ検索フック（API: `GET /api/search?q=&scope=shared`）。
+ * C3-8 / Issue #718 Phase 5-4。
+ *
+ * **スコープ挙動**:
+ * - サーバーは個人ページ (`note_id IS NULL`) と、自分が参加するノートの
+ *   ネイティブページの両方を返す（Phase 5-1 で `scope=own` の方は
+ *   `note_id IS NULL` の防御フィルタを追加済みだが、`shared` は意図的に
+ *   混在のまま）。
+ * - 各行は `note_id: string | null` を含むので、呼び出し側は必要に応じて
+ *   個人 / ノートネイティブを判別できる（`useGlobalSearch` /
+ *   `SearchResults` は個人ページ重複を避けるためここでフィルタしている）。
+ *
+ * Mixed-scope search hook (`GET /api/search?q=&scope=shared`).
+ *
+ * The server returns both personal pages and note-native pages from notes the
+ * caller participates in. Each row carries `note_id: string | null` so callers
+ * can branch on it (`useGlobalSearch` / `SearchResults` filter to note-native
+ * rows so personal pages from `useSearchPages` are not double-counted).
  */
 export function useSearchSharedNotes(query: string) {
   const { getToken, isSignedIn } = useAuth();

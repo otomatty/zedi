@@ -16,6 +16,7 @@ import {
   calculateEnhancedScore,
 } from "@/lib/searchUtils";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
+import { dedupSharedRowsAgainstPersonal } from "@/hooks/useGlobalSearch";
 
 interface SearchResultItem extends SearchResultCardItem {
   snippet: string;
@@ -68,14 +69,25 @@ export default function SearchResults() {
         };
       });
 
-    const shared: SearchResultItem[] = sharedResults.map((r) => {
+    // Issue #718 Phase 5-4: dedup 契約は `dedupSharedRowsAgainstPersonal` に集約。
+    // 個人 IDB に既に出ている page id だけを shared から落とす。`note_id` が
+    // null でも他ユーザー所有のリンク済み個人ページは IDB に無いので残す
+    // (Codex / CodeRabbit 指摘)。
+    //
+    // Issue #718 Phase 5-4: dedup is centralized in
+    // `dedupSharedRowsAgainstPersonal` and works by `pageId` so linked personal
+    // pages owned by other note members (which IDB does not have) survive
+    // (Codex / CodeRabbit review).
+    const personalIds = new Set(personal.map((item) => item.pageId));
+    const shared: SearchResultItem[] = dedupSharedRowsAgainstPersonal(
+      sharedResults,
+      personalIds,
+    ).map((r) => {
       const preview = r.content_preview ?? "";
       const snippet = extractSmartSnippet(preview, keywords, 200);
       const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
       return {
         pageId: r.id,
-        // `note_id` は個人ページが混ざると null になり得るので undefined に正規化する。
-        // `note_id` may be null when personal pages are mixed into shared results.
         noteId: r.note_id ?? undefined,
         title: r.title ?? "無題のページ",
         snippet,
