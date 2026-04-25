@@ -119,6 +119,7 @@ function toBuffer(ydocState: unknown): Buffer | null {
 async function rewriteSourcePage(
   db: Database,
   sourcePageId: string,
+  renamedPageId: string,
   oldTitle: string,
   newTitle: string,
 ): Promise<{ changed: boolean; rewrite: RewriteResult }> {
@@ -154,7 +155,13 @@ async function rewriteSourcePage(
 
     const doc = new Y.Doc();
     Y.applyUpdate(doc, new Uint8Array(buffer));
-    const rewrite = rewriteTitleRefsInDoc(doc, oldTitle, newTitle);
+    // `renamedPageId` を渡すことで `targetId` 属性付きマークは ID 一致のみで
+    // 書き換える（issue #737）。`targetId` が無い旧マークはタイトル一致で
+    // フォールバック書き換えされる。
+    // Pass `renamedPageId` so marks carrying a `targetId` are rewritten only
+    // on id match (issue #737); legacy marks without `targetId` continue to
+    // use the title-only fallback (lazy migration).
+    const rewrite = rewriteTitleRefsInDoc(doc, oldTitle, newTitle, { renamedPageId });
     const hasChanges = rewrite.wikiLinkMarksUpdated > 0 || rewrite.tagMarksUpdated > 0;
     if (!hasChanges) {
       return { changed: false, rewrite };
@@ -330,7 +337,13 @@ export async function propagateTitleRename(
   for (const sourceId of uniqueSourceIds) {
     result.sourcePagesAttempted += 1;
     try {
-      const { changed, rewrite } = await rewriteSourcePage(db, sourceId, trimmedOld, trimmedNew);
+      const { changed, rewrite } = await rewriteSourcePage(
+        db,
+        sourceId,
+        renamedPageId,
+        trimmedOld,
+        trimmedNew,
+      );
       result.sourcePagesSucceeded += 1;
       result.wikiLinkMarksUpdated += rewrite.wikiLinkMarksUpdated;
       result.wikiLinkTextUpdated += rewrite.wikiLinkTextUpdated;

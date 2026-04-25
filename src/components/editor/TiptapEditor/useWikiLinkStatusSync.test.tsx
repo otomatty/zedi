@@ -17,14 +17,19 @@ vi.mock("@/hooks/usePageQueries", () => ({
   useWikiLinkExistsChecker: vi.fn(
     (options?: { notePages?: MockNotePage[]; pageNoteId?: string | null }) => ({
       checkExistence: vi.fn(async (titles: string[]) => {
-        const pageTitles = new Set(
-          (options?.pageNoteId ? (options.notePages ?? []) : []).map((page) =>
-            page.title.toLowerCase().trim(),
-          ),
+        const inScope = options?.pageNoteId ? (options.notePages ?? []) : [];
+        const pageTitles = new Set(inScope.map((page) => page.title.toLowerCase().trim()));
+        // issue #737: `pageTitleToId` を返すモック契約。テストは「resolution は
+        // するが id 解決は不要」のシナリオを想定しているため空 Map を返しても十分。
+        // Mock contract for issue #737. The current scenarios only assert
+        // exists/referenced changes, so an empty map is fine.
+        const pageTitleToId = new Map<string, string>(
+          inScope.map((page) => [page.title.toLowerCase().trim(), page.id]),
         );
         return {
           pageTitles,
           referencedTitles: new Set<string>(),
+          pageTitleToId,
         };
       }),
     }),
@@ -143,9 +148,12 @@ describe("useWikiLinkStatusSync", () => {
       await vi.advanceTimersByTimeAsync(150);
     });
 
+    // issue #737: 解決時には `targetId` も同時に payload に乗る。
+    // Resolution also writes `targetId` (issue #737).
     expect(chainApi.updateAttributes).toHaveBeenCalledWith("wikiLink", {
       exists: true,
       referenced: false,
+      targetId: "page-beta",
     });
     expect(wikiLinkMark.attrs.exists).toBe(true);
     expect(onChange).toHaveBeenCalledTimes(1);

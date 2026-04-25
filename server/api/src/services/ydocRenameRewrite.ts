@@ -5,18 +5,31 @@
  * Pure helper that rewrites WikiLink and tag marks inside a Y.Doc when the
  * referenced page title changes. Called from `titleRenamePropagationService`.
  *
- * 設計方針 / Design notes (issue #726):
- * - 対象: `wikiLink` マーク（`attrs.title`）と `tag` マーク（`attrs.name`）。
- * - マッチは小文字・前後スペース除去で大文字小文字・空白差異を吸収する。
- * - セグメントのテキストが旧タイトル（正規化済み）と一致する場合にのみ
- *   テキストを書き換える。一致しない場合は「手動で編集された」扱いで
- *   テキストはそのままにし、マーク属性だけ更新する。
+ * 設計方針 / Design notes (issue #726, updated for issue #737):
+ * - 対象: `wikiLink` マーク（`attrs.title` / `attrs.targetId`）と `tag` マーク
+ *   （`attrs.name` / `attrs.targetId`）。
+ * - マッチング優先順位:
+ *   1. マークが `targetId` 属性（UUID 文字列）を持つ場合は **id 一致のみ** で
+ *      書き換える（`renamedPageId` と一致したときに書き換え）。これにより
+ *      同名ページが共存していても誤書き換えを防ぐ（issue #737）。
+ *   2. `targetId` を持たない（旧データ・未解決状態）場合はタイトル/名前
+ *      文字列の一致でフォールバック書き換えを行う（既存挙動 / lazy migration）。
+ * - セグメントのテキストは旧タイトル（正規化済み）と一致する場合にのみ書き換える。
+ *   一致しない場合は「手動で編集された」扱いでテキストはそのまま、マーク属性だけ
+ *   更新する。
  * - タグ書き換えは新タイトルがタグ名として有効な文字集合（`tagUtils.ts` の
  *   `TAG_PASTE_REGEX` に準拠）のときだけ行う。スペースや無効文字を含む
  *   タイトルへ追従するとタグが壊れるため。
  *
- * - Targets `wikiLink` marks (keyed on `attrs.title`) and `tag` marks
- *   (keyed on `attrs.name`).
+ * - Targets `wikiLink` marks (`attrs.title` / `attrs.targetId`) and `tag`
+ *   marks (`attrs.name` / `attrs.targetId`).
+ * - Match precedence:
+ *   1. When the mark carries a `targetId` (UUID string), only rewrite when
+ *      `targetId === renamedPageId`. This avoids same-title pages being
+ *      rewritten in lockstep (issue #737).
+ *   2. Otherwise (no `targetId` — pre-issue-#737 data or unresolved marks),
+ *      fall back to title/name string matching (legacy behaviour, lazy
+ *      migration so older docs still rewrite).
  * - Matching is case/whitespace insensitive to line up with `wikiLinkUtils`
  *   / `tagUtils` client-side normalization.
  * - Segment text is replaced only when it matches the old title after
@@ -45,15 +58,35 @@ export interface RewriteResult {
 }
 
 /**
- * タグ名として許容する文字集合。`src/lib/tagUtils.ts` の `TAG_PASTE_REGEX`
- * と同じ字種（英数字・アンダースコア・ハイフン + ひらがな／カタカナ／CJK）
- * を想定している。`TAG_PASTE_REGEX` が変わったらここも更新する必要がある。
+ * タグ名として許容する文字集合（正規表現の文字クラス内側のみ）。クライアント
+ * 側の `@zedi/shared/tagCharacterClass` (`TAG_NAME_CHAR_CLASS`) と同一文字列で
+ * なければならない。`server/api` はワークスペース外で独自の `bun.lock` を持つ
+ * (Railway 単一 build context) ため `@zedi/shared` を直接 import できない。
+ * 代わりに `src/lib/tagCharacterClassSync.test.ts` がクライアント側の vitest
+ * で本ファイルを `fs.readFileSync` し、文字列一致を CI で検証する。本定数を
+ * 編集する場合は `packages/shared/src/tagCharacterClass.ts` も同時に更新する
+ * こと。
  *
- * Allowed characters for a tag name. Mirrors `TAG_PASTE_REGEX` in
- * `src/lib/tagUtils.ts` (alphanumerics, underscore, hyphen, plus hiragana /
- * katakana / CJK). Keep the two in sync if the client-side regex changes.
+ * Allowed characters for a tag name (inner contents of a regex character
+ * class). MUST stay byte-equal to `TAG_NAME_CHAR_CLASS` in
+ * `@zedi/shared/tagCharacterClass`. `server/api` is intentionally outside the
+ * Bun workspace (its own `bun.lock` is the Railway build context), so it
+ * cannot import `@zedi/shared` directly. The client-side vitest file
+ * `src/lib/tagCharacterClassSync.test.ts` reads this file via
+ * `fs.readFileSync` and asserts both literals match in CI. When editing this
+ * constant, update `packages/shared/src/tagCharacterClass.ts` in lockstep.
  */
-const VALID_TAG_NAME_REGEX = /^[A-Za-z0-9_\-぀-ヿ㐀-鿿]+$/;
+export const TAG_NAME_CHAR_CLASS_STRING = "A-Za-z0-9_\\-぀-ヿ㐀-鿿";
+
+// ReDoS 安全 / ReDoS-safe:
+// `TAG_NAME_CHAR_CLASS_STRING` はハードコードされた定数（外部入力ではない）。
+// パターンは `^[...]+$` のみで、ネストした量指定子・代替も無いため
+// 入力長に対して線形時間。静的解析ツールが警告を出した場合は誤検知。
+// `TAG_NAME_CHAR_CLASS_STRING` is a hardcoded constant (never user input).
+// The pattern is a single anchored character class with one quantifier and
+// no nested quantifiers / alternations, so matching is linear in input
+// length. Static-analysis ReDoS warnings on this regex are false positives.
+const VALID_TAG_NAME_REGEX = new RegExp(`^[${TAG_NAME_CHAR_CLASS_STRING}]+$`);
 
 function normalizeTitle(value: string): string {
   return value.toLowerCase().trim();
@@ -92,20 +125,70 @@ interface SegmentPlan {
   tagMark: Record<string, unknown> | null;
 }
 
+/**
+ * `targetId` 属性が UUID 文字列として有効か判定するヘルパー。空文字や非文字列、
+ * 純粋な空白は「id 無し」として扱い、タイトル一致 fallback の対象にする。
+ *
+ * Decide whether `targetId` is a usable UUID string. Empty / non-string /
+ * whitespace-only values fall back to the legacy title-matching path so
+ * pre-issue-#737 marks still propagate.
+ */
+function isUsableTargetId(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * 旧データ／未解決マークかを判定する。`targetId` を持たない場合のみ
+ * タイトル一致 fallback を許可する（issue #737 lazy migration）。
+ *
+ * Detect a legacy / unresolved mark. Only marks without a usable `targetId`
+ * are allowed to match by title (issue #737 lazy migration).
+ */
+function shouldUseTitleFallback(mark: Record<string, unknown>): boolean {
+  return !isUsableTargetId(mark.targetId);
+}
+
 function planSegment(
   attributes: Record<string, unknown>,
   normalizedOld: string,
   allowTagRewrite: boolean,
+  renamedPageId: string | null,
 ): SegmentPlan {
   const wikiLinkMark = isPlainObject(attributes.wikiLink) ? attributes.wikiLink : null;
   const tagMark = isPlainObject(attributes.tag) ? attributes.tag : null;
   const wikiTitle = wikiLinkMark ? extractStringAttr(wikiLinkMark.title) : null;
   const tagName = tagMark ? extractStringAttr(tagMark.name) : null;
+
+  // `targetId` を持つマークは ID 一致のみで判定する。同名ページの誤書き換え
+  // (issue #737) を防ぐため、`targetId` が renamedPageId と異なる場合は
+  // 例えタイトルが一致していても書き換えない。`targetId` が無いマークだけが
+  // タイトル一致 fallback の対象（lazy migration）。
+  // Marks carrying a `targetId` are matched strictly by id. Even if the
+  // title also matches, a non-matching id means the mark targets a different
+  // (same-titled) page and must not be rewritten. Only id-less marks fall
+  // back to title matching (legacy / lazy migration).
+  const wikiHasFallback = wikiLinkMark !== null && shouldUseTitleFallback(wikiLinkMark);
+  const tagHasFallback = tagMark !== null && shouldUseTitleFallback(tagMark);
+
+  const wikiIdMatches =
+    wikiLinkMark !== null &&
+    renamedPageId !== null &&
+    isUsableTargetId(wikiLinkMark.targetId) &&
+    wikiLinkMark.targetId === renamedPageId;
+  const tagIdMatches =
+    tagMark !== null &&
+    renamedPageId !== null &&
+    isUsableTargetId(tagMark.targetId) &&
+    tagMark.targetId === renamedPageId;
+
+  const wikiTitleMatches = wikiTitle !== null && normalizeTitle(wikiTitle) === normalizedOld;
+  const tagTitleMatches = tagName !== null && normalizeTitle(tagName) === normalizedOld;
+
   return {
     wikiLinkMark,
     tagMark,
-    wikiMatches: wikiTitle !== null && normalizeTitle(wikiTitle) === normalizedOld,
-    tagMatches: tagName !== null && allowTagRewrite && normalizeTitle(tagName) === normalizedOld,
+    wikiMatches: wikiIdMatches || (wikiHasFallback && wikiTitleMatches),
+    tagMatches: allowTagRewrite && (tagIdMatches || (tagHasFallback && tagTitleMatches)),
   };
 }
 
@@ -135,6 +218,7 @@ function rewriteText(
   oldTitle: string,
   newTitle: string,
   allowTagRewrite: boolean,
+  renamedPageId: string | null,
   result: RewriteResult,
 ): void {
   const delta = text.toDelta() as Array<unknown>;
@@ -164,7 +248,7 @@ function rewriteText(
       continue;
     }
 
-    const plan = planSegment(attributes, normalizedOld, allowTagRewrite);
+    const plan = planSegment(attributes, normalizedOld, allowTagRewrite, renamedPageId);
     if (!plan.wikiMatches && !plan.tagMatches) {
       offset += length;
       continue;
@@ -210,6 +294,7 @@ function walk(
   oldTitle: string,
   newTitle: string,
   allowTagRewrite: boolean,
+  renamedPageId: string | null,
   result: RewriteResult,
 ): void {
   // `node.get(i)` は Yjs の連結リストを頭から辿るため O(i)。インデックス
@@ -221,9 +306,9 @@ function walk(
   const children = node.toArray() as XmlNode[];
   for (const child of children) {
     if (child instanceof Y.XmlText) {
-      rewriteText(child, oldTitle, newTitle, allowTagRewrite, result);
+      rewriteText(child, oldTitle, newTitle, allowTagRewrite, renamedPageId, result);
     } else if (child instanceof Y.XmlElement) {
-      walk(child, oldTitle, newTitle, allowTagRewrite, result);
+      walk(child, oldTitle, newTitle, allowTagRewrite, renamedPageId, result);
     }
     // Y.XmlHook は Tiptap のスキーマで通常使わないためスキップする。
     // Y.XmlHook is not used by Tiptap's default schema, so skip it.
@@ -231,26 +316,90 @@ function walk(
 }
 
 /**
+ * `rewriteTitleRefsInDoc` のオプション。`renamedPageId` を渡せるようにし、
+ * `targetId` 属性ベースの厳密マッチを有効化する（issue #737）。
+ *
+ * Options for `rewriteTitleRefsInDoc`. `renamedPageId` enables strict
+ * `targetId`-based matching introduced for issue #737.
+ */
+export interface RewriteTitleRefsOptions {
+  /**
+   * リネーム対象ページの UUID。マークが `targetId` 属性を持つ場合は ID 一致で
+   * のみ書き換える（同名ページの誤書き換えを防ぐ）。`null` / 省略時は、
+   * `targetId` を **持たない** マークだけがタイトル一致 fallback で書き換わる。
+   * 一方、`targetId` を持つマークは検証手段が無いため安全側に倒して **書き換え
+   * ない**（誤書き換え防止 / issue #737）。
+   *
+   * UUID of the renamed page. When provided, marks carrying a `targetId`
+   * attribute are rewritten only on id match — preventing same-title pages
+   * from being rewritten in lockstep. When `null`/omitted, only marks
+   * **without** a usable `targetId` fall back to legacy title-only matching;
+   * marks that already carry a `targetId` are **skipped** because their
+   * target cannot be verified safely (issue #737).
+   */
+  renamedPageId?: string | null;
+  /**
+   * 対象 XmlFragment 名。Tiptap の既定値 `"default"`。テスト用途以外では
+   * 通常変更しない。
+   *
+   * Target XmlFragment name; Tiptap default `"default"`. Tests rarely need
+   * to override this.
+   */
+  fragmentName?: string;
+}
+
+/**
  * `doc` 内の WikiLink / タグマークについて、旧タイトル `oldTitle` を参照
  * しているものを新タイトル `newTitle` へ書き換える。テキストノードは
  * セグメントのテキストが旧タイトルと一致する場合のみ書き換える。
+ *
+ * `options.renamedPageId` を指定すると、`targetId` 属性を持つマークは ID
+ * 一致でのみ書き換える（同名ページの誤書き換えを防ぐ・issue #737）。
+ * `targetId` を持たない既存マークは従来通りタイトル一致でフォールバックする
+ * （lazy migration）。
  *
  * Rewrite WikiLink and tag marks in `doc` whose target matches `oldTitle`
  * so they point at `newTitle`. Segment text is only rewritten when it
  * matches the old title (so user-edited link text is preserved).
  *
+ * Passing `options.renamedPageId` switches marks that carry a `targetId`
+ * attribute to id-strict matching (preventing same-title-page collisions —
+ * issue #737). Marks without a `targetId` continue to match by title
+ * (legacy / lazy migration).
+ *
+ * 後方互換 / Backward compatibility:
+ * 第 4 引数は旧 API では `fragmentName: string` だった。文字列を渡された場合は
+ * `{ fragmentName }` として解釈し、issue #737 以前の呼び出し元が静かに既定
+ * フラグメントへ書き換わってしまうのを防ぐ。
+ * The fourth argument used to be a `fragmentName` string. When a string is
+ * passed it is interpreted as `{ fragmentName }`, so pre-issue-#737 callers
+ * are not silently retargeted at the default fragment.
+ *
  * @param doc - 書き換え対象の Y.Doc / the Y.Doc to mutate.
  * @param oldTitle - 旧ページタイトル / previous page title.
  * @param newTitle - 新ページタイトル / new page title.
- * @param fragmentName - 対象 XmlFragment 名（デフォルト `"default"`）/ fragment name (default `"default"`).
+ * @param optionsOrFragmentName - 任意オプション、または旧 API の fragmentName
+ *   文字列 / either the new options object or the legacy `fragmentName`
+ *   string (kept for backward compatibility).
  * @returns 書き換え件数 / counts of what was rewritten.
  */
 export function rewriteTitleRefsInDoc(
   doc: Y.Doc,
   oldTitle: string,
   newTitle: string,
-  fragmentName = "default",
+  optionsOrFragmentName: RewriteTitleRefsOptions | string = {},
 ): RewriteResult {
+  // 旧 4-arg 形式 (`fragmentName` 文字列) を `{ fragmentName }` に正規化する。
+  // 文字列をそのまま `options` として読むと `"foo".fragmentName` が undefined
+  // になり、既定フラグメントを書き換えてしまう静かな破壊が発生する。
+  // Normalize the legacy 4-arg form (`fragmentName` string) into the options
+  // shape. Reading a raw string as `options` would silently retarget the
+  // default fragment because `"foo".fragmentName === undefined`.
+  const options: RewriteTitleRefsOptions =
+    typeof optionsOrFragmentName === "string"
+      ? { fragmentName: optionsOrFragmentName }
+      : optionsOrFragmentName;
+
   const result: RewriteResult = {
     wikiLinkMarksUpdated: 0,
     wikiLinkTextUpdated: 0,
@@ -262,10 +411,12 @@ export function rewriteTitleRefsInDoc(
   if (normalizeTitle(oldTitle) === normalizeTitle(newTitle)) return result;
 
   const allowTagRewrite = VALID_TAG_NAME_REGEX.test(newTitle);
+  const fragmentName = options.fragmentName ?? "default";
+  const renamedPageId = isUsableTargetId(options.renamedPageId) ? options.renamedPageId : null;
   const fragment = doc.getXmlFragment(fragmentName);
 
   doc.transact(() => {
-    walk(fragment, oldTitle, newTitle, allowTagRewrite, result);
+    walk(fragment, oldTitle, newTitle, allowTagRewrite, renamedPageId, result);
   }, "rename-propagation");
 
   return result;

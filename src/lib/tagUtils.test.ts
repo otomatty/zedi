@@ -256,6 +256,54 @@ describe("updateTagAttributes", () => {
     expect(result.content).toBe(bad);
     expect(result.hasChanges).toBe(false);
   });
+
+  describe("targetId plumbing (issue #737)", () => {
+    // `pageTitleToId` を渡すと resolved タグに `targetId` を埋める。
+    // Pin the `targetId` plumbing introduced for issue #737.
+    const TARGET_ID = "11111111-aaaa-bbbb-cccc-000000000001";
+
+    function buildContent(extraAttrs: Record<string, unknown> = {}): string {
+      return JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "tech",
+                marks: [
+                  {
+                    type: "tag",
+                    attrs: { name: "tech", exists: false, referenced: false, ...extraAttrs },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    }
+
+    it("populates targetId when pageTitleToId is provided and tag resolves", () => {
+      const content = buildContent();
+      const map = new Map([["tech", TARGET_ID]]);
+      const result = updateTagAttributes(content, new Set(["tech"]), new Set(), map);
+      expect(result.hasChanges).toBe(true);
+      const attrs = JSON.parse(result.content).content[0].content[0].marks[0].attrs;
+      expect(attrs.exists).toBe(true);
+      expect(attrs.targetId).toBe(TARGET_ID);
+    });
+
+    it("leaves targetId untouched when pageTitleToId is omitted", () => {
+      // 既存マークの `targetId` は触らない契約を固定する。
+      // Pin that omitting the map preserves any pre-existing id.
+      const content = buildContent({ targetId: "preexisting-id" });
+      const result = updateTagAttributes(content, new Set(["tech"]), new Set());
+      const attrs = JSON.parse(result.content).content[0].content[0].marks[0].attrs;
+      expect(attrs.targetId).toBe("preexisting-id");
+    });
+  });
 });
 
 describe("getUniqueTagNames", () => {

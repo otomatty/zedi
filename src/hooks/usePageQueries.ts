@@ -807,9 +807,25 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
     ): Promise<{
       pageTitles: Set<string>;
       referencedTitles: Set<string>;
+      /**
+       * 正規化済みタイトル → ターゲットページ id のマップ。同一スコープ内に
+       * 同名ページが複数あった場合は **最後に出現したページの id** が残る
+       * （Map への上書き）。`useWikiLinkStatusSync` / `useTagStatusSync` が
+       * `targetId` 属性を埋めるためだけに使う（issue #737 / 案 A）。
+       *
+       * Normalized title → target page id map. With duplicate titles inside
+       * the same scope the **last write wins** (Map overwrite). Used by the
+       * status-sync hooks to populate the `targetId` attribute on resolved
+       * marks (issue #737, approach A).
+       */
+      pageTitleToId: Map<string, string>;
     }> => {
       if (!isLoaded || titles.length === 0) {
-        return { pageTitles: new Set(), referencedTitles: new Set() };
+        return {
+          pageTitles: new Set(),
+          referencedTitles: new Set(),
+          pageTitleToId: new Map(),
+        };
       }
 
       const repo = await getRepository();
@@ -821,15 +837,27 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
       // Select the candidate source based on scope (issue #713 Phase 4).
       // If note-scope candidates have not loaded yet, return empty sets so
       // we do not mis-classify valid same-note links as missing on this pass.
-      let pageTitles: Set<string>;
-      if (pageNoteId !== null) {
-        if (notePages === undefined) {
-          return { pageTitles: new Set(), referencedTitles: new Set() };
-        }
-        pageTitles = new Set(notePages.map((p) => p.title.toLowerCase().trim()));
-      } else {
-        const pages = await repo.getPagesSummary(userId);
-        pageTitles = new Set(pages.map((p) => p.title.toLowerCase().trim()));
+      const sourcePages = pageNoteId !== null ? notePages : await repo.getPagesSummary(userId);
+      if (pageNoteId !== null && sourcePages === undefined) {
+        return {
+          pageTitles: new Set(),
+          referencedTitles: new Set(),
+          pageTitleToId: new Map(),
+        };
+      }
+
+      // 単一ループで `pageTitles` と `pageTitleToId` を構築する。`.map()` で
+      // Set を作ってから別ループで Map を埋める旧実装は冗長で、データに対する
+      // 走査が 2 回発生していた（Gemini レビュー指摘）。
+      // Single pass populates both `pageTitles` and `pageTitleToId`. The
+      // earlier shape used `.map()` to seed the Set and a separate loop for
+      // the Map, walking the same data twice (Gemini review feedback).
+      const pageTitles = new Set<string>();
+      const pageTitleToId = new Map<string, string>();
+      for (const p of sourcePages ?? []) {
+        const normalized = p.title.toLowerCase().trim();
+        pageTitles.add(normalized);
+        pageTitleToId.set(normalized, p.id);
       }
 
       // Get ghost links to check referenced status. ノートスコープのゴースト
@@ -862,7 +890,7 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
         }
       }
 
-      return { pageTitles, referencedTitles };
+      return { pageTitles, referencedTitles, pageTitleToId };
     },
     [getRepository, userId, isLoaded, pageNoteId, notePages],
   );

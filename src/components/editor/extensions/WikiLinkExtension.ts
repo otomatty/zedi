@@ -53,7 +53,11 @@ export interface WikiLinkOptions {
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     wikiLink: {
-      setWikiLink: (attributes: { title: string; exists: boolean }) => ReturnType;
+      setWikiLink: (attributes: {
+        title: string;
+        exists: boolean;
+        targetId?: string | null;
+      }) => ReturnType;
       unsetWikiLink: () => ReturnType;
     };
   }
@@ -98,6 +102,31 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
           "data-referenced": String(attributes.referenced),
         }),
       },
+      /**
+       * 解決済みターゲットページの UUID。リンクが既存ページに解決されたタイミング
+       * (`useWikiLinkStatusSync`) で埋められ、リネーム伝播（issue #737 / `ydocRenameRewrite`）
+       * がタイトル文字列ではなく ID 一致で対象を特定できるようにする。未解決の
+       * 段階や旧データでは `null` で、この場合の伝播はタイトル文字列にフォール
+       * バックする（後方互換のため）。
+       *
+       * Resolved target page UUID. Filled in by `useWikiLinkStatusSync` once
+       * the link resolves to an existing page so rename propagation
+       * (issue #737 / `ydocRenameRewrite`) can match by id instead of by
+       * title string — preventing same-title pages from being rewritten in
+       * lockstep. `null` for unresolved or pre-issue-#737 marks; the
+       * rewriter falls back to title matching in that case.
+       */
+      targetId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-target-id"),
+        renderHTML: (attributes) => {
+          const value = attributes.targetId;
+          if (typeof value !== "string" || value.length === 0) {
+            return {};
+          }
+          return { "data-target-id": value };
+        },
+      },
     };
   },
 
@@ -141,7 +170,7 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
           // match[0] is the full `[[Title]]` literal; extract only the title.
           const title = extractWikiLinkTitle(match[0] ?? "");
           if (!title) return false;
-          return { title, exists: false, referenced: false };
+          return { title, exists: false, referenced: false, targetId: null };
         },
       }),
     ];
