@@ -68,25 +68,32 @@ export default function SearchResults() {
         };
       });
 
-    const shared: SearchResultItem[] = sharedResults.map((r) => {
-      const preview = r.content_preview ?? "";
-      const snippet = extractSmartSnippet(preview, keywords, 200);
-      const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
-      return {
-        pageId: r.id,
-        // `note_id` は個人ページが混ざると null になり得るので undefined に正規化する。
-        // `note_id` may be null when personal pages are mixed into shared results.
-        noteId: r.note_id ?? undefined,
-        title: r.title ?? "無題のページ",
-        snippet,
-        highlightedSnippet,
-        matchType: "content" as MatchType,
-        sourceUrl: r.source_url ?? undefined,
-        thumbnailUrl: r.thumbnail_url ?? undefined,
-        updatedAt: new Date(r.updated_at).getTime(),
-        score: 0,
-      };
-    });
+    // Issue #718 Phase 5-4: shared 側の個人ページ (`note_id IS NULL`) は
+    // `useSearchPages`（IDB）からの personal 結果と重複するため除外する。
+    // ここで残るのはノートネイティブのみ (`note_id !== null`)。
+    //
+    // Issue #718 Phase 5-4: drop personal pages from the shared response —
+    // they are already covered by the personal results from `useSearchPages`.
+    // Only note-native rows (`note_id !== null`) survive here.
+    const shared: SearchResultItem[] = sharedResults
+      .filter((r) => r.note_id !== null)
+      .map((r) => {
+        const preview = r.content_preview ?? "";
+        const snippet = extractSmartSnippet(preview, keywords, 200);
+        const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
+        return {
+          pageId: r.id,
+          noteId: r.note_id ?? undefined,
+          title: r.title ?? "無題のページ",
+          snippet,
+          highlightedSnippet,
+          matchType: "content" as MatchType,
+          sourceUrl: r.source_url ?? undefined,
+          thumbnailUrl: r.thumbnail_url ?? undefined,
+          updatedAt: new Date(r.updated_at).getTime(),
+          score: 0,
+        };
+      });
 
     return [...personal, ...shared].sort((a, b) => b.score - a.score);
   }, [personalResults, sharedResults, searchQuery, keywords]);

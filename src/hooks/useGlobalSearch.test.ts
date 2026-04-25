@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { searchPages } from "./useGlobalSearch";
+import { searchPages, buildGlobalSearchResults } from "./useGlobalSearch";
 import type { Page } from "@/types/page";
+import type { SearchSharedResponse } from "@/lib/api/types";
 import { createPlainTextContent } from "@/test/testDatabase";
+import { parseSearchQuery } from "@/lib/searchUtils";
 
 // Helper to create a test page
 function createTestPage(id: string, title: string, content: string, options?: Partial<Page>): Page {
@@ -260,6 +262,111 @@ describe("searchPages", () => {
       expect(results).toHaveLength(1);
       // highlightedText should contain the highlighted keyword
       expect(results[0].highlightedText).toContain("【(special)】");
+    });
+  });
+});
+
+/**
+ * 共有検索の row 雛形を作るテストヘルパー。サーバーは個人ページも `note_id IS NULL`
+ * で返してくる仕様 (Issue #718 Phase 5-1) なので、両方のケースを並べて検証できる
+ * よう `note_id` を任意で受け取る。
+ *
+ * Test helper that builds a `SearchSharedResponse` row. The server still
+ * returns personal pages with `note_id: null` under `scope=shared`, so the
+ * tests below need to construct both shapes side-by-side.
+ */
+function createSharedRow(
+  overrides: Partial<SearchSharedResponse["results"][number]> &
+    Pick<SearchSharedResponse["results"][number], "id">,
+): SearchSharedResponse["results"][number] {
+  return {
+    id: overrides.id,
+    note_id: null,
+    owner_id: "u1",
+    title: "shared",
+    content_preview: "preview",
+    thumbnail_url: null,
+    source_url: null,
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+describe("buildGlobalSearchResults", () => {
+  /**
+   * Issue #718 Phase 5-4: shared 結果に混ざる個人ページ (`note_id IS NULL`) は、
+   * 個人 IDB 由来の personal 結果と重複するため `buildGlobalSearchResults` で
+   * 落とす。merged 結果には `noteId` 付きのノートネイティブだけが残ることを確認する。
+   *
+   * Phase 5-4: shared rows whose `note_id` is null are personal pages that the
+   * server still returns under `scope=shared`. They must be dropped to avoid
+   * double-counting personal results from the IDB path.
+   */
+  describe("Issue #718 Phase 5-4: dedup", () => {
+    it("drops shared rows with note_id === null (already covered by personal)", () => {
+      const query = "alpha";
+      const keywords = parseSearchQuery(query);
+      const personal: Page[] = [];
+      const shared = [
+        createSharedRow({ id: "personal-leak", note_id: null, title: "alpha personal" }),
+        createSharedRow({ id: "note-native", note_id: "note-1", title: "alpha note" }),
+      ];
+
+      const results = buildGlobalSearchResults(personal, shared, query, keywords);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].pageId).toBe("note-native");
+      expect(results[0].noteId).toBe("note-1");
+    });
+
+    it("does not double-list a page that appears in both personal and shared (note_id null)", () => {
+      const query = "alpha";
+      const keywords = parseSearchQuery(query);
+      const now = Date.now();
+      const personal: Page[] = [
+        {
+          id: "p1",
+          ownerUserId: "u1",
+          noteId: null,
+          title: "alpha",
+          content: createPlainTextContent("body"),
+          createdAt: now,
+          updatedAt: now,
+          isDeleted: false,
+        },
+      ];
+      const shared = [
+        createSharedRow({ id: "p1", note_id: null, title: "alpha" }),
+        createSharedRow({ id: "p2", note_id: "note-1", title: "alpha note" }),
+      ];
+
+      const results = buildGlobalSearchResults(personal, shared, query, keywords);
+
+      const ids = results.map((r) => r.pageId).sort();
+      // `p1` だけが personal 由来で 1 回、`p2` がノート由来で 1 回。
+      // `p1` only appears once (personal), `p2` once (shared note-native).
+      expect(ids).toEqual(["p1", "p2"]);
+    });
+
+    it("keeps note-native shared rows with their noteId for canonical /notes/:noteId/:pageId routing", () => {
+      const query = "alpha";
+      const keywords = parseSearchQuery(query);
+      const shared = [createSharedRow({ id: "p3", note_id: "note-9", title: "alpha shared" })];
+
+      const results = buildGlobalSearchResults([], shared, query, keywords);
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        pageId: "p3",
+        noteId: "note-9",
+      });
+    });
+
+    it("returns empty when query is shorter than 3 chars", () => {
+      const query = "ab";
+      const shared = [createSharedRow({ id: "p1", note_id: "n1" })];
+      const results = buildGlobalSearchResults([], shared, query, parseSearchQuery(query));
+      expect(results).toEqual([]);
     });
   });
 });
