@@ -4,7 +4,13 @@
  */
 
 /**
+ * 同期・描画フローで扱う WikiLink マークの最小形。`exists` は同名ページが
+ * 解決可能かどうか、`referenced` は他ページからゴーストリンクで参照されて
+ * いるかを表す。
  *
+ * Minimal shape of a WikiLink consumed by sync / render flows. `exists`
+ * indicates whether a same-titled page resolves; `referenced` tracks ghost
+ * references from other pages.
  */
 export interface WikiLinkInfo {
   title: string;
