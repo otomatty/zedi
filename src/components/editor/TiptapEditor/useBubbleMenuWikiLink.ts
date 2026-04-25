@@ -16,6 +16,26 @@ export interface UseBubbleMenuWikiLinkOptions {
 }
 
 /**
+ * `useBubbleMenuWikiLink` の戻り値。バブルメニューが必要とする状態と
+ * コマンドを公開契約として固定する（CodeRabbit レビュー指摘 / 戦略的
+ * `any` 禁止に従い、戻り値の型を明示）。
+ *
+ * Return shape of {@link useBubbleMenuWikiLink}. Fixes the public contract
+ * so downstream consumers stay stable as the payload evolves (per CodeRabbit
+ * review and the project's "no inferred public types" rule).
+ */
+export interface UseBubbleMenuWikiLinkResult {
+  /** True while the current selection sits inside a `wikiLink` mark. */
+  isWikiLinkSelection: boolean;
+  /** Convert the current selection text into a `[[Title]]` WikiLink mark. */
+  convertToWikiLink: () => Promise<void>;
+  /** Remove the `wikiLink` mark from the current selection. */
+  unsetWikiLink: () => void;
+  /** True while {@link UseBubbleMenuWikiLinkResult.convertToWikiLink} is running. */
+  isConverting: boolean;
+}
+
+/**
  * バブルメニューの「WikiLink に変換」操作を提供するフック。選択中テキストを
  * `[[Title]]` マークに変換し、解決済みのターゲットページがあれば `targetId`
  * 属性も埋める（issue #737）。
@@ -25,7 +45,10 @@ export interface UseBubbleMenuWikiLinkOptions {
  * existing page, populates the `targetId` attribute (issue #737) so future
  * rename propagation can disambiguate same-title pages by id.
  */
-export function useBubbleMenuWikiLink({ editor, pageId }: UseBubbleMenuWikiLinkOptions) {
+export function useBubbleMenuWikiLink({
+  editor,
+  pageId,
+}: UseBubbleMenuWikiLinkOptions): UseBubbleMenuWikiLinkResult {
   const { checkExistence } = useWikiLinkExistsChecker();
   const [isConverting, setIsConverting] = useState(false);
   const convertingRef = useRef(false);

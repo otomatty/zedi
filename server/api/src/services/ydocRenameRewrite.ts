@@ -78,6 +78,14 @@ export interface RewriteResult {
  */
 export const TAG_NAME_CHAR_CLASS_STRING = "A-Za-z0-9_\\-぀-ヿ㐀-鿿";
 
+// ReDoS 安全 / ReDoS-safe:
+// `TAG_NAME_CHAR_CLASS_STRING` はハードコードされた定数（外部入力ではない）。
+// パターンは `^[...]+$` のみで、ネストした量指定子・代替も無いため
+// 入力長に対して線形時間。静的解析ツールが警告を出した場合は誤検知。
+// `TAG_NAME_CHAR_CLASS_STRING` is a hardcoded constant (never user input).
+// The pattern is a single anchored character class with one quantifier and
+// no nested quantifiers / alternations, so matching is linear in input
+// length. Static-analysis ReDoS warnings on this regex are false positives.
 const VALID_TAG_NAME_REGEX = new RegExp(`^[${TAG_NAME_CHAR_CLASS_STRING}]+$`);
 
 function normalizeTitle(value: string): string {

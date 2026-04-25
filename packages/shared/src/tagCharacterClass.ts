@@ -15,9 +15,14 @@
  * 含まれる字種 / Included scripts:
  * - 半角英数字: `A-Za-z0-9`
  * - 区切り: アンダースコア `_`、ハイフン `-`
- * - ひらがな: U+3040..U+309F (`぀-ヿ` の前半)
- * - カタカナ: U+30A0..U+30FF (`぀-ヿ` の後半)
+ * - ひらがな (Hiragana, Unicode block U+3040..U+309F)
+ * - カタカナ (Katakana, Unicode block U+30A0..U+30FF)
+ *   ひらがなとカタカナは別ブロックだが、`぀-ヿ` (U+3040..U+30FF) の単一範囲で
+ *   両ブロックを連続して覆える。
+ *   Hiragana and Katakana are distinct Unicode blocks but the single range
+ *   `぀-ヿ` (U+3040..U+30FF) covers both contiguously.
  * - CJK 統合漢字 + 拡張 A: U+3400..U+9FFF (`㐀-鿿`)
+ *   CJK Unified Ideographs + Extension A.
  *
  * 同期義務 / Sync obligation:
  * - 本ファイルを編集したら、`server/api/src/services/ydocRenameRewrite.ts`

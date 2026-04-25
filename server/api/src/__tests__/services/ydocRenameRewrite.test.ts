@@ -403,6 +403,46 @@ describe("rewriteTitleRefsInDoc", () => {
       expect(result.wikiLinkMarksUpdated).toBe(1);
       expect(plainText(text)).toBe("Bar");
     });
+
+    // タグマーク版の fallback 挙動パリティ。同じ 2 ケースを `tag` マーク側でも
+    // 保証する（CodeRabbit レビュー指摘）。`tag` 単独でリグレッションが
+    // 入らないようテスト面でも `wikiLink` と同等の網を張る。
+    // Tag-mark parity for the two `renamedPageId`-omitted fallback branches
+    // (CodeRabbit review). Mirrors the wikiLink coverage so a tag-only
+    // regression cannot slip past the suite.
+    it("skips tag marks that carry a targetId when renamedPageId is omitted", () => {
+      const { doc, text } = buildDocWithParagraph([
+        {
+          insert: "foo",
+          attributes: {
+            tag: { name: "foo", exists: true, referenced: false, targetId: OTHER_PAGE_ID },
+          },
+        },
+      ]);
+
+      const result = rewriteTitleRefsInDoc(doc, "foo", "bar");
+
+      expect(result.tagMarksUpdated).toBe(0);
+      expect(result.tagTextUpdated).toBe(0);
+      expect(plainText(text)).toBe("foo");
+    });
+
+    it("keeps rewriting id-less tag marks by name even when renamedPageId is omitted", () => {
+      const { doc, text } = buildDocWithParagraph([
+        {
+          insert: "foo",
+          attributes: {
+            tag: { name: "foo", exists: true, referenced: false },
+          },
+        },
+      ]);
+
+      const result = rewriteTitleRefsInDoc(doc, "foo", "bar");
+
+      expect(result.tagMarksUpdated).toBe(1);
+      expect(result.tagTextUpdated).toBe(1);
+      expect(plainText(text)).toBe("bar");
+    });
   });
 
   describe("Guards and edge cases", () => {
