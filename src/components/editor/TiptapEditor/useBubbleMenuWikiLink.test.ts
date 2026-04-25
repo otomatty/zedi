@@ -49,7 +49,15 @@ function createMockEditor(options: {
 describe("useBubbleMenuWikiLink", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCheckExistence.mockResolvedValue({ pageTitles: new Set(), referencedTitles: new Set() });
+    // issue #737: 既定モックは `pageTitleToId` を空 Map で返す。個別テストが
+    // resolved 経路を試したい場合は `mockResolvedValue` を上書きする。
+    // Default mock returns an empty `pageTitleToId` (issue #737); tests that
+    // exercise the resolved branch override `mockResolvedValue` directly.
+    mockCheckExistence.mockResolvedValue({
+      pageTitles: new Set(),
+      referencedTitles: new Set(),
+      pageTitleToId: new Map(),
+    });
   });
 
   it("returns isWikiLinkSelection false when editor is not in wikiLink", () => {
@@ -99,7 +107,7 @@ describe("useBubbleMenuWikiLink", () => {
         marks: [
           {
             type: "wikiLink",
-            attrs: { title: "New Page", exists: false, referenced: false },
+            attrs: { title: "New Page", exists: false, referenced: false, targetId: null },
           },
         ],
         text: "[[New Page]]",
@@ -108,10 +116,13 @@ describe("useBubbleMenuWikiLink", () => {
     expect(editor.chainReturn.run).toHaveBeenCalled();
   });
 
-  it("convertToWikiLink uses exists and referenced from checkExistence", async () => {
+  it("convertToWikiLink uses exists, referenced, and targetId from checkExistence", async () => {
+    // issue #737: 解決済みターゲットの id を `targetId` 属性に埋める。
+    // Resolved target id is written into the `targetId` attribute (issue #737).
     mockCheckExistence.mockResolvedValue({
       pageTitles: new Set(["existing page"]),
       referencedTitles: new Set(["existing page"]),
+      pageTitleToId: new Map([["existing page", "page-existing-id"]]),
     });
     const editor = createMockEditor({ textBetween: "Existing Page" });
     const { result } = renderHook(() => useBubbleMenuWikiLink({ editor, pageId: "p1" }));
@@ -126,7 +137,12 @@ describe("useBubbleMenuWikiLink", () => {
         marks: [
           {
             type: "wikiLink",
-            attrs: { title: "Existing Page", exists: true, referenced: true },
+            attrs: {
+              title: "Existing Page",
+              exists: true,
+              referenced: true,
+              targetId: "page-existing-id",
+            },
           },
         ],
         text: "[[Existing Page]]",
@@ -134,10 +150,11 @@ describe("useBubbleMenuWikiLink", () => {
     ]);
   });
 
-  it("convertToWikiLink uses referenced true when only referencedTitles has the title", async () => {
+  it("convertToWikiLink uses referenced true and null targetId when only ghosted", async () => {
     mockCheckExistence.mockResolvedValue({
       pageTitles: new Set(),
       referencedTitles: new Set(["ghost"]),
+      pageTitleToId: new Map(),
     });
     const editor = createMockEditor({ textBetween: "Ghost" });
     const { result } = renderHook(() => useBubbleMenuWikiLink({ editor, pageId: "p1" }));
@@ -152,7 +169,9 @@ describe("useBubbleMenuWikiLink", () => {
         marks: [
           {
             type: "wikiLink",
-            attrs: { title: "Ghost", exists: false, referenced: true },
+            // `targetId` は未解決なので `null`（リネーム伝播はタイトル一致 fallback）。
+            // Unresolved → `targetId: null` (rename uses title fallback).
+            attrs: { title: "Ghost", exists: false, referenced: true, targetId: null },
           },
         ],
         text: "[[Ghost]]",
@@ -185,14 +204,15 @@ describe("useBubbleMenuWikiLink", () => {
   });
 
   it("convertToWikiLink ignores second call until first resolves (re-entrancy guard)", async () => {
-    const deferred: {
-      resolve: (v: { pageTitles: Set<string>; referencedTitles: Set<string> }) => void;
-    } = { resolve: () => {} };
-    const checkPromise = new Promise<{ pageTitles: Set<string>; referencedTitles: Set<string> }>(
-      (r) => {
-        deferred.resolve = r;
-      },
-    );
+    type CheckResult = {
+      pageTitles: Set<string>;
+      referencedTitles: Set<string>;
+      pageTitleToId: Map<string, string>;
+    };
+    const deferred: { resolve: (v: CheckResult) => void } = { resolve: () => {} };
+    const checkPromise = new Promise<CheckResult>((r) => {
+      deferred.resolve = r;
+    });
     mockCheckExistence.mockReturnValue(checkPromise);
 
     const editor = createMockEditor({ textBetween: "Foo" });
@@ -210,7 +230,11 @@ describe("useBubbleMenuWikiLink", () => {
 
     if (firstCall === undefined) throw new Error("expected firstCall");
     await act(async () => {
-      deferred.resolve({ pageTitles: new Set(), referencedTitles: new Set() });
+      deferred.resolve({
+        pageTitles: new Set(),
+        referencedTitles: new Set(),
+        pageTitleToId: new Map(),
+      });
       await firstCall;
     });
 

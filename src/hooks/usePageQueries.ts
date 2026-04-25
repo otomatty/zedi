@@ -807,9 +807,25 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
     ): Promise<{
       pageTitles: Set<string>;
       referencedTitles: Set<string>;
+      /**
+       * 正規化済みタイトル → ターゲットページ id のマップ。同一スコープ内に
+       * 同名ページが複数あった場合は **最後に出現したページの id** が残る
+       * （Map への上書き）。`useWikiLinkStatusSync` / `useTagStatusSync` が
+       * `targetId` 属性を埋めるためだけに使う（issue #737 / 案 A）。
+       *
+       * Normalized title → target page id map. With duplicate titles inside
+       * the same scope the **last write wins** (Map overwrite). Used by the
+       * status-sync hooks to populate the `targetId` attribute on resolved
+       * marks (issue #737, approach A).
+       */
+      pageTitleToId: Map<string, string>;
     }> => {
       if (!isLoaded || titles.length === 0) {
-        return { pageTitles: new Set(), referencedTitles: new Set() };
+        return {
+          pageTitles: new Set(),
+          referencedTitles: new Set(),
+          pageTitleToId: new Map(),
+        };
       }
 
       const repo = await getRepository();
@@ -822,14 +838,25 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
       // If note-scope candidates have not loaded yet, return empty sets so
       // we do not mis-classify valid same-note links as missing on this pass.
       let pageTitles: Set<string>;
+      const pageTitleToId = new Map<string, string>();
       if (pageNoteId !== null) {
         if (notePages === undefined) {
-          return { pageTitles: new Set(), referencedTitles: new Set() };
+          return {
+            pageTitles: new Set(),
+            referencedTitles: new Set(),
+            pageTitleToId: new Map(),
+          };
         }
         pageTitles = new Set(notePages.map((p) => p.title.toLowerCase().trim()));
+        for (const p of notePages) {
+          pageTitleToId.set(p.title.toLowerCase().trim(), p.id);
+        }
       } else {
         const pages = await repo.getPagesSummary(userId);
         pageTitles = new Set(pages.map((p) => p.title.toLowerCase().trim()));
+        for (const p of pages) {
+          pageTitleToId.set(p.title.toLowerCase().trim(), p.id);
+        }
       }
 
       // Get ghost links to check referenced status. ノートスコープのゴースト
@@ -862,7 +889,7 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
         }
       }
 
-      return { pageTitles, referencedTitles };
+      return { pageTitles, referencedTitles, pageTitleToId };
     },
     [getRepository, userId, isLoaded, pageNoteId, notePages],
   );

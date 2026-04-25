@@ -1,0 +1,18 @@
+{
+  "name": "@zedi/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Source-of-truth constants shared between client (src, admin) and server packages. / クライアント (src, admin) とサーバ (server/api 等) で共有する定数モジュール。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tagCharacterClass": "./src/tagCharacterClass.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "vitest": "^4.0.16"
+  }
+}

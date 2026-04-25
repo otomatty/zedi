@@ -15,14 +15,50 @@ import { propagateTitleRename } from "../../services/titleRenamePropagationServi
  * page_contents 行に入っているようなバイナリ Y.Doc を生成するヘルパー。
  * Build an encoded Y.Doc blob shaped like a `page_contents.ydoc_state` row.
  */
-function makeYdocWithWikiLink(title: string): Buffer {
+function makeYdocWithWikiLink(title: string, targetId?: string): Buffer {
   const doc = new Y.Doc();
   const fragment = doc.getXmlFragment("default");
   const paragraph = new Y.XmlElement("paragraph");
   fragment.insert(0, [paragraph]);
   const text = new Y.XmlText();
   paragraph.insert(0, [text]);
-  text.insert(0, title, { wikiLink: { title, exists: true, referenced: false } });
+  const wikiLink: Record<string, unknown> = { title, exists: true, referenced: false };
+  if (targetId !== undefined) {
+    wikiLink.targetId = targetId;
+  }
+  text.insert(0, title, { wikiLink });
+  return Buffer.from(Y.encodeStateAsUpdate(doc));
+}
+
+/**
+ * 同名タイトルの 2 つのリンクを並べた Y.Doc を作るヘルパー。`targetId` で
+ * どちらが renamedPage を指すかを明示する。issue #737 の重複タイトルケース
+ * を検証する。
+ *
+ * Build a Y.Doc with two same-titled links discriminated by `targetId`.
+ * Used to verify the issue #737 scenario where a rename must touch only one
+ * of the two visually identical links.
+ */
+function makeYdocWithTwoSameTitleLinks(
+  title: string,
+  firstTargetId: string,
+  secondTargetId: string,
+): Buffer {
+  const doc = new Y.Doc();
+  const fragment = doc.getXmlFragment("default");
+  const paragraph = new Y.XmlElement("paragraph");
+  fragment.insert(0, [paragraph]);
+  const text = new Y.XmlText();
+  paragraph.insert(0, [text]);
+  text.insert(0, title, {
+    wikiLink: { title, exists: true, referenced: false, targetId: firstTargetId },
+  });
+  // null を挟んで 2 つ目のマーク区間を独立させる（Yjs の format 継承を断つ）。
+  // Insert with `null` to break Yjs' formatting inheritance between segments.
+  text.insert(text.length, " and ", { wikiLink: null });
+  text.insert(text.length, title, {
+    wikiLink: { title, exists: true, referenced: false, targetId: secondTargetId },
+  });
   return Buffer.from(Y.encodeStateAsUpdate(doc));
 }
 
@@ -40,6 +76,33 @@ function decodeYdocWikiLinkTitle(buffer: Buffer): string | null {
     if (wl?.title) return wl.title;
   }
   return null;
+}
+
+/**
+ * `decodeYdocWikiLinkTitle` の同名リンク 2 つ版。`targetId` ごとにタイトルを
+ * 取り出し、どちらが書き換わったかを検証可能にする。
+ *
+ * Sibling helper to `decodeYdocWikiLinkTitle` that returns titles keyed by
+ * `targetId` so tests can assert which of the two same-titled links was
+ * rewritten and which was preserved.
+ */
+function decodeYdocWikiLinkTitlesByTargetId(buffer: Buffer): Record<string, string> {
+  const doc = new Y.Doc();
+  Y.applyUpdate(doc, new Uint8Array(buffer));
+  const fragment = doc.getXmlFragment("default");
+  const paragraph = fragment.get(0);
+  if (!(paragraph instanceof Y.XmlElement)) return {};
+  const text = paragraph.get(0);
+  if (!(text instanceof Y.XmlText)) return {};
+  const delta = text.toDelta() as Array<{ insert: unknown; attributes?: Record<string, unknown> }>;
+  const out: Record<string, string> = {};
+  for (const item of delta) {
+    const wl = item.attributes?.wikiLink as { title?: string; targetId?: string } | undefined;
+    if (wl?.title && wl.targetId) {
+      out[wl.targetId] = wl.title;
+    }
+  }
+  return out;
 }
 
 const PAGE_ID = "11111111-aaaa-bbbb-cccc-000000000001";
@@ -336,5 +399,58 @@ describe("propagateTitleRename", () => {
     expect(invalidate).not.toHaveBeenCalled();
     // Ghost promotion path still ran (empty result here). / ゴースト昇格の経路は通る。
     expect(result.ghostPromotionsCount).toBe(0);
+  });
+
+  it("rewrites only the link whose targetId matches the renamed page (issue #737)", async () => {
+    // 重複タイトル下のリネーム: ソースページ X が `[[Foo]]` を 2 回参照する。
+    // 1 つは renamedPage (PAGE_ID) を、もう 1 つは別ページ (OTHER_TARGET_ID)
+    // を `targetId` で指している。ID 一致の方だけを `[[Bar]]` に書き換え、
+    // もう一方は `[[Foo]]` のまま残ることを検証する。issue #737 案 A の本質。
+    // Same-title rename: source page X holds two `[[Foo]]` marks pointing to
+    // different pages via `targetId`. Only the mark whose `targetId` matches
+    // the renamed page should become `[[Bar]]`; the other must stay `[[Foo]]`.
+    // This is the core acceptance scenario for issue #737 (approach A).
+    const OTHER_TARGET_ID = "33333333-aaaa-bbbb-cccc-000000000003";
+    const originalYdoc = makeYdocWithTwoSameTitleLinks("Foo", PAGE_ID, OTHER_TARGET_ID);
+
+    const { db, chains } = createMockDb([
+      [{ sourceId: SOURCE_PAGE_ID }],
+      [], // FOR UPDATE
+      [{ pageId: SOURCE_PAGE_ID, ydocState: originalYdoc, version: 1 }],
+      [{ version: 2 }], // UPDATE page_contents
+      [], // UPDATE pages
+      PERSONAL_SCOPE_ROW,
+      [], // ghost candidates (none)
+    ]);
+    const invalidate = vi.fn().mockResolvedValue(undefined);
+
+    const result = await propagateTitleRename(db as never, PAGE_ID, "Foo", "Bar", {
+      invalidateDocument: invalidate,
+    });
+
+    expect(result.sourcePagesAttempted).toBe(1);
+    expect(result.sourcePagesSucceeded).toBe(1);
+    expect(result.wikiLinkMarksUpdated).toBe(1);
+    expect(result.wikiLinkTextUpdated).toBe(1);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+
+    // 書き戻された ydoc_state を読み取り、targetId ごとのタイトル分布を検証。
+    // Decode the persisted ydoc_state and check titles by `targetId`.
+    const updateChains = chains.filter((c) => c.startMethod === "update");
+    const pageContentsUpdate = updateChains.find((c) => {
+      const setArg = c.ops.find((op) => op.method === "set")?.args[0] as
+        | Record<string, unknown>
+        | undefined;
+      return setArg && "ydocState" in setArg;
+    });
+    const pcSetArg = pageContentsUpdate?.ops.find((op) => op.method === "set")?.args[0] as
+      | { ydocState: Buffer }
+      | undefined;
+    expect(pcSetArg?.ydocState).toBeInstanceOf(Buffer);
+    if (pcSetArg?.ydocState) {
+      const titles = decodeYdocWikiLinkTitlesByTargetId(pcSetArg.ydocState);
+      expect(titles[PAGE_ID]).toBe("Bar");
+      expect(titles[OTHER_TARGET_ID]).toBe("Foo");
+    }
   });
 });
