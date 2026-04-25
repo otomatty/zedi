@@ -16,6 +16,7 @@ import {
   calculateEnhancedScore,
 } from "@/lib/searchUtils";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
+import { dedupSharedRowsAgainstPersonal } from "@/hooks/useGlobalSearch";
 
 interface SearchResultItem extends SearchResultCardItem {
   snippet: string;
@@ -68,32 +69,36 @@ export default function SearchResults() {
         };
       });
 
-    // Issue #718 Phase 5-4: shared 側の個人ページ (`note_id IS NULL`) は
-    // `useSearchPages`（IDB）からの personal 結果と重複するため除外する。
-    // ここで残るのはノートネイティブのみ (`note_id !== null`)。
+    // Issue #718 Phase 5-4: dedup 契約は `dedupSharedRowsAgainstPersonal` に集約。
+    // 個人 IDB に既に出ている page id だけを shared から落とす。`note_id` が
+    // null でも他ユーザー所有のリンク済み個人ページは IDB に無いので残す
+    // (Codex / CodeRabbit 指摘)。
     //
-    // Issue #718 Phase 5-4: drop personal pages from the shared response —
-    // they are already covered by the personal results from `useSearchPages`.
-    // Only note-native rows (`note_id !== null`) survive here.
-    const shared: SearchResultItem[] = sharedResults
-      .filter((r) => r.note_id !== null)
-      .map((r) => {
-        const preview = r.content_preview ?? "";
-        const snippet = extractSmartSnippet(preview, keywords, 200);
-        const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
-        return {
-          pageId: r.id,
-          noteId: r.note_id ?? undefined,
-          title: r.title ?? "無題のページ",
-          snippet,
-          highlightedSnippet,
-          matchType: "content" as MatchType,
-          sourceUrl: r.source_url ?? undefined,
-          thumbnailUrl: r.thumbnail_url ?? undefined,
-          updatedAt: new Date(r.updated_at).getTime(),
-          score: 0,
-        };
-      });
+    // Issue #718 Phase 5-4: dedup is centralized in
+    // `dedupSharedRowsAgainstPersonal` and works by `pageId` so linked personal
+    // pages owned by other note members (which IDB does not have) survive
+    // (Codex / CodeRabbit review).
+    const personalIds = new Set(personal.map((item) => item.pageId));
+    const shared: SearchResultItem[] = dedupSharedRowsAgainstPersonal(
+      sharedResults,
+      personalIds,
+    ).map((r) => {
+      const preview = r.content_preview ?? "";
+      const snippet = extractSmartSnippet(preview, keywords, 200);
+      const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
+      return {
+        pageId: r.id,
+        noteId: r.note_id ?? undefined,
+        title: r.title ?? "無題のページ",
+        snippet,
+        highlightedSnippet,
+        matchType: "content" as MatchType,
+        sourceUrl: r.source_url ?? undefined,
+        thumbnailUrl: r.thumbnail_url ?? undefined,
+        updatedAt: new Date(r.updated_at).getTime(),
+        score: 0,
+      };
+    });
 
     return [...personal, ...shared].sort((a, b) => b.score - a.score);
   }, [personalResults, sharedResults, searchQuery, keywords]);

@@ -16,6 +16,41 @@ import type { SearchSharedResponse } from "@/lib/api/types";
 type SharedResultRow = SearchSharedResponse["results"][number];
 
 /**
+ * Issue #718 Phase 5-4 の dedup 契約を一箇所に集約するヘルパー。
+ *
+ * `scope=shared` レスポンスは以下の 3 種類のページを返す
+ * (`server/api/src/routes/search.ts`):
+ *
+ *  1. 呼び出し元自身の個人ページ (`owner_id = me AND note_id IS NULL`)
+ *  2. ノートメンバーシップ / オーナーシップ経由で見えるリンク済み個人ページ
+ *     (`note_pages` 経由、他ユーザー所有の `note_id IS NULL` ページも含み得る)
+ *  3. ノートネイティブページ (`note_id IS NOT NULL`)
+ *
+ * IDB は (1) しか持たないので、ここでは「`useSearchPages` で既に出ている page
+ * id」を集合で受け取り、それと一致する shared 行だけを落とす。`note_id` の
+ * null/non-null では判定しない (それだと (2) のリンク済み個人ページが脱落する。
+ * Codex 指摘)。
+ *
+ * Centralizes the Phase 5-4 dedup contract. `scope=shared` returns three kinds
+ * of rows: (1) the caller's own personal pages, (2) linked personal pages
+ * visible through note membership or ownership (these may belong to other
+ * users and can have `note_id IS NULL`), and (3) note-native pages. IDB only
+ * holds (1), so we dedup against the personal page id set instead of using
+ * `note_id` as a proxy — otherwise (2) would silently disappear (Codex
+ * review).
+ *
+ * @param rows shared 検索 API のレスポンス行 / Rows from the shared search API.
+ * @param personalIds `useSearchPages` (IDB) で既に出ている page id の集合 /
+ *   Set of page ids already present in personal search results.
+ */
+export function dedupSharedRowsAgainstPersonal<T extends { id: string }>(
+  rows: readonly T[],
+  personalIds: ReadonlySet<string>,
+): T[] {
+  return rows.filter((r) => !personalIds.has(r.id));
+}
+
+/**
  *
  */
 export interface SearchResult {
@@ -91,14 +126,15 @@ export function searchPages(pages: Page[], query: string): SearchResult[] {
  * Exported so the dedup behavior can be tested without spinning up React
  * Query (Issue #718 Phase 5-4).
  *
- * **Dedup contract**: shared rows with `note_id === null` are personal pages
- * that the server's `scope=shared` SQL still returns; they overlap with the
- * IDB-backed personal results, so this function drops them. Only note-native
- * rows (`note_id !== null`) survive on the shared side.
+ * **Dedup contract**: dedup is by `pageId` against the personal id set —
+ * see {@link dedupSharedRowsAgainstPersonal}. We can't filter by `note_id`
+ * alone because the server's `scope=shared` SQL returns linked personal
+ * pages (other users' `note_id IS NULL` pages reachable via `note_pages`)
+ * that are NOT covered by IDB.
  *
- * **重複排除の契約**: shared レスポンスには `scope=shared` の SQL 仕様で
- * `note_id IS NULL` の個人ページも含まれるが、IDB 由来の personal 結果と
- * 重複するため落とす。shared 側に残るのはノートネイティブのみ。
+ * **重複排除の契約**: dedup は `pageId` 一致でのみ行う
+ * ({@link dedupSharedRowsAgainstPersonal})。`note_id IS NULL` の中には IDB に
+ * 載っていないリンク済み個人ページが混ざるので、`note_id` での絞り込みは不可。
  */
 export function buildGlobalSearchResults(
   personalPages: Page[],
@@ -109,6 +145,8 @@ export function buildGlobalSearchResults(
 ): GlobalSearchResultItem[] {
   if (query.trim().length < 3 || keywords.length === 0) return [];
 
+  // 中間 sort は不要（最後にまとめて score 降順で並べ直す）。Gemini レビュー指摘。
+  // No intermediate sort here — the final merge sorts by score (Gemini review).
   const personal: Array<GlobalSearchResultItem & { score: number }> = personalPages
     .filter((page) => !page.isDeleted)
     .map((page) => {
@@ -125,24 +163,29 @@ export function buildGlobalSearchResults(
         sourceUrl: page.sourceUrl,
         score,
       };
-    })
-    .sort((a, b) => b.score - a.score);
-
-  const shared: Array<GlobalSearchResultItem & { score: number }> = sharedRows
-    .filter((r) => r.note_id !== null)
-    .map((r) => {
-      const preview = r.content_preview ?? "";
-      const highlightedText = highlightKeywords(preview, keywords);
-      return {
-        pageId: r.id,
-        noteId: r.note_id ?? undefined,
-        title: r.title ?? "無題のページ",
-        highlightedText: highlightedText || "（共有ノート）",
-        matchType: "content" as MatchType,
-        sourceUrl: r.source_url ?? undefined,
-        score: 0,
-      };
     });
+
+  const personalIds = new Set(personal.map((p) => p.pageId));
+  const shared: Array<GlobalSearchResultItem & { score: number }> = dedupSharedRowsAgainstPersonal(
+    sharedRows,
+    personalIds,
+  ).map((r) => {
+    const preview = r.content_preview ?? "";
+    const highlightedText = highlightKeywords(preview, keywords);
+    return {
+      pageId: r.id,
+      // ノートネイティブ / リンク済みノート所属ページのみ /notes ルーティングに乗せる。
+      // 単なるリンク済み個人ページ (`note_id IS NULL`) は note 側に飛ばさず /pages へ。
+      // Only note-native rows route under /notes; bare linked personal rows
+      // (`note_id IS NULL`) keep the personal /pages destination.
+      noteId: r.note_id ?? undefined,
+      title: r.title ?? "無題のページ",
+      highlightedText: highlightedText || "（共有ノート）",
+      matchType: "content" as MatchType,
+      sourceUrl: r.source_url ?? undefined,
+      score: 0,
+    };
+  });
 
   return [...personal, ...shared]
     .sort((a, b) => b.score - a.score)
