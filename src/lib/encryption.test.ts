@@ -13,6 +13,19 @@ function decodeBase64(s: string): Uint8Array {
   return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 }
 
+/**
+ * Re-encode the given bytes as Base64 and assert that `decrypt` rejects.
+ * Centralizes the "tamper bytes → expect rejection" flow used across IV /
+ * payload tamper tests so future drift only needs one update.
+ *
+ * 渡されたバイト列を Base64 化し、`decrypt` が必ず失敗することを検証する。
+ * IV / 暗号化データ改竄テストで繰り返される手順をここに集約する。
+ */
+async function expectDecryptRejectsFromBytes(bytes: Uint8Array): Promise<void> {
+  const b64 = btoa(String.fromCharCode(...bytes));
+  await expect(decrypt(b64)).rejects.toBeDefined();
+}
+
 describe("encryption", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -82,8 +95,7 @@ describe("encryption", () => {
         // Tampering the IV must trigger an authentication failure on decrypt.
         const tampered = new Uint8Array(bytes);
         tampered[0] ^= 0xff;
-        const tamperedB64 = btoa(String.fromCharCode(...tampered));
-        await expect(decrypt(tamperedB64)).rejects.toBeDefined();
+        await expectDecryptRejectsFromBytes(tampered);
       },
     );
 
@@ -94,8 +106,7 @@ describe("encryption", () => {
       const ciphertext = await encrypt("payload");
       const bytes = decodeBase64(ciphertext);
       const shifted = bytes.slice(1); // 先頭 1 バイト落とす → IV 領域がズレる
-      const shiftedB64 = btoa(String.fromCharCode(...shifted));
-      await expect(decrypt(shiftedB64)).rejects.toBeDefined();
+      await expectDecryptRejectsFromBytes(shifted);
     });
   });
 
@@ -111,8 +122,7 @@ describe("encryption", () => {
         // IV ではなく暗号化データ部 (offset = IV_LENGTH 以降) を 1 バイト改竄する。
         // Flip a bit in the encrypted-data portion (after the IV).
         tampered[IV_LENGTH] ^= 0x01;
-        const tamperedB64 = btoa(String.fromCharCode(...tampered));
-        await expect(decrypt(tamperedB64)).rejects.toBeDefined();
+        await expectDecryptRejectsFromBytes(tampered);
       },
     );
   });

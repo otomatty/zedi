@@ -85,8 +85,12 @@ describe("useImageUpload", () => {
         await result.current.uploadImage(file, { signal: controller.signal });
       });
 
+      // PNG は convertToWebP を経由するが、既定モックは入力 File をそのまま返すため、
+      // provider に渡るのは元の `file` インスタンスそのもの（参照同一性で検証）。
+      // PNG goes through convertToWebP, but the default mock returns the input
+      // unchanged, so the provider receives the very same `file` instance.
       expect(mocks.providerUploadImage).toHaveBeenCalledWith(
-        expect.any(File),
+        file,
         expect.objectContaining({ signal: controller.signal }),
       );
     });
@@ -193,27 +197,40 @@ describe("useImageUpload", () => {
       expect(mocks.providerUploadImage).toHaveBeenCalledWith(original, expect.any(Object));
     });
 
-    it("invokes provider with onProgress that updates hook progress state", async () => {
-      // provider に渡される onProgress を介して state.progress が更新されること。
-      // Pin the wiring of provider.onProgress → setState.progress.
-      let capturedOnProgress:
-        | ((p: { loaded: number; total: number; percentage: number }) => void)
-        | undefined;
-      mocks.providerUploadImage.mockImplementationOnce((_file, options) => {
+    it("provider's onProgress callback writes its arg through to state.progress", async () => {
+      // provider に渡される onProgress クロージャはアップロード完了後も有効で、
+      // 呼び出すと `setState((prev) => ({ ...prev, progress }))` が実行され、
+      // 引数オブジェクトがそのまま state.progress に反映されることを検証する。
+      // Capture the closure, finish the upload, then fire onProgress manually
+      // and observe the state. This avoids nested-act issues with deferred
+      // promises while still proving the wiring (closure → setState).
+      // Kills mutations that (a) drop the `progress` arg from setState or
+      // (b) replace it with a different value.
+      type ProgressArg = { loaded: number; total: number; percentage: number };
+      let capturedOnProgress: ((p: ProgressArg) => void) | undefined;
+      mocks.providerUploadImage.mockImplementationOnce(async (_file, options) => {
         capturedOnProgress = options.onProgress;
-        return Promise.resolve("https://cdn.example.com/x.webp");
+        return "https://cdn.example.com/x.webp";
       });
       const { result } = renderHook(() => useImageUpload());
 
-      const promise = act(async () => {
+      await act(async () => {
         await result.current.uploadImage(makeFile());
       });
 
-      // 進捗コールバックを擬似的に発火する（resolve 前に呼べたかは実装上難しいため、
-      // ここでは provider 呼び出しが受け取った onProgress 関数の存在のみ検証する）。
-      // We at least pin that provider received an `onProgress` function.
-      await promise;
+      // provider が onProgress を受け取った（関数として配線されている）。
+      // Pin that the provider received a callable onProgress.
       expect(capturedOnProgress).toBeTypeOf("function");
+
+      // クロージャを発火し、引数オブジェクトが state.progress に反映されることを検証する。
+      // Fire the captured callback and observe the resulting state.progress.
+      const observed: ProgressArg = { loaded: 50, total: 100, percentage: 50 };
+      if (!capturedOnProgress) throw new Error("capturedOnProgress was not set by provider mock");
+      const fire = capturedOnProgress;
+      act(() => {
+        fire(observed);
+      });
+      expect(result.current.progress).toEqual(observed);
     });
 
     it("reports the provider error message in error state and re-throws", async () => {
@@ -337,6 +354,11 @@ describe("useImageUpload", () => {
 
       expect(urls).toHaveLength(2);
       expect(mocks.providerUploadImage).toHaveBeenCalledTimes(2);
+      // 通った 2 件が画像エントリ (b.png, d.jpg) であることを参照同一性で固定する。
+      // Pin that the two calls are exactly the image entries (not text/pdf),
+      // so a swapped-filter mutation that lets non-image files through fails.
+      expect(mocks.providerUploadImage).toHaveBeenCalledWith(files[1], expect.any(Object));
+      expect(mocks.providerUploadImage).toHaveBeenCalledWith(files[3], expect.any(Object));
     });
 
     it("throws when no image files remain after filtering", async () => {
@@ -443,9 +465,13 @@ describe("useImageUpload", () => {
   });
 
   describe("clearError", () => {
-    it("resets error state to null without touching isUploading or progress", async () => {
-      // 直近のエラーを null に戻すが、他の state は不変であることを検証する。
-      // Pin that clearError ONLY resets `error`, not `isUploading` or `progress`.
+    it("resets error state to null and leaves the rest of state untouched", async () => {
+      // `setState((prev) => ({ ...prev, error: null }))` の意味論を検証する。
+      // 失敗した uploadImage の後に clearError を呼び、`error` だけが null に戻り、
+      // `isUploading` と `progress` は失敗時の値（false / null）のままであることを固定する。
+      // Pin both: (1) error → null, (2) the spread keeps `isUploading` / `progress`
+      // at the values the failed upload left them at (false / null), so a buggy
+      // clearError that resets the whole state would also surface here.
       mocks.providerUploadImage.mockRejectedValueOnce(new Error("oops"));
       const { result } = renderHook(() => useImageUpload());
 
@@ -458,12 +484,16 @@ describe("useImageUpload", () => {
       });
 
       expect(result.current.error).toBe("oops");
+      const isUploadingBefore = result.current.isUploading;
+      const progressBefore = result.current.progress;
 
       act(() => {
         result.current.clearError();
       });
 
       expect(result.current.error).toBeNull();
+      expect(result.current.isUploading).toBe(isUploadingBefore);
+      expect(result.current.progress).toBe(progressBefore);
     });
   });
 });
