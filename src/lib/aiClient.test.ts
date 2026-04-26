@@ -181,12 +181,15 @@ describe("aiClient", () => {
       expect(stored.openai.models).toEqual(["gpt-5"]);
     });
 
-    it("recovers when existing cache JSON is corrupt", () => {
+    it("壊れた既存キャッシュがあっても落ちず、生データは上書きしない / does not crash or overwrite when existing cache JSON is corrupt", () => {
       localStorage.setItem(CACHE_KEY, "{not json");
       const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       saveCachedModels("openai", ["gpt-5"]);
+      // parse 失敗をログに残す。`getCachedModels` 経由では null が返るが、
+      // 生の localStorage は壊れたまま放置される（saveCachedModels は catch して終わるため）。
+      // The parse failure is logged. `getCachedModels` returns null afterward,
+      // but the raw localStorage value stays untouched (saveCachedModels exits in the catch).
       expect(errSpy).toHaveBeenCalled();
-      // 2 回目以降の getItem では従来通り null （壊れた JSON のまま放置）
       expect(localStorage.getItem(CACHE_KEY)).toBe("{not json");
     });
   });
