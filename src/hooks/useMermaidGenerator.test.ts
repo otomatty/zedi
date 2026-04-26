@@ -47,7 +47,13 @@ afterEach(() => {
 
 describe("useMermaidGenerator", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // `clearAllMocks` only resets call history; implementations set via
+    // `mockImplementation` / `mockResolvedValue` / `mockRejectedValueOnce` would
+    // leak into later tests. `resetAllMocks` also clears those implementations,
+    // so each test starts from a clean baseline.
+    // `clearAllMocks` は呼び出し履歴しかクリアしないため、mockImplementation 等の実装が
+    // 後続テストへ持ち越される。`resetAllMocks` で実装も含めて初期化する。
+    vi.resetAllMocks();
   });
 
   it("starts in idle state with no result/error", () => {
@@ -141,6 +147,24 @@ describe("useMermaidGenerator", () => {
   });
 
   it("generate catches synchronous throws from generateMermaidDiagram and sets error", async () => {
+    // True sync throw: the mock raises before returning a promise so the hook's
+    // try/catch must convert it into an error state.
+    // 真の同期 throw: Promise を返す前に例外を投げ、hook の try/catch でエラー化されることを検証。
+    mockGenerateMermaidDiagram.mockImplementationOnce(() => {
+      throw new Error("network");
+    });
+
+    const { result } = renderHook(() => useMermaidGenerator());
+
+    await act(async () => {
+      await result.current.generate("topic", ["pie"]);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error?.message).toBe("network");
+  });
+
+  it("generate catches async rejections from generateMermaidDiagram and sets error", async () => {
     mockGenerateMermaidDiagram.mockRejectedValueOnce(new Error("network"));
 
     const { result } = renderHook(() => useMermaidGenerator());
