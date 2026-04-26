@@ -34,7 +34,7 @@
     "format:check": "prettier --check .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run && vitest run --config packages/shared/vitest.config.ts && vitest run --config packages/claude-sidecar/vitest.config.ts && vitest run --config server/hocuspocus/vitest.config.ts && vitest run --config server/mcp/vitest.config.ts",
+    "test:run": "vitest run && vitest run --config packages/shared/vitest.config.ts && vitest run --config packages/ui/vitest.config.ts && vitest run --config packages/claude-sidecar/vitest.config.ts && vitest run --config server/hocuspocus/vitest.config.ts && vitest run --config server/mcp/vitest.config.ts",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
