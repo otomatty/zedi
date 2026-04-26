@@ -8,7 +8,7 @@
  * JSON インポート/エクスポート、保存済み定義の選択ライフサイクルを検証する。
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 
 const mockToast = vi.fn();
@@ -48,6 +48,18 @@ function resetStore(initial: WorkflowDefinition[] = []): void {
     },
   });
 }
+
+// テスト失敗時もスパイ（URL.createObjectURL / HTMLAnchorElement.prototype.click 等）が
+// 確実に元に戻るよう、ファイル全体で共通の後始末を行う。fake timers を使ったテストは
+// 自分で `vi.useRealTimers()` を呼ぶか、ここで restore される前提でクリーンアップする。
+// File-wide cleanup so spies on globals (URL.createObjectURL,
+// HTMLAnchorElement.prototype.click, ...) are restored even if a test throws.
+// Tests that opt into fake timers should restore real timers themselves;
+// this hook handles spy restoration as a safety net.
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 describe("useWorkflowDraft - initial state and steps", () => {
   beforeEach(() => {
@@ -184,6 +196,11 @@ describe("useWorkflowDraft - import / export", () => {
   });
 
   it("exportJson opens a download link with sanitized filename", () => {
+    // 実装は `window.setTimeout(..., 0)` で revokeObjectURL を遅延させるため、
+    // fake timers を使ってフラッシュすることでフレーキーな実 setTimeout 待ちを避ける。
+    // The hook defers `revokeObjectURL` via `window.setTimeout(..., 0)`; use fake
+    // timers to flush deterministically and avoid flaky real-time waits.
+    vi.useFakeTimers();
     const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock-url");
     const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
@@ -201,24 +218,18 @@ describe("useWorkflowDraft - import / export", () => {
     expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
     expect(clickSpy).toHaveBeenCalledTimes(1);
 
-    // revoke is queued via setTimeout; flush it
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-url");
-        createObjectURLSpy.mockRestore();
-        revokeObjectURLSpy.mockRestore();
-        clickSpy.mockRestore();
-        resolve();
-      }, 5);
-    });
+    // Flush the queued setTimeout(..., 0) that triggers revokeObjectURL.
+    vi.runAllTimers();
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-url");
   });
 
   it("exportJson uses 'workflow' as the fallback when name is empty", () => {
-    const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock-url");
+    vi.useFakeTimers();
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock-url");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
 
     let downloadName = "";
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
       this: HTMLAnchorElement,
     ) {
       downloadName = this.download;
@@ -230,8 +241,7 @@ describe("useWorkflowDraft - import / export", () => {
     });
 
     expect(downloadName).toBe("workflow.json");
-    createObjectURLSpy.mockRestore();
-    clickSpy.mockRestore();
+    vi.runAllTimers();
   });
 
   it("onImportFile populates draft from a valid JSON file", async () => {
