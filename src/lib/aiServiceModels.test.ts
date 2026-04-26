@@ -279,25 +279,19 @@ describe("aiServiceModels", () => {
       });
     });
 
-    it("無限大や NaN の cost は 0 に正規化する", async () => {
-      fetchSpy.mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            models: [
-              {
-                id: "x:y",
-                provider: "openai",
-                model_id: "x",
-                display_name: "X",
-                input_cost_units: Number.POSITIVE_INFINITY,
-                output_cost_units: Number.NaN,
-              },
-            ],
-            tier: "free",
-          }),
-          { status: 200 },
-        ),
-      );
+    it("非有限数 (±Infinity) の cost は 0 に正規化する / non-finite cost values fall back to 0", async () => {
+      // `JSON.stringify(Infinity)` は `null` になり Number.isFinite ガードを通らないため、
+      // 生 JSON リテラル `1e1000` で `JSON.parse` に実際の Infinity を作らせる。
+      // (NaN は JSON 表現不可能だが、Number.isFinite ガードは符号無関係に同じ分岐へ落ちる。)
+      // We avoid `JSON.stringify(Infinity)` (which collapses to `null` and would only
+      // exercise the missing-field path). A raw `1e1000` literal yields an actual
+      // Infinity from `JSON.parse`, so this test really exercises the
+      // `Number.isFinite` guard in `toNum`.
+      const rawBody =
+        '{"models":[{"id":"x:y","provider":"openai","model_id":"x",' +
+        '"display_name":"X","input_cost_units":1e1000,"output_cost_units":-1e1000}],' +
+        '"tier":"free"}';
+      fetchSpy.mockResolvedValue(new Response(rawBody, { status: 200 }));
 
       const result = await fetchServerModels();
       expect(result.models[0].inputCostUnits).toBe(0);
