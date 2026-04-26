@@ -16,15 +16,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const handlerMock = vi.fn();
 
+/**
+ * `getEnv` を vi.fn で差し替え、テストごとに `mockReturnValueOnce` などで
+ * 値を上書きできるようにする。`vi.resetModules()` + `vi.doMock()` で再ロード
+ * する旧パターンより軽量で速い。
+ *
+ * Backed by a single vi.fn so individual tests can override the return value
+ * (e.g. with mockReturnValueOnce) without having to re-import the SUT module.
+ */
+const getEnvMock = vi.fn<(key: string) => string>();
+
 vi.mock("../../auth.js", () => ({
   auth: { handler: (req: Request) => handlerMock(req) },
 }));
 
 vi.mock("../../lib/env.js", () => ({
-  getEnv: (key: string) => {
-    if (key === "BETTER_AUTH_URL") return "https://api.example.com";
-    throw new Error(`unexpected env lookup: ${key}`);
-  },
+  getEnv: (key: string) => getEnvMock(key),
   getOptionalEnv: () => "",
 }));
 
@@ -35,6 +42,13 @@ describe("sendInvitationMagicLink", () => {
 
   beforeEach(() => {
     handlerMock.mockReset();
+    // 既定では BETTER_AUTH_URL を末尾スラッシュ無しで返す。
+    // Default: BETTER_AUTH_URL resolves without a trailing slash.
+    getEnvMock.mockReset();
+    getEnvMock.mockImplementation((key: string) => {
+      if (key === "BETTER_AUTH_URL") return "https://api.example.com";
+      throw new Error(`unexpected env lookup: ${key}`);
+    });
     // Suppress the `[magicLinkService] Unexpected error` log emitted on throw.
     // throw 経路で出るエラーログを黙らせる。
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -91,24 +105,19 @@ describe("sendInvitationMagicLink", () => {
   });
 
   it("strips a trailing slash from BETTER_AUTH_URL when constructing the URL", async () => {
-    // getEnv はテスト先頭で固定値 ("https://api.example.com") を返すため、
-    // 別途モジュールを再ロードして末尾スラッシュ版を試す。
-    // Reload the module with a slash-suffixed BETTER_AUTH_URL to exercise
-    // the `.replace(/\/$/, "")` call.
-    vi.resetModules();
+    // 1 回限り getEnv をスラッシュ付きで返し、`.replace(/\/$/, "")` を発火させる。
+    // Override BETTER_AUTH_URL just for this call to exercise the
+    // trailing-slash trim — far cheaper than reloading the SUT module.
+    getEnvMock.mockReturnValueOnce("https://api.example.com/");
     handlerMock.mockResolvedValue(new Response(null, { status: 200 }));
-    vi.doMock("../../auth.js", () => ({
-      auth: { handler: (req: Request) => handlerMock(req) },
-    }));
-    vi.doMock("../../lib/env.js", () => ({
-      getEnv: () => "https://api.example.com/",
-      getOptionalEnv: () => "",
-    }));
-    const { sendInvitationMagicLink: send } = await import("../../services/magicLinkService.js");
-    await send({ email: "x@example.com", callbackURL: "https://app.example.com/" });
+
+    await sendInvitationMagicLink({
+      email: "x@example.com",
+      callbackURL: "https://app.example.com/",
+    });
+
     const req = handlerMock.mock.calls[0]?.[0] as Request;
     expect(req.url).toBe("https://api.example.com/api/auth/sign-in/magic-link");
-    vi.resetModules();
   });
 
   it("returns sent=false with the response body when Better Auth replies non-OK", async () => {
