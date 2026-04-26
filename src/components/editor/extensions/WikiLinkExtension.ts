@@ -118,7 +118,12 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
        */
       targetId: {
         default: null,
-        parseHTML: (element) => element.getAttribute("data-target-id"),
+        parseHTML: (element) => {
+          const raw = element.getAttribute("data-target-id");
+          if (typeof raw !== "string") return null;
+          const normalized = raw.trim();
+          return normalized.length > 0 ? normalized : null;
+        },
         renderHTML: (attributes) => {
           const value = attributes.targetId;
           if (typeof value !== "string" || value.length === 0) {

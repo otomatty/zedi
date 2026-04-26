@@ -176,6 +176,8 @@ describe("aiChatStore", () => {
             // partialize されるので rehydrate 後に取り込まれない…はずが、zustand
             // の persist はそのまま反映してしまう。partialize は書き込み側のみ。
             // ここでは契約として「書き込み時に partialize される」ことを担保する。
+            // Even if volatile fields exist in storage, persist rehydrate can reflect them as-is.
+            // `partialize` only applies on write, so this test guards the write-side contract.
           },
         }),
       );
@@ -188,6 +190,7 @@ describe("aiChatStore", () => {
       expect(state.selectedModel).toEqual(model);
       // CodeRabbit のレビュー対応: 揮発フィールドが rehydrate で蘇らないことを明示確認。
       // Pin volatile fields explicitly so the test name matches its assertions.
+      // テスト名と検証内容の整合を保つため、揮発フィールドを明示的に検証する。
       expect(state.activeConversationId).toBeNull();
       expect(state.isStreaming).toBe(false);
       expect(state.showConversationList).toBe(false);

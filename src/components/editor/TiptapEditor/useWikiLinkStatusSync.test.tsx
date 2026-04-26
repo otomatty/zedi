@@ -19,10 +19,10 @@ vi.mock("@/hooks/usePageQueries", () => ({
       checkExistence: vi.fn(async (titles: string[]) => {
         const inScope = options?.pageNoteId ? (options.notePages ?? []) : [];
         const pageTitles = new Set(inScope.map((page) => page.title.toLowerCase().trim()));
-        // issue #737: `pageTitleToId` を返すモック契約。テストは「resolution は
-        // するが id 解決は不要」のシナリオを想定しているため空 Map を返しても十分。
-        // Mock contract for issue #737. The current scenarios only assert
-        // exists/referenced changes, so an empty map is fine.
+        // issue #737: `pageTitleToId` を返すモック契約。`targetId` 解決を伴う
+        // シナリオを検証できるよう、note スコープ内ページから title→id を構築する。
+        // Mock contract for issue #737. Build a title→id map from in-scope
+        // pages so `targetId` resolution paths are testable.
         const pageTitleToId = new Map<string, string>(
           inScope.map((page) => [page.title.toLowerCase().trim(), page.id]),
         );

@@ -73,5 +73,6 @@ export const CONTENT_PREVIEW_MAX_LENGTH = 120;
 export function buildContentPreview(text: string): string {
   const trimmed = text.trim().replace(/\s+/g, " ");
   if (trimmed.length <= CONTENT_PREVIEW_MAX_LENGTH) return trimmed;
-  return trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trim() + "...";
+  const headLength = Math.max(0, CONTENT_PREVIEW_MAX_LENGTH - 3);
+  return `${trimmed.slice(0, headLength).trim()}...`;
 }
