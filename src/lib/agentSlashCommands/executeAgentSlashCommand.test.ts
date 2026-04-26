@@ -167,12 +167,11 @@ describe("executeAgentSlashCommand — hook short-circuit", () => {
 
     expect(result).toBeNull();
     expect(runClaudeQueryToCompletion).toHaveBeenCalledTimes(1);
-    expect(insertSlashAgentMarkdownAt).toHaveBeenCalledWith(
-      editor,
-      expect.any(Number),
-      "claude-result",
-      "cursor",
-    );
+    // makeMockEditor() の既定で state.selection.from = 12 になるため、
+    // 挿入位置はその固定値を期待する（曖昧な expect.any(Number) を避ける）。
+    // The default mock editor has state.selection.from = 12, so pin it
+    // exactly instead of accepting any number.
+    expect(insertSlashAgentMarkdownAt).toHaveBeenCalledWith(editor, 12, "claude-result", "cursor");
   });
 });
 

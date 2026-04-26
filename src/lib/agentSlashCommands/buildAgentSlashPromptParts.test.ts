@@ -123,9 +123,11 @@ describe("buildExplainPrompt", () => {
     const out = buildExplainPrompt(editor, { selectionText: "captured snippet" });
     expect(out).toContain("Selection:");
     expect(out).toContain("captured snippet");
-    // captures.selectionText が優先されるため editor 取得は呼ばれない
-    // editor accessors should not be called when captures provide the selection.
-    expect(editor.getText).not.toHaveBeenCalled();
+    // /explain のフォールバックは getEditorSelectionText → doc.textBetween。
+    // captures.selectionText がある場合はこちらが呼ばれないことを固定する。
+    // /explain falls back via getEditorSelectionText → doc.textBetween, so
+    // pin that the document accessor is skipped when captures provide the text.
+    expect(editor.state.doc.textBetween).not.toHaveBeenCalled();
   });
 
   it("falls back to live editor selection when captures are absent", () => {
