@@ -249,8 +249,15 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # Golden list of files with stable mutation scores (Phase 1/2 of Epic #468).
+      # 安定したスコアを持つファイルを段階的に追加し、PR で退行を早めに検知する。
+      # Local scores measured 2026-04-26 with `stryker.config.mutation-changed.mjs`:
+      #   dateUtils.ts                94.03% / useContainerColumns.ts        86.67%
+      #   noteViewHelpers.ts         100.00% / aiChatConversationTitle.ts   100.00%
+      #   aiCostUtils.ts              91.18% / encryption.ts                 96.43%
+      #   mcpServerImportHelpers.ts  100.00% / onboardingState.ts            83.82%
       - name: Run mutation tests (limited scope)
-        run: bun run test:mutation -- --mutate "src/lib/dateUtils.ts,src/hooks/useContainerColumns.ts,src/pages/NoteView/noteViewHelpers.ts"
+        run: bun run test:mutation -- --mutate "src/lib/dateUtils.ts,src/hooks/useContainerColumns.ts,src/pages/NoteView/noteViewHelpers.ts,src/lib/aiChatConversationTitle.ts,src/lib/aiCostUtils.ts,src/lib/encryption.ts,src/lib/mcpServerImportHelpers.ts,src/lib/onboardingState.ts"
 
       - name: Upload mutation report
         if: always()
