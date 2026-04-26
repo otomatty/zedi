@@ -98,6 +98,17 @@ jobs:
 
       - run: bun run test:coverage
 
+      # Workspace package tests are not picked up by the root vitest config,
+      # so run their dedicated configs explicitly. Keep this list in sync with
+      # the `test:run` script in root package.json.
+      # ルートの vitest 設定はワークスペース配下のテストを含まないため、
+      # 各パッケージの vitest.config を明示的に実行する。
+      - name: Run @zedi/shared tests
+        run: bunx vitest run --config packages/shared/vitest.config.ts
+
+      - name: Run @zedi/ui tests
+        run: bunx vitest run --config packages/ui/vitest.config.ts
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
