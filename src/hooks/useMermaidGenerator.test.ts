@@ -40,6 +40,7 @@ import { useMermaidGenerator } from "./useMermaidGenerator";
 
 // Safety net to keep spies (e.g. console.error if added in future tests) and
 // any module-level setup from leaking between tests on assertion failures.
+// assertion 失敗時でも spy やモジュールレベルの設定が次のテストへ漏れないようにする。
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -225,6 +226,7 @@ describe("useMermaidGenerator", () => {
     const { result } = renderHook(() => useMermaidGenerator());
 
     // Trigger an initial error first.
+    // まず初期エラーを発生させる。
     await act(async () => {
       await result.current.generate("", ["flowchart"]);
     });
@@ -232,6 +234,7 @@ describe("useMermaidGenerator", () => {
 
     // Stub a long-running generation that resolves later so we can observe the
     // transitional state.
+    // 遷移中の状態を観測できるよう、あとで resolve する長時間生成を stub する。
     let resolveCb: (() => void) | null = null;
     mockGenerateMermaidDiagram.mockImplementation(
       (

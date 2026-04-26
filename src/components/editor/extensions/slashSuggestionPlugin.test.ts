@@ -148,11 +148,13 @@ describe("slashSuggestionPlugin — deactivation", () => {
     const plugin = getPlugin(onStateChange);
 
     // 1) Activate with `/foo`.
+    // 1) `/foo` でアクティブ化する。
     let state = makeState("/foo", plugin);
     expect(slashSuggestionPluginKey.getState(state)?.active).toBe(true);
     onStateChange.mockClear();
 
     // 2) Expand the selection to a range; the plugin must turn off.
+    // 2) 選択範囲をレンジに広げると、プラグインは非アクティブになる。
     const tr = state.tr.setSelection(TextSelection.create(state.doc, 1, 5));
     state = state.apply(tr);
     const pluginState = slashSuggestionPluginKey.getState(state);
@@ -182,6 +184,7 @@ describe("slashSuggestionPlugin — deactivation", () => {
     const plugin = getPlugin();
 
     // Active first.
+    // まずアクティブ状態にする。
     let state = makeState("/foo", plugin);
     expect(slashSuggestionPluginKey.getState(state)?.active).toBe(true);
 

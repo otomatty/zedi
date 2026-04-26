@@ -225,6 +225,7 @@ describe("useWorkflowDraft - import / export", () => {
     expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
     expect(clickSpy).toHaveBeenCalledTimes(1);
 
+    // キューされた setTimeout(..., 0) を実行して revokeObjectURL を発火させる。
     // Flush the queued setTimeout(..., 0) that triggers revokeObjectURL.
     vi.runAllTimers();
     expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock-url");

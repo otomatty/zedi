@@ -58,7 +58,7 @@ bun run test:run       # Vitest 単体テスト
 ## DB スキーマ変更（必読） / Database schema changes (must read)
 
 - **TS スキーマと SQL マイグレーションは常に対で更新する**。`server/api/src/schema/**/*.ts` を編集したら、必ず `server/api/drizzle/NNNN_*.sql` を新規追加し、`server/api/drizzle/meta/_journal.json` にエントリを追記する。  
-  _Always pair TS schema edits with a SQL migration: add a new `server/api/drizzle/NNNN_\*.sql`and append an entry to`server/api/drizzle/meta/_journal.json`. Skipping this caused PR #728 → production 500s on `/api/onboarding/status`and`/api/pages`._
+  Always pair TS schema edits with a SQL migration: add a new `server/api/drizzle/NNNN_*.sql` and append an entry to `server/api/drizzle/meta/_journal.json`. Skipping this caused production 500s in PR #728 on `/api/onboarding/status` and `/api/pages`.
 - **正本のマイグレーション置き場は `server/api/drizzle/` のみ**。CI (`deploy-{dev,prod}.yml`) は `bunx drizzle-kit migrate` だけを実行するため、ここ以外に SQL を置いても本番には適用されない。  
   _Source of truth is `server/api/drizzle/`. CI runs only `bunx drizzle-kit migrate`; SQL placed elsewhere is dead code._
 - **マイグレーションの書き方**:

@@ -284,6 +284,7 @@ describe("useWorkflowRunSession - resume", () => {
 
   it("resume passes startStepIndex/stepOutputs/resumePartial back to runWorkflowExecution", async () => {
     // First, drive a paused outcome so the hook captures pausedState.
+    // まず paused outcome を発生させ、hook が pausedState を保持する状態にする。
     mockRunWorkflowExecution.mockResolvedValueOnce({
       outcome: "paused",
       pausedAtStepIndex: 1,
@@ -345,6 +346,7 @@ describe("useWorkflowRunSession - resume", () => {
     await waitFor(() => expect(result.current.pausedState).not.toBeNull());
 
     // User edited the draft and removed `s2`.
+    // ユーザーが draft を編集し、`s2` を削除したケース。
     const editedDraft = makeDraft({
       steps: [{ id: "s1", title: "Step One", instruction: "do" }],
     });
@@ -359,6 +361,7 @@ describe("useWorkflowRunSession - resume", () => {
       variant: "destructive",
     });
     // After aborting, pausedState is reset to null.
+    // abort 後、pausedState が null にリセットされる。
     expect(result.current.pausedState).toBeNull();
   });
 });
@@ -401,6 +404,7 @@ describe("useWorkflowRunSession - cleanup and signals", () => {
     expect(capturedStepAbort?.signal.aborted).toBe(true);
 
     // Drain the promise so the test does not leak.
+    // テストリークを防ぐために Promise を解放する。
     await act(async () => {
       resolveExecution?.({ outcome: "completed" });
       await pending;
@@ -482,6 +486,7 @@ describe("useWorkflowRunSession - cleanup and signals", () => {
     expect(capturedStepAbort?.signal.aborted).toBe(true);
 
     // Resolve to avoid leaking the pending promise into the next test.
+    // 次のテストへ pending Promise が漏れないように resolve する。
     resolveExecution?.({ outcome: "stopped" });
     await pending;
   });
