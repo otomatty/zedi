@@ -15,11 +15,11 @@
  *
  * 仕組み / How it works:
  *   - 比較ベースを決める（環境変数 `DRIZZLE_DIFF_BASE` または既定で `origin/develop`）。
- *   - `git diff --name-only --diff-filter=AM <base>...HEAD` でスキーマ変更を抽出。
+ *   - `git diff --name-only --diff-filter=ADMR <base>...HEAD` でスキーマ変更を抽出。
  *     - 変更ファイル: `server/api/src/schema/**`
  *     - ただしテスト (`*.test.ts` / `__tests__/`) と純粋な型ファイル (`types/`) は除外。
  *   - 同じ diff で新規追加された `server/api/drizzle/*.sql` または
- *     `server/api/drizzle/meta/_journal.json` の変更があるか確認する。
+ *     `server/api/drizzle/meta/_journal.json` の変更が両方あるか確認する。
  *   - スキーマ変更があるのにマイグレーションが追加されていなければ exit 1。
  *
  *   Compute the diff between HEAD and the configured base (default
@@ -35,7 +35,7 @@
  *   コメントだけ・JSDoc だけのスキーマ TS 変更や、CHECK 制約に影響しない型の
  *   別名導入など「DB に当てる必要がない」差分の場合は、PR メッセージに
  *   `[skip drizzle-check]` を含めるか、コミットメッセージに同じ文字列を
- *   含めて CI から `--allow-skip-marker` 経由で許容できる（環境変数
+ *   含めることで許容できる（環境変数
  *   `DRIZZLE_SKIP_MARKER` でも可）。
  */
 
@@ -72,8 +72,8 @@ function git(args) {
 }
 
 /**
- * リモート参照が存在するか確認し、無ければ no-op で returns する。
- * Pull request CI 以外（push event など）で base が解決できない場合の保険。
+ * リモート参照が存在するか確認する。
+ * Pull request CI では base が解決できない場合に fail fast する。
  */
 function ensureBaseExists(base) {
   const result = spawnSync("git", ["rev-parse", "--verify", "--quiet", base], {
@@ -88,7 +88,7 @@ function ensureBaseExists(base) {
  * @returns {string[]}
  */
 function changedPaths(base) {
-  const out = git(["diff", "--name-only", "--diff-filter=AMR", `${base}...HEAD`]);
+  const out = git(["diff", "--name-only", "--diff-filter=ADMR", `${base}...HEAD`]);
   return out
     .split("\n")
     .map((s) => s.trim())
@@ -114,12 +114,13 @@ function isRelevantSchemaChange(path) {
   if (!path.startsWith(SCHEMA_PREFIX)) return false;
   if (path.endsWith(".test.ts")) return false;
   if (path.includes("/__tests__/")) return false;
+  if (path.includes("/types/")) return false;
   return path.endsWith(".ts");
 }
 
 /**
- * 新規マイグレーション SQL が追加されたか、または journal が更新されたか。
- * Either a new migration SQL was added or the journal was modified.
+ * 新規マイグレーション SQL が追加され、かつ journal も更新されたか。
+ * Whether both a new migration SQL was added AND the journal was modified.
  *
  * @param {string[]} added
  * @param {string[]} changed
@@ -148,6 +149,13 @@ function main() {
   const base = DEFAULT_BASE;
 
   if (!ensureBaseExists(base)) {
+    if (process.env.CI === "true") {
+      console.error(
+        `[check-drizzle-migrations] base ref "${base}" not found. Ensure actions/checkout uses fetch-depth: 0 or fetch the PR base branch before running this check.`,
+      );
+      process.exit(1);
+    }
+
     console.log(
       `[check-drizzle-migrations] base ref "${base}" not found; skipping check (most likely running outside PR context).`,
     );
