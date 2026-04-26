@@ -186,6 +186,11 @@ describe("aiChatStore", () => {
       expect(state.isOpen).toBe(true);
       expect(state.contextEnabled).toBe(false);
       expect(state.selectedModel).toEqual(model);
+      // CodeRabbit のレビュー対応: 揮発フィールドが rehydrate で蘇らないことを明示確認。
+      // Pin volatile fields explicitly so the test name matches its assertions.
+      expect(state.activeConversationId).toBeNull();
+      expect(state.isStreaming).toBe(false);
+      expect(state.showConversationList).toBe(false);
     });
   });
 });

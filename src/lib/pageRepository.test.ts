@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { IPageRepository, CreatePageOptions, PageRepositoryOptions } from "./pageRepository";
 import type { Page, PageSummary, Link, GhostLink, LinkType } from "@/types/page";
+import { StorageAdapterPageRepository } from "./pageRepository/StorageAdapterPageRepository";
+import type { StorageAdapter } from "./storageAdapter/StorageAdapter";
+import type { ApiClient } from "./api/apiClient";
 
 /**
  * `pageRepository.ts` は型のみのインターフェース層であり、ランタイムロジックを
@@ -129,11 +132,13 @@ function createInMemoryRepository(
         return;
       }
       store.links.push({ sourceId, targetId, linkType, createdAt: Date.now() });
+      await fireMutate();
     },
     async removeLink(sourceId, targetId, linkType: LinkType = "wiki") {
       store.links = store.links.filter(
         (l) => !(l.sourceId === sourceId && l.targetId === targetId && l.linkType === linkType),
       );
+      await fireMutate();
     },
     async getOutgoingLinks(pageId, linkType: LinkType = "wiki") {
       return store.links
@@ -163,12 +168,14 @@ function createInMemoryRepository(
         linkType,
         createdAt: Date.now(),
       });
+      await fireMutate();
     },
     async removeGhostLink(linkText, sourcePageId, linkType: LinkType = "wiki") {
       store.ghostLinks = store.ghostLinks.filter(
         (g) =>
           !(g.linkText === linkText && g.sourcePageId === sourcePageId && g.linkType === linkType),
       );
+      await fireMutate();
     },
     async getGhostLinkSources(linkText, linkType: LinkType = "wiki") {
       return store.ghostLinks
@@ -406,17 +413,109 @@ describe("IPageRepository contract", () => {
   });
 });
 
+/**
+ * 実プロダクションの `StorageAdapterPageRepository` が `IPageRepository` を満たし、
+ * かつ adapter / API へ正しく委譲することを spy で確認するスモーク層。
+ * CodeRabbit のレビュー対応: in-memory モックだけだと実装側の reg を見逃すため、
+ * 実装に直接アンカーした薄い契約スイートを置く（網羅検証は
+ * `pageRepository/StorageAdapterPageRepository.test.ts` 側）。
+ *
+ * Smoke layer that anchors `IPageRepository` contract assertions to the real
+ * runtime implementation so adapter regressions surface here too. Exhaustive
+ * delegation tests live alongside the implementation
+ * (`pageRepository/StorageAdapterPageRepository.test.ts`); this block exists so
+ * the interface file's test suite catches contract drift in the production class.
+ */
+function createMockAdapter(): StorageAdapter {
+  return {
+    getAllPages: vi.fn().mockResolvedValue([]),
+    getPage: vi.fn().mockResolvedValue(null),
+    upsertPage: vi.fn().mockResolvedValue(undefined),
+    deletePage: vi.fn().mockResolvedValue(undefined),
+    getYDocState: vi.fn().mockResolvedValue(null),
+    saveYDocState: vi.fn().mockResolvedValue(undefined),
+    getYDocVersion: vi.fn().mockResolvedValue(0),
+    getLinks: vi.fn().mockResolvedValue([]),
+    getBacklinks: vi.fn().mockResolvedValue([]),
+    saveLinks: vi.fn().mockResolvedValue(undefined),
+    getGhostLinks: vi.fn().mockResolvedValue([]),
+    saveGhostLinks: vi.fn().mockResolvedValue(undefined),
+    searchPages: vi.fn().mockResolvedValue([]),
+    updateSearchIndex: vi.fn().mockResolvedValue(undefined),
+    getLastSyncTime: vi.fn().mockResolvedValue(0),
+    setLastSyncTime: vi.fn().mockResolvedValue(undefined),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    resetDatabase: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function createMockApi(): ApiClient {
+  return {
+    deletePage: vi.fn(),
+    createPage: vi.fn(),
+  } as unknown as ApiClient;
+}
+
+describe("StorageAdapterPageRepository (production) satisfies IPageRepository", () => {
+  let adapter: ReturnType<typeof createMockAdapter>;
+  let api: ApiClient;
+  let repo: IPageRepository;
+
+  beforeEach(() => {
+    adapter = createMockAdapter();
+    api = createMockApi();
+    // 型レベルで `IPageRepository` を満たすかをここで強制する。
+    // Compile-time assertion that the production class satisfies the interface.
+    repo = new StorageAdapterPageRepository(adapter, api);
+  });
+
+  it("delegates createPage (guest) to adapter.upsertPage", async () => {
+    await repo.createPage("local-user", "Hello");
+    expect(adapter.upsertPage).toHaveBeenCalledOnce();
+  });
+
+  it("delegates getPage to adapter.getPage", async () => {
+    await repo.getPage("local-user", "p1");
+    expect(adapter.getPage).toHaveBeenCalledWith("p1");
+  });
+
+  it("delegates addLink to adapter.saveLinks (defaulting linkType to 'wiki')", async () => {
+    await repo.addLink("a", "b");
+    expect(adapter.getLinks).toHaveBeenCalledWith("a", "wiki");
+    expect(adapter.saveLinks).toHaveBeenCalledOnce();
+    const call = (adapter.saveLinks as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[2]).toBe("wiki");
+  });
+
+  it("delegates deletePage (auth) to adapter.deletePage and api.deletePage", async () => {
+    await repo.deletePage("auth-user", "p1");
+    expect(adapter.deletePage).toHaveBeenCalledWith("p1");
+    expect(api.deletePage).toHaveBeenCalledWith("p1");
+  });
+});
+
 describe("PageRepositoryOptions.onMutate", () => {
-  it("fires after each mutating method in implementations that wire it up", async () => {
+  it("fires after every mutating method (CRUD + link/ghost link paths)", async () => {
+    // CodeRabbit のレビュー対応: onMutate は CRUD だけでなく link/ghost link
+    // 系の mutation でも発火する契約。書き込み経路全体でリグレッションを検出できる。
+    //
+    // Address CodeRabbit feedback: `onMutate` is fired on every mutating path
+    // (page CRUD + link / ghost link writes), so a regression on any of them
+    // is caught here.
     const onMutate = vi.fn();
     const r = createInMemoryRepository(makeStore(), { onMutate });
 
     const page = await r.createPage("u1", "T");
     await r.updatePage("u1", page.id, { title: "T2" });
+    await r.addLink(page.id, "target");
+    await r.removeLink(page.id, "target");
+    await r.addGhostLink("Ghost", page.id);
+    await r.removeGhostLink("Ghost", page.id);
     await r.deletePage("u1", page.id);
 
-    // 3 mutations × 1 callback each = 3 invocations
-    expect(onMutate).toHaveBeenCalledTimes(3);
+    // 7 mutations (create / update / addLink / removeLink / addGhost / removeGhost / delete)
+    expect(onMutate).toHaveBeenCalledTimes(7);
   });
 
   it("is optional: implementations may skip the callback", async () => {
