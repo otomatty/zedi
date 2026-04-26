@@ -108,7 +108,7 @@ describe("GET /api/activity", () => {
     expect(body.limit).toBe(50);
   });
 
-  it("clamps limit to ACTIVITY_LIST_MAX_LIMIT (200)", async () => {
+  it("clamps limit to ACTIVITY_LIST_MAX_LIMIT (200) in the response", async () => {
     mockListActivity.mockResolvedValue({ rows: [], total: 0 });
     const { app } = createTestApp([]);
 
@@ -117,9 +117,8 @@ describe("GET /api/activity", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { limit: number };
     expect(body.limit).toBe(200);
-    // listActivity 自体には素のクランプ前 limit を渡す（service 側でも保護される想定）。
-    // The route forwards the raw limit, the service clamps internally.
-    expect(mockListActivity.mock.calls[0]?.[2]?.limit).toBe(9999);
+    // 何が下流に渡されるかはサービス側の責務なので、ここではアサートしない。
+    // Don't pin the value passed downstream — leave the bounding contract to the service.
   });
 
   it("rejects invalid kind with 400", async () => {

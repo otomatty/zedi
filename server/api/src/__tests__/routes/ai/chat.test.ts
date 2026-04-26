@@ -2,7 +2,7 @@
  * /api/chat のテスト（モデル検証、usage 制御、SSE ストリーミング、エラー）。
  * Tests for /api/chat: model validation, usage gating, SSE streaming, errors.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
@@ -111,6 +111,15 @@ beforeEach(() => {
   process.env = { ...ORIGINAL_ENV };
 });
 
+// process.env と vi.spyOn(...) をテスト終了時に必ずクリーンアップする。
+// テスト失敗時に inline mockRestore() がスキップされても spy が漏れないようにする。
+// Always reset process.env and restore spies on test end so a failing test
+// can't leak a console.error spy or env var into the next test.
+afterEach(() => {
+  process.env = { ...ORIGINAL_ENV };
+  vi.restoreAllMocks();
+});
+
 const validBody = {
   provider: "openai" as const,
   model: "gpt-4o",
@@ -197,7 +206,7 @@ describe("POST /api/chat — usage and API key gating", () => {
   it("propagates 'Model not found or inactive' as a 500 by default", async () => {
     process.env.OPENAI_API_KEY = "sk-test";
     mockValidateModelAccess.mockRejectedValueOnce(new Error("Model not found or inactive"));
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createTestApp();
 
     const res = await app.request("/api/chat", {
@@ -207,13 +216,12 @@ describe("POST /api/chat — usage and API key gating", () => {
     });
 
     expect(res.status).toBe(500);
-    consoleSpy.mockRestore();
   });
 
   it("maps a FORBIDDEN error from validateModelAccess to 403", async () => {
     process.env.OPENAI_API_KEY = "sk-test";
     mockValidateModelAccess.mockRejectedValueOnce(new Error("FORBIDDEN"));
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createTestApp();
 
     const res = await app.request("/api/chat", {
@@ -225,7 +233,6 @@ describe("POST /api/chat — usage and API key gating", () => {
     // errorHandler の statusMap で FORBIDDEN → 403。
     // statusMap in errorHandler maps the literal "FORBIDDEN" message to 403.
     expect(res.status).toBe(403);
-    consoleSpy.mockRestore();
   });
 });
 

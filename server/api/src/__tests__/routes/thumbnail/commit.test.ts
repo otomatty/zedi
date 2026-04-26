@@ -2,7 +2,7 @@
  * /api/thumbnail/commit のテスト（入力検証、外部 API、保存先未設定、容量超過）。
  * Tests for /api/thumbnail/commit (input validation, S3 wiring, errors).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
@@ -60,6 +60,12 @@ beforeEach(() => {
   mockCommitImage.mockReset();
   process.env = { ...ORIGINAL_ENV };
   process.env.STORAGE_BUCKET_NAME = "test-bucket";
+});
+
+// process.env はワーカー間で共有されうるので、テスト終了後にも必ず元へ戻す。
+// process.env can leak between test files via shared workers — restore it after every test.
+afterEach(() => {
+  process.env = { ...ORIGINAL_ENV };
 });
 
 describe("POST /api/thumbnail/commit", () => {

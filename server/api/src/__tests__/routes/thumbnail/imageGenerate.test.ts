@@ -2,7 +2,7 @@
  * /api/thumbnail/generate のテスト（Gemini 連携、入力検証、API キー未設定）。
  * Tests for /api/thumbnail/generate.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
@@ -53,6 +53,12 @@ beforeEach(() => {
   mockGenerate.mockReset();
   process.env = { ...ORIGINAL_ENV };
   process.env.GOOGLE_AI_API_KEY = "test-key";
+});
+
+// process.env はワーカー間で共有されうるので、テスト終了後にも必ず元へ戻す。
+// process.env can leak between test files via shared workers — restore it after every test.
+afterEach(() => {
+  process.env = { ...ORIGINAL_ENV };
 });
 
 describe("POST /api/thumbnail/generate", () => {

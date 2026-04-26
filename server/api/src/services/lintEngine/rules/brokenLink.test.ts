@@ -53,9 +53,12 @@ describe("runBrokenLinkRule", () => {
     const { db, chains } = asDb([[]]);
     await runBrokenLinkRule("user-x", db);
 
-    // 1 つの select チェーンが消費される。
-    // Exactly one chain is started for the SELECT.
+    // SELECT が 1 本だけ走り、必ず .where(...) を伴っていること（owner フィルタが
+    // うっかり外れていないことを最低限保証する）。
+    // Exactly one SELECT chain runs, and it always carries a .where(...) clause —
+    // this is the floor that catches an accidentally-removed owner filter.
     expect(chains).toHaveLength(1);
     expect(chains[0]?.startMethod).toBe("select");
+    expect(chains[0]?.ops.some((op) => op.method === "where")).toBe(true);
   });
 });

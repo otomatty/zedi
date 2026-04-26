@@ -44,10 +44,13 @@ describe("runOrphanRule", () => {
     expect(result.findings[1]?.pageIds).toEqual(["p-2"]);
   });
 
-  it("starts exactly one select chain", async () => {
+  it("starts exactly one select chain with a where clause", async () => {
     const { db, chains } = asDb([[]]);
     await runOrphanRule("user-x", db);
     expect(chains).toHaveLength(1);
     expect(chains[0]?.startMethod).toBe("select");
+    // owner フィルタが外れていないことの最低限の保険。
+    // Floor check that the owner filter has not been silently dropped.
+    expect(chains[0]?.ops.some((op) => op.method === "where")).toBe(true);
   });
 });

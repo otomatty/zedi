@@ -1,8 +1,8 @@
 /**
- * /api/subscription-manage のテスト（details / cancel / reactivate / change-plan）。
+ * /api/subscription のテスト（details / cancel / reactivate / change-plan）。
  * Tests for subscription management routes.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
 
@@ -81,6 +81,12 @@ beforeEach(() => {
   mockGetSubscription.mockReset();
   mockCheckUsage.mockReset();
   mockGetEnv.mockReset().mockReturnValue("polar-token");
+  process.env = { ...ORIGINAL_ENV };
+});
+
+// process.env はワーカー間で共有されうるので、テスト終了後にも必ず元へ戻す。
+// process.env can leak between test files via shared workers — restore it after every test.
+afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
 });
 

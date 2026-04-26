@@ -47,10 +47,14 @@ describe("runGhostManyRule", () => {
     expect(roadmap?.detail.count).toBe(3);
   });
 
-  it("starts exactly one select chain (HAVING is part of the same chain)", async () => {
+  it("starts exactly one select chain with where + having (HAVING shares the chain)", async () => {
     const { db, chains } = asDb([[]]);
     await runGhostManyRule("user-x", db);
     expect(chains).toHaveLength(1);
     expect(chains[0]?.startMethod).toBe("select");
+    // owner フィルタと閾値ハービング両方が外れていないことの最低限の保険。
+    // Floor check that neither the owner filter nor the count threshold is silently dropped.
+    expect(chains[0]?.ops.some((op) => op.method === "where")).toBe(true);
+    expect(chains[0]?.ops.some((op) => op.method === "having")).toBe(true);
   });
 });

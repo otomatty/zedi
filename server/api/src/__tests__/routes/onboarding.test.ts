@@ -101,8 +101,12 @@ describe("POST /api/onboarding/complete", () => {
     expect(mockInsertWelcomePage.mock.calls[0]?.[2]).toBe("ja");
   });
 
-  it("normalizes unknown locale to null", async () => {
-    mockInsertWelcomePage.mockResolvedValue({ pageId: "p", locale: null });
+  it("passes unknown locale through to insertWelcomePage as null", async () => {
+    // 実サービスは locale を必ず "ja" | "en" のいずれかで返す（resolveWelcomePageLocale
+    // のフォールバックがあるため）。ここでは "ja" にフォールバックされた結果を再現する。
+    // The real service always returns locale: "ja" | "en" because resolveWelcomePageLocale
+    // falls back to "ja" when requested is null. Mirror that real shape here.
+    mockInsertWelcomePage.mockResolvedValue({ pageId: "p", locale: "ja" });
     const { app } = createTestApp([undefined, undefined, [finalRow]]);
 
     const res = await app.request("/api/onboarding/complete", {
@@ -112,6 +116,8 @@ describe("POST /api/onboarding/complete", () => {
     });
 
     expect(res.status).toBe(200);
+    // 不明な locale はサービス呼び出し時に null へ正規化される。
+    // Unknown locales must be normalized to null before reaching the service.
     expect(mockInsertWelcomePage.mock.calls[0]?.[2]).toBeNull();
   });
 
@@ -125,6 +131,7 @@ describe("POST /api/onboarding/complete", () => {
     });
 
     expect(res.status).toBe(400);
+    expect(mockInsertWelcomePage).not.toHaveBeenCalled();
   });
 
   it("returns 400 when body is not an object", async () => {
@@ -137,6 +144,7 @@ describe("POST /api/onboarding/complete", () => {
     });
 
     expect(res.status).toBe(400);
+    expect(mockInsertWelcomePage).not.toHaveBeenCalled();
   });
 
   it("returns 400 when display_name is missing or empty after trim", async () => {
@@ -149,6 +157,7 @@ describe("POST /api/onboarding/complete", () => {
     });
 
     expect(res.status).toBe(400);
+    expect(mockInsertWelcomePage).not.toHaveBeenCalled();
   });
 
   it("returns 400 when display_name exceeds 120 characters", async () => {
@@ -162,6 +171,7 @@ describe("POST /api/onboarding/complete", () => {
     });
 
     expect(res.status).toBe(400);
+    expect(mockInsertWelcomePage).not.toHaveBeenCalled();
   });
 
   it("returns 401 without auth header", async () => {
@@ -176,14 +186,18 @@ describe("POST /api/onboarding/complete", () => {
     expect(res.status).toBe(401);
   });
 
-  it("does not include welcome_page fields when insertWelcomePage returns null (existing welcome)", async () => {
+  it("preserves existing welcome page fields when insertWelcomePage returns null", async () => {
+    // service が null を返すのは「ウェルカムページが既に存在する」シグナル。
+    // この場合、既存レコードの welcome_page_id を COALESCE で保持する。
+    // A null result means the welcome page already exists (idempotent path);
+    // the existing row's welcome_page_id is preserved via COALESCE.
     mockInsertWelcomePage.mockResolvedValue(null);
-    const rowWithoutWelcome = {
+    const rowWithExistingWelcome = {
       setupCompletedAt: new Date("2026-04-01T00:00:00Z"),
-      welcomePageId: null,
-      welcomePageCreatedAt: null,
+      welcomePageId: "page-existing-1",
+      welcomePageCreatedAt: new Date("2026-03-31T00:00:00Z"),
     };
-    const { app } = createTestApp([undefined, undefined, [rowWithoutWelcome]]);
+    const { app } = createTestApp([undefined, undefined, [rowWithExistingWelcome]]);
 
     const res = await app.request("/api/onboarding/complete", {
       method: "POST",
@@ -193,8 +207,10 @@ describe("POST /api/onboarding/complete", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.welcome_page_id).toBeNull();
-    expect(body.welcome_page_created_at).toBeNull();
+    expect(body.welcome_page_id).toBe("page-existing-1");
+    expect(body.welcome_page_created_at).toBe("2026-03-31T00:00:00.000Z");
+    // welcome_page_locale は service から読むため、null 返却時は null になる。
+    // welcome_page_locale comes from the service result; null result → null locale.
     expect(body.welcome_page_locale).toBeNull();
   });
 });

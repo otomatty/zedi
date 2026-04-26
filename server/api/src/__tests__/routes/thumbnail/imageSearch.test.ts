@@ -2,7 +2,7 @@
  * /api/thumbnail/search のテスト（クエリ検証、ページング、重複排除、エラー）。
  * Tests for /api/thumbnail/search (query validation, pagination, dedup, errors).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv, ImageSearchItem } from "../../../types/index.js";
 
@@ -65,6 +65,12 @@ beforeEach(() => {
   process.env = { ...ORIGINAL_ENV };
   process.env.GOOGLE_CUSTOM_SEARCH_API_KEY = "k";
   process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID = "cx";
+});
+
+// process.env はワーカー間で共有されうるので、テスト終了後にも必ず元へ戻す。
+// process.env can leak between test files via shared workers — restore it after every test.
+afterEach(() => {
+  process.env = { ...ORIGINAL_ENV };
 });
 
 describe("GET /api/thumbnail/search", () => {
