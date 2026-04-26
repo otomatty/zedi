@@ -179,6 +179,7 @@ describe("useConfirmDialogs - delete with impact", () => {
     expect(result.current.deleteTarget?.user.id).toBe(userA.id);
 
     // ユーザー B に切り替えてから古い request A を resolve しても、状態は B のまま
+    // Even if old request A resolves after switching to user B, the state stays on B.
     act(() => {
       result.current.requestDelete(userB);
     });
@@ -188,12 +189,12 @@ describe("useConfirmDialogs - delete with impact", () => {
       resolveA?.({ ...sampleImpact, notesCount: 999 });
       await Promise.resolve();
     });
-    // A の結果は反映されない
+    // A の結果は反映されない / A's resolved result must not be applied.
     expect(result.current.deleteTarget?.user.id).toBe(userB.id);
     expect(result.current.deleteTarget?.impact).toBeNull();
     expect(result.current.deleteTarget?.loadingImpact).toBe(true);
 
-    // B の resolve はちゃんと反映される
+    // B の resolve はちゃんと反映される / B's resolve still propagates correctly.
     await act(async () => {
       resolveB?.(sampleImpact);
       await Promise.resolve();
@@ -220,7 +221,7 @@ describe("useConfirmDialogs - delete with impact", () => {
     });
     expect(result.current.deleteTarget).toBeNull();
 
-    // resolve しても deleteTarget は null のまま
+    // resolve しても deleteTarget は null のまま / late resolve does not revive deleteTarget.
     await act(async () => {
       resolveLate?.(sampleImpact);
       await Promise.resolve();

@@ -193,7 +193,7 @@ describe("useAiModelsDragReorder.handleReorder", () => {
 });
 
 describe("useAiModelsDragReorder drag state", () => {
-  it("handleDragStart で draggedId を設定し、dataTransfer に id を入れる", () => {
+  it("handleDragStart で draggedId を設定し、dataTransfer に id を入れる / sets draggedId and writes id to dataTransfer", () => {
     const args = createArgs([makeModel("a", 0)]);
     const { result } = renderHook(() =>
       useAiModelsDragReorder({
@@ -216,7 +216,7 @@ describe("useAiModelsDragReorder drag state", () => {
     expect(JSON.parse(ev.dataTransfer.getData("application/json"))).toEqual({ id: "a" });
   });
 
-  it("handleDragOver で dragOverId を設定し preventDefault を呼ぶ", () => {
+  it("handleDragOver で dragOverId を設定し preventDefault を呼ぶ / sets dragOverId and calls preventDefault", () => {
     const args = createArgs([makeModel("a", 0)]);
     const { result } = renderHook(() =>
       useAiModelsDragReorder({
@@ -238,7 +238,7 @@ describe("useAiModelsDragReorder drag state", () => {
     expect(result.current.dragOverId).toBe("a");
   });
 
-  it("handleDragEnd / handleDragLeave で id 状態がクリアされる", () => {
+  it("handleDragEnd / handleDragLeave で id 状態がクリアされる / clears drag id state on drag end/leave", () => {
     const args = createArgs([makeModel("a", 0)]);
     const { result } = renderHook(() =>
       useAiModelsDragReorder({

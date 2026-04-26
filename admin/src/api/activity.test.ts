@@ -28,7 +28,7 @@ describe("listActivity", () => {
     expect(adminFetch).toHaveBeenCalledWith("/api/activity");
   });
 
-  it("kind / actor / from / to / limit / offset を querystring に詰める", async () => {
+  it("kind / actor / from / to / limit / offset を querystring に詰める / packs kind/actor/from/to/limit/offset into querystring", async () => {
     vi.mocked(adminFetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ entries: [], total: 0, limit: 10 }), { status: 200 }),
     );
