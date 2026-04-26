@@ -103,7 +103,7 @@ describe("useAISettings - initial load", () => {
 
     expect(result.current.settings).toEqual(baseDefaults);
     expect(errorSpy).toHaveBeenCalled();
-    errorSpy.mockRestore();
+    // The file-wide afterEach restores all spies, so no inline mockRestore is needed.
   });
 });
 
@@ -282,7 +282,7 @@ describe("useAISettings - save", () => {
     expect(saved).toBe(false);
     expect(result.current.isSaving).toBe(false);
     expect(errorSpy).toHaveBeenCalled();
-    errorSpy.mockRestore();
+    // Spy restoration is handled by the file-wide afterEach.
   });
 });
 
@@ -358,7 +358,11 @@ describe("useAISettings - test (connection)", () => {
   });
 
   it("captures errors thrown synchronously by testConnection", async () => {
-    mockTestConnection.mockRejectedValueOnce(new Error("network down"));
+    // 同期 throw を再現することでテスト名と挙動を一致させる。
+    // Use a synchronous throw so the test exercises the path implied by its title.
+    mockTestConnection.mockImplementationOnce(() => {
+      throw new Error("network down");
+    });
 
     const { result } = renderHook(() => useAISettings());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
