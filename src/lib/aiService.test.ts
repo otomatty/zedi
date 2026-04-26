@@ -725,11 +725,17 @@ describe("aiService - 回帰テスト", () => {
       | { type: "error"; content: string }
       | { type: "done"; content: "" };
 
+    // 実モジュールの型に揃えることで `createClaudeCodeProvider` のシグネチャ変更を
+    // テスト側でも型検査でき、`UnifiedAIProvider` 契約のドリフトを早期に検知する。
+    // Anchor the mock to the real module type so a signature change in
+    // `createClaudeCodeProvider` (or `UnifiedAIProvider`) is caught here at compile time.
+    type ClaudeCodeProviderModule = typeof import("@/lib/aiProviders/claudeCodeProvider");
+
     function buildProviderModule(opts: {
       available: boolean;
       chunks?: FakeChunk[];
       throwOnQuery?: unknown;
-    }) {
+    }): Pick<ClaudeCodeProviderModule, "createClaudeCodeProvider"> {
       return {
         createClaudeCodeProvider: () => ({
           id: "claude-code" as const,
