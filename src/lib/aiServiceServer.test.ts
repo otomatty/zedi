@@ -358,10 +358,12 @@ describe("aiServiceServer / callAIWithServer", () => {
             pulledOnce = true;
             controller.enqueue(encoder.encode('data: {"content":"a"}\n'));
             // 次の pull の前に abort
+            // Abort before the next pull.
             abortController.abort();
             return;
           }
           controller.enqueue(encoder.encode(":\n"));
+          controller.close();
         },
       });
       fetchSpy.mockResolvedValue(new Response(stream, { status: 200 }));

@@ -107,12 +107,14 @@ describe("WikiLinkExtension paste rule", () => {
         if (typeof addAttributes !== "function") {
           throw new Error("addAttributes must be a function");
         }
-        const attrs = addAttributes.call({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(extension as any),
+        type AddAttributesContext = Record<string, unknown> & {
+          parent?: (() => Record<string, unknown>) | undefined;
+        };
+        const context: AddAttributesContext = {
+          ...extension,
           parent: undefined,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any) as Record<string, unknown>;
+        };
+        const attrs = addAttributes.call(context) as Record<string, unknown>;
         const targetId = attrs.targetId as ReturnType<typeof getTargetIdSpec>;
         if (!targetId) throw new Error("targetId attribute missing");
         return targetId;
@@ -130,6 +132,9 @@ describe("WikiLinkExtension paste rule", () => {
         expect(spec.parseHTML(el)).toBe("11111111-aaaa-bbbb-cccc-000000000001");
 
         const empty = document.createElement("span");
+        expect(spec.parseHTML(empty)).toBeNull();
+
+        empty.setAttribute("data-target-id", "");
         expect(spec.parseHTML(empty)).toBeNull();
       });
 
