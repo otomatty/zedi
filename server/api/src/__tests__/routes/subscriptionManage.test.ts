@@ -84,10 +84,13 @@ beforeEach(() => {
   process.env = { ...ORIGINAL_ENV };
 });
 
-// process.env はワーカー間で共有されうるので、テスト終了後にも必ず元へ戻す。
-// process.env can leak between test files via shared workers — restore it after every test.
+// process.env と vi.spyOn(...) を必ずクリーンアップする。
+// テスト失敗時に inline mockRestore() がスキップされても spy が漏れないようにする。
+// Reset process.env and restore spies on test end so a failing assertion can't
+// leak a console.error spy or env var into the next test.
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
+  vi.restoreAllMocks();
 });
 
 // ── GET /details ────────────────────────────────────────────────────────────
@@ -148,6 +151,8 @@ describe("GET /api/subscription/details", () => {
       plan: "pro",
       status: "active",
       billingInterval: "monthly",
+      currentPeriodStart: "2026-04-01",
+      currentPeriodEnd: "2026-05-01",
       usage: { budgetUnits: 15000, consumedUnits: 7500, remainingUnits: 7500, usagePercent: 50 },
     });
   });
@@ -193,7 +198,7 @@ describe("POST /api/subscription/cancel", () => {
   it("returns 500 when Polar throws", async () => {
     mockGetSubscription.mockResolvedValue({ externalId: "sub_42" });
     mockSubscriptionsUpdate.mockRejectedValue(new Error("Polar down"));
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createTestApp();
 
     const res = await app.request("/api/subscription/cancel", {
@@ -204,7 +209,6 @@ describe("POST /api/subscription/cancel", () => {
     expect(res.status).toBe(500);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Failed to cancel subscription");
-    consoleSpy.mockRestore();
   });
 });
 
@@ -245,7 +249,7 @@ describe("POST /api/subscription/reactivate", () => {
   it("returns 500 when Polar throws", async () => {
     mockGetSubscription.mockResolvedValue({ externalId: "sub_99" });
     mockSubscriptionsUpdate.mockRejectedValue(new Error("oops"));
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createTestApp();
 
     const res = await app.request("/api/subscription/reactivate", {
@@ -254,7 +258,6 @@ describe("POST /api/subscription/reactivate", () => {
     });
 
     expect(res.status).toBe(500);
-    consoleSpy.mockRestore();
   });
 });
 
@@ -275,13 +278,27 @@ describe("POST /api/subscription/change-plan", () => {
     expect(body.error).toBe("Invalid JSON body");
   });
 
-  it("returns 400 when billingInterval is missing or invalid", async () => {
+  it("returns 400 when billingInterval is invalid", async () => {
     const app = createTestApp();
 
     const res = await app.request("/api/subscription/change-plan", {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ billingInterval: "weekly" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("billingInterval must be 'monthly' or 'yearly'");
+  });
+
+  it("returns 400 when billingInterval is missing from the body", async () => {
+    const app = createTestApp();
+
+    const res = await app.request("/api/subscription/change-plan", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
     });
 
     expect(res.status).toBe(400);
@@ -361,7 +378,7 @@ describe("POST /api/subscription/change-plan", () => {
     mockGetSubscription.mockResolvedValue({ externalId: "sub_x" });
     mockSubscriptionsUpdate.mockRejectedValue(new Error("Polar 503"));
     process.env.POLAR_PRO_MONTHLY_PRODUCT_ID = "prod_monthly";
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createTestApp();
 
     const res = await app.request("/api/subscription/change-plan", {
@@ -373,6 +390,5 @@ describe("POST /api/subscription/change-plan", () => {
     expect(res.status).toBe(500);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Failed to change plan");
-    consoleSpy.mockRestore();
   });
 });

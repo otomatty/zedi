@@ -62,10 +62,13 @@ beforeEach(() => {
   process.env.STORAGE_BUCKET_NAME = "test-bucket";
 });
 
-// process.env はワーカー間で共有されうるので、テスト終了後にも必ず元へ戻す。
-// process.env can leak between test files via shared workers — restore it after every test.
+// process.env と vi.spyOn(...) を必ずクリーンアップする。
+// テスト失敗時に inline mockRestore() がスキップされても spy が漏れないようにする。
+// Reset process.env and restore spies on test end so a failing assertion can't
+// leak a console.error spy or env var into the next test.
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
+  vi.restoreAllMocks();
 });
 
 describe("POST /api/thumbnail/commit", () => {
@@ -149,7 +152,7 @@ describe("POST /api/thumbnail/commit", () => {
 
   it("returns 502 when commitService throws an unrelated error", async () => {
     mockCommitImage.mockRejectedValue(new Error("S3 down"));
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createTestApp();
 
     const res = await app.request("/api/thumbnail/commit", {
@@ -159,7 +162,6 @@ describe("POST /api/thumbnail/commit", () => {
     });
 
     expect(res.status).toBe(502);
-    consoleSpy.mockRestore();
   });
 
   it("returns 401 without auth", async () => {

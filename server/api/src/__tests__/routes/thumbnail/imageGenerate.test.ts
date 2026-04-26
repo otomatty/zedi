@@ -85,6 +85,7 @@ describe("POST /api/thumbnail/generate", () => {
     });
 
     expect(res.status).toBe(400);
+    expect(mockGenerate).not.toHaveBeenCalled();
   });
 
   it("returns 503 when GOOGLE_AI_API_KEY is not set", async () => {

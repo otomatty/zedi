@@ -243,6 +243,9 @@ describe("GET /api/onboarding/status", () => {
       auto_create_update_notice: false,
     });
     expect(mockRetryWelcomePageIfNeeded).toHaveBeenCalledTimes(1);
+    // 認証済みユーザー ID が 2 番目の引数として渡されることを確認する。
+    // The authenticated userId must be forwarded as the second argument.
+    expect(mockRetryWelcomePageIfNeeded.mock.calls[0]?.[1]).toBe(TEST_USER_ID);
   });
 
   it("returns nulls and auto_create_update_notice=true when no row exists", async () => {
