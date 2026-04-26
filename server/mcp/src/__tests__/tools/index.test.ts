@@ -75,7 +75,19 @@ describe("ALL_TOOL_NAMES", () => {
   });
 
   it("includes the canonical user / pages / notes / search / clip surface", () => {
-    // 仕様凍結のため必須ツールを明示的に列挙する。/ Lock the canonical surface in tests so silent removals are caught.
+    // この list は意図的に `ALL_TOOL_NAMES` を二重化している。`registerAllTools` 側のテストは
+    // 「実装と `ALL_TOOL_NAMES` がズレないこと」しか保証しないので、両方を一括で消した
+    // (= 公開 API 縮退) 場合は検出できない。ここで仕様として固定したい一群のツール名を
+    // ハードコードしておくことで、その縮退を CI で確実に止める。新規ツール追加時にこの
+    // list の更新は不要 (`>=` 関係)、ただし既存ツールの削除/改名時は意図的な仕様変更として
+    // この list も併せて更新すること。
+    //
+    // This list intentionally duplicates `ALL_TOOL_NAMES`. The `registerAllTools` test only
+    // guarantees the registry stays consistent with `ALL_TOOL_NAMES`; if both were dropped
+    // together (i.e. a silent public-API regression) it would still pass. Locking the
+    // canonical surface here forces any tool removal/rename to be an explicit edit to this
+    // list, surfacing it in code review. Adding a new tool does NOT require touching this
+    // list (it's a "must contain" check, not an equality check).
     const required = [
       "zedi_get_current_user",
       "zedi_list_pages",
