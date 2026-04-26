@@ -55,6 +55,22 @@ bun run test:run       # Vitest 単体テスト
 - 既存のディレクトリ構成・命名規則に合わせる。
 - Conventional Commits 形式でコミット（`feat:`, `fix:`, `docs:` 等）。
 
+## DB スキーマ変更（必読） / Database schema changes (must read)
+
+- **TS スキーマと SQL マイグレーションは常に対で更新する**。`server/api/src/schema/**/*.ts` を編集したら、必ず `server/api/drizzle/NNNN_*.sql` を新規追加し、`server/api/drizzle/meta/_journal.json` にエントリを追記する。  
+  _Always pair TS schema edits with a SQL migration: add a new `server/api/drizzle/NNNN_\*.sql`and append an entry to`server/api/drizzle/meta/_journal.json`. Skipping this caused PR #728 → production 500s on `/api/onboarding/status`and`/api/pages`._
+- **正本のマイグレーション置き場は `server/api/drizzle/` のみ**。CI (`deploy-{dev,prod}.yml`) は `bunx drizzle-kit migrate` だけを実行するため、ここ以外に SQL を置いても本番には適用されない。  
+  _Source of truth is `server/api/drizzle/`. CI runs only `bunx drizzle-kit migrate`; SQL placed elsewhere is dead code._
+- **マイグレーションの書き方**:
+  - 既存の手書き例（`0017_add_link_type.sql` など）の体裁に合わせ、ステートメント間に `--> statement-breakpoint` を入れる。
+  - 既存環境で重複適用されても安全になるよう、原則として `IF NOT EXISTS` / `ON CONFLICT DO NOTHING` を使う。
+  - 必要であればバックフィル（既存行への初期値投入）も同じファイル内で行う。
+  - `bunx drizzle-kit generate` で雛形を作るときは、過去スナップショットが欠落しているため巨大な diff が出ることがある。その場合は `--name` 指定の出力を手で削減し、既存マイグレーション間で重複しない形に整えてから commit する（snapshot ファイルは生成物のみ、当面コミットしない方針）。
+- **CI ガード**: `.github/workflows/ci.yml` の `drizzle-migration-check` ジョブが PR で `server/api/src/schema/**` の変更と新規 `server/api/drizzle/*.sql` がペアになっているかを検証する。例外的に SQL 不要な場合（コメント/JSDoc 修正のみなど）は PR 本文かコミットメッセージに `[skip drizzle-check]` を入れる。  
+  _CI guard `drizzle-migration-check` enforces the schema/migration pairing. Use the `[skip drizzle-check]` marker only for non-DDL edits (comments, JSDoc, type aliases that do not affect SQL)._
+- **環境別の自動適用**: `develop` への push → `deploy-dev.yml` が development DB へ migrate。`main` への push → `deploy-prod.yml` が production DB へ migrate。スキーマ追従はこの 2 本だけ。  
+  _Auto-apply: push to `develop` migrates dev DB; push to `main` migrates prod DB. No other path applies migrations._
+
 ## ブランチ・PR の命名規則
 
 - **ブランチ**: `feature/説明`、`fix/説明`、`hotfix/説明`、`chore/説明` など（例: `feature/ai-models-ui`, `fix/search-crash`）。Issue 番号から作る場合は `feature/123`。

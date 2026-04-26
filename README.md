@@ -245,7 +245,7 @@ VITE_REALTIME_URL=ws://localhost:1234   # 本番は wss://realtime.zedi-note.app
 | **Visualization** | Recharts / `@xyflow/react` (React Flow) / Mermaid / KaTeX / Tesseract.js (OCR)                       |
 | **Auth**          | [Better Auth](https://better-auth.com/) (OAuth / セッション cookie)                                  |
 | **API**           | `server/api` — Hono on Bun + Drizzle ORM (PostgreSQL)                                                |
-| **Database**      | PostgreSQL (Drizzle migrations: `db/migrations`, `server/api/drizzle`) / IndexedDB (local・ブラウザ) |
+| **Database**      | PostgreSQL (Drizzle migrations: `server/api/drizzle/`) / IndexedDB (local・ブラウザ)                 |
 | **Realtime**      | `server/hocuspocus` — Hocuspocus (Y.js) によるリアルタイム共同編集                                   |
 | **MCP**           | `server/mcp` — Claude Code 連携（stdio / HTTP、詳細は [server/mcp/README.md](server/mcp/README.md)） |
 | **Storage**       | AWS S3（API 経由でアップロード、`@aws-sdk/client-s3`）                                               |
@@ -337,7 +337,7 @@ packages/                # Bun workspaces（共有ライブラリ）
 
 admin/                   # 管理画面アプリ（別 Vite + React + Tailwind / `@zedi/ui` 利用）
 extension/               # ブラウザ拡張（Manifest v3、Web Clipper）
-db/migrations/           # PostgreSQL マイグレーション SQL
+server/api/drizzle/      # PostgreSQL マイグレーション（drizzle-kit が読む正本 / source of truth）
 terraform/cloudflare/    # Cloudflare 関連インフラ定義
 e2e/                     # Playwright E2E テスト
 scripts/                 # セットアップ / sidecar ビルド / Stryker / 拡張ビルド等のスクリプト

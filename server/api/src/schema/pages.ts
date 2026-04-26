@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { notes } from "./notes.js";
@@ -98,6 +98,20 @@ export const pages = pgTable(
      * 部分述語に効くインデックス。
      */
     index("idx_pages_note_id").on(table.noteId),
+    /**
+     * オーナーごとに有効なウェルカムページは最大 1 件であることを担保する部分
+     * ユニーク index。`welcomePageService.insertWelcomePage` の `onConflictDoNothing`
+     * が target としてこの index に依拠している。実 DDL は
+     * `drizzle/0018_add_onboarding_and_page_kind.sql` を参照。
+     *
+     * Partial unique index that enforces "at most one live welcome page per
+     * owner". The `onConflictDoNothing` call in
+     * `welcomePageService.insertWelcomePage` targets this exact index. The
+     * actual DDL lives in `drizzle/0018_add_onboarding_and_page_kind.sql`.
+     */
+    uniqueIndex("idx_pages_unique_welcome_per_owner")
+      .on(table.ownerId)
+      .where(sql`${table.kind} = 'welcome' AND ${table.isDeleted} = false`),
   ],
 );
 
