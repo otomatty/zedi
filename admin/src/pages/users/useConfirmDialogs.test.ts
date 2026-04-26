@@ -59,7 +59,7 @@ describe("useConfirmDialogs - role change", () => {
     expect(result.current.roleChangeTarget).toBeNull();
   });
 
-  it("requestRoleChange → confirm で onRoleChange を呼んで target を null に戻す", () => {
+  it("requestRoleChange → confirm で onRoleChange を呼んで target を null に戻す / requestRoleChange then confirm fires onRoleChange and clears target", () => {
     const { result, onRoleChange } = makeHook();
     act(() => {
       result.current.requestRoleChange(userA, "admin");
@@ -81,7 +81,7 @@ describe("useConfirmDialogs - role change", () => {
     expect(onRoleChange).not.toHaveBeenCalled();
   });
 
-  it("cancel で target を null に戻す", () => {
+  it("cancel で target を null に戻す / cancel clears target", () => {
     const { result } = makeHook();
     act(() => {
       result.current.requestRoleChange(userA, "admin");
@@ -92,7 +92,7 @@ describe("useConfirmDialogs - role change", () => {
 });
 
 describe("useConfirmDialogs - unsuspend", () => {
-  it("request → confirm で onUnsuspend を呼ぶ", () => {
+  it("request → confirm で onUnsuspend を呼ぶ / request then confirm fires onUnsuspend", () => {
     const { result, onUnsuspend } = makeHook();
     act(() => {
       result.current.requestUnsuspend(userA);
@@ -106,7 +106,7 @@ describe("useConfirmDialogs - unsuspend", () => {
     expect(result.current.unsuspendTarget).toBeNull();
   });
 
-  it("cancel で target を null に戻す", () => {
+  it("cancel で target を null に戻す / cancel clears target", () => {
     const { result } = makeHook();
     act(() => {
       result.current.requestUnsuspend(userA);
@@ -121,7 +121,7 @@ describe("useConfirmDialogs - delete with impact", () => {
     vi.mocked(getUserImpact).mockReset();
   });
 
-  it("requestDelete でローディング状態 → impact 取得後に impact 反映", async () => {
+  it("requestDelete でローディング状態 → impact 取得後に impact 反映 / requestDelete shows loading then applies impact once it resolves", async () => {
     vi.mocked(getUserImpact).mockResolvedValueOnce(sampleImpact);
     const { result } = makeHook();
 
@@ -141,7 +141,7 @@ describe("useConfirmDialogs - delete with impact", () => {
     expect(result.current.deleteTarget?.impact).toEqual(sampleImpact);
   });
 
-  it("getUserImpact が失敗したら loadingImpact: false で impact は null のまま", async () => {
+  it("getUserImpact が失敗したら loadingImpact: false で impact は null のまま / when getUserImpact rejects, loadingImpact becomes false and impact stays null", async () => {
     vi.mocked(getUserImpact).mockRejectedValueOnce(new Error("nope"));
     const { result } = makeHook();
 
@@ -203,7 +203,7 @@ describe("useConfirmDialogs - delete with impact", () => {
     expect(result.current.deleteTarget?.loadingImpact).toBe(false);
   });
 
-  it("cancelDelete は requestId をインクリメントし、後から来た resolve を無効化する", async () => {
+  it("cancelDelete は requestId をインクリメントし、後から来た resolve を無効化する / cancelDelete bumps requestId and invalidates a late resolve", async () => {
     let resolveLate: ((v: UserImpact) => void) | null = null;
     vi.mocked(getUserImpact).mockImplementationOnce(
       () =>
@@ -229,7 +229,7 @@ describe("useConfirmDialogs - delete with impact", () => {
     expect(result.current.deleteTarget).toBeNull();
   });
 
-  it("confirmDelete で onDelete を呼んで target を null にする", async () => {
+  it("confirmDelete で onDelete を呼んで target を null にする / confirmDelete fires onDelete and clears target", async () => {
     vi.mocked(getUserImpact).mockResolvedValueOnce(sampleImpact);
     const { result, onDelete } = makeHook();
     act(() => {
@@ -246,7 +246,7 @@ describe("useConfirmDialogs - delete with impact", () => {
     expect(result.current.deleteTarget).toBeNull();
   });
 
-  it("confirmDelete が target なしのときは onDelete を呼ばない", () => {
+  it("confirmDelete が target なしのときは onDelete を呼ばない / confirmDelete without target does not fire onDelete", () => {
     const { result, onDelete } = makeHook();
     act(() => {
       result.current.confirmDelete();

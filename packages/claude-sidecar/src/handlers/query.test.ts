@@ -615,6 +615,72 @@ describe("runQuery", () => {
     ]);
   });
 
+  it("flushes an active tool with tool-use-complete when aborted mid-tool", async () => {
+    // Start a tool, then abort before it finishes — the consumer must still see
+    // tool-use-complete so the start/complete pair stays balanced.
+    // ツール開始後に中断した場合でも tool-use-complete を発火させ、開始/完了対応を保つ。
+    const ac = new AbortController();
+    // Custom iterable: emit tool-use-start, abort, then yield one more event that
+    // the loop should detect-and-break-on rather than process.
+    // tool-use-start を流した直後に abort し、次のイベントでループを抜けるイテラブル。
+    queryMock.mockReturnValue({
+      async *[Symbol.asyncIterator]() {
+        yield partial({
+          type: "content_block_start",
+          content_block: { type: "tool_use", name: "Bash", input: '{"command":"sleep 1"}' },
+        }) as unknown as SDKMessage;
+        ac.abort();
+        yield partial({
+          type: "content_block_delta",
+          delta: { type: "text_delta", text: "ignored" },
+        }) as unknown as SDKMessage;
+      },
+    });
+
+    await runQuery({
+      id: "q1",
+      prompt: "p",
+      writeLine: (l) => writes.push(l),
+      abortController: ac,
+      tracker,
+    });
+
+    expect(parsed()).toEqual([
+      { type: "tool-use-start", id: "q1", toolName: "Bash", toolInput: '{"command":"sleep 1"}' },
+      { type: "tool-use-complete", id: "q1", toolName: "Bash" },
+      { type: "error", id: "q1", error: "Query aborted", code: "aborted" },
+    ]);
+  });
+
+  it("flushes an active tool with tool-use-complete when the stream throws mid-tool", async () => {
+    // If the SDK iterator throws while a tool is active, emit tool-use-complete before the error.
+    // SDK イテレータがツール処理中に例外を投げた場合でも、エラーの前に tool-use-complete を発火させる。
+    queryMock.mockReturnValue({
+      async *[Symbol.asyncIterator]() {
+        yield partial({
+          type: "content_block_start",
+          content_block: { type: "tool_use", name: "Read", input: '{"path":"/x"}' },
+        }) as unknown as SDKMessage;
+        throw new Error("stream blew up");
+      },
+    });
+
+    await runQuery({
+      id: "q1",
+      prompt: "p",
+      writeLine: (l) => writes.push(l),
+      abortController: new AbortController(),
+      tracker,
+    });
+
+    expect(parsed()).toEqual([
+      { type: "tool-use-start", id: "q1", toolName: "Read", toolInput: '{"path":"/x"}' },
+      { type: "tool-use-complete", id: "q1", toolName: "Read" },
+      { type: "error", id: "q1", error: "stream blew up", code: "query_exception" },
+    ]);
+    expect(tracker.snapshot().status).toBe("idle");
+  });
+
   it("emits stream-complete with the aggregated text when the stream ends without a result", async () => {
     queryMock.mockReturnValue(
       makeQueryIterable([
