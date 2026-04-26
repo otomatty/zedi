@@ -607,6 +607,15 @@ describe("aiService - 回帰テスト", () => {
   });
 
   describe("callAIService - APIサーバー経由モード", () => {
+    // assertion 失敗時にも `fetch` / env の stub を確実に解除する。tail-cleanup だと
+    // 失敗時に後続テストへ stub が漏れるため、afterEach で unconditional に剥がす。
+    // Guarantee `fetch` / env stubs are cleared even when an assertion throws —
+    // tail-of-body cleanup would leak stubs into later tests.
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    });
+
     it("api_serverモードでAPIサーバーURLが未設定の場合はonErrorが呼ばれる", async () => {
       const settings: AISettings = {
         provider: "openai",
@@ -670,9 +679,6 @@ describe("aiService - 回帰テスト", () => {
       const body = JSON.parse(init?.body ?? "{}");
       expect(body.model).toBe("openai:gpt-5-pro");
       expect(callbacks.onComplete).toHaveBeenCalled();
-
-      vi.unstubAllEnvs();
-      vi.unstubAllGlobals();
     });
 
     it("apiMode が未設定でも api_server へフォールバックする", async () => {
@@ -704,8 +710,6 @@ describe("aiService - 回帰テスト", () => {
 
       // ユーザーキーモードならクライアントSDKが呼ばれるが、ここでは fetch のみ呼ばれることを確認。
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      vi.unstubAllEnvs();
-      vi.unstubAllGlobals();
     });
   });
 
