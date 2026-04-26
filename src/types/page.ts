@@ -52,22 +52,40 @@ export interface PageSummary {
 }
 
 /**
- * ページ間のリンク（source → target）。
- * Link between two pages (source → target).
+ * `links` / `ghost_links` で共有する種別識別子。サーバ側 `link_type` カラムに対応。
+ * Link kind shared by `links` / `ghost_links`; mirrors the server `link_type` column.
+ *
+ * - `"wiki"`: WikiLink `[[Title]]` (legacy default).
+ * - `"tag"`:  Hashtag `#name` (issue #725 Phase 1)。
+ */
+export type LinkType = "wiki" | "tag";
+
+/** `link_type` に許容される文字列値。 / Allowed `link_type` values. */
+export const LINK_TYPES: readonly LinkType[] = ["wiki", "tag"] as const;
+
+/**
+ * ページ間のリンク（source → target）。`linkType` で WikiLink とタグを区別する。
+ * Link between two pages (source → target); `linkType` distinguishes WikiLink vs. tag.
  */
 export interface Link {
   sourceId: string;
   targetId: string;
+  /**
+   * `'wiki'` | `'tag'`。Issue #725 で追加。未指定の旧コードパスは `'wiki'` として扱う。
+   * Added by issue #725; legacy callers default to `'wiki'`.
+   */
+  linkType: LinkType;
   createdAt: number;
 }
 
 /**
- * 対象ページがまだ存在しない WikiLink（未解決リンク）。
- * Unresolved WikiLink whose target page does not yet exist.
+ * 対象ページがまだ存在しない WikiLink / タグ（未解決リンク）。`linkType` で種別を区別する。
+ * Unresolved WikiLink or tag; `linkType` distinguishes which flavor is ghosted.
  */
 export interface GhostLink {
   linkText: string;
   sourcePageId: string;
+  linkType: LinkType;
   createdAt: number;
 }
 

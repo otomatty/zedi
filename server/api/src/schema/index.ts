@@ -40,10 +40,12 @@ export {
 export {
   links,
   ghostLinks,
+  LINK_TYPES,
   type Link,
   type NewLink,
   type GhostLink,
   type NewGhostLink,
+  type LinkType,
 } from "./links.js";
 export { pageContents, type PageContent, type NewPageContent } from "./pageContents.js";
 export { pageSnapshots, type PageSnapshot, type NewPageSnapshot } from "./pageSnapshots.js";

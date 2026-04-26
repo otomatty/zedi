@@ -27,6 +27,11 @@
 - エラーハンドリングとログが適切か。
 - 日本語・英語のコメント・ドキュメントがプロジェクトのトーンに合っているか。
 
+## DB スキーマ変更
+
+- TS スキーマ (`server/api/src/schema/**`) を変更した PR では必ず `server/api/drizzle/NNNN_*.sql` を新規追加し、`server/api/drizzle/meta/_journal.json` にもエントリを追記する。詳細は [AGENTS.md §「DB スキーマ変更」](./AGENTS.md#db-スキーマ変更必読--database-schema-changes-must-read) を参照。
+- CI の `drizzle-migration-check` ジョブが PR でスキーマ変更と SQL 追加のペアを強制する。
+
 ## その他
 
 - 変更が大きい場合は小さな PR に分けることを推奨する。

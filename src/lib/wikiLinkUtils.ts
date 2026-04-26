@@ -3,6 +3,15 @@
  * ページ内のWikiLinkの解析と状態更新を行う
  */
 
+/**
+ * 同期・描画フローで扱う WikiLink マークの最小形。`exists` は同名ページが
+ * 解決可能かどうか、`referenced` は他ページからゴーストリンクで参照されて
+ * いるかを表す。
+ *
+ * Minimal shape of a WikiLink consumed by sync / render flows. `exists`
+ * indicates whether a same-titled page resolves; `referenced` tracks ghost
+ * references from other pages.
+ */
 export interface WikiLinkInfo {
   title: string;
   exists: boolean;
@@ -66,12 +75,21 @@ export function extractWikiLinksFromContent(content: string): WikiLinkInfo[] {
  * @param content 元のTiptap JSONコンテンツ
  * @param pageTitles 存在するページのタイトルセット（小文字正規化済み）
  * @param referencedTitles 他ページから参照されているリンクテキストのセット（小文字正規化済み）
+ * @param pageTitleToId 正規化済みタイトル → ターゲットページ id のマップ。issue #737 で
+ *  追加。`exists` が true になるリンクに `targetId` 属性を埋めることで、リネーム伝播
+ *  が同名ページとの衝突を ID 一致で回避できるようにする。省略時は `targetId` を更新
+ *  しない（既存マークの値を温存する）。
+ *  Optional normalized title → target page id map (issue #737). When provided,
+ *  resolved links get their `targetId` populated so server-side rename
+ *  propagation can disambiguate same-title pages by id. When omitted, the
+ *  existing `targetId` is left untouched.
  * @returns 更新されたコンテンツと変更があったかどうか
  */
 export function updateWikiLinkAttributes(
   content: string,
   pageTitles: Set<string>,
   referencedTitles: Set<string>,
+  pageTitleToId?: Map<string, string>,
 ): { content: string; hasChanges: boolean } {
   if (!content) return { content, hasChanges: false };
 
@@ -99,17 +117,37 @@ export function updateWikiLinkAttributes(
               const normalizedTitle = (attrs.title as string).toLowerCase().trim();
               const newExists = pageTitles.has(normalizedTitle);
               const newReferenced = referencedTitles.has(normalizedTitle);
+              // 解決済みターゲット ID を埋める (issue #737)。`null` のまま
+              // 上書きしない (既存値温存) ため、resolved 時のみ書き換え対象。
+              // Populate the resolved target id (issue #737). Never overwrite
+              // an existing id with `null`; only update when the link
+              // resolves and the map provides a fresh id.
+              const resolvedTargetId =
+                newExists && pageTitleToId !== undefined
+                  ? (pageTitleToId.get(normalizedTitle) ?? null)
+                  : null;
+              const currentTargetId = typeof attrs.targetId === "string" ? attrs.targetId : null;
+              const targetIdChanged =
+                resolvedTargetId !== null && resolvedTargetId !== currentTargetId;
 
               // 状態が変わった場合のみ更新
-              if (attrs.exists !== newExists || attrs.referenced !== newReferenced) {
+              if (
+                attrs.exists !== newExists ||
+                attrs.referenced !== newReferenced ||
+                targetIdChanged
+              ) {
                 hasChanges = true;
+                const nextAttrs: Record<string, unknown> = {
+                  ...attrs,
+                  exists: newExists,
+                  referenced: newReferenced,
+                };
+                if (targetIdChanged) {
+                  nextAttrs.targetId = resolvedTargetId;
+                }
                 return {
                   ...mark,
-                  attrs: {
-                    ...attrs,
-                    exists: newExists,
-                    referenced: newReferenced,
-                  },
+                  attrs: nextAttrs,
                 };
               }
             }

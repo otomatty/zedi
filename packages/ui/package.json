@@ -10,6 +10,10 @@
     "./hooks/use-toast": "./src/hooks/use-toast.ts",
     "./components/sonner": "./src/components/sonner.tsx"
   },
+  "scripts": {
+    "test": "vitest --config vitest.config.ts",
+    "test:run": "vitest run --config vitest.config.ts"
+  },
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

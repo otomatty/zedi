@@ -120,6 +120,13 @@
       "when": 1777334400000,
       "tag": "0017_add_link_type",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777420800000,
+      "tag": "0018_add_onboarding_and_page_kind",
+      "breakpoints": true
     }
   ]
 }

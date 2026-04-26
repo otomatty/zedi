@@ -489,6 +489,67 @@ describe("updateWikiLinkAttributes", () => {
     expect(result.content).toBe(bad);
     expect(result.hasChanges).toBe(false);
   });
+
+  describe("targetId plumbing (issue #737)", () => {
+    // `pageTitleToId` を渡すと resolved リンクに `targetId` を埋める。
+    // Pin the `targetId` plumbing introduced for issue #737.
+    const TARGET_ID = "11111111-aaaa-bbbb-cccc-000000000001";
+
+    function buildContent(extraAttrs: Record<string, unknown> = {}): string {
+      return JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "Link",
+                marks: [
+                  {
+                    type: "wikiLink",
+                    attrs: { title: "Page", exists: false, referenced: false, ...extraAttrs },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    }
+
+    it("populates targetId when pageTitleToId is provided and link resolves", () => {
+      const content = buildContent();
+      const map = new Map([["page", TARGET_ID]]);
+      const result = updateWikiLinkAttributes(content, new Set(["page"]), new Set(), map);
+      expect(result.hasChanges).toBe(true);
+      const attrs = JSON.parse(result.content).content[0].content[0].marks[0].attrs;
+      expect(attrs.exists).toBe(true);
+      expect(attrs.targetId).toBe(TARGET_ID);
+    });
+
+    it("leaves targetId untouched when pageTitleToId is omitted", () => {
+      // 既存マークの `targetId` は触らない契約を固定する。
+      // Pin the contract that omitting the map does not blank a stale id.
+      const content = buildContent({ targetId: "preexisting-id" });
+      const result = updateWikiLinkAttributes(content, new Set(["page"]), new Set());
+      const attrs = JSON.parse(result.content).content[0].content[0].marks[0].attrs;
+      expect(attrs.targetId).toBe("preexisting-id");
+    });
+
+    it("does not set targetId when the link does not resolve", () => {
+      const content = buildContent();
+      const map = new Map([["other", TARGET_ID]]);
+      const result = updateWikiLinkAttributes(content, new Set(["other"]), new Set(), map);
+      // exists changed for "other"-not-page? No — the link title is "page" but
+      // pageTitles only contains "other", so newExists stays false.
+      // Reflect that hasChanges should be false for this configuration.
+      // タイトルは "page" だが pageTitles は "other" だけ持つので未解決のまま。
+      expect(result.hasChanges).toBe(false);
+      const attrs = JSON.parse(result.content).content[0].content[0].marks[0].attrs;
+      expect(attrs.targetId).toBeUndefined();
+    });
+  });
 });
 
 describe("getUniqueWikiLinkTitles", () => {

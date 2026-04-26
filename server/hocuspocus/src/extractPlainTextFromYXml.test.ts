@@ -140,6 +140,6 @@ describe("buildContentPreview", () => {
     const long = "x".repeat(200);
     const prev = buildContentPreview(long);
     expect(prev.endsWith("...")).toBe(true);
-    expect(prev.length).toBeLessThanOrEqual(124);
+    expect(prev.length).toBeLessThanOrEqual(120);
   });
 });

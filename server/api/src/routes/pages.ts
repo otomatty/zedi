@@ -17,6 +17,7 @@ import { authRequired } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { maybeCreateSnapshot } from "../services/snapshotService.js";
 import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
+import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
 
 /**
  * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
@@ -40,20 +41,76 @@ async function tryAutoSnapshot(
 const app = new Hono<AppEnv>();
 
 /**
+ * タイトル変更を検出した際に WikiLink / タグを他ページへ伝播させる
+ * (issue #726)。リネーム本体のレスポンスはブロックしないよう fire-and-forget
+ * で呼び出す。失敗時はログのみ。
+ *
+ * Fire-and-forget propagation of a title rename into referencing documents
+ * and ghost-link promotion (issue #726). The caller is not blocked; failures
+ * are logged but do not affect the main response.
+ */
+function tryPropagateTitleRename(
+  db: Database,
+  pageId: string,
+  oldTitle: string,
+  newTitle: string,
+): void {
+  void propagateTitleRename(db, pageId, oldTitle, newTitle).catch((error) => {
+    console.error(
+      `[RenamePropagation] Background propagation crashed for ${pageId} ` +
+        `(${oldTitle} → ${newTitle}):`,
+      error,
+    );
+  });
+}
+
+/**
  * PUT /content リクエストから pages テーブルの更新セットを構築し、変更があれば適用する。
- * Build and apply pages-table updates (title, content_preview, updated_at) from PUT body.
+ * タイトル更新を検出した場合は旧タイトルを返して呼び出し側から伝播処理を
+ * 起動できるようにする（issue #726）。
+ *
+ * Build and apply pages-table updates (title, content_preview, updated_at)
+ * from the PUT body. When the title is being changed, return the old / new
+ * title pair so the caller can kick off rename propagation once the row
+ * update is durable (issue #726).
  */
 async function applyPagesMetadataUpdate(
-  db: { update: Database["update"] },
+  db: { select: Database["select"]; update: Database["update"] },
   pageId: string,
   body: { title?: string; content_preview?: string },
-): Promise<void> {
+): Promise<{ renamed: { oldTitle: string; newTitle: string } | null }> {
+  let renamed: { oldTitle: string; newTitle: string } | null = null;
+
+  if (body.title !== undefined) {
+    const current = await db
+      .select({ title: pages.title })
+      .from(pages)
+      .where(eq(pages.id, pageId))
+      .limit(1);
+    const previousRaw = current[0]?.title ?? null;
+    const previousTrimmed = typeof previousRaw === "string" ? previousRaw.trim() : "";
+    const nextTrimmed = body.title.trim();
+    // 正規化（小文字化）して比較することで "Foo" → "foo" のような表記揺れだけの
+    // 変更は伝播をスキップする。`wikiLinkUtils` / `tagUtils` の照合も同一正規化。
+    // Normalize for comparison so "Foo" → "foo" — a change that wouldn't
+    // affect matching — does not trigger propagation. Mirrors the client-side
+    // `wikiLinkUtils` / `tagUtils` normalization.
+    if (
+      previousTrimmed.length > 0 &&
+      nextTrimmed.length > 0 &&
+      previousTrimmed.toLowerCase() !== nextTrimmed.toLowerCase()
+    ) {
+      renamed = { oldTitle: previousTrimmed, newTitle: nextTrimmed };
+    }
+  }
+
   const set: Record<string, unknown> = {};
   if (body.title !== undefined) set.title = body.title;
   if (body.content_preview !== undefined) set.contentPreview = body.content_preview;
-  if (Object.keys(set).length === 0) return;
+  if (Object.keys(set).length === 0) return { renamed };
   set.updatedAt = new Date();
   await db.update(pages).set(set).where(eq(pages.id, pageId));
+  return { renamed };
 }
 
 // ── GET /pages ──────────────────────────────────────────────────────────────
@@ -247,9 +304,9 @@ app.put("/:id/content", authRequired, async (c) => {
         const insertedRow = inserted[0];
         if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
 
-        await applyPagesMetadataUpdate(tx, pageId, body);
+        const { renamed } = await applyPagesMetadataUpdate(tx, pageId, body);
 
-        return { done: true as const, version: insertedRow.version ?? 1 };
+        return { done: true as const, version: insertedRow.version ?? 1, renamed };
       });
 
       if (firstSave.done) {
@@ -261,6 +318,14 @@ app.put("/:id/content", authRequired, async (c) => {
           firstSave.version,
           userId,
         );
+        if (firstSave.renamed) {
+          tryPropagateTitleRename(
+            db,
+            pageId,
+            firstSave.renamed.oldTitle,
+            firstSave.renamed.newTitle,
+          );
+        }
         return c.json({ version: firstSave.version });
       }
     }
@@ -293,7 +358,7 @@ app.put("/:id/content", authRequired, async (c) => {
     const updatedRow = updated[0];
     if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
 
-    await applyPagesMetadataUpdate(db, pageId, body);
+    const { renamed } = await applyPagesMetadataUpdate(db, pageId, body);
 
     void tryAutoSnapshot(
       db,
@@ -303,6 +368,10 @@ app.put("/:id/content", authRequired, async (c) => {
       updatedRow.version ?? 0,
       userId,
     );
+
+    if (renamed) {
+      tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
+    }
 
     return c.json({ version: updatedRow.version ?? 0 });
   }
@@ -327,7 +396,7 @@ app.put("/:id/content", authRequired, async (c) => {
     })
     .returning();
 
-  await applyPagesMetadataUpdate(db, pageId, body);
+  const { renamed } = await applyPagesMetadataUpdate(db, pageId, body);
 
   const resultRow = result[0];
   if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
@@ -340,6 +409,10 @@ app.put("/:id/content", authRequired, async (c) => {
     resultRow.version ?? 0,
     userId,
   );
+
+  if (renamed) {
+    tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
+  }
 
   return c.json({ version: resultRow.version });
 });

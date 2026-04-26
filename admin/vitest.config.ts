@@ -2,6 +2,11 @@ import path from "path";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // Anchor `include` / `setupFiles` to admin/ so the config also works when
+  // invoked from the workspace root (`vitest run --config admin/vitest.config.ts`).
+  // ルート（`vitest run --config admin/vitest.config.ts`）から呼ばれた場合も
+  // `include` / `setupFiles` が admin/ 配下を指すよう root を固定する。
+  root: __dirname,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -9,14 +9,18 @@ export interface InstallationCheckResult {
   version?: string;
 }
 
-const CLAUDE = process.platform === "win32" ? "claude.exe" : "claude";
-
-/** argv for `claude --version` (Windows uses `cmd /c` for npm-style shims). / Windows は npm 系シム解決のため cmd 経由 */
-function claudeVersionArgv(): string[] {
-  if (process.platform === "win32") {
+/**
+ * argv for `claude --version` (Windows uses `cmd /c` for npm-style shims).
+ * Windows は npm 系シム解決のため cmd 経由。
+ *
+ * @param platform - Override of `process.platform` for testing. / テスト用に `process.platform` を差し替えるためのオプション。
+ * @internal exported for unit testing only.
+ */
+export function claudeVersionArgv(platform: NodeJS.Platform = process.platform): string[] {
+  if (platform === "win32") {
     return ["cmd.exe", "/c", "claude", "--version"];
   }
-  return [CLAUDE, "--version"];
+  return ["claude", "--version"];
 }
 
 /**

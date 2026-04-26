@@ -104,6 +104,11 @@ export function extractTagsFromContent(content: string): TagInfo[] {
  * 属性を更新する。`pageTitles` / `referencedTitles` は呼び出し側で解決済みの
  * ページタイトル集合（小文字・トリム正規化済み）。
  *
+ * `pageTitleToId` を渡すと、解決時に `targetId` 属性も埋める（issue #737）。
+ * 省略時は既存の `targetId` を温存する。
+ * Pass `pageTitleToId` (issue #737) to also populate the `targetId`
+ * attribute on resolved marks; omitted → preserve existing id.
+ *
  * @returns 更新後の JSON と、属性変更が発生したかどうか。
  *          The updated JSON and a flag indicating whether any mark changed.
  */
@@ -111,6 +116,7 @@ export function updateTagAttributes(
   content: string,
   pageTitles: Set<string>,
   referencedTitles: Set<string>,
+  pageTitleToId?: Map<string, string>,
 ): { content: string; hasChanges: boolean } {
   if (!content) return { content, hasChanges: false };
 
@@ -138,16 +144,35 @@ export function updateTagAttributes(
               const normalizedName = name.toLowerCase();
               const newExists = pageTitles.has(normalizedName);
               const newReferenced = referencedTitles.has(normalizedName);
+              // 解決済みターゲット ID を埋める (issue #737)。`null` のまま
+              // 上書きしない (既存値温存) ため、resolved 時のみ書き換え対象。
+              // Populate the resolved target id (issue #737). Never overwrite
+              // an existing id with `null`; only update when resolved.
+              const resolvedTargetId =
+                newExists && pageTitleToId !== undefined
+                  ? (pageTitleToId.get(normalizedName) ?? null)
+                  : null;
+              const currentTargetId = typeof attrs.targetId === "string" ? attrs.targetId : null;
+              const targetIdChanged =
+                resolvedTargetId !== null && resolvedTargetId !== currentTargetId;
 
-              if (attrs.exists !== newExists || attrs.referenced !== newReferenced) {
+              if (
+                attrs.exists !== newExists ||
+                attrs.referenced !== newReferenced ||
+                targetIdChanged
+              ) {
                 hasChanges = true;
+                const nextAttrs: Record<string, unknown> = {
+                  ...attrs,
+                  exists: newExists,
+                  referenced: newReferenced,
+                };
+                if (targetIdChanged) {
+                  nextAttrs.targetId = resolvedTargetId;
+                }
                 return {
                   ...mark,
-                  attrs: {
-                    ...attrs,
-                    exists: newExists,
-                    referenced: newReferenced,
-                  },
+                  attrs: nextAttrs,
                 };
               }
             }

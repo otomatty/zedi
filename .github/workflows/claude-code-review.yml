@@ -1,9 +1,19 @@
 # Claude Code Review - main/develop 向け PR で自動実行
+# Claude Code Review - runs automatically on PRs targeting main / develop.
 #
 # 初回セットアップ時の注意:
-# OIDC 検証のため、ワークフローはデフォルトブランチ(main)に存在し同一内容である必要があります。
-# 初回の PR では Claude Code Review が失敗しますが、マージ後・develop→main リリース後に
-# 以降の PR で正常動作します。continue-on-error により初回失敗時もマージをブロックしません。
+# OIDC 検証のため、ワークフローは「現在のデフォルトブランチ」に存在し、
+# 対象ブランチ側にも同一内容である必要があります。
+# 初回の PR では Claude Code Review が失敗する場合がありますが、
+# 必要な反映後の PR で正常動作します。
+# continue-on-error により初回失敗時もマージをブロックしません。
+#
+# Initial setup note:
+# For OIDC verification, this workflow must exist on the repository's current
+# default branch and its contents must match the workflow on the target branch.
+# The first PR after a default-branch change may fail, but subsequent PRs work
+# normally once the workflow is propagated. `continue-on-error: true` ensures
+# that initial failures do not block merges.
 # ref: https://github.com/anthropics/claude-code-action/issues/722
 #
 name: Claude Code Review

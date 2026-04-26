@@ -1,5 +1,5 @@
 import type { IPageRepository } from "@/lib/pageRepository";
-import type { PageSummary } from "@/types/page";
+import type { PageSummary, LinkType } from "@/types/page";
 
 /**
  * `syncLinksWithRepo` が受け取る WikiLink の最小情報。
@@ -45,6 +45,16 @@ export interface SyncLinksOptions {
    * candidates and every WikiLink becomes a ghost link.
    */
   notePages?: Array<Pick<PageSummary, "id" | "title">>;
+  /**
+   * 同期対象の `link_type`。既定は `'wiki'`（WikiLink）。`'tag'` を指定すると
+   * タグ記法 (`#name`) のエッジを同期する（issue #725 Phase 1）。指定種別の
+   * バケットだけを読み書きし、別種別のエッジには触れない。
+   *
+   * Which link bucket to sync. Defaults to `'wiki'`; pass `'tag'` to sync
+   * hashtag edges (issue #725 Phase 1). Other link types are never read or
+   * written by this call.
+   */
+  linkType?: LinkType;
 }
 
 /**
@@ -83,6 +93,11 @@ export async function syncLinksWithRepo(
   // an empty string as personal scope; compare to `null` explicitly so the
   // scope switch follows the documented contract.
   const pageNoteId = options.pageNoteId ?? null;
+  // issue #725 Phase 1: `linkType` 省略時は `'wiki'`（既存の WikiLink 同期）。
+  // `'tag'` を渡すとタグエッジバケットのみを同期し、他種別のエッジには触れない。
+  // Default `linkType` to `'wiki'` (issue #725 Phase 1); `'tag'` scopes sync
+  // to the tag bucket only, leaving wiki edges intact.
+  const linkType: LinkType = options.linkType ?? "wiki";
   const candidateSource: Array<Pick<PageSummary, "id" | "title">> =
     pageNoteId !== null ? (options.notePages ?? []) : await repo.getPagesSummary(userId);
 
@@ -101,19 +116,19 @@ export async function syncLinksWithRepo(
   // the current scope: remove the stale edge so we do not accumulate dangling
   // graph entries when `notePages` is empty.
   const [oldOutgoingTargetIds, oldGhostTexts] = await Promise.all([
-    repo.getOutgoingLinks(sourcePageId),
-    repo.getGhostLinksBySourcePage(sourcePageId),
+    repo.getOutgoingLinks(sourcePageId, linkType),
+    repo.getGhostLinksBySourcePage(sourcePageId, linkType),
   ]);
   for (const targetId of oldOutgoingTargetIds) {
     const norm = idToNormalizedTitle.get(targetId);
     if (norm === undefined || !currentNormalizedTitles.has(norm)) {
-      await repo.removeLink(sourcePageId, targetId);
+      await repo.removeLink(sourcePageId, targetId, linkType);
     }
   }
   for (const linkText of oldGhostTexts) {
     const norm = linkText.toLowerCase().trim();
     if (!currentNormalizedTitles.has(norm)) {
-      await repo.removeGhostLink(linkText, sourcePageId);
+      await repo.removeGhostLink(linkText, sourcePageId, linkType);
     }
   }
 
@@ -123,10 +138,10 @@ export async function syncLinksWithRepo(
     const targetPageId = pageTitleToId.get(normalizedTitle);
 
     if (targetPageId && targetPageId !== sourcePageId) {
-      await repo.addLink(sourcePageId, targetPageId);
-      await repo.removeGhostLink(link.title, sourcePageId);
+      await repo.addLink(sourcePageId, targetPageId, linkType);
+      await repo.removeGhostLink(link.title, sourcePageId, linkType);
     } else if (!targetPageId) {
-      await repo.addGhostLink(link.title, sourcePageId);
+      await repo.addGhostLink(link.title, sourcePageId, linkType);
     }
   }
 }

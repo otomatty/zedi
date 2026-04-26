@@ -334,4 +334,50 @@ describe("PUT /api/pages/:id/content", () => {
 
     expect(res.status).toBe(400);
   });
+
+  // Issue #726: タイトル変更検出のため、PUT に title が含まれるとき pages.title
+  // を SELECT してから UPDATE を行う。これにより伝播処理の起点になる。
+  // Issue #726: when PUT carries `title`, the route SELECTs the current
+  // `pages.title` before UPDATE so the handler can detect a rename and
+  // trigger background propagation.
+  it("issues an extra SELECT for rename detection when body.title is provided", async () => {
+    const ydocB64 = Buffer.from("hello").toString("base64");
+    const { app, chains } = createPagesAppWithChains([
+      // 1. access check select
+      [{ id: PAGE_ID, ownerId: TEST_USER_ID }],
+      // 2. UPDATE page_contents (optimistic version path)
+      [{ version: 2, pageId: PAGE_ID }],
+      // 3. SELECT pages.title in applyPagesMetadataUpdate (rename detection)
+      //    Same title as body → no propagation triggered.
+      [{ title: "Same Title" }],
+      // 4. UPDATE pages (title + updatedAt)
+      [],
+      // 5. auto-snapshot select (empty → no snapshot)
+      [],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ydoc_state: ydocB64,
+        expected_version: 1,
+        title: "Same Title",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { version: number };
+    expect(body.version).toBe(2);
+
+    // applyPagesMetadataUpdate must have issued the extra SELECT for the
+    // pages.title read. The shape includes access-check SELECT + title-read
+    // SELECT (+ auto-snapshot SELECT), and at least one UPDATE chain.
+    // リネーム検出のため pages.title を読む SELECT が増えること。
+    const selectChains = chains.filter((c) => c.startMethod === "select");
+    expect(selectChains.length).toBeGreaterThanOrEqual(2);
+    const updateChains = chains.filter((c) => c.startMethod === "update");
+    // UPDATE page_contents + UPDATE pages
+    expect(updateChains.length).toBeGreaterThanOrEqual(2);
+  });
 });

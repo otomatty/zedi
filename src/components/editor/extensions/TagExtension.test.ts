@@ -202,4 +202,72 @@ describe("Tag extension configuration", () => {
     expect(extension.config.renderHTML).toBeDefined();
     expect(extension.config.addAttributes).toBeDefined();
   });
+
+  describe("targetId attribute (issue #737)", () => {
+    // 重複タイトル下でリネームを ID 一致で識別するため、tag マークに `targetId`
+    // 属性を追加した（issue #737 / 案 A）。本テスト群は属性宣言が正しい既定値
+    // と HTML ラウンドトリップを持つことを固定する。
+    // Pin the schema for the new `targetId` attribute used by rename
+    // propagation to discriminate same-title pages (issue #737, approach A).
+    function getTargetIdSpec(): {
+      default: unknown;
+      parseHTML: (el: HTMLElement) => unknown;
+      renderHTML: (attrs: Record<string, unknown>) => Record<string, unknown>;
+    } {
+      const extension = Tag.configure({});
+      const addAttributes = extension.config.addAttributes;
+      if (typeof addAttributes !== "function") {
+        throw new Error("addAttributes must be a function");
+      }
+      type AddAttributesContext = Record<string, unknown> & {
+        parent?: (() => Record<string, unknown>) | undefined;
+      };
+      const context: AddAttributesContext = {
+        ...extension,
+        parent: undefined,
+      };
+      const attrs = addAttributes.call(context) as Record<string, unknown>;
+      const targetId = attrs.targetId as ReturnType<typeof getTargetIdSpec>;
+      if (!targetId) throw new Error("targetId attribute missing");
+      return targetId;
+    }
+
+    it("declares a targetId attribute with default null", () => {
+      const spec = getTargetIdSpec();
+      expect(spec.default).toBeNull();
+    });
+
+    it("parses targetId from data-target-id on the rendered span", () => {
+      const spec = getTargetIdSpec();
+      const el = document.createElement("span");
+      el.setAttribute("data-target-id", "11111111-aaaa-bbbb-cccc-000000000001");
+      expect(spec.parseHTML(el)).toBe("11111111-aaaa-bbbb-cccc-000000000001");
+
+      const empty = document.createElement("span");
+      expect(spec.parseHTML(empty)).toBeNull();
+
+      empty.setAttribute("data-target-id", "");
+      expect(spec.parseHTML(empty)).toBeNull();
+    });
+
+    it("omits data-target-id when targetId is null or empty", () => {
+      // 属性が無いマーク（旧データや未解決状態）で `data-target-id=""` を出さない
+      // ことで、サーバ側 `rewriteTitleRefsInDoc` が「id が無い → タイトル fallback」
+      // と判定できるようにする。
+      // Pre-issue-#737 marks (and unresolved fresh pastes) must not emit a
+      // `data-target-id` attribute so the server-side rewriter sees them as
+      // id-less and falls back to title matching.
+      const spec = getTargetIdSpec();
+      expect(spec.renderHTML({ targetId: null })).toEqual({});
+      expect(spec.renderHTML({ targetId: "" })).toEqual({});
+      expect(spec.renderHTML({})).toEqual({});
+    });
+
+    it("emits data-target-id when targetId is a non-empty string", () => {
+      const spec = getTargetIdSpec();
+      expect(spec.renderHTML({ targetId: "11111111-aaaa-bbbb-cccc-000000000001" })).toEqual({
+        "data-target-id": "11111111-aaaa-bbbb-cccc-000000000001",
+      });
+    });
+  });
 });
