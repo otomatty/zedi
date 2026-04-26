@@ -67,7 +67,11 @@ vi.mock("@/hooks/useAIChatConversations", () => ({
     getConversation: (id: string) => mockGetConversation(id),
     getConversationsForPage: (pageId: string | undefined, type: string | undefined) =>
       mockGetConversationsForPage(pageId, type),
-    createConversation: () => mockCreateConversation(),
+    // 実装は `createConversation({ type, pageId, pageTitle })` の形でスナップショットを渡すため、
+    // 引数を破棄せず転送して回帰（snapshot を渡し忘れる変更）を検知できるようにする。
+    // The handler invokes `createConversation` with a `PageContextSnapshot`; forward
+    // the args so a regression that drops the snapshot is caught by the test.
+    createConversation: (...args: unknown[]) => mockCreateConversation(...args),
     updateConversation: (id: string, patch: unknown) => mockUpdateConversation(id, patch),
     deleteConversation: (id: string) => mockDeleteConversation(id),
   }),
@@ -317,6 +321,15 @@ describe("useAIChatPanelContentLogic - handlers wiring", () => {
     });
 
     expect(mockCreateConversation).toHaveBeenCalledTimes(1);
+    // 実装は editorContext の `{ type, pageId, pageTitle }` だけを抜き出してスナップショット化するので
+    // pageFullContent などの他のフィールドは含めずに比較する。
+    // The handler should pass a snapshot containing only the discriminant fields,
+    // not the full PageContext (e.g. pageFullContent must be excluded).
+    expect(mockCreateConversation).toHaveBeenCalledWith({
+      type: editorContext.type,
+      pageId: editorContext.pageId,
+      pageTitle: editorContext.pageTitle,
+    });
     expect(setActive).toHaveBeenCalledWith("new-conv");
     expect(mockSendMessage).toHaveBeenCalledWith("hi", []);
   });
