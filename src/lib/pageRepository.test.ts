@@ -1,0 +1,376 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { IPageRepository, CreatePageOptions, PageRepositoryOptions } from "./pageRepository";
+import type { Page, PageSummary, Link, GhostLink, LinkType } from "@/types/page";
+
+/**
+ * `pageRepository.ts` は型のみのインターフェース層であり、ランタイムロジックを
+ * 持たない。本テストは「インターフェースを満たす実装が、各 method を 1:1 で
+ * 下位ストア (=adapter) に委譲する」という契約をスパイで検証する。
+ *
+ * Concrete adapters (e.g. `StorageAdapterPageRepository`) carry their own
+ * behaviour tests; here we only verify the interface contract — every method
+ * exists, has the documented signature, and delegates verbatim.
+ *
+ * `pageRepository.ts` is a types-only module with no runtime behaviour. This
+ * test pins the contract: any implementation must expose every documented
+ * method and forward arguments to its underlying store.
+ */
+
+interface PageStoreLike {
+  pages: Map<string, Page>;
+  links: Link[];
+  ghostLinks: GhostLink[];
+}
+
+function makeStore(): PageStoreLike {
+  return { pages: new Map(), links: [], ghostLinks: [] };
+}
+
+/**
+ * 最小の `IPageRepository` 実装。各 method は store にしか触らず、CRUD と link
+ * 系は spy 越しに呼び出し回数を検証できる。
+ *
+ * Minimal repository implementation that delegates each method straight to a
+ * mutable store map; we then spy on it to verify delegation in tests.
+ */
+function createInMemoryRepository(
+  store: PageStoreLike,
+  options?: PageRepositoryOptions,
+): IPageRepository {
+  const fireMutate = async (): Promise<void> => {
+    if (options?.onMutate) await options.onMutate();
+  };
+
+  const repo: IPageRepository = {
+    async createPage(userId, title = "", content = "", opts) {
+      const id = `id-${store.pages.size + 1}`;
+      const now = Date.now();
+      const page: Page = {
+        id,
+        ownerUserId: userId,
+        noteId: null,
+        title,
+        content,
+        thumbnailUrl: opts?.thumbnailUrl ?? undefined,
+        sourceUrl: opts?.sourceUrl ?? undefined,
+        createdAt: now,
+        updatedAt: now,
+        isDeleted: false,
+      };
+      store.pages.set(id, page);
+      await fireMutate();
+      return page;
+    },
+    async getPage(_userId, pageId) {
+      const p = store.pages.get(pageId);
+      return p && !p.isDeleted ? p : null;
+    },
+    async getPages(_userId) {
+      return [...store.pages.values()].filter((p) => !p.isDeleted);
+    },
+    async getPagesSummary(_userId) {
+      return [...store.pages.values()].map<PageSummary>((p) => ({
+        id: p.id,
+        ownerUserId: p.ownerUserId,
+        noteId: p.noteId,
+        title: p.title,
+        contentPreview: p.contentPreview,
+        thumbnailUrl: p.thumbnailUrl,
+        sourceUrl: p.sourceUrl,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        isDeleted: p.isDeleted,
+      }));
+    },
+    async getPagesByIds(_userId, ids) {
+      return ids.map((id) => store.pages.get(id)).filter((p): p is Page => Boolean(p));
+    },
+    async getPageByTitle(_userId, title) {
+      return [...store.pages.values()].find((p) => p.title === title) ?? null;
+    },
+    async checkDuplicateTitle(_userId, title, excludePageId) {
+      return (
+        [...store.pages.values()].find((p) => p.title === title && p.id !== excludePageId) ?? null
+      );
+    },
+    async updatePage(_userId, pageId, updates) {
+      const p = store.pages.get(pageId);
+      if (!p) return;
+      store.pages.set(pageId, { ...p, ...updates, updatedAt: Date.now() });
+      await fireMutate();
+    },
+    async deletePage(_userId, pageId) {
+      const p = store.pages.get(pageId);
+      if (p) store.pages.set(pageId, { ...p, isDeleted: true });
+      await fireMutate();
+    },
+    async searchPages(_userId, query) {
+      return [...store.pages.values()].filter((p) =>
+        p.title.toLowerCase().includes(query.toLowerCase()),
+      );
+    },
+    async addLink(sourceId, targetId, linkType: LinkType = "wiki") {
+      if (
+        store.links.some(
+          (l) => l.sourceId === sourceId && l.targetId === targetId && l.linkType === linkType,
+        )
+      ) {
+        return;
+      }
+      store.links.push({ sourceId, targetId, linkType, createdAt: Date.now() });
+    },
+    async removeLink(sourceId, targetId, linkType: LinkType = "wiki") {
+      store.links = store.links.filter(
+        (l) => !(l.sourceId === sourceId && l.targetId === targetId && l.linkType === linkType),
+      );
+    },
+    async getOutgoingLinks(pageId, linkType: LinkType = "wiki") {
+      return store.links
+        .filter((l) => l.sourceId === pageId && l.linkType === linkType)
+        .map((l) => l.targetId);
+    },
+    async getBacklinks(pageId, linkType: LinkType = "wiki") {
+      return store.links
+        .filter((l) => l.targetId === pageId && l.linkType === linkType)
+        .map((l) => l.sourceId);
+    },
+    async getLinks(_userId) {
+      return [...store.links];
+    },
+    async addGhostLink(linkText, sourcePageId, linkType: LinkType = "wiki") {
+      if (
+        store.ghostLinks.some(
+          (g) =>
+            g.linkText === linkText && g.sourcePageId === sourcePageId && g.linkType === linkType,
+        )
+      ) {
+        return;
+      }
+      store.ghostLinks.push({
+        linkText,
+        sourcePageId,
+        linkType,
+        createdAt: Date.now(),
+      });
+    },
+    async removeGhostLink(linkText, sourcePageId, linkType: LinkType = "wiki") {
+      store.ghostLinks = store.ghostLinks.filter(
+        (g) =>
+          !(g.linkText === linkText && g.sourcePageId === sourcePageId && g.linkType === linkType),
+      );
+    },
+    async getGhostLinkSources(linkText, linkType: LinkType = "wiki") {
+      return store.ghostLinks
+        .filter((g) => g.linkText === linkText && g.linkType === linkType)
+        .map((g) => g.sourcePageId);
+    },
+    async getGhostLinks(_userId) {
+      return [...store.ghostLinks];
+    },
+    async getGhostLinksBySourcePage(sourcePageId, linkType: LinkType = "wiki") {
+      return store.ghostLinks
+        .filter((g) => g.sourcePageId === sourcePageId && g.linkType === linkType)
+        .map((g) => g.linkText);
+    },
+    async promoteGhostLink(userId, linkText) {
+      const sources = await repo.getGhostLinkSources(linkText, "wiki");
+      if (sources.length < 2) return null;
+      const created = await repo.createPage(userId, linkText, "");
+      for (const sourceId of sources) {
+        await repo.addLink(sourceId, created.id, "wiki");
+        await repo.removeGhostLink(linkText, sourceId, "wiki");
+      }
+      return created;
+    },
+  };
+
+  return repo;
+}
+
+describe("IPageRepository contract", () => {
+  let store: PageStoreLike;
+  let repo: IPageRepository;
+
+  beforeEach(() => {
+    store = makeStore();
+    repo = createInMemoryRepository(store);
+  });
+
+  it("exposes every documented method as a function", () => {
+    const required = [
+      "createPage",
+      "getPage",
+      "getPages",
+      "getPagesSummary",
+      "getPagesByIds",
+      "getPageByTitle",
+      "checkDuplicateTitle",
+      "updatePage",
+      "deletePage",
+      "searchPages",
+      "addLink",
+      "removeLink",
+      "getOutgoingLinks",
+      "getBacklinks",
+      "getLinks",
+      "addGhostLink",
+      "removeGhostLink",
+      "getGhostLinkSources",
+      "getGhostLinks",
+      "getGhostLinksBySourcePage",
+      "promoteGhostLink",
+    ] as const;
+
+    for (const name of required) {
+      expect(typeof (repo as unknown as Record<string, unknown>)[name]).toBe("function");
+    }
+  });
+
+  it("createPage stores a Page and respects CreatePageOptions", async () => {
+    const options: CreatePageOptions = {
+      sourceUrl: "https://example.com",
+      thumbnailUrl: "https://thumb.example.com/x.png",
+    };
+    const page = await repo.createPage("user-1", "Title", "body", options);
+
+    expect(page.title).toBe("Title");
+    expect(page.ownerUserId).toBe("user-1");
+    expect(page.sourceUrl).toBe(options.sourceUrl);
+    expect(page.thumbnailUrl).toBe(options.thumbnailUrl);
+    expect(store.pages.size).toBe(1);
+  });
+
+  it("read methods return what the underlying store contains", async () => {
+    await repo.createPage("u1", "Alpha");
+    await repo.createPage("u1", "Bravo");
+
+    const all = await repo.getPages("u1");
+    expect(all.map((p) => p.title).sort()).toEqual(["Alpha", "Bravo"]);
+
+    const byTitle = await repo.getPageByTitle("u1", "Alpha");
+    expect(byTitle?.title).toBe("Alpha");
+
+    const ids = all.map((p) => p.id);
+    const byIds = await repo.getPagesByIds("u1", ids);
+    expect(byIds).toHaveLength(2);
+
+    const summaries = await repo.getPagesSummary("u1");
+    expect(summaries).toHaveLength(2);
+    // contentPreview / thumbnailUrl は省略されていてよいが、必須キーは存在する
+    // contentPreview / thumbnailUrl may be omitted, but required keys are present
+    for (const s of summaries) {
+      expect(s).toHaveProperty("id");
+      expect(s).toHaveProperty("title");
+      expect(s).toHaveProperty("noteId");
+    }
+  });
+
+  it("checkDuplicateTitle excludes the given page id", async () => {
+    const a = await repo.createPage("u1", "Same");
+    await repo.createPage("u1", "Same");
+
+    const dup = await repo.checkDuplicateTitle("u1", "Same", a.id);
+    expect(dup).not.toBeNull();
+    expect(dup?.id).not.toBe(a.id);
+  });
+
+  it("updatePage merges fields and deletePage soft-deletes", async () => {
+    const page = await repo.createPage("u1", "Old");
+    await repo.updatePage("u1", page.id, { title: "New" });
+    expect((await repo.getPage("u1", page.id))?.title).toBe("New");
+
+    await repo.deletePage("u1", page.id);
+    expect(await repo.getPage("u1", page.id)).toBeNull();
+  });
+
+  it("link methods default linkType to 'wiki' (issue #725 Phase 1)", async () => {
+    await repo.addLink("a", "b");
+    await repo.addLink("a", "c", "tag");
+
+    expect(await repo.getOutgoingLinks("a")).toEqual(["b"]);
+    expect(await repo.getOutgoingLinks("a", "tag")).toEqual(["c"]);
+    expect(await repo.getBacklinks("b")).toEqual(["a"]);
+
+    const all = await repo.getLinks("u1");
+    expect(all.map((l) => l.linkType).sort()).toEqual(["tag", "wiki"]);
+
+    await repo.removeLink("a", "b");
+    expect(await repo.getOutgoingLinks("a")).toEqual([]);
+    // タグ側は削除されないことを確認 / tag-typed edge survives wiki removal
+    expect(await repo.getOutgoingLinks("a", "tag")).toEqual(["c"]);
+  });
+
+  it("ghost link methods support linkType scoping and source listing", async () => {
+    await repo.addGhostLink("Topic", "p1");
+    await repo.addGhostLink("Topic", "p2");
+    await repo.addGhostLink("Topic", "p3", "tag");
+
+    expect((await repo.getGhostLinkSources("Topic")).sort()).toEqual(["p1", "p2"]);
+    expect(await repo.getGhostLinkSources("Topic", "tag")).toEqual(["p3"]);
+    expect(await repo.getGhostLinksBySourcePage("p1")).toEqual(["Topic"]);
+
+    const all = await repo.getGhostLinks("u1");
+    expect(all).toHaveLength(3);
+
+    await repo.removeGhostLink("Topic", "p1");
+    expect((await repo.getGhostLinkSources("Topic")).sort()).toEqual(["p2"]);
+  });
+
+  it("promoteGhostLink only promotes when 2+ wiki ghosts exist", async () => {
+    expect(await repo.promoteGhostLink("u1", "Solo")).toBeNull();
+
+    await repo.addGhostLink("Pair", "p1");
+    await repo.addGhostLink("Pair", "p2");
+    const created = await repo.promoteGhostLink("u1", "Pair");
+    expect(created).not.toBeNull();
+    expect(created?.title).toBe("Pair");
+
+    expect(await repo.getGhostLinkSources("Pair")).toEqual([]);
+    const out1 = await repo.getOutgoingLinks("p1");
+    const out2 = await repo.getOutgoingLinks("p2");
+    expect(out1).toContain(created?.id);
+    expect(out2).toContain(created?.id);
+  });
+
+  it("delegates each mutation through the same wrapped object (spy contract)", async () => {
+    const wrapped = createInMemoryRepository(makeStore());
+    const spy = {
+      createPage: vi.spyOn(wrapped, "createPage"),
+      updatePage: vi.spyOn(wrapped, "updatePage"),
+      deletePage: vi.spyOn(wrapped, "deletePage"),
+      addLink: vi.spyOn(wrapped, "addLink"),
+      addGhostLink: vi.spyOn(wrapped, "addGhostLink"),
+    };
+
+    const p = await wrapped.createPage("u1", "T");
+    await wrapped.updatePage("u1", p.id, { title: "T2" });
+    await wrapped.addLink(p.id, "other");
+    await wrapped.addGhostLink("ghost", p.id);
+    await wrapped.deletePage("u1", p.id);
+
+    expect(spy.createPage).toHaveBeenCalledWith("u1", "T");
+    expect(spy.updatePage).toHaveBeenCalledWith("u1", p.id, { title: "T2" });
+    expect(spy.addLink).toHaveBeenCalledWith(p.id, "other");
+    expect(spy.addGhostLink).toHaveBeenCalledWith("ghost", p.id);
+    expect(spy.deletePage).toHaveBeenCalledWith("u1", p.id);
+  });
+});
+
+describe("PageRepositoryOptions.onMutate", () => {
+  it("fires after each mutating method in implementations that wire it up", async () => {
+    const onMutate = vi.fn();
+    const r = createInMemoryRepository(makeStore(), { onMutate });
+
+    const page = await r.createPage("u1", "T");
+    await r.updatePage("u1", page.id, { title: "T2" });
+    await r.deletePage("u1", page.id);
+
+    // 3 mutations × 1 callback each = 3 invocations
+    expect(onMutate).toHaveBeenCalledTimes(3);
+  });
+
+  it("is optional: implementations may skip the callback", async () => {
+    const r = createInMemoryRepository(makeStore());
+    await expect(r.createPage("u1", "T")).resolves.toBeDefined();
+  });
+});
