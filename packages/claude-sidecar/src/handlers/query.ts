@@ -21,7 +21,13 @@ export type WriteLine = (line: string) => void;
 
 const DEFAULT_TOOLS = ["Read", "Write", "Bash", "WebSearch"] as const;
 
-function extractTextDelta(msg: SDKPartialAssistantMessage): string | null {
+/**
+ * Extracts a text delta from a `content_block_delta` stream event.
+ * `content_block_delta` ストリームイベントからテキスト delta を取り出す。
+ *
+ * @internal exported for unit testing only.
+ */
+export function extractTextDelta(msg: SDKPartialAssistantMessage): string | null {
   const ev = msg.event as unknown as Record<string, unknown> | undefined;
   if (!ev || typeof ev !== "object") return null;
   if (ev.type !== "content_block_delta") return null;
@@ -34,8 +40,10 @@ function extractTextDelta(msg: SDKPartialAssistantMessage): string | null {
 /**
  * Detects a tool_use content_block_start from a stream event.
  * ストリームイベントから tool_use の content_block_start を検出する。
+ *
+ * @internal exported for unit testing only.
  */
-function extractToolUseStart(
+export function extractToolUseStart(
   msg: SDKPartialAssistantMessage,
 ): { name: string; input: string } | null {
   const ev = msg.event as unknown as Record<string, unknown> | undefined;
@@ -51,17 +59,31 @@ function extractToolUseStart(
 /**
  * Detects a content_block_stop from a stream event (to mark tool use complete).
  * ストリームイベントから content_block_stop を検出する。
+ *
+ * @internal exported for unit testing only.
  */
-function isContentBlockStop(msg: SDKPartialAssistantMessage): boolean {
+export function isContentBlockStop(msg: SDKPartialAssistantMessage): boolean {
   const ev = msg.event as { type?: string } | undefined;
   return ev?.type === "content_block_stop";
 }
 
-function isToolProgressMessage(msg: SDKMessage): msg is SDKToolProgressMessage {
+/**
+ * Type guard for `tool_progress` messages emitted by the SDK.
+ * SDK が送出する `tool_progress` メッセージかを判定する型ガード。
+ *
+ * @internal exported for unit testing only.
+ */
+export function isToolProgressMessage(msg: SDKMessage): msg is SDKToolProgressMessage {
   return typeof msg === "object" && msg !== null && "type" in msg && msg.type === "tool_progress";
 }
 
-function extractAssistantText(msg: SDKAssistantMessage): string {
+/**
+ * Concatenates text blocks contained in an assistant message.
+ * assistant メッセージ内のテキストブロックを連結する。
+ *
+ * @internal exported for unit testing only.
+ */
+export function extractAssistantText(msg: SDKAssistantMessage): string {
   const message = msg.message as { content?: unknown };
   const content = message.content;
   if (!Array.isArray(content)) return "";
@@ -80,15 +102,23 @@ function extractAssistantText(msg: SDKAssistantMessage): string {
   return out;
 }
 
-function isResultMessage(msg: SDKMessage): msg is SDKResultMessage {
+/**
+ * Type guard for SDK `result` messages.
+ * SDK の `result` メッセージかを判定する型ガード。
+ *
+ * @internal exported for unit testing only.
+ */
+export function isResultMessage(msg: SDKMessage): msg is SDKResultMessage {
   return typeof msg === "object" && msg !== null && "type" in msg && msg.type === "result";
 }
 
 /**
  * Checks if a message is a system init message containing MCP server status.
  * system init メッセージ（MCP サーバーステータスを含む）かどうかを判定する。
+ *
+ * @internal exported for unit testing only.
  */
-function isSystemInitMessage(msg: SDKMessage): boolean {
+export function isSystemInitMessage(msg: SDKMessage): boolean {
   return (
     typeof msg === "object" &&
     msg !== null &&
@@ -102,8 +132,10 @@ function isSystemInitMessage(msg: SDKMessage): boolean {
 /**
  * Emits stream-complete on success or error line on failure.
  * 成功時は stream-complete、失敗時は error 行を出す。
+ *
+ * @internal exported for unit testing only.
  */
-function emitResultOrError(
+export function emitResultOrError(
   id: string,
   msg: SDKResultMessage,
   aggregated: string,
