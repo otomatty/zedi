@@ -90,18 +90,11 @@ describe("useAiModelsDragReorder.handleReorder", () => {
       }),
     );
 
+    // handleReorder は内部関数なので handleDrop 経由で 0 → 2 の移動を発火する
+    // (a を末尾に動かす)。
+    // Trigger handleReorder via handleDrop (drop "a" onto "c" => move to end).
     await act(async () => {
-      await result.current.handleDragStart;
-      // 0 → 2 の入れ替え（a を末尾に） / move "a" to the end
-      await (result.current as unknown as { handleReorder: typeof result.current.handleDrop }); // 型回避
-    });
-
-    // 直接 handleReorder を呼べないため hook 内部の handleDrop 経由で再現
-    // a → c 上にドロップで 0 → 2 を発火
-    const ev = makeDragEvent({ "text/plain": "a" });
-    await act(async () => {
-      result.current.handleDrop(ev, "c");
-      // microtask 1 周
+      result.current.handleDrop(makeDragEvent({ "text/plain": "a" }), "c");
       await Promise.resolve();
     });
 

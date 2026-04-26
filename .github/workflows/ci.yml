@@ -100,14 +100,23 @@ jobs:
 
       # Workspace package tests are not picked up by the root vitest config,
       # so run their dedicated configs explicitly. Keep this list in sync with
-      # the `test:run` script in root package.json.
+      # the `test:run` script in root package.json. server/mcp has its own job
+      # (`mcp-test`); server/hocuspocus is invoked only via `test:run` and not
+      # duplicated here.
       # ルートの vitest 設定はワークスペース配下のテストを含まないため、
-      # 各パッケージの vitest.config を明示的に実行する。
+      # 各パッケージの vitest.config を明示的に実行する。server/mcp は別 job
+      # （`mcp-test`）で動かすためここには含めない。
+      - name: Run admin tests
+        run: bunx vitest run --config admin/vitest.config.ts
+
       - name: Run @zedi/shared tests
         run: bunx vitest run --config packages/shared/vitest.config.ts
 
       - name: Run @zedi/ui tests
         run: bunx vitest run --config packages/ui/vitest.config.ts
+
+      - name: Run @zedi/claude-sidecar tests
+        run: bunx vitest run --config packages/claude-sidecar/vitest.config.ts
 
       - name: Upload coverage report
         if: always()

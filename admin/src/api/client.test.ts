@@ -53,14 +53,12 @@ describe("getErrorMessage", () => {
 });
 
 describe("adminFetch", () => {
-  const originalFetch = globalThis.fetch;
-
   beforeEach(() => {
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("ok", { status: 200 })));
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
+    vi.unstubAllGlobals();
   });
 
   it("credentials: include を必ず指定する / always sets credentials: 'include'", async () => {

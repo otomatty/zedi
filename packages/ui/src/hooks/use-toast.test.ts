@@ -80,13 +80,16 @@ describe("toast() / useToast()", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    // 永続している memoryState を空にするために dismiss + REMOVE 動作を待つ
-    // Reset memoryState by dispatching dismiss/remove via the public API.
+    // memoryState はモジュール singleton なのでテスト間で共有される。
+    // dismiss → REMOVE_TOAST(=TOAST_REMOVE_DELAY 後) を待ってから real timer に戻す。
+    // memoryState is a module-level singleton; dismiss + advance fake timers so
+    // the queued REMOVE_TOAST clears toasts before switching back to real timers.
     const { result } = renderHook(() => useToast());
     act(() => {
       result.current.dismiss();
+      vi.advanceTimersByTime(1_000_000);
     });
+    vi.useRealTimers();
   });
 
   it("toast() を呼ぶと subscriber に新しい toast が伝播される / emits new toast to subscribers", () => {
