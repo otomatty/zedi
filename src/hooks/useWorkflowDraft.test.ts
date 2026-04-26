@@ -32,12 +32,19 @@ import { useWorkflowDraft } from "./useWorkflowDraft";
 function resetStore(initial: WorkflowDefinition[] = []): void {
   useWorkflowDefinitionsStore.setState({
     definitions: initial,
+    // 実装の `useWorkflowDefinitionsStore` は upsert 時に updatedAt 降順で並び替えるため
+    // モックでも同じ並びを保つ。順序依存のリグレッションが隠れないようにするため。
+    // Mirror the real store: sort by `updatedAt` descending after upsert so the
+    // test setup matches production ordering and order-dependent regressions
+    // can surface.
     upsertDefinition: (def: WorkflowDefinition) => {
       mockUpsertDefinition(def);
-      useWorkflowDefinitionsStore.setState((s) => ({
-        ...s,
-        definitions: [...s.definitions.filter((d) => d.id !== def.id), def],
-      }));
+      useWorkflowDefinitionsStore.setState((s) => {
+        const next = [...s.definitions.filter((d) => d.id !== def.id), def].sort(
+          (a, b) => b.updatedAt - a.updatedAt,
+        );
+        return { ...s, definitions: next };
+      });
     },
     removeDefinition: (id: string) => {
       mockRemoveDefinition(id);
@@ -99,7 +106,7 @@ describe("useWorkflowDraft - initial state and steps", () => {
       vi.useRealTimers();
     });
 
-    expect(result.current.draft.updatedAt).toBeGreaterThanOrEqual(before);
+    expect(result.current.draft.updatedAt).toBeGreaterThan(before);
   });
 
   it("removeStep removes the step at index", () => {

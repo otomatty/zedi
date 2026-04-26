@@ -110,13 +110,18 @@ describe("useWorkflowRunSession - validation guards", () => {
   });
 
   it("aborts with editorRequired toast when pageContext is not editor", async () => {
+    // 実装では type !== "editor" のときに editorRequired を出す。
+    // PageContext.type の有効値（"editor" | "home" | "search" | "other"）から
+    // editor 以外を選ぶことで unsafe な cast を避ける。
+    // The hook gates execution on `type === "editor"`. Use the valid "home"
+    // discriminant so we exercise the "not editor" branch without an as-cast.
     const { result } = renderHook(() => useWorkflowRunSession(makeDraft()), {
       wrapper: createWrapper({
-        type: "wiki",
+        type: "home",
         pageId: "w1",
-        pageTitle: "Wiki",
+        pageTitle: "Home",
         pageContent: "",
-      } as PageContext),
+      }),
     });
 
     await act(async () => {

@@ -170,9 +170,12 @@ describe("useGeneralSettings", () => {
     );
   });
 
-  it("save returns true and toggles isSaving flag", async () => {
+  it("save returns true, persists via saveGeneralSettings, and toggles isSaving flag", async () => {
     const { result } = renderHook(() => useGeneralSettings());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+    // 初回ロードで saveGeneralSettings は呼ばれていないが、念のためクリアしてから assert する。
+    // Clear any prior calls so the assertion below pinpoints save()'s side effect.
+    mockSaveGeneralSettings.mockClear();
 
     let saved = false;
     await act(async () => {
@@ -180,6 +183,8 @@ describe("useGeneralSettings", () => {
     });
 
     expect(saved).toBe(true);
+    expect(mockSaveGeneralSettings).toHaveBeenCalledTimes(1);
+    expect(mockSaveGeneralSettings).toHaveBeenCalledWith(result.current.settings);
     expect(result.current.isSaving).toBe(false);
   });
 

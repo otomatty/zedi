@@ -9,19 +9,20 @@
  * 接続テストの副作用（モデル一覧更新と選択モデルのフォールバック）、save、reset を検証する。
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import type { AISettings, AIProviderType } from "@/types/ai";
 import type { ConnectionTestResult } from "@/lib/aiClient";
 
-const mockLoadAISettings = vi.fn();
-const mockSaveAISettings = vi.fn();
-const mockClearAISettings = vi.fn();
-const mockGetDefaultAISettings = vi.fn();
+const mockLoadAISettings = vi.fn<() => Promise<AISettings | null>>();
+const mockSaveAISettings = vi.fn<(s: AISettings) => Promise<void>>();
+const mockClearAISettings = vi.fn<() => void>();
+const mockGetDefaultAISettings = vi.fn<() => AISettings>();
 
-const mockTestConnection = vi.fn();
-const mockGetAvailableModels = vi.fn();
-const mockClearModelsCache = vi.fn();
+const mockTestConnection =
+  vi.fn<(provider: AIProviderType, apiKey: string) => Promise<ConnectionTestResult>>();
+const mockGetAvailableModels = vi.fn<(provider: AIProviderType) => string[]>();
+const mockClearModelsCache = vi.fn<() => void>();
 
 vi.mock("@/lib/aiSettings", () => ({
   loadAISettings: () => mockLoadAISettings(),
@@ -38,6 +39,13 @@ vi.mock("@/lib/aiClient", () => ({
 }));
 
 import { useAISettings } from "./useAISettings";
+
+// テスト失敗時も console.error 等の spy が確実に元に戻るよう、ファイル全体で後始末する。
+// File-wide cleanup so any console spy (e.g. console.error) is restored even
+// when an assertion throws before the test reaches its inline mockRestore().
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const baseDefaults: AISettings = {
   provider: "google",

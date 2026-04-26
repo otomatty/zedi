@@ -8,16 +8,24 @@
  * コールバック呼び出し、AI 設定確認、reset を検証する。
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import type {
   MermaidDiagramType,
   MermaidGeneratorCallbacks,
   MermaidGeneratorResult,
 } from "@/lib/mermaidGenerator";
+import type { AISettings } from "@/types/ai";
 
-const mockGenerateMermaidDiagram = vi.fn();
-const mockGetAISettingsOrThrow = vi.fn();
+const mockGenerateMermaidDiagram =
+  vi.fn<
+    (
+      text: string,
+      diagramTypes: MermaidDiagramType[],
+      callbacks: MermaidGeneratorCallbacks,
+    ) => Promise<void>
+  >();
+const mockGetAISettingsOrThrow = vi.fn<() => Promise<AISettings>>();
 
 vi.mock("@/lib/mermaidGenerator", () => ({
   generateMermaidDiagram: (
@@ -29,6 +37,12 @@ vi.mock("@/lib/mermaidGenerator", () => ({
 }));
 
 import { useMermaidGenerator } from "./useMermaidGenerator";
+
+// Safety net to keep spies (e.g. console.error if added in future tests) and
+// any module-level setup from leaking between tests on assertion failures.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("useMermaidGenerator", () => {
   beforeEach(() => {
