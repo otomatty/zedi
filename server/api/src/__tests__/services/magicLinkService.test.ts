@@ -68,7 +68,7 @@ describe("sendInvitationMagicLink", () => {
 
     expect(result).toEqual({ sent: true, status: 200 });
     expect(handlerMock).toHaveBeenCalledTimes(1);
-    const req = handlerMock.mock.calls[0]?.[0] as Request;
+    const req = handlerMock.mock.calls[0][0] as Request;
     expect(req.method).toBe("POST");
     expect(req.url).toBe("https://api.example.com/api/auth/sign-in/magic-link");
     expect(req.headers.get("content-type")).toBe("application/json");
@@ -87,7 +87,8 @@ describe("sendInvitationMagicLink", () => {
       callbackURL: "https://app.example.com/",
     });
 
-    const req = handlerMock.mock.calls[0]?.[0] as Request;
+    expect(handlerMock).toHaveBeenCalledTimes(1);
+    const req = handlerMock.mock.calls[0][0] as Request;
     expect(req.headers.get("accept-language")).toBe("ja");
   });
 
@@ -100,7 +101,8 @@ describe("sendInvitationMagicLink", () => {
       locale: "en",
     });
 
-    const req = handlerMock.mock.calls[0]?.[0] as Request;
+    expect(handlerMock).toHaveBeenCalledTimes(1);
+    const req = handlerMock.mock.calls[0][0] as Request;
     expect(req.headers.get("accept-language")).toBe("en");
   });
 
@@ -116,7 +118,8 @@ describe("sendInvitationMagicLink", () => {
       callbackURL: "https://app.example.com/",
     });
 
-    const req = handlerMock.mock.calls[0]?.[0] as Request;
+    expect(handlerMock).toHaveBeenCalledTimes(1);
+    const req = handlerMock.mock.calls[0][0] as Request;
     expect(req.url).toBe("https://api.example.com/api/auth/sign-in/magic-link");
   });
 
