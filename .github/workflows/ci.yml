@@ -167,6 +167,36 @@ jobs:
         working-directory: server/api
         run: bunx tsc --noEmit
 
+  drizzle-migration-check:
+    name: Drizzle Migration Check
+    # Drizzle TS スキーマを変更したら必ずマイグレーション SQL を追加するルールの強制。
+    # PR #728 のように TS スキーマだけ更新して `server/api/drizzle/*.sql` を忘れると、
+    # 本番 DB がスキーマに追いつかず 500 エラーになるため、PR 段階で検出する。
+    # PR 限定（push にはマージベースの計算対象が無い）。
+    #
+    # Enforce: any change under `server/api/src/schema/**` must come with a new
+    # migration SQL file and an updated `_journal.json`. Detects PR #728-style
+    # regressions where production drifts from the application schema.
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          # PR ベースとの diff を取るため履歴を全部取得する。
+          # Need full history so the script can diff against the PR base.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Run drizzle migration consistency check
+        env:
+          DRIZZLE_DIFF_BASE: origin/${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/check-drizzle-migrations.mjs
+
   mcp-test:
     name: MCP Server Tests
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
