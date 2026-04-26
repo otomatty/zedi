@@ -150,7 +150,6 @@ describe("useAISettings - updateSettings", () => {
     const { result } = renderHook(() => useAISettings());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    // Pre-populate the modelId via save flow
     act(() => {
       result.current.updateSettings({ model: "gemini-3-pro-preview" });
     });
