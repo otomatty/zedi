@@ -450,16 +450,16 @@ function createMockAdapter(): StorageAdapter {
   };
 }
 
-function createMockApi(): ApiClient {
+function createMockApi(): Partial<ApiClient> {
   return {
     deletePage: vi.fn(),
     createPage: vi.fn(),
-  } as unknown as ApiClient;
+  };
 }
 
 describe("StorageAdapterPageRepository (production) satisfies IPageRepository", () => {
   let adapter: ReturnType<typeof createMockAdapter>;
-  let api: ApiClient;
+  let api: Partial<ApiClient>;
   let repo: IPageRepository;
 
   beforeEach(() => {
@@ -467,12 +467,15 @@ describe("StorageAdapterPageRepository (production) satisfies IPageRepository", 
     api = createMockApi();
     // 型レベルで `IPageRepository` を満たすかをここで強制する。
     // Compile-time assertion that the production class satisfies the interface.
-    repo = new StorageAdapterPageRepository(adapter, api);
+    repo = new StorageAdapterPageRepository(adapter, api as ApiClient);
   });
 
-  it("delegates createPage (guest) to adapter.upsertPage", async () => {
+  it("delegates createPage (guest) to adapter.upsertPage and skips api.createPage", async () => {
     await repo.createPage("local-user", "Hello");
     expect(adapter.upsertPage).toHaveBeenCalledOnce();
+    // CodeRabbit のレビュー対応: ゲスト経路で API が呼ばれない不変条件をガード。
+    // Guard the guest-path invariant: API must not be invoked for `local-user`.
+    expect(api.createPage).not.toHaveBeenCalled();
   });
 
   it("delegates getPage to adapter.getPage", async () => {

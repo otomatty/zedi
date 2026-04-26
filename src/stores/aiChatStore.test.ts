@@ -156,7 +156,7 @@ describe("aiChatStore", () => {
       expect(parsed.state).not.toHaveProperty("showConversationList");
     });
 
-    it("rehydrate restores persisted fields without resurrecting volatile ones", async () => {
+    it("rehydrate restores persisted fields and leaves unspecified volatile fields at defaults", async () => {
       const model = {
         id: "openai:gpt-4o",
         provider: "openai" as const,
