@@ -85,7 +85,6 @@ describe("readSlashAgentInsertPosition — non-browser environment", () => {
 
   beforeEach(() => {
     originalWindow = globalThis.window;
-    // @ts-expect-error -- intentional removal for SSR coverage
     delete (globalThis as { window?: unknown }).window;
     getItemSpy = vi.spyOn(Storage.prototype, "getItem");
     setItemSpy = vi.spyOn(Storage.prototype, "setItem");
