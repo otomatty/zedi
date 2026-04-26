@@ -74,6 +74,7 @@
         "@tiptap/starter-kit": "^3.20.0",
         "@tiptap/y-tiptap": "^3.0.2",
         "@xyflow/react": "^12.10.1",
+        "@zedi/shared": "workspace:*",
         "@zedi/ui": "workspace:*",
         "baseline-browser-mapping": "^2.9.19",
         "better-auth": "^1.2.0",
@@ -206,6 +207,14 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.90",
       },
+      "devDependencies": {
+        "typescript": "^6.0.2",
+        "vitest": "^4.0.16",
+      },
+    },
+    "packages/shared": {
+      "name": "@zedi/shared",
+      "version": "0.1.0",
       "devDependencies": {
         "typescript": "^6.0.2",
         "vitest": "^4.0.16",
@@ -1392,6 +1401,8 @@
     "@xyflow/system": ["@xyflow/system@0.0.75", "", { "dependencies": { "@types/d3-drag": "^3.0.7", "@types/d3-interpolate": "^3.0.4", "@types/d3-selection": "^3.0.10", "@types/d3-transition": "^3.0.8", "@types/d3-zoom": "^3.0.8", "d3-drag": "^3.0.0", "d3-interpolate": "^3.0.1", "d3-selection": "^3.0.0", "d3-zoom": "^3.0.0" } }, "sha512-iXs+AGFLi8w/VlAoc/iSxk+CxfT6o64Uw/k0CKASOPqjqz6E0rb5jFZgJtXGZCpfQI6OQpu5EnumP5fGxQheaQ=="],
 
     "@zedi/claude-sidecar": ["@zedi/claude-sidecar@workspace:packages/claude-sidecar"],
+
+    "@zedi/shared": ["@zedi/shared@workspace:packages/shared"],
 
     "@zedi/ui": ["@zedi/ui@workspace:packages/ui"],
 

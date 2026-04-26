@@ -47,6 +47,9 @@ vi.mock("@/hooks/usePageQueries", () => ({
       checkExistence: vi.fn().mockResolvedValue({
         pageTitles: new Set(),
         referencedTitles: new Set(),
+        // issue #737: 新フィールド `pageTitleToId` の契約に追従。
+        // Match the issue #737 contract by returning an empty map.
+        pageTitleToId: new Map(),
       }),
     }) as unknown,
 }));

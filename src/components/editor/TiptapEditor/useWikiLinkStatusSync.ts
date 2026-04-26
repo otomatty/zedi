@@ -106,7 +106,7 @@ export function useWikiLinkStatusSync({
       const titles = getUniqueWikiLinkTitles(currentWikiLinks);
 
       // ページの存在確認と参照状態を一括チェック
-      const { pageTitles, referencedTitles } = await checkExistence(titles, pageId);
+      const { pageTitles, referencedTitles, pageTitleToId } = await checkExistence(titles, pageId);
 
       // チェック準備ができていない場合はスキップ（次回再試行）
       if (pageTitles.size === 0 && titles.length > 0) {
@@ -114,7 +114,7 @@ export function useWikiLinkStatusSync({
       }
 
       // エディター内のWikiLinkマークを検索して更新が必要なものを収集
-      const updates = collectWikiLinkUpdates(editor, pageTitles, referencedTitles);
+      const updates = collectWikiLinkUpdates(editor, pageTitles, referencedTitles, pageTitleToId);
 
       // チェック完了を記録
       lastCheckedRef.current = { pageId, wikiLinkCount: currentCount, pageScopeSignature };
@@ -142,6 +142,15 @@ interface WikiLinkUpdate {
   to: number;
   exists: boolean;
   referenced: boolean;
+  /**
+   * 解決済みターゲットページの id。`null` のままにしておくと、後段で
+   * `updateAttributes` の payload から外して既存値を保持する（属性を消さない）。
+   *
+   * Resolved target page id. When `null`, the value is omitted from the
+   * `updateAttributes` payload so an existing `targetId` is preserved
+   * (we never blank out a previously-resolved id).
+   */
+  targetId: string | null;
 }
 
 /**
@@ -151,6 +160,7 @@ function collectWikiLinkUpdates(
   editor: Editor,
   pageTitles: Set<string>,
   referencedTitles: Set<string>,
+  pageTitleToId: Map<string, string>,
 ): WikiLinkUpdate[] {
   const updates: WikiLinkUpdate[] = [];
   const { doc } = editor.state;
@@ -164,14 +174,27 @@ function collectWikiLinkUpdates(
       const normalizedTitle = (mark.attrs.title as string).toLowerCase().trim();
       const newExists = pageTitles.has(normalizedTitle);
       const newReferenced = referencedTitles.has(normalizedTitle);
+      // 解決済みなら id を埋める (issue #737)。未解決時は `null` を返すと
+      // 適用フェーズで属性ペイロードから外し、既存の `targetId` を温存する。
+      // Populate `targetId` when the link resolves (issue #737). A `null`
+      // means "don't touch" — the apply step skips the field so a previously
+      // populated id is preserved through transient unresolved states.
+      const resolvedId = newExists ? (pageTitleToId.get(normalizedTitle) ?? null) : null;
+      const currentTargetId = typeof mark.attrs.targetId === "string" ? mark.attrs.targetId : null;
+      const targetIdChanged = resolvedId !== null && resolvedId !== currentTargetId;
 
       // ステータスが変わった場合のみ更新対象に追加
-      if (mark.attrs.exists !== newExists || mark.attrs.referenced !== newReferenced) {
+      if (
+        mark.attrs.exists !== newExists ||
+        mark.attrs.referenced !== newReferenced ||
+        targetIdChanged
+      ) {
         updates.push({
           from: pos,
           to: pos + node.nodeSize,
           exists: newExists,
           referenced: newReferenced,
+          targetId: targetIdChanged ? resolvedId : null,
         });
       }
     });
@@ -186,14 +209,23 @@ function collectWikiLinkUpdates(
 function applyWikiLinkUpdates(editor: Editor, updates: WikiLinkUpdate[]): void {
   // 位置がずれないよう逆順で適用
   for (const update of updates.reverse()) {
+    const attrs: Record<string, unknown> = {
+      exists: update.exists,
+      referenced: update.referenced,
+    };
+    // `targetId` を渡すのは「新しく解決された」ときだけ。`null` のまま
+    // 上書きすると、解決状態が一時的に外れた瞬間に id を失ってしまう。
+    // Only include `targetId` when we actually resolved a new id; passing
+    // `null` would clobber a previously-resolved id during transient
+    // unresolved windows (e.g. note-page list still loading).
+    if (update.targetId !== null) {
+      attrs.targetId = update.targetId;
+    }
     editor
       .chain()
       .setTextSelection({ from: update.from, to: update.to })
       .extendMarkRange("wikiLink")
-      .updateAttributes("wikiLink", {
-        exists: update.exists,
-        referenced: update.referenced,
-      })
+      .updateAttributes("wikiLink", attrs)
       .run();
   }
 }

@@ -271,14 +271,34 @@ export function usePage(pageId: string, options?: UsePageOptions) {
 }
 
 /**
- * Hook to search pages (personal; StorageAdapter)
+ * 個人スコープ専用のページ検索フック（IndexedDB 経由）。
+ *
+ * **スコープ契約 (Issue #718 Phase 5-4)**:
+ * - 返すのは `noteId === null` の個人ページのみ。
+ * - 実装は `IndexedDBStorageAdapter.searchPages` に委ねており、IDB には個人
+ *   ページしか永続化されない（`getAllPages` も `noteId === null` で防御的に
+ *   フィルタしている）。ノートネイティブページは API 経由で取得する。
+ * - ノート配下の検索が必要な場合は `useSearchSharedNotes`（混在）か、将来
+ *   実装される note-scoped 検索フック（Phase 5-2 の
+ *   `GET /api/notes/:noteId/search` を呼ぶ）を使うこと。
+ *
+ * Personal-scope-only page search (via IndexedDB).
+ *
+ * **Scope contract (Issue #718 Phase 5-4)**: returns only personal pages
+ * (`noteId === null`). The implementation delegates to
+ * `IndexedDBStorageAdapter.searchPages`, which only ever holds personal pages.
+ * For note-native results, callers must reach for `useSearchSharedNotes` (mixed
+ * scope) or a future note-scoped hook backed by Phase 5-2's
+ * `GET /api/notes/:noteId/search` endpoint.
+ *
+ * @returns React Query result whose `data` is `Page[]` of personal pages.
  */
 export function useSearchPages(query: string) {
   const { getRepository, userId, isLoaded } = useRepository();
 
   return useQuery({
     queryKey: pageKeys.search(userId, query),
-    queryFn: async () => {
+    queryFn: async (): Promise<Page[]> => {
       if (!query.trim()) return [];
       try {
         const repo = await getRepository();
@@ -298,7 +318,24 @@ export function useSearchPages(query: string) {
 }
 
 /**
- * Hook to search shared notes (API: GET /api/search?q=&scope=shared). C3-8.
+ * 混在スコープのページ検索フック（API: `GET /api/search?q=&scope=shared`）。
+ * C3-8 / Issue #718 Phase 5-4。
+ *
+ * **スコープ挙動**:
+ * - サーバーは個人ページ (`note_id IS NULL`) と、自分が参加するノートの
+ *   ネイティブページの両方を返す（Phase 5-1 で `scope=own` の方は
+ *   `note_id IS NULL` の防御フィルタを追加済みだが、`shared` は意図的に
+ *   混在のまま）。
+ * - 各行は `note_id: string | null` を含むので、呼び出し側は必要に応じて
+ *   個人 / ノートネイティブを判別できる（`useGlobalSearch` /
+ *   `SearchResults` は個人ページ重複を避けるためここでフィルタしている）。
+ *
+ * Mixed-scope search hook (`GET /api/search?q=&scope=shared`).
+ *
+ * The server returns both personal pages and note-native pages from notes the
+ * caller participates in. Each row carries `note_id: string | null` so callers
+ * can branch on it (`useGlobalSearch` / `SearchResults` filter to note-native
+ * rows so personal pages from `useSearchPages` are not double-counted).
  */
 export function useSearchSharedNotes(query: string) {
   const { getToken, isSignedIn } = useAuth();
@@ -723,12 +760,39 @@ export function useSyncWikiLinks(options: UseSyncWikiLinksOptions = {}) {
       await syncLinksWithRepo(repo, userId, sourcePageId, wikiLinks, {
         pageNoteId,
         notePages,
+        linkType: "wiki",
       });
     },
     [getRepository, userId, pageNoteId, notePages],
   );
 
-  return { syncLinks };
+  /**
+   * タグ (`#name`) を `link_type='tag'` バケットで同期する (issue #725 Phase 1)。
+   * 解決ロジックは WikiLink と同一（タイトル正規化で一致 → `links`、不一致 →
+   * `ghost_links`）。呼び出し側は `extractTagsFromContent` で `{ name }` 配列を
+   * 作って `{ title: name, exists: false }` 形に詰め替える。
+   *
+   * Sync tags in the `link_type='tag'` bucket (issue #725 Phase 1). The
+   * resolution strategy matches WikiLinks (normalized-title match → `links`,
+   * miss → `ghost_links`). Callers feed `extractTagsFromContent` results in
+   * as `{ title: name }` entries so we can reuse one resolver.
+   */
+  const syncTags = useCallback(
+    async (sourcePageId: string, tags: Array<{ name: string }>): Promise<void> => {
+      const repo = await getRepository();
+      // tag の `name` は WikiLink の `title` に等価なので同じ resolver に流す。
+      // The tag name is title-equivalent for resolution purposes.
+      const asLinks = tags.map((t) => ({ title: t.name, exists: false }));
+      await syncLinksWithRepo(repo, userId, sourcePageId, asLinks, {
+        pageNoteId,
+        notePages,
+        linkType: "tag",
+      });
+    },
+    [getRepository, userId, pageNoteId, notePages],
+  );
+
+  return { syncLinks, syncTags };
 }
 
 /**
@@ -780,9 +844,25 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
     ): Promise<{
       pageTitles: Set<string>;
       referencedTitles: Set<string>;
+      /**
+       * 正規化済みタイトル → ターゲットページ id のマップ。同一スコープ内に
+       * 同名ページが複数あった場合は **最後に出現したページの id** が残る
+       * （Map への上書き）。`useWikiLinkStatusSync` / `useTagStatusSync` が
+       * `targetId` 属性を埋めるためだけに使う（issue #737 / 案 A）。
+       *
+       * Normalized title → target page id map. With duplicate titles inside
+       * the same scope the **last write wins** (Map overwrite). Used by the
+       * status-sync hooks to populate the `targetId` attribute on resolved
+       * marks (issue #737, approach A).
+       */
+      pageTitleToId: Map<string, string>;
     }> => {
       if (!isLoaded || titles.length === 0) {
-        return { pageTitles: new Set(), referencedTitles: new Set() };
+        return {
+          pageTitles: new Set(),
+          referencedTitles: new Set(),
+          pageTitleToId: new Map(),
+        };
       }
 
       const repo = await getRepository();
@@ -794,15 +874,27 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
       // Select the candidate source based on scope (issue #713 Phase 4).
       // If note-scope candidates have not loaded yet, return empty sets so
       // we do not mis-classify valid same-note links as missing on this pass.
-      let pageTitles: Set<string>;
-      if (pageNoteId !== null) {
-        if (notePages === undefined) {
-          return { pageTitles: new Set(), referencedTitles: new Set() };
-        }
-        pageTitles = new Set(notePages.map((p) => p.title.toLowerCase().trim()));
-      } else {
-        const pages = await repo.getPagesSummary(userId);
-        pageTitles = new Set(pages.map((p) => p.title.toLowerCase().trim()));
+      const sourcePages = pageNoteId !== null ? notePages : await repo.getPagesSummary(userId);
+      if (pageNoteId !== null && sourcePages === undefined) {
+        return {
+          pageTitles: new Set(),
+          referencedTitles: new Set(),
+          pageTitleToId: new Map(),
+        };
+      }
+
+      // 単一ループで `pageTitles` と `pageTitleToId` を構築する。`.map()` で
+      // Set を作ってから別ループで Map を埋める旧実装は冗長で、データに対する
+      // 走査が 2 回発生していた（Gemini レビュー指摘）。
+      // Single pass populates both `pageTitles` and `pageTitleToId`. The
+      // earlier shape used `.map()` to seed the Set and a separate loop for
+      // the Map, walking the same data twice (Gemini review feedback).
+      const pageTitles = new Set<string>();
+      const pageTitleToId = new Map<string, string>();
+      for (const p of sourcePages ?? []) {
+        const normalized = p.title.toLowerCase().trim();
+        pageTitles.add(normalized);
+        pageTitleToId.set(normalized, p.id);
       }
 
       // Get ghost links to check referenced status. ノートスコープのゴースト
@@ -835,7 +927,7 @@ export function useWikiLinkExistsChecker(options: UseWikiLinkExistsCheckerOption
         }
       }
 
-      return { pageTitles, referencedTitles };
+      return { pageTitles, referencedTitles, pageTitleToId };
     },
     [getRepository, userId, isLoaded, pageNoteId, notePages],
   );

@@ -43,6 +43,66 @@ function createSyncApp(dbResults: unknown[]) {
   return { app, chains: mock.chains };
 }
 
+describe("GET /api/sync/pages — link_type in response (issue #725 Phase 1)", () => {
+  it("returns link_type on each links row and ghost_links row", async () => {
+    const now = new Date("2025-06-01T00:00:00Z");
+    const { app } = createSyncApp([
+      // 1: pages query
+      [
+        {
+          id: OWNED_PAGE,
+          owner_id: TEST_USER_ID,
+          title: "P",
+          content_preview: null,
+          thumbnail_url: null,
+          source_url: null,
+          source_page_id: null,
+          is_deleted: false,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+      // 2: links query
+      [
+        { sourceId: OWNED_PAGE, targetId: "t-wiki", linkType: "wiki", createdAt: now },
+        { sourceId: OWNED_PAGE, targetId: "t-tag", linkType: "tag", createdAt: now },
+      ],
+      // 3: ghost_links query
+      [
+        {
+          linkText: "ghost-wiki",
+          sourcePageId: OWNED_PAGE,
+          linkType: "wiki",
+          createdAt: now,
+          originalTargetPageId: null,
+          originalNoteId: null,
+        },
+        {
+          linkText: "ghost-tag",
+          sourcePageId: OWNED_PAGE,
+          linkType: "tag",
+          createdAt: now,
+          originalTargetPageId: null,
+          originalNoteId: null,
+        },
+      ],
+    ]);
+
+    const res = await app.request("/api/sync/pages", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      links: Array<{ source_id: string; target_id: string; link_type: string }>;
+      ghost_links: Array<{ link_text: string; source_page_id: string; link_type: string }>;
+    };
+    expect(body.links.map((l) => l.link_type).sort()).toEqual(["tag", "wiki"]);
+    expect(body.ghost_links.map((g) => g.link_type).sort()).toEqual(["tag", "wiki"]);
+  });
+});
+
 describe("POST /api/sync/pages — IDOR protection", () => {
   it("skips link insertion when source_id is not owned by the user", async () => {
     const oldDate = new Date("2024-01-01T00:00:00Z");
@@ -180,6 +240,183 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     const valuesOp = (insertChains[0]?.ops ?? []).find((op) => op.method === "values");
     const inserted = valuesOp?.args?.[0] as { title: string } | undefined;
     expect(inserted?.title).toBe("newer");
+  });
+
+  // ── Issue #725 Phase 1: link_type support ────────────────────────────
+  // `link_type` は WikiLink (`'wiki'`) とタグ (`'tag'`) を区別する識別子。
+  // 1) 既存クライアント互換: `link_type` 省略 → `'wiki'` として扱う。
+  // 2) タグ同期時に WikiLink を巻き添え削除しないよう、DELETE は
+  //    `(source_id, link_type)` ごとにスコープされる。
+  // 3) 同一 source の wiki と tag は独立エッジとして両立する。
+  //
+  // `link_type` distinguishes WikiLink (`'wiki'`) from Tag (`'tag'`). The
+  // server must (1) default to `'wiki'` for legacy bodies, (2) scope DELETE
+  // per `(source_id, link_type)` so tag sync cannot wipe wiki edges, and
+  // (3) accept wiki + tag edges on the same source pair simultaneously.
+  describe("link_type support (issue #725 Phase 1)", () => {
+    it("defaults link_type to 'wiki' when omitted in body.links (legacy client compat)", async () => {
+      const oldDate = new Date("2024-01-01T00:00:00Z");
+      const { app, chains } = createSyncApp([
+        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        undefined,
+        [{ id: OWNED_PAGE }],
+        undefined,
+        undefined,
+      ]);
+
+      const res = await app.request("/api/sync/pages", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          pages: [{ id: OWNED_PAGE, title: "My Page", updated_at: "2025-06-01T00:00:00Z" }],
+          links: [{ source_id: OWNED_PAGE, target_id: "target-a" }],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+
+      const insertChains = chains.filter((c) => c.startMethod === "insert");
+      expect(insertChains).toHaveLength(1);
+      const valuesOp = (insertChains[0]?.ops ?? []).find((op) => op.method === "values");
+      const inserted = valuesOp?.args?.[0] as { linkType?: string } | undefined;
+      expect(inserted?.linkType).toBe("wiki");
+    });
+
+    it("scopes DELETE per (source_id, link_type) when body.links mixes wiki + tag (no wiki wipeout)", async () => {
+      // 同一 source に wiki と tag が混在する push。wiki 用 DELETE と tag 用
+      // DELETE がそれぞれ独立に発行されること、INSERT も 2 件（各 link_type）
+      // になることを検証する。
+      //
+      // Mixed wiki + tag push for the same source: verify one DELETE per
+      // `(source_id, link_type)` pair and one INSERT per row.
+      const oldDate = new Date("2024-01-01T00:00:00Z");
+      const { app, chains } = createSyncApp([
+        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        undefined,
+        [{ id: OWNED_PAGE }],
+        undefined, // DELETE wiki
+        undefined, // DELETE tag
+        undefined, // INSERT wiki link
+        undefined, // INSERT tag link
+      ]);
+
+      const res = await app.request("/api/sync/pages", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          pages: [{ id: OWNED_PAGE, title: "My Page", updated_at: "2025-06-01T00:00:00Z" }],
+          links: [
+            { source_id: OWNED_PAGE, target_id: "target-wiki", link_type: "wiki" },
+            { source_id: OWNED_PAGE, target_id: "target-tag", link_type: "tag" },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+
+      const deleteChains = chains.filter((c) => c.startMethod === "delete");
+      // 1 DELETE per (source, link_type) pair = 2
+      expect(deleteChains).toHaveLength(2);
+
+      const insertChains = chains.filter((c) => c.startMethod === "insert");
+      // page UPDATE + 2 link INSERTs。page UPDATE は insert chain には
+      // 含まれないので、期待する insert は 2 件（wiki + tag）。
+      // Page UPDATE is not counted as an insert chain; expect 2 link INSERTs
+      // (one wiki + one tag).
+      expect(insertChains).toHaveLength(2);
+      const insertedLinkTypes = insertChains
+        .map((ch) => {
+          const valuesOp = ch.ops.find((op) => op.method === "values");
+          return (valuesOp?.args?.[0] as { linkType?: string } | undefined)?.linkType;
+        })
+        .sort();
+      expect(insertedLinkTypes).toEqual(["tag", "wiki"]);
+    });
+
+    it("does not touch existing tag edges when body.links contains only wiki (scoped DELETE)", async () => {
+      // tag エッジを持つページに対して wiki のみ push したとき、tag 用 DELETE が
+      // 発行されないことで既存 tag エッジが残ることを検証する。
+      //
+      // Push only wiki edges → server must not issue a tag DELETE, leaving
+      // existing tag edges untouched.
+      const oldDate = new Date("2024-01-01T00:00:00Z");
+      const { app, chains } = createSyncApp([
+        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        undefined,
+        [{ id: OWNED_PAGE }],
+        undefined, // DELETE wiki only
+        undefined, // INSERT wiki
+      ]);
+
+      const res = await app.request("/api/sync/pages", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          pages: [{ id: OWNED_PAGE, title: "My Page", updated_at: "2025-06-01T00:00:00Z" }],
+          links: [{ source_id: OWNED_PAGE, target_id: "target-a", link_type: "wiki" }],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const deleteChains = chains.filter((c) => c.startMethod === "delete");
+      // 単一 (source, wiki) ペアのみ → DELETE は 1 回だけ
+      expect(deleteChains).toHaveLength(1);
+    });
+
+    it("accepts link_type='tag' on ghost_links and defaults to 'wiki' when omitted", async () => {
+      const oldDate = new Date("2024-01-01T00:00:00Z");
+      const { app, chains } = createSyncApp([
+        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        undefined,
+        [{ id: OWNED_PAGE }],
+        undefined, // DELETE ghost wiki
+        undefined, // DELETE ghost tag
+        undefined, // INSERT ghost wiki
+        undefined, // INSERT ghost tag
+      ]);
+
+      const res = await app.request("/api/sync/pages", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          pages: [{ id: OWNED_PAGE, title: "My Page", updated_at: "2025-06-01T00:00:00Z" }],
+          ghost_links: [
+            { link_text: "legacy", source_page_id: OWNED_PAGE },
+            { link_text: "newtag", source_page_id: OWNED_PAGE, link_type: "tag" },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const insertChains = chains.filter((c) => c.startMethod === "insert");
+      expect(insertChains).toHaveLength(2);
+      const insertedTypes = insertChains
+        .map((ch) => {
+          const valuesOp = ch.ops.find((op) => op.method === "values");
+          return (valuesOp?.args?.[0] as { linkType?: string } | undefined)?.linkType;
+        })
+        .sort();
+      expect(insertedTypes).toEqual(["tag", "wiki"]);
+    });
+
+    it("rejects unknown link_type values with 400", async () => {
+      const oldDate = new Date("2024-01-01T00:00:00Z");
+      const { app } = createSyncApp([
+        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        undefined,
+      ]);
+
+      const res = await app.request("/api/sync/pages", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          pages: [{ id: OWNED_PAGE, title: "My Page", updated_at: "2025-06-01T00:00:00Z" }],
+          links: [{ source_id: OWNED_PAGE, target_id: "target-a", link_type: "totally-bogus" }],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+    });
   });
 
   it("skips both links and ghost_links for non-owned pages in combined request", async () => {

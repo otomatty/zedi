@@ -1,5 +1,6 @@
 import { Mark, markPasteRule, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { TAG_NAME_CHAR_CLASS } from "@zedi/shared/tagCharacterClass";
 
 /**
  * Regex matching hashtag patterns `#name` in pasted text.
@@ -9,8 +10,10 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
  * Preconditions to match:
  * - `#` must not be preceded by a word character, `/`, or another `#`
  *   (excludes `abc#tag`, URL fragments like `/page#anchor`, and `##`).
- * - The name must consist of Latin letters/digits, underscore, hyphen,
- *   Hiragana, Katakana, or CJK Unified/Extension A characters.
+ * - The name must consist of characters in {@link TAG_NAME_CHAR_CLASS}
+ *   (Latin letters/digits, underscore, hyphen, Hiragana, Katakana, CJK
+ *   Unified/Extension A). The character class lives in `@zedi/shared` so
+ *   the server's `VALID_TAG_NAME_REGEX` cannot drift from it.
  * - Trailing punctuation (`、。,.!?:;` 等) terminates the name.
  *
  * Tiptap's `markPasteRule` applies the mark to the *last* capture group and
@@ -24,6 +27,8 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
  * それ以外を削除する仕様（`WikiLinkExtension` と同様）。先頭の `#` を
  * マーク範囲に含めるため、敢えてキャプチャグループを使わず `match[0]` を
  * そのままマーク対象とし、タグ名は {@link extractTagName} で後付け抽出する。
+ * 文字クラス本体は `@zedi/shared` の `TAG_NAME_CHAR_CLASS` を共有することで、
+ * サーバ側 (`VALID_TAG_NAME_REGEX`) との二重定義によるドリフトを防ぐ。
  *
  * Fine-grained exclusions (numeric-only, 6/8-char hex colors) are applied in
  * `getAttributes` via {@link isExcludedTagName} so reject reasons sit next to
@@ -32,13 +37,13 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
  * 数字のみ・6/8 桁純 hex のような細かな除外は {@link isExcludedTagName} で
  * 行い、理由とデータ形状をまとめて管理する。
  */
-export const TAG_PASTE_REGEX = /(?<![\w/#])#[A-Za-z0-9_\-぀-ヿ㐀-鿿]+/g;
+export const TAG_PASTE_REGEX = new RegExp(`(?<![\\w/#])#[${TAG_NAME_CHAR_CLASS}]+`, "g");
 
 /**
  * Regex for extracting a tag name from a single `#name` literal (non-global).
  * 単一の `#name` 文字列からタグ名を取り出すための正規表現（非グローバル）。
  */
-const TAG_NAME_REGEX = /^#([A-Za-z0-9_\-぀-ヿ㐀-鿿]+)/;
+const TAG_NAME_REGEX = new RegExp(`^#([${TAG_NAME_CHAR_CLASS}]+)`);
 
 /**
  * Pattern matching a string of pure hexadecimal digits (any length).
@@ -147,6 +152,30 @@ export const Tag = Mark.create<TagOptions>({
           "data-referenced": String(attributes.referenced),
         }),
       },
+      /**
+       * 解決済みターゲットページの UUID。`useTagStatusSync` がリンク解決時に
+       * 埋め、リネーム伝播（issue #737 / `ydocRenameRewrite`）がタグ名文字列
+       * ではなく ID 一致で対象を特定できるようにする。未解決や旧データでは
+       * `null` で、その場合の伝播は名前文字列でフォールバックする
+       * （後方互換のため）。
+       *
+       * Resolved target page UUID. Populated by `useTagStatusSync` once the
+       * tag resolves to an existing page so rename propagation
+       * (issue #737 / `ydocRenameRewrite`) matches by id instead of by name
+       * string. `null` for unresolved or pre-issue-#737 marks; the rewriter
+       * falls back to name matching in that case (lazy migration).
+       */
+      targetId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-target-id"),
+        renderHTML: (attributes) => {
+          const value = attributes.targetId;
+          if (typeof value !== "string" || value.length === 0) {
+            return {};
+          }
+          return { "data-target-id": value };
+        },
+      },
     };
   },
 
@@ -197,7 +226,7 @@ export const Tag = Mark.create<TagOptions>({
           // the leading `#`) and reject when it hits an exclusion rule.
           const name = extractTagName(match[0] ?? "");
           if (!name || isExcludedTagName(name)) return false;
-          return { name, exists: false, referenced: false };
+          return { name, exists: false, referenced: false, targetId: null };
         },
       }),
     ];

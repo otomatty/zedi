@@ -7,9 +7,27 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, gt, inArray, isNull } from "drizzle-orm";
-import { pages, links, ghostLinks } from "../schema/index.js";
+import { pages, links, ghostLinks, LINK_TYPES, type LinkType } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
+
+/**
+ * `body.links` / `body.ghost_links` で受け取った `link_type` を正規化する。
+ * 未指定は `'wiki'`（issue #725 マイグレーション前の既定値）にフォールバック。
+ * 許可されない値は 400 で拒否する。
+ *
+ * Normalize the `link_type` received on wire. Omitted fields fall back to
+ * `'wiki'` for legacy-client compatibility; unknown values raise HTTP 400.
+ */
+function normalizeLinkType(value: unknown): LinkType {
+  if (value === undefined || value === null) return "wiki";
+  if (typeof value === "string" && (LINK_TYPES as readonly string[]).includes(value)) {
+    return value as LinkType;
+  }
+  throw new HTTPException(400, {
+    message: `Invalid link_type: ${JSON.stringify(value)}. Expected one of ${LINK_TYPES.join(", ")}.`,
+  });
+}
 
 const app = new Hono<AppEnv>();
 
@@ -73,11 +91,15 @@ app.get("/", authRequired, async (c) => {
     links: linksRows.map((l) => ({
       source_id: l.sourceId,
       target_id: l.targetId,
+      // `link_type` は issue #725 で導入。未マイグレ行は DB 側の既定で 'wiki'。
+      // Added by issue #725; legacy rows are backfilled to 'wiki' by the DB default.
+      link_type: l.linkType,
       created_at: l.createdAt.toISOString(),
     })),
     ghost_links: ghostLinksRows.map((g) => ({
       link_text: g.linkText,
       source_page_id: g.sourcePageId,
+      link_type: g.linkType,
       created_at: g.createdAt.toISOString(),
       original_target_page_id: g.originalTargetPageId,
       original_note_id: g.originalNoteId,
@@ -105,10 +127,19 @@ app.post("/", authRequired, async (c) => {
     links?: Array<{
       source_id: string;
       target_id: string;
+      /**
+       * `link_type` は WikiLink (`'wiki'`) とタグ (`'tag'`) を区別する。
+       * 省略時は `'wiki'` として扱う（issue #725 導入前の既定値）。
+       * `link_type` distinguishes WikiLink (`'wiki'`) from Tag (`'tag'`);
+       * omitted → `'wiki'` for legacy client compatibility (issue #725).
+       */
+      link_type?: string;
     }>;
     ghost_links?: Array<{
       link_text: string;
       source_page_id: string;
+      /** 同上 / Same contract as above. */
+      link_type?: string;
       original_target_page_id?: string;
       original_note_id?: string;
     }>;
@@ -117,6 +148,17 @@ app.post("/", authRequired, async (c) => {
   if (!body.pages?.length) {
     throw new HTTPException(400, { message: "pages array is required" });
   }
+
+  // `link_type` を先行バリデーションして、DB 書き込み前に不正値を弾く。
+  // Validate `link_type` up front so bad input never reaches DB writes.
+  const incomingLinks = (body.links ?? []).map((l) => ({
+    ...l,
+    link_type: normalizeLinkType(l.link_type),
+  }));
+  const incomingGhostLinks = (body.ghost_links ?? []).map((g) => ({
+    ...g,
+    link_type: normalizeLinkType(g.link_type),
+  }));
 
   const results: Array<{ id: string; action: string }> = [];
 
@@ -237,18 +279,37 @@ app.post("/", authRequired, async (c) => {
 
   // リンク同期 — 個人ページ間のみ
   // Link sync — personal pages only
-  if (body.links?.length) {
-    const sourceIds = [...new Set(body.links.map((l) => l.source_id))];
+  //
+  // issue #725: DELETE は `(source_id, link_type)` ペア単位でスコープする。
+  // これにより、タグ同期時に WikiLink エッジを、あるいはその逆を巻き添え削除
+  // しない。body に現れなかった `link_type` のエッジには触れない（従来の
+  // 「push に現れない source_id は触らない」セマンティクスを link_type 方向
+  // にも拡張した形）。
+  //
+  // issue #725: DELETE is scoped per `(source_id, link_type)` pair so that
+  // tag sync cannot wipe wiki edges (and vice versa). A `link_type` that does
+  // not appear in the push is left untouched, extending the existing
+  // "missing source_id → no delete" semantics along the link_type axis.
+  if (incomingLinks.length > 0) {
+    const sourceIds = [...new Set(incomingLinks.map((l) => l.source_id))];
     const ownedPages = await db
       .select({ id: pages.id })
       .from(pages)
       .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
     const ownedIds = new Set(ownedPages.map((r) => r.id));
-    for (const sourceId of sourceIds) {
-      if (!ownedIds.has(sourceId)) continue;
-      await db.delete(links).where(eq(links.sourceId, sourceId));
+
+    const deletePairs = new Set<string>();
+    for (const link of incomingLinks) {
+      if (!ownedIds.has(link.source_id)) continue;
+      const key = `${link.source_id} ${link.link_type}`;
+      if (deletePairs.has(key)) continue;
+      deletePairs.add(key);
+      await db
+        .delete(links)
+        .where(and(eq(links.sourceId, link.source_id), eq(links.linkType, link.link_type)));
     }
-    for (const link of body.links) {
+
+    for (const link of incomingLinks) {
       if (link.source_id === link.target_id) continue; // self-ref skip
       if (!ownedIds.has(link.source_id)) continue; // IDOR protection
       await db
@@ -256,31 +317,46 @@ app.post("/", authRequired, async (c) => {
         .values({
           sourceId: link.source_id,
           targetId: link.target_id,
+          linkType: link.link_type,
         })
         .onConflictDoNothing();
     }
   }
 
   // ゴーストリンク同期 — 個人ページ間のみ
-  // Ghost link sync — personal pages only
-  if (body.ghost_links?.length) {
-    const sourceIds = [...new Set(body.ghost_links.map((g) => g.source_page_id))];
+  // Ghost link sync — personal pages only (同じ link_type スコープ化方針)
+  if (incomingGhostLinks.length > 0) {
+    const sourceIds = [...new Set(incomingGhostLinks.map((g) => g.source_page_id))];
     const ownedGhostPages = await db
       .select({ id: pages.id })
       .from(pages)
       .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
     const ownedGhostIds = new Set(ownedGhostPages.map((r) => r.id));
-    for (const sourceId of sourceIds) {
-      if (!ownedGhostIds.has(sourceId)) continue;
-      await db.delete(ghostLinks).where(eq(ghostLinks.sourcePageId, sourceId));
+
+    const deletePairs = new Set<string>();
+    for (const gl of incomingGhostLinks) {
+      if (!ownedGhostIds.has(gl.source_page_id)) continue;
+      const key = `${gl.source_page_id} ${gl.link_type}`;
+      if (deletePairs.has(key)) continue;
+      deletePairs.add(key);
+      await db
+        .delete(ghostLinks)
+        .where(
+          and(
+            eq(ghostLinks.sourcePageId, gl.source_page_id),
+            eq(ghostLinks.linkType, gl.link_type),
+          ),
+        );
     }
-    for (const gl of body.ghost_links) {
+
+    for (const gl of incomingGhostLinks) {
       if (!ownedGhostIds.has(gl.source_page_id)) continue; // IDOR protection
       await db
         .insert(ghostLinks)
         .values({
           linkText: gl.link_text,
           sourcePageId: gl.source_page_id,
+          linkType: gl.link_type,
           originalTargetPageId: gl.original_target_page_id ?? null,
           originalNoteId: gl.original_note_id ?? null,
         })

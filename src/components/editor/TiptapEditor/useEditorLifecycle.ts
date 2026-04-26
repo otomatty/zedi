@@ -3,6 +3,7 @@ import type { Editor } from "@tiptap/core";
 import { sanitizeTiptapContent } from "@/lib/contentUtils";
 import { useContentSanitizer } from "./useContentSanitizer";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
+import { useTagStatusSync } from "./useTagStatusSync";
 import { usePasteImageHandler } from "./usePasteImageHandler";
 
 import { rememberSlashAgentSelection } from "@/lib/agentSlashCommands/slashAgentSelectionCache";
@@ -154,6 +155,17 @@ export function useEditorLifecycle({
   });
 
   useWikiLinkStatusSync({
+    editor,
+    content,
+    pageId: pageId || undefined,
+    onChange,
+    skipSync: isWikiGenerating,
+    pageNoteId: pageNoteId ?? null,
+  });
+
+  // issue #725 Phase 1: tag Mark の `exists` / `referenced` を同じ契約で同期する。
+  // Keep tag marks' status in sync alongside WikiLink marks (issue #725 Phase 1).
+  useTagStatusSync({
     editor,
     content,
     pageId: pageId || undefined,

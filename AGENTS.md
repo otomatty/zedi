@@ -55,6 +55,22 @@ bun run test:run       # Vitest 単体テスト
 - 既存のディレクトリ構成・命名規則に合わせる。
 - Conventional Commits 形式でコミット（`feat:`, `fix:`, `docs:` 等）。
 
+## DB スキーマ変更（必読） / Database schema changes (must read)
+
+- **TS スキーマと SQL マイグレーションは常に対で更新する**。`server/api/src/schema/**/*.ts` を編集したら、必ず `server/api/drizzle/NNNN_*.sql` を新規追加し、`server/api/drizzle/meta/_journal.json` にエントリを追記する。  
+  _Always pair TS schema edits with a SQL migration: add a new `server/api/drizzle/NNNN_\*.sql`and append an entry to`server/api/drizzle/meta/_journal.json`. Skipping this caused PR #728 → production 500s on `/api/onboarding/status`and`/api/pages`._
+- **正本のマイグレーション置き場は `server/api/drizzle/` のみ**。CI (`deploy-{dev,prod}.yml`) は `bunx drizzle-kit migrate` だけを実行するため、ここ以外に SQL を置いても本番には適用されない。  
+  _Source of truth is `server/api/drizzle/`. CI runs only `bunx drizzle-kit migrate`; SQL placed elsewhere is dead code._
+- **マイグレーションの書き方**:
+  - 既存の手書き例（`0017_add_link_type.sql` など）の体裁に合わせ、ステートメント間に `--> statement-breakpoint` を入れる。
+  - 既存環境で重複適用されても安全になるよう、原則として `IF NOT EXISTS` / `ON CONFLICT DO NOTHING` を使う。
+  - 必要であればバックフィル（既存行への初期値投入）も同じファイル内で行う。
+  - `bunx drizzle-kit generate` で雛形を作るときは、過去スナップショットが欠落しているため巨大な diff が出ることがある。その場合は `--name` 指定の出力を手で削減し、既存マイグレーション間で重複しない形に整えてから commit する（snapshot ファイルは生成物のみ、当面コミットしない方針）。
+- **CI ガード**: `.github/workflows/ci.yml` の `drizzle-migration-check` ジョブが PR で `server/api/src/schema/**` の変更と新規 `server/api/drizzle/*.sql` がペアになっているかを検証する。例外的に SQL 不要な場合（コメント/JSDoc 修正のみなど）は PR 本文かコミットメッセージに `[skip drizzle-check]` を入れる。  
+  _CI guard `drizzle-migration-check` enforces the schema/migration pairing. Use the `[skip drizzle-check]` marker only for non-DDL edits (comments, JSDoc, type aliases that do not affect SQL)._
+- **環境別の自動適用**: `develop` への push → `deploy-dev.yml` が development DB へ migrate。`main` への push → `deploy-prod.yml` が production DB へ migrate。スキーマ追従はこの 2 本だけ。  
+  _Auto-apply: push to `develop` migrates dev DB; push to `main` migrates prod DB. No other path applies migrations._
+
 ## ブランチ・PR の命名規則
 
 - **ブランチ**: `feature/説明`、`fix/説明`、`hotfix/説明`、`chore/説明` など（例: `feature/ai-models-ui`, `fix/search-crash`）。Issue 番号から作る場合は `feature/123`。
@@ -93,6 +109,17 @@ terraform/        # インフラ定義
 
 - ルート `package.json` の `workspaces` は `packages/*` と `admin` のみを含む。`server/api`, `server/hocuspocus`, `server/mcp` は **意図的にルートの Bun workspace から外して**、個別の Bun プロジェクトとして管理する。  
   _Root `workspaces` covers only `packages/*` and `admin`. The three `server/*` services (`api`, `hocuspocus`, `mcp`) are intentionally kept **outside** the root Bun workspace and managed as standalone Bun projects._
+
+### サーバ／クライアント間で共有する定数 / Sharing constants between server and client
+
+- `packages/shared`（`@zedi/shared`）は、フロント・admin・サーバすべてで共通利用したいピュアな TypeScript 定数を集約するためのワークスペースパッケージ。React や Node 専用 API には依存させない。  
+  _`packages/shared` (`@zedi/shared`) is a workspace package for pure TypeScript constants shared by client, admin, and (logically) server code. Keep it free of React or Node-only dependencies._
+- フロント (`src/`) と `admin/` はワークスペース内なので `import { ... } from "@zedi/shared/..."` で直接利用できる。  
+  _Workspace consumers (`src/`, `admin/`) import via `@zedi/shared/...`._
+- `server/api` 等のサーバプロジェクトはワークスペース外なので `@zedi/shared` を **直接 import できない**。代わりに同じ値を当該サーバ内に二重定義し、フロント側の vitest が `fs.readFileSync` でサーバファイルを読んで両者の文字列一致を検証するドリフト検知テスト（例: `src/lib/tagCharacterClassSync.test.ts`）を置くことで CI で同期を担保する。  
+  _Server projects (e.g. `server/api`) cannot import `@zedi/shared` because they are intentionally outside the workspace. Duplicate the constant inside the server source and add a client-side vitest (e.g. `src/lib/tagCharacterClassSync.test.ts`) that reads the server file via `fs.readFileSync` and asserts the two literals match. This keeps drift detectable in CI._
+- 値を更新する際は **`packages/shared` とサーバ側コピーを同時に編集すること**。ドリフト検知テストが落ちたら、片方しか変更していないサインなのでもう一方も追従させる。  
+  _When updating a shared value, edit `packages/shared` and the server-side copy together. If the drift test fails, the change touched only one side; sync the other._
 - 理由 / Rationale:
   - Railway の Dockerfile ビルドは「各サービスの Root Directory」を build context に取る (例: `server/mcp`)。ここからルート `bun.lock` を参照するのは面倒で、context をサービス単位に閉じるほうが再現性が高い。  
     _Railway Dockerfile builds take each service's Root Directory as the build context. Scoping `bun.lock` per service keeps the build self-contained and reproducible._
