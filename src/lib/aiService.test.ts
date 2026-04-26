@@ -778,8 +778,19 @@ describe("aiService - 回帰テスト", () => {
       };
     }
 
+    // `aiService.ts` は claude-code provider を動的 import するため、`vi.doMock` の効果を確実に切り替えるには
+    // モジュールキャッシュもリセットする必要がある。`doUnmock` はレジストリ上の mock 登録を消すだけで、
+    // 既に動的 import 済みのモジュールキャッシュには手を入れないため、`resetModules()` を併用する。
+    // The provider is loaded via dynamic import; `vi.doUnmock` only removes the mock registration
+    // and does not invalidate the cached module. Reset the module registry between tests so that
+    // each `vi.doMock` factory is the one returned by the next dynamic import.
+    beforeEach(() => {
+      vi.resetModules();
+    });
+
     afterEach(() => {
       vi.doUnmock("@/lib/aiProviders/claudeCodeProvider");
+      vi.resetModules();
     });
 
     it("isAvailable が false なら onError を呼ぶ", async () => {
