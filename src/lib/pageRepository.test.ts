@@ -69,28 +69,34 @@ function createInMemoryRepository(
       return [...store.pages.values()].filter((p) => !p.isDeleted);
     },
     async getPagesSummary(_userId) {
-      return [...store.pages.values()].map<PageSummary>((p) => ({
-        id: p.id,
-        ownerUserId: p.ownerUserId,
-        noteId: p.noteId,
-        title: p.title,
-        contentPreview: p.contentPreview,
-        thumbnailUrl: p.thumbnailUrl,
-        sourceUrl: p.sourceUrl,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-        isDeleted: p.isDeleted,
-      }));
+      return [...store.pages.values()]
+        .filter((p) => !p.isDeleted)
+        .map<PageSummary>((p) => ({
+          id: p.id,
+          ownerUserId: p.ownerUserId,
+          noteId: p.noteId,
+          title: p.title,
+          contentPreview: p.contentPreview,
+          thumbnailUrl: p.thumbnailUrl,
+          sourceUrl: p.sourceUrl,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          isDeleted: p.isDeleted,
+        }));
     },
     async getPagesByIds(_userId, ids) {
-      return ids.map((id) => store.pages.get(id)).filter((p): p is Page => Boolean(p));
+      return ids
+        .map((id) => store.pages.get(id))
+        .filter((p): p is Page => p !== undefined && !p.isDeleted);
     },
     async getPageByTitle(_userId, title) {
-      return [...store.pages.values()].find((p) => p.title === title) ?? null;
+      return [...store.pages.values()].find((p) => p.title === title && !p.isDeleted) ?? null;
     },
     async checkDuplicateTitle(_userId, title, excludePageId) {
       return (
-        [...store.pages.values()].find((p) => p.title === title && p.id !== excludePageId) ?? null
+        [...store.pages.values()].find(
+          (p) => p.title === title && p.id !== excludePageId && !p.isDeleted,
+        ) ?? null
       );
     },
     async updatePage(_userId, pageId, updates) {
@@ -105,9 +111,14 @@ function createInMemoryRepository(
       await fireMutate();
     },
     async searchPages(_userId, query) {
-      return [...store.pages.values()].filter((p) =>
-        p.title.toLowerCase().includes(query.toLowerCase()),
-      );
+      const normalized = query.toLowerCase().trim();
+      if (!normalized) return [];
+      return [...store.pages.values()].filter((p) => {
+        if (p.isDeleted) return false;
+        return (
+          p.title.toLowerCase().includes(normalized) || p.content.toLowerCase().includes(normalized)
+        );
+      });
     },
     async addLink(sourceId, targetId, linkType: LinkType = "wiki") {
       if (
@@ -281,6 +292,45 @@ describe("IPageRepository contract", () => {
 
     await repo.deletePage("u1", page.id);
     expect(await repo.getPage("u1", page.id)).toBeNull();
+  });
+
+  it("read methods consistently hide soft-deleted pages", async () => {
+    // モックの soft-delete 挙動が read 系全体で一貫しているかを担保する。
+    // gemini-code-assist のレビューで指摘されたモック内一貫性のリグレッション防止。
+    //
+    // Pin the mock's soft-delete contract across every read path so tests that
+    // exercise deletion paths get consistent results. Regression guard for the
+    // gemini-code-assist review feedback.
+    const alive = await repo.createPage("u1", "Alive");
+    const tombstone = await repo.createPage("u1", "Tombstone");
+    await repo.deletePage("u1", tombstone.id);
+
+    expect((await repo.getPages("u1")).map((p) => p.id)).toEqual([alive.id]);
+    expect((await repo.getPagesSummary("u1")).map((p) => p.id)).toEqual([alive.id]);
+    expect((await repo.getPagesByIds("u1", [alive.id, tombstone.id])).map((p) => p.id)).toEqual([
+      alive.id,
+    ]);
+    expect(await repo.getPageByTitle("u1", "Tombstone")).toBeNull();
+    expect(await repo.checkDuplicateTitle("u1", "Tombstone")).toBeNull();
+  });
+
+  it("searchPages mirrors pageStore semantics: title+content, trim, hide deleted", async () => {
+    // gemini-code-assist のレビュー対応: 実装側 (pageStore.searchPages) の
+    // 「title+content の部分一致」「空クエリは []」「論理削除は除外」をモックも遵守する。
+    //
+    // Address gemini-code-assist review: the mock now matches `pageStore.searchPages`
+    // — title+content match, blank queries return [], soft-deleted pages excluded.
+    await repo.createPage("u1", "Hello", "alpha body");
+    await repo.createPage("u1", "World", "beta body");
+    const trashed = await repo.createPage("u1", "Trash", "alpha trashed");
+    await repo.deletePage("u1", trashed.id);
+
+    expect((await repo.searchPages("u1", "alpha")).map((p) => p.title)).toEqual(["Hello"]);
+    expect((await repo.searchPages("u1", "BODY")).map((p) => p.title).sort()).toEqual([
+      "Hello",
+      "World",
+    ]);
+    expect(await repo.searchPages("u1", "   ")).toEqual([]);
   });
 
   it("link methods default linkType to 'wiki' (issue #725 Phase 1)", async () => {
