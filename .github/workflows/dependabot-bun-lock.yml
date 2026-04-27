@@ -1,0 +1,137 @@
+# Dependabot bun.lock 同期ワークフロー
+# Sync bun.lock for Dependabot pull requests.
+#
+# Dependabot は npm エコシステムを使うため `package.json` は更新できるが、
+# Bun のロックファイル (`bun.lock`) は更新できない。その結果、CI の
+# `bun install --frozen-lockfile` がロック不一致で即座に失敗する。
+# 本ワークフローは dependabot が作成した PR を検知し、対応する
+# `bun install` を実行して `bun.lock` を再生成し、PR ブランチに
+# 自動コミット・プッシュする。
+#
+# Dependabot updates `package.json` via the npm ecosystem but cannot regenerate
+# Bun's `bun.lock`. CI then fails immediately at `bun install --frozen-lockfile`
+# because the lockfile and manifest disagree. This workflow detects such PRs,
+# runs `bun install` in each affected directory, and pushes the regenerated
+# lockfile back to the PR branch so CI can pass.
+name: Dependabot bun.lock sync
+
+on:
+  pull_request:
+    # bun.lock を持つ全ディレクトリの package.json を監視する。
+    # dependabot.yml は現在 root / server/api / server/hocuspocus を対象にしているが、
+    # 過去 (PR #374) には admin/package.json も dependabot に更新されており、
+    # 将来 dependabot.yml が拡張されてもカバーできるよう全ロックを対象にする。
+    # Watch every package.json that has a sibling bun.lock. Although the
+    # current dependabot.yml only tracks root / server/api / server/hocuspocus,
+    # admin/package.json was once updated by Dependabot (PR #374), and this
+    # list also future-proofs the workflow against expansions of dependabot.yml.
+    paths:
+      - "package.json"
+      - "admin/package.json"
+      - "server/api/package.json"
+      - "server/hocuspocus/package.json"
+      - "server/mcp/package.json"
+
+# bun install で書き戻すため contents: write が必要。
+# Needs `contents: write` to push the regenerated lockfile back to the PR branch.
+permissions:
+  contents: write
+
+concurrency:
+  group: dependabot-bun-lock-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Sync bun.lock
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          # PR ブランチに直接書き戻すため、head ref をチェックアウトする。
+          # Check out the PR head ref so we can push commits back to it.
+          ref: ${{ github.event.pull_request.head.ref }}
+          # ベースブランチとの差分計算用に履歴を全部取る。
+          # Fetch full history so we can diff against the PR base.
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+
+      - name: Detect changed package.json directories
+        id: detect
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+          echo "Changed files in PR:"
+          echo "$changed"
+
+          dirs=()
+          # bun.lock を持つ全ディレクトリ。`on.paths` と一致させる。
+          # Every directory with a sibling bun.lock; keep in sync with `on.paths`.
+          for path in \
+            "package.json" \
+            "admin/package.json" \
+            "server/api/package.json" \
+            "server/hocuspocus/package.json" \
+            "server/mcp/package.json"; do
+            if printf '%s\n' "$changed" | grep -Fxq "$path"; then
+              dir=$(dirname "$path")
+              dirs+=("$dir")
+            fi
+          done
+
+          if [ ${#dirs[@]} -eq 0 ]; then
+            echo "No tracked package.json changed; nothing to do."
+            echo "dirs=" >> "$GITHUB_OUTPUT"
+          else
+            echo "dirs=${dirs[*]}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Regenerate bun.lock
+        if: steps.detect.outputs.dirs != ''
+        run: |
+          set -euo pipefail
+          for dir in ${{ steps.detect.outputs.dirs }}; do
+            echo "::group::bun install ($dir)"
+            (cd "$dir" && bun install --no-summary)
+            echo "::endgroup::"
+          done
+
+      - name: Commit and push bun.lock changes
+        if: steps.detect.outputs.dirs != ''
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          # bun.lock 以外の変更（例: node_modules メタ情報）は無視。
+          # Only stage bun.lock files; ignore any other side effects.
+          git add -- ':(glob)**/bun.lock' bun.lock 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "bun.lock is already in sync; nothing to commit."
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "chore(deps): sync bun.lock with package.json changes"
+          # GITHUB_TOKEN による push は新規ワークフロー実行をトリガーしないため、
+          # 無限ループは発生しない (GitHub Actions の組み込み安全機構)。
+          # PAT や GitHub App トークンに切り替える場合は、コミッタを確認する等の
+          # 別途ループ防止ロジックが必要になる。
+          # Pushes made with GITHUB_TOKEN do not trigger new workflow runs, so
+          # no infinite loop occurs (built-in GitHub Actions safety feature).
+          # If switching to a PAT or GitHub App token, add separate
+          # loop-prevention logic (e.g. checking the committer).
+          git push origin "HEAD:${HEAD_REF}"
