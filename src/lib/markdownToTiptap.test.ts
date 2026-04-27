@@ -28,13 +28,14 @@ describe("convertMarkdownToTiptapContent", () => {
     });
   });
 
-  it("converts ## and ### headings to levels 3 and 4", () => {
-    const result = convertMarkdownToTiptapContent("## Section\n### Sub");
+  it("converts ##, ###, #### headings to levels 3, 4, 5", () => {
+    const result = convertMarkdownToTiptapContent("## Section\n### Sub\n#### Detail");
     const parsed = JSON.parse(result) as {
       content: Array<{ type: string; attrs?: { level: number } }>;
     };
     expect(parsed.content[0]).toMatchObject({ type: "heading", attrs: { level: 3 } });
     expect(parsed.content[1]).toMatchObject({ type: "heading", attrs: { level: 4 } });
+    expect(parsed.content[2]).toMatchObject({ type: "heading", attrs: { level: 5 } });
   });
 
   it("converts bullet list items", () => {

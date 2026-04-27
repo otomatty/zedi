@@ -20,14 +20,20 @@ function buildHeadingClampTr(state: EditorState): Transaction | null {
       tr.setNodeMarkup(pos, undefined, { ...node.attrs, level: 2 });
       modified = true;
     }
+    // headings only contain inline content; no need to scan descendants further
+    return false;
   });
   return modified ? tr : null;
 }
 
-export /**
- *
+/**
+ * 旧 h1（level:1）や Y.Doc から取り込んだ低レベル見出しを h2 にクランプする Tiptap 拡張。
+ * `appendTransaction` で各変更後に正規化し、初回のみ `view` マウント直後の `queueMicrotask` でも反映する。
+ * Tiptap extension that clamps stray heading nodes (level &lt; 2) up to level 2.
+ * Runs on every transaction via `appendTransaction`, plus once on view mount via `queueMicrotask`
+ * because the initial document does not always pass through `appendTransaction`.
  */
-const HeadingLevelClamp = Extension.create({
+export const HeadingLevelClamp = Extension.create({
   name: "headingLevelClamp",
   addProseMirrorPlugins() {
     return [
@@ -36,9 +42,6 @@ const HeadingLevelClamp = Extension.create({
         view(view) {
           queueMicrotask(() => {
             if (view.isDestroyed) return;
-            /**
-             *
-             */
             const tr = buildHeadingClampTr(view.state);
             if (tr) {
               view.dispatch(tr);

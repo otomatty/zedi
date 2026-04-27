@@ -258,6 +258,30 @@
     margin-top: 0;
   }
 
+  .tiptap-editor h4 {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.55;
+    margin: 22px 0 10px;
+    color: hsl(var(--foreground));
+  }
+
+  .tiptap-editor h4:first-child {
+    margin-top: 0;
+  }
+
+  .tiptap-editor h5 {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.6;
+    margin: 18px 0 8px;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .tiptap-editor h5:first-child {
+    margin-top: 0;
+  }
+
   .tiptap-editor p {
     margin: 0 0 18px;
     line-height: 1.8;

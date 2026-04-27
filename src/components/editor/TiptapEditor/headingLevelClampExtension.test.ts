@@ -16,13 +16,13 @@ describe("HeadingLevelClamp", () => {
     editors.length = 0;
   });
 
-  it("migrates stored heading level 1 to 2 for schema levels 2-4", async () => {
+  it("migrates stored heading level 1 to 2 for schema levels 2-5", async () => {
     const el = document.createElement("div");
     const editor = new Editor({
       element: el,
       extensions: [
         StarterKit.configure({
-          heading: { levels: [2, 3, 4] },
+          heading: { levels: [2, 3, 4, 5] },
         }),
         HeadingLevelClamp,
       ],

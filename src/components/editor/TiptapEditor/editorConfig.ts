@@ -147,8 +147,9 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
   return [
     StarterKit.configure({
       heading: {
-        // Body top: h2–h4. Page title is the only h1, outside the editor document.
-        levels: [2, 3, 4],
+        // Body headings span h2–h5 (Markdown `#`/`##`/`###`/`####` map to 2/3/4/5).
+        // The page title is the only h1 and lives outside the editor document.
+        levels: [2, 3, 4, 5],
       },
       // Y.js が履歴を管理するためコラボ時は無効
       undoRedo: useCollaboration ? false : undefined,

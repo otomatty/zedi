@@ -28,10 +28,17 @@ function isClipLinkUriAllowed(url: string | undefined): boolean {
 // Web クリップ用の最小スキーマ（サーバー `clipAndCreate` と同系）。
 // Table / TaskList 等は含めない — 拡張は別 PR で検討する。
 // generateJSON に Image がないと <img> がドロップされる。
+// 外部 HTML の `<h1>`〜`<h3>` をパース時にドロップしないため、ここでは server 側
+// (`server/api/src/lib/articleExtractor.ts`) と同じ `[1, 2, 3]` を維持する。
+// 取り込み後の正規化（h1 → h2）はエディタ装着時の `HeadingLevelClamp` と
+// `sanitizeTiptapContent` が行う（PR #777）。
+// Keep parsing levels aligned with the server extractor so external `<h1>`〜`<h3>` survive
+// `generateJSON`; client/runtime clamping (HeadingLevelClamp + sanitizeTiptapContent) demotes
+// any level-1 headings to level 2 before they reach the editor body.
 const extensions = [
   StarterKit.configure({
     heading: {
-      levels: [2, 3, 4],
+      levels: [1, 2, 3],
     },
     codeBlock: false,
     link: false,
