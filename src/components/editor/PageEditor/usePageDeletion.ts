@@ -44,8 +44,29 @@ interface UsePageDeletionReturn {
 }
 
 /**
- * Hook for page deletion logic
- * Handles delete confirmation, back navigation with cleanup
+ * ページ削除フロー（明示削除・戻る・タイトル空・タイトル重複）の状態と
+ * ハンドラを束ねるフック。確認ダイアログの開閉、削除理由の保持、削除後の
+ * 遷移先決定、トースト表示までを管理する。
+ *
+ * issue #768: 削除を発火する前に呼び出し側 (`useEditorAutoSave`) の
+ * `cancelPendingSave` を必ず実行し、保留中の autosave debounce と unmount
+ * flush を抑止する。これにより `updatePage` が論理削除を上書きして
+ * 「無題のページ」が `/home` に復活するレースを防ぐ。`handleDelete` だけは
+ * `onError` でユーザーがエディタに残るため、保留中の編集を落とさないよう
+ * `onSuccess` 内（navigate 直前）でのみキャンセルする。
+ *
+ * Hook bundling page deletion flows (explicit delete, back navigation,
+ * empty-title cleanup, duplicate-title cleanup): manages confirmation
+ * dialog state, the deletion reason, post-delete navigation target, and
+ * toasts.
+ *
+ * issue #768: each deletion path invokes the caller-supplied
+ * `cancelPendingSave` (from `useEditorAutoSave`) to clear pending autosave
+ * debounces and suppress the unmount flush, preventing the race where
+ * `updatePage` overwrites the soft delete and an "untitled" row reappears
+ * on `/home`. `handleDelete` is the exception: its `onError` keeps the user
+ * on the editor, so cancellation is deferred to `onSuccess` (just before
+ * `navigate`) to avoid silently dropping queued edits on a failed delete.
  */
 export function usePageDeletion({
   currentPageId,
