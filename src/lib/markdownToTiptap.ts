@@ -55,14 +55,16 @@ export interface ConvertMarkdownToTiptapOptions {
  * 先頭の `# X` 1 行を取り除く（任意の先行空白行は許容、`## ...` などは対象外）。
  * Strip a single leading `# X` line, allowing optional leading whitespace-only lines.
  * `## ...` や本文中の `# X` には触れない。
+ *
+ * 入力は LF 正規化済み (`\n`) を想定する（呼び出し側で一度だけ正規化する）。
+ * The input is expected to be LF-normalized (`\n`); the caller normalizes once.
  */
-function stripLeadingH1Line(markdown: string): string {
-  const normalized = markdown.replace(/\r\n?/g, "\n");
+function stripLeadingH1Line(normalized: string): string {
   // `\s*` allows preceding blank/whitespace-only lines. The negative lookahead `(?!#)`
   // ensures we only match a single `#` (not `##`, `###`, ...). `[^\n]*` captures the
   // remainder of the heading line and the trailing `\n?` consumes its line break.
   const match = normalized.match(/^(\s*)# (?!#)[^\n]*\n?/);
-  if (!match) return markdown;
+  if (!match) return normalized;
   return normalized.slice(match[0].length);
 }
 
@@ -78,8 +80,12 @@ export function convertMarkdownToTiptapContent(
   markdown: string,
   options?: ConvertMarkdownToTiptapOptions,
 ): string {
-  const source = options?.dropLeadingH1 ? stripLeadingH1Line(markdown) : markdown;
-  const normalized = source.replace(/\r\n?/g, "\n");
+  // CRLF/CR を LF に正規化してから後続処理（H1 ストリップ、行分割）を一括で行う。
+  // Normalize CRLF/CR to LF once, then run downstream steps (H1 strip, line split).
+  let normalized = markdown.replace(/\r\n?/g, "\n");
+  if (options?.dropLeadingH1) {
+    normalized = stripLeadingH1Line(normalized);
+  }
   const lines = normalized.endsWith("\n")
     ? normalized.slice(0, -1).split("\n")
     : normalized.split("\n");
