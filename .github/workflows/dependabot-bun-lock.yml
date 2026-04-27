@@ -17,10 +17,20 @@ name: Dependabot bun.lock sync
 
 on:
   pull_request:
+    # bun.lock を持つ全ディレクトリの package.json を監視する。
+    # dependabot.yml は現在 root / server/api / server/hocuspocus を対象にしているが、
+    # 過去 (PR #374) には admin/package.json も dependabot に更新されており、
+    # 将来 dependabot.yml が拡張されてもカバーできるよう全ロックを対象にする。
+    # Watch every package.json that has a sibling bun.lock. Although the
+    # current dependabot.yml only tracks root / server/api / server/hocuspocus,
+    # admin/package.json was once updated by Dependabot (PR #374), and this
+    # list also future-proofs the workflow against expansions of dependabot.yml.
     paths:
       - "package.json"
+      - "admin/package.json"
       - "server/api/package.json"
       - "server/hocuspocus/package.json"
+      - "server/mcp/package.json"
 
 # bun install で書き戻すため contents: write が必要。
 # Needs `contents: write` to push the regenerated lockfile back to the PR branch.
@@ -67,9 +77,14 @@ jobs:
           echo "$changed"
 
           dirs=()
-          # dependabot.yml で監視しているエコシステムと一致させる。
-          # Keep this list in sync with .github/dependabot.yml.
-          for path in "package.json" "server/api/package.json" "server/hocuspocus/package.json"; do
+          # bun.lock を持つ全ディレクトリ。`on.paths` と一致させる。
+          # Every directory with a sibling bun.lock; keep in sync with `on.paths`.
+          for path in \
+            "package.json" \
+            "admin/package.json" \
+            "server/api/package.json" \
+            "server/hocuspocus/package.json" \
+            "server/mcp/package.json"; do
             if printf '%s\n' "$changed" | grep -Fxq "$path"; then
               dir=$(dirname "$path")
               dirs+=("$dir")
