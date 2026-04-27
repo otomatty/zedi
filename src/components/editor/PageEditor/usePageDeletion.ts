@@ -66,13 +66,19 @@ export function usePageDeletion({
 
   const handleDelete = useCallback(() => {
     if (currentPageId) {
-      // issue #768: 削除発火前に保留中の autosave をキャンセルして、
-      // unmount flush の updatePage が論理削除を上書きしないようにする。
-      // issue #768: cancel any pending autosave before firing the delete so
-      // the unmount flush's updatePage cannot overwrite the soft delete.
-      cancelPendingSave();
+      // issue #768 + Codex P2: 他のハンドラと違い、`handleDelete` の `onError`
+      // ではユーザーがエディタに残るため、削除失敗時に保留中の autosave を
+      // 落とすと最近の編集が失われる。そのため `cancelPendingSave` は削除が
+      // 成功して `/home` に遷移する直前（`onSuccess` 内）でのみ呼ぶ。
+      //
+      // issue #768 + Codex P2: unlike the other handlers, `handleDelete`'s
+      // `onError` keeps the user on the editor, so cancelling the pending
+      // autosave before the mutation would silently drop their queued edits
+      // on a failed delete. Cancel only inside `onSuccess`, just before
+      // navigating away (and the unmount flush).
       deletePageMutation.mutate(currentPageId, {
         onSuccess: () => {
+          cancelPendingSave();
           toast({
             title: "ページを削除しました",
           });

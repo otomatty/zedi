@@ -260,13 +260,23 @@ describe("usePageDeletion - cancelPendingSave 順序 (issue #768)", () => {
     expect(callOrder).toEqual(["cancel", "mutate"]);
   });
 
-  it("handleDelete (明示削除) も mutate より先に cancelPendingSave を呼ぶ", () => {
+  it("handleDelete (明示削除) は mutate → onSuccess の順で cancelPendingSave を呼ぶ (Codex P2: 失敗時の保留保存を保護)", () => {
+    // Codex P2 レビューの観点: `handleDelete` は他のハンドラと違い `onError`
+    // でエディタに残るため、mutate 前に cancelPendingSave すると失敗時に
+    // 保留中の編集が落ちる。`onSuccess` の中でだけキャンセルする実装を
+    // 順序検証する。
+    //
+    // Codex P2: unlike other deletion paths, `handleDelete`'s `onError`
+    // keeps the user on the editor, so cancelling before the mutation
+    // would silently drop their queued autosave. Verify cancellation
+    // only happens inside `onSuccess`.
     const callOrder: string[] = [];
     mockCancelPendingSave.mockImplementation(() => {
       callOrder.push("cancel");
     });
-    mockMutate.mockImplementation(() => {
+    mockMutate.mockImplementation((_id: string, opts?: { onSuccess?: () => void }) => {
       callOrder.push("mutate");
+      opts?.onSuccess?.();
     });
 
     const { result } = renderHook(() =>
@@ -281,7 +291,36 @@ describe("usePageDeletion - cancelPendingSave 順序 (issue #768)", () => {
 
     act(() => result.current.handleDelete());
 
-    expect(callOrder).toEqual(["cancel", "mutate"]);
+    expect(callOrder).toEqual(["mutate", "cancel"]);
+    expect(mockNavigate).toHaveBeenCalledWith("/home");
+  });
+
+  it("handleDelete: 削除失敗時は cancelPendingSave を呼ばず保留保存を保持する (Codex P2)", () => {
+    // 失敗ブランチではエディタに残るので、保留中の autosave は触らない。
+    // On the failure branch the user stays on the editor, so the pending
+    // autosave must remain intact.
+    mockMutate.mockImplementation((_id: string, opts?: { onError?: (e: Error) => void }) => {
+      opts?.onError?.(new Error("network down"));
+    });
+
+    const { result } = renderHook(() =>
+      usePageDeletion({
+        currentPageId: "page-1",
+        title: "foo",
+        content: NON_EMPTY_CONTENT,
+        shouldBlockSave: false,
+        cancelPendingSave: mockCancelPendingSave,
+      }),
+    );
+
+    act(() => result.current.handleDelete());
+
+    expect(mockCancelPendingSave).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith({
+      title: "削除に失敗しました",
+      variant: "destructive",
+    });
   });
 
   it("削除に至らないキャンセルパス (handleCancelDelete) では cancelPendingSave を呼ばない", () => {
