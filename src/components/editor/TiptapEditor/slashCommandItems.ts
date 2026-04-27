@@ -37,22 +37,32 @@ export const slashCommandItems: SlashCommandItem[] = [
     action: (editor, range) => editor.chain().focus().deleteRange(range).setParagraph().run(),
   },
   {
-    id: "heading1",
-    icon: "Heading1",
-    action: (editor, range) =>
-      editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
-  },
-  {
+    // ページタイトル input が h1 を担うため、本文 schema は `levels: [2, 3, 4, 5]`。
+    // ID とラベルは実 level に揃える。
+    // The page title input owns the only h1; the body schema allows levels 2–5,
+    // so each slash item's id matches the level it inserts.
     id: "heading2",
     icon: "Heading2",
     action: (editor, range) =>
-      editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
+      editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
   },
   {
     id: "heading3",
     icon: "Heading3",
     action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
+  },
+  {
+    id: "heading4",
+    icon: "Heading4",
+    action: (editor, range) =>
       editor.chain().focus().deleteRange(range).setHeading({ level: 4 }).run(),
+  },
+  {
+    id: "heading5",
+    icon: "Heading5",
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).setHeading({ level: 5 }).run(),
   },
   {
     id: "bulletList",
