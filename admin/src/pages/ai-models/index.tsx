@@ -7,64 +7,26 @@ import { useAiModelActions } from "./useAiModelActions";
 import { useAiModelsDragReorder } from "./useAiModelsDragReorder";
 
 /**
- *
+ * AI モデル管理ページのコンテナコンポーネント。
+ * Container component for the admin AI models page.
  */
 export default function AiModels() {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const [models, setModels] = useState<AiModelAdmin[]>([]);
-  /**
-   *
-   */
   const [loading, setLoading] = useState(true);
-  /**
-   *
-   */
   const [error, setError] = useState<string | null>(null);
-  /**
-   *
-   */
   const [syncing, setSyncing] = useState(false);
-  /**
-   *
-   */
   const [syncResult, setSyncResult] = useState<SyncResultItem[] | null>(null);
-  /**
-   *
-   */
   const [previewOpen, setPreviewOpen] = useState(false);
-  /**
-   *
-   */
   const [previewLoading, setPreviewLoading] = useState(false);
-  /**
-   *
-   */
   const [previewData, setPreviewData] = useState<SyncPreviewResult[] | null>(null);
-  /**
-   *
-   */
   const isMountedRef = useRef(true);
-  /**
-   *
-   */
   const originalModelsRef = useRef<AiModelAdmin[]>([]);
 
-  /**
-   *
-   */
   const load = useCallback(async (showLoading = true) => {
     if (showLoading && isMountedRef.current) setLoading(true);
     if (isMountedRef.current) setError(null);
     try {
-      /**
-       *
-       */
       const nextModels = await getAiModels();
       if (!isMountedRef.current) return;
       setModels(nextModels);
@@ -78,9 +40,6 @@ export default function AiModels() {
     }
   }, []);
 
-  /**
-   *
-   */
   const { handleModelUpdate, handleToggleActive, handleTierChange } = useAiModelActions({
     setModels,
     setError,
@@ -88,9 +47,6 @@ export default function AiModels() {
     originalModelsRef,
   });
 
-  /**
-   *
-   */
   const dragReorder = useAiModelsDragReorder({
     models,
     setModels,
@@ -107,17 +63,11 @@ export default function AiModels() {
     };
   }, [load]);
 
-  /**
-   *
-   */
   const handlePreviewClick = useCallback(async () => {
     setPreviewData(null);
     setPreviewLoading(true);
     setError(null);
     try {
-      /**
-       *
-       */
       const results = await previewSyncAiModels();
       if (!isMountedRef.current) return;
       setPreviewData(results);
@@ -131,9 +81,6 @@ export default function AiModels() {
     }
   }, []);
 
-  /**
-   *
-   */
   const handleSyncConfirm = useCallback(() => {
     setPreviewOpen(false);
     setPreviewData(null);
