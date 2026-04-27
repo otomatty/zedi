@@ -1,0 +1,20 @@
+{
+  "title": "監査ログ",
+  "filters": {
+    "action": "アクションで絞り込み",
+    "from": "期間（開始）",
+    "to": "期間（終了）"
+  },
+  "columns": {
+    "createdAt": "日時",
+    "actor": "操作者",
+    "action": "アクション",
+    "target": "対象",
+    "diff": "変更内容",
+    "ipAddress": "IP"
+  },
+  "empty": "監査ログはありません。",
+  "actions": {
+    "user.role.update": "ユーザー: ロール変更"
+  }
+}

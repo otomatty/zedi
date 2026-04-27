@@ -1,0 +1,63 @@
+{
+  "title": "User Management",
+  "statusFilterAriaLabel": "Status filter",
+  "searchEmailPlaceholder": "Search by email",
+  "searchEmailAriaLabel": "Search by email",
+  "columns": {
+    "email": "Email",
+    "name": "Name",
+    "status": "Status",
+    "role": "Role",
+    "pageCount": "Pages",
+    "createdAt": "Created",
+    "actions": "Actions"
+  },
+  "actions": {
+    "restore": "Restore",
+    "suspend": "Suspend",
+    "delete": "Delete"
+  },
+  "states": {
+    "saving": "Saving...",
+    "deleted": "Deleted"
+  },
+  "card": {
+    "reasonPrefix": "Reason: {{reason}}",
+    "pageCount": "Pages: {{count}}"
+  },
+  "row": {
+    "roleAriaLabel": "Role for {{email}}",
+    "suspendedReasonShort": "({{reason}})"
+  },
+  "roleChange": {
+    "title": "Change role",
+    "description": "Change role of {{name}} from \"{{from}}\" to \"{{to}}\"?",
+    "confirm": "Change"
+  },
+  "unsuspend": {
+    "title": "Lift suspension",
+    "description": "Lift the suspension and restore {{name}}'s account?",
+    "confirm": "Restore"
+  },
+  "deleteUser": {
+    "title": "Delete user",
+    "description": "Delete {{name}}. Personal information will be anonymized, and sessions and OAuth links will be removed. This action cannot be undone.",
+    "confirm": "Delete"
+  },
+  "impact": {
+    "title": "Impact:",
+    "notes": "Owned notes: {{count}}",
+    "sessions": "Active sessions: {{count}}",
+    "subscription": "Subscription: {{value}}",
+    "subscriptionActive": "Active",
+    "subscriptionNone": "None",
+    "lastAiUsage": "Last AI usage: {{date}}"
+  },
+  "suspendDialog": {
+    "title": "Suspend user",
+    "description": "Suspend {{name}}. Suspended users lose access to all APIs and existing sessions are invalidated.",
+    "confirm": "Suspend",
+    "reasonLabel": "Reason (optional)",
+    "reasonPlaceholder": "Enter the reason for suspension"
+  }
+}

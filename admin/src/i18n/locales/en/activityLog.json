@@ -1,0 +1,29 @@
+{
+  "title": "Activity Log",
+  "filters": {
+    "kind": "Kind",
+    "actor": "Actor"
+  },
+  "columns": {
+    "kind": "Kind",
+    "actor": "Actor",
+    "detail": "Detail",
+    "relatedPages": "Related pages",
+    "createdAt": "Recorded at"
+  },
+  "empty": "No activity logs yet.",
+  "showing": "Showing {{shown}} of {{total}}",
+  "kinds": {
+    "clip_ingest": "Clip ingest",
+    "chat_promote": "Chat promote",
+    "lint_run": "Lint run",
+    "wiki_generate": "Wiki generate",
+    "index_build": "Index build",
+    "wiki_schema_update": "Schema update"
+  },
+  "actors": {
+    "user": "User",
+    "ai": "AI",
+    "system": "System"
+  }
+}

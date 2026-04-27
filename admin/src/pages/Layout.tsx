@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { Bot, Users, ScrollText, HeartPulse, Activity } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   SidebarProvider,
   Sidebar,
@@ -15,12 +16,12 @@ import {
   SidebarHeader,
 } from "@zedi/ui";
 
-const navLinks = [
-  { to: "/ai-models", label: "AI モデル", icon: Bot },
-  { to: "/users", label: "ユーザー管理", icon: Users },
-  { to: "/audit-logs", label: "監査ログ", icon: ScrollText },
-  { to: "/wiki-health", label: "Wiki Health", icon: HeartPulse },
-  { to: "/activity-log", label: "活動ログ", icon: Activity },
+const NAV_ITEMS = [
+  { to: "/ai-models", labelKey: "nav.items.aiModels", icon: Bot },
+  { to: "/users", labelKey: "nav.items.users", icon: Users },
+  { to: "/audit-logs", labelKey: "nav.items.auditLogs", icon: ScrollText },
+  { to: "/wiki-health", labelKey: "nav.items.wikiHealth", icon: HeartPulse },
+  { to: "/activity-log", labelKey: "nav.items.activityLog", icon: Activity },
 ];
 
 /**
@@ -29,19 +30,21 @@ const navLinks = [
  */
 export default function Layout() {
   const location = useLocation();
+  const { t } = useTranslation();
 
   return (
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader className="border-sidebar-border border-b px-4 py-3">
-          <span className="text-sm font-semibold tracking-tight">Zedi 管理画面</span>
+          <span className="text-sm font-semibold tracking-tight">{t("nav.adminPanelTitle")}</span>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>メニュー</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("nav.menu")}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navLinks.map(({ to, label, icon: Icon }) => {
+                {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => {
+                  const label = t(labelKey);
                   const isActive =
                     location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
                   return (
@@ -63,7 +66,7 @@ export default function Layout() {
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4 md:hidden">
           <SidebarTrigger />
-          <span className="text-sm font-medium">管理画面</span>
+          <span className="text-sm font-medium">{t("nav.adminShortTitle")}</span>
         </header>
         <div className="flex-1 p-4 md:p-6">
           <Outlet />

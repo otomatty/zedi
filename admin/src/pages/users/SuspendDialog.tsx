@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Label, Textarea } from "@zedi/ui";
 import type { UserAdmin } from "@/api/admin";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
@@ -17,6 +18,7 @@ interface SuspendDialogProps {
  * Dialog for entering suspension reason before suspending a user.
  */
 export function SuspendDialog({ user, onClose, onConfirm }: SuspendDialogProps) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState("");
 
   const handleConfirm = () => {
@@ -37,23 +39,21 @@ export function SuspendDialog({ user, onClose, onConfirm }: SuspendDialogProps) 
     <ConfirmActionDialog
       open={user !== null}
       onOpenChange={handleOpenChange}
-      title="ユーザーをサスペンド"
+      title={t("users.suspendDialog.title")}
       description={
-        user
-          ? `${user.name || user.email} をサスペンドします。サスペンドされたユーザーはすべての API にアクセスできなくなり、既存セッションも無効化されます。`
-          : ""
+        user ? t("users.suspendDialog.description", { name: user.name || user.email }) : ""
       }
-      confirmLabel="サスペンド"
+      confirmLabel={t("users.suspendDialog.confirm")}
       destructive
       onConfirm={handleConfirm}
     >
       <div className="grid gap-2">
-        <Label htmlFor="suspend-reason">理由（任意）</Label>
+        <Label htmlFor="suspend-reason">{t("users.suspendDialog.reasonLabel")}</Label>
         <Textarea
           id="suspend-reason"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="サスペンドの理由を入力してください"
+          placeholder={t("users.suspendDialog.reasonPlaceholder")}
           rows={3}
         />
       </div>
