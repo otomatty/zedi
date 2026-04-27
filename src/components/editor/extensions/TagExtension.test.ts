@@ -289,6 +289,30 @@ describe("TagExtension input rule", () => {
       expect("#tech;".match(TAG_INPUT_REGEX)?.[1]).toBe("#tech");
     });
 
+    it("terminates on parentheses, brackets, and quotes", () => {
+      // 終端を `[^TAG_NAME_CHAR_CLASS]` まで広げたので、`(#tag)` のように
+      // 括弧で囲んだ場合や引用符で閉じた場合も `)` / `"` / `'` 入力時点で
+      // タグ化される（issue #769 レビュー反映）。
+      // The terminator class is `[^TAG_NAME_CHAR_CLASS]`, so `(#tag)`,
+      // `"#tag"`, `[#tag]` etc. all close the tag on the closing character
+      // (review feedback on issue #769).
+      expect("(#tag)".match(TAG_INPUT_REGEX)?.[1]).toBe("#tag");
+      expect("[#tag]".match(TAG_INPUT_REGEX)?.[1]).toBe("#tag");
+      expect("{#tag}".match(TAG_INPUT_REGEX)?.[1]).toBe("#tag");
+      expect('"#tag"'.match(TAG_INPUT_REGEX)?.[1]).toBe("#tag");
+      expect("'#tag'".match(TAG_INPUT_REGEX)?.[1]).toBe("#tag");
+      expect("「#技術」".match(TAG_INPUT_REGEX)?.[1]).toBe("#技術");
+    });
+
+    it("terminates when a second `#` is typed (e.g. `#tech#design`)", () => {
+      // `#` 自体も `TAG_NAME_CHAR_CLASS` に含まれないため終端扱いとなり、
+      // 連続して別タグを打ち始めた瞬間に直前のタグが確定する。
+      // `#` is not in `TAG_NAME_CHAR_CLASS`, so a second `#` terminates the
+      // previous tag — typing back-to-back tags `#tech#design` finalises
+      // `#tech` the moment the second `#` is typed.
+      expect("#tech#".match(TAG_INPUT_REGEX)?.[1]).toBe("#tech");
+    });
+
     it("does not match a `#` with no following name", () => {
       expect("# ".match(TAG_INPUT_REGEX)).toBeNull();
     });
@@ -356,6 +380,21 @@ describe("TagExtension input rule", () => {
         expect(handled).toBe(true);
         const html = editor.getHTML();
         expect(html).toContain('data-name="tech"');
+        expect(html).toContain("data-tag");
+      } finally {
+        editor.destroy();
+      }
+    });
+
+    it("applies the tag mark when `(#tag)` is closed with a `)`", () => {
+      // 括弧で囲んだケース：`(#tag` の後に `)` を打鍵すると `#tag` がタグ化。
+      // Closing `)` after `(#tag` finalises the tag — review feedback on #769.
+      const editor = makeEditor("<p>(#tag</p>");
+      try {
+        const handled = typeAt(editor, 6, ")");
+        expect(handled).toBe(true);
+        const html = editor.getHTML();
+        expect(html).toContain('data-name="tag"');
         expect(html).toContain("data-tag");
       } finally {
         editor.destroy();

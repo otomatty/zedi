@@ -44,16 +44,19 @@ export const TAG_PASTE_REGEX = new RegExp(`(?<![\\w/#])#[${TAG_NAME_CHAR_CLASS}]
  * while the user is typing. Used by {@link Tag.addInputRules} to convert
  * `#name` into the styled mark in real time.
  *
- * 入力規則用のハッシュタグ `#name` 検出正規表現。ユーザーが終端文字
- * （半角空白 / 改行 / 和文句読点 `、。,.!?:;`）まで打ち切ったタイミングで
- * `#name` をリアルタイムにタグマーク化するために {@link Tag.addInputRules}
- * から使用する。
+ * 入力規則用のハッシュタグ `#name` 検出正規表現。ユーザーが「タグ名に使えない
+ * 任意の文字」（半角空白 / 改行 / 句読点 / 括弧 / 引用符 など）まで打ち切った
+ * 時点で `#name` をリアルタイムにタグマーク化するために
+ * {@link Tag.addInputRules} から使用する。
  *
  * Preconditions to match:
  * - `#` must not be preceded by a word character, `/`, or another `#`
  *   (mirrors {@link TAG_PASTE_REGEX} so paste / typed paths agree).
  * - The name must consist of {@link TAG_NAME_CHAR_CLASS} characters.
- * - The match ends with a terminator (whitespace or punctuation).
+ * - The match ends with **any character outside `TAG_NAME_CHAR_CLASS`** —
+ *   whitespace, ASCII / CJK punctuation, parentheses, brackets, quotes, etc.
+ *   This mirrors how mainstream products (Twitter / GitHub) close hashtags
+ *   and keeps `(#tag)` / `"#tag"` / `[#tag]` working.
  *
  * The leading boundary and the terminator are intentionally **outside** any
  * capture group — the only capture (`match[1]`) is the literal `#name`. The
@@ -63,12 +66,12 @@ export const TAG_PASTE_REGEX = new RegExp(`(?<![\\w/#])#[${TAG_NAME_CHAR_CLASS}]
  *
  * 先頭境界・終端文字は **キャプチャに含めない**。唯一のキャプチャ `match[1]` は
  * `#name` 本体で、入力規則ハンドラはこの範囲だけにマークを付け、ユーザーが
- * 直前に打鍵した終端文字（空白・句読点）はそのまま残す。`markInputRule`
- * を使うと終端文字が削除されて打ち直しが必要になるため、独自ハンドラで
- * 範囲のみマーク化する。
+ * 直前に打鍵した終端文字（空白・句読点・括弧・引用符など）はそのまま残す。
+ * `markInputRule` を使うと終端文字が削除されて打ち直しが必要になるため、
+ * 独自ハンドラで範囲のみマーク化する。
  */
 export const TAG_INPUT_REGEX = new RegExp(
-  `(?:^|[^\\w/#])(#[${TAG_NAME_CHAR_CLASS}]+)[\\s、。,.!?:;]$`,
+  `(?:^|[^\\w/#])(#[${TAG_NAME_CHAR_CLASS}]+)[^${TAG_NAME_CHAR_CLASS}]$`,
 );
 
 /**
