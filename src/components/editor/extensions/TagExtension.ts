@@ -1,4 +1,4 @@
-import { Mark, markPasteRule, mergeAttributes } from "@tiptap/core";
+import { InputRule, Mark, markPasteRule, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { TAG_NAME_CHAR_CLASS } from "@zedi/shared/tagCharacterClass";
 
@@ -38,6 +38,38 @@ import { TAG_NAME_CHAR_CLASS } from "@zedi/shared/tagCharacterClass";
  * 行い、理由とデータ形状をまとめて管理する。
  */
 export const TAG_PASTE_REGEX = new RegExp(`(?<![\\w/#])#[${TAG_NAME_CHAR_CLASS}]+`, "g");
+
+/**
+ * Regex matching a hashtag pattern `#name` followed by a terminator character
+ * while the user is typing. Used by {@link Tag.addInputRules} to convert
+ * `#name` into the styled mark in real time.
+ *
+ * 入力規則用のハッシュタグ `#name` 検出正規表現。ユーザーが終端文字
+ * （半角空白 / 改行 / 和文句読点 `、。,.!?:;`）まで打ち切ったタイミングで
+ * `#name` をリアルタイムにタグマーク化するために {@link Tag.addInputRules}
+ * から使用する。
+ *
+ * Preconditions to match:
+ * - `#` must not be preceded by a word character, `/`, or another `#`
+ *   (mirrors {@link TAG_PASTE_REGEX} so paste / typed paths agree).
+ * - The name must consist of {@link TAG_NAME_CHAR_CLASS} characters.
+ * - The match ends with a terminator (whitespace or punctuation).
+ *
+ * The leading boundary and the terminator are intentionally **outside** any
+ * capture group — the only capture (`match[1]`) is the literal `#name`. The
+ * input-rule handler computes the document range from `match[1]` and applies
+ * the mark to that range only, leaving the user-typed terminator in place
+ * (unlike `markInputRule`, which would delete non-capture trailing text).
+ *
+ * 先頭境界・終端文字は **キャプチャに含めない**。唯一のキャプチャ `match[1]` は
+ * `#name` 本体で、入力規則ハンドラはこの範囲だけにマークを付け、ユーザーが
+ * 直前に打鍵した終端文字（空白・句読点）はそのまま残す。`markInputRule`
+ * を使うと終端文字が削除されて打ち直しが必要になるため、独自ハンドラで
+ * 範囲のみマーク化する。
+ */
+export const TAG_INPUT_REGEX = new RegExp(
+  `(?:^|[^\\w/#])(#[${TAG_NAME_CHAR_CLASS}]+)[\\s、。,.!?:;]$`,
+);
 
 /**
  * Regex for extracting a tag name from a single `#name` literal (non-global).
@@ -232,6 +264,76 @@ export const Tag = Mark.create<TagOptions>({
           const name = extractTagName(match[0] ?? "");
           if (!name || isExcludedTagName(name)) return false;
           return { name, exists: false, referenced: false, targetId: null };
+        },
+      }),
+    ];
+  },
+
+  addInputRules() {
+    // `this.type` を外側で捕捉し、ハンドラは PURE な関数として閉じ込める。
+    // Capture `this.type` outside the handler so the rule stays a pure closure.
+    const markType = this.type;
+
+    return [
+      new InputRule({
+        find: TAG_INPUT_REGEX,
+        handler: ({ state, range, match }) => {
+          const tagText = match[1];
+          const fullMatch = match[0];
+          if (!tagText || !fullMatch) return null;
+
+          // Re-use the same exclusion contract as the paste rule so typed and
+          // pasted input share their reject reasons (numeric-only / 6/8-hex).
+          // 貼り付け規則と同じ除外ルールに合わせる（数字のみ・6/8 桁 hex）。
+          const name = extractTagName(tagText);
+          if (!name || isExcludedTagName(name)) return null;
+
+          // Compute the document range of the `#name` portion: the regex may
+          // include a non-capturing leading boundary (`[^\w/#]`) and a trailing
+          // terminator (whitespace or punctuation), neither of which should be
+          // marked. Code-mark neighbourhoods are filtered upstream by the
+          // input-rule runner (it short-circuits on `mark.type.spec.code`), so
+          // the `excludes: "code"` invariant requires no extra guard here.
+          // `#name` 本体の文書内範囲を算出する。先頭境界（非単語文字）と
+          // 末尾の終端文字はマーク範囲に含めない。コードマーク内では Tiptap の
+          // 入力規則ランナー側で短絡されるためここで追加チェックは不要。
+          const tagOffsetInMatch = fullMatch.indexOf(tagText);
+          const tagStart = range.from + tagOffsetInMatch;
+          const tagEnd = tagStart + tagText.length;
+
+          // Tiptap の入力規則プラグインはハンドラ呼び出し時点でユーザーが
+          // タイプした文字（終端文字）をまだドキュメントに挿入していない。
+          // `tr.steps.length > 0` で `handleTextInput` が `true` を返す扱いと
+          // なり、ProseMirror デフォルトのテキスト挿入はスキップされるため、
+          // ここで終端文字を明示的に挿入してユーザー入力を保全する。終端文字は
+          // `fullMatch` のうちキャプチャ後ろに残る部分（通常 1 文字）に等しい。
+          // Tiptap's input-rule plugin invokes the handler before ProseMirror
+          // commits the just-typed character. Returning a transaction with
+          // `steps > 0` causes the plugin to dispatch it and skip the default
+          // text insertion, so we re-insert the terminator (the slice of
+          // `fullMatch` after the capture) ourselves to preserve the keystroke.
+          const typedTerminator = fullMatch.slice(tagOffsetInMatch + tagText.length);
+
+          // 注: `state.tr` は呼び出すたびに新しい Transaction を返すゲッター。
+          // Tiptap が `state` をラップして `tr` が同一インスタンスを返すように
+          // しているため、destructure して取り出した `tr` への変更が一括で
+          // ディスパッチされる。
+          // `state.tr` is a getter; Tiptap proxies `state` so accesses share a
+          // single `tr` instance which is then dispatched after the handler.
+          const { tr } = state;
+          if (typedTerminator.length > 0) {
+            // 終端文字をマーク範囲の直後に挿入する（範囲シフトを起こさないよう
+            // mark 適用より前に行う）。
+            // Insert the terminator first so the subsequent `addMark` range
+            // does not need rebasing.
+            tr.insertText(typedTerminator, range.to);
+          }
+          tr.addMark(
+            tagStart,
+            tagEnd,
+            markType.create({ name, exists: false, referenced: false, targetId: null }),
+          );
+          tr.removeStoredMark(markType);
         },
       }),
     ];
