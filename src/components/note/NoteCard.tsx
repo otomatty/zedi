@@ -24,7 +24,7 @@ const ROLE_I18N_KEYS: Record<NoteSummary["role"], string> = {
  * ノート一覧のカード。
  * / Card used in note lists.
  */
-const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
+export const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
 

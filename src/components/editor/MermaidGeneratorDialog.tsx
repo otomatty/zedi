@@ -32,7 +32,7 @@ interface MermaidGeneratorDialogProps {
  * Mermaid ダイアグラム生成ダイアログ。
  * / Dialog for generating Mermaid diagrams from selected text.
  */
-const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
+export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   open,
   onOpenChange,
   selectedText,
