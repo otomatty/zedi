@@ -144,4 +144,17 @@ describe("htmlToTiptapJSON", () => {
     expect(imageNodes.length).toBe(1);
     expect(imageNodes[0]?.attrs).toMatchObject({ src: "https://example.com/fig.webp" });
   });
+
+  // Regression for PR #777 review (Devin): keep <h1> as a heading node so that
+  // editor-time clamping (HeadingLevelClamp / sanitizeTiptapContent) can demote
+  // it to level 2. Dropping <h1> at parse time would silently lose semantics.
+  it("preserves <h1>..<h3> as heading nodes (clamping happens later)", () => {
+    const html = "<h1>Top</h1><h2>Sub</h2><h3>Detail</h3>";
+    const result = htmlToTiptapJSON(html);
+    const headings = result.content?.filter((n) => n.type === "heading") ?? [];
+    expect(headings).toHaveLength(3);
+    expect(headings[0]?.attrs).toMatchObject({ level: 1 });
+    expect(headings[1]?.attrs).toMatchObject({ level: 2 });
+    expect(headings[2]?.attrs).toMatchObject({ level: 3 });
+  });
 });

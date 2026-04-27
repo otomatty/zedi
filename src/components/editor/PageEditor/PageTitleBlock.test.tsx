@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PageTitleBlock } from "./PageTitleBlock";
 
@@ -8,6 +8,12 @@ describe("PageTitleBlock", () => {
     it("プレースホルダー「タイトル」が表示される", () => {
       render(<PageTitleBlock title="" onTitleChange={vi.fn()} />);
       expect(screen.getByPlaceholderText("タイトル")).toBeInTheDocument();
+    });
+
+    it("編集時も h1 として扱いアクセシビリティ上の見出し1になる", () => {
+      render(<PageTitleBlock title="編集中タイトル" onTitleChange={vi.fn()} />);
+      const heading = screen.getByRole("heading", { level: 1 });
+      expect(within(heading).getByRole("textbox")).toHaveValue("編集中タイトル");
     });
 
     it("テキストを変更すると onTitleChange が呼ばれる", async () => {

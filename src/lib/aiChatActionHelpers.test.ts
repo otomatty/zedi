@@ -137,6 +137,8 @@ describe("appendMarkdownToTiptapContent", () => {
       type: "paragraph",
       content: [{ type: "text", text: "Existing" }],
     });
+    // `##` → Tiptap level 2 (body: ##/###/####/##### = 2/3/4/5; `# X` stays literal because
+    // the page h1 lives in the title field)
     expect(parsed.content[1]).toMatchObject({
       type: "heading",
       attrs: { level: 2 },
