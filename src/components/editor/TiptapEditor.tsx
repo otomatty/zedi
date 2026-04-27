@@ -9,6 +9,7 @@ import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
 import { WikiLinkHoverCardLayer } from "./TiptapEditor/WikiLinkHoverCardLayer";
+import { TagSuggestionLayer } from "./TiptapEditor/TagSuggestionLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
@@ -67,6 +68,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     slashPos,
     slashRef,
     handleSlashClose,
+    tagSuggestionState,
+    tagSuggestionPos,
+    tagSuggestionRef,
+    handleTagSuggestionSelect,
+    handleTagSuggestionClose,
     mermaidDialogOpen,
     setMermaidDialogOpen,
     handleInsertMermaid,
@@ -145,6 +151,15 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         suggestionRef={suggestionRef}
         onSelect={handleSuggestionSelect}
         onClose={handleSuggestionClose}
+        pageNoteId={resolvedPageNoteId}
+      />
+      <TagSuggestionLayer
+        editor={editor}
+        suggestionState={tagSuggestionState}
+        position={tagSuggestionPos}
+        suggestionRef={tagSuggestionRef}
+        onSelect={handleTagSuggestionSelect}
+        onClose={handleTagSuggestionClose}
         pageNoteId={resolvedPageNoteId}
       />
       <WikiLinkHoverCardLayer
