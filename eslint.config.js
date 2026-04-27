@@ -81,10 +81,18 @@ export default tseslint.config(
       "no-console": "off", // 下の override で src のみ有効
 
       // --- TSDoc / JSDoc（export されたものにコメント必須、現時点は warning のみ） ---
+      // 空 JSDoc スタブの自動挿入を防ぐため `enableFixer: false` を指定する。
+      // `--fix` で空 description のブロックを生成すると `jsdoc/no-blank-block-descriptions`
+      // と矛盾し、レビューでもノイズとして繰り返し指摘されるため、警告のみ残し手動で記述する運用とする。
+      // Disable the auto-fixer so `--fix` does not insert empty JSDoc stubs.
+      // The auto-inserted blocks conflict with `jsdoc/no-blank-block-descriptions`
+      // and were repeatedly flagged as noise during review; we keep the warning
+      // but require contributors to write descriptions manually.
       "jsdoc/require-jsdoc": [
         "warn",
         {
           publicOnly: true,
+          enableFixer: false,
           require: {
             FunctionDeclaration: true,
             FunctionExpression: true,
