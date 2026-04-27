@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@hocuspocus/extension-redis": "^3.4.4",
-    "@hocuspocus/server": "^3.4.4",
+    "@hocuspocus/server": "^4.0.0",
     "aws-jwt-verify": "^5.1.1",
     "ioredis": "^5.9.3",
     "pg": "^8.19.0",
