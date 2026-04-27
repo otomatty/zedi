@@ -10,6 +10,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
+import i18n from "@/i18n";
 import type {
   MermaidDiagramType,
   MermaidGeneratorCallbacks,
@@ -54,6 +55,7 @@ describe("useMermaidGenerator", () => {
     // `clearAllMocks` は呼び出し履歴しかクリアしないため、mockImplementation 等の実装が
     // 後続テストへ持ち越される。`resetAllMocks` で実装も含めて初期化する。
     vi.resetAllMocks();
+    void i18n.changeLanguage("ja");
   });
 
   it("starts in idle state with no result/error", () => {

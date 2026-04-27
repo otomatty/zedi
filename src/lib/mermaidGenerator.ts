@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import { AISettings } from "@/types/ai";
 import { loadAISettings } from "./aiSettings";
+import i18n from "@/i18n";
 
 // ダイアグラムタイプの定義
 /** Supported Mermaid diagram kinds for the generator. */
@@ -26,83 +27,58 @@ export interface DiagramTypeInfo {
   example: string;
 }
 
-/** Built-in diagram type list for the Mermaid generator UI. */
-export const DIAGRAM_TYPES: DiagramTypeInfo[] = [
-  {
-    id: "flowchart",
-    name: "フローチャート",
-    description: "処理の流れや手順を表現",
-    example: "flowchart TD\n    A[開始] --> B{条件}\n    B -->|Yes| C[処理]\n    B -->|No| D[終了]",
-  },
-  {
-    id: "sequence",
-    name: "シーケンス図",
-    description: "オブジェクト間のやり取りを時系列で表現",
-    example:
-      "sequenceDiagram\n    participant A as ユーザー\n    participant B as システム\n    A->>B: リクエスト\n    B-->>A: レスポンス",
-  },
-  {
-    id: "classDiagram",
-    name: "クラス図",
-    description: "クラスの構造と関係を表現",
-    example:
-      "classDiagram\n    class Animal {\n        +String name\n        +eat()\n    }\n    class Dog {\n        +bark()\n    }\n    Animal <|-- Dog",
-  },
-  {
-    id: "stateDiagram",
-    name: "状態遷移図",
-    description: "状態の変化と遷移条件を表現",
-    example:
-      "stateDiagram-v2\n    [*] --> 待機中\n    待機中 --> 処理中: 開始\n    処理中 --> 完了: 終了\n    完了 --> [*]",
-  },
-  {
-    id: "erDiagram",
-    name: "ER図",
-    description: "エンティティ間の関係を表現",
-    example:
-      "erDiagram\n    USER ||--o{ ORDER : places\n    ORDER ||--|{ ITEM : contains\n    USER {\n        int id\n        string name\n    }",
-  },
-  {
-    id: "gantt",
-    name: "ガントチャート",
-    description: "プロジェクトのスケジュールを表現",
-    example:
-      "gantt\n    title プロジェクト計画\n    dateFormat YYYY-MM-DD\n    section フェーズ1\n    タスク1 :a1, 2024-01-01, 7d\n    タスク2 :after a1, 5d",
-  },
-  {
-    id: "pie",
-    name: "円グラフ",
-    description: "割合や構成比を表現",
-    example: 'pie title 構成比\n    "項目A" : 40\n    "項目B" : 30\n    "項目C" : 30',
-  },
-  {
-    id: "mindmap",
-    name: "マインドマップ",
-    description: "アイデアや概念の関連を表現",
-    example:
-      "mindmap\n  root((中心テーマ))\n    トピック1\n      サブトピック1\n      サブトピック2\n    トピック2\n      サブトピック3",
-  },
-];
+/**
+ * UI・プロンプトで処理する図の順序。固定ID。
+ * / Stable order and ids for diagram types.
+ */
+export const MERMAID_DIAGRAM_TYPE_ORDER: readonly MermaidDiagramType[] = [
+  "flowchart",
+  "sequence",
+  "classDiagram",
+  "stateDiagram",
+  "erDiagram",
+  "gantt",
+  "pie",
+  "mindmap",
+] as const;
 
-// プロンプトテンプレート
-const MERMAID_GENERATOR_PROMPT = `あなたはMermaidダイアグラムの専門家です。
-与えられたテキストの内容を分析し、指定されたダイアグラムタイプで適切なMermaidコードを生成してください。
+/**
+ * 現在 i18n 言語のラベル・例付き図定義。旧 `DIAGRAM_TYPES` の代わり。
+ * / Diagram type metadata in the current UI locale. Replaces static `DIAGRAM_TYPES`.
+ */
+export function getMermaidDiagramTypes(): DiagramTypeInfo[] {
+  const t = i18n.getFixedT(i18n.language);
+  return MERMAID_DIAGRAM_TYPE_ORDER.map((id) => ({
+    id,
+    name: t(`mermaid.diagramTypes.${id}.name`),
+    description: t(`mermaid.diagramTypes.${id}.description`),
+    example: t(`mermaid.diagramTypes.${id}.example`),
+  }));
+}
 
-## ダイアグラムタイプ
-{{diagramTypes}}
-
-## 入力テキスト
-{{text}}
-
-## 出力要件
-1. Mermaidの構文として正しいコードのみを出力
-2. コードブロック(\`\`\`)で囲まないこと
-3. 日本語のラベルを使用可能
-4. シンプルで読みやすい構造にする
-5. 余分な説明は不要、Mermaidコードのみを出力
-
-## 出力形式
-Mermaidコードのみを出力してください。`;
+/**
+ * 選択された図IDと本文から LLM 用ユーザープロンプトを組み立てる。
+ * / Builds the Mermaid user prompt for the current locale.
+ */
+export function buildMermaidGeneratorUserPrompt(
+  selectedDiagramTypes: MermaidDiagramType[],
+  sourceText: string,
+): string {
+  const t = i18n.getFixedT(i18n.language);
+  const all = getMermaidDiagramTypes();
+  const diagramTypesList = selectedDiagramTypes
+    .map((type) => {
+      const info = all.find((d) => d.id === type);
+      return info ? `- ${info.name} (${info.id}): ${info.description}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+  const withTypes = t("mermaid.generatorPrompt", {
+    diagramTypes: diagramTypesList,
+  });
+  // `sourceText` は i18n 展開に渡さない（`{{` を含みうる） / Do not pass sourceText to i18n.
+  return withTypes.replace("__ZEDI_MERMAID_SOURCE__", sourceText);
+}
 
 /** Result of a successful Mermaid generation. */
 export interface MermaidGeneratorResult {
@@ -162,18 +138,7 @@ async function generateWithOpenAI(
     dangerouslyAllowBrowser: true,
   });
 
-  const diagramTypesInfo = diagramTypes
-    .map((type) => {
-      const info = DIAGRAM_TYPES.find((d) => d.id === type);
-      return info ? `- ${info.name} (${info.id}): ${info.description}` : "";
-    })
-    .filter(Boolean)
-    .join("\n");
-
-  const prompt = MERMAID_GENERATOR_PROMPT.replace("{{diagramTypes}}", diagramTypesInfo).replace(
-    "{{text}}",
-    text,
-  );
+  const prompt = buildMermaidGeneratorUserPrompt(diagramTypes, text);
 
   try {
     const response = await client.chat.completions.create({
@@ -209,18 +174,7 @@ async function generateWithAnthropic(
     apiKey: settings.apiKey,
   });
 
-  const diagramTypesInfo = diagramTypes
-    .map((type) => {
-      const info = DIAGRAM_TYPES.find((d) => d.id === type);
-      return info ? `- ${info.name} (${info.id}): ${info.description}` : "";
-    })
-    .filter(Boolean)
-    .join("\n");
-
-  const prompt = MERMAID_GENERATOR_PROMPT.replace("{{diagramTypes}}", diagramTypesInfo).replace(
-    "{{text}}",
-    text,
-  );
+  const prompt = buildMermaidGeneratorUserPrompt(diagramTypes, text);
 
   try {
     const response = await client.messages.create({
@@ -254,18 +208,7 @@ async function generateWithGoogle(
 ): Promise<void> {
   const client = new GoogleGenAI({ apiKey: settings.apiKey });
 
-  const diagramTypesInfo = diagramTypes
-    .map((type) => {
-      const info = DIAGRAM_TYPES.find((d) => d.id === type);
-      return info ? `- ${info.name} (${info.id}): ${info.description}` : "";
-    })
-    .filter(Boolean)
-    .join("\n");
-
-  const prompt = MERMAID_GENERATOR_PROMPT.replace("{{diagramTypes}}", diagramTypesInfo).replace(
-    "{{text}}",
-    text,
-  );
+  const prompt = buildMermaidGeneratorUserPrompt(diagramTypes, text);
 
   try {
     const response = await client.models.generateContent({
@@ -342,11 +285,7 @@ export async function generateMermaidDiagram(
   if (settings.provider === "claude-code" || effectiveMode === "api_server") {
     try {
       const { callAIService } = await import("@/lib/aiService");
-      const diagramTypeStr = diagramTypes.join(", ");
-      const prompt = MERMAID_GENERATOR_PROMPT.replace("{{text}}", text).replace(
-        "{{diagramTypes}}",
-        diagramTypeStr,
-      );
+      const prompt = buildMermaidGeneratorUserPrompt(diagramTypes, text);
 
       await callAIService(
         settings,

@@ -1,8 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { I18nextProvider } from "react-i18next";
+import i18n from "@/i18n";
 import { WikiLinkPreviewContent } from "./WikiLinkPreviewContent";
 import type { Page } from "@/types/page";
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
+}
 
 const createMockPage = (overrides?: Partial<Page>): Page => ({
   id: "page-1",
@@ -18,10 +25,14 @@ const createMockPage = (overrides?: Partial<Page>): Page => ({
 });
 
 describe("WikiLinkPreviewContent", () => {
+  beforeEach(() => {
+    void i18n.changeLanguage("ja");
+  });
+
   describe("existing page (exists=true)", () => {
     it("should render page title", () => {
       const page = createMockPage({ title: "My Page" });
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent title="My Page" page={page} exists={true} referenced={false} />,
       );
       expect(screen.getByText("My Page")).toBeInTheDocument();
@@ -29,7 +40,7 @@ describe("WikiLinkPreviewContent", () => {
 
     it("should render content preview", () => {
       const page = createMockPage();
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="テストページ"
           page={page}
@@ -42,13 +53,15 @@ describe("WikiLinkPreviewContent", () => {
 
     it("should render '無題のページ' for empty title", () => {
       const page = createMockPage({ title: "" });
-      render(<WikiLinkPreviewContent title="" page={page} exists={true} referenced={false} />);
+      renderWithI18n(
+        <WikiLinkPreviewContent title="" page={page} exists={true} referenced={false} />,
+      );
       expect(screen.getByText("無題のページ")).toBeInTheDocument();
     });
 
     it("should render contentPreview if available", () => {
       const page = createMockPage({ contentPreview: "事前計算済みプレビュー" });
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="テストページ"
           page={page}
@@ -61,7 +74,7 @@ describe("WikiLinkPreviewContent", () => {
 
     it("should render relative time", () => {
       const page = createMockPage({ updatedAt: Date.now() - 3600000 });
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="テストページ"
           page={page}
@@ -76,7 +89,7 @@ describe("WikiLinkPreviewContent", () => {
       const user = userEvent.setup();
       const handleClick = vi.fn();
       const page = createMockPage();
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="テストページ"
           page={page}
@@ -91,7 +104,7 @@ describe("WikiLinkPreviewContent", () => {
 
     it("should not render a focusable button when onClick is absent", () => {
       const page = createMockPage();
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="テストページ"
           page={page}
@@ -105,7 +118,7 @@ describe("WikiLinkPreviewContent", () => {
 
   describe("ghost link (exists=false, referenced=false)", () => {
     it("should render title in muted style", () => {
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="新しいページ"
           page={undefined}
@@ -117,7 +130,7 @@ describe("WikiLinkPreviewContent", () => {
     });
 
     it("should show ghost message", () => {
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="新しいページ"
           page={undefined}
@@ -129,7 +142,7 @@ describe("WikiLinkPreviewContent", () => {
     });
 
     it("should show 'クリックして作成' prompt when onClick is provided", () => {
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="新しいページ"
           page={undefined}
@@ -142,7 +155,7 @@ describe("WikiLinkPreviewContent", () => {
     });
 
     it("should not show 'クリックして作成' when onClick is absent", () => {
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="新しいページ"
           page={undefined}
@@ -156,7 +169,7 @@ describe("WikiLinkPreviewContent", () => {
 
   describe("referenced ghost link (exists=false, referenced=true)", () => {
     it("should show referenced message", () => {
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="参照ページ"
           page={undefined}
@@ -172,7 +185,7 @@ describe("WikiLinkPreviewContent", () => {
     it("should call onClick when clicked", async () => {
       const user = userEvent.setup();
       const handleClick = vi.fn();
-      render(
+      renderWithI18n(
         <WikiLinkPreviewContent
           title="参照ページ"
           page={undefined}

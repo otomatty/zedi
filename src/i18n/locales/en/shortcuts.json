@@ -1,0 +1,25 @@
+{
+  "dialogTitle": "Keyboard shortcuts",
+  "closeWithEsc": "to close",
+  "category": {
+    "navigation": "Navigation",
+    "page": "Page",
+    "editor": "Editor"
+  },
+  "items": {
+    "openSearch": "Open search",
+    "goHome": "Go to home",
+    "newPage": "Create a new page",
+    "showShortcutList": "Show keyboard shortcuts",
+    "insertWikiLink": "Insert WikiLink",
+    "headingH1": "Heading H1",
+    "headingH2": "Heading H2",
+    "headingH3": "Heading H3",
+    "bulletList": "Bullet list",
+    "orderedList": "Numbered list",
+    "blockquote": "Quote",
+    "codeBlock": "Code block",
+    "bold": "Bold",
+    "italic": "Italic"
+  }
+}

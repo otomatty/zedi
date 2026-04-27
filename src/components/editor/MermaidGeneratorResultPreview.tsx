@@ -1,4 +1,5 @@
 import { Label } from "@zedi/ui";
+import { useTranslation } from "react-i18next";
 
 interface MermaidGeneratorResultPreviewProps {
   code: string;
@@ -14,17 +15,18 @@ export function MermaidGeneratorResultPreview({
   previewSvg,
   previewError,
 }: MermaidGeneratorResultPreviewProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>生成されたコード</Label>
+        <Label>{t("mermaid.preview.generatedCode")}</Label>
         <pre className="bg-muted max-h-32 overflow-auto rounded-md p-3 font-mono text-sm">
           {code}
         </pre>
       </div>
 
       <div className="space-y-2">
-        <Label>プレビュー</Label>
+        <Label>{t("mermaid.preview.previewLabel")}</Label>
         {previewError ? (
           <div className="bg-destructive/10 text-destructive rounded-md p-4 text-sm">
             {previewError}
@@ -36,7 +38,9 @@ export function MermaidGeneratorResultPreview({
             dangerouslySetInnerHTML={{ __html: previewSvg }}
           />
         ) : (
-          <div className="text-muted-foreground p-4 text-center">プレビューを読み込み中...</div>
+          <div className="text-muted-foreground p-4 text-center">
+            {t("mermaid.preview.loading")}
+          </div>
         )}
       </div>
     </div>

@@ -17,6 +17,7 @@
   "generalSettingsSaveFailed": "一般設定の保存に失敗しました",
   "testRunFailed": "テストの実行に失敗しました",
   "indexRebuildFailed": "Index の再構築に失敗しました",
+  "contentParseFailed": "コンテンツの解析に失敗しました。データが破損している可能性があります。",
   "mermaidEmptyText": "テキストが空です",
   "mermaidTypeRequired": "ダイアグラムタイプを選択してください",
   "mermaidGenerationFailed": "生成中にエラーが発生しました",

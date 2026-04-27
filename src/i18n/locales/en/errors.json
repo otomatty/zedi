@@ -17,6 +17,7 @@
   "generalSettingsSaveFailed": "Failed to save general settings",
   "testRunFailed": "Failed to run test",
   "indexRebuildFailed": "Failed to rebuild Index",
+  "contentParseFailed": "Failed to parse content. The data may be corrupted.",
   "mermaidEmptyText": "Text is empty",
   "mermaidTypeRequired": "Please select a diagram type",
   "mermaidGenerationFailed": "An error occurred during generation",

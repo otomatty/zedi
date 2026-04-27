@@ -80,5 +80,54 @@
     "openIndexPage": "Open __index__ page",
     "noPagesYet": "No pages yet.",
     "pageCount": "{{count}} pages"
+  },
+  "page": {
+    "noContent": "No content",
+    "noPreview": "No preview",
+    "titleCopySuffix": " (copy)",
+    "duplicated": "Duplicated",
+    "duplicatedWithTitle": "Created “{{title}}”",
+    "pageDeleted": "Deleted",
+    "deletedWithTitle": "“{{title}}” was deleted",
+    "duplicateFailed": "Could not duplicate the page",
+    "deleteFailed": "Could not delete the page",
+    "deleteConfirm": "Delete this page?",
+    "deleteBody": "“{{title}}” will be removed. This cannot be undone.",
+    "deleting": "Deleting...",
+    "delete": "Delete",
+    "duplicate": "Duplicate",
+    "linkSection": "Links ({{count}})",
+    "newLinksSection": "New links ({{count}})",
+    "linkTargets": "{{count}} link targets",
+    "lintTitle": "Suggestions ({{count}})",
+    "lintRule": {
+      "orphan": "Orphan page",
+      "ghost_many": "Many ghost links",
+      "title_similar": "Similar titles",
+      "conflict": "Conflict",
+      "broken_link": "Broken link"
+    },
+    "lintDetailTitleSimilar": "“{{titleA}}” and “{{titleB}}” are similar",
+    "lintUnknownError": "Unknown error",
+    "lintFetchFailed": "Failed to load suggestions",
+    "suggestionMarkResolved": "Mark suggestion as resolved",
+    "emptyHomeTitle": "Welcome to Zedi",
+    "emptyHomeLine1": "Build a network of ideas.",
+    "emptyHomeLine2": "Create your first page to start capturing thoughts.",
+    "emptyHomeCta": "Create your first page",
+    "ghostCreateHint": "Click to create page",
+    "untitledNote": "Untitled note"
+  },
+  "note": {
+    "owner": "Owner",
+    "editor": "Editor",
+    "viewer": "Viewer",
+    "guest": "Guest",
+    "roleUnknown": "Unknown"
+  },
+  "wikiLink": {
+    "notCreated": "This page does not exist yet.",
+    "notCreatedWithRefs": "This page does not exist yet, and is referenced from others.",
+    "clickToCreate": "Click to create"
   }
 }

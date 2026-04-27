@@ -78,7 +78,7 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   htmlFor={`provider-${provider.id}`}
                   className={`flex cursor-pointer items-center gap-2 font-medium ${isUnavailable ? "cursor-not-allowed" : ""}`}
                 >
-                  {provider.name}
+                  {t(`aiSettings.providers.${provider.id}.name`)}
                   {provider.desktopOnly && (
                     <Badge variant="outline" className="gap-1 text-xs">
                       <Monitor className="h-3 w-3" />
@@ -99,9 +99,9 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                     </Badge>
                   )}
                 </Label>
-                {provider.description && (
-                  <p className="text-muted-foreground text-xs">{provider.description}</p>
-                )}
+                <p className="text-muted-foreground text-xs">
+                  {t(`aiSettings.providers.${provider.id}.description`)}
+                </p>
                 {isSelected && <CapabilityMatrix capabilities={provider.capabilities} />}
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { FileText, Link as LinkIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import { getContentPreview } from "@/lib/contentUtils";
 import type { Page } from "@/types/page";
@@ -31,6 +32,7 @@ export function WikiLinkPreviewContent({
   referenced,
   onClick,
 }: WikiLinkPreviewContentProps) {
+  const { t } = useTranslation();
   if (page && exists) {
     const preview = page.contentPreview || getContentPreview(page.content, 100);
     const existingBody = (
@@ -41,7 +43,9 @@ export function WikiLinkPreviewContent({
           ) : (
             <FileText className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           )}
-          <span className="truncate text-sm font-medium">{page.title || "無題のページ"}</span>
+          <span className="truncate text-sm font-medium">
+            {page.title || t("common.untitledPage")}
+          </span>
         </span>
         {preview && (
           <span className="text-muted-foreground mt-1.5 line-clamp-3 block text-xs">{preview}</span>
@@ -68,11 +72,13 @@ export function WikiLinkPreviewContent({
         <span className="text-muted-foreground truncate text-sm font-medium">{title}</span>
       </span>
       <span className="text-muted-foreground mt-1.5 block text-xs">
-        {referenced
-          ? "まだ作成されていないページです。他のページからも参照されています。"
-          : "まだ作成されていないページです。"}
+        {referenced ? t("common.wikiLink.notCreatedWithRefs") : t("common.wikiLink.notCreated")}
       </span>
-      {onClick ? <span className="text-primary mt-2 block text-xs">クリックして作成</span> : null}
+      {onClick ? (
+        <span className="text-primary mt-2 block text-xs">
+          {t("common.wikiLink.clickToCreate")}
+        </span>
+      ) : null}
     </>
   );
 

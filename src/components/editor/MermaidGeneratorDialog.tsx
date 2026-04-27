@@ -14,6 +14,7 @@ import { MermaidDiagramType } from "@/lib/mermaidGenerator";
 import { MermaidGeneratorNotConfiguredView } from "./MermaidGeneratorNotConfiguredView";
 import { MermaidGeneratorFormFields } from "./MermaidGeneratorFormFields";
 import { MermaidGeneratorResultPreview } from "./MermaidGeneratorResultPreview";
+import { useTranslation } from "react-i18next";
 
 async function getMermaid() {
   const { default: mermaid } = await import("mermaid");
@@ -27,19 +28,47 @@ interface MermaidGeneratorDialogProps {
   onInsert: (code: string) => void;
 }
 
-export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
+/**
+ *
+ */
+export /**
+ *
+ */
+const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   open,
   onOpenChange,
   selectedText,
   onInsert,
 }) => {
+  /**
+   *
+   */
+  const { t } = useTranslation();
+  /**
+   *
+   */
   const navigate = useNavigate();
+  /**
+   *
+   */
   const location = useLocation();
+  /**
+   *
+   */
   const { status, result, error, isAIConfigured, generate, reset, checkAIConfigured } =
     useMermaidGenerator();
 
+  /**
+   *
+   */
   const [selectedTypes, setSelectedTypes] = useState<MermaidDiagramType[]>(["flowchart"]);
+  /**
+   *
+   */
   const [previewSvg, setPreviewSvg] = useState<string>("");
+  /**
+   *
+   */
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,18 +83,30 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   }, [open, checkAIConfigured, reset]);
 
   useEffect(() => {
+    /**
+     *
+     */
     const renderPreview = async () => {
       if (result?.code) {
         try {
+          /**
+           *
+           */
           const mermaid = await getMermaid();
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
           await mermaid.parse(result.code);
+          /**
+           *
+           */
           const id = `preview-${Math.random().toString(36).substr(2, 9)}`;
+          /**
+           *
+           */
           const { svg } = await mermaid.render(id, result.code);
           setPreviewSvg(svg);
           setPreviewError(null);
         } catch (err) {
-          setPreviewError(err instanceof Error ? err.message : "プレビューエラー");
+          setPreviewError(err instanceof Error ? err.message : t("mermaid.preview.parseError"));
           setPreviewSvg("");
         }
       }
@@ -73,16 +114,25 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     renderPreview();
   }, [result]);
 
+  /**
+   *
+   */
   const handleTypeToggle = (type: MermaidDiagramType) => {
     setSelectedTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
     );
   };
 
+  /**
+   *
+   */
   const handleGenerate = () => {
     generate(selectedText, selectedTypes);
   };
 
+  /**
+   *
+   */
   const handleInsert = () => {
     if (result?.code) {
       onInsert(result.code);
@@ -90,9 +140,18 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     }
   };
 
+  /**
+   *
+   */
   const handleGoToSettings = () => {
     onOpenChange(false);
+    /**
+     *
+     */
     const returnTo = `${location.pathname}${location.search}${location.hash}`;
+    /**
+     *
+     */
     const params = new URLSearchParams({ section: "ai", returnTo });
     navigate(`/settings?${params.toString()}`);
   };
@@ -111,8 +170,8 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] max-w-2xl overflow-auto">
         <DialogHeader>
-          <DialogTitle>Mermaidダイアグラムを生成</DialogTitle>
-          <DialogDescription>選択したテキストからダイアグラムを生成します。</DialogDescription>
+          <DialogTitle>{t("mermaid.dialog.title")}</DialogTitle>
+          <DialogDescription>{t("mermaid.dialog.description")}</DialogDescription>
         </DialogHeader>
 
         <MermaidGeneratorFormFields
@@ -134,14 +193,14 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            キャンセル
+            {t("mermaid.dialog.cancel")}
           </Button>
           {status === "completed" && result && (
             <>
               <Button variant="outline" onClick={handleGenerate}>
-                再生成
+                {t("mermaid.dialog.regenerate")}
               </Button>
-              <Button onClick={handleInsert}>挿入</Button>
+              <Button onClick={handleInsert}>{t("mermaid.dialog.insert")}</Button>
             </>
           )}
         </DialogFooter>

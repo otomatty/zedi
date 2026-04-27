@@ -141,7 +141,7 @@ function useEditorControllers(args: {
 export function useTiptapEditorController({
   content,
   onChange,
-  placeholder = "思考を書き始める...",
+  placeholder,
   autoFocus = false,
   pageId,
   pageTitle = "",

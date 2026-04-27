@@ -1,6 +1,13 @@
 {
   "uploadedImageAlt": "アップロードした画像",
   "savedAt": "{{relative}}に保存",
+  "startWritingPlaceholder": "思考を書き始める...",
+  "titlePlaceholder": "タイトル",
+  "pageMenu": {
+    "exportMarkdown": "Markdownでエクスポート",
+    "copyMarkdown": "Markdownをコピー",
+    "deletePage": "削除"
+  },
   "slashMenuAriaLabel": "スラッシュコマンドメニュー",
   "slashNoResults": "一致する項目がありません",
   "slashAgentRunning": "Claude Code を実行中…",

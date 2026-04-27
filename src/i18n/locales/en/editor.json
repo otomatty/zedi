@@ -1,6 +1,13 @@
 {
   "uploadedImageAlt": "Uploaded image",
   "savedAt": "Saved {{relative}}",
+  "startWritingPlaceholder": "Start writing your thoughts...",
+  "titlePlaceholder": "Title",
+  "pageMenu": {
+    "exportMarkdown": "Export Markdown",
+    "copyMarkdown": "Copy Markdown",
+    "deletePage": "Delete"
+  },
   "slashMenuAriaLabel": "Slash command menu",
   "slashNoResults": "No matching commands",
   "slashAgentRunning": "Running Claude Code…",

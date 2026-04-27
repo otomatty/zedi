@@ -28,7 +28,7 @@ export type { TiptapEditorProps } from "./TiptapEditor/types";
 const TiptapEditor: React.FC<TiptapEditorProps> = ({
   content,
   onChange,
-  placeholder = "思考を書き始める...",
+  placeholder,
   className,
   autoFocus = false,
   pageId,
@@ -47,6 +47,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   pageNoteId = null,
 }) => {
   const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("editor.startWritingPlaceholder");
   const {
     editor,
     editorFontSizePx,
@@ -94,7 +95,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   } = useTiptapEditorController({
     content,
     onChange,
-    placeholder,
+    placeholder: resolvedPlaceholder,
     autoFocus,
     pageId,
     pageTitle,

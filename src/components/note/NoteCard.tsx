@@ -12,14 +12,6 @@ interface NoteCardProps {
   index?: number;
 }
 
-const roleLabel: Record<NoteSummary["role"], string> = {
-  owner: "所有者",
-  editor: "編集者",
-  viewer: "閲覧者",
-  guest: "ゲスト",
-  none: "不明",
-};
-
 /**
  *
  */
@@ -60,9 +52,21 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-foreground truncate text-sm font-medium">
-            {note.title || "無題のノート"}
+            {note.title || t("common.page.untitledNote")}
           </h3>
-          <p className="text-muted-foreground mt-1 text-xs">{roleLabel[note.role]}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {t(
+              (
+                {
+                  owner: "common.note.owner",
+                  editor: "common.note.editor",
+                  viewer: "common.note.viewer",
+                  guest: "common.note.guest",
+                  none: "common.note.roleUnknown",
+                } as const
+              )[note.role],
+            )}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}

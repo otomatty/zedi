@@ -1,4 +1,5 @@
 import React, { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@zedi/ui";
 
 /**
@@ -13,15 +14,13 @@ export interface PageTitleBlockProps {
   isReadOnly?: boolean;
   /** バリデーションエラー（例: 重複）。ある場合にスタイル表示 */
   errorMessage?: string | null;
-  /** プレースホルダー。デフォルト「タイトル」 */
+  /** プレースホルダー。未指定時は i18n `editor.titlePlaceholder`。 / Placeholder; defaults to i18n `editor.titlePlaceholder`. */
   placeholder?: string;
   /** IntersectionObserver 用。タイトルブロックのルート要素に ref を付与 */
   titleRef?: React.Ref<HTMLDivElement | null>;
   /** Enter キー押下時（変換確定後）にコンテンツへフォーカスを移す場合に渡す */
   onEnterMoveToContent?: () => void;
 }
-
-const DEFAULT_PLACEHOLDER = "タイトル";
 
 /**
  * コンテンツ上部にタイトルを表示または編集するブロック。
@@ -32,10 +31,12 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
   onTitleChange,
   isReadOnly = false,
   errorMessage = null,
-  placeholder = DEFAULT_PLACEHOLDER,
+  placeholder,
   titleRef,
   onEnterMoveToContent,
 }) => {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("editor.titlePlaceholder");
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key !== "Enter") return;
@@ -62,7 +63,7 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
     return (
       <div ref={titleRef} className="pt-6 pb-2">
         <h1 className="text-2xl font-semibold break-words whitespace-normal">
-          {title || "無題のページ"}
+          {title || t("common.untitledPage")}
         </h1>
       </div>
     );
@@ -78,7 +79,7 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
           value={title}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           className={cn(
             "w-full border-0 bg-transparent text-2xl font-semibold",
             "placeholder:text-muted-foreground",
@@ -86,7 +87,7 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
             "min-h-[2.5rem] py-0 leading-tight",
             errorMessage ? "text-destructive" : "",
           )}
-          aria-label={placeholder}
+          aria-label={resolvedPlaceholder}
           aria-invalid={Boolean(errorMessage)}
         />
       </h1>

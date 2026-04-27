@@ -1,0 +1,66 @@
+{
+  "dialog": {
+    "title": "Generate Mermaid diagram",
+    "description": "Generate a diagram from the selected text.",
+    "cancel": "Cancel",
+    "regenerate": "Regenerate",
+    "insert": "Insert"
+  },
+  "form": {
+    "selectedText": "Selected text",
+    "selectTypes": "Choose diagram type (multiple allowed)",
+    "generate": "Generate diagram",
+    "generating": "Generating…",
+    "errorTitle": "Something went wrong",
+    "retry": "Retry"
+  },
+  "preview": {
+    "generatedCode": "Generated code",
+    "previewLabel": "Preview",
+    "loading": "Loading preview…",
+    "parseError": "Preview error"
+  },
+  "diagramTypes": {
+    "flowchart": {
+      "name": "Flowchart",
+      "description": "Show steps and control flow",
+      "example": "flowchart TD\n    A[Start] --> B{Condition}\n    B -->|Yes| C[Action]\n    B -->|No| D[End]"
+    },
+    "sequence": {
+      "name": "Sequence",
+      "description": "Time-ordered messages between parts",
+      "example": "sequenceDiagram\n    participant A as User\n    participant B as System\n    A->>B: Request\n    B-->>A: Response"
+    },
+    "classDiagram": {
+      "name": "Class diagram",
+      "description": "Classes and their relationships",
+      "example": "classDiagram\n    class Animal {\n        +String name\n        +eat()\n    }\n    class Dog {\n        +bark()\n    }\n    Animal <|-- Dog"
+    },
+    "stateDiagram": {
+      "name": "State diagram",
+      "description": "States and transitions",
+      "example": "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Running: start\n    Running --> Done: finish\n    Done --> [*]"
+    },
+    "erDiagram": {
+      "name": "ER diagram",
+      "description": "Entities and relationships",
+      "example": "erDiagram\n    USER ||--o{ ORDER : places\n    ORDER ||--|{ ITEM : contains\n    USER {\n        int id\n        string name\n    }"
+    },
+    "gantt": {
+      "name": "Gantt",
+      "description": "Project schedule",
+      "example": "gantt\n    title Project plan\n    dateFormat YYYY-MM-DD\n    section Phase1\n    Task1 :a1, 2024-01-01, 7d\n    Task2 :after a1, 5d"
+    },
+    "pie": {
+      "name": "Pie chart",
+      "description": "Proportions and shares",
+      "example": "pie title Breakdown\n    \"A\" : 40\n    \"B\" : 30\n    \"C\" : 30"
+    },
+    "mindmap": {
+      "name": "Mindmap",
+      "description": "Ideas and relationships",
+      "example": "mindmap\n  root((Center theme))\n    Topic1\n      Sub1\n      Sub2\n    Topic2\n      Sub3"
+    }
+  },
+  "generatorPrompt": "You are a Mermaid diagram expert.\nRead the text and output valid Mermaid for the selected diagram type(s).\n\n## Diagram types\n{{diagramTypes}}\n\n## Source text\n__ZEDI_MERMAID_SOURCE__\n\n## Output rules\n1. Output Mermaid code only, syntactically valid\n2. Do not wrap the output in code fences (```)\n3. You may use labels in the user’s language\n4. Keep the diagram small and readable\n5. No prose—Mermaid only\n\n## Output\nEmit Mermaid code only."
+}

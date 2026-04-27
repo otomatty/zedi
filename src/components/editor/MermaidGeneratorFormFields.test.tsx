@@ -1,11 +1,22 @@
-import { describe, it, expect, vi } from "vitest";
+import React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { I18nextProvider } from "react-i18next";
+import i18n from "@/i18n";
 import { MermaidGeneratorFormFields } from "./MermaidGeneratorFormFields";
 
+function renderWithI18n(ui: React.ReactElement) {
+  return render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
+}
+
 describe("MermaidGeneratorFormFields", () => {
+  beforeEach(() => {
+    void i18n.changeLanguage("ja");
+  });
+
   it("renders selected text and diagram type options", () => {
-    render(
+    renderWithI18n(
       <MermaidGeneratorFormFields
         selectedText="sample text"
         selectedTypes={["flowchart"]}
@@ -24,7 +35,7 @@ describe("MermaidGeneratorFormFields", () => {
   });
 
   it("disables generate button when no type selected", () => {
-    render(
+    renderWithI18n(
       <MermaidGeneratorFormFields
         selectedText="text"
         selectedTypes={[]}
@@ -41,7 +52,7 @@ describe("MermaidGeneratorFormFields", () => {
   it("calls onGenerate when ダイアグラムを生成 is clicked", async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
-    render(
+    renderWithI18n(
       <MermaidGeneratorFormFields
         selectedText="text"
         selectedTypes={["flowchart"]}
@@ -58,7 +69,7 @@ describe("MermaidGeneratorFormFields", () => {
   });
 
   it("shows generating state when status is generating", () => {
-    render(
+    renderWithI18n(
       <MermaidGeneratorFormFields
         selectedText="text"
         selectedTypes={["flowchart"]}
@@ -76,7 +87,7 @@ describe("MermaidGeneratorFormFields", () => {
   it("shows error and 再試行 button when status is error", async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
-    render(
+    renderWithI18n(
       <MermaidGeneratorFormFields
         selectedText="text"
         selectedTypes={["flowchart"]}
@@ -96,7 +107,7 @@ describe("MermaidGeneratorFormFields", () => {
   it("calls onTypeToggle when a diagram type is clicked", async () => {
     const user = userEvent.setup();
     const onTypeToggle = vi.fn();
-    render(
+    renderWithI18n(
       <MermaidGeneratorFormFields
         selectedText="text"
         selectedTypes={[]}

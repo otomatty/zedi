@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { buildSystemPrompt } from "./aiChatPrompt";
 import type { PageContext, ReferencedPage } from "../types/aiChat";
+import i18n from "@/i18n";
 
 describe("buildSystemPrompt", () => {
+  beforeEach(() => {
+    void i18n.changeLanguage("ja");
+  });
   it("includes existing page titles in system prompt", () => {
     const titles = ["ページA", "ページB", "ページC"];
     const result = buildSystemPrompt(null, titles);
