@@ -1,6 +1,7 @@
 import { InputRule, Mark, markPasteRule, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { TAG_NAME_CHAR_CLASS } from "@zedi/shared/tagCharacterClass";
+import { tagSuggestionPluginKey } from "./tagSuggestionPlugin";
 
 /**
  * Regex matching hashtag patterns `#name` in pasted text.
@@ -284,6 +285,23 @@ export const Tag = Mark.create<TagOptions>({
           const tagText = match[1];
           const fullMatch = match[0];
           if (!tagText || !fullMatch) return null;
+
+          // タグサジェスト (`TagSuggestionPlugin`, issue #767 Phase 2) が
+          // open の間は入力規則を発火させない。確定操作はサジェスト側が
+          // `tag` Mark の挿入を担当するため、ここで二重にマーク化すると
+          // `exists` / `targetId` 等の解決済み属性を上書きしてしまう。
+          // Esc でサジェストを閉じた後の空白終端は inactive 状態になるので
+          // 通常どおり入力規則経路でマーク化される（フォールバック契約）。
+          //
+          // While the tag suggestion popover is open (`TagSuggestionPlugin`,
+          // issue #767 Phase 2) the input rule must defer: confirming via the
+          // popover applies the mark with resolved `exists` / `targetId`,
+          // and re-running the input rule here would clobber those attrs
+          // with default values. After Esc the suggestion is inactive, so
+          // typing a terminator falls through to the input-rule path — the
+          // documented Esc-then-terminator fallback.
+          const suggestionState = tagSuggestionPluginKey.getState(state);
+          if (suggestionState?.active) return null;
 
           // Re-use the same exclusion contract as the paste rule so typed and
           // pasted input share their reject reasons (numeric-only / 6/8-hex).

@@ -11,7 +11,9 @@ import { useEditor } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
+import type { TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion";
+import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { createEditorExtensions, defaultEditorProps } from "./editorConfig";
 import type { TiptapEditorProps } from "./types";
@@ -54,6 +56,7 @@ interface UseEditorSetupOptions {
   handleLinkClick: (title: string) => void;
   handleStateChange: (state: WikiLinkSuggestionState) => void;
   handleSlashStateChange: (state: SlashSuggestionState) => void;
+  handleTagSuggestionStateChange: (state: TagSuggestionState) => void;
   handleRetryUpload: (nodeId: string) => void;
   handleRemoveUpload: (nodeId: string) => void;
   getProviderLabel: (providerId?: string | null) => string;
@@ -62,8 +65,10 @@ interface UseEditorSetupOptions {
   handleCopyImageUrl: (src: string) => void;
   suggestionState: WikiLinkSuggestionState | null;
   slashState: SlashSuggestionState | null;
+  tagSuggestionState: TagSuggestionState | null;
   suggestionRef: RefObject<WikiLinkSuggestionHandle | null>;
   slashRef: RefObject<SlashSuggestionHandle | null>;
+  tagSuggestionRef: RefObject<TagSuggestionHandle | null>;
   /** Note-linked workspace root for `@file:` (Issue #461). / `@file:` 用ワークスペースルート */
   workspaceRoot: string | null;
   /** Current note id for Tauri workspace registry reads (Issue #461). */
@@ -89,6 +94,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     handleLinkClick,
     handleStateChange,
     handleSlashStateChange,
+    handleTagSuggestionStateChange,
     handleRetryUpload,
     handleRemoveUpload,
     getProviderLabel,
@@ -97,8 +103,10 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     handleCopyImageUrl,
     suggestionState,
     slashState,
+    tagSuggestionState,
     suggestionRef,
     slashRef,
+    tagSuggestionRef,
     workspaceRoot,
     noteId,
   } = options;
@@ -134,10 +142,12 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
 
   const slashStateRef = useRef(slashState);
   const suggestionStateRef = useRef(suggestionState);
+  const tagSuggestionStateRef = useRef(tagSuggestionState);
   useEffect(() => {
     slashStateRef.current = slashState;
     suggestionStateRef.current = suggestionState;
-  }, [slashState, suggestionState]);
+    tagSuggestionStateRef.current = tagSuggestionState;
+  }, [slashState, suggestionState, tagSuggestionState]);
 
   const workspaceRootRef = useWorkspaceRootRef(workspaceRoot);
   const noteIdRef = useNoteIdRef(noteId);
@@ -150,6 +160,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
         onLinkClick: handleLinkClick,
         onStateChange: handleStateChange,
         onSlashStateChange: handleSlashStateChange,
+        onTagSuggestionStateChange: handleTagSuggestionStateChange,
         imageUploadOptions: {
           onRetry: handleRetryUpload,
           onRemove: handleRemoveUpload,
@@ -198,6 +209,13 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
             return slashRef.current.onKeyDown(event);
           if (suggestionStateRef.current?.active && suggestionRef.current)
             return suggestionRef.current.onKeyDown(event);
+          // タグサジェストは最後にチェックする。WikiLink / Slash と排他で
+          // active になる想定（`#` と `[[` / `/` は同時にトリガしない）。
+          // Tag suggestion comes last; in practice it cannot overlap with
+          // WikiLink (`[[`) or Slash (`/`) because their triggers are
+          // mutually exclusive characters.
+          if (tagSuggestionStateRef.current?.active && tagSuggestionRef.current)
+            return tagSuggestionRef.current.onKeyDown(event);
           return false;
         },
       },

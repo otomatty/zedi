@@ -519,6 +519,68 @@ describe("TagExtension input rule", () => {
         editor.destroy();
       }
     });
+
+    it("defers to the suggestion popover while it is active (issue #767)", async () => {
+      // Phase 2: タグサジェストが open の間は入力規則を発火させない。確定操作は
+      // サジェスト側が `tag` Mark を直接挿入するため、入力規則経由で重複マーク化
+      // すると `exists` / `targetId` などの解決済み属性を上書きしてしまう。
+      // Phase 2: while the suggestion popover is open, the input rule must
+      // defer so the suggestion's confirm path retains its resolved attrs
+      // (issue #767). We install both extensions, place the caret at the end
+      // of `#tech` (which makes the suggestion plugin go active), then
+      // type a space. The rule must NOT fire — the popover owns the confirm
+      // path.
+      const { TagSuggestionPlugin, tagSuggestionPluginKey } = await import("./tagSuggestionPlugin");
+      const editor = new Editor({
+        extensions: [StarterKit, Tag, TagSuggestionPlugin],
+        content: "<p>#tech</p>",
+      });
+      try {
+        // カーソル末尾セットでサジェストの `apply()` が走り active になる。
+        // Moving the caret runs the suggestion plugin's `apply()` and
+        // activates it (the regex sees `#tech` as text-before-cursor).
+        editor.commands.setTextSelection(6);
+        expect(tagSuggestionPluginKey.getState(editor.state)?.active).toBe(true);
+
+        const handled = typeAt(editor, 6, " ");
+        // 入力規則は null を返し、Tiptap デフォルトの空白挿入に委ねる。
+        // The rule returns null and lets Tiptap insert the space normally.
+        expect(handled).toBeFalsy();
+        const html = editor.getHTML();
+        expect(html).not.toContain("data-tag");
+      } finally {
+        editor.destroy();
+      }
+    });
+
+    it("falls through to the input rule after the suggestion is closed (issue #767 fallback)", async () => {
+      // 受け入れ条件のフォールバック契約: Esc で閉じた後に空白終端を打つと
+      // 入力規則経由でマーク化される。サジェストプラグインに `close` メタを
+      // 流して閉じてから空白を投入する。
+      // Acceptance-criteria fallback: closing the suggestion (Esc) then typing
+      // a terminator goes through the input-rule path. We activate the
+      // suggestion via cursor placement, dispatch the `close` meta to
+      // simulate Esc, then type a space.
+      const { TagSuggestionPlugin, tagSuggestionPluginKey } = await import("./tagSuggestionPlugin");
+      const editor = new Editor({
+        extensions: [StarterKit, Tag, TagSuggestionPlugin],
+        content: "<p>#tech</p>",
+      });
+      try {
+        editor.commands.setTextSelection(6);
+        expect(tagSuggestionPluginKey.getState(editor.state)?.active).toBe(true);
+        editor.view.dispatch(editor.state.tr.setMeta(tagSuggestionPluginKey, { close: true }));
+        expect(tagSuggestionPluginKey.getState(editor.state)?.active).toBe(false);
+
+        const handled = typeAt(editor, 6, " ");
+        expect(handled).toBe(true);
+        const html = editor.getHTML();
+        expect(html).toContain('data-name="tech"');
+        expect(html).toContain("data-tag");
+      } finally {
+        editor.destroy();
+      }
+    });
   });
 });
 

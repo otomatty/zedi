@@ -36,6 +36,7 @@ import {
   SlashSuggestionPlugin,
   type SlashSuggestionState,
 } from "../extensions/slashSuggestionPlugin";
+import { TagSuggestionPlugin, type TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 import { HeadingLevelClamp } from "./headingLevelClampExtension";
 import type { Extension } from "@tiptap/core";
 import type * as Y from "yjs";
@@ -113,6 +114,15 @@ export interface EditorExtensionsOptions {
   onTagClick?: (name: string) => void;
   onStateChange: (state: WikiLinkSuggestionState) => void;
   onSlashStateChange: (state: SlashSuggestionState) => void;
+  /**
+   * `#name` タグサジェストの状態通知。`TagSuggestionPlugin` が状態変化のたび
+   * に呼ぶ。Issue #767 (Phase 2)。
+   *
+   * Tag (`#name`) suggestion state callback. Invoked by
+   * `TagSuggestionPlugin` whenever the popover opens, closes, or the query
+   * changes. See issue #767 (Phase 2).
+   */
+  onTagSuggestionStateChange: (state: TagSuggestionState) => void;
   imageUploadOptions: Partial<ImageUploadOptions>;
   imageOptions: Partial<StorageImageOptions>;
   /** When set, enables Y.js collaboration and caret; StarterKit history is disabled */
@@ -133,6 +143,7 @@ interface CommonEditorExtensionsOptions {
   onTagClick?: (name: string) => void;
   onStateChange?: (state: WikiLinkSuggestionState) => void;
   onSlashStateChange?: (state: SlashSuggestionState) => void;
+  onTagSuggestionStateChange?: (state: TagSuggestionState) => void;
   imageUploadOptions?: Partial<ImageUploadOptions>;
   imageOptions?: Partial<StorageImageOptions>;
   fileReference?: EditorExtensionsOptions["fileReference"];
@@ -250,6 +261,17 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
           SlashSuggestionPlugin.configure({
             onStateChange: options.onSlashStateChange ?? (() => undefined),
           }),
+          // --- Phase 2: Tag (`#name`) suggestion (issue #767) ---
+          // 入力規則 (#766) との二重マーク化を避けるため、`TagExtension` の
+          // `addInputRules` ハンドラがこのプラグインの active 状態を見て発火を
+          // 抑止する。Esc で閉じた後の終端文字は通常どおり入力規則経路で
+          // マーク化される（フォールバック契約）。
+          // Coordinated with `TagExtension.addInputRules`: while this plugin is
+          // active the input rule short-circuits to avoid double-marking; after
+          // Esc the rule fires normally (Esc-then-terminator fallback).
+          TagSuggestionPlugin.configure({
+            onStateChange: options.onTagSuggestionStateChange ?? (() => undefined),
+          }),
         ]
       : []),
     // --- Image ---
@@ -316,6 +338,7 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     onTagClick: options.onTagClick,
     onStateChange: options.onStateChange,
     onSlashStateChange: options.onSlashStateChange,
+    onTagSuggestionStateChange: options.onTagSuggestionStateChange,
     imageUploadOptions: options.imageUploadOptions,
     imageOptions: options.imageOptions,
     fileReference: options.fileReference,
