@@ -250,7 +250,13 @@ describe("useSuggestionEffects", () => {
       });
     });
 
-    expect(mockCheckReferenced).toHaveBeenCalledWith("newtag", "page-1");
+    // checkReferenced は `linkType: "tag"` を明示的に渡す必要がある。さもないと
+    // `getGhostLinkSources` が既定の `"wiki"` バケットを検索してしまい、タグ用
+    // ゴーストリンクが拾えず常に false になる（PR #778 devin レビュー指摘）。
+    // The third argument MUST be `"tag"` so `getGhostLinkSources` searches the
+    // tag bucket; without it, tag ghosts go undiscovered and `referenced`
+    // would always resolve to false (PR #778 devin review).
+    expect(mockCheckReferenced).toHaveBeenCalledWith("newtag", "page-1", "tag");
     expect(mockEditor.chainRun).toHaveBeenCalled();
   });
 

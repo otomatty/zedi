@@ -14,10 +14,43 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { createRef, type RefObject } from "react";
 import { TagSuggestion, type TagSuggestionHandle } from "./TagSuggestion";
 import type { TagSuggestionCandidate } from "@/hooks/useTagCandidates";
+
+/**
+ * 矢印キーの状態更新後に ref.current を最新の handle に追従させるためのヘルパー。
+ * `setSelectedIndex` は再レンダーをスケジュールし、その後に
+ * `useImperativeHandle` が ref を差し替える。`act` で同期 flush することで
+ * 次の pressKey が新しいクロージャに当たる。
+ *
+ * Helper that flushes the re-render scheduled by `setSelectedIndex` so the
+ * next `ref.current?.onKeyDown` call sees the updated imperative handle.
+ */
+function pressKey(ref: RefObject<TagSuggestionHandle | null>, key: string): boolean | undefined {
+  let handled: boolean | undefined;
+  act(() => {
+    handled = ref.current?.onKeyDown(new KeyboardEvent("keydown", { key }));
+  });
+  return handled;
+}
+
+/**
+ * 初期マウント時に `useEffect` が `queueMicrotask` で予約した
+ * `setSelectedIndex(0)` を flush するためのヘルパー。これを呼ばないと最初の
+ * 矢印キー押下時に「リセット → 矢印反映」の順で state が更新されて、
+ * テストの期待値と矛盾する。
+ *
+ * Drain the microtask that the component queues during initial mount via
+ * `useEffect` (the `setSelectedIndex(0)` reset). Without this, the first
+ * arrow-key press races the reset and ends up at index 0.
+ */
+async function settleInitialMicrotasks(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
 
 function renderTagSuggestion(props: {
   query: string;
@@ -179,5 +212,100 @@ describe("TagSuggestion — keyboard navigation via imperative handle", () => {
 
     const otherEvent = new KeyboardEvent("keydown", { key: "Enter" });
     expect(ref.current?.onKeyDown(otherEvent)).toBe(false);
+  });
+
+  // 矢印キー / ラップアラウンド契約を固定する（受け入れ条件 + PR #778 レビュー反映）。
+  // Pin the arrow-key + wrap-around contract listed in the issue acceptance
+  // criteria (review feedback on PR #778 from coderabbitai).
+  it("ArrowUp from the first item wraps to the last and Enter confirms it", async () => {
+    // クエリ `tea` が `tea` と完全一致 + `team` の部分一致になり、`tech` には
+    // マッチしないため items は [tea (exact, 並び替え先頭), team] の 2 件、
+    // 「新規作成」項目は混ざらない。ArrowUp が末尾の `team` にラップする挙動を
+    // 純粋に検証できる。
+    // `tea` exactly matches one candidate and substring-matches `team`, so
+    // items is exactly [tea, team] without any "create new" suffix —
+    // letting us test ArrowUp wrap to the last real candidate cleanly.
+    const onSelect = vi.fn();
+    const candidates: TagSuggestionCandidate[] = [
+      { name: "tea", exists: true, targetId: "p2" },
+      { name: "team", exists: true, targetId: "p3" },
+      { name: "tech", exists: true, targetId: "p1" }, // does NOT match "tea"
+    ];
+    const { ref } = renderTagSuggestion({ query: "tea", candidates, onSelect });
+    await settleInitialMicrotasks();
+
+    expect(pressKey(ref, "ArrowUp")).toBe(true);
+    expect(pressKey(ref, "Enter")).toBe(true);
+    expect(onSelect).toHaveBeenLastCalledWith({
+      name: "team",
+      exists: true,
+      targetId: "p3",
+    });
+  });
+
+  it("ArrowDown from the last item wraps back to the first and Enter confirms it", async () => {
+    const onSelect = vi.fn();
+    const candidates: TagSuggestionCandidate[] = [
+      { name: "tea", exists: true, targetId: "p2" },
+      { name: "team", exists: true, targetId: "p3" },
+    ];
+    // query が完全一致するため "create new" は混ざらず items.length = 2。
+    // Exact match → no "create new" suffix, items.length is exactly 2.
+    const { ref } = renderTagSuggestion({ query: "tea", candidates, onSelect });
+    await settleInitialMicrotasks();
+
+    // 0 → 1 → 0（末尾を通り越して先頭へ巻き戻る）。
+    // 0 → 1 → 0 (wrap from last back to first).
+    expect(pressKey(ref, "ArrowDown")).toBe(true);
+    expect(pressKey(ref, "ArrowDown")).toBe(true);
+    expect(pressKey(ref, "Enter")).toBe(true);
+    expect(onSelect).toHaveBeenLastCalledWith({
+      name: "tea",
+      exists: true,
+      targetId: "p2",
+    });
+  });
+
+  it("ArrowDown advances the highlight one step at a time", async () => {
+    // 単発の ArrowDown でも次の候補にハイライトが進むことを Enter 経由で確認。
+    // A single ArrowDown advances by one — verified via Enter confirming the
+    // next candidate.
+    const onSelect = vi.fn();
+    const candidates: TagSuggestionCandidate[] = [
+      { name: "tech", exists: true, targetId: "p1" },
+      { name: "tea", exists: true, targetId: "p2" },
+      { name: "team", exists: true, targetId: "p3" },
+    ];
+    const { ref } = renderTagSuggestion({ query: "te", candidates, onSelect });
+    await settleInitialMicrotasks();
+
+    expect(pressKey(ref, "ArrowDown")).toBe(true);
+    expect(pressKey(ref, "Enter")).toBe(true);
+    expect(onSelect).toHaveBeenLastCalledWith({
+      name: "tea",
+      exists: true,
+      targetId: "p2",
+    });
+  });
+
+  it("Arrow keys are no-ops with a single candidate (no out-of-range index)", async () => {
+    // 候補が 1 件のとき、矢印キーで配列範囲外に飛ばないことを保証する。
+    // クエリは `tech` 完全一致にして「新規作成」項目が混ざらないようにする。
+    // With a single matching item (and an exact-match query so no "create
+    // new" suffix is added) the ref must not push the highlight out of range.
+    const onSelect = vi.fn();
+    const candidates: TagSuggestionCandidate[] = [{ name: "tech", exists: true, targetId: "p1" }];
+    const { ref } = renderTagSuggestion({ query: "tech", candidates, onSelect });
+    await settleInitialMicrotasks();
+
+    expect(pressKey(ref, "ArrowUp")).toBe(true);
+    expect(pressKey(ref, "ArrowDown")).toBe(true);
+    expect(pressKey(ref, "Enter")).toBe(true);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenLastCalledWith({
+      name: "tech",
+      exists: true,
+      targetId: "p1",
+    });
   });
 });

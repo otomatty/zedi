@@ -250,10 +250,16 @@ export function useSuggestionEffects({
       let referenced = false;
       if (!item.exists) {
         // 既存ページが無いタグでも、別ページで `#name` として登場していれば
-        // `referenced=true`（WikiLink ゴーストと同じ判定）。
+        // `referenced=true`（WikiLink ゴーストと同じ判定）。`linkType: "tag"`
+        // を明示しないと `getGhostLinkSources` が既定の `"wiki"` バケットを
+        // 検索してしまい、タグ用ゴーストリンクが拾えず常に false になる
+        // （PR #778 devin-ai-integration レビュー指摘）。
         // No real page yet, but the tag may already appear on other pages —
-        // mirror the WikiLink ghost referenced-check.
-        referenced = await checkReferenced(item.name, pageId);
+        // mirror the WikiLink ghost referenced-check. We must pass
+        // `linkType: "tag"` explicitly: without it, `getGhostLinkSources`
+        // searches the default `"wiki"` bucket and tag ghosts are never
+        // found, so `referenced` stays false (PR #778 devin review).
+        referenced = await checkReferenced(item.name, pageId, "tag");
       }
       editor
         .chain()

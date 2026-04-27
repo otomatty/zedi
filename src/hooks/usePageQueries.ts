@@ -14,7 +14,7 @@ import { StorageAdapterPageRepository } from "@/lib/pageRepository/StorageAdapte
 import type { IPageRepository } from "@/lib/pageRepository";
 import { syncLinksWithRepo } from "@/lib/syncWikiLinks";
 import { getPageListPreview } from "@/lib/contentUtils";
-import type { Page, PageSummary } from "@/types/page";
+import type { LinkType, Page, PageSummary } from "@/types/page";
 
 // Local user ID for unauthenticated users
 const LOCAL_USER_ID = "local-user";
@@ -635,16 +635,29 @@ export function useRemoveLink() {
 // --- Ghost Link hooks ---
 
 /**
- * Hook to check if a link text is referenced in ghost_links table from OTHER pages
+ * Hook to check if a link text is referenced in ghost_links table from OTHER
+ * pages. The optional `linkType` argument scopes the lookup so tag suggestion
+ * confirms (`"tag"`) hit the tag bucket instead of falling back to the
+ * default `"wiki"` lookup — without it, tag ghost references would always
+ * resolve to `referenced: false`. Issue #767 / PR #778 review feedback.
+ *
+ * 指定リンクテキストが他ページの ghost_links に登場するかを判定するフック。
+ * `linkType` を渡すと検索バケットを切り替えられる（タグサジェスト確定経路で
+ * `"tag"` を渡し、タグ用ゴーストリンクを正しく拾う）。デフォルトの `"wiki"` は
+ * 既存呼び出しを壊さないためのフォールバック。Issue #767 / PR #778 レビュー反映。
  */
 export function useCheckGhostLinkReferenced() {
   const { getRepository } = useRepository();
 
   const checkReferenced = useCallback(
-    async (linkText: string, currentPageId?: string): Promise<boolean> => {
+    async (
+      linkText: string,
+      currentPageId?: string,
+      linkType: LinkType = "wiki",
+    ): Promise<boolean> => {
       try {
         const repo = await getRepository();
-        const sources = await repo.getGhostLinkSources(linkText);
+        const sources = await repo.getGhostLinkSources(linkText, linkType);
         // Referenced if at least one OTHER page has this ghost link
         const otherSources = currentPageId ? sources.filter((id) => id !== currentPageId) : sources;
         return otherSources.length > 0;
