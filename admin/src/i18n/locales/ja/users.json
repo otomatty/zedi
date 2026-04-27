@@ -1,0 +1,63 @@
+{
+  "title": "ユーザー管理",
+  "statusFilterAriaLabel": "ステータスフィルタ",
+  "searchEmailPlaceholder": "メールで検索",
+  "searchEmailAriaLabel": "メールで検索",
+  "columns": {
+    "email": "メール",
+    "name": "名前",
+    "status": "ステータス",
+    "role": "ロール",
+    "pageCount": "ページ数",
+    "createdAt": "作成日",
+    "actions": "操作"
+  },
+  "actions": {
+    "restore": "復活",
+    "suspend": "サスペンド",
+    "delete": "削除"
+  },
+  "states": {
+    "saving": "保存中...",
+    "deleted": "削除済み"
+  },
+  "card": {
+    "reasonPrefix": "理由: {{reason}}",
+    "pageCount": "ページ数: {{count}}"
+  },
+  "row": {
+    "roleAriaLabel": "{{email}} のロール",
+    "suspendedReasonShort": "({{reason}})"
+  },
+  "roleChange": {
+    "title": "ロールを変更",
+    "description": "{{name}} のロールを「{{from}}」から「{{to}}」に変更しますか？",
+    "confirm": "変更する"
+  },
+  "unsuspend": {
+    "title": "サスペンドを解除",
+    "description": "{{name}} のサスペンドを解除し、アカウントを復活させますか？",
+    "confirm": "復活させる"
+  },
+  "deleteUser": {
+    "title": "ユーザーを削除",
+    "description": "{{name}} を削除します。個人情報は匿名化され、セッションと OAuth 連携は削除されます。この操作は元に戻せません。",
+    "confirm": "削除する"
+  },
+  "impact": {
+    "title": "影響範囲:",
+    "notes": "所有ノート: {{count}} 件",
+    "sessions": "アクティブセッション: {{count}} 件",
+    "subscription": "サブスクリプション: {{value}}",
+    "subscriptionActive": "あり (active)",
+    "subscriptionNone": "なし",
+    "lastAiUsage": "最後の AI 使用: {{date}}"
+  },
+  "suspendDialog": {
+    "title": "ユーザーをサスペンド",
+    "description": "{{name}} をサスペンドします。サスペンドされたユーザーはすべての API にアクセスできなくなり、既存セッションも無効化されます。",
+    "confirm": "サスペンド",
+    "reasonLabel": "理由（任意）",
+    "reasonPlaceholder": "サスペンドの理由を入力してください"
+  }
+}

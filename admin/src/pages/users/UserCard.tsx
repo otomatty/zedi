@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   Badge,
   Button,
@@ -33,6 +34,7 @@ export function UserCard({
   onDelete,
   saving,
 }: UserCardProps) {
+  const { t } = useTranslation();
   return (
     <Card
       className={
@@ -54,7 +56,9 @@ export function UserCard({
         </div>
         <div className="mt-0.5 text-sm text-slate-400">{user.email}</div>
         {user.suspendedReason && (
-          <div className="text-muted-foreground mt-1 text-xs">理由: {user.suspendedReason}</div>
+          <div className="text-muted-foreground mt-1 text-xs">
+            {t("users.card.reasonPrefix", { reason: user.suspendedReason })}
+          </div>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Select
@@ -62,7 +66,10 @@ export function UserCard({
             onValueChange={(v) => onRoleChange(v as UserRole)}
             disabled={saving || user.status !== "active"}
           >
-            <SelectTrigger className="h-8 w-[120px]" aria-label={`${user.email} のロール`}>
+            <SelectTrigger
+              className="h-8 w-[120px]"
+              aria-label={t("users.row.roleAriaLabel", { email: user.email })}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -71,21 +78,21 @@ export function UserCard({
             </SelectContent>
           </Select>
           <span className="text-xs text-slate-500">
-            ページ数: {user.pageCount.toLocaleString("ja-JP")}
+            {t("users.card.pageCount", { count: user.pageCount.toLocaleString("ja-JP") })}
           </span>
           <span className="text-xs text-slate-500">{formatDate(user.createdAt)}</span>
           {!saving && user.status === "deleted" ? (
-            <span className="text-muted-foreground text-xs">削除済み</span>
+            <span className="text-muted-foreground text-xs">{t("users.states.deleted")}</span>
           ) : (
             !saving && (
               <>
                 {user.status === "suspended" ? (
                   <Button type="button" variant="outline" size="sm" onClick={onUnsuspend}>
-                    復活
+                    {t("users.actions.restore")}
                   </Button>
                 ) : (
                   <Button type="button" variant="destructive" size="sm" onClick={onSuspend}>
-                    サスペンド
+                    {t("users.actions.suspend")}
                   </Button>
                 )}
                 <Button
@@ -95,12 +102,14 @@ export function UserCard({
                   className="text-destructive hover:text-destructive"
                   onClick={onDelete}
                 >
-                  削除
+                  {t("users.actions.delete")}
                 </Button>
               </>
             )
           )}
-          {saving && <span className="text-muted-foreground text-xs">保存中...</span>}
+          {saving && (
+            <span className="text-muted-foreground text-xs">{t("users.states.saving")}</span>
+          )}
         </div>
       </CardContent>
     </Card>

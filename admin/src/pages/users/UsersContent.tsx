@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Badge,
   Button,
@@ -87,6 +88,7 @@ export function UsersContent({
   onUnsuspend,
   onDelete,
 }: UsersContentProps) {
+  const { t } = useTranslation();
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const hasPreviousPage = page > 0;
   const hasNextPage = page + 1 < pageCount;
@@ -99,17 +101,20 @@ export function UsersContent({
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold">ユーザー管理</h1>
+        <h1 className="text-lg font-semibold">{t("users.title")}</h1>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Select
             value={statusFilter}
             onValueChange={(v) => onStatusFilterChange(v as UserStatus | "all")}
           >
-            <SelectTrigger className="h-9 w-full sm:w-[140px]" aria-label="ステータスフィルタ">
+            <SelectTrigger
+              className="h-9 w-full sm:w-[140px]"
+              aria-label={t("users.statusFilterAriaLabel")}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">すべて</SelectItem>
+              <SelectItem value="all">{t("common.all")}</SelectItem>
               <SelectItem value="active">active</SelectItem>
               <SelectItem value="suspended">suspended</SelectItem>
               <SelectItem value="deleted">deleted</SelectItem>
@@ -119,9 +124,9 @@ export function UsersContent({
             type="search"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="メールで検索"
+            placeholder={t("users.searchEmailPlaceholder")}
             className="w-full max-w-xs"
-            aria-label="メールで検索"
+            aria-label={t("users.searchEmailAriaLabel")}
           />
         </div>
       </div>
@@ -131,7 +136,7 @@ export function UsersContent({
       )}
 
       {loading && users.length === 0 ? (
-        <p className="mt-4 text-slate-400">読み込み中...</p>
+        <p className="mt-4 text-slate-400">{t("common.loading")}</p>
       ) : (
         <>
           {/* デスクトップ: テーブル */}
@@ -139,13 +144,13 @@ export function UsersContent({
             <Table className="border-border min-w-[480px] rounded border">
               <TableHeader>
                 <TableRow className="border-border bg-muted/50 hover:bg-transparent">
-                  <TableHead className="px-3 py-2">メール</TableHead>
-                  <TableHead className="px-3 py-2">名前</TableHead>
-                  <TableHead className="px-3 py-2">ステータス</TableHead>
-                  <TableHead className="px-3 py-2">ロール</TableHead>
-                  <TableHead className="px-3 py-2">ページ数</TableHead>
-                  <TableHead className="px-3 py-2">作成日</TableHead>
-                  <TableHead className="px-3 py-2">操作</TableHead>
+                  <TableHead className="px-3 py-2">{t("users.columns.email")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("users.columns.name")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("users.columns.status")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("users.columns.role")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("users.columns.pageCount")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("users.columns.createdAt")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("users.columns.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -163,11 +168,12 @@ export function UsersContent({
                           className="text-muted-foreground ml-1 text-xs"
                           title={u.suspendedReason}
                         >
-                          (
-                          {u.suspendedReason.length > 20
-                            ? `${u.suspendedReason.slice(0, 20)}...`
-                            : u.suspendedReason}
-                          )
+                          {t("users.row.suspendedReasonShort", {
+                            reason:
+                              u.suspendedReason.length > 20
+                                ? `${u.suspendedReason.slice(0, 20)}...`
+                                : u.suspendedReason,
+                          })}
                         </span>
                       )}
                     </TableCell>
@@ -179,7 +185,7 @@ export function UsersContent({
                       >
                         <SelectTrigger
                           className="h-8 min-w-[100px]"
-                          aria-label={`${u.email} のロール`}
+                          aria-label={t("users.row.roleAriaLabel", { email: u.email })}
                         >
                           <SelectValue />
                         </SelectTrigger>
@@ -197,9 +203,13 @@ export function UsersContent({
                     </TableCell>
                     <TableCell className="px-3 py-2">
                       {savingIds.has(u.id) ? (
-                        <span className="text-muted-foreground text-sm">保存中...</span>
+                        <span className="text-muted-foreground text-sm">
+                          {t("users.states.saving")}
+                        </span>
                       ) : u.status === "deleted" ? (
-                        <span className="text-muted-foreground text-sm">削除済み</span>
+                        <span className="text-muted-foreground text-sm">
+                          {t("users.states.deleted")}
+                        </span>
                       ) : (
                         <div className="flex items-center gap-1">
                           {u.status === "suspended" ? (
@@ -209,7 +219,7 @@ export function UsersContent({
                               size="sm"
                               onClick={() => confirm.requestUnsuspend(u)}
                             >
-                              復活
+                              {t("users.actions.restore")}
                             </Button>
                           ) : (
                             <Button
@@ -218,7 +228,7 @@ export function UsersContent({
                               size="sm"
                               onClick={() => setSuspendTarget(u)}
                             >
-                              サスペンド
+                              {t("users.actions.suspend")}
                             </Button>
                           )}
                           <Button
@@ -228,7 +238,7 @@ export function UsersContent({
                             className="text-destructive hover:text-destructive"
                             onClick={() => confirm.requestDelete(u)}
                           >
-                            削除
+                            {t("users.actions.delete")}
                           </Button>
                         </div>
                       )}
@@ -255,13 +265,15 @@ export function UsersContent({
           </div>
 
           <p className="mt-2 text-xs text-slate-500">
-            {total > 0 ? `${rangeStart}-${rangeEnd}` : "0"} 件を表示 / 合計 {total} 件
+            {total > 0
+              ? t("common.showingRange", { rangeStart, rangeEnd, total })
+              : t("common.showingZero", { total })}
           </p>
 
           {total > pageSize && (
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-xs text-slate-500">
-                {page + 1} / {pageCount} ページ
+                {t("common.page", { page: page + 1, count: pageCount })}
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -271,7 +283,7 @@ export function UsersContent({
                   onClick={() => onPageChange(page - 1)}
                   disabled={!hasPreviousPage || loading}
                 >
-                  前へ
+                  {t("common.previous")}
                 </Button>
                 <Button
                   type="button"
@@ -280,7 +292,7 @@ export function UsersContent({
                   onClick={() => onPageChange(page + 1)}
                   disabled={!hasNextPage || loading}
                 >
-                  次へ
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -300,13 +312,17 @@ export function UsersContent({
         onOpenChange={(open) => {
           if (!open) confirm.cancelRoleChange();
         }}
-        title="ロールを変更"
+        title={t("users.roleChange.title")}
         description={
           confirm.roleChangeTarget
-            ? `${confirm.roleChangeTarget.user.name || confirm.roleChangeTarget.user.email} のロールを「${confirm.roleChangeTarget.user.role}」から「${confirm.roleChangeTarget.newRole}」に変更しますか？`
+            ? t("users.roleChange.description", {
+                name: confirm.roleChangeTarget.user.name || confirm.roleChangeTarget.user.email,
+                from: confirm.roleChangeTarget.user.role,
+                to: confirm.roleChangeTarget.newRole,
+              })
             : ""
         }
-        confirmLabel="変更する"
+        confirmLabel={t("users.roleChange.confirm")}
         destructive
         onConfirm={confirm.confirmRoleChange}
       />
@@ -317,13 +333,15 @@ export function UsersContent({
         onOpenChange={(open) => {
           if (!open) confirm.cancelUnsuspend();
         }}
-        title="サスペンドを解除"
+        title={t("users.unsuspend.title")}
         description={
           confirm.unsuspendTarget
-            ? `${confirm.unsuspendTarget.name || confirm.unsuspendTarget.email} のサスペンドを解除し、アカウントを復活させますか？`
+            ? t("users.unsuspend.description", {
+                name: confirm.unsuspendTarget.name || confirm.unsuspendTarget.email,
+              })
             : ""
         }
-        confirmLabel="復活させる"
+        confirmLabel={t("users.unsuspend.confirm")}
         onConfirm={confirm.confirmUnsuspend}
       />
 
@@ -333,13 +351,15 @@ export function UsersContent({
         onOpenChange={(open) => {
           if (!open) confirm.cancelDelete();
         }}
-        title="ユーザーを削除"
+        title={t("users.deleteUser.title")}
         description={
           confirm.deleteTarget
-            ? `${confirm.deleteTarget.user.name || confirm.deleteTarget.user.email} を削除します。個人情報は匿名化され、セッションと OAuth 連携は削除されます。この操作は元に戻せません。`
+            ? t("users.deleteUser.description", {
+                name: confirm.deleteTarget.user.name || confirm.deleteTarget.user.email,
+              })
             : ""
         }
-        confirmLabel="削除する"
+        confirmLabel={t("users.deleteUser.confirm")}
         destructive
         confirmPhrase={confirm.deleteTarget?.user.email}
         loading={confirm.deleteTarget?.loadingImpact}
@@ -347,18 +367,28 @@ export function UsersContent({
       >
         {confirm.deleteTarget?.impact && (
           <div className="rounded border border-yellow-600/40 bg-yellow-900/20 p-3 text-sm">
-            <p className="mb-1 font-medium text-yellow-300">影響範囲:</p>
+            <p className="mb-1 font-medium text-yellow-300">{t("users.impact.title")}</p>
             <ul className="text-muted-foreground list-inside list-disc space-y-0.5">
-              <li>所有ノート: {confirm.deleteTarget.impact.notesCount} 件</li>
-              <li>アクティブセッション: {confirm.deleteTarget.impact.sessionsCount} 件</li>
+              <li>{t("users.impact.notes", { count: confirm.deleteTarget.impact.notesCount })}</li>
               <li>
-                サブスクリプション:{" "}
-                {confirm.deleteTarget.impact.activeSubscription ? "あり (active)" : "なし"}
+                {t("users.impact.sessions", {
+                  count: confirm.deleteTarget.impact.sessionsCount,
+                })}
+              </li>
+              <li>
+                {t("users.impact.subscription", {
+                  value: confirm.deleteTarget.impact.activeSubscription
+                    ? t("users.impact.subscriptionActive")
+                    : t("users.impact.subscriptionNone"),
+                })}
               </li>
               {confirm.deleteTarget.impact.lastAiUsageAt && (
                 <li>
-                  最後の AI 使用:{" "}
-                  {new Date(confirm.deleteTarget.impact.lastAiUsageAt).toLocaleDateString("ja-JP")}
+                  {t("users.impact.lastAiUsage", {
+                    date: new Date(confirm.deleteTarget.impact.lastAiUsageAt).toLocaleDateString(
+                      "ja-JP",
+                    ),
+                  })}
                 </li>
               )}
             </ul>

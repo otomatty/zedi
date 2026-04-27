@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Select,
@@ -16,18 +17,14 @@ import {
 import type { LintFindingItem, LintRule, LintRunSummaryItem } from "@/api/lint";
 import { formatDate } from "@/lib/dateUtils";
 
-/**
- * ルール名を日本語・英語で表示する。
- * Maps rule name to display label (Japanese / English).
- */
-const RULE_LABELS: Record<LintRule, string> = {
-  orphan: "孤立ページ / Orphan",
-  ghost_many: "Ghost Link 過多 / Ghost Excess",
-  title_similar: "タイトル類似 / Title Similar",
-  conflict: "矛盾 / Conflict",
-  broken_link: "リンク切れ / Broken Link",
-  stale: "古い情報 / Stale",
-};
+const ALL_RULES: LintRule[] = [
+  "orphan",
+  "ghost_many",
+  "title_similar",
+  "conflict",
+  "broken_link",
+  "stale",
+];
 
 /**
  * 重要度に対応する Badge バリアント。
@@ -44,21 +41,7 @@ function severityVariant(severity: string): "default" | "secondary" | "destructi
   }
 }
 
-/**
- * detail オブジェクトからサマリ文字列を生成する。
- * Creates a summary string from a detail object.
- */
-function formatDetail(detail: Record<string, unknown>): string {
-  if (typeof detail.suggestion === "string") return detail.suggestion;
-  if (typeof detail.title === "string") return detail.title;
-  if (typeof detail.linkText === "string") {
-    const count = typeof detail.count === "number" ? detail.count : "?";
-    return `「${detail.linkText}」(${count} 件)`;
-  }
-  return JSON.stringify(detail);
-}
-
-/** UI selector sentinel for "すべて" (no filter). */
+/** UI selector sentinel for "all rules" (no filter). */
 const ANY_RULE = "__any__";
 
 interface WikiHealthContentProps {
@@ -88,7 +71,22 @@ export function WikiHealthContent({
   onRunLint,
   onResolve,
 }: WikiHealthContentProps) {
+  const { t } = useTranslation();
   const filtered = ruleFilter ? findings.filter((f) => f.rule === ruleFilter) : findings;
+
+  /**
+   * detail オブジェクトからサマリ文字列を生成する。
+   * Creates a summary string from a detail object.
+   */
+  const formatDetail = (detail: Record<string, unknown>): string => {
+    if (typeof detail.suggestion === "string") return detail.suggestion;
+    if (typeof detail.title === "string") return detail.title;
+    if (typeof detail.linkText === "string") {
+      const count = typeof detail.count === "number" ? detail.count : "?";
+      return t("wikiHealth.detail.linkText", { linkText: detail.linkText, count });
+    }
+    return JSON.stringify(detail);
+  };
 
   const handleRuleChange = (value: string) => {
     onRuleFilterChange(value === ANY_RULE ? undefined : (value as LintRule));
@@ -97,9 +95,9 @@ export function WikiHealthContent({
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold">Wiki Health ダッシュボード</h1>
+        <h1 className="text-lg font-semibold">{t("wikiHealth.title")}</h1>
         <Button type="button" onClick={onRunLint} disabled={running || loading}>
-          {running ? "実行中..." : "Lint 実行"}
+          {running ? t("common.running") : t("wikiHealth.runLint")}
         </Button>
       </div>
 
@@ -108,7 +106,7 @@ export function WikiHealthContent({
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
           {summary.map((s) => (
             <div key={s.rule} className="bg-muted/50 rounded border px-3 py-2">
-              <div className="text-muted-foreground text-xs">{RULE_LABELS[s.rule]}</div>
+              <div className="text-muted-foreground text-xs">{t(`wikiHealth.rules.${s.rule}`)}</div>
               <div className="mt-1 text-xl font-bold">{s.count}</div>
             </div>
           ))}
@@ -122,7 +120,7 @@ export function WikiHealthContent({
           className="text-muted-foreground mb-1 block text-xs"
           id="lint-filter-rule-label"
         >
-          ルールで絞り込み
+          {t("wikiHealth.filterRule")}
         </label>
         <Select value={ruleFilter ?? ANY_RULE} onValueChange={handleRuleChange}>
           <SelectTrigger
@@ -133,10 +131,10 @@ export function WikiHealthContent({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ANY_RULE}>すべて</SelectItem>
-            {(Object.keys(RULE_LABELS) as LintRule[]).map((r) => (
+            <SelectItem value={ANY_RULE}>{t("common.all")}</SelectItem>
+            {ALL_RULES.map((r) => (
               <SelectItem key={r} value={r}>
-                {RULE_LABELS[r]}
+                {t(`wikiHealth.rules.${r}`)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -148,30 +146,28 @@ export function WikiHealthContent({
       )}
 
       {loading && findings.length === 0 ? (
-        <p className="text-muted-foreground mt-4">読み込み中...</p>
+        <p className="text-muted-foreground mt-4">{t("common.loading")}</p>
       ) : filtered.length === 0 ? (
         <p className="text-muted-foreground mt-4">
-          {findings.length === 0
-            ? "Lint findings はありません。「Lint 実行」をクリックしてください。"
-            : "該当する findings はありません。"}
+          {findings.length === 0 ? t("wikiHealth.emptyAll") : t("wikiHealth.emptyFiltered")}
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto">
           <Table className="border-border min-w-[640px] rounded border">
             <TableHeader>
               <TableRow className="border-border bg-muted/50 hover:bg-transparent">
-                <TableHead className="px-3 py-2">ルール</TableHead>
-                <TableHead className="px-3 py-2">重要度</TableHead>
-                <TableHead className="px-3 py-2">詳細</TableHead>
-                <TableHead className="px-3 py-2">検出日時</TableHead>
-                <TableHead className="px-3 py-2">操作</TableHead>
+                <TableHead className="px-3 py-2">{t("wikiHealth.columns.rule")}</TableHead>
+                <TableHead className="px-3 py-2">{t("wikiHealth.columns.severity")}</TableHead>
+                <TableHead className="px-3 py-2">{t("wikiHealth.columns.detail")}</TableHead>
+                <TableHead className="px-3 py-2">{t("wikiHealth.columns.createdAt")}</TableHead>
+                <TableHead className="px-3 py-2">{t("wikiHealth.columns.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((f) => (
                 <TableRow key={f.id} className="border-border align-top">
                   <TableCell className="px-3 py-2">
-                    <Badge variant="outline">{RULE_LABELS[f.rule]}</Badge>
+                    <Badge variant="outline">{t(`wikiHealth.rules.${f.rule}`)}</Badge>
                   </TableCell>
                   <TableCell className="px-3 py-2">
                     <Badge variant={severityVariant(f.severity)}>{f.severity}</Badge>
@@ -179,7 +175,7 @@ export function WikiHealthContent({
                   <TableCell className="max-w-md px-3 py-2">
                     <div className="text-sm">{formatDetail(f.detail)}</div>
                     <div className="text-muted-foreground mt-1 text-xs">
-                      {f.page_ids.length} ページ関連
+                      {t("wikiHealth.pagesRelated", { count: f.page_ids.length })}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2 whitespace-nowrap">
@@ -192,14 +188,16 @@ export function WikiHealthContent({
                       size="sm"
                       onClick={() => onResolve(f.id)}
                     >
-                      解決
+                      {t("wikiHealth.resolve")}
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          <p className="text-muted-foreground mt-2 text-xs">合計 {filtered.length} 件</p>
+          <p className="text-muted-foreground mt-2 text-xs">
+            {t("common.totalCount", { count: filtered.length })}
+          </p>
         </div>
       )}
     </div>

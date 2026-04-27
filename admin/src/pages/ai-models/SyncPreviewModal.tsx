@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Dialog,
@@ -28,6 +29,7 @@ export function SyncPreviewModal({
   onClose,
   onConfirm,
 }: SyncPreviewModalProps) {
+  const { t } = useTranslation();
   const totalToAdd = previewData?.reduce((sum, r) => sum + (r.toAdd?.length ?? 0), 0) ?? 0;
   const totalToDeactivate =
     previewData?.reduce((sum, r) => sum + (r.toDeactivate?.length ?? 0), 0) ?? 0;
@@ -40,14 +42,13 @@ export function SyncPreviewModal({
         aria-describedby="sync-preview-description"
       >
         <DialogHeader>
-          <DialogTitle id="sync-preview-title">同期プレビュー</DialogTitle>
+          <DialogTitle id="sync-preview-title">{t("aiModels.preview.title")}</DialogTitle>
           <DialogDescription id="sync-preview-description">
-            新規モデルは追加され、同期対象から外れた既存モデルは非アクティブ化されます。
-            既存モデルの表示名や料金は上書きされません。Sonnet 系は非アクティブで追加されます。
+            {t("aiModels.preview.description")}
           </DialogDescription>
         </DialogHeader>
         {loading ? (
-          <p className="text-muted-foreground mt-4">読み込み中...</p>
+          <p className="text-muted-foreground mt-4">{t("common.loading")}</p>
         ) : (
           <>
             <div className="mt-4 space-y-3">
@@ -61,9 +62,11 @@ export function SyncPreviewModal({
                     <ul className="text-muted-foreground mt-1 list-inside list-disc text-sm">
                       {r.toAdd.map((m) => (
                         <li key={m.id}>
-                          追加: {m.displayName}
+                          {t("aiModels.preview.addLabel", { name: m.displayName })}
                           {!m.isActive && (
-                            <span className="ml-1 text-amber-400">(非アクティブ)</span>
+                            <span className="ml-1 text-amber-400">
+                              {t("aiModels.preview.inactiveTag")}
+                            </span>
                           )}
                         </li>
                       ))}
@@ -72,30 +75,35 @@ export function SyncPreviewModal({
                   {r.toDeactivate && r.toDeactivate.length > 0 ? (
                     <ul className="mt-1 list-inside list-disc text-sm text-amber-300">
                       {r.toDeactivate.map((m) => (
-                        <li key={m.id}>無効化: {m.displayName}</li>
+                        <li key={m.id}>
+                          {t("aiModels.preview.deactivateLabel", { name: m.displayName })}
+                        </li>
                       ))}
                     </ul>
                   ) : null}
                   {!r.error &&
                   (r.toAdd?.length ?? 0) === 0 &&
                   (r.toDeactivate?.length ?? 0) === 0 ? (
-                    <p className="text-muted-foreground mt-1 text-sm">変更なし</p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      {t("aiModels.preview.noChanges")}
+                    </p>
                   ) : null}
                 </div>
               ))}
             </div>
             <div className="mt-4 flex flex-col gap-2">
               {hasPreviewErrors && (
-                <p className="text-sm text-amber-400">
-                  一部プロバイダーでエラーが発生しています。エラーのあるプロバイダーは同期されません。
-                </p>
+                <p className="text-sm text-amber-400">{t("aiModels.preview.errorWarning")}</p>
               )}
               <DialogFooter>
                 <Button type="button" variant="secondary" onClick={onClose}>
-                  キャンセル
+                  {t("common.cancel")}
                 </Button>
                 <Button type="button" onClick={onConfirm}>
-                  同期実行（追加 {totalToAdd} / 無効化 {totalToDeactivate}）
+                  {t("aiModels.preview.confirm", {
+                    added: totalToAdd,
+                    deactivated: totalToDeactivate,
+                  })}
                 </Button>
               </DialogFooter>
             </div>

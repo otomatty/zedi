@@ -1,0 +1,12 @@
+{
+  "adminPanelTitle": "Zedi 管理画面",
+  "adminShortTitle": "管理画面",
+  "menu": "メニュー",
+  "items": {
+    "aiModels": "AI モデル",
+    "users": "ユーザー管理",
+    "auditLogs": "監査ログ",
+    "wikiHealth": "Wiki Health",
+    "activityLog": "活動ログ"
+  }
+}

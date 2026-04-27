@@ -1,26 +1,70 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AiModelAdmin, SyncPreviewResult, SyncResultItem } from "@/api/admin";
 import { getAiModels, previewSyncAiModels, syncAiModels as syncAiModelsApi } from "@/api/admin";
 import { AiModelsContent } from "./AiModelsContent";
 import { useAiModelActions } from "./useAiModelActions";
 import { useAiModelsDragReorder } from "./useAiModelsDragReorder";
 
+/**
+ *
+ */
 export default function AiModels() {
+  /**
+   *
+   */
+  const { t } = useTranslation();
+  /**
+   *
+   */
   const [models, setModels] = useState<AiModelAdmin[]>([]);
+  /**
+   *
+   */
   const [loading, setLoading] = useState(true);
+  /**
+   *
+   */
   const [error, setError] = useState<string | null>(null);
+  /**
+   *
+   */
   const [syncing, setSyncing] = useState(false);
+  /**
+   *
+   */
   const [syncResult, setSyncResult] = useState<SyncResultItem[] | null>(null);
+  /**
+   *
+   */
   const [previewOpen, setPreviewOpen] = useState(false);
+  /**
+   *
+   */
   const [previewLoading, setPreviewLoading] = useState(false);
+  /**
+   *
+   */
   const [previewData, setPreviewData] = useState<SyncPreviewResult[] | null>(null);
+  /**
+   *
+   */
   const isMountedRef = useRef(true);
+  /**
+   *
+   */
   const originalModelsRef = useRef<AiModelAdmin[]>([]);
 
+  /**
+   *
+   */
   const load = useCallback(async (showLoading = true) => {
     if (showLoading && isMountedRef.current) setLoading(true);
     if (isMountedRef.current) setError(null);
     try {
+      /**
+       *
+       */
       const nextModels = await getAiModels();
       if (!isMountedRef.current) return;
       setModels(nextModels);
@@ -34,6 +78,9 @@ export default function AiModels() {
     }
   }, []);
 
+  /**
+   *
+   */
   const { handleModelUpdate, handleToggleActive, handleTierChange } = useAiModelActions({
     setModels,
     setError,
@@ -41,6 +88,9 @@ export default function AiModels() {
     originalModelsRef,
   });
 
+  /**
+   *
+   */
   const dragReorder = useAiModelsDragReorder({
     models,
     setModels,
@@ -57,11 +107,17 @@ export default function AiModels() {
     };
   }, [load]);
 
+  /**
+   *
+   */
   const handlePreviewClick = useCallback(async () => {
     setPreviewData(null);
     setPreviewLoading(true);
     setError(null);
     try {
+      /**
+       *
+       */
       const results = await previewSyncAiModels();
       if (!isMountedRef.current) return;
       setPreviewData(results);
@@ -75,6 +131,9 @@ export default function AiModels() {
     }
   }, []);
 
+  /**
+   *
+   */
   const handleSyncConfirm = useCallback(() => {
     setPreviewOpen(false);
     setPreviewData(null);
@@ -92,8 +151,8 @@ export default function AiModels() {
   if (loading && models.length === 0) {
     return (
       <div>
-        <h1 className="text-lg font-semibold">AI モデル管理</h1>
-        <p className="mt-2 text-slate-400">読み込み中...</p>
+        <h1 className="text-lg font-semibold">{t("aiModels.title")}</h1>
+        <p className="mt-2 text-slate-400">{t("common.loading")}</p>
       </div>
     );
   }

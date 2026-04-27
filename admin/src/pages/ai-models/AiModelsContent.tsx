@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button, Table, TableBody, TableHead, TableHeader, TableRow } from "@zedi/ui";
 import type { AiModelAdmin, SyncPreviewResult, SyncResultItem } from "@/api/admin";
 import { AiModelCard } from "./AiModelCard";
@@ -73,6 +74,8 @@ export function AiModelsContent({
   onDrop,
   onDragEnd,
 }: AiModelsContentProps) {
+  const { t } = useTranslation();
+
   function createDisplayNameHandlers(model: AiModelAdmin) {
     return {
       onDisplayNameChange: (value: string) =>
@@ -94,7 +97,7 @@ export function AiModelsContent({
   return (
     <div>
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-lg font-semibold">AI モデル管理</h1>
+        <h1 className="text-lg font-semibold">{t("aiModels.title")}</h1>
         <Button
           type="button"
           variant="secondary"
@@ -102,7 +105,7 @@ export function AiModelsContent({
           onClick={onPreviewClick}
           disabled={syncing}
         >
-          {syncing ? "同期中..." : "プロバイダーと同期"}
+          {syncing ? t("aiModels.syncing") : t("aiModels.syncWithProvider")}
         </Button>
       </div>
 
@@ -112,10 +115,15 @@ export function AiModelsContent({
 
       {syncResult && (
         <div className="mt-2 rounded bg-slate-800 px-3 py-2 text-sm text-slate-300">
-          <span className="font-medium">同期結果:</span>{" "}
+          <span className="font-medium">{t("aiModels.syncResult")}</span>{" "}
           {syncResult.map((r) => (
             <span key={r.provider} className="mr-3">
-              {r.provider}: {r.error ?? `追加 ${r.upserted} / 無効化 ${r.deactivated ?? 0}`}
+              {r.provider}:{" "}
+              {r.error ??
+                t("aiModels.syncStat", {
+                  added: r.upserted,
+                  deactivated: r.deactivated ?? 0,
+                })}
             </span>
           ))}
         </div>
@@ -134,13 +142,13 @@ export function AiModelsContent({
         <Table className="border-border min-w-[640px] rounded border">
           <TableHeader>
             <TableRow className="border-border bg-muted/50 hover:bg-transparent">
-              <TableHead className="w-8 px-1 py-2" aria-label="並び替え" />
-              <TableHead className="px-3 py-2">プロバイダー</TableHead>
-              <TableHead className="px-3 py-2">モデルID</TableHead>
-              <TableHead className="px-3 py-2">表示名</TableHead>
-              <TableHead className="px-3 py-2">ティア</TableHead>
-              <TableHead className="px-3 py-2">有効</TableHead>
-              <TableHead className="px-3 py-2">並び順</TableHead>
+              <TableHead className="w-8 px-1 py-2" aria-label={t("aiModels.columns.reorder")} />
+              <TableHead className="px-3 py-2">{t("aiModels.columns.provider")}</TableHead>
+              <TableHead className="px-3 py-2">{t("aiModels.columns.modelId")}</TableHead>
+              <TableHead className="px-3 py-2">{t("aiModels.columns.displayName")}</TableHead>
+              <TableHead className="px-3 py-2">{t("aiModels.columns.tier")}</TableHead>
+              <TableHead className="px-3 py-2">{t("aiModels.columns.active")}</TableHead>
+              <TableHead className="px-3 py-2">{t("aiModels.columns.sortOrder")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -178,8 +186,11 @@ export function AiModelsContent({
       </div>
 
       <p className="mt-2 text-xs text-slate-500">
-        {models.length} 件（有効: {models.filter((m) => m.isActive).length}）
-        <span className="hidden md:inline"> ドラッグで並び替え</span>
+        {t("aiModels.summary", {
+          total: models.length,
+          active: models.filter((m) => m.isActive).length,
+        })}
+        <span className="hidden md:inline"> {t("aiModels.dragHint")}</span>
       </p>
     </div>
   );
