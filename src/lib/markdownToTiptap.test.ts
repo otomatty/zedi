@@ -159,6 +159,50 @@ describe("convertMarkdownToTiptapContent", () => {
     });
 
     /**
+     * インデントされた `# X` 行は H1 ではない。`"   # comment"` のような行を
+     * 誤って消してしまわないこと（codex review on PR #791）。
+     * An indented `# X` line is not a real H1; e.g. `"   # comment"` must NOT be stripped.
+     * Regression for codex review on PR #791.
+     */
+    it("does not strip an indented `# X` line (codex review on PR #791)", () => {
+      const result = convertMarkdownToTiptapContent("    # comment\nnext", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; content?: Array<{ text?: string }> }>;
+      };
+      // 1 行目は paragraph として残り、テキストは `    # comment` のまま。
+      // The first line stays as a paragraph with text `    # comment`.
+      expect(parsed.content[0]).toMatchObject({ type: "paragraph" });
+      expect(parsed.content[0].content?.[0]?.text).toBe("    # comment");
+      expect(parsed.content[1].content?.[0]?.text).toBe("next");
+    });
+
+    /**
+     * 先行行が空白のみの「空行」であれば prelude として許容するが、
+     * 行末まで空白で構成された行のみが対象。
+     * Whitespace-only blank lines before the H1 are still allowed as prelude.
+     */
+    it("strips a leading H1 after a tab/space-only blank line", () => {
+      const result = convertMarkdownToTiptapContent("   \n# Title\n## Section", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{
+          type: string;
+          attrs?: { level: number };
+          content?: Array<{ text?: string }>;
+        }>;
+      };
+      const literalH1 = parsed.content.find(
+        (n) => n.type === "paragraph" && n.content?.some((c) => c.text === "# Title"),
+      );
+      expect(literalH1).toBeUndefined();
+      const headings = parsed.content.filter((n) => n.type === "heading");
+      expect(headings[0]).toMatchObject({ attrs: { level: 2 } });
+    });
+
+    /**
      * 2 つ目以降の `# X` は除去対象ではない。1 行のみ落とす。
      * Only the first H1 is removed; subsequent `# X` remains as a paragraph.
      */

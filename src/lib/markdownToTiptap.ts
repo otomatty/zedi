@@ -52,18 +52,28 @@ export interface ConvertMarkdownToTiptapOptions {
 }
 
 /**
- * 先頭の `# X` 1 行を取り除く（任意の先行空白行は許容、`## ...` などは対象外）。
- * Strip a single leading `# X` line, allowing optional leading whitespace-only lines.
+ * 先頭の `# X` 1 行を取り除く（任意の先行「空白のみの行」は許容、`## ...` などは対象外）。
+ * Strip a single leading `# X` line, allowing zero or more preceding blank-only lines.
  * `## ...` や本文中の `# X` には触れない。
  *
  * 入力は LF 正規化済み (`\n`) を想定する（呼び出し側で一度だけ正規化する）。
  * The input is expected to be LF-normalized (`\n`); the caller normalizes once.
+ *
+ * 注意: 先行する prelude は **改行で区切られた空白のみの行** に限定する。`\s*` のように
+ * 任意の空白を許すと `"    # comment\nnext"` のような「インデントされた `#` 始まりの行」
+ * までも H1 とみなして消してしまうため、`(?:[ \t]*\n)*` で「行末まで空白だけの行」のみ
+ * を消費する。
+ * Note: the prelude is restricted to newline-separated blank-only lines. A loose `\s*`
+ * would also strip indented `#`-starting lines (e.g., `"    # comment\nnext"`), silently
+ * corrupting AI-generated content that just happens to start with an indented `#`. The
+ * `(?:[ \t]*\n)*` form only consumes lines whose entire content is horizontal whitespace.
  */
 function stripLeadingH1Line(normalized: string): string {
-  // `\s*` allows preceding blank/whitespace-only lines. The negative lookahead `(?!#)`
-  // ensures we only match a single `#` (not `##`, `###`, ...). `[^\n]*` captures the
-  // remainder of the heading line and the trailing `\n?` consumes its line break.
-  const match = normalized.match(/^(\s*)# (?!#)[^\n]*\n?/);
+  // `(?:[ \t]*\n)*` consumes zero or more blank-only lines (horizontal whitespace +
+  // newline). The negative lookahead `(?!#)` ensures we only match a single `#` (not
+  // `##`, `###`, ...). `[^\n]*` captures the remainder of the heading line and the
+  // trailing `\n?` consumes its line break.
+  const match = normalized.match(/^(?:[ \t]*\n)*# (?!#)[^\n]*\n?/);
   if (!match) return normalized;
   return normalized.slice(match[0].length);
 }
