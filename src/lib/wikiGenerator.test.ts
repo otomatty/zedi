@@ -54,6 +54,29 @@ describe("wikiGeneratorPrompt", () => {
     expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).toContain("### 4. 参考情報の扱い");
     expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).not.toContain("### 4. 出典・参照元");
   });
+
+  // issue #784: モデルが本文先頭に `# {タイトル}` を出さないように、プロンプト側で
+  // 明示的に禁止することを保証する。
+  // issue #784: ensure the prompt explicitly forbids a leading `# {Title}` body heading,
+  // since the page title is owned by a separate input field.
+  it("explicitly forbids emitting a leading `# {タイトル}` body heading (issue #784)", () => {
+    expect(WIKI_GENERATOR_PROMPT).toContain("# {タイトル}");
+    expect(WIKI_GENERATOR_PROMPT).toContain("出力しないこと");
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).toContain("# {タイトル}");
+    expect(WIKI_GENERATOR_PROMPT_NO_SEARCH).toContain("出力しないこと");
+  });
+
+  // 旧テンプレ末尾の `## タイトル\n{{title}}` ブロックは AI が誤って `# {タイトル}` を
+  // 本文先頭に出す原因となるため、`<page_title>` 構造に置き換えられている。
+  // The old `## タイトル\n{{title}}` block was misread by AIs as a hint to emit `# {Title}`.
+  // It has been replaced with a `<page_title>` block to remove that ambiguity (issue #784).
+  it("uses a <page_title> tag instead of the legacy `## タイトル / {{title}}` template (issue #784)", () => {
+    expect(WIKI_GENERATOR_PROMPT).toContain("<page_title>");
+    expect(WIKI_GENERATOR_PROMPT).toContain("</page_title>");
+    expect(WIKI_GENERATOR_PROMPT).not.toMatch(/^## タイトル$/m);
+    expect(WIKI_GENERATOR_PROMPT).toContain("{{title}}");
+    expect(WIKI_GENERATOR_PROMPT).toContain("{{schema}}");
+  });
 });
 
 describe("extractWikiLinks", () => {

@@ -20,7 +20,13 @@ export function insertSlashAgentMarkdownAt(
   const normalized = markdown.trim() || "(empty result)";
   let content: unknown[];
   try {
-    const docJson = JSON.parse(convertMarkdownToTiptapContent(normalized)) as {
+    // AI（エージェント）出力経路なので、先頭の `# Title` 行を落とす（issue #784）。
+    // ページタイトル input と重複した literal paragraph を本文に残さないため。
+    // AI (agent) output path: strip a leading `# Title` line so it does not duplicate the
+    // page-title input as a literal paragraph in the body (issue #784).
+    const docJson = JSON.parse(
+      convertMarkdownToTiptapContent(normalized, { dropLeadingH1: true }),
+    ) as {
       content?: unknown[];
     };
     content = Array.isArray(docJson.content) ? docJson.content : [];

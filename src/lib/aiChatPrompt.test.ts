@@ -136,4 +136,16 @@ describe("buildSystemPrompt", () => {
     const result = buildSystemPrompt(null, [], referenced);
     expect(result).toContain("\n### UniqueRefTitleZedi395\n(ページID: id1)\n");
   });
+
+  // issue #784: AI 経由のチャットアクション (`content` フィールド) で本文先頭に
+  // `# Title` を出さないようプロンプトに明示的な禁止文を含めていることを保証する。
+  // issue #784: ensure the system prompt explicitly forbids `# Title` in any `content`
+  // field of chat actions (so AI output does not leak a literal `# Title` paragraph).
+  it("forbids leading `# Title` headings in chat-action content fields (issue #784)", async () => {
+    await i18n.changeLanguage("ja");
+    const result = buildSystemPrompt(null, []);
+    expect(result).toContain("# {ページタイトル}");
+    expect(result).toContain("絶対に含めない");
+    expect(result.toLowerCase()).toContain("never include a leading");
+  });
 });

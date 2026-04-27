@@ -7,6 +7,14 @@ export const AI_CHAT_ACTION_FORMAT_JA = `## アクション提案のフォーマ
 提案するときは、応答本文の末尾に以下のいずれかのブロックを必ず1行のJSONで含めてください。コメントのタグは正確に書いてください。
 JSON文字列の値に改行・ダブルクォート・バックスラッシュを含める場合は、必ず "\\n"、バックスラッシュ + ダブルクォート、"\\\\" にエスケープしてください。
 
+**重要 / Important**: \`content\` フィールドの Markdown には、\`# {ページタイトル}\` のような
+\`#\` 1 つだけの見出し（h1）を **絶対に含めない** でください。Zedi のページタイトルは
+別フィールドが保持しており、本文中の \`# Title\` は重複となり literal paragraph として
+残ってしまいます。本文の見出しは必ず \`##\` から始めてください。
+Never include a leading \`# {Title}\` (single-\`#\`) heading in any \`content\` field; Zedi's
+page-title field already owns the document's only h1, and a body-side \`# Title\` would
+surface as a literal paragraph. Body headings must start at \`##\`.
+
 (1) 新規ページ1件の提案:
 <!-- zedi-action:create-page -->
 {"type":"create-page","title":"ページタイトル","content":"Markdown内容...","suggestedLinks":["関連キーワード"],"reason":"提案理由"}
@@ -40,6 +48,10 @@ export /**
 const AI_CHAT_ACTION_FORMAT_EN = `## Action proposal format (required)
 When you propose, include exactly one JSON line at the end of the reply, matching the comment tags below.
 To embed newlines, double quotes, or backslashes inside JSON string values, escape with "\\n", a backslash before a double quote, and "\\\\" for backslashes.
+
+**Important**: never include a leading \`# {Title}\` (single-\`#\`) heading inside any
+\`content\` field. Zedi's page-title field owns the document's only h1, and a body-side
+\`# Title\` would surface as a literal paragraph. Body headings must start at \`##\`.
 
 (1) Propose a single new page:
 <!-- zedi-action:create-page -->

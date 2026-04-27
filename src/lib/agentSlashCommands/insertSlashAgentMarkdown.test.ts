@@ -63,7 +63,9 @@ describe("insertSlashAgentMarkdownAt", () => {
     const { editor, insertContentAt } = makeMockEditor(100);
     insertSlashAgentMarkdownAt(editor, 7, "**hi**", "cursor");
 
-    expect(convertMarkdownToTiptapContent).toHaveBeenCalledWith("**hi**");
+    // AI（エージェント）出力経路のため `dropLeadingH1: true` が渡る（issue #784）。
+    // The agent (AI) output path passes `dropLeadingH1: true` (issue #784).
+    expect(convertMarkdownToTiptapContent).toHaveBeenCalledWith("**hi**", { dropLeadingH1: true });
     expect(insertContentAt).toHaveBeenCalledTimes(1);
     expect(insertContentAt).toHaveBeenCalledWith(7, [
       { type: "paragraph", content: [{ type: "text", text: "hi" }] },
@@ -93,7 +95,9 @@ describe("insertSlashAgentMarkdownAt", () => {
 
     // 空白のみの結果は "(empty result)" に置換され、ユーザに変換不能を示す。
     // Whitespace-only results are replaced with "(empty result)" so the user notices.
-    expect(convertMarkdownToTiptapContent).toHaveBeenCalledWith("(empty result)");
+    expect(convertMarkdownToTiptapContent).toHaveBeenCalledWith("(empty result)", {
+      dropLeadingH1: true,
+    });
   });
 
   it("handles missing content array by inserting an empty list (no crash)", () => {
