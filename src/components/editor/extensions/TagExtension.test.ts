@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Editor } from "@tiptap/core";
-import Document from "@tiptap/extension-document";
-import Paragraph from "@tiptap/extension-paragraph";
-import Text from "@tiptap/extension-text";
-import { Code } from "@tiptap/extension-code";
+import StarterKit from "@tiptap/starter-kit";
 import {
   Tag,
   TAG_INPUT_REGEX,
@@ -316,16 +313,19 @@ describe("TagExtension input rule", () => {
 
   describe("integration with a real Tiptap editor", () => {
     /**
-     * Build a minimal editor with the Tag mark plus the bare nodes / marks the
-     * extension depends on. `Code` is required because `Tag` declares
-     * `excludes: "code"` — leaving it out trips a schema validation error.
+     * Build a minimal editor with `StarterKit` (which contains Document,
+     * Paragraph, Text, Code, and basic input rules) plus the Tag mark under
+     * test. Using StarterKit instead of cherry-picked extensions keeps
+     * dependencies aligned with the rest of the codebase (it is already
+     * imported elsewhere) and avoids unlisted-dependency violations.
      *
-     * Tag マーク + 最小限の依存（`Code` は `excludes: "code"` のため必須）で
-     * 編集インスタンスを作る。タグマーク用の `excludes` 制約を保つため。
+     * Tag マークと StarterKit（Document / Paragraph / Text / Code を内包）で
+     * 編集インスタンスを作る。本体側でも StarterKit を使っており、
+     * テストの依存も合わせることで knip の unlisted dependency 検出を回避する。
      */
     function makeEditor(initialContent: string): Editor {
       return new Editor({
-        extensions: [Document, Paragraph, Text, Code, Tag],
+        extensions: [StarterKit, Tag],
         content: initialContent,
       });
     }
@@ -416,13 +416,17 @@ describe("TagExtension input rule", () => {
     });
 
     it("does not mark a Markdown heading `# Heading`", () => {
-      // ` ` の直前が裸の `#` のみで `#name` 形式ではないため発火しない。
-      // The regex requires `#` followed by at least one name char; bare `#`
-      // does not match.
+      // 裸の `#` のあとに空白を打鍵しても、タグ規則は `#` 直後に最低 1 文字の
+      // 名前を要求するため発火しない。StarterKit の heading 入力規則が代わりに
+      // 反応する可能性があるが、本テストはあくまで「タグマークが付かない」
+      // ことだけを保証する。
+      // Bare `#` followed by space must not produce a tag mark — the regex
+      // demands at least one name character after `#`. StarterKit's heading
+      // input rule may fire instead, but we only assert that no `data-tag`
+      // appears in the result (the heading transform is StarterKit's concern).
       const editor = makeEditor("<p>#</p>");
       try {
-        const handled = typeAt(editor, 2, " ");
-        expect(handled).toBeFalsy();
+        typeAt(editor, 2, " ");
         const html = editor.getHTML();
         expect(html).not.toContain("data-tag");
       } finally {
