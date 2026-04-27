@@ -245,6 +245,16 @@ function sanitizeNode(
   // Create a copy of the node
   const sanitizedNode: Record<string, unknown> = { ...node };
 
+  // 本文最上位を h2 に揃え、古い Tiptap JSON（level:1 や欠損＝1 相当）を 2 へ
+  if (nodeType === "heading") {
+    const attrs = { ...((node.attrs as Record<string, unknown> | undefined) ?? {}) };
+    const level = typeof attrs.level === "number" ? attrs.level : 1;
+    if (level < 2) {
+      attrs.level = 2;
+      sanitizedNode.attrs = attrs;
+    }
+  }
+
   // Sanitize marks if present
   if (node.marks && Array.isArray(node.marks)) {
     const sanitizedMarks = (node.marks as Array<Record<string, unknown>>).filter((mark) => {

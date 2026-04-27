@@ -40,19 +40,19 @@ export const slashCommandItems: SlashCommandItem[] = [
     id: "heading1",
     icon: "Heading1",
     action: (editor, range) =>
-      editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run(),
+      editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
   },
   {
     id: "heading2",
     icon: "Heading2",
     action: (editor, range) =>
-      editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
+      editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
   },
   {
     id: "heading3",
     icon: "Heading3",
     action: (editor, range) =>
-      editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
+      editor.chain().focus().deleteRange(range).setHeading({ level: 4 }).run(),
   },
   {
     id: "bulletList",

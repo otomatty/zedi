@@ -154,7 +154,7 @@ describe("transformWikiLinksInContent", () => {
       content: [
         {
           type: "heading",
-          attrs: { level: 1 },
+          attrs: { level: 2 },
           content: [{ type: "text", text: "Title with [[Link]]" }],
         },
       ],

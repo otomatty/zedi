@@ -10,7 +10,7 @@ describe("convertMarkdownToTiptapContent", () => {
     expect(parsed.content[0]).toMatchObject({ type: "paragraph" });
   });
 
-  it("converts # heading to heading level 1", () => {
+  it("converts # heading to body top level 2 (not page h1; title is outside the doc)", () => {
     const result = convertMarkdownToTiptapContent("# Title");
     const parsed = JSON.parse(result) as {
       content: Array<{ type: string; attrs?: { level: number }; content?: unknown[] }>;
@@ -18,7 +18,7 @@ describe("convertMarkdownToTiptapContent", () => {
     expect(parsed.content).toHaveLength(1);
     expect(parsed.content[0]).toMatchObject({
       type: "heading",
-      attrs: { level: 1 },
+      attrs: { level: 2 },
     });
     const firstContent = parsed.content[0].content;
     expect(firstContent).toHaveLength(1);
@@ -28,13 +28,13 @@ describe("convertMarkdownToTiptapContent", () => {
     });
   });
 
-  it("converts ## and ### headings", () => {
+  it("converts ## and ### headings to levels 3 and 4", () => {
     const result = convertMarkdownToTiptapContent("## Section\n### Sub");
     const parsed = JSON.parse(result) as {
       content: Array<{ type: string; attrs?: { level: number } }>;
     };
-    expect(parsed.content[0]).toMatchObject({ type: "heading", attrs: { level: 2 } });
-    expect(parsed.content[1]).toMatchObject({ type: "heading", attrs: { level: 3 } });
+    expect(parsed.content[0]).toMatchObject({ type: "heading", attrs: { level: 3 } });
+    expect(parsed.content[1]).toMatchObject({ type: "heading", attrs: { level: 4 } });
   });
 
   it("converts bullet list items", () => {

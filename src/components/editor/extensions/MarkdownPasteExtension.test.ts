@@ -124,7 +124,7 @@ describe("MarkdownPaste extension", () => {
     const parsedDoc = {
       type: "doc",
       content: [
-        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Hello" }] },
+        { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Hello" }] },
       ],
     };
     const { handlePaste, mockEditor } = getHandlePaste({

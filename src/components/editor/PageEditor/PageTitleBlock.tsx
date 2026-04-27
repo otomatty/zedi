@@ -68,24 +68,28 @@ export const PageTitleBlock: React.FC<PageTitleBlockProps> = ({
     );
   }
 
+  // 編集タイトルは当該ページの h1。本文は h2 起点（editor）と揃えて 1 ページ 1 見出しにする
+  // Editable page title is the only &lt;h1&gt;; body headings start at h2 in the editor
   return (
     <div ref={titleRef} className="pt-6 pb-2">
-      <input
-        type="text"
-        value={title}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className={cn(
-          "w-full border-0 bg-transparent text-2xl font-semibold",
-          "placeholder:text-muted-foreground",
-          "focus:outline-none",
-          "min-h-[2.5rem] py-0 leading-tight",
-          errorMessage ? "text-destructive" : "",
-        )}
-        aria-label={placeholder}
-        aria-invalid={Boolean(errorMessage)}
-      />
+      <h1 className="m-0 break-words whitespace-normal">
+        <input
+          type="text"
+          value={title}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className={cn(
+            "w-full border-0 bg-transparent text-2xl font-semibold",
+            "placeholder:text-muted-foreground",
+            "focus:outline-none",
+            "min-h-[2.5rem] py-0 leading-tight",
+            errorMessage ? "text-destructive" : "",
+          )}
+          aria-label={placeholder}
+          aria-invalid={Boolean(errorMessage)}
+        />
+      </h1>
       {errorMessage && (
         <p className="text-destructive mt-1 text-sm" role="alert">
           {errorMessage}

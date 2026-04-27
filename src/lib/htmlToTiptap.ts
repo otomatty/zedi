@@ -31,7 +31,7 @@ function isClipLinkUriAllowed(url: string | undefined): boolean {
 const extensions = [
   StarterKit.configure({
     heading: {
-      levels: [1, 2, 3],
+      levels: [2, 3, 4],
     },
     codeBlock: false,
     link: false,

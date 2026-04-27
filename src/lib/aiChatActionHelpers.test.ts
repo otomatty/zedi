@@ -137,9 +137,10 @@ describe("appendMarkdownToTiptapContent", () => {
       type: "paragraph",
       content: [{ type: "text", text: "Existing" }],
     });
+    // `##` → Tiptap level 3 (body: #/##/### = 2/3/4; page h1 is outside the doc)
     expect(parsed.content[1]).toMatchObject({
       type: "heading",
-      attrs: { level: 2 },
+      attrs: { level: 3 },
     });
     expect(parsed.content[2]).toMatchObject({
       type: "bulletList",
