@@ -29,6 +29,8 @@ import type {
   InviteLinkRedeemResponse,
   CreateInviteLinkBody,
   InviteLinkRow,
+  DomainAccessRow,
+  CreateDomainAccessBody,
 } from "./types";
 
 export type { NoteListItem };
@@ -573,6 +575,51 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<{ revoked: true; revokedAt: string }>(
         "DELETE",
         `/api/notes/${encodeURIComponent(noteId)}/invite-links/${encodeURIComponent(linkId)}`,
+      );
+    },
+
+    // ── Domain access (epic #657 / issue #663) ─────────────────────────────
+
+    /**
+     * GET /api/notes/:noteId/domain-access — ドメインルール一覧（owner / editor）。
+     * List domain-access rules for a note (owner or editor).
+     */
+    async listDomainAccess(noteId: string): Promise<DomainAccessRow[]> {
+      return req<DomainAccessRow[]>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/domain-access`,
+      );
+    },
+
+    /**
+     * POST /api/notes/:noteId/domain-access — ドメインルールを追加（オーナー）。
+     * Create a domain-access rule (owner only). Server rejects free-email
+     * providers (gmail.com etc.) with HTTP 400.
+     */
+    async createDomainAccess(
+      noteId: string,
+      body: CreateDomainAccessBody,
+    ): Promise<DomainAccessRow> {
+      return req<DomainAccessRow>(
+        "POST",
+        `/api/notes/${encodeURIComponent(noteId)}/domain-access`,
+        { body },
+      );
+    },
+
+    /**
+     * DELETE /api/notes/:noteId/domain-access/:id — ドメインルールを削除（オーナー）。
+     * 削除直後にそのドメインからのアクセスは失効する（キャッシュなし）。
+     * Delete a domain-access rule (owner only). Effect is immediate — callers
+     * who relied on this rule lose access on their next request.
+     */
+    async deleteDomainAccess(
+      noteId: string,
+      accessId: string,
+    ): Promise<{ removed: true; id: string }> {
+      return req<{ removed: true; id: string }>(
+        "DELETE",
+        `/api/notes/${encodeURIComponent(noteId)}/domain-access/${encodeURIComponent(accessId)}`,
       );
     },
 
