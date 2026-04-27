@@ -1,4 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import i18n from "@/i18n";
 import type { ChatTreeState, PageContext, TreeChatMessage } from "../types/aiChat";
 import type { AIServiceRequest } from "../lib/aiService";
 import { loadAISettings } from "../lib/aiSettings";
@@ -94,7 +95,7 @@ export async function executeRegenerateAssistant(
     }
     settings = loaded;
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "AI設定の読み込みに失敗しました";
+    const errorMessage = err instanceof Error ? err.message : i18n.t("errors.aiSettingsLoadFailed");
     patchAssistantSettingsLoadFailure(
       setTree,
       newAssistantId,

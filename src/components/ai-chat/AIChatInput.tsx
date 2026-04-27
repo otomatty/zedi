@@ -108,12 +108,12 @@ export function AIChatInput({
               )}
               onMouseDown={(e) => {
                 e.preventDefault();
-                selectMentionPage({ id: page.id, title: page.title || "無題のページ" });
+                selectMentionPage({ id: page.id, title: page.title || t("common.untitledPage") });
               }}
               onMouseEnter={() => setMentionIndex(idx)}
             >
               <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
-              <span className="truncate">{page.title || "無題のページ"}</span>
+              <span className="truncate">{page.title || t("common.untitledPage")}</span>
             </button>
           ))}
         </div>

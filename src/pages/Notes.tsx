@@ -186,9 +186,7 @@ const Notes: React.FC = () => {
       <NotesLayout>
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <h1 className="mb-4 text-2xl font-semibold">{t("notes.title")}</h1>
-          <p className="text-muted-foreground mb-6">
-            {t("notes.signInRequired", "ノートを利用するにはサインインが必要です")}
-          </p>
+          <p className="text-muted-foreground mb-6">{t("notes.signInRequired")}</p>
           <Link to="/sign-in">
             <Button>{t("nav.signIn")}</Button>
           </Link>

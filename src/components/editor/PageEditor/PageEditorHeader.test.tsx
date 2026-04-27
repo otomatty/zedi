@@ -19,6 +19,22 @@ vi.mock("@/lib/dateUtils", () => ({
   formatTimeAgo: (ts: number) => `formatted:${ts}`,
 }));
 
+// `useTranslation` をモックして、i18n インスタンス未初期化エラーを避けつつ
+// `editor.savedAt` の実テンプレートを再現する。
+// Stub `useTranslation` so the test does not boot i18next, and reproduce the
+// actual `editor.savedAt` template behaviour.
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (key === "editor.savedAt" && opts?.relative !== undefined) {
+        return `${String(opts.relative)}に保存`;
+      }
+      return key;
+    },
+  }),
+  initReactI18next: { type: "3rdParty", init: () => undefined },
+}));
+
 vi.mock("@/contexts/GlobalSearchContext", () => ({
   useGlobalSearchContextOptional: () => null,
 }));

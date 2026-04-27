@@ -37,6 +37,7 @@ import {
   type SlashSuggestionState,
 } from "../extensions/slashSuggestionPlugin";
 import { TagSuggestionPlugin, type TagSuggestionState } from "../extensions/tagSuggestionPlugin";
+import { HeadingLevelClamp } from "./headingLevelClampExtension";
 import type { Extension } from "@tiptap/core";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
@@ -157,7 +158,9 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
   return [
     StarterKit.configure({
       heading: {
-        levels: [1, 2, 3],
+        // Body headings span h2–h5 (Markdown `#`/`##`/`###`/`####` map to 2/3/4/5).
+        // The page title is the only h1 and lives outside the editor document.
+        levels: [2, 3, 4, 5],
       },
       // Y.js が履歴を管理するためコラボ時は無効
       undoRedo: useCollaboration ? false : undefined,
@@ -168,6 +171,8 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
       // 下で個別に Underline を追加するため StarterKit の underline は無効
       underline: false,
     }),
+    // Legacy h1 + collab: normalize to h2 after each change / 旧 h1 や Y.Doc 取り込みを h2 に揃える
+    HeadingLevelClamp,
     Markdown.configure({
       markedOptions: { gfm: true },
     }),

@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 import type { ReferencedPage } from "../../types/aiChat";
 
 const FILE_TEXT_SVG =
@@ -11,7 +12,13 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ *
+ */
 export function createChipElement(id: string, title: string): HTMLSpanElement {
+  /**
+   *
+   */
   const chip = document.createElement("span");
   chip.contentEditable = "false";
   chip.dataset.pageId = id;
@@ -23,13 +30,25 @@ export function createChipElement(id: string, title: string): HTMLSpanElement {
   return chip;
 }
 
+/**
+ *
+ */
 export function getEditorContentFromEditor(editor: HTMLDivElement | null): {
   text: string;
   refs: ReferencedPage[];
 } {
   if (!editor) return { text: "", refs: [] };
+  /**
+   *
+   */
   let text = "";
+  /**
+   *
+   */
   const refs: ReferencedPage[] = [];
+  /**
+   *
+   */
   const walk = (node: Node) => {
     if (node.nodeType === Node.TEXT_NODE) {
       text += node.textContent || "";
@@ -52,6 +71,9 @@ export function getEditorContentFromEditor(editor: HTMLDivElement | null): {
   return { text, refs };
 }
 
+/**
+ *
+ */
 export function insertChipAtCursorInEditor(
   editor: HTMLDivElement | null,
   id: string,
@@ -59,20 +81,41 @@ export function insertChipAtCursorInEditor(
   onAfter: () => void,
 ): void {
   if (!editor) return;
+  /**
+   *
+   */
   const chip = createChipElement(id, title);
+  /**
+   *
+   */
   const sel = window.getSelection();
+  /**
+   *
+   */
   let inserted = false;
   if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+    /**
+     *
+     */
     const range = sel.getRangeAt(0);
     range.deleteContents();
     range.insertNode(chip);
     inserted = true;
   }
   if (!inserted) editor.appendChild(chip);
+  /**
+   *
+   */
   const spacer = document.createTextNode("\u00A0");
   chip.after(spacer);
+  /**
+   *
+   */
   const cursorSel = window.getSelection();
   if (cursorSel) {
+    /**
+     *
+     */
     const r = document.createRange();
     r.setStartAfter(spacer);
     r.collapse(true);
@@ -83,32 +126,71 @@ export function insertChipAtCursorInEditor(
   editor.focus();
 }
 
+/**
+ *
+ */
 export function replaceMentionWithChip(
   editor: HTMLDivElement | null,
   page: { id: string; title: string },
   onAfter: () => void,
 ): void {
   if (!editor) return;
-  const title = page.title || "無題のページ";
+  /**
+   *
+   */
+  const title = page.title || i18n.t("common.untitledPage");
+  /**
+   *
+   */
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
+  /**
+   *
+   */
   const range = sel.getRangeAt(0);
   if (!editor.contains(range.startContainer)) return;
+  /**
+   *
+   */
   const node = range.startContainer;
   if (node.nodeType !== Node.TEXT_NODE) return;
+  /**
+   *
+   */
   const text = node.textContent || "";
+  /**
+   *
+   */
   const cursorPos = range.startOffset;
+  /**
+   *
+   */
   const beforeCursor = text.slice(0, cursorPos);
+  /**
+   *
+   */
   const lastAt = beforeCursor.lastIndexOf("@");
   if (lastAt < 0) return;
+  /**
+   *
+   */
   const chip = createChipElement(page.id, title);
+  /**
+   *
+   */
   const deleteRange = document.createRange();
   deleteRange.setStart(node, lastAt);
   deleteRange.setEnd(node, cursorPos);
   deleteRange.deleteContents();
   deleteRange.insertNode(chip);
+  /**
+   *
+   */
   const spacer = document.createTextNode("\u00A0");
   chip.after(spacer);
+  /**
+   *
+   */
   const newRange = document.createRange();
   newRange.setStartAfter(spacer);
   newRange.collapse(true);

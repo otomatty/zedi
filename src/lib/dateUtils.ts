@@ -1,23 +1,42 @@
 import { format, isToday, isYesterday, parseISO } from "date-fns";
-import { ja } from "date-fns/locale";
+import { ja, enUS } from "date-fns/locale";
+import type { Locale } from "date-fns/locale";
+import i18n from "@/i18n";
 import type { Page, DateGroup } from "@/types/page";
 
 /**
- * Human-readable Japanese label for a calendar date (e.g. `今日（4月19日・日）` /
- * `4月19日（日）`). Uses "今日" / "昨日" for today and yesterday, otherwise the
- * short month-day-weekday form.
+ * Returns the active date-fns locale matching the current i18n language.
+ * Falls back to en-US for any non-`ja` language so adding new locales later
+ * does not silently render Japanese.
  *
- * カレンダー日を日本語の表示用ラベルに整形する。今日 / 昨日は「今日」「昨日」を
- * 前置し、それ以外は「M月d日（曜）」を返す。
+ * 現在の i18n 言語に対応する date-fns ロケールを返す。
+ * 日本語以外は en-US にフォールバック（将来言語追加時の保守性のため）。
+ */
+export function getActiveLocale(): Locale {
+  const lang = i18n.language?.split("-")[0];
+  if (lang === "ja") return ja;
+  return enUS;
+}
+
+/**
+ * Human-readable label for a calendar date. Today / Yesterday are prefixed;
+ * otherwise a short month-day-weekday form. Both the prefix template and the
+ * underlying date-fns pattern come from the locale file.
+ *
+ * カレンダー日を表示用ラベルに整形する。今日 / 昨日は前置し、それ以外は短縮形式。
+ * 接頭辞テンプレートと date-fns パターンの双方を locale ファイルから取得する。
  */
 export function formatDateLabel(date: Date): string {
+  const locale = getActiveLocale();
   if (isToday(date)) {
-    return `今日（${format(date, "M月d日・E", { locale: ja })}）`;
+    const inner = format(date, i18n.t("common.date.format.labelToday"), { locale });
+    return i18n.t("common.date.today", { date: inner });
   }
   if (isYesterday(date)) {
-    return `昨日（${format(date, "M月d日・E", { locale: ja })}）`;
+    const inner = format(date, i18n.t("common.date.format.labelToday"), { locale });
+    return i18n.t("common.date.yesterday", { date: inner });
   }
-  return format(date, "M月d日（E）", { locale: ja });
+  return format(date, i18n.t("common.date.format.labelOther"), { locale });
 }
 
 /**
@@ -73,19 +92,22 @@ export function groupPagesByDate(pages: Page[]): DateGroup[] {
 }
 
 /**
- * Compact relative-time label in Japanese (e.g. `たった今` / `5分前` / `2時間前` /
- * `3日前`). Falls back to an `M/d` date for anything older than a week.
+ * Compact relative-time label (e.g. "Just now" / "5 min ago" / "2 hr ago" /
+ * "3 days ago"). Falls back to an `M/d` date for anything older than a week.
  *
- * 日本語の相対時刻ラベル（「たった今」「5分前」「2時間前」「3日前」など）。
+ * 相対時刻ラベル（「たった今」「5分前」「2時間前」「3日前」など）。
  * 1 週間を超える場合は `M/d` 形式の日付表記にフォールバックする。
  */
 export function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
 
-  if (seconds < 60) return "たった今";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}分前`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}時間前`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}日前`;
+  if (seconds < 60) return i18n.t("common.date.justNow");
+  if (seconds < 3600) return i18n.t("common.date.minutesAgo", { count: Math.floor(seconds / 60) });
+  if (seconds < 86400) return i18n.t("common.date.hoursAgo", { count: Math.floor(seconds / 3600) });
+  if (seconds < 604800)
+    return i18n.t("common.date.daysAgo", { count: Math.floor(seconds / 86400) });
 
-  return format(new Date(timestamp), "M/d", { locale: ja });
+  return format(new Date(timestamp), i18n.t("common.date.format.shortMonthDay"), {
+    locale: getActiveLocale(),
+  });
 }

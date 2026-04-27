@@ -89,6 +89,7 @@ function NotePageEditorEditable({
   const updatePageMutation = useUpdatePage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTitleRef = useRef<string | null>(null);
   const isSavingTitleRef = useRef(false);
@@ -175,8 +176,8 @@ function NotePageEditorEditable({
       }
       console.error("Failed to save page title:", error);
       toast({
-        title: "タイトルの保存に失敗しました",
-        description: "通信環境を確認し、再度お試しください。",
+        title: t("errors.titleSaveFailedTitle"),
+        description: t("errors.titleSaveFailedDescription"),
         variant: "destructive",
       });
       throw error;
@@ -332,7 +333,7 @@ const NotePageView: React.FC = () => {
         title: t("notes.pageCopiedToPersonal"),
         action: result.localImported ? (
           <Button size="sm" variant="ghost" onClick={() => navigate(`/pages/${result.page_id}`)}>
-            {t("common.open", "開く")}
+            {t("common.open")}
           </Button>
         ) : undefined,
       });
@@ -350,7 +351,7 @@ const NotePageView: React.FC = () => {
   if (isLoading) {
     return (
       <PageLoadingOrDenied>
-        <p className="text-muted-foreground text-sm">読み込み中...</p>
+        <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
       </PageLoadingOrDenied>
     );
   }

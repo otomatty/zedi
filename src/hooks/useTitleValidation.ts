@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import i18n from "@/i18n";
 import { useCheckDuplicateTitle } from "./usePageQueries";
 import type { Page } from "@/types/page";
 
@@ -52,7 +53,7 @@ export function useTitleValidation(options: UseTitleValidationOptions) {
           duplicatePage: null,
           isValidating: false,
           isEmpty: true,
-          errorMessage: isNewPage ? null : "タイトルを入力してください",
+          errorMessage: isNewPage ? null : i18n.t("errors.titleRequired"),
         });
         return;
       }
@@ -80,7 +81,7 @@ export function useTitleValidation(options: UseTitleValidationOptions) {
           isValidating: false,
           isEmpty: false,
           errorMessage: duplicate
-            ? `「${duplicate.title}」というタイトルのページが既に存在します`
+            ? i18n.t("errors.titleDuplicate", { title: duplicate.title })
             : null,
         });
       }, debounceMs);

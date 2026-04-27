@@ -1,6 +1,7 @@
 // AI設定を管理するカスタムフック
 
 import { useState, useEffect, useCallback } from "react";
+import i18n from "@/i18n";
 import { AISettings, getDefaultModel, getDefaultModels, getProviderById } from "@/types/ai";
 import {
   loadAISettings,
@@ -154,7 +155,7 @@ export function useAISettings(): UseAISettingsReturn {
     } catch (error) {
       const errorResult: ConnectionTestResult = {
         success: false,
-        message: "テストの実行に失敗しました",
+        message: i18n.t("errors.testRunFailed"),
         error: error instanceof Error ? error.message : "Unknown error",
       };
       setTestResult(errorResult);

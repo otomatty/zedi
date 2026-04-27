@@ -1,3 +1,5 @@
+import i18n from "@/i18n";
+
 // Supported node types in zedi's Tiptap schema
 const SUPPORTED_NODE_TYPES = new Set([
   "doc",
@@ -245,6 +247,16 @@ function sanitizeNode(
   // Create a copy of the node
   const sanitizedNode: Record<string, unknown> = { ...node };
 
+  // 本文最上位を h2 に揃え、古い Tiptap JSON（level:1 や欠損＝1 相当）を 2 へ
+  if (nodeType === "heading") {
+    const attrs = { ...((node.attrs as Record<string, unknown> | undefined) ?? {}) };
+    const level = typeof attrs.level === "number" ? attrs.level : 1;
+    if (level < 2) {
+      attrs.level = 2;
+      sanitizedNode.attrs = attrs;
+    }
+  }
+
   // Sanitize marks if present
   if (node.marks && Array.isArray(node.marks)) {
     const sanitizedMarks = (node.marks as Array<Record<string, unknown>>).filter((mark) => {
@@ -468,7 +480,7 @@ export function generateAutoTitle(content: string): string {
   const plainText = extractPlainText(content);
   const firstLine = plainText.split("\n")[0]?.trim() || "";
 
-  if (!firstLine) return "無題のページ";
+  if (!firstLine) return i18n.t("common.untitledPage");
 
   // Use first 40 characters of the first line
   if (firstLine.length <= 40) return firstLine;
@@ -483,17 +495,23 @@ export function buildContentErrorMessage(result: SanitizeResult): string {
   const parts: string[] = [];
 
   if (result.removedNodeTypes.length > 0) {
-    parts.push(`未対応のノード: ${result.removedNodeTypes.join(", ")}`);
+    parts.push(
+      i18n.t("errors.contentUnsupportedNode", { types: result.removedNodeTypes.join(", ") }),
+    );
   }
   if (result.removedMarkTypes.length > 0) {
-    parts.push(`未対応のマーク: ${result.removedMarkTypes.join(", ")}`);
+    parts.push(
+      i18n.t("errors.contentUnsupportedMark", { types: result.removedMarkTypes.join(", ") }),
+    );
   }
 
   if (parts.length === 0) {
-    return "コンテンツに問題がありました。";
+    return i18n.t("errors.contentInvalid");
   }
 
-  return `移行データに問題があります。${parts.join("、")}が含まれていたため自動的に修正されました。`;
+  return i18n.t("errors.migrationDataIssue", {
+    fields: parts.join(i18n.t("common.listSeparator")),
+  });
 }
 
 /**
