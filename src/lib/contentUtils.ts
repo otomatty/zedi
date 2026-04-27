@@ -499,7 +499,9 @@ export function buildContentErrorMessage(result: SanitizeResult): string {
     return i18n.t("errors.contentInvalid");
   }
 
-  return i18n.t("errors.migrationDataIssue", { fields: parts.join("、") });
+  return i18n.t("errors.migrationDataIssue", {
+    fields: parts.join(i18n.t("common.listSeparator")),
+  });
 }
 
 /**

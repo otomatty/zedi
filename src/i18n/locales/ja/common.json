@@ -42,20 +42,31 @@
   "newConversation": "新しい会話",
   "search": {
     "resultsHeading": "「{{query}}」の検索結果",
-    "resultsCount": "{{count}}件",
+    "resultsCount_one": "{{count}}件",
+    "resultsCount_other": "{{count}}件",
     "promptHeading": "検索キーワードを入力してください",
     "minChars": "3文字以上入力してください",
     "emptyTitle": "検索結果が見つかりません",
     "emptyDescription": "別のキーワードで検索してみてください",
     "initialHint": "ヘッダーの検索バーからキーワードを入力してください"
   },
+  "listSeparator": "、",
   "date": {
     "today": "今日（{{date}}）",
     "yesterday": "昨日（{{date}}）",
     "justNow": "たった今",
-    "minutesAgo": "{{count}}分前",
-    "hoursAgo": "{{count}}時間前",
-    "daysAgo": "{{count}}日前"
+    "minutesAgo_one": "{{count}}分前",
+    "minutesAgo_other": "{{count}}分前",
+    "hoursAgo_one": "{{count}}時間前",
+    "hoursAgo_other": "{{count}}時間前",
+    "daysAgo_one": "{{count}}日前",
+    "daysAgo_other": "{{count}}日前",
+    "format": {
+      "labelToday": "M月d日・E",
+      "labelOther": "M月d日（E）",
+      "shortMonthDay": "M/d",
+      "fullDateTime": "yyyy年M月d日 HH:mm"
+    }
   },
   "wikiIndex": {
     "pageTitle": "Wiki Index / カテゴリ目次",

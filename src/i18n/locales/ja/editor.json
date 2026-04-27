@@ -1,5 +1,6 @@
 {
   "uploadedImageAlt": "アップロードした画像",
+  "savedAt": "{{relative}}に保存",
   "slashMenuAriaLabel": "スラッシュコマンドメニュー",
   "slashNoResults": "一致する項目がありません",
   "slashAgentRunning": "Claude Code を実行中…",

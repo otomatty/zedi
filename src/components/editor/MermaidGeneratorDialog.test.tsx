@@ -38,6 +38,9 @@ vi.mock("@/hooks/useMermaidGenerator", () => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "ja" } }),
+  // i18n インスタンスを直接 import している lib (例: aiSettings) が
+  // i18n/index.ts を読み込むため、initReactI18next の最低限のモックを返す。
+  initReactI18next: { type: "3rdParty", init: () => undefined },
 }));
 
 vi.mock("mermaid", () => ({

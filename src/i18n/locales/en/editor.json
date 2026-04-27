@@ -1,5 +1,6 @@
 {
   "uploadedImageAlt": "Uploaded image",
+  "savedAt": "Saved {{relative}}",
   "slashMenuAriaLabel": "Slash command menu",
   "slashNoResults": "No matching commands",
   "slashAgentRunning": "Running Claude Code…",

@@ -15,9 +15,11 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { format } from "date-fns";
 import { Button, useToast } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { getActiveLocale } from "@/lib/dateUtils";
 
 /**
  * Read-only response from GET /api/activity/index.
@@ -196,7 +198,11 @@ const IndexPage: React.FC = () => {
                   {data.timestamp ? (
                     <div className="text-muted-foreground mt-1 text-xs">
                       {t("common.wikiIndex.lastBuiltAt", {
-                        date: new Date(data.timestamp).toLocaleString(),
+                        date: format(
+                          new Date(data.timestamp),
+                          t("common.date.format.fullDateTime"),
+                          { locale: getActiveLocale() },
+                        ),
                       })}
                     </div>
                   ) : (

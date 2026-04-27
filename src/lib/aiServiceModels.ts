@@ -72,8 +72,10 @@ async function fetchModelsFromApi(
   } catch (e) {
     const message =
       e instanceof TypeError && e.message.includes("fetch")
-        ? `ネットワークエラー: ${apiBaseUrl} に接続できません。CORS または URL を確認してください。`
-        : `リクエスト失敗: ${e instanceof Error ? e.message : String(e)}`;
+        ? i18n.t("errors.networkUnreachable", { url: apiBaseUrl })
+        : i18n.t("errors.requestFailed", {
+            message: e instanceof Error ? e.message : String(e),
+          });
     const err = new FetchServerModelsError(message, "NETWORK", {
       body: e instanceof Error ? e.message : String(e),
     });
@@ -86,7 +88,9 @@ async function fetchModelsFromApi(
     bodyText = await response.text();
   } catch (e) {
     const err = new FetchServerModelsError(
-      `レスポンスの読み取りに失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      i18n.t("errors.responseReadFailed", {
+        message: e instanceof Error ? e.message : String(e),
+      }),
       "NETWORK",
     );
     console.error("[fetchServerModels]", err.message, e);

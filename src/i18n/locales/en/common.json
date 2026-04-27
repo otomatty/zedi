@@ -42,20 +42,31 @@
   "newConversation": "New conversation",
   "search": {
     "resultsHeading": "Results for \"{{query}}\"",
-    "resultsCount": "{{count}} results",
+    "resultsCount_one": "{{count}} result",
+    "resultsCount_other": "{{count}} results",
     "promptHeading": "Enter a search keyword",
     "minChars": "Please enter at least 3 characters",
     "emptyTitle": "No results found",
     "emptyDescription": "Try a different keyword",
     "initialHint": "Use the search bar in the header to enter a keyword"
   },
+  "listSeparator": ", ",
   "date": {
     "today": "Today ({{date}})",
     "yesterday": "Yesterday ({{date}})",
     "justNow": "Just now",
-    "minutesAgo": "{{count}} min ago",
-    "hoursAgo": "{{count}} hr ago",
-    "daysAgo": "{{count}} day ago"
+    "minutesAgo_one": "{{count}} min ago",
+    "minutesAgo_other": "{{count}} min ago",
+    "hoursAgo_one": "{{count}} hr ago",
+    "hoursAgo_other": "{{count}} hr ago",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago",
+    "format": {
+      "labelToday": "MMM d (EEE)",
+      "labelOther": "MMM d (EEE)",
+      "shortMonthDay": "M/d",
+      "fullDateTime": "MMM d, yyyy HH:mm"
+    }
   },
   "wikiIndex": {
     "pageTitle": "Wiki Index",

@@ -180,7 +180,7 @@ export function buildGlobalSearchResults(
       // Only note-native rows route under /notes; bare linked personal rows
       // (`note_id IS NULL`) keep the personal /pages destination.
       noteId: r.note_id ?? undefined,
-      title: r.title ?? i18n.t("common.untitledPage"),
+      title: r.title?.trim() ? r.title : i18n.t("common.untitledPage"),
       highlightedText: highlightedText || i18n.t("common.sharedNoteContext"),
       matchType: "content" as MatchType,
       sourceUrl: r.source_url ?? undefined,

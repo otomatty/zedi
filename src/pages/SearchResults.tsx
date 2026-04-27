@@ -94,7 +94,7 @@ export default function SearchResults() {
       return {
         pageId: r.id,
         noteId: r.note_id ?? undefined,
-        title: r.title ?? t("common.untitledPage"),
+        title: r.title?.trim() ? r.title : t("common.untitledPage"),
         snippet,
         highlightedSnippet,
         matchType: "content" as MatchType,

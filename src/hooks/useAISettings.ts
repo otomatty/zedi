@@ -155,7 +155,7 @@ export function useAISettings(): UseAISettingsReturn {
     } catch (error) {
       const errorResult: ConnectionTestResult = {
         success: false,
-        message: i18n.t("errors.seedTestRunFailed"),
+        message: i18n.t("errors.testRunFailed"),
         error: error instanceof Error ? error.message : "Unknown error",
       };
       setTestResult(errorResult);

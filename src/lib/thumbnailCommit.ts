@@ -92,7 +92,7 @@ export async function commitThumbnailFromUrl(
   }
 
   if (!response.ok) {
-    let message = `画像の保存に失敗しました: ${response.status}`;
+    let message = i18n.t("errors.imageSaveFailed", { status: response.status });
     try {
       const data = (await response.json()) as { error?: string; message?: string };
       if (data?.message) message = data.message;

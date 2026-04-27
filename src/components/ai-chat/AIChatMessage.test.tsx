@@ -6,6 +6,11 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => (key === "aiChat.messages.loadingSkeleton" ? "Loading response" : key),
   }),
+  // i18n インスタンスを直接 import している lib の初期化が読み込まれるため、
+  // initReactI18next も最低限のモックを返す。
+  // Lib code that imports the `i18n` instance pulls `i18n/index.ts` which
+  // calls `i18n.use(initReactI18next)`, so the mock must export it too.
+  initReactI18next: { type: "3rdParty", init: () => undefined },
 }));
 
 import { AIChatMessage } from "./AIChatMessage";
