@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Input,
@@ -44,6 +45,7 @@ export function AiModelRow({
   onDrop,
   onDragEnd,
 }: AiModelRowProps) {
+  const { t } = useTranslation();
   return (
     <TableRow
       draggable
@@ -73,12 +75,15 @@ export function AiModelRow({
             }
           }}
           className="h-8 min-w-[120px] text-sm"
-          aria-label={`${m.modelId} の表示名`}
+          aria-label={t("aiModels.displayNameAriaLabel", { modelId: m.modelId })}
         />
       </TableCell>
       <TableCell className="px-3 py-2">
         <Select value={m.tierRequired} onValueChange={(v) => onTierChange(v as "free" | "pro")}>
-          <SelectTrigger className="h-8 min-w-[100px]" aria-label={`${m.displayName} のティア`}>
+          <SelectTrigger
+            className="h-8 min-w-[100px]"
+            aria-label={t("aiModels.tierAriaLabel", { name: m.displayName })}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

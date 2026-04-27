@@ -1,0 +1,19 @@
+{
+  "cancel": "キャンセル",
+  "confirm": "確認",
+  "loading": "読み込み中...",
+  "saving": "保存中...",
+  "processing": "処理中...",
+  "previous": "前へ",
+  "next": "次へ",
+  "all": "すべて",
+  "save": "保存",
+  "delete": "削除",
+  "reload": "再読み込み",
+  "running": "実行中...",
+  "page": "{{page}} / {{count}} ページ",
+  "showingRange": "{{rangeStart}}-{{rangeEnd}} 件を表示 / 合計 {{total}} 件",
+  "showingZero": "0 件を表示 / 合計 {{total}} 件",
+  "totalCount": "合計 {{count}} 件",
+  "confirmPhraseDefault": "確認のため「{{phrase}}」を入力してください / Type \"{{phrase}}\" to confirm"
+}

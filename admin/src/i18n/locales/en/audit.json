@@ -1,0 +1,20 @@
+{
+  "title": "Audit Logs",
+  "filters": {
+    "action": "Filter by action",
+    "from": "From",
+    "to": "To"
+  },
+  "columns": {
+    "createdAt": "Timestamp",
+    "actor": "Actor",
+    "action": "Action",
+    "target": "Target",
+    "diff": "Changes",
+    "ipAddress": "IP"
+  },
+  "empty": "No audit logs.",
+  "actions": {
+    "user.role.update": "User: Role change"
+  }
+}

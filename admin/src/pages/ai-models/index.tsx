@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AiModelAdmin, SyncPreviewResult, SyncResultItem } from "@/api/admin";
 import { getAiModels, previewSyncAiModels, syncAiModels as syncAiModelsApi } from "@/api/admin";
 import { AiModelsContent } from "./AiModelsContent";
 import { useAiModelActions } from "./useAiModelActions";
 import { useAiModelsDragReorder } from "./useAiModelsDragReorder";
 
+/**
+ * AI モデル管理ページのコンテナコンポーネント。
+ * Container component for the admin AI models page.
+ */
 export default function AiModels() {
+  const { t } = useTranslation();
   const [models, setModels] = useState<AiModelAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,8 +98,8 @@ export default function AiModels() {
   if (loading && models.length === 0) {
     return (
       <div>
-        <h1 className="text-lg font-semibold">AI モデル管理</h1>
-        <p className="mt-2 text-slate-400">読み込み中...</p>
+        <h1 className="text-lg font-semibold">{t("aiModels.title")}</h1>
+        <p className="mt-2 text-slate-400">{t("common.loading")}</p>
       </div>
     );
   }

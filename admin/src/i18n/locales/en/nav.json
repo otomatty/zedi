@@ -1,0 +1,12 @@
+{
+  "adminPanelTitle": "Zedi Admin",
+  "adminShortTitle": "Admin",
+  "menu": "Menu",
+  "items": {
+    "aiModels": "AI Models",
+    "users": "Users",
+    "auditLogs": "Audit Logs",
+    "wikiHealth": "Wiki Health",
+    "activityLog": "Activity Log"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "Wiki Health ダッシュボード",
+  "runLint": "Lint 実行",
+  "filterRule": "ルールで絞り込み",
+  "emptyAll": "Lint findings はありません。「Lint 実行」をクリックしてください。",
+  "emptyFiltered": "該当する findings はありません。",
+  "columns": {
+    "rule": "ルール",
+    "severity": "重要度",
+    "detail": "詳細",
+    "createdAt": "検出日時",
+    "actions": "操作"
+  },
+  "pagesRelated": "{{count}} ページ関連",
+  "resolve": "解決",
+  "rules": {
+    "orphan": "孤立ページ / Orphan",
+    "ghost_many": "Ghost Link 過多 / Ghost Excess",
+    "title_similar": "タイトル類似 / Title Similar",
+    "conflict": "矛盾 / Conflict",
+    "broken_link": "リンク切れ / Broken Link",
+    "stale": "古い情報 / Stale"
+  },
+  "detail": {
+    "linkText": "「{{linkText}}」({{count}} 件)"
+  }
+}
