@@ -24,6 +24,18 @@ interface UseEditorAutoSaveOptions {
 
 interface UseEditorAutoSaveReturn {
   saveChanges: (title: string, content: string, forceBlockTitle?: boolean) => void;
+  /**
+   * 保留中の debounce 保存とアンマウント時 flush をキャンセルする。
+   * `usePageDeletion` がページ削除を発火する直前に呼ぶことで、
+   * unmount flush の `updatePage` が論理削除を上書きして「無題のページ」が
+   * 復活するレース (issue #768) を防ぐ。
+   *
+   * Cancel any pending debounced save and suppress the unmount flush.
+   * Called by `usePageDeletion` immediately before firing
+   * `deletePageMutation.mutate`, so the unmount flush's `updatePage` cannot
+   * race the soft delete and resurrect the row (issue #768).
+   */
+  cancelPendingSave: () => void;
   lastSaved: number | null;
   isSaving: boolean;
   isSyncingLinks: boolean;
@@ -192,8 +204,17 @@ export function useEditorAutoSave({
     ],
   );
 
+  const cancelPendingSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    pendingRef.current = null;
+  }, []);
+
   return {
     saveChanges,
+    cancelPendingSave,
     lastSaved,
     isSaving,
     isSyncingLinks,

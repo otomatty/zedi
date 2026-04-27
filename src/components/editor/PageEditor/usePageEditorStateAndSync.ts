@@ -33,12 +33,14 @@ function usePageEditorDeletionAndNav(
   content: string,
   sourceUrl: string,
   shouldBlockSave: boolean,
+  cancelPendingSave: () => void,
 ) {
   const deletion = usePageDeletion({
     currentPageId,
     title,
     content,
     shouldBlockSave,
+    cancelPendingSave,
   });
   const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(title, content, sourceUrl);
   usePageEditorKeyboard({ onBack: deletion.handleBack });
@@ -129,6 +131,17 @@ export function usePageEditorStateAndSync() {
     usePageEditorWikiCollab(resetWikiBase, collaboration);
 
   const {
+    saveChanges,
+    cancelPendingSave,
+    lastSaved: autoSaveLastSaved,
+    isSyncingLinks,
+  } = usePageEditorAutoSaveWithMutation({
+    currentPageId,
+    shouldBlockSave,
+    updateLastSaved,
+  });
+
+  const {
     deleteConfirmOpen,
     deleteReason,
     setDeleteConfirmOpen,
@@ -139,17 +152,14 @@ export function usePageEditorStateAndSync() {
     handleOpenDuplicatePage,
     handleExportMarkdown,
     handleCopyMarkdown,
-  } = usePageEditorDeletionAndNav(currentPageId, title, content, sourceUrl, shouldBlockSave);
-
-  const {
-    saveChanges,
-    lastSaved: autoSaveLastSaved,
-    isSyncingLinks,
-  } = usePageEditorAutoSaveWithMutation({
+  } = usePageEditorDeletionAndNav(
     currentPageId,
+    title,
+    content,
+    sourceUrl,
     shouldBlockSave,
-    updateLastSaved,
-  });
+    cancelPendingSave,
+  );
 
   const { displayLastSaved, pendingInitialContent, setPendingInitialContent } =
     useDisplayLastSavedAndPending(autoSaveLastSaved, lastSaved);

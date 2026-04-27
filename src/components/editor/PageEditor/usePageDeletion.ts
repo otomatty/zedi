@@ -9,6 +9,18 @@ interface UsePageDeletionOptions {
   title: string;
   content: string;
   shouldBlockSave: boolean;
+  /**
+   * 削除発火直前に呼ぶ、保留中 autosave のキャンセル関数。
+   * `useEditorAutoSave.cancelPendingSave` を渡す想定。issue #768 のレース
+   * （unmount flush の `updatePage` が論理削除を上書きして「無題のページ」
+   * が復活する）を防ぐために必須。
+   *
+   * Cancel any pending autosave before firing a delete. Pass
+   * `useEditorAutoSave.cancelPendingSave`. Required to prevent the issue
+   * #768 race where the unmount flush's `updatePage` overwrites the soft
+   * delete and resurrects an "untitled page" row.
+   */
+  cancelPendingSave: () => void;
 }
 
 interface UsePageDeletionReturn {
@@ -40,6 +52,7 @@ export function usePageDeletion({
   title,
   content,
   shouldBlockSave,
+  cancelPendingSave,
 }: UsePageDeletionOptions): UsePageDeletionReturn {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -53,6 +66,11 @@ export function usePageDeletion({
 
   const handleDelete = useCallback(() => {
     if (currentPageId) {
+      // issue #768: 削除発火前に保留中の autosave をキャンセルして、
+      // unmount flush の updatePage が論理削除を上書きしないようにする。
+      // issue #768: cancel any pending autosave before firing the delete so
+      // the unmount flush's updatePage cannot overwrite the soft delete.
+      cancelPendingSave();
       deletePageMutation.mutate(currentPageId, {
         onSuccess: () => {
           toast({
@@ -68,7 +86,7 @@ export function usePageDeletion({
         },
       });
     }
-  }, [currentPageId, deletePageMutation, navigate, toast]);
+  }, [currentPageId, deletePageMutation, navigate, toast, cancelPendingSave]);
 
   const handleBack = useCallback(() => {
     const hasContent = isContentNotEmpty(content);
@@ -94,6 +112,9 @@ export function usePageDeletion({
         return;
       }
 
+      // issue #768: 削除発火前に保留中の autosave をキャンセル。
+      // issue #768: cancel any pending autosave before firing the delete.
+      cancelPendingSave();
       // コンテンツがない場合はそのまま削除
       deletePageMutation.mutate(currentPageId);
       if (shouldDeleteForDuplicate) {
@@ -107,10 +128,22 @@ export function usePageDeletion({
       }
     }
     navigate("/home");
-  }, [navigate, currentPageId, title, content, deletePageMutation, shouldBlockSave, toast]);
+  }, [
+    navigate,
+    currentPageId,
+    title,
+    content,
+    deletePageMutation,
+    shouldBlockSave,
+    toast,
+    cancelPendingSave,
+  ]);
 
   const handleConfirmDelete = useCallback(() => {
     if (currentPageId) {
+      // issue #768: 削除発火前に保留中の autosave をキャンセル。
+      // issue #768: cancel any pending autosave before firing the delete.
+      cancelPendingSave();
       deletePageMutation.mutate(currentPageId);
       toast({
         title: `${deleteReason}を削除しました`,
@@ -120,7 +153,15 @@ export function usePageDeletion({
     navigate(pendingNavTarget);
     // 次回に備えてデフォルトに戻す / reset to default for next invocation
     setPendingNavTarget("/home");
-  }, [currentPageId, deletePageMutation, deleteReason, navigate, pendingNavTarget, toast]);
+  }, [
+    currentPageId,
+    deletePageMutation,
+    deleteReason,
+    navigate,
+    pendingNavTarget,
+    toast,
+    cancelPendingSave,
+  ]);
 
   const handleCancelDelete = useCallback(() => {
     setDeleteConfirmOpen(false);
@@ -149,6 +190,9 @@ export function usePageDeletion({
         return;
       }
 
+      // issue #768: 削除発火前に保留中の autosave をキャンセル。
+      // issue #768: cancel any pending autosave before firing the delete.
+      cancelPendingSave();
       // コンテンツがない場合はそのまま削除して遷移
       // Otherwise delete immediately and navigate to the existing page.
       deletePageMutation.mutate(currentPageId);
@@ -157,7 +201,7 @@ export function usePageDeletion({
       });
       navigate(targetPath);
     },
-    [currentPageId, content, deletePageMutation, navigate, toast],
+    [currentPageId, content, deletePageMutation, navigate, toast, cancelPendingSave],
   );
 
   return {

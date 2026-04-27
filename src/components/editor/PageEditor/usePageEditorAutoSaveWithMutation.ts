@@ -31,6 +31,7 @@ export function usePageEditorAutoSaveWithMutation({
 
   const {
     saveChanges,
+    cancelPendingSave,
     lastSaved: autoSaveLastSaved,
     isSyncingLinks,
   } = useEditorAutoSave({
@@ -67,5 +68,5 @@ export function usePageEditorAutoSaveWithMutation({
     },
   });
 
-  return { saveChanges, lastSaved: autoSaveLastSaved, isSyncingLinks };
+  return { saveChanges, cancelPendingSave, lastSaved: autoSaveLastSaved, isSyncingLinks };
 }

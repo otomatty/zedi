@@ -10,10 +10,11 @@ import { usePageDeletion } from "./usePageDeletion";
  * (`handleOpenDuplicatePage`) used by the duplicate-title warning.
  */
 
-const { mockNavigate, mockMutate, mockToast } = vi.hoisted(() => ({
+const { mockNavigate, mockMutate, mockToast, mockCancelPendingSave } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   mockMutate: vi.fn(),
   mockToast: vi.fn(),
+  mockCancelPendingSave: vi.fn(),
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -52,6 +53,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
         title: "foo",
         content: NON_EMPTY_CONTENT,
         shouldBlockSave: true,
+        cancelPendingSave: mockCancelPendingSave,
       }),
     );
 
@@ -69,6 +71,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
         title: "foo",
         content: EMPTY_CONTENT,
         shouldBlockSave: true,
+        cancelPendingSave: mockCancelPendingSave,
       }),
     );
 
@@ -89,6 +92,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
         title: "foo",
         content: NON_EMPTY_CONTENT,
         shouldBlockSave: true,
+        cancelPendingSave: mockCancelPendingSave,
       }),
     );
 
@@ -107,6 +111,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
         title: "foo",
         content: NON_EMPTY_CONTENT,
         shouldBlockSave: true,
+        cancelPendingSave: mockCancelPendingSave,
       }),
     );
 
@@ -128,6 +133,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
         title: "foo",
         content: NON_EMPTY_CONTENT,
         shouldBlockSave: true,
+        cancelPendingSave: mockCancelPendingSave,
       }),
     );
 
@@ -146,6 +152,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
         title: "foo",
         content: NON_EMPTY_CONTENT,
         shouldBlockSave: true,
+        cancelPendingSave: mockCancelPendingSave,
       }),
     );
 
@@ -157,5 +164,141 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
 
     // 最終 navigate は /home であるべき
     expect(mockNavigate).toHaveBeenLastCalledWith("/home");
+  });
+});
+
+/**
+ * Issue #768: 削除前に保留中の autosave をキャンセルすることで、
+ * unmount flush の `updatePage` が論理削除を上書きして「無題のページ」が
+ * 復活するレースを防ぐ。各削除パスで `cancelPendingSave` が
+ * `deletePageMutation.mutate` よりも先に呼ばれることを順序検証する。
+ *
+ * Issue #768: cancelling the pending autosave before deletion prevents the
+ * unmount flush's `updatePage` from racing the soft delete and resurrecting
+ * an "untitled page" row. These tests assert that for each deletion path
+ * `cancelPendingSave` runs *before* `deletePageMutation.mutate`.
+ */
+describe("usePageDeletion - cancelPendingSave 順序 (issue #768)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("handleOpenDuplicatePage (空コンテンツ) は mutate より先に cancelPendingSave を呼ぶ", () => {
+    const callOrder: string[] = [];
+    mockCancelPendingSave.mockImplementation(() => {
+      callOrder.push("cancel");
+    });
+    mockMutate.mockImplementation(() => {
+      callOrder.push("mutate");
+    });
+
+    const { result } = renderHook(() =>
+      usePageDeletion({
+        currentPageId: "dup-id",
+        title: "foo",
+        content: EMPTY_CONTENT,
+        shouldBlockSave: true,
+        cancelPendingSave: mockCancelPendingSave,
+      }),
+    );
+
+    act(() => result.current.handleOpenDuplicatePage("target-id"));
+
+    expect(callOrder).toEqual(["cancel", "mutate"]);
+  });
+
+  it("handleBack (タイトル空・コンテンツ無し) は mutate より先に cancelPendingSave を呼ぶ", () => {
+    const callOrder: string[] = [];
+    mockCancelPendingSave.mockImplementation(() => {
+      callOrder.push("cancel");
+    });
+    mockMutate.mockImplementation(() => {
+      callOrder.push("mutate");
+    });
+
+    const { result } = renderHook(() =>
+      usePageDeletion({
+        currentPageId: "page-1",
+        title: "",
+        content: EMPTY_CONTENT,
+        shouldBlockSave: false,
+        cancelPendingSave: mockCancelPendingSave,
+      }),
+    );
+
+    act(() => result.current.handleBack());
+
+    expect(callOrder).toEqual(["cancel", "mutate"]);
+    expect(mockToast).toHaveBeenCalledWith({
+      title: "タイトルが未入力のため、ページを削除しました",
+    });
+  });
+
+  it("handleConfirmDelete は mutate より先に cancelPendingSave を呼ぶ", () => {
+    const callOrder: string[] = [];
+    mockCancelPendingSave.mockImplementation(() => {
+      callOrder.push("cancel");
+    });
+    mockMutate.mockImplementation(() => {
+      callOrder.push("mutate");
+    });
+
+    const { result } = renderHook(() =>
+      usePageDeletion({
+        currentPageId: "page-1",
+        title: "",
+        content: NON_EMPTY_CONTENT,
+        shouldBlockSave: false,
+        cancelPendingSave: mockCancelPendingSave,
+      }),
+    );
+
+    // 確認ダイアログを開いてから confirm
+    act(() => result.current.handleBack());
+    act(() => result.current.handleConfirmDelete());
+
+    expect(callOrder).toEqual(["cancel", "mutate"]);
+  });
+
+  it("handleDelete (明示削除) も mutate より先に cancelPendingSave を呼ぶ", () => {
+    const callOrder: string[] = [];
+    mockCancelPendingSave.mockImplementation(() => {
+      callOrder.push("cancel");
+    });
+    mockMutate.mockImplementation(() => {
+      callOrder.push("mutate");
+    });
+
+    const { result } = renderHook(() =>
+      usePageDeletion({
+        currentPageId: "page-1",
+        title: "foo",
+        content: NON_EMPTY_CONTENT,
+        shouldBlockSave: false,
+        cancelPendingSave: mockCancelPendingSave,
+      }),
+    );
+
+    act(() => result.current.handleDelete());
+
+    expect(callOrder).toEqual(["cancel", "mutate"]);
+  });
+
+  it("削除に至らないキャンセルパス (handleCancelDelete) では cancelPendingSave を呼ばない", () => {
+    const { result } = renderHook(() =>
+      usePageDeletion({
+        currentPageId: "page-1",
+        title: "",
+        content: NON_EMPTY_CONTENT,
+        shouldBlockSave: false,
+        cancelPendingSave: mockCancelPendingSave,
+      }),
+    );
+
+    act(() => result.current.handleBack()); // opens dialog only
+    act(() => result.current.handleCancelDelete());
+
+    expect(mockCancelPendingSave).not.toHaveBeenCalled();
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 });

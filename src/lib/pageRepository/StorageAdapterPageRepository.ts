@@ -254,6 +254,16 @@ export class StorageAdapterPageRepository {
   ): Promise<void> {
     const existing = await this.adapter.getPage(pageId);
     if (!existing) return;
+    // issue #768 safety net: 論理削除済みページに対する update は no-op。
+    // 現在の `adapter.getPage` は `isDeleted: true` を null として返すので
+    // 上の早期 return で実質カバーされているが、将来 `getPage` が tombstone も
+    // 返す仕様に変わったときに削除済み行を復活させないための明示ガード。
+    //
+    // issue #768 safety net: skip updates targeting a soft-deleted page.
+    // Today `adapter.getPage` already filters out `isDeleted: true` rows so
+    // the early return above covers it, but this explicit guard keeps the
+    // contract intact if `getPage` ever starts surfacing tombstones.
+    if (existing.isDeleted) return;
     const now = Date.now();
     const meta: PageMetadata = {
       ...existing,

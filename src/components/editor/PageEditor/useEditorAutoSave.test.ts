@@ -336,6 +336,94 @@ describe("useEditorAutoSave", () => {
     });
   });
 
+  describe("cancelPendingSave (issue #768)", () => {
+    it("デバウンス中に cancelPendingSave を呼ぶと onSave / syncWikiLinks がもう走らない / pending debounce is cleared so onSave never fires", async () => {
+      const syncWikiLinks = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue(true);
+      const onSaveContentOnly = vi.fn().mockResolvedValue(true);
+
+      const { result } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 500,
+          onSave,
+          onSaveContentOnly,
+          syncWikiLinks,
+        }),
+      );
+
+      act(() => {
+        result.current.saveChanges("My Title", "{}");
+      });
+
+      act(() => {
+        result.current.cancelPendingSave();
+      });
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      expect(onSave).not.toHaveBeenCalled();
+      expect(onSaveContentOnly).not.toHaveBeenCalled();
+      expect(syncWikiLinks).not.toHaveBeenCalled();
+    });
+
+    it("cancelPendingSave 後にアンマウントしても unmount flush で onSave / syncWikiLinks が呼ばれない / unmount flush is suppressed after cancelPendingSave", async () => {
+      const syncWikiLinks = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue(true);
+      const onSaveContentOnly = vi.fn().mockResolvedValue(true);
+
+      const { result, unmount } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 500,
+          onSave,
+          onSaveContentOnly,
+          syncWikiLinks,
+        }),
+      );
+
+      act(() => {
+        result.current.saveChanges("My Title", "{}");
+      });
+
+      act(() => {
+        result.current.cancelPendingSave();
+      });
+
+      unmount();
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      expect(onSave).not.toHaveBeenCalled();
+      expect(onSaveContentOnly).not.toHaveBeenCalled();
+      expect(syncWikiLinks).not.toHaveBeenCalled();
+    });
+
+    it("保留中の保存が無いときに cancelPendingSave を呼んでも安全（no-op） / cancelPendingSave is safe to call when nothing is pending", () => {
+      const onSave = vi.fn().mockResolvedValue(true);
+      const { result } = renderHook(() =>
+        useEditorAutoSave({
+          pageId,
+          debounceMs: 500,
+          onSave,
+          onSaveContentOnly: vi.fn().mockResolvedValue(true),
+          syncWikiLinks: vi.fn().mockResolvedValue(undefined),
+        }),
+      );
+
+      expect(() => {
+        act(() => {
+          result.current.cancelPendingSave();
+        });
+      }).not.toThrow();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  });
+
   describe("保存成功時の linkedPages 無効化（3.5）", () => {
     it("onSaveSuccess で queryClient.invalidateQueries が linkedPages の queryKey で1回呼ばれる", async () => {
       const queryClient = new QueryClient();
