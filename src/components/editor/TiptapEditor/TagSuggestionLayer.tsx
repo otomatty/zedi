@@ -43,7 +43,15 @@ export const TagSuggestionLayer: React.FC<TagSuggestionLayerProps> = ({
   onClose,
   pageNoteId,
 }) => {
-  const { candidates } = useTagCandidates(pageNoteId);
+  // ポップオーバーが open のときだけ候補（特にゴーストタグの fetch）を実行する。
+  // `useTagCandidates` は `enabled` でクエリを抑止するので、`#` が打鍵されるまで
+  // IndexedDB / API を叩かない（gemini-code-assist のレビュー指摘）。
+  // Only fetch candidates while the popover is active so the ghost-tag query
+  // does not hit IndexedDB / the network until the user types `#`. The hook
+  // now accepts an `enabled` flag to gate its react-query call (review
+  // feedback from gemini-code-assist).
+  const isActive = Boolean(suggestionState?.active);
+  const { candidates } = useTagCandidates(pageNoteId, { enabled: isActive });
 
   if (!suggestionState?.active || !suggestionState.range || !position || !editor) return null;
 
@@ -57,7 +65,6 @@ export const TagSuggestionLayer: React.FC<TagSuggestionLayerProps> = ({
     >
       <TagSuggestion
         ref={suggestionRef}
-        editor={editor}
         query={suggestionState.query}
         range={suggestionState.range}
         onSelect={onSelect}

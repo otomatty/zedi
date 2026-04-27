@@ -1,5 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
-import { Editor } from "@tiptap/core";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { cn } from "@zedi/ui";
 import { Hash, Plus } from "lucide-react";
 import type { TagSuggestionCandidate } from "@/hooks/useTagCandidates";
@@ -25,8 +24,15 @@ export interface TagSuggestionItem {
 }
 
 interface TagSuggestionProps {
-  editor: Editor;
   query: string;
+  /**
+   * `#name` 全体のドキュメント内範囲。確定時の置換に使うが、本コンポーネントは
+   * 表示のみ担当するためここでは保持しない（呼び出し側が `onSelect` で利用）。
+   *
+   * Document range covering `#name`. Consumed by the caller via `onSelect`;
+   * this component doesn't read it directly but keeps the prop so the parent
+   * layer matches `WikiLinkSuggestion`'s shape (issue #767 review feedback).
+   */
   range: { from: number; to: number };
   onSelect: (item: TagSuggestionItem) => void;
   onClose: () => void;
@@ -67,16 +73,32 @@ export const TagSuggestion = forwardRef<TagSuggestionHandle, TagSuggestionProps>
   ({ query, candidates, onSelect, onClose }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
 
-    const items = ((): TagSuggestionItem[] => {
+    const items = useMemo<TagSuggestionItem[]>(() => {
       const normalized = query.trim().toLowerCase();
-      const matching = candidates
-        .filter((c) => (normalized ? c.name.toLowerCase().includes(normalized) : true))
-        .slice(0, MAX_VISIBLE)
-        .map<TagSuggestionItem>((c) => ({
-          name: c.name,
-          exists: c.exists,
-          targetId: c.targetId,
-        }));
+      // `MAX_VISIBLE` のスライス前に「完全一致を先頭」へ並べ替えるのが要点。
+      // これをやらないと、6 件目以降に完全一致がいた場合に表示から漏れたうえで
+      // `exactMatch` が truthy になり「新規作成」項目も追加されないため、ユーザが
+      // 完全一致候補を選択できなくなる（gemini-code-assist のレビュー指摘）。
+      // Sort exact-match candidates to the front BEFORE slicing to MAX_VISIBLE.
+      // Without this, a candidate matching the query exactly but sitting outside
+      // the first 5 includes-matches gets dropped from the visible list while
+      // `exactMatch` is still truthy, so the "create new" fallback also doesn't
+      // fire — leaving the user unable to select the exact tag (gemini review).
+      const filtered = normalized
+        ? candidates.filter((c) => c.name.toLowerCase().includes(normalized))
+        : candidates;
+      const sorted = [...filtered].sort((a, b) => {
+        const aExact = a.name.toLowerCase() === normalized;
+        const bExact = b.name.toLowerCase() === normalized;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return 0;
+      });
+      const matching = sorted.slice(0, MAX_VISIBLE).map<TagSuggestionItem>((c) => ({
+        name: c.name,
+        exists: c.exists,
+        targetId: c.targetId,
+      }));
 
       const exactMatch = candidates.find((c) => c.name.toLowerCase() === normalized);
       const result = [...matching];
@@ -84,7 +106,7 @@ export const TagSuggestion = forwardRef<TagSuggestionHandle, TagSuggestionProps>
         result.push({ name: query.trim(), exists: false, targetId: null });
       }
       return result;
-    })();
+    }, [query, candidates]);
 
     // クエリ変更ごとに選択位置をリセット。再描画後に走るよう microtask で
     // 倒すのは `WikiLinkSuggestion` と同じ手法（ちらつき防止）。
