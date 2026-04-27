@@ -122,7 +122,11 @@ function NotePageEditorEditable({
     insertAtCursorRef.current = (markdown: string) => {
       if (!editorInsertRef.current) return false;
       try {
-        const docJson = convertMarkdownToTiptapContent(markdown);
+        // この経路は AI チャットアシスタントの Markdown を挿入する用途。
+        // 先頭の `# Title` 行はページタイトル input と重複するため落とす（issue #784）。
+        // This path inserts AI chat assistant Markdown. Drop a leading `# Title` line so it
+        // does not duplicate the page-title input as a literal paragraph (issue #784).
+        const docJson = convertMarkdownToTiptapContent(markdown, { dropLeadingH1: true });
         const doc = JSON.parse(docJson) as { content: unknown[] };
         return editorInsertRef.current(doc.content);
       } catch {

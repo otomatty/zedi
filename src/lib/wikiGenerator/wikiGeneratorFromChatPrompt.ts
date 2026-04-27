@@ -59,6 +59,12 @@ ${schemaSection}
 ## 執筆ルール
 - 出力は**Markdownのみ**（前置きや「以下に」などのメタ文は不要）。
 - 導入部でトピックを定義し、見出し（## / ###）でアウトラインの各点を展開する。
+- **本文先頭に \`# {ページタイトル}\` の見出しを出力しないこと**。タイトルは上の
+  \`<page_title>\` で管理されており、本文側で再出力すると literal paragraph として
+  残ってしまう。最初の見出しは必ず \`##\` から始めること。
+- Do **NOT** emit a leading \`# {Title}\` heading at the start of the body. The title is
+  owned by the \`<page_title>\` block above; echoing it as a body heading would surface as a
+  literal paragraph. The first heading must always be \`##\`.
 - 必要に応じて Zedi の [[WikiLink]] 記法で関連語をリンクする。
 - ユーザーの言語で書く（会話の言語に合わせる）。
 

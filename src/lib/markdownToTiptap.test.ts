@@ -64,4 +64,160 @@ describe("convertMarkdownToTiptapContent", () => {
     expect(withWikiMark).toBeDefined();
     expect(withWikiMark?.text).toBe("[[PageName]]");
   });
+
+  // issue #784: AI 出力経路の defensive ガード。
+  // issue #784: defensive guard for AI output paths.
+  describe("dropLeadingH1 option", () => {
+    /**
+     * AI が `# Title` 行から本文を始めた典型ケース。`dropLeadingH1: true` を
+     * 渡すと最初の H1 行が除去され、続く `## Section` が h2 として変換される。
+     */
+    it("strips a leading `# Title` line when dropLeadingH1 is true", () => {
+      const result = convertMarkdownToTiptapContent("# Title\n## Section\nbody", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; attrs?: { level: number }; content?: unknown[] }>;
+      };
+      // 先頭の `# Title` 行は paragraph として残らない。
+      // The leading `# Title` line is no longer present as a paragraph.
+      const literalH1Paragraph = parsed.content.find((n) => {
+        if (n.type !== "paragraph") return false;
+        const inline = n.content as Array<{ text?: string }> | undefined;
+        return inline?.some((node) => node.text === "# Title");
+      });
+      expect(literalH1Paragraph).toBeUndefined();
+      // `## Section` は heading level 2 のまま。
+      // `## Section` still maps to a level-2 heading.
+      expect(parsed.content[0]).toMatchObject({ type: "heading", attrs: { level: 2 } });
+    });
+
+    /**
+     * 既定（option 省略）では PR #777 の方針通り `# Title` は literal paragraph として残る。
+     * Default (no option) keeps `# X` as a literal paragraph per PR #777.
+     */
+    it("keeps `# Title` as a literal paragraph when dropLeadingH1 is not set", () => {
+      const result = convertMarkdownToTiptapContent("# Title\n## Section");
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; content?: Array<{ text?: string }> }>;
+      };
+      expect(parsed.content[0]).toMatchObject({ type: "paragraph" });
+      expect(parsed.content[0].content?.[0]?.text).toBe("# Title");
+    });
+
+    /**
+     * 先頭にある H1 行のみ落とす。本文中の `# X` は触らない。
+     * Only the leading H1 is dropped; mid-document `# X` stays.
+     */
+    it("does not drop a `# X` line that is not at the start", () => {
+      const result = convertMarkdownToTiptapContent("Intro\n# Title", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; content?: Array<{ text?: string }> }>;
+      };
+      // 2 つの paragraph が残る (Intro と `# Title`)。
+      expect(parsed.content).toHaveLength(2);
+      expect(parsed.content[0].content?.[0]?.text).toBe("Intro");
+      expect(parsed.content[1].content?.[0]?.text).toBe("# Title");
+    });
+
+    /**
+     * `## Section` は H1 ではないので `dropLeadingH1: true` でも触らない。
+     * `## Section` is not a single-`#` heading, so even with dropLeadingH1 it is preserved.
+     */
+    it("does not strip a leading `## Section` line", () => {
+      const result = convertMarkdownToTiptapContent("## Section\nbody", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; attrs?: { level: number } }>;
+      };
+      expect(parsed.content[0]).toMatchObject({ type: "heading", attrs: { level: 2 } });
+    });
+
+    /**
+     * AI ストリームでは先頭に空行が混じることがある。先行空白行越しの H1 も落とす。
+     * AI streams sometimes prepend whitespace; the H1 should still be stripped through it.
+     */
+    it("strips a leading H1 even after leading blank lines", () => {
+      const result = convertMarkdownToTiptapContent("\n\n# Title\n## Section", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; attrs?: { level: number } }>;
+      };
+      // 先頭の `# Title` literal paragraph は出現しない。
+      const hasLiteralH1 = parsed.content.some((n) => {
+        if (n.type !== "paragraph") return false;
+        const inline = (n as { content?: Array<{ text?: string }> }).content;
+        return inline?.some((node) => node.text === "# Title");
+      });
+      expect(hasLiteralH1).toBe(false);
+      const headings = parsed.content.filter((n) => n.type === "heading");
+      expect(headings[0]).toMatchObject({ attrs: { level: 2 } });
+    });
+
+    /**
+     * インデントされた `# X` 行は H1 ではない。`"   # comment"` のような行を
+     * 誤って消してしまわないこと（codex review on PR #791）。
+     * An indented `# X` line is not a real H1; e.g. `"   # comment"` must NOT be stripped.
+     * Regression for codex review on PR #791.
+     */
+    it("does not strip an indented `# X` line (codex review on PR #791)", () => {
+      const result = convertMarkdownToTiptapContent("    # comment\nnext", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; content?: Array<{ text?: string }> }>;
+      };
+      // 1 行目は paragraph として残り、テキストは `    # comment` のまま。
+      // The first line stays as a paragraph with text `    # comment`.
+      expect(parsed.content[0]).toMatchObject({ type: "paragraph" });
+      expect(parsed.content[0].content?.[0]?.text).toBe("    # comment");
+      expect(parsed.content[1].content?.[0]?.text).toBe("next");
+    });
+
+    /**
+     * 先行行が空白のみの「空行」であれば prelude として許容するが、
+     * 行末まで空白で構成された行のみが対象。
+     * Whitespace-only blank lines before the H1 are still allowed as prelude.
+     */
+    it("strips a leading H1 after a tab/space-only blank line", () => {
+      const result = convertMarkdownToTiptapContent("   \n# Title\n## Section", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{
+          type: string;
+          attrs?: { level: number };
+          content?: Array<{ text?: string }>;
+        }>;
+      };
+      const literalH1 = parsed.content.find(
+        (n) => n.type === "paragraph" && n.content?.some((c) => c.text === "# Title"),
+      );
+      expect(literalH1).toBeUndefined();
+      const headings = parsed.content.filter((n) => n.type === "heading");
+      expect(headings[0]).toMatchObject({ attrs: { level: 2 } });
+    });
+
+    /**
+     * 2 つ目以降の `# X` は除去対象ではない。1 行のみ落とす。
+     * Only the first H1 is removed; subsequent `# X` remains as a paragraph.
+     */
+    it("strips only the first leading H1 line, not the second", () => {
+      const result = convertMarkdownToTiptapContent("# Title\n# Another\nbody", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(result) as {
+        content: Array<{ type: string; content?: Array<{ text?: string }> }>;
+      };
+      const literals = parsed.content
+        .filter((n) => n.type === "paragraph")
+        .map((n) => n.content?.[0]?.text);
+      expect(literals).toContain("# Another");
+      expect(literals).not.toContain("# Title");
+    });
+  });
 });

@@ -176,6 +176,85 @@ describe("appendMarkdownToTiptapContent", () => {
     const parsed = JSON.parse(appended) as { content: Array<Record<string, unknown>> };
     expect(parsed.content.length).toBeGreaterThan(0);
   });
+
+  // issue #784: AI が `# Title` を含む Markdown を返したケース。
+  // issue #784: AI returns Markdown with a stray leading `# Title`.
+  describe("with dropLeadingH1 option (AI append path, issue #784)", () => {
+    /**
+     * `dropLeadingH1: true` を渡すと、AI 出力の `# Title` 行が本文に literal
+     * paragraph として残らない。
+     * With `dropLeadingH1: true`, a leading `# Title` line from AI output does not survive
+     * in the appended body as a literal paragraph.
+     */
+    it("does not leave `# Title` as a literal paragraph when AI append path is used", () => {
+      const existingContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Existing" }],
+          },
+        ],
+      });
+
+      const appended = appendMarkdownToTiptapContent(existingContent, "# Title\n## Section\n本文", {
+        dropLeadingH1: true,
+      });
+      const parsed = JSON.parse(appended) as {
+        content: Array<{
+          type: string;
+          attrs?: { level: number };
+          content?: Array<{ text?: string }>;
+        }>;
+      };
+
+      const literalH1 = parsed.content.find((n) => {
+        if (n.type !== "paragraph") return false;
+        return n.content?.some((node) => node.text === "# Title");
+      });
+      expect(literalH1).toBeUndefined();
+
+      // `## Section` は h2 として残り、本文の paragraph も保持される。
+      // `## Section` is preserved as h2 and the body paragraph survives.
+      expect(parsed.content[0]).toMatchObject({
+        type: "paragraph",
+        content: [{ type: "text", text: "Existing" }],
+      });
+      expect(parsed.content.some((n) => n.type === "heading" && n.attrs?.level === 2)).toBe(true);
+      expect(
+        parsed.content.some(
+          (n) => n.type === "paragraph" && n.content?.some((node) => node.text === "本文"),
+        ),
+      ).toBe(true);
+    });
+
+    /**
+     * 既定では従来通り `# Title` が literal paragraph として残る（人手入力用）。
+     * Default behavior preserves `# Title` as a literal paragraph (human-input path).
+     */
+    it("default (no option) preserves `# Title` as literal paragraph", () => {
+      const existingContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Existing" }],
+          },
+        ],
+      });
+
+      const appended = appendMarkdownToTiptapContent(existingContent, "# Title\n## Section");
+      const parsed = JSON.parse(appended) as {
+        content: Array<{ type: string; content?: Array<{ text?: string }> }>;
+      };
+
+      const literalH1 = parsed.content.find((n) => {
+        if (n.type !== "paragraph") return false;
+        return n.content?.some((node) => node.text === "# Title");
+      });
+      expect(literalH1).toBeDefined();
+    });
+  });
 });
 
 describe("appendTiptapContent", () => {

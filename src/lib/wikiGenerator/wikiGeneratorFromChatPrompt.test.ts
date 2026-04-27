@@ -59,4 +59,13 @@ describe("buildChatPageWikiUserPrompt", () => {
     expect(rulesIdx).toBeGreaterThan(-1);
     expect(schemaIdx).toBeLessThan(rulesIdx);
   });
+
+  // issue #784: モデルが本文先頭に `# {ページタイトル}` を出さないように、
+  // 「執筆ルール」で明示的に禁止していることを保証する。
+  // issue #784: assert that the rule explicitly forbids a leading `# {Title}` body heading.
+  it("explicitly forbids a leading `# {ページタイトル}` body heading (issue #784)", () => {
+    const p = buildChatPageWikiUserPrompt("Topic", "- a", "User: hi");
+    expect(p).toContain("# {ページタイトル}");
+    expect(p).toContain("出力しないこと");
+  });
 });

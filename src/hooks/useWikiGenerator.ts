@@ -41,7 +41,11 @@ export function useWikiGenerator(): UseWikiGeneratorReturn {
     }
 
     const timer = setTimeout(() => {
-      const tiptapContent = convertMarkdownToTiptapContent(streamedContent);
+      // AI 出力では先頭の `# Title` を落とす（タイトルは別 input が担う、issue #784）。
+      // Strip a stray leading `# Title` from AI output (the title lives in its own input, issue #784).
+      const tiptapContent = convertMarkdownToTiptapContent(streamedContent, {
+        dropLeadingH1: true,
+      });
       setThrottledTiptapContent(tiptapContent);
     }, THROTTLE_INTERVAL_MS);
 
@@ -109,11 +113,13 @@ export function useWikiGenerator(): UseWikiGeneratorReturn {
   }, []);
 
   const getTiptapContent = useCallback((): string | null => {
+    // AI 出力経路なので先頭の `# Title` を落とす（issue #784）。
+    // AI path: strip a leading `# Title` from generated Markdown (issue #784).
     if (result) {
-      return convertMarkdownToTiptapContent(result.content);
+      return convertMarkdownToTiptapContent(result.content, { dropLeadingH1: true });
     }
     if (streamedContent) {
-      return convertMarkdownToTiptapContent(streamedContent);
+      return convertMarkdownToTiptapContent(streamedContent, { dropLeadingH1: true });
     }
     return null;
   }, [result, streamedContent]);

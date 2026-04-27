@@ -174,7 +174,13 @@ describe("useAIChatActions", () => {
       });
     });
 
-    const expectedContent = appendMarkdownToTiptapContent("", "Append body");
+    // `dropLeadingH1: true` is passed in the production code (issue #784); content with no
+    // leading `# X` is unaffected, so the expected document matches both sides.
+    // 本番コードでは `dropLeadingH1: true` を渡している（issue #784）。先頭に `# X` が
+    // 無い入力なら有り無しで結果は同じ。
+    const expectedContent = appendMarkdownToTiptapContent("", "Append body", {
+      dropLeadingH1: true,
+    });
     expect(mockUpdatePageMutateAsync).toHaveBeenCalledWith({
       pageId: "page-1",
       updates: { content: expectedContent },
@@ -184,6 +190,50 @@ describe("useAIChatActions", () => {
     expect(mockToast).toHaveBeenCalledWith({
       title: "aiChat.notifications.appendSuccess",
     });
+  });
+
+  // issue #784: AI が `# Title\n## Section\n本文` のように先頭 H1 を出した場合でも、
+  // 本文に `# Title` が literal paragraph として残らない（`dropLeadingH1: true` が
+  // 経路に確実に伝わっていることの回帰テスト）。
+  // issue #784: when the AI emits a leading `# Title`, it must NOT survive in the body as a
+  // literal paragraph. This is a regression test that the AI append path threads
+  // `dropLeadingH1: true` through to the converter.
+  it("append-to-page strips a leading `# Title` line from AI markdown (issue #784)", async () => {
+    const pageContext = {
+      type: "editor" as const,
+      pageId: "page-1",
+      pageTitle: "Current Page",
+      pageFullContent: "",
+    };
+    const { result } = renderHook(() => useAIChatActions({ pageContext }), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.handleExecuteAction({
+        type: "append-to-page",
+        pageTitle: "Current Page",
+        content: "# Title\n## Section\n本文",
+        reason: "test",
+      });
+    });
+
+    expect(mockUpdatePageMutateAsync).toHaveBeenCalledTimes(1);
+    const call = mockUpdatePageMutateAsync.mock.calls[0]?.[0] as {
+      pageId: string;
+      updates: { content: string };
+    };
+    const updatedDoc = JSON.parse(call.updates.content) as {
+      content: Array<{ type: string; content?: Array<{ text?: string }> }>;
+    };
+
+    // `# Title` 行が本文に literal paragraph として残らない。
+    // The `# Title` line does not survive as a literal paragraph in the body.
+    const literalH1 = updatedDoc.content.find((node) => {
+      if (node.type !== "paragraph") return false;
+      return node.content?.some((inline) => inline.text === "# Title");
+    });
+    expect(literalH1).toBeUndefined();
   });
 
   it("suggest-wiki-links appends only missing links and syncs them", async () => {
@@ -209,7 +259,11 @@ describe("useAIChatActions", () => {
       });
     });
 
-    const expectedContent = appendMarkdownToTiptapContent("", "- [[Alpha]]\n- [[Beta]]");
+    // 本番経路は `{ dropLeadingH1: true }` を渡すが、`-` 始まりリストには影響なし。
+    // The production path passes `{ dropLeadingH1: true }`; no leading `# X` ⇒ identical output.
+    const expectedContent = appendMarkdownToTiptapContent("", "- [[Alpha]]\n- [[Beta]]", {
+      dropLeadingH1: true,
+    });
     expect(mockUpdatePageMutateAsync).toHaveBeenCalledWith({
       pageId: "page-1",
       updates: { content: expectedContent },
