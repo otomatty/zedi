@@ -126,7 +126,12 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m "chore(deps): sync bun.lock with package.json changes"
-          # paths フィルタにより bun.lock のみの push では本ワークフローは再起動しない。
-          # The paths filter excludes bun.lock-only pushes, so this commit will
-          # not retrigger the workflow (no infinite loop).
+          # GITHUB_TOKEN による push は新規ワークフロー実行をトリガーしないため、
+          # 無限ループは発生しない (GitHub Actions の組み込み安全機構)。
+          # PAT や GitHub App トークンに切り替える場合は、コミッタを確認する等の
+          # 別途ループ防止ロジックが必要になる。
+          # Pushes made with GITHUB_TOKEN do not trigger new workflow runs, so
+          # no infinite loop occurs (built-in GitHub Actions safety feature).
+          # If switching to a PAT or GitHub App token, add separate
+          # loop-prevention logic (e.g. checking the committer).
           git push origin "HEAD:${HEAD_REF}"
