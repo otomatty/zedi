@@ -6,9 +6,10 @@
 import type { FC, SVGProps } from "react";
 import {
   Pilcrow,
-  Heading1,
   Heading2,
   Heading3,
+  Heading4,
+  Heading5,
   List,
   ListOrdered,
   CheckSquare,
@@ -35,9 +36,10 @@ import type { AgentSlashCommandId } from "@/lib/agentSlashCommands/types";
 /** Map icon name string → Lucide component / アイコン名 → Lucide コンポーネント */
 export const slashMenuIconMap: Record<string, FC<SVGProps<SVGSVGElement>>> = {
   Pilcrow,
-  Heading1,
   Heading2,
   Heading3,
+  Heading4,
+  Heading5,
   List,
   ListOrdered,
   CheckSquare,

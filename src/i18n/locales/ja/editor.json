@@ -83,20 +83,25 @@
       "description": "本文テキスト",
       "aliases": "段落,paragraph,p,text"
     },
-    "heading1": {
-      "title": "見出し1",
-      "description": "大見出し",
-      "aliases": "見出し1,h1,大見出し,heading"
-    },
     "heading2": {
       "title": "見出し2",
-      "description": "中見出し",
-      "aliases": "見出し2,h2,中見出し,heading"
+      "description": "大見出し",
+      "aliases": "見出し2,h2,大見出し,heading"
     },
     "heading3": {
       "title": "見出し3",
+      "description": "中見出し",
+      "aliases": "見出し3,h3,中見出し,heading"
+    },
+    "heading4": {
+      "title": "見出し4",
       "description": "小見出し",
-      "aliases": "見出し3,h3,小見出し,heading"
+      "aliases": "見出し4,h4,小見出し,heading"
+    },
+    "heading5": {
+      "title": "見出し5",
+      "description": "最下層の見出し",
+      "aliases": "見出し5,h5,最小見出し,heading"
     },
     "bulletList": {
       "title": "箇条書き",
