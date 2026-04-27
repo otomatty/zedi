@@ -100,16 +100,27 @@ export default tseslint.config(
             ClassDeclaration: true,
             ArrowFunctionExpression: true,
           },
+          // `publicOnly` は `require` 配下にのみ作用するため、`contexts` 側は明示的に
+          // `ExportNamedDeclaration` 配下のセレクタへ絞り、未 export の内部宣言で
+          // 警告が出ないようにする。
+          // `publicOnly` only filters the `require` targets, so we scope custom
+          // contexts to children of `ExportNamedDeclaration` to avoid warning
+          // on internal, non-exported declarations.
           contexts: [
-            "TSTypeAliasDeclaration",
-            "TSInterfaceDeclaration",
-            "TSEnumDeclaration",
-            "VariableDeclaration",
+            "ExportNamedDeclaration > TSTypeAliasDeclaration",
+            "ExportNamedDeclaration > TSInterfaceDeclaration",
+            "ExportNamedDeclaration > TSEnumDeclaration",
+            "ExportNamedDeclaration > VariableDeclaration",
           ],
         },
       ],
       "jsdoc/require-description": ["warn", { descriptionStyle: "body" }],
-      "jsdoc/no-blank-block-descriptions": "error",
+      // `jsdoc/require-jsdoc` が `warn` であるのに、空 description を `error` にすると
+      // 「JSDoc を書き始めた人ほどブロックされる」逆インセンティブになるため warn に統一する。
+      // Align severity with `jsdoc/require-jsdoc` (`warn`); making blank
+      // descriptions `error` would penalise contributors who start writing JSDoc
+      // more than those who skip it entirely.
+      "jsdoc/no-blank-block-descriptions": "warn",
       "tsdoc/syntax": "warn",
 
       // --- 可読性・複雑度 ---
