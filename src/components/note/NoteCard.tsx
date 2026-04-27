@@ -12,25 +12,22 @@ interface NoteCardProps {
   index?: number;
 }
 
+const ROLE_I18N_KEYS: Record<NoteSummary["role"], string> = {
+  owner: "common.note.owner",
+  editor: "common.note.editor",
+  viewer: "common.note.viewer",
+  guest: "common.note.guest",
+  none: "common.note.roleUnknown",
+};
+
 /**
- *
- */
-export /**
- *
+ * ノート一覧のカード。
+ * / Card used in note lists.
  */
 const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const { t } = useTranslation();
 
-  /**
-   *
-   */
   const handleClick = () => {
     navigate(`/notes/${note.id}`);
   };
@@ -54,19 +51,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index = 0 }) => {
           <h3 className="text-foreground truncate text-sm font-medium">
             {note.title || t("common.page.untitledNote")}
           </h3>
-          <p className="text-muted-foreground mt-1 text-xs">
-            {t(
-              (
-                {
-                  owner: "common.note.owner",
-                  editor: "common.note.editor",
-                  viewer: "common.note.viewer",
-                  guest: "common.note.guest",
-                  none: "common.note.roleUnknown",
-                } as const
-              )[note.role],
-            )}
-          </p>
+          <p className="text-muted-foreground mt-1 text-xs">{t(ROLE_I18N_KEYS[note.role])}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}

@@ -4,8 +4,8 @@ import type { PageContext, ReferencedPage } from "../types/aiChat";
 import i18n from "@/i18n";
 
 describe("buildSystemPrompt", () => {
-  beforeEach(() => {
-    void i18n.changeLanguage("ja");
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
   });
   it("includes existing page titles in system prompt", () => {
     const titles = ["ページA", "ページB", "ページC"];

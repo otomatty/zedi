@@ -10,8 +10,8 @@ function renderWithI18n(ui: React.ReactElement) {
 }
 
 describe("MermaidGeneratorResultPreview", () => {
-  beforeEach(() => {
-    void i18n.changeLanguage("ja");
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
   });
 
   it("renders code and preview section", () => {

@@ -29,10 +29,8 @@ interface MermaidGeneratorDialogProps {
 }
 
 /**
- *
- */
-export /**
- *
+ * Mermaid ダイアグラム生成ダイアログ。
+ * / Dialog for generating Mermaid diagrams from selected text.
  */
 const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   open,
@@ -40,35 +38,14 @@ const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   selectedText,
   onInsert,
 }) => {
-  /**
-   *
-   */
   const { t } = useTranslation();
-  /**
-   *
-   */
   const navigate = useNavigate();
-  /**
-   *
-   */
   const location = useLocation();
-  /**
-   *
-   */
   const { status, result, error, isAIConfigured, generate, reset, checkAIConfigured } =
     useMermaidGenerator();
 
-  /**
-   *
-   */
   const [selectedTypes, setSelectedTypes] = useState<MermaidDiagramType[]>(["flowchart"]);
-  /**
-   *
-   */
   const [previewSvg, setPreviewSvg] = useState<string>("");
-  /**
-   *
-   */
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,25 +60,13 @@ const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   }, [open, checkAIConfigured, reset]);
 
   useEffect(() => {
-    /**
-     *
-     */
     const renderPreview = async () => {
       if (result?.code) {
         try {
-          /**
-           *
-           */
           const mermaid = await getMermaid();
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
           await mermaid.parse(result.code);
-          /**
-           *
-           */
-          const id = `preview-${Math.random().toString(36).substr(2, 9)}`;
-          /**
-           *
-           */
+          const id = `preview-${Math.random().toString(36).slice(2, 11)}`;
           const { svg } = await mermaid.render(id, result.code);
           setPreviewSvg(svg);
           setPreviewError(null);
@@ -112,27 +77,18 @@ const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
       }
     };
     renderPreview();
-  }, [result]);
+  }, [result, t]);
 
-  /**
-   *
-   */
   const handleTypeToggle = (type: MermaidDiagramType) => {
     setSelectedTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
     );
   };
 
-  /**
-   *
-   */
   const handleGenerate = () => {
     generate(selectedText, selectedTypes);
   };
 
-  /**
-   *
-   */
   const handleInsert = () => {
     if (result?.code) {
       onInsert(result.code);
@@ -140,18 +96,9 @@ const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     }
   };
 
-  /**
-   *
-   */
   const handleGoToSettings = () => {
     onOpenChange(false);
-    /**
-     *
-     */
     const returnTo = `${location.pathname}${location.search}${location.hash}`;
-    /**
-     *
-     */
     const params = new URLSearchParams({ section: "ai", returnTo });
     navigate(`/settings?${params.toString()}`);
   };

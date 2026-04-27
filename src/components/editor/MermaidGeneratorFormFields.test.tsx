@@ -11,8 +11,8 @@ function renderWithI18n(ui: React.ReactElement) {
 }
 
 describe("MermaidGeneratorFormFields", () => {
-  beforeEach(() => {
-    void i18n.changeLanguage("ja");
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
   });
 
   it("renders selected text and diagram type options", () => {

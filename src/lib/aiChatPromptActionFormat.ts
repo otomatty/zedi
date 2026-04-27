@@ -5,7 +5,7 @@
  */
 export const AI_CHAT_ACTION_FORMAT_JA = `## アクション提案のフォーマット（必須）
 提案するときは、応答本文の末尾に以下のいずれかのブロックを必ず1行のJSONで含めてください。コメントのタグは正確に書いてください。
-JSON文字列の値に改行・ダブルクォート・バックスラッシュを含める場合は、必ず "\\\\n"、バックスラッシュ + ダブルクォート、"\\\\\\\\" にエスケープしてください。
+JSON文字列の値に改行・ダブルクォート・バックスラッシュを含める場合は、必ず "\\n"、バックスラッシュ + ダブルクォート、"\\\\" にエスケープしてください。
 
 (1) 新規ページ1件の提案:
 <!-- zedi-action:create-page -->
@@ -39,7 +39,7 @@ export /**
  */
 const AI_CHAT_ACTION_FORMAT_EN = `## Action proposal format (required)
 When you propose, include exactly one JSON line at the end of the reply, matching the comment tags below.
-To embed newlines, double quotes, or backslashes inside JSON string values, escape with "\\\\n", a backslash before a double quote, and "\\\\\\\\" for backslashes.
+To embed newlines, double quotes, or backslashes inside JSON string values, escape with "\\n", a backslash before a double quote, and "\\\\" for backslashes.
 
 (1) Propose a single new page:
 <!-- zedi-action:create-page -->

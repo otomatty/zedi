@@ -25,8 +25,8 @@ const createMockPage = (overrides?: Partial<Page>): Page => ({
 });
 
 describe("WikiLinkPreviewContent", () => {
-  beforeEach(() => {
-    void i18n.changeLanguage("ja");
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
   });
 
   describe("existing page (exists=true)", () => {

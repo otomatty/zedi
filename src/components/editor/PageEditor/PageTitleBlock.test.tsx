@@ -11,8 +11,8 @@ function renderWithI18n(ui: React.ReactElement) {
 }
 
 describe("PageTitleBlock", () => {
-  beforeEach(() => {
-    void i18n.changeLanguage("ja");
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
   });
 
   describe("編集モード", () => {

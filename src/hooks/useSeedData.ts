@@ -7,28 +7,14 @@ import { buildSeedTutorialPages } from "@/lib/seedTutorialPages";
 const SEED_KEY = "zedi-seeded";
 
 /**
- *
+ * 未ログイン初回利用者向けのチュートリアルページを作成する。
+ * / Seeds tutorial pages for first-time unsigned users.
  */
 export function useSeedData() {
-  /**
-   *
-   */
   const { isSignedIn } = useAuth();
-  /**
-   *
-   */
   const { data: pages, isLoading, isSuccess } = usePagesSummary();
-  /**
-   *
-   */
   const createPageMutation = useCreatePage();
-  /**
-   *
-   */
   const hasSeededRef = useRef(false);
-  /**
-   *
-   */
   const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
@@ -40,9 +26,6 @@ export function useSeedData() {
     if (hasSeededRef.current) return;
 
     // Check if we've already seeded in localStorage
-    /**
-     *
-     */
     const hasSeeded = localStorage.getItem(SEED_KEY);
     if (hasSeeded) return;
 
@@ -51,24 +34,12 @@ export function useSeedData() {
       hasSeededRef.current = true;
       queueMicrotask(() => setIsSeeding(true));
 
-      /**
-       *
-       */
       const t = i18n.getFixedT(i18n.language);
-      /**
-       *
-       */
       const tutorialPages = buildSeedTutorialPages(t);
 
       // Create tutorial pages sequentially
-      /**
-       *
-       */
       const seedPages = async () => {
-        for (/**
-         *
-         */
-        const tutorialPage of tutorialPages) {
+        for (const tutorialPage of tutorialPages) {
           try {
             await createPageMutation.mutateAsync({
               title: tutorialPage.title,

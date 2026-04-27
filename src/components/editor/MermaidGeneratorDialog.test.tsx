@@ -63,8 +63,8 @@ function renderDialog(props: { open?: boolean; selectedText?: string } = {}) {
 }
 
 describe("MermaidGeneratorDialog", () => {
-  beforeEach(() => {
-    void i18n.changeLanguage("ja");
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
     vi.clearAllMocks();
     mockUseMermaidGenerator.status = "idle";
     mockUseMermaidGenerator.result = null;
