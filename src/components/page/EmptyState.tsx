@@ -2,11 +2,13 @@ import React from "react";
 import { Sparkles, Plus } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { useCreateNewPage } from "@/hooks/useCreateNewPage";
+import { useTranslation } from "react-i18next";
 
 /**
  *
  */
 const EmptyState: React.FC = () => {
+  const { t } = useTranslation();
   const { createNewPage, isCreating } = useCreateNewPage();
 
   return (
@@ -15,17 +17,17 @@ const EmptyState: React.FC = () => {
         <Sparkles className="text-primary h-10 w-10" />
       </div>
 
-      <h2 className="mb-2 text-xl font-semibold">Zediへようこそ</h2>
+      <h2 className="mb-2 text-xl font-semibold">{t("common.page.emptyHomeTitle")}</h2>
 
       <p className="text-muted-foreground mb-8 max-w-md leading-relaxed">
-        思考のネットワークを構築しましょう。
+        {t("common.page.emptyHomeLine1")}
         <br />
-        最初のページを作成して、アイデアを記録し始めてください。
+        {t("common.page.emptyHomeLine2")}
       </p>
 
       <Button onClick={createNewPage} disabled={isCreating} size="lg" className="shadow-glow gap-2">
         <Plus className="h-5 w-5" />
-        最初のページを作成
+        {t("common.page.emptyHomeCta")}
       </Button>
     </div>
   );

@@ -23,6 +23,10 @@ import jaHome from "./locales/ja/home.json";
 import jaAiChat from "./locales/ja/aiChat.json";
 import jaInvite from "./locales/ja/invite.json";
 import jaWikiSchema from "./locales/ja/wikiSchema.json";
+import jaShortcuts from "./locales/ja/shortcuts.json";
+import jaSeedData from "./locales/ja/seedData.json";
+import jaMermaid from "./locales/ja/mermaid.json";
+import jaAiPrompt from "./locales/ja/aiPrompt.json";
 import enCommon from "./locales/en/common.json";
 import enSettings from "./locales/en/settings.json";
 import enGeneralSettings from "./locales/en/generalSettings.json";
@@ -42,6 +46,10 @@ import enHome from "./locales/en/home.json";
 import enAiChat from "./locales/en/aiChat.json";
 import enInvite from "./locales/en/invite.json";
 import enWikiSchema from "./locales/en/wikiSchema.json";
+import enShortcuts from "./locales/en/shortcuts.json";
+import enSeedData from "./locales/en/seedData.json";
+import enMermaid from "./locales/en/mermaid.json";
+import enAiPrompt from "./locales/en/aiPrompt.json";
 
 const ja = {
   common: jaCommon,
@@ -63,6 +71,10 @@ const ja = {
   aiChat: jaAiChat,
   invite: jaInvite,
   wikiSchema: jaWikiSchema,
+  shortcuts: jaShortcuts,
+  seedData: jaSeedData,
+  mermaid: jaMermaid,
+  aiPrompt: jaAiPrompt,
 };
 
 const en = {
@@ -85,6 +97,10 @@ const en = {
   aiChat: enAiChat,
   invite: enInvite,
   wikiSchema: enWikiSchema,
+  shortcuts: enShortcuts,
+  seedData: enSeedData,
+  mermaid: enMermaid,
+  aiPrompt: enAiPrompt,
 };
 
 // localStorage の設定から初期言語を取得

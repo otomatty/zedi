@@ -35,6 +35,10 @@
     "description": "UIの表示言語を設定します",
     "label": "表示言語"
   },
+  "locales": {
+    "ja": "日本語",
+    "en": "English"
+  },
   "profile": {
     "title": "プロフィール",
     "description": "アカウント名とサムネイルを設定します",

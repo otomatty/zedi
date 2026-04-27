@@ -1,0 +1,28 @@
+{
+  "welcome": {
+    "title": "👋 Welcome to Zedi",
+    "p1": "Zedi is a “zero-friction knowledge network.”",
+    "p2": "Unburden writing and the obligation to organize—let your thinking expand like the universe.",
+    "hBasics": "Core ideas",
+    "li1": "One page, one idea",
+    "li2": "Link small pages instead of one long note",
+    "li3": "Don’t perfect first—capture first"
+  },
+  "links": {
+    "title": "🔗 How to link",
+    "p1": "In Zedi, create links with [[Page title]] syntax.",
+    "hTypes": "Link types",
+    "liInternal": "Internal: points to an existing page",
+    "liGhost": "Ghost: links to a page that does not exist yet (may be created later)",
+    "p2": "Unlinked pages are “seeds waiting to sprout.” You don’t have to organize them yet."
+  },
+  "capture": {
+    "title": "✨ Capture your thoughts",
+    "p1": "When an idea appears, put it on a page right away.",
+    "hTips": "Capture tips",
+    "o1": "Use the + button (bottom right) to create a new page quickly",
+    "o2": "The title is auto-generated—start from the body if you like",
+    "o3": "Aim to capture, not to perfect, at first",
+    "quote": "If a blank page scares you, write a single line first."
+  }
+}

@@ -118,5 +118,23 @@
     },
     "save": "保存",
     "cancel": "キャンセル"
+  },
+  "providers": {
+    "google": {
+      "name": "Google",
+      "description": "Google Gemini 3 モデル"
+    },
+    "openai": {
+      "name": "OpenAI",
+      "description": "OpenAI GPT-5 モデル"
+    },
+    "anthropic": {
+      "name": "Anthropic",
+      "description": "Anthropic Claude 4 モデル"
+    },
+    "claude-code": {
+      "name": "Claude Code",
+      "description": "Claude Code (デスクトップ専用 / Desktop only)"
+    }
   }
 }

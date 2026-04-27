@@ -3,7 +3,6 @@ import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useAISettings } from "@/hooks/useAISettings";
 import { useStorageSettings } from "@/hooks/useStorageSettings";
 import { useProfile } from "@/hooks/useProfile";
-import { THEME_OPTIONS, LOCALE_OPTIONS } from "@/types/generalSettings";
 import type { StorageProviderType } from "@/types/storage";
 import type { SettingsSectionId } from "./SettingsSection";
 
@@ -27,12 +26,9 @@ export function useSettingsSummaries(): Record<SettingsSectionId, string> {
 
   const generalSummary = (): string => {
     if (general.isLoading) return "";
-    const themeOpt = THEME_OPTIONS.find((o) => o.value === general.settings.theme);
-    const themeText =
-      i18n.language === "ja" ? themeOpt?.label : (themeOpt?.labelEn ?? general.settings.theme);
+    const themeText = t(`generalSettings.theme.${general.settings.theme}`);
     const fontSizePx = general.editorFontSizePx ?? 16;
-    const localeOpt = LOCALE_OPTIONS.find((o) => o.value === general.settings.locale);
-    const localeText = localeOpt?.label ?? general.settings.locale;
+    const localeText = t(`generalSettings.locales.${general.settings.locale}`);
     const profileText = displayName
       ? t("settings.summary.general.profileSet")
       : t("settings.summary.general.profileUnset");

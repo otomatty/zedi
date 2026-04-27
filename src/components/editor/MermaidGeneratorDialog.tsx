@@ -14,6 +14,7 @@ import { MermaidDiagramType } from "@/lib/mermaidGenerator";
 import { MermaidGeneratorNotConfiguredView } from "./MermaidGeneratorNotConfiguredView";
 import { MermaidGeneratorFormFields } from "./MermaidGeneratorFormFields";
 import { MermaidGeneratorResultPreview } from "./MermaidGeneratorResultPreview";
+import { useTranslation } from "react-i18next";
 
 async function getMermaid() {
   const { default: mermaid } = await import("mermaid");
@@ -27,12 +28,17 @@ interface MermaidGeneratorDialogProps {
   onInsert: (code: string) => void;
 }
 
+/**
+ * Mermaid ダイアグラム生成ダイアログ。
+ * / Dialog for generating Mermaid diagrams from selected text.
+ */
 export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
   open,
   onOpenChange,
   selectedText,
   onInsert,
 }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { status, result, error, isAIConfigured, generate, reset, checkAIConfigured } =
@@ -60,18 +66,18 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
           const mermaid = await getMermaid();
           mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
           await mermaid.parse(result.code);
-          const id = `preview-${Math.random().toString(36).substr(2, 9)}`;
+          const id = `preview-${Math.random().toString(36).slice(2, 11)}`;
           const { svg } = await mermaid.render(id, result.code);
           setPreviewSvg(svg);
           setPreviewError(null);
         } catch (err) {
-          setPreviewError(err instanceof Error ? err.message : "プレビューエラー");
+          setPreviewError(err instanceof Error ? err.message : t("mermaid.preview.parseError"));
           setPreviewSvg("");
         }
       }
     };
     renderPreview();
-  }, [result]);
+  }, [result, t]);
 
   const handleTypeToggle = (type: MermaidDiagramType) => {
     setSelectedTypes((prev) =>
@@ -111,8 +117,8 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] max-w-2xl overflow-auto">
         <DialogHeader>
-          <DialogTitle>Mermaidダイアグラムを生成</DialogTitle>
-          <DialogDescription>選択したテキストからダイアグラムを生成します。</DialogDescription>
+          <DialogTitle>{t("mermaid.dialog.title")}</DialogTitle>
+          <DialogDescription>{t("mermaid.dialog.description")}</DialogDescription>
         </DialogHeader>
 
         <MermaidGeneratorFormFields
@@ -134,14 +140,14 @@ export const MermaidGeneratorDialog: React.FC<MermaidGeneratorDialogProps> = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            キャンセル
+            {t("mermaid.dialog.cancel")}
           </Button>
           {status === "completed" && result && (
             <>
               <Button variant="outline" onClick={handleGenerate}>
-                再生成
+                {t("mermaid.dialog.regenerate")}
               </Button>
-              <Button onClick={handleInsert}>挿入</Button>
+              <Button onClick={handleInsert}>{t("mermaid.dialog.insert")}</Button>
             </>
           )}
         </DialogFooter>

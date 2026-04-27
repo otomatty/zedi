@@ -80,5 +80,54 @@
     "openIndexPage": "__index__ ページを開く",
     "noPagesYet": "まだページがありません。",
     "pageCount": "{{count}} ページ"
+  },
+  "page": {
+    "noContent": "コンテンツがありません",
+    "noPreview": "内容がありません",
+    "titleCopySuffix": "のコピー",
+    "duplicated": "複製しました",
+    "duplicatedWithTitle": "「{{title}}」を作成しました",
+    "pageDeleted": "削除しました",
+    "deletedWithTitle": "「{{title}}」を削除しました",
+    "duplicateFailed": "ページの複製に失敗しました",
+    "deleteFailed": "ページの削除に失敗しました",
+    "deleteConfirm": "ページを削除しますか？",
+    "deleteBody": "「{{title}}」を削除します。この操作は取り消せません。",
+    "deleting": "削除中...",
+    "delete": "削除",
+    "duplicate": "複製",
+    "linkSection": "リンク ({{count}})",
+    "newLinksSection": "新しいリンク ({{count}})",
+    "linkTargets": "{{count}}件のリンク先",
+    "lintTitle": "Suggestions ({{count}})",
+    "lintRule": {
+      "orphan": "孤立ページ",
+      "ghost_many": "Ghost Link 過多",
+      "title_similar": "タイトル類似",
+      "conflict": "矛盾",
+      "broken_link": "リンク切れ"
+    },
+    "lintDetailTitleSimilar": "「{{titleA}}」と「{{titleB}}」が類似しています",
+    "lintUnknownError": "Unknown error",
+    "lintFetchFailed": "Suggestions の取得に失敗しました",
+    "suggestionMarkResolved": "この Suggestion を解決済みにする / Mark suggestion as resolved",
+    "emptyHomeTitle": "Zediへようこそ",
+    "emptyHomeLine1": "思考のネットワークを構築しましょう。",
+    "emptyHomeLine2": "最初のページを作成して、アイデアを記録し始めてください。",
+    "emptyHomeCta": "最初のページを作成",
+    "ghostCreateHint": "クリックしてページを作成",
+    "untitledNote": "無題のノート"
+  },
+  "note": {
+    "owner": "所有者",
+    "editor": "編集者",
+    "viewer": "閲覧者",
+    "guest": "ゲスト",
+    "roleUnknown": "不明"
+  },
+  "wikiLink": {
+    "notCreated": "まだ作成されていないページです。",
+    "notCreatedWithRefs": "まだ作成されていないページです。他のページからも参照されています。",
+    "clickToCreate": "クリックして作成"
   }
 }

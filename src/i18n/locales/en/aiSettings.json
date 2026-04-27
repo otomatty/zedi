@@ -118,5 +118,23 @@
     },
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "providers": {
+    "google": {
+      "name": "Google",
+      "description": "Google Gemini 3 models"
+    },
+    "openai": {
+      "name": "OpenAI",
+      "description": "OpenAI GPT-5 models"
+    },
+    "anthropic": {
+      "name": "Anthropic",
+      "description": "Anthropic Claude 4 models"
+    },
+    "claude-code": {
+      "name": "Claude Code",
+      "description": "Claude Code (desktop only)"
+    }
   }
 }

@@ -29,6 +29,12 @@ vi.mock("react-i18next", () => ({
       if (key === "editor.savedAt" && opts?.relative !== undefined) {
         return `${String(opts.relative)}に保存`;
       }
+      if (key === "editor.pageMenu.exportMarkdown") return "Markdownでエクスポート";
+      if (key === "editor.pageMenu.copyMarkdown") return "Markdownをコピー";
+      if (key === "editor.pageMenu.deletePage") return "削除";
+      if (key === "editor.pageHistory.menuButton") return "変更履歴";
+      if (key === "common.back") return "戻る";
+      if (key === "common.moreActions") return "more";
       return key;
     },
   }),
@@ -188,7 +194,7 @@ describe("PageEditorHeader", () => {
         </div>,
       );
 
-      const backButton = screen.getByRole("button", { name: /back|common\.back/i });
+      const backButton = screen.getByRole("button", { name: /戻る|back/i });
       const scrollContainer = container.firstElementChild as HTMLElement | null;
       const header = scrollContainer?.firstElementChild as HTMLElement | null;
       expect(scrollContainer).not.toBeNull();

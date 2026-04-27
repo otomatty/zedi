@@ -4,6 +4,7 @@ import { Link2 } from "lucide-react";
 import type { PageSummary } from "@/types/page";
 import { cn } from "@zedi/ui";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
+import { useTranslation } from "react-i18next";
 
 interface NotePageCardProps {
   noteId: string;
@@ -17,6 +18,7 @@ export /**
  *
  */
 const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
+  const { t } = useTranslation();
   /**
    *
    */
@@ -58,7 +60,7 @@ const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
         <div className="flex items-start gap-1.5">
           {isClipped && <Link2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />}
           <h3 className="text-foreground line-clamp-2 text-sm font-medium">
-            {page.title || "無題のページ"}
+            {page.title || t("common.untitledPage")}
           </h3>
         </div>
       </div>
@@ -78,7 +80,7 @@ const NotePageCard: React.FC<NotePageCardProps> = ({ noteId, page }) => {
         ) : (
           <div className="h-full px-3 pb-3">
             <p className="text-muted-foreground line-clamp-4 text-xs leading-relaxed">
-              {preview || "コンテンツがありません"}
+              {preview || t("common.page.noContent")}
             </p>
           </div>
         )}

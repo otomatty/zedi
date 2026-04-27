@@ -1,5 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@zedi/ui";
 import { FileText, Link as LinkIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { formatTimeAgo } from "@/lib/dateUtils";
 import type { PageCard } from "@/hooks/useLinkedPages";
 
@@ -12,6 +13,7 @@ interface PageLinkCardProps {
  *
  */
 export function PageLinkCard({ page, onClick }: PageLinkCardProps) {
+  const { t } = useTranslation();
   return (
     <Card
       className="hover:bg-accent flex aspect-square cursor-pointer flex-col transition-colors"
@@ -24,12 +26,12 @@ export function PageLinkCard({ page, onClick }: PageLinkCardProps) {
           ) : (
             <FileText className="text-muted-foreground h-3 w-3 shrink-0" />
           )}
-          <span className="truncate">{page.title || "無題のページ"}</span>
+          <span className="truncate">{page.title || t("common.untitledPage")}</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-between p-3 pt-0">
         <p className="text-muted-foreground line-clamp-3 text-xs">
-          {page.preview || "内容がありません"}
+          {page.preview || t("common.page.noPreview")}
         </p>
         <p className="text-muted-foreground mt-auto text-xs">{formatTimeAgo(page.updatedAt)}</p>
       </CardContent>

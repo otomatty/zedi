@@ -17,6 +17,7 @@ import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { createEditorExtensions, defaultEditorProps } from "./editorConfig";
 import type { TiptapEditorProps } from "./types";
+import i18n from "@/i18n";
 
 /**
  * Keeps latest `workspaceRoot` in a ref without re-running `useEditor` (Issue #461).
@@ -129,7 +130,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     if (lastReportedContentRef.current === content) return;
     lastReportedContentRef.current = content;
     onContentError?.({
-      message: "コンテンツの解析に失敗しました。データが破損している可能性があります。",
+      message: i18n.t("errors.contentParseFailed"),
       removedNodeTypes: [],
       removedMarkTypes: [],
       wasSanitized: false,
