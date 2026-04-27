@@ -15,6 +15,6 @@
   },
   "empty": "監査ログはありません。",
   "actions": {
-    "user.role.update": "ユーザー: ロール変更"
+    "user_role_update": "ユーザー: ロール変更"
   }
 }

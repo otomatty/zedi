@@ -88,7 +88,7 @@ export function UsersContent({
   onUnsuspend,
   onDelete,
 }: UsersContentProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const hasPreviousPage = page > 0;
   const hasNextPage = page + 1 < pageCount;
@@ -196,7 +196,7 @@ export function UsersContent({
                       </Select>
                     </TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2 tabular-nums">
-                      {u.pageCount.toLocaleString("ja-JP")}
+                      {u.pageCount.toLocaleString(i18n.language)}
                     </TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2">
                       {formatDate(u.createdAt)}
@@ -386,7 +386,7 @@ export function UsersContent({
                 <li>
                   {t("users.impact.lastAiUsage", {
                     date: new Date(confirm.deleteTarget.impact.lastAiUsageAt).toLocaleDateString(
-                      "ja-JP",
+                      i18n.language,
                     ),
                   })}
                 </li>

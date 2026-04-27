@@ -15,5 +15,5 @@
   "showingRange": "{{rangeStart}}-{{rangeEnd}} 件を表示 / 合計 {{total}} 件",
   "showingZero": "0 件を表示 / 合計 {{total}} 件",
   "totalCount": "合計 {{count}} 件",
-  "confirmPhraseDefault": "確認のため「{{phrase}}」を入力してください / Type \"{{phrase}}\" to confirm"
+  "confirmPhraseDefault": "確認のため「{{phrase}}」を入力してください"
 }

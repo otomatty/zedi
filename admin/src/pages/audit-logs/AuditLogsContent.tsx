@@ -44,13 +44,19 @@ interface AuditLogsContentProps {
 const ANY_ACTION = "__any__";
 
 /**
- * 現時点では Phase 1 (#550) のロール変更のみ記録される。
- * 後続で suspend/unsuspend/delete が追加される想定。
+ * Phase 1 (#550) で記録される `action` 値と、対応する i18n キーの組。
+ * i18next のデフォルト keySeparator が `.` なので、`user.role.update` のような
+ * ドット入りキーを直接 `t()` に渡すと階層走査が走り解決できない。API 値（左）と
+ * i18n キー（右）を分離することでこの問題を避ける。
  *
- * Only role-change is recorded in Phase 1 (#550); suspend/unsuspend/delete
- * will be added by subsequent issues.
+ * Phase 1 records only role-change actions. We keep the API action string
+ * (left) separate from the dot-free i18n key (right) because i18next splits
+ * lookup paths on `.`, so calling `t("audit.actions.user.role.update")` would
+ * fail to resolve the flat translation key.
  */
-const KNOWN_ACTION_VALUES = ["user.role.update"] as const;
+const KNOWN_ACTIONS: { value: string; i18nKey: string }[] = [
+  { value: "user.role.update", i18nKey: "user_role_update" },
+];
 
 /**
  * `action` ごとに before/after を短いサマリに整形する。
@@ -124,9 +130,9 @@ export function AuditLogsContent({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ANY_ACTION}>{t("common.all")}</SelectItem>
-              {KNOWN_ACTION_VALUES.map((value) => (
+              {KNOWN_ACTIONS.map(({ value, i18nKey }) => (
                 <SelectItem key={value} value={value}>
-                  {t(`audit.actions.${value}`)}
+                  {t(`audit.actions.${i18nKey}`)}
                 </SelectItem>
               ))}
             </SelectContent>

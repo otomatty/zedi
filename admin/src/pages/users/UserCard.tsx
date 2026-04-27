@@ -34,7 +34,7 @@ export function UserCard({
   onDelete,
   saving,
 }: UserCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <Card
       className={
@@ -78,7 +78,7 @@ export function UserCard({
             </SelectContent>
           </Select>
           <span className="text-xs text-slate-500">
-            {t("users.card.pageCount", { count: user.pageCount.toLocaleString("ja-JP") })}
+            {t("users.card.pageCount", { count: user.pageCount.toLocaleString(i18n.language) })}
           </span>
           <span className="text-xs text-slate-500">{formatDate(user.createdAt)}</span>
           {!saving && user.status === "deleted" ? (

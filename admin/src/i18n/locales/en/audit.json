@@ -15,6 +15,6 @@
   },
   "empty": "No audit logs.",
   "actions": {
-    "user.role.update": "User: Role change"
+    "user_role_update": "User: Role change"
   }
 }
