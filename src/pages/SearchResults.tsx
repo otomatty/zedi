@@ -1,5 +1,6 @@
 import { useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Container from "@/components/layout/Container";
 import { SearchResultCard } from "@/components/search/SearchResultCard";
 import type { SearchResultCardItem } from "@/components/search/SearchResultCard";
@@ -31,6 +32,7 @@ interface SearchResultItem extends SearchResultCardItem {
 export default function SearchResults() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { setQuery } = useGlobalSearchContext();
   const searchQuery = (searchParams.get("q") ?? "").trim();
 
@@ -58,7 +60,7 @@ export default function SearchResults() {
         const highlightedSnippet = highlightKeywords(snippet, keywords);
         return {
           pageId: page.id,
-          title: page.title || "無題のページ",
+          title: page.title || t("common.untitledPage"),
           snippet,
           highlightedSnippet,
           matchType,
@@ -85,11 +87,14 @@ export default function SearchResults() {
     ).map((r) => {
       const preview = r.content_preview ?? "";
       const snippet = extractSmartSnippet(preview, keywords, 200);
-      const highlightedSnippet = highlightKeywords(snippet || "（共有ノート）", keywords);
+      const highlightedSnippet = highlightKeywords(
+        snippet || t("common.sharedNoteContext"),
+        keywords,
+      );
       return {
         pageId: r.id,
         noteId: r.note_id ?? undefined,
-        title: r.title ?? "無題のページ",
+        title: r.title ?? t("common.untitledPage"),
         snippet,
         highlightedSnippet,
         matchType: "content" as MatchType,
@@ -101,7 +106,7 @@ export default function SearchResults() {
     });
 
     return [...personal, ...shared].sort((a, b) => b.score - a.score);
-  }, [personalResults, sharedResults, searchQuery, keywords]);
+  }, [personalResults, sharedResults, searchQuery, keywords, t]);
 
   /**
    * Navigates to the note page or standalone page for the clicked result.
@@ -130,16 +135,16 @@ export default function SearchResults() {
         <div className="mb-6">
           {searchQuery ? (
             <h1 className="text-lg font-medium">
-              「{searchQuery}」の検索結果
+              {t("common.search.resultsHeading", { query: searchQuery })}
               {!isLoading && (
                 <span className="text-muted-foreground ml-2 text-sm font-normal">
-                  {results.length}件
+                  {t("common.search.resultsCount", { count: results.length })}
                 </span>
               )}
             </h1>
           ) : (
             <h1 className="text-muted-foreground text-lg font-medium">
-              検索キーワードを入力してください
+              {t("common.search.promptHeading")}
             </h1>
           )}
         </div>
@@ -147,13 +152,13 @@ export default function SearchResults() {
         {isLoading && searchQuery.length >= 3 && <SearchResultsLoadingSkeleton />}
 
         {searchQuery.length > 0 && searchQuery.length < 3 && (
-          <SearchResultsEmptyState description="3文字以上入力してください" />
+          <SearchResultsEmptyState description={t("common.search.minChars")} />
         )}
 
         {!isLoading && searchQuery.length >= 3 && results.length === 0 && (
           <SearchResultsEmptyState
-            title="検索結果が見つかりません"
-            description="別のキーワードで検索してみてください"
+            title={t("common.search.emptyTitle")}
+            description={t("common.search.emptyDescription")}
           />
         )}
 
@@ -169,9 +174,7 @@ export default function SearchResults() {
           </div>
         )}
 
-        {!searchQuery && (
-          <SearchResultsEmptyState description="ヘッダーの検索バーからキーワードを入力してください" />
-        )}
+        {!searchQuery && <SearchResultsEmptyState description={t("common.search.initialHint")} />}
       </Container>
     </div>
   );

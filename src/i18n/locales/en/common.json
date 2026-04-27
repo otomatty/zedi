@@ -36,5 +36,38 @@
   "useWithoutSignIn": "Use without signing in",
   "startUsingApp": "Start using the app",
   "createPageFailed": "Failed to create page",
-  "copyFailed": "Copy failed"
+  "copyFailed": "Copy failed",
+  "untitledPage": "Untitled page",
+  "sharedNoteContext": "(Shared note)",
+  "newConversation": "New conversation",
+  "search": {
+    "resultsHeading": "Results for \"{{query}}\"",
+    "resultsCount": "{{count}} results",
+    "promptHeading": "Enter a search keyword",
+    "minChars": "Please enter at least 3 characters",
+    "emptyTitle": "No results found",
+    "emptyDescription": "Try a different keyword",
+    "initialHint": "Use the search bar in the header to enter a keyword"
+  },
+  "date": {
+    "today": "Today ({{date}})",
+    "yesterday": "Yesterday ({{date}})",
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} hr ago",
+    "daysAgo": "{{count}} day ago"
+  },
+  "wikiIndex": {
+    "pageTitle": "Wiki Index",
+    "backToHome": "Back to home",
+    "rebuild": "Rebuild",
+    "description": "Auto-generated category index (equivalent to Karpathy's LLM Wiki index.md). Rebuild after adding or updating pages to refresh categories.",
+    "totalPagesLabel": "Total pages:",
+    "categoryCountLabel": "Categories:",
+    "lastBuiltAt": "Last built at {{date}}",
+    "notBuiltYet": "Not built yet",
+    "openIndexPage": "Open __index__ page",
+    "noPagesYet": "No pages yet.",
+    "pageCount": "{{count}} pages"
+  }
 }

@@ -3,6 +3,7 @@
  * AI service abstraction layer. Dispatches API calls based on mode.
  */
 
+import i18n from "@/i18n";
 import {
   type AISettings,
   type APIMode,
@@ -146,7 +147,9 @@ async function callAIWithUserKey(
       }
     }
   } catch (error) {
-    callbacks.onError?.(error instanceof Error ? error : new Error("AI API呼び出しエラー"));
+    callbacks.onError?.(
+      error instanceof Error ? error : new Error(i18n.t("errors.aiApiCallError")),
+    );
   }
 }
 
@@ -169,9 +172,7 @@ async function callAIWithClaudeCode(
 
     const available = await provider.isAvailable();
     if (!available) {
-      throw new Error(
-        "Claude Code が利用できません。デスクトップアプリで Claude Code がインストールされていることを確認してください。",
-      );
+      throw new Error(i18n.t("errors.claudeCodeUnavailable"));
     }
 
     let fullContent = "";
@@ -212,7 +213,9 @@ async function callAIWithClaudeCode(
 
     callbacks.onComplete?.({ content: fullContent, finishReason: fullContent ? "stop" : "abort" });
   } catch (error) {
-    callbacks.onError?.(error instanceof Error ? error : new Error("Claude Code 呼び出しエラー"));
+    callbacks.onError?.(
+      error instanceof Error ? error : new Error(i18n.t("errors.claudeCodeCallError")),
+    );
   }
 }
 

@@ -3,6 +3,7 @@
  * AI service — model listing and usage fetching.
  */
 
+import i18n from "@/i18n";
 import type { AIModel, AIUsage, CachedServerModels, UserTier } from "@/types/ai";
 
 /** Uses same base URL as REST API (VITE_API_BASE_URL). */
@@ -93,7 +94,7 @@ async function fetchModelsFromApi(
   }
 
   if (!response.ok) {
-    const err = new FetchServerModelsError("API エラーが発生しました", "HTTP", {
+    const err = new FetchServerModelsError(i18n.t("errors.apiError"), "HTTP", {
       status: response.status,
       statusText: response.statusText,
       body: bodyText.slice(0, 500),
@@ -110,17 +111,25 @@ async function fetchModelsFromApi(
   try {
     data = JSON.parse(bodyText) as { models?: unknown[]; tier?: UserTier };
   } catch (_e) {
-    const err = new FetchServerModelsError("レスポンスが JSON ではありません", "INVALID_RESPONSE", {
-      body: bodyText.slice(0, 500),
-    });
+    const err = new FetchServerModelsError(
+      i18n.t("errors.apiResponseNotJson"),
+      "INVALID_RESPONSE",
+      {
+        body: bodyText.slice(0, 500),
+      },
+    );
     console.error("[fetchServerModels]", { body: bodyText.slice(0, 500) });
     throw err;
   }
 
   if (!Array.isArray(data.models)) {
-    const err = new FetchServerModelsError("API のレスポンス形式が不正です", "INVALID_RESPONSE", {
-      body: bodyText.slice(0, 500),
-    });
+    const err = new FetchServerModelsError(
+      i18n.t("errors.apiResponseInvalid"),
+      "INVALID_RESPONSE",
+      {
+        body: bodyText.slice(0, 500),
+      },
+    );
     console.error("[fetchServerModels]", { body: bodyText.slice(0, 500) });
     throw err;
   }
@@ -168,10 +177,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
     url: apiBaseUrl ? `${apiBaseUrl}/api/ai/models` : "(none)",
   });
   if (!apiBaseUrl) {
-    const err = new FetchServerModelsError(
-      "VITE_API_BASE_URL が設定されていません。.env に API サーバーの URL を設定してください。",
-      "NO_BASE_URL",
-    );
+    const err = new FetchServerModelsError(i18n.t("errors.apiBaseUrlMissing"), "NO_BASE_URL");
     console.error("[fetchServerModels]", err.message);
     throw err;
   }

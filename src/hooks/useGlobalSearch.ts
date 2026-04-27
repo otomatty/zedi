@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import i18n from "@/i18n";
 import { useSearchPages, useSearchSharedNotes } from "./usePageQueries";
 import { useDebouncedValue } from "./useDebouncedValue";
 import { extractPlainText } from "@/lib/contentUtils";
@@ -157,7 +158,7 @@ export function buildGlobalSearchResults(
       const highlightedText = highlightKeywords(matchedText, keywords);
       return {
         pageId: page.id,
-        title: page.title || "無題のページ",
+        title: page.title || i18n.t("common.untitledPage"),
         highlightedText,
         matchType,
         sourceUrl: page.sourceUrl,
@@ -179,8 +180,8 @@ export function buildGlobalSearchResults(
       // Only note-native rows route under /notes; bare linked personal rows
       // (`note_id IS NULL`) keep the personal /pages destination.
       noteId: r.note_id ?? undefined,
-      title: r.title ?? "無題のページ",
-      highlightedText: highlightedText || "（共有ノート）",
+      title: r.title ?? i18n.t("common.untitledPage"),
+      highlightedText: highlightedText || i18n.t("common.sharedNoteContext"),
       matchType: "content" as MatchType,
       sourceUrl: r.source_url ?? undefined,
       score: 0,

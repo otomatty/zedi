@@ -1,3 +1,5 @@
+import i18n from "@/i18n";
+
 // Supported node types in zedi's Tiptap schema
 const SUPPORTED_NODE_TYPES = new Set([
   "doc",
@@ -468,7 +470,7 @@ export function generateAutoTitle(content: string): string {
   const plainText = extractPlainText(content);
   const firstLine = plainText.split("\n")[0]?.trim() || "";
 
-  if (!firstLine) return "無題のページ";
+  if (!firstLine) return i18n.t("common.untitledPage");
 
   // Use first 40 characters of the first line
   if (firstLine.length <= 40) return firstLine;
@@ -483,17 +485,21 @@ export function buildContentErrorMessage(result: SanitizeResult): string {
   const parts: string[] = [];
 
   if (result.removedNodeTypes.length > 0) {
-    parts.push(`未対応のノード: ${result.removedNodeTypes.join(", ")}`);
+    parts.push(
+      i18n.t("errors.contentUnsupportedNode", { types: result.removedNodeTypes.join(", ") }),
+    );
   }
   if (result.removedMarkTypes.length > 0) {
-    parts.push(`未対応のマーク: ${result.removedMarkTypes.join(", ")}`);
+    parts.push(
+      i18n.t("errors.contentUnsupportedMark", { types: result.removedMarkTypes.join(", ") }),
+    );
   }
 
   if (parts.length === 0) {
-    return "コンテンツに問題がありました。";
+    return i18n.t("errors.contentInvalid");
   }
 
-  return `移行データに問題があります。${parts.join("、")}が含まれていたため自動的に修正されました。`;
+  return i18n.t("errors.migrationDataIssue", { fields: parts.join("、") });
 }
 
 /**

@@ -3,6 +3,7 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
+import i18n from "@/i18n";
 import { AISettings, AIProviderType, CachedModels, getDefaultModels } from "@/types/ai";
 
 /** Union of SDK client types used for user-API-key mode. */
@@ -197,7 +198,7 @@ async function testOpenAIConnection(apiKey: string): Promise<ConnectionTestResul
 
     return {
       success: true,
-      message: `接続成功！ ${models.length}個のモデルが利用可能です`,
+      message: i18n.t("errors.connectionSuccessWithModels", { count: models.length }),
       models,
     };
   } catch (error) {
@@ -206,14 +207,14 @@ async function testOpenAIConnection(apiKey: string): Promise<ConnectionTestResul
     if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key")) {
       return {
         success: false,
-        message: "APIキーが無効です",
+        message: i18n.t("errors.apiKeyInvalid"),
         error: errorMessage,
       };
     }
 
     return {
       success: false,
-      message: "接続に失敗しました",
+      message: i18n.t("errors.apiConnectionFailed"),
       error: errorMessage,
     };
   }
@@ -241,14 +242,14 @@ async function testAnthropicConnection(apiKey: string): Promise<ConnectionTestRe
       const models = getDefaultModels("anthropic");
       return {
         success: true,
-        message: "接続成功！ Anthropic APIが利用可能です",
+        message: i18n.t("errors.anthropicConnectionSuccess"),
         models,
       };
     }
 
     return {
       success: false,
-      message: "予期しないレスポンス形式です",
+      message: i18n.t("errors.unexpectedResponseFormat"),
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -256,14 +257,14 @@ async function testAnthropicConnection(apiKey: string): Promise<ConnectionTestRe
     if (errorMessage.includes("401") || errorMessage.includes("authentication")) {
       return {
         success: false,
-        message: "APIキーが無効です",
+        message: i18n.t("errors.apiKeyInvalid"),
         error: errorMessage,
       };
     }
 
     return {
       success: false,
-      message: "接続に失敗しました",
+      message: i18n.t("errors.apiConnectionFailed"),
       error: errorMessage,
     };
   }
@@ -282,7 +283,7 @@ async function testGoogleConnection(apiKey: string): Promise<ConnectionTestResul
 
     return {
       success: true,
-      message: `接続成功！ ${models.length}個のモデルが利用可能です`,
+      message: i18n.t("errors.connectionSuccessWithModels", { count: models.length }),
       models,
     };
   } catch (error) {
@@ -291,14 +292,14 @@ async function testGoogleConnection(apiKey: string): Promise<ConnectionTestResul
     if (errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("400")) {
       return {
         success: false,
-        message: "APIキーが無効です",
+        message: i18n.t("errors.apiKeyInvalid"),
         error: errorMessage,
       };
     }
 
     return {
       success: false,
-      message: "接続に失敗しました",
+      message: i18n.t("errors.apiConnectionFailed"),
       error: errorMessage,
     };
   }
@@ -316,7 +317,7 @@ export async function testConnection(
   if (provider !== "claude-code" && (!apiKey || apiKey.trim() === "")) {
     return {
       success: false,
-      message: "APIキーを入力してください",
+      message: i18n.t("errors.apiKeyRequired"),
     };
   }
 
@@ -330,14 +331,13 @@ export async function testConnection(
     case "claude-code":
       return {
         success: false,
-        message:
-          "Claude Code は API キー接続テスト非対応です。設定画面で利用可否を確認してください。",
+        message: i18n.t("errors.claudeCodeConnectionTestUnsupported"),
       };
     default: {
       const _exhaustive: never = provider;
       return {
         success: false,
-        message: `不明なプロバイダー: ${_exhaustive}`,
+        message: i18n.t("errors.unknownProvider", { provider: _exhaustive }),
       };
     }
   }
