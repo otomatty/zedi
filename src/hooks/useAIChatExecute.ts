@@ -1,4 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import i18n from "@/i18n";
 import type {
   ChatMessage,
   ChatTreeState,
@@ -127,7 +128,7 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     }
     settings = loaded;
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "AI設定の読み込みに失敗しました";
+    const errorMessage = err instanceof Error ? err.message : i18n.t("errors.aiSettingsLoadFailed");
     patchAssistantSettingsLoadFailure(
       setTree,
       assistantMessageId,

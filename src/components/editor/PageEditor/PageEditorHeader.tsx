@@ -193,7 +193,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
           )}
           {lastSaved && (
             <span className="text-muted-foreground hidden text-xs sm:inline">
-              {formatTimeAgo(lastSaved)}に保存
+              {t("editor.savedAt", { relative: formatTimeAgo(lastSaved) })}
             </span>
           )}
 

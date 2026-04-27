@@ -60,7 +60,9 @@ export function AIChatConversationList({
               >
                 <MessageSquare className="h-4 w-4 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{conv.title || "新しい会話"}</p>
+                  <p className="truncate text-sm font-medium">
+                    {conv.title || t("common.newConversation")}
+                  </p>
                   <p className="text-muted-foreground text-xs">
                     {new Date(conv.updatedAt).toLocaleDateString()}
                   </p>
@@ -71,7 +73,7 @@ export function AIChatConversationList({
                     onDelete(conv.id);
                   }}
                   className="hover:bg-destructive/10 rounded p-1 opacity-0 transition-all group-hover:opacity-100"
-                  title="削除"
+                  title={t("aiChat.history.delete")}
                 >
                   <Trash2 className="text-destructive h-3.5 w-3.5" />
                 </button>

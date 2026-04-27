@@ -14,9 +14,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { format } from "date-fns";
 import { Button, useToast } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { getActiveLocale } from "@/lib/dateUtils";
 
 /**
  * Read-only response from GET /api/activity/index.
@@ -95,6 +98,7 @@ async function rebuildIndex(): Promise<IndexRebuildResponse> {
  */
 const IndexPage: React.FC = () => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [data, setData] = useState<IndexViewModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
@@ -131,11 +135,11 @@ const IndexPage: React.FC = () => {
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      toast({ title: "Index の再構築に失敗しました", variant: "destructive" });
+      toast({ title: t("errors.indexRebuildFailed"), variant: "destructive" });
     } finally {
       setRebuilding(false);
     }
-  }, [toast]);
+  }, [toast, t]);
 
   useEffect(() => {
     void load();
@@ -146,9 +150,9 @@ const IndexPage: React.FC = () => {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title="Wiki Index / カテゴリ目次"
+        title={t("common.wikiIndex.pageTitle")}
         backTo="/home"
-        backLabel="Back to home"
+        backLabel={t("common.wikiIndex.backToHome")}
         actions={
           <Button onClick={() => void rebuild()} disabled={busy} size="sm">
             {rebuilding ? (
@@ -156,7 +160,7 @@ const IndexPage: React.FC = () => {
             ) : (
               <RefreshCw className="mr-2 h-4 w-4" />
             )}
-            再構築 / Rebuild
+            {t("common.wikiIndex.rebuild")}
           </Button>
         }
       />
@@ -164,11 +168,7 @@ const IndexPage: React.FC = () => {
       <div className="min-h-0 flex-1 py-6">
         <Container>
           <div className="mx-auto max-w-2xl space-y-6">
-            <p className="text-muted-foreground text-sm">
-              AI が生成するカテゴリ別目次（Karpathy LLM Wiki の
-              <code className="mx-1">index.md</code>
-              相当）。ページを追加・更新したあとに再構築するとカテゴリが更新されます。
-            </p>
+            <p className="text-muted-foreground text-sm">{t("common.wikiIndex.description")}</p>
 
             {error && (
               <div className="rounded bg-red-900/30 px-3 py-2 text-sm text-red-200">{error}</div>
@@ -184,20 +184,30 @@ const IndexPage: React.FC = () => {
               <>
                 <div className="bg-muted/40 rounded border px-4 py-3 text-sm">
                   <div>
-                    <span className="text-muted-foreground">対象ページ数:</span>{" "}
+                    <span className="text-muted-foreground">
+                      {t("common.wikiIndex.totalPagesLabel")}
+                    </span>{" "}
                     <span className="font-semibold">{data.totalPages}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">カテゴリ数:</span>{" "}
+                    <span className="text-muted-foreground">
+                      {t("common.wikiIndex.categoryCountLabel")}
+                    </span>{" "}
                     <span className="font-semibold">{data.categories.length}</span>
                   </div>
                   {data.timestamp ? (
                     <div className="text-muted-foreground mt-1 text-xs">
-                      Last built at {new Date(data.timestamp).toLocaleString()}
+                      {t("common.wikiIndex.lastBuiltAt", {
+                        date: format(
+                          new Date(data.timestamp),
+                          t("common.date.format.fullDateTime"),
+                          { locale: getActiveLocale() },
+                        ),
+                      })}
                     </div>
                   ) : (
                     <div className="text-muted-foreground mt-1 text-xs">
-                      まだ再構築されていません / Not built yet
+                      {t("common.wikiIndex.notBuiltYet")}
                     </div>
                   )}
                   {data.pageId && (
@@ -206,14 +216,14 @@ const IndexPage: React.FC = () => {
                         to={`/pages/${data.pageId}`}
                         className="text-primary text-sm underline underline-offset-2"
                       >
-                        __index__ ページを開く / Open __index__ page
+                        {t("common.wikiIndex.openIndexPage")}
                       </Link>
                     </div>
                   )}
                 </div>
 
                 {data.categories.length === 0 ? (
-                  <p className="text-muted-foreground">まだページがありません。 / No pages yet.</p>
+                  <p className="text-muted-foreground">{t("common.wikiIndex.noPagesYet")}</p>
                 ) : (
                   <ul className="divide-border divide-y rounded border">
                     {data.categories.map((cat) => (
@@ -222,7 +232,9 @@ const IndexPage: React.FC = () => {
                         className="flex items-center justify-between px-4 py-2 text-sm"
                       >
                         <span className="font-medium">{cat.label}</span>
-                        <span className="text-muted-foreground">{cat.count} ページ</span>
+                        <span className="text-muted-foreground">
+                          {t("common.wikiIndex.pageCount", { count: cat.count })}
+                        </span>
                       </li>
                     ))}
                   </ul>

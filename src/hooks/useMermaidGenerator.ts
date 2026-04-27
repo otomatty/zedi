@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import i18n from "@/i18n";
 import {
   generateMermaidDiagram,
   getAISettingsOrThrow,
@@ -6,6 +7,9 @@ import {
   MermaidGeneratorResult,
 } from "@/lib/mermaidGenerator";
 
+/**
+ *
+ */
 export type MermaidGeneratorStatus = "idle" | "generating" | "completed" | "error";
 
 interface UseMermaidGeneratorReturn {
@@ -18,12 +22,30 @@ interface UseMermaidGeneratorReturn {
   checkAIConfigured: () => Promise<boolean>;
 }
 
+/**
+ *
+ */
 export function useMermaidGenerator(): UseMermaidGeneratorReturn {
+  /**
+   *
+   */
   const [status, setStatus] = useState<MermaidGeneratorStatus>("idle");
+  /**
+   *
+   */
   const [result, setResult] = useState<MermaidGeneratorResult | null>(null);
+  /**
+   *
+   */
   const [error, setError] = useState<Error | null>(null);
+  /**
+   *
+   */
   const [isAIConfigured, setIsAIConfigured] = useState<boolean | null>(null);
 
+  /**
+   *
+   */
   const checkAIConfigured = useCallback(async (): Promise<boolean> => {
     try {
       await getAISettingsOrThrow();
@@ -35,15 +57,18 @@ export function useMermaidGenerator(): UseMermaidGeneratorReturn {
     }
   }, []);
 
+  /**
+   *
+   */
   const generate = useCallback(async (text: string, diagramTypes: MermaidDiagramType[]) => {
     if (!text.trim()) {
-      setError(new Error("テキストが空です"));
+      setError(new Error(i18n.t("errors.mermaidEmptyText")));
       setStatus("error");
       return;
     }
 
     if (diagramTypes.length === 0) {
-      setError(new Error("ダイアグラムタイプを選択してください"));
+      setError(new Error(i18n.t("errors.mermaidTypeRequired")));
       setStatus("error");
       return;
     }
@@ -64,12 +89,19 @@ export function useMermaidGenerator(): UseMermaidGeneratorReturn {
         },
       });
     } catch (err) {
-      const error = err instanceof Error ? err : new Error("生成中にエラーが発生しました");
+      /**
+       *
+       */
+      const error =
+        err instanceof Error ? err : new Error(i18n.t("errors.mermaidGenerationFailed"));
       setError(error);
       setStatus("error");
     }
   }, []);
 
+  /**
+   *
+   */
   const reset = useCallback(() => {
     setStatus("idle");
     setResult(null);

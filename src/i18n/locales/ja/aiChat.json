@@ -30,7 +30,9 @@
     "withContext": "このページについて質問..."
   },
   "context": {
-    "referencing": "「{{title}}」を参照中"
+    "referencing": "「{{title}}」を参照中",
+    "disable": "コンテキストを無効化",
+    "enable": "コンテキストを有効化"
   },
   "welcome": {
     "editor": {

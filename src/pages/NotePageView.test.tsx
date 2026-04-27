@@ -213,7 +213,7 @@ describe("NotePageView", () => {
 
     renderNotePageView();
 
-    expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+    expect(screen.getByText("common.loading")).toBeInTheDocument();
   });
 
   it("shows not found message when note or page is not found", () => {
@@ -331,7 +331,11 @@ describe("NotePageView", () => {
       expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
     });
     expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "タイトルの保存に失敗しました", variant: "destructive" }),
+      expect.objectContaining({
+        title: "errors.titleSaveFailedTitle",
+        description: "errors.titleSaveFailedDescription",
+        variant: "destructive",
+      }),
     );
     consoleError.mockRestore();
   });

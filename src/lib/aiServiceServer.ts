@@ -3,6 +3,7 @@
  * AI service — API server calls via SSE streaming.
  */
 
+import i18n from "@/i18n";
 import type { AIResponseUsage } from "@/types/ai";
 import type { AIServiceRequest, AIServiceCallbacks, AIServiceResponse } from "./aiService";
 
@@ -104,7 +105,7 @@ async function fetchAIChatResponse(
 ): Promise<Response> {
   const apiBaseUrl = getAIAPIBaseUrl();
   if (!apiBaseUrl) {
-    throw new Error("AI APIサーバーのURLが設定されていません");
+    throw new Error(i18n.t("errors.aiApiServerUrlMissing"));
   }
   const response = await fetch(`${apiBaseUrl}/api/ai/chat`, {
     method: "POST",
@@ -125,7 +126,7 @@ async function fetchAIChatResponse(
   }
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
-    const message = errorBody?.error || response.statusText || "AI API呼び出しエラー";
+    const message = errorBody?.error || response.statusText || i18n.t("errors.aiApiCallError");
     throw new Error(message);
   }
   return response;
@@ -140,7 +141,7 @@ async function handleAIChatHttpResponse(
   if (request.options?.stream) {
     const reader = response.body?.getReader();
     if (!reader) {
-      throw new Error("ストリーミングレスポンスが取得できません");
+      throw new Error(i18n.t("errors.streamingResponseUnavailable"));
     }
     const state = {
       fullContent: "",
@@ -155,7 +156,7 @@ async function handleAIChatHttpResponse(
         usage: state.lastUsage,
       });
     } else if (!streamCompleted && !state.fullContent) {
-      callbacks.onError?.(new Error("ストリーミングレスポンスが空のまま切断されました"));
+      callbacks.onError?.(new Error(i18n.t("errors.streamingResponseEmpty")));
     }
     return;
   }
@@ -182,6 +183,8 @@ export async function callAIWithServer(
     const response = await fetchAIChatResponse(request, abortSignal);
     await handleAIChatHttpResponse(response, request, callbacks, abortSignal);
   } catch (error) {
-    callbacks.onError?.(error instanceof Error ? error : new Error("AI API呼び出しエラー"));
+    callbacks.onError?.(
+      error instanceof Error ? error : new Error(i18n.t("errors.aiApiCallError")),
+    );
   }
 }
