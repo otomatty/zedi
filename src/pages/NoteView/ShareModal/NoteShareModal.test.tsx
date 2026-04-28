@@ -153,7 +153,8 @@ describe("NoteShareModal", () => {
     expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "notes.shareTabVisibility" }));
     expect(screen.getByText("notes.shareReadOnlyNotice")).toBeInTheDocument();
-    // owner-only Save button must be absent for editors
+    // editor では owner 専用の Save ボタンが描画されないこと。
+    // owner-only Save button must be absent for editors.
     expect(
       screen.queryByRole("button", { name: "notes.shareSaveChanges" }),
     ).not.toBeInTheDocument();
@@ -187,9 +188,11 @@ describe("NoteShareModal", () => {
 
   it("editor's members tab hides the invite form and full-page link", () => {
     renderModal({ userRole: "editor" });
-    // Invite form heading is replaced by a plain "members" heading in read-only mode
+    // read-only モードでは招待フォームの見出しが「メンバー」見出しに差し替わる。
+    // Invite form heading is replaced by a plain "members" heading in read-only mode.
     expect(screen.queryByRole("heading", { name: "notes.inviteMember" })).not.toBeInTheDocument();
-    // The full-members-page link (rendered in the footer of the tab) is hidden for editors
+    // フルメンバーページへのリンク（タブ末尾）も editor には表示しない。
+    // The full-members-page link (rendered in the footer of the tab) is hidden for editors.
     expect(
       screen.queryByRole("link", { name: /notes\.shareOpenMembersPage/ }),
     ).not.toBeInTheDocument();

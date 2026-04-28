@@ -15,7 +15,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
-import type { Note } from "@/types/note";
+import type { Note, NoteAccessRole } from "@/types/note";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -42,12 +42,17 @@ vi.mock("@/hooks/useNoteQueries", () => ({
 }));
 
 // 共有モーダルは別テストでカバー済み。ここは「呼ばれたか」だけ気にする。
+// `userRole` のフォールバックはコンポーネント本体の最小権限既定値 (`"none"`) と
+// 揃え、呼び出し側で渡し漏れがあった場合に回帰として顕在化させる (#794 review)。
+//
 // The share modal has its own test suite — stub it here to keep this file
-// focused on the entry-point UI.
+// focused on the entry-point UI. The fallback for `userRole` mirrors the
+// component's least-privilege default (`"none"`) so a missing-prop regression
+// surfaces in tests instead of being silently promoted to owner UI.
 vi.mock("./ShareModal/NoteShareModal", () => ({
-  NoteShareModal: ({ open, userRole }: { open: boolean; userRole?: string }) =>
+  NoteShareModal: ({ open, userRole }: { open: boolean; userRole?: NoteAccessRole }) =>
     open ? (
-      <div data-testid="note-share-modal" data-user-role={userRole ?? "owner"}>
+      <div data-testid="note-share-modal" data-user-role={userRole ?? "none"}>
         ShareModal
       </div>
     ) : null,
