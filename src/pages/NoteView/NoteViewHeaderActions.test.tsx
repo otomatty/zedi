@@ -73,12 +73,16 @@ const baseNote: Note = {
 
 function renderActions(props: Partial<React.ComponentProps<typeof NoteViewHeaderActions>> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // 既定値は最小権限の `"none"`。各テストはエレベートしたロールを明示的に渡す。
+  // Default to least-privilege `"none"`; tests opt into elevated roles
+  // explicitly so a missing override surfaces as an obvious test failure
+  // instead of silently rendering owner UI.
   const merged = {
     note: baseNote,
     canManageMembers: true,
     isSignedIn: true,
     canView: true,
-    userRole: "owner" as const,
+    userRole: "none" as const,
     ...props,
   };
   return render(
