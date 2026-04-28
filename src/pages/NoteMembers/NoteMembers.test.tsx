@@ -44,7 +44,18 @@ vi.mock("@/components/layout/Container", () => ({
   ),
 }));
 vi.mock("./NoteMembersManageSection", () => ({
-  NoteMembersManageSection: () => <div data-testid="members-manage-section">ManageSection</div>,
+  NoteMembersManageSection: ({ readOnly }: { readOnly?: boolean }) => (
+    <div data-testid="members-manage-section" data-readonly={readOnly ? "true" : "false"}>
+      ManageSection
+    </div>
+  ),
+}));
+vi.mock("./NoteInviteLinksSection", () => ({
+  NoteInviteLinksSection: ({ readOnly }: { readOnly?: boolean }) => (
+    <div data-testid="invite-links-section" data-readonly={readOnly ? "true" : "false"}>
+      InviteLinksSection
+    </div>
+  ),
 }));
 
 function renderNoteMembers(noteId: string) {
@@ -106,10 +117,10 @@ describe("NoteMembers", () => {
     );
   });
 
-  it("shows no permission to manage members when canManageMembers is false", () => {
+  it("shows no permission to manage members when role=viewer (no manage + no editor read-only)", () => {
     vi.mocked(useNote).mockReturnValue({
       note: { id: "n1", title: "My Note" },
-      access: { canView: true, canManageMembers: false },
+      access: { role: "viewer", canView: true, canManageMembers: false },
       source: "local",
       isLoading: false,
     } as never);
@@ -118,14 +129,31 @@ describe("NoteMembers", () => {
     expect(screen.queryByTestId("members-manage-section")).not.toBeInTheDocument();
   });
 
-  it("shows manage section when canManageMembers is true", () => {
+  it("shows manage section when canManageMembers is true (owner editable)", () => {
     vi.mocked(useNote).mockReturnValue({
       note: { id: "n1", title: "My Note" },
-      access: { canView: true, canManageMembers: true },
+      access: { role: "owner", canView: true, canManageMembers: true },
       source: "local",
       isLoading: false,
     } as never);
     renderNoteMembers("note-1");
-    expect(screen.getByTestId("members-manage-section")).toBeInTheDocument();
+    const section = screen.getByTestId("members-manage-section");
+    expect(section).toBeInTheDocument();
+    expect(section).toHaveAttribute("data-readonly", "false");
+  });
+
+  it("editor (canView, no manage) sees the members section in read-only mode (#675)", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "n1", title: "My Note" },
+      access: { role: "editor", canView: true, canManageMembers: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    renderNoteMembers("note-1");
+    const section = screen.getByTestId("members-manage-section");
+    expect(section).toBeInTheDocument();
+    expect(section).toHaveAttribute("data-readonly", "true");
+    // Permission denial message must NOT appear for editors
+    expect(screen.queryByText("notes.noPermissionToManageMembers")).not.toBeInTheDocument();
   });
 });

@@ -129,6 +129,18 @@ export interface NoteInviteLinksSectionProps {
    * `NoteEditPermission` domain type (#676 coderabbit).
    */
   editPermission?: NoteEditPermission;
+  /**
+   * read-only モードで描画するか。editor 向けに既存のリンクだけ閲覧（コピー）
+   * させたいときに `true` を渡す。
+   * - 発行フォーム（Label / Role / Expiry / MaxUses / Create）は非表示
+   * - 既存リンクのコピーボタンは引き続き表示（共有用途）
+   * - 取り消しボタンは非表示（破壊的操作なので owner 限定）
+   *
+   * Render in read-only mode. Hides the create form and revoke buttons but
+   * keeps the per-row copy button so editors can still distribute existing
+   * links. Owner-only destructive ops stay hidden.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -139,6 +151,7 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
   noteId,
   now,
   editPermission,
+  readOnly = false,
 }) => {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -338,68 +351,77 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
       <h2 className="mb-1 text-sm font-semibold">{t("notes.inviteLinksTitle")}</h2>
       <p className="text-muted-foreground mb-4 text-xs">{t("notes.inviteLinksPhase5Hint")}</p>
 
-      <div className="grid gap-3 md:grid-cols-[1fr_140px_160px_160px_auto]">
-        <Input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder={t("notes.inviteLinksLabelPlaceholder")}
-          aria-label={t("notes.inviteLinksLabelAria")}
-        />
-        <Select value={role} onValueChange={handleRoleChange}>
-          <SelectTrigger aria-label={t("notes.inviteLinksRoleAria")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="viewer">{t("notes.inviteLinksRoleViewer")}</SelectItem>
-            <SelectItem value="editor" disabled={!canCreateEditorLink}>
-              {t("notes.inviteLinksRoleEditor")}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={expiryPreset} onValueChange={(v) => setExpiryPreset(v as ExpiryPreset)}>
-          <SelectTrigger aria-label={t("notes.inviteLinksExpiryAria")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="d1">{t("notes.inviteLinksExpiry1d")}</SelectItem>
-            <SelectItem value="d7">{t("notes.inviteLinksExpiry7d")}</SelectItem>
-            <SelectItem value="d30">{t("notes.inviteLinksExpiry30d")}</SelectItem>
-            <SelectItem value="d90">{t("notes.inviteLinksExpiry90d")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={maxUsesPreset} onValueChange={(v) => setMaxUsesPreset(v as MaxUsesPreset)}>
-          <SelectTrigger aria-label={t("notes.inviteLinksMaxUsesAria")}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">{t("notes.inviteLinksMaxUsesN", { count: 1 })}</SelectItem>
-            <SelectItem value="10">{t("notes.inviteLinksMaxUsesN", { count: 10 })}</SelectItem>
-            <SelectItem value="50">{t("notes.inviteLinksMaxUsesN", { count: 50 })}</SelectItem>
-            <SelectItem value="100">{t("notes.inviteLinksMaxUsesN", { count: 100 })}</SelectItem>
-            <SelectItem value="unlimited">{t("notes.inviteLinksMaxUsesUnlimited")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          onClick={handleCreate}
-          disabled={createMutation.isPending || needsEditorAck}
-          className="gap-1"
-        >
-          {createMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
-          {t("notes.inviteLinksCreateCta")}
-        </Button>
-      </div>
+      {!readOnly ? (
+        <>
+          <div className="grid gap-3 md:grid-cols-[1fr_140px_160px_160px_auto]">
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder={t("notes.inviteLinksLabelPlaceholder")}
+              aria-label={t("notes.inviteLinksLabelAria")}
+            />
+            <Select value={role} onValueChange={handleRoleChange}>
+              <SelectTrigger aria-label={t("notes.inviteLinksRoleAria")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="viewer">{t("notes.inviteLinksRoleViewer")}</SelectItem>
+                <SelectItem value="editor" disabled={!canCreateEditorLink}>
+                  {t("notes.inviteLinksRoleEditor")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={expiryPreset} onValueChange={(v) => setExpiryPreset(v as ExpiryPreset)}>
+              <SelectTrigger aria-label={t("notes.inviteLinksExpiryAria")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="d1">{t("notes.inviteLinksExpiry1d")}</SelectItem>
+                <SelectItem value="d7">{t("notes.inviteLinksExpiry7d")}</SelectItem>
+                <SelectItem value="d30">{t("notes.inviteLinksExpiry30d")}</SelectItem>
+                <SelectItem value="d90">{t("notes.inviteLinksExpiry90d")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={maxUsesPreset}
+              onValueChange={(v) => setMaxUsesPreset(v as MaxUsesPreset)}
+            >
+              <SelectTrigger aria-label={t("notes.inviteLinksMaxUsesAria")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">{t("notes.inviteLinksMaxUsesN", { count: 1 })}</SelectItem>
+                <SelectItem value="10">{t("notes.inviteLinksMaxUsesN", { count: 10 })}</SelectItem>
+                <SelectItem value="50">{t("notes.inviteLinksMaxUsesN", { count: 50 })}</SelectItem>
+                <SelectItem value="100">
+                  {t("notes.inviteLinksMaxUsesN", { count: 100 })}
+                </SelectItem>
+                <SelectItem value="unlimited">{t("notes.inviteLinksMaxUsesUnlimited")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleCreate}
+              disabled={createMutation.isPending || needsEditorAck}
+              className="gap-1"
+            >
+              {createMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              {t("notes.inviteLinksCreateCta")}
+            </Button>
+          </div>
 
-      {role === "editor" && !canCreateEditorLink ? (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-          {t("notes.inviteLinksEditorUnavailableOwnerOnly")}
-        </p>
+          {role === "editor" && !canCreateEditorLink ? (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              {t("notes.inviteLinksEditorUnavailableOwnerOnly")}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
-      <div className="mt-4 space-y-3">
+      <div className={readOnly ? "space-y-3" : "mt-4 space-y-3"}>
         {isLoading ? (
           <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
         ) : links.length === 0 ? (
@@ -413,12 +435,16 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
               onCopy={() => handleCopy(link.token)}
               onRevoke={() => handleRevoke(link.id)}
               revoking={revokeMutation.isPending}
+              readOnly={readOnly}
             />
           ))
         )}
       </div>
 
-      <AlertDialog open={editorConfirmOpen} onOpenChange={handleEditorDialogOpenChange}>
+      <AlertDialog
+        open={!readOnly && editorConfirmOpen}
+        onOpenChange={handleEditorDialogOpenChange}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -452,6 +478,11 @@ interface InviteLinkRowViewProps {
   onCopy: () => void;
   onRevoke: () => void;
   revoking: boolean;
+  /**
+   * read-only モードでは取り消しボタンを出さない（コピーは引き続き可）。
+   * In read-only mode the revoke button is hidden; copy stays available.
+   */
+  readOnly?: boolean;
 }
 
 const InviteLinkRowView: React.FC<InviteLinkRowViewProps> = ({
@@ -460,6 +491,7 @@ const InviteLinkRowView: React.FC<InviteLinkRowViewProps> = ({
   onCopy,
   onRevoke,
   revoking,
+  readOnly = false,
 }) => {
   const { t } = useTranslation();
   const expiresMs = new Date(link.expires_at).getTime();
@@ -539,16 +571,18 @@ const InviteLinkRowView: React.FC<InviteLinkRowViewProps> = ({
         >
           <Copy className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("notes.inviteLinksRevokeAria")}
-          title={t("notes.inviteLinksRevoke")}
-          onClick={onRevoke}
-          disabled={revoking}
-        >
-          <XCircle className="h-4 w-4" />
-        </Button>
+        {!readOnly ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("notes.inviteLinksRevokeAria")}
+            title={t("notes.inviteLinksRevoke")}
+            onClick={onRevoke}
+            disabled={revoking}
+          >
+            <XCircle className="h-4 w-4" />
+          </Button>
+        ) : null}
       </div>
     </div>
   );

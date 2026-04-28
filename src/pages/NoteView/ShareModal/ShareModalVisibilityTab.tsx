@@ -225,7 +225,11 @@ function VisibilityTabView({
             {isSaving ? t("common.saving") : t("notes.shareSaveChanges")}
           </Button>
         </div>
-      ) : null}
+      ) : (
+        <p className="text-muted-foreground text-xs" role="note">
+          {t("notes.shareReadOnlyNotice")}
+        </p>
+      )}
     </div>
   );
 }
