@@ -3,8 +3,8 @@
  * Tests for the NoteShareModal tab structure.
  *
  * 観点 / Coverage:
- *   - 基本タブ (メンバー / リンク / 公開設定) が表示される
- *   - ドメインタブは showDomainsTab が true のときのみ表示される
+ *   - 基本タブ (メンバー / リンク / ドメイン / 公開設定) が表示される
+ *   - ドメインタブは showDomainsTab=false で隠せる
  *   - モーダルが閉じているときは hidden 状態
  *   - 公開設定タブで visibility が unlisted のとき共有 URL フィールドが表示される
  */
@@ -52,6 +52,12 @@ vi.mock("@/hooks/useInviteLinks", () => ({
   useRevokeInviteLink: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
+vi.mock("@/hooks/useDomainAccess", () => ({
+  useDomainAccessForNote: () => ({ data: [], isLoading: false }),
+  useCreateDomainAccess: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteDomainAccess: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
 const baseNote: Note = {
   id: "note-1",
   ownerUserId: "user-1",
@@ -81,17 +87,17 @@ describe("NoteShareModal", () => {
     vi.clearAllMocks();
   });
 
-  it("renders members, links, and visibility tabs by default", () => {
+  it("renders members, links, domains, and visibility tabs by default", () => {
     renderModal();
     expect(screen.getByRole("tab", { name: "notes.shareTabMembers" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "notes.shareTabLinks" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabDomains" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "notes.shareTabDomains" })).not.toBeInTheDocument();
   });
 
-  it("shows domains tab when showDomainsTab is true", () => {
-    renderModal({ showDomainsTab: true });
-    expect(screen.getByRole("tab", { name: "notes.shareTabDomains" })).toBeInTheDocument();
+  it("hides the domains tab when showDomainsTab is false", () => {
+    renderModal({ showDomainsTab: false });
+    expect(screen.queryByRole("tab", { name: "notes.shareTabDomains" })).not.toBeInTheDocument();
   });
 
   it("renders nothing visible when open is false", () => {
@@ -121,5 +127,36 @@ describe("NoteShareModal", () => {
     renderModal({ note: { ...baseNote, visibility: "private" } });
     await user.click(screen.getByRole("tab", { name: "notes.shareTabVisibility" }));
     expect(screen.queryByLabelText("notes.shareLink")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the members tab when showDomainsTab flips to false on the active tab", async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <NoteShareModal open onOpenChange={() => {}} note={baseNote} showDomainsTab />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await user.click(screen.getByRole("tab", { name: "notes.shareTabDomains" }));
+    expect(screen.getByRole("tab", { name: "notes.shareTabDomains" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <NoteShareModal open onOpenChange={() => {}} note={baseNote} showDomainsTab={false} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByRole("tab", { name: "notes.shareTabDomains" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabMembers" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
   });
 });

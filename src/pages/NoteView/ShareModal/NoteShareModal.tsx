@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 } from "@zedi/ui";
 import type { Note } from "@/types/note";
 import { NoteInviteLinksSection } from "@/pages/NoteMembers/NoteInviteLinksSection";
+import { ShareModalDomainTab } from "./ShareModalDomainTab";
 import { ShareModalMembersTab } from "./ShareModalMembersTab";
 import { ShareModalVisibilityTab } from "./ShareModalVisibilityTab";
 
@@ -25,17 +26,20 @@ export interface NoteShareModalProps {
   onOpenChange: (open: boolean) => void;
   note: Note;
   /**
-   * Phase 6 (#663) のドメイン許可タブを表示するかどうか。未実装のときは `false` を指定してタブを隠す。
-   * Whether to show the Phase 6 (#663) domain-allowlist tab. Pass `false` (the
-   * default) to hide it until that phase ships.
+   * ドメイン招待タブ (Phase 6 / #663) を表示するか。既定で表示する。
+   * 必要に応じて `false` を渡せば非表示にできる（テスト用途・特殊フロー想定）。
+   *
+   * Whether to show the domain-access tab (Phase 6 / issue #663). Defaults to
+   * `true` now that the feature has shipped; pass `false` to hide it for
+   * specific flows (e.g. tests, edge-case UIs).
    */
   showDomainsTab?: boolean;
 }
 
 /**
- * ノート共有モーダル。メンバー招待・共有リンク・公開設定を 1 つのダイアログに集約する。
- * Consolidated share modal for a note: members, share links, and visibility
- * (domains tab is reserved for Phase 6 and hidden by default).
+ * ノート共有モーダル。メンバー招待・共有リンク・ドメイン招待・公開設定を 1 つのダイアログに集約する。
+ * Consolidated share modal for a note: members, share links, domain access,
+ * and visibility.
  *
  * このモーダルはオーナー向け UI のみサポートする。エディタ向けの読み取り専用
  * 表示は別 Issue のフォローアップで追加する。
@@ -47,10 +51,21 @@ export function NoteShareModal({
   open,
   onOpenChange,
   note,
-  showDomainsTab = false,
+  showDomainsTab = true,
 }: NoteShareModalProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("members");
+
+  // ドメインタブを表示中に `showDomainsTab` が false に切り替わると、Tabs が
+  // 存在しない値を保持してパネルが空になる。先頭の members タブへフォールバック。
+  // If `showDomainsTab` flips to false while the domains tab is active, the
+  // Tabs control would hold a non-existent value; fall back to the first tab.
+  useEffect(() => {
+    if (!showDomainsTab && activeTab === "domains") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- guard for vanished tab
+      setActiveTab("members");
+    }
+  }, [showDomainsTab, activeTab]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,6 +95,12 @@ export function NoteShareModal({
           <TabsContent value="links">
             <NoteInviteLinksSection noteId={note.id} editPermission={note.editPermission} />
           </TabsContent>
+
+          {showDomainsTab ? (
+            <TabsContent value="domains">
+              <ShareModalDomainTab noteId={note.id} enabled={open} />
+            </TabsContent>
+          ) : null}
 
           <TabsContent value="visibility">
             <ShareModalVisibilityTab note={note} canEdit />

@@ -446,3 +446,31 @@ export interface InviteLinkRow {
   label: string | null;
   created_at: string;
 }
+
+// ── Domain access (epic #657 / issue #663) ────────────────────────────────
+
+/**
+ * `note_domain_access` 行の API 表現。サーバーが snake_case で返す。
+ * API representation of a `note_domain_access` row (snake_case from server).
+ */
+export interface DomainAccessRow {
+  id: string;
+  note_id: string;
+  domain: string;
+  role: "viewer" | "editor";
+  created_by_user_id: string;
+  /** v1 では常に null（v2 で DNS-TXT 検証時に設定）/ Always null in v1; reserved for DNS-TXT verification in v2. */
+  verified_at: string | null;
+  created_at: string;
+}
+
+/**
+ * `POST /api/notes/:noteId/domain-access` のリクエストボディ。
+ * Request body for creating a domain-access rule.
+ */
+export interface CreateDomainAccessBody {
+  /** 小文字、`@` なし。サーバーが正規化・フリーメール拒否を行う / Lowercased, no leading `@`; server normalises and rejects free-email providers. */
+  domain: string;
+  /** ロール（既定: `viewer`）/ Role (default: `viewer`). */
+  role?: "viewer" | "editor";
+}

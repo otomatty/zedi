@@ -1,36 +1,27 @@
 /**
- * 無料メール (free-webmail) プロバイダのドメイン拒否リストと、`note_domain_access`
- * のドメイン入力を正規化・検証するユーティリティ。
+ * `note_domain_access` (#663) のドメイン入力で参照する、フリーメール (free-webmail)
+ * プロバイダの拒否リストとドメイン文字列の正規化ユーティリティ。
  *
- * ドメイン招待 (#663) は「社内 OSS / WG」など閉じた組織のメールドメインを
- * 対象にする機能なので、Gmail / Outlook / Yahoo といった「誰でも取得できる」
- * フリーメールを許可すると、事実上 `unlisted` と区別がつかなくなる。ここでは
- * ハードコードされた拒否リストで代表的なものだけ弾き、将来は DNS TXT による
- * 所有権検証 (`verifiedAt`) に進化させる前提の最低限のガード。
+ * ドメイン招待は社内 OSS / WG など閉じた組織のメールドメインを対象とした機能なので、
+ * 誰でも取得できる Gmail / Outlook / Yahoo 等のドメインを許可してしまうと事実上
+ * `unlisted` と区別がつかなくなる。本ファイルが「真実の値」となり、`server/api`
+ * 側が同じ値を二重定義し、`src/lib/freeEmailDomainsSync.test.ts` が CI で同期を担保する。
+ *
+ * Source-of-truth deny-list of free-webmail providers + domain-input
+ * validation helpers used by the `note_domain_access` flow (#663). Domain
+ * invitations are intended for closed organisational domains, so allowing
+ * "anyone can register" providers (Gmail, Outlook, Yahoo, …) would collapse
+ * the feature into `unlisted`. This file owns the canonical values; the
+ * `server/api` package duplicates them in its own copy because it lives
+ * outside the workspace, and `src/lib/freeEmailDomainsSync.test.ts` keeps
+ * the two in sync via a CI drift detector.
  *
  * 同期義務 / Sync obligation:
- * - `packages/shared/src/freeEmailDomains.ts` が真実の値。`server/api` は
- *   ワークスペース外なので `@zedi/shared` を直接 import できず、本ファイルで
- *   同じ値を二重定義している。`src/lib/freeEmailDomainsSync.test.ts` が
- *   両者の `FREE_EMAIL_DOMAINS` / `DOMAIN_REGEX` の一致を CI で担保する。
- * - 本ファイルを編集したら `packages/shared/src/freeEmailDomains.ts` も
- *   同じ値で更新すること。ドリフト検知テストが失敗したら片側しか更新して
- *   いないので、もう片方を揃える。
- *
- * Deny-list of free-webmail providers, plus helpers to normalise and validate
- * domain inputs for `note_domain_access` (issue #663).
- *
- * Domain-scoped invitations are meant for closed organisational domains
- * (company, working group). Allowing free-mail providers would essentially
- * collapse this feature into `unlisted`, since anyone can mint an address at
- * those hosts. This module hard-codes the most common ones as a v1 safeguard;
- * a future v2 will add DNS-TXT ownership verification via `verifiedAt`.
- *
- * Sync obligation: the canonical copy lives in
- * `packages/shared/src/freeEmailDomains.ts`. `server/api` cannot import
- * `@zedi/shared` because it lives outside the workspace, so this file
- * duplicates the values; `src/lib/freeEmailDomainsSync.test.ts` enforces
- * equality between the two sides in CI. Update both files together.
+ * - 本ファイルを編集したら `server/api/src/lib/freeEmailDomains.ts` も同じ値で更新する。
+ *   ドリフト検知テストが失敗したらどちらか片側しか更新していないので、もう片方を揃える。
+ * - When this file changes, also update
+ *   `server/api/src/lib/freeEmailDomains.ts`. If the drift test fails, only
+ *   one side was edited — sync the other.
  */
 
 /**
@@ -90,11 +81,11 @@ export const FREE_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * `DomainValidationError` は {@link normalizeDomainInput} が返すエラーを分類する
- * 判別共用体。ルート側で HTTP ステータスやユーザー向けメッセージにマップする。
+ * `DomainValidationError` は {@link normalizeDomainInput} が返すエラーを分類する判別共用体。
+ * 呼び出し側は HTTP ステータスやユーザー向けメッセージにマップする。
  *
- * Discriminated error kinds returned by {@link normalizeDomainInput}. Routes
- * map them to HTTP status codes and user-facing messages.
+ * Discriminated error kinds returned by {@link normalizeDomainInput}. Callers
+ * map them to HTTP status codes or user-facing messages.
  */
 export type DomainValidationError =
   | { kind: "empty" }
@@ -121,7 +112,7 @@ export type DomainValidationResult =
  * Each label is alphanumeric plus hyphen, 1..63 chars; the whole name must be
  * 1..253 chars; the TLD must be alphabetic and at least 2 characters.
  */
-const DOMAIN_REGEX = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
+export const DOMAIN_REGEX = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
 
 /**
  * ユーザー/API 入力のドメイン文字列を正規化する。
@@ -155,25 +146,4 @@ export function normalizeDomainInput(raw: unknown): DomainValidationResult {
     return { ok: false, error: { kind: "free_email", domain: value } };
   }
   return { ok: true, domain: value };
-}
-
-/**
- * メールアドレスからドメイン部（小文字・`@` なし）を取り出す。
- * 解析できなければ `null`。呼び出し側で「マッチするドメインルールがあるか」を
- * 調べる用途を想定している。
- *
- * Extract the lower-cased, `@`-less domain part of an email address, or
- * `null` when the input is not a plausible address. Callers use this to look
- * up matching domain-access rules.
- */
-export function extractEmailDomain(email: string | undefined | null): string | null {
-  if (typeof email !== "string") return null;
-  const atIndex = email.lastIndexOf("@");
-  if (atIndex <= 0 || atIndex === email.length - 1) return null;
-  const domain = email
-    .slice(atIndex + 1)
-    .trim()
-    .toLowerCase();
-  if (domain.length === 0) return null;
-  return domain;
 }
