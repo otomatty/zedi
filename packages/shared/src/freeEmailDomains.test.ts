@@ -1,9 +1,14 @@
 /**
- * Tests for the client-side domain validator (issue #663).
- * クライアント側ドメイン検証のテスト。
+ * `normalizeDomainInput` の最低限のスペックテスト。トリミング・小文字化・先頭 `@` の
+ * 除去・空入力／形式不正／フリーメール拒否を固定する。
+ *
+ * Lock down the minimum contract for `normalizeDomainInput`: trimming,
+ * lower-casing, leading `@` stripping, and rejection of empty/malformed/
+ * free-webmail inputs.
  */
 import { describe, it, expect } from "vitest";
-import { normalizeDomainInput } from "./domainValidation";
+
+import { normalizeDomainInput } from "./freeEmailDomains.js";
 
 describe("normalizeDomainInput", () => {
   it("trims, lower-cases, and accepts a plain domain", () => {

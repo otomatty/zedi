@@ -6,7 +6,8 @@
   "description": "Source-of-truth constants shared between client (src, admin) and server packages. / クライアント (src, admin) とサーバ (server/api 等) で共有する定数モジュール。",
   "exports": {
     ".": "./src/index.ts",
-    "./tagCharacterClass": "./src/tagCharacterClass.ts"
+    "./tagCharacterClass": "./src/tagCharacterClass.ts",
+    "./freeEmailDomains": "./src/freeEmailDomains.ts"
   },
   "scripts": {
     "test": "vitest run"
