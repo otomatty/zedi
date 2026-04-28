@@ -6,7 +6,7 @@
  * 観点 / Coverage:
  *   - Owner: ドロップダウン（共有 + 設定）が表示される
  *   - Editor / Viewer (signed-in, canView): 共有ボタンのみが表示される
- *   - Guest (canView だが未ログイン): 「ログインすると投稿できます」ヒント
+ *   - Guest: 未ログインならヒント、サインイン済み public/unlisted guest は共有導線なし
  *   - canView=false: 何もレンダリングしない
  */
 import React from "react";
@@ -106,6 +106,17 @@ describe("NoteViewHeaderActions — role-based visibility (#675)", () => {
   it("viewer は単独の共有ボタンを表示する（公開設定を read-only で見せるため）", () => {
     renderActions({ canManageMembers: false, userRole: "viewer" });
     expect(screen.getByRole("button", { name: "notes.shareAria" })).toBeInTheDocument();
+  });
+
+  it("サインイン済み guest は共有ボタンを表示しない", () => {
+    const { container } = renderActions({
+      canManageMembers: false,
+      isSignedIn: true,
+      canView: true,
+      userRole: "guest",
+    });
+    expect(screen.queryByRole("button", { name: "notes.shareAria" })).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("未ログイン (canView=true, isSignedIn=false) はログインヒントを表示する", () => {

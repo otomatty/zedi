@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -88,6 +88,8 @@ function getTabPermissions(role: NoteAccessRole): {
   };
 }
 
+type ShareModalTab = "members" | "links" | "domains" | "visibility";
+
 /**
  * ノート共有モーダル。メンバー招待・共有リンク・ドメイン招待・公開設定を 1 つのダイアログに集約する。
  * `userRole` でタブ表示と read-only モードを出し分ける（owner=編集可、editor=全タブ
@@ -110,38 +112,38 @@ export function NoteShareModal({
 
   const showDomains = perms.showDomains && showDomainsTab;
 
-  const initialTab = perms.showMembers
-    ? "members"
-    : perms.showLinks
-      ? "links"
-      : showDomains
-        ? "domains"
-        : "visibility";
+  const getFirstVisibleTab = useCallback((): ShareModalTab => {
+    if (perms.showMembers) return "members";
+    if (perms.showLinks) return "links";
+    if (showDomains) return "domains";
+    return "visibility";
+  }, [perms.showMembers, perms.showLinks, showDomains]);
 
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState<ShareModalTab>(getFirstVisibleTab);
 
   // タブがロール / showDomainsTab 変化で消えると Tabs が空パネルを保持してしまう。
   // 利用可能な先頭タブにフォールバックする。
   // If the active tab disappears (role change or `showDomainsTab` flip), fall
   // back to the first remaining tab so the panel never goes blank.
   useEffect(() => {
-    const visible = new Set<string>();
-    if (perms.showMembers) visible.add("members");
-    if (perms.showLinks) visible.add("links");
-    if (showDomains) visible.add("domains");
-    if (perms.showVisibility) visible.add("visibility");
-    if (!visible.has(activeTab)) {
-      const fallback = perms.showMembers
-        ? "members"
-        : perms.showLinks
-          ? "links"
-          : showDomains
-            ? "domains"
-            : "visibility";
+    const isVisible =
+      (activeTab === "members" && perms.showMembers) ||
+      (activeTab === "links" && perms.showLinks) ||
+      (activeTab === "domains" && showDomains) ||
+      (activeTab === "visibility" && perms.showVisibility);
+
+    if (!isVisible) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- guard for vanished tab
-      setActiveTab(fallback);
+      setActiveTab(getFirstVisibleTab());
     }
-  }, [perms, showDomains, activeTab]);
+  }, [
+    activeTab,
+    getFirstVisibleTab,
+    perms.showLinks,
+    perms.showMembers,
+    perms.showVisibility,
+    showDomains,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

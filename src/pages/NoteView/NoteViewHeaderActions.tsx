@@ -40,7 +40,7 @@ export interface NoteViewHeaderActionsProps {
  * - Editor / Viewer (signed-in, canView): 共有ボタンのみを表示する。共有モーダルは
  *   `userRole` に応じて owner 向け編集 UI / editor 向け read-only / viewer 向け
  *   公開設定のみ、と出し分ける。
- * - Guest (canView だが未ログイン): 「ログインすると投稿できます」ヒント。
+ * - Guest: 共有導線は表示しない。未ログイン guest のみログインヒントを表示する。
  *
  * /notes/[id] 上部アクション。オーナーは共有 + 設定のドロップダウンを、
  * editor / viewer はサインインしていれば共有ボタンを表示する。共有モーダル
@@ -70,10 +70,13 @@ export function NoteViewHeaderActions({
     return <span className="text-muted-foreground text-sm">{t("notes.loginToPost")}</span>;
   }
 
+  const canOpenShareModal = userRole === "editor" || userRole === "viewer";
+
   // editor / viewer は共有ボタン単体を出す（設定ページは owner 限定）。
   // Editors / viewers see a single share button — the settings page link stays
-  // owner-only.
-  if (!canManageMembers) {
+  // owner-only. Signed-in guests can view public/unlisted notes but do not get
+  // the share entry point.
+  if (!canManageMembers && canOpenShareModal) {
     return (
       <div className="flex items-center gap-2">
         <Button
@@ -93,6 +96,10 @@ export function NoteViewHeaderActions({
         />
       </div>
     );
+  }
+
+  if (!canManageMembers) {
+    return null;
   }
 
   return (

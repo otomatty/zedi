@@ -254,7 +254,7 @@ export function NoteMembersManageSection({
                           ? t("notes.a11yCancelInvitation", { email: member.memberEmail })
                           : t("notes.a11yRemoveMember", { email: member.memberEmail })
                       }
-                      title={isActionable ? t("notes.cancelInvitation") : undefined}
+                      title={isActionable ? t("notes.cancelInvitation") : t("notes.removeMember")}
                       onClick={() => onRemoveMember(member.memberEmail)}
                     >
                       {isActionable ? (

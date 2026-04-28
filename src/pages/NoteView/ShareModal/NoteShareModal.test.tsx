@@ -10,7 +10,7 @@
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -158,13 +158,21 @@ describe("NoteShareModal", () => {
     expect(screen.getByText("notes.shareReadOnlyNotice")).toBeInTheDocument();
   });
 
-  it("owner sees all tabs and the visibility tab Save button (no read-only notice)", () => {
+  it("owner sees all tabs and the visibility tab Save button (no read-only notice)", async () => {
+    const user = userEvent.setup();
     renderModal({ userRole: "owner" });
     expect(screen.getByRole("tab", { name: "notes.shareTabMembers" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "notes.shareTabLinks" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "notes.shareTabDomains" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toBeInTheDocument();
-    expect(screen.queryByText("notes.shareReadOnlyNotice")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "notes.shareTabVisibility" }));
+    const visibilityPanel = screen.getByRole("tabpanel");
+    expect(
+      within(visibilityPanel).queryByText("notes.shareReadOnlyNotice"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(visibilityPanel).getByRole("button", { name: "notes.shareSaveChanges" }),
+    ).toBeInTheDocument();
   });
 
   it("editor's members tab hides the invite form and full-page link", () => {
