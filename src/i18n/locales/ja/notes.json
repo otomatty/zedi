@@ -198,6 +198,7 @@
   "domainTabRoleEditor": "編集者",
   "domainTabNoRules": "ドメインルールはまだありません。",
   "domainTabLoading": "ドメインルールを読み込み中…",
+  "domainTabLoadFailed": "ドメインルールを取得できませんでした。しばらくしてから再度お試しください。",
   "domainTabRuleSummary": "{{domain}} のメールを持つユーザーは {{role}} として参加できます。",
   "domainTabUnverifiedBadge": "未検証",
   "domainTabUnverifiedHint": "ドメインの所有権は未検証です。DNS TXT による検証は今後のリリースで追加予定です。",

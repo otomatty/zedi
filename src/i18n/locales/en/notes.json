@@ -198,6 +198,7 @@
   "domainTabRoleEditor": "Editor",
   "domainTabNoRules": "No domain rules yet.",
   "domainTabLoading": "Loading domain rules…",
+  "domainTabLoadFailed": "Failed to load domain rules. Please try again later.",
   "domainTabRuleSummary": "Anyone with an email at {{domain}} can join as {{role}}.",
   "domainTabUnverifiedBadge": "Unverified",
   "domainTabUnverifiedHint": "Domain ownership is not yet verified. DNS-TXT verification will arrive in a future release.",

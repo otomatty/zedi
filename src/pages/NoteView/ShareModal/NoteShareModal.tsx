@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -55,6 +55,17 @@ export function NoteShareModal({
 }: NoteShareModalProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("members");
+
+  // ドメインタブを表示中に `showDomainsTab` が false に切り替わると、Tabs が
+  // 存在しない値を保持してパネルが空になる。先頭の members タブへフォールバック。
+  // If `showDomainsTab` flips to false while the domains tab is active, the
+  // Tabs control would hold a non-existent value; fall back to the first tab.
+  useEffect(() => {
+    if (!showDomainsTab && activeTab === "domains") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- guard for vanished tab
+      setActiveTab("members");
+    }
+  }, [showDomainsTab, activeTab]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

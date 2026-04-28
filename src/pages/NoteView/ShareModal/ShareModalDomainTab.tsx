@@ -197,7 +197,7 @@ export function ShareModalDomainTab({ noteId, enabled }: ShareModalDomainTabProp
   const { t } = useTranslation();
   const { toast } = useToast();
 
-  const { data: rules, isLoading } = useDomainAccessForNote(noteId, enabled);
+  const { data: rules, isLoading, isError } = useDomainAccessForNote(noteId, enabled);
   const createMutation = useCreateDomainAccess(noteId);
   const deleteMutation = useDeleteDomainAccess(noteId);
 
@@ -223,20 +223,21 @@ export function ShareModalDomainTab({ noteId, enabled }: ShareModalDomainTabProp
       setRoleInput("viewer");
       toast({ title: t("notes.domainTabCreated") });
     } catch (error) {
-      // サーバーが正規化前のドメインを 400 で拒否した場合のフォールバック表示。
-      // Fallback messaging when the server rejects an input we let through.
-      let message = t("notes.domainTabCreateFailed");
-      if (error instanceof ApiError && error.status === 400) {
-        const lower = error.message.toLowerCase();
-        if (lower.includes("free email")) {
-          message = t("notes.domainTabCreateFailedFreeEmail", { domain });
-        } else if (lower.includes("invalid format")) {
-          message = t("notes.domainTabCreateFailedInvalid");
-        } else if (lower.includes("required")) {
-          message = t("notes.domainTabCreateFailedEmpty");
-        }
-      }
-      toast({ title: message, variant: "destructive" });
+      // 事前にクライアント側で `normalizeDomainInput` を通しているため、サーバーが
+      // 400 を返すのは想定外のケース（ドメインリストの drift、競合エラーなど）。
+      // 詳細メッセージはサーバー文言をそのまま `description` に出し、判別ロジックは
+      // 持たない（壊れやすい文字列マッチの代わりに `ApiError.message` を表示する）。
+      //
+      // The client validates with `normalizeDomainInput` before submitting, so a
+      // server 400 here means something we couldn't pre-empt (list drift,
+      // conflict, etc.). Surface the server message verbatim instead of trying
+      // to classify it via fragile substring matching.
+      const description = error instanceof ApiError && error.message ? error.message : undefined;
+      toast({
+        title: t("notes.domainTabCreateFailed"),
+        description,
+        variant: "destructive",
+      });
     }
   };
 
@@ -291,6 +292,10 @@ export function ShareModalDomainTab({ noteId, enabled }: ShareModalDomainTabProp
       <section className="space-y-2">
         {isLoading ? (
           <p className="text-muted-foreground text-sm">{t("notes.domainTabLoading")}</p>
+        ) : isError ? (
+          <p className="text-destructive text-sm" role="alert">
+            {t("notes.domainTabLoadFailed")}
+          </p>
         ) : !rules || rules.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("notes.domainTabNoRules")}</p>
         ) : (

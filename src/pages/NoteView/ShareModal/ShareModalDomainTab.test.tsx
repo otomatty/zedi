@@ -67,10 +67,13 @@ function row(overrides: Partial<DomainAccessRow> = {}): DomainAccessRow {
   };
 }
 
-function renderTab(props: { rules?: DomainAccessRow[]; isLoading?: boolean } = {}) {
+function renderTab(
+  props: { rules?: DomainAccessRow[]; isLoading?: boolean; isError?: boolean } = {},
+) {
   useDomainAccessForNote.mockReturnValue({
     data: props.rules ?? [],
     isLoading: props.isLoading ?? false,
+    isError: props.isError ?? false,
   });
   useCreateDomainAccess.mockReturnValue({
     mutateAsync: createMutateAsync,
@@ -111,6 +114,12 @@ describe("ShareModalDomainTab", () => {
   it("shows the empty state when there are no rules", () => {
     renderTab();
     expect(screen.getByText("notes.domainTabNoRules")).toBeInTheDocument();
+  });
+
+  it("shows a load-failure message instead of the empty state when the query errors", () => {
+    renderTab({ isError: true, rules: undefined });
+    expect(screen.getByText("notes.domainTabLoadFailed")).toBeInTheDocument();
+    expect(screen.queryByText("notes.domainTabNoRules")).not.toBeInTheDocument();
   });
 
   it("renders rules with role badge and unverified badge", () => {
