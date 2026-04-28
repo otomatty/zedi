@@ -103,6 +103,7 @@ describe("NoteViewHeaderActions — role-based visibility (#675)", () => {
     renderActions({ canManageMembers: true, userRole: "owner" });
     expect(screen.getByRole("button", { name: "notes.openActions" })).toBeInTheDocument();
     // 共有ボタン単体は出さない（ドロップダウン経由でアクセス）
+    // No standalone share button — owner accesses Share via the dropdown.
     expect(screen.queryByRole("button", { name: "notes.shareAria" })).not.toBeInTheDocument();
   });
 
