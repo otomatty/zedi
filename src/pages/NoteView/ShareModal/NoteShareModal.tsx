@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -11,7 +11,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@zedi/ui";
-import type { Note } from "@/types/note";
+import type { Note, NoteAccessRole } from "@/types/note";
 import { NoteInviteLinksSection } from "@/pages/NoteMembers/NoteInviteLinksSection";
 import { ShareModalDomainTab } from "./ShareModalDomainTab";
 import { ShareModalMembersTab } from "./ShareModalMembersTab";
@@ -34,38 +34,114 @@ export interface NoteShareModalProps {
    * specific flows (e.g. tests, edge-case UIs).
    */
   showDomainsTab?: boolean;
+  /**
+   * 現在ユーザーのノート上のロール。タブの表示可否・read-only モードを切り替える。
+   * - owner: 全タブ + 編集可
+   * - editor: 全タブ表示 + 全タブ read-only（誰がアクセス可能か透明性のため）
+   * - viewer: 公開設定タブのみ表示（read-only）。メンバー / リンク / ドメインは
+   *   プライバシー配慮のため非表示
+   * - guest / none: そもそも ShareButton 側で出さない想定だが、フォールバックで
+   *   viewer と同等の最小表示にする
+   *
+   * Current user's role on the note. Drives tab visibility + read-only state.
+   */
+  userRole?: NoteAccessRole;
+}
+
+/**
+ * `userRole` から各タブの可視性・編集可否を導出する。
+ * Derive per-tab visibility + edit-state from the current user's role.
+ */
+function getTabPermissions(role: NoteAccessRole): {
+  canEdit: boolean;
+  showMembers: boolean;
+  showLinks: boolean;
+  showDomains: boolean;
+  showVisibility: boolean;
+} {
+  if (role === "owner") {
+    return {
+      canEdit: true,
+      showMembers: true,
+      showLinks: true,
+      showDomains: true,
+      showVisibility: true,
+    };
+  }
+  if (role === "editor") {
+    return {
+      canEdit: false,
+      showMembers: true,
+      showLinks: true,
+      showDomains: true,
+      showVisibility: true,
+    };
+  }
+  // viewer / guest / none — 公開設定 read-only のみ
+  // viewer / guest / none — visibility tab only, read-only
+  return {
+    canEdit: false,
+    showMembers: false,
+    showLinks: false,
+    showDomains: false,
+    showVisibility: true,
+  };
 }
 
 /**
  * ノート共有モーダル。メンバー招待・共有リンク・ドメイン招待・公開設定を 1 つのダイアログに集約する。
+ * `userRole` でタブ表示と read-only モードを出し分ける（owner=編集可、editor=全タブ
+ * read-only、viewer=公開設定のみ read-only）。
+ *
  * Consolidated share modal for a note: members, share links, domain access,
- * and visibility.
- *
- * このモーダルはオーナー向け UI のみサポートする。エディタ向けの読み取り専用
- * 表示は別 Issue のフォローアップで追加する。
- *
- * Only supports the owner UI for now; editor-facing read-only tabs will arrive
- * in a follow-up issue.
+ * and visibility. `userRole` gates which tabs are visible and toggles read-only
+ * mode for non-owners (owner edits everything; editor sees everything as
+ * read-only for transparency; viewer only sees the visibility tab).
  */
 export function NoteShareModal({
   open,
   onOpenChange,
   note,
   showDomainsTab = true,
+  userRole = "owner",
 }: NoteShareModalProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState("members");
+  const perms = useMemo(() => getTabPermissions(userRole), [userRole]);
 
-  // ドメインタブを表示中に `showDomainsTab` が false に切り替わると、Tabs が
-  // 存在しない値を保持してパネルが空になる。先頭の members タブへフォールバック。
-  // If `showDomainsTab` flips to false while the domains tab is active, the
-  // Tabs control would hold a non-existent value; fall back to the first tab.
+  const showDomains = perms.showDomains && showDomainsTab;
+
+  const initialTab = perms.showMembers
+    ? "members"
+    : perms.showLinks
+      ? "links"
+      : showDomains
+        ? "domains"
+        : "visibility";
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // タブがロール / showDomainsTab 変化で消えると Tabs が空パネルを保持してしまう。
+  // 利用可能な先頭タブにフォールバックする。
+  // If the active tab disappears (role change or `showDomainsTab` flip), fall
+  // back to the first remaining tab so the panel never goes blank.
   useEffect(() => {
-    if (!showDomainsTab && activeTab === "domains") {
+    const visible = new Set<string>();
+    if (perms.showMembers) visible.add("members");
+    if (perms.showLinks) visible.add("links");
+    if (showDomains) visible.add("domains");
+    if (perms.showVisibility) visible.add("visibility");
+    if (!visible.has(activeTab)) {
+      const fallback = perms.showMembers
+        ? "members"
+        : perms.showLinks
+          ? "links"
+          : showDomains
+            ? "domains"
+            : "visibility";
       // eslint-disable-next-line react-hooks/set-state-in-effect -- guard for vanished tab
-      setActiveTab("members");
+      setActiveTab(fallback);
     }
-  }, [showDomainsTab, activeTab]);
+  }, [perms, showDomains, activeTab]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,35 +152,52 @@ export function NoteShareModal({
         </DialogHeader>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
           <TabsList>
-            <TabsTrigger value="members">{t("notes.shareTabMembers")}</TabsTrigger>
-            <TabsTrigger value="links">{t("notes.shareTabLinks")}</TabsTrigger>
-            {showDomainsTab ? (
+            {perms.showMembers ? (
+              <TabsTrigger value="members">{t("notes.shareTabMembers")}</TabsTrigger>
+            ) : null}
+            {perms.showLinks ? (
+              <TabsTrigger value="links">{t("notes.shareTabLinks")}</TabsTrigger>
+            ) : null}
+            {showDomains ? (
               <TabsTrigger value="domains">{t("notes.shareTabDomains")}</TabsTrigger>
             ) : null}
-            <TabsTrigger value="visibility">{t("notes.shareTabVisibility")}</TabsTrigger>
+            {perms.showVisibility ? (
+              <TabsTrigger value="visibility">{t("notes.shareTabVisibility")}</TabsTrigger>
+            ) : null}
           </TabsList>
 
-          <TabsContent value="members">
-            <ShareModalMembersTab
-              noteId={note.id}
-              enabled={open}
-              onNavigate={() => onOpenChange(false)}
-            />
-          </TabsContent>
-
-          <TabsContent value="links">
-            <NoteInviteLinksSection noteId={note.id} editPermission={note.editPermission} />
-          </TabsContent>
-
-          {showDomainsTab ? (
-            <TabsContent value="domains">
-              <ShareModalDomainTab noteId={note.id} enabled={open} />
+          {perms.showMembers ? (
+            <TabsContent value="members">
+              <ShareModalMembersTab
+                noteId={note.id}
+                enabled={open}
+                onNavigate={() => onOpenChange(false)}
+                readOnly={!perms.canEdit}
+              />
             </TabsContent>
           ) : null}
 
-          <TabsContent value="visibility">
-            <ShareModalVisibilityTab note={note} canEdit />
-          </TabsContent>
+          {perms.showLinks ? (
+            <TabsContent value="links">
+              <NoteInviteLinksSection
+                noteId={note.id}
+                editPermission={note.editPermission}
+                readOnly={!perms.canEdit}
+              />
+            </TabsContent>
+          ) : null}
+
+          {showDomains ? (
+            <TabsContent value="domains">
+              <ShareModalDomainTab noteId={note.id} enabled={open} readOnly={!perms.canEdit} />
+            </TabsContent>
+          ) : null}
+
+          {perms.showVisibility ? (
+            <TabsContent value="visibility">
+              <ShareModalVisibilityTab note={note} canEdit={perms.canEdit} />
+            </TabsContent>
+          ) : null}
         </Tabs>
       </DialogContent>
     </Dialog>

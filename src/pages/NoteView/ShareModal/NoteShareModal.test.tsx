@@ -129,6 +129,54 @@ describe("NoteShareModal", () => {
     expect(screen.queryByLabelText("notes.shareLink")).not.toBeInTheDocument();
   });
 
+  // ------------------------------------------------------------------
+  // Role-based tab visibility (#675)
+  // ロール別タブ表示マトリックス (#675)
+  // ------------------------------------------------------------------
+
+  it("editor sees all tabs but the visibility tab shows the read-only notice", async () => {
+    const user = userEvent.setup();
+    renderModal({ userRole: "editor" });
+    expect(screen.getByRole("tab", { name: "notes.shareTabMembers" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabLinks" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabDomains" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "notes.shareTabVisibility" }));
+    expect(screen.getByText("notes.shareReadOnlyNotice")).toBeInTheDocument();
+    // owner-only Save button must be absent for editors
+    expect(
+      screen.queryByRole("button", { name: "notes.shareSaveChanges" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("viewer only sees the visibility tab and gets the read-only notice", () => {
+    renderModal({ userRole: "viewer" });
+    expect(screen.queryByRole("tab", { name: "notes.shareTabMembers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "notes.shareTabLinks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "notes.shareTabDomains" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toBeInTheDocument();
+    expect(screen.getByText("notes.shareReadOnlyNotice")).toBeInTheDocument();
+  });
+
+  it("owner sees all tabs and the visibility tab Save button (no read-only notice)", () => {
+    renderModal({ userRole: "owner" });
+    expect(screen.getByRole("tab", { name: "notes.shareTabMembers" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabLinks" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabDomains" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toBeInTheDocument();
+    expect(screen.queryByText("notes.shareReadOnlyNotice")).not.toBeInTheDocument();
+  });
+
+  it("editor's members tab hides the invite form and full-page link", () => {
+    renderModal({ userRole: "editor" });
+    // Invite form heading is replaced by a plain "members" heading in read-only mode
+    expect(screen.queryByRole("heading", { name: "notes.inviteMember" })).not.toBeInTheDocument();
+    // The full-members-page link (rendered in the footer of the tab) is hidden for editors
+    expect(
+      screen.queryByRole("link", { name: /notes\.shareOpenMembersPage/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("falls back to the members tab when showDomainsTab flips to false on the active tab", async () => {
     const user = userEvent.setup();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

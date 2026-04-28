@@ -114,6 +114,7 @@ const NoteView: React.FC = () => {
               canManageMembers={canManageMembers}
               isSignedIn={isSignedIn}
               canView={Boolean(access?.canView)}
+              userRole={access?.role ?? "none"}
             />
           </div>
           <NoteViewMainContent

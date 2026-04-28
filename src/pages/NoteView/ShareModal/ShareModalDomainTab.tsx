@@ -62,6 +62,14 @@ export interface ShareModalDomainTabProps {
    * so we don't fetch while the modal is hidden.
    */
   enabled: boolean;
+  /**
+   * read-only モードで描画するか。editor 向けに既存ルールだけ閲覧させたいときに
+   * `true` を渡す。発行フォーム・削除ボタン・editor 確認モーダルを抑止する。
+   *
+   * Render in read-only mode (editor browsing the rules). Hides the add form,
+   * remove buttons, and editor-role confirmation dialog.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -151,10 +159,12 @@ function DomainAccessRuleItem({
   rule,
   onRemove,
   removePending,
+  readOnly = false,
 }: {
   rule: DomainAccessRow;
   onRemove: (rule: DomainAccessRow) => void;
   removePending: boolean;
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const roleLabel =
@@ -175,16 +185,18 @@ function DomainAccessRuleItem({
           {t("notes.domainTabRuleSummary", { domain: rule.domain, role: roleLabel })}
         </p>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={t("notes.domainTabRemoveAria", { domain: rule.domain })}
-        title={t("notes.domainTabRemove")}
-        onClick={() => onRemove(rule)}
-        disabled={removePending}
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
+      {!readOnly ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t("notes.domainTabRemoveAria", { domain: rule.domain })}
+          title={t("notes.domainTabRemove")}
+          onClick={() => onRemove(rule)}
+          disabled={removePending}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -193,7 +205,11 @@ function DomainAccessRuleItem({
  * 共有モーダルのドメインタブ。ドメインルールの追加・一覧・削除を扱う。
  * Domain tab — handles add / list / remove for domain-access rules.
  */
-export function ShareModalDomainTab({ noteId, enabled }: ShareModalDomainTabProps) {
+export function ShareModalDomainTab({
+  noteId,
+  enabled,
+  readOnly = false,
+}: ShareModalDomainTabProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -278,16 +294,18 @@ export function ShareModalDomainTab({ noteId, enabled }: ShareModalDomainTabProp
         <p className="text-muted-foreground text-xs">{t("notes.domainTabDescription")}</p>
       </header>
 
-      <DomainAccessAddForm
-        domainInput={domainInput}
-        setDomainInput={setDomainInput}
-        roleInput={roleInput}
-        setRoleInput={setRoleInput}
-        onAdd={handleAddClick}
-        isPending={createMutation.isPending}
-        isValid={validation.ok}
-        inputError={inputError}
-      />
+      {!readOnly ? (
+        <DomainAccessAddForm
+          domainInput={domainInput}
+          setDomainInput={setDomainInput}
+          roleInput={roleInput}
+          setRoleInput={setRoleInput}
+          onAdd={handleAddClick}
+          isPending={createMutation.isPending}
+          isValid={validation.ok}
+          inputError={inputError}
+        />
+      ) : null}
 
       <section className="space-y-2">
         {isLoading ? (
@@ -305,13 +323,14 @@ export function ShareModalDomainTab({ noteId, enabled }: ShareModalDomainTabProp
               rule={rule}
               onRemove={(target) => void handleRemove(target)}
               removePending={deleteMutation.isPending}
+              readOnly={readOnly}
             />
           ))
         )}
       </section>
 
       <AlertDialog
-        open={pendingEditorConfirm !== null}
+        open={!readOnly && pendingEditorConfirm !== null}
         onOpenChange={(open) => {
           if (!open) setPendingEditorConfirm(null);
         }}

@@ -45,7 +45,10 @@ function makeInvitation(overrides: Partial<NoteMemberInvitation> = {}): NoteMemb
   };
 }
 
-function renderSection(members: React.ComponentProps<typeof NoteMembersManageSection>["members"]) {
+function renderSection(
+  members: React.ComponentProps<typeof NoteMembersManageSection>["members"],
+  extra: Partial<React.ComponentProps<typeof NoteMembersManageSection>> = {},
+) {
   return render(
     <NoteMembersManageSection
       members={members}
@@ -63,6 +66,7 @@ function renderSection(members: React.ComponentProps<typeof NoteMembersManageSec
       onRemoveMember={async () => {}}
       onResendInvitation={async () => {}}
       now={() => NOW_MS}
+      {...extra}
     />,
   );
 }
@@ -142,5 +146,49 @@ describe("NoteMembersManageSection — badge derivation", () => {
     ]);
 
     expect(screen.getByText("notes.statusPending")).toBeInTheDocument();
+  });
+
+  // ------------------------------------------------------------------
+  // readOnly mode (#675) — editor / viewer browses the list without editing
+  // ------------------------------------------------------------------
+
+  it("readOnly=true は招待フォーム・操作ボタンを隠し、ステータスバッジは残す", () => {
+    renderSection(
+      [
+        {
+          memberEmail: "guest@example.com",
+          role: "viewer",
+          status: "pending",
+          invitation: makeInvitation(),
+        },
+        {
+          memberEmail: "alice@example.com",
+          role: "editor",
+          status: "accepted",
+          invitation: null,
+        },
+      ],
+      { readOnly: true },
+    );
+
+    // 招待フォームの見出しは出さない（read-only 用の "members" 見出しに置き換わる）
+    expect(screen.queryByRole("heading", { name: "notes.inviteMember" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "notes.members" })).toBeInTheDocument();
+
+    // Add ボタン・再送ボタン・取り消し / 削除ボタンは全て非表示
+    expect(screen.queryByRole("button", { name: "notes.add" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /notes\.a11yResendInvitation/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /notes\.a11yCancelInvitation/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /notes\.a11yRemoveMember/ }),
+    ).not.toBeInTheDocument();
+
+    // ステータスバッジは引き続き表示されている
+    expect(screen.getByText("notes.statusAccepted")).toBeInTheDocument();
+    expect(screen.getByText(/^notes\.statusPendingWithMeta\(/)).toBeInTheDocument();
   });
 });
