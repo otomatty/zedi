@@ -11,7 +11,7 @@
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
@@ -106,6 +106,16 @@ describe("NoteViewHeaderActions — role-based visibility (#675)", () => {
   it("viewer は単独の共有ボタンを表示する（公開設定を read-only で見せるため）", () => {
     renderActions({ canManageMembers: false, userRole: "viewer" });
     expect(screen.getByRole("button", { name: "notes.shareAria" })).toBeInTheDocument();
+  });
+
+  it("editor の共有ボタン押下で userRole がモーダルへ伝播する", () => {
+    // クリック経路で `userRole` が NoteShareModal に渡り続けていることを担保。
+    // ロールマトリックス全体を支える接続点なので、回帰検知用に明示的に確認する。
+    // Click-path regression guard: ensures the editor's role keeps flowing into
+    // NoteShareModal so the read-only matrix is not silently bypassed.
+    renderActions({ canManageMembers: false, userRole: "editor" });
+    fireEvent.click(screen.getByRole("button", { name: "notes.shareAria" }));
+    expect(screen.getByTestId("note-share-modal")).toHaveAttribute("data-user-role", "editor");
   });
 
   it("サインイン済み guest は共有ボタンを表示しない", () => {

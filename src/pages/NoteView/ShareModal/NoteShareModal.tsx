@@ -43,7 +43,12 @@ export interface NoteShareModalProps {
    * - guest / none: そもそも ShareButton 側で出さない想定だが、フォールバックで
    *   viewer と同等の最小表示にする
    *
+   * 既定値は最小権限の `"none"`。呼び出し側でロールを明示的に渡し損ねた場合に
+   * オーナー UI を露出させないためのフェイルセーフ (#794 review)。
+   *
    * Current user's role on the note. Drives tab visibility + read-only state.
+   * Defaults to least-privilege `"none"` so a caller that forgets to pass a
+   * role can never accidentally surface owner-only edit controls (#794 review).
    */
   userRole?: NoteAccessRole;
 }
@@ -105,7 +110,7 @@ export function NoteShareModal({
   onOpenChange,
   note,
   showDomainsTab = true,
-  userRole = "owner",
+  userRole = "none",
 }: NoteShareModalProps) {
   const { t } = useTranslation();
   const perms = useMemo(() => getTabPermissions(userRole), [userRole]);

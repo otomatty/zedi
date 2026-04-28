@@ -71,12 +71,22 @@ const baseNote: Note = {
   isDeleted: false,
 };
 
+/**
+ * Default to `userRole="owner"` for tab-structure tests. The component itself
+ * defaults to `"none"` (least-privilege) so an accidental omission cannot
+ * surface owner-only edit controls; tests opt into the privileged flow
+ * explicitly via the helper unless they override `userRole`.
+ *
+ * タブ構造のテストは owner UI を前提にしているため helper 側で `"owner"` を
+ * 注入する。コンポーネント本体の既定値は `"none"` (最小権限) で、呼び出し側で
+ * ロールを明示しなかった場合にもオーナー UI が露出しないようにしている。
+ */
 function renderModal(props: Partial<React.ComponentProps<typeof NoteShareModal>> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <NoteShareModal open onOpenChange={() => {}} note={baseNote} {...props} />
+        <NoteShareModal open onOpenChange={() => {}} note={baseNote} userRole="owner" {...props} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -191,7 +201,13 @@ describe("NoteShareModal", () => {
     const { rerender } = render(
       <QueryClientProvider client={client}>
         <MemoryRouter>
-          <NoteShareModal open onOpenChange={() => {}} note={baseNote} showDomainsTab />
+          <NoteShareModal
+            open
+            onOpenChange={() => {}}
+            note={baseNote}
+            userRole="owner"
+            showDomainsTab
+          />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -204,7 +220,13 @@ describe("NoteShareModal", () => {
     rerender(
       <QueryClientProvider client={client}>
         <MemoryRouter>
-          <NoteShareModal open onOpenChange={() => {}} note={baseNote} showDomainsTab={false} />
+          <NoteShareModal
+            open
+            onOpenChange={() => {}}
+            note={baseNote}
+            userRole="owner"
+            showDomainsTab={false}
+          />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -214,5 +236,33 @@ describe("NoteShareModal", () => {
       "data-state",
       "active",
     );
+  });
+
+  // ------------------------------------------------------------------
+  // Default `userRole` is least-privilege (#794 review)
+  // ------------------------------------------------------------------
+
+  it("omitting userRole falls back to least-privilege rendering (visibility tab read-only)", () => {
+    // 呼び出し側がうっかり userRole を渡し忘れた場合でも、メンバー / リンク /
+    // ドメインタブは表示されず、公開設定タブも read-only で描画される。
+    // If a caller accidentally omits `userRole`, the modal must NOT promote to
+    // owner-level UI. Members / links / domains tabs stay hidden and the
+    // visibility tab renders read-only with the notice.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <NoteShareModal open onOpenChange={() => {}} note={baseNote} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByRole("tab", { name: "notes.shareTabMembers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "notes.shareTabLinks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "notes.shareTabDomains" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "notes.shareTabVisibility" })).toBeInTheDocument();
+    expect(screen.getByText("notes.shareReadOnlyNotice")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "notes.shareSaveChanges" }),
+    ).not.toBeInTheDocument();
   });
 });
