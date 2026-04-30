@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@zedi/ui";
 import type { UserAdmin, UserRole, UserStatus } from "@/api/admin";
-import { formatDate } from "@/lib/dateUtils";
+import { formatDate, formatNumber, getActiveLocale } from "@/lib/dateUtils";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 import { UserCard } from "./UserCard";
 import { SuspendDialog } from "./SuspendDialog";
@@ -196,7 +196,7 @@ export function UsersContent({
                       </Select>
                     </TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2 tabular-nums">
-                      {u.pageCount.toLocaleString("ja-JP")}
+                      {formatNumber(u.pageCount)}
                     </TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2">
                       {formatDate(u.createdAt)}
@@ -386,7 +386,7 @@ export function UsersContent({
                 <li>
                   {t("users.impact.lastAiUsage", {
                     date: new Date(confirm.deleteTarget.impact.lastAiUsageAt).toLocaleDateString(
-                      "ja-JP",
+                      getActiveLocale(),
                     ),
                   })}
                 </li>

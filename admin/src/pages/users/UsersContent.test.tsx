@@ -127,6 +127,12 @@ vi.mock("./useConfirmDialogs", () => ({
 
 vi.mock("@/lib/dateUtils", () => ({
   formatDate: (d: string) => d,
+  // Mirror the real ja-JP behaviour (the test setup forces ja) so the
+  // existing "1,234" assertion below stays meaningful.
+  // 実装は ja のときカンマ区切りになる。テスト setup が ja を強制しているため、
+  // 既存アサーション "1,234" がそのまま意味を持つよう同等の整形を返す。
+  formatNumber: (n: number) => n.toLocaleString("ja-JP"),
+  getActiveLocale: () => "ja-JP" as const,
 }));
 
 const mockUser: UserAdmin = {
