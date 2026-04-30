@@ -467,30 +467,37 @@ if (NODE_ENV === "production" && !API_INTERNAL_URL) {
 }
 
 // サーバー起動
-void hocuspocusServer.listen(PORT, () => {
-  console.log("========================================");
-  console.log("  Zedi Hocuspocus Server Started");
-  console.log("========================================");
-  console.log(`  Port:         ${PORT}`);
-  console.log(`  Health:       http://localhost:${PORT}/health`);
-  console.log(`  WebSocket:    ws://localhost:${PORT}`);
-  console.log(`  Redis:        ${REDIS_URL ? "Enabled" : "Disabled"}`);
-  console.log(`  Environment:  ${NODE_ENV || "development"}`);
-  if (!API_INTERNAL_URL && NODE_ENV !== "production") {
-    if (isTruthyEnvFlag(HOCUSPOCUS_DEV_MODE)) {
-      console.warn(
-        "[Auth] API_INTERNAL_URL is unset; HOCUSPOCUS_DEV_MODE allows unauthenticated collaboration. / " +
-          "内部 API URL 未設定のため開発バイパスが有効です。",
-      );
-    } else {
-      console.warn(
-        "[Auth] API_INTERNAL_URL is unset; WebSocket auth will fail until it is set or HOCUSPOCUS_DEV_MODE=true (local dev only). / " +
-          "内部 API URL 未設定のため接続は拒否されます（ローカル検証のみ HOCUSPOCUS_DEV_MODE=true）。",
-      );
+hocuspocusServer
+  .listen(PORT, () => {
+    console.log("========================================");
+    console.log("  Zedi Hocuspocus Server Started");
+    console.log("========================================");
+    console.log(`  Port:         ${PORT}`);
+    console.log(`  Health:       http://localhost:${PORT}/health`);
+    console.log(`  WebSocket:    ws://localhost:${PORT}`);
+    console.log(`  Redis:        ${REDIS_URL ? "Enabled" : "Disabled"}`);
+    console.log(`  Environment:  ${NODE_ENV || "development"}`);
+    if (!API_INTERNAL_URL && NODE_ENV !== "production") {
+      if (isTruthyEnvFlag(HOCUSPOCUS_DEV_MODE)) {
+        console.warn(
+          "[Auth] API_INTERNAL_URL is unset; HOCUSPOCUS_DEV_MODE allows unauthenticated collaboration. / " +
+            "内部 API URL 未設定のため開発バイパスが有効です。",
+        );
+      } else {
+        console.warn(
+          "[Auth] API_INTERNAL_URL is unset; WebSocket auth will fail until it is set or HOCUSPOCUS_DEV_MODE=true (local dev only). / " +
+            "内部 API URL 未設定のため接続は拒否されます（ローカル検証のみ HOCUSPOCUS_DEV_MODE=true）。",
+        );
+      }
     }
-  }
-  console.log("========================================");
-});
+    console.log("========================================");
+  })
+  .catch((error) => {
+    // Fail loudly on startup errors (port in use, onListen hook reject, etc.)
+    // 起動時エラー（ポート競合・onListen フック失敗など）を握り潰さず即座に終了する
+    console.error("[Startup] Failed to start hocuspocus server:", error);
+    process.exit(1);
+  });
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
