@@ -1,6 +1,5 @@
-import { Hocuspocus } from "@hocuspocus/server";
-import { createServer, IncomingMessage, ServerResponse } from "http";
-import { WebSocketServer } from "ws";
+import { Server as HocuspocusServer } from "@hocuspocus/server";
+import { IncomingMessage, ServerResponse } from "http";
 import { Redis } from "@hocuspocus/extension-redis";
 import { Pool, PoolClient } from "pg";
 import * as Y from "yjs";
@@ -285,7 +284,9 @@ if (REDIS_URL) {
   }
 }
 
-const hocuspocus = new Hocuspocus({
+const hocuspocusServer = new HocuspocusServer({
+  port: PORT,
+  stopOnSignals: false,
   name: "zedi-hocuspocus",
   extensions,
 
@@ -384,6 +385,7 @@ const hocuspocus = new Hocuspocus({
     // ドキュメント変更時（デバウンス前）
   },
 });
+const hocuspocus = hocuspocusServer.hocuspocus;
 
 async function invalidateLiveDocument(documentName: string): Promise<boolean> {
   if (!hocuspocus.documents.has(documentName)) {
@@ -422,8 +424,10 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
   await handleHttpRequestFallback(requestUrl, res);
 }
 
-// カスタムHTTPサーバー（ヘルスチェック用）
-const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+// Hocuspocus v4 owns WebSocket upgrades; keep our health/internal HTTP routes.
+// WebSocket upgrade は Hocuspocus v4 に任せ、health/internal の HTTP ルートだけ差し替える。
+hocuspocusServer.httpServer.removeAllListeners("request");
+hocuspocusServer.httpServer.on("request", (req: IncomingMessage, res: ServerResponse) => {
   void handleHttpRequest(req, res).catch((error) => {
     console.error("[HTTP] Request handling failed:", error);
     if (!res.headersSent) {
@@ -454,14 +458,6 @@ async function handleHttpRequestFallback(requestUrl: URL, res: ServerResponse): 
   res.end(JSON.stringify({ error: "Not Found" }));
 }
 
-// WebSocketサーバーをHTTPサーバーにアタッチ
-const wss = new WebSocketServer({ server: httpServer });
-
-// WebSocket接続をHocuspocusに渡す
-wss.on("connection", (socket, request) => {
-  hocuspocus.handleConnection(socket, request);
-});
-
 if (NODE_ENV === "production" && !API_INTERNAL_URL) {
   console.error(
     "[Auth] CRITICAL: API_INTERNAL_URL is unset in production. Refusing to start. / " +
@@ -471,52 +467,55 @@ if (NODE_ENV === "production" && !API_INTERNAL_URL) {
 }
 
 // サーバー起動
-httpServer.listen(PORT, () => {
-  console.log("========================================");
-  console.log("  Zedi Hocuspocus Server Started");
-  console.log("========================================");
-  console.log(`  Port:         ${PORT}`);
-  console.log(`  Health:       http://localhost:${PORT}/health`);
-  console.log(`  WebSocket:    ws://localhost:${PORT}`);
-  console.log(`  Redis:        ${REDIS_URL ? "Enabled" : "Disabled"}`);
-  console.log(`  Environment:  ${NODE_ENV || "development"}`);
-  if (!API_INTERNAL_URL && NODE_ENV !== "production") {
-    if (isTruthyEnvFlag(HOCUSPOCUS_DEV_MODE)) {
-      console.warn(
-        "[Auth] API_INTERNAL_URL is unset; HOCUSPOCUS_DEV_MODE allows unauthenticated collaboration. / " +
-          "内部 API URL 未設定のため開発バイパスが有効です。",
-      );
-    } else {
-      console.warn(
-        "[Auth] API_INTERNAL_URL is unset; WebSocket auth will fail until it is set or HOCUSPOCUS_DEV_MODE=true (local dev only). / " +
-          "内部 API URL 未設定のため接続は拒否されます（ローカル検証のみ HOCUSPOCUS_DEV_MODE=true）。",
-      );
+hocuspocusServer
+  .listen(PORT, () => {
+    console.log("========================================");
+    console.log("  Zedi Hocuspocus Server Started");
+    console.log("========================================");
+    console.log(`  Port:         ${PORT}`);
+    console.log(`  Health:       http://localhost:${PORT}/health`);
+    console.log(`  WebSocket:    ws://localhost:${PORT}`);
+    console.log(`  Redis:        ${REDIS_URL ? "Enabled" : "Disabled"}`);
+    console.log(`  Environment:  ${NODE_ENV || "development"}`);
+    if (!API_INTERNAL_URL && NODE_ENV !== "production") {
+      if (isTruthyEnvFlag(HOCUSPOCUS_DEV_MODE)) {
+        console.warn(
+          "[Auth] API_INTERNAL_URL is unset; HOCUSPOCUS_DEV_MODE allows unauthenticated collaboration. / " +
+            "内部 API URL 未設定のため開発バイパスが有効です。",
+        );
+      } else {
+        console.warn(
+          "[Auth] API_INTERNAL_URL is unset; WebSocket auth will fail until it is set or HOCUSPOCUS_DEV_MODE=true (local dev only). / " +
+            "内部 API URL 未設定のため接続は拒否されます（ローカル検証のみ HOCUSPOCUS_DEV_MODE=true）。",
+        );
+      }
     }
-  }
-  console.log("========================================");
-});
+    console.log("========================================");
+  })
+  .catch((error) => {
+    // Fail loudly on startup errors (port in use, onListen hook reject, etc.)
+    // 起動時エラー（ポート競合・onListen フック失敗など）を握り潰さず即座に終了する
+    console.error("[Startup] Failed to start hocuspocus server:", error);
+    process.exit(1);
+  });
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("[Shutdown] SIGTERM received, closing server...");
-  hocuspocus.closeConnections();
+  await hocuspocusServer.destroy();
   if (pgPool) {
     await pgPool.end();
   }
-  httpServer.close(() => {
-    console.log("[Shutdown] Server closed");
-    process.exit(0);
-  });
+  console.log("[Shutdown] Server closed");
+  process.exit(0);
 });
 
 process.on("SIGINT", async () => {
   console.log("[Shutdown] SIGINT received, closing server...");
-  hocuspocus.closeConnections();
+  await hocuspocusServer.destroy();
   if (pgPool) {
     await pgPool.end();
   }
-  httpServer.close(() => {
-    console.log("[Shutdown] Server closed");
-    process.exit(0);
-  });
+  console.log("[Shutdown] Server closed");
+  process.exit(0);
 });
