@@ -12,15 +12,12 @@
     "@hocuspocus/extension-redis": "^4.0.0",
     "@hocuspocus/server": "^4.0.0",
     "aws-jwt-verify": "^5.1.1",
-    "ioredis": "^5.9.3",
     "pg": "^8.19.0",
-    "ws": "^8.19.0",
     "yjs": "^13.6.29"
   },
   "devDependencies": {
     "@types/node": "^25.3.2",
     "@types/pg": "^8.16.0",
-    "@types/ws": "^8.18.1",
     "tsx": "^4.19.0",
     "typescript": "^6.0.2",
     "vitest": "^4.0.16"
