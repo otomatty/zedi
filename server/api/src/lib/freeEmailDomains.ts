@@ -8,6 +8,15 @@
  * ハードコードされた拒否リストで代表的なものだけ弾き、将来は DNS TXT による
  * 所有権検証 (`verifiedAt`) に進化させる前提の最低限のガード。
  *
+ * 同期義務 / Sync obligation:
+ * - `packages/shared/src/freeEmailDomains.ts` が真実の値。`server/api` は
+ *   ワークスペース外なので `@zedi/shared` を直接 import できず、本ファイルで
+ *   同じ値を二重定義している。`src/lib/freeEmailDomainsSync.test.ts` が
+ *   両者の `FREE_EMAIL_DOMAINS` / `DOMAIN_REGEX` の一致を CI で担保する。
+ * - 本ファイルを編集したら `packages/shared/src/freeEmailDomains.ts` も
+ *   同じ値で更新すること。ドリフト検知テストが失敗したら片側しか更新して
+ *   いないので、もう片方を揃える。
+ *
  * Deny-list of free-webmail providers, plus helpers to normalise and validate
  * domain inputs for `note_domain_access` (issue #663).
  *
@@ -16,6 +25,12 @@
  * collapse this feature into `unlisted`, since anyone can mint an address at
  * those hosts. This module hard-codes the most common ones as a v1 safeguard;
  * a future v2 will add DNS-TXT ownership verification via `verifiedAt`.
+ *
+ * Sync obligation: the canonical copy lives in
+ * `packages/shared/src/freeEmailDomains.ts`. `server/api` cannot import
+ * `@zedi/shared` because it lives outside the workspace, so this file
+ * duplicates the values; `src/lib/freeEmailDomainsSync.test.ts` enforces
+ * equality between the two sides in CI. Update both files together.
  */
 
 /**

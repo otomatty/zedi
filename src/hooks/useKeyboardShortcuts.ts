@@ -63,40 +63,37 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
 }
 
 /**
- * Metadata describing a single keyboard shortcut for the shortcuts dialog.
+ * Metadata for one shortcut row in the shortcuts dialog.
+ * ショートカット一覧 1 行。表示文は i18n `shortcuts.items.${id}`（英語/日本語）。
+ * / Display text via i18n `shortcuts.items.${id}`.
  */
 export interface ShortcutInfo {
+  /** i18n key under `shortcuts.items` / i18n id under `shortcuts.items` */
+  id: string;
   key: string;
-  description: string;
   category: "navigation" | "page" | "editor";
 }
 
 /**
- * List of all keyboard shortcuts shown in the shortcuts dialog.
- * ショートカット一覧ダイアログで表示する全キーボードショートカット。
+ * List of keyboard shortcuts shown in the dialog (i18n keys, not user-facing text).
+ * 表示文言は `KeyboardShortcutsDialog` で `t` を掛ける。
+ * / Labels are i18n keys; use `t` in the dialog.
  */
 export const KEYBOARD_SHORTCUTS: ShortcutInfo[] = [
-  // Navigation
-  { key: "⌘K", description: "検索を開く", category: "navigation" },
-  { key: "⌘H", description: "ホームに戻る", category: "navigation" },
-  { key: "⌘N", description: "新規ページを作成", category: "navigation" },
-  {
-    key: "⌘/",
-    description: "ショートカット一覧を表示",
-    category: "navigation",
-  },
-
-  // Editor
-  { key: "[[", description: "WikiLink を挿入", category: "editor" },
-  { key: "# ", description: "見出し H1", category: "editor" },
-  { key: "## ", description: "見出し H2", category: "editor" },
-  { key: "### ", description: "見出し H3", category: "editor" },
-  { key: "- ", description: "箇条書きリスト", category: "editor" },
-  { key: "1. ", description: "番号付きリスト", category: "editor" },
-  { key: "> ", description: "引用", category: "editor" },
-  { key: "```", description: "コードブロック", category: "editor" },
-  { key: "**text**", description: "太字", category: "editor" },
-  { key: "*text*", description: "斜体", category: "editor" },
+  { id: "openSearch", key: "⌘K", category: "navigation" },
+  { id: "goHome", key: "⌘H", category: "navigation" },
+  { id: "newPage", key: "⌘N", category: "navigation" },
+  { id: "showShortcutList", key: "⌘/", category: "navigation" },
+  { id: "insertWikiLink", key: "[[", category: "editor" },
+  { id: "headingH1", key: "# ", category: "editor" },
+  { id: "headingH2", key: "## ", category: "editor" },
+  { id: "headingH3", key: "### ", category: "editor" },
+  { id: "bulletList", key: "- ", category: "editor" },
+  { id: "orderedList", key: "1. ", category: "editor" },
+  { id: "blockquote", key: "> ", category: "editor" },
+  { id: "codeBlock", key: "```", category: "editor" },
+  { id: "bold", key: "**text**", category: "editor" },
+  { id: "italic", key: "*text*", category: "editor" },
 ];
 
 /**

@@ -1,18 +1,22 @@
-import { describe, it, expect, vi } from "vitest";
+import React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { I18nextProvider } from "react-i18next";
+import i18n from "@/i18n";
 import { MermaidGeneratorNotConfiguredView } from "./MermaidGeneratorNotConfiguredView";
 
-vi.mock("react-i18next", () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-    i18n: { language: "ja" },
-  }),
-}));
+function renderWithI18n(ui: React.ReactElement) {
+  return render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
+}
 
 describe("MermaidGeneratorNotConfiguredView", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
+  });
+
   it("renders title and description", () => {
-    render(
+    renderWithI18n(
       <MermaidGeneratorNotConfiguredView
         open={true}
         onOpenChange={vi.fn()}
@@ -20,19 +24,15 @@ describe("MermaidGeneratorNotConfiguredView", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("heading", { name: "editor.commands.mermaid.notConfigured.title" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("editor.commands.mermaid.notConfigured.description"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("editor.commands.mermaid.notConfigured.hint")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /AI設定が必要/ })).toBeInTheDocument();
+    expect(screen.getByText(/Mermaidダイアグラムを生成するには/)).toBeInTheDocument();
+    expect(screen.getByText(/設定画面でOpenAI/)).toBeInTheDocument();
   });
 
   it("calls onOpenChange(false) when cancel is clicked", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
-    render(
+    renderWithI18n(
       <MermaidGeneratorNotConfiguredView
         open={true}
         onOpenChange={onOpenChange}
@@ -40,7 +40,7 @@ describe("MermaidGeneratorNotConfiguredView", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "common.cancel" }));
+    await user.click(screen.getByRole("button", { name: "キャンセル" }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -48,7 +48,7 @@ describe("MermaidGeneratorNotConfiguredView", () => {
   it("calls onGoToSettings when goToSettings is clicked", async () => {
     const user = userEvent.setup();
     const onGoToSettings = vi.fn();
-    render(
+    renderWithI18n(
       <MermaidGeneratorNotConfiguredView
         open={true}
         onOpenChange={vi.fn()}
@@ -56,7 +56,7 @@ describe("MermaidGeneratorNotConfiguredView", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "common.goToSettings" }));
+    await user.click(screen.getByRole("button", { name: "設定画面へ" }));
 
     expect(onGoToSettings).toHaveBeenCalledTimes(1);
   });

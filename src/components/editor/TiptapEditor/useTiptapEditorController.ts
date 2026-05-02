@@ -2,7 +2,9 @@ import { useRef, useState, type MutableRefObject, type RefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
+import type { TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion";
+import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useWikiLinkNavigation } from "./useWikiLinkNavigation";
@@ -39,6 +41,7 @@ function useEditorControllers(args: {
   handleLinkClick: (title: string) => void;
   handleStateChange: (state: WikiLinkSuggestionState) => void;
   handleSlashStateChange: (state: SlashSuggestionState) => void;
+  handleTagSuggestionStateChange: (state: TagSuggestionState) => void;
   handleRetryUpload: (nodeId: string) => void;
   handleRemoveUpload: (nodeId: string) => void;
   getProviderLabel: (providerId?: string | null) => string;
@@ -47,8 +50,10 @@ function useEditorControllers(args: {
   handleCopyImageUrl: (src: string) => void;
   suggestionState: WikiLinkSuggestionState | null;
   slashState: SlashSuggestionState | null;
+  tagSuggestionState: TagSuggestionState | null;
   suggestionRef: RefObject<WikiLinkSuggestionHandle | null>;
   slashRef: RefObject<SlashSuggestionHandle | null>;
+  tagSuggestionRef: RefObject<TagSuggestionHandle | null>;
   handleInsertImageClick: () => void;
   handleInsertCameraImageClick: () => void;
   handleImageUpload: (files: File[]) => Promise<void>;
@@ -78,6 +83,7 @@ function useEditorControllers(args: {
     handleLinkClick: args.handleLinkClick,
     handleStateChange: args.handleStateChange,
     handleSlashStateChange: args.handleSlashStateChange,
+    handleTagSuggestionStateChange: args.handleTagSuggestionStateChange,
     handleRetryUpload: args.handleRetryUpload,
     handleRemoveUpload: args.handleRemoveUpload,
     getProviderLabel: args.getProviderLabel,
@@ -86,8 +92,10 @@ function useEditorControllers(args: {
     handleCopyImageUrl: args.handleCopyImageUrl,
     suggestionState: args.suggestionState,
     slashState: args.slashState,
+    tagSuggestionState: args.tagSuggestionState,
     suggestionRef: args.suggestionRef,
     slashRef: args.slashRef,
+    tagSuggestionRef: args.tagSuggestionRef,
     workspaceRoot: args.workspaceRoot,
     noteId: args.noteId,
   });
@@ -96,6 +104,7 @@ function useEditorControllers(args: {
     editor,
     suggestionState: args.suggestionState,
     slashState: args.slashState,
+    tagSuggestionState: args.tagSuggestionState,
     editorContainerRef: args.editorContainerRef,
     pageId: args.pageId,
     handleInsertImageClick: args.handleInsertImageClick,
@@ -132,7 +141,7 @@ function useEditorControllers(args: {
 export function useTiptapEditorController({
   content,
   onChange,
-  placeholder = "思考を書き始める...",
+  placeholder,
   autoFocus = false,
   pageId,
   pageTitle = "",
@@ -214,6 +223,7 @@ export function useTiptapEditorController({
     handleLinkClick,
     handleStateChange: suggestionControllers.handleStateChange,
     handleSlashStateChange: suggestionControllers.handleSlashStateChange,
+    handleTagSuggestionStateChange: suggestionControllers.handleTagSuggestionStateChange,
     handleRetryUpload: imageUpload.handleRetryUpload,
     handleRemoveUpload: imageUpload.handleRemoveUpload,
     getProviderLabel,
@@ -222,8 +232,10 @@ export function useTiptapEditorController({
     handleCopyImageUrl,
     suggestionState: suggestionControllers.suggestionState,
     slashState: suggestionControllers.slashState,
+    tagSuggestionState: suggestionControllers.tagSuggestionState,
     suggestionRef: suggestionControllers.suggestionRef,
     slashRef: suggestionControllers.slashRef,
+    tagSuggestionRef: suggestionControllers.tagSuggestionRef,
     handleInsertImageClick: imageUpload.handleInsertImageClick,
     handleInsertCameraImageClick: imageUpload.handleInsertCameraImageClick,
     handleImageUpload: imageUpload.handleImageUpload,
@@ -258,6 +270,11 @@ export function useTiptapEditorController({
     slashPos: editorControllers.slashPos,
     slashRef: suggestionControllers.slashRef,
     handleSlashClose: editorControllers.handleSlashClose,
+    tagSuggestionState: suggestionControllers.tagSuggestionState,
+    tagSuggestionPos: editorControllers.tagSuggestionPos,
+    tagSuggestionRef: suggestionControllers.tagSuggestionRef,
+    handleTagSuggestionSelect: editorControllers.handleTagSuggestionSelect,
+    handleTagSuggestionClose: editorControllers.handleTagSuggestionClose,
     mermaidDialogOpen,
     setMermaidDialogOpen,
     handleInsertMermaid: editorControllers.handleInsertMermaid,

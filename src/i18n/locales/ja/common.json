@@ -36,5 +36,98 @@
   "useWithoutSignIn": "ログインせずに使う",
   "startUsingApp": "アプリを使い始める",
   "createPageFailed": "ページの作成に失敗しました",
-  "copyFailed": "コピーに失敗しました"
+  "copyFailed": "コピーに失敗しました",
+  "untitledPage": "無題のページ",
+  "sharedNoteContext": "（共有ノート）",
+  "newConversation": "新しい会話",
+  "search": {
+    "resultsHeading": "「{{query}}」の検索結果",
+    "resultsCount_one": "{{count}}件",
+    "resultsCount_other": "{{count}}件",
+    "promptHeading": "検索キーワードを入力してください",
+    "minChars": "3文字以上入力してください",
+    "emptyTitle": "検索結果が見つかりません",
+    "emptyDescription": "別のキーワードで検索してみてください",
+    "initialHint": "ヘッダーの検索バーからキーワードを入力してください"
+  },
+  "listSeparator": "、",
+  "date": {
+    "today": "今日（{{date}}）",
+    "yesterday": "昨日（{{date}}）",
+    "justNow": "たった今",
+    "minutesAgo_one": "{{count}}分前",
+    "minutesAgo_other": "{{count}}分前",
+    "hoursAgo_one": "{{count}}時間前",
+    "hoursAgo_other": "{{count}}時間前",
+    "daysAgo_one": "{{count}}日前",
+    "daysAgo_other": "{{count}}日前",
+    "format": {
+      "labelToday": "M月d日・E",
+      "labelOther": "M月d日（E）",
+      "shortMonthDay": "M/d",
+      "fullDateTime": "yyyy年M月d日 HH:mm"
+    }
+  },
+  "wikiIndex": {
+    "pageTitle": "Wiki Index / カテゴリ目次",
+    "backToHome": "ホームへ戻る",
+    "rebuild": "再構築",
+    "description": "AI が生成するカテゴリ別目次（Karpathy LLM Wiki の index.md 相当）。ページを追加・更新したあとに再構築するとカテゴリが更新されます。",
+    "totalPagesLabel": "対象ページ数:",
+    "categoryCountLabel": "カテゴリ数:",
+    "lastBuiltAt": "最終ビルド: {{date}}",
+    "notBuiltYet": "まだ再構築されていません",
+    "openIndexPage": "__index__ ページを開く",
+    "noPagesYet": "まだページがありません。",
+    "pageCount": "{{count}} ページ"
+  },
+  "page": {
+    "noContent": "コンテンツがありません",
+    "noPreview": "内容がありません",
+    "titleCopySuffix": "のコピー",
+    "duplicated": "複製しました",
+    "duplicatedWithTitle": "「{{title}}」を作成しました",
+    "pageDeleted": "削除しました",
+    "deletedWithTitle": "「{{title}}」を削除しました",
+    "duplicateFailed": "ページの複製に失敗しました",
+    "deleteFailed": "ページの削除に失敗しました",
+    "deleteConfirm": "ページを削除しますか？",
+    "deleteBody": "「{{title}}」を削除します。この操作は取り消せません。",
+    "deleting": "削除中...",
+    "delete": "削除",
+    "duplicate": "複製",
+    "linkSection": "リンク ({{count}})",
+    "newLinksSection": "新しいリンク ({{count}})",
+    "linkTargets": "{{count}}件のリンク先",
+    "lintTitle": "Suggestions ({{count}})",
+    "lintRule": {
+      "orphan": "孤立ページ",
+      "ghost_many": "Ghost Link 過多",
+      "title_similar": "タイトル類似",
+      "conflict": "矛盾",
+      "broken_link": "リンク切れ"
+    },
+    "lintDetailTitleSimilar": "「{{titleA}}」と「{{titleB}}」が類似しています",
+    "lintUnknownError": "Unknown error",
+    "lintFetchFailed": "Suggestions の取得に失敗しました",
+    "suggestionMarkResolved": "この Suggestion を解決済みにする / Mark suggestion as resolved",
+    "emptyHomeTitle": "Zediへようこそ",
+    "emptyHomeLine1": "思考のネットワークを構築しましょう。",
+    "emptyHomeLine2": "最初のページを作成して、アイデアを記録し始めてください。",
+    "emptyHomeCta": "最初のページを作成",
+    "ghostCreateHint": "クリックしてページを作成",
+    "untitledNote": "無題のノート"
+  },
+  "note": {
+    "owner": "所有者",
+    "editor": "編集者",
+    "viewer": "閲覧者",
+    "guest": "ゲスト",
+    "roleUnknown": "不明"
+  },
+  "wikiLink": {
+    "notCreated": "まだ作成されていないページです。",
+    "notCreatedWithRefs": "まだ作成されていないページです。他のページからも参照されています。",
+    "clickToCreate": "クリックして作成"
+  }
 }

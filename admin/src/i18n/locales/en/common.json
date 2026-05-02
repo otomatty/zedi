@@ -1,0 +1,19 @@
+{
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "loading": "Loading...",
+  "saving": "Saving...",
+  "processing": "Processing...",
+  "previous": "Previous",
+  "next": "Next",
+  "all": "All",
+  "save": "Save",
+  "delete": "Delete",
+  "reload": "Reload",
+  "running": "Running...",
+  "page": "Page {{page}} / {{count}}",
+  "showingRange": "Showing {{rangeStart}}-{{rangeEnd}} of {{total}}",
+  "showingZero": "Showing 0 of {{total}}",
+  "totalCount": "Total: {{count}}",
+  "confirmPhraseDefault": "Type \"{{phrase}}\" to confirm"
+}

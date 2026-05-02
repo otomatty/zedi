@@ -163,15 +163,16 @@ export function useAIChatInput({
   const mentionCandidates = useMemo(() => {
     if (deferredMentionQuery === null) return [];
     const q = deferredMentionQuery.toLowerCase();
+    const untitled = t("common.untitledPage");
     const pendingIds = new Set(pendingRefs.map((r) => r.id));
     return pages
       .filter((p) => !p.isDeleted && !pendingIds.has(p.id))
       .filter((p) => {
-        const title = (p.title || "無題のページ").toLowerCase();
+        const title = (p.title || untitled).toLowerCase();
         return q === "" || title.includes(q);
       })
       .slice(0, 8);
-  }, [deferredMentionQuery, pages, pendingRefs]);
+  }, [deferredMentionQuery, pages, pendingRefs, t]);
 
   const detectMention = useCallback(() => {
     const sel = window.getSelection();
@@ -260,7 +261,10 @@ export function useAIChatInput({
           e.preventDefault();
           const selected = mentionCandidates[mentionIndex];
           if (selected)
-            selectMentionPage({ id: selected.id, title: selected.title || "無題のページ" });
+            selectMentionPage({
+              id: selected.id,
+              title: selected.title || t("common.untitledPage"),
+            });
           return;
         }
         if (e.key === "Escape") {
@@ -274,7 +278,7 @@ export function useAIChatInput({
         handleSubmit();
       }
     },
-    [mentionQuery, mentionCandidates, mentionIndex, selectMentionPage, handleSubmit],
+    [mentionQuery, mentionCandidates, mentionIndex, selectMentionPage, handleSubmit, t],
   );
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {

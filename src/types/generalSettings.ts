@@ -31,28 +31,29 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   executableCodeConfirmBeforeRun: true,
 };
 
-/** テーマの表示名 */
-export const THEME_OPTIONS: { value: ThemeMode; label: string; labelEn: string }[] = [
-  { value: "system", label: "システムに従う", labelEn: "System" },
-  { value: "light", label: "ライト", labelEn: "Light" },
-  { value: "dark", label: "ダーク", labelEn: "Dark" },
+/**
+ * テーマ選択の値。表示名は i18n `generalSettings.theme.*`。
+ * / Theme options; labels come from i18n `generalSettings.theme.*`.
+ */
+export const THEME_OPTIONS: { value: ThemeMode }[] = [
+  { value: "system" },
+  { value: "light" },
+  { value: "dark" },
 ];
 
-/** フォントサイズの表示名と対応 px（custom は px: null） */
-export const FONT_SIZE_OPTIONS: {
-  value: EditorFontSize;
-  label: string;
-  labelEn: string;
-  px: number | null;
-}[] = [
-  { value: "small", label: "小", labelEn: "Small", px: 14 },
-  { value: "medium", label: "中", labelEn: "Medium", px: 16 },
-  { value: "large", label: "大", labelEn: "Large", px: 18 },
-  { value: "custom", label: "カスタム", labelEn: "Custom", px: null },
+/**
+ * フォントプリセットと px。表示名は i18n `generalSettings.fontSize.*`。
+ * / Font presets; labels from i18n `generalSettings.fontSize.*`.
+ */
+export const FONT_SIZE_OPTIONS: { value: EditorFontSize; px: number | null }[] = [
+  { value: "small", px: 14 },
+  { value: "medium", px: 16 },
+  { value: "large", px: 18 },
+  { value: "custom", px: null },
 ];
 
-/** 言語の表示名 */
-export const LOCALE_OPTIONS: { value: UILocale; label: string }[] = [
-  { value: "ja", label: "日本語" },
-  { value: "en", label: "English" },
-];
+/**
+ * 言語の選択肢。表示名は i18n `generalSettings.locales.*`。
+ * / Locale options; labels from i18n `generalSettings.locales.*`.
+ */
+export const LOCALE_OPTIONS: { value: UILocale }[] = [{ value: "ja" }, { value: "en" }];

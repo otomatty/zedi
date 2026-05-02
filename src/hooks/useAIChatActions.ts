@@ -102,7 +102,13 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
       /**
        *
        */
-      const nextContent = appendMarkdownToTiptapContent(latestPageContentRef.current, markdown);
+      // AI 経路では先頭の `# Title` 行を落とし、ページタイトル input と重複した
+      // literal paragraph が本文に残らないようにする（issue #784）。
+      // The AI path strips a leading `# Title` line so it does not duplicate the
+      // page-title input as a literal paragraph in the body (issue #784).
+      const nextContent = appendMarkdownToTiptapContent(latestPageContentRef.current, markdown, {
+        dropLeadingH1: true,
+      });
       await updatePageMutation.mutateAsync({
         pageId: currentPageId,
         updates: { content: nextContent },

@@ -36,5 +36,98 @@
   "useWithoutSignIn": "Use without signing in",
   "startUsingApp": "Start using the app",
   "createPageFailed": "Failed to create page",
-  "copyFailed": "Copy failed"
+  "copyFailed": "Copy failed",
+  "untitledPage": "Untitled page",
+  "sharedNoteContext": "(Shared note)",
+  "newConversation": "New conversation",
+  "search": {
+    "resultsHeading": "Results for \"{{query}}\"",
+    "resultsCount_one": "{{count}} result",
+    "resultsCount_other": "{{count}} results",
+    "promptHeading": "Enter a search keyword",
+    "minChars": "Please enter at least 3 characters",
+    "emptyTitle": "No results found",
+    "emptyDescription": "Try a different keyword",
+    "initialHint": "Use the search bar in the header to enter a keyword"
+  },
+  "listSeparator": ", ",
+  "date": {
+    "today": "Today ({{date}})",
+    "yesterday": "Yesterday ({{date}})",
+    "justNow": "Just now",
+    "minutesAgo_one": "{{count}} min ago",
+    "minutesAgo_other": "{{count}} min ago",
+    "hoursAgo_one": "{{count}} hr ago",
+    "hoursAgo_other": "{{count}} hr ago",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago",
+    "format": {
+      "labelToday": "MMM d (EEE)",
+      "labelOther": "MMM d (EEE)",
+      "shortMonthDay": "M/d",
+      "fullDateTime": "MMM d, yyyy HH:mm"
+    }
+  },
+  "wikiIndex": {
+    "pageTitle": "Wiki Index",
+    "backToHome": "Back to home",
+    "rebuild": "Rebuild",
+    "description": "Auto-generated category index (equivalent to Karpathy's LLM Wiki index.md). Rebuild after adding or updating pages to refresh categories.",
+    "totalPagesLabel": "Total pages:",
+    "categoryCountLabel": "Categories:",
+    "lastBuiltAt": "Last built at {{date}}",
+    "notBuiltYet": "Not built yet",
+    "openIndexPage": "Open __index__ page",
+    "noPagesYet": "No pages yet.",
+    "pageCount": "{{count}} pages"
+  },
+  "page": {
+    "noContent": "No content",
+    "noPreview": "No preview",
+    "titleCopySuffix": " (copy)",
+    "duplicated": "Duplicated",
+    "duplicatedWithTitle": "Created “{{title}}”",
+    "pageDeleted": "Deleted",
+    "deletedWithTitle": "“{{title}}” was deleted",
+    "duplicateFailed": "Could not duplicate the page",
+    "deleteFailed": "Could not delete the page",
+    "deleteConfirm": "Delete this page?",
+    "deleteBody": "“{{title}}” will be removed. This cannot be undone.",
+    "deleting": "Deleting...",
+    "delete": "Delete",
+    "duplicate": "Duplicate",
+    "linkSection": "Links ({{count}})",
+    "newLinksSection": "New links ({{count}})",
+    "linkTargets": "{{count}} link targets",
+    "lintTitle": "Suggestions ({{count}})",
+    "lintRule": {
+      "orphan": "Orphan page",
+      "ghost_many": "Many ghost links",
+      "title_similar": "Similar titles",
+      "conflict": "Conflict",
+      "broken_link": "Broken link"
+    },
+    "lintDetailTitleSimilar": "“{{titleA}}” and “{{titleB}}” are similar",
+    "lintUnknownError": "Unknown error",
+    "lintFetchFailed": "Failed to load suggestions",
+    "suggestionMarkResolved": "Mark suggestion as resolved",
+    "emptyHomeTitle": "Welcome to Zedi",
+    "emptyHomeLine1": "Build a network of ideas.",
+    "emptyHomeLine2": "Create your first page to start capturing thoughts.",
+    "emptyHomeCta": "Create your first page",
+    "ghostCreateHint": "Click to create page",
+    "untitledNote": "Untitled note"
+  },
+  "note": {
+    "owner": "Owner",
+    "editor": "Editor",
+    "viewer": "Viewer",
+    "guest": "Guest",
+    "roleUnknown": "Unknown"
+  },
+  "wikiLink": {
+    "notCreated": "This page does not exist yet.",
+    "notCreatedWithRefs": "This page does not exist yet, and is referenced from others.",
+    "clickToCreate": "Click to create"
+  }
 }

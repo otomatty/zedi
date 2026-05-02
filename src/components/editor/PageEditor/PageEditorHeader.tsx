@@ -193,7 +193,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
           )}
           {lastSaved && (
             <span className="text-muted-foreground hidden text-xs sm:inline">
-              {formatTimeAgo(lastSaved)}に保存
+              {t("editor.savedAt", { relative: formatTimeAgo(lastSaved) })}
             </span>
           )}
 
@@ -217,11 +217,11 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
               )}
               <DropdownMenuItem onClick={onExportMarkdown}>
                 <Download className="mr-2 h-4 w-4" />
-                Markdownでエクスポート
+                {t("editor.pageMenu.exportMarkdown")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopyMarkdown}>
                 <Copy className="mr-2 h-4 w-4" />
-                Markdownをコピー
+                {t("editor.pageMenu.copyMarkdown")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -229,7 +229,7 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                削除
+                {t("editor.pageMenu.deletePage")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

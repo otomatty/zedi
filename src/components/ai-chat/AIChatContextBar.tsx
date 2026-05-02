@@ -36,7 +36,7 @@ export function AIChatContextBar() {
       <button
         onClick={toggleContext}
         className="hover:text-foreground ml-2 flex shrink-0 items-center gap-1 transition-colors"
-        title={contextEnabled ? "コンテキストを無効化" : "コンテキストを有効化"}
+        title={contextEnabled ? t("aiChat.context.disable") : t("aiChat.context.enable")}
       >
         {contextEnabled ? (
           <ToggleRight className="text-primary h-4 w-4" />

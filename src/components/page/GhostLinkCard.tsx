@@ -1,5 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@zedi/ui";
 import { FilePlus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface GhostLinkCardProps {
   title: string;
@@ -10,6 +11,7 @@ interface GhostLinkCardProps {
  *
  */
 export function GhostLinkCard({ title, onClick }: GhostLinkCardProps) {
+  const { t } = useTranslation();
   return (
     <Card
       className="hover:bg-accent flex aspect-square cursor-pointer flex-col border-dashed transition-colors"
@@ -22,7 +24,7 @@ export function GhostLinkCard({ title, onClick }: GhostLinkCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-end p-3 pt-0">
-        <p className="text-muted-foreground text-xs">クリックしてページを作成</p>
+        <p className="text-muted-foreground text-xs">{t("common.page.ghostCreateHint")}</p>
       </CardContent>
     </Card>
   );

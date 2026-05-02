@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Link2, FilePlus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Skeleton } from "@zedi/ui";
 import { LinkSection } from "./LinkSection";
 import { LinkGroupRow } from "./LinkGroupRow";
@@ -32,6 +33,7 @@ function LinkedPagesSkeleton() {
  *
  */
 export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPagesSectionProps) {
+  const { t } = useTranslation();
   /**
    *
    */
@@ -111,7 +113,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
       {/* Combined Links section (outgoing without children + backlinks) */}
       {allLinks.length > 0 && (
         <LinkSection
-          title="リンク"
+          title={t("common.page.linkSection", { count: allLinks.length })}
           icon={<Link2 className="h-4 w-4" />}
           pages={allLinks}
           onPageClick={handlePageClick}
@@ -123,7 +125,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
         <div className="space-y-3">
           <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
             <FilePlus className="h-4 w-4" />
-            <span>新しいリンク ({ghostLinks.length})</span>
+            <span>{t("common.page.newLinksSection", { count: ghostLinks.length })}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {ghostLinks.map((title) => (

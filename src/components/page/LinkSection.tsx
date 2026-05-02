@@ -20,9 +20,7 @@ export function LinkSection({ title, icon, pages, onPageClick }: LinkSectionProp
       {title && (
         <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
           {icon}
-          <span>
-            {title} ({pages.length})
-          </span>
+          <span>{title}</span>
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">

@@ -9,6 +9,7 @@ import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
 import { WikiLinkHoverCardLayer } from "./TiptapEditor/WikiLinkHoverCardLayer";
+import { TagSuggestionLayer } from "./TiptapEditor/TagSuggestionLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
@@ -27,7 +28,7 @@ export type { TiptapEditorProps } from "./TiptapEditor/types";
 const TiptapEditor: React.FC<TiptapEditorProps> = ({
   content,
   onChange,
-  placeholder = "思考を書き始める...",
+  placeholder,
   className,
   autoFocus = false,
   pageId,
@@ -46,6 +47,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   pageNoteId = null,
 }) => {
   const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("editor.startWritingPlaceholder");
   const {
     editor,
     editorFontSizePx,
@@ -67,6 +69,11 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     slashPos,
     slashRef,
     handleSlashClose,
+    tagSuggestionState,
+    tagSuggestionPos,
+    tagSuggestionRef,
+    handleTagSuggestionSelect,
+    handleTagSuggestionClose,
     mermaidDialogOpen,
     setMermaidDialogOpen,
     handleInsertMermaid,
@@ -88,7 +95,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   } = useTiptapEditorController({
     content,
     onChange,
-    placeholder,
+    placeholder: resolvedPlaceholder,
     autoFocus,
     pageId,
     pageTitle,
@@ -145,6 +152,15 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         suggestionRef={suggestionRef}
         onSelect={handleSuggestionSelect}
         onClose={handleSuggestionClose}
+        pageNoteId={resolvedPageNoteId}
+      />
+      <TagSuggestionLayer
+        editor={editor}
+        suggestionState={tagSuggestionState}
+        position={tagSuggestionPos}
+        suggestionRef={tagSuggestionRef}
+        onSelect={handleTagSuggestionSelect}
+        onClose={handleTagSuggestionClose}
         pageNoteId={resolvedPageNoteId}
       />
       <WikiLinkHoverCardLayer

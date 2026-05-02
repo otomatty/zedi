@@ -326,6 +326,12 @@ export async function runQuery(params: {
     }
 
     if (abortController.signal.aborted) {
+      // Flush any active tool so downstream consumers see a balanced start/complete pair.
+      // 中断時もアクティブなツールを完了扱いにし、開始/完了の対応関係を保つ。
+      if (activeToolName) {
+        emit({ type: "tool-use-complete", id, toolName: activeToolName });
+        activeToolName = null;
+      }
       emit({
         type: "error",
         id,
@@ -341,6 +347,12 @@ export async function runQuery(params: {
       result: { content: aggregated },
     });
   } catch (err) {
+    // Flush any active tool before reporting the exception so the start/complete pair stays balanced.
+    // 例外発生時もアクティブなツールを完了扱いにし、開始/完了の対応関係を保つ。
+    if (activeToolName) {
+      emit({ type: "tool-use-complete", id, toolName: activeToolName });
+      activeToolName = null;
+    }
     const message = err instanceof Error ? err.message : String(err);
     emit({
       type: "error",

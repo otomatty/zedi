@@ -1,0 +1,27 @@
+{
+  "title": "Wiki Health Dashboard",
+  "runLint": "Run lint",
+  "filterRule": "Filter by rule",
+  "emptyAll": "No lint findings. Click \"Run lint\" to start.",
+  "emptyFiltered": "No matching findings.",
+  "columns": {
+    "rule": "Rule",
+    "severity": "Severity",
+    "detail": "Detail",
+    "createdAt": "Detected at",
+    "actions": "Actions"
+  },
+  "pagesRelated": "{{count}} pages related",
+  "resolve": "Resolve",
+  "rules": {
+    "orphan": "Orphan",
+    "ghost_many": "Ghost Excess",
+    "title_similar": "Title Similar",
+    "conflict": "Conflict",
+    "broken_link": "Broken Link",
+    "stale": "Stale"
+  },
+  "detail": {
+    "linkText": "\"{{linkText}}\" ({{count}})"
+  }
+}

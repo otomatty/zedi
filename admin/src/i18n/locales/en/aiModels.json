@@ -1,0 +1,30 @@
+{
+  "title": "AI Model Management",
+  "syncing": "Syncing...",
+  "syncWithProvider": "Sync with provider",
+  "syncResult": "Sync result:",
+  "syncStat": "Added {{added}} / Deactivated {{deactivated}}",
+  "columns": {
+    "reorder": "Reorder",
+    "provider": "Provider",
+    "modelId": "Model ID",
+    "displayName": "Display name",
+    "tier": "Tier",
+    "active": "Active",
+    "sortOrder": "Order"
+  },
+  "summary": "{{total}} models (active: {{active}})",
+  "dragHint": "Drag to reorder",
+  "displayNameAriaLabel": "Display name for {{modelId}}",
+  "tierAriaLabel": "Tier for {{name}}",
+  "preview": {
+    "title": "Sync preview",
+    "description": "New models will be added, and existing models no longer in scope will be deactivated. Existing models' display names and pricing are not overwritten. Sonnet-family models are added as inactive.",
+    "noChanges": "No changes",
+    "addLabel": "Add: {{name}}",
+    "deactivateLabel": "Deactivate: {{name}}",
+    "inactiveTag": "(inactive)",
+    "errorWarning": "Some providers reported errors. Providers with errors will not be synced.",
+    "confirm": "Run sync (Add {{added}} / Deactivate {{deactivated}})"
+  }
+}

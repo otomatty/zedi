@@ -35,6 +35,10 @@
     "description": "Set the display language for the UI",
     "label": "Display Language"
   },
+  "locales": {
+    "ja": "Japanese",
+    "en": "English"
+  },
   "profile": {
     "title": "Profile",
     "description": "Configure your display name and avatar",

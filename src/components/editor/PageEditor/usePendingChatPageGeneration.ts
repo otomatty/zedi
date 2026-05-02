@@ -123,7 +123,9 @@ export function usePendingChatPageGeneration({
       if (throttleId) return;
       throttleId = setTimeout(() => {
         throttleId = null;
-        const tiptap = convertMarkdownToTiptapContent(markdown);
+        // AI 出力経路。先頭の `# Title` 行はタイトル input と重複するため落とす（issue #784）。
+        // AI path: drop a stray leading `# Title` line that duplicates the title input (issue #784).
+        const tiptap = convertMarkdownToTiptapContent(markdown, { dropLeadingH1: true });
         setContent(tiptap);
         setWikiContentForCollab(tiptap);
       }, PENDING_CHAT_PAGE_STREAM_THROTTLE_MS);
@@ -141,7 +143,9 @@ export function usePendingChatPageGeneration({
         onComplete: (result) => {
           if (throttleId) clearTimeout(throttleId);
           throttleId = null;
-          const tiptap = convertMarkdownToTiptapContent(result.content);
+          // 同上、AI 出力なので先頭 `# Title` を落とす（issue #784）。
+          // Same as above: AI output, drop a leading `# Title` (issue #784).
+          const tiptap = convertMarkdownToTiptapContent(result.content, { dropLeadingH1: true });
           setContent(tiptap);
           setWikiContentForCollab(tiptap);
           saveChanges(titleRef.current, tiptap);

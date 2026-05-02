@@ -17,16 +17,14 @@ interface MermaidGeneratorNotConfiguredViewProps {
 }
 
 /**
- *
+ * AI 未設定時の Mermaid 生成ダイアログ本文。
+ * / Mermaid generator dialog when AI is not configured.
  */
 export function MermaidGeneratorNotConfiguredView({
   open,
   onOpenChange,
   onGoToSettings,
 }: MermaidGeneratorNotConfiguredViewProps) {
-  /**
-   *
-   */
   const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,15 +32,15 @@ export function MermaidGeneratorNotConfiguredView({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-500" />
-            {t("editor.commands.mermaid.notConfigured.title")}
+            {t("editor.slash.mermaid.notConfigured.title")}
           </DialogTitle>
           <DialogDescription>
-            {t("editor.commands.mermaid.notConfigured.description")}
+            {t("editor.slash.mermaid.notConfigured.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
           <p className="text-muted-foreground text-sm">
-            {t("editor.commands.mermaid.notConfigured.hint")}
+            {t("editor.slash.mermaid.notConfigured.hint")}
           </p>
         </div>
         <DialogFooter>

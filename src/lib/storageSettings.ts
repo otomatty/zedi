@@ -1,6 +1,7 @@
 // ストレージ設定の保存/読み込み機能
 
 import { encrypt, decrypt } from "./encryption";
+import i18n from "@/i18n";
 import { StorageSettings, DEFAULT_STORAGE_SETTINGS } from "@/types/storage";
 import { isStorageConfiguredForUpload } from "@/lib/storage";
 
@@ -43,7 +44,7 @@ export async function saveStorageSettings(settings: StorageSettings): Promise<vo
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
   } catch (error) {
     console.error("Failed to save storage settings:", error);
-    throw new Error("ストレージ設定の保存に失敗しました");
+    throw new Error(i18n.t("errors.storageSettingsSaveFailed"));
   }
 }
 

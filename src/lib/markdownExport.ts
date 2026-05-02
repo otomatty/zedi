@@ -42,7 +42,14 @@ Object.assign(nodeHandlers, {
   doc: (n) => convertChildren(n),
   paragraph: (n) => convertChildren(n) + "\n\n",
   heading: (n) => {
-    const level = (n.attrs?.level as number) || 1;
+    // 本文の見出しは body schema 上 h2–h5（level 2–5）。level が欠落している旧データでも
+    // ページタイトルと衝突する `#` 1 個に潰さず、最小の本文見出しレベル `##` にフォールバック
+    // する。これにより `convertMarkdownToTiptapContent` との round-trip が対称に保たれる。
+    // Body headings span schema levels 2–5. If the level attribute is missing on legacy data,
+    // fall back to `##` (the minimum body heading) instead of `#`, which would clash with the
+    // page title and round-trip back to a literal `# X` paragraph in `convertMarkdownToTiptapContent`.
+    const rawLevel = n.attrs?.level;
+    const level = typeof rawLevel === "number" && rawLevel >= 2 ? rawLevel : 2;
     const prefix = "#".repeat(level);
     return `${prefix} ${convertChildren(n)}\n\n`;
   },

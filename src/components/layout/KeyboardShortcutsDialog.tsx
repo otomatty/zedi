@@ -4,17 +4,12 @@ import {
   formatShortcutKey,
   type ShortcutInfo,
 } from "@/hooks/useKeyboardShortcuts";
+import { useTranslation } from "react-i18next";
 
 interface KeyboardShortcutsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const categoryLabels: Record<ShortcutInfo["category"], string> = {
-  navigation: "ナビゲーション",
-  page: "ページ操作",
-  editor: "エディタ",
-};
 
 const categoryOrder: ShortcutInfo["category"][] = ["navigation", "page", "editor"];
 
@@ -22,10 +17,12 @@ const categoryOrder: ShortcutInfo["category"][] = ["navigation", "page", "editor
  *
  */
 export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcutsDialogProps) {
-  // Group shortcuts by category
-  /**
-   *
-   */
+  const { t } = useTranslation();
+  const categoryLabels: Record<ShortcutInfo["category"], string> = {
+    navigation: t("shortcuts.category.navigation"),
+    page: t("shortcuts.category.page"),
+    editor: t("shortcuts.category.editor"),
+  };
   const groupedShortcuts = categoryOrder
     .map((category) => ({
       category,
@@ -38,7 +35,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcut
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>キーボードショートカット</DialogTitle>
+          <DialogTitle>{t("shortcuts.dialogTitle")}</DialogTitle>
         </DialogHeader>
         <div className="max-h-[60vh] space-y-6 overflow-y-auto pr-2">
           {groupedShortcuts.map((group) => (
@@ -47,7 +44,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcut
               <div className="space-y-2">
                 {group.shortcuts.map((shortcut, index) => (
                   <div key={index} className="flex items-center justify-between py-1">
-                    <span className="text-sm">{shortcut.description}</span>
+                    <span className="text-sm">{t(`shortcuts.items.${shortcut.id}` as const)}</span>
                     <kbd className="border-border bg-muted rounded border px-2 py-1 font-mono text-xs">
                       {formatShortcutKey(shortcut.key)}
                     </kbd>
@@ -59,7 +56,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcut
         </div>
         <div className="text-muted-foreground border-t pt-4 text-center text-xs">
           <kbd className="border-border bg-muted rounded border px-1.5 py-0.5 font-mono">Esc</kbd>{" "}
-          で閉じる
+          {t("shortcuts.closeWithEsc")}
         </div>
       </DialogContent>
     </Dialog>

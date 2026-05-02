@@ -1,6 +1,7 @@
 // AI設定の保存/読み込み機能
 
 import { encrypt, decrypt } from "./encryption";
+import i18n from "@/i18n";
 import { AISettings, DEFAULT_AI_SETTINGS } from "@/types/ai";
 import { isTauriDesktop } from "@/lib/platform";
 
@@ -33,7 +34,7 @@ export async function saveAISettings(settings: AISettings): Promise<void> {
     dispatchAISettingsChanged();
   } catch (error) {
     console.error("Failed to save AI settings:", error);
-    throw new Error("AI設定の保存に失敗しました");
+    throw new Error(i18n.t("errors.aiSettingsSaveFailed"));
   }
 }
 

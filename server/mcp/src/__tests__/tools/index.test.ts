@@ -16,8 +16,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ZediClient } from "../../client/ZediClient.js";
 import { ALL_TOOL_NAMES, registerAllTools } from "../../tools/index.js";
 
-/** Build a fully-mocked ZediClient. Tools call only the methods we register, so types are safe. /
- *  全メソッドをモック化した ZediClient。 */
+/**
+ * Build a fully-mocked ZediClient. Tools call only the methods we register, so types are safe.
+ * 全メソッドをモック化した ZediClient。
+ */
 function createMockClient(): ZediClient {
   return {
     getCurrentUser: vi.fn(),

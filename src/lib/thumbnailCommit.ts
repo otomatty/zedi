@@ -6,6 +6,8 @@
  * Used by useThumbnailCommit (editor) and WebClipperDialog.
  */
 
+import i18n from "@/i18n";
+
 /**
  * 401 応答時に呼び出し側でサインイン誘導を行うための例外クラス。
  * 呼び出し側が必要に応じてリダイレクトやトースト表示を行う。
@@ -55,7 +57,7 @@ export async function commitThumbnailFromUrl(
 ): Promise<CommitThumbnailResult> {
   const { baseUrl } = options;
   if (!baseUrl) {
-    throw new Error("APIのURLが設定されていません");
+    throw new Error(i18n.t("errors.apiUrlNotConfigured"));
   }
 
   const controller = new AbortController();
@@ -78,7 +80,7 @@ export async function commitThumbnailFromUrl(
     });
   } catch (error) {
     if (error && typeof error === "object" && "name" in error && error.name === "AbortError") {
-      throw new Error("画像保存のリクエストがタイムアウトしました");
+      throw new Error(i18n.t("errors.imageSaveTimeout"));
     }
     throw error;
   } finally {
@@ -86,11 +88,11 @@ export async function commitThumbnailFromUrl(
   }
 
   if (response.status === 401) {
-    throw new AuthRedirectError("ログインが必要です");
+    throw new AuthRedirectError(i18n.t("errors.loginRequired"));
   }
 
   if (!response.ok) {
-    let message = `画像の保存に失敗しました: ${response.status}`;
+    let message = i18n.t("errors.imageSaveFailed", { status: response.status });
     try {
       const data = (await response.json()) as { error?: string; message?: string };
       if (data?.message) message = data.message;
@@ -102,6 +104,6 @@ export async function commitThumbnailFromUrl(
   }
 
   const data = (await response.json()) as { imageUrl?: string; provider?: string };
-  if (!data.imageUrl) throw new Error("画像のURLが取得できませんでした");
+  if (!data.imageUrl) throw new Error(i18n.t("errors.imageUrlNotReturned"));
   return { imageUrl: data.imageUrl, provider: data.provider ?? "s3" };
 }

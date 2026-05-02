@@ -19,6 +19,28 @@ vi.mock("@/lib/dateUtils", () => ({
   formatTimeAgo: (ts: number) => `formatted:${ts}`,
 }));
 
+// `useTranslation` をモックして、i18n インスタンス未初期化エラーを避けつつ
+// `editor.savedAt` の実テンプレートを再現する。
+// Stub `useTranslation` so the test does not boot i18next, and reproduce the
+// actual `editor.savedAt` template behaviour.
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (key === "editor.savedAt" && opts?.relative !== undefined) {
+        return `${String(opts.relative)}に保存`;
+      }
+      if (key === "editor.pageMenu.exportMarkdown") return "Markdownでエクスポート";
+      if (key === "editor.pageMenu.copyMarkdown") return "Markdownをコピー";
+      if (key === "editor.pageMenu.deletePage") return "削除";
+      if (key === "editor.pageHistory.menuButton") return "変更履歴";
+      if (key === "common.back") return "戻る";
+      if (key === "common.moreActions") return "more";
+      return key;
+    },
+  }),
+  initReactI18next: { type: "3rdParty", init: () => undefined },
+}));
+
 vi.mock("@/contexts/GlobalSearchContext", () => ({
   useGlobalSearchContextOptional: () => null,
 }));
@@ -172,7 +194,7 @@ describe("PageEditorHeader", () => {
         </div>,
       );
 
-      const backButton = screen.getByRole("button", { name: /back|common\.back/i });
+      const backButton = screen.getByRole("button", { name: /戻る|back/i });
       const scrollContainer = container.firstElementChild as HTMLElement | null;
       const header = scrollContainer?.firstElementChild as HTMLElement | null;
       expect(scrollContainer).not.toBeNull();

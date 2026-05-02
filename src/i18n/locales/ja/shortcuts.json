@@ -1,0 +1,25 @@
+{
+  "dialogTitle": "キーボードショートカット",
+  "closeWithEsc": "で閉じる",
+  "category": {
+    "navigation": "ナビゲーション",
+    "page": "ページ操作",
+    "editor": "エディタ"
+  },
+  "items": {
+    "openSearch": "検索を開く",
+    "goHome": "ホームに戻る",
+    "newPage": "新規ページを作成",
+    "showShortcutList": "ショートカット一覧を表示",
+    "insertWikiLink": "WikiLink を挿入",
+    "headingH1": "見出し H1",
+    "headingH2": "見出し H2",
+    "headingH3": "見出し H3",
+    "bulletList": "箇条書きリスト",
+    "orderedList": "番号付きリスト",
+    "blockquote": "引用",
+    "codeBlock": "コードブロック",
+    "bold": "太字",
+    "italic": "斜体"
+  }
+}

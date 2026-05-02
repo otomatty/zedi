@@ -44,7 +44,7 @@ export const LanguageSelectField: React.FC<LanguageSelectFieldProps> = ({
         <SelectContent>
           {LOCALE_OPTIONS.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
-              {opt.label}
+              {t(`generalSettings.locales.${opt.value}`)}
             </SelectItem>
           ))}
         </SelectContent>

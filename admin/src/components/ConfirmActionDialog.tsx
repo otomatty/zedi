@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -71,7 +72,7 @@ export function ConfirmActionDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "確認",
+  confirmLabel,
   destructive = false,
   loading = false,
   confirmPhrase,
@@ -79,6 +80,8 @@ export function ConfirmActionDialog({
   onConfirm,
   children,
 }: ConfirmActionDialogProps) {
+  const { t } = useTranslation();
+  const resolvedConfirmLabel = confirmLabel ?? t("common.confirm");
   const [phraseInput, setPhraseInput] = useState("");
 
   // ダイアログ閉じ時に確認フレーズ入力をリセット / Reset phrase input when dialog closes
@@ -116,7 +119,7 @@ export function ConfirmActionDialog({
               <div className="grid gap-2">
                 <Label htmlFor="confirm-phrase-input">
                   {confirmPhraseLabel ??
-                    `確認のため「${confirmPhrase}」を入力してください / Type "${confirmPhrase}" to confirm`}
+                    t("common.confirmPhraseDefault", { phrase: confirmPhrase })}
                 </Label>
                 <Input
                   id="confirm-phrase-input"
@@ -131,7 +134,7 @@ export function ConfirmActionDialog({
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>キャンセル</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{t("common.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             className={cn(
               destructive && "bg-destructive text-destructive-foreground hover:bg-destructive/90",
@@ -148,7 +151,7 @@ export function ConfirmActionDialog({
               handleConfirm();
             }}
           >
-            {loading ? "処理中..." : confirmLabel}
+            {loading ? t("common.processing") : resolvedConfirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

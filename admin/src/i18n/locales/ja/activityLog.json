@@ -1,0 +1,29 @@
+{
+  "title": "活動ログ",
+  "filters": {
+    "kind": "種別 / Kind",
+    "actor": "起点 / Actor"
+  },
+  "columns": {
+    "kind": "種別",
+    "actor": "起点",
+    "detail": "詳細",
+    "relatedPages": "関連ページ",
+    "createdAt": "記録日時"
+  },
+  "empty": "活動ログはまだありません。",
+  "showing": "表示 {{shown}} / 合計 {{total}} 件",
+  "kinds": {
+    "clip_ingest": "クリップ取り込み / Clip ingest",
+    "chat_promote": "Chat → Wiki 昇格 / Chat promote",
+    "lint_run": "Lint 実行 / Lint run",
+    "wiki_generate": "Wiki 生成 / Wiki generate",
+    "index_build": "Index 構築 / Index build",
+    "wiki_schema_update": "スキーマ更新 / Schema update"
+  },
+  "actors": {
+    "user": "ユーザー / User",
+    "ai": "AI",
+    "system": "システム / System"
+  }
+}

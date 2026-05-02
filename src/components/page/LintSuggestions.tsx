@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Skeleton } from "@zedi/ui";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * Lint finding の型（API レスポンス）。
@@ -114,27 +115,6 @@ function ruleIcon(rule: string): ReactNode {
 }
 
 /**
- * ルール名を日本語で表示する。
- * Returns a Japanese label for the given rule.
- */
-function ruleLabel(rule: string): string {
-  switch (rule) {
-    case "orphan":
-      return "孤立ページ";
-    case "ghost_many":
-      return "Ghost Link 過多";
-    case "title_similar":
-      return "タイトル類似";
-    case "conflict":
-      return "矛盾";
-    case "broken_link":
-      return "リンク切れ";
-    default:
-      return rule;
-  }
-}
-
-/**
  * 重要度に応じたスタイルアイコンを返す。
  * Returns a styled icon for the given severity.
  */
@@ -153,14 +133,20 @@ function severityIcon(severity: string): ReactNode {
  * detail からサマリ文字列を生成する。
  * Creates a summary string from the detail object.
  */
-function formatDetail(detail: Record<string, unknown>): string {
+function formatDetail(
+  detail: Record<string, unknown>,
+  t: (key: string, opts?: Record<string, string>) => string,
+): string {
   if (typeof detail.suggestion === "string") return detail.suggestion;
   if (typeof detail.title === "string") return detail.title;
   if (typeof detail.linkText === "string") {
     return `「${detail.linkText}」`;
   }
   if (typeof detail.titleA === "string" && typeof detail.titleB === "string") {
-    return `「${detail.titleA}」と「${detail.titleB}」が類似しています`;
+    return t("common.page.lintDetailTitleSimilar", {
+      titleA: detail.titleA,
+      titleB: detail.titleB,
+    });
   }
   return JSON.stringify(detail);
 }
@@ -179,7 +165,14 @@ interface LintSuggestionsProps {
  * @param pageId - 対象ページ ID / Target page ID
  */
 export function LintSuggestions({ pageId }: LintSuggestionsProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  const ruleLabel = (rule: string) => {
+    const key = `common.page.lintRule.${rule}` as const;
+    const translated = t(key);
+    return translated === key ? rule : translated;
+  };
 
   const {
     data: findings,
@@ -220,13 +213,13 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
       <div role="alert" className="mt-6 space-y-3 border-t pt-6">
         <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <span>Suggestions の取得に失敗しました</span>
+          <span>{t("common.page.lintFetchFailed")}</span>
         </div>
         <p className="text-muted-foreground text-sm">
-          {error instanceof Error ? error.message : "Unknown error"}
+          {error instanceof Error ? error.message : t("common.page.lintUnknownError")}
         </p>
         <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
-          再試行
+          {t("common.retry")}
         </Button>
       </div>
     );
@@ -238,7 +231,7 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
     <div className="mt-6 space-y-3 border-t pt-6">
       <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
         <AlertTriangle className="h-4 w-4" />
-        <span>Suggestions ({findings.length})</span>
+        <span>{t("common.page.lintTitle", { count: findings.length })}</span>
       </div>
       <div className="space-y-2">
         {findings.map((f) => (
@@ -251,7 +244,7 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
                   {ruleLabel(f.rule)}
                 </Badge>
               </div>
-              <p className="text-muted-foreground mt-1 text-sm">{formatDetail(f.detail)}</p>
+              <p className="text-muted-foreground mt-1 text-sm">{formatDetail(f.detail, t)}</p>
             </div>
             <Button
               type="button"
@@ -260,7 +253,7 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
               className="shrink-0"
               onClick={() => resolveMutation.mutate(f.id)}
               disabled={resolveMutation.isPending}
-              aria-label="この Suggestion を解決済みにする / Mark suggestion as resolved"
+              aria-label={t("common.page.suggestionMarkResolved")}
             >
               <CheckCircle2 className="h-4 w-4" />
             </Button>

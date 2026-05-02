@@ -30,7 +30,9 @@
     "withContext": "Ask about this page..."
   },
   "context": {
-    "referencing": "Referencing \"{{title}}\""
+    "referencing": "Referencing \"{{title}}\"",
+    "disable": "Disable context",
+    "enable": "Enable context"
   },
   "welcome": {
     "editor": {

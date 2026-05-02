@@ -1,0 +1,66 @@
+{
+  "dialog": {
+    "title": "Mermaidダイアグラムを生成",
+    "description": "選択したテキストからダイアグラムを生成します。",
+    "cancel": "キャンセル",
+    "regenerate": "再生成",
+    "insert": "挿入"
+  },
+  "form": {
+    "selectedText": "選択されたテキスト",
+    "selectTypes": "ダイアグラムタイプを選択（複数可）",
+    "generate": "ダイアグラムを生成",
+    "generating": "生成中...",
+    "errorTitle": "エラーが発生しました",
+    "retry": "再試行"
+  },
+  "preview": {
+    "generatedCode": "生成されたコード",
+    "previewLabel": "プレビュー",
+    "loading": "プレビューを読み込み中...",
+    "parseError": "プレビューエラー"
+  },
+  "diagramTypes": {
+    "flowchart": {
+      "name": "フローチャート",
+      "description": "処理の流れや手順を表現",
+      "example": "flowchart TD\n    A[開始] --> B{条件}\n    B -->|Yes| C[処理]\n    B -->|No| D[終了]"
+    },
+    "sequence": {
+      "name": "シーケンス図",
+      "description": "オブジェクト間のやり取りを時系列で表現",
+      "example": "sequenceDiagram\n    participant A as ユーザー\n    participant B as システム\n    A->>B: リクエスト\n    B-->>A: レスポンス"
+    },
+    "classDiagram": {
+      "name": "クラス図",
+      "description": "クラスの構造と関係を表現",
+      "example": "classDiagram\n    class Animal {\n        +String name\n        +eat()\n    }\n    class Dog {\n        +bark()\n    }\n    Animal <|-- Dog"
+    },
+    "stateDiagram": {
+      "name": "状態遷移図",
+      "description": "状態の変化と遷移条件を表現",
+      "example": "stateDiagram-v2\n    [*] --> 待機中\n    待機中 --> 処理中: 開始\n    処理中 --> 完了: 終了\n    完了 --> [*]"
+    },
+    "erDiagram": {
+      "name": "ER図",
+      "description": "エンティティ間の関係を表現",
+      "example": "erDiagram\n    USER ||--o{ ORDER : places\n    ORDER ||--|{ ITEM : contains\n    USER {\n        int id\n        string name\n    }"
+    },
+    "gantt": {
+      "name": "ガントチャート",
+      "description": "プロジェクトのスケジュールを表現",
+      "example": "gantt\n    title プロジェクト計画\n    dateFormat YYYY-MM-DD\n    section フェーズ1\n    タスク1 :a1, 2024-01-01, 7d\n    タスク2 :after a1, 5d"
+    },
+    "pie": {
+      "name": "円グラフ",
+      "description": "割合や構成比を表現",
+      "example": "pie title 構成比\n    \"項目A\" : 40\n    \"項目B\" : 30\n    \"項目C\" : 30"
+    },
+    "mindmap": {
+      "name": "マインドマップ",
+      "description": "アイデアや概念の関連を表現",
+      "example": "mindmap\n  root((中心テーマ))\n    トピック1\n      サブトピック1\n      サブトピック2\n    トピック2\n      サブトピック3"
+    }
+  },
+  "generatorPrompt": "あなたはMermaidダイアグラムの専門家です。\n与えられたテキストの内容を分析し、指定されたダイアグラムタイプで適切なMermaidコードを生成してください。\n\n## ダイアグラムタイプ\n{{diagramTypes}}\n\n## 入力テキスト\n__ZEDI_MERMAID_SOURCE__\n\n## 出力要件\n1. Mermaidの構文として正しいコードのみを出力\n2. コードブロック(```)で囲まないこと\n3. 日本語のラベルを使用可能\n4. シンプルで読みやすい構造にする\n5. 余分な説明は不要、Mermaidコードのみを出力\n\n## 出力形式\nMermaidコードのみを出力してください。"
+}

@@ -39,6 +39,22 @@ describe("sanitizeTiptapContent", () => {
     expect(parsed.content[0].content[0].text).toBe("Hello world");
   });
 
+  it("clamps stored heading level 1 to 2 (body top = h2)", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Legacy" }] },
+      ],
+    });
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    const parsed = JSON.parse(result.content) as {
+      content: Array<{ type: string; attrs?: { level: number } }>;
+    };
+    expect(parsed.content[0].type).toBe("heading");
+    expect(parsed.content[0].attrs?.level).toBe(2);
+  });
+
   it("should remove unsupported node types", () => {
     const contentWithUnsupportedNode = JSON.stringify({
       type: "doc",

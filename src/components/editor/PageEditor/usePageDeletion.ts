@@ -9,6 +9,18 @@ interface UsePageDeletionOptions {
   title: string;
   content: string;
   shouldBlockSave: boolean;
+  /**
+   * 削除発火直前に呼ぶ、保留中 autosave のキャンセル関数。
+   * `useEditorAutoSave.cancelPendingSave` を渡す想定。issue #768 のレース
+   * （unmount flush の `updatePage` が論理削除を上書きして「無題のページ」
+   * が復活する）を防ぐために必須。
+   *
+   * Cancel any pending autosave before firing a delete. Pass
+   * `useEditorAutoSave.cancelPendingSave`. Required to prevent the issue
+   * #768 race where the unmount flush's `updatePage` overwrites the soft
+   * delete and resurrects an "untitled page" row.
+   */
+  cancelPendingSave: () => void;
 }
 
 interface UsePageDeletionReturn {
@@ -32,14 +44,36 @@ interface UsePageDeletionReturn {
 }
 
 /**
- * Hook for page deletion logic
- * Handles delete confirmation, back navigation with cleanup
+ * ページ削除フロー（明示削除・戻る・タイトル空・タイトル重複）の状態と
+ * ハンドラを束ねるフック。確認ダイアログの開閉、削除理由の保持、削除後の
+ * 遷移先決定、トースト表示までを管理する。
+ *
+ * issue #768: 削除を発火する前に呼び出し側 (`useEditorAutoSave`) の
+ * `cancelPendingSave` を必ず実行し、保留中の autosave debounce と unmount
+ * flush を抑止する。これにより `updatePage` が論理削除を上書きして
+ * 「無題のページ」が `/home` に復活するレースを防ぐ。`handleDelete` だけは
+ * `onError` でユーザーがエディタに残るため、保留中の編集を落とさないよう
+ * `onSuccess` 内（navigate 直前）でのみキャンセルする。
+ *
+ * Hook bundling page deletion flows (explicit delete, back navigation,
+ * empty-title cleanup, duplicate-title cleanup): manages confirmation
+ * dialog state, the deletion reason, post-delete navigation target, and
+ * toasts.
+ *
+ * issue #768: each deletion path invokes the caller-supplied
+ * `cancelPendingSave` (from `useEditorAutoSave`) to clear pending autosave
+ * debounces and suppress the unmount flush, preventing the race where
+ * `updatePage` overwrites the soft delete and an "untitled" row reappears
+ * on `/home`. `handleDelete` is the exception: its `onError` keeps the user
+ * on the editor, so cancellation is deferred to `onSuccess` (just before
+ * `navigate`) to avoid silently dropping queued edits on a failed delete.
  */
 export function usePageDeletion({
   currentPageId,
   title,
   content,
   shouldBlockSave,
+  cancelPendingSave,
 }: UsePageDeletionOptions): UsePageDeletionReturn {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -53,8 +87,19 @@ export function usePageDeletion({
 
   const handleDelete = useCallback(() => {
     if (currentPageId) {
+      // issue #768 + Codex P2: 他のハンドラと違い、`handleDelete` の `onError`
+      // ではユーザーがエディタに残るため、削除失敗時に保留中の autosave を
+      // 落とすと最近の編集が失われる。そのため `cancelPendingSave` は削除が
+      // 成功して `/home` に遷移する直前（`onSuccess` 内）でのみ呼ぶ。
+      //
+      // issue #768 + Codex P2: unlike the other handlers, `handleDelete`'s
+      // `onError` keeps the user on the editor, so cancelling the pending
+      // autosave before the mutation would silently drop their queued edits
+      // on a failed delete. Cancel only inside `onSuccess`, just before
+      // navigating away (and the unmount flush).
       deletePageMutation.mutate(currentPageId, {
         onSuccess: () => {
+          cancelPendingSave();
           toast({
             title: "ページを削除しました",
           });
@@ -68,7 +113,7 @@ export function usePageDeletion({
         },
       });
     }
-  }, [currentPageId, deletePageMutation, navigate, toast]);
+  }, [currentPageId, deletePageMutation, navigate, toast, cancelPendingSave]);
 
   const handleBack = useCallback(() => {
     const hasContent = isContentNotEmpty(content);
@@ -94,6 +139,9 @@ export function usePageDeletion({
         return;
       }
 
+      // issue #768: 削除発火前に保留中の autosave をキャンセル。
+      // issue #768: cancel any pending autosave before firing the delete.
+      cancelPendingSave();
       // コンテンツがない場合はそのまま削除
       deletePageMutation.mutate(currentPageId);
       if (shouldDeleteForDuplicate) {
@@ -107,10 +155,22 @@ export function usePageDeletion({
       }
     }
     navigate("/home");
-  }, [navigate, currentPageId, title, content, deletePageMutation, shouldBlockSave, toast]);
+  }, [
+    navigate,
+    currentPageId,
+    title,
+    content,
+    deletePageMutation,
+    shouldBlockSave,
+    toast,
+    cancelPendingSave,
+  ]);
 
   const handleConfirmDelete = useCallback(() => {
     if (currentPageId) {
+      // issue #768: 削除発火前に保留中の autosave をキャンセル。
+      // issue #768: cancel any pending autosave before firing the delete.
+      cancelPendingSave();
       deletePageMutation.mutate(currentPageId);
       toast({
         title: `${deleteReason}を削除しました`,
@@ -120,7 +180,15 @@ export function usePageDeletion({
     navigate(pendingNavTarget);
     // 次回に備えてデフォルトに戻す / reset to default for next invocation
     setPendingNavTarget("/home");
-  }, [currentPageId, deletePageMutation, deleteReason, navigate, pendingNavTarget, toast]);
+  }, [
+    currentPageId,
+    deletePageMutation,
+    deleteReason,
+    navigate,
+    pendingNavTarget,
+    toast,
+    cancelPendingSave,
+  ]);
 
   const handleCancelDelete = useCallback(() => {
     setDeleteConfirmOpen(false);
@@ -149,6 +217,9 @@ export function usePageDeletion({
         return;
       }
 
+      // issue #768: 削除発火前に保留中の autosave をキャンセル。
+      // issue #768: cancel any pending autosave before firing the delete.
+      cancelPendingSave();
       // コンテンツがない場合はそのまま削除して遷移
       // Otherwise delete immediately and navigate to the existing page.
       deletePageMutation.mutate(currentPageId);
@@ -157,7 +228,7 @@ export function usePageDeletion({
       });
       navigate(targetPath);
     },
-    [currentPageId, content, deletePageMutation, navigate, toast],
+    [currentPageId, content, deletePageMutation, navigate, toast, cancelPendingSave],
   );
 
   return {

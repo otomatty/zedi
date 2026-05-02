@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
@@ -21,6 +22,7 @@ interface AiModelCardProps {
 
 /**
  * モバイル用リスト表示（カード形式）。ドラッグ並び替えはなし。
+ * Mobile card view of an AI model row (no drag reorder support).
  */
 export function AiModelCard({
   model: m,
@@ -29,6 +31,7 @@ export function AiModelCard({
   onTierChange,
   onToggleActive,
 }: AiModelCardProps) {
+  const { t } = useTranslation();
   return (
     <Card className={!m.isActive ? "opacity-60" : ""}>
       <CardContent className="p-3">
@@ -50,7 +53,7 @@ export function AiModelCard({
               }
             }}
             className="h-8 text-sm"
-            aria-label={`${m.modelId} の表示名`}
+            aria-label={t("aiModels.displayNameAriaLabel", { modelId: m.modelId })}
           />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -60,7 +63,10 @@ export function AiModelCard({
               if (v === "free" || v === "pro") onTierChange(v);
             }}
           >
-            <SelectTrigger className="h-8 w-[100px]" aria-label={`${m.displayName} のティア`}>
+            <SelectTrigger
+              className="h-8 w-[100px]"
+              aria-label={t("aiModels.tierAriaLabel", { name: m.displayName })}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

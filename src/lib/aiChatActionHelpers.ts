@@ -6,9 +6,13 @@ import {
   type ReferencedPage,
 } from "@/types/aiChat";
 import { extractWikiLinksFromContent } from "./wikiLinkUtils";
-import { convertMarkdownToTiptapContent } from "./markdownToTiptap";
+import {
+  convertMarkdownToTiptapContent,
+  type ConvertMarkdownToTiptapOptions,
+} from "./markdownToTiptap";
 
 export { convertMarkdownToTiptapContent } from "./markdownToTiptap";
+export type { ConvertMarkdownToTiptapOptions } from "./markdownToTiptap";
 
 type TiptapDoc = {
   type: "doc";
@@ -108,9 +112,21 @@ export function appendTiptapContent(existingContent: string, appendedContent: st
 /**
  * Converts markdown to Tiptap JSON and appends it to existing content.
  * Markdown を Tiptap JSON に変換し、既存コンテンツの末尾に追記する。
+ *
+ * AI チャット経路（要約・追記など）では `options.dropLeadingH1: true` を指定し、
+ * 先頭に紛れ込んだ `# Title` 行 1 行を落として本文に literal paragraph として
+ * 残らないようにする。詳細は {@link ConvertMarkdownToTiptapOptions} を参照。
+ *
+ * AI chat paths (summarize, append, ...) should pass `options.dropLeadingH1: true` so a
+ * stray leading `# Title` line does not survive as a literal paragraph in the body.
+ * See {@link ConvertMarkdownToTiptapOptions} for details.
  */
-export function appendMarkdownToTiptapContent(existingContent: string, markdown: string): string {
-  return appendTiptapContent(existingContent, convertMarkdownToTiptapContent(markdown));
+export function appendMarkdownToTiptapContent(
+  existingContent: string,
+  markdown: string,
+  options?: ConvertMarkdownToTiptapOptions,
+): string {
+  return appendTiptapContent(existingContent, convertMarkdownToTiptapContent(markdown, options));
 }
 
 /**

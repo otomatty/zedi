@@ -1,0 +1,30 @@
+{
+  "title": "AI モデル管理",
+  "syncing": "同期中...",
+  "syncWithProvider": "プロバイダーと同期",
+  "syncResult": "同期結果:",
+  "syncStat": "追加 {{added}} / 無効化 {{deactivated}}",
+  "columns": {
+    "reorder": "並び替え",
+    "provider": "プロバイダー",
+    "modelId": "モデルID",
+    "displayName": "表示名",
+    "tier": "ティア",
+    "active": "有効",
+    "sortOrder": "並び順"
+  },
+  "summary": "{{total}} 件（有効: {{active}}）",
+  "dragHint": "ドラッグで並び替え",
+  "displayNameAriaLabel": "{{modelId}} の表示名",
+  "tierAriaLabel": "{{name}} のティア",
+  "preview": {
+    "title": "同期プレビュー",
+    "description": "新規モデルは追加され、同期対象から外れた既存モデルは非アクティブ化されます。 既存モデルの表示名や料金は上書きされません。Sonnet 系は非アクティブで追加されます。",
+    "noChanges": "変更なし",
+    "addLabel": "追加: {{name}}",
+    "deactivateLabel": "無効化: {{name}}",
+    "inactiveTag": "(非アクティブ)",
+    "errorWarning": "一部プロバイダーでエラーが発生しています。エラーのあるプロバイダーは同期されません。",
+    "confirm": "同期実行（追加 {{added}} / 無効化 {{deactivated}}）"
+  }
+}

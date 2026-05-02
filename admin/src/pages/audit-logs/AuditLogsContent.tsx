@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Input,
@@ -39,7 +40,7 @@ interface AuditLogsContentProps {
   onPageChange: (page: number) => void;
 }
 
-/** UI selector sentinel for "すべて" (no filter). */
+/** UI selector sentinel for "all actions" (no filter). */
 const ANY_ACTION = "__any__";
 
 /**
@@ -49,9 +50,7 @@ const ANY_ACTION = "__any__";
  * Only role-change is recorded in Phase 1 (#550); suspend/unsuspend/delete
  * will be added by subsequent issues.
  */
-const KNOWN_ACTIONS: { value: string; label: string }[] = [
-  { value: "user.role.update", label: "ユーザー: ロール変更" },
-];
+const KNOWN_ACTION_VALUES = ["user.role.update"] as const;
 
 /**
  * `action` ごとに before/after を短いサマリに整形する。
@@ -90,6 +89,7 @@ export function AuditLogsContent({
   loading,
   onPageChange,
 }: AuditLogsContentProps) {
+  const { t } = useTranslation();
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const hasPreviousPage = page > 0;
   const hasNextPage = page + 1 < pageCount;
@@ -106,7 +106,7 @@ export function AuditLogsContent({
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold">監査ログ</h1>
+        <h1 className="text-lg font-semibold">{t("audit.title")}</h1>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -116,17 +116,17 @@ export function AuditLogsContent({
             className="mb-1 block text-xs text-slate-400"
             id="audit-filter-action-label"
           >
-            アクションで絞り込み
+            {t("audit.filters.action")}
           </label>
           <Select value={filters.action ?? ANY_ACTION} onValueChange={handleActionChange}>
             <SelectTrigger id="audit-filter-action" aria-labelledby="audit-filter-action-label">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ANY_ACTION}>すべて</SelectItem>
-              {KNOWN_ACTIONS.map((a) => (
-                <SelectItem key={a.value} value={a.value}>
-                  {a.label}
+              <SelectItem value={ANY_ACTION}>{t("common.all")}</SelectItem>
+              {KNOWN_ACTION_VALUES.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {t(`audit.actions.${value}`)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -134,7 +134,7 @@ export function AuditLogsContent({
         </div>
         <div>
           <label htmlFor="audit-filter-from" className="mb-1 block text-xs text-slate-400">
-            期間（開始）
+            {t("audit.filters.from")}
           </label>
           <Input
             id="audit-filter-from"
@@ -145,7 +145,7 @@ export function AuditLogsContent({
         </div>
         <div>
           <label htmlFor="audit-filter-to" className="mb-1 block text-xs text-slate-400">
-            期間（終了）
+            {t("audit.filters.to")}
           </label>
           <Input
             id="audit-filter-to"
@@ -161,21 +161,21 @@ export function AuditLogsContent({
       )}
 
       {loading && logs.length === 0 ? (
-        <p className="mt-4 text-slate-400">読み込み中...</p>
+        <p className="mt-4 text-slate-400">{t("common.loading")}</p>
       ) : logs.length === 0 ? (
-        <p className="mt-4 text-slate-400">監査ログはありません。</p>
+        <p className="mt-4 text-slate-400">{t("audit.empty")}</p>
       ) : (
         <>
           <div className="mt-4 overflow-x-auto">
             <Table className="border-border min-w-[720px] rounded border">
               <TableHeader>
                 <TableRow className="border-border bg-muted/50 hover:bg-transparent">
-                  <TableHead className="px-3 py-2">日時</TableHead>
-                  <TableHead className="px-3 py-2">操作者</TableHead>
-                  <TableHead className="px-3 py-2">アクション</TableHead>
-                  <TableHead className="px-3 py-2">対象</TableHead>
-                  <TableHead className="px-3 py-2">変更内容</TableHead>
-                  <TableHead className="px-3 py-2">IP</TableHead>
+                  <TableHead className="px-3 py-2">{t("audit.columns.createdAt")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("audit.columns.actor")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("audit.columns.action")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("audit.columns.target")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("audit.columns.diff")}</TableHead>
+                  <TableHead className="px-3 py-2">{t("audit.columns.ipAddress")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -219,13 +219,15 @@ export function AuditLogsContent({
           </div>
 
           <p className="mt-2 text-xs text-slate-500">
-            {total > 0 ? `${rangeStart}-${rangeEnd}` : "0"} 件を表示 / 合計 {total} 件
+            {total > 0
+              ? t("common.showingRange", { rangeStart, rangeEnd, total })
+              : t("common.showingZero", { total })}
           </p>
 
           {total > pageSize && (
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-xs text-slate-500">
-                {page + 1} / {pageCount} ページ
+                {t("common.page", { page: page + 1, count: pageCount })}
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -235,7 +237,7 @@ export function AuditLogsContent({
                   onClick={() => onPageChange(page - 1)}
                   disabled={!hasPreviousPage || loading}
                 >
-                  前へ
+                  {t("common.previous")}
                 </Button>
                 <Button
                   type="button"
@@ -244,7 +246,7 @@ export function AuditLogsContent({
                   onClick={() => onPageChange(page + 1)}
                   disabled={!hasNextPage || loading}
                 >
-                  次へ
+                  {t("common.next")}
                 </Button>
               </div>
             </div>

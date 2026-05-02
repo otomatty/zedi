@@ -7,3 +7,10 @@
  * Node-only APIs so the package stays universally importable.
  */
 export { TAG_NAME_CHAR_CLASS } from "./tagCharacterClass.js";
+export {
+  DOMAIN_REGEX,
+  FREE_EMAIL_DOMAINS,
+  normalizeDomainInput,
+  type DomainValidationError,
+  type DomainValidationResult,
+} from "./freeEmailDomains.js";

@@ -81,10 +81,18 @@ export default tseslint.config(
       "no-console": "off", // 下の override で src のみ有効
 
       // --- TSDoc / JSDoc（export されたものにコメント必須、現時点は warning のみ） ---
+      // 空 JSDoc スタブの自動挿入を防ぐため `enableFixer: false` を指定する。
+      // `--fix` で空 description のブロックを生成すると `jsdoc/no-blank-block-descriptions`
+      // と矛盾し、レビューでもノイズとして繰り返し指摘されるため、警告のみ残し手動で記述する運用とする。
+      // Disable the auto-fixer so `--fix` does not insert empty JSDoc stubs.
+      // The auto-inserted blocks conflict with `jsdoc/no-blank-block-descriptions`
+      // and were repeatedly flagged as noise during review; we keep the warning
+      // but require contributors to write descriptions manually.
       "jsdoc/require-jsdoc": [
         "warn",
         {
           publicOnly: true,
+          enableFixer: false,
           require: {
             FunctionDeclaration: true,
             FunctionExpression: true,
@@ -92,16 +100,27 @@ export default tseslint.config(
             ClassDeclaration: true,
             ArrowFunctionExpression: true,
           },
+          // `publicOnly` は `require` 配下にのみ作用するため、`contexts` 側は明示的に
+          // `ExportNamedDeclaration` 配下のセレクタへ絞り、未 export の内部宣言で
+          // 警告が出ないようにする。
+          // `publicOnly` only filters the `require` targets, so we scope custom
+          // contexts to children of `ExportNamedDeclaration` to avoid warning
+          // on internal, non-exported declarations.
           contexts: [
-            "TSTypeAliasDeclaration",
-            "TSInterfaceDeclaration",
-            "TSEnumDeclaration",
-            "VariableDeclaration",
+            "ExportNamedDeclaration > TSTypeAliasDeclaration",
+            "ExportNamedDeclaration > TSInterfaceDeclaration",
+            "ExportNamedDeclaration > TSEnumDeclaration",
+            "ExportNamedDeclaration > VariableDeclaration",
           ],
         },
       ],
       "jsdoc/require-description": ["warn", { descriptionStyle: "body" }],
-      "jsdoc/no-blank-block-descriptions": "error",
+      // `jsdoc/require-jsdoc` が `warn` であるのに、空 description を `error` にすると
+      // 「JSDoc を書き始めた人ほどブロックされる」逆インセンティブになるため warn に統一する。
+      // Align severity with `jsdoc/require-jsdoc` (`warn`); making blank
+      // descriptions `error` would penalise contributors who start writing JSDoc
+      // more than those who skip it entirely.
+      "jsdoc/no-blank-block-descriptions": "warn",
       "tsdoc/syntax": "warn",
 
       // --- 可読性・複雑度 ---

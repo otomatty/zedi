@@ -113,6 +113,22 @@ export interface NoteMembersManageSectionProps {
    * Injection point for tests; defaults to `Date.now()`.
    */
   now?: () => number;
+  /**
+   * read-only モードで描画するか。editor / viewer 向けに `NoteMembersManageSection`
+   * のメンバー一覧だけ閲覧させたいときに `true` を渡す。
+   * - 招待フォーム（Email / Role / Add）は非表示
+   * - 各メンバー行の Role セレクトは disabled
+   * - 再送信 / 取り消し ボタンと、accepted 行の削除ボタンは非表示
+   * - `deriveBadgeVariant()` のステータスバッジ（declined 含む）は引き続き表示する
+   *
+   * Render `NoteMembersManageSection` in read-only mode (editor / viewer
+   * browsing the member list only).
+   * - Hides the invite form (email / role / add)
+   * - Disables each member row's Role select
+   * - Hides resend / cancel buttons and the remove button on accepted rows
+   * - Keeps `deriveBadgeVariant()` status badges visible, including declined
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -132,36 +148,43 @@ export function NoteMembersManageSection({
   onRemoveMember,
   onResendInvitation,
   now,
+  readOnly = false,
 }: NoteMembersManageSectionProps) {
   const { t } = useTranslation();
   const nowMs = (now ?? Date.now)();
   return (
     <section className="border-border/60 mt-6 rounded-lg border p-4">
-      <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
-      <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
-        <Input
-          value={memberEmail}
-          onChange={(event) => setMemberEmail(event.target.value)}
-          placeholder={t("notes.emailPlaceholder")}
-        />
-        <Select
-          value={memberRole}
-          onValueChange={(value) => setMemberRole(value as NoteMemberRole)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("notes.role")} />
-          </SelectTrigger>
-          <SelectContent>
-            {roleOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button onClick={onAddMember}>{t("notes.add")}</Button>
-      </div>
-      <div className="mt-4 space-y-3">
+      {readOnly ? (
+        <h2 className="mb-4 text-sm font-semibold">{t("notes.members")}</h2>
+      ) : (
+        <>
+          <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
+          <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
+            <Input
+              value={memberEmail}
+              onChange={(event) => setMemberEmail(event.target.value)}
+              placeholder={t("notes.emailPlaceholder")}
+            />
+            <Select
+              value={memberRole}
+              onValueChange={(value) => setMemberRole(value as NoteMemberRole)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t("notes.role")} />
+              </SelectTrigger>
+              <SelectContent>
+                {roleOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={onAddMember}>{t("notes.add")}</Button>
+          </div>
+        </>
+      )}
+      <div className={readOnly ? "space-y-3" : "mt-4 space-y-3"}>
         {isMembersLoading ? (
           <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
         ) : members.length === 0 ? (
@@ -202,6 +225,7 @@ export function NoteMembersManageSection({
                     onValueChange={(value) =>
                       onUpdateRole(member.memberEmail, value as NoteMemberRole)
                     }
+                    disabled={readOnly}
                   >
                     <SelectTrigger className="w-32">
                       <SelectValue />
@@ -214,7 +238,7 @@ export function NoteMembersManageSection({
                       ))}
                     </SelectContent>
                   </Select>
-                  {isPending && (
+                  {!readOnly && isPending && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -225,23 +249,25 @@ export function NoteMembersManageSection({
                       <RefreshCw className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={
-                      isActionable
-                        ? t("notes.a11yCancelInvitation", { email: member.memberEmail })
-                        : t("notes.a11yRemoveMember", { email: member.memberEmail })
-                    }
-                    title={isActionable ? t("notes.cancelInvitation") : undefined}
-                    onClick={() => onRemoveMember(member.memberEmail)}
-                  >
-                    {isActionable ? (
-                      <XCircle className="h-4 w-4" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={
+                        isActionable
+                          ? t("notes.a11yCancelInvitation", { email: member.memberEmail })
+                          : t("notes.a11yRemoveMember", { email: member.memberEmail })
+                      }
+                      title={isActionable ? t("notes.cancelInvitation") : t("notes.removeMember")}
+                      onClick={() => onRemoveMember(member.memberEmail)}
+                    >
+                      {isActionable ? (
+                        <XCircle className="h-4 w-4" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             );

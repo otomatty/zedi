@@ -1,5 +1,13 @@
 {
   "uploadedImageAlt": "Uploaded image",
+  "savedAt": "Saved {{relative}}",
+  "startWritingPlaceholder": "Start writing your thoughts...",
+  "titlePlaceholder": "Title",
+  "pageMenu": {
+    "exportMarkdown": "Export Markdown",
+    "copyMarkdown": "Copy Markdown",
+    "deletePage": "Delete"
+  },
   "slashMenuAriaLabel": "Slash command menu",
   "slashNoResults": "No matching commands",
   "slashAgentRunning": "Running Claude Code…",
@@ -75,20 +83,25 @@
       "description": "Body text",
       "aliases": "paragraph,p,text"
     },
-    "heading1": {
-      "title": "Heading 1",
-      "description": "Large heading",
-      "aliases": "heading1,h1,heading"
-    },
     "heading2": {
       "title": "Heading 2",
-      "description": "Medium heading",
+      "description": "Large heading",
       "aliases": "heading2,h2,heading"
     },
     "heading3": {
       "title": "Heading 3",
-      "description": "Small heading",
+      "description": "Medium heading",
       "aliases": "heading3,h3,heading"
+    },
+    "heading4": {
+      "title": "Heading 4",
+      "description": "Small heading",
+      "aliases": "heading4,h4,heading"
+    },
+    "heading5": {
+      "title": "Heading 5",
+      "description": "Smallest heading",
+      "aliases": "heading5,h5,heading"
     },
     "bulletList": {
       "title": "Bullet list",

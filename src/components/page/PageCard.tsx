@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@zedi/ui";
+import { useTranslation } from "react-i18next";
 
 interface PageCardProps {
   page: PageSummary;
@@ -36,6 +37,7 @@ interface PageCardProps {
  * Page card component. Shows context menu on right-click (desktop only). No context menu on mobile.
  */
 const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const createPageMutation = useCreatePage();
@@ -51,6 +53,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     page.thumbnailUrl,
   );
   const isClipped = !!page.sourceUrl;
+  const displayTitle = page.title || t("common.untitledPage");
 
   const handleClick = () => {
     // ドラッグ直後のクリックを無視 / Ignore click right after drag
@@ -63,13 +66,13 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
-      const data = JSON.stringify({ id: page.id, title: page.title || "無題のページ" });
+      const data = JSON.stringify({ id: page.id, title: displayTitle });
       e.dataTransfer.setData(ZEDI_PAGE_MIME_TYPE, data);
       e.dataTransfer.effectAllowed = "link";
       setIsDragging(true);
       isDraggingRef.current = true;
     },
-    [page.id, page.title],
+    [page.id, displayTitle],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -90,22 +93,22 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
         throw new Error("Page not found");
       }
 
-      const newTitle = `${page.title || "無題のページ"}のコピー`;
+      const newTitle = `${displayTitle}${t("common.page.titleCopySuffix")}`;
       const newPage = await createPageMutation.mutateAsync({
         title: newTitle,
         content: fullPage.content,
       });
 
       toast({
-        title: "複製しました",
-        description: `「${newTitle}」を作成しました`,
+        title: t("common.page.duplicated"),
+        description: t("common.page.duplicatedWithTitle", { title: newTitle }),
       });
       navigate(`/pages/${newPage.id}`);
     } catch (error) {
       console.error("Failed to duplicate page:", error);
       toast({
-        title: "エラー",
-        description: "ページの複製に失敗しました",
+        title: t("common.error"),
+        description: t("common.page.duplicateFailed"),
         variant: "destructive",
       });
     }
@@ -115,15 +118,15 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     deletePageMutation.mutate(page.id, {
       onSuccess: () => {
         toast({
-          title: "削除しました",
-          description: `「${page.title || "無題のページ"}」を削除しました`,
+          title: t("common.page.pageDeleted"),
+          description: t("common.page.deletedWithTitle", { title: displayTitle }),
         });
         setIsDeleteDialogOpen(false);
       },
       onError: () => {
         toast({
-          title: "エラー",
-          description: "ページの削除に失敗しました",
+          title: t("common.error"),
+          description: t("common.page.deleteFailed"),
           variant: "destructive",
         });
         setIsDeleteDialogOpen(false);
@@ -162,9 +165,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
       <div className="flex-shrink-0 p-3 pb-2">
         <div className="flex items-start gap-1.5">
           {isClipped && <Link2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />}
-          <h3 className="text-foreground line-clamp-2 text-sm font-medium">
-            {page.title || "無題のページ"}
-          </h3>
+          <h3 className="text-foreground line-clamp-2 text-sm font-medium">{displayTitle}</h3>
         </div>
       </div>
 
@@ -184,7 +185,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
         ) : (
           <div className="h-full px-3 pb-3">
             <p className="text-muted-foreground line-clamp-4 text-xs leading-relaxed">
-              {preview || "コンテンツがありません"}
+              {preview || t("common.page.noContent")}
             </p>
           </div>
         )}
@@ -197,7 +198,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     <>
       <ContextMenuItem onClick={handleDuplicate} disabled={createPageMutation.isPending}>
         <Copy className="mr-2 h-4 w-4" />
-        複製
+        {t("common.page.duplicate")}
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
@@ -205,7 +206,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
         className="text-destructive focus:text-destructive"
       >
         <Trash2 className="mr-2 h-4 w-4" />
-        削除
+        {t("common.page.delete")}
       </ContextMenuItem>
     </>
   );
@@ -226,20 +227,19 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>ページを削除しますか？</AlertDialogTitle>
+            <AlertDialogTitle>{t("common.page.deleteConfirm")}</AlertDialogTitle>
             <AlertDialogDescription>
-              「{page.title || "無題のページ"}
-              」を削除します。この操作は取り消せません。
+              {t("common.page.deleteBody", { title: displayTitle })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deletePageMutation.isPending}
             >
-              {deletePageMutation.isPending ? "削除中..." : "削除"}
+              {deletePageMutation.isPending ? t("common.page.deleting") : t("common.page.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

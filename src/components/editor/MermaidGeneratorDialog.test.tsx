@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { I18nextProvider } from "react-i18next";
+import i18n from "@/i18n";
 import type { MermaidGeneratorStatus } from "@/hooks/useMermaidGenerator";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 
@@ -36,10 +38,6 @@ vi.mock("@/hooks/useMermaidGenerator", () => ({
   useMermaidGenerator: () => mockUseMermaidGenerator,
 }));
 
-vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: "ja" } }),
-}));
-
 vi.mock("mermaid", () => ({
   default: {
     initialize: vi.fn(),
@@ -56,14 +54,17 @@ function renderDialog(props: { open?: boolean; selectedText?: string } = {}) {
     onInsert: vi.fn(),
   };
   return render(
-    <MemoryRouter>
-      <MermaidGeneratorDialog {...defaultProps} {...props} />
-    </MemoryRouter>,
+    <I18nextProvider i18n={i18n}>
+      <MemoryRouter>
+        <MermaidGeneratorDialog {...defaultProps} {...props} />
+      </MemoryRouter>
+    </I18nextProvider>,
   );
 }
 
 describe("MermaidGeneratorDialog", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("ja");
     vi.clearAllMocks();
     mockUseMermaidGenerator.status = "idle";
     mockUseMermaidGenerator.result = null;
@@ -81,10 +82,8 @@ describe("MermaidGeneratorDialog", () => {
   it("renders not-configured view when isAIConfigured is false", () => {
     mockUseMermaidGenerator.isAIConfigured = false;
     renderDialog();
-    expect(
-      screen.getByRole("heading", { name: "editor.commands.mermaid.notConfigured.title" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "common.goToSettings" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /AI設定が必要/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "設定画面へ" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ダイアグラムを生成" })).not.toBeInTheDocument();
   });
 
@@ -113,14 +112,16 @@ describe("MermaidGeneratorDialog", () => {
     // mermaid module is mocked above so preview generation does not run; test only verifies insert/close
 
     render(
-      <MemoryRouter>
-        <MermaidGeneratorDialog
-          open={true}
-          onOpenChange={onOpenChange}
-          selectedText="text"
-          onInsert={onInsert}
-        />
-      </MemoryRouter>,
+      <I18nextProvider i18n={i18n}>
+        <MemoryRouter>
+          <MermaidGeneratorDialog
+            open={true}
+            onOpenChange={onOpenChange}
+            selectedText="text"
+            onInsert={onInsert}
+          />
+        </MemoryRouter>
+      </I18nextProvider>,
     );
 
     await user.click(screen.getByRole("button", { name: "挿入" }));
@@ -134,7 +135,7 @@ describe("MermaidGeneratorDialog", () => {
     mockUseMermaidGenerator.isAIConfigured = false;
     renderDialog();
 
-    await user.click(screen.getByRole("button", { name: "common.goToSettings" }));
+    await user.click(screen.getByRole("button", { name: "設定画面へ" }));
 
     const navigateUrl = mockNavigate.mock.calls[0][0];
     expect(navigateUrl).toContain("/settings?");

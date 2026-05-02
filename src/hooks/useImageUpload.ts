@@ -1,6 +1,7 @@
 // 画像アップロードを管理するカスタムフック
 
 import { useState, useCallback } from "react";
+import i18n from "@/i18n";
 import { useStorageSettings } from "./useStorageSettings";
 import { useAuth } from "./useAuth";
 import {
@@ -69,11 +70,11 @@ export function useImageUpload(): UseImageUploadReturn {
       throwIfAborted();
 
       if (!isStorageConfiguredForUpload(settings)) {
-        throw new Error("ストレージが設定されていません。設定画面でストレージを設定してください。");
+        throw new Error(i18n.t("errors.storageNotConfigured"));
       }
 
       if (!file.type.startsWith("image/")) {
-        throw new Error("画像ファイルのみアップロードできます");
+        throw new Error(i18n.t("errors.imageOnly"));
       }
 
       setState((prev) => ({
@@ -126,7 +127,8 @@ export function useImageUpload(): UseImageUploadReturn {
           }));
           throw error;
         }
-        const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
+        const errorMessage =
+          error instanceof Error ? error.message : i18n.t("errors.imageUploadFailed");
         setState((prev) => ({
           ...prev,
           isUploading: false,
@@ -150,7 +152,7 @@ export function useImageUpload(): UseImageUploadReturn {
       const imageFiles = files.filter((file) => file.type.startsWith("image/"));
 
       if (imageFiles.length === 0) {
-        throw new Error("画像ファイルが選択されていません");
+        throw new Error(i18n.t("errors.imageNotSelected"));
       }
 
       setState((prev) => ({
@@ -166,7 +168,8 @@ export function useImageUpload(): UseImageUploadReturn {
 
         return urls;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "アップロードに失敗しました";
+        const errorMessage =
+          error instanceof Error ? error.message : i18n.t("errors.imageUploadFailed");
         setState((prev) => ({
           ...prev,
           isUploading: false,

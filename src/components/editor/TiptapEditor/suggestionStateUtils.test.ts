@@ -3,9 +3,11 @@ import {
   isSameSuggestionRange,
   isSameWikiLinkSuggestionState,
   isSameSlashSuggestionState,
+  isSameTagSuggestionState,
 } from "./suggestionStateUtils";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
+import type { TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 
 function createWikiLinkState(overrides: Partial<WikiLinkSuggestionState>): WikiLinkSuggestionState {
   return {
@@ -23,6 +25,16 @@ function createSlashState(overrides: Partial<SlashSuggestionState>): SlashSugges
     query: "",
     range: null,
     decorations: {} as SlashSuggestionState["decorations"],
+    ...overrides,
+  };
+}
+
+function createTagState(overrides: Partial<TagSuggestionState>): TagSuggestionState {
+  return {
+    active: false,
+    query: "",
+    range: null,
+    decorations: {} as TagSuggestionState["decorations"],
     ...overrides,
   };
 }
@@ -119,5 +131,37 @@ describe("isSameSlashSuggestionState", () => {
     const a = createSlashState({ active: true, query: "q", range: { from: 0, to: 1 } });
     const b = createSlashState({ active: true, query: "q", range: { from: 2, to: 3 } });
     expect(isSameSlashSuggestionState(a, b)).toBe(false);
+  });
+});
+
+describe("isSameTagSuggestionState", () => {
+  it("returns false when first argument is null", () => {
+    const b = createTagState({ active: true, query: "tec", range: { from: 0, to: 4 } });
+    expect(isSameTagSuggestionState(null, b)).toBe(false);
+  });
+
+  it("returns true when active, query and range match", () => {
+    const state = createTagState({ active: true, query: "tec", range: { from: 1, to: 5 } });
+    expect(isSameTagSuggestionState(state, state)).toBe(true);
+    const b = createTagState({ active: true, query: "tec", range: { from: 1, to: 5 } });
+    expect(isSameTagSuggestionState(state, b)).toBe(true);
+  });
+
+  it("returns false when active differs", () => {
+    const a = createTagState({ active: true, query: "q", range: null });
+    const b = createTagState({ active: false, query: "q", range: null });
+    expect(isSameTagSuggestionState(a, b)).toBe(false);
+  });
+
+  it("returns false when query differs", () => {
+    const a = createTagState({ active: true, query: "a", range: null });
+    const b = createTagState({ active: true, query: "b", range: null });
+    expect(isSameTagSuggestionState(a, b)).toBe(false);
+  });
+
+  it("returns false when range differs", () => {
+    const a = createTagState({ active: true, query: "q", range: { from: 0, to: 1 } });
+    const b = createTagState({ active: true, query: "q", range: { from: 2, to: 3 } });
+    expect(isSameTagSuggestionState(a, b)).toBe(false);
   });
 });
