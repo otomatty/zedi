@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@zedi/ui";
 import type { UserAdmin, UserRole } from "@/api/admin";
-import { formatDate } from "@/lib/dateUtils";
+import { formatDate, formatNumber } from "@/lib/dateUtils";
 
 interface UserCardProps {
   user: UserAdmin;
@@ -78,7 +78,7 @@ export function UserCard({
             </SelectContent>
           </Select>
           <span className="text-xs text-slate-500">
-            {t("users.card.pageCount", { count: user.pageCount.toLocaleString("ja-JP") })}
+            {t("users.card.pageCount", { count: formatNumber(user.pageCount) })}
           </span>
           <span className="text-xs text-slate-500">{formatDate(user.createdAt)}</span>
           {!saving && user.status === "deleted" ? (

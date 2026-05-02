@@ -500,22 +500,25 @@ hocuspocusServer
   });
 
 // Graceful shutdown
-process.on("SIGTERM", async () => {
-  console.log("[Shutdown] SIGTERM received, closing server...");
-  await hocuspocusServer.destroy();
-  if (pgPool) {
-    await pgPool.end();
+async function gracefulShutdown(signal: "SIGTERM" | "SIGINT"): Promise<void> {
+  console.log(`[Shutdown] ${signal} received, closing server...`);
+  try {
+    await hocuspocusServer.destroy();
+    if (pgPool) {
+      await pgPool.end();
+    }
+    console.log("[Shutdown] Server closed");
+    process.exit(0);
+  } catch (error) {
+    console.error("[Shutdown] Failed to close server cleanly:", error);
+    process.exit(1);
   }
-  console.log("[Shutdown] Server closed");
-  process.exit(0);
+}
+
+process.on("SIGTERM", () => {
+  void gracefulShutdown("SIGTERM");
 });
 
-process.on("SIGINT", async () => {
-  console.log("[Shutdown] SIGINT received, closing server...");
-  await hocuspocusServer.destroy();
-  if (pgPool) {
-    await pgPool.end();
-  }
-  console.log("[Shutdown] Server closed");
-  process.exit(0);
+process.on("SIGINT", () => {
+  void gracefulShutdown("SIGINT");
 });

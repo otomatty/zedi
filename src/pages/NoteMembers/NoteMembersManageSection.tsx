@@ -114,15 +114,19 @@ export interface NoteMembersManageSectionProps {
    */
   now?: () => number;
   /**
-   * read-only モードで描画するか。editor / viewer 向けにメンバー一覧だけ
-   * 閲覧させたいときに `true` を渡す。
+   * read-only モードで描画するか。editor / viewer 向けに `NoteMembersManageSection`
+   * のメンバー一覧だけ閲覧させたいときに `true` を渡す。
    * - 招待フォーム（Email / Role / Add）は非表示
    * - 各メンバー行の Role セレクトは disabled
-   * - 再送信 / 取り消し ボタンは非表示
-   * - ステータスバッジ（pending / expired / accepted）は引き続き表示する
+   * - 再送信 / 取り消し ボタンと、accepted 行の削除ボタンは非表示
+   * - `deriveBadgeVariant()` のステータスバッジ（declined 含む）は引き続き表示する
    *
-   * Render in read-only mode (editor / viewer browsing the list). Hides the
-   * invite form and per-row action buttons; status badges remain.
+   * Render `NoteMembersManageSection` in read-only mode (editor / viewer
+   * browsing the member list only).
+   * - Hides the invite form (email / role / add)
+   * - Disables each member row's Role select
+   * - Hides resend / cancel buttons and the remove button on accepted rows
+   * - Keeps `deriveBadgeVariant()` status badges visible, including declined
    */
   readOnly?: boolean;
 }
