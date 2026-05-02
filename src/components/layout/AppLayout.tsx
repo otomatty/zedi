@@ -51,7 +51,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               isMobile
                 ? {
                     paddingBottom:
-                      "calc(var(--app-bottom-nav-height, 3.5rem) + env(safe-area-inset-bottom))",
+                      "calc(var(--app-bottom-nav-height, 4.5rem) + env(safe-area-inset-bottom))",
                   }
                 : undefined
             }
