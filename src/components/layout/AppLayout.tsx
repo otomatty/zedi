@@ -27,7 +27,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         style={
           {
             "--app-header-height": isMobile ? "4rem" : "4.5rem",
-            "--app-bottom-nav-height": isMobile ? "3.5rem" : "0px",
+            "--app-bottom-nav-height": isMobile ? "4.5rem" : "0px",
             "--ai-chat-width": "22rem",
           } as React.CSSProperties
         }

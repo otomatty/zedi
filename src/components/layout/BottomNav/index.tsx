@@ -94,7 +94,7 @@ const MeTab: React.FC<MeTabProps> = ({ open, onOpenChange }) => {
       aria-expanded={open}
       onClick={() => onOpenChange(true)}
       className={cn(
-        "text-muted-foreground hover:text-foreground flex h-full w-full flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+        "text-muted-foreground hover:text-foreground flex h-full w-full flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors",
       )}
     >
       <span className="relative">
