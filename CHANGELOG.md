@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.19.0 (2026-05-02)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump googleapis/release-please-action from 4 to 5 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/770
+* chore(deps): bump @hocuspocus/server from 3.4.4 to 4.0.0 in /server/hocuspocus by @dependabot[bot] in https://github.com/otomatty/zedi/pull/771
+* chore(deps): bump @hocuspocus/extension-redis from 3.4.4 to 4.0.0 in /server/hocuspocus by @dependabot[bot] in https://github.com/otomatty/zedi/pull/772
+* chore(deps): bump @anthropic-ai/sdk from 0.90.0 to 0.91.1 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/773
+* chore(deps): bump @hocuspocus/provider from 3.4.4 to 4.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/775
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.18.0...zedi-v0.19.0
+
 ## 0.18.0 (2026-04-26)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
