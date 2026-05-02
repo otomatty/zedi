@@ -11,19 +11,18 @@ const headingLevelClampKey = new PluginKey("headingLevelClamp");
  *     also run once in queueMicrotask after the plugin view is mounted
  */
 function buildHeadingClampTr(state: EditorState): Transaction | null {
-  const tr = state.tr;
-  let modified = false;
+  let tr: Transaction | null = null;
   state.doc.descendants((node, pos) => {
     if (node.type.name !== "heading") return;
     const level = typeof node.attrs.level === "number" ? node.attrs.level : 1;
     if (level < 2) {
+      tr ??= state.tr;
       tr.setNodeMarkup(pos, undefined, { ...node.attrs, level: 2 });
-      modified = true;
     }
     // headings only contain inline content; no need to scan descendants further
     return false;
   });
-  return modified ? tr : null;
+  return tr;
 }
 
 /**
@@ -49,7 +48,10 @@ export const HeadingLevelClamp = Extension.create({
           });
           return {};
         },
-        appendTransaction(_transactions, _oldState, newState) {
+        appendTransaction(transactions, _oldState, newState) {
+          if (!transactions.some((tr) => tr.docChanged)) {
+            return null;
+          }
           return buildHeadingClampTr(newState);
         },
       }),
