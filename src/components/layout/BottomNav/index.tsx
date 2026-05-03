@@ -37,9 +37,9 @@ export const BottomNav: React.FC = () => {
         "border-border bg-background/95 supports-[backdrop-filter]:bg-background/80 fixed right-0 bottom-0 left-0 z-40 border-t backdrop-blur",
         "pb-[env(safe-area-inset-bottom)]",
       )}
-      style={{ height: "calc(var(--app-bottom-nav-height, 3.5rem) + env(safe-area-inset-bottom))" }}
+      style={{ height: "calc(var(--app-bottom-nav-height, 4.5rem) + env(safe-area-inset-bottom))" }}
     >
-      <ul className="mx-auto flex h-[var(--app-bottom-nav-height,3.5rem)] max-w-md items-stretch">
+      <ul className="mx-auto flex h-[var(--app-bottom-nav-height,4.5rem)] max-w-md items-stretch">
         {PRIMARY_NAV_ITEMS.map((item) => (
           <BottomNavTab
             key={item.path}
@@ -94,7 +94,7 @@ const MeTab: React.FC<MeTabProps> = ({ open, onOpenChange }) => {
       aria-expanded={open}
       onClick={() => onOpenChange(true)}
       className={cn(
-        "text-muted-foreground hover:text-foreground flex h-full w-full flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+        "text-muted-foreground hover:text-foreground flex h-full w-full flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors",
       )}
     >
       <span className="relative">
