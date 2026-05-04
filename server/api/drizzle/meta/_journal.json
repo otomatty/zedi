@@ -127,6 +127,13 @@
       "when": 1777420800000,
       "tag": "0018_add_onboarding_and_page_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777507200000,
+      "tag": "0019_add_api_errors",
+      "breakpoints": true
     }
   ]
 }

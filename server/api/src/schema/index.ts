@@ -74,6 +74,14 @@ export {
   type NewThumbnailObject,
 } from "./thumbnails.js";
 export { adminAuditLogs, type AdminAuditLog, type NewAdminAuditLog } from "./auditLogs.js";
+export {
+  apiErrors,
+  type ApiError,
+  type NewApiError,
+  type ApiErrorSeverity,
+  type ApiErrorStatus,
+  type ApiErrorSuspectedFile,
+} from "./apiErrors.js";
 export { sources, type Source, type NewSource } from "./sources.js";
 export { pageSources, type PageSource, type NewPageSource } from "./pageSources.js";
 export {
