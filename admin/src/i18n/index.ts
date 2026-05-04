@@ -12,6 +12,7 @@ import jaAudit from "./locales/ja/audit.json";
 import jaWikiHealth from "./locales/ja/wikiHealth.json";
 import jaActivityLog from "./locales/ja/activityLog.json";
 import jaAiModels from "./locales/ja/aiModels.json";
+import jaErrors from "./locales/ja/errors.json";
 import enCommon from "./locales/en/common.json";
 import enNav from "./locales/en/nav.json";
 import enAuth from "./locales/en/auth.json";
@@ -20,6 +21,7 @@ import enAudit from "./locales/en/audit.json";
 import enWikiHealth from "./locales/en/wikiHealth.json";
 import enActivityLog from "./locales/en/activityLog.json";
 import enAiModels from "./locales/en/aiModels.json";
+import enErrors from "./locales/en/errors.json";
 
 const ja = {
   common: jaCommon,
@@ -30,6 +32,7 @@ const ja = {
   wikiHealth: jaWikiHealth,
   activityLog: jaActivityLog,
   aiModels: jaAiModels,
+  errors: jaErrors,
 };
 
 const en = {
@@ -41,6 +44,7 @@ const en = {
   wikiHealth: enWikiHealth,
   activityLog: enActivityLog,
   aiModels: enAiModels,
+  errors: enErrors,
 };
 
 /**

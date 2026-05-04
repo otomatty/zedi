@@ -338,6 +338,157 @@ export async function deleteUser(id: string): Promise<{ user: UserAdminBase }> {
   return res.json();
 }
 
+/** API エラーのワークフロー状態 / Workflow status for an API error */
+export type ApiErrorStatus = "open" | "investigating" | "resolved" | "ignored";
+
+/**
+ * UI のセレクト・タブ等で参照する `ApiErrorStatus` の全値。型定義から逸脱しない
+ * よう Single source of truth として `@/api/admin` に置く。
+ *
+ * Single source of truth for the full set of `ApiErrorStatus` values consumed
+ * by UI (select dropdowns, tabs, status badges).
+ */
+export const API_ERROR_STATUS_VALUES: readonly ApiErrorStatus[] = [
+  "open",
+  "investigating",
+  "resolved",
+  "ignored",
+];
+
+/** API エラーの重大度 / Severity assigned by AI analysis */
+export type ApiErrorSeverity = "high" | "medium" | "low" | "unknown";
+
+/**
+ * `ApiErrorSeverity` の全値（UI フィルターで使用）。
+ * Full set of `ApiErrorSeverity` values used by UI filters.
+ */
+export const API_ERROR_SEVERITY_VALUES: readonly ApiErrorSeverity[] = [
+  "high",
+  "medium",
+  "low",
+  "unknown",
+];
+
+/**
+ * 一覧でアクティブ（未対応扱い）として件数バッジに数えるステータス。
+ * ナビバッジ表示やフィルター初期値の Single source of truth。
+ *
+ * Statuses considered "active" (untriaged work) by the navigation badge.
+ * Single source of truth shared between Layout and the errors page.
+ */
+export const ACTIVE_API_ERROR_STATUSES: readonly ApiErrorStatus[] = ["open", "investigating"];
+
+/**
+ * AI が推定した「関連しそうなファイル」のエントリ。
+ * Suspected file entry produced by the AI analysis step.
+ */
+export interface ApiErrorSuspectedFile {
+  path: string;
+  reason?: string;
+  line?: number;
+}
+
+/**
+ * `api_errors` 行のクライアント表現。タイムスタンプは ISO 文字列で扱う。
+ * Client-side shape of an `api_errors` row. Timestamps are ISO strings.
+ */
+export interface ApiErrorRow {
+  id: string;
+  sentryIssueId: string;
+  fingerprint: string | null;
+  title: string;
+  route: string | null;
+  statusCode: number | null;
+  occurrences: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  severity: ApiErrorSeverity;
+  status: ApiErrorStatus;
+  aiSummary: string | null;
+  aiSuspectedFiles: ApiErrorSuspectedFile[] | null;
+  aiRootCause: string | null;
+  aiSuggestedFix: string | null;
+  githubIssueNumber: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `GET /api/admin/errors` のクエリパラメータ / Query params for error list API */
+export interface GetApiErrorsParams {
+  status?: ApiErrorStatus;
+  severity?: ApiErrorSeverity;
+  limit?: number;
+  offset?: number;
+}
+
+/** API エラー一覧のレスポンス / Response shape for error list API */
+export interface GetApiErrorsResponse {
+  errors: ApiErrorRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/**
+ * 管理画面用の API エラー一覧を取得する。
+ * Fetches the `api_errors` list for the admin errors page.
+ *
+ * @param params - フィルタ・ページネーション / Filters and pagination
+ * @returns 行配列・総件数・適用された limit/offset / Rows, total count, and applied limit/offset
+ */
+export async function getApiErrors(params?: GetApiErrorsParams): Promise<GetApiErrorsResponse> {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.severity) sp.set("severity", params.severity);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.offset != null) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  const res = await adminFetch(`/api/admin/errors${qs ? `?${qs}` : ""}`);
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch API errors"));
+  }
+  return res.json();
+}
+
+/**
+ * 単一の API エラー詳細を取得する。
+ * Fetches a single `api_errors` row by id.
+ *
+ * @param id - 行 ID / Row id (UUID)
+ * @returns 詳細行 / Detail row
+ */
+export async function getApiErrorById(id: string): Promise<ApiErrorRow> {
+  const res = await adminFetch(`/api/admin/errors/${encodeURIComponent(id)}`);
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch API error"));
+  }
+  const data: { error: ApiErrorRow } = await res.json();
+  return data.error;
+}
+
+/**
+ * API エラーのワークフロー状態を更新する。
+ * Updates the workflow `status` of an `api_errors` row.
+ *
+ * @param id - 行 ID / Row id
+ * @param status - 遷移先の状態 / Next status
+ * @returns 更新後の行 / Updated row
+ */
+export async function patchApiErrorStatus(
+  id: string,
+  status: ApiErrorStatus,
+): Promise<ApiErrorRow> {
+  const res = await adminFetch(`/api/admin/errors/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to update API error status"));
+  }
+  const data: { error: ApiErrorRow } = await res.json();
+  return data.error;
+}
+
 /**
  * 監査ログ 1 行。
  * A single admin audit log row as returned by `GET /api/admin/audit-logs`.

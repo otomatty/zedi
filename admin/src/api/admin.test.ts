@@ -9,6 +9,10 @@ import {
   patchAiModelsBulk,
   previewSyncAiModels,
   syncAiModels,
+  getApiErrors,
+  getApiErrorById,
+  patchApiErrorStatus,
+  type ApiErrorRow,
 } from "./admin";
 
 // `adminFetch` だけモックし、`getErrorMessage` は実装をそのまま使う
@@ -213,5 +217,110 @@ describe("syncAiModels", () => {
     expect(adminFetch).toHaveBeenCalledWith("/api/ai/admin/sync-models", {
       method: "POST",
     });
+  });
+});
+
+const sampleErrorRow: ApiErrorRow = {
+  id: "00000000-0000-0000-0000-000000000001",
+  sentryIssueId: "sentry-1",
+  fingerprint: null,
+  title: "TypeError",
+  route: "GET /api/x",
+  statusCode: 500,
+  occurrences: 1,
+  firstSeenAt: "2026-05-01T00:00:00Z",
+  lastSeenAt: "2026-05-04T00:00:00Z",
+  severity: "high",
+  status: "open",
+  aiSummary: null,
+  aiSuspectedFiles: null,
+  aiRootCause: null,
+  aiSuggestedFix: null,
+  githubIssueNumber: null,
+  createdAt: "2026-05-01T00:00:00Z",
+  updatedAt: "2026-05-04T00:00:00Z",
+};
+
+describe("getApiErrors", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("status / severity / limit / offset をクエリ文字列に渡す", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ errors: [sampleErrorRow], total: 1, limit: 10, offset: 0 }), {
+        status: 200,
+      }),
+    );
+    const out = await getApiErrors({ status: "open", severity: "high", limit: 10, offset: 0 });
+    expect(out.errors).toHaveLength(1);
+    expect(out.total).toBe(1);
+    expect(adminFetch).toHaveBeenCalledWith(
+      "/api/admin/errors?status=open&severity=high&limit=10&offset=0",
+    );
+  });
+
+  it("パラメータ無しのときはクエリ文字列を付けない", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ errors: [], total: 0, limit: 50, offset: 0 }), {
+        status: 200,
+      }),
+    );
+    const out = await getApiErrors();
+    expect(out.errors).toEqual([]);
+    expect(out.total).toBe(0);
+    expect(adminFetch).toHaveBeenCalledWith("/api/admin/errors");
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "boom" }), { status: 500 }),
+    );
+    await expect(getApiErrors()).rejects.toThrow(/boom/);
+  });
+});
+
+describe("getApiErrorById", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら row を返し、id を URL エンコードする", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: sampleErrorRow }), { status: 200 }),
+    );
+    const out = await getApiErrorById(sampleErrorRow.id);
+    expect(out).toEqual(sampleErrorRow);
+    expect(adminFetch).toHaveBeenCalledWith(`/api/admin/errors/${sampleErrorRow.id}`);
+  });
+});
+
+describe("patchApiErrorStatus", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("PATCH に status を載せ、更新後の row を返す", async () => {
+    const updated = { ...sampleErrorRow, status: "investigating" as const };
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: updated }), { status: 200 }),
+    );
+    const out = await patchApiErrorStatus(sampleErrorRow.id, "investigating");
+    expect(out.status).toBe("investigating");
+    expect(adminFetch).toHaveBeenCalledWith(`/api/admin/errors/${sampleErrorRow.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "investigating" }),
+    });
+  });
+
+  it("409 で throw する（並行更新競合）", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "status changed concurrently; refetch and retry" }), {
+        status: 409,
+      }),
+    );
+    await expect(patchApiErrorStatus(sampleErrorRow.id, "resolved")).rejects.toThrow(
+      /status changed concurrently/,
+    );
   });
 });
