@@ -34,6 +34,7 @@ import thumbGenerateRoutes from "./routes/thumbnail/imageGenerate.js";
 import thumbCommitRoutes from "./routes/thumbnail/commit.js";
 import thumbServeRoutes from "./routes/thumbnail/serve.js";
 import webhookPolarRoutes from "./routes/webhooks/polar.js";
+import webhookSentryRoutes from "./routes/webhooks/sentry.js";
 import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 import lintRoutes from "./routes/lint.js";
@@ -97,6 +98,10 @@ export function createApp(): Hono<AppEnv> {
 
   // Webhook (no JWT auth — uses Standard Webhooks signature)
   app.route("/api/webhooks/polar", webhookPolarRoutes);
+
+  // Sentry Internal Integration webhook (HMAC-SHA256 via Client Secret)
+  // Sentry Internal Integration の webhook（Client Secret による HMAC 署名検証）
+  app.route("/api/webhooks/sentry", webhookSentryRoutes);
 
   // Checkout & Customer Portal
   app.route("/api", checkoutRoutes);
