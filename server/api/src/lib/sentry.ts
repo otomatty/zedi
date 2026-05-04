@@ -103,7 +103,7 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
       headers: scrubShallowRecord(event.request.headers),
       data: scrubDeep(event.request.data, new WeakSet()),
       query_string: scrubQueryStringField(event.request.query_string),
-      cookies: scrubShallowRecord(event.request.cookies),
+      cookies: scrubCookies(event.request.cookies),
     };
   }
   if (event.user) {
@@ -145,6 +145,13 @@ function scrubShallowRecord(
     }
   }
   return out;
+}
+
+function scrubCookies(
+  input: Record<string, unknown> | undefined,
+): Record<string, string> | undefined {
+  if (!input || typeof input !== "object") return input;
+  return Object.fromEntries(Object.keys(input).map((key) => [key, FILTERED]));
 }
 
 function scrubDeep(value: unknown, seen: WeakSet<object>, key?: string): unknown {

@@ -98,7 +98,7 @@ describe("scrubSentryEvent", () => {
       "x-safe": "ok",
     });
     expect(scrubbed.request?.cookies).toMatchObject({
-      session: "secret",
+      session: "[Filtered]",
       email: "[Filtered]",
     });
     expect(scrubbed.request?.data).toMatchObject({
