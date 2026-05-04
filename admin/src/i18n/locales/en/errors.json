@@ -1,0 +1,46 @@
+{
+  "title": "API Errors",
+  "empty": "No errors have been reported yet.",
+  "filters": {
+    "status": "Status",
+    "severity": "Severity"
+  },
+  "columns": {
+    "status": "Status",
+    "severity": "Severity",
+    "title": "Title",
+    "route": "Route",
+    "occurrences": "Occurrences",
+    "lastSeen": "Last seen",
+    "actions": "Actions"
+  },
+  "status": {
+    "open": "Open",
+    "investigating": "Investigating",
+    "resolved": "Resolved",
+    "ignored": "Ignored"
+  },
+  "severity": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "unknown": "Unknown"
+  },
+  "actions": {
+    "viewDetail": "View detail"
+  },
+  "detail": {
+    "firstSeen": "First seen",
+    "lastSeen": "Last seen",
+    "severity": "Severity",
+    "statusCode": "HTTP status",
+    "occurrencesShort": "{{count}} occurrences",
+    "aiSummary": "AI summary",
+    "aiRootCause": "AI root cause",
+    "aiSuggestedFix": "AI suggested fix",
+    "suspectedFiles": "Suspected files",
+    "githubIssue": "Linked GitHub issue: #{{number}}",
+    "statusUpdate": "Update status",
+    "save": "Save"
+  }
+}

@@ -2,11 +2,13 @@
   "adminPanelTitle": "Zedi Admin",
   "adminShortTitle": "Admin",
   "menu": "Menu",
+  "unreadBadgeAriaLabel": "{{count}} unresolved",
   "items": {
     "aiModels": "AI Models",
     "users": "Users",
     "auditLogs": "Audit Logs",
     "wikiHealth": "Wiki Health",
-    "activityLog": "Activity Log"
+    "activityLog": "Activity Log",
+    "errors": "Errors"
   }
 }

@@ -1,0 +1,46 @@
+{
+  "title": "API エラー",
+  "empty": "対象のエラーはまだ報告されていません。",
+  "filters": {
+    "status": "ステータス",
+    "severity": "重大度"
+  },
+  "columns": {
+    "status": "状態",
+    "severity": "重大度",
+    "title": "タイトル",
+    "route": "ルート",
+    "occurrences": "発生回数",
+    "lastSeen": "最終発生",
+    "actions": "操作"
+  },
+  "status": {
+    "open": "未対応",
+    "investigating": "調査中",
+    "resolved": "解決済み",
+    "ignored": "無視"
+  },
+  "severity": {
+    "high": "高",
+    "medium": "中",
+    "low": "低",
+    "unknown": "未判定"
+  },
+  "actions": {
+    "viewDetail": "詳細を見る"
+  },
+  "detail": {
+    "firstSeen": "初回発生",
+    "lastSeen": "最終発生",
+    "severity": "重大度",
+    "statusCode": "HTTP ステータス",
+    "occurrencesShort": "{{count}} 回発生",
+    "aiSummary": "AI による要約",
+    "aiRootCause": "AI による原因仮説",
+    "aiSuggestedFix": "AI による修正方針",
+    "suspectedFiles": "関連が疑われるファイル",
+    "githubIssue": "関連 GitHub Issue: #{{number}}",
+    "statusUpdate": "ステータスを更新",
+    "save": "保存"
+  }
+}
