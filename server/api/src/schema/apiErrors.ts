@@ -75,9 +75,13 @@ export const apiErrors = pgTable(
     /** 最終観測時刻（upsert で前進する） / Last-seen timestamp; advances on upsert */
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
     /** AI 解析後の重大度（既定 `unknown`） / Severity after AI analysis */
-    severity: text("severity").$type<ApiErrorSeverity>().notNull().default("unknown"),
+    severity: text("severity", { enum: ["high", "medium", "low", "unknown"] })
+      .notNull()
+      .default("unknown"),
     /** 管理画面で人が更新するワークフロー状態 / Admin-updated workflow status */
-    status: text("status").$type<ApiErrorStatus>().notNull().default("open"),
+    status: text("status", { enum: ["open", "investigating", "resolved", "ignored"] })
+      .notNull()
+      .default("open"),
     /** AI が生成した要約 / AI-generated summary */
     aiSummary: text("ai_summary"),
     /** AI が推定した関連ファイル一覧 / AI-suspected related files */

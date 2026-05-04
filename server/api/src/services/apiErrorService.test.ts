@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ALLOWED_API_ERROR_STATUS_TRANSITIONS,
+  ApiErrorStatusConflictError,
   assertValidApiErrorStatusTransition,
   isValidApiErrorStatusTransition,
   upsertFromSentrySummary,
@@ -214,6 +215,88 @@ describe("upsertFromSentrySummary", () => {
       }),
     ).rejects.toThrow(/sentryIssueId is required/i);
   });
+
+  it("rejects null/undefined sentry_issue_id without throwing TypeError", async () => {
+    // Webhook 由来の不正なペイロード（null や欠落）でも構造化されたメッセージで弾く。
+    // Malformed webhook payloads (null / missing) are rejected with a clear
+    // validation message rather than a runtime TypeError on `.trim()`.
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        // biome-ignore lint/suspicious/noExplicitAny: simulating a malformed external payload
+        sentryIssueId: null as unknown as string,
+        title: "noop",
+      }),
+    ).rejects.toThrow(/sentryIssueId is required/i);
+  });
+
+  it("rejects empty / null title at the boundary", async () => {
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "   ",
+      }),
+    ).rejects.toThrow(/title is required/i);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: null as unknown as string,
+      }),
+    ).rejects.toThrow(/title is required/i);
+  });
+
+  it("on recurrence of a resolved row, the upsert reopens to status='open'", async () => {
+    // 再発検出: 過去に resolved にされた issue が再来したら open に戻し、
+    // admin の既定ビュー（未解決一覧）から見落とされないようにする。
+    // この振る舞いは upsert SQL の `set.status` で `CASE` 式により実装。
+    // 単体テストではモックが返す「再オープン後」の行で振る舞いを検証する。
+    //
+    // Regression detection: a previously-resolved issue must reopen on
+    // recurrence so it doesn't fall outside the admin's default open view.
+    // The behavior lives in the upsert's `set.status` CASE expression; this
+    // unit test asserts the contract via the mock-returned post-upsert row.
+    const reopened = makeRow({
+      occurrences: 5,
+      status: "open",
+      firstSeenAt: new Date("2026-04-01T00:00:00Z"),
+      lastSeenAt: new Date("2026-05-04T00:00:00Z"),
+    });
+    const db = createMockDb([[reopened]]);
+
+    const result = await upsertFromSentrySummary(db as never, {
+      sentryIssueId: "sentry-issue-1",
+      title: "regression",
+      occurrencesDelta: 1,
+      lastSeenAt: new Date("2026-05-04T00:00:00Z"),
+    });
+
+    expect(result.status).toBe("open");
+    expect(result.firstSeenAt.toISOString()).toBe("2026-04-01T00:00:00.000Z");
+  });
+
+  it("treats non-finite occurrencesDelta (NaN, Infinity) as 1", async () => {
+    // NaN / Infinity がそのまま SQL に渡るとクエリが失敗するので、安全側に倒して 1 にする。
+    // NaN / Infinity would fail the underlying query; coerce to the safe default of 1.
+    const upserted = makeRow({ occurrences: 1 });
+    const db = createMockDb([[upserted], [upserted]]);
+
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        occurrencesDelta: Number.NaN,
+      }),
+    ).resolves.toEqual(upserted);
+
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        occurrencesDelta: Number.POSITIVE_INFINITY,
+      }),
+    ).resolves.toEqual(upserted);
+  });
 });
 
 // ── listApiErrors / get* ───────────────────────────────────────────────────
@@ -337,5 +420,24 @@ describe("updateApiErrorStatus", () => {
     });
 
     expect(result?.status).toBe("open");
+  });
+
+  it("throws ApiErrorStatusConflictError when the row was changed concurrently", async () => {
+    // 読み取り時点 status='open' で遷移バリデーションをパスしたあと、
+    // UPDATE が行を返さない（= 他リクエストが status を変えていた）ケース。
+    // 並行更新を黙って上書きするのではなく 409 マップ可能なエラーにする。
+    //
+    // Read sees status='open' (transition validates), then the UPDATE returns
+    // zero rows because a competing write changed the row. We surface a
+    // typed error so the caller can map it to HTTP 409.
+    const before = makeRow({ status: "open" });
+    const db = createMockDb([[before], []]);
+
+    await expect(
+      updateApiErrorStatus(db as never, {
+        id: before.id,
+        nextStatus: "investigating",
+      }),
+    ).rejects.toBeInstanceOf(ApiErrorStatusConflictError);
   });
 });

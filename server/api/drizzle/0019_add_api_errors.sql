@@ -24,8 +24,10 @@ CREATE TABLE IF NOT EXISTS "api_errors" (
     "occurrences" integer DEFAULT 1 NOT NULL,
     "first_seen_at" timestamp with time zone DEFAULT now() NOT NULL,
     "last_seen_at" timestamp with time zone DEFAULT now() NOT NULL,
-    "severity" text DEFAULT 'unknown' NOT NULL,
-    "status" text DEFAULT 'open' NOT NULL,
+    "severity" text DEFAULT 'unknown' NOT NULL
+        CHECK ("severity" IN ('high', 'medium', 'low', 'unknown')),
+    "status" text DEFAULT 'open' NOT NULL
+        CHECK ("status" IN ('open', 'investigating', 'resolved', 'ignored')),
     "ai_summary" text,
     "ai_suspected_files" jsonb,
     "ai_root_cause" text,

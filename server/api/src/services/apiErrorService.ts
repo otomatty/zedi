@@ -125,23 +125,32 @@ export interface UpsertFromSentrySummaryInput {
  * the descriptive columns from non-null EXCLUDED values, and **preserves
  * `first_seen_at`** by design.
  *
- * @throws when `sentryIssueId` is empty or the upsert returns no rows.
+ * @throws when `sentryIssueId` または `title` が空、もしくは upsert が
+ *   行を返さなかった場合。Throws on empty `sentryIssueId` / `title`, or when
+ *   the upsert produced no row.
  */
 export async function upsertFromSentrySummary(
   db: Database,
   input: UpsertFromSentrySummaryInput,
 ): Promise<ApiError> {
-  const sentryIssueId = input.sentryIssueId.trim();
+  // Webhook 入力は外部由来。null / undefined / NaN を強めにバリデートする。
+  // Webhook payloads are external; defend hard against null/undefined/NaN.
+  const sentryIssueId = (input.sentryIssueId ?? "").trim();
   if (!sentryIssueId) {
     throw new Error("sentryIssueId is required");
   }
-  const occurrencesDelta = Math.max(1, Math.floor(input.occurrencesDelta ?? 1));
+  const title = (input.title ?? "").trim();
+  if (!title) {
+    throw new Error("title is required");
+  }
+  const rawDelta = input.occurrencesDelta ?? 1;
+  const occurrencesDelta = Number.isFinite(rawDelta) ? Math.max(1, Math.floor(rawDelta)) : 1;
   const now = input.lastSeenAt ?? new Date();
 
   const values: NewApiError = {
     sentryIssueId,
     fingerprint: input.fingerprint ?? null,
-    title: input.title,
+    title,
     route: input.route ?? null,
     statusCode: input.statusCode ?? null,
     occurrences: occurrencesDelta,
@@ -169,12 +178,21 @@ export async function upsertFromSentrySummary(
         route: sql`COALESCE(EXCLUDED.route, ${apiErrors.route})`,
         statusCode: sql`COALESCE(EXCLUDED.status_code, ${apiErrors.statusCode})`,
         fingerprint: sql`COALESCE(EXCLUDED.fingerprint, ${apiErrors.fingerprint})`,
+        // 再発検出: `resolved` は再来時に `open` へ戻す。`ignored` は
+        // admin が明示的に「無視」と判断したものなので尊重して触らない。
+        // それ以外（open / investigating）は維持。
+        //
+        // Regression detection: a recurrence reopens `resolved` rows so the
+        // admin's default open/triage view surfaces them again. `ignored` is
+        // an explicit admin decision and is left alone; `open` and
+        // `investigating` are preserved.
+        status: sql`CASE WHEN ${apiErrors.status} = 'resolved' THEN 'open'::text ELSE ${apiErrors.status} END`,
         updatedAt: sql`NOW()`,
-        // first_seen_at / status / severity / ai_* / github_issue_number は意図的に
+        // first_seen_at / severity / ai_* / github_issue_number は意図的に
         // 触らない。再来で初回時刻や人手で更新した状態を巻き戻さないため。
-        // first_seen_at, status, severity, ai_*, github_issue_number are
-        // intentionally untouched: a re-occurrence must not rewind first-seen
-        // or undo human / AI updates.
+        // first_seen_at, severity, ai_*, github_issue_number are intentionally
+        // untouched: a re-occurrence must not rewind first-seen or undo
+        // human / AI updates.
       },
     })
     .returning();
@@ -283,17 +301,42 @@ export interface UpdateApiErrorStatusInput {
 }
 
 /**
+ * `updateApiErrorStatus` が並行更新と衝突したときに投げるエラー。
+ * Thrown by `updateApiErrorStatus` when a concurrent write changed the row's
+ * status between the read and the conditional UPDATE.
+ *
+ * 呼び出し側（admin ルート）は HTTP 409 Conflict にマップすることを想定する。
+ * Callers (e.g. the admin route) are expected to map this to HTTP 409.
+ */
+export class ApiErrorStatusConflictError extends Error {
+  /**
+   * 衝突した行 ID を含むエラーを生成する。
+   * Build a conflict error tagged with the row id that lost the race.
+   */
+  constructor(id: string) {
+    super(`api_errors row changed concurrently while updating status: ${id}`);
+    this.name = "ApiErrorStatusConflictError";
+  }
+}
+
+/**
  * ワークフロー状態を更新する。
  *
  * - 対象行が存在しなければ `null` を返す。
  * - 同一 status への遷移は no-op として現在の行をそのまま返す。
  * - 遷移が許可されていない場合は `Error` を投げる（呼び出し側で 400 へ変換）。
+ * - 並行更新の検出: UPDATE 述語で「読み取り時点の status」を一致条件にし、
+ *   その間に他リクエストが status を変えていた場合は
+ *   `ApiErrorStatusConflictError` を投げる（409 にマップ）。
  *
  * Update the workflow status with transition validation.
  *
  * - Returns `null` when the target row does not exist.
  * - Same-state transitions short-circuit to a no-op (returning the unchanged row).
  * - Invalid transitions throw; the caller maps the error to HTTP 400.
+ * - Concurrency: the UPDATE WHERE clause includes the previously-read status,
+ *   so a competing write that flipped the row in between yields zero rows
+ *   and we throw `ApiErrorStatusConflictError` (caller maps to HTTP 409).
  */
 export async function updateApiErrorStatus(
   db: Database,
@@ -311,10 +354,16 @@ export async function updateApiErrorStatus(
       status: input.nextStatus,
       updatedAt: sql`NOW()`,
     })
-    .where(eq(apiErrors.id, input.id))
+    // status を読み取り時点の値に固定して、間に挟まった並行更新を検出する。
+    // Pin the WHERE on the read-time status so an interleaved write fails
+    // closed (zero rows) instead of silently overwriting.
+    .where(and(eq(apiErrors.id, input.id), eq(apiErrors.status, current.status)))
     .returning();
 
-  return updated ?? null;
+  if (!updated) {
+    throw new ApiErrorStatusConflictError(input.id);
+  }
+  return updated;
 }
 
 // 公開はしないがコンパイル時に未使用警告が出ないよう、import を参照しておく。
