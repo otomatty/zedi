@@ -13,6 +13,7 @@
  */
 import { Hono } from "hono";
 import {
+  ApiErrorInvalidTransitionError,
   ApiErrorStatusConflictError,
   API_ERROR_LIST_DEFAULT_LIMIT,
   API_ERROR_LIST_MAX_LIMIT,
@@ -27,6 +28,16 @@ const app = new Hono<AppEnv>();
 
 const VALID_STATUSES = ["open", "investigating", "resolved", "ignored"] as const;
 const VALID_SEVERITIES = ["high", "medium", "low", "unknown"] as const;
+
+/**
+ * UUID v1〜v5 を許容する正規表現。`api_errors.id` は `uuid` 型なので
+ * 不正な形式が来た時点で 404 を返し、Postgres まで投げない（500 を防ぐ）。
+ *
+ * RFC 4122 UUID matcher (any version). `api_errors.id` is a Postgres `uuid`
+ * column, so passing a malformed string would surface as a 500 from the DB.
+ * Reject early with 404 to keep the route resilient to garbage input.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * クエリ文字列を `ApiErrorStatus` に変換する。空 / 不正値は `null`。
@@ -106,6 +117,9 @@ app.get("/", async (c) => {
  */
 app.get("/:id", async (c) => {
   const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "Not found" }, 404);
+  }
   const db = c.get("db");
   const row = await getApiErrorById(db, id);
   if (!row) {
@@ -129,16 +143,23 @@ app.get("/:id", async (c) => {
  */
 app.patch("/:id", async (c) => {
   const id = c.req.param("id");
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: "Not found" }, 404);
+  }
   const db = c.get("db");
 
-  let body: { status?: unknown };
+  let body: { status?: unknown } | null;
   try {
-    body = await c.req.json<{ status?: unknown }>();
+    body = await c.req.json<{ status?: unknown } | null>();
   } catch {
     return c.json({ error: "invalid JSON body" }, 400);
   }
 
-  if (typeof body.status !== "string") {
+  // `c.req.json()` は body が "null" や非オブジェクトでも throw しない場合がある。
+  // ここで明示的にガードしないと `body.status` で TypeError になる。
+  // Hono's `c.req.json()` doesn't throw on a literal `null` or non-object body,
+  // so guard explicitly before reading `.status`.
+  if (!body || typeof body !== "object" || typeof body.status !== "string") {
     return c.json({ error: "status is required" }, 400);
   }
   const nextStatus = parseStatus(body.status);
@@ -161,7 +182,7 @@ app.patch("/:id", async (c) => {
     if (err instanceof ApiErrorStatusConflictError) {
       return c.json({ error: "status changed concurrently; refetch and retry" }, 409);
     }
-    if (err instanceof Error && /invalid api_errors status transition/i.test(err.message)) {
+    if (err instanceof ApiErrorInvalidTransitionError) {
       return c.json({ error: err.message }, 400);
     }
     throw err;

@@ -155,12 +155,26 @@ describe("GET /api/admin/errors/:id", () => {
 
   it("returns 403 when user is not admin", async () => {
     const { app } = createAdminTestApp([USER_ROLE_RESULT]);
-    const res = await app.request("/api/admin/errors/some-id", { headers: adminAuthHeaders() });
+    const res = await app.request("/api/admin/errors/00000000-0000-0000-0000-000000000010", {
+      headers: adminAuthHeaders(),
+    });
     expect(res.status).toBe(403);
+  });
+
+  it("returns 404 when id is not a valid UUID (no DB query issued)", async () => {
+    // 不正な UUID は Postgres まで投げると 500 になるので、ルート層で 404 にする。
+    // Malformed UUIDs would otherwise surface as a Postgres-level 500; reject early.
+    const { app, chains } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+    const res = await app.request("/api/admin/errors/not-a-uuid", { headers: adminAuthHeaders() });
+    expect(res.status).toBe(404);
+    // Only the adminRequired role-check chain ran; no errors-table SELECT was issued.
+    expect(chains).toHaveLength(1);
   });
 });
 
 // ── PATCH /api/admin/errors/:id ─────────────────────────────────────────────
+
+const VALID_UUID = "00000000-0000-0000-0000-000000000001";
 
 describe("PATCH /api/admin/errors/:id", () => {
   it("updates status when transition is valid", async () => {
@@ -196,7 +210,7 @@ describe("PATCH /api/admin/errors/:id", () => {
 
   it("returns 400 when body is invalid JSON", async () => {
     const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
-    const res = await app.request("/api/admin/errors/some-id", {
+    const res = await app.request(`/api/admin/errors/${VALID_UUID}`, {
       method: "PATCH",
       headers: adminAuthHeaders(),
       body: "{not-json",
@@ -206,7 +220,7 @@ describe("PATCH /api/admin/errors/:id", () => {
 
   it("returns 400 when status is missing", async () => {
     const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
-    const res = await app.request("/api/admin/errors/some-id", {
+    const res = await app.request(`/api/admin/errors/${VALID_UUID}`, {
       method: "PATCH",
       headers: adminAuthHeaders(),
       body: JSON.stringify({}),
@@ -214,14 +228,39 @@ describe("PATCH /api/admin/errors/:id", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when body is JSON null", async () => {
+    // body が "null" のときに body.status を読むと TypeError になりうる。
+    // Sending a literal `null` body must short-circuit to 400 before
+    // dereferencing `.status`.
+    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+    const res = await app.request(`/api/admin/errors/${VALID_UUID}`, {
+      method: "PATCH",
+      headers: adminAuthHeaders(),
+      body: "null",
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("returns 400 when status is not a recognized value", async () => {
     const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
-    const res = await app.request("/api/admin/errors/some-id", {
+    const res = await app.request(`/api/admin/errors/${VALID_UUID}`, {
       method: "PATCH",
       headers: adminAuthHeaders(),
       body: JSON.stringify({ status: "garbage" }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("returns 404 when id is not a valid UUID (no DB query issued)", async () => {
+    const { app, chains } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+    const res = await app.request("/api/admin/errors/not-a-uuid", {
+      method: "PATCH",
+      headers: adminAuthHeaders(),
+      body: JSON.stringify({ status: "investigating" }),
+    });
+    expect(res.status).toBe(404);
+    // Only the adminRequired role-check chain ran; no SELECT/UPDATE was issued.
+    expect(chains).toHaveLength(1);
   });
 
   it("returns 400 on a disallowed transition (ignored -> resolved)", async () => {
@@ -264,7 +303,7 @@ describe("PATCH /api/admin/errors/:id", () => {
 
   it("returns 401 without auth", async () => {
     const { app } = createAdminTestApp([]);
-    const res = await app.request("/api/admin/errors/some-id", {
+    const res = await app.request(`/api/admin/errors/${VALID_UUID}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "investigating" }),
@@ -274,7 +313,7 @@ describe("PATCH /api/admin/errors/:id", () => {
 
   it("returns 403 when user is not admin", async () => {
     const { app } = createAdminTestApp([USER_ROLE_RESULT]);
-    const res = await app.request("/api/admin/errors/some-id", {
+    const res = await app.request(`/api/admin/errors/${VALID_UUID}`, {
       method: "PATCH",
       headers: adminAuthHeaders(),
       body: JSON.stringify({ status: "investigating" }),

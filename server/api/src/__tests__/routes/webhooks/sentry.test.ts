@@ -109,6 +109,23 @@ describe("extractSentrySummary", () => {
     expect(result?.route).toBe("POST https://example.com/api/ingest");
   });
 
+  it("extracts from data.error when issue/event slots are absent", () => {
+    // 一部の Sentry イベント種別では識別子が data.error 配下にしかない。
+    // For event shapes where the id only lives under `data.error`, the
+    // extractor must still locate it; otherwise those errors silently drop
+    // out of admin error tracking.
+    const result = extractSentrySummary({
+      data: {
+        error: {
+          id: "error-only-77",
+          title: "Some API error",
+        },
+      },
+    });
+    expect(result?.sentryIssueId).toBe("error-only-77");
+    expect(result?.title).toBe("Some API error");
+  });
+
   it("falls back to a default title when none is provided", () => {
     const result = extractSentrySummary({
       data: { issue: { id: "noTitle" } },

@@ -28,6 +28,50 @@ import type {
 import type { Database } from "../types/index.js";
 
 /**
+ * `upsertFromSentrySummary` の境界バリデーションで投げるエラー。
+ * Thrown by `upsertFromSentrySummary` when the external (webhook) payload
+ * fails boundary validation (empty / null required fields, invalid timestamps,
+ * non-integer `statusCode`, inverted timeline, etc.).
+ *
+ * 呼び出し側（webhook ルート）は HTTP 400 にマップすることを想定する。
+ * Callers (e.g. the Sentry webhook route) are expected to map this to
+ * HTTP 400 instead of letting it bubble up to the generic 500 path.
+ */
+export class ApiErrorValidationError extends Error {
+  /**
+   * 構造化メッセージで境界バリデーションエラーを生成する。
+   * Build a boundary-validation error tagged with a structured message.
+   */
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiErrorValidationError";
+  }
+}
+
+/**
+ * `assertValidApiErrorStatusTransition` が許可されていない遷移を検出したときに投げる。
+ * Thrown when `assertValidApiErrorStatusTransition` rejects a `from -> to`
+ * transition that isn't permitted by `ALLOWED_API_ERROR_STATUS_TRANSITIONS`.
+ *
+ * 呼び出し側は HTTP 400 にマップすることを想定する。
+ * Callers map this to HTTP 400.
+ */
+export class ApiErrorInvalidTransitionError extends Error {
+  /**
+   * 現在および要求された遷移先の status を保持してエラーを生成する。
+   * Build a transition error that retains both endpoints so the route layer
+   * can surface them in the 400 response without re-parsing the message.
+   */
+  constructor(
+    public readonly current: ApiErrorStatus,
+    public readonly next: ApiErrorStatus,
+  ) {
+    super(`Invalid api_errors status transition: ${current} -> ${next}`);
+    this.name = "ApiErrorInvalidTransitionError";
+  }
+}
+
+/**
  * 状態遷移の許可マップ。`from -> to` の集合で表現する。
  *
  * - 同一 status へのフラットな遷移はマップから除外しており、呼び出し側で
@@ -77,7 +121,7 @@ export function assertValidApiErrorStatusTransition(
   next: ApiErrorStatus,
 ): void {
   if (!isValidApiErrorStatusTransition(current, next)) {
-    throw new Error(`Invalid api_errors status transition: ${current} -> ${next}`);
+    throw new ApiErrorInvalidTransitionError(current, next);
   }
 }
 
@@ -128,23 +172,23 @@ function normalizeUpsertInput(input: UpsertFromSentrySummaryInput): {
 } {
   const sentryIssueId = (input.sentryIssueId ?? "").trim();
   if (!sentryIssueId) {
-    throw new Error("sentryIssueId is required");
+    throw new ApiErrorValidationError("sentryIssueId is required");
   }
   const title = (input.title ?? "").trim();
   if (!title) {
-    throw new Error("title is required");
+    throw new ApiErrorValidationError("title is required");
   }
   if (
     input.statusCode != null &&
     (!Number.isFinite(input.statusCode) || !Number.isInteger(input.statusCode))
   ) {
-    throw new Error("statusCode must be a finite integer");
+    throw new ApiErrorValidationError("statusCode must be a finite integer");
   }
   if (input.firstSeenAt && !Number.isFinite(input.firstSeenAt.getTime())) {
-    throw new Error("firstSeenAt must be a valid Date");
+    throw new ApiErrorValidationError("firstSeenAt must be a valid Date");
   }
   if (input.lastSeenAt && !Number.isFinite(input.lastSeenAt.getTime())) {
-    throw new Error("lastSeenAt must be a valid Date");
+    throw new ApiErrorValidationError("lastSeenAt must be a valid Date");
   }
   const rawDelta = input.occurrencesDelta ?? 1;
   const occurrencesDelta = Number.isFinite(rawDelta) ? Math.max(1, Math.floor(rawDelta)) : 1;
@@ -155,7 +199,7 @@ function normalizeUpsertInput(input: UpsertFromSentrySummaryInput): {
   // Monotonicity invariant: firstSeenAt <= lastSeenAt. Prevents a malformed
   // webhook from persisting an inverted timeline into `api_errors`.
   if (firstSeenAt.getTime() > now.getTime()) {
-    throw new Error("firstSeenAt must be less than or equal to lastSeenAt");
+    throw new ApiErrorValidationError("firstSeenAt must be less than or equal to lastSeenAt");
   }
   return { sentryIssueId, title, occurrencesDelta, firstSeenAt, now };
 }

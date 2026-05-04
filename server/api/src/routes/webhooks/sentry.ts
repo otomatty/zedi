@@ -23,7 +23,10 @@
 import crypto from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { upsertFromSentrySummary } from "../../services/apiErrorService.js";
+import {
+  ApiErrorValidationError,
+  upsertFromSentrySummary,
+} from "../../services/apiErrorService.js";
 import type { AppEnv } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -169,6 +172,7 @@ function extractSentryIssueId(
   data: Record<string, unknown>,
   issue: Record<string, unknown> | null,
   event: Record<string, unknown> | null,
+  error: Record<string, unknown> | null,
 ): string | null {
   const group = isRecord(data.group) ? data.group : null;
   const eventIssue = event && isRecord(event.issue) ? event.issue : null;
@@ -176,6 +180,7 @@ function extractSentryIssueId(
     asString(issue?.id) ??
     asString(event?.issue_id) ??
     asString(eventIssue?.id) ??
+    asString(error?.id) ??
     asString(group?.id) ??
     asString(data.id)
   );
@@ -247,7 +252,7 @@ export function extractSentrySummary(payload: unknown): SentrySummaryExtraction 
   const event = isRecord(data.event) ? data.event : null;
   const error = isRecord(data.error) ? data.error : null;
 
-  const sentryIssueId = extractSentryIssueId(data, issue, event);
+  const sentryIssueId = extractSentryIssueId(data, issue, event, error);
   if (!sentryIssueId) return null;
 
   const title =
@@ -327,15 +332,15 @@ app.post("/", async (c) => {
     return c.json({ received: true, id: row.id });
   } catch (err) {
     // 入力検証エラー (sentryIssueId / title / statusCode 等) は 400 で返す。
-    // それ以外は 500 にフォールバックさせる。
+    // それ以外は 500 にフォールバックさせる。サービス層が型付きエラーを投げるので
+    // メッセージ文字列に依存せず instanceof で分岐する。
     // Boundary validation errors → 400; anything else → bubble up to 500.
+    // We branch on `instanceof ApiErrorValidationError` rather than parsing the
+    // error message so service-side message tweaks don't accidentally flip
+    // 400-eligible failures into 500s.
     const message = err instanceof Error ? err.message : "unknown error";
     console.error(`[sentry-webhook] Failed to upsert: ${message}`);
-    if (
-      err instanceof Error &&
-      /required|must be|less than or equal/i.test(err.message) &&
-      !/no rows/i.test(err.message)
-    ) {
+    if (err instanceof ApiErrorValidationError) {
       return c.json({ error: message }, 400);
     }
     throw err;
