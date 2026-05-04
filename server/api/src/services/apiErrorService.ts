@@ -123,6 +123,7 @@ function normalizeUpsertInput(input: UpsertFromSentrySummaryInput): {
   sentryIssueId: string;
   title: string;
   occurrencesDelta: number;
+  firstSeenAt: Date;
   now: Date;
 } {
   const sentryIssueId = (input.sentryIssueId ?? "").trim();
@@ -148,7 +149,15 @@ function normalizeUpsertInput(input: UpsertFromSentrySummaryInput): {
   const rawDelta = input.occurrencesDelta ?? 1;
   const occurrencesDelta = Number.isFinite(rawDelta) ? Math.max(1, Math.floor(rawDelta)) : 1;
   const now = input.lastSeenAt ?? new Date();
-  return { sentryIssueId, title, occurrencesDelta, now };
+  const firstSeenAt = input.firstSeenAt ?? now;
+  // 単調性の不変条件: firstSeenAt <= lastSeenAt。malformed な webhook が
+  // 逆転したタイムラインを書き込むのを防ぐ。
+  // Monotonicity invariant: firstSeenAt <= lastSeenAt. Prevents a malformed
+  // webhook from persisting an inverted timeline into `api_errors`.
+  if (firstSeenAt.getTime() > now.getTime()) {
+    throw new Error("firstSeenAt must be less than or equal to lastSeenAt");
+  }
+  return { sentryIssueId, title, occurrencesDelta, firstSeenAt, now };
 }
 
 /**
@@ -167,10 +176,12 @@ function normalizeUpsertInput(input: UpsertFromSentrySummaryInput): {
  * `resolved` rows on recurrence, and **preserves `first_seen_at`** by design.
  *
  * @throws when `sentryIssueId` または `title` が空、`statusCode` が
- *   有限の整数でない、`firstSeenAt` / `lastSeenAt` が不正な Date、もしくは
- *   upsert が行を返さなかった場合。Throws on empty `sentryIssueId` /
- *   `title`, non-integer `statusCode`, Invalid Date timestamps, or when
- *   the upsert produced no row.
+ *   有限の整数でない、`firstSeenAt` / `lastSeenAt` が不正な Date、
+ *   `firstSeenAt` が `lastSeenAt` より後、もしくは upsert が行を返さなかった
+ *   場合。Throws on empty `sentryIssueId` / `title`, non-integer
+ *   `statusCode`, Invalid Date timestamps, an inverted timeline
+ *   (`firstSeenAt` later than `lastSeenAt`), or when the upsert produced
+ *   no row.
  */
 export async function upsertFromSentrySummary(
   db: Database,
@@ -178,7 +189,7 @@ export async function upsertFromSentrySummary(
 ): Promise<ApiError> {
   // Webhook 入力は外部由来。null / undefined / NaN / Invalid Date を弾く。
   // Webhook payloads are external; defend hard against null/NaN/Invalid Date.
-  const { sentryIssueId, title, occurrencesDelta, now } = normalizeUpsertInput(input);
+  const { sentryIssueId, title, occurrencesDelta, firstSeenAt, now } = normalizeUpsertInput(input);
 
   const values: NewApiError = {
     sentryIssueId,
@@ -187,7 +198,7 @@ export async function upsertFromSentrySummary(
     route: input.route ?? null,
     statusCode: input.statusCode ?? null,
     occurrences: occurrencesDelta,
-    firstSeenAt: input.firstSeenAt ?? now,
+    firstSeenAt,
     lastSeenAt: now,
     severity: input.severity ?? "unknown",
     status: "open",

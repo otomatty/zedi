@@ -271,6 +271,37 @@ describe("upsertFromSentrySummary", () => {
     ).rejects.toThrow(/statusCode must be a finite integer/i);
   });
 
+  it("rejects an inverted timeline (firstSeenAt > lastSeenAt)", async () => {
+    // 単調性の不変条件チェック: 逆転したタイムスタンプは DB に書かない。
+    // Monotonicity invariant: a webhook with firstSeenAt > lastSeenAt cannot
+    // persist its inverted timeline.
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        firstSeenAt: new Date("2026-05-02T00:00:00Z"),
+        lastSeenAt: new Date("2026-05-01T00:00:00Z"),
+      }),
+    ).rejects.toThrow(/firstSeenAt must be less than or equal to lastSeenAt/i);
+  });
+
+  it("accepts firstSeenAt === lastSeenAt (boundary case)", async () => {
+    // 同時刻は許容する（初回観測と最終観測が同一イベントなら自然）。
+    // Equal timestamps are allowed (a fresh issue's first/last observation
+    // can coincide).
+    const t = new Date("2026-05-01T00:00:00Z");
+    const db = createMockDb([[makeRow({ firstSeenAt: t, lastSeenAt: t })]]);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        firstSeenAt: t,
+        lastSeenAt: t,
+      }),
+    ).resolves.toBeDefined();
+  });
+
   it("rejects Invalid Date for firstSeenAt / lastSeenAt", async () => {
     const db = createMockDb([[makeRow()]]);
     await expect(
