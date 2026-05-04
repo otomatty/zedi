@@ -13,7 +13,10 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
     const status = err.status;
     console.error(`[api] ${c.req.method} ${c.req.path} → ${status}`, err.message);
     if (shouldCaptureApiException(status)) {
-      captureApiException(err, status, { method: c.req.method, path: c.req.path });
+      captureApiException(err, status, {
+        method: c.req.method,
+        routePath: c.req.routePath,
+      });
     }
     return c.json({ error: err.message }, status);
   }
@@ -33,7 +36,10 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
 
   console.error(`[api] ${c.req.method} ${c.req.path} → ${status}`, err);
   if (shouldCaptureApiException(status)) {
-    captureApiException(err, status, { method: c.req.method, path: c.req.path });
+    captureApiException(err, status, {
+      method: c.req.method,
+      routePath: c.req.routePath,
+    });
   }
   return c.json({ error: message }, status as ContentfulStatusCode);
 };

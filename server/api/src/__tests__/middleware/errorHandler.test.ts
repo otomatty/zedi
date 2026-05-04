@@ -5,9 +5,12 @@
  * - サービス層が throw する `new Error("UNAUTHORIZED")` などの
  *   "magic message" は statusMap に従って HTTP ステータスへ写像される。
  * - 未知のエラーは 500 を返し、message は「Internal server error」または素のエラー文。
+ * - Sentry capture は実装側の `shouldCaptureApiException` の判定に従い、
+ *   `captureApiException` だけを差し替える partial mock で検証する。
  *
  * Unit tests for the global Hono error handler. Covers HTTPException pass-through,
- * the magic-message → status mapping, and the unknown-error 500 default.
+ * the magic-message → status mapping, the unknown-error 500 default, and the
+ * Sentry capture policy by partially mocking only `captureApiException`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
@@ -16,13 +19,15 @@ import type { AppEnv } from "../../types/index.js";
 
 const sentryMock = vi.hoisted(() => ({
   captureApiException: vi.fn(),
-  shouldCaptureApiException: vi.fn(
-    (status: number) =>
-      status >= 500 || (status >= 400 && status < 500 && ![401, 403, 404].includes(status)),
-  ),
 }));
 
-vi.mock("../../lib/sentry.js", () => sentryMock);
+vi.mock("../../lib/sentry.js", async () => {
+  const actual = await vi.importActual<typeof import("../../lib/sentry.js")>("../../lib/sentry.js");
+  return {
+    ...actual,
+    captureApiException: sentryMock.captureApiException,
+  };
+});
 
 import { errorHandler } from "../../middleware/errorHandler.js";
 
@@ -94,7 +99,7 @@ describe("errorHandler", () => {
         status,
         expect.objectContaining({
           method: "GET",
-          path: "/throw",
+          routePath: "/throw",
         }),
       );
     });
@@ -148,8 +153,27 @@ describe("errorHandler", () => {
         expectedStatus,
         expect.objectContaining({
           method: "GET",
-          path: "/throw",
+          routePath: "/throw",
         }),
+      );
+    });
+
+    it("forwards the matched route pattern (not the raw token-bearing path)", async () => {
+      // capability token を含む生パスではなく、Hono の route pattern を渡すことを保証する。
+      // Ensures we forward the route pattern (e.g., `/invite/:token`) so that
+      // request-time capability tokens never reach Sentry through `extra`.
+      const app = new Hono<AppEnv>();
+      app.onError(errorHandler);
+      app.get("/invite/:token", () => {
+        throw new Error("kapow");
+      });
+
+      await app.request("/invite/secret-capability-token");
+
+      expect(sentryMock.captureApiException).toHaveBeenCalledWith(
+        expect.any(Error),
+        500,
+        expect.objectContaining({ method: "GET", routePath: "/invite/:token" }),
       );
     });
   });
