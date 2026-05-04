@@ -7,6 +7,7 @@ import { pages } from "../../schema/pages.js";
 import { recordAuditLog } from "../../lib/auditLog.js";
 import { getUserImpact, anonymizeUser } from "../../lib/userDelete.js";
 import auditLogsRoutes from "./auditLogs.js";
+import errorsRoutes from "./errors.js";
 import type { AppEnv } from "../../types/index.js";
 import type { UserStatus } from "../../schema/users.js";
 
@@ -17,6 +18,10 @@ app.use("*", adminRequired);
 
 // 監査ログのサブルート / Audit log sub-routes
 app.route("/audit-logs", auditLogsRoutes);
+
+// API エラー一覧 / 詳細 / 状態更新サブルート（Epic #616 Phase 1）
+// API errors sub-routes (list / detail / status update) for Epic #616 Phase 1.
+app.route("/errors", errorsRoutes);
 
 /** GET /api/admin/me — current admin user (for admin UI). */
 app.get("/me", (c) => {
