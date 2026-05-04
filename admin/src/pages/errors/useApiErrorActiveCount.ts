@@ -12,7 +12,11 @@ import { API_ERRORS_POLL_INTERVAL_MS } from "./useApiErrors";
  * `limit:1` call per active status and sums the `total` fields, so we only
  * pay the cost of the COUNT query — not the row payload.
  *
- * @returns 件数 (取得失敗・未認証時は 0) / Count; falls back to 0 on error.
+ * @returns 初期値は 0。取得成功で値を更新し、失敗時は直前の取得値を維持する
+ *          （誤った 0 表示でフラッシュしないため）。
+ *          / Starts at 0; updates on successful fetches and preserves the last
+ *          successful value when a refresh fails (so the badge does not flash
+ *          to 0 on transient errors).
  */
 export function useApiErrorActiveCount(): number {
   const [count, setCount] = useState(0);
@@ -44,7 +48,13 @@ export function useApiErrorActiveCount(): number {
       }
     };
 
-    void fetchCount();
+    // 初回ブートストラップもポーリングと同じ可視性ガードに従わせる。バックグラウンド
+    // タブで mount された際に fan-out リクエストを走らせない。
+    // Apply the same visibility guard to the bootstrap fetch so a tab that
+    // mounts while hidden does not pay the full fan-out before any tick fires.
+    if (typeof document === "undefined" || !document.hidden) {
+      void fetchCount();
+    }
     const id = window.setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       void fetchCount();

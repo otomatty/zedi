@@ -341,8 +341,33 @@ export async function deleteUser(id: string): Promise<{ user: UserAdminBase }> {
 /** API エラーのワークフロー状態 / Workflow status for an API error */
 export type ApiErrorStatus = "open" | "investigating" | "resolved" | "ignored";
 
+/**
+ * UI のセレクト・タブ等で参照する `ApiErrorStatus` の全値。型定義から逸脱しない
+ * よう Single source of truth として `@/api/admin` に置く。
+ *
+ * Single source of truth for the full set of `ApiErrorStatus` values consumed
+ * by UI (select dropdowns, tabs, status badges).
+ */
+export const API_ERROR_STATUS_VALUES: readonly ApiErrorStatus[] = [
+  "open",
+  "investigating",
+  "resolved",
+  "ignored",
+];
+
 /** API エラーの重大度 / Severity assigned by AI analysis */
 export type ApiErrorSeverity = "high" | "medium" | "low" | "unknown";
+
+/**
+ * `ApiErrorSeverity` の全値（UI フィルターで使用）。
+ * Full set of `ApiErrorSeverity` values used by UI filters.
+ */
+export const API_ERROR_SEVERITY_VALUES: readonly ApiErrorSeverity[] = [
+  "high",
+  "medium",
+  "low",
+  "unknown",
+];
 
 /**
  * 一覧でアクティブ（未対応扱い）として件数バッジに数えるステータス。

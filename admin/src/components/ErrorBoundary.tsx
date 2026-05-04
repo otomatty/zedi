@@ -37,9 +37,15 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   /** 例外を Sentry に転送する。/ Forward the caught exception to Sentry. */
   componentDidCatch(error: Error, info: ErrorInfo): void {
     // Sentry が未初期化でも落ちないよう、helper 経由でガードする。
+    // `componentStack` を `extra` に載せて、どのコンポーネントツリーで発生したかを
+    // Sentry イベントに残す。
+    //
     // Route through the helper so an uninitialized Sentry SDK still no-ops cleanly.
+    // Forward `componentStack` so the Sentry event records which subtree threw.
     try {
-      captureException(error);
+      captureException(error, {
+        extra: { componentStack: info.componentStack ?? undefined },
+      });
     } catch {
       // 失敗時もフォールバック描画は継続する。
       // Continue rendering the fallback even if reporting fails.

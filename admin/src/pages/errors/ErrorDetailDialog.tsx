@@ -16,9 +16,8 @@ import {
   SelectValue,
 } from "@zedi/ui";
 import type { ApiErrorRow, ApiErrorStatus } from "@/api/admin";
-import { formatDate, formatNumber } from "@/lib/dateUtils";
-
-const STATUS_VALUES: ApiErrorStatus[] = ["open", "investigating", "resolved", "ignored"];
+import { API_ERROR_STATUS_VALUES } from "@/api/admin";
+import { formatDate } from "@/lib/dateUtils";
 
 interface ErrorDetailDialogProps {
   row: ApiErrorRow | null;
@@ -77,7 +76,9 @@ export function ErrorDetailDialog({
           <DialogTitle className="break-all">{row.title}</DialogTitle>
           <DialogDescription>
             {row.route ? `${row.route} · ` : ""}
-            {t("errors.detail.occurrencesShort", { count: formatNumber(row.occurrences) })}
+            {/* `count` は i18next の plural ルール解決にそのまま使われるので number で渡す。
+                Pass `count` as a number so i18next plural resolution works (`_one` / `_other`). */}
+            {t("errors.detail.occurrencesShort", { count: row.occurrences })}
           </DialogDescription>
         </DialogHeader>
 
@@ -169,7 +170,7 @@ export function ErrorDetailDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_VALUES.map((value) => (
+                {API_ERROR_STATUS_VALUES.map((value) => (
                   <SelectItem key={value} value={value}>
                     {t(`errors.status.${value}`)}
                   </SelectItem>

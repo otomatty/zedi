@@ -4,7 +4,8 @@ import { ErrorBoundary } from "./ErrorBoundary";
 
 const captureException = vi.fn();
 vi.mock("@/lib/sentry", () => ({
-  captureException: (error: unknown) => captureException(error),
+  captureException: (error: unknown, context?: { extra?: Record<string, unknown> }) =>
+    captureException(error, context),
 }));
 
 /**
@@ -47,7 +48,7 @@ describe("ErrorBoundary", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("caught: boom!");
   });
 
-  it("forwards the caught exception to Sentry via captureException", () => {
+  it("forwards the caught exception and component stack to Sentry", () => {
     const error = new Error("explode");
     render(
       <ErrorBoundary fallback={() => <div role="alert">fallback</div>}>
@@ -56,7 +57,12 @@ describe("ErrorBoundary", () => {
     );
 
     expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(error);
+    const [forwardedError, context] = captureException.mock.calls[0];
+    expect(forwardedError).toBe(error);
+    // componentStack は React が提供する文字列。中身は React のバージョンに
+    // 依存するので具体値ではなく型のみ検証する。
+    // The component stack content depends on React internals; verify shape only.
+    expect(context).toMatchObject({ extra: { componentStack: expect.any(String) } });
   });
 
   it("renders a default fallback when no fallback prop is provided", () => {

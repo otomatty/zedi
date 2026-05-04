@@ -2,7 +2,7 @@
   "adminPanelTitle": "Zedi 管理画面",
   "adminShortTitle": "管理画面",
   "menu": "メニュー",
-  "unreadBadgeAriaLabel": "未対応 {{count}} 件",
+  "unreadBadgeAriaLabel": "未対応の API エラー {{count}} 件",
   "items": {
     "aiModels": "AI モデル",
     "users": "ユーザー管理",

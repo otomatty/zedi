@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@zedi/ui";
 import type { ApiErrorRow, ApiErrorSeverity, ApiErrorStatus } from "@/api/admin";
+import { API_ERROR_SEVERITY_VALUES, API_ERROR_STATUS_VALUES } from "@/api/admin";
 import { formatDate, formatNumber } from "@/lib/dateUtils";
 
 const ANY = "__any__";
@@ -30,9 +31,6 @@ interface ErrorsContentProps {
   onSeverityFilterChange: (next: ApiErrorSeverity | "all") => void;
   onSelect: (row: ApiErrorRow) => void;
 }
-
-const STATUS_VALUES: ApiErrorStatus[] = ["open", "investigating", "resolved", "ignored"];
-const SEVERITY_VALUES: ApiErrorSeverity[] = ["high", "medium", "low", "unknown"];
 
 /**
  * `status` ごとのバッジ色（テーマトークンで揃える）。
@@ -136,7 +134,7 @@ export function ErrorsContent({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ANY}>{t("common.all")}</SelectItem>
-              {STATUS_VALUES.map((value) => (
+              {API_ERROR_STATUS_VALUES.map((value) => (
                 <SelectItem key={value} value={value}>
                   {t(`errors.status.${value}`)}
                 </SelectItem>
@@ -166,7 +164,7 @@ export function ErrorsContent({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ANY}>{t("common.all")}</SelectItem>
-              {SEVERITY_VALUES.map((value) => (
+              {API_ERROR_SEVERITY_VALUES.map((value) => (
                 <SelectItem key={value} value={value}>
                   {t(`errors.severity.${value}`)}
                 </SelectItem>

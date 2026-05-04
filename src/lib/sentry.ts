@@ -45,14 +45,27 @@ export function initSentry(): boolean {
 }
 
 /**
+ * Sentry へ送る追加コンテキスト（`extra` のみ受け付ける軽量版）。
+ * Lightweight subset of Sentry's `CaptureContext` exposed to callers — only
+ * `extra` is supported so the helper stays easy to mock in tests.
+ */
+export interface CaptureExtras {
+  extra?: Record<string, unknown>;
+}
+
+/**
  * 任意の例外を Sentry に送信するヘルパー。テスト容易性のため Sentry の
  * `captureException` を直接呼ばずにこの関数を経由する。
  *
  * Helper for forwarding caught exceptions to Sentry. Tests can mock this
  * module instead of the entire SDK.
+ *
+ * @param error - 例外オブジェクト / Caught exception
+ * @param context - `{ extra: {...} }` 形式の追加コンテキスト（任意）
+ *                  / Optional `{ extra: {...} }` context attached to the event
  */
-export function captureException(error: unknown): void {
-  Sentry.captureException(error);
+export function captureException(error: unknown, context?: CaptureExtras): void {
+  Sentry.captureException(error, context);
 }
 
 export { Sentry };
