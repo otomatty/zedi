@@ -396,6 +396,26 @@ describe("listApiErrors", () => {
     expect(result.total).toBe(0);
   });
 
+  it("does not throw on fractional / NaN limit/offset (Postgres would reject non-integers)", async () => {
+    // Postgres は LIMIT/OFFSET に小数を許容しないため、サービス側で整数化する。
+    // Postgres rejects fractional LIMIT/OFFSET, so the service must coerce to
+    // an integer before issuing the query.
+    const db = createMockDb([[], [{ count: 0 }]]);
+
+    await expect(listApiErrors(db as never, { limit: 25.7, offset: 10.4 })).resolves.toEqual({
+      rows: [],
+      total: 0,
+    });
+
+    const db2 = createMockDb([[], [{ count: 0 }]]);
+    await expect(
+      listApiErrors(db2 as never, {
+        limit: Number.NaN,
+        offset: Number.POSITIVE_INFINITY,
+      }),
+    ).resolves.toEqual({ rows: [], total: 0 });
+  });
+
   it("accepts status and severity filters without error", async () => {
     const db = createMockDb([[], [{ count: 0 }]]);
 

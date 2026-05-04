@@ -112,26 +112,6 @@ export interface UpsertFromSentrySummaryInput {
 }
 
 /**
- * `api_errors` を `sentry_issue_id` をキーに upsert する。
- *
- * - 初回 insert: 渡された値で行を作成。`occurrences` は `occurrencesDelta`
- *   （既定 1）。
- * - 競合時: `occurrences` を加算、`last_seen_at` は `GREATEST` で前進、
- *   `title` / `route` / `status_code` / `fingerprint` は新しい非 null 値で更新。
- *   **`first_seen_at` は意図的に保持する**（再来時に上書きしない）。
- *
- * Upsert keyed on `sentry_issue_id`. Inserts on first sight; on conflict,
- * increments `occurrences`, advances `last_seen_at` with `GREATEST`, refreshes
- * the descriptive columns from non-null EXCLUDED values, and **preserves
- * `first_seen_at`** by design.
- *
- * @throws when `sentryIssueId` または `title` が空、`statusCode` が
- *   有限の整数でない、`firstSeenAt` / `lastSeenAt` が不正な Date、もしくは
- *   upsert が行を返さなかった場合。Throws on empty `sentryIssueId` /
- *   `title`, non-integer `statusCode`, Invalid Date timestamps, or when
- *   the upsert produced no row.
- */
-/**
  * 外部 Webhook 由来の入力を境界で正規化・検証する内部ヘルパ。
  * 不正な値は構造化メッセージで throw する（呼び出し側で 400 にマップ）。
  *
@@ -171,6 +151,27 @@ function normalizeUpsertInput(input: UpsertFromSentrySummaryInput): {
   return { sentryIssueId, title, occurrencesDelta, now };
 }
 
+/**
+ * `api_errors` を `sentry_issue_id` をキーに upsert する。
+ *
+ * - 初回 insert: 渡された値で行を作成。`occurrences` は `occurrencesDelta`
+ *   （既定 1）。
+ * - 競合時: `occurrences` を加算、`last_seen_at` は `GREATEST` で前進、
+ *   `title` / `route` / `status_code` / `fingerprint` は新しい非 null 値で更新。
+ *   `status` は `resolved` のみ `open` に戻す（再発検出）。
+ *   **`first_seen_at` は意図的に保持する**（再来時に上書きしない）。
+ *
+ * Upsert keyed on `sentry_issue_id`. Inserts on first sight; on conflict,
+ * increments `occurrences`, advances `last_seen_at` with `GREATEST`, refreshes
+ * the descriptive columns from non-null EXCLUDED values, reopens
+ * `resolved` rows on recurrence, and **preserves `first_seen_at`** by design.
+ *
+ * @throws when `sentryIssueId` または `title` が空、`statusCode` が
+ *   有限の整数でない、`firstSeenAt` / `lastSeenAt` が不正な Date、もしくは
+ *   upsert が行を返さなかった場合。Throws on empty `sentryIssueId` /
+ *   `title`, non-integer `statusCode`, Invalid Date timestamps, or when
+ *   the upsert produced no row.
+ */
 export async function upsertFromSentrySummary(
   db: Database,
   input: UpsertFromSentrySummaryInput,
@@ -272,12 +273,22 @@ export async function listApiErrors(
   db: Database,
   filters: ListApiErrorsFilters,
 ): Promise<{ rows: ApiError[]; total: number }> {
+  // 小数や NaN をそのまま LIMIT/OFFSET に渡すと Postgres が拒否するため、
+  // clamp の前に整数化する（不正値は既定値にフォールバック）。
+  // Postgres rejects non-integer LIMIT/OFFSET, so coerce to an integer before
+  // clamping; non-finite inputs fall back to the documented defaults.
+  const rawLimit = Number(filters.limit ?? API_ERROR_LIST_DEFAULT_LIMIT);
+  const rawOffset = Number(filters.offset ?? 0);
   const limit = clamp(
-    Number(filters.limit ?? API_ERROR_LIST_DEFAULT_LIMIT),
+    Number.isFinite(rawLimit) ? Math.floor(rawLimit) : API_ERROR_LIST_DEFAULT_LIMIT,
     1,
     API_ERROR_LIST_MAX_LIMIT,
   );
-  const offset = clamp(Number(filters.offset ?? 0), 0, Number.MAX_SAFE_INTEGER);
+  const offset = clamp(
+    Number.isFinite(rawOffset) ? Math.floor(rawOffset) : 0,
+    0,
+    Number.MAX_SAFE_INTEGER,
+  );
 
   const conditions: SQL[] = [];
   if (filters.status) conditions.push(eq(apiErrors.status, filters.status));
