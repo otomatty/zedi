@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ALLOWED_API_ERROR_STATUS_TRANSITIONS,
+  ApiErrorAiAnalysisValidationError,
   ApiErrorStatusConflictError,
   assertValidApiErrorStatusTransition,
   isValidApiErrorStatusTransition,
@@ -23,6 +24,7 @@ import {
   listApiErrors,
   getApiErrorById,
   getApiErrorBySentryIssueId,
+  updateAiAnalysis,
   updateApiErrorStatus,
   API_ERROR_LIST_DEFAULT_LIMIT,
   API_ERROR_LIST_MAX_LIMIT,
@@ -560,5 +562,80 @@ describe("updateApiErrorStatus", () => {
         nextStatus: "investigating",
       }),
     ).rejects.toBeInstanceOf(ApiErrorStatusConflictError);
+  });
+});
+
+// ── updateAiAnalysis ───────────────────────────────────────────────────────
+
+describe("updateAiAnalysis", () => {
+  it("updates AI fields and severity when payload is valid", async () => {
+    const after = makeRow({
+      severity: "high",
+      aiSummary: "ヌルポインタ参照",
+      aiSuspectedFiles: [{ path: "src/a.ts", line: 12 }],
+      aiRootCause: "X が undefined",
+      aiSuggestedFix: "guard 追加",
+    });
+    const db = createMockDb([[after]]);
+    const result = await updateAiAnalysis(db as never, {
+      id: after.id,
+      severity: "high",
+      aiSummary: "ヌルポインタ参照",
+      aiSuspectedFiles: [{ path: "src/a.ts", line: 12 }],
+      aiRootCause: "X が undefined",
+      aiSuggestedFix: "guard 追加",
+    });
+    expect(result?.severity).toBe("high");
+    expect(result?.aiSummary).toBe("ヌルポインタ参照");
+  });
+
+  it("returns null when the row does not exist (UPDATE returns no rows)", async () => {
+    const db = createMockDb([[]]);
+    const result = await updateAiAnalysis(db as never, {
+      id: "00000000-0000-0000-0000-000000000099",
+      severity: "high",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("rejects an unknown severity value at the boundary", async () => {
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      updateAiAnalysis(db as never, {
+        id: "00000000-0000-0000-0000-000000000001",
+        // biome-ignore lint/suspicious/noExplicitAny: simulating an external bad payload
+        severity: "garbage" as never,
+      }),
+    ).rejects.toBeInstanceOf(ApiErrorAiAnalysisValidationError);
+  });
+
+  it("rejects ai_suspected_files entries without a non-empty path", async () => {
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      updateAiAnalysis(db as never, {
+        id: "00000000-0000-0000-0000-000000000001",
+        aiSuspectedFiles: [{ path: "" } as never],
+      }),
+    ).rejects.toBeInstanceOf(ApiErrorAiAnalysisValidationError);
+  });
+
+  it("rejects ai_suspected_files entries with non-integer line numbers", async () => {
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      updateAiAnalysis(db as never, {
+        id: "00000000-0000-0000-0000-000000000001",
+        aiSuspectedFiles: [{ path: "src/a.ts", line: 1.5 } as never],
+      }),
+    ).rejects.toBeInstanceOf(ApiErrorAiAnalysisValidationError);
+  });
+
+  it("with no fields, falls back to a SELECT to probe row existence", async () => {
+    // 全フィールド undefined のときは UPDATE を発行しない（不要な書き込みを避ける）。
+    // When all fields are undefined the service must not issue a noop UPDATE;
+    // it only probes existence so callers can map "row gone" to 404 cleanly.
+    const row = makeRow();
+    const db = createMockDb([[row]]);
+    const result = await updateAiAnalysis(db as never, { id: row.id });
+    expect(result?.id).toBe(row.id);
   });
 });

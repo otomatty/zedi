@@ -35,6 +35,7 @@ import thumbCommitRoutes from "./routes/thumbnail/commit.js";
 import thumbServeRoutes from "./routes/thumbnail/serve.js";
 import webhookPolarRoutes from "./routes/webhooks/polar.js";
 import webhookSentryRoutes from "./routes/webhooks/sentry.js";
+import webhookGithubAiCallbackRoutes from "./routes/webhooks/githubAiCallback.js";
 import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 import lintRoutes from "./routes/lint.js";
@@ -102,6 +103,16 @@ export function createApp(): Hono<AppEnv> {
   // Sentry Internal Integration webhook (HMAC-SHA256 via Client Secret)
   // Sentry Internal Integration の webhook（Client Secret による HMAC 署名検証）
   app.route("/api/webhooks/sentry", webhookSentryRoutes);
+
+  // GitHub Actions AI 解析結果コールバック (Epic #616 Phase 2 / issue #805)
+  // GitHub App の installation token を Authorization ヘッダで受け取り、
+  // GitHub API 越しに検証してから `api_errors` 行に AI 解析結果を書き戻す。
+  //
+  // GitHub Actions AI analysis callback (Epic #616 Phase 2 / issue #805).
+  // Authentication: GitHub App installation tokens validated via the GitHub
+  // API. Mounted outside the admin gate because the workflow has no user
+  // session.
+  app.route("/api/webhooks/github/ai-result", webhookGithubAiCallbackRoutes);
 
   // Checkout & Customer Portal
   app.route("/api", checkoutRoutes);

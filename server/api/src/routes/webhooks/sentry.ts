@@ -25,8 +25,10 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
   ApiErrorValidationError,
+  getApiErrorBySentryIssueId,
   upsertFromSentrySummary,
 } from "../../services/apiErrorService.js";
+import { readDispatchRepository, triggerRepositoryDispatch } from "../../lib/githubAppAuth.js";
 import type { AppEnv } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -304,6 +306,48 @@ export function extractSentrySummary(payload: unknown): SentrySummaryExtraction 
 }
 
 /**
+ * 新規 `sentry_issue_id` を初めて観測したときに `repository_dispatch`
+ * (`event_type: analyze-error`) を発火する。Webhook レスポンスを遅らせない
+ * よう必ず非 await で呼び出し、失敗時はログのみ残す。
+ *
+ * Trigger the `analyze-error` `repository_dispatch` event when a brand-new
+ * Sentry issue lands. This MUST be called without `await` so the Sentry
+ * webhook response is not delayed by GitHub round-trips. Configuration is
+ * optional: if `GITHUB_DISPATCH_REPOSITORY` is unset we skip the dispatch
+ * silently — issue #805 explicitly allows the AI workflow to be wired up
+ * later without breaking this endpoint.
+ */
+async function dispatchAnalyzeError(
+  apiErrorId: string,
+  sentryIssueId: string,
+  title: string,
+  route: string | null,
+): Promise<void> {
+  const target = readDispatchRepository();
+  if (!target) {
+    // 未設定: Phase 2 の Actions が未デプロイの段階では正常系。
+    // Unconfigured: a deliberate Phase 2 staging state where the Actions side
+    // is not deployed yet. Skip without raising.
+    console.log("[sentry-webhook] GITHUB_DISPATCH_REPOSITORY unset; skipping repository_dispatch");
+    return;
+  }
+  await triggerRepositoryDispatch({
+    eventType: "analyze-error",
+    clientPayload: {
+      api_error_id: apiErrorId,
+      sentry_issue_id: sentryIssueId,
+      title,
+      route,
+    },
+    owner: target.owner,
+    repo: target.repo,
+  });
+  console.log(
+    `[sentry-webhook] repository_dispatch fired for issue=${sentryIssueId} target=${target.owner}/${target.repo}`,
+  );
+}
+
+/**
  * POST /api/webhooks/sentry — Sentry Internal Integration 受信エンドポイント。
  * POST /api/webhooks/sentry — Sentry Internal Integration receiver.
  */
@@ -344,6 +388,17 @@ app.post("/", async (c) => {
 
   const db = c.get("db");
   try {
+    // 既存行の有無を upsert 前に判定する。`isNew === true` のときだけ
+    // GitHub Actions の AI 解析ワークフローを起動し、再来時には起動しない。
+    // 競合時は二重起動になり得るが、Phase 2 のワークフロー側で冪等に扱う前提。
+    //
+    // Detect first-sight before the upsert so we only kick off the AI analysis
+    // workflow on net-new issues. Concurrent webhooks for the same id may both
+    // observe `null` and both dispatch — Phase 2's workflow must dedupe on its
+    // side; the trade-off keeps this path race-free of an additional lock.
+    const existing = await getApiErrorBySentryIssueId(db, summary.sentryIssueId);
+    const isNew = existing === null;
+
     const row = await upsertFromSentrySummary(db, {
       sentryIssueId: summary.sentryIssueId,
       title: summary.title,
@@ -353,8 +408,28 @@ app.post("/", async (c) => {
       occurrencesDelta: 1,
     });
     console.log(
-      `[sentry-webhook] resource=${resource} upserted issue=${row.sentryIssueId} occurrences=${row.occurrences}`,
+      `[sentry-webhook] resource=${resource} upserted issue=${row.sentryIssueId} occurrences=${row.occurrences} isNew=${isNew}`,
     );
+
+    if (isNew) {
+      // fire-and-forget: dispatch のレスポンスを await せずに 200 を返す。
+      // dispatch 失敗は Sentry 側へリトライさせず、ログだけ残して握りつぶす
+      // （Actions が未デプロイでも API がデグレしない、issue #805 受け入れ条件）。
+      //
+      // Fire-and-forget so the Sentry webhook's HTTP response doesn't block on
+      // GitHub. Failures are logged, not thrown — issue #805 explicitly
+      // requires the API to keep working even when the Actions workflow is not
+      // deployed yet.
+      void dispatchAnalyzeError(row.id, row.sentryIssueId, row.title, row.route ?? null).catch(
+        (err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            `[sentry-webhook] repository_dispatch failed for issue=${row.sentryIssueId}: ${message}`,
+          );
+        },
+      );
+    }
+
     return c.json({ received: true, id: row.id });
   } catch (err) {
     // 入力検証エラー (sentryIssueId / title / statusCode 等) は 400 で返す。
