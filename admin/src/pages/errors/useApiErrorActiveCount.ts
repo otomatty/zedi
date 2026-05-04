@@ -17,17 +17,25 @@ import { API_ERRORS_POLL_INTERVAL_MS } from "./useApiErrors";
 export function useApiErrorActiveCount(): number {
   const [count, setCount] = useState(0);
   const isMountedRef = useRef(true);
+  // ポーリングと visibilitychange の発火が重なると、遅い古いリクエストが
+  // 新しい結果を上書きする恐れがある。`useApiErrors` と同じパターンで
+  // 「最新リクエスト ID」だけを採用するようガードする。
+  //
+  // Polling and visibilitychange can race; a slow earlier response would
+  // otherwise overwrite a fresher one. Mirror `useApiErrors`' pattern and
+  // keep only the latest request's result.
+  const latestRequestRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
-    let cancelled = false;
 
     const fetchCount = async () => {
+      const requestId = ++latestRequestRef.current;
       try {
         const results = await Promise.all(
           ACTIVE_API_ERROR_STATUSES.map((status) => getApiErrors({ status, limit: 1 })),
         );
-        if (cancelled || !isMountedRef.current) return;
+        if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         const total = results.reduce((sum, r) => sum + r.total, 0);
         setCount(total);
       } catch {
@@ -50,8 +58,10 @@ export function useApiErrorActiveCount(): number {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      cancelled = true;
       isMountedRef.current = false;
+      // unmount 後の遅延応答も確実に破棄するため request id を進めておく。
+      // Bump the request id on unmount so any in-flight response is discarded.
+      latestRequestRef.current += 1;
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
