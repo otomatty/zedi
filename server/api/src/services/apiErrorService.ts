@@ -125,16 +125,26 @@ export interface UpsertFromSentrySummaryInput {
  * the descriptive columns from non-null EXCLUDED values, and **preserves
  * `first_seen_at`** by design.
  *
- * @throws when `sentryIssueId` または `title` が空、もしくは upsert が
- *   行を返さなかった場合。Throws on empty `sentryIssueId` / `title`, or when
+ * @throws when `sentryIssueId` または `title` が空、`statusCode` が
+ *   有限の整数でない、`firstSeenAt` / `lastSeenAt` が不正な Date、もしくは
+ *   upsert が行を返さなかった場合。Throws on empty `sentryIssueId` /
+ *   `title`, non-integer `statusCode`, Invalid Date timestamps, or when
  *   the upsert produced no row.
  */
-export async function upsertFromSentrySummary(
-  db: Database,
-  input: UpsertFromSentrySummaryInput,
-): Promise<ApiError> {
-  // Webhook 入力は外部由来。null / undefined / NaN を強めにバリデートする。
-  // Webhook payloads are external; defend hard against null/undefined/NaN.
+/**
+ * 外部 Webhook 由来の入力を境界で正規化・検証する内部ヘルパ。
+ * 不正な値は構造化メッセージで throw する（呼び出し側で 400 にマップ）。
+ *
+ * Internal helper: normalize + validate a webhook payload at the boundary.
+ * Each violation throws with a structured message so the caller can map it
+ * to HTTP 400.
+ */
+function normalizeUpsertInput(input: UpsertFromSentrySummaryInput): {
+  sentryIssueId: string;
+  title: string;
+  occurrencesDelta: number;
+  now: Date;
+} {
   const sentryIssueId = (input.sentryIssueId ?? "").trim();
   if (!sentryIssueId) {
     throw new Error("sentryIssueId is required");
@@ -143,9 +153,31 @@ export async function upsertFromSentrySummary(
   if (!title) {
     throw new Error("title is required");
   }
+  if (
+    input.statusCode != null &&
+    (!Number.isFinite(input.statusCode) || !Number.isInteger(input.statusCode))
+  ) {
+    throw new Error("statusCode must be a finite integer");
+  }
+  if (input.firstSeenAt && !Number.isFinite(input.firstSeenAt.getTime())) {
+    throw new Error("firstSeenAt must be a valid Date");
+  }
+  if (input.lastSeenAt && !Number.isFinite(input.lastSeenAt.getTime())) {
+    throw new Error("lastSeenAt must be a valid Date");
+  }
   const rawDelta = input.occurrencesDelta ?? 1;
   const occurrencesDelta = Number.isFinite(rawDelta) ? Math.max(1, Math.floor(rawDelta)) : 1;
   const now = input.lastSeenAt ?? new Date();
+  return { sentryIssueId, title, occurrencesDelta, now };
+}
+
+export async function upsertFromSentrySummary(
+  db: Database,
+  input: UpsertFromSentrySummaryInput,
+): Promise<ApiError> {
+  // Webhook 入力は外部由来。null / undefined / NaN / Invalid Date を弾く。
+  // Webhook payloads are external; defend hard against null/NaN/Invalid Date.
+  const { sentryIssueId, title, occurrencesDelta, now } = normalizeUpsertInput(input);
 
   const values: NewApiError = {
     sentryIssueId,

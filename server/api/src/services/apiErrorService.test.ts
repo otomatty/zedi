@@ -246,6 +246,49 @@ describe("upsertFromSentrySummary", () => {
     ).rejects.toThrow(/title is required/i);
   });
 
+  it("rejects non-integer / non-finite statusCode at the boundary", async () => {
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        statusCode: 200.5,
+      }),
+    ).rejects.toThrow(/statusCode must be a finite integer/i);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        statusCode: Number.NaN,
+      }),
+    ).rejects.toThrow(/statusCode must be a finite integer/i);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        statusCode: Number.POSITIVE_INFINITY,
+      }),
+    ).rejects.toThrow(/statusCode must be a finite integer/i);
+  });
+
+  it("rejects Invalid Date for firstSeenAt / lastSeenAt", async () => {
+    const db = createMockDb([[makeRow()]]);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        firstSeenAt: new Date("not-a-real-date"),
+      }),
+    ).rejects.toThrow(/firstSeenAt must be a valid Date/i);
+    await expect(
+      upsertFromSentrySummary(db as never, {
+        sentryIssueId: "sentry-issue-1",
+        title: "boom",
+        lastSeenAt: new Date("not-a-real-date"),
+      }),
+    ).rejects.toThrow(/lastSeenAt must be a valid Date/i);
+  });
+
   it("on recurrence of a resolved row, the upsert reopens to status='open'", async () => {
     // 再発検出: 過去に resolved にされた issue が再来したら open に戻し、
     // admin の既定ビュー（未解決一覧）から見落とされないようにする。
@@ -272,6 +315,33 @@ describe("upsertFromSentrySummary", () => {
     });
 
     expect(result.status).toBe("open");
+    expect(result.firstSeenAt.toISOString()).toBe("2026-04-01T00:00:00.000Z");
+  });
+
+  it("on recurrence of an ignored row, the upsert keeps status='ignored'", async () => {
+    // 再発検出の対称側: admin が「無視」と明示判断した issue は再来しても
+    // 触らない。`set.status` の CASE は resolved のみを open に戻すため、
+    // ignored は元の値を維持する（CASE の ELSE 分岐）。
+    //
+    // Symmetric to the resolved auto-reopen: an admin's explicit `ignored`
+    // decision must not be overridden by a webhook recurrence. The CASE
+    // expression's ELSE branch preserves the existing status verbatim.
+    const stayIgnored = makeRow({
+      occurrences: 7,
+      status: "ignored",
+      firstSeenAt: new Date("2026-04-01T00:00:00Z"),
+      lastSeenAt: new Date("2026-05-04T00:00:00Z"),
+    });
+    const db = createMockDb([[stayIgnored]]);
+
+    const result = await upsertFromSentrySummary(db as never, {
+      sentryIssueId: "sentry-issue-1",
+      title: "recurrence",
+      occurrencesDelta: 1,
+      lastSeenAt: new Date("2026-05-04T00:00:00Z"),
+    });
+
+    expect(result.status).toBe("ignored");
     expect(result.firstSeenAt.toISOString()).toBe("2026-04-01T00:00:00.000Z");
   });
 
