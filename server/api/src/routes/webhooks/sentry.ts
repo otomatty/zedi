@@ -187,27 +187,53 @@ function extractSentryIssueId(
 }
 
 /**
- * route 推定: `event.request.method + url` → `tags.transaction` →
- * `issue.metadata.transaction` → `issue.shortId` の順に試す。
+ * 与えられた URL を pathname だけに正規化する（origin / query / fragment を捨てる）。
  *
- * Derive a `route` string from a Sentry payload. Priority: HTTP request
- * method+url, then the `transaction` tag, then issue metadata, then the
- * issue short id. All slots are optional and may be absent.
+ * Reduce a URL string to just its pathname (origin / query / fragment stripped)
+ * so we don't persist capability tokens or other request-specific bytes into
+ * `api_errors.route`. Falls back to a manual split when the value is not a
+ * fully-qualified URL.
+ */
+function urlToPath(url: string): string {
+  try {
+    return new URL(url).pathname || url;
+  } catch {
+    return url.split(/[?#]/, 1)[0] ?? url;
+  }
+}
+
+/**
+ * route 推定: `tags.transaction` → `issue.metadata.transaction` →
+ * `issue.shortId` → `event.request.url`（pathname のみ） の順に試す。
+ *
+ * URL を最後の手段にしているのは Phase 1 の方針（Sentry 側でスクラブ済みの
+ * 集約サマリだけ持つ）に従い、生 URL が `api_errors.route` に流入して
+ * トークンやクエリ文字列が残るのを避けるため。
+ *
+ * Derive a `route` string from a Sentry payload. Priority: the `transaction`
+ * tag, then issue metadata, then the issue short id, and finally `request.url`
+ * reduced to its pathname. URLs are the last resort and always sanitized so
+ * the column does not retain origins, query strings, or fragments — Phase 1
+ * stores summary-only data so capability tokens and PII never persist here.
  */
 function extractRoute(
   issue: Record<string, unknown> | null,
   event: Record<string, unknown> | null,
   tags: Record<string, string>,
 ): string | null {
+  const metadata = isRecord(issue?.metadata) ? issue.metadata : null;
+  if (tags.transaction) return tags.transaction;
+  const metaTransaction = asString(metadata?.transaction);
+  if (metaTransaction) return metaTransaction;
+  const shortId = asString(issue?.shortId);
+  if (shortId) return shortId;
+
   const request = event && isRecord(event.request) ? event.request : null;
   const reqUrl = asString(request?.url);
-  if (reqUrl) {
-    const reqMethod = asString(request?.method);
-    return reqMethod ? `${reqMethod} ${reqUrl}` : reqUrl;
-  }
-  if (tags.transaction) return tags.transaction;
-  const metadata = isRecord(issue?.metadata) ? issue.metadata : null;
-  return asString(metadata?.transaction) ?? asString(issue?.shortId) ?? null;
+  if (!reqUrl) return null;
+  const path = urlToPath(reqUrl);
+  const reqMethod = asString(request?.method);
+  return reqMethod ? `${reqMethod} ${path}` : path;
 }
 
 /**

@@ -13,6 +13,7 @@
  */
 import { Hono } from "hono";
 import {
+  ALLOWED_API_ERROR_STATUS_TRANSITIONS,
   ApiErrorInvalidTransitionError,
   ApiErrorStatusConflictError,
   API_ERROR_LIST_DEFAULT_LIMIT,
@@ -26,7 +27,14 @@ import type { AppEnv } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
 
-const VALID_STATUSES = ["open", "investigating", "resolved", "ignored"] as const;
+// 単一の Source of truth から status の許容値を導出する。サービス側で
+// `ApiErrorStatus` を増やすと自動的にこのリストにも反映され、ドリフトを防げる。
+// Derive the accepted status values from the single source of truth in
+// `apiErrorService`. Adding a new status to `ApiErrorStatus` automatically
+// expands the transition map and therefore this list, preventing drift.
+const VALID_STATUSES = Object.keys(
+  ALLOWED_API_ERROR_STATUS_TRANSITIONS,
+) as readonly ApiErrorStatus[];
 const VALID_SEVERITIES = ["high", "medium", "low", "unknown"] as const;
 
 /**

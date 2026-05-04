@@ -90,14 +90,22 @@ describe("extractSentrySummary", () => {
     expect(result?.route).toBe("POST /api/ingest");
   });
 
-  it("extracts from data.event with request + contexts.response", () => {
+  it("extracts from data.event with request + contexts.response, stripping URL to path", () => {
+    // フォールバックで URL を使う場合は origin / query / fragment を削り、
+    // pathname だけを残す（capability token や絶対 URL を api_errors.route に
+    // 入れないため）。
+    // When falling back to request.url, strip origin / query / fragment so we
+    // never persist capability tokens or absolute URLs into api_errors.route.
     const result = extractSentrySummary({
       action: "triggered",
       data: {
         event: {
           issue_id: "9999",
           title: "ReferenceError: foo is not defined",
-          request: { method: "POST", url: "https://example.com/api/ingest" },
+          request: {
+            method: "POST",
+            url: "https://example.com/api/ingest?token=secret#frag",
+          },
           contexts: { response: { status_code: 500 } },
           fingerprint: ["abc-123"],
         },
@@ -106,7 +114,24 @@ describe("extractSentrySummary", () => {
     expect(result?.sentryIssueId).toBe("9999");
     expect(result?.statusCode).toBe(500);
     expect(result?.fingerprint).toBe("abc-123");
-    expect(result?.route).toBe("POST https://example.com/api/ingest");
+    expect(result?.route).toBe("POST /api/ingest");
+  });
+
+  it("prefers tags.transaction over request.url when both exist", () => {
+    // tags.transaction はスクラブ済みのルートテンプレなのでそちらを優先する。
+    // The transaction tag carries Sentry's already-scrubbed route template, so
+    // it wins over a raw request URL.
+    const result = extractSentrySummary({
+      data: {
+        event: {
+          issue_id: "1",
+          title: "boom",
+          request: { method: "GET", url: "https://example.com/api/ingest?token=secret" },
+          tags: [["transaction", "GET /api/pages/:id"]],
+        },
+      },
+    });
+    expect(result?.route).toBe("GET /api/pages/:id");
   });
 
   it("extracts from data.error when issue/event slots are absent", () => {
