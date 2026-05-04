@@ -224,17 +224,21 @@ export async function triggerRepositoryDispatch(input: {
 /**
  * 受信した installation token を GitHub 側で検証する。
  *
- * GitHub の installation token は不透明文字列（`ghs_...`）なので、ローカル検証は
- * できない。`GET /installation/repositories` を当該 token で呼び、200 が返り、
- * かつ `installation.id` が当アプリの `GITHUB_APP_INSTALLATION_ID` と一致する場合
- * のみ有効と判定する。タイムアウトは 5 秒に短く設定し、コールバック側を遅延させない。
+ * GitHub の installation token は不透明文字列（`ghs_...`）なのでローカル検証は
+ * できない。`GET /installation` を当該 token で呼ぶと、その installation 自身の
+ * メタデータ（`id` を含む）が返るので、`id` を `GITHUB_APP_INSTALLATION_ID`
+ * と比較して一致した場合のみ有効と判定する。これにより別のインストールから
+ * 盗まれた token をなりすましに使われることを防ぐ。タイムアウトは 5 秒に短く
+ * 設定し、コールバック側を遅延させない。
  *
  * Validate an inbound installation access token. GitHub installation tokens are
- * opaque (`ghs_...`), so we round-trip to GitHub: hit
- * `GET /installation/repositories` with the token, accept 200, and require the
- * returned `installation.id` to match our `GITHUB_APP_INSTALLATION_ID` so a
- * stolen token from a different installation cannot impersonate ours. Times
- * out at 5 s to keep the callback path responsive.
+ * opaque (`ghs_...`), so we round-trip to GitHub: hit `GET /installation`,
+ * which returns the installation's own metadata (including `id`), and require
+ * the returned id to equal our configured `GITHUB_APP_INSTALLATION_ID`. This
+ * blocks tokens minted for any *other* installation of the same App from
+ * impersonating ours. Times out at 5 s to keep the callback path responsive.
+ *
+ * @see https://docs.github.com/en/rest/apps/installations#get-an-installation-for-the-authenticated-app
  */
 export async function verifyInstallationToken(token: string): Promise<boolean> {
   if (!token) return false;
@@ -242,7 +246,7 @@ export async function verifyInstallationToken(token: string): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5_000);
   try {
-    const res = await fetch(`${GITHUB_API_BASE}/installation/repositories?per_page=1`, {
+    const res = await fetch(`${GITHUB_API_BASE}/installation`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: GITHUB_ACCEPT,
@@ -252,23 +256,16 @@ export async function verifyInstallationToken(token: string): Promise<boolean> {
       signal: controller.signal,
     });
     if (!res.ok) return false;
-    const json = (await res.json().catch(() => null)) as {
-      total_count?: unknown;
-      repositories?: unknown;
-    } | null;
+    const json = (await res.json().catch(() => null)) as { id?: unknown } | null;
     if (!json) return false;
-    // GitHub returns the installation id only via the `installation` field on
-    // some endpoints. `/installation/repositories` does not echo it, so we
-    // additionally call `/installation` via the token to confirm the binding.
-    // Simpler: reconcile by header `x-github-installation-id` when provided,
-    // otherwise rely on the App-id-bound listing matching our installation.
-    const headerId = res.headers.get("x-github-installation-id");
-    if (headerId !== null) {
-      return headerId === installationId;
-    }
-    // Fallback: the listing succeeded under our App private key's installation,
-    // so accept the token. (We've already verified our App config matches.)
-    return true;
+    // `id` は数値で返るので文字列比較できるよう正規化する。env 側は文字列なので、
+    // 両側を文字列に揃えて比較しないと `123 === "123"` が常に false になり、
+    // 検証が常に失敗側へフェイルクローズしてしまう。
+    // GitHub returns `id` as a number; normalize to string for comparison
+    // against the env-string `installationId`. Without this, `123 === "123"`
+    // would always be false and verification would silently fail closed.
+    const idStr = typeof json.id === "number" || typeof json.id === "string" ? String(json.id) : "";
+    return idStr.length > 0 && idStr === installationId;
   } catch {
     return false;
   } finally {

@@ -4,50 +4,63 @@
  * - `readDispatchRepository`: env 解析（owner/repo, 未設定, 不正値）
  * - `getInstallationToken`: モック fetch 越しのキャッシュ挙動
  * - `triggerRepositoryDispatch`: 設定欠落時のエラーと正常時のリクエスト形状
+ * - `verifyInstallationToken`: GET /installation 経由の id 比較
  *
  * Unit tests for `githubAppAuth`. Network calls are mocked by stubbing the
  * global `fetch`, and the in-module token cache is reset between tests via
  * the exported `__resetInstallationTokenCacheForTests` helper so each test
- * starts from a deterministic state.
+ * starts from a deterministic state. The JWT-signing path (`createAppJWT`)
+ * is mocked at the `jose` boundary so the test suite does not need to ship
+ * a real RSA private key (which would trip secret-scanners like gitleaks).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// `jose` の RS256 署名は実鍵を要求するが、テストでは JWT の中身も署名検証も
+// しないので、`importPKCS8` / `SignJWT` ともに固定の文字列を返すモックに置き換える。
+// これによりテスト用の PEM をリポジトリに置く必要がなくなり、gitleaks 等の
+// 秘密情報スキャナでの誤検知も避けられる。
+//
+// Mock `jose` at the boundary so JWT minting becomes deterministic without a
+// real private key. The tests don't actually verify the signature; they only
+// care that the install-token fetch happens with `Bearer <something>`. Avoiding
+// a real PEM also keeps gitleaks/secret-scanners quiet on this test file.
+vi.mock("jose", () => {
+  // `new SignJWT()` を `new` で呼ぶので、コンストラクタ可能なクラスを返す。
+  // vi.fn().mockImplementation(...) は constructor として動かないため、
+  // 素のクラスにフルチェーンの no-op メソッドを生やす。
+  // `SignJWT` is invoked with `new`, so we expose a real constructible class.
+  // `vi.fn().mockImplementation(...)` is not constructible in vitest, so we
+  // hand-roll the chainable no-op surface that `createAppJWT` walks through.
+  class MockSignJWT {
+    setProtectedHeader(): this {
+      return this;
+    }
+    setIssuedAt(): this {
+      return this;
+    }
+    setIssuer(): this {
+      return this;
+    }
+    setExpirationTime(): this {
+      return this;
+    }
+    async sign(): Promise<string> {
+      return "mock.app.jwt";
+    }
+  }
+  return {
+    importPKCS8: async () => "mock-key" as unknown,
+    SignJWT: MockSignJWT,
+  };
+});
+
 import {
   __resetInstallationTokenCacheForTests,
   getInstallationToken,
   readDispatchRepository,
   triggerRepositoryDispatch,
+  verifyInstallationToken,
 } from "./githubAppAuth.js";
-
-// テスト用 PEM。RSA 2048 bit, PKCS#8。テスト中だけ使う使い捨て鍵。
-// Disposable RSA-2048 PKCS#8 PEM used only during tests; do not reuse outside.
-const TEST_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj
-MzEfYyjiWA4R4/M2bS1GB4t7NXp98C3SC6dVMvDuictGeurT8jNbvJZHtCSuYEvu
-NMoSfm76oqFvAp8Gy0iz5sxjZmSnXyCdPEovGhLa0VzMaQ8s+CLOyS56YyCFGeJZ
-qgtzJ6GR3eqoYSW9b9UMvkBpZODSctWSNGj3P7jRFDO5VoTwCQAWbFnOjDfH5Ulg
-p2PKSQnSJP3AJLQNFNe7br1XbrhV//eO+t51mIpGSDCUv3E0DDFcWDTH9cXDTTlR
-ZVEiR2BwpZOOkE/Z0/BVnhZYL71oZV34bKfWjQIt6V/isSMahdsAASACp4ZTGtwi
-VuNd9tybAgMBAAECggEAVc0HhJ/KJHfhjkEMKE5sROhntQWuXp42rEcwKZ3os3VR
-1BjzjXQdKp+UROBYOQGcGmCD78vMLbn78Yh+RCv8UAJZzAlVf8eEfQoTxxojTLmZ
-i2I7GpghKIjDyQAyOAWmZN8Qp8Hz/fVPMcG8h2PTPhFxQgjJB7hFfcJsXtv6zIag
-v+KeoESNKf9xmH5o5WLyNaRBJ1DK9Cmt5nYyy+8ftXnQq8HppOPK9pYr3W9XTHjF
-DtAZyAkKddF80z3YA6NWyEWh/gZ9GDtDCxWoVI1JqDQK1Y3i9lNGvExTrEefbJQF
-yCyDRbHPwkydL7Gd4gPjbXhccYKHZUpyqd87fc0poQKBgQDzh+oyrA4F84pq5zMm
-4jSUZbZbjp4hZAkVbB6AZAnK8O1mTcDrcjZIQ1adnaCPgaBjsnBdVMdq+zAdEN/J
-2RFpPN4n4HpvXSTxe/hEIxQv0v0XhvhmM8XNumC+4Vbkfsy6Pg8+L65GFy+k88iV
-DpcvGvUySMl9+9R26YNrAwsUGwKBgQDFL/ZvT2XTQkcoGY9P36Yta4S3W3i/VW5e
-38IBHNm7zb+sDGw1DsWGSKM4DtxP3R0+cElrEzSx0ICZQJ9tjROvKRC2Chx0HaJj
-SDOhhsC4MBoqTGz7WKU5HxgY5p0iOcvjFjnIrG3lCt5ZBaVSeKpPtJzZb5hzOpLs
-n9cs/rWlIQKBgF4dC/6cFqLPgxvSwNQ4EMjPSBtoHchhkIs2DOxx9DK/cFFcxjyy
-T+wpXnk3SwvuO5BgaUbgxIzIvjNiR8+LYpRtcM37LcGE//MJ4qfIz3fBXewEoP3x
-MEkXSTmNqCcLgC4S7gHfzAVf/oREEa6fewd2u7qdGYOSpRy7p8yEsVxJAoGADUcS
-wMrtrA8zumlPv+EgQbbg2lI7TCmVH1fWLAFb1cSTWeAmLfXCmsM1ZYlW4aS4z+lU
-LbmZPeAlhJMuFcQ/r0POqRAUgUaJv+nlNVWmokbywCsBoEY/5cXhPo2eJ6FYY9FJ
-SVxKb3tzq4IHpf4F8WJwO8z4i9Lq0UZ3dTLi8EECgYEA0wAEh4+AVGbg4kGVU9YJ
-cyaXdoxe8yflsi05F8R5OLUjgbXfKOZRDgxWJyqNFwGsVOQ8b5AszqM9+jRkEWj/
-UqWjVzsAiv5uRnDrBJSIIz8ymdQ9y5NfZf/9dnjV7Fs2xFLLqo7w6Kn2KbWA5J5b
-PhBSjz2eOhevAQrpvqdYvUw=
------END PRIVATE KEY-----`;
 
 describe("readDispatchRepository", () => {
   const ORIGINAL = process.env.GITHUB_DISPATCH_REPOSITORY;
@@ -82,7 +95,9 @@ describe("getInstallationToken / triggerRepositoryDispatch", () => {
     __resetInstallationTokenCacheForTests();
     process.env.GITHUB_APP_ID = "12345";
     process.env.GITHUB_APP_INSTALLATION_ID = "67890";
-    process.env.GITHUB_APP_PRIVATE_KEY = TEST_PRIVATE_KEY_PEM;
+    // 実鍵は不要 — `jose` をモック済みなので任意の文字列で OK。
+    // No real key needed; `jose` is mocked above so any non-empty string passes.
+    process.env.GITHUB_APP_PRIVATE_KEY = "mocked-not-a-real-key";
   });
 
   afterEach(() => {
@@ -111,6 +126,7 @@ describe("getInstallationToken / triggerRepositoryDispatch", () => {
     const t2 = await getInstallationToken();
     expect(t1).toBe("ghs_install_token_abc");
     expect(t2).toBe(t1);
+    // キャッシュ済み: 2 回呼んでもネットワーク往復は 1 回だけ。
     // Cached: only one network call, despite two callers.
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -139,6 +155,7 @@ describe("getInstallationToken / triggerRepositoryDispatch", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       calls.push({ url, init });
+      // 1 回目: installation token 取得。2 回目: dispatch 本体。
       // First call: installation token. Second call: dispatch.
       if (url.includes("/access_tokens")) {
         return new Response(
@@ -167,5 +184,79 @@ describe("getInstallationToken / triggerRepositoryDispatch", () => {
     const sentBody = JSON.parse(String(calls[1]?.init?.body));
     expect(sentBody.event_type).toBe("analyze-error");
     expect(sentBody.client_payload).toEqual({ api_error_id: "abc" });
+  });
+});
+
+describe("verifyInstallationToken", () => {
+  beforeEach(() => {
+    process.env.GITHUB_APP_ID = "12345";
+    process.env.GITHUB_APP_INSTALLATION_ID = "67890";
+    process.env.GITHUB_APP_PRIVATE_KEY = "mocked-not-a-real-key";
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.GITHUB_APP_ID;
+    delete process.env.GITHUB_APP_INSTALLATION_ID;
+    delete process.env.GITHUB_APP_PRIVATE_KEY;
+  });
+
+  it("returns false for an empty token without hitting GitHub", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await verifyInstallationToken("")).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns true when GET /installation returns the matching installation id", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      expect(url).toBe("https://api.github.com/installation");
+      return new Response(JSON.stringify({ id: 67890 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await verifyInstallationToken("ghs_ok")).toBe(true);
+  });
+
+  it("returns false when GET /installation returns a different installation id", async () => {
+    // セキュリティ重要: 別のインストールから盗まれた token をはじく。
+    // Security-critical: a token minted for a *different* installation of the
+    // same App must not authenticate against ours.
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ id: 99999 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await verifyInstallationToken("ghs_other_install")).toBe(false);
+  });
+
+  it("returns false when GitHub returns non-2xx", async () => {
+    const fetchMock = vi.fn(async () => new Response("unauthorized", { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await verifyInstallationToken("ghs_bad")).toBe(false);
+  });
+
+  it("returns false when response body is malformed", async () => {
+    const fetchMock = vi.fn(async () => new Response("not-json", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await verifyInstallationToken("ghs_garbled")).toBe(false);
+  });
+
+  it("returns false when the response omits the id field", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ account: { login: "x" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await verifyInstallationToken("ghs_no_id")).toBe(false);
   });
 });
