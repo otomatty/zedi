@@ -13,6 +13,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../../types/index.js";
+
+const sentryMock = vi.hoisted(() => ({
+  captureApiException: vi.fn(),
+  shouldCaptureApiException: vi.fn(
+    (status: number) =>
+      status >= 500 || (status >= 400 && status < 500 && ![401, 403, 404].includes(status)),
+  ),
+}));
+
+vi.mock("../../lib/sentry.js", () => sentryMock);
+
 import { errorHandler } from "../../middleware/errorHandler.js";
 
 /**
@@ -39,6 +50,7 @@ describe("errorHandler", () => {
 
   afterEach(() => {
     errorSpy.mockRestore();
+    sentryMock.captureApiException.mockReset();
   });
 
   describe("HTTPException pass-through", () => {
@@ -62,6 +74,30 @@ describe("errorHandler", () => {
       );
       expect(res.status).toBe(403);
     });
+
+    it.each([401, 403, 404] as const)(
+      "does not capture expected HTTP %d errors",
+      async (status) => {
+        await appThrowing(new HTTPException(status, { message: "expected" })).request("/throw");
+
+        expect(sentryMock.captureApiException).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([400, 409, 422] as const)("captures unexpected HTTP %d errors", async (status) => {
+      const err = new HTTPException(status, { message: "unexpected" });
+
+      await appThrowing(err).request("/throw");
+
+      expect(sentryMock.captureApiException).toHaveBeenCalledWith(
+        err,
+        status,
+        expect.objectContaining({
+          method: "GET",
+          path: "/throw",
+        }),
+      );
+    });
   });
 
   describe("statusMap (magic message) mapping", () => {
@@ -75,11 +111,46 @@ describe("errorHandler", () => {
       ["NOT_FOUND", 404],
       ["BAD_REQUEST", 400],
       ["CONFLICT", 409],
+      ["VALIDATION_FAILED", 422],
     ] as const)("maps Error('%s') to %d", async (message, expected) => {
       const res = await appThrowing(new Error(message)).request("/throw");
       expect(res.status).toBe(expected);
       const body = (await res.json()) as { error: string };
       expect(body.error).toBe(message);
+    });
+  });
+
+  describe("Sentry capture policy", () => {
+    it.each([
+      ["UNAUTHORIZED", 401],
+      ["FORBIDDEN", 403],
+      ["NOT_FOUND", 404],
+      ["STORAGE_QUOTA_EXCEEDED", 403],
+    ] as const)("does not capture expected Error('%s') as %d", async (message, _expectedStatus) => {
+      await appThrowing(new Error(message)).request("/throw");
+
+      expect(sentryMock.captureApiException).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["BAD_REQUEST", 400],
+      ["CONFLICT", 409],
+      ["VALIDATION_FAILED", 422],
+      ["RATE_LIMIT_EXCEEDED", 429],
+      ["kapow", 500],
+    ] as const)("captures Error('%s') mapped to %d", async (message, expectedStatus) => {
+      const err = new Error(message);
+
+      await appThrowing(err).request("/throw");
+
+      expect(sentryMock.captureApiException).toHaveBeenCalledWith(
+        err,
+        expectedStatus,
+        expect.objectContaining({
+          method: "GET",
+          path: "/throw",
+        }),
+      );
     });
   });
 
