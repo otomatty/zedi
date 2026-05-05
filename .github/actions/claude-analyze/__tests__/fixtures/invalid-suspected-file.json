@@ -1,0 +1,9 @@
+{
+  "severity": "high",
+  "ai_summary": "Suspected files entry is missing the required path.",
+  "ai_suspected_files": [
+    {
+      "reason": "no path means this entry is invalid"
+    }
+  ]
+}

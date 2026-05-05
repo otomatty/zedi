@@ -1,0 +1,7 @@
+{
+  "severity": "low",
+  "ai_summary": "Transient network blip while contacting the third-party clipper service. Retried automatically.",
+  "ai_root_cause": null,
+  "ai_suggested_fix": null,
+  "ai_suspected_files": null
+}
