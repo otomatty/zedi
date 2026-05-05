@@ -33,6 +33,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import process from "node:process";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseAndValidate } from "./schema.mjs";
@@ -445,8 +446,14 @@ export async function main() {
 
 // `import` for tests should not auto-run main(). Only run when invoked
 // directly as a script (matches Node's pattern for ESM entry detection).
+// `fileURLToPath` を使うことで Windows の `/C:/...` 形式が `C:\...` に正規化され、
+// `path.resolve(process.argv[1])` と正しくマッチする（HERE 側と一貫）。
+// Use `fileURLToPath` so the comparison stays correct on Windows
+// (`new URL(...).pathname` would yield `/C:/...` and never match
+// `path.resolve(process.argv[1])`). Mirrors the `import.meta.dirname`
+// migration earlier in this file.
 const invokedDirectly =
-  process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname;
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invokedDirectly) {
   main().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
