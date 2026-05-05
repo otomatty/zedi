@@ -21,9 +21,11 @@
 import { Hono } from "hono";
 import {
   ApiErrorAiAnalysisValidationError,
+  getApiErrorById,
   updateAiAnalysis,
   type UpdateAiAnalysisInput,
 } from "../../services/apiErrorService.js";
+import type { ApiErrorSeverity } from "../../schema/apiErrors.js";
 import { publishApiErrorUpdate } from "../../services/apiErrorBroadcaster.js";
 import { notifyApiErrorAlert } from "../../services/notifier.js";
 import { verifyInstallationToken } from "../../lib/githubAppAuth.js";
@@ -39,6 +41,29 @@ const app = new Hono<AppEnv>();
  * column, so reject malformed values early to keep the route resilient.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Phase 3 / #809 で通知対象となる severity の集合。
+ * Severity values that warrant an email alert (Phase 3 / #809).
+ */
+const NOTIFIABLE_SEVERITIES: ReadonlySet<ApiErrorSeverity> = new Set(["high", "medium"]);
+
+/**
+ * 1 行に対する通知を「冪等な再送 / 部分更新では再発火させない」ためのガード。
+ * `prev` が notifiable で `next` も notifiable のとき（例: high→high の冪等
+ * 再送、medium→high のエスカレート）は false を返す。`prev` が notifiable
+ * でなく `next` が notifiable のときだけ true。これにより 1 行あたり最大
+ * 1 通の運用通知に揃える。
+ *
+ * Returns true only when severity transitions from a non-notifiable value
+ * (`low` / `unknown`) into `high` or `medium`. Idempotent retries
+ * (high → high) and lateral moves between notifiable levels (medium → high)
+ * deliberately return false so each row produces at most one operational
+ * email over its lifetime.
+ */
+export function severityBecameNotifiable(prev: ApiErrorSeverity, next: ApiErrorSeverity): boolean {
+  return !NOTIFIABLE_SEVERITIES.has(prev) && NOTIFIABLE_SEVERITIES.has(next);
+}
 
 /**
  * `Authorization: Bearer ...` ヘッダから token を抜き出す。
@@ -151,6 +176,22 @@ app.put("/:id", async (c) => {
   }
 
   const db = c.get("db");
+  // Phase 3 / #809 の通知は「severity が初めて high/medium に到達したとき」
+  // のみ発火させる。`updateAiAnalysis` は冪等なので、リトライや severity を
+  // 含まない部分更新のたびに通知すると重複アラートが発生する。よって
+  // UPDATE 前に行を読み、pre.severity と updated.severity を比較する。
+  // 行が無ければここで 404 を返し、後続の UPDATE を発行しない。
+  //
+  // Phase 3 / #809: only alert when severity *transitions* into high/medium
+  // for the first time. `updateAiAnalysis` is idempotent — retries or partial
+  // callbacks (e.g. an empty body or a callback that only refreshes
+  // `ai_summary`) would otherwise resend the alert. We read the row first so
+  // we can compare pre vs post severity, and so a missing row short-circuits
+  // before the UPDATE.
+  const pre = await getApiErrorById(db, id);
+  if (!pre) {
+    return c.json({ error: "Not found" }, 404);
+  }
   try {
     const updated = await updateAiAnalysis(db, { id, ...normalized });
     if (!updated) {
@@ -162,21 +203,28 @@ app.put("/:id", async (c) => {
     // SSE 購読者へ AI 解析結果を配信 (Phase 2 / issue #807)。
     // Notify SSE subscribers so the admin UI updates without a page reload.
     publishApiErrorUpdate(updated);
-    // 重要エラーのメール通知 (Phase 3 / issue #809)。severity が `high` /
-    // `medium` 以外、もしくは `MONITORING_NOTIFY_EMAIL` 未設定の場合は no-op。
-    // ここを唯一の呼び出し元にして二重通知を防ぐ。fire-and-forget で
-    // webhook 応答を遅らせない（notifier 側でエラーは swallow 済み）。
+    // 重要エラーのメール通知 (Phase 3 / issue #809)。`pre.severity` が
+    // notifiable でなく、かつ `updated.severity` が notifiable のときだけ
+    // 1 回だけ発火する。冪等な再送やエスカレート済み行への部分更新では
+    // 発火しない。`MONITORING_NOTIFY_EMAIL` 未設定時は notifier 側で no-op。
     //
-    // Email alert for high-impact errors (Phase 3 / #809). The notifier is a
-    // no-op when severity is `low`/`unknown` or `MONITORING_NOTIFY_EMAIL` is
-    // unset. This is the single call site to prevent duplicate alerts; we
-    // fire-and-forget so the webhook response doesn't await Resend.
-    void notifyApiErrorAlert({
-      apiErrorId: updated.id,
-      sentryIssueId: updated.sentryIssueId,
-      severity: updated.severity,
-      title: updated.title,
-    });
+    // Email alert for high-impact errors (Phase 3 / #809). Fires exactly when
+    // severity transitions from a non-notifiable value (`low` / `unknown` /
+    // null) into `high` or `medium`. Idempotent retries and partial updates
+    // on already-escalated rows are deliberate no-ops here. The notifier
+    // itself further no-ops when `MONITORING_NOTIFY_EMAIL` is unset.
+    if (severityBecameNotifiable(pre.severity, updated.severity)) {
+      // fire-and-forget: notifier 側でエラーは swallow 済み。webhook 応答を
+      // Resend 呼び出しで遅延させない。
+      // fire-and-forget so the webhook response doesn't await Resend; the
+      // notifier itself swallows transport errors.
+      void notifyApiErrorAlert({
+        apiErrorId: updated.id,
+        sentryIssueId: updated.sentryIssueId,
+        severity: updated.severity,
+        title: updated.title,
+      });
+    }
     // 外部 (GitHub Actions) 向けの webhook なので、`error` キーを成功時に流用する
     // 内部 admin API の慣習ではなく、`data` キーで返して "error 有無で失敗判定"
     // できる素直な形にする（admin/src/api/admin.ts と異なり消費者がまだ存在しない）。

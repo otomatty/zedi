@@ -143,6 +143,64 @@ describe("notifyApiErrorAlert", () => {
     expect(args.html).toContain("high");
   });
 
+  it("ADMIN_BASE_URL が http:/https: 以外なら URL を載せない（防御的）", async () => {
+    // operator が javascript:alert(1) や data: URL を誤設定しても、本文の
+    // クリック可能リンクには絶対に流れ込まないことを確認する。
+    //
+    // Defense-in-depth against an operator typo: non-HTTP(S) schemes must
+    // never make it into the alert HTML as a clickable link.
+    process.env.MONITORING_NOTIFY_EMAIL = "ops@example.com";
+
+    for (const bad of [
+      "javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "file:///etc/passwd",
+      "not-a-url",
+      "   ",
+    ]) {
+      vi.clearAllMocks();
+      mockSendEmail.mockResolvedValue({ success: true, id: "x" });
+      process.env.ADMIN_BASE_URL = bad;
+      await notifyApiErrorAlert({
+        apiErrorId: "00000000-0000-0000-0000-000000000001",
+        sentryIssueId: "sentry-abc",
+        severity: "high",
+        title: "TypeError",
+      });
+      const args = mockSendEmail.mock.calls[0]?.[0];
+      expect(args.html).not.toContain("javascript:");
+      expect(args.html).not.toContain("data:");
+      expect(args.html).not.toContain("file:");
+      expect(args.html).not.toContain("href=");
+    }
+  });
+
+  it("件名から CR/LF を取り除く（header-injection 防御）", async () => {
+    // sentryIssueId は実運用では英数記号のみだが、防御的に CR/LF を除去
+    // した結果が件名に反映されることを確認する。
+    //
+    // Defense-in-depth: even if a malformed sentry_issue_id slips through,
+    // CR/LF must not survive into the subject so SMTP transports can never
+    // be tricked into header injection.
+    process.env.MONITORING_NOTIFY_EMAIL = "ops@example.com";
+
+    await notifyApiErrorAlert({
+      apiErrorId: "00000000-0000-0000-0000-000000000001",
+      sentryIssueId: "sentry\r\nBcc:attacker@example.com",
+      severity: "high",
+      title: "TypeError",
+    });
+
+    const args = mockSendEmail.mock.calls[0]?.[0];
+    // 件名に CR/LF が残っていなければヘッダ折り返しによるヘッダ注入は不可能。
+    // 文字列としての "Bcc:" は残るが、改行が挟まらないので別ヘッダにはならない。
+    //
+    // No CR/LF in the subject means an SMTP transport can't fold the line
+    // into a new header. The literal "Bcc:" substring is harmless without a
+    // preceding line break.
+    expect(args.subject).not.toMatch(/[\r\n]/);
+  });
+
   it("PII (Authorization / Cookie / raw email) を本文に含めない", async () => {
     process.env.MONITORING_NOTIFY_EMAIL = "ops@example.com";
     process.env.ADMIN_BASE_URL = "https://admin.zedi-note.app";

@@ -217,17 +217,26 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     vi.resetModules();
     await stubVerifyInstallationToken(true);
     const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
+    const pre = {
+      id: VALID_UUID,
+      sentryIssueId: "abc",
+      severity: "unknown",
+      title: "TypeError",
+    };
     const updated = {
       id: VALID_UUID,
       sentryIssueId: "abc",
       severity: "high",
+      title: "TypeError",
       aiSummary: "ヌルポインタ参照",
       aiSuspectedFiles: [{ path: "src/a.ts", line: 12 }],
       aiRootCause: "X が undefined",
       aiSuggestedFix: "guard 追加",
     };
-    // updateAiAnalysis issues a single update chain that resolves to [row].
-    const { db, chains } = createMockDb([[updated]]);
+    // The route now does a pre-read (`getApiErrorById`) before the UPDATE so
+    // it can compare pre/post severity for the Phase 3 notifier. Mock both
+    // chains: select then update.
+    const { db, chains } = createMockDb([[pre], [updated]]);
     const app = new Hono<AppEnv>();
     app.onError(errorHandler);
     app.use("*", async (c, next) => {
@@ -259,7 +268,10 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     vi.resetModules();
     await stubVerifyInstallationToken(true);
     const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
-    const { db } = createMockDb([]);
+    // Pre-read returns the existing row; updateAiAnalysis then throws
+    // ApiErrorAiAnalysisValidationError on the bad severity → 400.
+    const pre = { id: VALID_UUID, sentryIssueId: "abc", severity: "unknown", title: "x" };
+    const { db } = createMockDb([[pre]]);
     const app = new Hono<AppEnv>();
     app.onError(errorHandler);
     app.use("*", async (c, next) => {
@@ -280,7 +292,8 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     vi.resetModules();
     await stubVerifyInstallationToken(true);
     const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
-    const { db } = createMockDb([]);
+    const pre = { id: VALID_UUID, sentryIssueId: "abc", severity: "unknown", title: "x" };
+    const { db } = createMockDb([[pre]]);
     const app = new Hono<AppEnv>();
     app.onError(errorHandler);
     app.use("*", async (c, next) => {
@@ -301,7 +314,8 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     vi.resetModules();
     await stubVerifyInstallationToken(true);
     const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
-    // updateAiAnalysis returns null when the UPDATE returns no rows.
+    // The pre-read short-circuits to 404 when the row is missing, so the
+    // route never issues the UPDATE.
     const { db } = createMockDb([[]]);
     const app = new Hono<AppEnv>();
     app.onError(errorHandler);
@@ -319,13 +333,12 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     expect(res.status).toBe(404);
   });
 
-  it("invokes notifyApiErrorAlert exactly once with the post-update row (Phase 3 / #809)", async () => {
-    // 通知は AI コールバックの 1 箇所からのみ起動する（二重通知防止）。
-    // notifyApiErrorAlert が成功 200 のたびに 1 回だけ呼ばれることを確認する。
+  it("notifies once when severity transitions from unknown into high (Phase 3 / #809)", async () => {
+    // severity が `unknown` から `high` へ初めて昇格したケース。1 回だけ
+    // notifier に渡すことを担保する。
     //
-    // The notifier is called from this single site to prevent duplicate
-    // alerts. Verify that a successful 200 response invokes it exactly once
-    // with the post-update row's fields.
+    // First-sight escalation from `unknown` → `high` must invoke the
+    // notifier exactly once with the post-update row's fields.
     vi.resetModules();
     const notifySpy = vi.fn().mockResolvedValue({ email: { sent: true, id: "e1" } });
     await vi.doMock("../../../services/notifier.js", () => ({
@@ -333,13 +346,14 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     }));
     await stubVerifyInstallationToken(true);
     const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
-    const updated = {
+    const pre = {
       id: VALID_UUID,
       sentryIssueId: "sentry-xyz",
-      severity: "high",
+      severity: "unknown",
       title: "TypeError",
     };
-    const { db } = createMockDb([[updated]]);
+    const updated = { ...pre, severity: "high" };
+    const { db } = createMockDb([[pre], [updated]]);
     const app = new Hono<AppEnv>();
     app.onError(errorHandler);
     app.use("*", async (c, next) => {
@@ -364,5 +378,123 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
       severity: "high",
       title: "TypeError",
     });
+  });
+
+  it("does NOT notify on idempotent retry (high → high)", async () => {
+    // GitHub Actions が同じ severity でリトライした場合、行はすでに
+    // 通知済みなので再送しない。
+    //
+    // GitHub Actions retries the AI workflow occasionally. If the row was
+    // already escalated and the callback re-asserts the same severity, we
+    // must NOT resend the alert.
+    vi.resetModules();
+    const notifySpy = vi.fn().mockResolvedValue({ email: { sent: true } });
+    await vi.doMock("../../../services/notifier.js", () => ({
+      notifyApiErrorAlert: notifySpy,
+    }));
+    await stubVerifyInstallationToken(true);
+    const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
+    const pre = {
+      id: VALID_UUID,
+      sentryIssueId: "sentry-xyz",
+      severity: "high",
+      title: "TypeError",
+    };
+    const updated = { ...pre };
+    const { db } = createMockDb([[pre], [updated]]);
+    const app = new Hono<AppEnv>();
+    app.onError(errorHandler);
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/webhooks/github/ai-result", routes);
+
+    const res = await app.request(`/api/webhooks/github/ai-result/${VALID_UUID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ghs_ok" },
+      body: JSON.stringify({ severity: "high" }),
+    });
+    expect(res.status).toBe(200);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("does NOT notify on partial callback that omits severity (already-escalated row)", async () => {
+    // severity を含まない部分更新（例: ai_summary だけ refresh）。pre が
+    // すでに `high` の行に対して再送が発生してはいけない。
+    //
+    // Partial callback that only refreshes a non-severity AI field on a row
+    // already at `high`. Pre and post severity match, so the notifier must
+    // not fire — even though the post-update severity is notifiable.
+    vi.resetModules();
+    const notifySpy = vi.fn().mockResolvedValue({ email: { sent: true } });
+    await vi.doMock("../../../services/notifier.js", () => ({
+      notifyApiErrorAlert: notifySpy,
+    }));
+    await stubVerifyInstallationToken(true);
+    const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
+    const pre = {
+      id: VALID_UUID,
+      sentryIssueId: "sentry-xyz",
+      severity: "high",
+      title: "TypeError",
+    };
+    const updated = { ...pre, aiSummary: "更新後の要約" };
+    const { db } = createMockDb([[pre], [updated]]);
+    const app = new Hono<AppEnv>();
+    app.onError(errorHandler);
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/webhooks/github/ai-result", routes);
+
+    const res = await app.request(`/api/webhooks/github/ai-result/${VALID_UUID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ghs_ok" },
+      body: JSON.stringify({ ai_summary: "更新後の要約" }),
+    });
+    expect(res.status).toBe(200);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  it("does NOT notify when severity downgrades into low/unknown", async () => {
+    // 通知済み行 (`high`) を `low` に下げるケースは通知しない。
+    //
+    // De-escalations from a notifiable severity back to `low`/`unknown`
+    // must not produce a fresh alert.
+    vi.resetModules();
+    const notifySpy = vi.fn().mockResolvedValue({ email: { sent: true } });
+    await vi.doMock("../../../services/notifier.js", () => ({
+      notifyApiErrorAlert: notifySpy,
+    }));
+    await stubVerifyInstallationToken(true);
+    const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
+    const pre = {
+      id: VALID_UUID,
+      sentryIssueId: "sentry-xyz",
+      severity: "high",
+      title: "TypeError",
+    };
+    const updated = { ...pre, severity: "low" };
+    const { db } = createMockDb([[pre], [updated]]);
+    const app = new Hono<AppEnv>();
+    app.onError(errorHandler);
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/webhooks/github/ai-result", routes);
+
+    const res = await app.request(`/api/webhooks/github/ai-result/${VALID_UUID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ghs_ok" },
+      body: JSON.stringify({ severity: "low" }),
+    });
+    expect(res.status).toBe(200);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(notifySpy).not.toHaveBeenCalled();
   });
 });

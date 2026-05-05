@@ -29,6 +29,7 @@
  * @see https://github.com/otomatty/zedi/issues/616
  * @see https://github.com/otomatty/zedi/issues/809
  */
+import { getOptionalEnv } from "../lib/env.js";
 import type { ApiErrorSeverity } from "../schema/apiErrors.js";
 import { sendEmail } from "./emailService.js";
 
@@ -89,16 +90,30 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * 末尾スラッシュを 1 つだけに正規化する（`https://x/` も `https://x` も同じ
- * 結果）。空文字なら null。
+ * 末尾スラッシュを取り除き、`http(s)` スキームのみを許可した正規化済み
+ * base URL を返す。`javascript:` 等の危険なスキームや URL として解析不能な
+ * 値は null にフォールバックして、本文に埋め込まれないようにする。
  *
- * Normalize a base URL by stripping trailing slashes. Returns null for empty
- * inputs so the caller can distinguish "configured" from "absent" cleanly.
+ * Normalize a base URL: strip trailing slashes and only accept the `http:` /
+ * `https:` schemes. Anything else (`javascript:`, `data:`, malformed input,
+ * etc.) returns null so it never lands in alert HTML — operator-controlled
+ * env var, but defense in depth keeps a config typo from producing a clickable
+ * non-HTTP link in an email body.
  */
-function normalizeBaseUrl(raw: string | undefined): string | null {
-  if (!raw) return null;
+function normalizeBaseUrl(raw: string): string | null {
   const trimmed = raw.trim().replace(/\/+$/, "");
-  return trimmed.length > 0 ? trimmed : null;
+  if (trimmed.length === 0) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+  // 正規化済み URL を再合成。pathname が "/" のときは省略する。
+  // Reassemble from parsed components; drop a bare `/` pathname.
+  const path = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/+$/, "");
+  return `${parsed.origin}${path}`;
 }
 
 /**
@@ -117,10 +132,21 @@ function normalizeBaseUrl(raw: string | undefined): string | null {
  * renders.
  */
 function buildEmail(payload: NotifyApiErrorAlertPayload): { subject: string; html: string } {
-  const adminBase = normalizeBaseUrl(process.env.ADMIN_BASE_URL);
+  const adminBase = normalizeBaseUrl(getOptionalEnv("ADMIN_BASE_URL"));
   const adminUrl = adminBase ? `${adminBase}/errors/${payload.apiErrorId}` : null;
 
-  const subject = `[zedi:${payload.severity}] API error ${payload.sentryIssueId}`;
+  // 件名から CR/LF を取り除いて、メール送信ライブラリが SMTP ヘッダ化する
+  // 際の header injection (RFC 5322 folding 悪用) を防ぐ。Resend は JSON で
+  // 受けるため現状は発火しないが、防御を 1 段噛ませてもコストはほぼゼロ。
+  //
+  // Strip CR/LF from the subject as defense-in-depth against SMTP header
+  // injection. Resend takes the subject as a JSON field today so this isn't
+  // exploitable now, but the cost is one regex and the behavior holds even
+  // if we ever swap mail transports.
+  const subject = `[zedi:${payload.severity}] API error ${payload.sentryIssueId}`.replace(
+    /[\r\n]+/g,
+    " ",
+  );
 
   const lines: string[] = [
     `<p><strong>severity:</strong> ${escapeHtml(payload.severity)}</p>`,
@@ -158,7 +184,7 @@ export async function notifyApiErrorAlert(
     return { email: { sent: false } };
   }
 
-  const to = process.env.MONITORING_NOTIFY_EMAIL?.trim();
+  const to = getOptionalEnv("MONITORING_NOTIFY_EMAIL").trim();
   if (!to) {
     console.warn(
       "[notifier] MONITORING_NOTIFY_EMAIL is not set; skipping alert for sentry_issue_id=",
