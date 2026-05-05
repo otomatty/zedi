@@ -224,6 +224,13 @@ export function grepCandidateFiles(keywords, workspace) {
     "git",
     [
       "grep",
+      // `-F` でリテラルマッチに固定する。Sentry の title には `.` や `(` 等の
+      // 正規表現メタ文字が混じり得るため、デフォルトの正規表現マッチだと
+      // 関係ないファイルまで広く拾ってしまう。
+      // Force literal (fixed-string) matching with `-F`. Sentry titles often
+      // contain regex metacharacters (`.`, `(`, …) which would otherwise
+      // broaden the search and dilute the candidate-file list.
+      "-F",
       "-l",
       ...patternFlags,
       "--",
@@ -432,7 +439,15 @@ export async function main() {
         .map((p) => ({ path: p, reason: "grep candidate" })),
     });
   } else {
-    const client = new Anthropic({ apiKey: env.anthropicApiKey });
+    // SDK の組み込みリトライ（既定 maxRetries=2）を無効化して、外側の
+    // `callClaudeWithRetry` (MAX_ATTEMPTS=2) だけがリトライ予算を握る。
+    // 入れ子状態だと最悪 2*2=4 回呼ばれて issue #806 の「1〜2 回まで」を超える。
+    //
+    // Disable the SDK's built-in retry (defaults to `maxRetries: 2`) so only
+    // the outer `callClaudeWithRetry` loop (MAX_ATTEMPTS=2) controls the
+    // retry budget. Without this, nested retries could fire 2×2=4 upstream
+    // calls, breaching issue #806's "1〜2 回まで" requirement.
+    const client = new Anthropic({ apiKey: env.anthropicApiKey, maxRetries: 0 });
     raw = await callClaudeWithRetry(client, env.model, prompt);
   }
 
