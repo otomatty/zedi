@@ -1,0 +1,113 @@
+# `analyze-error.yml` — Sentry が検知した API エラーを Claude で解析し、結果を
+# Zedi API のコールバックに書き戻す。Epic #616 Phase 2 / Issue #806。
+#
+# 起動経路:
+#   - `repository_dispatch` (`event_type: analyze-error`):
+#       Zedi API の Sentry webhook ハンドラから自動発火される。
+#       client_payload は `api_error_id`, `sentry_issue_id`, `title`, `route`。
+#   - `workflow_dispatch`:
+#       手動入力 / fixture 入力で end-to-end のドライランを行う。
+#       詳しくは `.github/actions/claude-analyze/README.md` を参照。
+#
+# Trigger paths:
+#   - `repository_dispatch` (`event_type: analyze-error`): fired by the Zedi
+#     API's Sentry webhook handler when a brand-new `sentry_issue_id` lands.
+#     The `client_payload` carries `api_error_id`, `sentry_issue_id`, `title`,
+#     and `route`.
+#   - `workflow_dispatch`: manual / fixture input for end-to-end dry runs.
+#     See `.github/actions/claude-analyze/README.md` for the recipe.
+name: Analyze API error
+
+on:
+  repository_dispatch:
+    types: [analyze-error]
+  workflow_dispatch:
+    inputs:
+      api_error_id:
+        description: "`api_errors.id` (UUID)"
+        required: true
+        type: string
+      sentry_issue_id:
+        description: Sentry issue id
+        required: true
+        type: string
+      title:
+        description: Short error title
+        required: true
+        type: string
+      route:
+        description: "Route (e.g. `POST /api/ingest`)"
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: Skip Anthropic call and emit a stub payload
+        required: false
+        type: boolean
+        default: true
+      skip_callback:
+        description: Validate locally but do not PUT to the API
+        required: false
+        type: boolean
+        default: true
+
+# 最小権限。callback は GitHub App の installation token 経由で行うため、
+# `GITHUB_TOKEN` には何も書かせない。
+# Minimum permissions. The callback uses a GitHub App installation token, so
+# the default `GITHUB_TOKEN` needs nothing beyond `contents: read`.
+permissions:
+  contents: read
+
+# 同一 sentry_issue_id への並行起動を防ぐ。再来時にも余計に Claude を呼ばないため。
+# Prevent concurrent runs for the same Sentry issue. Avoids spending Anthropic
+# credits twice when the webhook briefly double-fires on the same issue id.
+concurrency:
+  group: >-
+    analyze-error-${{
+      github.event.client_payload.sentry_issue_id ||
+      github.event.inputs.sentry_issue_id
+    }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    name: Analyze with Claude
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Mint GitHub App installation token
+        # callback の Bearer に使う。`actions/create-github-app-token` は App ID +
+        # Private Key から短命 installation token を発行し、自動で revoke する。
+        # ワークフロー外には漏れない。`skip_callback=true` の場合はこのステップを
+        # スキップして、secrets 未設定環境（fork PR など）でもドライランが回るようにする。
+        #
+        # Mint the bearer used for the API callback. `actions/create-github-app-token`
+        # exchanges App ID + Private Key for a short-lived installation token and
+        # auto-revokes it at job end. Skipped when `skip_callback=true` so the
+        # dry-run path works in environments without the App secrets configured.
+        if: github.event_name == 'repository_dispatch' || github.event.inputs.skip_callback != 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GITHUB_APP_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Run Claude analyze action
+        uses: ./.github/actions/claude-analyze
+        with:
+          api_error_id: ${{ github.event.client_payload.api_error_id || github.event.inputs.api_error_id }}
+          sentry_issue_id: ${{ github.event.client_payload.sentry_issue_id || github.event.inputs.sentry_issue_id }}
+          title: ${{ github.event.client_payload.title || github.event.inputs.title }}
+          route: ${{ github.event.client_payload.route || github.event.inputs.route }}
+          callback_base_url: ${{ secrets.AI_ERROR_CALLBACK_BASE_URL }}
+          installation_token: ${{ steps.app-token.outputs.token }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          dry_run: ${{ github.event.inputs.dry_run || 'false' }}
+          skip_callback: ${{ github.event.inputs.skip_callback || 'false' }}

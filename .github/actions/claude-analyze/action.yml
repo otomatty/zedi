@@ -1,0 +1,142 @@
+# `.github/actions/claude-analyze` — Composite action that runs the Claude
+# AI error analysis script and PUTs the validated result back to the API
+# callback endpoint. Epic #616 Phase 2 / issue #806.
+#
+# This action is invoked by `.github/workflows/analyze-error.yml` on
+# `repository_dispatch` (`event_type: analyze-error`). See README.md for the
+# full client_payload contract and a workflow_dispatch dry-run recipe.
+name: Claude analyze API error
+description: >
+  Analyze a Sentry-reported API error with Claude and PUT the structured
+  result back to the Zedi API callback endpoint. / Sentry が検知した API エラーを
+  Claude で解析し、構造化結果を Zedi API のコールバックへ書き戻す。
+
+inputs:
+  api_error_id:
+    description: "`api_errors.id` (UUID) for the row to update."
+    required: true
+  sentry_issue_id:
+    description: Sentry issue id from the dispatch client_payload.
+    required: true
+  title:
+    description: Short error title from Sentry.
+    required: true
+  route:
+    description: Route where the error fired (may be empty).
+    required: false
+    default: ""
+  callback_base_url:
+    description: >
+      Base URL for the API callback (e.g. https://api.example.com).
+      The action appends `/api/webhooks/github/ai-result/<id>`.
+    required: true
+  installation_token:
+    description: GitHub App installation access token used as the bearer for the callback PUT.
+    required: true
+  anthropic_api_key:
+    description: Anthropic API key for the Claude call.
+    required: true
+  model:
+    description: Override Claude model id (defaults to claude-sonnet-4-6).
+    required: false
+    default: ""
+  dry_run:
+    description: When "true", skip the Anthropic call and emit a stub payload (for workflow_dispatch testing).
+    required: false
+    default: "false"
+  skip_callback:
+    description: When "true", validate locally but do not PUT to the API (pairs with dry_run for fixture validation).
+    required: false
+    default: "false"
+
+outputs:
+  severity:
+    description: AI-assigned severity (high | medium | low | unknown).
+    value: ${{ steps.analyze.outputs.severity }}
+  output_path:
+    description: Path to the validated analysis JSON written by the script.
+    value: ${{ steps.analyze.outputs.output_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: .nvmrc
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: "1.3"
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+
+    - name: Run analyze script
+      id: analyze
+      shell: bash
+      env:
+        CLAUDE_ANALYZE_API_ERROR_ID: ${{ inputs.api_error_id }}
+        CLAUDE_ANALYZE_SENTRY_ISSUE_ID: ${{ inputs.sentry_issue_id }}
+        CLAUDE_ANALYZE_TITLE: ${{ inputs.title }}
+        CLAUDE_ANALYZE_ROUTE: ${{ inputs.route }}
+        CLAUDE_ANALYZE_REPOSITORY: ${{ github.repository }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        CLAUDE_MODEL: ${{ inputs.model }}
+        CLAUDE_ANALYZE_DRY_RUN: ${{ inputs.dry_run }}
+        CLAUDE_ANALYZE_OUTPUT: ${{ runner.temp }}/analyze-output.json
+      run: |
+        node "${{ github.action_path }}/analyze.mjs"
+        echo "output_path=${CLAUDE_ANALYZE_OUTPUT}" >> "$GITHUB_OUTPUT"
+        # severity を outputs に拾う。Node スクリプトに依存させず、jq で抜き出す。
+        # Pull severity into outputs via jq — keeps the script's only contract
+        # the JSON file, no out-of-band stdout protocol to maintain.
+        SEVERITY=$(jq -r '.severity' "${CLAUDE_ANALYZE_OUTPUT}")
+        echo "severity=${SEVERITY}" >> "$GITHUB_OUTPUT"
+        echo "::notice title=AI severity::${SEVERITY}"
+
+    - name: PUT analysis to API callback
+      if: inputs.skip_callback != 'true'
+      shell: bash
+      env:
+        CALLBACK_URL: ${{ inputs.callback_base_url }}/api/webhooks/github/ai-result/${{ inputs.api_error_id }}
+        INSTALLATION_TOKEN: ${{ inputs.installation_token }}
+        OUTPUT_PATH: ${{ steps.analyze.outputs.output_path }}
+      run: |
+        set -euo pipefail
+        # API のコールバックに PUT。失敗時は最大 2 回までリトライ（issue #806 の
+        # 「workflow 内で 1〜2 回まで」要件）。HTTP ステータスを判定し、
+        # 5xx / ネットワークエラーのみリトライ、4xx は即失敗（auth 不正など）。
+        #
+        # PUT to the API callback. Retry up to 2 attempts (issue #806's "1〜2 回
+        # まで"). Only retry on transient 5xx / network errors; 4xx (auth, bad
+        # payload) is final so misconfiguration surfaces immediately.
+        attempt=1
+        max_attempts=2
+        while true; do
+          echo "PUT ${CALLBACK_URL} (attempt ${attempt}/${max_attempts})"
+          http_status=$(curl -sS -o /tmp/callback-response.txt -w "%{http_code}" \
+            -X PUT "${CALLBACK_URL}" \
+            -H "Authorization: Bearer ${INSTALLATION_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary "@${OUTPUT_PATH}" || echo "000")
+          echo "HTTP ${http_status}"
+          if [ "${http_status}" -ge 200 ] && [ "${http_status}" -lt 300 ]; then
+            cat /tmp/callback-response.txt
+            echo
+            echo "Callback succeeded."
+            break
+          fi
+          if [ "${http_status}" -ge 400 ] && [ "${http_status}" -lt 500 ]; then
+            echo "::error title=Callback rejected (${http_status})::$(cat /tmp/callback-response.txt)"
+            exit 1
+          fi
+          if [ "${attempt}" -ge "${max_attempts}" ]; then
+            echo "::error title=Callback failed after ${max_attempts} attempts (${http_status})::$(cat /tmp/callback-response.txt)"
+            exit 1
+          fi
+          attempt=$((attempt + 1))
+          sleep 5
+        done
