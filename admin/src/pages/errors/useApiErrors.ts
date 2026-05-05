@@ -6,6 +6,7 @@ import type {
   GetApiErrorsResponse,
 } from "@/api/admin";
 import { getApiErrors } from "@/api/admin";
+import { getApiUrl } from "@/api/client";
 
 /**
  * SSE が利用できない環境（古いブラウザ、ネットワーク制限）でのフォールバック
@@ -71,23 +72,33 @@ export interface UseApiErrorsResult {
 
 /**
  * SSE で受信した 1 行を既存の `errors` 配列にマージする。
- * 同 ID があれば置換し、無ければ先頭に追加して `total` をインクリメントする。
  *
- * Merge a single SSE-pushed row into the current list state. Matching rows
- * are replaced in place; brand-new ids are prepended (newest-first) and the
- * total count bumps by one so pagination footers stay accurate.
+ * - 既存の ID が見つかった場合は元の位置から取り除いて先頭へ移動する。
+ *   サーバー側のデフォルト順序が `last_seen_at DESC` なので、更新（再発生・
+ *   AI 解析完了・状態変更）があった行を先頭に置く方が REST 再取得時の順序
+ *   と整合する。
+ * - 未知の ID なら先頭に追加し、`total` をインクリメントする。
+ * - `offset > 0` のページではこの単純マージが完全には正しくないが、
+ *   現状 UI は単一ページのみ表示するため許容（将来ページネーション導入時に
+ *   再考）。
+ *
+ * Merge an SSE-pushed row into the list. Existing ids are *moved* to the
+ * front (matching the server's `last_seen_at DESC` ordering on a re-fetch),
+ * and brand-new ids are prepended with `total` bumping by one. Pagination
+ * (`offset > 0`) isn't fully consistent under this merge, but the current
+ * UI shows a single page so we accept the trade-off.
  */
 function mergeRow(prev: GetApiErrorsResponse | null, row: ApiErrorRow): GetApiErrorsResponse {
   if (!prev) {
     return { errors: [row], total: 1, limit: 1, offset: 0 };
   }
-  const idx = prev.errors.findIndex((r) => r.id === row.id);
-  if (idx >= 0) {
-    const next = prev.errors.slice();
-    next[idx] = row;
-    return { ...prev, errors: next };
-  }
-  return { ...prev, errors: [row, ...prev.errors], total: prev.total + 1 };
+  const filtered = prev.errors.filter((r) => r.id !== row.id);
+  const isUpdate = filtered.length < prev.errors.length;
+  return {
+    ...prev,
+    errors: [row, ...filtered],
+    total: isUpdate ? prev.total : prev.total + 1,
+  };
 }
 
 /**
@@ -191,7 +202,12 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
 
     const open = () => {
       if (cancelled) return;
-      es = new EventSource("/api/admin/errors/stream", { withCredentials: true });
+      // 本番では admin と API のオリジンが分かれているため、相対パスではなく
+      // `VITE_API_BASE_URL` を解決した絶対 URL を使う必要がある (PR #816 review)。
+      // Production splits the admin origin (Cloudflare Pages) from the API
+      // origin, so the EventSource URL must go through `getApiUrl` to hit
+      // the correct host instead of falling back to admin's origin.
+      es = new EventSource(getApiUrl("/api/admin/errors/stream"), { withCredentials: true });
 
       es.addEventListener("ready", () => {
         backoff = SSE_RECONNECT_INITIAL_MS;
@@ -239,9 +255,18 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
     const onVisible = () => {
       if (typeof document !== "undefined" && document.hidden) return;
       // 可視化されたタイミングで未接続なら即時再接続を試みる。
+      // 既存の `reconnectTimer` を必ずクリアしてから接続を張ることで、
+      // タイマー fire と immediate-reopen が競合して EventSource が二重に
+      // 生成されるのを防ぐ。
       // When the tab becomes visible again, eagerly reconnect if we lost the
-      // stream while hidden.
+      // stream while hidden. Cancel any pending backoff timer first so a
+      // racing `setTimeout` callback can't open a second EventSource on top
+      // of this one (which would leak the older connection).
       if (!es) {
+        if (reconnectTimer != null) {
+          window.clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
         backoff = SSE_RECONNECT_INITIAL_MS;
         open();
       }

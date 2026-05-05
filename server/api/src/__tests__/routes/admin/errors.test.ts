@@ -12,8 +12,10 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 import {
+  API_ERROR_STREAM_MAX_SUBSCRIBERS,
   clearApiErrorSubscribers,
   publishApiErrorUpdate,
+  subscribeApiErrorUpdates,
 } from "../../../services/apiErrorBroadcaster.js";
 
 vi.mock("../../../middleware/auth.js", () => ({
@@ -413,5 +415,21 @@ describe("GET /api/admin/errors/stream", () => {
     const { app } = createAdminTestApp([USER_ROLE_RESULT]);
     const res = await app.request("/api/admin/errors/stream", { headers: adminAuthHeaders() });
     expect(res.status).toBe(403);
+  });
+
+  it("returns 503 (not 200) when subscriber cap is reached", async () => {
+    // 上限まで購読者を埋めてから接続を試みると、`streamSSE` 開始前に 503 で
+    // 即時拒否されることを確認する (PR #816 review fix)。
+    // Pre-fill the broadcaster up to the cap so the next connection hits the
+    // pre-check inside the `/stream` route and gets a real 503 response
+    // instead of a 200 + SSE error event.
+    for (let i = 0; i < API_ERROR_STREAM_MAX_SUBSCRIBERS; i++) {
+      subscribeApiErrorUpdates(() => {});
+    }
+    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+    const res = await app.request("/api/admin/errors/stream", { headers: adminAuthHeaders() });
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/subscriber cap/i);
   });
 });

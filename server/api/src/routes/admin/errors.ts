@@ -24,7 +24,8 @@ import {
   updateApiErrorStatus,
 } from "../../services/apiErrorService.js";
 import {
-  ApiErrorStreamCapacityExceededError,
+  apiErrorSubscriberCount,
+  API_ERROR_STREAM_MAX_SUBSCRIBERS,
   publishApiErrorUpdate,
   subscribeApiErrorUpdates,
 } from "../../services/apiErrorBroadcaster.js";
@@ -170,6 +171,17 @@ const SSE_KEEPALIVE_MS = 25_000;
  *   so the browser's auto-reconnect waits 30 s instead of the default ~3 s.
  */
 app.get("/stream", (c) => {
+  // 上限チェックは streamSSE を呼ぶ前に行う。streamSSE が走り出すと既に
+  // ステータス 200 + `text/event-stream` のレスポンスが開始されてしまい、
+  // 503 へ降格できないため。クライアント側は 503 を見て backoff する想定。
+  // Reject capacity exhaustion BEFORE entering streamSSE — once that helper
+  // commits the response (200 + text/event-stream), we can no longer change
+  // the status to 503. The pre-check lets clients see a real 503 and apply
+  // the documented backoff strategy instead of treating it as a transient
+  // SSE-level error.
+  if (apiErrorSubscriberCount() >= API_ERROR_STREAM_MAX_SUBSCRIBERS) {
+    return c.json({ error: `subscriber cap reached (${API_ERROR_STREAM_MAX_SUBSCRIBERS})` }, 503);
+  }
   return streamSSE(
     c,
     async (stream) => {
@@ -180,12 +192,17 @@ app.get("/stream", (c) => {
       // and uses our preferred reconnect delay.
       await stream.writeSSE({ data: "", event: "ready", retry: 30_000 });
 
+      // すべての更新を購読。送信は async なのでイベントを内部キューに溜め、
+      // 順序を保ったまま flush する。
+      // Subscribe and queue events; SSE writes are async but listener
+      // callbacks must be sync, so we serialize through a microtask chain.
+      // 上限はルート冒頭で確認済みのため通常 throw しないが、競合で同時に
+      // 限界を超えた場合に備えて catch して接続を畳む。
+      // Capacity is verified at the top of the route, but a concurrent
+      // subscribe could still exceed the cap; close the stream cleanly if
+      // that race fires instead of leaking an unhandled rejection.
       let unsubscribe: (() => void) | null = null;
       try {
-        // すべての更新を購読。送信は async なのでイベントを内部キューに溜め、
-        // 順序を保ったまま flush する。
-        // Subscribe and queue events; SSE writes are async but listener
-        // callbacks must be sync, so we serialize through a microtask chain.
         let writeChain: Promise<void> = Promise.resolve();
         unsubscribe = subscribeApiErrorUpdates((row) => {
           writeChain = writeChain
@@ -199,15 +216,14 @@ app.get("/stream", (c) => {
             });
         });
       } catch (err) {
-        if (err instanceof ApiErrorStreamCapacityExceededError) {
-          await stream.writeSSE({
-            event: "error",
-            data: JSON.stringify({ error: "subscriber cap reached" }),
-          });
-          await stream.close();
-          return;
-        }
-        throw err;
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[admin-errors-stream] subscribe failed: ${message}`);
+        await stream.writeSSE({
+          event: "error",
+          data: JSON.stringify({ error: "subscribe failed" }),
+        });
+        await stream.close();
+        return;
       }
 
       stream.onAbort(() => {

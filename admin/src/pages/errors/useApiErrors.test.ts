@@ -155,17 +155,38 @@ describe("useApiErrors", () => {
     expect(result.current.total).toBe(1);
   });
 
-  it("opens an EventSource on mount and closes it on unmount", async () => {
+  it("opens an EventSource on mount (URL routed through getApiUrl) and closes it on unmount", async () => {
     const { unmount } = renderHook(() => useApiErrors({ intervalMs: 0 }));
     await waitFor(() => expect(lastInstance).not.toBeNull());
     const es = getInstance();
+    // `getApiUrl` 経由なので、`VITE_API_BASE_URL` が空文字でもフルパスは
+    // `/api/admin/errors/stream` を含む。
+    // `getApiUrl` resolves the path; with an empty `VITE_API_BASE_URL` it
+    // stays same-origin, so the URL still ends with the SSE path.
     expect(es.url).toContain("/api/admin/errors/stream");
     expect(es.withCredentials).toBe(true);
     unmount();
     expect(es.closed).toBe(true);
   });
 
-  it("merges an `update` SSE event by id (replace)", async () => {
+  it("merges an `update` SSE event by id and moves the row to the front", async () => {
+    // 初期一覧に 2 件目の行を返すように mockResolvedValue を上書きし、
+    // 2 番目の行を更新したらリストの先頭へ移動することを確認する。
+    // Bootstrap with two rows so we can verify the second row is *moved* to
+    // the front (matching the server's `last_seen_at DESC` ordering) rather
+    // than replaced in place.
+    const second: ApiErrorRow = {
+      ...getBaseRow(),
+      id: "00000000-0000-0000-0000-0000000000bb",
+      title: "second",
+    };
+    vi.mocked(getApiErrors).mockResolvedValueOnce({
+      errors: [getBaseRow(), second],
+      total: 2,
+      limit: 50,
+      offset: 0,
+    });
+
     const { result } = renderHook(() => useApiErrors({ intervalMs: 0 }));
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -173,13 +194,16 @@ describe("useApiErrors", () => {
       getInstance().dispatch("ready", "");
     });
 
-    const replacement = { ...getBaseRow(), title: "replaced" };
+    const updatedSecond = { ...second, title: "second (updated)" };
     act(() => {
-      getInstance().dispatch("update", replacement);
+      getInstance().dispatch("update", updatedSecond);
     });
 
-    expect(result.current.errors[0]?.title).toBe("replaced");
-    expect(result.current.total).toBe(1);
+    expect(result.current.errors).toHaveLength(2);
+    expect(result.current.errors[0]?.id).toBe(second.id);
+    expect(result.current.errors[0]?.title).toBe("second (updated)");
+    expect(result.current.errors[1]?.id).toBe(getBaseRow().id);
+    expect(result.current.total).toBe(2);
     expect(result.current.streamConnected).toBe(true);
   });
 
