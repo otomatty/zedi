@@ -197,7 +197,14 @@ export function buildIssueTitle({ severity, title, sentryIssueId }) {
 function inlineOrNone(value) {
   if (value === null || value === undefined) return "(none)";
   if (typeof value !== "string") return "(none)";
-  const collapsed = value.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+  // バックスラッシュを先にエスケープしてから pipe をエスケープする。順序を
+  // 逆にすると入力 `\|` が `\\|` になり、Markdown 上は「リテラル `\` + 生 `|`」
+  // と解釈されて表が壊れる（CodeQL: Incomplete string escaping）。
+  // Escape backslashes first, then pipes. Reversing the order would turn an
+  // input of `\|` into `\\|`, which Markdown renders as a literal `\` plus a
+  // raw `|` — and the raw pipe would break the surrounding table cell.
+  const escaped = value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+  const collapsed = escaped.replace(/\s+/g, " ").trim();
   return collapsed.length === 0 ? "(none)" : collapsed;
 }
 

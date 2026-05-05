@@ -149,6 +149,29 @@ test("buildIssueBody escapes pipe characters in table cells so Markdown tables s
   assert.match(body, /GET \/api\/foo\\\|bar/);
 });
 
+test("buildIssueBody escapes backslashes before pipes (CodeQL: Incomplete string escaping)", () => {
+  // 入力 `\|` を `\\|` ではなく `\\\\\|` (= リテラル `\\` + escaped `|`) に
+  // しなければ、Markdown では「リテラル `\` + 生 `|`」と解釈され表が崩れる。
+  // バックスラッシュを先にエスケープすることでこの誤解釈を防ぐ。
+  // Input `\|` must become `\\\|` (literal backslash + escaped pipe), not
+  // `\\|` — otherwise Markdown reads `\\` as a literal backslash and the
+  // bare `|` breaks the table cell.
+  const body = buildIssueBody({
+    severity: "medium",
+    summary: "summary",
+    rootCause: null,
+    suggestedFix: null,
+    suspectedFiles: null,
+    route: "weird\\|route",
+    sentryIssueId: "fixture-bs",
+    apiErrorId: "id",
+    workflowRunUrl: "https://example.invalid/run/2",
+  });
+  // ファイル中のリテラル文字列としては `weird\\\\\\|route` (= `weird\\\|route`).
+  // Literal in JS source: `weird\\\\\\|route` — represents `weird\\\|route`.
+  assert.match(body, /weird\\\\\\|route/);
+});
+
 test("buildIssueBody handles missing optional fields without showing 'null'", () => {
   const body = buildIssueBody({
     severity: "medium",
