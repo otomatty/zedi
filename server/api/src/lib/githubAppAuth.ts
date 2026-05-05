@@ -51,6 +51,42 @@ const APP_JWT_TTL_SEC = 9 * 60;
  */
 const REFRESH_MARGIN_MS = 60_000;
 
+/**
+ * GitHub API 呼び出しのタイムアウト（ms）。GitHub の通常レイテンシは 100ms〜
+ * 数百 ms 程度なので、ハング検知としては 10 秒で十分。これを超えると
+ * AbortError として外側に伝搬し、呼び出し側の .catch / 503 パスが走る。
+ *
+ * Timeout (ms) for outbound GitHub API calls. Normal latency is well under
+ * 1 s; 10 s catches genuine hangs without false-tripping on cold edges. Hits
+ * surface as `AbortError` so the caller's `.catch` / 503 path triggers
+ * instead of leaking a pending promise on bursty webhook traffic.
+ */
+const GITHUB_FETCH_TIMEOUT_MS = 10_000;
+
+/**
+ * `fetch` を AbortController ベースのタイムアウトでラップする。
+ * GitHub API がスタックしたときに、未解決のままの Promise が積もって
+ * webhook ハンドラの fire-and-forget パスを詰まらせるのを防ぐ。
+ *
+ * Wrap `fetch` with an `AbortController`-based timeout so a stalled GitHub API
+ * call cannot leave a forever-pending promise behind. Without this, bursts of
+ * Sentry webhooks that all detach `triggerRepositoryDispatch().catch(log)`
+ * would slowly accumulate hung promises whenever GitHub stalls.
+ */
+async function fetchGitHubWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number = GITHUB_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface CachedInstallationToken {
   token: string;
   /** ms epoch — token expiry as reported by GitHub. */
@@ -125,7 +161,7 @@ export async function getInstallationToken(): Promise<string> {
   }
   const { installationId } = readAppConfig();
   const jwt = await createAppJWT();
-  const res = await fetch(
+  const res = await fetchGitHubWithTimeout(
     `${GITHUB_API_BASE}/app/installations/${encodeURIComponent(installationId)}/access_tokens`,
     {
       method: "POST",
@@ -198,7 +234,7 @@ export async function triggerRepositoryDispatch(input: {
     throw new Error("GITHUB_DISPATCH_REPOSITORY is not configured");
   }
   const token = await getInstallationToken();
-  const res = await fetch(
+  const res = await fetchGitHubWithTimeout(
     `${GITHUB_API_BASE}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/dispatches`,
     {
       method: "POST",
@@ -222,53 +258,112 @@ export async function triggerRepositoryDispatch(input: {
 }
 
 /**
+ * `verifyInstallationToken` が GitHub 側の障害（5xx / ネットワーク / タイムアウト）
+ * で検証できなかったときに投げるエラー。呼び出し側は本物の認証失敗 (`false`) と
+ * 区別して 503 / リトライ可能なレスポンスにマップする。
+ *
+ * Thrown by `verifyInstallationToken` when the failure is on GitHub's side
+ * (5xx / network / timeout) rather than a definitive "this token is invalid".
+ * Lets the caller distinguish transient outages (retryable, → 503) from real
+ * auth failures (`false`, → 403) so an outage does not silently drop valid AI
+ * results as permanent auth errors.
+ */
+export class GitHubInstallationVerificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GitHubInstallationVerificationError";
+  }
+}
+
+/**
  * 受信した installation token を GitHub 側で検証する。
  *
  * GitHub の installation token は不透明文字列（`ghs_...`）なのでローカル検証は
  * できない。`GET /installation` を当該 token で呼ぶと、その installation 自身の
  * メタデータ（`id` を含む）が返るので、`id` を `GITHUB_APP_INSTALLATION_ID`
  * と比較して一致した場合のみ有効と判定する。これにより別のインストールから
- * 盗まれた token をなりすましに使われることを防ぐ。タイムアウトは 5 秒に短く
- * 設定し、コールバック側を遅延させない。
+ * 盗まれた token をなりすましに使われることを防ぐ。
+ *
+ * 戻り値の意味づけ:
+ * - `true`: 認証成功（id 一致）。
+ * - `false`: 本物の認証失敗（401/403/404 / id 不一致 / レスポンス body の
+ *   `id` が欠落・型違い）。呼び出し側は HTTP 403 にマップする。
+ * - throw `GitHubInstallationVerificationError`: GitHub 側の障害
+ *   （5xx / ネットワーク / タイムアウト / JSON パース失敗）。呼び出し側は
+ *   HTTP 503 にマップしてリトライ可能であることを示す。
  *
  * Validate an inbound installation access token. GitHub installation tokens are
  * opaque (`ghs_...`), so we round-trip to GitHub: hit `GET /installation`,
  * which returns the installation's own metadata (including `id`), and require
  * the returned id to equal our configured `GITHUB_APP_INSTALLATION_ID`. This
  * blocks tokens minted for any *other* installation of the same App from
- * impersonating ours. Times out at 5 s to keep the callback path responsive.
+ * impersonating ours.
+ *
+ * Result semantics:
+ * - `true` → token authenticates as our installation.
+ * - `false` → genuine auth failure (401/403/404, id mismatch, missing id).
+ *   Callers map this to HTTP 403.
+ * - throws `GitHubInstallationVerificationError` → GitHub-side trouble (5xx,
+ *   network error, timeout, malformed JSON). Callers map this to HTTP 503 so
+ *   the workflow can retry instead of dropping a valid AI result.
  *
  * @see https://docs.github.com/en/rest/apps/installations#get-an-installation-for-the-authenticated-app
  */
 export async function verifyInstallationToken(token: string): Promise<boolean> {
   if (!token) return false;
   const { installationId } = readAppConfig();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 5_000);
+  let res: Response;
   try {
-    const res = await fetch(`${GITHUB_API_BASE}/installation`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: GITHUB_ACCEPT,
-        "X-GitHub-Api-Version": GITHUB_API_VERSION,
-        "User-Agent": USER_AGENT,
+    res = await fetchGitHubWithTimeout(
+      `${GITHUB_API_BASE}/installation`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: GITHUB_ACCEPT,
+          "X-GitHub-Api-Version": GITHUB_API_VERSION,
+          "User-Agent": USER_AGENT,
+        },
       },
-      signal: controller.signal,
-    });
-    if (!res.ok) return false;
-    const json = (await res.json().catch(() => null)) as { id?: unknown } | null;
-    if (!json) return false;
-    // `id` は数値で返るので文字列比較できるよう正規化する。env 側は文字列なので、
-    // 両側を文字列に揃えて比較しないと `123 === "123"` が常に false になり、
-    // 検証が常に失敗側へフェイルクローズしてしまう。
-    // GitHub returns `id` as a number; normalize to string for comparison
-    // against the env-string `installationId`. Without this, `123 === "123"`
-    // would always be false and verification would silently fail closed.
-    const idStr = typeof json.id === "number" || typeof json.id === "string" ? String(json.id) : "";
-    return idStr.length > 0 && idStr === installationId;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
+      5_000,
+    );
+  } catch (err) {
+    // ネットワーク障害 / AbortError は GitHub 側の不調として扱い、
+    // throw して呼び出し側に 503 マップさせる（403 でドロップしない）。
+    // Network failures and AbortError are treated as upstream outages so the
+    // route can retry-by-503 instead of permanently rejecting a valid token.
+    const message = err instanceof Error ? err.message : String(err);
+    throw new GitHubInstallationVerificationError(
+      `GitHub installation verification network error: ${message}`,
+    );
   }
+  // 401/403/404 は本物の認証失敗（token 不正・存在しない・権限なし）。
+  // 401/403/404 are definitive auth failures: token rejected by GitHub.
+  if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+  // 5xx などその他の非 2xx は GitHub 側の障害として throw する。
+  // Other non-2xx responses (mainly 5xx) are upstream issues; surface as
+  // retryable so callers can map to 503.
+  if (!res.ok) {
+    throw new GitHubInstallationVerificationError(
+      `GitHub installation verification returned ${res.status}`,
+    );
+  }
+  let json: { id?: unknown } | null;
+  try {
+    json = (await res.json()) as { id?: unknown } | null;
+  } catch {
+    // 200 を返したのに JSON が壊れているのは GitHub 側の異常なので transient 扱い。
+    // A 200 with malformed JSON is a GitHub-side anomaly, not an auth issue.
+    throw new GitHubInstallationVerificationError(
+      "GitHub installation verification returned malformed JSON",
+    );
+  }
+  if (!json) return false;
+  // `id` は数値で返るので文字列比較できるよう正規化する。env 側は文字列なので、
+  // 両側を文字列に揃えて比較しないと `123 === "123"` が常に false になり、
+  // 検証が常に失敗側へフェイルクローズしてしまう。
+  // GitHub returns `id` as a number; normalize to string for comparison
+  // against the env-string `installationId`. Without this, `123 === "123"`
+  // would always be false and verification would silently fail closed.
+  const idStr = typeof json.id === "number" || typeof json.id === "string" ? String(json.id) : "";
+  return idStr.length > 0 && idStr === installationId;
 }

@@ -56,6 +56,7 @@ vi.mock("jose", () => {
 
 import {
   __resetInstallationTokenCacheForTests,
+  GitHubInstallationVerificationError,
   getInstallationToken,
   readDispatchRepository,
   triggerRepositoryDispatch,
@@ -236,16 +237,53 @@ describe("verifyInstallationToken", () => {
     expect(await verifyInstallationToken("ghs_other_install")).toBe(false);
   });
 
-  it("returns false when GitHub returns non-2xx", async () => {
+  it("returns false on a definitive 401 (auth failure)", async () => {
     const fetchMock = vi.fn(async () => new Response("unauthorized", { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
     expect(await verifyInstallationToken("ghs_bad")).toBe(false);
   });
 
-  it("returns false when response body is malformed", async () => {
+  it("returns false on 403 / 404 (auth failure)", async () => {
+    for (const status of [403, 404]) {
+      const fetchMock = vi.fn(async () => new Response("nope", { status }));
+      vi.stubGlobal("fetch", fetchMock);
+      expect(await verifyInstallationToken("ghs_bad")).toBe(false);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("throws GitHubInstallationVerificationError on 5xx (transient outage)", async () => {
+    // 5xx は GitHub 側の障害なので 403 (false) ではなく throw して、
+    // 呼び出し側で 503 リトライ可能としてマップさせる。
+    // 5xx is GitHub-side trouble: callback layer maps a thrown error to 503
+    // (retryable) rather than dropping a valid AI result as a permanent 403.
+    const fetchMock = vi.fn(async () => new Response("upstream broke", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(verifyInstallationToken("ghs_unknown")).rejects.toBeInstanceOf(
+      GitHubInstallationVerificationError,
+    );
+  });
+
+  it("throws GitHubInstallationVerificationError on network error", async () => {
+    // ネットワーク障害も transient 扱い。
+    // Network errors are transient too.
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(verifyInstallationToken("ghs_unknown")).rejects.toBeInstanceOf(
+      GitHubInstallationVerificationError,
+    );
+  });
+
+  it("throws GitHubInstallationVerificationError when 200 body is malformed JSON", async () => {
+    // 200 で壊れた body を返すのは GitHub 側の異常 → transient 扱い。
+    // A 200 with malformed JSON is a GitHub anomaly; don't paper over it as auth failure.
     const fetchMock = vi.fn(async () => new Response("not-json", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    expect(await verifyInstallationToken("ghs_garbled")).toBe(false);
+    await expect(verifyInstallationToken("ghs_garbled")).rejects.toBeInstanceOf(
+      GitHubInstallationVerificationError,
+    );
   });
 
   it("returns false when the response omits the id field", async () => {

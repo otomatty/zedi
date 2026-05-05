@@ -111,6 +111,41 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     expect(chains).toHaveLength(0);
   });
 
+  it("returns 503 when verifyInstallationToken throws (transient GitHub outage)", async () => {
+    // GitHub 側の 5xx / ネットワーク障害は 403 ではなく 503 にマップされ、
+    // workflow 側でリトライ可能であることを示す。
+    // GitHub-side outages must surface as 503 (retryable) rather than 403,
+    // so a transient outage doesn't permanently drop a valid AI result.
+    vi.resetModules();
+    await vi.doMock("../../../lib/githubAppAuth.js", async () => {
+      const actual = await vi.importActual<typeof import("../../../lib/githubAppAuth.js")>(
+        "../../../lib/githubAppAuth.js",
+      );
+      return {
+        ...actual,
+        verifyInstallationToken: async () => {
+          throw new actual.GitHubInstallationVerificationError("upstream 503");
+        },
+      };
+    });
+    const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
+    const { db } = createMockDb([]);
+    const app = new Hono<AppEnv>();
+    app.onError(errorHandler);
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/webhooks/github/ai-result", routes);
+
+    const res = await app.request(`/api/webhooks/github/ai-result/${VALID_UUID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ghs_xx" },
+      body: JSON.stringify({ severity: "high" }),
+    });
+    expect(res.status).toBe(503);
+  });
+
   it("returns 403 when verifyInstallationToken rejects the token", async () => {
     // verifyInstallationToken は外部 (GitHub) を叩くので必ずモックする。
     // Always stub verifyInstallationToken because it would otherwise hit

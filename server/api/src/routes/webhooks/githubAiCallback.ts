@@ -99,6 +99,8 @@ function normalizeBody(body: unknown): Omit<UpdateAiAnalysisInput, "id"> | null 
  *
  * - 401: missing / malformed bearer token
  * - 403: token did not validate against our GitHub App installation
+ * - 503: transient GitHub-side failure (5xx / timeout / network) — caller
+ *   should retry; we never silently turn outages into 403s.
  * - 400: invalid JSON, invalid severity, or malformed `ai_suspected_files`
  * - 404: no row matches `:id` (or `:id` is not a UUID)
  * - 200: returned the post-update row
