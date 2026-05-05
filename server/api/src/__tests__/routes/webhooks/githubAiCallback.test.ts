@@ -248,9 +248,9 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { error: { id: string; severity: string } };
-    expect(body.error.id).toBe(VALID_UUID);
-    expect(body.error.severity).toBe("high");
+    const body = (await res.json()) as { data: { id: string; severity: string } };
+    expect(body.data.id).toBe(VALID_UUID);
+    expect(body.data.severity).toBe("high");
     expect(chains.filter((c) => c.startMethod === "update")).toHaveLength(1);
   });
 

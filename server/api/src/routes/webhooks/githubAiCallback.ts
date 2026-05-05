@@ -157,7 +157,16 @@ app.put("/:id", async (c) => {
     console.log(
       `[github-ai-callback] updated api_error=${updated.id} severity=${updated.severity}`,
     );
-    return c.json({ error: updated });
+    // 外部 (GitHub Actions) 向けの webhook なので、`error` キーを成功時に流用する
+    // 内部 admin API の慣習ではなく、`data` キーで返して "error 有無で失敗判定"
+    // できる素直な形にする（admin/src/api/admin.ts と異なり消費者がまだ存在しない）。
+    //
+    // External GitHub-Actions-facing webhook: don't reuse the admin route's
+    // `{ error: row }` success shape — it's confusing for outside consumers
+    // (presence-of-`error` no longer means failure). Use `data` so the
+    // response shape is unambiguous. No backward-compat concern: the AI
+    // workflow that calls this endpoint hasn't been written yet.
+    return c.json({ data: updated });
   } catch (err) {
     if (err instanceof ApiErrorAiAnalysisValidationError) {
       return c.json({ error: err.message }, 400);
