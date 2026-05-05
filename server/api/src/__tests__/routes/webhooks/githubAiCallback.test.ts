@@ -67,6 +67,7 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     process.env.GITHUB_APP_ID = "123";
     process.env.GITHUB_APP_INSTALLATION_ID = "456";
     process.env.GITHUB_APP_PRIVATE_KEY = "stub";
@@ -316,5 +317,52 @@ describe("PUT /api/webhooks/github/ai-result/:id", () => {
       body: JSON.stringify({ severity: "high" }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it("invokes notifyApiErrorAlert exactly once with the post-update row (Phase 3 / #809)", async () => {
+    // 通知は AI コールバックの 1 箇所からのみ起動する（二重通知防止）。
+    // notifyApiErrorAlert が成功 200 のたびに 1 回だけ呼ばれることを確認する。
+    //
+    // The notifier is called from this single site to prevent duplicate
+    // alerts. Verify that a successful 200 response invokes it exactly once
+    // with the post-update row's fields.
+    vi.resetModules();
+    const notifySpy = vi.fn().mockResolvedValue({ email: { sent: true, id: "e1" } });
+    await vi.doMock("../../../services/notifier.js", () => ({
+      notifyApiErrorAlert: notifySpy,
+    }));
+    await stubVerifyInstallationToken(true);
+    const { default: routes } = await import("../../../routes/webhooks/githubAiCallback.js");
+    const updated = {
+      id: VALID_UUID,
+      sentryIssueId: "sentry-xyz",
+      severity: "high",
+      title: "TypeError",
+    };
+    const { db } = createMockDb([[updated]]);
+    const app = new Hono<AppEnv>();
+    app.onError(errorHandler);
+    app.use("*", async (c, next) => {
+      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+      await next();
+    });
+    app.route("/api/webhooks/github/ai-result", routes);
+
+    const res = await app.request(`/api/webhooks/github/ai-result/${VALID_UUID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ghs_ok" },
+      body: JSON.stringify({ severity: "high" }),
+    });
+    expect(res.status).toBe(200);
+    // fire-and-forget の microtask が消化されるのを待つ。
+    // Drain any pending microtasks queued by the fire-and-forget call.
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(notifySpy).toHaveBeenCalledTimes(1);
+    expect(notifySpy).toHaveBeenCalledWith({
+      apiErrorId: VALID_UUID,
+      sentryIssueId: "sentry-xyz",
+      severity: "high",
+      title: "TypeError",
+    });
   });
 });

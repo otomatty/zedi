@@ -25,6 +25,7 @@ import {
   type UpdateAiAnalysisInput,
 } from "../../services/apiErrorService.js";
 import { publishApiErrorUpdate } from "../../services/apiErrorBroadcaster.js";
+import { notifyApiErrorAlert } from "../../services/notifier.js";
 import { verifyInstallationToken } from "../../lib/githubAppAuth.js";
 import type { AppEnv } from "../../types/index.js";
 
@@ -161,6 +162,21 @@ app.put("/:id", async (c) => {
     // SSE 購読者へ AI 解析結果を配信 (Phase 2 / issue #807)。
     // Notify SSE subscribers so the admin UI updates without a page reload.
     publishApiErrorUpdate(updated);
+    // 重要エラーのメール通知 (Phase 3 / issue #809)。severity が `high` /
+    // `medium` 以外、もしくは `MONITORING_NOTIFY_EMAIL` 未設定の場合は no-op。
+    // ここを唯一の呼び出し元にして二重通知を防ぐ。fire-and-forget で
+    // webhook 応答を遅らせない（notifier 側でエラーは swallow 済み）。
+    //
+    // Email alert for high-impact errors (Phase 3 / #809). The notifier is a
+    // no-op when severity is `low`/`unknown` or `MONITORING_NOTIFY_EMAIL` is
+    // unset. This is the single call site to prevent duplicate alerts; we
+    // fire-and-forget so the webhook response doesn't await Resend.
+    void notifyApiErrorAlert({
+      apiErrorId: updated.id,
+      sentryIssueId: updated.sentryIssueId,
+      severity: updated.severity,
+      title: updated.title,
+    });
     // 外部 (GitHub Actions) 向けの webhook なので、`error` キーを成功時に流用する
     // 内部 admin API の慣習ではなく、`data` キーで返して "error 有無で失敗判定"
     // できる素直な形にする（admin/src/api/admin.ts と異なり消費者がまだ存在しない）。
