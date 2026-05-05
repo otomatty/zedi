@@ -12,6 +12,7 @@
  * @see https://github.com/otomatty/zedi/issues/803
  */
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import {
   ALLOWED_API_ERROR_STATUS_TRANSITIONS,
   ApiErrorInvalidTransitionError,
@@ -22,7 +23,13 @@ import {
   listApiErrors,
   updateApiErrorStatus,
 } from "../../services/apiErrorService.js";
-import type { ApiErrorSeverity, ApiErrorStatus } from "../../schema/apiErrors.js";
+import {
+  apiErrorSubscriberCount,
+  API_ERROR_STREAM_MAX_SUBSCRIBERS,
+  publishApiErrorUpdate,
+  subscribeApiErrorUpdates,
+} from "../../services/apiErrorBroadcaster.js";
+import type { ApiError, ApiErrorSeverity, ApiErrorStatus } from "../../schema/apiErrors.js";
 import type { AppEnv } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -120,6 +127,143 @@ app.get("/", async (c) => {
 });
 
 /**
+ * SSE で送信するイベントの payload を ApiError 行から組み立てる。
+ * timestamps は Date のまま JSON.stringify すると ISO 文字列になる。クライアントは
+ * `ApiErrorRow` として消費する。
+ *
+ * Build the SSE event payload from an `ApiError` row. Date instances
+ * stringify to ISO 8601 so the wire shape matches the REST `ApiErrorRow`.
+ */
+function serializeRowEvent(row: ApiError): string {
+  return JSON.stringify(row);
+}
+
+/**
+ * SSE 接続のキープアライブ間隔 (ms)。プロキシや LB がアイドル接続を切る前に
+ * コメント行を送って TCP を温存する。
+ *
+ * Keep-alive interval (ms) for SSE connections. Proxies / load balancers tend
+ * to drop idle TCP after 30–60 s; emit a comment line periodically so the
+ * stream stays open without producing visible events on the client.
+ */
+const SSE_KEEPALIVE_MS = 25_000;
+
+/**
+ * GET /api/admin/errors/stream — `text/event-stream` で `api_errors` の更新を
+ * リアルタイム配信する (Epic #616 Phase 2 / issue #807)。`adminRequired` は
+ * 親ルート (`/api/admin`) で適用済み。
+ *
+ * クライアントは `EventSource('/api/admin/errors/stream')` で接続し、
+ * `update` イベントの `data` を `ApiErrorRow` としてパースする。受信側は同 ID
+ * の行を最新値で置換し、未知の ID なら一覧の先頭に追加する想定。
+ *
+ * GET /api/admin/errors/stream — Server-Sent Events feed of `api_errors`
+ * updates (Epic #616 Phase 2 / issue #807). Browsers consume it via
+ * `EventSource`; each `update` event carries one `ApiErrorRow` JSON payload so
+ * the admin UI can replace the row in place (or prepend on first sight)
+ * without a full refetch.
+ *
+ * - 503: 同時接続数の上限に達している。クライアントは backoff 後に再接続する。
+ * - 200: 接続確立後、最初に `: connected` コメント行と `retry: 30000` を返す。
+ *
+ * - 503: subscriber cap reached; client must back off before reconnecting.
+ * - 200: on connect, emits a `: connected` comment plus a `retry: 30000` hint
+ *   so the browser's auto-reconnect waits 30 s instead of the default ~3 s.
+ */
+app.get("/stream", (c) => {
+  // 上限チェックは streamSSE を呼ぶ前に行う。streamSSE が走り出すと既に
+  // ステータス 200 + `text/event-stream` のレスポンスが開始されてしまい、
+  // 503 へ降格できないため。クライアント側は 503 を見て backoff する想定。
+  // Reject capacity exhaustion BEFORE entering streamSSE — once that helper
+  // commits the response (200 + text/event-stream), we can no longer change
+  // the status to 503. The pre-check lets clients see a real 503 and apply
+  // the documented backoff strategy instead of treating it as a transient
+  // SSE-level error.
+  if (apiErrorSubscriberCount() >= API_ERROR_STREAM_MAX_SUBSCRIBERS) {
+    return c.json({ error: `subscriber cap reached (${API_ERROR_STREAM_MAX_SUBSCRIBERS})` }, 503);
+  }
+  return streamSSE(
+    c,
+    async (stream) => {
+      // EventSource は接続成功直後の最初のイベントを待つので、空っぽの応答を
+      // 返さないよう必ずコメントと retry ヒントを送る。
+      // EventSource holds the request "pending" until the first event lands;
+      // emit a comment + retry hint so the browser commits to the connection
+      // and uses our preferred reconnect delay.
+      await stream.writeSSE({ data: "", event: "ready", retry: 30_000 });
+
+      // すべての更新を購読。送信は async なのでイベントを内部キューに溜め、
+      // 順序を保ったまま flush する。
+      // Subscribe and queue events; SSE writes are async but listener
+      // callbacks must be sync, so we serialize through a microtask chain.
+      // 上限はルート冒頭で確認済みのため通常 throw しないが、競合で同時に
+      // 限界を超えた場合に備えて catch して接続を畳む。
+      // Capacity is verified at the top of the route, but a concurrent
+      // subscribe could still exceed the cap; close the stream cleanly if
+      // that race fires instead of leaking an unhandled rejection.
+      let unsubscribe: (() => void) | null = null;
+      try {
+        let writeChain: Promise<void> = Promise.resolve();
+        unsubscribe = subscribeApiErrorUpdates((row) => {
+          writeChain = writeChain
+            .then(async () => {
+              if (stream.aborted || stream.closed) return;
+              await stream.writeSSE({ event: "update", data: serializeRowEvent(row) });
+            })
+            .catch((err) => {
+              const message = err instanceof Error ? err.message : String(err);
+              console.error(`[admin-errors-stream] write failed: ${message}`);
+            });
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[admin-errors-stream] subscribe failed: ${message}`);
+        await stream.writeSSE({
+          event: "error",
+          data: JSON.stringify({ error: "subscribe failed" }),
+        });
+        await stream.close();
+        return;
+      }
+
+      stream.onAbort(() => {
+        unsubscribe?.();
+      });
+
+      // クライアントが切断するまでキープアライブを送り続ける。
+      // sleep が abort で resolve すると while を抜けて handler が終了し、
+      // ここまで来たら `onAbort` で unsubscribe 済み。
+      // Heartbeat loop: emit a comment line every SSE_KEEPALIVE_MS so idle
+      // proxies (and our own server) don't tear down the TCP connection.
+      // Exits naturally when the client disconnects (sleep resolves on abort).
+      while (!stream.aborted && !stream.closed) {
+        await stream.sleep(SSE_KEEPALIVE_MS);
+        if (stream.aborted || stream.closed) break;
+        // 生の SSE コメント行（`:` で始まり空行で終わる）を直接書き込む。
+        // `writeSSE` は `event:` 行を必ず生成するためコメントにはならず、
+        // 名前付きイベントが配信されてしまう (PR #816 review)。
+        // Write a raw SSE comment line (`:` prefix, blank-line terminated).
+        // `writeSSE` always emits an `event:` field, which would be a named
+        // event the client receives — not the invisible keep-alive we want
+        // (PR #816 review).
+        await stream.write(": ping\n\n");
+      }
+
+      unsubscribe?.();
+    },
+    async (err, stream) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[admin-errors-stream] handler error: ${message}`);
+      try {
+        await stream.writeSSE({ event: "error", data: JSON.stringify({ error: "stream error" }) });
+      } catch {
+        /* swallow — connection likely closed */
+      }
+    },
+  );
+});
+
+/**
  * GET /api/admin/errors/:id — 詳細取得。
  * GET /api/admin/errors/:id — fetch a single row by primary key.
  */
@@ -185,6 +329,11 @@ app.patch("/:id", async (c) => {
     if (!row) {
       return c.json({ error: "Not found" }, 404);
     }
+    // SSE 購読者へ最新行を配信。失敗してもステータス更新は成功扱いにする
+    // （broadcaster は in-memory なので例外時は購読者側で polling fallback を期待）。
+    // Notify SSE subscribers; errors here must not flip the PATCH response from
+    // 200 to 5xx because the DB write already succeeded.
+    publishApiErrorUpdate(row);
     return c.json({ error: row });
   } catch (err) {
     if (err instanceof ApiErrorStatusConflictError) {

@@ -5,7 +5,22 @@
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 
-function getApiUrl(path: string): string {
+/**
+ * パスを `VITE_API_BASE_URL` と結合して絶対 URL（または相対パス）を返す。
+ * 本番では admin が Cloudflare Pages、API が `https://api.zedi-note.app`
+ * など別オリジンになるため、`fetch` だけでなく `EventSource` などの
+ * リクエスト URL もこの関数で組み立てる必要がある。
+ *
+ * Resolve a path against `VITE_API_BASE_URL`. Production splits the admin
+ * origin (Cloudflare Pages) from the API origin
+ * (`https://api.zedi-note.app`), so EventSource and other non-`adminFetch`
+ * consumers must use this helper or they'll hit the wrong host.
+ *
+ * @param path - API パス（先頭の `/` は任意）/ API path (leading `/` optional)
+ * @returns 絶対 URL（base 設定時）または同一オリジンのパス /
+ *          Absolute URL when a base is set, otherwise the same-origin path
+ */
+export function getApiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return baseUrl ? `${baseUrl.replace(/\/$/, "")}${normalized}` : normalized;
 }
