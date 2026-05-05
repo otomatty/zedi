@@ -239,10 +239,14 @@ app.get("/stream", (c) => {
       while (!stream.aborted && !stream.closed) {
         await stream.sleep(SSE_KEEPALIVE_MS);
         if (stream.aborted || stream.closed) break;
-        // SSE コメント行（`:` で始まる）はクライアントには配信されない。
-        // SSE comment lines (leading `:`) are ignored by the EventSource API
-        // but keep the underlying connection alive.
-        await stream.writeSSE({ data: "", event: "ping" });
+        // 生の SSE コメント行（`:` で始まり空行で終わる）を直接書き込む。
+        // `writeSSE` は `event:` 行を必ず生成するためコメントにはならず、
+        // 名前付きイベントが配信されてしまう (PR #816 review)。
+        // Write a raw SSE comment line (`:` prefix, blank-line terminated).
+        // `writeSSE` always emits an `event:` field, which would be a named
+        // event the client receives — not the invisible keep-alive we want
+        // (PR #816 review).
+        await stream.write(": ping\n\n");
       }
 
       unsubscribe?.();
