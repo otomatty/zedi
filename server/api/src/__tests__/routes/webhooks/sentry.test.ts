@@ -179,15 +179,25 @@ describe("extractSentrySummary", () => {
 
 describe("POST /api/webhooks/sentry", () => {
   const ORIGINAL_ENV = process.env.SENTRY_WEBHOOK_SECRET;
+  const ORIGINAL_DISPATCH_REPO = process.env.GITHUB_DISPATCH_REPOSITORY;
 
   beforeEach(() => {
     process.env.SENTRY_WEBHOOK_SECRET = TEST_SECRET;
+    // Issue #805 のテストでは repository_dispatch が外部に飛ばないようにする。
+    // Keep `GITHUB_DISPATCH_REPOSITORY` unset so the dispatch helper short-
+    // circuits — we don't want fire-and-forget tasks reaching out to GitHub.
+    delete process.env.GITHUB_DISPATCH_REPOSITORY;
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "log").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     process.env.SENTRY_WEBHOOK_SECRET = ORIGINAL_ENV;
+    if (ORIGINAL_DISPATCH_REPO === undefined) {
+      delete process.env.GITHUB_DISPATCH_REPOSITORY;
+    } else {
+      process.env.GITHUB_DISPATCH_REPOSITORY = ORIGINAL_DISPATCH_REPO;
+    }
     vi.restoreAllMocks();
   });
 
@@ -197,8 +207,9 @@ describe("POST /api/webhooks/sentry", () => {
       sentryIssueId: "abc-123",
       occurrences: 1,
     };
-    // upsertFromSentrySummary issues a single insert chain that resolves to [row].
-    const { app, chains } = createApp([[upsertedRow]]);
+    // First chain: getApiErrorBySentryIssueId returns no existing row (isNew=true).
+    // Second chain: upsertFromSentrySummary returns the inserted row.
+    const { app, chains } = createApp([[], [upsertedRow]]);
     const body = JSON.stringify({
       action: "created",
       data: {
@@ -228,6 +239,78 @@ describe("POST /api/webhooks/sentry", () => {
     // The handler issued exactly one insert chain.
     const insertChains = chains.filter((c) => c.startMethod === "insert");
     expect(insertChains).toHaveLength(1);
+  });
+
+  it("logs and skips repository_dispatch when GITHUB_DISPATCH_REPOSITORY is unset (isNew=true)", async () => {
+    // 受け入れ条件: Actions 側未デプロイでも API がデグレしない。
+    // Issue #805 acceptance criterion: the API must not degrade when the
+    // Actions-side workflow is not deployed yet. We assert that on a fresh
+    // issue, with no dispatch repository configured, the handler still
+    // returns 200 and logs a deliberate skip.
+    delete process.env.GITHUB_DISPATCH_REPOSITORY;
+
+    const upsertedRow = {
+      id: "00000000-0000-0000-0000-0000000000bb",
+      sentryIssueId: "fresh-1",
+      title: "fresh issue",
+      route: null,
+      occurrences: 1,
+    };
+    const { app } = createApp([[], [upsertedRow]]);
+    const body = JSON.stringify({
+      data: { issue: { id: "fresh-1", title: "fresh issue" } },
+    });
+
+    const res = await app.request("/api/webhooks/sentry", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "sentry-hook-signature": sign(body),
+      },
+      body,
+    });
+
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 0));
+    // We log "isNew=true" on the success line and a separate skip line for
+    // the dispatch — both go through `console.log`. Ensure no error path
+    // fired (the helper doesn't throw when the dispatch repo is unset).
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire repository_dispatch on a recurrence (isNew=false)", async () => {
+    process.env.GITHUB_DISPATCH_REPOSITORY = "owner/repo";
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const existingRow = {
+      id: "00000000-0000-0000-0000-0000000000cc",
+      sentryIssueId: "recur-1",
+      title: "recurrence",
+      route: null,
+      occurrences: 5,
+    };
+    const upserted = { ...existingRow, occurrences: 6 };
+    // First SELECT returns the existing row → isNew=false → no dispatch.
+    const { app } = createApp([[existingRow], [upserted]]);
+    const body = JSON.stringify({
+      data: { issue: { id: "recur-1", title: "recurrence" } },
+    });
+
+    const res = await app.request("/api/webhooks/sentry", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "sentry-hook-signature": sign(body),
+      },
+      body,
+    });
+
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 0));
+    // No GitHub fetch should have happened: the dispatch path was skipped.
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it("returns 403 when signature is missing", async () => {

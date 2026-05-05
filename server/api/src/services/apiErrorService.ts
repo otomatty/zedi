@@ -464,6 +464,138 @@ export async function updateApiErrorStatus(
   return updated;
 }
 
+/**
+ * `updateAiAnalysis` の入力。AI 解析結果コールバック (Epic #616 Phase 2) で
+ * GitHub Actions から渡される。受け取り側 (`updateAiAnalysis`) は与えられた
+ * フィールドのみ更新し、`undefined` のものは既存値を保持する。
+ *
+ * Input shape used by `updateAiAnalysis` — the callback path that GitHub
+ * Actions hits with the AI analysis results. Fields left `undefined` keep
+ * their existing value so the workflow can post partial updates (e.g. just
+ * the severity) without clobbering earlier data.
+ */
+export interface UpdateAiAnalysisInput {
+  id: string;
+  aiSummary?: string | null;
+  aiSuspectedFiles?: ApiErrorSuspectedFile[] | null;
+  aiRootCause?: string | null;
+  aiSuggestedFix?: string | null;
+  severity?: ApiErrorSeverity;
+}
+
+/**
+ * `updateAiAnalysis` の境界バリデーションで投げるエラー。
+ * Thrown by `updateAiAnalysis` when the callback payload fails boundary
+ * validation (unknown severity, malformed suspected-files entries, etc.).
+ *
+ * 呼び出し側は HTTP 400 にマップすることを想定する。
+ * Callers map this to HTTP 400.
+ */
+export class ApiErrorAiAnalysisValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiErrorAiAnalysisValidationError";
+  }
+}
+
+const VALID_SEVERITIES_FOR_AI: readonly ApiErrorSeverity[] = ["high", "medium", "low", "unknown"];
+
+/**
+ * `aiSuspectedFiles` を境界で検証する。配列であり、各要素が
+ * `{ path: string }` を最低限満たすことを要求する。
+ *
+ * Validate `aiSuspectedFiles` at the boundary. Each entry must be an object
+ * with a non-empty `path`; `reason` and `line` are optional but must be the
+ * right shape when present, so we don't persist garbage into the JSONB column.
+ */
+function validateSuspectedFiles(value: unknown): ApiErrorSuspectedFile[] | null {
+  if (value === null) return null;
+  if (!Array.isArray(value)) {
+    throw new ApiErrorAiAnalysisValidationError("aiSuspectedFiles must be an array");
+  }
+  const out: ApiErrorSuspectedFile[] = [];
+  for (const [i, entry] of value.entries()) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new ApiErrorAiAnalysisValidationError(`aiSuspectedFiles[${i}] must be an object`);
+    }
+    const e = entry as Record<string, unknown>;
+    if (typeof e.path !== "string" || e.path.length === 0) {
+      throw new ApiErrorAiAnalysisValidationError(
+        `aiSuspectedFiles[${i}].path must be a non-empty string`,
+      );
+    }
+    if (e.reason !== undefined && typeof e.reason !== "string") {
+      throw new ApiErrorAiAnalysisValidationError(`aiSuspectedFiles[${i}].reason must be a string`);
+    }
+    if (
+      e.line !== undefined &&
+      (typeof e.line !== "number" || !Number.isFinite(e.line) || !Number.isInteger(e.line))
+    ) {
+      throw new ApiErrorAiAnalysisValidationError(
+        `aiSuspectedFiles[${i}].line must be a finite integer`,
+      );
+    }
+    const normalized: ApiErrorSuspectedFile = { path: e.path };
+    if (typeof e.reason === "string") normalized.reason = e.reason;
+    if (typeof e.line === "number") normalized.line = e.line;
+    out.push(normalized);
+  }
+  return out;
+}
+
+/**
+ * AI 解析結果を `api_errors` 行に書き戻す（Epic #616 Phase 2）。
+ *
+ * - 行が存在しなければ `null` を返す。
+ * - `severity` が不正値ならば `ApiErrorAiAnalysisValidationError` を投げる。
+ * - `undefined` のフィールドは UPDATE に含めず、既存値を保持する。
+ *
+ * Persist AI analysis results onto an `api_errors` row (Epic #616 Phase 2).
+ * Returns `null` when the row does not exist; throws
+ * `ApiErrorAiAnalysisValidationError` for invalid severity / suspected-files
+ * shape. `undefined` fields are omitted from the UPDATE so partial workflow
+ * posts (e.g. severity only) don't clobber pre-existing AI fields.
+ */
+export async function updateAiAnalysis(
+  db: Database,
+  input: UpdateAiAnalysisInput,
+): Promise<ApiError | null> {
+  if (input.severity !== undefined && !VALID_SEVERITIES_FOR_AI.includes(input.severity)) {
+    throw new ApiErrorAiAnalysisValidationError(
+      `severity must be one of ${VALID_SEVERITIES_FOR_AI.join(", ")}`,
+    );
+  }
+
+  const updates: Partial<
+    Pick<
+      NewApiError,
+      "aiSummary" | "aiSuspectedFiles" | "aiRootCause" | "aiSuggestedFix" | "severity"
+    >
+  > = {};
+  if (input.aiSummary !== undefined) updates.aiSummary = input.aiSummary;
+  if (input.aiSuspectedFiles !== undefined) {
+    updates.aiSuspectedFiles = validateSuspectedFiles(input.aiSuspectedFiles);
+  }
+  if (input.aiRootCause !== undefined) updates.aiRootCause = input.aiRootCause;
+  if (input.aiSuggestedFix !== undefined) updates.aiSuggestedFix = input.aiSuggestedFix;
+  if (input.severity !== undefined) updates.severity = input.severity;
+
+  // 何も更新しないコールバックは行存在のみ返す（不要な UPDATE を発行しない）。
+  // No-op callback: just probe existence so the route can return 404 cleanly
+  // without burning a NOOP UPDATE on the row.
+  if (Object.keys(updates).length === 0) {
+    return getApiErrorById(db, input.id);
+  }
+
+  const [updated] = await db
+    .update(apiErrors)
+    .set({ ...updates, updatedAt: sql`NOW()` })
+    .where(eq(apiErrors.id, input.id))
+    .returning();
+
+  return updated ?? null;
+}
+
 // 公開はしないがコンパイル時に未使用警告が出ないよう、import を参照しておく。
 // Touch types so tsc/eslint don't strip them in `--isolatedModules` builds.
 export type { ApiErrorSuspectedFile };

@@ -10,3 +10,15 @@
 # The TEST_TOKEN at invite.test.ts:38 is a hard-coded mock string used only for
 # invitation API unit tests — it is not a real API key or secret.
 b1e5dab7fa191b9f317b066099ca3fbb6450c5a7:server/api/src/__tests__/routes/invite.test.ts:generic-api-key:38
+
+# server/api/src/lib/githubAppAuth.test.ts:23 のコミット d10d11f に含まれる
+# RSA 秘密鍵は、PR #814 (issue #805) のテスト用に生成された使い捨ての鍵で、
+# 後続のコミット f6825d7 で `jose` モックに置き換えて削除済み。実際の署名には
+# 一度も使われていないが、Git 履歴には残るため fingerprint を追加して
+# 誤検知扱いにする。
+# The RSA private key in commit d10d11f at githubAppAuth.test.ts:23 was a
+# disposable test key generated solely for PR #814 (issue #805). The follow-up
+# commit f6825d7 replaced the JWT path with a `jose` mock and removed the key
+# from HEAD; it was never used to sign anything outside this test file. Git
+# history retains the blob, so we suppress the historical match here.
+d10d11f5fa92743bb5a8214ca5c088d7cb4b01dd:server/api/src/lib/githubAppAuth.test.ts:private-key:23
