@@ -50,13 +50,24 @@ on:
         required: false
         type: boolean
         default: true
+      skip_issue:
+        description: Skip GitHub Issue create / comment (Epic #616 Phase 3)
+        required: false
+        type: boolean
+        default: true
 
-# 最小権限。callback は GitHub App の installation token 経由で行うため、
-# `GITHUB_TOKEN` には何も書かせない。
-# Minimum permissions. The callback uses a GitHub App installation token, so
-# the default `GITHUB_TOKEN` needs nothing beyond `contents: read`.
+# API callback と Issue 起票はどちらも GitHub App の installation token 経由で行う
+# ため、デフォルト `GITHUB_TOKEN` には書き込みを与えない。`issues: write` を
+# 明示するのは Epic #616 Phase 3 (Issue #808) の要件: フォールバックで `gh`
+# CLI を使えるようにし、ジョブの権限境界を YAML 上で読み取れるようにする目的。
+#
+# Both the API callback and the auto-issue step use the GitHub App installation
+# token (minted just below). `issues: write` is declared explicitly per Issue
+# #808 so the workflow's intent is visible in YAML and `gh` CLI fallbacks are
+# usable; the App token is still the actual writer.
 permissions:
   contents: read
+  issues: write
 
 # 同一 sentry_issue_id への並行起動を防ぐ。再来時にも余計に Claude を呼ばないため。
 # Prevent concurrent runs for the same Sentry issue. Avoids spending Anthropic
@@ -81,16 +92,21 @@ jobs:
           fetch-depth: 1
 
       - name: Mint GitHub App installation token
-        # callback の Bearer に使う。`actions/create-github-app-token` は App ID +
-        # Private Key から短命 installation token を発行し、自動で revoke する。
-        # ワークフロー外には漏れない。`skip_callback=true` の場合はこのステップを
-        # スキップして、secrets 未設定環境（fork PR など）でもドライランが回るようにする。
+        # callback の Bearer + 自動 Issue 起票の bearer に使う。`actions/create-github-app-token`
+        # は App ID + Private Key から短命 installation token を発行し、自動で revoke する。
+        # ワークフロー外には漏れない。`skip_callback` と `skip_issue` の両方が true の
+        # ドライランではこのステップをスキップし、secrets 未設定環境（fork PR など）
+        # でもパイプラインが回るようにする。
         #
-        # Mint the bearer used for the API callback. `actions/create-github-app-token`
-        # exchanges App ID + Private Key for a short-lived installation token and
-        # auto-revokes it at job end. Skipped when `skip_callback=true` so the
-        # dry-run path works in environments without the App secrets configured.
-        if: github.event_name == 'repository_dispatch' || github.event.inputs.skip_callback != 'true'
+        # Mint the bearer used by both the API callback and the auto-issue
+        # step. Skipped only when both `skip_callback` and `skip_issue` are
+        # `true` (the workflow_dispatch dry-run default), so repositories
+        # without GitHub App secrets configured can still validate the
+        # pipeline end-to-end.
+        if: >-
+          github.event_name == 'repository_dispatch' ||
+          github.event.inputs.skip_callback != 'true' ||
+          github.event.inputs.skip_issue != 'true'
         id: app-token
         uses: actions/create-github-app-token@v2
         with:
@@ -111,3 +127,10 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           dry_run: ${{ github.event.inputs.dry_run || 'false' }}
           skip_callback: ${{ github.event.inputs.skip_callback || 'false' }}
+          # `repository_dispatch` 経由（本番経路）では常に Issue 起票判定を回す。
+          # `workflow_dispatch` では入力 `skip_issue` を尊重し、デフォルトは true で
+          # ローカルのドライラン中に誤って Issue を作らないようにする。
+          # On `repository_dispatch` (production path) always run the auto-issue
+          # gate. On `workflow_dispatch` honor the `skip_issue` input (default
+          # true) so ad-hoc dry runs cannot accidentally file Issues.
+          skip_issue: ${{ github.event.inputs.skip_issue || 'false' }}

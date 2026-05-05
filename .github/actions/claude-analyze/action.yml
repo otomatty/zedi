@@ -48,6 +48,12 @@ inputs:
     description: When "true", validate locally but do not PUT to the API (pairs with dry_run for fixture validation).
     required: false
     default: "false"
+  skip_issue:
+    description: >
+      When "true", skip the auto-issue (create / comment) step. Pairs with
+      `dry_run` / `skip_callback` for fixture validation. Epic #616 Phase 3.
+    required: false
+    default: "false"
 
 outputs:
   severity:
@@ -56,6 +62,17 @@ outputs:
   output_path:
     description: Path to the validated analysis JSON written by the script.
     value: ${{ steps.analyze.outputs.output_path }}
+  issue_action:
+    description: >
+      Outcome of the auto-issue step: `skipped`, `created`, or `commented`.
+      Empty when `skip_issue=true`. Epic #616 Phase 3 / Issue #808.
+    value: ${{ steps.auto-issue.outputs.action }}
+  issue_number:
+    description: GitHub Issue number created or commented on (empty when skipped).
+    value: ${{ steps.auto-issue.outputs.issue_number }}
+  issue_html_url:
+    description: HTML URL of the created Issue or recurrence comment (empty when skipped).
+    value: ${{ steps.auto-issue.outputs.issue_html_url }}
 
 runs:
   using: composite
@@ -149,3 +166,27 @@ runs:
           attempt=$((attempt + 1))
           sleep 5
         done
+
+    - name: Auto-file or comment GitHub Issue
+      # Epic #616 Phase 3 / Issue #808: severity が high / medium のときだけ
+      # Issue を起票し、同一 sentry_issue_id に既存オープン Issue があれば
+      # コメント追記で再発を表現する（連続 100 回でも 1 件に集約）。`skip_issue`
+      # は `workflow_dispatch` のドライラン用フラグ。
+      #
+      # Files a GitHub Issue when AI severity is high / medium, or appends a
+      # recurrence comment when an open Issue with the matching
+      # `sentry-issue:<id>` label already exists. Honors `skip_issue` so
+      # workflow_dispatch dry runs cannot accidentally create Issues.
+      if: inputs.skip_issue != 'true'
+      id: auto-issue
+      shell: bash
+      env:
+        AUTO_ISSUE_OUTPUT_PATH: ${{ steps.analyze.outputs.output_path }}
+        AUTO_ISSUE_SENTRY_ISSUE_ID: ${{ inputs.sentry_issue_id }}
+        AUTO_ISSUE_API_ERROR_ID: ${{ inputs.api_error_id }}
+        AUTO_ISSUE_TITLE: ${{ inputs.title }}
+        AUTO_ISSUE_ROUTE: ${{ inputs.route }}
+        AUTO_ISSUE_REPOSITORY: ${{ github.repository }}
+        AUTO_ISSUE_TOKEN: ${{ inputs.installation_token }}
+        AUTO_ISSUE_WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: node "${{ github.action_path }}/autoIssueRunner.mjs"
