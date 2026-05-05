@@ -12,6 +12,7 @@
  * @see https://github.com/otomatty/zedi/issues/803
  */
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import {
   ALLOWED_API_ERROR_STATUS_TRANSITIONS,
   ApiErrorInvalidTransitionError,
@@ -22,7 +23,12 @@ import {
   listApiErrors,
   updateApiErrorStatus,
 } from "../../services/apiErrorService.js";
-import type { ApiErrorSeverity, ApiErrorStatus } from "../../schema/apiErrors.js";
+import {
+  ApiErrorStreamCapacityExceededError,
+  publishApiErrorUpdate,
+  subscribeApiErrorUpdates,
+} from "../../services/apiErrorBroadcaster.js";
+import type { ApiError, ApiErrorSeverity, ApiErrorStatus } from "../../schema/apiErrors.js";
 import type { AppEnv } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -120,6 +126,124 @@ app.get("/", async (c) => {
 });
 
 /**
+ * SSE で送信するイベントの payload を ApiError 行から組み立てる。
+ * timestamps は Date のまま JSON.stringify すると ISO 文字列になる。クライアントは
+ * `ApiErrorRow` として消費する。
+ *
+ * Build the SSE event payload from an `ApiError` row. Date instances
+ * stringify to ISO 8601 so the wire shape matches the REST `ApiErrorRow`.
+ */
+function serializeRowEvent(row: ApiError): string {
+  return JSON.stringify(row);
+}
+
+/**
+ * SSE 接続のキープアライブ間隔 (ms)。プロキシや LB がアイドル接続を切る前に
+ * コメント行を送って TCP を温存する。
+ *
+ * Keep-alive interval (ms) for SSE connections. Proxies / load balancers tend
+ * to drop idle TCP after 30–60 s; emit a comment line periodically so the
+ * stream stays open without producing visible events on the client.
+ */
+const SSE_KEEPALIVE_MS = 25_000;
+
+/**
+ * GET /api/admin/errors/stream — `text/event-stream` で `api_errors` の更新を
+ * リアルタイム配信する (Epic #616 Phase 2 / issue #807)。`adminRequired` は
+ * 親ルート (`/api/admin`) で適用済み。
+ *
+ * クライアントは `EventSource('/api/admin/errors/stream')` で接続し、
+ * `update` イベントの `data` を `ApiErrorRow` としてパースする。受信側は同 ID
+ * の行を最新値で置換し、未知の ID なら一覧の先頭に追加する想定。
+ *
+ * GET /api/admin/errors/stream — Server-Sent Events feed of `api_errors`
+ * updates (Epic #616 Phase 2 / issue #807). Browsers consume it via
+ * `EventSource`; each `update` event carries one `ApiErrorRow` JSON payload so
+ * the admin UI can replace the row in place (or prepend on first sight)
+ * without a full refetch.
+ *
+ * - 503: 同時接続数の上限に達している。クライアントは backoff 後に再接続する。
+ * - 200: 接続確立後、最初に `: connected` コメント行と `retry: 30000` を返す。
+ *
+ * - 503: subscriber cap reached; client must back off before reconnecting.
+ * - 200: on connect, emits a `: connected` comment plus a `retry: 30000` hint
+ *   so the browser's auto-reconnect waits 30 s instead of the default ~3 s.
+ */
+app.get("/stream", (c) => {
+  return streamSSE(
+    c,
+    async (stream) => {
+      // EventSource は接続成功直後の最初のイベントを待つので、空っぽの応答を
+      // 返さないよう必ずコメントと retry ヒントを送る。
+      // EventSource holds the request "pending" until the first event lands;
+      // emit a comment + retry hint so the browser commits to the connection
+      // and uses our preferred reconnect delay.
+      await stream.writeSSE({ data: "", event: "ready", retry: 30_000 });
+
+      let unsubscribe: (() => void) | null = null;
+      try {
+        // すべての更新を購読。送信は async なのでイベントを内部キューに溜め、
+        // 順序を保ったまま flush する。
+        // Subscribe and queue events; SSE writes are async but listener
+        // callbacks must be sync, so we serialize through a microtask chain.
+        let writeChain: Promise<void> = Promise.resolve();
+        unsubscribe = subscribeApiErrorUpdates((row) => {
+          writeChain = writeChain
+            .then(async () => {
+              if (stream.aborted || stream.closed) return;
+              await stream.writeSSE({ event: "update", data: serializeRowEvent(row) });
+            })
+            .catch((err) => {
+              const message = err instanceof Error ? err.message : String(err);
+              console.error(`[admin-errors-stream] write failed: ${message}`);
+            });
+        });
+      } catch (err) {
+        if (err instanceof ApiErrorStreamCapacityExceededError) {
+          await stream.writeSSE({
+            event: "error",
+            data: JSON.stringify({ error: "subscriber cap reached" }),
+          });
+          await stream.close();
+          return;
+        }
+        throw err;
+      }
+
+      stream.onAbort(() => {
+        unsubscribe?.();
+      });
+
+      // クライアントが切断するまでキープアライブを送り続ける。
+      // sleep が abort で resolve すると while を抜けて handler が終了し、
+      // ここまで来たら `onAbort` で unsubscribe 済み。
+      // Heartbeat loop: emit a comment line every SSE_KEEPALIVE_MS so idle
+      // proxies (and our own server) don't tear down the TCP connection.
+      // Exits naturally when the client disconnects (sleep resolves on abort).
+      while (!stream.aborted && !stream.closed) {
+        await stream.sleep(SSE_KEEPALIVE_MS);
+        if (stream.aborted || stream.closed) break;
+        // SSE コメント行（`:` で始まる）はクライアントには配信されない。
+        // SSE comment lines (leading `:`) are ignored by the EventSource API
+        // but keep the underlying connection alive.
+        await stream.writeSSE({ data: "", event: "ping" });
+      }
+
+      unsubscribe?.();
+    },
+    async (err, stream) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[admin-errors-stream] handler error: ${message}`);
+      try {
+        await stream.writeSSE({ event: "error", data: JSON.stringify({ error: "stream error" }) });
+      } catch {
+        /* swallow — connection likely closed */
+      }
+    },
+  );
+});
+
+/**
  * GET /api/admin/errors/:id — 詳細取得。
  * GET /api/admin/errors/:id — fetch a single row by primary key.
  */
@@ -185,6 +309,11 @@ app.patch("/:id", async (c) => {
     if (!row) {
       return c.json({ error: "Not found" }, 404);
     }
+    // SSE 購読者へ最新行を配信。失敗してもステータス更新は成功扱いにする
+    // （broadcaster は in-memory なので例外時は購読者側で polling fallback を期待）。
+    // Notify SSE subscribers; errors here must not flip the PATCH response from
+    // 200 to 5xx because the DB write already succeeded.
+    publishApiErrorUpdate(row);
     return c.json({ error: row });
   } catch (err) {
     if (err instanceof ApiErrorStatusConflictError) {

@@ -8,9 +8,13 @@
  *   [0] adminRequired → ADMIN_ROLE_RESULT (or USER_ROLE_RESULT for 403 cases)
  *   [1..] handler queries (depends on the route)
  */
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
+import {
+  clearApiErrorSubscribers,
+  publishApiErrorUpdate,
+} from "../../../services/apiErrorBroadcaster.js";
 
 vi.mock("../../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
@@ -318,6 +322,96 @@ describe("PATCH /api/admin/errors/:id", () => {
       headers: adminAuthHeaders(),
       body: JSON.stringify({ status: "investigating" }),
     });
+    expect(res.status).toBe(403);
+  });
+});
+
+// ── GET /api/admin/errors/stream ────────────────────────────────────────────
+
+/**
+ * SSE のレスポンスは ReadableStream で延々と続くため、テストでは最初のチャンクを
+ * 1〜2 個読んだら必ず cancel して接続を閉じる。閉じないと vitest がハングする。
+ *
+ * SSE responses keep streaming, so each test reads at most a couple of chunks
+ * and then cancels the body. Forgetting to cancel hangs the test runner.
+ */
+async function readUntil(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  predicate: (text: string) => boolean,
+  timeoutMs = 1_000,
+): Promise<string> {
+  const decoder = new TextDecoder();
+  let acc = "";
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) acc += decoder.decode(value, { stream: true });
+    if (predicate(acc)) return acc;
+  }
+  return acc;
+}
+
+describe("GET /api/admin/errors/stream", () => {
+  afterEach(() => {
+    // テスト間で broadcaster の購読者が残らないようにクリアする。
+    // Reset broadcaster state between tests so a leaked subscriber doesn't
+    // cross-contaminate later cases.
+    clearApiErrorSubscribers();
+  });
+
+  it("returns 200 with text/event-stream and the initial ready event", async () => {
+    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+
+    const res = await app.request("/api/admin/errors/stream", {
+      headers: adminAuthHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/event-stream/i);
+    const body = res.body;
+    if (!body) throw new Error("expected SSE body");
+    const reader = body.getReader();
+    const text = await readUntil(reader, (t) => t.includes("event: ready"));
+    expect(text).toContain("event: ready");
+    expect(text).toContain("retry: 30000");
+    await reader.cancel();
+  });
+
+  it("forwards published rows as `update` events to subscribers", async () => {
+    const { app } = createAdminTestApp([ADMIN_ROLE_RESULT]);
+
+    const res = await app.request("/api/admin/errors/stream", {
+      headers: adminAuthHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = res.body;
+    if (!body) throw new Error("expected SSE body");
+    const reader = body.getReader();
+    // Wait for the initial ready event so the subscriber is registered before
+    // we publish.
+    await readUntil(reader, (t) => t.includes("event: ready"));
+
+    const row = makeRow({ id: "00000000-0000-0000-0000-0000000000aa" });
+    publishApiErrorUpdate(row);
+
+    const text = await readUntil(reader, (t) => t.includes("event: update"));
+    expect(text).toContain("event: update");
+    expect(text).toContain('"id":"00000000-0000-0000-0000-0000000000aa"');
+    await reader.cancel();
+  });
+
+  it("returns 401 without auth", async () => {
+    const { app } = createAdminTestApp([]);
+    const res = await app.request("/api/admin/errors/stream", {
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when user is not admin", async () => {
+    const { app } = createAdminTestApp([USER_ROLE_RESULT]);
+    const res = await app.request("/api/admin/errors/stream", { headers: adminAuthHeaders() });
     expect(res.status).toBe(403);
   });
 });

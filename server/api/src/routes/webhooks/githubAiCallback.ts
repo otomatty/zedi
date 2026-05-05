@@ -24,6 +24,7 @@ import {
   updateAiAnalysis,
   type UpdateAiAnalysisInput,
 } from "../../services/apiErrorService.js";
+import { publishApiErrorUpdate } from "../../services/apiErrorBroadcaster.js";
 import { verifyInstallationToken } from "../../lib/githubAppAuth.js";
 import type { AppEnv } from "../../types/index.js";
 
@@ -157,6 +158,9 @@ app.put("/:id", async (c) => {
     console.log(
       `[github-ai-callback] updated api_error=${updated.id} severity=${updated.severity}`,
     );
+    // SSE 購読者へ AI 解析結果を配信 (Phase 2 / issue #807)。
+    // Notify SSE subscribers so the admin UI updates without a page reload.
+    publishApiErrorUpdate(updated);
     // 外部 (GitHub Actions) 向けの webhook なので、`error` キーを成功時に流用する
     // 内部 admin API の慣習ではなく、`data` キーで返して "error 有無で失敗判定"
     // できる素直な形にする（admin/src/api/admin.ts と異なり消費者がまだ存在しない）。

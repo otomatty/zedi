@@ -28,6 +28,7 @@ import {
   getApiErrorBySentryIssueId,
   upsertFromSentrySummary,
 } from "../../services/apiErrorService.js";
+import { publishApiErrorUpdate } from "../../services/apiErrorBroadcaster.js";
 import { readDispatchRepository, triggerRepositoryDispatch } from "../../lib/githubAppAuth.js";
 import type { AppEnv } from "../../types/index.js";
 
@@ -410,6 +411,11 @@ app.post("/", async (c) => {
     console.log(
       `[sentry-webhook] resource=${resource} upserted issue=${row.sentryIssueId} occurrences=${row.occurrences} isNew=${isNew}`,
     );
+    // SSE 購読者へ最新行を配信 (Phase 2 / issue #807)。broadcaster は in-memory
+    // なので Webhook の応答性に影響しない。
+    // Fan out to SSE subscribers (Phase 2 / issue #807). Broadcaster is
+    // synchronous + in-memory, so it doesn't slow down the webhook response.
+    publishApiErrorUpdate(row);
 
     if (isNew) {
       // fire-and-forget: dispatch のレスポンスを await せずに 200 を返す。
