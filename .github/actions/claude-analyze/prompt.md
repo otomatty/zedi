@@ -33,7 +33,7 @@ The following snippets were grep'd from the checkout based on the error
 title / route. They are best-effort, not exhaustive — you may name additional
 files if they are likely involved (mark them with `reason: "speculative"`).
 
-```
+```text
 {{repo_excerpts}}
 ```
 

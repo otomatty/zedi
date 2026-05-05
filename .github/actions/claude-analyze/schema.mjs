@@ -56,7 +56,17 @@ export const analysisOutputSchema = z
     ai_summary: z.string().min(1, "ai_summary must be a non-empty string"),
     ai_root_cause: z.string().nullable().optional(),
     ai_suggested_fix: z.string().nullable().optional(),
-    ai_suspected_files: z.array(suspectedFileSchema).nullable().optional(),
+    // 最大 5 件は `prompt.md` と README に明示している契約。Claude が指示を無視して
+    // 大量に返してきた場合に CI で弾く（API に 6 件以上を書き戻さない）。
+    // The 5-entry cap is a contract documented in `prompt.md` and the README.
+    // Enforce it at the schema layer so a Claude response that ignores the
+    // instruction (and returns 6+ files) fails CI rather than being PUT to
+    // the API with an oversized list.
+    ai_suspected_files: z
+      .array(suspectedFileSchema)
+      .max(5, "ai_suspected_files must have at most 5 entries")
+      .nullable()
+      .optional(),
   })
   .strict();
 

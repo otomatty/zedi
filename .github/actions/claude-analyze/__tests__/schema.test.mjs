@@ -72,6 +72,11 @@ test("invalid-suspected-file.json is rejected when an entry has no path", async 
   assert.throws(() => parseAndValidate(raw), /path/);
 });
 
+test("invalid-too-many-files.json is rejected when ai_suspected_files exceeds 5 entries", async () => {
+  const raw = await loadFixtureRaw("invalid-too-many-files.json");
+  assert.throws(() => parseAndValidate(raw), /ai_suspected_files.*5|at most 5/);
+});
+
 test("parseAndValidate strips Claude's ```json``` fence and prose preamble", () => {
   const wrapped = [
     "Sure, here is the analysis:",

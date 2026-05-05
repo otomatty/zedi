@@ -117,10 +117,19 @@ runs:
         max_attempts=2
         while true; do
           echo "PUT ${CALLBACK_URL} (attempt ${attempt}/${max_attempts})"
+          # `--connect-timeout` で TCP 接続待ちを 10 秒、`--max-time` でリクエスト
+          # 全体を 30 秒に制限する。ハングした session が retry ループの背圧になる
+          # のを防ぐ（Job timeout の 10 分を一発で食い潰すのを避ける目的）。
+          # `--connect-timeout` caps TCP connect at 10 s; `--max-time` caps the
+          # total request at 30 s. Without these, a hung session would block the
+          # retry loop and could burn the entire 10-minute job timeout on a
+          # single PUT.
           http_status=$(curl -sS -o /tmp/callback-response.txt -w "%{http_code}" \
             -X PUT "${CALLBACK_URL}" \
             -H "Authorization: Bearer ${INSTALLATION_TOKEN}" \
             -H "Content-Type: application/json" \
+            --connect-timeout 10 \
+            --max-time 30 \
             --data-binary "@${OUTPUT_PATH}" || echo "000")
           echo "HTTP ${http_status}"
           if [ "${http_status}" -ge 200 ] && [ "${http_status}" -lt 300 ]; then

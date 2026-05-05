@@ -37,7 +37,12 @@ import process from "node:process";
 import Anthropic from "@anthropic-ai/sdk";
 import { parseAndValidate } from "./schema.mjs";
 
-const HERE = path.dirname(new URL(import.meta.url).pathname);
+// `import.meta.dirname` は Node 20.11+ で利用可能。`new URL(import.meta.url).pathname`
+// 経由よりも Windows 互換が良い（`/C:/...` 問題を踏まない）。
+// `import.meta.dirname` (Node 20.11+) is preferred over deriving the path from
+// `import.meta.url` because it does not produce broken `/C:/...` paths on
+// Windows. CI runs on Linux but the script is also exercised locally.
+const HERE = import.meta.dirname;
 
 /**
  * Claude モデル ID。最新の Sonnet 4.6 を既定にする。`CLAUDE_MODEL` 環境変数で
@@ -116,6 +121,14 @@ function readEnv() {
     if (!v) throw new Error(`required env var ${name} is missing`);
     return v;
   };
+  // dryRun を先に決める。Anthropic 呼び出しを行わないドライラン経路では
+  // `ANTHROPIC_API_KEY` が未設定でも動作するようにし、secrets が未配備の fork や
+  // 検証用環境でも `workflow_dispatch` でパイプラインを通せるようにする。
+  //
+  // Resolve `dryRun` first so the dry-run path tolerates a missing
+  // `ANTHROPIC_API_KEY`. Fork PRs and pre-secrets-rollout environments rely
+  // on this to exercise the analyze step end-to-end without the API key.
+  const dryRun = /^(1|true|yes)$/i.test(process.env.CLAUDE_ANALYZE_DRY_RUN?.trim() ?? "");
   return {
     apiErrorId: must("CLAUDE_ANALYZE_API_ERROR_ID"),
     sentryIssueId: must("CLAUDE_ANALYZE_SENTRY_ISSUE_ID"),
@@ -124,22 +137,28 @@ function readEnv() {
     // route is nullable on the server side, so we permit empty string here.
     route: process.env.CLAUDE_ANALYZE_ROUTE?.trim() ?? "",
     repository: must("CLAUDE_ANALYZE_REPOSITORY"),
-    anthropicApiKey: must("ANTHROPIC_API_KEY"),
+    anthropicApiKey: dryRun
+      ? (process.env.ANTHROPIC_API_KEY?.trim() ?? "")
+      : must("ANTHROPIC_API_KEY"),
     model: process.env.CLAUDE_MODEL?.trim() || DEFAULT_MODEL,
     outputPath: must("CLAUDE_ANALYZE_OUTPUT"),
     workspace: process.env.GITHUB_WORKSPACE?.trim() || process.cwd(),
-    dryRun: /^(1|true|yes)$/i.test(process.env.CLAUDE_ANALYZE_DRY_RUN?.trim() ?? ""),
+    dryRun,
   };
 }
 
 /**
- * `title` / `route` から英数字の検索キーワードを抽出する。短すぎる語 (< 4 文字)、
+ * `title` / `route` から検索キーワードを抽出する。短すぎる語 (< 4 文字)、
  * よくある語 (`error`, `failed` など)、HTTP メソッドは除外。重複も除く。
+ * Sentry のタイトルに日本語などの非 ASCII 文字が含まれても切り捨てないよう、
+ * Unicode プロパティ（`\p{L}` 文字 / `\p{N}` 数字）で語境界を判定する。
  *
  * Extract searchable tokens from `title` / `route`. Filters short words
  * (< 4 chars), common error vocabulary, and HTTP verbs so grep lands on
  * symbols/paths actually present in the codebase rather than every file
- * containing the word "error". De-duplicates results.
+ * containing the word "error". Splits on Unicode property classes so that
+ * non-ASCII titles (Japanese error messages, identifiers with accented
+ * characters, …) keep their tokens instead of getting stripped to empty.
  *
  * @param {string} title
  * @param {string} route
@@ -169,7 +188,7 @@ export function deriveKeywords(title, route) {
     "into",
   ]);
   const tokens = `${title} ${route}`
-    .split(/[^A-Za-z0-9_/.\-]+/)
+    .split(/[^\p{L}\p{N}_/.\-]+/u)
     .map((t) => t.trim())
     .filter((t) => t.length >= 4 && !stop.has(t.toLowerCase()));
   return Array.from(new Set(tokens)).slice(0, 8);
@@ -191,38 +210,44 @@ export function deriveKeywords(title, route) {
  */
 export function grepCandidateFiles(keywords, workspace) {
   if (keywords.length === 0) return [];
+  // 全キーワードをまとめて 1 回の `git grep -e KW1 -e KW2 ...` で検索する。
+  // 個別呼び出しに比べてプロセス起動コストを N→1 に削減できる（OR 検索なので
+  // ファイル名集合の和は変わらない）。
+  //
+  // Run a single `git grep` with `-e` for each keyword instead of spawning N
+  // processes. `git grep` with multiple `-e` flags performs an OR search, so
+  // the resulting filename set is identical to the previous loop's union but
+  // avoids per-keyword process startup overhead.
+  const patternFlags = keywords.flatMap((kw) => ["-e", kw]);
+  const res = spawnSync(
+    "git",
+    [
+      "grep",
+      "-l",
+      ...patternFlags,
+      "--",
+      // 巨大な lockfile / 生成物 / バイナリは検索対象外。
+      // Skip lockfiles, build outputs, and binaries.
+      ":!*.lock",
+      ":!*lock.json",
+      ":!dist/**",
+      ":!**/dist/**",
+      ":!node_modules/**",
+      ":!**/node_modules/**",
+      ":!**/*.png",
+      ":!**/*.jpg",
+      ":!**/*.svg",
+      ":!**/*.pdf",
+    ],
+    { cwd: workspace, encoding: "utf8", timeout: 15_000 },
+  );
   /** @type {Set<string>} */
   const hits = new Set();
-  for (const kw of keywords) {
-    const res = spawnSync(
-      "git",
-      [
-        "grep",
-        "-l",
-        "--",
-        kw,
-        // 巨大な lockfile / 生成物 / バイナリは検索対象外。
-        // Skip lockfiles, build outputs, and binaries.
-        ":!*.lock",
-        ":!*lock.json",
-        ":!dist/**",
-        ":!**/dist/**",
-        ":!node_modules/**",
-        ":!**/node_modules/**",
-        ":!**/*.png",
-        ":!**/*.jpg",
-        ":!**/*.svg",
-        ":!**/*.pdf",
-      ],
-      { cwd: workspace, encoding: "utf8", timeout: 15_000 },
-    );
-    if (res.status === 0 && typeof res.stdout === "string") {
-      for (const line of res.stdout.split("\n")) {
-        const trimmed = line.trim();
-        if (trimmed) hits.add(trimmed);
-      }
+  if (res.status === 0 && typeof res.stdout === "string") {
+    for (const line of res.stdout.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed) hits.add(trimmed);
     }
-    if (hits.size >= MAX_EXCERPT_FILES * 4) break;
   }
   // 候補が多すぎるとプロンプトが肥大化するので、source パスらしいものを優先する。
   // Rank: prefer real source files; deprioritize tests, docs, snapshots.
@@ -352,12 +377,25 @@ async function callClaudeWithRetry(client, model, prompt) {
  */
 export async function main() {
   const env = readEnv();
+  // 起動時ログでは title / route の生値を出さない。Sentry の data scrubbing が
+  // 一次防御だが、CI ログは別保管面なので二段防御として長さだけを残す。
+  // api_error_id / sentry_issue_id はそれぞれ DB の id / Sentry 内の id で機密性が
+  // 低いのでそのまま出して相関を取れるようにする。
+  //
+  // Avoid logging raw `title` / `route` at startup. Sentry's data scrubbing is
+  // the primary defense, but CI logs are a separate retention plane, so we
+  // emit metadata only here as a second line of defense. `api_error_id` and
+  // `sentry_issue_id` are bare ids (no PII) and stay verbatim so log lines
+  // can be cross-referenced with the admin UI / Sentry.
   console.log(
-    `[claude-analyze] api_error_id=${env.apiErrorId} sentry_issue_id=${env.sentryIssueId} title=${JSON.stringify(env.title)} route=${JSON.stringify(env.route)}`,
+    `[claude-analyze] api_error_id=${env.apiErrorId} sentry_issue_id=${env.sentryIssueId} title_len=${env.title.length} route_present=${env.route.length > 0}`,
   );
 
   const keywords = deriveKeywords(env.title, env.route);
-  console.log(`[claude-analyze] keywords=${JSON.stringify(keywords)}`);
+  // keywords も title/route 由来なので個別の文字列は出さず件数だけ残す。
+  // Keywords are derived from title/route, so log only the count (not the
+  // tokens themselves) to keep CI logs free of substring leaks.
+  console.log(`[claude-analyze] keywords_count=${keywords.length}`);
   const candidateFiles = grepCandidateFiles(keywords, env.workspace);
   console.log(`[claude-analyze] candidate_files=${JSON.stringify(candidateFiles)}`);
   const excerpts = await buildExcerpts(candidateFiles, env.workspace);
@@ -384,7 +422,13 @@ export async function main() {
       ai_summary: `(dry-run) would analyze ${env.title}`,
       ai_root_cause: null,
       ai_suggested_fix: null,
-      ai_suspected_files: candidateFiles.map((p) => ({ path: p, reason: "grep candidate" })),
+      // schema 上限 (max 5) と `prompt.md` の出力規約に合わせて先頭 5 件に絞る。
+      // grep 上限 (`MAX_EXCERPT_FILES` = 6) より小さいため明示的に slice する。
+      // Cap at the schema's 5-entry limit (the same cap documented in
+      // `prompt.md`). `MAX_EXCERPT_FILES` is 6 so an explicit slice is needed.
+      ai_suspected_files: candidateFiles
+        .slice(0, 5)
+        .map((p) => ({ path: p, reason: "grep candidate" })),
     });
   } else {
     const client = new Anthropic({ apiKey: env.anthropicApiKey });
