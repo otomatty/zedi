@@ -21,6 +21,7 @@ import {
   buildIssueTitle,
   buildRecurrenceCommentBody,
   buildSentryIssueLabel,
+  ensureLabel,
   parseRepository,
   runAutoIssue,
   shouldFileIssue,
@@ -81,6 +82,20 @@ test("buildIssueTitle truncates titles longer than the cap and falls back to pla
   // Confirm truncation actually happened (not just under the GitHub limit).
   const xCount = (title.match(/x/g) ?? []).length;
   assert.ok(xCount < 500, `expected truncation, ${xCount} 'x' chars remained`);
+  // 末尾に省略記号があり、切り捨てが視覚的に分かること。
+  // Truncated titles should end with `...` so readers see at a glance that
+  // the title was cut.
+  assert.match(title, /\.\.\. \(sentry:fixture-2\)$/);
+
+  // 上限ちょうど (TITLE_BODY_MAX) なら省略記号は付かない。
+  // A title exactly at the cap should NOT receive the ellipsis.
+  const exactCap = "y".repeat(180);
+  const exactTitle = buildIssueTitle({
+    severity: "high",
+    title: exactCap,
+    sentryIssueId: "fixture-cap",
+  });
+  assert.ok(!/\.\.\./.test(exactTitle), "no ellipsis when title length is exactly the cap");
 
   const placeholder = buildIssueTitle({ severity: "high", title: "", sentryIssueId: "fixture-3" });
   assert.match(placeholder, /\(no title\)/);
@@ -113,6 +128,25 @@ test("buildIssueBody includes AI fields and the sentry id but no Sentry URL", ()
   // alone are enough to cross-reference, and including the URL would leak the
   // org / project slug into a public-by-default Issue body.
   assert.ok(!/sentry\.io/.test(body), "Sentry URL must not appear in the issue body");
+});
+
+test("buildIssueBody escapes pipe characters in table cells so Markdown tables stay intact", () => {
+  // route に `|` が混入した場合 (例えば proxy 由来の奇妙なルート文字列など) でも
+  // 表組みが崩れないこと。エスケープ後は `\|` として表示される。
+  // A `|` in the route (or any inline-rendered field) must be escaped to
+  // `\|` so the Markdown table doesn't get split into extra columns.
+  const body = buildIssueBody({
+    severity: "medium",
+    summary: "summary",
+    rootCause: null,
+    suggestedFix: null,
+    suspectedFiles: null,
+    route: "GET /api/foo|bar",
+    sentryIssueId: "fixture-pipe",
+    apiErrorId: "id",
+    workflowRunUrl: "https://example.invalid/run/1",
+  });
+  assert.match(body, /GET \/api\/foo\\\|bar/);
 });
 
 test("buildIssueBody handles missing optional fields without showing 'null'", () => {
@@ -438,4 +472,63 @@ test("runAutoIssue picks the lowest-numbered open issue when multiple match (def
 
   assert.equal(result.action, "commented");
   assert.equal(result.issueNumber, 100);
+});
+
+test("ensureLabel tolerates 422 from POST /labels (race when another run created the label)", async () => {
+  // GET → 404 (未存在), POST → 422 (別 run が直前に作成) のシナリオ。
+  // throw せず "existing" を返すこと。
+  // GET → 404 (missing), POST → 422 (created by a concurrent run between our
+  // GET and POST). The function should not throw and should report
+  // "existing" so the caller treats it as success.
+  const responses = [
+    {
+      match: (u, i) => i.method === "GET" && u.endsWith("/labels/auto-reported"),
+      status: 404,
+    },
+    { match: (u, i) => i.method === "POST" && u.endsWith("/labels"), status: 422 },
+  ];
+  const { fetchImpl } = makeFetchStub(responses);
+  const outcome = await ensureLabel({
+    owner: "otomatty",
+    repo: "zedi",
+    label: "auto-reported",
+    token: "tok",
+    fetchImpl,
+    logger: { log: () => {} },
+  });
+  assert.equal(outcome, "existing");
+});
+
+test("ensureLabel returns 'existing' immediately when GET succeeds (no POST issued)", async () => {
+  let postCount = 0;
+  /**
+   * @param {string} url
+   * @param {{ method?: string }} init
+   */
+  async function fetchImpl(url, init = {}) {
+    if (init.method === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { name: "monitoring" };
+        },
+        async text() {
+          return "{}";
+        },
+      };
+    }
+    postCount += 1;
+    throw new Error("POST should not be called");
+  }
+  const outcome = await ensureLabel({
+    owner: "otomatty",
+    repo: "zedi",
+    label: "monitoring",
+    token: "tok",
+    fetchImpl,
+    logger: { log: () => {} },
+  });
+  assert.equal(outcome, "existing");
+  assert.equal(postCount, 0);
 });

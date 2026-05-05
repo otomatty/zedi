@@ -163,18 +163,33 @@ export function parseRepository(repository) {
  */
 export function buildIssueTitle({ severity, title, sentryIssueId }) {
   const trimmed = (title ?? "").trim();
-  const body = trimmed.length === 0 ? "(no title)" : trimmed.slice(0, TITLE_BODY_MAX);
+  let body;
+  if (trimmed.length === 0) {
+    body = "(no title)";
+  } else if (trimmed.length <= TITLE_BODY_MAX) {
+    body = trimmed;
+  } else {
+    // 切り捨ての可視化のため末尾 3 文字を `...` に置き換える。文字数は
+    // `TITLE_BODY_MAX` 内に収める（合計サイズは GitHub の 256 文字上限を侵さない）。
+    // Replace the last 3 chars with `...` so readers see at a glance that the
+    // title was truncated. Keeps total length ≤ TITLE_BODY_MAX so the
+    // prefix/suffix stay safely under GitHub's 256-char Issue-title cap.
+    body = `${trimmed.slice(0, TITLE_BODY_MAX - 3)}...`;
+  }
   return `[${severity}] ${body} (sentry:${sentryIssueId})`;
 }
 
 /**
  * 抜粋 Markdown 用にユーザー由来の任意文字列をエスケープして 1 行表示する。
- * 空文字列・null / undefined は `(none)` を返す。改行は半角スペースに畳む
- * （表組みが崩れないようにするため）。
+ * 空文字列・null / undefined は `(none)` を返す。改行は半角スペースに畳み、
+ * 表組みのセル区切り `|` はバックスラッシュでエスケープする（route や AI 出力に
+ * `|` が混入したときに表が崩れないようにする）。
  *
- * Inline-safe formatter for free-form strings dropped into the issue body
- * tables. Returns `(none)` for empty / null / undefined input and collapses
- * newlines to spaces so Markdown tables do not break.
+ * Inline-safe formatter for free-form strings dropped into the Issue body
+ * tables. Returns `(none)` for empty / null / undefined input. Collapses
+ * newlines to a single space and escapes `|` as `\|` so a stray pipe in a
+ * route segment or AI-generated string cannot break the surrounding Markdown
+ * table.
  *
  * @param {unknown} value
  * @returns {string}
@@ -182,7 +197,7 @@ export function buildIssueTitle({ severity, title, sentryIssueId }) {
 function inlineOrNone(value) {
   if (value === null || value === undefined) return "(none)";
   if (typeof value !== "string") return "(none)";
-  const collapsed = value.replace(/\s+/g, " ").trim();
+  const collapsed = value.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
   return collapsed.length === 0 ? "(none)" : collapsed;
 }
 
@@ -395,13 +410,29 @@ export async function ensureLabel({ owner, repo, label, token, fetchImpl, logger
     return "existing";
   }
   const meta = LABEL_METADATA[label] ?? LABEL_METADATA.__sentryIssue;
-  await ghRequest({
+  // 422 は「同名ラベルが既に存在」を意味する（GitHub API の検証エラー）。
+  // GET と POST の間に別 workflow run が同じラベルを作った場合に発生し得る
+  // ので、ここでは throw せず "existing" として扱う。同一 sentry_issue_id への
+  // 並行起動は workflow の `concurrency` で 1 本に絞っているが、別 sentry_issue_id
+  // が共通の `auto-reported` を初回作成するレースは残るためこのガードを付ける。
+  //
+  // 422 means "label already exists" (GitHub API validation error). Can happen
+  // if another workflow run created the same label between our GET and POST.
+  // The workflow's `concurrency` group serializes per `sentry_issue_id`, but
+  // different ids racing to create the shared `auto-reported` label is still
+  // possible — tolerate 422 so the recurrent path doesn't fail spuriously.
+  const post = await ghRequest({
     url: `${GITHUB_API}/repos/${owner}/${repo}/labels`,
     method: "POST",
     token,
     body: { name: label, color: meta.color, description: meta.description },
     fetchImpl,
+    acceptStatuses: [422],
   });
+  if (post.status === 422) {
+    logger.log?.(`[auto-issue] label already existed (race tolerated): ${label}`);
+    return "existing";
+  }
   logger.log?.(`[auto-issue] created missing label: ${label}`);
   return "created";
 }
