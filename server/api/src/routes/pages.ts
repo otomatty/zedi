@@ -483,15 +483,23 @@ app.delete("/:id", authRequired, async (c) => {
   // See issue #713.
   await assertPageEditAccess(db, pageId, userId);
 
-  // GC 対象のサムネイル ID を取りつつ、ページを soft-delete する。
+  // GC 対象のサムネイル ID とページオーナーを取りつつ、ページを soft-delete する。
   // `thumbnail_object_id` も同時に NULL にして、DB 上は「サムネイルが
   // 紐づいていないページ」になるようにする（復元時に死んだ ID を残さない）。
   //
-  // Capture the linked thumbnail id and soft-delete the page in one shot.
-  // Clearing `thumbnail_object_id` keeps the row consistent — if the page
-  // is ever restored we don't want it pointing at a now-collected blob.
+  // Capture the linked thumbnail id and the page owner, then soft-delete in
+  // one shot. Clearing `thumbnail_object_id` keeps the row consistent — if
+  // the page is ever restored we don't want it pointing at a now-collected
+  // blob. We capture `ownerId` because thumbnails are owner-scoped: in a
+  // shared note, the user performing the deletion (`userId`) may differ
+  // from the page owner, and `deleteThumbnailObject` matches on the
+  // thumbnail's owner predicate. Passing the actor's id would orphan the
+  // blob and silently keep burning the real owner's quota.
   const [target] = await db
-    .select({ thumbnailObjectId: pages.thumbnailObjectId })
+    .select({
+      thumbnailObjectId: pages.thumbnailObjectId,
+      ownerId: pages.ownerId,
+    })
     .from(pages)
     .where(eq(pages.id, pageId))
     .limit(1);
@@ -507,8 +515,8 @@ app.delete("/:id", authRequired, async (c) => {
   // GC is best-effort: a thumbnail delete failure must not roll back the page
   // soft-delete from the user's perspective. `deleteThumbnailObject` already
   // logs S3 failures so a sweeper can reclaim orphans.
-  if (target?.thumbnailObjectId) {
-    await deleteThumbnailObject(target.thumbnailObjectId, userId, db);
+  if (target?.thumbnailObjectId && target.ownerId) {
+    await deleteThumbnailObject(target.thumbnailObjectId, target.ownerId, db);
   }
 
   return c.json({ id: pageId, deleted: true });
