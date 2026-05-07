@@ -15,13 +15,21 @@ const s3 = new S3Client({
   forcePathStyle: true,
 });
 
+// `thumbnail_tier_quotas` がシードされていない環境でフォールバック上限が小さすぎると
+// 数件クリップしただけで 413 を踏む。drizzle/0020_seed_thumbnail_tier_quotas.sql の
+// free 行と同じ 100 MB に揃えておく。
+// Fallback ceiling matches the `free` row seeded in
+// drizzle/0020_seed_thumbnail_tier_quotas.sql (100 MB) so unseeded environments
+// don't silently throttle every user to a handful of web clips.
+const FALLBACK_QUOTA_BYTES = 100 * 1024 * 1024;
+
 async function getStorageQuotaBytes(tier: string, db: Database): Promise<number> {
   const rows = await db
     .select({ storageLimitBytes: thumbnailTierQuotas.storageLimitBytes })
     .from(thumbnailTierQuotas)
     .where(eq(thumbnailTierQuotas.tier, tier))
     .limit(1);
-  return rows[0]?.storageLimitBytes ?? 10 * 1024 * 1024;
+  return rows[0]?.storageLimitBytes ?? FALLBACK_QUOTA_BYTES;
 }
 
 async function getStorageUsedBytes(userId: string, db: Database): Promise<number> {
@@ -72,11 +80,16 @@ async function fetchImageAsBuffer(
 }
 
 /**
- * サムネイル画像を取得して S3 に保存し、プロキシ配信用の URL を返す。
- * Fetches a thumbnail image, persists it to S3, and returns a proxy-serving URL.
+ * サムネイル画像を取得して S3 に保存し、プロキシ配信用の URL と保存した
+ * thumbnail_objects 行の ID を返す。
+ * Fetches a thumbnail image, persists it to S3, and returns the proxy URL plus
+ * the persisted `thumbnail_objects.id`.
  *
  * バケットは非公開のため、`/api/thumbnail/serve/:id` 経由でストリーミング配信する。
+ * `objectId` は呼び出し側がページ行に紐づけて削除時 GC で参照する。
  * The bucket is private, so the returned URL streams via `/api/thumbnail/serve/:id`.
+ * Callers persist `objectId` on the owning page row so DELETE /pages/:id can GC
+ * the S3 blob and DB row.
  *
  * 必須環境変数 `BETTER_AUTH_URL` は、副作用（S3 アップロード・DB 挿入）より前に
  * 検証する。未設定なら即座に throw し、オーファンなオブジェクトや行を残さない。
@@ -92,7 +105,7 @@ export async function commitImage(
   sourceUrl: string,
   fallbackUrl: string | undefined,
   db: Database,
-): Promise<{ imageUrl: string }> {
+): Promise<{ imageUrl: string; objectId: string }> {
   // BETTER_AUTH_URL は必須。S3 アップロードや DB 挿入より前に検証して fail-fast する。
   // Validate BETTER_AUTH_URL before any side effects so a missing env var cannot
   // leave orphan storage objects or DB rows.
@@ -147,5 +160,5 @@ export async function commitImage(
     sizeBytes,
   });
 
-  return { imageUrl: `${baseUrl}/api/thumbnail/serve/${objectId}` };
+  return { imageUrl: `${baseUrl}/api/thumbnail/serve/${objectId}`, objectId };
 }

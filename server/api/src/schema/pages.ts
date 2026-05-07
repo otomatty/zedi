@@ -55,6 +55,17 @@ export const pages = pgTable(
     title: text("title"),
     contentPreview: text("content_preview"),
     thumbnailUrl: text("thumbnail_url"),
+    /**
+     * 紐づく `thumbnail_objects.id`。ページ削除時にこの ID を辿って S3
+     * オブジェクトと DB 行を GC する。サムネイル無しページや古いページは
+     * NULL のまま。FK は持たない（GC は API 経路で明示的に扱う方針）。
+     *
+     * Reference to `thumbnail_objects.id`. DELETE /pages/:id uses this to
+     * garbage-collect the S3 blob and DB row. NULL when the page has no
+     * thumbnail or predates this column. No FK by design — see
+     * `drizzle/0021_add_pages_thumbnail_object_id.sql`.
+     */
+    thumbnailObjectId: uuid("thumbnail_object_id"),
     sourceUrl: text("source_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -91,6 +102,14 @@ export const pages = pgTable(
       .where(sql`NOT ${table.isDeleted}`),
     index("idx_pages_owner_special_kind").on(table.ownerId, table.specialKind),
     index("idx_pages_owner_kind").on(table.ownerId, table.kind),
+    /**
+     * `thumbnail_object_id` 引きインデックス。DELETE /pages/:id で
+     * thumbnail GC を実行する際の小さな確認クエリでも有効。
+     *
+     * Lookup index for `thumbnail_object_id`. Used by the small confirmation
+     * query in DELETE /pages/:id when garbage-collecting thumbnails.
+     */
+    index("idx_pages_thumbnail_object_id").on(table.thumbnailObjectId),
     /**
      * Lookup of pages owned by a particular note (and an efficient predicate
      * for "personal pages only" via `note_id IS NULL` / `IS NOT NULL`).

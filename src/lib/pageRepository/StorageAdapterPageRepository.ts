@@ -147,6 +147,7 @@ export class StorageAdapterPageRepository {
       content_preview: contentPreview || undefined,
       source_url: options?.sourceUrl ?? undefined,
       thumbnail_url: options?.thumbnailUrl ?? undefined,
+      thumbnail_object_id: options?.thumbnailObjectId ?? undefined,
     });
     const meta = syncPageItemToMetadata(created);
     await this.adapter.upsertPage(meta);

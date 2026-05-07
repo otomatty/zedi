@@ -375,16 +375,21 @@ export function useCreatePage() {
       content = "",
       sourceUrl,
       thumbnailUrl,
+      thumbnailObjectId,
     }: {
       title?: string;
       content?: string;
       sourceUrl?: string | null;
       thumbnailUrl?: string | null;
+      /** Web Clipper 経由でコミット済みのサムネイル ID。削除時の GC で参照する。 */
+      /** Persisted thumbnail object id from /api/thumbnail/commit. Used for GC. */
+      thumbnailObjectId?: string | null;
     }) => {
       const repo = await getRepository();
       return repo.createPage(userId, title, content, {
         sourceUrl: sourceUrl ?? undefined,
         thumbnailUrl: thumbnailUrl ?? undefined,
+        thumbnailObjectId: thumbnailObjectId ?? undefined,
       });
     },
     onSuccess: (newPage) => {

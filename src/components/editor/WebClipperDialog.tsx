@@ -20,7 +20,22 @@ interface WebClipperDialogProps {
     content: string,
     sourceUrl: string,
     thumbnailUrl?: string | null,
-  ) => void;
+    /**
+     * `/api/thumbnail/commit` で保存されたサムネイルの ID。指定すると
+     * ページ作成時にサーバへ渡し、削除時に S3 オブジェクトを GC する。
+     *
+     * Persisted `thumbnail_objects.id` from `/api/thumbnail/commit`. When
+     * present, the page creation request links to it so DELETE can GC.
+     */
+    thumbnailObjectId?: string | null,
+    /**
+     * ページ作成は非同期処理。ダイアログは Promise の解決を待ってから閉じる。
+     * 失敗（reject）時はダイアログを開いたまま、ユーザーにリトライを許す。
+     *
+     * Page creation is asynchronous; the dialog awaits this promise before
+     * closing. A rejected promise keeps the dialog open so the user can retry.
+     */
+  ) => Promise<void> | void;
   /** Chrome拡張等から渡される初期URL。開いた時にプリフィルする。 */
   initialUrl?: string;
 }
