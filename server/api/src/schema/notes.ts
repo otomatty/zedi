@@ -7,15 +7,24 @@ import {
   integer,
   primaryKey,
   index,
+  uniqueIndex,
   unique,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { pages } from "./pages.js";
 
-export /**
+/**
+ * ノート（複数ページのまとまり）。
+ * 各ユーザーには `is_default = true` のデフォルトノートが 1 件だけ存在する
+ * （旧来の「個人ページ」概念の置き換え）。タイトルは `<users.name>のノート`。
  *
+ * Note (a collection of pages). Every user owns exactly one default note
+ * (`is_default = true`) titled `<users.name>のノート`. The default note
+ * replaces the previous "personal pages" concept; deletion is rejected at the
+ * API layer (`routes/notes/crud.ts`).
  */
-const notes = pgTable(
+export const notes = pgTable(
   "notes",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -33,6 +42,16 @@ const notes = pgTable(
       .default("owner_only"),
     isOfficial: boolean("is_official").notNull().default(false),
     viewCount: integer("view_count").notNull().default(0),
+    /**
+     * ユーザーごとに 1 件存在するデフォルトノート（マイノート）であることを示す。
+     * 部分ユニーク index `idx_notes_unique_default_per_owner` により有効な
+     * デフォルトは 1 ユーザーにつき 1 件のみ。削除拒否はアプリ層で行う。
+     *
+     * Marks the user's single default note ("マイノート"). The partial unique
+     * index `idx_notes_unique_default_per_owner` keeps at most one live default
+     * per owner; the delete guard lives in the API layer.
+     */
+    isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -42,16 +61,19 @@ const notes = pgTable(
     index("idx_notes_visibility").on(table.visibility),
     index("idx_notes_edit_permission").on(table.editPermission),
     index("idx_notes_is_official").on(table.isOfficial),
+    /**
+     * 1 ユーザーにつき有効なデフォルトノートは 1 件のみ。
+     * At most one live default note per owner.
+     */
+    uniqueIndex("idx_notes_unique_default_per_owner")
+      .on(table.ownerId)
+      .where(sql`${table.isDefault} = true AND ${table.isDeleted} = false`),
   ],
 );
 
-/**
- *
- */
+/** Select type for the notes table. / notes テーブルの SELECT 型。 */
 export type Note = typeof notes.$inferSelect;
-/**
- *
- */
+/** Insert type for the notes table. / notes テーブルの INSERT 型。 */
 export type NewNote = typeof notes.$inferInsert;
 
 export /**

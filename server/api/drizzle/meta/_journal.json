@@ -134,6 +134,13 @@
       "when": 1777507200000,
       "tag": "0019_add_api_errors",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1778544000000,
+      "tag": "0020_add_default_note",
+      "breakpoints": true
     }
   ]
 }

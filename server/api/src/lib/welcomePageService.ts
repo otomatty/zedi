@@ -18,6 +18,7 @@ import Link from "@tiptap/extension-link";
 import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import { pages, pageContents, userOnboardingStatus } from "../schema/index.js";
 import type { Database } from "../types/index.js";
+import { ensureDefaultNote } from "../services/defaultNoteService.js";
 import { VideoServer } from "./videoServerExtension.js";
 import {
   welcomePageContent,
@@ -167,6 +168,16 @@ export async function insertWelcomePage(
   const ydoc = prosemirrorJSONToYDoc(welcomePageSchema, doc, YDOC_FRAGMENT);
   const ydocState = Y.encodeStateAsUpdate(ydoc);
 
+  // ウェルカムページはデフォルトノート（「<ユーザー名>のノート」）に所属させる。
+  // 既存フローでは個人ページとして `note_id = NULL` で作っていたが、デフォルト
+  // ノートモデル（PR 1a 以降）では新規ページもノート所属に揃える。
+  // `ensureDefaultNote` は冪等で、まだ存在しなければここで作成する。
+  // Welcome pages live in the user's default note ("<users.name>のノート").
+  // The previous flow stored them as personal pages (`note_id = NULL`); the
+  // default-note model unifies new pages under their owning note.
+  // `ensureDefaultNote` is idempotent and creates the note on first use.
+  const noteId = await ensureDefaultNote(tx, userId);
+
   // 部分ユニーク index と同じ述語 (`kind='welcome' AND is_deleted=false`) を
   // ON CONFLICT に指定する。並行リクエストで衝突すると INSERT は 0 行返す。
   // Match the partial unique index predicate so a concurrent insert is a
@@ -175,6 +186,7 @@ export async function insertWelcomePage(
     .insert(pages)
     .values({
       ownerId: userId,
+      noteId,
       title,
       contentPreview,
       kind: "welcome",

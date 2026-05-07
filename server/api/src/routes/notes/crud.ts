@@ -197,7 +197,17 @@ app.delete("/:noteId", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  await requireNoteOwner(db, noteId, userId);
+  const note = await requireNoteOwner(db, noteId, userId);
+
+  // デフォルトノート（マイノート）は削除不可。誤操作で個人スペースが消えるのを
+  // 防ぐ。再作成は `ensureDefaultNote` で可能だがリンク・履歴は失われるため
+  // 拒否する。Issue: 「ホーム廃止 → /notes/me 着地」スレッド参照。
+  // The default note ("マイノート") is non-deletable — losing it would destroy
+  // the user's personal space. `ensureDefaultNote` could re-create one, but
+  // links and history would be gone, so we reject deletion outright.
+  if (note.isDefault) {
+    throw new HTTPException(400, { message: "Default note cannot be deleted" });
+  }
 
   await db
     .update(notes)

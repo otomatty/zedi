@@ -301,6 +301,26 @@ describe("DELETE /api/notes/:noteId", () => {
 
     expect(res.status).toBe(404);
   });
+
+  it("should return 400 when trying to delete a default note", async () => {
+    // デフォルトノート（マイノート）はユーザーの個人スペースなので削除拒否。
+    // The default note is the user's personal space; deletion is rejected.
+    const defaultNote = createMockNote({ isDefault: true });
+    const { app } = createTestApp([
+      [defaultNote], // requireNoteOwner → findActiveNoteById (owner)
+    ]);
+
+    const res = await app.request(`/api/notes/${defaultNote.id}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(400);
+    // HTTPException は text/plain でメッセージを返すため res.text() で検証する。
+    // HTTPException returns the message as text/plain, so assert via res.text().
+    const body = await res.text();
+    expect(body).toMatch(/default note/i);
+  });
 });
 
 // ── GET /api/notes/:noteId ──────────────────────────────────────────────────
