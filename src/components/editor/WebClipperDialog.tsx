@@ -20,6 +20,14 @@ interface WebClipperDialogProps {
     content: string,
     sourceUrl: string,
     thumbnailUrl?: string | null,
+    /**
+     * `/api/thumbnail/commit` で保存されたサムネイルの ID。指定すると
+     * ページ作成時にサーバへ渡し、削除時に S3 オブジェクトを GC する。
+     *
+     * Persisted `thumbnail_objects.id` from `/api/thumbnail/commit`. When
+     * present, the page creation request links to it so DELETE can GC.
+     */
+    thumbnailObjectId?: string | null,
   ) => void;
   /** Chrome拡張等から渡される初期URL。開いた時にプリフィルする。 */
   initialUrl?: string;

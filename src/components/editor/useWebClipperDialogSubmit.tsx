@@ -4,13 +4,22 @@
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useToast } from "@zedi/ui";
-import { commitThumbnailFromUrl, AuthRedirectError } from "@/lib/thumbnailCommit";
+import { useNavigate } from "react-router-dom";
+import { ToastAction, useToast } from "@zedi/ui";
+import {
+  commitThumbnailFromUrl,
+  AuthRedirectError,
+  QuotaExceededError,
+} from "@/lib/thumbnailCommit";
 import { getThumbnailApiBaseUrl } from "@/components/editor/TiptapEditor/thumbnailApiHelpers";
 import type { ClippedContent } from "@/lib/webClipper";
 
 function isAuthRedirectError(err: unknown): err is AuthRedirectError {
   return err instanceof AuthRedirectError;
+}
+
+function isQuotaExceededError(err: unknown): err is QuotaExceededError {
+  return err instanceof QuotaExceededError;
 }
 
 /**
@@ -25,6 +34,7 @@ export interface UseWebClipperDialogSubmitOptions {
     content: string,
     sourceUrl: string,
     thumbnailUrl?: string | null,
+    thumbnailObjectId?: string | null,
   ) => void;
   setUrl: (url: string) => void;
   resetDialogState: () => void;
@@ -70,6 +80,7 @@ export function useWebClipperDialogSubmit(
 
   const { t } = useTranslation();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const submitGenerationRef = useRef(0);
@@ -112,6 +123,7 @@ export function useWebClipperDialogSubmit(
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     let committedThumbnail: string | undefined;
+    let committedObjectId: string | undefined;
     let committedProvider: string | undefined;
     let commitAttemptedAndFailed = false;
 
@@ -127,6 +139,7 @@ export function useWebClipperDialogSubmit(
               title: clippedContent.title,
             });
             committedThumbnail = result.imageUrl;
+            committedObjectId = result.objectId;
             committedProvider = result.provider;
           }
         } catch (err) {
@@ -138,6 +151,28 @@ export function useWebClipperDialogSubmit(
               variant: "destructive",
             });
             commitAttemptedAndFailed = true;
+          } else if (isQuotaExceededError(err)) {
+            // 容量超過時はアップグレード誘導 UI を出し、ページ作成自体は中止する。
+            // 失敗しているのにテキストだけ取り込むと「サムネイル無しの不完全なページ」が
+            // 静かに作られて気付きにくいため、ここでは早期 return して操作を止める。
+            //
+            // On quota-exceed we surface an upgrade prompt and abort the entire
+            // submit. Silently creating a thumbnail-less page would hide the
+            // problem from the user, so make the failure explicit.
+            toast({
+              title: t("editor.webClipper.quotaExceeded"),
+              description: t("editor.webClipper.quotaExceededDescription"),
+              variant: "destructive",
+              action: (
+                <ToastAction
+                  altText={t("editor.webClipper.upgradeCta")}
+                  onClick={() => navigate("/pricing")}
+                >
+                  {t("editor.webClipper.upgradeCta")}
+                </ToastAction>
+              ),
+            });
+            return;
           } else {
             console.error("Failed to commit thumbnail:", err);
             toast({
@@ -164,6 +199,7 @@ export function useWebClipperDialogSubmit(
           tiptapContent,
           clippedContent.sourceUrl,
           committedThumbnail ?? undefined,
+          committedObjectId ?? undefined,
         );
         handleDialogOpenChange(false);
       }
@@ -177,6 +213,7 @@ export function useWebClipperDialogSubmit(
     getTiptapContent,
     onClipped,
     handleDialogOpenChange,
+    navigate,
     toast,
     t,
   ]);

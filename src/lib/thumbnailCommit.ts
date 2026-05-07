@@ -29,9 +29,39 @@ export class AuthRedirectError extends Error {
   }
 }
 
+/**
+ * 413 (STORAGE_QUOTA_EXCEEDED) 応答時に投げる例外。
+ * 呼び出し側がアップグレード誘導 UI を出すために、通常のエラーから区別する。
+ *
+ * Thrown on 413 STORAGE_QUOTA_EXCEEDED responses so callers can surface an
+ * upgrade prompt instead of the generic "save failed" toast.
+ */
+export class QuotaExceededError extends Error {
+  readonly quotaExceeded = true;
+  /**
+   * 指定メッセージで QuotaExceededError を生成する。
+   * Creates a QuotaExceededError with the given message.
+   *
+   * @param message - サーバーから返された人間可読メッセージ / Server-supplied message
+   */
+  constructor(message?: string) {
+    super(message);
+    this.name = "QuotaExceededError";
+  }
+}
+
 /** サムネイル commit API の結果 / Result from the thumbnail commit API */
 export interface CommitThumbnailResult {
   imageUrl: string;
+  /**
+   * 保存された thumbnail_objects.id。ページ作成 API に渡して、ページ削除時の
+   * GC に利用する。サーバが旧仕様で objectId を返さない場合は undefined。
+   *
+   * The persisted `thumbnail_objects.id`. Forwarded to the page creation API so
+   * DELETE /pages/:id can GC the storage object. Undefined when the server is
+   * an older build that doesn't return it.
+   */
+  objectId?: string;
   provider: string;
 }
 
@@ -43,6 +73,32 @@ export interface CommitThumbnailOptions {
 }
 
 const THUMBNAIL_COMMIT_TIMEOUT_MS = 15_000;
+
+/**
+ * 非OK応答の body をベストエフォートでパースして適切な Error を構築する。
+ * 413 もしくは `code === "STORAGE_QUOTA_EXCEEDED"` の場合は QuotaExceededError、
+ * それ以外は素の Error。
+ *
+ * Best-effort parse of a non-OK response body and surface the right error
+ * class: `QuotaExceededError` for 413 / `code === "STORAGE_QUOTA_EXCEEDED"`,
+ * generic `Error` otherwise.
+ */
+async function buildErrorFromFailedResponse(response: Response): Promise<Error> {
+  let message = i18n.t("errors.imageSaveFailed", { status: response.status });
+  let code: string | undefined;
+  try {
+    const data = (await response.json()) as { error?: string; message?: string; code?: string };
+    if (data?.message) message = data.message;
+    else if (data?.error) message = data.error;
+    if (data?.code) code = data.code;
+  } catch {
+    // ignore parse errors
+  }
+  if (response.status === 413 || code === "STORAGE_QUOTA_EXCEEDED") {
+    return new QuotaExceededError(message);
+  }
+  return new Error(message);
+}
 
 /**
  * 指定した sourceUrl の画像を POST /api/thumbnail/commit でストレージに保存する。
@@ -92,18 +148,18 @@ export async function commitThumbnailFromUrl(
   }
 
   if (!response.ok) {
-    let message = i18n.t("errors.imageSaveFailed", { status: response.status });
-    try {
-      const data = (await response.json()) as { error?: string; message?: string };
-      if (data?.message) message = data.message;
-      else if (data?.error) message = data.error;
-    } catch {
-      // ignore parse errors
-    }
-    throw new Error(message);
+    throw await buildErrorFromFailedResponse(response);
   }
 
-  const data = (await response.json()) as { imageUrl?: string; provider?: string };
+  const data = (await response.json()) as {
+    imageUrl?: string;
+    objectId?: string;
+    provider?: string;
+  };
   if (!data.imageUrl) throw new Error(i18n.t("errors.imageUrlNotReturned"));
-  return { imageUrl: data.imageUrl, provider: data.provider ?? "s3" };
+  return {
+    imageUrl: data.imageUrl,
+    objectId: data.objectId,
+    provider: data.provider ?? "s3",
+  };
 }

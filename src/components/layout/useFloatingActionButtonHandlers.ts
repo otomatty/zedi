@@ -39,6 +39,9 @@ export interface UseFloatingActionButtonHandlersResult {
     content: string,
     sourceUrl: string,
     thumbnailUrl?: string | null,
+    /** Persisted thumbnail object id from /api/thumbnail/commit (used for GC). */
+    /** /api/thumbnail/commit が返すサムネイル ID（削除時 GC に使う）。 */
+    thumbnailObjectId?: string | null,
   ) => Promise<void>;
   handleImageCreated: (
     imageUrl: string,
@@ -120,13 +123,20 @@ export function useFloatingActionButtonHandlers(
   );
 
   const handleWebClipped = useCallback(
-    async (title: string, content: string, sourceUrl: string, thumbnailUrl?: string | null) => {
+    async (
+      title: string,
+      content: string,
+      sourceUrl: string,
+      thumbnailUrl?: string | null,
+      thumbnailObjectId?: string | null,
+    ) => {
       try {
         const newPage = await createPageMutation.mutateAsync({
           title,
           content,
           sourceUrl,
           thumbnailUrl,
+          thumbnailObjectId,
         });
         await linkAndNavigate(newPage.id, { initialContent: content });
       } catch (error) {

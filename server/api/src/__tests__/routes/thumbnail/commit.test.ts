@@ -111,8 +111,11 @@ describe("POST /api/thumbnail/commit", () => {
     expect(mockCommitImage).not.toHaveBeenCalled();
   });
 
-  it("returns 200 with imageUrl + provider when commitService succeeds", async () => {
-    mockCommitImage.mockResolvedValue({ imageUrl: "https://cdn.example/abc.png" });
+  it("returns 200 with imageUrl + objectId + provider when commitService succeeds", async () => {
+    mockCommitImage.mockResolvedValue({
+      imageUrl: "https://cdn.example/abc.png",
+      objectId: "obj-123",
+    });
     const app = createTestApp();
 
     const res = await app.request("/api/thumbnail/commit", {
@@ -125,8 +128,12 @@ describe("POST /api/thumbnail/commit", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { imageUrl: string; provider: string };
-    expect(body).toEqual({ imageUrl: "https://cdn.example/abc.png", provider: "s3" });
+    const body = (await res.json()) as { imageUrl: string; objectId: string; provider: string };
+    expect(body).toEqual({
+      imageUrl: "https://cdn.example/abc.png",
+      objectId: "obj-123",
+      provider: "s3",
+    });
     // trim 後の値をサービスに渡す。
     // The handler trims both sourceUrl and fallbackUrl before forwarding.
     expect(mockCommitImage).toHaveBeenCalledWith(
@@ -137,7 +144,7 @@ describe("POST /api/thumbnail/commit", () => {
     );
   });
 
-  it("returns 413 when commitService throws STORAGE_QUOTA_EXCEEDED", async () => {
+  it("returns 413 with STORAGE_QUOTA_EXCEEDED code when commitService throws STORAGE_QUOTA_EXCEEDED", async () => {
     mockCommitImage.mockRejectedValue(new Error("STORAGE_QUOTA_EXCEEDED"));
     const app = createTestApp();
 
@@ -148,6 +155,13 @@ describe("POST /api/thumbnail/commit", () => {
     });
 
     expect(res.status).toBe(413);
+    // クライアントは `code` を見てアップグレード誘導 UI を出すため、文字列として
+    // 露出させる契約を壊さないこと。
+    // Clients dispatch the upgrade-prompt UI by inspecting `code`; the contract
+    // must not regress.
+    const body = (await res.json()) as { code?: string; message?: string };
+    expect(body.code).toBe("STORAGE_QUOTA_EXCEEDED");
+    expect(typeof body.message).toBe("string");
   });
 
   it("returns 502 when commitService throws an unrelated error", async () => {
