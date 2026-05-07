@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { ToastAction, useToast } from "@zedi/ui";
 import {
   commitThumbnailFromUrl,
+  deleteCommittedThumbnail,
   AuthRedirectError,
   QuotaExceededError,
 } from "@/lib/thumbnailCommit";
@@ -140,6 +141,14 @@ export function useWebClipperDialogSubmit(
     let committedObjectId: string | undefined;
     let committedProvider: string | undefined;
     let commitAttemptedAndFailed = false;
+    // `onClipped` を呼んだら true。`onClipped` の内側でページ作成失敗時の
+    // ロールバックは呼び出し先（`handleWebClipped`）が担当しているため、
+    // フックの finally で二重 DELETE しないよう判定に使う。
+    //
+    // Becomes true once we hand off to `onClipped`. The callee
+    // (`handleWebClipped`) owns rollback in that path, so we use this flag
+    // in finally to avoid issuing a duplicate DELETE.
+    let commitHandedOff = false;
 
     try {
       if (clippedContent.thumbnailUrl) {
@@ -218,6 +227,7 @@ export function useWebClipperDialogSubmit(
         // doesn't dismiss before the page actually exists. On failure the
         // callee already shows a toast and rolls back the committed thumbnail;
         // we simply leave the dialog open so the user can retry or cancel.
+        commitHandedOff = true;
         try {
           await onClipped(
             clippedContent.title,
@@ -234,6 +244,25 @@ export function useWebClipperDialogSubmit(
         handleDialogOpenChange(false);
       }
     } finally {
+      // `onClipped` まで到達せずに早期 return（ダイアログ再オープンによる
+      // submitGeneration 変更や、空の `tiptapContent` など）した場合、コミット
+      // 済みのサムネイルがどのページからも参照されない状態でストレージ枠を
+      // 圧迫する。`onClipped` まで届いたケースは呼び出し先がロールバック責務を
+      // 持つので二重 DELETE を避けるため `commitHandedOff` を見て分岐する。
+      //
+      // If we exited before reaching `onClipped` (e.g. dialog re-open changed
+      // submitGeneration, or `tiptapContent` came back null), the already-
+      // committed thumbnail has nothing referencing it and would burn quota.
+      // The `onClipped` path is owned by the callee for rollback, so we gate
+      // on `commitHandedOff` to avoid a duplicate DELETE.
+      if (committedObjectId && !commitHandedOff) {
+        const baseUrl = getThumbnailApiBaseUrl();
+        if (baseUrl) {
+          // ベストエフォート、await しても throw しない (deleteCommittedThumbnail 内部で吸収)
+          // Best-effort; deleteCommittedThumbnail swallows its own errors.
+          await deleteCommittedThumbnail(committedObjectId, { baseUrl });
+        }
+      }
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }

@@ -161,6 +161,32 @@ describe("deleteCommittedThumbnail", () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 
+  it("非OK レスポンス (500/429/403 等) は warn でログを残す / warns on unexpected non-OK rollback responses", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    mockFetch.mockResolvedValue(new Response(null, { status: 500, statusText: "Server Error" }));
+
+    await deleteCommittedThumbnail("obj-500", { baseUrl: "https://api.example.com" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const args = warnSpy.mock.calls[0];
+    expect(args.some((arg) => arg === 500)).toBe(true);
+    expect(args.some((arg) => arg === "obj-500")).toBe(true);
+  });
+
+  it("401/404 は no-op として warn しない / treats 401/404 as expected no-ops (no warn)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    await deleteCommittedThumbnail("obj-401", { baseUrl: "https://api.example.com" });
+
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    await deleteCommittedThumbnail("obj-404", { baseUrl: "https://api.example.com" });
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it("baseUrl/objectId のいずれかが空なら fetch しない / no-ops when baseUrl or objectId is empty", async () => {
     const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
 

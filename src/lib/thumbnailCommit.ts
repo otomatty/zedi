@@ -191,11 +191,28 @@ export async function deleteCommittedThumbnail(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), THUMBNAIL_DELETE_TIMEOUT_MS);
   try {
-    await fetch(`${baseUrl}/api/thumbnail/serve/${encodeURIComponent(objectId)}`, {
+    const response = await fetch(`${baseUrl}/api/thumbnail/serve/${encodeURIComponent(objectId)}`, {
       method: "DELETE",
       credentials: "include",
       signal: controller.signal,
     });
+    // 401 はサインアウト中の rollback、404 は既に削除済み（DELETE 自体や
+    // サーバー側 GC 経由）の正常系。それ以外の非 OK（500/429/403 など）は
+    // ロールバック失敗としてログだけ残し、サーバー側スイーパーに回収を委ねる。
+    //
+    // 401 means the user is signed out mid-rollback and 404 means the row is
+    // already gone (e.g. concurrent delete or server-side GC) — both are
+    // expected no-ops. Anything else (500/429/403/...) is an unexpected
+    // rollback failure: log so it's visible, then fall through and let the
+    // server-side sweeper reclaim the orphan.
+    if (!response.ok && response.status !== 401 && response.status !== 404) {
+      console.warn(
+        "[thumbnail/rollback] DELETE returned unexpected status:",
+        response.status,
+        response.statusText,
+        objectId,
+      );
+    }
   } catch (err) {
     // ロールバックの失敗はサーバ側スイーパで回収可能なので、UX を壊さず警告だけ残す。
     // Rollback failures are reclaimable by the server-side sweeper, so log and move on.
