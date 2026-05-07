@@ -138,8 +138,22 @@
     {
       "idx": 19,
       "version": "7",
+      "when": 1777593600000,
+      "tag": "0020_seed_thumbnail_tier_quotas",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777680000000,
+      "tag": "0021_add_pages_thumbnail_object_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
       "when": 1778544000000,
-      "tag": "0020_add_default_note",
+      "tag": "0022_add_default_note",
       "breakpoints": true
     }
   ]

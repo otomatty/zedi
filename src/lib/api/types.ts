@@ -128,6 +128,13 @@ export interface CreatePageBody {
   content_preview?: string;
   source_page_id?: string | null;
   thumbnail_url?: string | null;
+  /**
+   * `thumbnail_objects.id` linked to this page (used by Web Clipper). Lets
+   * DELETE /api/pages/:id GC the S3 blob + DB row when the page is deleted.
+   * Web Clipper で保存したサムネイルの thumbnail_objects.id。ページ削除時に
+   * これを辿って S3 オブジェクトと DB 行を GC する。
+   */
+  thumbnail_object_id?: string | null;
   source_url?: string | null;
 }
 
