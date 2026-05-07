@@ -163,3 +163,44 @@ export async function commitThumbnailFromUrl(
     provider: data.provider ?? "s3",
   };
 }
+
+const THUMBNAIL_DELETE_TIMEOUT_MS = 10_000;
+
+/**
+ * Web Clipper のような「サムネイル commit → ページ作成」フローで、ページ作成が
+ * 失敗したときに事前にコミットしたサムネイルを巻き戻す。`DELETE /api/thumbnail/serve/:id`
+ * を best-effort で叩き、失敗してもユーザー体験を壊さない（呼び出し元は throw
+ * しないことを期待してよい）。
+ *
+ * Best-effort rollback for the "commit thumbnail → create page" flow used by
+ * the Web Clipper. When page creation fails after a successful thumbnail
+ * commit, callers invoke this to avoid leaking an orphan that would otherwise
+ * keep counting against the user's quota. The DELETE endpoint is owner-scoped
+ * server-side, so 404/401 are normal outcomes; we never throw out.
+ *
+ * @param objectId - 削除対象の thumbnail_objects.id / Persisted thumbnail object id.
+ * @param options - REST API のベース URL を含む設定 / Settings (currently just `baseUrl`).
+ */
+export async function deleteCommittedThumbnail(
+  objectId: string,
+  options: { baseUrl: string },
+): Promise<void> {
+  const { baseUrl } = options;
+  if (!baseUrl || !objectId) return;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), THUMBNAIL_DELETE_TIMEOUT_MS);
+  try {
+    await fetch(`${baseUrl}/api/thumbnail/serve/${encodeURIComponent(objectId)}`, {
+      method: "DELETE",
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch (err) {
+    // ロールバックの失敗はサーバ側スイーパで回収可能なので、UX を壊さず警告だけ残す。
+    // Rollback failures are reclaimable by the server-side sweeper, so log and move on.
+    console.warn("Failed to roll back committed thumbnail:", err);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}

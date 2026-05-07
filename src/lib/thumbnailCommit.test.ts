@@ -14,7 +14,12 @@ vi.mock("@/i18n", () => ({
   default: { t: (key: string) => key },
 }));
 
-import { commitThumbnailFromUrl, AuthRedirectError, QuotaExceededError } from "./thumbnailCommit";
+import {
+  commitThumbnailFromUrl,
+  deleteCommittedThumbnail,
+  AuthRedirectError,
+  QuotaExceededError,
+} from "./thumbnailCommit";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -119,5 +124,59 @@ describe("commitThumbnailFromUrl", () => {
     expect(caught).toBeInstanceOf(Error);
     expect(caught).not.toBeInstanceOf(QuotaExceededError);
     expect(caught).not.toBeInstanceOf(AuthRedirectError);
+  });
+});
+
+describe("deleteCommittedThumbnail", () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = ORIGINAL_FETCH;
+    vi.restoreAllMocks();
+  });
+
+  it("DELETE /api/thumbnail/serve/:id を所有者 cookie 付きで叩く / issues a credentialed DELETE to /api/thumbnail/serve/:id", async () => {
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await deleteCommittedThumbnail("obj-1", { baseUrl: "https://api.example.com" });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.example.com/api/thumbnail/serve/obj-1");
+    expect(init.method).toBe("DELETE");
+    expect(init.credentials).toBe("include");
+  });
+
+  it("ネットワーク失敗を飲み込んで throw しない / swallows network failures (rollback is best-effort)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    mockFetch.mockRejectedValueOnce(new Error("network down"));
+
+    await expect(
+      deleteCommittedThumbnail("obj-2", { baseUrl: "https://api.example.com" }),
+    ).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("baseUrl/objectId のいずれかが空なら fetch しない / no-ops when baseUrl or objectId is empty", async () => {
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+
+    await deleteCommittedThumbnail("", { baseUrl: "https://api.example.com" });
+    await deleteCommittedThumbnail("obj-3", { baseUrl: "" });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("objectId に特殊文字が含まれていても URL エンコードされる / URL-encodes the objectId", async () => {
+    const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await deleteCommittedThumbnail("ob/j+id?", { baseUrl: "https://api.example.com" });
+
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toBe("https://api.example.com/api/thumbnail/serve/ob%2Fj%2Bid%3F");
   });
 });

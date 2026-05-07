@@ -23,7 +23,15 @@ function isQuotaExceededError(err: unknown): err is QuotaExceededError {
 }
 
 /**
+ * Web Clipper ダイアログの送信フック (`useWebClipperDialogSubmit`) のオプション。
+ * 各メンバーの意味は下記コメントの通り：`onClipped` は Promise を返してよく、
+ * フックは解決を await してからダイアログを閉じる（失敗時は開いたままにして
+ * ユーザーにリトライを許す）。
  *
+ * Options for the Web Clipper dialog submit hook. `onClipped` may return a
+ * promise — the hook awaits it before closing the dialog so a rejected
+ * promise (e.g. a transient page-create failure) keeps the dialog open and
+ * lets the user retry.
  */
 export interface UseWebClipperDialogSubmitOptions {
   open: boolean;
@@ -35,7 +43,7 @@ export interface UseWebClipperDialogSubmitOptions {
     sourceUrl: string,
     thumbnailUrl?: string | null,
     thumbnailObjectId?: string | null,
-  ) => void;
+  ) => Promise<void> | void;
   setUrl: (url: string) => void;
   resetDialogState: () => void;
   clippedContent: ClippedContent | null;
@@ -48,7 +56,13 @@ export interface UseWebClipperDialogSubmitOptions {
 }
 
 /**
+ * Web Clipper 送信フック (`useWebClipperDialogSubmit`) の戻り値。
+ * `isBusy` は「クリップ抽出中（fetching/extracting）」と「送信中（submitting）」
+ * を合算した busy フラグで、ダイアログのボタンや入力の disabled 制御に使う。
  *
+ * Return shape of the Web Clipper dialog submit hook. `isBusy` is the union of
+ * "clip extracting" and "submitting" so callers can disable inputs/buttons
+ * with a single flag.
  */
 export interface UseWebClipperDialogSubmitReturn {
   handleDialogOpenChange: (nextOpen: boolean) => void;
@@ -194,13 +208,29 @@ export function useWebClipperDialogSubmit(
       if (submitGeneration !== submitGenerationRef.current) return;
       const tiptapContent = getTiptapContent(thumbnailForContent, committedProvider);
       if (tiptapContent) {
-        onClipped(
-          clippedContent.title,
-          tiptapContent,
-          clippedContent.sourceUrl,
-          committedThumbnail ?? undefined,
-          committedObjectId ?? undefined,
-        );
+        // `onClipped` (= ページ作成 + 遷移) は非同期。完了するまで dialog を閉じず、
+        // `isSubmitting` も保持する。失敗時は呼び出し先 (handleWebClipped) が toast
+        // とロールバックを担当しているので、ここでは dialog を開いたままにして
+        // ユーザーがリトライ・キャンセルを選べる状態に戻すだけ。
+        //
+        // `onClipped` (page create + navigate) is async. Await it before
+        // closing the dialog and keep `isSubmitting` true throughout so the UI
+        // doesn't dismiss before the page actually exists. On failure the
+        // callee already shows a toast and rolls back the committed thumbnail;
+        // we simply leave the dialog open so the user can retry or cancel.
+        try {
+          await onClipped(
+            clippedContent.title,
+            tiptapContent,
+            clippedContent.sourceUrl,
+            committedThumbnail ?? undefined,
+            committedObjectId ?? undefined,
+          );
+        } catch {
+          if (submitGeneration !== submitGenerationRef.current) return;
+          return;
+        }
+        if (submitGeneration !== submitGenerationRef.current) return;
         handleDialogOpenChange(false);
       }
     } finally {

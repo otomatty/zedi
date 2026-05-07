@@ -8,6 +8,8 @@ import { useTranslation } from "react-i18next";
 import { useCreatePage } from "@/hooks/usePageQueries";
 import { useAddPageToNote } from "@/hooks/useNoteQueries";
 import { useToast } from "@zedi/ui";
+import { deleteCommittedThumbnail } from "@/lib/thumbnailCommit";
+import { getThumbnailApiBaseUrl } from "@/components/editor/TiptapEditor/thumbnailApiHelpers";
 import type { FABMenuOption } from "./FABMenu";
 
 /** FAB の作成・クリップ・画像ダイアログ制御用オプション。Options for FAB create/clip/image dialog handlers. */
@@ -130,22 +132,41 @@ export function useFloatingActionButtonHandlers(
       thumbnailUrl?: string | null,
       thumbnailObjectId?: string | null,
     ) => {
+      let newPage: Awaited<ReturnType<typeof createPageMutation.mutateAsync>>;
       try {
-        const newPage = await createPageMutation.mutateAsync({
+        newPage = await createPageMutation.mutateAsync({
           title,
           content,
           sourceUrl,
           thumbnailUrl,
           thumbnailObjectId,
         });
-        await linkAndNavigate(newPage.id, { initialContent: content });
       } catch (error) {
+        // ページ作成が失敗すると、直前にコミット済みのサムネイルを参照する行が
+        // どこにも残らず、永久にユーザーのストレージ枠を圧迫する。ベストエフォート
+        // で `DELETE /api/thumbnail/serve/:id` を叩いてオーファンを回収してから、
+        // 呼び出し元（submit hook）に失敗を伝播させる。submit hook 側はダイアログを
+        // 開いたままにしてリトライを許可する。
+        //
+        // If page creation fails after a thumbnail commit, the committed
+        // thumbnail row would otherwise be unreferenced and silently keep
+        // counting against the user's storage quota forever. Best-effort
+        // delete to roll it back, then rethrow so the submit hook can keep
+        // the dialog open and let the user retry.
+        if (thumbnailObjectId) {
+          const baseUrl = getThumbnailApiBaseUrl();
+          if (baseUrl) {
+            await deleteCommittedThumbnail(thumbnailObjectId, { baseUrl });
+          }
+        }
         console.error("Failed to create page from URL:", error);
         toast({
           title: t("common.createPageFailed"),
           variant: "destructive",
         });
+        throw error;
       }
+      await linkAndNavigate(newPage.id, { initialContent: content });
     },
     [createPageMutation, linkAndNavigate, toast, t],
   );
