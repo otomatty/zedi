@@ -18,6 +18,8 @@ import Link from "@tiptap/extension-link";
 import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import { pages, pageContents, userOnboardingStatus } from "../schema/index.js";
 import type { Database } from "../types/index.js";
+import type { DbOrTx } from "../types/dbOrTx.js";
+import { ensureDefaultNote } from "../services/defaultNoteService.js";
 import { VideoServer } from "./videoServerExtension.js";
 import {
   welcomePageContent,
@@ -61,15 +63,6 @@ const welcomePageExtensions = [
  * once at module load instead of per call to keep the hot path cheap.
  */
 const welcomePageSchema = getSchema(welcomePageExtensions);
-
-/**
- * Drizzle のトランザクション型。サービスを route 側のトランザクションに参加
- * させるため型を抽出する。
- *
- * Drizzle transaction type, extracted so this service can join a route-level
- * transaction instead of opening its own.
- */
-export type DbOrTx = Parameters<Parameters<Database["transaction"]>[0]>[0] | Database;
 
 /**
  * ウェルカムページ生成結果。Welcome page generation result.
@@ -167,25 +160,15 @@ export async function insertWelcomePage(
   const ydoc = prosemirrorJSONToYDoc(welcomePageSchema, doc, YDOC_FRAGMENT);
   const ydocState = Y.encodeStateAsUpdate(ydoc);
 
-  // PR 1a ではウェルカムページの所属モデルは旧来どおり「個人ページ」
-  // (`note_id = NULL`) のままにしておく。理由は以下:
-  //   - `GET /api/notes/:id/pages` と `routes/notes/search.ts` は `note_pages`
-  //     経由でページを引くため、`note_id` だけ埋めて `note_pages` 行を作らない
-  //     と、デフォルトノート画面でウェルカムページが見えない (PR コメント参照)
-  //   - 旧 `/home` (`scope=own`, `note_id IS NULL`) でも見えなくなる
-  // PR 1b で個人ページをまとめてデフォルトノートへ移行する際にウェルカム
-  // ページも一緒に移行する。それまでは挙動互換を保つ。
-  //
-  // PR 1a keeps the welcome page as a "personal page" (`note_id = NULL`).
-  // Setting `note_id` here without also creating a `note_pages` row would hide
-  // the welcome page from `GET /api/notes/:id/pages` and note search (both
-  // read via `note_pages`), and from the legacy `/home` listing
-  // (`scope=own` / `note_id IS NULL`). PR 1b will migrate personal pages —
-  // including welcome pages — into the default note in one coordinated step.
+  // Issue #823: ウェルカムページは呼び出し元ユーザーのデフォルトノートに所属させる。
+  // Welcome pages belong to the user's default note (issue #823).
+  const defaultNote = await ensureDefaultNote(tx, userId);
+
   const inserted = await tx
     .insert(pages)
     .values({
       ownerId: userId,
+      noteId: defaultNote.id,
       title,
       contentPreview,
       kind: "welcome",

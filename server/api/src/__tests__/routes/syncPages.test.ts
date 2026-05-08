@@ -17,6 +17,23 @@ vi.mock("../../middleware/auth.js", () => ({
   },
 }));
 
+/** PR 1b: GET/POST sync は ensureDefaultNote を先に叩く。モックしてチェーンをページ同期クエリに寄せる。 */
+vi.mock("../../services/defaultNoteService.js", () => ({
+  ensureDefaultNote: vi.fn(async () => ({
+    id: "sync-default-note-id",
+    ownerId: "user-owner",
+    title: "Default",
+    visibility: "private" as const,
+    editPermission: "owner_only" as const,
+    isOfficial: false,
+    isDefault: true,
+    viewCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDeleted: false,
+  })),
+}));
+
 import { Hono } from "hono";
 import syncPagesRoute from "../../routes/syncPages.js";
 import { createMockDb } from "../createMockDb.js";
@@ -108,7 +125,14 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const { app, chains } = createSyncApp([
       // 1: bulk page fetch (LWW pre-load)
-      [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+      [
+        {
+          id: OWNED_PAGE,
+          ownerId: TEST_USER_ID,
+          noteId: "sync-default-note-id",
+          updatedAt: oldDate,
+        },
+      ],
       // 2: page update
       undefined,
       // 3: owned pages query for links
@@ -143,7 +167,14 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const { app, chains } = createSyncApp([
       // 1: bulk page fetch (LWW pre-load)
-      [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+      [
+        {
+          id: OWNED_PAGE,
+          ownerId: TEST_USER_ID,
+          noteId: "sync-default-note-id",
+          updatedAt: oldDate,
+        },
+      ],
       // 2: page update
       undefined,
       // 3: owned pages query for ghost_links
@@ -257,7 +288,14 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     it("defaults link_type to 'wiki' when omitted in body.links (legacy client compat)", async () => {
       const oldDate = new Date("2024-01-01T00:00:00Z");
       const { app, chains } = createSyncApp([
-        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        [
+          {
+            id: OWNED_PAGE,
+            ownerId: TEST_USER_ID,
+            noteId: "sync-default-note-id",
+            updatedAt: oldDate,
+          },
+        ],
         undefined,
         [{ id: OWNED_PAGE }],
         undefined,
@@ -291,7 +329,14 @@ describe("POST /api/sync/pages — IDOR protection", () => {
       // `(source_id, link_type)` pair and one INSERT per row.
       const oldDate = new Date("2024-01-01T00:00:00Z");
       const { app, chains } = createSyncApp([
-        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        [
+          {
+            id: OWNED_PAGE,
+            ownerId: TEST_USER_ID,
+            noteId: "sync-default-note-id",
+            updatedAt: oldDate,
+          },
+        ],
         undefined,
         [{ id: OWNED_PAGE }],
         undefined, // DELETE wiki
@@ -341,7 +386,14 @@ describe("POST /api/sync/pages — IDOR protection", () => {
       // existing tag edges untouched.
       const oldDate = new Date("2024-01-01T00:00:00Z");
       const { app, chains } = createSyncApp([
-        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        [
+          {
+            id: OWNED_PAGE,
+            ownerId: TEST_USER_ID,
+            noteId: "sync-default-note-id",
+            updatedAt: oldDate,
+          },
+        ],
         undefined,
         [{ id: OWNED_PAGE }],
         undefined, // DELETE wiki only
@@ -366,7 +418,14 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     it("accepts link_type='tag' on ghost_links and defaults to 'wiki' when omitted", async () => {
       const oldDate = new Date("2024-01-01T00:00:00Z");
       const { app, chains } = createSyncApp([
-        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+        [
+          {
+            id: OWNED_PAGE,
+            ownerId: TEST_USER_ID,
+            noteId: "sync-default-note-id",
+            updatedAt: oldDate,
+          },
+        ],
         undefined,
         [{ id: OWNED_PAGE }],
         undefined, // DELETE ghost wiki
@@ -400,11 +459,7 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     });
 
     it("rejects unknown link_type values with 400", async () => {
-      const oldDate = new Date("2024-01-01T00:00:00Z");
-      const { app } = createSyncApp([
-        [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
-        undefined,
-      ]);
+      const { app } = createSyncApp([]);
 
       const res = await app.request("/api/sync/pages", {
         method: "POST",
@@ -423,7 +478,14 @@ describe("POST /api/sync/pages — IDOR protection", () => {
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const { app, chains } = createSyncApp([
       // 1: bulk page fetch (LWW pre-load)
-      [{ id: OWNED_PAGE, ownerId: TEST_USER_ID, noteId: null, updatedAt: oldDate }],
+      [
+        {
+          id: OWNED_PAGE,
+          ownerId: TEST_USER_ID,
+          noteId: "sync-default-note-id",
+          updatedAt: oldDate,
+        },
+      ],
       // 2: page update
       undefined,
       // 3: owned pages query for links

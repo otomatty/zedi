@@ -42,7 +42,7 @@
  */
 
 import * as Y from "yjs";
-import { and, eq, sql, ne, inArray, isNull } from "drizzle-orm";
+import { and, eq, sql, ne, inArray } from "drizzle-orm";
 import { links, ghostLinks, pageContents, pages } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 import { rewriteTitleRefsInDoc, type RewriteResult } from "./ydocRenameRewrite.js";
@@ -197,27 +197,11 @@ async function rewriteSourcePage(
 
 /**
  * 新タイトルと一致するゴーストリンクを、リネーム対象と同一スコープ内でのみ
- * 実体リンクへ昇格させる。スコープはリネーム対象の `pages.note_id` と
- * `pages.owner_id` から決定する:
+ * 実体リンクへ昇格させる。スコープはリネーム対象の `pages.note_id` で決定する。
+ * ソースページも同一 `note_id` の場合のみ昇格する（Issue #823）。
  *
- *   - リネーム対象がノートネイティブ (`note_id` 非 NULL): ソースの `note_id`
- *     が同一の場合のみ昇格。
- *   - リネーム対象が個人ページ (`note_id` NULL): ソースも個人 (`note_id` NULL)
- *     かつオーナーが同一の場合のみ昇格。
- *
- * これにより、別テナント／別ノートで同一テキストを持つ `ghost_links` が
- * 誤って消費されることを防ぐ（PR #736 P1 レビュー参照）。
- *
- * Promote ghost-link rows matching the new title — but only within the
- * renamed page's ownership / note scope. Without this filter, a rename in
- * one tenant would silently consume unrelated ghost rows elsewhere that
- * happen to share the same text, creating cross-tenant link edges
- * (reviewed as P1 on PR #736).
- *
- *   - Note-native target (`note_id != null`): only promote ghosts whose
- *     source page is in the same `note_id`.
- *   - Personal target (`note_id = null`): only promote ghosts whose source
- *     is also personal (`note_id = null`) and has the same `owner_id`.
+ * Promote ghost-link rows matching the new title only when the source page
+ * shares the renamed page's `note_id` (issue #823).
  */
 async function promoteGhostLinks(
   db: Database,
@@ -235,13 +219,7 @@ async function promoteGhostLinks(
     const scope = scopeRows[0];
     if (!scope) return 0;
 
-    // 2. 同一スコープかつテキスト一致のゴースト行を列挙する。
-    //    Find in-scope ghost rows whose text matches the new title.
-    const scopePredicate =
-      scope.noteId !== null
-        ? eq(pages.noteId, scope.noteId)
-        : and(isNull(pages.noteId), eq(pages.ownerId, scope.ownerId));
-
+    // 2. 同一ノート（`pages.note_id`）かつテキスト一致のゴースト行を列挙する。
     const candidates = await tx
       .select({
         sourcePageId: ghostLinks.sourcePageId,
@@ -253,7 +231,7 @@ async function promoteGhostLinks(
         and(
           sql`LOWER(TRIM(${ghostLinks.linkText})) = LOWER(TRIM(${newTitle}))`,
           ne(ghostLinks.sourcePageId, renamedPageId),
-          scopePredicate,
+          eq(pages.noteId, scope.noteId),
         ),
       );
 

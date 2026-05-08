@@ -3,7 +3,6 @@ import { users, session, account } from "./users.js";
 import { pages } from "./pages.js";
 import {
   notes,
-  notePages,
   noteMembers,
   noteInvitations,
   noteInviteLinks,
@@ -79,7 +78,6 @@ const pagesRelations = relations(pages, ({ one, many }) => ({
     fields: [pages.noteId],
     references: [notes.id],
   }),
-  notePages: many(notePages),
   snapshots: many(pageSnapshots),
   media: many(media),
   outgoingLinks: many(links, { relationName: "sourceLinks" }),
@@ -96,35 +94,13 @@ const notesRelations = relations(notes, ({ one, many }) => ({
     references: [users.id],
   }),
   pages: many(pages),
-  notePages: many(notePages),
   noteMembers: many(noteMembers),
   noteInvitations: many(noteInvitations),
   noteInviteLinks: many(noteInviteLinks),
   noteDomainAccess: many(noteDomainAccess),
 }));
 
-export /**
- *
- */
-const notePagesRelations = relations(notePages, ({ one }) => ({
-  note: one(notes, {
-    fields: [notePages.noteId],
-    references: [notes.id],
-  }),
-  page: one(pages, {
-    fields: [notePages.pageId],
-    references: [pages.id],
-  }),
-  addedBy: one(users, {
-    fields: [notePages.addedByUserId],
-    references: [users.id],
-  }),
-}));
-
-export /**
- *
- */
-const noteMembersRelations = relations(noteMembers, ({ one }) => ({
+export const noteMembersRelations = relations(noteMembers, ({ one }) => ({
   note: one(notes, {
     fields: [noteMembers.noteId],
     references: [notes.id],

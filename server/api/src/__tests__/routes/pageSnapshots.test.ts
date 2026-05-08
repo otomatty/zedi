@@ -1,6 +1,12 @@
 /**
  * pageSnapshots ルートのテスト（認可・CRUD）
  * Tests for page snapshots routes: authorization, list, detail, restore.
+ *
+ * Issue #823: `assertPageViewAccess` / `assertPageEditAccess` は `pages.note_id` 経由の
+ * ノートロールのみで判定する。モック DB は SELECT 連鎖をこの順に返す。
+ *
+ * Issue #823: access checks use note roles via `pages.note_id` only; mocks must return
+ * SELECT chains in this order.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context, Next } from "hono";
@@ -33,6 +39,30 @@ function authHeaders(userId: string = OWNER_ID) {
   };
 }
 
+function mockNote(noteOwnerId: string) {
+  return {
+    id: NOTE_ID,
+    ownerId: noteOwnerId,
+    title: "n",
+    visibility: "private" as const,
+    editPermission: "owner_only" as const,
+    isOfficial: false,
+    viewCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDeleted: false,
+  };
+}
+
+/** 1: pages row  2: caller email  3: findActiveNoteById */
+function viewAccessPrefix(
+  asUserEmail: string,
+  noteOwnerId: string,
+  pageRow: Record<string, unknown>,
+) {
+  return [[pageRow], [{ email: asUserEmail }], [mockNote(noteOwnerId)]];
+}
+
 function createSnapshotsApp(dbResults: unknown[]) {
   const { db } = createMockDb(dbResults);
   const app = new Hono<AppEnv>();
@@ -52,8 +82,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// ── 認証 / Authentication ──────────────────────────────────────────────────
-
 describe("Authentication", () => {
   it("returns 401 without auth header", async () => {
     const app = createSnapshotsApp([]);
@@ -64,15 +92,12 @@ describe("Authentication", () => {
   });
 });
 
-// ── GET /snapshots — 一覧 / List ────────────────────────────────────────────
-
 describe("GET /api/pages/:id/snapshots", () => {
   it("returns snapshots for page owner", async () => {
     const now = new Date();
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // assertPageViewAccess: pages query
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
-      // snapshots query
+      ...viewAccessPrefix("owner@example.com", OWNER_ID, pageRow),
       [
         {
           id: SNAPSHOT_ID,
@@ -83,7 +108,6 @@ describe("GET /api/pages/:id/snapshots", () => {
           createdAt: now,
         },
       ],
-      // users query (email resolution)
       [{ id: OWNER_ID, email: "owner@example.com" }],
     ]);
 
@@ -96,12 +120,7 @@ describe("GET /api/pages/:id/snapshots", () => {
     const body = (await res.json()) as {
       snapshots: Array<{
         id: string;
-        version: number;
-        content_text: string;
-        created_by: string;
         created_by_email: string;
-        trigger: string;
-        created_at: string;
       }>;
     };
     expect(body.snapshots).toEqual([
@@ -113,10 +132,7 @@ describe("GET /api/pages/:id/snapshots", () => {
   });
 
   it("returns 404 when page does not exist", async () => {
-    const app = createSnapshotsApp([
-      // assertPageViewAccess: pages query returns empty
-      [],
-    ]);
+    const app = createSnapshotsApp([[]]);
 
     const res = await app.request(`/api/pages/${PAGE_ID}/snapshots`, {
       method: "GET",
@@ -127,12 +143,10 @@ describe("GET /api/pages/:id/snapshots", () => {
   });
 
   it("returns 403 when user is not owner and not a note member", async () => {
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // assertPageViewAccess: pages query
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
-      // user email lookup
-      [{ email: "other@example.com" }],
-      // notePages + noteMembers JOIN returns empty
+      ...viewAccessPrefix("other@example.com", OWNER_ID, pageRow),
+      [],
       [],
     ]);
 
@@ -145,14 +159,10 @@ describe("GET /api/pages/:id/snapshots", () => {
   });
 
   it("allows access for note member", async () => {
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // assertPageViewAccess: pages query (owner is different)
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
-      // user email lookup
-      [{ email: "member@example.com" }],
-      // notePages + noteMembers JOIN returns a match
-      [{ noteId: NOTE_ID }],
-      // snapshots query
+      ...viewAccessPrefix("member@example.com", OWNER_ID, pageRow),
+      [{ role: "viewer" }],
       [],
     ]);
 
@@ -165,16 +175,13 @@ describe("GET /api/pages/:id/snapshots", () => {
   });
 });
 
-// ── GET /snapshots/:snapshotId — 詳細 / Detail ─────────────────────────────
-
 describe("GET /api/pages/:id/snapshots/:snapshotId", () => {
   it("returns snapshot detail for owner", async () => {
     const now = new Date();
     const ydocBuffer = Buffer.from("test-ydoc");
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // assertPageViewAccess: pages query
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
-      // snapshot query
+      ...viewAccessPrefix("owner@example.com", OWNER_ID, pageRow),
       [
         {
           id: SNAPSHOT_ID,
@@ -187,7 +194,6 @@ describe("GET /api/pages/:id/snapshots/:snapshotId", () => {
           createdAt: now,
         },
       ],
-      // user email lookup for created_by
       [{ email: "owner@example.com" }],
     ]);
 
@@ -208,10 +214,9 @@ describe("GET /api/pages/:id/snapshots/:snapshotId", () => {
   });
 
   it("returns 404 when snapshot does not exist", async () => {
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // assertPageViewAccess: pages query
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
-      // snapshot query returns empty
+      ...viewAccessPrefix("owner@example.com", OWNER_ID, pageRow),
       [],
     ]);
 
@@ -224,13 +229,13 @@ describe("GET /api/pages/:id/snapshots/:snapshotId", () => {
   });
 });
 
-// ── POST /snapshots/:snapshotId/restore — 復元 / Restore ──────────────────
-
 describe("POST /api/pages/:id/snapshots/:snapshotId/restore", () => {
   it("returns 403 when non-owner tries to restore", async () => {
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // page ownership check
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
+      ...viewAccessPrefix("other@example.com", OWNER_ID, pageRow),
+      [],
+      [],
     ]);
 
     const res = await app.request(`/api/pages/${PAGE_ID}/snapshots/${SNAPSHOT_ID}/restore`, {
@@ -242,10 +247,7 @@ describe("POST /api/pages/:id/snapshots/:snapshotId/restore", () => {
   });
 
   it("returns 404 when page does not exist for restore", async () => {
-    const app = createSnapshotsApp([
-      // page query returns empty
-      [],
-    ]);
+    const app = createSnapshotsApp([[]]);
 
     const res = await app.request(`/api/pages/${PAGE_ID}/snapshots/${SNAPSHOT_ID}/restore`, {
       method: "POST",
@@ -256,10 +258,9 @@ describe("POST /api/pages/:id/snapshots/:snapshotId/restore", () => {
   });
 
   it("returns 404 when snapshot does not exist for restore", async () => {
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // page ownership check
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
-      // snapshot query returns empty
+      ...viewAccessPrefix("owner@example.com", OWNER_ID, pageRow),
       [],
     ]);
 
@@ -273,10 +274,9 @@ describe("POST /api/pages/:id/snapshots/:snapshotId/restore", () => {
 
   it("restores snapshot and returns new version for owner", async () => {
     const ydocBuffer = Buffer.from("restored-ydoc");
+    const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
     const app = createSnapshotsApp([
-      // page ownership check
-      [{ id: PAGE_ID, ownerId: OWNER_ID }],
-      // snapshot query
+      ...viewAccessPrefix("owner@example.com", OWNER_ID, pageRow),
       [
         {
           id: SNAPSHOT_ID,
@@ -289,19 +289,12 @@ describe("POST /api/pages/:id/snapshots/:snapshotId/restore", () => {
           createdAt: new Date(),
         },
       ],
-      // transaction: row lock
       [{}],
-      // transaction: current content
       [{ version: 2, ydocState: Buffer.from("current"), contentText: "current" }],
-      // transaction: insert current snapshot
       [{}],
-      // transaction: update page_contents
       [{ version: 3, pageId: PAGE_ID }],
-      // transaction: insert restore snapshot
       [{ id: "snap-restore-001" }],
-      // transaction: update pages metadata
       [{}],
-      // transaction: prune old snapshots
       [{}],
     ]);
 

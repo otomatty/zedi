@@ -4,14 +4,7 @@
  */
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import {
-  notes,
-  notePages,
-  noteMembers,
-  noteDomainAccess,
-  pages,
-  users,
-} from "../../schema/index.js";
+import { notes, noteMembers, noteDomainAccess, pages, users } from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import type { Database } from "../../types/index.js";
 import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
@@ -105,19 +98,12 @@ export async function getActivePageCounts(
   if (noteIds.length === 0) return new Map();
   const counts = await db
     .select({
-      noteId: notePages.noteId,
+      noteId: pages.noteId,
       count: sql<number>`cast(count(*) as integer)`,
     })
-    .from(notePages)
-    .innerJoin(pages, eq(notePages.pageId, pages.id))
-    .where(
-      and(
-        inArray(notePages.noteId, noteIds),
-        eq(notePages.isDeleted, false),
-        eq(pages.isDeleted, false),
-      ),
-    )
-    .groupBy(notePages.noteId);
+    .from(pages)
+    .where(and(inArray(pages.noteId, noteIds), eq(pages.isDeleted, false)))
+    .groupBy(pages.noteId);
   return new Map(counts.map((c) => [c.noteId, c.count]));
 }
 
@@ -209,7 +195,7 @@ export async function getNoteRole(
       )
       .limit(1);
 
-    const firstMember = member[0];
+    const firstMember = (Array.isArray(member) ? member : [])[0];
     if (firstMember) {
       return { role: firstMember.role as NoteMemberRole, note };
     }
@@ -234,8 +220,9 @@ export async function getNoteRole(
           ),
         );
 
-      if (rules.length > 0) {
-        const hasEditor = rules.some((r) => r.role === "editor");
+      const ruleRows = Array.isArray(rules) ? rules : [];
+      if (ruleRows.length > 0) {
+        const hasEditor = ruleRows.some((r) => r.role === "editor");
         return { role: hasEditor ? "editor" : "viewer", note };
       }
     }

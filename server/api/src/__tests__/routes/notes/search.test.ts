@@ -105,12 +105,9 @@ describe("GET /api/notes/:noteId/search", () => {
     expect(chains.some((c) => c.startMethod === "execute")).toBe(false);
   });
 
-  it("restricts SQL to pages joined via note_pages for this noteId", async () => {
-    // ノートスコープ: `note_pages.note_id = :noteId` の inner join で絞り込み、
-    // 他ノートや個人 /home のページが混ざらないことを SQL レベルで担保する。
-    // Scope guard at the SQL layer: inner join through `note_pages` with
-    // `note_id = :noteId` so pages from other notes (or personal /home) cannot
-    // leak into the results.
+  it("restricts SQL to pages where p.note_id matches path noteId (issue #823)", async () => {
+    // ノートスコープ: `pages.note_id = :noteId` で直接フィルタする（note_pages 廃止）。
+    // Scope guard: filter `pages.note_id` to the path param (`note_pages` removed).
     const mockNote = createMockNote();
     const { app, chains } = createTestApp([
       [mockNote], // getNoteRole → owner
@@ -126,11 +123,7 @@ describe("GET /api/notes/:noteId/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("note_pages");
-    expect(serialised).toContain("np.note_id");
-    // SELECT 句に p.note_id を含め、呼び出し側がネイティブ / リンク済み個人ページを
-    // 見分けられるようにする (Phase 5 契約)。
-    // Expose `p.note_id` so callers can tell note-native vs linked personal.
+    expect(serialised).not.toContain("note_pages");
     expect(serialised).toContain("p.note_id");
     // ILIKE による全文検索パターンが使われていること。
     // ILIKE search uses the escaped pattern.

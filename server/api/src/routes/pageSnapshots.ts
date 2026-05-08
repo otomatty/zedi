@@ -47,7 +47,7 @@ app.get("/:id/snapshots", authRequired, async (c) => {
       .select({ id: users.id, email: users.email })
       .from(users)
       .where(inArray(users.id, userIds));
-    for (const u of userRows) {
+    for (const u of Array.isArray(userRows) ? userRows : []) {
       emailMap.set(u.id, u.email);
     }
   }
@@ -91,7 +91,8 @@ app.get("/:id/snapshots/:snapshotId", authRequired, async (c) => {
       .from(users)
       .where(eq(users.id, row.createdBy))
       .limit(1);
-    createdByEmail = userRow[0]?.email ?? null;
+    const emailRows = Array.isArray(userRow) ? userRow : [];
+    createdByEmail = emailRows[0]?.email ?? null;
   }
 
   const ydocBase64 =
@@ -118,20 +119,13 @@ app.get("/:id/snapshots/:snapshotId", authRequired, async (c) => {
  * 他のページ書き込み系エンドポイント（`PUT /api/pages/:id/content` など）と
  * 同じく `assertPageEditAccess` に委譲する。
  *
- * - 個人ページ（`pages.note_id IS NULL`）: `pages.ownerId` 一致のみ
- * - ノートネイティブページ（`pages.note_id IS NOT NULL`）: ノートロール +
- *   `editPermission` の `canEdit` 評価（issue #713）。これにより、ノートを抜けた
- *   元作成者が restore を継続できてしまう問題と、ノートオーナーが他メンバー作成
- *   ページを restore できない問題の両方が解消される。
+ * - Issue #823 以降、すべてのページは `pages.note_id` でノートに所属する。復元は
+ *   `assertPageEditAccess`（所属ノートの `canEdit`）で判定する。
  *
- * Restore a snapshot. Edit permission is required and is now delegated to
- * `assertPageEditAccess`, the same helper used by `PUT /api/pages/:id/content`.
- *
- * - Personal page (`pages.note_id IS NULL`): only the `pages.ownerId` user.
- * - Note-native page (`pages.note_id IS NOT NULL`): the caller's note role
- *   must satisfy `canEdit` against the note's `editPermission` (issue #713).
- *   This both prevents removed members from continuing to restore and lets
- *   note owners restore snapshots on pages created by other editors.
+ * Restore a snapshot. Edit permission is delegated to `assertPageEditAccess`
+ * (`canEdit` on the owning note). Every page belongs to a note (issue #823).
+ * This prevents removed members from restoring while allowing note owners to
+ * restore snapshots on pages created by other editors when policy allows.
  *
  * **Collaboration / コラボレーション**: This endpoint acquires a DB row lock for `page_contents`
  * and then asks Hocuspocus to invalidate the live document after commit. Configure

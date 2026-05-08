@@ -10,8 +10,8 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, ne, and, or, desc, asc, sql, inArray } from "drizzle-orm";
-import { notes, notePages, noteMembers, pages, users } from "../../schema/index.js";
+import { eq, ne, and, or, desc, sql, inArray } from "drizzle-orm";
+import { notes, noteMembers, pages, users } from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import { authRequired, authOptional } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
@@ -323,16 +323,10 @@ app.get("/:noteId", authOptional, async (c) => {
       createdAt: pages.createdAt,
       updatedAt: pages.updatedAt,
       isDeleted: pages.isDeleted,
-      sortOrder: notePages.sortOrder,
-      addedByUserId: notePages.addedByUserId,
-      addedAt: notePages.createdAt,
     })
-    .from(notePages)
-    .innerJoin(pages, eq(notePages.pageId, pages.id))
-    .where(
-      and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false), eq(pages.isDeleted, false)),
-    )
-    .orderBy(asc(notePages.sortOrder));
+    .from(pages)
+    .where(and(eq(pages.noteId, noteId), eq(pages.isDeleted, false)))
+    .orderBy(desc(pages.updatedAt));
 
   const response: NoteDetailApiResponse = {
     ...noteRowToApi(note),
@@ -341,12 +335,7 @@ app.get("/:noteId", authOptional, async (c) => {
       (p): NotePageApiItem => ({
         id: p.id,
         owner_id: p.ownerId,
-        // `note_id` は「リンクされた個人ページ」か「ノートネイティブページ」かを
-        // 区別する。note-native だけに有効なアクション（例: 「個人に取り込み」）
-        // をクライアント側で出し分けるため、Phase 3 から明示的に返す。
-        // Surface `note_id` so clients can distinguish linked personal pages
-        // (null) from note-native pages (non-null). Phase 3 needs this to gate
-        // note-native-only actions such as "copy to personal".
+        /** 所属ノート ID（Issue #823 以降は常にこのノート ID）。 */
         note_id: p.noteId,
         source_page_id: p.sourcePageId,
         title: p.title,
@@ -356,9 +345,6 @@ app.get("/:noteId", authOptional, async (c) => {
         created_at: p.createdAt,
         updated_at: p.updatedAt,
         is_deleted: p.isDeleted,
-        sort_order: p.sortOrder,
-        added_by_user_id: p.addedByUserId,
-        added_at: p.addedAt,
       }),
     ),
   };

@@ -65,27 +65,16 @@ export interface NoteListApiItem extends NoteApiFields {
 }
 
 /**
- * `GET /api/notes/:id` のページ行。`note_id` が NULL なら個人ページがこのノート
- * にリンクされているだけ、値ありならノートネイティブページ。
- * Page row returned inside `GET /api/notes/:id`. `note_id` = null → linked
- * personal page; non-null → note-native page.
+ * `GET /api/notes/:id` のページ行。Issue #823 以降、ページは常に 1 つのノートに所属し、
+ * `note_id` はこのレスポンスのノート ID と一致する。
+ *
+ * Page row inside `GET /api/notes/:id`. After issue #823 every page belongs to
+ * exactly one note; `note_id` matches the enclosing note id.
  */
 export interface NotePageApiItem {
   id: string;
   owner_id: string;
-  /**
-   * ページのスコープ。`null` なら個人ページがこのノートに「リンク」されている
-   * だけ（所有者の /home にも現れる）。値ありなら、このノートに所属するノート
-   * ネイティブページ (`pages.note_id = noteId`)。クライアントはこれを見て
-   * 「個人に取り込み」のような note-native 専用アクションを出し分ける。
-   * Issue #713 Phase 3。
-   *
-   * Page scope. `null` means the page is a linked personal page (still on the
-   * owner's /home). A non-null value means a note-native page owned by this
-   * note (`pages.note_id = noteId`). Clients use this to gate note-native-only
-   * actions such as "copy to personal". See issue #713 Phase 3.
-   */
-  note_id: string | null;
+  note_id: string;
   source_page_id: string | null;
   title: string | null;
   content_preview: string | null;
@@ -94,20 +83,14 @@ export interface NotePageApiItem {
   created_at: Date;
   updated_at: Date;
   is_deleted: boolean;
-  sort_order: number;
-  added_by_user_id: string;
-  added_at: Date;
 }
 
 /**
- * `GET /api/notes/:id` のレスポンス。呼び出し元の解決ロールと、このノート
- * 表示に含まれる全ページ（リンクされた個人ページ + ノートネイティブ）を含む。
- * `note_id` が NULL の行はリンクされた個人ページ（所有者の /home にも出る）、
- * 値ありの行はこのノートに所属するノートネイティブページ。
- * `GET /api/notes/:id` response: caller's resolved role plus every page shown
- * in this note view (linked personal + note-native). A `note_id` of `null`
- * means a linked personal page (also on the owner's `/home`); a non-null
- * value means a note-native page owned by this note.
+ * `GET /api/notes/:id` のレスポンス。呼び出し元の解決ロールと、`pages.note_id = id`
+ * の全ページを含む。
+ *
+ * `GET /api/notes/:id` response: caller's resolved role plus every page with
+ * `pages.note_id` equal to this note id.
  */
 export interface NoteDetailApiResponse extends NoteApiFields {
   current_user_role: NonNullable<NoteRole>;

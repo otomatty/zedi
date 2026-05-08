@@ -2,13 +2,13 @@
  * GET /api/search のスコープ分離テスト (Issue #718 Phase 5-1)。
  * Tests for scope separation on GET /api/search (Issue #718 Phase 5-1).
  *
- * Phase 1〜4 で `pages.note_id` による個人 / ノートネイティブページのスコープ分離が
- * 導入されたため、`scope=own` でも SQL レベルで `p.note_id IS NULL` を強制し、
- * ノートネイティブページがリークしないことを検証する。
+ * Issue #823: `scope=own` は呼び出し元のデフォルトノート配下に限定し、`scope=shared`
+ * は共有ノート（オーナー / メンバー / ドメインルール）へ所属するページを横断する。
+ * `note_pages` テーブルは廃止されている。
  *
- * Ensures `scope=own` restricts results to personal pages (note_id IS NULL) at
- * the SQL layer so note-native pages cannot leak into personal search results,
- * while `scope=shared` keeps its existing cross-scope behavior.
+ * Issue #823: `scope=own` restricts to the caller's default note; `scope=shared` spans
+ * pages in notes reachable via owner / member / domain access. The `note_pages` table
+ * is gone.
  */
 import { describe, it, expect, vi } from "vitest";
 import type { Context, Next } from "hono";
@@ -70,9 +70,7 @@ describe("GET /api/search", () => {
     expect(chains).toHaveLength(0);
   });
 
-  it("scope=own restricts SQL to personal pages (note_id IS NULL) to prevent note-native leakage", async () => {
-    // Phase 5-1 防御的修正: 個人検索結果にノートネイティブページが混ざってはならない。
-    // Phase 5-1 defensive fix: personal search results must never include note-native pages.
+  it("scope=own uses default-note subquery on p.note_id (issue #823)", async () => {
     const { app, chains } = createSearchApp([{ rows: [] }]);
 
     const res = await app.request("/api/search?q=hello&scope=own", {
@@ -84,13 +82,12 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("p.note_id IS NULL");
-    expect(serialised).toContain("p.owner_id");
+    expect(serialised).toContain("is_default");
+    expect(serialised).toContain("p.note_id");
+    expect(serialised).toContain(TEST_USER_ID);
   });
 
   it("defaults to scope=own when scope query parameter is omitted", async () => {
-    // scope 未指定時の既定は個人スコープ。省略時にノートネイティブがリークしないよう同じガードを要求する。
-    // Omitted scope defaults to personal, so the same guard must apply.
     const { app, chains } = createSearchApp([{ rows: [] }]);
 
     const res = await app.request("/api/search?q=hello", {
@@ -102,12 +99,11 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("p.note_id IS NULL");
+    expect(serialised).toContain("is_default");
+    expect(serialised).toContain("p.note_id");
   });
 
-  it("scope=shared keeps non-personal access branches alongside the personal ownership guard", async () => {
-    // shared は個人ページの owner 分岐を残しつつ、note_pages 経由の共有アクセスも併せ持つ。
-    // `shared` keeps the personal-owner guard but must still include note-based branches.
+  it("scope=shared uses note ownership / member / domain EXISTS branches without note_pages", async () => {
     const { app, chains } = createSearchApp([{ rows: [] }]);
 
     const res = await app.request("/api/search?q=hello&scope=shared", {
@@ -119,8 +115,8 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("p.note_id IS NULL");
-    expect(serialised).toContain("note_pages");
+    expect(serialised).not.toContain("note_pages");
+    expect(serialised).toContain("note_members");
     expect(serialised).toContain("OR EXISTS");
   });
 
@@ -135,7 +131,7 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(200);
   });
 
-  it("scope=shared keeps personal ownership limited to personal pages and adds note-owner access via note_pages", async () => {
+  it("scope=shared keeps note-scoped EXISTS predicates (no note_pages join)", async () => {
     const { app, chains } = createSearchApp([{ rows: [] }]);
 
     const res = await app.request("/api/search?q=hello&scope=shared", {
@@ -147,25 +143,22 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("p.owner_id");
-    expect(serialised).toContain("p.note_id IS NULL");
-    expect(serialised).toContain("note_pages");
-    expect(serialised).toContain("np.page_id = p.id");
-    expect(serialised).toContain("n.owner_id");
+    expect(serialised).toContain(TEST_USER_ID);
+    expect(serialised).not.toContain("note_pages");
+    expect(serialised).toContain("p.note_id");
   });
 
-  it("response rows include note_id so callers can distinguish personal vs note-native", async () => {
-    // 呼び出し側 (フロント / MCP) がスコープ判定できるよう、レスポンスには必ず note_id を含める。
-    // Callers (frontend / MCP) must be able to tell personal vs note-native, so include note_id.
+  it("response rows include note_id so callers can distinguish pages by owning note", async () => {
+    const defaultNotePageId = "11111111-1111-1111-1111-111111111111";
     const { app, chains } = createSearchApp([
       {
         rows: [
           {
-            id: "page-personal",
-            title: "Personal",
+            id: defaultNotePageId,
+            title: "In default note",
             content_preview: null,
             updated_at: new Date("2026-04-01T00:00:00Z").toISOString(),
-            note_id: null,
+            note_id: defaultNotePageId,
           },
         ],
       },
@@ -181,27 +174,22 @@ describe("GET /api/search", () => {
     expect(body.results).toHaveLength(1);
     expect(body.results[0]).toHaveProperty("note_id");
 
-    // SELECT 句に p.note_id が含まれていることも検証する (両スコープ)。
-    // Verify SELECT list includes p.note_id regardless of scope.
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     const serialised = JSON.stringify(executeChain?.startArgs);
     expect(serialised).toContain("p.note_id");
   });
 
-  it("scope=own SELECT list exposes p.note_id and response surfaces note_id: null", async () => {
-    // SQL の SELECT に note_id が含まれること、かつ JSON ペイロード上も
-    // note_id (個人ページなので null) が露出することを併せて契約する。
-    // Pin both the SQL projection and the JSON payload contract: scope=own
-    // surfaces note_id (null for personal pages) on each result row.
+  it("scope=own SELECT list exposes p.note_id (default-note constraint)", async () => {
+    const defaultNotePageId = "22222222-2222-2222-2222-222222222222";
     const { app, chains } = createSearchApp([
       {
         rows: [
           {
-            id: "page-own",
-            title: "Own page",
+            id: defaultNotePageId,
+            title: "Own scope page",
             content_preview: null,
             updated_at: new Date("2026-04-01T00:00:00Z").toISOString(),
-            note_id: null,
+            note_id: defaultNotePageId,
           },
         ],
       },
@@ -215,10 +203,11 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { results: Array<Record<string, unknown>> };
     expect(body.results).toHaveLength(1);
-    expect(body.results[0]).toHaveProperty("note_id", null);
+    expect(body.results[0]).toHaveProperty("note_id", defaultNotePageId);
 
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     const serialised = JSON.stringify(executeChain?.startArgs);
     expect(serialised).toContain("p.note_id");
+    expect(serialised).toContain("is_default");
   });
 });

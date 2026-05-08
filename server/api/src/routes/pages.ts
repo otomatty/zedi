@@ -1,8 +1,8 @@
 /**
  * /api/pages — ページ CRUD + コンテンツ管理
  *
- * GET    /api/pages                — 自分 (own) のページ一覧、または共有 (shared) を含めた一覧をページネーション取得
- *        — List the caller's pages (own, or own + shared via notes) with limit/offset pagination.
+ * GET    /api/pages                — **410 Gone**（Issue #823）。一覧は `/api/notes/:id/pages` 等へ移行。
+ *        — **410 Gone** (issue #823); list pages via `/api/notes/:id/pages`, etc.
  * GET    /api/pages/:id/content — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
  *        — Retrieve Y.Doc content (200 + empty `ydoc_state` when no `page_contents` row).
  * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
@@ -15,6 +15,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { pages, pageContents } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
+import { ensureDefaultNote } from "../services/defaultNoteService.js";
 import { maybeCreateSnapshot } from "../services/snapshotService.js";
 import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
@@ -115,100 +116,20 @@ async function applyPagesMetadataUpdate(
 }
 
 // ── GET /pages ──────────────────────────────────────────────────────────────
-// `scope=shared` の場合、`/api/search` と同じ認可ロジック
-// (own + 受諾済みノートメンバー + note owner) を流用する。
-// When `scope=shared`, reuses the same authorization model as `/api/search`
-// (own pages + accepted note members + note owners).
+// Issue #823: ページ一覧は `pages.note_id` 直接モデルへ移行したため本エンドポイントは廃止。
+// クライアントは `GET /api/notes/:noteId/pages`（既定ノートは `GET /api/notes/me`）を利用する。
+//
+// Issue #823: listing moved to note-scoped endpoints; this route is retired.
+// Clients should use `GET /api/notes/:noteId/pages` (resolve default via `GET /api/notes/me`).
 app.get("/", authRequired, async (c) => {
-  const userId = c.get("userId");
-  const db = c.get("db");
-
-  // クエリパラメータは整数として明示的にパースする。`Number("abc")` だと NaN が SQL に渡るため。
-  // Parse query params as integers — `Number("abc")` would propagate NaN into SQL.
-  const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "20", 10) || 20, 1), 100);
-  const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
-  const scope = c.req.query("scope") === "shared" ? "shared" : "own";
-
-  // アクセス制御だけを変数化して SELECT 文の重複を避ける。
-  // `shared` は `services/pageAccessService.ts` と同じ正規の認可モデルを採用:
-  //   - notes が未削除であること
-  //   - note_members.status = 'accepted' (招待を受諾済み) であること
-  //   - note_members / note_pages が未削除であること
-  // 大規模データセットでもプランナーが効きやすい EXISTS + JOIN を使う。
-  // Vary only the access predicate to avoid duplicating the SELECT.
-  // `shared` mirrors the canonical authorization model from `services/pageAccessService.ts`:
-  //   the linked note must be active, the membership must be accepted, and the join rows
-  //   must not be soft-deleted. EXISTS + JOIN keeps the planner happy on large datasets.
-  // `own` スコープは個人ページ（`pages.note_id IS NULL`）のみを返す。
-  // ノートネイティブページ（issue #713）は、ノート画面または `scope=shared`
-  // 経由でのみアクセスする。`shared` 経由の場合は (a) note_members 経由の
-  // メンバーシップ、または (b) `note_pages -> notes.owner_id = userId` 経由の
-  // オーナーシップで含まれる。オーナー経路を note-native page だけに限定すると、
-  // linked personal page が listing から消えて `assertPageViewAccess` と非対称になる。
-  // `getNoteRole` の解決順 (owner → member → ...) と listing predicate を揃える。
-  //
-  // The `own` scope returns personal pages only (`pages.note_id IS NULL`).
-  // Note-native pages (issue #713) are accessed via the note view or
-  // `scope=shared`. `shared` includes them either through (a) `note_members`
-  // membership or (b) note ownership reached through `note_pages`. That owner
-  // branch must cover linked personal pages too; otherwise owners could open
-  // them via `assertPageViewAccess` while the listing hides them.
-  const accessFilter =
-    scope === "shared"
-      ? sql`(
-          (p.owner_id = ${userId} AND p.note_id IS NULL)
-          OR EXISTS (
-            SELECT 1 FROM note_pages np
-            JOIN notes n ON n.id = np.note_id
-            JOIN note_members nm ON nm.note_id = np.note_id
-            JOIN "user" u ON u.email = nm.member_email
-            WHERE np.page_id = p.id
-              AND u.id = ${userId}
-              AND nm.status = 'accepted'
-              AND nm.is_deleted = false
-              AND np.is_deleted = false
-              AND n.is_deleted = false
-          )
-          OR EXISTS (
-            SELECT 1 FROM note_pages np
-            JOIN notes n ON n.id = np.note_id
-            WHERE np.page_id = p.id
-              AND np.is_deleted = false
-              AND n.owner_id = ${userId}
-              AND n.is_deleted = false
-          )
-        )`
-      : sql`p.owner_id = ${userId} AND p.note_id IS NULL`;
-
-  // Wiki の内部システムページ（`special_kind` が `__index__` / `__log__`、
-  // および `is_schema = true` のスキーマページ）は通常一覧から除外する。
-  // クライアントがそれらを編集するための専用 UI が別にあるため、`/api/pages`
-  // で返すと NotFound 化したり、ヘッダ付きカードの中に編集不能な行が混ざる。
-  // include_special=true を指定したクライアントのみオプトインで取得できる。
-  // Hide internal/system pages (special_kind set or is_schema=true) from the
-  // generic listing; clients that need them can opt in with include_special=true.
-  const includeSpecial = c.req.query("include_special") === "true";
-  const specialKindFilter = includeSpecial
-    ? sql`TRUE`
-    : sql`p.special_kind IS NULL AND p.is_schema = false`;
-
-  // `note_id` を返すことで、`scope=shared` で混在 listing を受け取った
-  // クライアントが個人ページ（`note_id IS NULL`）とノートネイティブページを
-  // 区別できる。MCP の `zedi_list_pages` ツールはこれに依存している。
-  // Surface `note_id` so callers receiving mixed `scope=shared` results (e.g.
-  // the `zedi_list_pages` MCP tool) can distinguish personal vs note-native.
-  const result = await db.execute(sql`
-    SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id
-    FROM pages p
-    WHERE p.is_deleted = false
-      AND ${specialKindFilter}
-      AND ${accessFilter}
-    ORDER BY p.updated_at DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `);
-
-  return c.json({ pages: result.rows });
+  c.header("Deprecation", "true");
+  return c.json(
+    {
+      message:
+        "GET /api/pages is gone (issue #823). Use GET /api/notes/me then GET /api/notes/:noteId/pages.",
+    },
+    410,
+  );
 });
 
 // ── GET /pages/:id/content ──────────────────────────────────────────────────
@@ -217,10 +138,8 @@ app.get("/:id/content", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  // 個人ページは所有者のみ、ノートネイティブページはノートのロール解決
-  // （member / domain / public guest）が成立すれば閲覧可。Issue #713 を参照。
-  // Personal pages: owner only. Note-native pages: any resolved note role
-  // (member / domain / public guest) may view. See issue #713.
+  // すべてのページはノート所属。閲覧は `getNoteRole(pages.note_id)` が成立すれば可。
+  // Every page belongs to a note; viewing requires a resolved note role on `pages.note_id`.
   await assertPageViewAccess(db, pageId, userId);
 
   // コンテンツ取得
@@ -273,10 +192,8 @@ app.put("/:id/content", authRequired, async (c) => {
     throw new HTTPException(400, { message: "ydoc_state is required" });
   }
 
-  // 個人ページは所有者のみ、ノートネイティブページは note ロール / editPermission
-  // で判定する。Issue #713 を参照。
-  // Personal pages: owner only. Note-native pages: note role + editPermission
-  // (`canEdit`). See issue #713.
+  // 編集はノートロール + `editPermission` (`canEdit`) で判定する。
+  // Editing requires note role + `canEdit` against the owning note.
   await assertPageEditAccess(db, pageId, userId);
 
   const ydocBuffer = Buffer.from(body.ydoc_state, "base64");
@@ -424,6 +341,8 @@ app.post("/", authRequired, async (c) => {
   const db = c.get("db");
 
   const body = await c.req.json<{
+    /** 省略時は呼び出し元のデフォルトノート（マイノート）へ所属させる。 */
+    note_id?: string | null;
     title?: string;
     content_preview?: string;
     source_page_id?: string;
@@ -440,10 +359,18 @@ app.post("/", authRequired, async (c) => {
     thumbnail_object_id?: string | null;
   }>();
 
+  let resolvedNoteId =
+    typeof body.note_id === "string" && body.note_id.trim() !== "" ? body.note_id.trim() : null;
+  if (!resolvedNoteId) {
+    const defaultNote = await ensureDefaultNote(db, userId);
+    resolvedNoteId = defaultNote.id;
+  }
+
   const result = await db
     .insert(pages)
     .values({
       ownerId: userId,
+      noteId: resolvedNoteId,
       title: body.title ?? null,
       contentPreview: body.content_preview ?? null,
       sourcePageId: body.source_page_id ?? null,
@@ -478,9 +405,8 @@ app.delete("/:id", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  // ノートネイティブページの削除はノート編集権限で判定する。
-  // Note-native page deletion is governed by the note's edit permission.
-  // See issue #713.
+  // ページ削除は所属ノートの編集権限で判定する。
+  // Page deletion is governed by edit permission on the owning note.
   await assertPageEditAccess(db, pageId, userId);
 
   // GC 対象のサムネイル ID とページオーナーを取りつつ、ページを soft-delete する。

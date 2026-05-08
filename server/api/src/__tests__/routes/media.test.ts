@@ -46,11 +46,15 @@ vi.mock("@aws-sdk/client-s3", () => {
   function MockDeleteObjectCommand() {
     /* stub */
   }
+  function MockHeadObjectCommand() {
+    /* stub — ownership probe on /confirm */
+  }
   return {
     S3Client: MockS3Client,
     PutObjectCommand: MockPutObjectCommand,
     GetObjectCommand: MockGetObjectCommand,
     DeleteObjectCommand: MockDeleteObjectCommand,
+    HeadObjectCommand: MockHeadObjectCommand,
   };
 });
 
@@ -86,6 +90,8 @@ function createMediaApp(dbResults: unknown[]) {
 
 beforeEach(() => {
   mockS3Send.mockReset();
+  // POST /confirm always probes via HeadObject; tests that need other shapes use mockResolvedValueOnce.
+  mockS3Send.mockResolvedValue({ ContentLength: 1024 });
 });
 
 describe("POST /api/media/confirm — S3 key ownership validation", () => {
