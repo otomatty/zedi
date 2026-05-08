@@ -1,10 +1,10 @@
--- 0020: Default note (additive). Add `notes.is_default` and create one default
+-- 0022: Default note (additive). Add `notes.is_default` and create one default
 -- note per existing user titled `'<users.name>のノート'`. This is the additive
 -- foundation for the "every page belongs to a note" model — a follow-up
 -- migration will backfill personal pages into the default note, drop the
 -- `note_pages` link table, and promote `pages.note_id` to NOT NULL.
 --
--- 0020: デフォルトノート（追加のみ）。`notes.is_default` カラムを追加し、
+-- 0022: デフォルトノート（追加のみ）。`notes.is_default` カラムを追加し、
 -- 既存ユーザー全員に「<users.name>のノート」というタイトルのデフォルトノートを
 -- 1 件ずつ作成する。これは「すべてのページはノートに属する」モデルへの土台で、
 -- 既存個人ページをデフォルトノートに移行し `note_pages` を廃止する破壊的変更は
