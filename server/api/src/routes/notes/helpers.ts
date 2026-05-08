@@ -195,7 +195,7 @@ export async function getNoteRole(
       )
       .limit(1);
 
-    const firstMember = (Array.isArray(member) ? member : [])[0];
+    const firstMember = member[0];
     if (firstMember) {
       return { role: firstMember.role as NoteMemberRole, note };
     }
@@ -220,9 +220,8 @@ export async function getNoteRole(
           ),
         );
 
-      const ruleRows = Array.isArray(rules) ? rules : [];
-      if (ruleRows.length > 0) {
-        const hasEditor = ruleRows.some((r) => r.role === "editor");
+      if (rules.length > 0) {
+        const hasEditor = rules.some((r) => r.role === "editor");
         return { role: hasEditor ? "editor" : "viewer", note };
       }
     }

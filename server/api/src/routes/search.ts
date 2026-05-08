@@ -18,6 +18,7 @@ import { sql } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
 import { extractEmailDomain } from "../lib/freeEmailDomains.js";
+import { getDefaultNoteOrNull } from "../services/defaultNoteService.js";
 
 function escapeLike(input: string): string {
   return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -98,18 +99,16 @@ app.get("/", authRequired, async (c) => {
       LIMIT ${limit}
     `);
   } else {
+    const defaultNote = await getDefaultNoteOrNull(db, userId);
+    if (!defaultNote) {
+      return c.json({ results: [] });
+    }
     results = await db.execute(sql`
       SELECT ${searchColumns}
       FROM pages p
       LEFT JOIN page_contents pc ON pc.page_id = p.id
       WHERE p.is_deleted = false
-        AND p.note_id = (
-          SELECT n.id FROM notes n
-          WHERE n.owner_id = ${userId}
-            AND n.is_default = true
-            AND n.is_deleted = false
-          LIMIT 1
-        )
+        AND p.note_id = ${defaultNote.id}
         AND (
           p.title ILIKE ${pattern}
           OR pc.content_text ILIKE ${pattern}

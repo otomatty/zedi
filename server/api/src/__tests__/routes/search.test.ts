@@ -23,9 +23,26 @@ vi.mock("../../middleware/auth.js", () => ({
   },
 }));
 
+vi.mock("../../services/defaultNoteService.js", () => ({
+  getDefaultNoteOrNull: vi.fn(async () => ({
+    id: "default-note-search-mock",
+    ownerId: "user-search-test-001",
+    title: "Mock default",
+    visibility: "private" as const,
+    editPermission: "owner_only" as const,
+    isOfficial: false,
+    isDefault: true,
+    viewCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDeleted: false,
+  })),
+}));
+
 import { Hono } from "hono";
 import searchRoutes from "../../routes/search.js";
 import { createMockDb } from "../createMockDb.js";
+import { getDefaultNoteOrNull } from "../../services/defaultNoteService.js";
 
 const TEST_USER_ID = "user-search-test-001";
 
@@ -70,7 +87,7 @@ describe("GET /api/search", () => {
     expect(chains).toHaveLength(0);
   });
 
-  it("scope=own uses default-note subquery on p.note_id (issue #823)", async () => {
+  it("scope=own binds listing to default note id from getDefaultNoteOrNull (issue #823)", async () => {
     const { app, chains } = createSearchApp([{ rows: [] }]);
 
     const res = await app.request("/api/search?q=hello&scope=own", {
@@ -82,9 +99,10 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("is_default");
+    expect(serialised).toContain("default-note-search-mock");
     expect(serialised).toContain("p.note_id");
-    expect(serialised).toContain(TEST_USER_ID);
+    expect(serialised).not.toContain("is_default");
+    expect(serialised).not.toContain("SELECT n.id FROM notes n");
   });
 
   it("defaults to scope=own when scope query parameter is omitted", async () => {
@@ -99,8 +117,23 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     expect(executeChain).toBeDefined();
     const serialised = JSON.stringify(executeChain?.startArgs);
-    expect(serialised).toContain("is_default");
+    expect(serialised).toContain("default-note-search-mock");
     expect(serialised).toContain("p.note_id");
+  });
+
+  it("scope=own returns empty results when default note is missing", async () => {
+    vi.mocked(getDefaultNoteOrNull).mockResolvedValueOnce(null);
+    const { app, chains } = createSearchApp([]);
+
+    const res = await app.request("/api/search?q=hello&scope=own", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: unknown[] };
+    expect(body.results).toEqual([]);
+    expect(chains.find((c) => c.startMethod === "execute")).toBeUndefined();
   });
 
   it("scope=shared uses note ownership / member / domain EXISTS branches without note_pages", async () => {
@@ -208,6 +241,7 @@ describe("GET /api/search", () => {
     const executeChain = chains.find((chain) => chain.startMethod === "execute");
     const serialised = JSON.stringify(executeChain?.startArgs);
     expect(serialised).toContain("p.note_id");
-    expect(serialised).toContain("is_default");
+    expect(serialised).toContain("default-note-search-mock");
+    expect(serialised).not.toContain("is_default");
   });
 });

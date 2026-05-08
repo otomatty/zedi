@@ -22,8 +22,7 @@ async function getPageOwnership(db: Database, pageId: string): Promise<PageOwner
     .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
     .limit(1);
 
-  const pageRows = Array.isArray(page) ? page : [];
-  const pageRow = pageRows[0];
+  const pageRow = page[0];
   if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
   return pageRow as PageOwnership;
 }
@@ -35,8 +34,7 @@ async function getUserEmailLowercase(db: Database, userId: string): Promise<stri
     .where(eq(users.id, userId))
     .limit(1);
 
-  const rows = Array.isArray(userRow) ? userRow : [];
-  const email = rows[0]?.email;
+  const email = userRow[0]?.email;
   if (!email) throw new HTTPException(403, { message: "Forbidden" });
   return email.trim().toLowerCase();
 }

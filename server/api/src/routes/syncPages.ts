@@ -73,22 +73,19 @@ app.get("/", authRequired, async (c) => {
     query = query.where(and(personalPageFilter, gt(pages.updatedAt, new Date(since))));
   }
 
-  const rowsRaw = await query.orderBy(pages.updatedAt);
-  const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
+  const rows = await query.orderBy(pages.updatedAt);
   const pageIds = rows.map((r) => r.id);
 
   let linksRows: (typeof links.$inferSelect)[] = [];
   let ghostLinksRows: (typeof ghostLinks.$inferSelect)[] = [];
 
   if (pageIds.length > 0) {
-    const linksRaw = await db.select().from(links).where(inArray(links.sourceId, pageIds));
-    linksRows = Array.isArray(linksRaw) ? linksRaw : [];
+    linksRows = await db.select().from(links).where(inArray(links.sourceId, pageIds));
 
-    const ghostsRaw = await db
+    ghostLinksRows = await db
       .select()
       .from(ghostLinks)
       .where(inArray(ghostLinks.sourcePageId, pageIds));
-    ghostLinksRows = Array.isArray(ghostsRaw) ? ghostsRaw : [];
   }
 
   return c.json({
@@ -223,7 +220,7 @@ app.post("/", authRequired, async (c) => {
           .from(pages)
           .where(inArray(pages.id, incomingIds))
       : [];
-  const existingRows: ExistingRow[] = Array.isArray(existingRaw) ? existingRaw : [];
+  const existingRows: ExistingRow[] = existingRaw;
   const existingMap = new Map<string, ExistingRow>(existingRows.map((row) => [row.id, row]));
 
   for (const p of latestIncomingById.values()) {
@@ -309,7 +306,7 @@ app.post("/", authRequired, async (c) => {
           inArray(pages.id, sourceIds),
         ),
       );
-    const ownedPages = Array.isArray(ownedPagesRaw) ? ownedPagesRaw : [];
+    const ownedPages = ownedPagesRaw;
     const ownedIds = new Set(ownedPages.map((r) => r.id));
 
     const deletePairs = new Set<string>();
@@ -351,7 +348,7 @@ app.post("/", authRequired, async (c) => {
           inArray(pages.id, sourceIds),
         ),
       );
-    const ownedGhostPages = Array.isArray(ownedGhostRaw) ? ownedGhostRaw : [];
+    const ownedGhostPages = ownedGhostRaw;
     const ownedGhostIds = new Set(ownedGhostPages.map((r) => r.id));
 
     const deletePairs = new Set<string>();

@@ -11,6 +11,7 @@ vi.mock("../../middleware/auth.js", () => ({
     const userId = c.req.header("x-test-user-id");
     if (!userId) return c.json({ message: "Unauthorized" }, 401);
     c.set("userId", userId);
+    c.set("userEmail", "tester@example.com");
     await next();
   },
 }));
@@ -29,11 +30,24 @@ vi.mock("../../services/defaultNoteService.js", () => ({
     updatedAt: new Date(),
     isDeleted: false,
   })),
+  getDefaultNoteOrNull: vi.fn(async (_db: unknown, userId: string) => ({
+    id: "default-note-mock",
+    ownerId: userId,
+    title: "Mockのノート",
+    visibility: "private" as const,
+    editPermission: "owner_only" as const,
+    isOfficial: false,
+    isDefault: true,
+    viewCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDeleted: false,
+  })),
 }));
 
 import { Hono } from "hono";
 import pageRoutes from "../../routes/pages.js";
-import { ensureDefaultNote } from "../../services/defaultNoteService.js";
+import { ensureDefaultNote, getDefaultNoteOrNull } from "../../services/defaultNoteService.js";
 import { createMockDb } from "../createMockDb.js";
 
 const TEST_USER_ID = "user-test-123";
@@ -137,7 +151,39 @@ describe("GET /api/pages/:id/content", () => {
 });
 
 describe("GET /api/pages", () => {
-  it("returns 410 Gone with Deprecation header (issue #823)", async () => {
+  it("returns 200 with Deprecation header and legacy listing shape (issue #823 shim)", async () => {
+    const updatedAt = new Date("2026-03-01T12:00:00Z");
+    const app = createPagesApp([
+      {
+        rows: [
+          {
+            id: "list-page-1",
+            title: "Hello",
+            content_preview: "pv",
+            updated_at: updatedAt,
+            note_id: "default-note-mock",
+          },
+        ],
+      },
+    ]);
+
+    const res = await app.request("/api/pages", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Deprecation")).toBe("true");
+    const body = (await res.json()) as {
+      pages: Array<{ id: string; title: string; note_id: string }>;
+    };
+    expect(body.pages).toHaveLength(1);
+    expect(body.pages[0]?.id).toBe("list-page-1");
+    expect(body.pages[0]?.note_id).toBe("default-note-mock");
+  });
+
+  it("returns empty pages when default note is missing (no listing)", async () => {
+    vi.mocked(getDefaultNoteOrNull).mockResolvedValueOnce(null);
     const app = createPagesApp([]);
 
     const res = await app.request("/api/pages", {
@@ -145,10 +191,10 @@ describe("GET /api/pages", () => {
       headers: authHeaders(),
     });
 
-    expect(res.status).toBe(410);
+    expect(res.status).toBe(200);
     expect(res.headers.get("Deprecation")).toBe("true");
-    const body = (await res.json()) as { message: string };
-    expect(body.message).toContain("issue #823");
+    const body = (await res.json()) as { pages: unknown[] };
+    expect(body.pages).toEqual([]);
   });
 
   it("returns 401 without auth header", async () => {
@@ -196,6 +242,44 @@ describe("POST /api/pages", () => {
     const body = (await res.json()) as { id: string; owner_id: string };
     expect(body.id).toBe("new-page-id");
     expect(body.owner_id).toBe(TEST_USER_ID);
+  });
+
+  it("returns 403 when note_id points to a note the caller cannot edit", async () => {
+    const otherOwnerNote = {
+      id: "foreign-note-id",
+      ownerId: "other-user",
+      title: "Someone else's note",
+      visibility: "private" as const,
+      editPermission: "owner_only" as const,
+      isOfficial: false,
+      isDefault: false,
+      viewCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isDeleted: false,
+    };
+
+    const app = createPagesApp([[otherOwnerNote], [], []]);
+
+    const res = await app.request("/api/pages", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Nope", note_id: "foreign-note-id" }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 404 when note_id does not exist", async () => {
+    const app = createPagesApp([[]]);
+
+    const res = await app.request("/api/pages", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Nope", note_id: "missing-note-id" }),
+    });
+
+    expect(res.status).toBe(404);
   });
 });
 

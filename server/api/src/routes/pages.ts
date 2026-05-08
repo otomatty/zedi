@@ -1,8 +1,10 @@
 /**
  * /api/pages — ページ CRUD + コンテンツ管理
  *
- * GET    /api/pages                — **410 Gone**（Issue #823）。一覧は `/api/notes/:id/pages` 等へ移行。
- *        — **410 Gone** (issue #823); list pages via `/api/notes/:id/pages`, etc.
+ * GET    /api/pages                — 後方互換のページ一覧（Issue #823 以降は `Deprecation: true`）。
+ *        新規実装は `GET /api/notes/me` → `GET /api/notes/:noteId/pages` を推奨。
+ *        — Legacy page listing (sends `Deprecation: true` after issue #823).
+ *        Prefer `GET /api/notes/me` then `GET /api/notes/:noteId/pages` for new clients.
  * GET    /api/pages/:id/content — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
  *        — Retrieve Y.Doc content (200 + empty `ydoc_state` when no `page_contents` row).
  * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
@@ -15,7 +17,9 @@ import { eq, and, sql } from "drizzle-orm";
 import { pages, pageContents } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
-import { ensureDefaultNote } from "../services/defaultNoteService.js";
+import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
+import { getNoteRole, canEdit } from "./notes/helpers.js";
+import { extractEmailDomain } from "../lib/freeEmailDomains.js";
 import { maybeCreateSnapshot } from "../services/snapshotService.js";
 import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
@@ -116,20 +120,84 @@ async function applyPagesMetadataUpdate(
 }
 
 // ── GET /pages ──────────────────────────────────────────────────────────────
-// Issue #823: ページ一覧は `pages.note_id` 直接モデルへ移行したため本エンドポイントは廃止。
-// クライアントは `GET /api/notes/:noteId/pages`（既定ノートは `GET /api/notes/me`）を利用する。
+// Issue #823: 一覧は `pages.note_id` モデルで再実装。MCP `zedi_list_pages` 等の後方互換のため
+// 200 で返しつつ `Deprecation: true` を付与する。新規クライアントはノート配下エンドポイントへ。
 //
-// Issue #823: listing moved to note-scoped endpoints; this route is retired.
-// Clients should use `GET /api/notes/:noteId/pages` (resolve default via `GET /api/notes/me`).
+// Issue #823: reimplemented listing on `pages.note_id`. Keeps HTTP 200 for MCP / legacy callers
+// while setting `Deprecation: true`; new clients should use note-scoped routes.
 app.get("/", authRequired, async (c) => {
+  const userId = c.get("userId");
+  const userEmailRaw = c.get("userEmail");
+  const db = c.get("db");
+
+  const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "20", 10) || 20, 1), 100);
+  const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
+  const scope = c.req.query("scope") === "shared" ? "shared" : "own";
+  const includeSpecial = c.req.query("include_special") === "true";
+
+  const specialKindFilter = includeSpecial
+    ? sql`TRUE`
+    : sql`p.special_kind IS NULL AND p.is_schema = false`;
+
   c.header("Deprecation", "true");
-  return c.json(
-    {
-      message:
-        "GET /api/pages is gone (issue #823). Use GET /api/notes/me then GET /api/notes/:noteId/pages.",
-    },
-    410,
-  );
+
+  const normalizedEmail = typeof userEmailRaw === "string" ? userEmailRaw.trim().toLowerCase() : "";
+  const emailDomain = extractEmailDomain(normalizedEmail);
+
+  const domainBranch =
+    emailDomain !== null
+      ? sql`OR EXISTS (
+          SELECT 1
+          FROM notes n
+          INNER JOIN note_domain_access nda ON nda.note_id = n.id
+          WHERE n.id = p.note_id
+            AND n.is_deleted = false
+            AND nda.is_deleted = false
+            AND nda.domain = ${emailDomain}
+        )`
+      : sql``;
+
+  let accessFilter;
+
+  if (scope === "own") {
+    const defaultNote = await getDefaultNoteOrNull(db, userId);
+    if (!defaultNote) {
+      return c.json({ pages: [] });
+    }
+    accessFilter = sql`p.note_id = ${defaultNote.id}`;
+  } else {
+    accessFilter = sql`(
+      EXISTS (
+        SELECT 1 FROM notes n
+        WHERE n.id = p.note_id AND n.is_deleted = false AND n.owner_id = ${userId}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM notes n
+        INNER JOIN note_members nm ON nm.note_id = n.id
+        INNER JOIN "user" u ON LOWER(u.email) = LOWER(nm.member_email)
+        WHERE n.id = p.note_id
+          AND u.id = ${userId}
+          AND nm.status = 'accepted'
+          AND nm.is_deleted = false
+          AND n.is_deleted = false
+      )
+      ${domainBranch}
+    )`;
+  }
+
+  const result = await db.execute(sql`
+    SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id
+    FROM pages p
+    WHERE p.is_deleted = false
+    AND ${specialKindFilter}
+    AND ${accessFilter}
+    ORDER BY p.updated_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `);
+
+  return c.json({ pages: result.rows });
 });
 
 // ── GET /pages/:id/content ──────────────────────────────────────────────────
@@ -364,6 +432,13 @@ app.post("/", authRequired, async (c) => {
   if (!resolvedNoteId) {
     const defaultNote = await ensureDefaultNote(db, userId);
     resolvedNoteId = defaultNote.id;
+  } else {
+    const userEmail = c.get("userEmail");
+    const { role, note } = await getNoteRole(resolvedNoteId, userId, userEmail, db);
+    if (!note) throw new HTTPException(404, { message: "Note not found" });
+    if (!role || !canEdit(role, note)) {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
   }
 
   const result = await db

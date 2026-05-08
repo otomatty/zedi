@@ -47,7 +47,7 @@ app.get("/:id/snapshots", authRequired, async (c) => {
       .select({ id: users.id, email: users.email })
       .from(users)
       .where(inArray(users.id, userIds));
-    for (const u of Array.isArray(userRows) ? userRows : []) {
+    for (const u of userRows) {
       emailMap.set(u.id, u.email);
     }
   }
@@ -91,8 +91,7 @@ app.get("/:id/snapshots/:snapshotId", authRequired, async (c) => {
       .from(users)
       .where(eq(users.id, row.createdBy))
       .limit(1);
-    const emailRows = Array.isArray(userRow) ? userRow : [];
-    createdByEmail = emailRows[0]?.email ?? null;
+    createdByEmail = userRow[0]?.email ?? null;
   }
 
   const ydocBase64 =
