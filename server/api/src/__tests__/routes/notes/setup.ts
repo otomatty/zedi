@@ -30,6 +30,7 @@ export function createMockNote(overrides: Record<string, unknown> = {}) {
     visibility: "private",
     editPermission: "owner_only",
     isOfficial: false,
+    isDefault: false,
     viewCount: 0,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),

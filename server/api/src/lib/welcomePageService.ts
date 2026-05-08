@@ -167,10 +167,21 @@ export async function insertWelcomePage(
   const ydoc = prosemirrorJSONToYDoc(welcomePageSchema, doc, YDOC_FRAGMENT);
   const ydocState = Y.encodeStateAsUpdate(ydoc);
 
-  // 部分ユニーク index と同じ述語 (`kind='welcome' AND is_deleted=false`) を
-  // ON CONFLICT に指定する。並行リクエストで衝突すると INSERT は 0 行返す。
-  // Match the partial unique index predicate so a concurrent insert is a
-  // no-op instead of aborting the transaction.
+  // PR 1a ではウェルカムページの所属モデルは旧来どおり「個人ページ」
+  // (`note_id = NULL`) のままにしておく。理由は以下:
+  //   - `GET /api/notes/:id/pages` と `routes/notes/search.ts` は `note_pages`
+  //     経由でページを引くため、`note_id` だけ埋めて `note_pages` 行を作らない
+  //     と、デフォルトノート画面でウェルカムページが見えない (PR コメント参照)
+  //   - 旧 `/home` (`scope=own`, `note_id IS NULL`) でも見えなくなる
+  // PR 1b で個人ページをまとめてデフォルトノートへ移行する際にウェルカム
+  // ページも一緒に移行する。それまでは挙動互換を保つ。
+  //
+  // PR 1a keeps the welcome page as a "personal page" (`note_id = NULL`).
+  // Setting `note_id` here without also creating a `note_pages` row would hide
+  // the welcome page from `GET /api/notes/:id/pages` and note search (both
+  // read via `note_pages`), and from the legacy `/home` listing
+  // (`scope=own` / `note_id IS NULL`). PR 1b will migrate personal pages —
+  // including welcome pages — into the default note in one coordinated step.
   const inserted = await tx
     .insert(pages)
     .values({

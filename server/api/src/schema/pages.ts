@@ -40,15 +40,14 @@ export const pages = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     /**
-     * 所属ノート ID。NULL は個人ページ、値ありはそのノートに所属するノート
-     * ネイティブページ。ノートネイティブページは個人ホーム（`note_id IS NULL`
-     * フィルタ）には現れず、ノート削除時に `ON DELETE CASCADE` で一緒に消える。
+     * 所属ノート ID。NULL は個人ページ（旧モデル）、値ありはそのノートに
+     * 所属するノートネイティブページ。デフォルトノート移行（PR 1b）後は
+     * NOT NULL に昇格させ、すべてのページがノート所属になる予定。
      * Issue #713 を参照。
      *
-     * Owning note ID. NULL means a personal page; a non-null value identifies
-     * a note-native page that lives only inside that note. Personal-home
-     * queries filter on `note_id IS NULL`, and note deletion cascades to
-     * note-native pages. See issue #713.
+     * Owning note ID. NULL is a legacy "personal page"; a non-null value is a
+     * note-native page. PR 1b will backfill personal pages into each user's
+     * default note and promote this column to NOT NULL. See issue #713.
      */
     noteId: uuid("note_id").references(() => notes.id, { onDelete: "cascade" }),
     sourcePageId: uuid("source_page_id"),

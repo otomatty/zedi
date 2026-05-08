@@ -75,6 +75,10 @@ const pagesRelations = relations(pages, ({ one, many }) => ({
     fields: [pages.id],
     references: [pageContents.pageId],
   }),
+  note: one(notes, {
+    fields: [pages.noteId],
+    references: [notes.id],
+  }),
   notePages: many(notePages),
   snapshots: many(pageSnapshots),
   media: many(media),
@@ -91,6 +95,7 @@ const notesRelations = relations(notes, ({ one, many }) => ({
     fields: [notes.ownerId],
     references: [users.id],
   }),
+  pages: many(pages),
   notePages: many(notePages),
   noteMembers: many(noteMembers),
   noteInvitations: many(noteInvitations),

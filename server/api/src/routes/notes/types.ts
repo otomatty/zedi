@@ -39,6 +39,13 @@ export interface NoteApiFields {
   visibility: NoteVisibility;
   edit_permission: NoteEditPermission;
   is_official: boolean;
+  /**
+   * デフォルトノート（`<users.name>のノート`）であるか。フロントは「マイノート」
+   * バッジの表示や削除ボタンの抑止に使う。
+   * Whether this is the user's default note (`<users.name>のノート`). Clients
+   * use this to render the "マイノート" badge and hide the delete control.
+   */
+  is_default: boolean;
   view_count: number;
   created_at: Date;
   updated_at: Date;

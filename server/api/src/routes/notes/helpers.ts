@@ -31,6 +31,7 @@ export function noteRowToApi(note: Note): NoteApiFields {
     visibility: note.visibility,
     edit_permission: note.editPermission,
     is_official: note.isOfficial,
+    is_default: note.isDefault,
     view_count: note.viewCount,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
