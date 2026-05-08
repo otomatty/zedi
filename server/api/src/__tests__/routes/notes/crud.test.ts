@@ -304,9 +304,13 @@ describe("DELETE /api/notes/:noteId", () => {
 
   it("should return 400 when trying to delete a default note", async () => {
     // デフォルトノート（マイノート）はユーザーの個人スペースなので削除拒否。
+    // 拒否時には soft-delete UPDATE が走らないことも併せて検証し、
+    // 「拒否したのに更新は適用された」の取りこぼしを防ぐ。
     // The default note is the user's personal space; deletion is rejected.
+    // Also assert no `update` chain fires so we lock down the contract that
+    // a rejected delete leaves the row untouched.
     const defaultNote = createMockNote({ isDefault: true });
-    const { app } = createTestApp([
+    const { app, chains } = createTestApp([
       [defaultNote], // requireNoteOwner → findActiveNoteById (owner)
     ]);
 
@@ -320,6 +324,9 @@ describe("DELETE /api/notes/:noteId", () => {
     // HTTPException returns the message as text/plain, so assert via res.text().
     const body = await res.text();
     expect(body).toMatch(/default note/i);
+    // soft-delete UPDATE が走っていないことを確認する。
+    // Verify the soft-delete UPDATE chain did not execute.
+    expect(chains.some((c) => c.startMethod === "update")).toBe(false);
   });
 });
 

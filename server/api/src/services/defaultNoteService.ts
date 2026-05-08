@@ -16,7 +16,7 @@
  *   the partial unique index `idx_notes_unique_default_per_owner`.
  * - `getDefaultNoteOrNull`: read-only lookup; returns null when not created.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { notes, users } from "../schema/index.js";
 import type { Note } from "../schema/index.js";
@@ -73,6 +73,10 @@ export async function ensureDefaultNote(db: DbOrTx, userId: string): Promise<Not
 
   const title = formatDefaultNoteTitle(user.name);
 
+  // 明示的に部分ユニーク index `idx_notes_unique_default_per_owner` を target に
+  // 指定して、無関係なユニーク制約衝突を黙って飲み込まないようにする。
+  // Explicitly target the partial unique index so we don't silently swallow
+  // unrelated unique-constraint violations.
   const inserted = await db
     .insert(notes)
     .values({
@@ -82,7 +86,10 @@ export async function ensureDefaultNote(db: DbOrTx, userId: string): Promise<Not
       editPermission: "owner_only",
       isDefault: true,
     })
-    .onConflictDoNothing()
+    .onConflictDoNothing({
+      target: notes.ownerId,
+      where: sql`${notes.isDefault} = true AND ${notes.isDeleted} = false`,
+    })
     .returning();
 
   const newRow = inserted[0];
