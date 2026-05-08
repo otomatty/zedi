@@ -24,10 +24,10 @@ import { TEST_USER_ID, createMockNote, createTestApp, authHeaders } from "./setu
 
 describe("GET /api/notes/me", () => {
   it("returns the existing default note with snake_case fields", async () => {
-    // Given: ensureDefaultNote の SELECT が既存行を返す → INSERT/再 SELECT は不要、
-    // /me ハンドラの SELECT で返す。
-    // Given an existing default note: ensureDefaultNote's SELECT returns it,
-    // skipping INSERT and re-SELECT; the handler's SELECT returns it.
+    // Given: 既存のデフォルトノートがある場合、ensureDefaultNote の SELECT で
+    // 行が返るので INSERT/再 SELECT は走らない。ハンドラはその行をそのまま返す。
+    // When a default note exists, ensureDefaultNote's SELECT returns it, no
+    // INSERT or extra round-trip is needed, and the handler returns it as-is.
     const defaultNote = createMockNote({
       id: "note-default-001",
       title: "テストユーザーのノート",
@@ -35,8 +35,7 @@ describe("GET /api/notes/me", () => {
     });
 
     const { app } = createTestApp([
-      [defaultNote], // ensureDefaultNote → getDefaultNoteIdOrNull
-      [defaultNote], // handler SELECT
+      [defaultNote], // ensureDefaultNote → getDefaultNoteOrNull
     ]);
 
     const res = await app.request("/api/notes/me", {
@@ -56,9 +55,9 @@ describe("GET /api/notes/me", () => {
 
   it("creates the default note on first access and returns it", async () => {
     // Given: 初回アクセスで `notes.is_default=true` の行は無い → users.name から
-    // タイトルを組み立てて INSERT → handler SELECT で読み返す。
-    // First-time access path: no default note yet, so ensureDefaultNote reads
-    // users.name, INSERTs, then the handler SELECT reads back the new row.
+    // タイトルを組み立てて INSERT、`returning()` で全カラムが返る。
+    // First-time path: no default note yet → ensureDefaultNote reads
+    // users.name and INSERTs RETURNING the full row.
     const newDefault = createMockNote({
       id: "note-default-new",
       title: "山田のノート",
@@ -66,10 +65,9 @@ describe("GET /api/notes/me", () => {
     });
 
     const { app } = createTestApp([
-      [], // ensureDefaultNote → getDefaultNoteIdOrNull (none)
+      [], // ensureDefaultNote → getDefaultNoteOrNull (none)
       [{ name: "山田" }], // ensureDefaultNote → users select
-      [{ id: newDefault.id }], // ensureDefaultNote → INSERT returning
-      [newDefault], // handler SELECT
+      [newDefault], // ensureDefaultNote → INSERT returning full row
     ]);
 
     const res = await app.request("/api/notes/me", {

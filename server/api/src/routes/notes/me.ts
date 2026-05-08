@@ -11,9 +11,6 @@
  * The frontend `/notes/me` landing page hits this endpoint first.
  */
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
-import { eq } from "drizzle-orm";
-import { notes } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
 import { ensureDefaultNote } from "../../services/defaultNoteService.js";
@@ -25,17 +22,8 @@ app.get("/me", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const noteId = await ensureDefaultNote(db, userId);
-
-  const rows = await db.select().from(notes).where(eq(notes.id, noteId)).limit(1);
-  const row = rows[0];
-  if (!row) {
-    // ensureDefaultNote が成功しているのにここで取れないのは整合性破壊。
-    // ensureDefaultNote returned an id that no longer exists — invariant break.
-    throw new HTTPException(500, { message: "Default note vanished" });
-  }
-
-  return c.json(noteRowToApi(row));
+  const note = await ensureDefaultNote(db, userId);
+  return c.json(noteRowToApi(note));
 });
 
 export default app;
