@@ -70,6 +70,21 @@ function LegacyPageRedirect() {
 }
 
 /**
+ * Redirect legacy `/home` to `/notes/me`, preserving search and hash.
+ * Chrome 拡張（`/home?clipUrl=...&from=chrome-extension`）など、`/home` を直接
+ * 叩いてくる旧クライアントを救済するため、クエリ・ハッシュをそのまま転送する
+ * （issue #826）。
+ *
+ * Forwards `/home?<query>#<hash>` to `/notes/me?<query>#<hash>` so legacy
+ * Chrome-extension hand-offs (e.g. `/home?clipUrl=...`) keep working until the
+ * extension itself is updated to call `/notes/me` directly (issue #826).
+ */
+function LegacyHomeRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={`/notes/me${search}${hash}`} replace />;
+}
+
+/**
  * Redirect singular `/note/:noteId` (and sub-routes) to plural `/notes/:noteId/...`.
  * 旧パス `/note/:noteId` 系を複数形 `/notes/:noteId/...` にリダイレクト。
  */
@@ -178,15 +193,18 @@ const App = () => (
                       {/*
                           Legacy `/home` — redirect to `/notes/me` so existing
                           bookmarks, browser extensions, and external links keep
-                          working (issue #825 acceptance criteria). The actual
-                          landing happens at `/notes/me` which then resolves the
-                          default note id.
+                          working (issue #825 acceptance criteria). Search and
+                          hash are preserved by `LegacyHomeRedirect`, which is
+                          required so the Chrome-extension `clipUrl` hand-off
+                          (`/home?clipUrl=...`) keeps round-tripping through
+                          `/notes/me?clipUrl=...` (issue #826).
                           旧 `/home`: 既存のブックマーク / 拡張 / 外部リンク救済
                           のため `/notes/me` にリダイレクトする（issue #825）。
-                          実際のランディングは `/notes/me` 側でデフォルトノート
-                          ID を解決する。
+                          `LegacyHomeRedirect` で search / hash を保持し、Chrome
+                          拡張の `/home?clipUrl=...` ハンドオフを `/notes/me`
+                          経由でも動作させる（issue #826）。
                        */}
-                      <Route path="/home" element={<Navigate to="/notes/me" replace />} />
+                      <Route path="/home" element={<LegacyHomeRedirect />} />
                       <Route path="/ai/history" element={<AIChatHistory />} />
                       <Route path="/ai/:conversationId" element={<AIChatDetail />} />
                       <Route path="/ai" element={<AIChatLanding />} />
