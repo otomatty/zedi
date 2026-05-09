@@ -425,9 +425,7 @@ describe("GET /api/notes/:noteId", () => {
     expect(page).toHaveProperty("source_page_id");
     expect(page).toHaveProperty("content_preview");
     expect(page).toHaveProperty("thumbnail_url");
-    expect(page).toHaveProperty("sort_order");
-    expect(page).toHaveProperty("added_by_user_id");
-    expect(page).toHaveProperty("added_at");
+    expect(page).toHaveProperty("note_id", mockNote.id);
   });
 
   it("should return 404 for non-existent note", async () => {

@@ -16,6 +16,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
 import type { Database } from "../types/index.js";
+import { ensureDefaultNote } from "./defaultNoteService.js";
 
 /**
  * A single page entry as it appears in the index.
@@ -290,10 +291,12 @@ export async function rebuildIndexForOwner(
       // try/catch alone cannot recover without an explicit SAVEPOINT).
       // 並行再構築で SELECT を両方通過した場合、生の一意制約違反は tx を失敗状態に
       // するため、ON CONFLICT DO NOTHING + 再 SELECT で勝者行を採用する。
+      const defaultNote = await ensureDefaultNote(tx, ownerId);
       const inserted = await tx
         .insert(pages)
         .values({
           ownerId,
+          noteId: defaultNote.id,
           title: INDEX_PAGE_TITLE,
           specialKind: "__index__",
           createdAt: now,

@@ -12,7 +12,6 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
-import { pages } from "./pages.js";
 
 /**
  * ノート（複数ページのまとまり）。
@@ -76,46 +75,7 @@ export type Note = typeof notes.$inferSelect;
 /** Insert type for the notes table. / notes テーブルの INSERT 型。 */
 export type NewNote = typeof notes.$inferInsert;
 
-export /**
- *
- */
-const notePages = pgTable(
-  "note_pages",
-  {
-    noteId: uuid("note_id")
-      .notNull()
-      .references(() => notes.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
-    addedByUserId: text("added_by_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    sortOrder: integer("sort_order").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-    isDeleted: boolean("is_deleted").default(false).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.noteId, table.pageId] }),
-    index("idx_note_pages_note_id").on(table.noteId),
-    index("idx_note_pages_page_id").on(table.pageId),
-  ],
-);
-
-/**
- *
- */
-export type NotePage = typeof notePages.$inferSelect;
-/**
- *
- */
-export type NewNotePage = typeof notePages.$inferInsert;
-
-export /**
- *
- */
-const noteMembers = pgTable(
+export const noteMembers = pgTable(
   "note_members",
   {
     noteId: uuid("note_id")

@@ -155,6 +155,13 @@
       "when": 1778544000000,
       "tag": "0022_add_default_note",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1778630400000,
+      "tag": "0023_migrate_personal_pages_drop_note_pages",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,7 @@ import { authRequired } from "../middleware/auth.js";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
 import { recordActivity } from "../services/activityLogService.js";
+import { ensureDefaultNote } from "../services/defaultNoteService.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -108,10 +109,12 @@ app.put("/", authRequired, async (c) => {
       await tx.update(pages).set({ title, updatedAt: now }).where(eq(pages.id, existing.id));
       resolvedPageId = existing.id;
     } else {
+      const defaultNote = await ensureDefaultNote(tx, userId);
       const [newPage] = await tx
         .insert(pages)
         .values({
           ownerId: userId,
+          noteId: defaultNote.id,
           title,
           isSchema: true,
           createdAt: now,

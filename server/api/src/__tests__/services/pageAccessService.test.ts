@@ -1,11 +1,12 @@
 /**
  * `services/pageAccessService.ts` のテスト。
  *
- * Issue #713 で導入した「個人ページ vs ノートネイティブページ」の権限分岐を
- * 中心に検証する。
+ * Issue #823 以降はすべてのページが `pages.note_id` でノートに所属し、閲覧・編集は
+ * `getNoteRole` / `canEdit` のみで判定する（`pages.owner_id` の一致だけでは許可しない）。
  *
- * Tests for `services/pageAccessService.ts`. Focused on the personal-page vs.
- * note-native-page authorization split introduced in issue #713.
+ * Tests for `services/pageAccessService.ts`. After issue #823 every page belongs to a
+ * note via `pages.note_id`; view/edit authorization uses `getNoteRole` / `canEdit`
+ * only — owning the `pages` row alone is never sufficient.
  */
 import { describe, it, expect } from "vitest";
 import type { Database } from "../../types/index.js";
@@ -22,130 +23,110 @@ function asDb(db: unknown): Database {
   return db as unknown as Database;
 }
 
-describe("assertPageViewAccess (issue #713)", () => {
-  it("allows personal page owner", async () => {
+function noteRow(
+  ownerId: string,
+  overrides: Partial<{ editPermission: "owner_only" | "members_editors" }> = {},
+) {
+  return {
+    id: NOTE_ID,
+    ownerId,
+    title: "n",
+    visibility: "private" as const,
+    editPermission: overrides.editPermission ?? "owner_only",
+    isOfficial: false,
+    viewCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isDeleted: false,
+  };
+}
+
+/** Private note, caller not owner: member + domain rule lookups run then deny. */
+function noRoleChains(pageOwnerId: string) {
+  return [
+    [{ id: PAGE_ID, ownerId: pageOwnerId, noteId: NOTE_ID }],
+    [{ email: USER_EMAIL }],
+    [noteRow(OTHER_USER_ID)],
+    [],
+    [],
+  ];
+}
+
+describe("assertPageViewAccess (issue #823)", () => {
+  it("allows note owner even when pages.owner_id differs", async () => {
     const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: USER_ID, noteId: null }], // getPageOwnership
+      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
+      [{ email: USER_EMAIL }],
+      [noteRow(USER_ID)],
     ]);
     await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
   });
 
-  it("denies non-owner / non-member on personal page", async () => {
+  it("denies when caller has no resolved note role (pages.owner_id match is insufficient)", async () => {
+    const { db } = createMockDb(noRoleChains(USER_ID));
+    await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("denies when active note row is missing", async () => {
     const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: null }], // getPageOwnership
-      [{ email: USER_EMAIL }], // getUserEmailLowercase
-      [], // notePages JOIN — no membership
-      [], // note_pages -> notes.owner_id fallback
+      [{ id: PAGE_ID, ownerId: USER_ID, noteId: NOTE_ID }],
+      [{ email: USER_EMAIL }],
+      [],
     ]);
     await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 403,
     });
   });
 
-  it("allows note owner on a linked personal page even without a note_members row", async () => {
-    const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: null }], // getPageOwnership
-      [{ email: USER_EMAIL }], // getUserEmailLowercase
-      [], // notePages JOIN — no membership
-      [{ noteId: NOTE_ID }], // note_pages -> notes.owner_id fallback
-    ]);
-    await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
-  });
-
   it("denies note-native page when caller has no role on the note", async () => {
-    // ノートネイティブページは pages.ownerId 一致では許可しない（脱退者対策）。
-    // Note-native: owning the underlying pages row is intentionally not enough.
-    const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: USER_ID, noteId: NOTE_ID }], // getPageOwnership
-      [{ email: USER_EMAIL }], // getUserEmailLowercase
-      [], // getNoteRole → findActiveNoteById: note not found by helper path
-    ]);
+    const { db } = createMockDb(noRoleChains(USER_ID));
     await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 403,
     });
   });
 
   it("allows note owner on note-native page", async () => {
-    const noteRow = {
-      id: NOTE_ID,
-      ownerId: USER_ID,
-      title: "n",
-      visibility: "private",
-      editPermission: "owner_only",
-      isOfficial: false,
-      viewCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDeleted: false,
-    };
     const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }], // getPageOwnership
-      [{ email: USER_EMAIL }], // getUserEmailLowercase
-      [noteRow], // getNoteRole → findActiveNoteById (owner short-circuits, no further queries)
+      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
+      [{ email: USER_EMAIL }],
+      [noteRow(USER_ID)],
     ]);
     await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
   });
 
   it("returns 404 when page is missing", async () => {
-    const { db } = createMockDb([[]]); // getPageOwnership empty
+    const { db } = createMockDb([[]]);
     await expect(assertPageViewAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 404,
     });
   });
 });
 
-describe("assertPageEditAccess (issue #713)", () => {
-  it("allows personal page owner", async () => {
-    const { db } = createMockDb([[{ id: PAGE_ID, ownerId: USER_ID, noteId: null }]]);
+describe("assertPageEditAccess (issue #823)", () => {
+  it("allows note owner on note-native page (canEdit=true)", async () => {
+    const { db } = createMockDb([
+      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
+      [{ email: USER_EMAIL }],
+      [noteRow(USER_ID)],
+    ]);
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
   });
 
-  it("denies non-owner on personal page (note membership doesn't grant edit)", async () => {
-    const { db } = createMockDb([[{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: null }]]);
+  it("denies when pages.owner_id matches but caller has no note edit role", async () => {
+    const { db } = createMockDb(noRoleChains(USER_ID));
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 403,
     });
   });
 
-  it("allows note owner on note-native page (canEdit=true)", async () => {
-    const noteRow = {
-      id: NOTE_ID,
-      ownerId: USER_ID,
-      title: "n",
-      visibility: "private",
-      editPermission: "owner_only",
-      isOfficial: false,
-      viewCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDeleted: false,
-    };
-    const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
-      [{ email: USER_EMAIL }],
-      [noteRow], // getNoteRole owner short-circuit
-    ]);
-    await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
-  });
-
   it("denies viewer member on note-native page when editPermission=members_editors", async () => {
-    const noteRow = {
-      id: NOTE_ID,
-      ownerId: OTHER_USER_ID,
-      title: "n",
-      visibility: "private",
-      editPermission: "members_editors",
-      isOfficial: false,
-      viewCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDeleted: false,
-    };
     const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: USER_ID, noteId: NOTE_ID }], // getPageOwnership (own underlying row)
+      [{ id: PAGE_ID, ownerId: USER_ID, noteId: NOTE_ID }],
       [{ email: USER_EMAIL }],
-      [noteRow], // findActiveNoteById
-      [{ role: "viewer" }], // member lookup → viewer
+      [noteRow(OTHER_USER_ID, { editPermission: "members_editors" })],
+      [{ role: "viewer" }],
     ]);
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 403,
@@ -153,51 +134,17 @@ describe("assertPageEditAccess (issue #713)", () => {
   });
 
   it("allows editor member on note-native page when editPermission=members_editors", async () => {
-    const noteRow = {
-      id: NOTE_ID,
-      ownerId: OTHER_USER_ID,
-      title: "n",
-      visibility: "private",
-      editPermission: "members_editors",
-      isOfficial: false,
-      viewCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDeleted: false,
-    };
     const { db } = createMockDb([
       [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
       [{ email: USER_EMAIL }],
-      [noteRow],
-      [{ role: "editor" }], // editor passes canEdit when editPermission != owner_only
+      [noteRow(OTHER_USER_ID, { editPermission: "members_editors" })],
+      [{ role: "editor" }],
     ]);
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
   });
 
   it("denies non-owner of underlying row when no note role resolves", async () => {
-    // ノートネイティブページの編集権限は note ロールのみで判定。
-    // Note-native edit permission depends on note role only — owning the
-    // underlying pages row (e.g. created the page then was removed) is NOT
-    // enough. See issue #713.
-    const noteRow = {
-      id: NOTE_ID,
-      ownerId: OTHER_USER_ID,
-      title: "n",
-      visibility: "private",
-      editPermission: "owner_only",
-      isOfficial: false,
-      viewCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDeleted: false,
-    };
-    const { db } = createMockDb([
-      [{ id: PAGE_ID, ownerId: USER_ID, noteId: NOTE_ID }],
-      [{ email: USER_EMAIL }],
-      [noteRow],
-      [], // member lookup empty
-      [], // domain access lookup empty
-    ]);
+    const { db } = createMockDb(noRoleChains(USER_ID));
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 403,
     });

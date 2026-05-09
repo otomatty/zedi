@@ -16,7 +16,6 @@ export {
 } from "./userOnboardingStatus.js";
 export {
   notes,
-  notePages,
   noteMembers,
   noteInvitations,
   noteInviteLinks,
@@ -24,8 +23,6 @@ export {
   noteDomainAccess,
   type Note,
   type NewNote,
-  type NotePage,
-  type NewNotePage,
   type NoteMember,
   type NewNoteMember,
   type NoteInvitation,
@@ -105,7 +102,6 @@ export {
   accountRelations,
   pagesRelations,
   notesRelations,
-  notePagesRelations,
   noteMembersRelations,
   noteInvitationsRelations,
   noteInviteLinksRelations,

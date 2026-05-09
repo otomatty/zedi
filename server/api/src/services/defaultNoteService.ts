@@ -20,7 +20,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { notes, users } from "../schema/index.js";
 import type { Note } from "../schema/index.js";
-import type { DbOrTx } from "../lib/welcomePageService.js";
+import type { DbOrTx } from "../types/dbOrTx.js";
 
 /**
  * デフォルトノートのタイトルを `<users.name>のノート` の形式で返す。

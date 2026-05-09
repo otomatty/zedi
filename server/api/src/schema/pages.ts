@@ -40,16 +40,15 @@ export const pages = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     /**
-     * 所属ノート ID。NULL は個人ページ（旧モデル）、値ありはそのノートに
-     * 所属するノートネイティブページ。デフォルトノート移行（PR 1b）後は
-     * NOT NULL に昇格させ、すべてのページがノート所属になる予定。
-     * Issue #713 を参照。
+     * 所属ノート ID。すべてのページはちょうど 1 つのノートに属する（Issue #823）。
+     * ユーザーの「個人スペース」はデフォルトノート（`notes.is_default`）のページ群。
      *
-     * Owning note ID. NULL is a legacy "personal page"; a non-null value is a
-     * note-native page. PR 1b will backfill personal pages into each user's
-     * default note and promote this column to NOT NULL. See issue #713.
+     * Owning note ID. Every page belongs to exactly one note (issue #823). A
+     * user's personal space is the page set under their default note.
      */
-    noteId: uuid("note_id").references(() => notes.id, { onDelete: "cascade" }),
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
     sourcePageId: uuid("source_page_id"),
     title: text("title"),
     contentPreview: text("content_preview"),
@@ -110,10 +109,8 @@ export const pages = pgTable(
      */
     index("idx_pages_thumbnail_object_id").on(table.thumbnailObjectId),
     /**
-     * Lookup of pages owned by a particular note (and an efficient predicate
-     * for "personal pages only" via `note_id IS NULL` / `IS NOT NULL`).
-     * 特定のノートに所属するページの引きと、`note_id IS NULL`/`IS NOT NULL` の
-     * 部分述語に効くインデックス。
+     * Lookup of pages by owning note (`pages.note_id`).
+     * 所属ノート別のページ引き用インデックス。
      */
     index("idx_pages_note_id").on(table.noteId),
     /**
