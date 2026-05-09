@@ -68,7 +68,12 @@ const Onboarding: React.FC = () => {
         avatarUrl: profile.avatarUrl || null,
         locale: settings.locale === "en" ? "en" : "ja",
       });
-      const target = response.welcome_page_id ? `/pages/${response.welcome_page_id}` : "/home";
+      // ウェルカムページが生成された場合はそこへ、無い場合はマイノートに着地。
+      // /home は廃止され `/notes/me` で代替する（issue #825）。
+      // Land on the welcome page when one was generated; otherwise the
+      // default-note landing. `/home` was retired in favor of `/notes/me`
+      // (issue #825).
+      const target = response.welcome_page_id ? `/pages/${response.welcome_page_id}` : "/notes/me";
       navigate(target, { replace: true });
     } catch (error) {
       console.error("[Onboarding] completion failed:", error);
@@ -88,7 +93,11 @@ const Onboarding: React.FC = () => {
   const isLoading = isProfileLoading || isSettingsLoading;
 
   if (!needsSetupWizard) {
-    return <Navigate to="/home" replace />;
+    // セットアップ済みのユーザは `/notes/me` 経由でデフォルトノートへ着地する
+    // （issue #825 で `/home` を廃止）。
+    // Already-onboarded users land on the default note via `/notes/me`
+    // (issue #825 retires `/home`).
+    return <Navigate to="/notes/me" replace />;
   }
 
   if (isLoading) {

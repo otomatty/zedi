@@ -594,6 +594,45 @@ describe("apiClient", () => {
       expect(result.results).toEqual([]);
     });
 
+    it("getMyNote sends GET to /api/notes/me and returns the parsed note (issue #825)", async () => {
+      // フロントの `/notes/me` ランディングはこのレスポンスから `id` を読み取り、
+      // `/notes/:noteId` にリダイレクトするため、エンドポイント・メソッド・
+      // 返却形状の 3 点を契約として固定する。
+      // The `/notes/me` landing depends on this method to resolve the default
+      // note id, so lock the URL, HTTP method, and response shape here.
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              id: "note-default-1",
+              owner_id: "user-1",
+              title: "user のノート",
+              visibility: "private",
+              edit_permission: "owner_only",
+              is_official: false,
+              is_default: true,
+              view_count: 0,
+              created_at: "2026-01-01T00:00:00.000Z",
+              updated_at: "2026-01-01T00:00:00.000Z",
+              is_deleted: false,
+            }),
+          ),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
+      const result = await client.getMyNote();
+
+      expect(result.id).toBe("note-default-1");
+      expect(result.is_default).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://api.test.example.com/api/notes/me");
+      expect(init.method).toBe("GET");
+    });
+
     it("deletePage sends DELETE request", async () => {
       const fetchMock = vi.fn().mockResolvedValue({
         ok: true,

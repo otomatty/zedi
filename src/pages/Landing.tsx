@@ -40,9 +40,12 @@ const Landing: React.FC = () => {
     );
   }
 
-  // Redirect to /home if user is signed in
+  // サインイン済みのユーザはランディングを表示せず、`/notes/me` を経由して
+  // デフォルトノートへ着地する（issue #825 で `/home` を廃止）。
+  // Signed-in users skip the marketing landing and land on the default note
+  // via `/notes/me` (issue #825 retires `/home`).
   if (isSignedIn) {
-    return <Navigate to="/home" replace />;
+    return <Navigate to="/notes/me" replace />;
   }
 
   const features = [
