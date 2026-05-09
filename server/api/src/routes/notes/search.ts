@@ -8,9 +8,13 @@
  *
  * Scope contract (issue #823):
  * - Results are restricted to rows where `pages.note_id` matches the path param.
+ * - Requires an authenticated session (`authRequired`). Access is decided via
+ *   `getNoteRole`; any resolved role (owner/editor/viewer/guest) may search.
+ *   Unauthenticated callers get 401; callers without a role on a private note get 403.
  *
- * - 閲覧権限は `getNoteRole` で解決し、任意のロール（owner / editor / viewer /
- *   guest）が解決できれば検索を許可する。private ノートの非メンバーは 403。
+ * - 認証済みセッション必須（`authRequired`）。閲覧権限は `getNoteRole` で解決し、
+ *   解決されたロール（owner / editor / viewer / guest）があれば検索を許可する。
+ *   未ログインは 401、private でロールなしは 403。
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";

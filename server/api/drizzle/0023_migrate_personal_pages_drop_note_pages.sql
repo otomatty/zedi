@@ -4,7 +4,9 @@
 -- 0023: 旧個人ページ（`pages.note_id IS NULL`）を所有者のデフォルトノートへ移し、
 -- `pages.note_id` を NOT NULL に昇格し、`note_pages` を DROP する。
 --
--- Idempotent / re-run safety: INSERT uses NOT EXISTS guards; DELETE targets orphans only.
+-- Idempotent / re-run safety: INSERT uses NOT EXISTS guards plus
+-- ON CONFLICT aligned with partial unique index `idx_notes_unique_default_per_owner`;
+-- DELETE targets orphans only.
 
 -- 1) Orphan personal pages whose owner row no longer exists — delete before NOT NULL
 DELETE FROM "pages"
@@ -25,7 +27,8 @@ WHERE EXISTS (
     WHERE n."owner_id" = u."id"
       AND n."is_default" = true
       AND n."is_deleted" = false
-  );
+  )
+ON CONFLICT ("owner_id") WHERE ("is_default" = true AND "is_deleted" = false) DO NOTHING;
 --> statement-breakpoint
 
 -- 3) Backfill personal pages into the owner's default note
