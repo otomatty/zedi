@@ -13,7 +13,7 @@ import {
   useParams,
 } from "react-router-dom";
 import Landing from "./pages/Landing";
-import Home from "./pages/Home";
+import NoteMeRedirect from "./pages/NoteMeRedirect";
 import Notes from "./pages/Notes";
 import NotesDiscover from "./pages/NotesDiscover";
 import OfficialGuidePlaceholder from "./pages/OfficialGuidePlaceholder";
@@ -156,8 +156,37 @@ const App = () => (
                         so every page gets the common Header + primary nav + user menu + AI dock.
                         共通 AppLayout（ヘッダー + 機能ナビ + ユーザーメニュー + AI ドック）でラップ。 */}
                     <Route element={<AppShellRoute />}>
-                      {/* Home and PageEditor: available without login (local-only mode) */}
-                      <Route path="/home" element={<Home />} />
+                      {/*
+                          `/notes/me` — landing that resolves the caller's default
+                          note via `GET /api/notes/me` and redirects to
+                          `/notes/:noteId` (issue #825). Auth-required: guests are
+                          bounced through `ProtectedRoute` so the API call never
+                          gets a 401.
+                          `/notes/me`: `GET /api/notes/me` でデフォルトノート ID を
+                          解決し、`/notes/:noteId` に 1 段リダイレクトする
+                          （issue #825）。未ログインは `ProtectedRoute` でサイン
+                          インに飛ばし、API が 401 を返さないようにする。
+                       */}
+                      <Route
+                        path="/notes/me"
+                        element={
+                          <ProtectedRoute>
+                            <NoteMeRedirect />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/*
+                          Legacy `/home` — redirect to `/notes/me` so existing
+                          bookmarks, browser extensions, and external links keep
+                          working (issue #825 acceptance criteria). The actual
+                          landing happens at `/notes/me` which then resolves the
+                          default note id.
+                          旧 `/home`: 既存のブックマーク / 拡張 / 外部リンク救済
+                          のため `/notes/me` にリダイレクトする（issue #825）。
+                          実際のランディングは `/notes/me` 側でデフォルトノート
+                          ID を解決する。
+                       */}
+                      <Route path="/home" element={<Navigate to="/notes/me" replace />} />
                       <Route path="/ai/history" element={<AIChatHistory />} />
                       <Route path="/ai/:conversationId" element={<AIChatDetail />} />
                       <Route path="/ai" element={<AIChatLanding />} />

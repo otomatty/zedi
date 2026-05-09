@@ -6,15 +6,17 @@ export interface Page {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。`null` は個人ページ、文字列値はそのノートに所属する
-   * ノートネイティブページ。個人 `/home` のグリッドには `null` のページのみ
-   * を表示する。Issue #713 を参照。
+   * 所属ノート ID。Issue #823 でデフォルトノート（マイノート）が導入され、
+   * すべてのページはちょうど 1 つのノートに所属するようになった。旧 `/home`
+   * 表示用の「個人ページ（`note_id IS NULL`）」概念は廃止され、Issue #825 で
+   * フロント型も non-null に揃えた。
    *
-   * Owning note ID. `null` is a personal page; a string identifies a
-   * note-native page. Personal `/home` only renders the `null` ones. See
-   * issue #713.
+   * Owning note ID. After issue #823 every page belongs to exactly one note
+   * (the caller's default note replaces the legacy "personal page" concept,
+   * where `note_id` was `null`). Issue #825 tightened the frontend type to
+   * non-null to match the API contract.
    */
-  noteId: string | null;
+  noteId: string;
   title: string;
   content: string; // Tiptap JSON stringified
   contentPreview?: string;
@@ -33,15 +35,13 @@ export interface PageSummary {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。`null` は個人ページ、文字列値はそのノートに所属する
-   * ノートネイティブページ。個人 `/home` のグリッドには `null` のページのみ
-   * を表示する。Issue #713 を参照。
+   * 所属ノート ID。`Page.noteId` と同様、Issue #823 / #825 によりフロント型も
+   * non-null になった。
    *
-   * Owning note ID. `null` is a personal page; a string identifies a
-   * note-native page. Personal `/home` only renders the `null` ones. See
-   * issue #713.
+   * Owning note ID. Mirrors the non-null contract on `Page.noteId` after
+   * issues #823 and #825.
    */
-  noteId: string | null;
+  noteId: string;
   title: string;
   contentPreview?: string;
   thumbnailUrl?: string;

@@ -1,4 +1,4 @@
-import { Home, FileText, Sparkles } from "lucide-react";
+import { NotebookPen, FileText, Sparkles } from "lucide-react";
 import { matchPath } from "react-router-dom";
 import type React from "react";
 
@@ -38,7 +38,19 @@ export interface PrimaryNavItem {
  * 追加・削除・並び替えはこの配列だけを編集すれば両方のUIに反映される。
  */
 export const PRIMARY_NAV_ITEMS: readonly PrimaryNavItem[] = [
-  { path: "/home", icon: Home, i18nKey: "nav.home" },
+  /**
+   * 「マイノート」: `/notes/me` ランディングを経由してデフォルトノートに着地する。
+   * 解決後は `/notes/:noteId` に再ルーティングされるため、アクティブ判定は
+   * ランディング自体（`/notes/me`）の完全一致のみに留める。任意のノート
+   * (`/notes/:noteId`) を開いただけでこのタブを点灯させると、デフォルト以外の
+   * ノートに居るときも「マイノート」が選択されたように見えてしまう。
+   *
+   * "My Note": the entry point is `/notes/me`, which redirects to the
+   * resolved `/notes/:noteId`. We only treat the literal `/notes/me`
+   * pathname as active so the tab does not light up for unrelated note
+   * views. See issue #825.
+   */
+  { path: "/notes/me", icon: NotebookPen, i18nKey: "nav.myNote" },
   {
     path: "/notes",
     icon: FileText,

@@ -24,6 +24,16 @@ export const noteKeys = {
   lists: () => [...noteKeys.all, "list"] as const,
   list: (userId: string, userEmail?: string) =>
     [...noteKeys.lists(), userId, userEmail ?? ""] as const,
+  /**
+   * `GET /api/notes/me` のキー。`/notes/me` ランディングがデフォルトノート ID を
+   * 解決する際に使う（issue #825）。userId 単位でキャッシュし、別アカウントへの
+   * 切り替え時は別キーになるようにする。
+   *
+   * Cache key for `GET /api/notes/me`. Used by the `/notes/me` landing page to
+   * resolve the default note id (issue #825). Keyed per `userId` so account
+   * switches do not bleed cache.
+   */
+  myNote: (userId: string) => [...noteKeys.all, "me", userId] as const,
   details: () => [...noteKeys.all, "detail"] as const,
   detail: (noteId: string, userId?: string, userEmail?: string) =>
     [...noteKeys.details(), noteId, userId ?? "", userEmail ?? ""] as const,
@@ -131,14 +141,12 @@ function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
   return {
     id: p.id,
     ownerUserId: p.owner_id,
-    // Phase 3 でサーバー側が `note_id` を返すようになった（issue #713）。
-    // `null` ならこのノートにリンクされているだけの個人ページ、値ありなら
-    // ノートネイティブ。note-native 限定の UI（「個人に取り込み」など）は
-    // これを見て出し分ける。
-    // Phase 3 surfaced `note_id` on the server (issue #713). `null` means a
-    // linked personal page; a non-null value means a note-native page.
-    // Note-native-only UI (e.g. "copy to personal") gates on this.
-    noteId: p.note_id ?? null,
+    // Issue #823 でデフォルトノートが導入され、ページは必ずいずれかのノートに
+    // 所属するようになったため `note_id` は常に非 null（issue #825 で
+    // フロント型も non-null に揃えた）。
+    // After issue #823 every page belongs to exactly one note, so `note_id`
+    // is always present (issue #825 also tightened the frontend type).
+    noteId: p.note_id,
     title: p.title ?? "",
     contentPreview: p.content_preview ?? undefined,
     thumbnailUrl: p.thumbnail_url ?? undefined,
@@ -219,6 +227,34 @@ export function useNotes() {
     ...query,
     isLoading: query.isLoading || !isLoaded,
   };
+}
+
+/**
+ * デフォルトノート（マイノート）の ID を解決するフック。`GET /api/notes/me`
+ * を呼び、未作成ならサーバ側で idempotent に作成された ID を受け取る。
+ * `/notes/me` ランディング（`NoteMeRedirect`）がこの hook を使ってリダイレクト
+ * 先の `noteId` を決める。Issue #825。
+ *
+ * Resolves the caller's default note ("マイノート") id. Hits
+ * `GET /api/notes/me`, which idempotently creates one when missing. The
+ * `/notes/me` landing page (`NoteMeRedirect`) consumes the resolved `noteId`
+ * to issue the single-step redirect to `/notes/:noteId`. Issue #825.
+ */
+export function useMyNote() {
+  const { api, userId, isLoaded, isSignedIn } = useNoteApi();
+
+  const query = useQuery({
+    queryKey: noteKeys.myNote(userId),
+    queryFn: () => api.getMyNote(),
+    // 認証必須: 未ログインで叩くと 401 が返るため、サインイン後にのみ実行する。
+    // Auth-only: the endpoint returns 401 for guests, so gate on `isSignedIn`.
+    enabled: isLoaded && isSignedIn,
+    // ID は同一セッションでは変わらないため、再取得頻度を低く保つ。
+    // The id is stable for the session, so keep refetches conservative.
+    staleTime: 1000 * 60 * 5,
+  });
+
+  return query;
 }
 
 type UseNoteOptions = { allowRemote?: boolean };

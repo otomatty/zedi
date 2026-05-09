@@ -70,7 +70,7 @@ describe("AuthCallback returnTo handling", () => {
     expect(loc.assign).toHaveBeenCalledWith(returnTo);
   });
 
-  it("falls back to /home when returnTo is not on the allowlist", () => {
+  it("falls back to /notes/me when returnTo is not on the allowlist", () => {
     loc = stubLocation(`?returnTo=${encodeURIComponent("/dangerous")}`);
 
     render(
@@ -79,7 +79,7 @@ describe("AuthCallback returnTo handling", () => {
       </MemoryRouter>,
     );
 
-    expect(loc.assign).toHaveBeenCalledWith("/home");
+    expect(loc.assign).toHaveBeenCalledWith("/notes/me");
   });
 
   it("redirects to /invite-links/:token after social sign-in", () => {
@@ -115,7 +115,7 @@ describe("AuthCallback returnTo handling", () => {
     );
 
     expect(loc.assign).toHaveBeenCalledTimes(1);
-    expect(loc.assign).toHaveBeenCalledWith("/home");
+    expect(loc.assign).toHaveBeenCalledWith("/notes/me");
   });
 
   it("rejects a bare /invite-links/ with no token", () => {
@@ -128,7 +128,7 @@ describe("AuthCallback returnTo handling", () => {
     );
 
     expect(loc.assign).toHaveBeenCalledTimes(1);
-    expect(loc.assign).toHaveBeenCalledWith("/home");
+    expect(loc.assign).toHaveBeenCalledWith("/notes/me");
   });
 
   it("allows URL-encoded slashes inside the token and round-trips them safely", () => {

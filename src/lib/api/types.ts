@@ -12,20 +12,20 @@ export interface SyncPagesResponse {
 }
 
 /**
- * `/api/sync/pages` etc. が返すページ行。`note_id` が `null` または未指定の場合は
- * 個人ページ（issue #713）。GET `/api/sync/pages` は個人ページのみを返すため
- * 実運用では常に `null` だが、新規エンドポイントでも同じ型を再利用できるよう
- * 任意フィールドとして表現している。
+ * `/api/sync/pages` 等が返すページ行。Issue #823 でデフォルトノートが導入され、
+ * すべてのページは（自分のデフォルトノートを含む）いずれかのノートに所属する
+ * ようになったため、`note_id` は常に非 null。Issue #825 で `Page.noteId` も
+ * フロント型上 non-null に揃えた。
  *
- * Page row from `/api/sync/pages` and friends. `note_id` `null` or missing
- * means a personal page (issue #713). GET `/api/sync/pages` only ever returns
- * personal pages, but the field is optional so the same type can describe
- * note-native rows from future endpoints.
+ * Page row from `/api/sync/pages` and friends. After issue #823 every page
+ * belongs to exactly one note (the caller's default note for legacy
+ * "personal" pages), so `note_id` is always present. Issue #825 aligned the
+ * frontend `Page.noteId` to the same non-null contract.
  */
 export interface SyncPageItem {
   id: string;
   owner_id: string;
-  note_id?: string | null;
+  note_id: string;
   source_page_id: string | null;
   title: string | null;
   content_preview: string | null;
@@ -177,20 +177,20 @@ export interface CopyNotePageToPersonalResponse {
 /**
  * GET /api/search?q=&scope=shared のレスポンス。
  *
- * `note_id` は個人ページ (`note_id IS NULL`) も結果に含まれ得るため null になり得る
- * (Issue #718 Phase 5-1)。呼び出し側はノートネイティブと個人を区別する必要がある場合
- * このフィールドで判定する。
+ * Issue #823 でデフォルトノートが導入されてから、すべてのページは必ずいずれかの
+ * ノートに所属する。共有検索でもこの不変条件は変わらないため、`note_id` は常に
+ * 非 null。Issue #825 で型を non-null に揃えた。
  *
  * Response of GET /api/search?q=&scope=shared.
  *
- * `note_id` may be null because personal pages (`note_id IS NULL`) can also
- * appear in shared search results (Issue #718 Phase 5-1). Callers that need to
- * distinguish note-native from personal pages should branch on this field.
+ * After issue #823 every page belongs to exactly one note (the caller's
+ * default note for legacy "personal" rows), so `note_id` is always present
+ * even in shared search results. Issue #825 tightened the type accordingly.
  */
 export interface SearchSharedResponse {
   results: Array<{
     id: string;
-    note_id: string | null;
+    note_id: string;
     owner_id: string;
     title: string | null;
     content_preview: string | null;
@@ -198,6 +198,29 @@ export interface SearchSharedResponse {
     source_url: string | null;
     updated_at: string;
   }>;
+}
+
+/**
+ * `GET /api/notes/me` のレスポンス。呼び出し元のデフォルトノート（マイノート）を
+ * 返す。フロントの `/notes/me` ランディングはこの `id` を使って
+ * `/notes/:noteId` にリダイレクトする。Issue #823 / #825。
+ *
+ * Response of `GET /api/notes/me` — the caller's default note ("マイノート").
+ * The `/notes/me` landing page reads `id` and redirects to `/notes/:noteId`.
+ * See issues #823 and #825.
+ */
+export interface MyNoteResponse {
+  id: string;
+  owner_id: string;
+  title: string | null;
+  visibility: string;
+  edit_permission: string;
+  is_official: boolean;
+  is_default: boolean;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
 }
 
 /** GET /api/notes response item (C3-9: role, page_count, member_count). Create/update return base fields only. */
@@ -259,17 +282,15 @@ export interface GetNoteResponse {
     id: string;
     owner_id: string;
     /**
-     * ページのスコープ。`null` ならこのノートに「リンク」されているだけの個人
-     * ページ（所有者の /home にも現れる）、値ありならこのノートに所属する
-     * ノートネイティブページ。クライアントはこれを見て note-native 限定の
-     * アクション（例: 「個人に取り込み」）を出し分ける。Issue #713 Phase 3。
+     * ページが所属するノートの ID。Issue #823 以降、すべてのページはちょうど
+     * 1 つのノートに所属し、この値はレスポンスのノート ID と一致する。
+     * Issue #825 で型上も non-null に揃えた。
      *
-     * Page scope. `null` → a linked personal page (also visible on the
-     * owner's /home). A non-null value → a note-native page owned by this
-     * note. Clients gate note-native-only actions such as "copy to personal"
-     * on this. See issue #713 Phase 3.
+     * Owning note id. After issue #823 every page belongs to exactly one note
+     * and this matches the enclosing note's `id`. Issue #825 also tightened
+     * the type to non-null.
      */
-    note_id: string | null;
+    note_id: string;
     source_page_id: string | null;
     title: string | null;
     content_preview: string | null;

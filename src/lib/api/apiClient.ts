@@ -15,6 +15,7 @@ import type {
   CopyNotePageToPersonalResponse,
   SearchSharedResponse,
   NoteListItem,
+  MyNoteResponse,
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
@@ -294,6 +295,20 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     /** GET /api/notes — list notes the user can access (role, page_count, member_count). */
     async getNotes(): Promise<NoteListItem[]> {
       return req<NoteListItem[]>("GET", "/api/notes");
+    },
+
+    /**
+     * GET /api/notes/me — return the caller's default note ("マイノート").
+     * If one does not exist yet (e.g. brand-new account) the server creates
+     * it on the fly. Used by the `/notes/me` landing page to resolve the
+     * note id for a redirect into `/notes/:noteId`.
+     *
+     * GET /api/notes/me — 呼び出し元のデフォルトノート（マイノート）を返す。
+     * 未作成ならサーバが idempotent に作成する。`/notes/me` ランディングが
+     * 最初に叩いて、解決した note id へリダイレクトする。
+     */
+    async getMyNote(): Promise<MyNoteResponse> {
+      return req<MyNoteResponse>("GET", "/api/notes/me");
     },
 
     /** GET /api/notes/:id — note detail (auth optional; public/unlisted viewable by guests). */
