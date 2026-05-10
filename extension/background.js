@@ -2,7 +2,7 @@
  * Zedi Web Clipper - Background service worker
  * Phase 2: When token exists, call clip-and-create. Otherwise open Zedi with clipUrl.
  */
-importScripts("config.worker.js");
+importScripts("config.worker.js", "constants.js");
 
 const STORAGE_KEY = "zedi_ext_token";
 
@@ -75,7 +75,8 @@ async function clipAndCreate(url) {
 
 function openZediWithClipUrl(url) {
   const params = new URLSearchParams({ clipUrl: url, from: "chrome-extension" });
-  chrome.tabs.create({ url: `${getApiBase()}/home?${params.toString()}` });
+  const path = self.ZEDI_EXT_CONSTANTS.CLIP_PATH;
+  chrome.tabs.create({ url: `${getApiBase()}${path}?${params.toString()}` });
 }
 
 async function savePage(url) {
