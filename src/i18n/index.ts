@@ -19,7 +19,6 @@ import jaDonate from "./locales/ja/donate.json";
 import jaPricing from "./locales/ja/pricing.json";
 import jaOnboarding from "./locales/ja/onboarding.json";
 import jaOfficialGuide from "./locales/ja/officialGuide.json";
-import jaHome from "./locales/ja/home.json";
 import jaAiChat from "./locales/ja/aiChat.json";
 import jaInvite from "./locales/ja/invite.json";
 import jaWikiSchema from "./locales/ja/wikiSchema.json";
@@ -42,7 +41,6 @@ import enDonate from "./locales/en/donate.json";
 import enPricing from "./locales/en/pricing.json";
 import enOnboarding from "./locales/en/onboarding.json";
 import enOfficialGuide from "./locales/en/officialGuide.json";
-import enHome from "./locales/en/home.json";
 import enAiChat from "./locales/en/aiChat.json";
 import enInvite from "./locales/en/invite.json";
 import enWikiSchema from "./locales/en/wikiSchema.json";
@@ -67,7 +65,6 @@ const ja = {
   pricing: jaPricing,
   onboarding: jaOnboarding,
   officialGuide: jaOfficialGuide,
-  home: jaHome,
   aiChat: jaAiChat,
   invite: jaInvite,
   wikiSchema: jaWikiSchema,
@@ -93,7 +90,6 @@ const en = {
   pricing: enPricing,
   onboarding: enOnboarding,
   officialGuide: enOfficialGuide,
-  home: enHome,
   aiChat: enAiChat,
   invite: enInvite,
   wikiSchema: enWikiSchema,

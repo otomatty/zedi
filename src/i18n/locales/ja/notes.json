@@ -61,6 +61,8 @@
   "pageRemoved": "ページを削除しました",
   "pageRemoveFailed": "ページの削除に失敗しました",
   "pagesCount": "{{count}} 件のページ",
+  "pageCountLabel": "ページ数",
+  "totalPages_other": "{{count}} ページ",
   "members": "メンバー",
   "settings": "設定",
   "openActions": "アクションメニューを開く",

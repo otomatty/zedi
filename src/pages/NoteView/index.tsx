@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import Container from "@/components/layout/Container";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
+import { NotePageCount } from "@/components/note/NotePageCount";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge, useToast } from "@zedi/ui";
 import { NoteAddPageDialog } from "./NoteAddPageDialog";
@@ -123,8 +124,9 @@ const NoteView: React.FC = () => {
   return (
     <ContentWithAIChat
       floatingAction={
-        canEdit || canShowAddPage ? (
-          <div className="mr-4 mb-4">
+        <div className="mr-4 mb-4 flex flex-col items-end gap-2">
+          <NotePageCount noteId={note.id} />
+          {(canEdit || canShowAddPage) && (
             <FloatingActionButton
               noteId={note.id}
               onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
@@ -134,8 +136,8 @@ const NoteView: React.FC = () => {
               }
               hiddenOptions={canEdit ? undefined : ["blank", "url", "image"]}
             />
-          </div>
-        ) : null
+          )}
+        </div>
       }
     >
       <div className="min-h-0 flex-1 py-6">
