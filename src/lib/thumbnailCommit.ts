@@ -172,11 +172,24 @@ const THUMBNAIL_DELETE_TIMEOUT_MS = 10_000;
  * を best-effort で叩き、失敗してもユーザー体験を壊さない（呼び出し元は throw
  * しないことを期待してよい）。
  *
+ * レスポンス契約: 401（サインアウト中の rollback）、404（既に削除済みや並行 GC）、
+ * 409（issue #820 の参照ガードがライブページの参照を理由に削除を拒否し blob を
+ * 保存した phantom rollback ケース）はいずれも期待された no-op として静かに扱う。
+ * 他の非 OK（500/429/403 等）はロールバック失敗としてログだけ残し、サーバ側の
+ * スイーパーに孤立 blob の回収を委ねる。
+ *
  * Best-effort rollback for the "commit thumbnail → create page" flow used by
  * the Web Clipper. When page creation fails after a successful thumbnail
  * commit, callers invoke this to avoid leaking an orphan that would otherwise
- * keep counting against the user's quota. The DELETE endpoint is owner-scoped
- * server-side, so 404/401 are normal outcomes; we never throw out.
+ * keep counting against the user's quota.
+ *
+ * Response contract: 401 (signed-out rollback), 404 (already deleted or
+ * concurrent GC), and 409 (issue #820 referential guard preserved the blob
+ * because a live page still references it — i.e. our rollback fired phantom
+ * after a successful page commit) are all expected no-ops and produce no
+ * warning. Anything else (500/429/403/...) is logged as an unexpected
+ * rollback failure and left to the server-side sweeper to reclaim. The
+ * function never throws.
  *
  * @param objectId - 削除対象の thumbnail_objects.id / Persisted thumbnail object id.
  * @param options - REST API のベース URL を含む設定 / Settings (currently just `baseUrl`).
@@ -197,15 +210,26 @@ export async function deleteCommittedThumbnail(
       signal: controller.signal,
     });
     // 401 はサインアウト中の rollback、404 は既に削除済み（DELETE 自体や
-    // サーバー側 GC 経由）の正常系。それ以外の非 OK（500/429/403 など）は
-    // ロールバック失敗としてログだけ残し、サーバー側スイーパーに回収を委ねる。
+    // サーバー側 GC 経由）の正常系。409 はサーバー側参照ガード (issue #820)
+    // が「ライブページがまだ参照しているので消さない」と判定した結果で、
+    // ロールバックが phantom 発火だった場合のあるべき挙動。それ以外の
+    // 非 OK（500/429/403 など）はロールバック失敗としてログだけ残し、
+    // サーバー側スイーパーに回収を委ねる。
     //
     // 401 means the user is signed out mid-rollback and 404 means the row is
     // already gone (e.g. concurrent delete or server-side GC) — both are
-    // expected no-ops. Anything else (500/429/403/...) is an unexpected
-    // rollback failure: log so it's visible, then fall through and let the
-    // server-side sweeper reclaim the orphan.
-    if (!response.ok && response.status !== 401 && response.status !== 404) {
+    // expected no-ops. 409 is the response from the server-side referential
+    // guard (issue #820) when a live page still points at the thumbnail,
+    // i.e. our rollback was a phantom and the server correctly preserved
+    // the blob. Anything else (500/429/403/...) is an unexpected rollback
+    // failure: log so it's visible, then fall through and let the server-side
+    // sweeper reclaim the orphan.
+    if (
+      !response.ok &&
+      response.status !== 401 &&
+      response.status !== 404 &&
+      response.status !== 409
+    ) {
       console.warn(
         "[thumbnail/rollback] DELETE returned unexpected status:",
         response.status,

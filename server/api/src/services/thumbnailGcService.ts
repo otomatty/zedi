@@ -19,10 +19,20 @@
  * the orphan and rely on a sweeper to reclaim it — losing the DB row first
  * is safer than the inverse (DB row pointing at a missing blob would surface
  * as broken images in the UI).
+ *
+ * 参照ガード: 生きている `pages` 行が `thumbnail_object_id` で当該サムネイル
+ * を参照している間は削除を拒否する（issue #820）。クライアント側の rollback
+ * が誤発火した場合でもライブページのサムネイルが消えないことを保証する。
+ *
+ * Referential guard: refuses deletion while any non-deleted `pages` row still
+ * references the thumbnail via `thumbnail_object_id` (issue #820). This makes
+ * the client-side rollback in page creation flows safe — even if a phantom
+ * delete fires after a successful page commit, the server preserves the
+ * thumbnail.
  */
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { and, eq } from "drizzle-orm";
-import { thumbnailObjects } from "../schema/index.js";
+import { pages, thumbnailObjects } from "../schema/index.js";
 import { getEnv } from "../lib/env.js";
 import type { Database } from "../types/index.js";
 
@@ -62,14 +72,70 @@ function getBucket(): string {
 }
 
 /**
+ * `deleteThumbnailObject` の結果種別。
+ *
+ * Discriminated outcome of {@link deleteThumbnailObject}:
+ *  - `deleted`    — DB row removed (S3 delete attempted best-effort).
+ *  - `not_found`  — No row matched the owner-scoped predicate (no-op).
+ *  - `referenced` — A live `pages` row still references this thumbnail; the
+ *                   DB row was preserved.
+ */
+export type DeleteThumbnailOutcome = "deleted" | "not_found" | "referenced";
+
+/**
  * 指定 thumbnail_objects 行を所有者スコープで削除する。
- * 行が見つからなかった (= 既に削除済 or 別ユーザー) 場合は何もしない。
+ * 所有者不一致や行欠落は `not_found`、生きているページが参照していれば
+ * `referenced` を返し、削除を行わない。
  *
  * Deletes a `thumbnail_objects` row scoped to its owner, then deletes the
- * matching S3 object. No-op when the row is missing (already deleted or
- * owned by someone else). Errors during S3 delete are logged so a sweeper
- * can reclaim orphaned blobs but never propagated — callers must not block
- * page deletion on storage availability.
+ * matching S3 object. Returns:
+ *  - `not_found` when the row is missing or owned by a different user
+ *    (already deleted, never existed, or ownership changed).
+ *  - `referenced` when a non-deleted `pages` row **owned by the same user**
+ *    still points at the thumbnail via `thumbnail_object_id` — the row is
+ *    preserved so the referencing page does not lose its thumbnail.
+ *    Foreign-owner referrers are ignored to prevent a third-party DoS
+ *    (a different user planting a phantom reference via unvalidated
+ *    `POST /api/pages` input).
+ *  - `deleted` after a successful DB delete. S3 errors are logged so a
+ *    sweeper can reclaim orphaned blobs but never propagated — callers
+ *    must not block page deletion on storage availability.
+ *
+ * 参照ガード（issue #820）はトランザクション内で「参照チェック → DELETE」を
+ * まとめて実行し、`pages.is_deleted = false` で同オーナーが持つ参照行が
+ * あれば DELETE を取り止める。これにより `POST /api/pages` 成功直後に
+ * ネットワーク応答が失われた場合でも、クライアント側 rollback がライブ
+ * ページのサムネイルを誤って削除することを防ぐ。
+ *
+ * 既知の限界: PostgreSQL の既定 isolation (READ COMMITTED) では、別の
+ * トランザクションが参照 SELECT 後 / DELETE 完了前に同じ
+ * `thumbnail_object_id` を持つ pages 行を INSERT してくる相互競合は閉じ
+ * きれない。最悪ケースでサムネイルが消えた直後に追加された参照ページが
+ * 「画像 404」状態になる。`thumbnail_objects` 行を `FOR UPDATE` で掴み
+ * `POST /api/pages` 側にも整合的なロック取得を求めるか、
+ * `pages.thumbnail_object_id` に FK (ON DELETE RESTRICT) を張るのが
+ * 真の解決だが、本 issue のスコープを超えるため別 issue で対応する。
+ * 単一ユーザーが自分のサムネイルとページを直列に操作する典型動線では
+ * この競合は実際には発生しない。
+ *
+ * The referential guard (issue #820) co-locates the live-reference SELECT
+ * and the DELETE in a single transaction so this service's own steps don't
+ * interleave. Ownership is verified before the reference check so 404/409
+ * cannot be used to probe other users' thumbnail state.
+ *
+ * Known limitation: a single transaction under PostgreSQL's default
+ * READ COMMITTED isolation does NOT serialize against concurrent INSERTs
+ * from other connections — another transaction can insert a page with
+ * `thumbnail_object_id = objectId` between our referrer SELECT and our
+ * DELETE, leaving a dangling reference that surfaces as a 404 image. A
+ * proper fix needs either an FK with ON DELETE RESTRICT on
+ * `pages.thumbnail_object_id` (reversing the explicit no-FK choice in
+ * migration 0021) or coordinated row locking — `SELECT … FOR UPDATE` on
+ * the `thumbnail_objects` row here, plus a matching `FOR SHARE` lock in
+ * `POST /api/pages` before insert. Both are out of scope for this issue
+ * and tracked as a follow-up. The race does not arise on the typical
+ * single-user "commit thumbnail → create page → maybe rollback" path
+ * because those steps are serialized at the client.
  *
  * @param objectId - 対象の thumbnail_objects.id
  * @param userId - 呼び出し元ユーザー ID（所有者一致を必須）
@@ -79,25 +145,89 @@ export async function deleteThumbnailObject(
   objectId: string,
   userId: string,
   db: Database,
-): Promise<void> {
-  const deleted = await db
-    .delete(thumbnailObjects)
-    .where(and(eq(thumbnailObjects.id, objectId), eq(thumbnailObjects.userId, userId)))
-    .returning({ s3Key: thumbnailObjects.s3Key });
+): Promise<DeleteThumbnailOutcome> {
+  const txResult = await db.transaction(async (tx) => {
+    // 1. 所有者チェック。所有者でない / 存在しない場合は `not_found` を返し、
+    //    後続の参照ガードで他ユーザーのサムネイル状況が漏れるのを防ぐ。
+    //
+    // 1. Ownership check. Run this first so an unauthorized caller always
+    //    gets `not_found` regardless of whether a referencing page exists —
+    //    otherwise a 404/409 split would leak other users' state.
+    const owned = await tx
+      .select({ id: thumbnailObjects.id })
+      .from(thumbnailObjects)
+      .where(and(eq(thumbnailObjects.id, objectId), eq(thumbnailObjects.userId, userId)))
+      .limit(1);
+    if (owned.length === 0) return { status: "not_found" as const };
 
-  const deletedRow = deleted[0];
-  if (!deletedRow) return;
+    // 2. ライブ参照チェック。`pages.is_deleted = false` かつ **サムネイル所有者と
+    //    同じオーナー** が持つ行が一つでも `thumbnail_object_id` で当該サムネイル
+    //    を参照していれば中止する。所有者でフィルタしないと、悪意のある第三者が
+    //    `POST /api/pages` に他人の `thumbnail_object_id` を渡してダミー参照を
+    //    作り、被害者の DELETE を恒久的に 409 へ落として GC を妨げ、容量枠を
+    //    食い潰す DoS が成立しうる。`POST /api/pages` がサムネイル所有権を
+    //    検証するまでの間、ガード側で被害者ページに限定してこの DoS を遮断する。
+    //    なお DELETE /api/pages/:id 経路はサムネイル GC 前に
+    //    `thumbnail_object_id` を NULL にしているのでこの分岐には入らない。
+    //
+    // 2. Live-reference check. Abort only when a non-deleted `pages` row owned
+    //    by the **same owner as the thumbnail** still points at it. Without
+    //    the owner predicate, a malicious user can call `POST /api/pages`
+    //    with someone else's `thumbnail_object_id` (the route currently
+    //    accepts the field unverified) to plant a phantom referrer; the
+    //    victim's `DELETE /api/thumbnail/serve/:id` then returns 409
+    //    indefinitely, blocking GC and burning the victim's quota. Scoping
+    //    the guard to owner-matching pages closes that DoS until
+    //    `POST /api/pages` enforces thumbnail ownership end-to-end. The
+    //    page-delete flow nulls `thumbnail_object_id` before calling here,
+    //    so this branch only fires for the standalone
+    //    DELETE /api/thumbnail/serve/:id path (e.g. a phantom client
+    //    rollback after a successful page commit).
+    const referrer = await tx
+      .select({ id: pages.id })
+      .from(pages)
+      .where(
+        and(
+          eq(pages.thumbnailObjectId, objectId),
+          eq(pages.isDeleted, false),
+          eq(pages.ownerId, userId),
+        ),
+      )
+      .limit(1);
+    if (referrer.length > 0) return { status: "referenced" as const };
 
+    // 3. DB 行削除。所有者スコープを再度効かせ、SELECT〜DELETE 間の TOCTOU
+    //    に備える。
+    //
+    // 3. Delete the DB row, re-applying the ownership predicate to handle
+    //    a TOCTOU change between the SELECT and the DELETE.
+    const deleted = await tx
+      .delete(thumbnailObjects)
+      .where(and(eq(thumbnailObjects.id, objectId), eq(thumbnailObjects.userId, userId)))
+      .returning({ s3Key: thumbnailObjects.s3Key });
+    const deletedRow = deleted[0];
+    if (!deletedRow) return { status: "not_found" as const };
+
+    return { status: "deleted" as const, s3Key: deletedRow.s3Key };
+  });
+
+  if (txResult.status !== "deleted") return txResult.status;
+
+  // S3 削除はトランザクション外で行う。外部 IO で接続を保持し続けないため。
+  // S3 deletion runs outside the transaction so external IO doesn't pin the
+  // DB connection.
   try {
-    await getS3().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: deletedRow.s3Key }));
+    await getS3().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: txResult.s3Key }));
   } catch (err) {
     const s3Err = err as { name?: string } | null;
     if (s3Err?.name !== "NoSuchKey") {
       console.error("[thumbnail/gc] S3 DeleteObject failed after DB delete (orphaned object):", {
         objectId,
-        s3Key: deletedRow.s3Key,
+        s3Key: txResult.s3Key,
         err,
       });
     }
   }
+
+  return "deleted";
 }

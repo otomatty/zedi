@@ -174,7 +174,15 @@ describe("deleteCommittedThumbnail", () => {
     expect(args.some((arg) => arg === "obj-500")).toBe(true);
   });
 
-  it("401/404 は no-op として warn しない / treats 401/404 as expected no-ops (no warn)", async () => {
+  it("401/404/409 は no-op として warn しない / treats 401/404/409 as expected no-ops (no warn)", async () => {
+    // 409 は issue #820 の参照ガードが「ライブページが参照中なので消さない」
+    // と判定したケース。phantom rollback としてはむしろ望ましい結果なので
+    // ログは残さない。
+    //
+    // 409 is the issue #820 referential-guard response: a live page still
+    // references this thumbnail and the server preserved it. That is the
+    // intended outcome when our rollback fired phantom-style after a
+    // successful page commit, so we suppress the warning.
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const mockFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
 
@@ -183,6 +191,9 @@ describe("deleteCommittedThumbnail", () => {
 
     mockFetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
     await deleteCommittedThumbnail("obj-404", { baseUrl: "https://api.example.com" });
+
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 409 }));
+    await deleteCommittedThumbnail("obj-409", { baseUrl: "https://api.example.com" });
 
     expect(warnSpy).not.toHaveBeenCalled();
   });
