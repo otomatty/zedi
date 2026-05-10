@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@zedi/ui";
 import { HeaderSearchBar } from "./Header/HeaderSearchBar";
+import { NoteSwitcher } from "./Header/NoteSwitcher";
 import Container from "@/components/layout/Container";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
 import { useHeaderActions } from "@/contexts/HeaderActionsContext";
@@ -42,6 +43,14 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({ className }) => {
           className="flex shrink-0 items-center gap-1 empty:hidden"
           data-testid="header-left-slot"
         />
+        {/* Mobile NoteSwitcher: rendered as a compact icon trigger so the
+            mobile bar still fits the search input in one row. The component
+            collapses to a label-less icon button at this breakpoint and
+            self-hides for signed-out users. Issue #827.
+            モバイルの NoteSwitcher は、検索入力と 1 行に収まるよう
+            コンパクトなアイコントリガーとして描画する。サインアウト中は
+            内部で非表示になる。issue #827。 */}
+        <NoteSwitcher />
         {hasSearchContext && (
           <div className="min-w-0 flex-1">
             <HeaderSearchBar />

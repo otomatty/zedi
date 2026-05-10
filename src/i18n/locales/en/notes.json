@@ -1,5 +1,14 @@
 {
   "title": "Notes",
+  "switcher": {
+    "trigger": "Switch note",
+    "heading": "Your notes",
+    "defaultBadge": "Default",
+    "empty": "You don't have any notes yet.",
+    "loading": "Loading notes…",
+    "allNotes": "See all notes",
+    "newNote": "Create new note"
+  },
   "newNote": "New note",
   "newNoteDialogTitle": "New note",
   "noteTitle": "Title",
