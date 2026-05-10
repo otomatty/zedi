@@ -177,12 +177,6 @@
     return res.json();
   }
 
-  function openZediWithClipUrl(url) {
-    const params = new URLSearchParams({ clipUrl: url, from: "chrome-extension" });
-    chrome.tabs.create({ url: `${getApiBase()}/notes/me?${params.toString()}` });
-    window.close();
-  }
-
   document.addEventListener("DOMContentLoaded", async () => {
     const urlEl = document.getElementById("url");
     const saveBtn = document.getElementById("saveBtn");
