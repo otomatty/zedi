@@ -31,6 +31,12 @@ export interface Note {
   visibility: NoteVisibility;
   editPermission: NoteEditPermission;
   isOfficial: boolean;
+  /**
+   * Whether this is the caller's default note (`<users.name>のノート`). Drives
+   * the "マイノート" badge and the public/unlisted save warning dialog.
+   * 既定ノート（マイノート）かどうか。バッジ表示や公開警告ダイアログで使う。
+   */
+  isDefault: boolean;
   viewCount: number;
   createdAt: number;
   updatedAt: number;

@@ -231,6 +231,12 @@ export interface NoteListItem {
   visibility: string;
   edit_permission?: string;
   is_official?: boolean;
+  /**
+   * Whether this is the caller's default note. Surfaced to the frontend so
+   * note settings can warn before flipping the default note to public/unlisted.
+   * 既定ノート（マイノート）かどうか。公開警告ダイアログ判定に利用する。
+   */
+  is_default?: boolean;
   view_count?: number;
   created_at: string;
   updated_at: string;
@@ -273,6 +279,12 @@ export interface GetNoteResponse {
   visibility: string;
   edit_permission?: string;
   is_official?: boolean;
+  /**
+   * Whether this is the caller's default note. The settings page reads this to
+   * gate the "公開化で個人メモが流出する可能性" warning dialog.
+   * 既定ノートかどうか。設定画面で公開化警告ダイアログを出す判定に使う。
+   */
+  is_default?: boolean;
   view_count?: number;
   created_at: string;
   updated_at: string;

@@ -121,6 +121,8 @@
   "editPermissionHelpAnyLoggedIn": "Any signed-in user who can view this note (public or unlisted link) can edit pages.",
   "publicAnyLoggedInConfirmTitle": "Save with open collaboration for all signed-in users?",
   "publicAnyLoggedInConfirmDescription": "With this visibility and edit permission, every signed-in user who can open this note (public or unlisted link) can edit it. Continue?",
+  "defaultNotePublicWarningTitle": "Make your default note shareable?",
+  "defaultNotePublicWarningDescription": "This is your default note (\"My Note\"). Switching it to public or unlisted will expose every page you have stored here so far. Consider moving any private pages to another note before continuing.",
   "publicAnyLoggedInCreateConfirmTitle": "Create a note with open collaboration for all signed-in users?",
   "publicAnyLoggedInCreateConfirmDescription": "With this visibility and edit permission, every signed-in user who can open this note (public or unlisted link) can edit it. Continue?",
   "tabMyNotes": "My Notes",

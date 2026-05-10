@@ -60,6 +60,7 @@ function apiNoteToNote(item: {
   visibility: string;
   edit_permission?: string;
   is_official?: boolean;
+  is_default?: boolean;
   view_count?: number;
   created_at: string;
   updated_at: string;
@@ -72,6 +73,7 @@ function apiNoteToNote(item: {
     visibility: item.visibility as Note["visibility"],
     editPermission: (item.edit_permission as Note["editPermission"]) ?? "owner_only",
     isOfficial: item.is_official ?? false,
+    isDefault: item.is_default ?? false,
     viewCount: item.view_count ?? 0,
     createdAt: parseTs(item.created_at),
     updatedAt: parseTs(item.updated_at),
