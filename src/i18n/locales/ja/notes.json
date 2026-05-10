@@ -1,5 +1,14 @@
 {
   "title": "ノート",
+  "switcher": {
+    "trigger": "ノートを切り替え",
+    "heading": "あなたのノート",
+    "defaultBadge": "既定",
+    "empty": "まだノートがありません",
+    "loading": "ノートを読み込み中…",
+    "allNotes": "すべてのノートを見る",
+    "newNote": "新規ノートを作成"
+  },
   "newNote": "新規ノート",
   "newNoteDialogTitle": "新しいノート",
   "noteTitle": "タイトル",

@@ -49,6 +49,14 @@ vi.mock("./Header/UnifiedMenu", () => ({
   UnifiedMenu: () => unifiedMenuMock(),
 }));
 
+// NoteSwitcher pulls in heavy dependencies (auth + react-query). The mobile
+// header test only cares that the bar layout stays compact, so stub it out.
+// NoteSwitcher は auth / react-query 経由で重い依存を引き込むため、
+// レイアウト検証だけの本テストではスタブ化する。
+vi.mock("./Header/NoteSwitcher", () => ({
+  NoteSwitcher: () => <div data-testid="note-switcher" />,
+}));
+
 function renderHeader() {
   return render(
     <MemoryRouter>

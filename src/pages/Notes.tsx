@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { NotesLayout } from "@/components/note/NotesLayout";
 import { useNotes, useCreateNote } from "@/hooks/useNoteQueries";
@@ -31,6 +31,36 @@ import { Label } from "@zedi/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@zedi/ui";
 import { useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
+
+/**
+ * Decide whether the create-note dialog should auto-open from a `?new=1`
+ * deep-link, and strip the param on first render so a refresh does not
+ * reopen the dialog. Used by the header NoteSwitcher (issue #827).
+ *
+ * `?new=1` ディープリンクから新規作成ダイアログを自動的に開くかどうかを
+ * 判定し、リロード時に再度開かないよう初回レンダーで除去する。
+ * ヘッダーの NoteSwitcher（issue #827）から呼び出される。
+ */
+function useNewNoteDeepLink(): boolean {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const wantsCreate = useMemo(
+    () => new URLSearchParams(location.search).get("new") === "1",
+    [location.search],
+  );
+
+  useEffect(() => {
+    if (!wantsCreate) return;
+    const next = new URLSearchParams(location.search);
+    next.delete("new");
+    navigate(
+      { pathname: location.pathname, search: next.toString(), hash: location.hash },
+      { replace: true },
+    );
+  }, [wantsCreate, location.pathname, location.search, location.hash, navigate]);
+
+  return wantsCreate;
+}
 
 interface CreateNoteDialogContentProps {
   title: string;
@@ -124,7 +154,9 @@ const Notes: React.FC = () => {
   /** After closing the public-collab confirm, reopen the create dialog if user cancelled. / 確認をキャンセルしたら作成ダイアログを再度開く */
   const reopenCreateAfterPublicConfirmRef = useRef(false);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const wantsCreate = useNewNoteDeepLink();
+
+  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(() => wantsCreate);
   const [isPublicAnyLoggedInCreateConfirmOpen, setIsPublicAnyLoggedInCreateConfirmOpen] =
     useState(false);
   const [title, setTitle] = useState("");
