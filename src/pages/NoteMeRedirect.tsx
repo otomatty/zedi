@@ -101,11 +101,12 @@ const NoteMeRedirect: React.FC = () => {
   // Forward a validated `clipUrl` into the note view while preserving other
   // query params; drop only invalid `clipUrl` values.
   const rawClipUrl = searchParams.get("clipUrl");
-  const validClipUrl = rawClipUrl && isClipUrlAllowed(rawClipUrl) ? rawClipUrl : null;
+  const hasClipUrlParam = rawClipUrl !== null;
+  const validClipUrl = hasClipUrlParam && isClipUrlAllowed(rawClipUrl) ? rawClipUrl : null;
   const nextParams = new URLSearchParams(searchParams);
   if (validClipUrl) {
     nextParams.set("clipUrl", validClipUrl);
-  } else if (rawClipUrl) {
+  } else if (hasClipUrlParam) {
     nextParams.delete("clipUrl");
   }
   const nextSearch = nextParams.toString();

@@ -139,6 +139,18 @@ describe("NoteMeRedirect", () => {
     expect(screen.getByTestId("note-view-search")).toHaveTextContent("?keep=1");
   });
 
+  it("drops an empty `clipUrl` while preserving other query params", () => {
+    useMyNoteMock.mockReturnValue({
+      data: { id: "note-default-123" },
+      isLoading: false,
+      error: null,
+    });
+    renderAt("/notes/me?keep=1&clipUrl=");
+    // 空の clipUrl も検証 NG として削除し、他のクエリだけを保持する。
+    // Empty `clipUrl` is invalid too; keep only the unrelated query params.
+    expect(screen.getByTestId("note-view-search")).toHaveTextContent("?keep=1");
+  });
+
   it("redirects to /onboarding when the setup wizard is still pending", () => {
     useOnboardingMock.mockReturnValue({ needsSetupWizard: true });
     useMyNoteMock.mockReturnValue({
