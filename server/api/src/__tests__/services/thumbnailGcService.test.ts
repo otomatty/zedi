@@ -100,6 +100,34 @@ describe("deleteThumbnailObject", () => {
     expect(chains.filter((c) => c.startMethod === "delete")).toHaveLength(0);
   });
 
+  it("他ユーザーのページが参照していてもブロックしない / foreign-owner referrer does not block deletion", async () => {
+    // 第三者が `POST /api/pages` 経由で他人の `thumbnail_object_id` を指す
+    // ダミーページを作成しても、参照ガードは所有者一致行のみを見るので
+    // 被害者の DELETE は成功する。owner predicate が WHERE から外れている
+    // と、攻撃者がガードを永久に発火させて被害者の容量枠を消費し続ける
+    // DoS が成立してしまう（PR #839 のレビュー指摘）。
+    //
+    // A third party who plants a page that references another user's
+    // thumbnail (POST /api/pages currently doesn't validate thumbnail
+    // ownership) must not be able to lock the victim's GC. The guard
+    // scopes its referrer SELECT to `pages.owner_id = userId`, so the
+    // referrer SELECT here returns empty for the victim and the DELETE
+    // proceeds. Without the owner predicate this would degenerate into a
+    // permanent quota-burning DoS.
+    const { deleteThumbnailObject } = await importGcService();
+    // [ownership SELECT — found] [referrer SELECT — empty (owner-scoped)] [DELETE returning]
+    const { db } = createMockDb([
+      [{ id: "obj-foreign-ref" }],
+      [],
+      [{ s3Key: "users/u1/thumbnails/z.png" }],
+    ]);
+
+    await expect(deleteThumbnailObject("obj-foreign-ref", "u1", db as never)).resolves.toBe(
+      "deleted",
+    );
+    expect(mockS3Send).toHaveBeenCalledTimes(1);
+  });
+
   it("DELETE が 0 行返したら 'not_found' に縮退して S3 を呼ばない / DELETE returning 0 rows collapses to 'not_found'", async () => {
     const { deleteThumbnailObject } = await importGcService();
     // [ownership SELECT — found] [referrer SELECT — empty] [DELETE — 0 rows]

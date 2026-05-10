@@ -172,11 +172,24 @@ const THUMBNAIL_DELETE_TIMEOUT_MS = 10_000;
  * を best-effort で叩き、失敗してもユーザー体験を壊さない（呼び出し元は throw
  * しないことを期待してよい）。
  *
+ * レスポンス契約: 401（サインアウト中の rollback）、404（既に削除済みや並行 GC）、
+ * 409（issue #820 の参照ガードがライブページの参照を理由に削除を拒否し blob を
+ * 保存した phantom rollback ケース）はいずれも期待された no-op として静かに扱う。
+ * 他の非 OK（500/429/403 等）はロールバック失敗としてログだけ残し、サーバ側の
+ * スイーパーに孤立 blob の回収を委ねる。
+ *
  * Best-effort rollback for the "commit thumbnail → create page" flow used by
  * the Web Clipper. When page creation fails after a successful thumbnail
  * commit, callers invoke this to avoid leaking an orphan that would otherwise
- * keep counting against the user's quota. The DELETE endpoint is owner-scoped
- * server-side, so 404/401 are normal outcomes; we never throw out.
+ * keep counting against the user's quota.
+ *
+ * Response contract: 401 (signed-out rollback), 404 (already deleted or
+ * concurrent GC), and 409 (issue #820 referential guard preserved the blob
+ * because a live page still references it — i.e. our rollback fired phantom
+ * after a successful page commit) are all expected no-ops and produce no
+ * warning. Anything else (500/429/403/...) is logged as an unexpected
+ * rollback failure and left to the server-side sweeper to reclaim. The
+ * function never throws.
  *
  * @param objectId - 削除対象の thumbnail_objects.id / Persisted thumbnail object id.
  * @param options - REST API のベース URL を含む設定 / Settings (currently just `baseUrl`).

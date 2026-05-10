@@ -91,22 +91,51 @@ export type DeleteThumbnailOutcome = "deleted" | "not_found" | "referenced";
  * matching S3 object. Returns:
  *  - `not_found` when the row is missing or owned by a different user
  *    (already deleted, never existed, or ownership changed).
- *  - `referenced` when a non-deleted `pages` row still points at the
- *    thumbnail via `thumbnail_object_id` — the row is preserved so the
- *    referencing page does not lose its thumbnail.
+ *  - `referenced` when a non-deleted `pages` row **owned by the same user**
+ *    still points at the thumbnail via `thumbnail_object_id` — the row is
+ *    preserved so the referencing page does not lose its thumbnail.
+ *    Foreign-owner referrers are ignored to prevent a third-party DoS
+ *    (a different user planting a phantom reference via unvalidated
+ *    `POST /api/pages` input).
  *  - `deleted` after a successful DB delete. S3 errors are logged so a
  *    sweeper can reclaim orphaned blobs but never propagated — callers
  *    must not block page deletion on storage availability.
  *
- * 参照ガード（issue #820）はトランザクション内でチェック→削除を直列化し、
- * `pages.is_deleted = false` の参照行があれば DELETE を取り止める。これにより
- * `POST /api/pages` 成功直後にネットワーク応答が失われた場合でも、クライアント
- * 側 rollback がライブページのサムネイルを誤って削除することを防ぐ。
+ * 参照ガード（issue #820）はトランザクション内で「参照チェック → DELETE」を
+ * まとめて実行し、`pages.is_deleted = false` で同オーナーが持つ参照行が
+ * あれば DELETE を取り止める。これにより `POST /api/pages` 成功直後に
+ * ネットワーク応答が失われた場合でも、クライアント側 rollback がライブ
+ * ページのサムネイルを誤って削除することを防ぐ。
  *
- * The referential guard (issue #820) serializes the check and the DELETE
- * inside a single transaction so concurrent deletes can't slip through.
- * Ownership is verified before the reference check to avoid leaking the
- * existence of other users' thumbnails via differing 404/409 responses.
+ * 既知の限界: PostgreSQL の既定 isolation (READ COMMITTED) では、別の
+ * トランザクションが参照 SELECT 後 / DELETE 完了前に同じ
+ * `thumbnail_object_id` を持つ pages 行を INSERT してくる相互競合は閉じ
+ * きれない。最悪ケースでサムネイルが消えた直後に追加された参照ページが
+ * 「画像 404」状態になる。`thumbnail_objects` 行を `FOR UPDATE` で掴み
+ * `POST /api/pages` 側にも整合的なロック取得を求めるか、
+ * `pages.thumbnail_object_id` に FK (ON DELETE RESTRICT) を張るのが
+ * 真の解決だが、本 issue のスコープを超えるため別 issue で対応する。
+ * 単一ユーザーが自分のサムネイルとページを直列に操作する典型動線では
+ * この競合は実際には発生しない。
+ *
+ * The referential guard (issue #820) co-locates the live-reference SELECT
+ * and the DELETE in a single transaction so this service's own steps don't
+ * interleave. Ownership is verified before the reference check so 404/409
+ * cannot be used to probe other users' thumbnail state.
+ *
+ * Known limitation: a single transaction under PostgreSQL's default
+ * READ COMMITTED isolation does NOT serialize against concurrent INSERTs
+ * from other connections — another transaction can insert a page with
+ * `thumbnail_object_id = objectId` between our referrer SELECT and our
+ * DELETE, leaving a dangling reference that surfaces as a 404 image. A
+ * proper fix needs either an FK with ON DELETE RESTRICT on
+ * `pages.thumbnail_object_id` (reversing the explicit no-FK choice in
+ * migration 0021) or coordinated row locking — `SELECT … FOR UPDATE` on
+ * the `thumbnail_objects` row here, plus a matching `FOR SHARE` lock in
+ * `POST /api/pages` before insert. Both are out of scope for this issue
+ * and tracked as a follow-up. The race does not arise on the typical
+ * single-user "commit thumbnail → create page → maybe rollback" path
+ * because those steps are serialized at the client.
  *
  * @param objectId - 対象の thumbnail_objects.id
  * @param userId - 呼び出し元ユーザー ID（所有者一致を必須）
@@ -131,20 +160,39 @@ export async function deleteThumbnailObject(
       .limit(1);
     if (owned.length === 0) return { status: "not_found" as const };
 
-    // 2. ライブ参照チェック。`pages.is_deleted = false` の行が一つでも
-    //    `thumbnail_object_id` で当該サムネイルを参照していれば中止する。
-    //    DELETE /api/pages/:id 経路はサムネイル GC 前に `thumbnail_object_id`
-    //    を NULL にしているのでこの分岐には入らない。
+    // 2. ライブ参照チェック。`pages.is_deleted = false` かつ **サムネイル所有者と
+    //    同じオーナー** が持つ行が一つでも `thumbnail_object_id` で当該サムネイル
+    //    を参照していれば中止する。所有者でフィルタしないと、悪意のある第三者が
+    //    `POST /api/pages` に他人の `thumbnail_object_id` を渡してダミー参照を
+    //    作り、被害者の DELETE を恒久的に 409 へ落として GC を妨げ、容量枠を
+    //    食い潰す DoS が成立しうる。`POST /api/pages` がサムネイル所有権を
+    //    検証するまでの間、ガード側で被害者ページに限定してこの DoS を遮断する。
+    //    なお DELETE /api/pages/:id 経路はサムネイル GC 前に
+    //    `thumbnail_object_id` を NULL にしているのでこの分岐には入らない。
     //
-    // 2. Live-reference check. Abort if any non-deleted `pages` row still
-    //    points at this thumbnail. The page-delete flow nulls
-    //    `thumbnail_object_id` before calling here, so this branch only
-    //    fires for the standalone DELETE /api/thumbnail/serve/:id path
-    //    (e.g. a phantom client rollback after a successful page commit).
+    // 2. Live-reference check. Abort only when a non-deleted `pages` row owned
+    //    by the **same owner as the thumbnail** still points at it. Without
+    //    the owner predicate, a malicious user can call `POST /api/pages`
+    //    with someone else's `thumbnail_object_id` (the route currently
+    //    accepts the field unverified) to plant a phantom referrer; the
+    //    victim's `DELETE /api/thumbnail/serve/:id` then returns 409
+    //    indefinitely, blocking GC and burning the victim's quota. Scoping
+    //    the guard to owner-matching pages closes that DoS until
+    //    `POST /api/pages` enforces thumbnail ownership end-to-end. The
+    //    page-delete flow nulls `thumbnail_object_id` before calling here,
+    //    so this branch only fires for the standalone
+    //    DELETE /api/thumbnail/serve/:id path (e.g. a phantom client
+    //    rollback after a successful page commit).
     const referrer = await tx
       .select({ id: pages.id })
       .from(pages)
-      .where(and(eq(pages.thumbnailObjectId, objectId), eq(pages.isDeleted, false)))
+      .where(
+        and(
+          eq(pages.thumbnailObjectId, objectId),
+          eq(pages.isDeleted, false),
+          eq(pages.ownerId, userId),
+        ),
+      )
       .limit(1);
     if (referrer.length > 0) return { status: "referenced" as const };
 
