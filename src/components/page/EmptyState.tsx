@@ -5,11 +5,19 @@ import { useCreateNewPage } from "@/hooks/useCreateNewPage";
 import { useTranslation } from "react-i18next";
 
 /**
+ * Empty-state shown by `PageGrid` when the user has no pages. In a note
+ * context (`noteId` provided) the CTA creates a page directly inside that
+ * note via `useCreateNewPage({ noteId })`; otherwise it creates a personal
+ * page. The visual layout (Sparkles + headline + CTA) is intentionally
+ * shared so the note grid matches the legacy `/home` look.
  *
+ * `PageGrid` がページを 1 件も持たないときに表示する空状態。`noteId` 渡し時
+ * は CTA が同ノート内のページ作成に直行する。デザイン（Sparkles + 見出し +
+ * CTA）はホームと統一する。
  */
-const EmptyState: React.FC = () => {
+const EmptyState: React.FC<{ noteId?: string }> = ({ noteId }) => {
   const { t } = useTranslation();
-  const { createNewPage, isCreating } = useCreateNewPage();
+  const { createNewPage, isCreating } = useCreateNewPage(noteId ? { noteId } : undefined);
 
   return (
     <div className="animate-fade-in flex flex-col items-center justify-center px-4 py-24 text-center">

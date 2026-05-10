@@ -5,6 +5,7 @@ import type { PageSummary } from "@/types/page";
 import { ZEDI_PAGE_MIME_TYPE } from "@/types/aiChat";
 import { cn } from "@zedi/ui";
 import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
+import { useRemovePageFromNote } from "@/hooks/useNoteQueries";
 import { useToast } from "@zedi/ui";
 import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
 import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
@@ -30,18 +31,42 @@ import { useTranslation } from "react-i18next";
 interface PageCardProps {
   page: PageSummary;
   index?: number;
+  /**
+   * ノート文脈での表示時は `noteId` を渡す。遷移先・削除セマンティクスが
+   * `/notes/:noteId/:pageId` 配下に切り替わる。未指定時は従来の `/pages/:id`
+   * （個人ページ向け）として動作する。
+   *
+   * Pass `noteId` when rendering inside a note. Navigation and the delete
+   * mutation switch to the note-scoped variants. Without it the card behaves
+   * as the legacy personal-page card under `/pages/:id`.
+   */
+  noteId?: string;
+  /**
+   * 削除メニューを表示するかどうか。ノート文脈ではノートの編集権 (`canEdit`)
+   * を渡す。未指定時は従来通り表示する。
+   *
+   * Whether the delete menu item is shown. In a note context callers pass the
+   * caller's `canEdit` access. When omitted the menu item is shown (legacy
+   * personal-page behavior).
+   */
+  canDelete?: boolean;
 }
 
 /**
  * ページカードコンポーネント。デスクトップでは右クリックでコンテキストメニューを表示する。モバイルではメニュー非表示。
- * Page card component. Shows context menu on right-click (desktop only). No context menu on mobile.
+ * `noteId` 指定時はノート配下のカードとして遷移先・削除導線を切り替える。
+ *
+ * Page card component. Shows a context menu on right-click (desktop only).
+ * When `noteId` is provided, navigation and delete behavior switch to the
+ * note-scoped routes; otherwise it behaves as the legacy personal-page card.
  */
-const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
+const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete = true }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const createPageMutation = useCreatePage();
   const deletePageMutation = useDeletePage();
+  const removeFromNoteMutation = useRemovePageFromNote();
   const pageDetailQuery = usePage(page.id, { enabled: false });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -55,13 +80,15 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
   const isClipped = !!page.sourceUrl;
   const displayTitle = page.title || t("common.untitledPage");
 
+  const targetHref = noteId ? `/notes/${noteId}/${page.id}` : `/pages/${page.id}`;
+
   const handleClick = () => {
     // ドラッグ直後のクリックを無視 / Ignore click right after drag
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       return;
     }
-    navigate(`/pages/${page.id}`);
+    navigate(targetHref);
   };
 
   const handleDragStart = useCallback(
@@ -114,24 +141,33 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     }
   };
 
+  const isDeletePending = noteId ? removeFromNoteMutation.isPending : deletePageMutation.isPending;
+
   const handleDelete = () => {
-    deletePageMutation.mutate(page.id, {
-      onSuccess: () => {
-        toast({
-          title: t("common.page.pageDeleted"),
-          description: t("common.page.deletedWithTitle", { title: displayTitle }),
-        });
-        setIsDeleteDialogOpen(false);
-      },
-      onError: () => {
-        toast({
-          title: t("common.error"),
-          description: t("common.page.deleteFailed"),
-          variant: "destructive",
-        });
-        setIsDeleteDialogOpen(false);
-      },
-    });
+    const onSuccess = () => {
+      toast({
+        title: t("common.page.pageDeleted"),
+        description: t("common.page.deletedWithTitle", { title: displayTitle }),
+      });
+      setIsDeleteDialogOpen(false);
+    };
+    const onError = () => {
+      toast({
+        title: t("common.error"),
+        description: t("common.page.deleteFailed"),
+        variant: "destructive",
+      });
+      setIsDeleteDialogOpen(false);
+    };
+
+    if (noteId) {
+      // ノート配下では note-scoped DELETE を使い、サーバ側 `canEdit` ガードを通す。
+      // In a note context, hit the note-scoped DELETE so the server's `canEdit`
+      // gate (`server/api/src/routes/notes/pages.ts`) authorizes the soft-delete.
+      removeFromNoteMutation.mutate({ noteId, pageId: page.id }, { onSuccess, onError });
+    } else {
+      deletePageMutation.mutate(page.id, { onSuccess, onError });
+    }
   };
 
   const openDeleteDialogAfterMenuClose = useCallback(() => {
@@ -193,28 +229,45 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
     </button>
   );
 
+  // ノート文脈ではコピー先がページ集合（個人ページ）になるため、現状は
+  // 複製メニューを出さない。後続 issue で「同ノート内に複製」を追加予定。
+  // Hide duplicate inside a note: the existing flow targets the personal-page
+  // collection. A note-scoped duplicate is tracked as a follow-up.
+  const showDuplicate = !noteId;
+
   // デスクトップ用メニューアイテム / Desktop menu items
   const menuItems = (
     <>
-      <ContextMenuItem onClick={handleDuplicate} disabled={createPageMutation.isPending}>
-        <Copy className="mr-2 h-4 w-4" />
-        {t("common.page.duplicate")}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem
-        onSelect={openDeleteDialogAfterMenuClose}
-        className="text-destructive focus:text-destructive"
-      >
-        <Trash2 className="mr-2 h-4 w-4" />
-        {t("common.page.delete")}
-      </ContextMenuItem>
+      {showDuplicate && (
+        <ContextMenuItem onClick={handleDuplicate} disabled={createPageMutation.isPending}>
+          <Copy className="mr-2 h-4 w-4" />
+          {t("common.page.duplicate")}
+        </ContextMenuItem>
+      )}
+      {canDelete && (
+        <>
+          {showDuplicate && <ContextMenuSeparator />}
+          <ContextMenuItem
+            onSelect={openDeleteDialogAfterMenuClose}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t("common.page.delete")}
+          </ContextMenuItem>
+        </>
+      )}
     </>
   );
 
+  // メニューアイテムが何もない場合はコンテキストメニューを開かない。
+  // Don't open the context menu if no actions remain (e.g. read-only viewer).
+  const hasMenuItems = showDuplicate || canDelete;
+
   return (
     <>
-      {isMobile ? (
-        // モバイル: コンテキストメニューなし / Mobile: no context menu
+      {isMobile || !hasMenuItems ? (
+        // モバイル or メニュー項目なし: コンテキストメニューを出さない
+        // Mobile, or no available actions → render bare card without ContextMenu
         cardButton
       ) : (
         // デスクトップ: 右クリックで ContextMenu を表示 / Desktop: right-click opens ContextMenu
@@ -237,9 +290,9 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0 }) => {
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deletePageMutation.isPending}
+              disabled={isDeletePending}
             >
-              {deletePageMutation.isPending ? t("common.page.deleting") : t("common.page.delete")}
+              {isDeletePending ? t("common.page.deleting") : t("common.page.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
