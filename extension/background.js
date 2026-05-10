@@ -75,7 +75,7 @@ async function clipAndCreate(url) {
 
 function openZediWithClipUrl(url) {
   const params = new URLSearchParams({ clipUrl: url, from: "chrome-extension" });
-  chrome.tabs.create({ url: `${getApiBase()}/home?${params.toString()}` });
+  chrome.tabs.create({ url: `${getApiBase()}/notes/me?${params.toString()}` });
 }
 
 async function savePage(url) {
