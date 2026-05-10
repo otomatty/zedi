@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
@@ -12,6 +12,7 @@ import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import { NoteViewMainContent } from "./NoteViewMainContent";
+import { isClipUrlAllowed } from "@/lib/webClipper";
 
 /**
  * Note detail page: pages grid, add/remove, header actions.
@@ -21,6 +22,22 @@ const NoteView: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // `?clipUrl=<URL>` を読み取り、検証 OK の値だけ FAB に渡す（issue #826）。
+  // クライアント側で `isClipUrlAllowed` を通すことで、`/notes/me` を経由せず
+  // 直接ノート URL を踏まれた場合でもサーバー側 `clipUrlPolicy` と同じルール
+  // で弾く。検証 NG の値は静かに無視する（再ロードで誤って起動しない）。
+  //
+  // Read `?clipUrl=<URL>` and forward only validated values to the FAB
+  // (issue #826). Re-running the same `isClipUrlAllowed` check the server
+  // applies in `clipUrlPolicy.ts` keeps direct hits to `/notes/:id` safe even
+  // when callers skip `/notes/me`. Invalid values are ignored quietly so a
+  // refresh doesn't relaunch the dialog.
+  const rawClipUrl = searchParams.get("clipUrl");
+  const validClipUrl = rawClipUrl && isClipUrlAllowed(rawClipUrl) ? rawClipUrl : null;
 
   const { isSignedIn } = useNoteApi();
   const {
@@ -53,6 +70,29 @@ const NoteView: React.FC = () => {
 
   const removePageMutation = useRemovePageFromNote();
   const [isAddPageOpen, setIsAddPageOpen] = useState(false);
+
+  /**
+   * クリップダイアログを閉じたとき、URL から `clipUrl` クエリだけを除去する。
+   * 他のクエリ・ハッシュは保持する。再ロードで誤ってダイアログが再起動しない
+   * ようにするための副作用なし側のクリーンアップ（旧 `Home.tsx` から移植）。
+   *
+   * Strip the `clipUrl` query when the clip dialog closes, while keeping the
+   * rest of the search and hash intact. Without this the dialog would
+   * re-open on refresh; ported from the old `Home.tsx` cleanup hook.
+   */
+  const handleClipDialogClosedWithInitialUrl = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("clipUrl");
+    const nextSearch = next.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [navigate, location.pathname, location.hash, searchParams]);
 
   const handleRemovePage = async (pageId: string) => {
     if (!noteId) return;
@@ -88,6 +128,10 @@ const NoteView: React.FC = () => {
             <FloatingActionButton
               noteId={note.id}
               onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
+              initialClipUrl={validClipUrl && canEdit ? validClipUrl : undefined}
+              onClipDialogClosedWithInitialUrl={
+                validClipUrl && canEdit ? handleClipDialogClosedWithInitialUrl : undefined
+              }
               hiddenOptions={canEdit ? undefined : ["blank", "url", "image"]}
             />
           </div>
