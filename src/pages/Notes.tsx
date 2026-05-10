@@ -33,33 +33,42 @@ import { useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
 /**
- * Decide whether the create-note dialog should auto-open from a `?new=1`
- * deep-link, and strip the param on first render so a refresh does not
- * reopen the dialog. Used by the header NoteSwitcher (issue #827).
+ * Watch for the `?new=1` deep-link from the header NoteSwitcher (issue #827).
+ * When the param is present, fire `onOpen` (typically opens the create dialog)
+ * and strip the param so a refresh does not reopen the dialog. Reacts to URL
+ * transitions while `Notes` is already mounted, since the same component
+ * persists across `/notes` ↔ `/notes?new=1` route updates.
  *
- * `?new=1` ディープリンクから新規作成ダイアログを自動的に開くかどうかを
- * 判定し、リロード時に再度開かないよう初回レンダーで除去する。
- * ヘッダーの NoteSwitcher（issue #827）から呼び出される。
+ * `?new=1` ディープリンク（ヘッダーの NoteSwitcher、issue #827）を監視する。
+ * クエリが現れたら `onOpen` を呼び出し（通常は作成ダイアログを開く）、
+ * リロード時に再オープンしないようクエリを除去する。`Notes` がマウントされた
+ * まま `/notes` ↔ `/notes?new=1` を遷移するケースにも対応する。
  */
-function useNewNoteDeepLink(): boolean {
+export function useNewNoteDeepLink(onOpen: () => void): void {
   const location = useLocation();
   const navigate = useNavigate();
-  const wantsCreate = useMemo(
-    () => new URLSearchParams(location.search).get("new") === "1",
-    [location.search],
-  );
+  // Latest-callback ref so the URL-watch effect can fire `onOpen` without
+  // listing it in its dependency array — callers typically pass an inline
+  // `() => setIsDialogOpen(true)`, which would otherwise re-trigger the
+  // effect on every render of `Notes`.
+  // 最新の onOpen を ref で保持し、URL 監視 effect の依存配列に含めない。
+  // 呼び出し側がインライン関数（`() => setIsDialogOpen(true)` など）を
+  // 渡す場合、毎レンダーで effect が再走するのを避けるため。
+  const onOpenRef = useRef(onOpen);
+  useEffect(() => {
+    onOpenRef.current = onOpen;
+  });
 
   useEffect(() => {
-    if (!wantsCreate) return;
-    const next = new URLSearchParams(location.search);
-    next.delete("new");
+    const params = new URLSearchParams(location.search);
+    if (params.get("new") !== "1") return;
+    onOpenRef.current();
+    params.delete("new");
     navigate(
-      { pathname: location.pathname, search: next.toString(), hash: location.hash },
+      { pathname: location.pathname, search: params.toString(), hash: location.hash },
       { replace: true },
     );
-  }, [wantsCreate, location.pathname, location.search, location.hash, navigate]);
-
-  return wantsCreate;
+  }, [location.pathname, location.search, location.hash, navigate]);
 }
 
 interface CreateNoteDialogContentProps {
@@ -154,9 +163,8 @@ const Notes: React.FC = () => {
   /** After closing the public-collab confirm, reopen the create dialog if user cancelled. / 確認をキャンセルしたら作成ダイアログを再度開く */
   const reopenCreateAfterPublicConfirmRef = useRef(false);
 
-  const wantsCreate = useNewNoteDeepLink();
-
-  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(() => wantsCreate);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  useNewNoteDeepLink(() => setIsDialogOpen(true));
   const [isPublicAnyLoggedInCreateConfirmOpen, setIsPublicAnyLoggedInCreateConfirmOpen] =
     useState(false);
   const [title, setTitle] = useState("");
