@@ -12,11 +12,33 @@
  * 新規ノート作成への導線を置き、新規作成は `Notes` ページの既存ダイアログに
  * 委譲する。
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { NoteSummary } from "@/types/note";
+
+/**
+ * Mock return shapes mirroring the real `useNoteQueries` / `useAuth` hooks so
+ * the test harness keeps strict typing across calls and avoids hiding interface
+ * drift behind untyped `vi.fn()`.
+ *
+ * `useNoteQueries` / `useAuth` の戻り値型をテスト側で明示し、`vi.fn()` を
+ * 経由してインターフェースが食い違っても気付けるようにする。
+ */
+type UseNotesResult = {
+  data: NoteSummary[] | undefined;
+  isLoading: boolean;
+};
+type UseMyNoteResult = {
+  data: { id: string; is_default: boolean } | undefined;
+  isLoading: boolean;
+};
+type UseAuthResult = {
+  isSignedIn: boolean;
+  isLoaded: boolean;
+  userId: string | null;
+};
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -46,9 +68,9 @@ vi.mock("@zedi/ui", async () => {
   };
 });
 
-const useNotesMock = vi.fn();
-const useMyNoteMock = vi.fn();
-const useAuthMock = vi.fn();
+const useNotesMock: Mock<() => UseNotesResult> = vi.fn();
+const useMyNoteMock: Mock<(options?: { enabled?: boolean }) => UseMyNoteResult> = vi.fn();
+const useAuthMock: Mock<() => UseAuthResult> = vi.fn();
 
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNotes: () => useNotesMock(),
@@ -164,6 +186,7 @@ describe("NoteSwitcher", () => {
 
     const items = await screen.findAllByRole("menuitem");
     // Filter to note rows (footer items have distinct names).
+    // ノート行のみに絞り込む（フッター項目は名前が異なる）。
     const noteRowNames = items
       .map((el) => el.textContent ?? "")
       .filter((text) => /My default|Alpha note|Beta note|Gamma note/.test(text));
@@ -171,6 +194,7 @@ describe("NoteSwitcher", () => {
     expect(noteRowNames[0]).toMatch(/My default/);
     expect(noteRowNames[0]).toMatch(/既定/);
     // Beta (updatedAt=300) > Gamma (200) > Alpha (100).
+    // updatedAt が大きい順に Beta(300) > Gamma(200) > Alpha(100)。
     expect(noteRowNames[1]).toMatch(/Beta note/);
     expect(noteRowNames[2]).toMatch(/Gamma note/);
     expect(noteRowNames[3]).toMatch(/Alpha note/);
@@ -229,7 +253,13 @@ describe("NoteSwitcher", () => {
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const betaItem = await screen.findByRole("menuitem", { name: /Beta note/ });
+    // Exercise actual click-to-navigate so the test catches breakage in the
+    // `Link` wiring beyond just the static href.
+    // 静的な href だけでなく、`Link` のクリック遷移そのものが壊れた場合も
+    // 検知できるよう、実際にクリックして遷移を確認する。
     expect(betaItem).toHaveAttribute("href", "/notes/note-beta");
+    await user.click(betaItem);
+    expect(screen.getByTestId("location")).toHaveTextContent("/notes/note-beta");
   });
 
   it("renders an 'all notes' footer that links to /notes", async () => {
@@ -274,6 +304,7 @@ describe("NoteSwitcher", () => {
 
     expect(await screen.findByText("まだノートがありません")).toBeInTheDocument();
     // The footer shortcuts must remain available even when the list is empty.
+    // 一覧が空でもフッターのショートカットは表示され続ける必要がある。
     expect(screen.getByRole("menuitem", { name: "新規ノートを作成" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "すべてのノートを見る" })).toBeInTheDocument();
   });
@@ -303,6 +334,7 @@ describe("NoteSwitcher", () => {
     );
     expect(rows.length).toBe(50);
     // 80 -> sorted by updatedAt DESC, expect Note 79 first.
+    // 80 件を updatedAt 降順で並べた場合、先頭は Note 79 になる。
     expect(rows[0].textContent?.trim()).toBe("Note 79");
   });
 
