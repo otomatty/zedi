@@ -308,7 +308,22 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
         </ContextMenu>
       )}
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        // Radix の AlertDialogAction はクリック時に自動でダイアログを閉じる
+        // ため、`isDeletePending` の表示が間に合わない。削除実行中は閉じる
+        // 操作（Action / Cancel / Esc / overlay）を無視し、ミューテーション
+        // 完了後に `setIsDeleteDialogOpen(false)` で閉じる動線に統一する。
+        //
+        // Radix's `AlertDialogAction` auto-closes the dialog on click, which
+        // hides the `isDeletePending` UI before the mutation resolves. Gate
+        // close events on the pending flag so the dialog only closes after
+        // the mutation's `onSuccess`/`onError` callbacks fire.
+        onOpenChange={(nextOpen) => {
+          if (isDeletePending && !nextOpen) return;
+          setIsDeleteDialogOpen(nextOpen);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("common.page.deleteConfirm")}</AlertDialogTitle>
@@ -317,9 +332,18 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletePending}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              // 自動 close を抑止して `handleDelete` 内部のミューテーション完了を
+              // 待つ。`disabled` が二重押下を防ぎ、`onSuccess` / `onError` が確定
+              // したタイミングで `setIsDeleteDialogOpen(false)` が走る。
+              // Suppress Radix's auto-close so the mutation can run with the
+              // pending UI visible. Closing happens explicitly in the
+              // mutation callbacks once it settles.
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isDeletePending}
             >

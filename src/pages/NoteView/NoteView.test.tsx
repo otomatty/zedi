@@ -96,8 +96,21 @@ vi.mock("./NoteViewHeaderActions", () => ({
   NoteViewHeaderActions: () => <div data-testid="note-view-header-actions">HeaderActions</div>,
 }));
 vi.mock("@/components/page/PageGrid", () => ({
-  default: ({ noteId, canEdit }: { noteId?: string; canEdit?: boolean }) => (
-    <div data-testid="page-grid" data-note-id={noteId ?? ""} data-can-edit={String(!!canEdit)}>
+  default: ({
+    noteId,
+    canEdit,
+    canDeletePage,
+  }: {
+    noteId?: string;
+    canEdit?: boolean;
+    canDeletePage?: (page: unknown) => boolean;
+  }) => (
+    <div
+      data-testid="page-grid"
+      data-note-id={noteId ?? ""}
+      data-can-edit={String(!!canEdit)}
+      data-can-delete-fn={String(typeof canDeletePage === "function")}
+    >
       PageGrid
     </div>
   ),
@@ -193,6 +206,7 @@ describe("NoteView", () => {
     expect(grid).toBeInTheDocument();
     expect(grid).toHaveAttribute("data-note-id", "n1");
     expect(grid).toHaveAttribute("data-can-edit", "true");
+    expect(grid).toHaveAttribute("data-can-delete-fn", "true");
   });
 
   it("renders untitled note label when note title is empty", () => {
