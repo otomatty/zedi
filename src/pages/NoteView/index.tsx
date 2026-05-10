@@ -5,14 +5,15 @@ import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
 import { NotePageCount } from "@/components/note/NotePageCount";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
-import { Badge, useToast } from "@zedi/ui";
+import { Badge } from "@zedi/ui";
 import { NoteAddPageDialog } from "./NoteAddPageDialog";
-import { useNote, useNoteApi, useNotePages, useRemovePageFromNote } from "@/hooks/useNoteQueries";
+import { useNote, useNoteApi, useNotePages } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
-import { NoteViewMainContent } from "./NoteViewMainContent";
+import PageGrid from "@/components/page/PageGrid";
+import type { PageSummary } from "@/types/page";
 import { isClipUrlAllowed } from "@/lib/webClipper";
 
 /**
@@ -22,7 +23,6 @@ import { isClipUrlAllowed } from "@/lib/webClipper";
 const NoteView: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -53,24 +53,37 @@ const NoteView: React.FC = () => {
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
 
-  const canDeletePage = useCallback(
-    (addedByUserId: string | null | undefined) => {
-      if (addedByUserId == null || addedByUserId === "") return false;
+  // ヘッダーのページ数表示と `NoteAddPageDialog` の重複検出に使う。グリッド
+  // 自体は `PageGrid` 内部で同じクエリキーを引くので二重フェッチにはならない。
+  // Used by the header counter and `NoteAddPageDialog`'s dedup check. The
+  // grid itself reuses the same React Query key, so this is a cache hit.
+  const { data: notePages = [] } = useNotePages(noteId ?? "", noteSource, Boolean(access?.canView));
+
+  const [isAddPageOpen, setIsAddPageOpen] = useState(false);
+
+  /**
+   * ページごとの削除可否を `access.canDeletePage(addedByUserId)` で判定する
+   * コールバック。オーナーは全削除可、エディターは自分が追加したページのみ
+   * 削除可、という旧 `NoteViewPageGrid` の挙動を `PageGrid` 上で再現する。
+   * `addedByUserId` は `NotePageSummary` だけが持つフィールドのため、
+   * `PageGrid` 側のシグネチャ (`PageSummary`) に合わせてキャストして取り出す。
+   *
+   * Per-page delete callback that mirrors the old `NoteViewPageGrid`
+   * behavior: owners may delete any page, editors only the ones they added.
+   * `addedByUserId` only exists on `NotePageSummary`, so we read it through
+   * a narrow cast against the `PageSummary` signature `PageGrid` exposes.
+   * The server's `canEdit` guard remains authoritative.
+   */
+  const canDeletePageInGrid = useCallback(
+    (page: PageSummary) => {
       const fn = access?.canDeletePage;
       if (!fn) return false;
+      const addedByUserId = (page as PageSummary & { addedByUserId?: string | null }).addedByUserId;
+      if (addedByUserId == null || addedByUserId === "") return false;
       return fn(addedByUserId);
     },
     [access],
   );
-
-  const { data: notePages = [], isLoading: isPagesLoading } = useNotePages(
-    noteId ?? "",
-    noteSource,
-    Boolean(access?.canView),
-  );
-
-  const removePageMutation = useRemovePageFromNote();
-  const [isAddPageOpen, setIsAddPageOpen] = useState(false);
 
   /**
    * クリップダイアログを閉じたとき、URL から `clipUrl` クエリだけを除去する。
@@ -94,17 +107,6 @@ const NoteView: React.FC = () => {
       { replace: true },
     );
   }, [navigate, location.pathname, location.hash, searchParams]);
-
-  const handleRemovePage = async (pageId: string) => {
-    if (!noteId) return;
-    try {
-      await removePageMutation.mutateAsync({ noteId, pageId });
-      toast({ title: t("notes.pageRemoved") });
-    } catch (error) {
-      console.error("Failed to remove page:", error);
-      toast({ title: t("notes.pageRemoveFailed"), variant: "destructive" });
-    }
-  };
 
   if (isLoading) {
     return (
@@ -163,13 +165,9 @@ const NoteView: React.FC = () => {
               userRole={access?.role ?? "none"}
             />
           </div>
-          <NoteViewMainContent
-            noteId={note.id}
-            notePages={notePages}
-            isPagesLoading={isPagesLoading}
-            canDeletePage={canDeletePage}
-            onRemovePage={handleRemovePage}
-          />
+          <div className="mt-4">
+            <PageGrid noteId={note.id} canEdit={canEdit} canDeletePage={canDeletePageInGrid} />
+          </div>
         </Container>
       </div>
       {canShowAddPage && (
