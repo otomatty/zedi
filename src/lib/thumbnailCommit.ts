@@ -197,15 +197,26 @@ export async function deleteCommittedThumbnail(
       signal: controller.signal,
     });
     // 401 はサインアウト中の rollback、404 は既に削除済み（DELETE 自体や
-    // サーバー側 GC 経由）の正常系。それ以外の非 OK（500/429/403 など）は
-    // ロールバック失敗としてログだけ残し、サーバー側スイーパーに回収を委ねる。
+    // サーバー側 GC 経由）の正常系。409 はサーバー側参照ガード (issue #820)
+    // が「ライブページがまだ参照しているので消さない」と判定した結果で、
+    // ロールバックが phantom 発火だった場合のあるべき挙動。それ以外の
+    // 非 OK（500/429/403 など）はロールバック失敗としてログだけ残し、
+    // サーバー側スイーパーに回収を委ねる。
     //
     // 401 means the user is signed out mid-rollback and 404 means the row is
     // already gone (e.g. concurrent delete or server-side GC) — both are
-    // expected no-ops. Anything else (500/429/403/...) is an unexpected
-    // rollback failure: log so it's visible, then fall through and let the
-    // server-side sweeper reclaim the orphan.
-    if (!response.ok && response.status !== 401 && response.status !== 404) {
+    // expected no-ops. 409 is the response from the server-side referential
+    // guard (issue #820) when a live page still points at the thumbnail,
+    // i.e. our rollback was a phantom and the server correctly preserved
+    // the blob. Anything else (500/429/403/...) is an unexpected rollback
+    // failure: log so it's visible, then fall through and let the server-side
+    // sweeper reclaim the orphan.
+    if (
+      !response.ok &&
+      response.status !== 401 &&
+      response.status !== 404 &&
+      response.status !== 409
+    ) {
       console.warn(
         "[thumbnail/rollback] DELETE returned unexpected status:",
         response.status,
