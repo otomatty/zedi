@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { useMyNote } from "@/hooks/useNoteQueries";
@@ -51,17 +51,18 @@ import { isClipUrlAllowed } from "@/lib/webClipper";
  */
 const NoteMeRedirect: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { needsSetupWizard } = useOnboarding();
-  const { data, isLoading, error } = useMyNote();
+  const { data, isLoading, error } = useMyNote({ enabled: !needsSetupWizard });
 
   // セットアップウィザード未完了のユーザーは先にオンボーディングに送る。
   // useMyNote 側の API は idempotent だがウィザード後にデフォルトノートを
   // 再解決する流れを踏むほうが UX として素直なので、ノート解決の前に分岐する。
   // Send users that haven't finished the setup wizard to `/onboarding` before
-  // we let `useMyNote` materialize the default note. The endpoint is
+  // we let the `useMyNote` query materialize the default note. The endpoint is
   // idempotent, but resolving after the wizard keeps the flow predictable.
   if (needsSetupWizard) {
-    return <Navigate to="/onboarding" replace />;
+    return <Navigate to={`/onboarding${location.search}${location.hash}`} replace />;
   }
 
   if (isLoading) {
@@ -96,12 +97,19 @@ const NoteMeRedirect: React.FC = () => {
   }
 
   // クリップ URL を `/notes/:noteId` に引き継ぐ。検証 NG の値は捨てる。
-  // Forward a validated `clipUrl` into the note view; drop invalid values.
+  // 他のクエリは保持し、検証 NG の clipUrl だけを捨てる。
+  // Forward a validated `clipUrl` into the note view while preserving other
+  // query params; drop only invalid `clipUrl` values.
   const rawClipUrl = searchParams.get("clipUrl");
   const validClipUrl = rawClipUrl && isClipUrlAllowed(rawClipUrl) ? rawClipUrl : null;
-  const targetSearch = validClipUrl
-    ? `?${new URLSearchParams({ clipUrl: validClipUrl }).toString()}`
-    : "";
+  const nextParams = new URLSearchParams(searchParams);
+  if (validClipUrl) {
+    nextParams.set("clipUrl", validClipUrl);
+  } else if (rawClipUrl) {
+    nextParams.delete("clipUrl");
+  }
+  const nextSearch = nextParams.toString();
+  const targetSearch = nextSearch ? `?${nextSearch}` : "";
 
   return <Navigate to={`/notes/${data.id}${targetSearch}`} replace />;
 };

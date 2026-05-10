@@ -125,20 +125,15 @@ const NoteView: React.FC = () => {
       floatingAction={
         canEdit || canShowAddPage ? (
           <div className="mr-4 mb-4">
-            {validClipUrl && canEdit ? (
-              <FloatingActionButton
-                noteId={note.id}
-                onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
-                initialClipUrl={validClipUrl}
-                onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
-              />
-            ) : (
-              <FloatingActionButton
-                noteId={note.id}
-                onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
-                hiddenOptions={canEdit ? undefined : ["blank", "url", "image"]}
-              />
-            )}
+            <FloatingActionButton
+              noteId={note.id}
+              onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
+              initialClipUrl={validClipUrl && canEdit ? validClipUrl : undefined}
+              onClipDialogClosedWithInitialUrl={
+                validClipUrl && canEdit ? handleClipDialogClosedWithInitialUrl : undefined
+              }
+              hiddenOptions={canEdit ? undefined : ["blank", "url", "image"]}
+            />
           </div>
         ) : null
       }

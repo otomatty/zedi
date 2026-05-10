@@ -25,10 +25,13 @@ test.describe("Web Clipper clipUrl flow", () => {
 
     // With mock auth (VITE_E2E_TEST), the user is signed in; the dialog should
     // auto-open after `/notes/me` resolves to `/notes/:noteId?clipUrl=...`.
+    // モック認証（VITE_E2E_TEST）ではサインイン済みなので、`/notes/me` が
+    // `/notes/:noteId?clipUrl=...` に解決された後にダイアログが自動で開く。
     const dialog = page.getByRole("dialog").filter({ hasText: /URL.*取り込み|Import from URL/i });
     await expect(dialog).toBeVisible({ timeout: 10000 });
 
     // URL input should be prefilled.
+    // URL 入力欄には clipUrl がプリフィルされる。
     const urlInput = page.getByPlaceholder(/URL.*入力|Enter URL/i);
     await expect(urlInput).toBeVisible();
     await expect(urlInput).toHaveValue(clipUrl);
@@ -45,6 +48,8 @@ test.describe("Web Clipper clipUrl flow", () => {
 
     // /home preserves search params and redirects to /notes/me, which then
     // resolves to /notes/:noteId?clipUrl=... — the dialog should still open.
+    // /home は search params を保ったまま /notes/me にリダイレクトし、その後
+    // /notes/:noteId?clipUrl=... に解決されるため、ダイアログは開き続ける。
     const dialog = page.getByRole("dialog").filter({ hasText: /URL.*取り込み|Import from URL/i });
     await expect(dialog).toBeVisible({ timeout: 10000 });
     const urlInput = page.getByPlaceholder(/URL.*入力|Enter URL/i);
@@ -57,6 +62,7 @@ test.describe("Web Clipper clipUrl flow", () => {
     await page.waitForLoadState("networkidle");
 
     // Invalid URLs are stripped at /notes/me; the dialog must stay closed.
+    // 無効な URL は /notes/me で剥がされるため、ダイアログは閉じたままになる。
     const dialog = page.getByRole("dialog").filter({ hasText: /URL.*取り込み|Import from URL/i });
     await expect(dialog).not.toBeVisible();
   });

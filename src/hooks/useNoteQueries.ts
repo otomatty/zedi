@@ -230,6 +230,22 @@ export function useNotes() {
 }
 
 /**
+ * デフォルトノート解決 hook の実行オプション。
+ *
+ * Runtime options for the default-note resolver hook.
+ */
+export interface UseMyNoteOptions {
+  /**
+   * クエリ実行を追加で制御する。オンボーディング中など、副作用のある
+   * default note 解決を遅らせたい画面で利用する。
+   *
+   * Additional query gate for screens that need to defer the side-effecting
+   * default-note resolution, such as the setup wizard redirect path.
+   */
+  enabled?: boolean;
+}
+
+/**
  * デフォルトノート（マイノート）の ID を解決するフック。`GET /api/notes/me`
  * を呼び、未作成ならサーバ側で idempotent に作成された ID を受け取る。
  * `/notes/me` ランディング（`NoteMeRedirect`）がこの hook を使ってリダイレクト
@@ -240,15 +256,16 @@ export function useNotes() {
  * `/notes/me` landing page (`NoteMeRedirect`) consumes the resolved `noteId`
  * to issue the single-step redirect to `/notes/:noteId`. Issue #825.
  */
-export function useMyNote() {
+export function useMyNote(options: UseMyNoteOptions = {}) {
   const { api, userId, isLoaded, isSignedIn } = useNoteApi();
+  const shouldResolve = options.enabled ?? true;
 
   const query = useQuery({
     queryKey: noteKeys.myNote(userId),
     queryFn: () => api.getMyNote(),
     // 認証必須: 未ログインで叩くと 401 が返るため、サインイン後にのみ実行する。
     // Auth-only: the endpoint returns 401 for guests, so gate on `isSignedIn`.
-    enabled: isLoaded && isSignedIn,
+    enabled: isLoaded && isSignedIn && shouldResolve,
     // ID は同一セッションでは変わらないため、再取得頻度を低く保つ。
     // The id is stable for the session, so keep refetches conservative.
     staleTime: 1000 * 60 * 5,

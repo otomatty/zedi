@@ -22,7 +22,7 @@ const useMyNoteMock = vi.fn();
 const useOnboardingMock = vi.fn();
 
 vi.mock("@/hooks/useNoteQueries", () => ({
-  useMyNote: () => useMyNoteMock(),
+  useMyNote: (...args: unknown[]) => useMyNoteMock(...args),
 }));
 
 vi.mock("@/hooks/useOnboarding", () => ({
@@ -38,13 +38,24 @@ function NoteViewProbe() {
   );
 }
 
+function OnboardingProbe() {
+  const location = useLocation();
+  return (
+    <div data-testid="onboarding">
+      onboarding
+      <span data-testid="onboarding-search">{location.search}</span>
+      <span data-testid="onboarding-hash">{location.hash}</span>
+    </div>
+  );
+}
+
 function renderAt(path = "/notes/me") {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/notes/me" element={<NoteMeRedirect />} />
         <Route path="/notes/:noteId" element={<NoteViewProbe />} />
-        <Route path="/onboarding" element={<div data-testid="onboarding">onboarding</div>} />
+        <Route path="/onboarding" element={<OnboardingProbe />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -96,12 +107,11 @@ describe("NoteMeRedirect", () => {
     });
     const clipUrl = "https://example.com/article";
     renderAt(`/notes/me?clipUrl=${encodeURIComponent(clipUrl)}&from=chrome-extension`);
-    // 検証 OK の clipUrl は引き継ぐ。`from` のような他クエリは保持しなくてよい
-    // （NoteView 側では使わない）。
-    // Validated `clipUrl` is forwarded. Auxiliary params like `from` are
-    // dropped because NoteView only consumes `clipUrl`.
+    // 検証 OK の clipUrl は正規化しつつ、`from` のような他クエリも保持する。
+    // Validated `clipUrl` is normalized while auxiliary params like `from`
+    // are preserved across the redirect.
     expect(screen.getByTestId("note-view-search")).toHaveTextContent(
-      `?clipUrl=${encodeURIComponent(clipUrl)}`,
+      `?clipUrl=${encodeURIComponent(clipUrl)}&from=chrome-extension`,
     );
   });
 
@@ -117,6 +127,18 @@ describe("NoteMeRedirect", () => {
     expect(screen.getByTestId("note-view-search")).toHaveTextContent("");
   });
 
+  it("drops only an invalid `clipUrl` while preserving other query params", () => {
+    useMyNoteMock.mockReturnValue({
+      data: { id: "note-default-123" },
+      isLoading: false,
+      error: null,
+    });
+    renderAt(`/notes/me?keep=1&clipUrl=${encodeURIComponent("chrome://extensions")}`);
+    // clipUrl だけ削除され、他のクエリはノートビューへ引き継がれる。
+    // Only `clipUrl` is removed; other query params continue to the note view.
+    expect(screen.getByTestId("note-view-search")).toHaveTextContent("?keep=1");
+  });
+
   it("redirects to /onboarding when the setup wizard is still pending", () => {
     useOnboardingMock.mockReturnValue({ needsSetupWizard: true });
     useMyNoteMock.mockReturnValue({
@@ -124,8 +146,13 @@ describe("NoteMeRedirect", () => {
       isLoading: false,
       error: null,
     });
-    renderAt(`/notes/me?clipUrl=${encodeURIComponent("https://example.com/x")}`);
+    renderAt(`/notes/me?clipUrl=${encodeURIComponent("https://example.com/x")}#clip`);
     expect(screen.getByTestId("onboarding")).toBeInTheDocument();
+    expect(screen.getByTestId("onboarding-search")).toHaveTextContent(
+      `?clipUrl=${encodeURIComponent("https://example.com/x")}`,
+    );
+    expect(screen.getByTestId("onboarding-hash")).toHaveTextContent("#clip");
     expect(screen.queryByTestId("note-view")).not.toBeInTheDocument();
+    expect(useMyNoteMock).toHaveBeenCalledWith({ enabled: false });
   });
 });
