@@ -68,6 +68,20 @@ interface PageGridProps {
    * personal pages are always deletable by their owner.
    */
   canEdit?: boolean;
+  /**
+   * ページごとに削除可否を判定する関数。ノート文脈で「オーナーは全削除可・
+   * エディターは自分が追加したページのみ」のような細かい制御を復元するための
+   * フック。渡されない場合は `canEdit`（ノート文脈）または常に true（個人）が
+   * 適用される。サーバ側 `canEdit` ガードと併走する UX 向けのフィルタで、
+   * 実際の権限判定は API が行う。
+   *
+   * Per-page delete guard. Restores the granular rule used by the previous
+   * `NoteViewPageGrid` (owners may delete any page, editors only the ones
+   * they added). When omitted the grid falls back to the coarse `canEdit`
+   * boolean (note) or always-true (personal). This is a UX-side filter; the
+   * server's `canEdit` guard remains the source of truth.
+   */
+  canDeletePage?: (page: PageSummary) => boolean;
 }
 
 /**
@@ -81,7 +95,12 @@ interface PageGridProps {
  * 3 状態構成。`noteId` を渡すとノート配下のページ一覧として動作する
  * （旧 `NoteViewPageGrid` の置き換え）。
  */
-const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false, noteId, canEdit = true }) => {
+const PageGrid: React.FC<PageGridProps> = ({
+  isSeeding = false,
+  noteId,
+  canEdit = true,
+  canDeletePage,
+}) => {
   const { ref, columns } = useContainerColumns();
   const isNoteContext = Boolean(noteId);
 
@@ -116,7 +135,7 @@ const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false, noteId, canEdit 
       (!isNoteContext && (syncStatus === "syncing" || isInitialSyncPending)) ||
       isSeeding);
 
-  const showDelete = isNoteContext ? canEdit : true;
+  const defaultDeletePermission = isNoteContext ? canEdit : true;
 
   return (
     <div ref={ref} className="pb-24">
@@ -130,7 +149,7 @@ const PageGrid: React.FC<PageGridProps> = ({ isSeeding = false, noteId, canEdit 
               page={page}
               index={index}
               noteId={noteId}
-              canDelete={showDelete}
+              canDelete={canDeletePage ? canDeletePage(page) : defaultDeletePermission}
             />
           ))}
         </div>

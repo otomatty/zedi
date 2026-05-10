@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Link2, Copy, Trash2 } from "lucide-react";
 import type { PageSummary } from "@/types/page";
 import { ZEDI_PAGE_MIME_TYPE } from "@/types/aiChat";
-import { cn } from "@zedi/ui";
+import { Button, cn } from "@zedi/ui";
 import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
 import { useRemovePageFromNote } from "@/hooks/useNoteQueries";
 import { useToast } from "@zedi/ui";
@@ -263,12 +263,43 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
   // Don't open the context menu if no actions remain (e.g. read-only viewer).
   const hasMenuItems = showDuplicate || canDelete;
 
+  // モバイルではコンテキストメニューが出せないため、ノート文脈で削除権限が
+  // ある場合は旧 `NoteViewPageGrid` と同様、カード右上に常設のゴミ箱ボタン
+  // を出す。`isMobile` 判定を採用するのは、デスクトップでは右クリックの
+  // ContextMenu を主動線にするため（重複表示を避ける）。
+  // Touch devices can't trigger the right-click context menu, so when a note
+  // editor/owner is allowed to delete a page we surface a permanent trash
+  // overlay (matching the previous `NoteViewPageGrid` UX). Desktop keeps the
+  // context menu as the primary action to avoid double UI.
+  const showMobileNoteDeleteButton = isMobile && Boolean(noteId) && canDelete;
+
+  const cardWithMobileDelete = showMobileNoteDeleteButton ? (
+    <div className="relative">
+      {cardButton}
+      <Button
+        type="button"
+        variant="secondary"
+        size="icon"
+        className="absolute top-2 right-2 h-7 w-7"
+        aria-label={t("common.page.delete")}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsDeleteDialogOpen(true);
+        }}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  ) : (
+    cardButton
+  );
+
   return (
     <>
       {isMobile || !hasMenuItems ? (
         // モバイル or メニュー項目なし: コンテキストメニューを出さない
         // Mobile, or no available actions → render bare card without ContextMenu
-        cardButton
+        cardWithMobileDelete
       ) : (
         // デスクトップ: 右クリックで ContextMenu を表示 / Desktop: right-click opens ContextMenu
         <ContextMenu modal={false}>

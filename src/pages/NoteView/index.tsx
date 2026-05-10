@@ -13,6 +13,7 @@ import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import PageGrid from "@/components/page/PageGrid";
+import type { PageSummary } from "@/types/page";
 import { isClipUrlAllowed } from "@/lib/webClipper";
 
 /**
@@ -59,6 +60,30 @@ const NoteView: React.FC = () => {
   const { data: notePages = [] } = useNotePages(noteId ?? "", noteSource, Boolean(access?.canView));
 
   const [isAddPageOpen, setIsAddPageOpen] = useState(false);
+
+  /**
+   * ページごとの削除可否を `access.canDeletePage(addedByUserId)` で判定する
+   * コールバック。オーナーは全削除可、エディターは自分が追加したページのみ
+   * 削除可、という旧 `NoteViewPageGrid` の挙動を `PageGrid` 上で再現する。
+   * `addedByUserId` は `NotePageSummary` だけが持つフィールドのため、
+   * `PageGrid` 側のシグネチャ (`PageSummary`) に合わせてキャストして取り出す。
+   *
+   * Per-page delete callback that mirrors the old `NoteViewPageGrid`
+   * behavior: owners may delete any page, editors only the ones they added.
+   * `addedByUserId` only exists on `NotePageSummary`, so we read it through
+   * a narrow cast against the `PageSummary` signature `PageGrid` exposes.
+   * The server's `canEdit` guard remains authoritative.
+   */
+  const canDeletePageInGrid = useCallback(
+    (page: PageSummary) => {
+      const fn = access?.canDeletePage;
+      if (!fn) return false;
+      const addedByUserId = (page as PageSummary & { addedByUserId?: string | null }).addedByUserId;
+      if (addedByUserId == null || addedByUserId === "") return false;
+      return fn(addedByUserId);
+    },
+    [access],
+  );
 
   /**
    * クリップダイアログを閉じたとき、URL から `clipUrl` クエリだけを除去する。
@@ -141,7 +166,7 @@ const NoteView: React.FC = () => {
             />
           </div>
           <div className="mt-4">
-            <PageGrid noteId={note.id} canEdit={canEdit} />
+            <PageGrid noteId={note.id} canEdit={canEdit} canDeletePage={canDeletePageInGrid} />
           </div>
         </Container>
       </div>
