@@ -120,6 +120,8 @@
   "editPermissionHelpAnyLoggedIn": "このノートを閲覧できるログイン済みユーザー（公開・限定公開URL 経由を含む）なら誰でもページを編集できます。",
   "publicAnyLoggedInConfirmTitle": "ログイン済み全員が編集できる設定で保存しますか？",
   "publicAnyLoggedInConfirmDescription": "この公開範囲と編集権限では、このノートを開けるサインイン済みユーザー全員が編集できます（公開・限定公開URLのいずれも）。続行しますか？",
+  "defaultNotePublicWarningTitle": "マイノートを公開してもよろしいですか？",
+  "defaultNotePublicWarningDescription": "これはあなたのマイノートです。公開または限定公開（URL）に変更すると、これまでマイノートに保存していたページがすべて公開されます。続行する前に、公開したくないページを別のノートに移動することをおすすめします。",
   "publicAnyLoggedInCreateConfirmTitle": "ログイン済み全員が編集できるノートを作成しますか？",
   "publicAnyLoggedInCreateConfirmDescription": "この公開範囲と編集権限では、このノートを開けるサインイン済みユーザー全員が編集できます（公開・限定公開URLのいずれも）。続行しますか？",
   "tabMyNotes": "参加中のノート",

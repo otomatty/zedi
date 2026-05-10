@@ -91,6 +91,7 @@ function makeNote(overrides: Partial<NoteSummary> & { id: string }): NoteSummary
     visibility: overrides.visibility ?? "private",
     editPermission: overrides.editPermission ?? "owner_only",
     isOfficial: overrides.isOfficial ?? false,
+    isDefault: overrides.isDefault ?? false,
     viewCount: overrides.viewCount ?? 0,
     createdAt: overrides.createdAt ?? 0,
     updatedAt: overrides.updatedAt ?? 0,

@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { NoteSettingsShareSection } from "./NoteSettingsShareSection";
 import { NoteSettingsVisibilitySection } from "./NoteSettingsVisibilitySection";
 import { NoteSettingsDeleteSection } from "./NoteSettingsDeleteSection";
+import { DefaultNotePublicWarningDialog } from "./DefaultNotePublicWarningDialog";
 import { PublicAnyLoggedInSaveAlertDialog } from "./PublicAnyLoggedInSaveAlertDialog";
 import { useNoteSettingsSaveWithPublicConfirm } from "./useNoteSettingsSaveWithPublicConfirm";
 
@@ -43,6 +44,9 @@ const NoteSettings: React.FC = () => {
     confirmOpen: isPublicAnyLoggedInSaveConfirmOpen,
     setConfirmOpen: setIsPublicAnyLoggedInSaveConfirmOpen,
     handleConfirmPublicAnyLoggedInSave,
+    defaultNoteWarningOpen: isDefaultNoteWarningOpen,
+    setDefaultNoteWarningOpen: setIsDefaultNoteWarningOpen,
+    handleConfirmDefaultNoteWarning,
     isSaving,
   } = useNoteSettingsSaveWithPublicConfirm({
     noteId,
@@ -158,6 +162,13 @@ const NoteSettings: React.FC = () => {
               onConfirmDelete={handleDeleteNote}
               isDeleting={deleteNoteMutation.isPending}
               noteTitle={note.title || t("notes.untitledNote")}
+            />
+
+            <DefaultNotePublicWarningDialog
+              open={isDefaultNoteWarningOpen}
+              onOpenChange={setIsDefaultNoteWarningOpen}
+              onConfirm={handleConfirmDefaultNoteWarning}
+              isSaving={isSaving}
             />
 
             <PublicAnyLoggedInSaveAlertDialog

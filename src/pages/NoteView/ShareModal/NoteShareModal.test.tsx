@@ -65,6 +65,7 @@ const baseNote: Note = {
   visibility: "private",
   editPermission: "owner_only",
   isOfficial: false,
+  isDefault: false,
   viewCount: 0,
   createdAt: 0,
   updatedAt: 0,
