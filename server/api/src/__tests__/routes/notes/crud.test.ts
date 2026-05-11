@@ -558,37 +558,51 @@ describe("GET /api/notes/:noteId", () => {
       expect(etag1).not.toBe(etag2);
     });
 
-    it("should produce a different ETag when the same note is viewed under a different role", async () => {
-      const ownerNote = createMockNote();
-      const viewerNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "public" });
+    it("should produce a different ETag when the same note row is viewed under a different role", async () => {
+      // PR #856 review (CodeRabbit minor): role が ETag に効いていることを示すには、
+      // 同一の note row を異なる auth 文脈で取得して比較する必要がある。
+      // 異なる note id 同士の比較では noteId だけで ETag が変わるため、
+      // role を `makeNoteETag` から外しても test が通ってしまう。
+      //
+      // To verify the role actually contributes to the ETag we must read the
+      // *same* note row under two different auth contexts. Comparing distinct
+      // note ids would still pass even if `role` were dropped from the hash
+      // because `noteId` alone differentiates them.
+      const sharedPublicNote = createMockNote({
+        id: "note-shared",
+        // ownerId は createMockNote のデフォルト (TEST_USER_ID) なので、
+        // authHeaders() を付けたリクエストはオーナーとして扱われる。
+        // ownerId stays at the default `TEST_USER_ID`, so a request with
+        // `authHeaders()` resolves to the owner.
+        visibility: "public",
+      });
+      const pagesSignal = mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 3);
+
       const { app } = createTestApp([
-        // Owner GET
-        [ownerNote],
-        mockPagesSignal(), // ETag pages signal
-        [], // pages
-        // Guest GET on a different (public) note id
-        [viewerNote], // findActiveNoteById
-        [], // member check
-        [], // domain access check
-        mockPagesSignal(), // ETag pages signal
+        // First GET: authed user is the OWNER (single role-resolution query)
+        [sharedPublicNote],
+        pagesSignal,
+        [], // pages query
+        // Second GET: anonymous viewer → guest role on the SAME note row.
+        // No userEmail → getNoteRole skips member/domain checks for guests.
+        [sharedPublicNote],
+        pagesSignal,
         [], // viewCount update
         [], // pages query
       ]);
 
-      const resOwner = await app.request(`/api/notes/${ownerNote.id}`, {
+      const resOwner = await app.request(`/api/notes/${sharedPublicNote.id}`, {
         headers: authHeaders(),
       });
-      const etagOwner = resOwner.headers.get("ETag");
+      const resGuest = await app.request(`/api/notes/${sharedPublicNote.id}`);
 
-      const resGuest = await app.request(`/api/notes/${viewerNote.id}`, {
-        headers: authHeaders(),
-      });
+      const etagOwner = resOwner.headers.get("ETag");
       const etagGuest = resGuest.headers.get("ETag");
 
       expect(etagOwner).toBeTruthy();
       expect(etagGuest).toBeTruthy();
-      // 異なるロール (owner vs guest) + 異なる note は別 ETag になる。
-      // Different role (and different note id) must yield distinct ETags.
+      // Same note row + same pages signal → only `role` differs. ETags must
+      // still diverge, which proves role is mixed into the hash.
       expect(etagOwner).not.toBe(etagGuest);
     });
 
