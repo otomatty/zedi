@@ -207,7 +207,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.2",
-    "@commitlint/config-conventional": "^20.4.2",
+    "@commitlint/config-conventional": "^21.0.0",
     "@eslint/js": "^9.32.0",
     "@libsql/client": "^0.17.0",
     "@playwright/test": "^1.57.0",
