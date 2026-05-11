@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
+
+// useAuth を controllable な mock に差し替える。テスト内で `mockAuthState.userId`
+// を書き換えることでサインアウト / アカウント切替の遷移を再現できる
+// （PR #856 CodeRabbit major review: cache が auth scope を考慮するように
+// なったため、テスト側でも auth principal を制御する必要がある）。
+//
+// `useAuth` is mocked so individual tests can flip `mockAuthState.userId` to
+// simulate sign-out / account-switch, which is required to exercise the new
+// scope-keyed cache added in PR #856 (CodeRabbit major review).
+const mockAuthState: { userId: string | null } = { userId: "test-user-1" };
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    userId: mockAuthState.userId,
+    isSignedIn: mockAuthState.userId !== null,
+    isLoaded: true,
+  }),
+}));
+
 import {
   useAuthenticatedImageUrl,
   requiresAuth,
@@ -16,9 +34,19 @@ let mockRevokeObjectURL: ReturnType<typeof vi.fn>;
 type IOCallback = (entries: IntersectionObserverEntry[]) => void;
 let lastObserverCallback: IOCallback | null = null;
 let lastObserverDisconnect: ReturnType<typeof vi.fn> | null = null;
+let lastObserverOptions: IntersectionObserverInit | undefined;
+
+// 直代入で上書きするグローバル群は `vi.restoreAllMocks()` では元に戻らないので、
+// 明示的に保存して afterEach で復元する（PR #856 CodeRabbit major review）。
+// `vi.restoreAllMocks()` does not undo direct global assignments, so capture
+// the originals up-front and restore them in `afterEach` to prevent the mocks
+// from leaking into later test files (PR #856 CodeRabbit major review).
 const originalIntersectionObserver = global.IntersectionObserver;
+const originalCreateObjectURL = global.URL.createObjectURL;
+const originalRevokeObjectURL = global.URL.revokeObjectURL;
 
 beforeEach(() => {
+  mockAuthState.userId = "test-user-1";
   mockCreateObjectURL = vi.fn().mockReturnValue(FAKE_BLOB_URL);
   mockRevokeObjectURL = vi.fn();
   global.URL.createObjectURL = mockCreateObjectURL as (obj: Blob | MediaSource) => string;
@@ -27,6 +55,7 @@ beforeEach(() => {
 
   lastObserverCallback = null;
   lastObserverDisconnect = null;
+  lastObserverOptions = undefined;
   global.IntersectionObserver = class IO {
     readonly root: Element | null = null;
     readonly rootMargin: string = "";
@@ -35,9 +64,10 @@ beforeEach(() => {
     unobserve = vi.fn();
     disconnect = vi.fn();
     takeRecords = vi.fn().mockReturnValue([]);
-    constructor(cb: IntersectionObserverCallback) {
+    constructor(cb: IntersectionObserverCallback, options?: IntersectionObserverInit) {
       lastObserverCallback = cb as unknown as IOCallback;
       lastObserverDisconnect = this.disconnect;
+      lastObserverOptions = options;
     }
   } as unknown as typeof IntersectionObserver;
 
@@ -45,9 +75,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  __resetImageCacheForTesting();
   vi.restoreAllMocks();
   global.IntersectionObserver = originalIntersectionObserver;
-  __resetImageCacheForTesting();
+  global.URL.createObjectURL = originalCreateObjectURL;
+  global.URL.revokeObjectURL = originalRevokeObjectURL;
 });
 
 function mockFetchSuccess(body = new Blob(["img"], { type: "image/png" })) {
@@ -343,6 +375,40 @@ describe("useAuthenticatedImageUrl", () => {
     });
   });
 
+  // ─── Auth scope isolation (PR #856 CodeRabbit major review) ────────
+  describe("auth scope isolation", () => {
+    it("does not reuse a blob URL across different auth principals", async () => {
+      const blobUserA = "blob:http://localhost:3000/user-a";
+      const blobUserB = "blob:http://localhost:3000/user-b";
+      mockCreateObjectURL.mockReturnValueOnce(blobUserA).mockReturnValueOnce(blobUserB);
+      mockFetchSuccess();
+      const src = "/api/thumbnail/serve/shared-across-users";
+
+      // User A subscribes and resolves.
+      mockAuthState.userId = "user-a";
+      const { result: rA, unmount: unmountA } = renderHook(() => useAuthenticatedImageUrl(src));
+      await waitFor(() => {
+        expect(rA.current.resolvedUrl).toBe(blobUserA);
+      });
+
+      // User A unmounts (e.g. sign-out). refCount → 0 should revoke user A's blob.
+      unmountA();
+      expect(mockRevokeObjectURL).toHaveBeenCalledWith(blobUserA);
+
+      // User B signs in and subscribes to the SAME src. They must NOT receive
+      // the previously-cached blob; a fresh fetch must run under their cookies.
+      mockAuthState.userId = "user-b";
+      const { result: rB } = renderHook(() => useAuthenticatedImageUrl(src));
+      await waitFor(() => {
+        expect(rB.current.resolvedUrl).toBe(blobUserB);
+      });
+
+      // 2 fetches total (one per scope) and 2 distinct blob URLs created.
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(mockCreateObjectURL).toHaveBeenCalledTimes(2);
+    });
+  });
+
   // ─── Lazy loading via IntersectionObserver (Issue #851) ─────────────
   describe("lazy loading", () => {
     let element: HTMLDivElement;
@@ -367,6 +433,11 @@ describe("useAuthenticatedImageUrl", () => {
       expect(global.fetch).not.toHaveBeenCalled();
       expect(result.current.isLoading).toBe(false);
       expect(result.current.resolvedUrl).toBeUndefined();
+      // 200px の rootMargin で先読みウィンドウを確保している（PR #856 CodeRabbit nitpick）。
+      // Lazy mode must construct the observer with a 200px prefetch margin so
+      // images start loading just before they scroll into view (PR #856
+      // CodeRabbit nitpick).
+      expect(lastObserverOptions?.rootMargin).toBe("200px");
     });
 
     it("fetches after intersection callback fires", async () => {
