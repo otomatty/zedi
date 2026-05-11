@@ -316,6 +316,62 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return reqOptionalAuth<GetNoteResponse>("GET", `/api/notes/${encodeURIComponent(noteId)}`);
     },
 
+    /**
+     * GET /api/notes/:id with conditional ETag support (Issue #853).
+     *
+     * Send `ifNoneMatch` to opt into 304 short-circuiting. The server responds
+     * with 304 (no body) when the cached representation is still fresh; the
+     * caller is expected to reuse its cached payload in that case.
+     *
+     * `GET /api/notes/:id` を ETag 条件付きで叩く（Issue #853）。
+     * `ifNoneMatch` を渡すと未変更時は 304（body 無し）が返り、呼び出し側は
+     * 自前のキャッシュを使い回すことで body 転送を省略できる。
+     */
+    async getNoteWithCache(
+      noteId: string,
+      options: { ifNoneMatch?: string } = {},
+    ): Promise<{
+      notModified: boolean;
+      data: GetNoteResponse | null;
+      etag: string | null;
+    }> {
+      const base = baseUrl.replace(/\/$/, "");
+      const url = new URL(
+        `/api/notes/${encodeURIComponent(noteId)}`,
+        base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"),
+      );
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (options.ifNoneMatch) headers["If-None-Match"] = options.ifNoneMatch;
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), {
+          method: "GET",
+          headers,
+          credentials: "include",
+        });
+      } catch (networkError) {
+        throw new ApiError(
+          `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
+          0,
+          "NETWORK_ERROR",
+        );
+      }
+      const etag = res.headers.get("ETag");
+      if (res.status === 304) {
+        return { notModified: true, data: null, etag };
+      }
+      const text = await res.text();
+      const data = parseResponseText(text, res.status);
+      if (!res.ok) {
+        throwOnErrorResponse(data, res);
+      }
+      return {
+        notModified: false,
+        data: unwrapEnvelope<GetNoteResponse>(data),
+        etag,
+      };
+    },
+
     /** GET /api/notes/discover — public notes list (auth optional). */
     async getPublicNotes(opts?: {
       sort?: string;

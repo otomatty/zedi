@@ -460,6 +460,128 @@ describe("GET /api/notes/:noteId", () => {
 
     expect(res.status).toBe(403);
   });
+
+  // ── ETag / 304 (Issue #853) ────────────────────────────────────────
+  describe("ETag / 304 conditional GET", () => {
+    it("should include an ETag header on a 200 response", async () => {
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app } = createTestApp([[mockNote], [mockPage]]);
+
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+
+      expect(res.status).toBe(200);
+      const etag = res.headers.get("ETag");
+      expect(etag).toBeTruthy();
+      expect(etag).toMatch(/^W\/".+"$/);
+      expect(res.headers.get("Cache-Control")).toContain("private");
+      expect(res.headers.get("Vary")).toContain("Cookie");
+    });
+
+    it("should return 304 with an empty body when If-None-Match matches", async () => {
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app, chains } = createTestApp([
+        [mockNote], // first request: getNoteRole
+        [mockPage], // first request: pages query
+        [mockNote], // second request: getNoteRole only (no pages query)
+      ]);
+
+      const res1 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag = res1.headers.get("ETag");
+      expect(etag).toBeTruthy();
+      if (!etag) throw new Error("ETag header missing");
+
+      const chainsBefore = chains.length;
+      const res2 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: { ...authHeaders(), "If-None-Match": etag },
+      });
+
+      expect(res2.status).toBe(304);
+      expect(await res2.text()).toBe("");
+      // pages クエリも viewCount UPDATE も走らないので、新規に消費される
+      // chain は getNoteRole の 1 件のみ。
+      // Only the role-resolution DB query runs on the 304 path; pages query
+      // and viewCount update are both skipped.
+      expect(chains.length - chainsBefore).toBe(1);
+    });
+
+    it("should produce a different ETag after note.updatedAt changes", async () => {
+      const firstNote = createMockNote({ updatedAt: new Date("2026-01-01T00:00:00Z") });
+      const updatedNote = createMockNote({ updatedAt: new Date("2026-02-15T12:34:56Z") });
+      const { app } = createTestApp([
+        [firstNote],
+        [], // pages query
+        [updatedNote],
+        [], // pages query
+      ]);
+
+      const res1 = await app.request(`/api/notes/${firstNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag1 = res1.headers.get("ETag");
+
+      const res2 = await app.request(`/api/notes/${updatedNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag2 = res2.headers.get("ETag");
+
+      expect(etag1).toBeTruthy();
+      expect(etag2).toBeTruthy();
+      expect(etag1).not.toBe(etag2);
+    });
+
+    it("should produce a different ETag when the same note is viewed under a different role", async () => {
+      const ownerNote = createMockNote();
+      const viewerNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "public" });
+      const { app } = createTestApp([
+        // Owner GET
+        [ownerNote],
+        [], // pages
+        // Guest GET on a different (public) note id
+        [viewerNote], // findActiveNoteById
+        [], // member check
+        [], // domain access check
+        [], // viewCount update
+        [], // pages query
+      ]);
+
+      const resOwner = await app.request(`/api/notes/${ownerNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etagOwner = resOwner.headers.get("ETag");
+
+      const resGuest = await app.request(`/api/notes/${viewerNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etagGuest = resGuest.headers.get("ETag");
+
+      expect(etagOwner).toBeTruthy();
+      expect(etagGuest).toBeTruthy();
+      // 異なるロール (owner vs guest) + 異なる note は別 ETag になる。
+      // Different role (and different note id) must yield distinct ETags.
+      expect(etagOwner).not.toBe(etagGuest);
+    });
+
+    it("should ignore a stale If-None-Match and return 200 with a fresh body", async () => {
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app } = createTestApp([[mockNote], [mockPage]]);
+
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: { ...authHeaders(), "If-None-Match": 'W/"definitely-stale"' },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toHaveProperty("id", mockNote.id);
+      expect(res.headers.get("ETag")).toBeTruthy();
+    });
+  });
 });
 
 // ── GET /api/notes ──────────────────────────────────────────────────────────

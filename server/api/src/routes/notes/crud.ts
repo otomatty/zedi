@@ -8,6 +8,7 @@
  * GET    /:noteId         — ノート詳細取得
  * GET    /                — ユーザーのノート一覧
  */
+import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, ne, and, or, desc, sql, inArray } from "drizzle-orm";
@@ -79,6 +80,26 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "boolean") return value;
   throw new HTTPException(400, { message: "Invalid is_official" });
+}
+
+/**
+ * Note 詳細レスポンス用の weak ETag を生成する。`note.updatedAt` と role を
+ * 混ぜ、リクエスタのロールに応じてレスポンスが変わる事実を反映する。
+ * weak (`W/...`) を採用するのは、view_count のフェイヤアンドフォーゲット
+ * 更新によりレスポンス body が byte-for-byte 一致しないため。
+ *
+ * Generates a weak ETag for note detail responses. The hash includes
+ * `note.updatedAt` and the resolved role so different roles do not share a
+ * cache entry. The ETag is weak (`W/...`) because the fire-and-forget
+ * `view_count` update can shift the response body byte-for-byte even when
+ * the semantically meaningful state has not changed.
+ */
+function makeNoteETag(noteId: string, updatedAt: Date, role: string): string {
+  const hash = createHash("sha1")
+    .update(`${noteId}:${updatedAt.getTime()}:${role}`)
+    .digest("base64url")
+    .slice(0, 22);
+  return `W/"${hash}"`;
 }
 
 const app = new Hono<AppEnv>();
@@ -302,6 +323,25 @@ app.get("/:noteId", authOptional, async (c) => {
 
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  const etag = makeNoteETag(note.id, note.updatedAt, role);
+  c.header("ETag", etag);
+  c.header("Cache-Control", "private, must-revalidate");
+  c.header("Vary", "Cookie");
+
+  // クライアントが前回受け取った ETag を `If-None-Match` で送ってきていれば、
+  // body・viewCount・pages クエリをまるごとスキップする（Issue #853）。
+  // 304 経路では viewCount も更新しない: 「画面を実際に取得した」のは body を
+  // 受け取ったときに限るという解釈で、ETag を安定させる効果もある。
+  //
+  // When the client sends back a matching `If-None-Match`, short-circuit with
+  // 304 and skip both the `view_count` update and the pages query (Issue
+  // #853). Treating "fetched" as "received a body" keeps the counter
+  // semantically meaningful and keeps the ETag stable longer.
+  const ifNoneMatch = c.req.header("If-None-Match");
+  if (ifNoneMatch && ifNoneMatch === etag) {
+    return c.body(null, 304);
+  }
 
   // 非オーナーのアクセスごとに `view_count` をインクリメントするが、UPDATE は
   // レスポンスをブロックしないよう投げっぱなしにする（Issue #849）。失敗時は
