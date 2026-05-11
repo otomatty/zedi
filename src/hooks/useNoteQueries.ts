@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth, useUser } from "@/hooks/useAuth";
 import { createApiClient } from "@/lib/api";
 import type {
@@ -291,6 +291,38 @@ export function useMyNote(options: UseMyNoteOptions = {}) {
 type UseNoteOptions = { allowRemote?: boolean };
 
 /**
+ * `useNote` / `useNotePages` 共通の `placeholderData` ファクトリ。
+ * `noteId` をまたぐ遷移では前ノートの結果を残して白画面を回避するが、
+ * 認証コンテキスト (`userId` / `userEmail`) が変化する遷移
+ * （ログアウト・別アカウントへの切替）では前ユーザーのデータを残さない
+ * よう `undefined` を返す。Issue #855 review (Codex P1)。
+ *
+ * Shared `placeholderData` factory for `useNote` and `useNotePages`. The
+ * previous result is preserved across `noteId` transitions to avoid the
+ * blank loading state, but it is discarded when the auth principal
+ * (`userId` / `userEmail`) changes (sign-out, account switch) so a private
+ * note that becomes inaccessible stops rendering the previous user's data
+ * mid-transition.
+ */
+function notePlaceholderDataIfSamePrincipal(userId: string, userEmail: string | undefined) {
+  const currentEmail = userEmail ?? "";
+  return (
+    previousData: GetNoteResponse | undefined,
+    previousQuery?: { queryKey: readonly unknown[] },
+  ): GetNoteResponse | undefined => {
+    if (!previousData || !previousQuery) return undefined;
+    const key = previousQuery.queryKey;
+    // `noteKeys.detail(noteId, userId, userEmail)` produces
+    // [..., noteId, userId, userEmail]; the principal lives in the last two
+    // slots regardless of any future prefix changes.
+    if (key.length < 2) return undefined;
+    const prevUserId = key[key.length - 2];
+    const prevUserEmail = key[key.length - 1];
+    return prevUserId === userId && prevUserEmail === currentEmail ? previousData : undefined;
+  };
+}
+
+/**
  * 単一の Note とアクセス権情報を取得するフック。
  * Hook that fetches a single Note alongside the caller's access context.
  *
@@ -309,10 +341,14 @@ export function useNote(noteId: string, _options?: UseNoteOptions) {
     queryKey: noteKeys.detail(noteId, userId, userEmail),
     queryFn: () => api.getNote(noteId),
     enabled: isLoaded && !!noteId,
-    // 別ノートへ遷移しても前ノートのデータを残し、白画面を回避する。
+    // 別ノートへ遷移しても前ノートのデータを残し、白画面を回避する。ただし
+    // ログアウト・アカウント切替時に前ユーザーのデータを引き継がないよう、
+    // `userId` / `userEmail` が同一の場合に限って placeholder を返す。
+    //
     // Keep showing the previous note while fetching the next one to avoid the
-    // blank loading state on navigation between notes.
-    placeholderData: keepPreviousData,
+    // blank loading state, gated on a matching auth principal so logout /
+    // account switches do not carry the previous user's data forward.
+    placeholderData: notePlaceholderDataIfSamePrincipal(userId, userEmail),
     select: (res): NoteWithAccess => {
       const note = apiNoteToNote(res);
       const access = buildAccessFromApi(note, res.current_user_role, userId);
@@ -370,11 +406,20 @@ export function useNotePages(
     queryKey: noteKeys.detail(noteId, userId, userEmail),
     queryFn: () => api.getNote(noteId),
     enabled: enabled && isLoaded && !!noteId,
-    placeholderData: keepPreviousData,
+    placeholderData: notePlaceholderDataIfSamePrincipal(userId, userEmail),
+    // Issue #823 以降、ページは 1 つのノートにのみ所属し、API レスポンスは
+    // 旧 `note_pages` の `added_by_user_id` を返さない。ページのオーナーが
+    // 実質「ページを追加した人」なので `owner_id` を採用する（Issue #855
+    // review fix; gemini-code-assist HIGH）。
+    //
+    // Since #823 every page lives in exactly one note and the API stopped
+    // returning the legacy `note_pages.added_by_user_id`. The page owner is
+    // effectively the adder, so we surface `owner_id` here. Fixes the
+    // gemini-code-assist HIGH finding on PR #855.
     select: (res): NotePageSummary[] =>
       res.pages.map((p) => ({
         ...apiPageToPageSummary(p),
-        addedByUserId: p.added_by_user_id,
+        addedByUserId: p.owner_id,
       })),
   });
 }
