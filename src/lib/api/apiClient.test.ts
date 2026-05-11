@@ -767,4 +767,93 @@ describe("apiClient", () => {
       expect(result2.created).toBe(true);
     });
   });
+
+  // ── getNoteWithCache (ETag / 304, Issue #853) ────────────────────────
+  describe("getNoteWithCache", () => {
+    it("sends If-None-Match and returns { notModified: true, data: null } for 304", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: false,
+          status: 304,
+          body: "",
+          headers: new Headers({ ETag: 'W/"abc123"' }),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.getNoteWithCache("note-1", { ifNoneMatch: 'W/"abc123"' });
+
+      expect(result.notModified).toBe(true);
+      expect(result.data).toBeNull();
+      expect(result.etag).toBe('W/"abc123"');
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect((init.headers as Record<string, string>)["If-None-Match"]).toBe('W/"abc123"');
+    });
+
+    it("returns parsed body and ETag header on 200", async () => {
+      const noteBody = {
+        id: "note-1",
+        owner_id: "user-1",
+        title: "T",
+        visibility: "private",
+        edit_permission: "owner_only",
+        is_official: false,
+        view_count: 0,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        is_deleted: false,
+        current_user_role: "owner",
+        pages: [],
+      };
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify(noteBody),
+          headers: new Headers({ ETag: 'W/"fresh"' }),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.getNoteWithCache("note-1");
+
+      expect(result.notModified).toBe(false);
+      expect(result.data).toMatchObject({ id: "note-1", current_user_role: "owner" });
+      expect(result.etag).toBe('W/"fresh"');
+    });
+
+    it("does not include If-None-Match when no ETag is provided", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify({
+            id: "note-1",
+            owner_id: "user-1",
+            title: "T",
+            visibility: "private",
+            edit_permission: "owner_only",
+            is_official: false,
+            view_count: 0,
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+            is_deleted: false,
+            current_user_role: "owner",
+            pages: [],
+          }),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNoteWithCache("note-1");
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect((init.headers as Record<string, string>)["If-None-Match"]).toBeUndefined();
+    });
+  });
 });

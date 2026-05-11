@@ -74,8 +74,12 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
   const isMobile = useIsMobile();
 
   const preview = page.contentPreview ?? "";
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // 画面外カードのサムネイル fetch を遅延し、初期ロード時の並列リクエスト数を抑える (Issue #851)
+  // Defer thumbnail fetch for off-screen cards to reduce initial parallel request count (Issue #851)
   const { resolvedUrl: thumbnail, hasError: thumbnailError } = useAuthenticatedImageUrl(
     page.thumbnailUrl,
+    { lazy: true, ref: buttonRef },
   );
   const isClipped = !!page.sourceUrl;
   const displayTitle = page.title || t("common.untitledPage");
@@ -179,6 +183,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
   // カード本体の button 要素 / Card button element
   const cardButton = (
     <button
+      ref={buttonRef}
       draggable={!isMobile}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}

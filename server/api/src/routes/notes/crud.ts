@@ -8,6 +8,7 @@
  * GET    /:noteId         — ノート詳細取得
  * GET    /                — ユーザーのノート一覧
  */
+import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, ne, and, or, desc, sql, inArray } from "drizzle-orm";
@@ -79,6 +80,63 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "boolean") return value;
   throw new HTTPException(400, { message: "Invalid is_official" });
+}
+
+/**
+ * Note 詳細レスポンス用の weak ETag を生成する。`note.updatedAt` と role に
+ * 加えて、ページの最大 `updated_at` と件数も混ぜることで、`notes.updated_at`
+ * を経由しないページ単体編集（`PUT /api/pages/:id/content`・タイトル変更・
+ * ハード削除）でも ETag が変わるようにする。
+ * weak (`W/...`) を採用するのは、`view_count` のフェイヤアンドフォーゲット
+ * 更新によりレスポンス body が byte-for-byte 一致しないため。
+ *
+ * Generates a weak ETag for note detail responses. The hash mixes
+ * `note.updatedAt`, the resolved role, and a pages-change signal
+ * (`MAX(pages.updated_at) + COUNT(*)`) so that page-only edits which do not
+ * bump `notes.updated_at` (e.g. `PUT /api/pages/:id/content`, title rename,
+ * hard delete) still invalidate the validator. The ETag is weak (`W/...`)
+ * because the fire-and-forget `view_count` update can shift the response
+ * body byte-for-byte even when the semantically meaningful state has not
+ * changed.
+ */
+function makeNoteETag(
+  noteId: string,
+  noteUpdatedAt: Date,
+  role: string,
+  pagesMaxUpdatedAt: Date | null,
+  pagesCount: number,
+): string {
+  const hash = createHash("sha1")
+    .update(
+      `${noteId}:${noteUpdatedAt.getTime()}:${role}:${pagesMaxUpdatedAt?.getTime() ?? 0}:${pagesCount}`,
+    )
+    .digest("base64url")
+    .slice(0, 22);
+  return `W/"${hash}"`;
+}
+
+/**
+ * RFC 7232 §3.2 準拠の `If-None-Match` 弱比較。`*` ワイルドカード、
+ * カンマ区切り複数値、`W/` プレフィックス（大文字小文字非区別）を
+ * 正しく扱う（PR #856 CodeRabbit nitpick）。
+ *
+ * Weak `If-None-Match` matcher per RFC 7232 §3.2. Handles the `*`
+ * wildcard, comma-separated lists, and case-insensitive `W/` prefix so
+ * spec-compliant clients that normalize or batch validators still hit
+ * the 304 path (PR #856 CodeRabbit nitpick).
+ */
+export function ifNoneMatchMatches(headerValue: string | undefined, currentEtag: string): boolean {
+  if (!headerValue) return false;
+  const trimmed = headerValue.trim();
+  // `*` matches any current representation (RFC 7232 §3.2).
+  if (trimmed === "*") return true;
+  const normalize = (token: string) => token.trim().replace(/^W\//i, "");
+  const target = normalize(currentEtag);
+  if (!target) return false;
+  return headerValue.split(",").some((token) => {
+    const candidate = normalize(token);
+    return candidate.length > 0 && candidate === target;
+  });
 }
 
 const app = new Hono<AppEnv>();
@@ -302,6 +360,50 @@ app.get("/:noteId", authOptional, async (c) => {
 
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  // ページ側の変更（コンテンツ編集・タイトル変更・追加・削除）を ETag に反映
+  // するため、active なページの MAX(updated_at) と件数を 1 クエリで集約する。
+  // Phase 3 で追加した `(note_id, updated_at DESC) WHERE is_deleted = false`
+  // 部分インデックスにより、これは index-only で済む軽量クエリ。
+  //
+  // Aggregate `MAX(updated_at)` and `COUNT(*)` over active pages so the ETag
+  // captures page-level mutations that do not bump `notes.updated_at`
+  // (content edits via `/api/pages/:id/content`, title rename, hard
+  // delete). The partial composite index added in Phase 3 lets Postgres
+  // resolve this from the index alone, keeping the cost negligible.
+  const pagesSignalRows = await db
+    .select({
+      maxUpdatedAt: sql<Date | null>`MAX(${pages.updatedAt})`,
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(pages)
+    .where(and(eq(pages.noteId, noteId), eq(pages.isDeleted, false)));
+  const pagesSignal = pagesSignalRows[0] ?? { maxUpdatedAt: null, count: 0 };
+
+  const etag = makeNoteETag(
+    note.id,
+    note.updatedAt,
+    role,
+    pagesSignal.maxUpdatedAt,
+    pagesSignal.count,
+  );
+  c.header("ETag", etag);
+  c.header("Cache-Control", "private, must-revalidate");
+  c.header("Vary", "Cookie");
+
+  // クライアントが前回受け取った ETag を `If-None-Match` で送ってきていれば、
+  // body・viewCount・pages クエリをまるごとスキップする（Issue #853）。
+  // 304 経路では viewCount も更新しない: 「画面を実際に取得した」のは body を
+  // 受け取ったときに限るという解釈で、ETag を安定させる効果もある。
+  //
+  // When the client sends back a matching `If-None-Match`, short-circuit with
+  // 304 and skip both the `view_count` update and the pages query (Issue
+  // #853). Treating "fetched" as "received a body" keeps the counter
+  // semantically meaningful and keeps the ETag stable longer.
+  const ifNoneMatch = c.req.header("If-None-Match");
+  if (ifNoneMatchMatches(ifNoneMatch, etag)) {
+    return c.body(null, 304);
+  }
 
   // 非オーナーのアクセスごとに `view_count` をインクリメントするが、UPDATE は
   // レスポンスをブロックしないよう投げっぱなしにする（Issue #849）。失敗時は

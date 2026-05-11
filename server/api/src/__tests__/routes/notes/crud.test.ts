@@ -31,6 +31,59 @@ import {
   createTestApp,
   authHeaders,
 } from "./setup.js";
+import { ifNoneMatchMatches } from "../../../routes/notes/crud.js";
+
+/**
+ * `GET /api/notes/:id` の ETag 計算で叩く
+ * `MAX(pages.updated_at) + COUNT(*)` 集約クエリのモック行。
+ *
+ * Mock row for the pages-signal aggregate query that `GET /api/notes/:id`
+ * runs while computing the ETag (Issue #853).
+ */
+function mockPagesSignal(maxUpdatedAt: Date | null = null, count = 0) {
+  return [{ maxUpdatedAt, count }];
+}
+
+// ── ifNoneMatchMatches (Issue #853, PR #856 review) ─────────────────────────
+
+describe("ifNoneMatchMatches", () => {
+  const etag = 'W/"abc123"';
+
+  it("returns false for missing header", () => {
+    expect(ifNoneMatchMatches(undefined, etag)).toBe(false);
+    expect(ifNoneMatchMatches("", etag)).toBe(false);
+  });
+
+  it("matches exact weak ETag", () => {
+    expect(ifNoneMatchMatches('W/"abc123"', etag)).toBe(true);
+  });
+
+  it("matches when header omits the W/ prefix (weak comparison)", () => {
+    expect(ifNoneMatchMatches('"abc123"', etag)).toBe(true);
+  });
+
+  it("matches case-insensitively on the W/ prefix", () => {
+    expect(ifNoneMatchMatches('w/"abc123"', etag)).toBe(true);
+  });
+
+  it("matches one tag in a comma-separated list", () => {
+    expect(ifNoneMatchMatches('W/"other", W/"abc123", W/"foo"', etag)).toBe(true);
+  });
+
+  it("matches the wildcard `*`", () => {
+    expect(ifNoneMatchMatches("*", etag)).toBe(true);
+    expect(ifNoneMatchMatches("  *  ", etag)).toBe(true);
+  });
+
+  it("does not match a different ETag", () => {
+    expect(ifNoneMatchMatches('W/"different"', etag)).toBe(false);
+  });
+
+  it("ignores empty tokens in a list", () => {
+    expect(ifNoneMatchMatches(', ,W/"abc123",', etag)).toBe(true);
+    expect(ifNoneMatchMatches(", ,", etag)).toBe(false);
+  });
+});
 
 // ── POST /api/notes ─────────────────────────────────────────────────────────
 
@@ -339,6 +392,7 @@ describe("GET /api/notes/:noteId", () => {
 
     const { app } = createTestApp([
       [mockNote], // getNoteRole → findActiveNoteById (owner)
+      mockPagesSignal(mockPage.updatedAt as Date, 1), // ETag pages signal
       [mockPage], // pages query
     ]);
 
@@ -370,6 +424,7 @@ describe("GET /api/notes/:noteId", () => {
       [publicNote], // getNoteRole → findActiveNoteById (not owner)
       [], // getNoteRole → member check (not a member)
       [], // getNoteRole → domain access check (no matching rule)
+      mockPagesSignal(), // ETag pages signal
       [], // viewCount update
       [], // pages query
     ]);
@@ -392,6 +447,7 @@ describe("GET /api/notes/:noteId", () => {
 
     const { app } = createTestApp([
       [publicNote], // getNoteRole (no userId, no email → guest)
+      mockPagesSignal(), // ETag pages signal
       [], // viewCount update
       [], // pages query
     ]);
@@ -409,6 +465,7 @@ describe("GET /api/notes/:noteId", () => {
 
     const { app } = createTestApp([
       [mockNote], // getNoteRole
+      mockPagesSignal(mockPage.updatedAt as Date, 1), // ETag pages signal
       [mockPage], // pages query
     ]);
 
@@ -459,6 +516,233 @@ describe("GET /api/notes/:noteId", () => {
     });
 
     expect(res.status).toBe(403);
+  });
+
+  // ── ETag / 304 (Issue #853) ────────────────────────────────────────
+  describe("ETag / 304 conditional GET", () => {
+    it("should include an ETag header on a 200 response", async () => {
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+        [mockPage],
+      ]);
+
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+
+      expect(res.status).toBe(200);
+      const etag = res.headers.get("ETag");
+      expect(etag).toBeTruthy();
+      expect(etag).toMatch(/^W\/".+"$/);
+      expect(res.headers.get("Cache-Control")).toContain("private");
+      expect(res.headers.get("Vary")).toContain("Cookie");
+    });
+
+    it("should return 304 with an empty body when If-None-Match matches", async () => {
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app, chains } = createTestApp([
+        [mockNote], // first request: getNoteRole
+        mockPagesSignal(mockPage.updatedAt as Date, 1), // first request: ETag pages signal
+        [mockPage], // first request: pages query
+        [mockNote], // second request: getNoteRole
+        mockPagesSignal(mockPage.updatedAt as Date, 1), // second request: ETag pages signal
+      ]);
+
+      const res1 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag = res1.headers.get("ETag");
+      expect(etag).toBeTruthy();
+      if (!etag) throw new Error("ETag header missing");
+
+      const chainsBefore = chains.length;
+      const res2 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: { ...authHeaders(), "If-None-Match": etag },
+      });
+
+      expect(res2.status).toBe(304);
+      expect(await res2.text()).toBe("");
+      // 304 経路で消費するのは getNoteRole + pages signal の 2 件のみ。
+      // pages 本体クエリと viewCount UPDATE はスキップされる。
+      // Only role resolution + pages signal aggregate run on the 304 path;
+      // the full pages query and the viewCount update are both skipped.
+      expect(chains.length - chainsBefore).toBe(2);
+    });
+
+    it("should produce a different ETag after note.updatedAt changes", async () => {
+      const firstNote = createMockNote({ updatedAt: new Date("2026-01-01T00:00:00Z") });
+      const updatedNote = createMockNote({ updatedAt: new Date("2026-02-15T12:34:56Z") });
+      const { app } = createTestApp([
+        [firstNote],
+        mockPagesSignal(), // ETag pages signal
+        [], // pages query
+        [updatedNote],
+        mockPagesSignal(), // ETag pages signal
+        [], // pages query
+      ]);
+
+      const res1 = await app.request(`/api/notes/${firstNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag1 = res1.headers.get("ETag");
+
+      const res2 = await app.request(`/api/notes/${updatedNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag2 = res2.headers.get("ETag");
+
+      expect(etag1).toBeTruthy();
+      expect(etag2).toBeTruthy();
+      expect(etag1).not.toBe(etag2);
+    });
+
+    it("should produce a different ETag when the same note row is viewed under a different role", async () => {
+      // PR #856 review (CodeRabbit minor): role が ETag に効いていることを示すには、
+      // 同一の note row を異なる auth 文脈で取得して比較する必要がある。
+      // 異なる note id 同士の比較では noteId だけで ETag が変わるため、
+      // role を `makeNoteETag` から外しても test が通ってしまう。
+      //
+      // To verify the role actually contributes to the ETag we must read the
+      // *same* note row under two different auth contexts. Comparing distinct
+      // note ids would still pass even if `role` were dropped from the hash
+      // because `noteId` alone differentiates them.
+      const sharedPublicNote = createMockNote({
+        id: "note-shared",
+        // ownerId は createMockNote のデフォルト (TEST_USER_ID) なので、
+        // authHeaders() を付けたリクエストはオーナーとして扱われる。
+        // ownerId stays at the default `TEST_USER_ID`, so a request with
+        // `authHeaders()` resolves to the owner.
+        visibility: "public",
+      });
+      const pagesSignal = mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 3);
+
+      const { app } = createTestApp([
+        // First GET: authed user is the OWNER (single role-resolution query)
+        [sharedPublicNote],
+        pagesSignal,
+        [], // pages query
+        // Second GET: anonymous viewer → guest role on the SAME note row.
+        // No userEmail → getNoteRole skips member/domain checks for guests.
+        [sharedPublicNote],
+        pagesSignal,
+        [], // viewCount update
+        [], // pages query
+      ]);
+
+      const resOwner = await app.request(`/api/notes/${sharedPublicNote.id}`, {
+        headers: authHeaders(),
+      });
+      const resGuest = await app.request(`/api/notes/${sharedPublicNote.id}`);
+
+      const etagOwner = resOwner.headers.get("ETag");
+      const etagGuest = resGuest.headers.get("ETag");
+
+      expect(etagOwner).toBeTruthy();
+      expect(etagGuest).toBeTruthy();
+      // Same note row + same pages signal → only `role` differs. ETags must
+      // still diverge, which proves role is mixed into the hash.
+      expect(etagOwner).not.toBe(etagGuest);
+    });
+
+    it("should change ETag when a page is edited even if notes.updated_at is unchanged", async () => {
+      // Codex P1 (#856 review): ページ単体編集 (`PUT /api/pages/:id/content` 等)
+      // で `notes.updated_at` が動かなくても、ETag は変わるべき。pages signal
+      // (MAX(updated_at), COUNT) を ETag のハッシュ入力に混ぜることで保証する。
+      //
+      // Codex P1 (#856 review): editing a page via routes that do not bump
+      // `notes.updated_at` (e.g. `PUT /api/pages/:id/content`) must still
+      // shift the ETag. Verified by sending the same note row twice with
+      // different `MAX(pages.updated_at)` values.
+      const mockNote = createMockNote();
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 1),
+        [], // pages query
+        [mockNote],
+        mockPagesSignal(new Date("2026-03-10T08:00:00Z"), 1),
+        [], // pages query
+      ]);
+
+      const res1 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+      const res2 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+
+      const etag1 = res1.headers.get("ETag");
+      const etag2 = res2.headers.get("ETag");
+      expect(etag1).toBeTruthy();
+      expect(etag2).toBeTruthy();
+      expect(etag1).not.toBe(etag2);
+    });
+
+    it("should return 304 when If-None-Match is a list and one entry matches", async () => {
+      // RFC 7232 §3.2: 複数バリデータがカンマ区切りで送られるケース。1 件でも
+      // 現在の ETag に一致すれば 304 を返さなければならない（PR #856
+      // CodeRabbit nitpick: クライアントが正規化・列挙してくる場合に備える）。
+      //
+      // RFC 7232 §3.2: clients may send a comma-separated list of validators
+      // and the server must 304 if any one of them matches the current ETag.
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+        [mockPage],
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+      ]);
+
+      const res1 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag = res1.headers.get("ETag");
+      if (!etag) throw new Error("ETag header missing");
+
+      const res2 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: {
+          ...authHeaders(),
+          "If-None-Match": `W/"stale-1", ${etag}, W/"stale-2"`,
+        },
+      });
+
+      expect(res2.status).toBe(304);
+    });
+
+    it("should return 304 when If-None-Match is the wildcard `*`", async () => {
+      const mockNote = createMockNote();
+      const { app } = createTestApp([[mockNote], mockPagesSignal()]);
+
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: { ...authHeaders(), "If-None-Match": "*" },
+      });
+
+      expect(res.status).toBe(304);
+    });
+
+    it("should ignore a stale If-None-Match and return 200 with a fresh body", async () => {
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+        [mockPage],
+      ]);
+
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: { ...authHeaders(), "If-None-Match": 'W/"definitely-stale"' },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toHaveProperty("id", mockNote.id);
+      expect(res.headers.get("ETag")).toBeTruthy();
+    });
   });
 });
 

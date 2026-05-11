@@ -117,12 +117,25 @@ function unwrapEnvelope<T>(data: unknown): T {
   return data as T;
 }
 
-async function request<T>(
+/**
+ * URL・ヘッダ・`RequestInit` の組み立てを集約するヘルパ。
+ * `request` / `requestOptionalAuth` / `getNoteWithCache` で共通化することで、
+ * 認証クッキーやヘッダの取り扱いが一箇所に揃う（PR #856 Gemini HIGH review）。
+ *
+ * Centralizes URL + headers + `RequestInit` construction so every fetch in
+ * this client agrees on `credentials`, `Content-Type`, query handling, and
+ * the new `If-None-Match` opt-in (see PR #856 Gemini HIGH review).
+ */
+function buildRequestInit(
   method: string,
   path: string,
   baseUrl: string,
-  options: { body?: unknown; query?: Record<string, string> } = {},
-): Promise<T> {
+  options: {
+    body?: unknown;
+    query?: Record<string, string>;
+    ifNoneMatch?: string;
+  },
+): { url: string; init: RequestInit } {
   const base = baseUrl.replace(/\/$/, "");
   const url = new URL(
     path.startsWith("/") ? path : `/${path}`,
@@ -131,25 +144,41 @@ async function request<T>(
   if (options.query) {
     Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (options.ifNoneMatch) headers["If-None-Match"] = options.ifNoneMatch;
   const init: RequestInit = { method, headers, credentials: "include" };
   if (options.body !== undefined) {
     init.body = JSON.stringify(options.body);
   }
+  return { url: url.toString(), init };
+}
+
+/**
+ * `fetch` のネットワーク例外を `ApiError(NETWORK_ERROR)` に揃えるラッパ。
+ * Wraps `fetch` so connection-level failures surface as `ApiError(NETWORK_ERROR)`.
+ */
+async function safeFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (networkError) {
+    throw new ApiError(
+      `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
+      0,
+      "NETWORK_ERROR",
+    );
+  }
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  baseUrl: string,
+  options: { body?: unknown; query?: Record<string, string> } = {},
+): Promise<T> {
+  const { url, init } = buildRequestInit(method, path, baseUrl, options);
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    let res: Response;
-    try {
-      res = await fetch(url.toString(), init);
-    } catch (networkError) {
-      throw new ApiError(
-        `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
-        0,
-        "NETWORK_ERROR",
-      );
-    }
+    const res = await safeFetch(url, init);
 
     if (res.status === 503 && attempt < MAX_RETRIES) {
       const retryAfterSec = parseInt(res.headers.get("Retry-After") ?? "", 10);
@@ -175,35 +204,51 @@ async function requestOptionalAuth<T>(
   baseUrl: string,
   options: { body?: unknown; query?: Record<string, string> } = {},
 ): Promise<T> {
-  const base = baseUrl.replace(/\/$/, "");
-  const url = new URL(
-    path.startsWith("/") ? path : `/${path}`,
-    base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"),
-  );
-  if (options.query) {
-    Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
-  }
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const init: RequestInit = { method, headers, credentials: "include" };
-  if (options.body !== undefined) {
-    init.body = JSON.stringify(options.body);
-  }
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), init);
-  } catch (networkError) {
-    throw new ApiError(
-      `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
-      0,
-      "NETWORK_ERROR",
-    );
-  }
+  const { url, init } = buildRequestInit(method, path, baseUrl, options);
+  const res = await safeFetch(url, init);
   const text = await res.text();
   const data = parseResponseText(text, res.status);
   if (!res.ok) {
     throwOnErrorResponse(data, res);
   }
   return unwrapEnvelope<T>(data);
+}
+
+/**
+ * `requestOptionalAuth` の ETag 対応版。`If-None-Match` を載せ、`304 Not
+ * Modified` のときは body を読まずに `{ notModified: true }` を返す。`fetch`
+ * の組み立てとネットワーク例外ハンドリングは `buildRequestInit` /
+ * `safeFetch` で共有するので、認証や `Content-Type` の振る舞いが
+ * 通常パスとずれない（PR #856 Gemini HIGH review）。
+ *
+ * ETag-aware sibling of `requestOptionalAuth`. Sends `If-None-Match` and
+ * short-circuits on `304 Not Modified` so the empty body is never fed to
+ * `JSON.parse`. Shares `buildRequestInit` / `safeFetch` with the standard
+ * path so auth / `Content-Type` / network error semantics stay in lockstep
+ * (see PR #856 Gemini HIGH review).
+ */
+async function requestOptionalAuthConditional<T>(
+  method: string,
+  path: string,
+  baseUrl: string,
+  options: { body?: unknown; query?: Record<string, string>; ifNoneMatch?: string } = {},
+): Promise<{ notModified: boolean; data: T | null; etag: string | null }> {
+  const { url, init } = buildRequestInit(method, path, baseUrl, options);
+  const res = await safeFetch(url, init);
+  const etag = res.headers.get("ETag");
+  if (res.status === 304) {
+    return { notModified: true, data: null, etag };
+  }
+  const text = await res.text();
+  const data = parseResponseText(text, res.status);
+  if (!res.ok) {
+    throwOnErrorResponse(data, res);
+  }
+  return {
+    notModified: false,
+    data: unwrapEnvelope<T>(data),
+    etag,
+  };
 }
 
 /**
@@ -314,6 +359,33 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     /** GET /api/notes/:id — note detail (auth optional; public/unlisted viewable by guests). */
     async getNote(noteId: string): Promise<GetNoteResponse> {
       return reqOptionalAuth<GetNoteResponse>("GET", `/api/notes/${encodeURIComponent(noteId)}`);
+    },
+
+    /**
+     * GET /api/notes/:id with conditional ETag support (Issue #853).
+     *
+     * Send `ifNoneMatch` to opt into 304 short-circuiting. The server responds
+     * with 304 (no body) when the cached representation is still fresh; the
+     * caller is expected to reuse its cached payload in that case.
+     *
+     * `GET /api/notes/:id` を ETag 条件付きで叩く（Issue #853）。
+     * `ifNoneMatch` を渡すと未変更時は 304（body 無し）が返り、呼び出し側は
+     * 自前のキャッシュを使い回すことで body 転送を省略できる。
+     */
+    async getNoteWithCache(
+      noteId: string,
+      options: { ifNoneMatch?: string } = {},
+    ): Promise<{
+      notModified: boolean;
+      data: GetNoteResponse | null;
+      etag: string | null;
+    }> {
+      return requestOptionalAuthConditional<GetNoteResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}`,
+        baseUrl,
+        { ifNoneMatch: options.ifNoneMatch },
+      );
     },
 
     /** GET /api/notes/discover — public notes list (auth optional). */
