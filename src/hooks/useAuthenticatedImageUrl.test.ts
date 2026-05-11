@@ -1,11 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { useAuthenticatedImageUrl, requiresAuth } from "./useAuthenticatedImageUrl";
+import {
+  useAuthenticatedImageUrl,
+  requiresAuth,
+  __resetImageCacheForTesting,
+} from "./useAuthenticatedImageUrl";
 
 const FAKE_BLOB_URL = "blob:http://localhost:3000/fake-uuid";
 
 let mockCreateObjectURL: ReturnType<typeof vi.fn>;
 let mockRevokeObjectURL: ReturnType<typeof vi.fn>;
+
+// IntersectionObserver の callback を捕捉して任意のタイミングで発火するためのストア。
+// Storage for the most-recent IntersectionObserver callback so tests can fire it.
+type IOCallback = (entries: IntersectionObserverEntry[]) => void;
+let lastObserverCallback: IOCallback | null = null;
+let lastObserverDisconnect: ReturnType<typeof vi.fn> | null = null;
+const originalIntersectionObserver = global.IntersectionObserver;
 
 beforeEach(() => {
   mockCreateObjectURL = vi.fn().mockReturnValue(FAKE_BLOB_URL);
@@ -13,10 +24,30 @@ beforeEach(() => {
   global.URL.createObjectURL = mockCreateObjectURL as (obj: Blob | MediaSource) => string;
   global.URL.revokeObjectURL = mockRevokeObjectURL as (url: string) => void;
   vi.spyOn(global, "fetch");
+
+  lastObserverCallback = null;
+  lastObserverDisconnect = null;
+  global.IntersectionObserver = class IO {
+    readonly root: Element | null = null;
+    readonly rootMargin: string = "";
+    readonly thresholds: ReadonlyArray<number> = [];
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+    takeRecords = vi.fn().mockReturnValue([]);
+    constructor(cb: IntersectionObserverCallback) {
+      lastObserverCallback = cb as unknown as IOCallback;
+      lastObserverDisconnect = this.disconnect;
+    }
+  } as unknown as typeof IntersectionObserver;
+
+  __resetImageCacheForTesting();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  global.IntersectionObserver = originalIntersectionObserver;
+  __resetImageCacheForTesting();
 });
 
 function mockFetchSuccess(body = new Blob(["img"], { type: "image/png" })) {
@@ -254,5 +285,123 @@ describe("useAuthenticatedImageUrl", () => {
     });
 
     expect(result.current.hasError).toBe(false);
+  });
+
+  // ─── Shared cache (Issue #851) ──────────────────────────────────────
+  describe("shared cache across instances", () => {
+    it("fetches only once when two hooks subscribe to the same src", async () => {
+      mockFetchSuccess();
+      const src = "/api/thumbnail/serve/shared-1";
+
+      const { result: r1 } = renderHook(() => useAuthenticatedImageUrl(src));
+      const { result: r2 } = renderHook(() => useAuthenticatedImageUrl(src));
+
+      await waitFor(() => {
+        expect(r1.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+        expect(r2.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(mockCreateObjectURL).toHaveBeenCalledTimes(1);
+    });
+
+    it("only revokes blob URL after every subscriber unmounts", async () => {
+      mockFetchSuccess();
+      const src = "/api/thumbnail/serve/shared-2";
+
+      const { result: r1, unmount: u1 } = renderHook(() => useAuthenticatedImageUrl(src));
+      const { result: r2, unmount: u2 } = renderHook(() => useAuthenticatedImageUrl(src));
+
+      await waitFor(() => {
+        expect(r1.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+        expect(r2.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+      });
+
+      u1();
+      expect(mockRevokeObjectURL).not.toHaveBeenCalled();
+
+      u2();
+      expect(mockRevokeObjectURL).toHaveBeenCalledWith(FAKE_BLOB_URL);
+      expect(mockRevokeObjectURL).toHaveBeenCalledTimes(1);
+    });
+
+    it("resolves immediately for a second subscriber when entry is already cached", async () => {
+      mockFetchSuccess();
+      const src = "/api/thumbnail/serve/shared-3";
+
+      const { result: r1 } = renderHook(() => useAuthenticatedImageUrl(src));
+      await waitFor(() => {
+        expect(r1.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+      });
+
+      const { result: r2 } = renderHook(() => useAuthenticatedImageUrl(src));
+      await waitFor(() => {
+        expect(r2.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ─── Lazy loading via IntersectionObserver (Issue #851) ─────────────
+  describe("lazy loading", () => {
+    let element: HTMLDivElement;
+
+    beforeEach(() => {
+      element = document.createElement("div");
+      document.body.appendChild(element);
+    });
+
+    afterEach(() => {
+      if (element.parentNode) element.parentNode.removeChild(element);
+    });
+
+    it("does not fetch until the observed element intersects", async () => {
+      mockFetchSuccess();
+      const src = "/api/thumbnail/serve/lazy-1";
+      const ref = { current: element };
+
+      const { result } = renderHook(() => useAuthenticatedImageUrl(src, { lazy: true, ref }));
+
+      // 初期描画では fetch しない / Initial render does not fetch
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.resolvedUrl).toBeUndefined();
+    });
+
+    it("fetches after intersection callback fires", async () => {
+      mockFetchSuccess();
+      const src = "/api/thumbnail/serve/lazy-2";
+      const ref = { current: element };
+
+      const { result } = renderHook(() => useAuthenticatedImageUrl(src, { lazy: true, ref }));
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(lastObserverCallback).not.toBeNull();
+
+      await act(async () => {
+        lastObserverCallback?.([{ isIntersecting: true } as IntersectionObserverEntry]);
+      });
+
+      await waitFor(() => {
+        expect(result.current.resolvedUrl).toBe(FAKE_BLOB_URL);
+      });
+      expect(global.fetch).toHaveBeenCalledWith(src, { credentials: "include" });
+    });
+
+    it("disconnects the observer after intersection", async () => {
+      mockFetchSuccess();
+      const src = "/api/thumbnail/serve/lazy-3";
+      const ref = { current: element };
+
+      renderHook(() => useAuthenticatedImageUrl(src, { lazy: true, ref }));
+
+      const disconnect = lastObserverDisconnect;
+      await act(async () => {
+        lastObserverCallback?.([{ isIntersecting: true } as IntersectionObserverEntry]);
+      });
+
+      expect(disconnect).toHaveBeenCalled();
+    });
   });
 });
