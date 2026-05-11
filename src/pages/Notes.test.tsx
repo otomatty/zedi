@@ -1,15 +1,18 @@
 /**
- * Regression tests for the `?new=1` deep-link handling on the `Notes` page
- * (issue #827, gemini / codex review on PR #834). The header NoteSwitcher
- * sends users to `/notes?new=1` to open the create-note dialog. The hook
- * must fire `onOpen` both on first mount AND when the URL transitions
- * `/notes` → `/notes?new=1` while `Notes` is already mounted, then strip
- * the param so a refresh does not reopen the dialog.
+ * Regression tests for the `?new=1` deep-link handling on the `Notes` page.
+ * Originally introduced for the header `NoteSwitcher` (issue #827, gemini /
+ * codex review on PR #834); now the deep-link is emitted by
+ * `NoteTitleSwitcher` on each note page, but the contract is identical:
+ * `/notes?new=1` opens the create-note dialog.
  *
- * `Notes` ページの `?new=1` ディープリンク処理の退行テスト
- * （issue #827・PR #834 の gemini / codex レビュー指摘）。
- * ヘッダーの NoteSwitcher は `/notes?new=1` に遷移して新規作成ダイアログを
- * 開かせる。フックは「初回マウント時」と「`Notes` がマウントされたまま
+ * The hook must fire `onOpen` both on first mount AND when the URL
+ * transitions `/notes` → `/notes?new=1` while `Notes` is already mounted,
+ * then strip the param so a refresh does not reopen the dialog.
+ *
+ * `Notes` ページの `?new=1` ディープリンク処理の退行テスト。
+ * 旧ヘッダー NoteSwitcher 由来（issue #827・PR #834）の動線で、現在は
+ * 各ノート画面の `NoteTitleSwitcher` が同じディープリンクを発行する。
+ * フックは「初回マウント時」と「`Notes` がマウントされたまま
  * `/notes` → `/notes?new=1` に遷移した場合」の両方で `onOpen` を発火し、
  * リロード時に再オープンしないようクエリを除去しなければならない。
  */
@@ -66,9 +69,10 @@ describe("useNewNoteDeepLink", () => {
     expect(onOpen).not.toHaveBeenCalled();
     expect(observedSearch).toBe("");
 
-    // Simulate the header NoteSwitcher pushing `/notes?new=1` while the
-    // page is still mounted.
-    // ヘッダーの NoteSwitcher が `/notes?new=1` を push したのを再現する。
+    // Simulate `NoteTitleSwitcher` pushing `/notes?new=1` while the page
+    // is still mounted (e.g. user picked "new note" from the title menu).
+    // `NoteTitleSwitcher` のメニュー経由で `/notes?new=1` が push された状況を
+    // 再現する。
     act(() => {
       navigateRef?.("/notes?new=1");
     });

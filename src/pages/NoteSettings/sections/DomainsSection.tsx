@@ -1,18 +1,17 @@
 /**
- * 共有モーダルのドメイン招待タブ (Phase 6 / issue #663)。
- * Domain-access tab inside the share modal — adds, lists, and removes domain
- * rules backed by `note_domain_access`. Free-webmail providers are pre-checked
- * client-side and ultimately rejected by the server.
+ * `/notes/:noteId/settings/domains` — ドメイン招待ルールの追加・一覧・削除セクション。
  *
- * 編集者向けロールでドメインを追加するときは、編集権限が広く渡るリスクが
- * あるため確認ダイアログを挟む。`verifiedAt` は v1 では常に null なので
- * 全ての行で「未検証」バッジを出して注意を促す。
+ * 旧 `ShareModalDomainTab` の実装を設定画面のサブルートに移植したもの。
+ * - 編集者ロールでルールを追加すると確認ダイアログを挟む（広く編集権限が渡るため）
+ * - `verifiedAt` が null の行は「未検証」バッジを必ず表示
+ * - owner は追加・削除可、editor は read-only で一覧閲覧のみ
  *
- * Adding an `editor` rule pops a confirmation dialog because it grants edit
- * access to everyone at that domain. `verifiedAt` is always null in v1, so
- * each row carries an "unverified" badge until DNS-TXT verification ships.
+ * Domains section. Carried over from the former `ShareModalDomainTab` —
+ * adds a confirmation dialog for editor-role rules, surfaces an
+ * "unverified" badge whenever `verifiedAt` is null, and renders read-only
+ * for editors.
  */
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -41,47 +40,14 @@ import {
 } from "@/hooks/useDomainAccess";
 import { ApiError } from "@/lib/api";
 import { normalizeDomainInput } from "@/lib/domainValidation";
+import type { DomainValidationError, DomainValidationResult } from "@/lib/domainValidation";
 import type { DomainAccessRow } from "@/lib/api/types";
+import { useNoteSettingsContext } from "../NoteSettingsContext";
 
-/**
- * ドメインルール選択肢のロール。
- * Roles selectable when adding a domain rule.
- */
 type DomainRole = "viewer" | "editor";
 
-/**
- * ドメインタブの Props。
- * Props for the domain tab.
- */
-export interface ShareModalDomainTabProps {
-  noteId: string;
-  /**
-   * モーダルが開いているか。閉じている間は React Query を発火させないために
-   * `enabled` として下流に渡す。
-   * Whether the parent modal is open. Forwarded to React Query as `enabled`
-   * so we don't fetch while the modal is hidden.
-   */
-  enabled: boolean;
-  /**
-   * read-only モードで描画するか。editor 向けに既存ルールだけ閲覧させたいときに
-   * `true` を渡す。発行フォーム・削除ボタン・editor 確認モーダルを抑止する。
-   *
-   * Render in read-only mode (editor browsing the rules). Hides the add form,
-   * remove buttons, and editor-role confirmation dialog.
-   */
-  readOnly?: boolean;
-}
-
-/**
- * 入力エラーキー判定の戻り値型。`null` ならエラーなし。
- * Result of computing the inline-error label for the domain input.
- */
 type InputError = null | { kind: "invalid_format" } | { kind: "free_email"; domain: string };
 
-/**
- * 入力欄の状態 + ミューテーションを 1 つの interface にまとめて引数の数を抑える。
- * Bundle of state passed into the inner add-form to keep the prop list short.
- */
 interface AddFormProps {
   domainInput: string;
   setDomainInput: (v: string) => void;
@@ -93,13 +59,6 @@ interface AddFormProps {
   inputError: InputError;
 }
 
-/**
- * 入力フォーム部分。`AlertDialog` の確認ロジックは親側に残しているので、ここは
- * 値の表示と「追加」ボタンの click ハンドラを呼ぶだけのプレゼンテーション層。
- *
- * Add-form section. The confirmation flow lives in the parent; this component
- * is purely presentational and just calls `onAdd` when the button is clicked.
- */
 function DomainAccessAddForm({
   domainInput,
   setDomainInput,
@@ -118,7 +77,7 @@ function DomainAccessAddForm({
   })();
   return (
     <section className="border-border/60 space-y-3 rounded-lg border p-4">
-      <h4 className="text-sm font-semibold">{t("notes.domainTabAddHeading")}</h4>
+      <h3 className="text-sm font-semibold">{t("notes.domainTabAddHeading")}</h3>
       <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
         <div className="flex flex-col gap-1">
           <Input
@@ -126,10 +85,10 @@ function DomainAccessAddForm({
             onChange={(event) => setDomainInput(event.target.value)}
             placeholder={t("notes.domainPlaceholder")}
             aria-invalid={errorMessage ? true : undefined}
-            aria-describedby={errorMessage ? "domain-input-error" : undefined}
+            aria-describedby={errorMessage ? "domain-section-error" : undefined}
           />
           {errorMessage ? (
-            <p id="domain-input-error" className="text-destructive text-xs">
+            <p id="domain-section-error" className="text-destructive text-xs">
               {errorMessage}
             </p>
           ) : null}
@@ -152,8 +111,8 @@ function DomainAccessAddForm({
 }
 
 /**
- * 一覧行。ロールバッジ・未検証バッジ・削除ボタンを 1 行で描画する。
- * Single row inside the rule list — role + unverified badge + remove button.
+ * 一覧 1 行の描画。ドメイン / ロール / 未検証バッジ / 削除ボタンをまとめる。
+ * Single rule row — domain, role badge, unverified badge, remove button.
  */
 function DomainAccessRuleItem({
   rule,
@@ -202,35 +161,48 @@ function DomainAccessRuleItem({
 }
 
 /**
- * 共有モーダルのドメインタブ。ドメインルールの追加・一覧・削除を扱う。
- * Domain tab — handles add / list / remove for domain-access rules.
+ * `/notes/:noteId/settings/domains` セクション本体。owner はルール追加 /
+ * 削除、editor は read-only で一覧閲覧、viewer は no-access。
+ *
+ * Section body for `/notes/:noteId/settings/domains`. Owner edits, editor
+ * read-only, viewer locked out.
  */
-export function ShareModalDomainTab({
-  noteId,
-  enabled,
-  readOnly = false,
-}: ShareModalDomainTabProps) {
+const DomainsSection: React.FC = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { note, canManage, canViewAsEditor } = useNoteSettingsContext();
+  const canShow = canManage || canViewAsEditor;
+  const readOnly = !canManage;
 
-  const { data: rules, isLoading, isError } = useDomainAccessForNote(noteId, enabled);
-  const createMutation = useCreateDomainAccess(noteId);
-  const deleteMutation = useDeleteDomainAccess(noteId);
+  const enabled = canShow;
+  const { data: rules, isLoading, isError } = useDomainAccessForNote(note.id, enabled);
+  const createMutation = useCreateDomainAccess(note.id);
+  const deleteMutation = useDeleteDomainAccess(note.id);
 
   const [domainInput, setDomainInput] = useState("");
   const [roleInput, setRoleInput] = useState<DomainRole>("viewer");
   const [pendingEditorConfirm, setPendingEditorConfirm] = useState<{ domain: string } | null>(null);
 
-  const validation = useMemo(() => normalizeDomainInput(domainInput), [domainInput]);
+  const validation: DomainValidationResult = useMemo(
+    () => normalizeDomainInput(domainInput),
+    [domainInput],
+  );
+  // `in` 演算子で narrowing する（`validation.ok` 経由の narrowing が
+  // useMemo クロージャ・ターナリの両方で TS に伝わらないケースを回避）。
+  // Use the `in` operator to narrow: TS sometimes refuses to narrow via
+  // `validation.ok` through useMemo closures or ternaries, so we pivot on
+  // the `error` key directly.
+  const validationError: DomainValidationError | null =
+    "error" in validation ? validation.error : null;
   const inputError: InputError = useMemo(() => {
-    if (validation.ok) return null;
+    if (!validationError) return null;
     if (domainInput.trim().length === 0) return null;
-    if (validation.error.kind === "invalid_format") return { kind: "invalid_format" };
-    if (validation.error.kind === "free_email") {
-      return { kind: "free_email", domain: validation.error.domain };
+    if (validationError.kind === "invalid_format") return { kind: "invalid_format" };
+    if (validationError.kind === "free_email") {
+      return { kind: "free_email", domain: validationError.domain };
     }
     return null;
-  }, [validation, domainInput]);
+  }, [validationError, domainInput]);
 
   const submitCreate = async (domain: string) => {
     try {
@@ -239,15 +211,6 @@ export function ShareModalDomainTab({
       setRoleInput("viewer");
       toast({ title: t("notes.domainTabCreated") });
     } catch (error) {
-      // 事前にクライアント側で `normalizeDomainInput` を通しているため、サーバーが
-      // 400 を返すのは想定外のケース（ドメインリストの drift、競合エラーなど）。
-      // 詳細メッセージはサーバー文言をそのまま `description` に出し、判別ロジックは
-      // 持たない（壊れやすい文字列マッチの代わりに `ApiError.message` を表示する）。
-      //
-      // The client validates with `normalizeDomainInput` before submitting, so a
-      // server 400 here means something we couldn't pre-empt (list drift,
-      // conflict, etc.). Surface the server message verbatim instead of trying
-      // to classify it via fragile substring matching.
       const description = error instanceof ApiError && error.message ? error.message : undefined;
       toast({
         title: t("notes.domainTabCreateFailed"),
@@ -258,17 +221,24 @@ export function ShareModalDomainTab({
   };
 
   const handleAddClick = () => {
-    if (!validation.ok) {
-      if (validation.error.kind === "empty") {
+    if (validationError) {
+      if (validationError.kind === "empty") {
         toast({ title: t("notes.domainTabCreateFailedEmpty"), variant: "destructive" });
       }
       return;
     }
+    // `validationError` が null のときは ok ブランチが確定するが、TS の narrowing
+    // が `useMemo` 経由で `validation` に伝わらないため `domain` を直接読む
+    // 経路でフォールバックする（`validationError` が null = 正常 = domain 有）。
+    // `domain` lives on the ok-branch; safely read it via the in-narrowed
+    // local since TS won't carry narrowing back to `validation` reliably.
+    const domain = "domain" in validation ? validation.domain : null;
+    if (!domain) return;
     if (roleInput === "editor") {
-      setPendingEditorConfirm({ domain: validation.domain });
+      setPendingEditorConfirm({ domain });
       return;
     }
-    void submitCreate(validation.domain);
+    void submitCreate(domain);
   };
 
   const handleConfirmEditorAdd = () => {
@@ -287,10 +257,16 @@ export function ShareModalDomainTab({
     }
   };
 
+  if (!canShow) {
+    return (
+      <p className="text-muted-foreground text-sm">{t("notes.noPermissionToManageMembers")}</p>
+    );
+  }
+
   return (
-    <div className="space-y-6 pt-4">
+    <div className="space-y-6">
       <header className="space-y-1">
-        <h3 className="text-sm font-semibold">{t("notes.domainTabHeading")}</h3>
+        <h2 className="text-base font-semibold">{t("notes.settingsNav.domains")}</h2>
         <p className="text-muted-foreground text-xs">{t("notes.domainTabDescription")}</p>
       </header>
 
@@ -352,4 +328,6 @@ export function ShareModalDomainTab({
       </AlertDialog>
     </div>
   );
-}
+};
+
+export default DomainsSection;

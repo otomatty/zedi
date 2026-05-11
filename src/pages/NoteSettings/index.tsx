@@ -1,29 +1,33 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import React, { useMemo } from "react";
+import { Link, Outlet, useParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
+import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
-import { Button, useToast } from "@zedi/ui";
-import { useDeleteNote, useNote } from "@/hooks/useNoteQueries";
-import type { NoteEditPermission, NoteVisibility } from "@/types/note";
+import { Button } from "@zedi/ui";
+import { useNote } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
-import { NoteSettingsShareSection } from "./NoteSettingsShareSection";
-import { NoteSettingsVisibilitySection } from "./NoteSettingsVisibilitySection";
-import { NoteSettingsDeleteSection } from "./NoteSettingsDeleteSection";
-import { DefaultNotePublicWarningDialog } from "./DefaultNotePublicWarningDialog";
-import { PublicAnyLoggedInSaveAlertDialog } from "./PublicAnyLoggedInSaveAlertDialog";
-import { useNoteSettingsSaveWithPublicConfirm } from "./useNoteSettingsSaveWithPublicConfirm";
+import { NoteSettingsContext, type NoteSettingsContextValue } from "./NoteSettingsContext";
+import { NoteSettingsSidebar } from "./NoteSettingsSidebar";
 
 /**
- * Note settings page: share link, visibility, delete; save confirms public + any_logged_in once.
- * ノート設定ページ（共有リンク・公開範囲・削除）。公開 + any_logged_in への初回保存時に確認する。
+ * `NoteSettings` は `/notes/:noteId/settings` のレイアウトコンポーネント。
+ *
+ * - 共通領域: ヘッダー（タイトル + 公開バッジ + 「ノートへ戻る」）+ サイドナビ
+ * - 各セクションは `<Outlet />` 経由で描画され、`NoteSettingsContext` から
+ *   `note` / `access` / `role` / `canManage` を受け取る（再フェッチを避ける）
+ * - 権限ゲート:
+ *   - 未ログイン / `canView=false` → no-access プレースホルダ
+ *   - `viewer` 以外で remote source（共有モーダル経由の閲覧）も同様に no-access
+ *
+ * Layout for `/notes/:noteId/settings/*`. Owns the shared header + sidebar
+ * shell; each subroute renders its own `<Outlet />` content. Permissions are
+ * resolved once here and propagated via `NoteSettingsContext` so sections
+ * stay thin.
  */
 const NoteSettings: React.FC = () => {
   const { t } = useTranslation();
   const { noteId } = useParams<{ noteId: string }>();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
   const {
     note,
     access,
@@ -31,81 +35,20 @@ const NoteSettings: React.FC = () => {
     isLoading: isNoteLoading,
   } = useNote(noteId ?? "", { allowRemote: true });
 
-  const canManage = Boolean(access?.canManageMembers && source === "local");
-  const deleteNoteMutation = useDeleteNote();
+  const isLocal = source === "local";
 
-  const [title, setTitle] = useState("");
-  const [visibility, setVisibility] = useState<NoteVisibility>("private");
-  const [editPermission, setEditPermission] = useState<NoteEditPermission>("owner_only");
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
-  const {
-    handleSaveNote,
-    confirmOpen: isPublicAnyLoggedInSaveConfirmOpen,
-    setConfirmOpen: setIsPublicAnyLoggedInSaveConfirmOpen,
-    handleConfirmPublicAnyLoggedInSave,
-    defaultNoteWarningOpen: isDefaultNoteWarningOpen,
-    setDefaultNoteWarningOpen: setIsDefaultNoteWarningOpen,
-    handleConfirmDefaultNoteWarning,
-    isSaving,
-  } = useNoteSettingsSaveWithPublicConfirm({
-    noteId,
-    note: note ?? undefined,
-    title,
-    visibility,
-    editPermission,
-  });
-
-  useEffect(() => {
-    if (!note) return;
-    // Sync local form state from the loaded note. Setters are called directly
-    // (no `queueMicrotask`) so a deferred callback cannot fire after `note`
-    // becomes null — that previously caused unhandled microtask exceptions
-    // surfaced as Stryker `# errors`, plus React `act()` warnings in tests.
-    // ロード済みノートからローカル状態を同期。`queueMicrotask` で遅延すると、
-    // `note` が null/入れ替わった後にコールバックが走って例外となり、
-    // mutation testing の RuntimeError や `act()` 警告の原因になっていた。
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot init from loaded note
-    setTitle(note.title);
-    setVisibility(note.visibility);
-    setEditPermission(note.editPermission);
-  }, [note]);
-
-  const noteUrl = useMemo(() => {
-    if (!noteId) return "";
-    return `${window.location.origin}/notes/${noteId}`;
-  }, [noteId]);
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(noteUrl);
-      toast({ title: t("notes.linkCopied") });
-    } catch (error) {
-      console.error("Failed to copy link:", error);
-      toast({ title: t("notes.linkCopyFailed"), variant: "destructive" });
-    }
-  };
-
-  const handleDeleteNote = async () => {
-    if (!noteId) return;
-    try {
-      await deleteNoteMutation.mutateAsync(noteId);
-      toast({ title: t("notes.noteDeleted") });
-      setIsDeleteDialogOpen(false);
-      // ノート（コンテナ）削除後はノート一覧 (`/notes`) へ戻す。個人ページ削除
-      // (`usePageDeletion` / `NotePageView`) がホーム (`/home`) へ戻すのは、
-      // 削除対象がページであり個人ホームに属しているため。両者は対象が異なる
-      // ので遷移先も異なる（PR #719 CodeRabbit の指摘への明示）。
-      // After deleting a note (the container), return to the notes index
-      // (`/notes`). Page-level deletes go to `/home` because the deleted
-      // entity belongs to the personal home—different entities, different
-      // landing pages by design (clarified per PR #719 review feedback).
-      navigate("/notes");
-    } catch (error) {
-      console.error("Failed to delete note:", error);
-      toast({ title: t("notes.noteDeleteFailed"), variant: "destructive" });
-    }
-  };
+  const contextValue = useMemo<NoteSettingsContextValue | null>(() => {
+    if (!note || !access) return null;
+    const canManage = Boolean(access.canManageMembers && isLocal);
+    const canViewAsEditor = Boolean(access.role === "editor" && access.canView && isLocal);
+    return {
+      note,
+      access,
+      role: access.role,
+      canManage,
+      canViewAsEditor,
+    };
+  }, [note, access, isLocal]);
 
   if (isNoteLoading) {
     return (
@@ -115,7 +58,7 @@ const NoteSettings: React.FC = () => {
     );
   }
 
-  if (!note || !access?.canView) {
+  if (!note || !access?.canView || !contextValue) {
     return (
       <PageLoadingOrDenied>
         <p className="text-muted-foreground text-sm">{t("notes.noteNotFoundOrNoAccess")}</p>
@@ -123,64 +66,50 @@ const NoteSettings: React.FC = () => {
     );
   }
 
+  // サイドナビが扱えるロールに正規化する。`guest`/`none` は viewer 相当に
+  // 落として、最低限 visibility セクションを read-only で閲覧可能にする。
+  // Normalize to a role the sidebar understands. `guest` / `none` fall back to
+  // `viewer` so the visibility section can still be reviewed read-only.
+  const sidebarRole: "owner" | "editor" | "viewer" =
+    contextValue.role === "owner"
+      ? "owner"
+      : contextValue.role === "editor" && contextValue.canViewAsEditor
+        ? "editor"
+        : "viewer";
+
   return (
-    <div className="min-h-0 flex-1 py-8">
-      <Container>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-xl font-semibold">{t("notes.noteSettings")}</h1>
-              <NoteVisibilityBadge visibility={visibility} />
+    <NoteSettingsContext.Provider value={contextValue}>
+      <div className="min-h-0 flex-1 py-8">
+        <Container>
+          <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            {/* タイトル → ノート切替 → 公開バッジ を 1 行に並べる。長いノート名は
+                NoteTitleSwitcher 側で whitespace-nowrap、外側は flex-wrap で
+                次の行に逃がす。
+                Lay out "Settings → [Note switcher] → [Visibility badge]" on a
+                single row. Long note titles stay on one line inside the
+                switcher; the wrapper flex-wraps to keep things readable on
+                narrow viewports. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="text-xl font-semibold whitespace-nowrap">{t("notes.noteSettings")}</h1>
+              <NoteTitleSwitcher noteId={note.id} noteTitle={note.title} variant="subtitle" />
+              <NoteVisibilityBadge visibility={note.visibility} />
             </div>
-            <p className="text-muted-foreground mt-1 truncate text-sm">
-              {note.title || t("notes.untitledNote")}
-            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/notes/${note.id}`}>{t("notes.backToNote")}</Link>
+            </Button>
+          </header>
+
+          <div className="mt-6 grid gap-6 md:grid-cols-[200px_1fr] md:gap-8">
+            <aside className="md:sticky md:top-24 md:self-start">
+              <NoteSettingsSidebar noteId={note.id} sidebarRole={sidebarRole} />
+            </aside>
+            <main className="min-w-0">
+              <Outlet />
+            </main>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to={`/notes/${note.id}`}>{t("notes.backToNote")}</Link>
-          </Button>
-        </div>
-
-        {!canManage ? (
-          <p className="text-muted-foreground mt-6 text-sm">{t("notes.noPermissionToEdit")}</p>
-        ) : (
-          <>
-            <NoteSettingsShareSection noteUrl={noteUrl} onCopyLink={handleCopyLink} />
-            <NoteSettingsVisibilitySection
-              title={title}
-              setTitle={setTitle}
-              visibility={visibility}
-              setVisibility={setVisibility}
-              editPermission={editPermission}
-              setEditPermission={setEditPermission}
-              onSaveNote={handleSaveNote}
-              isSaving={isSaving}
-            />
-            <NoteSettingsDeleteSection
-              isDeleteDialogOpen={isDeleteDialogOpen}
-              onOpenChange={setIsDeleteDialogOpen}
-              onConfirmDelete={handleDeleteNote}
-              isDeleting={deleteNoteMutation.isPending}
-              noteTitle={note.title || t("notes.untitledNote")}
-            />
-
-            <DefaultNotePublicWarningDialog
-              open={isDefaultNoteWarningOpen}
-              onOpenChange={setIsDefaultNoteWarningOpen}
-              onConfirm={handleConfirmDefaultNoteWarning}
-              isSaving={isSaving}
-            />
-
-            <PublicAnyLoggedInSaveAlertDialog
-              open={isPublicAnyLoggedInSaveConfirmOpen}
-              onOpenChange={setIsPublicAnyLoggedInSaveConfirmOpen}
-              onConfirm={handleConfirmPublicAnyLoggedInSave}
-              isSaving={isSaving}
-            />
-          </>
-        )}
-      </Container>
-    </div>
+        </Container>
+      </div>
+    </NoteSettingsContext.Provider>
   );
 };
 

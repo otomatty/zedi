@@ -3,11 +3,12 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import Container from "@/components/layout/Container";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
-import { NotePageCount } from "@/components/note/NotePageCount";
+import { NoteShareUrlCopyButton } from "@/components/note/NoteShareUrlCopyButton";
+import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge } from "@zedi/ui";
 import { NoteAddPageDialog } from "./NoteAddPageDialog";
-import { useNote, useNoteApi, useNotePages } from "@/hooks/useNoteQueries";
+import { useNote, useNotePages } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
@@ -40,7 +41,6 @@ const NoteView: React.FC = () => {
   const rawClipUrl = searchParams.get("clipUrl");
   const validClipUrl = rawClipUrl && isClipUrlAllowed(rawClipUrl) ? rawClipUrl : null;
 
-  const { isSignedIn } = useNoteApi();
   const {
     note,
     access,
@@ -53,10 +53,10 @@ const NoteView: React.FC = () => {
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
 
-  // ヘッダーのページ数表示と `NoteAddPageDialog` の重複検出に使う。グリッド
-  // 自体は `PageGrid` 内部で同じクエリキーを引くので二重フェッチにはならない。
-  // Used by the header counter and `NoteAddPageDialog`'s dedup check. The
-  // grid itself reuses the same React Query key, so this is a cache hit.
+  // `NoteAddPageDialog` の重複検出に使う。グリッド自体は `PageGrid` 内部で
+  // 同じクエリキーを引くので二重フェッチにはならない。
+  // Used for `NoteAddPageDialog` dedup; the grid reuses the same React Query
+  // key, so this is a cache hit.
   const { data: notePages = [] } = useNotePages(noteId ?? "", noteSource, Boolean(access?.canView));
 
   const [isAddPageOpen, setIsAddPageOpen] = useState(false);
@@ -126,9 +126,8 @@ const NoteView: React.FC = () => {
   return (
     <ContentWithAIChat
       floatingAction={
-        <div className="mr-4 mb-4 flex flex-col items-end gap-2">
-          <NotePageCount noteId={note.id} />
-          {(canEdit || canShowAddPage) && (
+        canEdit || canShowAddPage ? (
+          <div className="mr-4 mb-4 flex flex-col items-end gap-2">
             <FloatingActionButton
               noteId={note.id}
               onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
@@ -138,8 +137,8 @@ const NoteView: React.FC = () => {
               }
               hiddenOptions={canEdit ? undefined : ["blank", "url", "image"]}
             />
-          )}
-        </div>
+          </div>
+        ) : undefined
       }
     >
       <div className="min-h-0 flex-1 py-6">
@@ -147,21 +146,17 @@ const NoteView: React.FC = () => {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-xl font-semibold">
-                  {note.title || t("notes.untitledNote")}
+                <h1 className="whitespace-nowrap">
+                  <NoteTitleSwitcher noteId={note.id} noteTitle={note.title} variant="heading" />
                 </h1>
+                <NoteShareUrlCopyButton noteId={note.id} visibility={note.visibility} />
                 <NoteVisibilityBadge visibility={note.visibility} />
                 {note.isOfficial && <Badge variant="secondary">{t("notes.officialBadge")}</Badge>}
               </div>
-              <p className="text-muted-foreground mt-1 text-sm">
-                {t("notes.pagesCount", { count: notePages.length })}
-              </p>
             </div>
             <NoteViewHeaderActions
               note={note}
               canManageMembers={canManageMembers}
-              isSignedIn={isSignedIn}
-              canView={Boolean(access?.canView)}
               userRole={access?.role ?? "none"}
             />
           </div>
