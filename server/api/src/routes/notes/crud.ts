@@ -303,11 +303,22 @@ app.get("/:noteId", authOptional, async (c) => {
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
 
+  // 非オーナーのアクセスごとに `view_count` をインクリメントするが、UPDATE は
+  // レスポンスをブロックしないよう投げっぱなしにする（Issue #849）。失敗時は
+  // ログのみで継続し、Discover の並び替えに使うカウンタは最終的に整合する。
+  //
+  // Increment `view_count` on every non-owner visit, but fire-and-forget the
+  // UPDATE so it does not add a DB round trip to the response (Issue #849).
+  // Errors are logged and swallowed; the counter that backs Discover's sort
+  // converges eventually.
   if (role !== "owner") {
-    await db
+    void db
       .update(notes)
       .set({ viewCount: sql`${notes.viewCount} + 1` })
-      .where(eq(notes.id, noteId));
+      .where(eq(notes.id, noteId))
+      .catch((error) => {
+        console.error(`[api] noteViewCountUpdateFailed noteId=${noteId}`, error);
+      });
   }
 
   const pagesResult = await db
@@ -317,7 +328,6 @@ app.get("/:noteId", authOptional, async (c) => {
       noteId: pages.noteId,
       sourcePageId: pages.sourcePageId,
       title: pages.title,
-      contentPreview: pages.contentPreview,
       thumbnailUrl: pages.thumbnailUrl,
       sourceUrl: pages.sourceUrl,
       createdAt: pages.createdAt,
@@ -339,7 +349,12 @@ app.get("/:noteId", authOptional, async (c) => {
         note_id: p.noteId,
         source_page_id: p.sourcePageId,
         title: p.title,
-        content_preview: p.contentPreview,
+        // Issue #849 移行措置: レスポンス軽量化のため常に `null`。プレビューが
+        // 必要な箇所は専用エンドポイント or 個別ページ取得を使う。
+        // Migration step for #849: always `null` to keep the response slim.
+        // Callers that need the preview should hit a dedicated endpoint or
+        // fetch the page individually.
+        content_preview: null,
         thumbnail_url: p.thumbnailUrl,
         source_url: p.sourceUrl,
         created_at: p.createdAt,

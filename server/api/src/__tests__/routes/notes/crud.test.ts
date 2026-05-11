@@ -423,7 +423,9 @@ describe("GET /api/notes/:noteId", () => {
     expect(page).toHaveProperty("id", "page-abc");
     expect(page).toHaveProperty("owner_id");
     expect(page).toHaveProperty("source_page_id");
-    expect(page).toHaveProperty("content_preview");
+    // Issue #849 移行措置: レスポンス軽量化のため `content_preview` は常に `null`。
+    // Migration step for #849: `content_preview` is always `null` on the wire.
+    expect(page).toHaveProperty("content_preview", null);
     expect(page).toHaveProperty("thumbnail_url");
     expect(page).toHaveProperty("note_id", mockNote.id);
   });

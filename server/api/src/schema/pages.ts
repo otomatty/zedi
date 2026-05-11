@@ -114,6 +114,23 @@ export const pages = pgTable(
      */
     index("idx_pages_note_id").on(table.noteId),
     /**
+     * `GET /api/notes/:id` のページ列挙クエリ
+     * (`WHERE note_id = $1 AND is_deleted = false ORDER BY updated_at DESC`)
+     * 専用の部分複合インデックス。ソフト削除行を除外してインデックスサイズを
+     * 最小化しつつ、ノート単位のソートをインメモリではなくインデックススキャン
+     * で解決する。Issue #850。
+     *
+     * Partial composite index that backs the page listing in
+     * `GET /api/notes/:id`
+     * (`WHERE note_id = $1 AND is_deleted = false ORDER BY updated_at DESC`).
+     * Excluding soft-deleted rows keeps the index small and lets the
+     * note-scoped sort run as an index scan instead of an in-memory sort.
+     * Issue #850.
+     */
+    index("idx_pages_note_active_updated")
+      .on(table.noteId, table.updatedAt.desc())
+      .where(sql`${table.isDeleted} = false`),
+    /**
      * オーナーごとに有効なウェルカムページは最大 1 件であることを担保する部分
      * ユニーク index。`welcomePageService.insertWelcomePage` の `onConflictDoNothing`
      * が target としてこの index に依拠している。実 DDL は

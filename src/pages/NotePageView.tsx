@@ -173,7 +173,7 @@ function NotePageEditorEditable({
       // `noteKeys.*` にあるため、タイトル変更をノート表示やサイドバーに反映
       // させるには明示的に無効化する必要がある。
       queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
-      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(noteId) });
     } catch (error) {
       if (pendingTitleRef.current === null) {
         setTitle(previousTitle);
