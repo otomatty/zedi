@@ -83,20 +83,33 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
 }
 
 /**
- * Note 詳細レスポンス用の weak ETag を生成する。`note.updatedAt` と role を
- * 混ぜ、リクエスタのロールに応じてレスポンスが変わる事実を反映する。
- * weak (`W/...`) を採用するのは、view_count のフェイヤアンドフォーゲット
+ * Note 詳細レスポンス用の weak ETag を生成する。`note.updatedAt` と role に
+ * 加えて、ページの最大 `updated_at` と件数も混ぜることで、`notes.updated_at`
+ * を経由しないページ単体編集（`PUT /api/pages/:id/content`・タイトル変更・
+ * ハード削除）でも ETag が変わるようにする。
+ * weak (`W/...`) を採用するのは、`view_count` のフェイヤアンドフォーゲット
  * 更新によりレスポンス body が byte-for-byte 一致しないため。
  *
- * Generates a weak ETag for note detail responses. The hash includes
- * `note.updatedAt` and the resolved role so different roles do not share a
- * cache entry. The ETag is weak (`W/...`) because the fire-and-forget
- * `view_count` update can shift the response body byte-for-byte even when
- * the semantically meaningful state has not changed.
+ * Generates a weak ETag for note detail responses. The hash mixes
+ * `note.updatedAt`, the resolved role, and a pages-change signal
+ * (`MAX(pages.updated_at) + COUNT(*)`) so that page-only edits which do not
+ * bump `notes.updated_at` (e.g. `PUT /api/pages/:id/content`, title rename,
+ * hard delete) still invalidate the validator. The ETag is weak (`W/...`)
+ * because the fire-and-forget `view_count` update can shift the response
+ * body byte-for-byte even when the semantically meaningful state has not
+ * changed.
  */
-function makeNoteETag(noteId: string, updatedAt: Date, role: string): string {
+function makeNoteETag(
+  noteId: string,
+  noteUpdatedAt: Date,
+  role: string,
+  pagesMaxUpdatedAt: Date | null,
+  pagesCount: number,
+): string {
   const hash = createHash("sha1")
-    .update(`${noteId}:${updatedAt.getTime()}:${role}`)
+    .update(
+      `${noteId}:${noteUpdatedAt.getTime()}:${role}:${pagesMaxUpdatedAt?.getTime() ?? 0}:${pagesCount}`,
+    )
     .digest("base64url")
     .slice(0, 22);
   return `W/"${hash}"`;
@@ -324,7 +337,32 @@ app.get("/:noteId", authOptional, async (c) => {
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
 
-  const etag = makeNoteETag(note.id, note.updatedAt, role);
+  // ページ側の変更（コンテンツ編集・タイトル変更・追加・削除）を ETag に反映
+  // するため、active なページの MAX(updated_at) と件数を 1 クエリで集約する。
+  // Phase 3 で追加した `(note_id, updated_at DESC) WHERE is_deleted = false`
+  // 部分インデックスにより、これは index-only で済む軽量クエリ。
+  //
+  // Aggregate `MAX(updated_at)` and `COUNT(*)` over active pages so the ETag
+  // captures page-level mutations that do not bump `notes.updated_at`
+  // (content edits via `/api/pages/:id/content`, title rename, hard
+  // delete). The partial composite index added in Phase 3 lets Postgres
+  // resolve this from the index alone, keeping the cost negligible.
+  const pagesSignalRows = await db
+    .select({
+      maxUpdatedAt: sql<Date | null>`MAX(${pages.updatedAt})`,
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(pages)
+    .where(and(eq(pages.noteId, noteId), eq(pages.isDeleted, false)));
+  const pagesSignal = pagesSignalRows[0] ?? { maxUpdatedAt: null, count: 0 };
+
+  const etag = makeNoteETag(
+    note.id,
+    note.updatedAt,
+    role,
+    pagesSignal.maxUpdatedAt,
+    pagesSignal.count,
+  );
   c.header("ETag", etag);
   c.header("Cache-Control", "private, must-revalidate");
   c.header("Vary", "Cookie");

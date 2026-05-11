@@ -32,6 +32,17 @@ import {
   authHeaders,
 } from "./setup.js";
 
+/**
+ * `GET /api/notes/:id` の ETag 計算で叩く
+ * `MAX(pages.updated_at) + COUNT(*)` 集約クエリのモック行。
+ *
+ * Mock row for the pages-signal aggregate query that `GET /api/notes/:id`
+ * runs while computing the ETag (Issue #853).
+ */
+function mockPagesSignal(maxUpdatedAt: Date | null = null, count = 0) {
+  return [{ maxUpdatedAt, count }];
+}
+
 // ── POST /api/notes ─────────────────────────────────────────────────────────
 
 describe("POST /api/notes", () => {
@@ -339,6 +350,7 @@ describe("GET /api/notes/:noteId", () => {
 
     const { app } = createTestApp([
       [mockNote], // getNoteRole → findActiveNoteById (owner)
+      mockPagesSignal(mockPage.updatedAt as Date, 1), // ETag pages signal
       [mockPage], // pages query
     ]);
 
@@ -370,6 +382,7 @@ describe("GET /api/notes/:noteId", () => {
       [publicNote], // getNoteRole → findActiveNoteById (not owner)
       [], // getNoteRole → member check (not a member)
       [], // getNoteRole → domain access check (no matching rule)
+      mockPagesSignal(), // ETag pages signal
       [], // viewCount update
       [], // pages query
     ]);
@@ -392,6 +405,7 @@ describe("GET /api/notes/:noteId", () => {
 
     const { app } = createTestApp([
       [publicNote], // getNoteRole (no userId, no email → guest)
+      mockPagesSignal(), // ETag pages signal
       [], // viewCount update
       [], // pages query
     ]);
@@ -409,6 +423,7 @@ describe("GET /api/notes/:noteId", () => {
 
     const { app } = createTestApp([
       [mockNote], // getNoteRole
+      mockPagesSignal(mockPage.updatedAt as Date, 1), // ETag pages signal
       [mockPage], // pages query
     ]);
 
@@ -466,7 +481,11 @@ describe("GET /api/notes/:noteId", () => {
     it("should include an ETag header on a 200 response", async () => {
       const mockNote = createMockNote();
       const mockPage = createMockPageRow();
-      const { app } = createTestApp([[mockNote], [mockPage]]);
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+        [mockPage],
+      ]);
 
       const res = await app.request(`/api/notes/${mockNote.id}`, {
         headers: authHeaders(),
@@ -485,8 +504,10 @@ describe("GET /api/notes/:noteId", () => {
       const mockPage = createMockPageRow();
       const { app, chains } = createTestApp([
         [mockNote], // first request: getNoteRole
+        mockPagesSignal(mockPage.updatedAt as Date, 1), // first request: ETag pages signal
         [mockPage], // first request: pages query
-        [mockNote], // second request: getNoteRole only (no pages query)
+        [mockNote], // second request: getNoteRole
+        mockPagesSignal(mockPage.updatedAt as Date, 1), // second request: ETag pages signal
       ]);
 
       const res1 = await app.request(`/api/notes/${mockNote.id}`, {
@@ -503,11 +524,11 @@ describe("GET /api/notes/:noteId", () => {
 
       expect(res2.status).toBe(304);
       expect(await res2.text()).toBe("");
-      // pages クエリも viewCount UPDATE も走らないので、新規に消費される
-      // chain は getNoteRole の 1 件のみ。
-      // Only the role-resolution DB query runs on the 304 path; pages query
-      // and viewCount update are both skipped.
-      expect(chains.length - chainsBefore).toBe(1);
+      // 304 経路で消費するのは getNoteRole + pages signal の 2 件のみ。
+      // pages 本体クエリと viewCount UPDATE はスキップされる。
+      // Only role resolution + pages signal aggregate run on the 304 path;
+      // the full pages query and the viewCount update are both skipped.
+      expect(chains.length - chainsBefore).toBe(2);
     });
 
     it("should produce a different ETag after note.updatedAt changes", async () => {
@@ -515,8 +536,10 @@ describe("GET /api/notes/:noteId", () => {
       const updatedNote = createMockNote({ updatedAt: new Date("2026-02-15T12:34:56Z") });
       const { app } = createTestApp([
         [firstNote],
+        mockPagesSignal(), // ETag pages signal
         [], // pages query
         [updatedNote],
+        mockPagesSignal(), // ETag pages signal
         [], // pages query
       ]);
 
@@ -541,11 +564,13 @@ describe("GET /api/notes/:noteId", () => {
       const { app } = createTestApp([
         // Owner GET
         [ownerNote],
+        mockPagesSignal(), // ETag pages signal
         [], // pages
         // Guest GET on a different (public) note id
         [viewerNote], // findActiveNoteById
         [], // member check
         [], // domain access check
+        mockPagesSignal(), // ETag pages signal
         [], // viewCount update
         [], // pages query
       ]);
@@ -567,10 +592,47 @@ describe("GET /api/notes/:noteId", () => {
       expect(etagOwner).not.toBe(etagGuest);
     });
 
+    it("should change ETag when a page is edited even if notes.updated_at is unchanged", async () => {
+      // Codex P1 (#856 review): ページ単体編集 (`PUT /api/pages/:id/content` 等)
+      // で `notes.updated_at` が動かなくても、ETag は変わるべき。pages signal
+      // (MAX(updated_at), COUNT) を ETag のハッシュ入力に混ぜることで保証する。
+      //
+      // Codex P1 (#856 review): editing a page via routes that do not bump
+      // `notes.updated_at` (e.g. `PUT /api/pages/:id/content`) must still
+      // shift the ETag. Verified by sending the same note row twice with
+      // different `MAX(pages.updated_at)` values.
+      const mockNote = createMockNote();
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 1),
+        [], // pages query
+        [mockNote],
+        mockPagesSignal(new Date("2026-03-10T08:00:00Z"), 1),
+        [], // pages query
+      ]);
+
+      const res1 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+      const res2 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+
+      const etag1 = res1.headers.get("ETag");
+      const etag2 = res2.headers.get("ETag");
+      expect(etag1).toBeTruthy();
+      expect(etag2).toBeTruthy();
+      expect(etag1).not.toBe(etag2);
+    });
+
     it("should ignore a stale If-None-Match and return 200 with a fresh body", async () => {
       const mockNote = createMockNote();
       const mockPage = createMockPageRow();
-      const { app } = createTestApp([[mockNote], [mockPage]]);
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+        [mockPage],
+      ]);
 
       const res = await app.request(`/api/notes/${mockNote.id}`, {
         headers: { ...authHeaders(), "If-None-Match": 'W/"definitely-stale"' },
