@@ -35,9 +35,20 @@ const ESTIMATED_ROW_HEIGHT = 220;
  * `PageGrid` の親が `ContentWithAIChat` 内の overflow-y-auto コンテナなので、
  * スクロールコンテナを自分で持たずに既存レイアウトに同調する。
  *
+ * `getComputedStyle` をループで呼ぶため理論的にはレイアウトスラッシュの懸念が
+ * あるが、本関数は `useLayoutEffect` から mount 時に 1 回だけ実行される。
+ * 祖先深さもページ全体で 5〜10 階層に収まるため、実用上のコストは無視できる
+ * （PR #856 Gemini medium review に対する acknowledged comment）。
+ *
  * Walk up the DOM to find the nearest ancestor whose `overflow-y` is
  * `auto` or `scroll`. Falls back to `null` (which the virtualizer treats as
  * window-less, i.e. it will skip measurement until a scroll element appears).
+ *
+ * Calling `getComputedStyle` in a loop could in principle cause layout
+ * thrashing, but this runs exactly once from `useLayoutEffect` on mount and
+ * the ancestor chain in this app is shallow (~5-10 nodes), so the cost is
+ * negligible in practice. Documented in response to PR #856 Gemini medium
+ * review.
  */
 function findScrollParent(el: HTMLElement | null): HTMLElement | null {
   let cur = el?.parentElement ?? null;
@@ -220,7 +231,16 @@ const PageGrid: React.FC<PageGridProps> = ({
             return (
               <div
                 key={row.key}
-                data-row-index={row.index}
+                // `useVirtualizer` の `measureElement` は既定で `data-index`
+                // 属性を読んで仮想行と DOM 要素を紐付ける。属性名を変えると
+                // 動的計測が機能せず ESTIMATED_ROW_HEIGHT に固定されるので
+                // 必ず `data-index` のまま渡す (PR #856 Codex P2 review)。
+                //
+                // `measureElement` looks up the virtual row via the
+                // `data-index` attribute by default; renaming the attribute
+                // breaks dynamic measurement and pins the virtualizer to
+                // `ESTIMATED_ROW_HEIGHT` (see PR #856 Codex P2 review).
+                data-index={row.index}
                 ref={rowVirtualizer.measureElement}
                 className={cn(
                   "absolute top-0 left-0 grid w-full gap-3 pb-3",

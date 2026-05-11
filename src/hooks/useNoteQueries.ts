@@ -303,17 +303,45 @@ type UseNoteOptions = { allowRemote?: boolean };
  * 理由は、queryFn の中から軽量に参照したい + 304 時のフォールバックを
  * シンプルにするため。
  *
+ * Map の挿入順保証を利用した LRU バウンディングで、長時間セッションでも
+ * 際限なくエントリが積み上がらないようにする（上限を超えたら最古を捨てる、
+ * PR #856 Gemini medium review）。
+ *
  * Module-scoped cache for the most-recent ETag seen for each
  * `GET /api/notes/:id` request (Issue #853). Keyed by note id + auth
  * principal so a role change invalidates the cached validator. Kept
  * separate from React Query's query cache so the `queryFn` can both read
  * and write without going through the (potentially stale) query data
  * snapshot, and so the 304 fallback path stays straightforward.
+ *
+ * Bounded via LRU eviction (using `Map`'s insertion-order guarantee) so a
+ * long browsing session does not accumulate unbounded entries (PR #856
+ * Gemini medium review).
  */
+const NOTE_ETAG_CACHE_MAX_ENTRIES = 64;
 const noteEtagCache = new Map<string, string>();
 
 function noteEtagKey(noteId: string, userId: string, userEmail: string | undefined): string {
   return `${noteId}:${userId}:${userEmail ?? ""}`;
+}
+
+/** LRU read: bump the entry to most-recently-used by re-inserting it. */
+function noteEtagCacheGet(key: string): string | undefined {
+  const value = noteEtagCache.get(key);
+  if (value === undefined) return undefined;
+  noteEtagCache.delete(key);
+  noteEtagCache.set(key, value);
+  return value;
+}
+
+/** LRU write: insert as most-recently-used, evict oldest if over capacity. */
+function noteEtagCacheSet(key: string, value: string): void {
+  if (noteEtagCache.has(key)) noteEtagCache.delete(key);
+  noteEtagCache.set(key, value);
+  if (noteEtagCache.size > NOTE_ETAG_CACHE_MAX_ENTRIES) {
+    const oldest = noteEtagCache.keys().next().value;
+    if (oldest !== undefined) noteEtagCache.delete(oldest);
+  }
 }
 
 /** Test-only helper. ETag キャッシュをクリアする。 */
@@ -339,7 +367,7 @@ function makeNoteQueryFn(
 ) {
   return async (ctx: QueryFunctionContext<readonly unknown[]>): Promise<GetNoteResponse> => {
     const etagKey = noteEtagKey(noteId, userId, userEmail);
-    const ifNoneMatch = noteEtagCache.get(etagKey);
+    const ifNoneMatch = noteEtagCacheGet(etagKey);
     const result = await api.getNoteWithCache(noteId, { ifNoneMatch });
 
     if (result.notModified) {
@@ -350,14 +378,14 @@ function makeNoteQueryFn(
       // 304 without a local cache (e.g. fresh tab, no persistence) — refetch
       // unconditionally to recover.
       const fresh = await api.getNoteWithCache(noteId);
-      if (fresh.etag) noteEtagCache.set(etagKey, fresh.etag);
+      if (fresh.etag) noteEtagCacheSet(etagKey, fresh.etag);
       if (!fresh.data) {
         throw new Error("Server returned 304 twice without a cached body");
       }
       return fresh.data;
     }
 
-    if (result.etag) noteEtagCache.set(etagKey, result.etag);
+    if (result.etag) noteEtagCacheSet(etagKey, result.etag);
     if (!result.data) {
       throw new Error("Unexpected null body on 200 response from /api/notes/:id");
     }
