@@ -68,7 +68,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   })),
   noteKeys: {
     page: (noteId: string, pageId: string) => ["notes", "pages", noteId, pageId],
-    pageList: (noteId: string) => ["notes", "pages", noteId],
+    detailsByNoteId: (noteId: string) => ["notes", "detail", noteId],
   },
 }));
 

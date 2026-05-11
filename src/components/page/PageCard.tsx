@@ -194,7 +194,11 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
       )}
       style={{
         animationFillMode: "forwards",
-        animationDelay: `${index * 50}ms`,
+        // ノート内のページが多くても末尾カードのフェードイン待ちが伸び続けない
+        // よう、stagger は 8 枚（400ms）で頭打ちにする（Issue #848）。
+        // Cap the stagger at 8 cards (400ms) so large notes don't trail the
+        // last card behind a multi-second fade-in queue (Issue #848).
+        animationDelay: `${Math.min(index, 8) * 50}ms`,
       }}
     >
       {/* Title - Top */}

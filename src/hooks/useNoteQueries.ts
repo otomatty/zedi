@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useAuth, useUser } from "@/hooks/useAuth";
 import { createApiClient } from "@/lib/api";
 import type {
@@ -37,10 +37,22 @@ export const noteKeys = {
   details: () => [...noteKeys.all, "detail"] as const,
   detail: (noteId: string, userId?: string, userEmail?: string) =>
     [...noteKeys.details(), noteId, userId ?? "", userEmail ?? ""] as const,
+  /**
+   * `noteId` 配下のすべての detail エントリ（任意の `userId` / `userEmail`）に
+   * 一致するプレフィックスキー。`invalidateQueries` のターゲットとして使う。
+   * Issue #848 で `useNotePages` を `useNote` と同じキーに統一した結果、
+   * 旧 `pageList(noteId)` 無効化はこちらに置き換えられる。
+   *
+   * Prefix key matching every detail entry for `noteId` regardless of caller
+   * `userId` / `userEmail`. Used as the `invalidateQueries` target after
+   * mutations that change the page list. Issue #848 collapsed `useNotePages`
+   * onto the same key as `useNote`, so the old `pageList(noteId)` invalidator
+   * is replaced by this one.
+   */
+  detailsByNoteId: (noteId: string) => [...noteKeys.details(), noteId] as const,
   publicList: (sort: string, limit: number, offset: number) =>
     [...noteKeys.all, "public", sort, limit, offset] as const,
   pages: () => [...noteKeys.all, "pages"] as const,
-  pageList: (noteId: string) => [...noteKeys.pages(), noteId] as const,
   page: (noteId: string, pageId: string) => [...noteKeys.pages(), noteId, pageId] as const,
   members: () => [...noteKeys.all, "members"] as const,
   memberList: (noteId: string) => [...noteKeys.members(), noteId] as const,
@@ -281,19 +293,31 @@ type UseNoteOptions = { allowRemote?: boolean };
 /**
  * 単一の Note とアクセス権情報を取得するフック。
  * Hook that fetches a single Note alongside the caller's access context.
+ *
+ * `useNotePages` と同じ `queryKey` / `queryFn` を共有し、`select` で
+ * `{ note, access }` を導出する。これにより `GET /api/notes/:id` の
+ * 重複フェッチが回避される（Issue #848）。
+ *
+ * Shares the `queryKey` / `queryFn` with `useNotePages` and derives
+ * `{ note, access }` via `select`. This dedupes `GET /api/notes/:id` so the
+ * heavy JSON is fetched only once per note (Issue #848).
  */
 export function useNote(noteId: string, _options?: UseNoteOptions) {
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
   const query = useQuery({
     queryKey: noteKeys.detail(noteId, userId, userEmail),
-    queryFn: async (): Promise<NoteWithAccess> => {
-      const res = await api.getNote(noteId);
+    queryFn: () => api.getNote(noteId),
+    enabled: isLoaded && !!noteId,
+    // 別ノートへ遷移しても前ノートのデータを残し、白画面を回避する。
+    // Keep showing the previous note while fetching the next one to avoid the
+    // blank loading state on navigation between notes.
+    placeholderData: keepPreviousData,
+    select: (res): NoteWithAccess => {
       const note = apiNoteToNote(res);
       const access = buildAccessFromApi(note, res.current_user_role, userId);
       return { note, access };
     },
-    enabled: isLoaded && !!noteId,
   });
 
   const noteWithAccess = query.data ?? null;
@@ -324,25 +348,34 @@ export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 
 
 /**
  * 指定ノートに含まれるページ一覧（ノート画面用）を取得するフック。
+ *
+ * `useNote` と同じ `queryKey` / `queryFn` を使い、`select` でページ配列のみを
+ * 切り出す。React Query が同一キーでフェッチをディデュープするので、
+ * `useNote` と同居しても `GET /api/notes/:id` は 1 回しか走らない
+ * （Issue #848）。
+ *
  * Hook that fetches pages belonging to the given note for the note view.
+ * Reuses the `queryKey` / `queryFn` of `useNote` and extracts the pages slice
+ * through `select`, so co-locating both hooks yields a single
+ * `GET /api/notes/:id` round trip (Issue #848).
  */
 export function useNotePages(
   noteId: string,
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  const { api, isLoaded } = useNoteApi();
+  const { api, userId, userEmail, isLoaded } = useNoteApi();
 
   return useQuery({
-    queryKey: noteKeys.pageList(noteId),
-    queryFn: async (): Promise<NotePageSummary[]> => {
-      const res = await api.getNote(noteId);
-      return res.pages.map((p) => ({
+    queryKey: noteKeys.detail(noteId, userId, userEmail),
+    queryFn: () => api.getNote(noteId),
+    enabled: enabled && isLoaded && !!noteId,
+    placeholderData: keepPreviousData,
+    select: (res): NotePageSummary[] =>
+      res.pages.map((p) => ({
         ...apiPageToPageSummary(p),
         addedByUserId: p.added_by_user_id,
-      }));
-    },
-    enabled: enabled && isLoaded && !!noteId,
+      })),
   });
 }
 
@@ -489,7 +522,7 @@ export function useAddPageToNote() {
       await api.addNotePage(noteId, { pageId, title });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
     },
   });
@@ -512,7 +545,7 @@ export function useCopyPersonalPageToNote() {
       return api.copyPersonalPageToNote(noteId, sourcePageId);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
     },
   });
@@ -612,7 +645,7 @@ export function useRemovePageFromNote() {
       await api.removeNotePage(noteId, pageId);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
     },
   });
