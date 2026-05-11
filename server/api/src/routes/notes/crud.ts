@@ -115,6 +115,30 @@ function makeNoteETag(
   return `W/"${hash}"`;
 }
 
+/**
+ * RFC 7232 §3.2 準拠の `If-None-Match` 弱比較。`*` ワイルドカード、
+ * カンマ区切り複数値、`W/` プレフィックス（大文字小文字非区別）を
+ * 正しく扱う（PR #856 CodeRabbit nitpick）。
+ *
+ * Weak `If-None-Match` matcher per RFC 7232 §3.2. Handles the `*`
+ * wildcard, comma-separated lists, and case-insensitive `W/` prefix so
+ * spec-compliant clients that normalize or batch validators still hit
+ * the 304 path (PR #856 CodeRabbit nitpick).
+ */
+export function ifNoneMatchMatches(headerValue: string | undefined, currentEtag: string): boolean {
+  if (!headerValue) return false;
+  const trimmed = headerValue.trim();
+  // `*` matches any current representation (RFC 7232 §3.2).
+  if (trimmed === "*") return true;
+  const normalize = (token: string) => token.trim().replace(/^W\//i, "");
+  const target = normalize(currentEtag);
+  if (!target) return false;
+  return headerValue.split(",").some((token) => {
+    const candidate = normalize(token);
+    return candidate.length > 0 && candidate === target;
+  });
+}
+
 const app = new Hono<AppEnv>();
 
 // ── POST / ──────────────────────────────────────────────────────────────────
@@ -377,7 +401,7 @@ app.get("/:noteId", authOptional, async (c) => {
   // #853). Treating "fetched" as "received a body" keeps the counter
   // semantically meaningful and keeps the ETag stable longer.
   const ifNoneMatch = c.req.header("If-None-Match");
-  if (ifNoneMatch && ifNoneMatch === etag) {
+  if (ifNoneMatchMatches(ifNoneMatch, etag)) {
     return c.body(null, 304);
   }
 

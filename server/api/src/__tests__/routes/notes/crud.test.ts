@@ -31,6 +31,7 @@ import {
   createTestApp,
   authHeaders,
 } from "./setup.js";
+import { ifNoneMatchMatches } from "../../../routes/notes/crud.js";
 
 /**
  * `GET /api/notes/:id` の ETag 計算で叩く
@@ -42,6 +43,47 @@ import {
 function mockPagesSignal(maxUpdatedAt: Date | null = null, count = 0) {
   return [{ maxUpdatedAt, count }];
 }
+
+// ── ifNoneMatchMatches (Issue #853, PR #856 review) ─────────────────────────
+
+describe("ifNoneMatchMatches", () => {
+  const etag = 'W/"abc123"';
+
+  it("returns false for missing header", () => {
+    expect(ifNoneMatchMatches(undefined, etag)).toBe(false);
+    expect(ifNoneMatchMatches("", etag)).toBe(false);
+  });
+
+  it("matches exact weak ETag", () => {
+    expect(ifNoneMatchMatches('W/"abc123"', etag)).toBe(true);
+  });
+
+  it("matches when header omits the W/ prefix (weak comparison)", () => {
+    expect(ifNoneMatchMatches('"abc123"', etag)).toBe(true);
+  });
+
+  it("matches case-insensitively on the W/ prefix", () => {
+    expect(ifNoneMatchMatches('w/"abc123"', etag)).toBe(true);
+  });
+
+  it("matches one tag in a comma-separated list", () => {
+    expect(ifNoneMatchMatches('W/"other", W/"abc123", W/"foo"', etag)).toBe(true);
+  });
+
+  it("matches the wildcard `*`", () => {
+    expect(ifNoneMatchMatches("*", etag)).toBe(true);
+    expect(ifNoneMatchMatches("  *  ", etag)).toBe(true);
+  });
+
+  it("does not match a different ETag", () => {
+    expect(ifNoneMatchMatches('W/"different"', etag)).toBe(false);
+  });
+
+  it("ignores empty tokens in a list", () => {
+    expect(ifNoneMatchMatches(', ,W/"abc123",', etag)).toBe(true);
+    expect(ifNoneMatchMatches(", ,", etag)).toBe(false);
+  });
+});
 
 // ── POST /api/notes ─────────────────────────────────────────────────────────
 
@@ -637,6 +679,50 @@ describe("GET /api/notes/:noteId", () => {
       expect(etag1).toBeTruthy();
       expect(etag2).toBeTruthy();
       expect(etag1).not.toBe(etag2);
+    });
+
+    it("should return 304 when If-None-Match is a list and one entry matches", async () => {
+      // RFC 7232 §3.2: 複数バリデータがカンマ区切りで送られるケース。1 件でも
+      // 現在の ETag に一致すれば 304 を返さなければならない（PR #856
+      // CodeRabbit nitpick: クライアントが正規化・列挙してくる場合に備える）。
+      //
+      // RFC 7232 §3.2: clients may send a comma-separated list of validators
+      // and the server must 304 if any one of them matches the current ETag.
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+        [mockPage],
+        [mockNote],
+        mockPagesSignal(mockPage.updatedAt as Date, 1),
+      ]);
+
+      const res1 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+      const etag = res1.headers.get("ETag");
+      if (!etag) throw new Error("ETag header missing");
+
+      const res2 = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: {
+          ...authHeaders(),
+          "If-None-Match": `W/"stale-1", ${etag}, W/"stale-2"`,
+        },
+      });
+
+      expect(res2.status).toBe(304);
+    });
+
+    it("should return 304 when If-None-Match is the wildcard `*`", async () => {
+      const mockNote = createMockNote();
+      const { app } = createTestApp([[mockNote], mockPagesSignal()]);
+
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: { ...authHeaders(), "If-None-Match": "*" },
+      });
+
+      expect(res.status).toBe(304);
     });
 
     it("should ignore a stale If-None-Match and return 200 with a fresh body", async () => {
