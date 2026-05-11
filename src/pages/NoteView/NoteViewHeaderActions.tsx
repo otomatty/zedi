@@ -1,159 +1,52 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { MoreHorizontal, Settings, Share2 } from "lucide-react";
-import {
-  Badge,
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@zedi/ui";
+import { Settings } from "lucide-react";
+import { Button } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import { useNoteMembers } from "@/hooks/useNoteQueries";
 import type { Note, NoteAccessRole } from "@/types/note";
-import { NoteShareModal } from "./ShareModal/NoteShareModal";
 
 /**
- * Props for the consolidated header actions dropdown.
- * 統合ヘッダーアクション（ドロップダウン）の Props。
+ * Props for the simplified note header actions.
+ * 簡素化されたノートヘッダーアクションの Props。
  */
 export interface NoteViewHeaderActionsProps {
   note: Note;
+  /** owner 判定（管理可能か）。owner のときだけ歯車を出す。 */
   canManageMembers: boolean;
-  isSignedIn: boolean;
-  canView: boolean;
   /**
-   * 共有モーダルのタブ可視性 / read-only 制御に使う現在ユーザーのロール。
-   * Current user's role on this note. Used to gate which share-modal tabs are
-   * visible and which are rendered as read-only for editor / viewer.
+   * ロール情報。現状は描画分岐に直接使わないが、将来 editor 向け read-only
+   * 設定リンクを出したくなったときの拡張点として props に残す（呼び出し側を
+   * 二度変えなくて済むようにするための予防的シグネチャ維持）。
+   * Kept on the props so a future read-only entry point for editors does not
+   * require touching every caller.
    */
   userRole: NoteAccessRole;
 }
 
 /**
- * Renders the note detail page top actions.
+ * ノート詳細ページ上部の操作アイコン。owner のみ「設定ページへ」遷移する
+ * 歯車アイコンリンクを表示する。共有モーダルは廃止し、共有 URL コピーは
+ * `NoteShareUrlCopyButton`（タイトル横、public/unlisted のとき）に分離した。
  *
- * - Owner: ドロップダウン（共有 + 設定）+ 招待済みメンバー数バッジ。
- * - Editor / Viewer (signed-in, canView): 共有ボタンのみを表示する。共有モーダルは
- *   `userRole` に応じて owner 向け編集 UI / editor 向け read-only / viewer 向け
- *   公開設定のみ、と出し分ける。
- * - Guest: 共有導線は表示しない。未ログイン guest のみログインヒントを表示する。
- *
- * /notes/[id] 上部アクション。オーナーは共有 + 設定のドロップダウンを、
- * editor / viewer はサインインしていれば共有ボタンを表示する。共有モーダル
- * 側で `userRole` を解釈し閲覧可能タブ・read-only モードを切り替える。
+ * Top-right note actions. Owners get a single gear icon linking to
+ * `/notes/:id/settings`. The legacy share modal was retired; the quick-copy
+ * URL action now lives next to the title as `NoteShareUrlCopyButton`.
  */
-export function NoteViewHeaderActions({
-  note,
-  canManageMembers,
-  isSignedIn,
-  canView,
-  userRole,
-}: NoteViewHeaderActionsProps) {
+export function NoteViewHeaderActions({ note, canManageMembers }: NoteViewHeaderActionsProps) {
   const { t } = useTranslation();
-  const [isShareOpen, setIsShareOpen] = useState(false);
 
-  // 招待済みメンバー数バッジは owner のみ取得・表示する。editor もメンバー一覧を
-  // 閲覧できるが、ヘッダー上のバッジ価値は管理者向けのため owner 限定のままにする。
-  // Only owners fetch + display the accepted-member count badge. Editors can
-  // still browse the list inside the modal, but the header badge stays
-  // owner-only since it is an at-a-glance signal for the manager.
-  const { data: members = [] } = useNoteMembers(note.id, canManageMembers);
-  const acceptedCount = members.filter((m) => m.status === "accepted").length;
-
-  if (!canView) return null;
-
-  if (!isSignedIn) {
-    return <span className="text-muted-foreground text-sm">{t("notes.loginToPost")}</span>;
-  }
-
-  const canOpenShareModal = userRole === "editor" || userRole === "viewer";
-
-  // editor / viewer は共有ボタン単体を出す（設定ページは owner 限定）。
-  // Editors / viewers see a single share button — the settings page link stays
-  // owner-only. Signed-in guests can view public/unlisted notes but do not get
-  // the share entry point.
-  if (!canManageMembers && canOpenShareModal) {
-    return (
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsShareOpen(true)}
-          aria-label={t("notes.shareAria")}
-        >
-          <Share2 className="mr-2 h-4 w-4" aria-hidden />
-          {t("notes.share")}
-        </Button>
-        <NoteShareModal
-          open={isShareOpen}
-          onOpenChange={setIsShareOpen}
-          note={note}
-          userRole={userRole}
-        />
-      </div>
-    );
-  }
-
-  if (!canManageMembers) {
-    return null;
-  }
+  if (!canManageMembers) return null;
 
   return (
-    <div className="flex items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={t("notes.openActions")}
-            className="relative"
-          >
-            <MoreHorizontal className="h-4 w-4" aria-hidden />
-            {acceptedCount > 0 ? (
-              <Badge
-                variant="secondary"
-                className="ml-2 h-5 min-w-5 px-1.5 text-xs"
-                aria-label={t("notes.shareMemberCountAria", { count: acceptedCount })}
-              >
-                {acceptedCount}
-              </Badge>
-            ) : null}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-44">
-          <DropdownMenuLabel>{t("notes.headerActionsLabel")}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setIsShareOpen(true)}>
-            <Share2 className="mr-2 h-4 w-4" aria-hidden />
-            <span>{t("notes.share")}</span>
-            {acceptedCount > 0 ? (
-              <Badge
-                variant="secondary"
-                className="ml-auto h-5 min-w-5 px-1.5 text-xs"
-                aria-label={t("notes.shareMemberCountAria", { count: acceptedCount })}
-              >
-                {acceptedCount}
-              </Badge>
-            ) : null}
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to={`/notes/${note.id}/settings`} className="flex w-full items-center">
-              <Settings className="mr-2 h-4 w-4" aria-hidden />
-              <span>{t("notes.settings")}</span>
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <NoteShareModal
-        open={isShareOpen}
-        onOpenChange={setIsShareOpen}
-        note={note}
-        userRole={userRole}
-      />
-    </div>
+    <Button
+      asChild
+      variant="ghost"
+      size="icon"
+      aria-label={t("notes.openSettings")}
+      title={t("notes.openSettings")}
+    >
+      <Link to={`/notes/${note.id}/settings`}>
+        <Settings className="h-4 w-4" aria-hidden />
+      </Link>
+    </Button>
   );
 }

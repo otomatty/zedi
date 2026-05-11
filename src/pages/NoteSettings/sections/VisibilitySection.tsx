@@ -1,15 +1,17 @@
+import React, { useEffect, useMemo, useState } from "react";
 import { Copy } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label, RadioGroup, RadioGroupItem, useToast } from "@zedi/ui";
-import type { Note, NoteEditPermission, NoteVisibility } from "@/types/note";
+import type { NoteEditPermission, NoteVisibility } from "@/types/note";
 import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
-import { PublicAnyLoggedInSaveAlertDialog } from "@/pages/NoteSettings/PublicAnyLoggedInSaveAlertDialog";
-import { useNoteSettingsSaveWithPublicConfirm } from "@/pages/NoteSettings/useNoteSettingsSaveWithPublicConfirm";
+import { DefaultNotePublicWarningDialog } from "../DefaultNotePublicWarningDialog";
+import { PublicAnyLoggedInSaveAlertDialog } from "../PublicAnyLoggedInSaveAlertDialog";
+import { useNoteSettingsSaveWithPublicConfirm } from "../useNoteSettingsSaveWithPublicConfirm";
+import { useNoteSettingsContext } from "../NoteSettingsContext";
 
 /**
- * 公開設定タブの i18n 説明文キー。
- * i18n keys for the visibility description under each radio option.
+ * 公開設定 radio 1 行分の i18n キー（説明文）。
+ * Description i18n keys for each visibility radio row.
  */
 const visibilityDescriptionKeys: Record<NoteVisibility, string> = {
   private: "notes.shareVisibilityDescriptionPrivate",
@@ -19,8 +21,8 @@ const visibilityDescriptionKeys: Record<NoteVisibility, string> = {
 };
 
 /**
- * 編集権限タブの i18n ラベル・説明文キー。
- * i18n keys for the edit-permission radio labels and descriptions.
+ * 編集権限 radio のラベル / 説明文 i18n キー。
+ * Label / description i18n keys for each edit-permission radio row.
  */
 const editPermissionLabelKeys: Record<NoteEditPermission, string> = {
   owner_only: "notes.editPermissionOwnerOnly",
@@ -41,50 +43,23 @@ const EDIT_PERMISSION_ORDER: NoteEditPermission[] = [
   "any_logged_in",
 ];
 
-/**
- * 公開設定タブの Props。
- * Props for the visibility tab.
- */
-export interface ShareModalVisibilityTabProps {
-  note: Note;
+interface VisibilityOptionRowProps {
+  value: NoteVisibility;
+  selectedVisibility: NoteVisibility;
   canEdit: boolean;
-}
-
-/**
- * 公開設定タブの内部 Props。
- * Props for the inner rendering component (state injected from the parent).
- */
-interface VisibilityTabViewProps extends ShareModalVisibilityTabProps {
-  visibility: NoteVisibility;
-  setVisibility: (v: NoteVisibility) => void;
-  editPermission: NoteEditPermission;
-  setEditPermission: (v: NoteEditPermission) => void;
   noteUrl: string;
   onCopyNoteUrl: () => void;
-  onSave: () => void;
-  isSaving: boolean;
-  isDirty: boolean;
 }
 
-/**
- * 公開設定 radio 1 行分の描画。
- * Renders one visibility option row (radio + label + description, plus share URL block for unlisted).
- */
 function VisibilityOptionRow({
   value,
   selectedVisibility,
   canEdit,
   noteUrl,
   onCopyNoteUrl,
-}: {
-  value: NoteVisibility;
-  selectedVisibility: NoteVisibility;
-  canEdit: boolean;
-  noteUrl: string;
-  onCopyNoteUrl: () => void;
-}) {
+}: VisibilityOptionRowProps) {
   const { t } = useTranslation();
-  const inputId = `share-visibility-${value}`;
+  const inputId = `visibility-section-${value}`;
   return (
     <div className="border-border/60 flex gap-3 rounded-md border p-3">
       <RadioGroupItem value={value} id={inputId} disabled={!canEdit} className="mt-1" />
@@ -115,21 +90,19 @@ function VisibilityOptionRow({
   );
 }
 
-/**
- * 編集権限 radio 1 行分の描画。
- * Renders one edit-permission option row (radio + label + description).
- */
+interface EditPermissionOptionRowProps {
+  value: NoteEditPermission;
+  allowedEditOptions: readonly NoteEditPermission[];
+  canEdit: boolean;
+}
+
 function EditPermissionOptionRow({
   value,
   allowedEditOptions,
   canEdit,
-}: {
-  value: NoteEditPermission;
-  allowedEditOptions: readonly NoteEditPermission[];
-  canEdit: boolean;
-}) {
+}: EditPermissionOptionRowProps) {
   const { t } = useTranslation();
-  const inputId = `share-edit-permission-${value}`;
+  const inputId = `visibility-section-edit-${value}`;
   const enabled = allowedEditOptions.includes(value);
   return (
     <div
@@ -148,108 +121,27 @@ function EditPermissionOptionRow({
 }
 
 /**
- * 公開設定タブの内部描画（状態はロジック側から受け取る）。
- * Inner rendering — receives state from the logic layer so the outer component
- * can stay thin and testable.
+ * `/notes/:noteId/settings/visibility` — 公開範囲・編集権限・共有 URL を扱う。
+ *
+ * 旧仕様では `NoteSettings` 全体で 1 ボタン保存だったが、サブルート化に伴い
+ * このセクションだけで完結する保存ボタンに切り替えた。`title` は現状値を
+ * そのまま渡し、副作用で title が変化することはない。
+ *
+ * Visibility + edit-permission section with self-contained save. `title`
+ * stays untouched (the General section owns it). Reuses the dual-dialog
+ * confirmation flow for default-note exposure and `public + any_logged_in`.
  */
-function VisibilityTabView({
-  visibility,
-  setVisibility,
-  editPermission,
-  setEditPermission,
-  canEdit,
-  noteUrl,
-  onCopyNoteUrl,
-  onSave,
-  isSaving,
-  isDirty,
-}: VisibilityTabViewProps) {
-  const { t } = useTranslation();
-  const allowedEditOptions = allowedEditPermissions[visibility];
-  return (
-    <div className="space-y-6 pt-4">
-      <section className="space-y-3">
-        <h3 className="text-sm font-semibold">{t("notes.shareVisibilityHeading")}</h3>
-        <RadioGroup
-          value={visibility}
-          onValueChange={(value) => {
-            if (!canEdit) return;
-            const next = value as NoteVisibility;
-            setVisibility(next);
-            const allowed = allowedEditPermissions[next];
-            if (!allowed.includes(editPermission)) {
-              setEditPermission(allowed[0]);
-            }
-          }}
-          className="gap-3"
-          aria-label={t("notes.shareVisibilityHeading")}
-        >
-          {VISIBILITY_ORDER.map((value) => (
-            <VisibilityOptionRow
-              key={value}
-              value={value}
-              selectedVisibility={visibility}
-              canEdit={canEdit}
-              noteUrl={noteUrl}
-              onCopyNoteUrl={onCopyNoteUrl}
-            />
-          ))}
-        </RadioGroup>
-      </section>
-
-      <section className="space-y-3">
-        <h3 className="text-sm font-semibold">{t("notes.shareEditPermissionHeading")}</h3>
-        <RadioGroup
-          value={editPermission}
-          onValueChange={(value) => {
-            if (!canEdit) return;
-            setEditPermission(value as NoteEditPermission);
-          }}
-          className="gap-3"
-          aria-label={t("notes.shareEditPermissionHeading")}
-        >
-          {EDIT_PERMISSION_ORDER.map((value) => (
-            <EditPermissionOptionRow
-              key={value}
-              value={value}
-              allowedEditOptions={allowedEditOptions}
-              canEdit={canEdit}
-            />
-          ))}
-        </RadioGroup>
-      </section>
-
-      {canEdit ? (
-        <div className="flex justify-end">
-          <Button onClick={onSave} disabled={isSaving || !isDirty}>
-            {isSaving ? t("common.saving") : t("notes.shareSaveChanges")}
-          </Button>
-        </div>
-      ) : (
-        <p className="text-muted-foreground text-xs" role="note">
-          {t("notes.shareReadOnlyNotice")}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * 公開設定タブ。visibility と editPermission を変更し、unlisted のときは共有 URL を表示する。
- * Visibility tab — lets the owner change visibility + edit permission. When
- * `unlisted` is selected the share URL copy control is rendered inline so users
- * can distinguish it from share-link invitations.
- */
-export function ShareModalVisibilityTab({ note, canEdit }: ShareModalVisibilityTabProps) {
+const VisibilitySection: React.FC = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { note, canManage } = useNoteSettingsContext();
 
   const [visibility, setVisibility] = useState<NoteVisibility>(note.visibility);
   const [editPermission, setEditPermission] = useState<NoteEditPermission>(note.editPermission);
 
   useEffect(() => {
-    // Sync form state if the underlying note changes (e.g. after save + refetch).
-    // ノートが再取得されたらフォーム状態を同期する。
+    // Sync local state on refetch (after save / external update).
+    // ノート再取得時にフォーム状態を同期する。
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot init from loaded note
     setVisibility(note.visibility);
     setEditPermission(note.editPermission);
@@ -260,6 +152,9 @@ export function ShareModalVisibilityTab({ note, canEdit }: ShareModalVisibilityT
     confirmOpen,
     setConfirmOpen,
     handleConfirmPublicAnyLoggedInSave,
+    defaultNoteWarningOpen,
+    setDefaultNoteWarningOpen,
+    handleConfirmDefaultNoteWarning,
     isSaving,
   } = useNoteSettingsSaveWithPublicConfirm({
     noteId: note.id,
@@ -284,22 +179,85 @@ export function ShareModalVisibilityTab({ note, canEdit }: ShareModalVisibilityT
     }
   };
 
+  const allowedEditOptions = allowedEditPermissions[visibility];
   const isDirty = visibility !== note.visibility || editPermission !== note.editPermission;
+  const canEdit = canManage;
 
   return (
-    <>
-      <VisibilityTabView
-        note={note}
-        canEdit={canEdit}
-        visibility={visibility}
-        setVisibility={setVisibility}
-        editPermission={editPermission}
-        setEditPermission={setEditPermission}
-        noteUrl={noteUrl}
-        onCopyNoteUrl={handleCopyNoteUrl}
-        onSave={handleSaveNote}
+    <div className="space-y-6">
+      <section className="border-border/60 space-y-3 rounded-lg border p-4">
+        <header className="space-y-1">
+          <h2 className="text-base font-semibold">{t("notes.shareVisibilityHeading")}</h2>
+          <p className="text-muted-foreground text-xs">{t("notes.visibilitySectionDescription")}</p>
+        </header>
+        <RadioGroup
+          value={visibility}
+          onValueChange={(value) => {
+            if (!canEdit) return;
+            const next = value as NoteVisibility;
+            setVisibility(next);
+            const allowed = allowedEditPermissions[next];
+            if (!allowed.includes(editPermission)) {
+              setEditPermission(allowed[0]);
+            }
+          }}
+          className="gap-3"
+          aria-label={t("notes.shareVisibilityHeading")}
+        >
+          {VISIBILITY_ORDER.map((value) => (
+            <VisibilityOptionRow
+              key={value}
+              value={value}
+              selectedVisibility={visibility}
+              canEdit={canEdit}
+              noteUrl={noteUrl}
+              onCopyNoteUrl={handleCopyNoteUrl}
+            />
+          ))}
+        </RadioGroup>
+      </section>
+
+      <section className="border-border/60 space-y-3 rounded-lg border p-4">
+        <header className="space-y-1">
+          <h2 className="text-base font-semibold">{t("notes.shareEditPermissionHeading")}</h2>
+        </header>
+        <RadioGroup
+          value={editPermission}
+          onValueChange={(value) => {
+            if (!canEdit) return;
+            setEditPermission(value as NoteEditPermission);
+          }}
+          className="gap-3"
+          aria-label={t("notes.shareEditPermissionHeading")}
+        >
+          {EDIT_PERMISSION_ORDER.map((value) => (
+            <EditPermissionOptionRow
+              key={value}
+              value={value}
+              allowedEditOptions={allowedEditOptions}
+              canEdit={canEdit}
+            />
+          ))}
+        </RadioGroup>
+      </section>
+
+      {canEdit ? (
+        <div className="flex justify-end">
+          <Button onClick={handleSaveNote} disabled={isSaving || !isDirty}>
+            {isSaving ? t("common.saving") : t("notes.shareSaveChanges")}
+          </Button>
+        </div>
+      ) : (
+        <p className="text-muted-foreground text-xs" role="note">
+          {t("notes.shareReadOnlyNotice")}
+        </p>
+      )}
+
+      <DefaultNotePublicWarningDialog
+        open={defaultNoteWarningOpen}
+        onOpenChange={setDefaultNoteWarningOpen}
+        onConfirm={handleConfirmDefaultNoteWarning}
         isSaving={isSaving}
-        isDirty={isDirty}
       />
       <PublicAnyLoggedInSaveAlertDialog
         open={confirmOpen}
@@ -307,6 +265,8 @@ export function ShareModalVisibilityTab({ note, canEdit }: ShareModalVisibilityT
         onConfirm={handleConfirmPublicAnyLoggedInSave}
         isSaving={isSaving}
       />
-    </>
+    </div>
   );
-}
+};
+
+export default VisibilitySection;

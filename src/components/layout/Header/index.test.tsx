@@ -73,9 +73,6 @@ vi.mock("./HeaderSearchBar", () => ({
 vi.mock("./NavigationMenu", () => ({
   NavigationMenu: () => <div data-testid="navigation-menu">NavigationMenu</div>,
 }));
-vi.mock("./NoteSwitcher", () => ({
-  NoteSwitcher: () => <div data-testid="note-switcher">NoteSwitcher</div>,
-}));
 vi.mock("./UnifiedMenu", () => ({ UnifiedMenu: () => <div data-testid="unified-menu">Menu</div> }));
 
 describe("Header", () => {

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import NoteView from "./index";
-import { useNote, useNotePages, useNoteApi } from "@/hooks/useNoteQueries";
+import { useNote, useNotePages } from "@/hooks/useNoteQueries";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -31,7 +31,6 @@ vi.mock("@/hooks/useNoteQueries", () => ({
     isPending: false,
   }),
   useRemovePageFromNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useNoteApi: vi.fn(() => ({ isSignedIn: true })),
 }));
 
 vi.mock("@/hooks/usePageQueries", () => ({
@@ -95,6 +94,24 @@ vi.mock("@/components/layout/Container", () => ({
 vi.mock("./NoteViewHeaderActions", () => ({
   NoteViewHeaderActions: () => <div data-testid="note-view-header-actions">HeaderActions</div>,
 }));
+vi.mock("@/components/note/NoteShareUrlCopyButton", () => ({
+  NoteShareUrlCopyButton: ({ noteId, visibility }: { noteId: string; visibility: string }) => (
+    <div
+      data-testid="note-share-url-copy-button"
+      data-note-id={noteId}
+      data-visibility={visibility}
+    />
+  ),
+}));
+vi.mock("@/components/note/NoteTitleSwitcher", () => ({
+  // タイトル切替 UI は単体テスト側で検証済み。ここではタイトル文字列だけを
+  // スタブとして出力し、heading 検証 (`getByRole("heading")`) を維持する。
+  // The switcher behaviour has its own unit tests; render the title only so
+  // `heading` role assertions keep working.
+  NoteTitleSwitcher: ({ noteTitle }: { noteTitle: string; noteId: string }) => (
+    <span data-testid="note-title-switcher">{noteTitle || "notes.untitledNote"}</span>
+  ),
+}));
 vi.mock("@/components/page/PageGrid", () => ({
   default: ({
     noteId,
@@ -149,7 +166,6 @@ describe("NoteView", () => {
       isLoading: false,
     } as never);
     vi.mocked(useNotePages).mockReturnValue({ data: [], isLoading: false } as never);
-    vi.mocked(useNoteApi).mockReturnValue({ isSignedIn: true } as never);
   });
 
   it("shows loading message when note is loading", () => {

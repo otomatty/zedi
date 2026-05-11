@@ -33,7 +33,12 @@ import NotFound from "./pages/NotFound";
 import NoteView from "./pages/NoteView";
 import NotePageView from "./pages/NotePageView";
 import NoteSettings from "./pages/NoteSettings";
-import NoteMembers from "./pages/NoteMembers";
+import GeneralSection from "./pages/NoteSettings/sections/GeneralSection";
+import VisibilitySection from "./pages/NoteSettings/sections/VisibilitySection";
+import MembersSection from "./pages/NoteSettings/sections/MembersSection";
+import LinksSection from "./pages/NoteSettings/sections/LinksSection";
+import DomainsSection from "./pages/NoteSettings/sections/DomainsSection";
+import DangerZoneSection from "./pages/NoteSettings/sections/DangerZoneSection";
 import Onboarding from "./pages/Onboarding";
 import AIChatHistory from "./pages/AIChatHistory";
 import AIChatLanding from "./pages/AIChatLanding";
@@ -87,12 +92,34 @@ function LegacyHomeRedirect() {
 /**
  * Redirect singular `/note/:noteId` (and sub-routes) to plural `/notes/:noteId/...`.
  * 旧パス `/note/:noteId` 系を複数形 `/notes/:noteId/...` にリダイレクト。
+ *
+ * `suffix === "members"` は新仕様で `/notes/:id/settings/members` 配下に
+ * 統合済みなので、設定画面のメンバーセクションへ転送する。
+ *
+ * `suffix === "members"` is folded into the settings layout under
+ * `/notes/:id/settings/members`, so the redirect targets that subroute.
  */
 function LegacyNoteRedirect({ suffix }: { suffix?: "settings" | "members" }) {
   const { noteId } = useParams<{ noteId: string }>();
   const { search, hash } = useLocation();
-  const tail = suffix ? `/${suffix}` : "";
+  const tail =
+    suffix === "members" ? "/settings/members" : suffix === "settings" ? "/settings" : "";
   return <Navigate to={`/notes/${noteId}${tail}${search}${hash}`} replace />;
+}
+
+/**
+ * Redirect the legacy standalone `/notes/:noteId/members` page to the
+ * settings subroute `/notes/:noteId/settings/members`. Preserves search /
+ * hash so any deep-linked filters keep working.
+ *
+ * 旧 `/notes/:noteId/members` ページを `/notes/:noteId/settings/members` に
+ * リダイレクト。search / hash はそのまま転送するので、メンバー一覧への
+ * ディープリンクは引き続き動作する。
+ */
+function LegacyMembersRedirect() {
+  const { noteId } = useParams<{ noteId: string }>();
+  const { search, hash } = useLocation();
+  return <Navigate to={`/notes/${noteId}/settings/members${search}${hash}`} replace />;
 }
 
 /**
@@ -249,8 +276,26 @@ const App = () => (
                       />
                       <Route path="/donate" element={<Donate />} />
                       <Route path="/notes/:noteId" element={<NoteView />} />
-                      <Route path="/notes/:noteId/settings" element={<NoteSettings />} />
-                      <Route path="/notes/:noteId/members" element={<NoteMembers />} />
+                      {/* Settings は `/notes/:noteId/settings/*` のネスト構造。
+                          各セクションは <Outlet /> 経由で描画され、共通レイアウト
+                          （サイドナビ + ヘッダー）は `NoteSettings` が提供する。
+                          旧 `/notes/:noteId/members` は `/settings/members` に統合。
+
+                          Settings is nested: `/notes/:noteId/settings/*` shares
+                          the `NoteSettings` layout (sidebar + header) and each
+                          subroute renders into its `<Outlet />`. The legacy
+                          `/notes/:noteId/members` page redirects into the
+                          `members` subroute below for URL backward compat. */}
+                      <Route path="/notes/:noteId/settings" element={<NoteSettings />}>
+                        <Route index element={<Navigate to="general" replace />} />
+                        <Route path="general" element={<GeneralSection />} />
+                        <Route path="visibility" element={<VisibilitySection />} />
+                        <Route path="members" element={<MembersSection />} />
+                        <Route path="links" element={<LinksSection />} />
+                        <Route path="domains" element={<DomainsSection />} />
+                        <Route path="danger" element={<DangerZoneSection />} />
+                      </Route>
+                      <Route path="/notes/:noteId/members" element={<LegacyMembersRedirect />} />
                       <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
                       {/* Legacy path — redirect `/notes/:noteId/pages/:pageId` to
                           the shorter `/notes/:noteId/:pageId`.

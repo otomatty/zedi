@@ -1,16 +1,14 @@
 /**
- * Tests for {@link NoteSwitcher}, the header dropdown that lets users hop
- * between their notes without leaving the editor surface (issue #827). The
- * default note is pinned to the top with a badge; the rest of the rows are
- * sorted by `updatedAt` descending. The footer links to `/notes` ("see all")
- * and offers a quick "new note" entry that delegates to the existing
- * create-note dialog on the notes index page.
+ * Tests for {@link NoteTitleSwitcher}, the note-title-as-switcher component
+ * that replaces the former header `NoteSwitcher`. It renders the current
+ * note title as a dropdown trigger on note detail / settings / members
+ * pages, listing the user's notes (default note pinned, then `updatedAt`
+ * DESC). Footer shortcuts link to `/notes?new=1` and `/notes`.
  *
- * ヘッダーにノート切替用のドロップダウン {@link NoteSwitcher} を追加するテスト
- * （issue #827）。デフォルトノートはバッジ付きで先頭に固定し、それ以外は
- * `updatedAt` 降順で並べる。フッターには `/notes`（一覧）への "see all" と
- * 新規ノート作成への導線を置き、新規作成は `Notes` ページの既存ダイアログに
- * 委譲する。
+ * 旧ヘッダー `NoteSwitcher` を置き換えるノートタイトル兼切替 UI のテスト。
+ * ノート詳細/設定/メンバー画面で、現在のタイトルをトリガーとしてドロップダウンを開く。
+ * デフォルトノートを先頭に固定し、それ以外は `updatedAt` 降順で並べる。
+ * フッターは `/notes?new=1` と `/notes` への 2 項目を保持する。
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -18,14 +16,6 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { NoteSummary } from "@/types/note";
 
-/**
- * Mock return shapes mirroring the real `useNoteQueries` / `useAuth` hooks so
- * the test harness keeps strict typing across calls and avoids hiding interface
- * drift behind untyped `vi.fn()`.
- *
- * `useNoteQueries` / `useAuth` の戻り値型をテスト側で明示し、`vi.fn()` を
- * 経由してインターフェースが食い違っても気付けるようにする。
- */
 type UseNotesResult = {
   data: NoteSummary[] | undefined;
   isLoading: boolean;
@@ -44,7 +34,6 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => {
       const table: Record<string, string> = {
-        "nav.menu": "メニュー",
         "notes.switcher.trigger": "ノートを切り替え",
         "notes.switcher.heading": "ノート",
         "notes.switcher.defaultBadge": "既定",
@@ -81,7 +70,7 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => useAuthMock(),
 }));
 
-import { NoteSwitcher } from "./NoteSwitcher";
+import { NoteTitleSwitcher } from "./NoteTitleSwitcher";
 
 function makeNote(overrides: Partial<NoteSummary> & { id: string }): NoteSummary {
   return {
@@ -107,7 +96,16 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname + location.search}</div>;
 }
 
-function renderAt(path: string) {
+function renderAt(
+  path: string,
+  props: Partial<React.ComponentProps<typeof NoteTitleSwitcher>> = {},
+) {
+  const merged = {
+    noteId: props.noteId ?? "note-alpha",
+    noteTitle: props.noteTitle ?? "Alpha note",
+    variant: props.variant,
+    className: props.className,
+  };
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -115,7 +113,7 @@ function renderAt(path: string) {
           path="*"
           element={
             <>
-              <NoteSwitcher />
+              <NoteTitleSwitcher {...merged} />
               <LocationProbe />
             </>
           }
@@ -125,28 +123,12 @@ function renderAt(path: string) {
   );
 }
 
-const noteAlpha = makeNote({
-  id: "note-alpha",
-  title: "Alpha note",
-  updatedAt: 100,
-});
-const noteBeta = makeNote({
-  id: "note-beta",
-  title: "Beta note",
-  updatedAt: 300,
-});
-const noteGamma = makeNote({
-  id: "note-gamma",
-  title: "Gamma note",
-  updatedAt: 200,
-});
-const defaultNote = makeNote({
-  id: "note-default",
-  title: "My default",
-  updatedAt: 50,
-});
+const noteAlpha = makeNote({ id: "note-alpha", title: "Alpha note", updatedAt: 100 });
+const noteBeta = makeNote({ id: "note-beta", title: "Beta note", updatedAt: 300 });
+const noteGamma = makeNote({ id: "note-gamma", title: "Gamma note", updatedAt: 200 });
+const defaultNote = makeNote({ id: "note-default", title: "My default", updatedAt: 50 });
 
-describe("NoteSwitcher", () => {
+describe("NoteTitleSwitcher", () => {
   beforeEach(() => {
     useAuthMock.mockReturnValue({ isSignedIn: true, isLoaded: true, userId: "user-1" });
     useNotesMock.mockReturnValue({
@@ -163,15 +145,23 @@ describe("NoteSwitcher", () => {
     vi.clearAllMocks();
   });
 
-  it("renders nothing when the user is signed out", () => {
-    useAuthMock.mockReturnValue({ isSignedIn: false, isLoaded: true, userId: null });
-    renderAt("/notes/note-alpha");
-    expect(screen.queryByRole("button", { name: "ノートを切り替え" })).not.toBeInTheDocument();
+  it("renders the current note title inside the trigger", () => {
+    renderAt("/notes/note-alpha", { noteTitle: "Alpha note" });
+    const trigger = screen.getByRole("button", { name: "ノートを切り替え" });
+    expect(trigger).toHaveTextContent("Alpha note");
   });
 
-  it("renders the trigger with the switcher aria-label when signed in", () => {
-    renderAt("/notes/note-alpha");
-    expect(screen.getByRole("button", { name: "ノートを切り替え" })).toBeInTheDocument();
+  it("falls back to the untitled label when title is empty", () => {
+    renderAt("/notes/note-alpha", { noteTitle: "   " });
+    const trigger = screen.getByRole("button", { name: "ノートを切り替え" });
+    expect(trigger).toHaveTextContent("無題のノート");
+  });
+
+  it("renders the title as plain text (not a button) for signed-out users", () => {
+    useAuthMock.mockReturnValue({ isSignedIn: false, isLoaded: true, userId: null });
+    renderAt("/notes/note-alpha", { noteTitle: "Public note" });
+    expect(screen.queryByRole("button", { name: "ノートを切り替え" })).not.toBeInTheDocument();
+    expect(screen.getByText("Public note")).toBeInTheDocument();
   });
 
   it("does not render note items until the trigger is clicked", () => {
@@ -186,24 +176,23 @@ describe("NoteSwitcher", () => {
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const items = await screen.findAllByRole("menuitem");
-    // Filter to note rows (footer items have distinct names).
-    // ノート行のみに絞り込む（フッター項目は名前が異なる）。
     const noteRowNames = items
       .map((el) => el.textContent ?? "")
       .filter((text) => /My default|Alpha note|Beta note|Gamma note/.test(text));
 
     expect(noteRowNames[0]).toMatch(/My default/);
     expect(noteRowNames[0]).toMatch(/既定/);
-    // Beta (updatedAt=300) > Gamma (200) > Alpha (100).
-    // updatedAt が大きい順に Beta(300) > Gamma(200) > Alpha(100)。
     expect(noteRowNames[1]).toMatch(/Beta note/);
     expect(noteRowNames[2]).toMatch(/Gamma note/);
     expect(noteRowNames[3]).toMatch(/Alpha note/);
   });
 
-  it("marks the active note with aria-current=true", async () => {
+  it("marks the active note (matching `noteId` prop) with aria-current=true", async () => {
     const user = userEvent.setup();
-    renderAt("/notes/note-beta");
+    // 設定ページのように /notes/:noteId/settings 配下でも noteId prop で
+    // アクティブ判定できる。
+    // Even on /notes/:noteId/settings the prop drives the highlight.
+    renderAt("/notes/note-beta/settings", { noteId: "note-beta", noteTitle: "Beta note" });
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const betaItem = await screen.findByRole("menuitem", { name: /Beta note/ });
@@ -213,51 +202,12 @@ describe("NoteSwitcher", () => {
     expect(alphaItem).not.toHaveAttribute("aria-current", "true");
   });
 
-  it("does not mark anything active on /notes (the index)", async () => {
-    const user = userEvent.setup();
-    renderAt("/notes");
-    await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
-
-    const noteItems = (await screen.findAllByRole("menuitem")).filter((el) =>
-      /Alpha note|Beta note|Gamma note|My default/.test(el.textContent ?? ""),
-    );
-    for (const item of noteItems) {
-      expect(item).not.toHaveAttribute("aria-current", "true");
-    }
-  });
-
-  it("treats sub-paths like /notes/:noteId/:pageId as still on that note", async () => {
-    const user = userEvent.setup();
-    renderAt("/notes/note-gamma/some-page");
-    await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
-
-    const gammaItem = await screen.findByRole("menuitem", { name: /Gamma note/ });
-    expect(gammaItem).toHaveAttribute("aria-current", "true");
-  });
-
-  it("ignores the literal /notes/me landing path for active highlighting", async () => {
-    const user = userEvent.setup();
-    renderAt("/notes/me");
-    await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
-
-    const noteItems = (await screen.findAllByRole("menuitem")).filter((el) =>
-      /Alpha note|Beta note|Gamma note|My default/.test(el.textContent ?? ""),
-    );
-    for (const item of noteItems) {
-      expect(item).not.toHaveAttribute("aria-current", "true");
-    }
-  });
-
   it("navigates to /notes/:noteId when a row is selected", async () => {
     const user = userEvent.setup();
     renderAt("/notes/note-alpha");
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const betaItem = await screen.findByRole("menuitem", { name: /Beta note/ });
-    // Exercise actual click-to-navigate so the test catches breakage in the
-    // `Link` wiring beyond just the static href.
-    // 静的な href だけでなく、`Link` のクリック遷移そのものが壊れた場合も
-    // 検知できるよう、実際にクリックして遷移を確認する。
     expect(betaItem).toHaveAttribute("href", "/notes/note-beta");
     await user.click(betaItem);
     expect(screen.getByTestId("location")).toHaveTextContent("/notes/note-beta");
@@ -268,9 +218,7 @@ describe("NoteSwitcher", () => {
     renderAt("/notes/note-alpha");
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
-    const allLink = await screen.findByRole("menuitem", {
-      name: "すべてのノートを見る",
-    });
+    const allLink = await screen.findByRole("menuitem", { name: "すべてのノートを見る" });
     expect(allLink).toHaveAttribute("href", "/notes");
   });
 
@@ -283,38 +231,23 @@ describe("NoteSwitcher", () => {
     expect(newLink).toHaveAttribute("href", "/notes?new=1");
   });
 
-  it("falls back to a placeholder when a note has an empty title", async () => {
-    useNotesMock.mockReturnValue({
-      data: [makeNote({ id: "note-untitled", title: "", updatedAt: 999 })],
-      isLoading: false,
-    });
-    useMyNoteMock.mockReturnValue({ data: undefined, isLoading: false });
-    const user = userEvent.setup();
-    renderAt("/notes");
-    await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
-
-    expect(await screen.findByRole("menuitem", { name: /無題のノート/ })).toBeInTheDocument();
-  });
-
-  it("shows an empty hint when the user has no notes", async () => {
+  it("shows an empty hint and keeps the footer shortcuts", async () => {
     useNotesMock.mockReturnValue({ data: [], isLoading: false });
     useMyNoteMock.mockReturnValue({ data: undefined, isLoading: false });
     const user = userEvent.setup();
-    renderAt("/notes");
+    renderAt("/notes/note-alpha");
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     expect(await screen.findByText("まだノートがありません")).toBeInTheDocument();
-    // The footer shortcuts must remain available even when the list is empty.
-    // 一覧が空でもフッターのショートカットは表示され続ける必要がある。
     expect(screen.getByRole("menuitem", { name: "新規ノートを作成" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "すべてのノートを見る" })).toBeInTheDocument();
   });
 
-  it("shows a loading hint while the notes list is fetching", async () => {
+  it("shows a loading hint while fetching", async () => {
     useNotesMock.mockReturnValue({ data: undefined, isLoading: true });
     useMyNoteMock.mockReturnValue({ data: undefined, isLoading: true });
     const user = userEvent.setup();
-    renderAt("/notes");
+    renderAt("/notes/note-alpha");
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     expect(await screen.findByText("読み込み中…")).toBeInTheDocument();
@@ -327,15 +260,13 @@ describe("NoteSwitcher", () => {
     useNotesMock.mockReturnValue({ data: many, isLoading: false });
     useMyNoteMock.mockReturnValue({ data: undefined, isLoading: false });
     const user = userEvent.setup();
-    renderAt("/notes");
+    renderAt("/notes/note-0", { noteId: "note-0", noteTitle: "Note 0" });
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const rows = (await screen.findAllByRole("menuitem")).filter((el) =>
       /^Note \d+$/.test((el.textContent ?? "").trim()),
     );
     expect(rows.length).toBe(50);
-    // 80 -> sorted by updatedAt DESC, expect Note 79 first.
-    // 80 件を updatedAt 降順で並べた場合、先頭は Note 79 になる。
     expect(rows[0].textContent?.trim()).toBe("Note 79");
   });
 
@@ -349,10 +280,21 @@ describe("NoteSwitcher", () => {
     });
     useMyNoteMock.mockReturnValue({ data: undefined, isLoading: false });
     const user = userEvent.setup();
-    renderAt("/notes");
+    renderAt("/notes/note-live", { noteId: "note-live", noteTitle: "Live note" });
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     expect(screen.queryByRole("menuitem", { name: /Dead note/ })).not.toBeInTheDocument();
     expect(await screen.findByRole("menuitem", { name: /Live note/ })).toBeInTheDocument();
+  });
+
+  it("applies subtitle text styling when variant=subtitle", () => {
+    renderAt("/notes/note-alpha/settings", {
+      noteId: "note-alpha",
+      noteTitle: "Alpha note",
+      variant: "subtitle",
+    });
+    const trigger = screen.getByRole("button", { name: "ノートを切り替え" });
+    expect(trigger.className).toMatch(/text-sm/);
+    expect(trigger.className).not.toMatch(/text-xl/);
   });
 });

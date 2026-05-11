@@ -33,16 +33,19 @@ import { useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 
 /**
- * Watch for the `?new=1` deep-link from the header NoteSwitcher (issue #827).
- * When the param is present, fire `onOpen` (typically opens the create dialog)
- * and strip the param so a refresh does not reopen the dialog. Reacts to URL
- * transitions while `Notes` is already mounted, since the same component
- * persists across `/notes` ↔ `/notes?new=1` route updates.
+ * Watch for the `?new=1` deep-link emitted by `NoteTitleSwitcher`'s
+ * "new note" footer item (originally issue #827; the header switcher has
+ * been replaced by the title-as-switcher control on each note page). When
+ * the param is present, fire `onOpen` (typically opens the create dialog)
+ * and strip the param so a refresh does not reopen the dialog. Reacts to
+ * URL transitions while `Notes` is already mounted, since the same
+ * component persists across `/notes` ↔ `/notes?new=1` route updates.
  *
- * `?new=1` ディープリンク（ヘッダーの NoteSwitcher、issue #827）を監視する。
- * クエリが現れたら `onOpen` を呼び出し（通常は作成ダイアログを開く）、
- * リロード時に再オープンしないようクエリを除去する。`Notes` がマウントされた
- * まま `/notes` ↔ `/notes?new=1` を遷移するケースにも対応する。
+ * `?new=1` ディープリンクの監視（旧ヘッダー NoteSwitcher は廃止され、各
+ * ノート画面のタイトル `NoteTitleSwitcher` が代替）。クエリが現れたら
+ * `onOpen` を呼び出し（通常は作成ダイアログを開く）、リロード時に再オープン
+ * しないようクエリを除去する。`Notes` がマウントされたまま
+ * `/notes` ↔ `/notes?new=1` を遷移するケースにも対応する。
  */
 export function useNewNoteDeepLink(onOpen: () => void): void {
   const location = useLocation();
