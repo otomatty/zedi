@@ -20,6 +20,13 @@ describe("buildPdfSourceDeepLink", () => {
       "/sources/a%2Fb%20c/pdf#page=1",
     );
   });
+
+  it("throws on non-1-indexed-integer pdfPage so invalid deep links never propagate", () => {
+    expect(() => buildPdfSourceDeepLink({ sourceId: "s", pdfPage: 0 })).toThrow();
+    expect(() => buildPdfSourceDeepLink({ sourceId: "s", pdfPage: -1 })).toThrow();
+    expect(() => buildPdfSourceDeepLink({ sourceId: "s", pdfPage: 1.5 })).toThrow();
+    expect(() => buildPdfSourceDeepLink({ sourceId: "s", pdfPage: Number.NaN })).toThrow();
+  });
 });
 
 describe("buildDerivedPageTitle", () => {

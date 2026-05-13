@@ -157,6 +157,8 @@ export function createApp(): Hono<AppEnv> {
 
   // Local PDF sources + highlights (issue otomatty/zedi#389).
   // PDF binaries never reach the server — only hashes / page counts / highlights.
+  // ローカル PDF のソース行とハイライト (issue otomatty/zedi#389)。
+  // PDF バイナリ自体はサーバに渡さず、ハッシュ・ページ数・ハイライトのみを扱う。
   app.route("/api/sources", pdfSourcesRoutes);
 
   // Wiki Schema (P3 — user-defined wiki "constitution")

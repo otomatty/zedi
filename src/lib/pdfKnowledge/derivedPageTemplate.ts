@@ -62,8 +62,17 @@ export function buildDerivedPageTitle(input: BuildDerivedPageTitleInput): string
  * PDF.js の URL fragment convention に合わせている。
  * Format `/sources/<sourceId>/pdf#page=<pdfPage>`; the fragment follows the
  * PDF.js URL fragment convention.
+ *
+ * @throws Error - `pdfPage` が 1 以上の整数でない場合。`pdfPage` must be a
+ *   1-indexed positive integer; otherwise the function throws so callers
+ *   surface the bug instead of producing an invalid deep link.
  */
 export function buildPdfSourceDeepLink(params: { sourceId: string; pdfPage: number }): string {
+  if (!Number.isInteger(params.pdfPage) || params.pdfPage < 1) {
+    throw new Error(
+      `buildPdfSourceDeepLink: pdfPage must be a positive integer, got ${String(params.pdfPage)}`,
+    );
+  }
   return `/sources/${encodeURIComponent(params.sourceId)}/pdf#page=${params.pdfPage}`;
 }
 
