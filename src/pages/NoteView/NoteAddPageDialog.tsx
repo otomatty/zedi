@@ -4,17 +4,28 @@ import { Dialog, DialogContent, useToast } from "@zedi/ui";
 import { useAddPageToNote, useCopyPersonalPageToNote } from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { NoteViewAddPageDialogContent } from "./NoteViewAddPageDialogContent";
-import type { PageSummary } from "@/types/page";
 
 /**
  * Props for the controlled add-page dialog.
  * ページ追加ダイアログ（親で開閉制御）の Props。
+ *
+ * Issue #860 Phase 3 で `notePages: PageSummary[]` を除去した。旧コードは
+ * `notePageIds` Set を作って `allPages` から除外していたが、issue #823 以降
+ * ノートネイティブページは個人ページとは別 ID 体系で、一致は発生しないため
+ * 実質 no-op になっていた。重複タイトル判定は将来的に note-scoped 検索 API
+ * に寄せる方針で、ここでは全件配列の依存を断つ。
+ *
+ * Issue #860 Phase 3 dropped the `notePages` prop. The previous implementation
+ * built a `notePageIds` Set and filtered personal pages by it, but since
+ * issue #823 note-native pages live in a different id space from personal
+ * pages so the filter never excluded anything. The duplicate-title check will
+ * move to a note-scoped lookup API later; until then we just stop pulling in
+ * the full note pages array.
  */
 export interface NoteAddPageDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   noteId: string;
-  notePages: PageSummary[];
   canEdit: boolean;
 }
 
@@ -27,13 +38,7 @@ export interface NoteAddPageDialogProps {
  * 検索フィルタ／新規タイトル状態とミューテーションを内部で完結させ、親は
  * ノート情報と開閉制御のみを渡す。
  */
-export function NoteAddPageDialog({
-  open,
-  onOpenChange,
-  noteId,
-  notePages,
-  canEdit,
-}: NoteAddPageDialogProps) {
+export function NoteAddPageDialog({ open, onOpenChange, noteId, canEdit }: NoteAddPageDialogProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const addPageMutation = useAddPageToNote();
@@ -43,16 +48,11 @@ export function NoteAddPageDialog({
   const [pageFilter, setPageFilter] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
 
-  const notePageIds = useMemo(() => new Set(notePages.map((p) => p.id)), [notePages]);
-  const availablePages = useMemo(
-    () => allPages.filter((p) => !notePageIds.has(p.id)),
-    [allPages, notePageIds],
-  );
   const filteredPages = useMemo(() => {
     const query = pageFilter.trim().toLowerCase();
-    if (!query) return availablePages;
-    return availablePages.filter((p) => (p.title || "").toLowerCase().includes(query));
-  }, [availablePages, pageFilter]);
+    if (!query) return allPages;
+    return allPages.filter((p) => (p.title || "").toLowerCase().includes(query));
+  }, [allPages, pageFilter]);
 
   const runAddPage = async (params: { pageId: string } | { title: string }) => {
     try {

@@ -317,6 +317,49 @@ export interface GetNoteResponse {
   }>;
 }
 
+/**
+ * `?include=` トークンで追加できるオプションフィールド（issue #860 Phase 1）。
+ * `preview` は `content_preview`、`thumbnail` は `thumbnail_url` の同梱を要求する。
+ *
+ * Optional field tokens for `?include=` on `GET /api/notes/:noteId/pages`
+ * (issue #860 Phase 1). `preview` toggles `content_preview` and `thumbnail`
+ * toggles `thumbnail_url`.
+ */
+export type NotePageWindowInclude = "preview" | "thumbnail";
+
+/**
+ * `GET /api/notes/:noteId/pages` のページ行（keyset window）。`content_preview`
+ * と `thumbnail_url` は `?include=` で要求された場合のみ非 null。
+ *
+ * Page summary row from `GET /api/notes/:noteId/pages`. `content_preview` /
+ * `thumbnail_url` are populated only when the matching `?include=` token is set.
+ */
+export interface NotePageWindowItem {
+  id: string;
+  owner_id: string;
+  note_id: string;
+  source_page_id: string | null;
+  title: string | null;
+  content_preview: string | null;
+  thumbnail_url: string | null;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+}
+
+/**
+ * `GET /api/notes/:noteId/pages` の keyset cursor pagination レスポンス。
+ * `next_cursor` が `null` の場合は末尾まで到達済み。
+ *
+ * Keyset cursor pagination response. A `null` `next_cursor` means the caller
+ * has reached the end of the list.
+ */
+export interface NotePageWindowResponse {
+  items: NotePageWindowItem[];
+  next_cursor: string | null;
+}
+
 /** GET /api/pages/:id/snapshots response. */
 export interface SnapshotListResponse {
   snapshots: SnapshotListItem[];

@@ -3,12 +3,24 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAuth } from "@/hooks/useAuth";
 import { useContainerColumns } from "@/hooks/useContainerColumns";
 import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
-import { useNotePages } from "@/hooks/useNoteQueries";
+import { useInfiniteNotePages } from "@/hooks/useNoteQueries";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
 import { cn, Skeleton } from "@zedi/ui";
 import { hasNeverSynced } from "@/lib/sync";
 import type { PageSummary } from "@/types/page";
+
+/**
+ * 末尾検知の前倒し量（行数）。virtual range の末尾がリストの末尾から
+ * `INFINITE_FETCH_THRESHOLD_ROWS` 行以内に入ったら次の window をフェッチする。
+ * 数値が大きいほどスクロール体感は滑らかになる代わりに余分なリクエストが
+ * 増えるため、virtualizer の `overscan` (4) と同じオーダーに揃える。
+ *
+ * Number of rows from the tail at which we trigger the next infinite fetch.
+ * Matches the virtualizer's `overscan`, so the next window is requested
+ * roughly as the user enters the overscan zone.
+ */
+const INFINITE_FETCH_THRESHOLD_ROWS = 4;
 
 const skeletonItems = Array.from({ length: 20 }, (_, index) => index);
 
@@ -159,19 +171,35 @@ const PageGrid: React.FC<PageGridProps> = ({
   // Personal pages source. Always invoked to satisfy hook rules, but ignored
   // when a `noteId` is provided.
   const personalQuery = usePagesSummary({ enabled: !isNoteContext });
-  const noteQuery = useNotePages(noteId ?? "", undefined, isNoteContext);
+  // ノート文脈では keyset cursor pagination 経路 (`GET /api/notes/:id/pages`)
+  // を `useInfiniteQuery` で段階取得する（issue #860 Phase 3）。サーバ順は
+  // `updated_at DESC, id DESC` で固定されているため、ここで再ソートはしない。
+  // In a note context, fetch the page list as a keyset-paginated infinite
+  // query (issue #860 Phase 3). The server's `updated_at DESC, id DESC` order
+  // is preserved verbatim; no client-side resort.
+  const noteInfinite = useInfiniteNotePages(noteId ?? "", { enabled: isNoteContext });
 
-  const pages: PageSummary[] = isNoteContext
-    ? ((noteQuery.data ?? []) as PageSummary[])
-    : (personalQuery.data ?? []);
-  const isLoading = isNoteContext ? noteQuery.isLoading : personalQuery.isLoading;
+  const pages: PageSummary[] = isNoteContext ? noteInfinite.pages : (personalQuery.data ?? []);
+  const isLoading = isNoteContext ? noteInfinite.isLoading : personalQuery.isLoading;
 
   const syncStatus = useSyncStatus();
   const { isSignedIn } = useAuth();
 
+  // 個人ページ集合は IndexedDB から「全件」が返るので、未取得の差分を埋める
+  // ためにここで `updatedAt DESC` ソート + `isDeleted` フィルタが必要。
+  // ノート文脈ではサーバが既に `(updated_at DESC, id DESC)` で返し、`is_deleted`
+  // も除外済みなので、フィルタ・ソートを再適用しない（issue #860 Phase 3 の
+  // 「PageGrid 側で再 sort せず、サーバ順を信頼する」要件）。
+  //
+  // Personal pages come straight from IndexedDB so the client still has to
+  // filter soft-deleted rows and reapply `updatedAt DESC`. For note pages we
+  // trust the server's `(updated_at DESC, id DESC)` ordering and the
+  // `is_deleted = false` predicate enforced by `GET /api/notes/:id/pages`,
+  // matching the Phase 3 requirement to stop re-sorting on the client.
   const sortedPages = useMemo(() => {
+    if (isNoteContext) return pages;
     return [...pages].filter((p) => !p.isDeleted).sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [pages]);
+  }, [isNoteContext, pages]);
 
   // 同期スケルトンは個人ページ向けの初回同期インジケータなのでノート文脈では出さない。
   // The sync-driven skeleton is a personal-pages first-sync indicator and is
@@ -218,6 +246,46 @@ const PageGrid: React.FC<PageGridProps> = ({
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalHeight = rowVirtualizer.getTotalSize();
+
+  // `getVirtualItems()` はスクロールごとに新しい配列を返すため、依存配列に
+  // そのまま入れるとエフェクトが毎フレーム再評価される。実際に末尾検知に
+  // 必要なのは「最後に見えている row の index」だけなので、それだけを派生
+  // 値として取り出して依存にする（gemini-code-assist PR #866 review）。
+  // `virtualRows` が空のときは `-1` にフォールバックして無効化する。
+  //
+  // `getVirtualItems()` returns a fresh array on every scroll, so depending
+  // on it re-runs the effect every frame. Only the trailing virtual index
+  // matters for tail detection — derive it once and depend on that scalar
+  // instead (gemini-code-assist on PR #866). Empty windows fall back to
+  // `-1`, which the effect treats as "no last row, do nothing".
+  const lastVirtualIndex =
+    virtualRows.length > 0 ? (virtualRows[virtualRows.length - 1]?.index ?? -1) : -1;
+
+  // 仮想 range の末尾が `rowCount - threshold` を超えたら次の window を取りに
+  // 行く（issue #860 Phase 3）。`hasNextPage` と `isFetchingNextPage` でガード
+  // することで、末尾到達後の追加呼び出しと in-flight 中の重複呼び出しを抑止
+  // する。`infiniteHook` は個人ページ文脈では呼ばない（`useInfiniteNotePages`
+  // 自身が `enabled` ガードしているのでフックは安全）。
+  //
+  // Trigger `fetchNextPage()` once the rendered virtual range gets within
+  // `INFINITE_FETCH_THRESHOLD_ROWS` of the loaded tail (issue #860 Phase 3).
+  // `hasNextPage` / `isFetchingNextPage` guard against fetching past the end
+  // of the list and against duplicate in-flight calls.
+  useEffect(() => {
+    if (!isNoteContext) return;
+    if (!noteInfinite.hasNextPage || noteInfinite.isFetchingNextPage) return;
+    if (lastVirtualIndex === -1) return;
+    if (lastVirtualIndex >= rowCount - INFINITE_FETCH_THRESHOLD_ROWS) {
+      noteInfinite.fetchNextPage();
+    }
+  }, [
+    isNoteContext,
+    noteInfinite.hasNextPage,
+    noteInfinite.isFetchingNextPage,
+    noteInfinite.fetchNextPage,
+    lastVirtualIndex,
+    rowCount,
+  ]);
 
   return (
     <div ref={containerRef} className="pb-24">

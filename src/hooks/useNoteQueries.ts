@@ -1,7 +1,10 @@
+import { useMemo } from "react";
 import {
-  useQuery,
+  useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
+  type InfiniteData,
   type QueryFunctionContext,
 } from "@tanstack/react-query";
 import { useAuth, useUser } from "@/hooks/useAuth";
@@ -12,6 +15,9 @@ import type {
   NoteMemberItem,
   DiscoverResponse,
   CopyNotePageToPersonalResponse,
+  NotePageWindowInclude,
+  NotePageWindowItem,
+  NotePageWindowResponse,
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
@@ -59,6 +65,44 @@ export const noteKeys = {
     [...noteKeys.all, "public", sort, limit, offset] as const,
   pages: () => [...noteKeys.all, "pages"] as const,
   page: (noteId: string, pageId: string) => [...noteKeys.pages(), noteId, pageId] as const,
+  /**
+   * `useInfiniteNotePages` の queryKey ファクトリ。`useNote` 系の detail キーとは
+   * 別系統で持ち、include トークンと pageSize までキーに含めることで、同一
+   * ノートでも異なる include / pageSize で同居できるようにする（issue #860
+   * Phase 3）。
+   *
+   * Query-key factory for `useInfiniteNotePages`. Kept separate from the
+   * `useNote` detail key so the windowed list does not collide with the legacy
+   * shell payload. `include` and `pageSize` are part of the key so different
+   * call sites can co-exist without cross-contaminating cached pages
+   * (issue #860 Phase 3).
+   */
+  pagesWindow: (
+    noteId: string,
+    userId: string,
+    userEmail: string | undefined,
+    include: ReadonlyArray<NotePageWindowInclude>,
+    pageSize: number,
+  ) =>
+    [
+      ...noteKeys.pages(),
+      "window",
+      noteId,
+      userId,
+      userEmail ?? "",
+      [...include].sort().join(","),
+      pageSize,
+    ] as const,
+  /**
+   * `noteId` 配下のすべての window エントリ（任意の include / pageSize / 認証
+   * プリンシパル）にマッチするプレフィックスキー。Mutation 後の
+   * `invalidateQueries` ターゲットに使う。
+   *
+   * Prefix key matching every window entry for a note regardless of include
+   * tokens, page size, or auth principal. Used as the invalidation target
+   * after mutations that change the note's page list.
+   */
+  pagesWindowByNoteId: (noteId: string) => [...noteKeys.pages(), "window", noteId] as const,
   members: () => [...noteKeys.all, "members"] as const,
   memberList: (noteId: string) => [...noteKeys.members(), noteId] as const,
 };
@@ -528,6 +572,179 @@ export function useNotePages(
 }
 
 /**
+ * `useInfiniteNotePages` のデフォルト 1 ページサイズ（issue #860 Phase 3）。
+ * サーバ側上限 ({@link MAX_PAGES_LIMIT}) と整合させる。
+ *
+ * Default page size for `useInfiniteNotePages` (issue #860 Phase 3). Aligned
+ * with the server-side cap defined in
+ * `server/api/src/routes/notes/pages.ts` (`MAX_PAGES_LIMIT = 100`).
+ */
+export const DEFAULT_INFINITE_NOTE_PAGES_SIZE = 50;
+
+/**
+ * `useInfiniteNotePages` のデフォルト include。一覧カード描画には preview と
+ * thumbnail が必要なため、両方とも要求する。
+ *
+ * Default `include` set for `useInfiniteNotePages`. The grid cards render the
+ * head preview and the thumbnail, so both extras are requested.
+ */
+const DEFAULT_INFINITE_NOTE_PAGES_INCLUDE: ReadonlyArray<NotePageWindowInclude> = [
+  "preview",
+  "thumbnail",
+];
+
+/**
+ * `useInfiniteNotePages` のオプション。
+ *
+ * Options for {@link useInfiniteNotePages}.
+ */
+export interface UseInfiniteNotePagesOptions {
+  /**
+   * 取得する追加フィールド。デフォルトでは `preview` と `thumbnail` の両方を
+   * 要求する。サーバは未指定トークンを無視するため、将来追加された値も後方
+   * 互換に渡せる。
+   *
+   * Optional extra fields to request via `?include=`. Defaults to both
+   * `preview` and `thumbnail`. The server silently drops unknown tokens, so
+   * passing future values stays backward compatible.
+   */
+  include?: ReadonlyArray<NotePageWindowInclude>;
+  /**
+   * 1 ページあたりの取得件数（1..100）。省略時は {@link DEFAULT_INFINITE_NOTE_PAGES_SIZE}。
+   *
+   * Items per request (1..100). Defaults to
+   * {@link DEFAULT_INFINITE_NOTE_PAGES_SIZE}.
+   */
+  pageSize?: number;
+  /**
+   * 取得を抑止するゲート。`noteId` がまだ確定していない、もしくは権限判定が
+   * 終わるまで遅らせたい呼び出し側で使う。
+   *
+   * Gate to suppress fetching, e.g. while `noteId` is still being resolved or
+   * before the caller has confirmed view permission.
+   */
+  enabled?: boolean;
+}
+
+/**
+ * `NotePageWindowItem`（snake_case の API 行）を `NotePageSummary`（camelCase の
+ * フロント型）に正規化する。ISO 文字列の timestamp は `parseTs` で ms に
+ * 落とし、`addedByUserId` には `owner_id` を流す（issue #823 以降ページ
+ * オーナー＝追加者と等価で、サーバ window レスポンスも legacy
+ * `added_by_user_id` を返さないため）。
+ *
+ * Maps a `NotePageWindowItem` (snake_case API row) to the camelCase
+ * `NotePageSummary` consumed by the grid. ISO timestamps go through
+ * `parseTs` to millisecond integers, and `addedByUserId` is populated from
+ * `owner_id` since after issue #823 page owner ≡ adder and the windowed
+ * response no longer carries the legacy `added_by_user_id` field.
+ */
+function notePageWindowItemToSummary(p: NotePageWindowItem): NotePageSummary {
+  return {
+    id: p.id,
+    ownerUserId: p.owner_id,
+    noteId: p.note_id,
+    title: p.title ?? "",
+    contentPreview: p.content_preview ?? undefined,
+    thumbnailUrl: p.thumbnail_url ?? undefined,
+    sourceUrl: p.source_url ?? undefined,
+    createdAt: parseTs(p.created_at),
+    updatedAt: parseTs(p.updated_at),
+    isDeleted: p.is_deleted,
+    // issue #823 以降「ページを追加した人」 ≒ ページの owner。
+    // After issue #823 the page owner is effectively the "adder", so reuse
+    // `owner_id` to keep the `addedByUserId` slot populated for delete-guard UX.
+    addedByUserId: p.owner_id,
+  };
+}
+
+/**
+ * ノート配下のページ一覧を keyset cursor pagination で段階取得するフック
+ * （issue #860 Phase 3）。サーバの `GET /api/notes/:noteId/pages` 経路に
+ * 対応し、`fetchNextPage()` で `next_cursor` を辿る。React Query の
+ * `useInfiniteQuery` を使うので、UI 側は仮想スクロールの末尾検知から
+ * 続きを要求するだけで済む。
+ *
+ * 戻り値の `pages` は全 window をフラット化した {@link NotePageSummary} 配列
+ * （サーバ順 `updated_at DESC, id DESC` を維持）。`hasNextPage` /
+ * `isFetchingNextPage` は仮想スクロール側で「これ以上要求しない」「重複呼び
+ * 出しを抑止する」ためにそのまま使う。
+ *
+ * Step-paginated infinite query for a note's page list (issue #860 Phase 3).
+ * Wraps `GET /api/notes/:noteId/pages` and threads the opaque `next_cursor`
+ * back into the next request via `useInfiniteQuery`. UI consumers can flip
+ * the `pages` array directly into a virtualized list and trigger
+ * `fetchNextPage()` when the visible window approaches the tail.
+ *
+ * Returned `pages` is the flattened, server-ordered (`updated_at DESC,
+ * id DESC`) array of {@link NotePageSummary}. `hasNextPage` /
+ * `isFetchingNextPage` are surfaced so the caller can debounce repeated
+ * tail-trigger fetches.
+ */
+export function useInfiniteNotePages(noteId: string, options: UseInfiniteNotePagesOptions = {}) {
+  const { api, userId, userEmail, isLoaded } = useNoteApi();
+  const include = options.include ?? DEFAULT_INFINITE_NOTE_PAGES_INCLUDE;
+  const pageSize = options.pageSize ?? DEFAULT_INFINITE_NOTE_PAGES_SIZE;
+  const enabled = (options.enabled ?? true) && isLoaded && !!noteId;
+
+  const query = useInfiniteQuery<
+    NotePageWindowResponse,
+    Error,
+    InfiniteData<NotePageWindowResponse, string | null>,
+    readonly unknown[],
+    string | null
+  >({
+    queryKey: noteKeys.pagesWindow(noteId, userId, userEmail, include, pageSize),
+    queryFn: async (ctx): Promise<NotePageWindowResponse> => {
+      const cursor = ctx.pageParam ?? null;
+      return api.getNotePages(noteId, {
+        cursor,
+        limit: pageSize,
+        include,
+      });
+    },
+    enabled,
+    // 先頭リクエストは cursor 無し。サーバが `next_cursor: null` を返したら
+    // `getNextPageParam` は `undefined` を返して infinite query が終端を認識する。
+    // First request has no cursor; once the server returns `next_cursor: null`
+    // we report `undefined` to mark the end of the list to React Query.
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+  });
+
+  // `select` を使わずに導出してメモ化する。`useInfiniteQuery` の `select` は
+  // 各 page を変換するか、全体を変換するか型が複雑になりやすいので、
+  // ここでは導出値だけ `useMemo` で計算する。
+  // Derive the flattened summary list outside `select` to keep the generic
+  // types simple; `useInfiniteQuery` re-runs the selector on every cache
+  // update, so wrapping the work in `useMemo` keeps render churn bounded.
+  const flattened = useMemo<NotePageSummary[]>(() => {
+    if (!query.data) return [];
+    const out: NotePageSummary[] = [];
+    for (const window of query.data.pages) {
+      for (const item of window.items) {
+        out.push(notePageWindowItemToSummary(item));
+      }
+    }
+    return out;
+  }, [query.data]);
+
+  return {
+    /** Flattened, server-ordered page summaries across all fetched windows. */
+    pages: flattened,
+    /** Raw infinite-query pages, exposed for advanced callers that need cursor state. */
+    rawPages: query.data?.pages ?? [],
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isFetchingNextPage: query.isFetchingNextPage,
+    hasNextPage: query.hasNextPage,
+    fetchNextPage: query.fetchNextPage,
+    refetch: query.refetch,
+    error: query.error,
+  };
+}
+
+/**
  * ノート内の単一ページ（noteId + pageId）を取得するフック。
  * Hook that fetches a single page within a note by noteId + pageId.
  */
@@ -672,6 +889,12 @@ export function useAddPageToNote() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+      // issue #860 Phase 3: 新規ページは window の先頭に来るので、すべての
+      // include / pageSize 組合せをまとめて再フェッチさせる。
+      // Issue #860 Phase 3: invalidate every windowed cache for this note so
+      // the newly created page shows up at the top regardless of include /
+      // pageSize variant.
+      queryClient.invalidateQueries({ queryKey: noteKeys.pagesWindowByNoteId(variables.noteId) });
     },
   });
 }
@@ -695,6 +918,9 @@ export function useCopyPersonalPageToNote() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+      // issue #860 Phase 3: window 経路の infinite cache も合わせて更新。
+      // Issue #860 Phase 3: also refresh the windowed infinite cache.
+      queryClient.invalidateQueries({ queryKey: noteKeys.pagesWindowByNoteId(variables.noteId) });
     },
   });
 }
@@ -795,6 +1021,9 @@ export function useRemovePageFromNote() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+      // issue #860 Phase 3: 削除後の window を再フェッチする。
+      // Issue #860 Phase 3: refresh the windowed infinite cache after deletion.
+      queryClient.invalidateQueries({ queryKey: noteKeys.pagesWindowByNoteId(variables.noteId) });
     },
   });
 }
