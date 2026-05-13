@@ -29,18 +29,43 @@ const DEFAULT_PAGES_LIMIT = 50;
 
 /**
  * keyset cursor の中身。`(updated_at, id)` の組で `ORDER BY updated_at DESC, id DESC`
- * を一意に進める。 issue #860 Phase 1。
+ * を一意に進める。`updatedAt` はマイクロ秒精度を保つため、JS の `Date.toISOString()`
+ * ではなく PostgreSQL 側で `to_char(... at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+ * 経由で組み立てた文字列（例: `2026-05-13T12:34:56.123456Z`）をそのまま保持し、
+ * 比較時は `::timestamptz` にキャストし直す。pg ドライバ経由で `Date` に
+ * 変換するとミリ秒に丸まるため、`defaultNow()` 由来の行を取りこぼす（issue #860
+ * Phase 1 の gemini-code-assist / codex レビュー）。
  *
- * Cursor payload encoding `(updated_at, id)`. The pair uniquely advances
- * `ORDER BY updated_at DESC, id DESC` even when `updated_at` collides
- * across rows (issue #860 Phase 1).
+ * Cursor payload encoding `(updated_at, id)`. `updatedAt` stores the
+ * Postgres-formatted ISO string with microsecond precision
+ * (`YYYY-MM-DDTHH24:MI:SS.USZ`) rather than `Date.toISOString()`, because the
+ * pg driver collapses `timestamptz` values down to JS millisecond `Date`s and
+ * would otherwise skip rows that share a millisecond but differ in
+ * microseconds (e.g. consecutive `defaultNow()` inserts). Comparisons cast
+ * the stored string back via `::timestamptz` so the round-trip is lossless
+ * (Issue #860 Phase 1; gemini-code-assist + chatgpt-codex review on #865).
  */
 interface PagesCursor {
-  /** ISO 8601 timestamp string of `pages.updated_at` from the last returned row. */
+  /**
+   * Postgres-formatted ISO timestamp string with microsecond precision
+   * (`YYYY-MM-DDTHH24:MI:SS.USZ`) from the last returned row's `updated_at`.
+   */
   updatedAt: string;
   /** UUID of the last returned page. */
   id: string;
 }
+
+/**
+ * RFC 4122 系の UUID 文字列を許容する正規表現。pg の `uuid` カラムへ流す前に
+ * cursor 由来の `id` を検証して、`22P02` (invalid_text_representation) 経由の
+ * 500 を避けるため使う（issue #860 Phase 1 / coderabbitai review on #865）。
+ *
+ * Permissive RFC 4122 UUID matcher used to gate cursor `id` before it
+ * reaches the pg `uuid` column, so malformed values fall out as a
+ * deterministic 400 instead of a `22P02` 500 (Issue #860 Phase 1;
+ * coderabbitai review on PR #865).
+ */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Encodes a {@link PagesCursor} as opaque base64url JSON. The exact encoding
@@ -85,8 +110,24 @@ function decodePagesCursor(raw: string | undefined): PagesCursor | null {
   if (typeof updatedAtRaw !== "string" || typeof idRaw !== "string") {
     throw new HTTPException(400, { message: "Invalid cursor" });
   }
+  // `updatedAt` は微小精度の ISO 文字列を保持するが、JS の `Date` parser は
+  // マイクロ秒を捨てるため、ここでは「`Date` が解釈可能か」だけを軽く確認する。
+  // 厳密な範囲チェックは pg 側の `::timestamptz` キャストに委ねる。
+  //
+  // `updatedAt` keeps a microsecond-precision ISO string, but JS `Date` only
+  // parses to milliseconds. We use it as a cheap sanity check; the real
+  // validation happens in Postgres via `::timestamptz` at query time.
   const ts = new Date(updatedAtRaw);
   if (Number.isNaN(ts.getTime())) {
+    throw new HTTPException(400, { message: "Invalid cursor" });
+  }
+  // cursor.id は最終的に pg の `uuid` カラム比較に流れる。不正値だと pg が
+  // `22P02` で 500 を返してしまうため、ここで UUID 形式を強制して 400 に倒す。
+  //
+  // The decoded `id` will be compared against pg's `uuid` column. Anything
+  // that does not look like a UUID would surface as a `22P02` 500, so reject
+  // it deterministically as 400 here.
+  if (!UUID_PATTERN.test(idRaw)) {
     throw new HTTPException(400, { message: "Invalid cursor" });
   }
   return { updatedAt: updatedAtRaw, id: idRaw };
@@ -294,14 +335,20 @@ app.get("/:noteId/pages", authOptional, async (c) => {
   // keyset 条件: `(updated_at, id)` を `(c.updatedAt, c.id)` より小さい組に絞る。
   // `ORDER BY updated_at DESC, id DESC` と同じ向きで進めるため、
   // `updated_at < cursor.updatedAt OR (updated_at = cursor.updatedAt AND id < cursor.id)`
-  // を使う。`limit + 1` 件取得して、超過したら `next_cursor` を発行する。
+  // を使う。cursor の `updatedAt` は pg 側でマイクロ秒精度の ISO 文字列として
+  // 保存しているため、比較側でも JS Date を介さず `::timestamptz` キャストで突合
+  // し、ms 切り捨てによる行の取りこぼしを防ぐ（gemini-code-assist / codex on PR #865）。
+  // `limit + 1` 件取得して、超過したら `next_cursor` を発行する。
   //
-  // Keyset predicate paired with `ORDER BY updated_at DESC, id DESC`. Fetching
-  // `limit + 1` rows lets us emit `next_cursor` without a separate count
-  // query.
+  // Keyset predicate paired with `ORDER BY updated_at DESC, id DESC`. The
+  // cursor's `updatedAt` is the Postgres-formatted microsecond ISO string,
+  // so comparisons cast it back via `::timestamptz` to keep microsecond
+  // precision end-to-end (avoiding the JS `Date` truncation flagged by
+  // gemini-code-assist + codex on PR #865). Fetching `limit + 1` rows lets
+  // us emit `next_cursor` without a separate count query.
   const whereClauses = [eq(pages.noteId, noteId), eq(pages.isDeleted, false)];
   if (cursor) {
-    const cursorTs = new Date(cursor.updatedAt);
+    const cursorTsSql = sql`${cursor.updatedAt}::timestamptz`;
     // drizzle の `or()` は要素が空配列のとき undefined を返す型だが、ここでは
     // 必ず 2 つ渡しているため undefined は来ない。型を絞るため明示的に分岐する。
     //
@@ -309,14 +356,25 @@ app.get("/:noteId/pages", authOptional, async (c) => {
     // `SQL | undefined`. Use an explicit `if` to keep TypeScript happy
     // without resorting to a non-null assertion.
     const keysetPredicate = or(
-      lt(pages.updatedAt, cursorTs),
-      and(sql`${pages.updatedAt} = ${cursorTs}`, lt(pages.id, cursor.id)),
+      lt(pages.updatedAt, cursorTsSql),
+      and(eq(pages.updatedAt, cursorTsSql), lt(pages.id, cursor.id)),
     );
     if (keysetPredicate) {
       whereClauses.push(keysetPredicate);
     }
   }
 
+  // `updatedAtIso` は cursor を組み立てるためだけに pg 側で
+  // マイクロ秒精度の ISO 文字列を生成して持ち帰る。pg ドライバ経由で
+  // 受け取る `updated_at` は JS Date に丸まる（ms 精度）ため、それだけでは
+  // 同一ミリ秒で別マイクロ秒の行を取りこぼす（gemini-code-assist / codex
+  // on PR #865）。
+  //
+  // `updatedAtIso` ships the microsecond-precision ISO string built by
+  // Postgres so the cursor never loses precision. The `updated_at` field
+  // returned via the pg driver collapses to a JS `Date` (millisecond), which
+  // would silently skip rows that share a millisecond but differ in
+  // microseconds (gemini-code-assist + codex on PR #865).
   const rows = await db
     .select({
       id: pages.id,
@@ -329,6 +387,7 @@ app.get("/:noteId/pages", authOptional, async (c) => {
       sourceUrl: pages.sourceUrl,
       createdAt: pages.createdAt,
       updatedAt: pages.updatedAt,
+      updatedAtIso: sql<string>`to_char(${pages.updatedAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
       isDeleted: pages.isDeleted,
     })
     .from(pages)
@@ -342,8 +401,7 @@ app.get("/:noteId/pages", authOptional, async (c) => {
   const nextCursor =
     hasMore && last
       ? encodePagesCursor({
-          updatedAt:
-            last.updatedAt instanceof Date ? last.updatedAt.toISOString() : String(last.updatedAt),
+          updatedAt: last.updatedAtIso,
           id: last.id,
         })
       : null;

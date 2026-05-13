@@ -148,8 +148,17 @@ describe("POST /api/notes/:noteId/pages", () => {
 });
 
 describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () => {
-  /** Builds a page row matching the new SELECT in `pages.ts`. */
+  /**
+   * `pages.ts` の新しい SELECT に合わせたページ行を生成する。
+   * `updatedAtIso` は本番経路で pg `to_char(... 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+   * から返るマイクロ秒精度の ISO 文字列。
+   *
+   * Builds a page row matching the new SELECT in `pages.ts`. `updatedAtIso`
+   * is the microsecond-precision ISO string produced by pg
+   * `to_char(... 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` in the real path.
+   */
   function buildPageRow(overrides: Record<string, unknown> = {}) {
+    const updatedAt = (overrides.updatedAt as Date | undefined) ?? new Date("2026-01-01T00:00:00Z");
     return {
       id: "pg-1",
       ownerId: TEST_USER_ID,
@@ -160,7 +169,10 @@ describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () =
       thumbnailUrl: "https://cdn.example/thumb-1.jpg",
       sourceUrl: null,
       createdAt: new Date("2026-01-01T00:00:00Z"),
-      updatedAt: new Date("2026-01-01T00:00:00Z"),
+      updatedAt,
+      // Default mirrors `to_char(..., 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` (microseconds).
+      // 既定値は pg の `to_char` 出力（マイクロ秒精度の ISO 文字列）を模倣する。
+      updatedAtIso: `${updatedAt.toISOString().replace("Z", "")}000Z`,
       isDeleted: false,
       ...overrides,
     };
@@ -189,7 +201,8 @@ describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () =
     expect(body.items).toHaveLength(2);
     expect(body.next_cursor).toBeNull();
     expect(body.items[0]).toMatchObject({ id: "pg-1", title: "First" });
-    // include= not specified → preview / thumbnail must be null
+    // `?include=` を指定していない場合は preview / thumbnail は必ず null になる。
+    // When `?include=` is omitted, preview and thumbnail must come back as null.
     expect(body.items[0]?.content_preview).toBeNull();
     expect(body.items[0]?.thumbnail_url).toBeNull();
   });
@@ -232,7 +245,8 @@ describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () =
 
   it("emits next_cursor when more rows are available", async () => {
     const mockNote = createMockNote();
-    // Build limit+1 rows so the route signals there is more to fetch.
+    // `next_cursor` を出すには limit+1 件返す必要がある。
+    // The route emits `next_cursor` only when limit+1 rows come back.
     const rows = Array.from({ length: 3 }, (_, i) =>
       buildPageRow({
         id: `pg-${i}`,
@@ -280,7 +294,8 @@ describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () =
     const mockNote = createMockNote();
     const { app } = createTestApp([[mockNote], []]);
 
-    // base64url("{}") decodes cleanly but lacks updatedAt/id → 400.
+    // base64url("{}") はデコード自体は成功するが updatedAt / id を欠くため 400 になる。
+    // `base64url("{}")` decodes cleanly but lacks updatedAt/id, so the route rejects it as 400.
     const badCursor = Buffer.from("{}", "utf8").toString("base64url");
     const res = await app.request(`/api/notes/${NOTE_ID}/pages?cursor=${badCursor}`, {
       method: "GET",
@@ -290,7 +305,67 @@ describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () =
     expect(res.status).toBe(400);
   });
 
+  it("rejects cursor whose id is not a UUID with 400", async () => {
+    // `cursor.id` が UUID として不正だと pg `uuid` キャストが 22P02 を投げて
+    // 500 になるため、ルート側で先に 400 に倒す必要がある（coderabbitai review on #865）。
+    //
+    // A non-UUID `cursor.id` would otherwise reach the pg `uuid` cast and
+    // surface as a `22P02` 500. The route should 400 it up front instead
+    // (coderabbitai review on PR #865).
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote], []]);
+
+    const cursor = Buffer.from(
+      JSON.stringify({ updatedAt: "2026-01-01T00:00:00.000000Z", id: "not-a-uuid" }),
+      "utf8",
+    ).toString("base64url");
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages?cursor=${cursor}`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("preserves microsecond precision in next_cursor (no Date.toISOString truncation)", async () => {
+    // pg は `timestamp with time zone` をマイクロ秒精度で持つが、JS Date は
+    // ミリ秒まで。ルートは pg 側の `to_char(...)` を `updatedAtIso` として
+    // 受け取り、それをそのまま cursor に詰めるため、マイクロ秒桁が失われない
+    // ことを確認する（gemini-code-assist + codex on PR #865）。
+    //
+    // Postgres stores `timestamp with time zone` at microsecond precision,
+    // but JS `Date` truncates to milliseconds. The route receives the
+    // microsecond ISO string from pg via `to_char(...)` as `updatedAtIso`
+    // and copies it verbatim into the cursor, which the assertion verifies
+    // (gemini-code-assist + codex on PR #865).
+    const microIso = "2026-04-01T12:34:56.123456Z";
+    const mockNote = createMockNote();
+    const rows = [
+      buildPageRow({ id: "11111111-1111-4111-8111-111111111111", updatedAtIso: microIso }),
+      buildPageRow({ id: "22222222-2222-4222-8222-222222222222", updatedAtIso: microIso }),
+    ];
+    const { app } = createTestApp([[mockNote], rows]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages?limit=1`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { next_cursor: string | null };
+    const nextCursor = body.next_cursor;
+    expect(nextCursor).not.toBeNull();
+    if (nextCursor === null) throw new Error("expected next_cursor to be present");
+    const decoded = JSON.parse(Buffer.from(nextCursor, "base64url").toString("utf8")) as {
+      updatedAt: string;
+      id: string;
+    };
+    expect(decoded.updatedAt).toBe(microIso);
+  });
+
   it("allows guest access on public notes (authOptional)", async () => {
+    // Public visibility では getNoteRole が認証なしでも guest として解決する。
     // Public visibility → getNoteRole resolves caller as `guest` even without auth.
     const mockNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "public" });
     const row = buildPageRow();
@@ -298,7 +373,8 @@ describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () =
 
     const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
       method: "GET",
-      // intentionally no x-test-user-id → unauthenticated request
+      // 認証ヘッダなし: 未ログインリクエスト。
+      // No x-test-user-id header → unauthenticated request.
       headers: { "Content-Type": "application/json" },
     });
 
