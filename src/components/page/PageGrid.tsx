@@ -247,6 +247,20 @@ const PageGrid: React.FC<PageGridProps> = ({
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalHeight = rowVirtualizer.getTotalSize();
 
+  // `getVirtualItems()` はスクロールごとに新しい配列を返すため、依存配列に
+  // そのまま入れるとエフェクトが毎フレーム再評価される。実際に末尾検知に
+  // 必要なのは「最後に見えている row の index」だけなので、それだけを派生
+  // 値として取り出して依存にする（gemini-code-assist PR #866 review）。
+  // `virtualRows` が空のときは `-1` にフォールバックして無効化する。
+  //
+  // `getVirtualItems()` returns a fresh array on every scroll, so depending
+  // on it re-runs the effect every frame. Only the trailing virtual index
+  // matters for tail detection — derive it once and depend on that scalar
+  // instead (gemini-code-assist on PR #866). Empty windows fall back to
+  // `-1`, which the effect treats as "no last row, do nothing".
+  const lastVirtualIndex =
+    virtualRows.length > 0 ? (virtualRows[virtualRows.length - 1]?.index ?? -1) : -1;
+
   // 仮想 range の末尾が `rowCount - threshold` を超えたら次の window を取りに
   // 行く（issue #860 Phase 3）。`hasNextPage` と `isFetchingNextPage` でガード
   // することで、末尾到達後の追加呼び出しと in-flight 中の重複呼び出しを抑止
@@ -260,10 +274,8 @@ const PageGrid: React.FC<PageGridProps> = ({
   useEffect(() => {
     if (!isNoteContext) return;
     if (!noteInfinite.hasNextPage || noteInfinite.isFetchingNextPage) return;
-    if (virtualRows.length === 0) return;
-    const lastVisibleRow = virtualRows[virtualRows.length - 1];
-    if (!lastVisibleRow) return;
-    if (lastVisibleRow.index >= rowCount - INFINITE_FETCH_THRESHOLD_ROWS) {
+    if (lastVirtualIndex === -1) return;
+    if (lastVirtualIndex >= rowCount - INFINITE_FETCH_THRESHOLD_ROWS) {
       noteInfinite.fetchNextPage();
     }
   }, [
@@ -271,7 +283,7 @@ const PageGrid: React.FC<PageGridProps> = ({
     noteInfinite.hasNextPage,
     noteInfinite.isFetchingNextPage,
     noteInfinite.fetchNextPage,
-    virtualRows,
+    lastVirtualIndex,
     rowCount,
   ]);
 

@@ -626,7 +626,19 @@ export interface UseInfiniteNotePagesOptions {
   enabled?: boolean;
 }
 
-/** ISO 文字列 → ms 整数。パースできなければ 0 を返す。 */
+/**
+ * `NotePageWindowItem`（snake_case の API 行）を `NotePageSummary`（camelCase の
+ * フロント型）に正規化する。ISO 文字列の timestamp は `parseTs` で ms に
+ * 落とし、`addedByUserId` には `owner_id` を流す（issue #823 以降ページ
+ * オーナー＝追加者と等価で、サーバ window レスポンスも legacy
+ * `added_by_user_id` を返さないため）。
+ *
+ * Maps a `NotePageWindowItem` (snake_case API row) to the camelCase
+ * `NotePageSummary` consumed by the grid. ISO timestamps go through
+ * `parseTs` to millisecond integers, and `addedByUserId` is populated from
+ * `owner_id` since after issue #823 page owner ≡ adder and the windowed
+ * response no longer carries the legacy `added_by_user_id` field.
+ */
 function notePageWindowItemToSummary(p: NotePageWindowItem): NotePageSummary {
   return {
     id: p.id,
