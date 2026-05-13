@@ -29,7 +29,6 @@ import {
   OTHER_USER_ID,
   TEST_USER_EMAIL,
   createMockNote,
-  createMockPageListRow,
   createTestApp,
   authHeaders,
 } from "./setup.js";
@@ -148,14 +147,32 @@ describe("POST /api/notes/:noteId/pages", () => {
   });
 });
 
-describe("GET /api/notes/:noteId/pages", () => {
-  it("lists pages filtered by pages.note_id ordered by updated_at desc", async () => {
+describe("GET /api/notes/:noteId/pages (Issue #860 Phase 1 cursor window)", () => {
+  /** Builds a page row matching the new SELECT in `pages.ts`. */
+  function buildPageRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "pg-1",
+      ownerId: TEST_USER_ID,
+      noteId: NOTE_ID,
+      sourcePageId: null,
+      title: "First",
+      contentPreview: "preview body...",
+      thumbnailUrl: "https://cdn.example/thumb-1.jpg",
+      sourceUrl: null,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      updatedAt: new Date("2026-01-01T00:00:00Z"),
+      isDeleted: false,
+      ...overrides,
+    };
+  }
+
+  it("returns items with content_preview/thumbnail nulled by default", async () => {
     const mockNote = createMockNote();
-    const row1 = createMockPageListRow({ page_id: "pg-1", page_title: "First" });
-    const row2 = createMockPageListRow({
-      page_id: "pg-2",
-      page_title: "Second",
-      page_updated_at: new Date("2026-02-01T00:00:00Z"),
+    const row1 = buildPageRow({ id: "pg-1", title: "First" });
+    const row2 = buildPageRow({
+      id: "pg-2",
+      title: "Second",
+      updatedAt: new Date("2026-02-01T00:00:00Z"),
     });
     const { app } = createTestApp([[mockNote], [row1, row2]]);
 
@@ -165,10 +182,129 @@ describe("GET /api/notes/:noteId/pages", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { pages: Array<Record<string, unknown>> };
-    expect(body.pages).toHaveLength(2);
-    expect(body.pages[0]).toMatchObject({ page_id: "pg-1", page_title: "First" });
-    expect(body.pages[0]).not.toHaveProperty("sort_order");
+    const body = (await res.json()) as {
+      items: Array<Record<string, unknown>>;
+      next_cursor: string | null;
+    };
+    expect(body.items).toHaveLength(2);
+    expect(body.next_cursor).toBeNull();
+    expect(body.items[0]).toMatchObject({ id: "pg-1", title: "First" });
+    // include= not specified → preview / thumbnail must be null
+    expect(body.items[0]?.content_preview).toBeNull();
+    expect(body.items[0]?.thumbnail_url).toBeNull();
+  });
+
+  it("includes content_preview when ?include=preview is set", async () => {
+    const mockNote = createMockNote();
+    const row = buildPageRow({ id: "pg-1", contentPreview: "hello preview" });
+    const { app } = createTestApp([[mockNote], [row]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages?include=preview`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: Array<Record<string, unknown>> };
+    expect(body.items[0]?.content_preview).toBe("hello preview");
+    expect(body.items[0]?.thumbnail_url).toBeNull();
+  });
+
+  it("includes thumbnail_url when ?include=thumbnail is set", async () => {
+    const mockNote = createMockNote();
+    const row = buildPageRow({
+      id: "pg-1",
+      contentPreview: "hello preview",
+      thumbnailUrl: "https://cdn.example/t.jpg",
+    });
+    const { app } = createTestApp([[mockNote], [row]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages?include=thumbnail`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: Array<Record<string, unknown>> };
+    expect(body.items[0]?.thumbnail_url).toBe("https://cdn.example/t.jpg");
+    expect(body.items[0]?.content_preview).toBeNull();
+  });
+
+  it("emits next_cursor when more rows are available", async () => {
+    const mockNote = createMockNote();
+    // Build limit+1 rows so the route signals there is more to fetch.
+    const rows = Array.from({ length: 3 }, (_, i) =>
+      buildPageRow({
+        id: `pg-${i}`,
+        title: `Page ${i}`,
+        updatedAt: new Date(`2026-03-0${i + 1}T00:00:00Z`),
+      }),
+    );
+    const { app } = createTestApp([[mockNote], rows]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages?limit=2`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<Record<string, unknown>>;
+      next_cursor: string | null;
+    };
+    expect(body.items).toHaveLength(2);
+    expect(typeof body.next_cursor).toBe("string");
+    expect(body.next_cursor && body.next_cursor.length).toBeGreaterThan(0);
+  });
+
+  it("returns null next_cursor when result fits the page", async () => {
+    const mockNote = createMockNote();
+    const rows = [buildPageRow({ id: "pg-only" })];
+    const { app } = createTestApp([[mockNote], rows]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages?limit=5`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<Record<string, unknown>>;
+      next_cursor: string | null;
+    };
+    expect(body.items).toHaveLength(1);
+    expect(body.next_cursor).toBeNull();
+  });
+
+  it("rejects malformed cursor payloads with 400", async () => {
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote], []]);
+
+    // base64url("{}") decodes cleanly but lacks updatedAt/id → 400.
+    const badCursor = Buffer.from("{}", "utf8").toString("base64url");
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages?cursor=${badCursor}`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("allows guest access on public notes (authOptional)", async () => {
+    // Public visibility → getNoteRole resolves caller as `guest` even without auth.
+    const mockNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "public" });
+    const row = buildPageRow();
+    const { app } = createTestApp([[mockNote], [row]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "GET",
+      // intentionally no x-test-user-id → unauthenticated request
+      headers: { "Content-Type": "application/json" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: Array<Record<string, unknown>> };
+    expect(body.items).toHaveLength(1);
   });
 
   it("returns 403 when caller has no note role", async () => {

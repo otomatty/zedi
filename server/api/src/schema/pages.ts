@@ -131,6 +131,22 @@ export const pages = pgTable(
       .on(table.noteId, table.updatedAt.desc())
       .where(sql`${table.isDeleted} = false`),
     /**
+     * `GET /api/notes/:noteId/pages` (Issue #860 Phase 1) の keyset cursor
+     * pagination 用部分複合インデックス。
+     * `ORDER BY updated_at DESC, id DESC` を index-only でスキャンし、
+     * `(updated_at, id)` 二値の cursor 突合（`updated_at = $1 AND id < $2` の
+     * tie-break 経路）も index 内で解決できるよう、`id DESC` まで含める。
+     *
+     * Partial composite index that backs the keyset cursor pagination on
+     * `GET /api/notes/:noteId/pages` (Issue #860 Phase 1). Extending the
+     * existing `(note_id, updated_at DESC)` order with `id DESC` lets the
+     * `(updated_at, id)` tie-break predicate stay inside the index instead
+     * of falling back to a heap re-check / sort.
+     */
+    index("idx_pages_note_active_updated_id")
+      .on(table.noteId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.isDeleted} = false`),
+    /**
      * オーナーごとに有効なウェルカムページは最大 1 件であることを担保する部分
      * ユニーク index。`welcomePageService.insertWelcomePage` の `onConflictDoNothing`
      * が target としてこの index に依拠している。実 DDL は
