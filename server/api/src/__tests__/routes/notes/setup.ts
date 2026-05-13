@@ -57,18 +57,6 @@ export function createMockPageRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** テスト用ページ一覧行のデフォルト / Default mock page list row */
-export function createMockPageListRow(overrides: Record<string, unknown> = {}) {
-  return {
-    page_id: "page-test-001",
-    page_title: "Test Page",
-    page_content_preview: "Preview...",
-    page_thumbnail_url: null,
-    page_updated_at: new Date("2026-01-01T00:00:00Z"),
-    ...overrides,
-  };
-}
-
 /** Mock row shape matches DB select (camelCase). Route maps to snake_case in response. */
 export function createMockMember(overrides: Record<string, unknown> = {}) {
   return {

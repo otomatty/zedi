@@ -81,14 +81,16 @@ export interface NotePageApiItem {
    * 一覧カード描画用の先頭プレビュー (`pages.content_preview`)。本文 fetch を
    * 伴わずにカードへ表示するために、保存時に算出した短い抜粋を返す。Issue #849
    * で一時的に常時 `null` 化していたが、Issue #860 Phase 0 で復旧した。
-   * Phase 1 以降でノートシェルとページ一覧の API が分離されたら、本フィールド
-   * は `GET /api/notes/:noteId/pages?include=preview` 側で提供される予定。
+   * Phase 1 で導入した `GET /api/notes/:noteId/pages?include=preview` がノート
+   * シェルとページ一覧を分離した新経路だが、互換期間中は本フィールドも維持する
+   * （Phase 6 で `pages[]` ごと撤去する予定）。
    *
    * Short head-of-body preview (`pages.content_preview`) used to render list
    * cards without fetching full page bodies. Temporarily forced to `null` by
-   * Issue #849 and restored by Issue #860 Phase 0. Once Phase 1 splits the
-   * note-shell and page-list APIs, this field will live on
-   * `GET /api/notes/:noteId/pages?include=preview` instead.
+   * Issue #849 and restored by Issue #860 Phase 0. Phase 1 added
+   * `GET /api/notes/:noteId/pages?include=preview` as the new split route;
+   * this field is kept for the compatibility window until `pages[]` itself
+   * is removed in Phase 6.
    */
   content_preview: string | null;
   thumbnail_url: string | null;
@@ -108,6 +110,52 @@ export interface NotePageApiItem {
 export interface NoteDetailApiResponse extends NoteApiFields {
   current_user_role: NonNullable<NoteRole>;
   pages: NotePageApiItem[];
+}
+
+/**
+ * `GET /api/notes/:noteId/pages` の cursor `include` 指定で追加できるオプション
+ * フィールド。`preview` は `content_preview`、`thumbnail` は `thumbnail_url` の
+ * 同梱を要求する。未指定時は両フィールドとも `null` で返す（Issue #860 Phase 1）。
+ *
+ * Optional fields requested via `?include=` on `GET /api/notes/:noteId/pages`.
+ * `preview` toggles `content_preview` and `thumbnail` toggles `thumbnail_url`;
+ * both are `null` when unrequested (Issue #860 Phase 1).
+ */
+export type NotePageWindowInclude = "preview" | "thumbnail";
+
+/**
+ * `GET /api/notes/:noteId/pages` のページ行。keyset cursor pagination 経路で
+ * 返す軽量サマリ。`content_preview` / `thumbnail_url` は `?include=` で
+ * 明示的に要求された場合のみセットされ、それ以外は `null` で返る。
+ *
+ * Page summary returned by `GET /api/notes/:noteId/pages` (Issue #860 Phase
+ * 1). `content_preview` and `thumbnail_url` are populated only when their
+ * corresponding `?include=` token is present; otherwise they are `null`.
+ */
+export interface NotePageWindowItem {
+  id: string;
+  owner_id: string;
+  note_id: string;
+  source_page_id: string | null;
+  title: string | null;
+  content_preview: string | null;
+  thumbnail_url: string | null;
+  source_url: string | null;
+  created_at: Date;
+  updated_at: Date;
+  is_deleted: boolean;
+}
+
+/**
+ * `GET /api/notes/:noteId/pages` の keyset cursor pagination レスポンス。
+ * `next_cursor` が `null` の場合は末尾まで到達済み。
+ *
+ * Keyset cursor pagination response for `GET /api/notes/:noteId/pages`. A
+ * `null` `next_cursor` means there are no more items.
+ */
+export interface NotePageWindowResponse {
+  items: NotePageWindowItem[];
+  next_cursor: string | null;
 }
 
 /**
