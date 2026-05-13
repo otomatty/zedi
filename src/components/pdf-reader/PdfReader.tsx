@@ -33,6 +33,10 @@ export function PdfReader() {
   const { sourceId } = useParams<{ sourceId: string }>();
   const [verify, setVerify] = useState<PdfVerifyResult | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  // Bumped after a successful re-attach so the verify effect re-runs and
+  // reflects the file's new state (Gemini review on PR #858).
+  // 再アタッチ成功時にこのカウンタを進めて verify を再実行する。
+  const [verifyCounter, setVerifyCounter] = useState(0);
   const highlightsQuery = usePdfHighlights(sourceId);
 
   useEffect(() => {
@@ -40,7 +44,9 @@ export function PdfReader() {
     let cancelled = false;
     verifyPdfSource(sourceId)
       .then((result) => {
-        if (!cancelled) setVerify(result);
+        if (cancelled) return;
+        setVerify(result);
+        setVerifyError(null);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -50,7 +56,7 @@ export function PdfReader() {
     return () => {
       cancelled = true;
     };
-  }, [sourceId]);
+  }, [sourceId, verifyCounter]);
 
   if (!isTauriDesktop()) {
     return <PdfReaderUnsupported />;
@@ -69,7 +75,10 @@ export function PdfReader() {
   return (
     <div className="flex h-full flex-col">
       {fileMissing && (
-        <MissingPdfBanner sourceId={sourceId} onReattachComplete={() => setVerify(null)} />
+        <MissingPdfBanner
+          sourceId={sourceId}
+          onReattachComplete={() => setVerifyCounter((c) => c + 1)}
+        />
       )}
       <div className="grid h-full grid-cols-[1fr_320px] gap-0">
         <main className="overflow-auto p-6">
