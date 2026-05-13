@@ -24,9 +24,18 @@ const personalQueryData: { current: PageSummary[] | undefined; isLoading: boolea
   current: undefined,
   isLoading: false,
 };
-const noteQueryData: { current: PageSummary[] | undefined; isLoading: boolean } = {
+const noteInfiniteData: {
+  current: PageSummary[] | undefined;
+  isLoading: boolean;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: ReturnType<typeof vi.fn>;
+} = {
   current: undefined,
   isLoading: false,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  fetchNextPage: vi.fn(),
 };
 
 vi.mock("@/hooks/usePageQueries", () => ({
@@ -38,7 +47,17 @@ vi.mock("@/hooks/usePageQueries", () => ({
 }));
 
 vi.mock("@/hooks/useNoteQueries", () => ({
-  useNotePages: () => ({ data: noteQueryData.current, isLoading: noteQueryData.isLoading }),
+  useInfiniteNotePages: () => ({
+    pages: noteInfiniteData.current ?? [],
+    rawPages: [],
+    isLoading: noteInfiniteData.isLoading,
+    isFetching: false,
+    isFetchingNextPage: noteInfiniteData.isFetchingNextPage,
+    hasNextPage: noteInfiniteData.hasNextPage,
+    fetchNextPage: noteInfiniteData.fetchNextPage,
+    refetch: vi.fn(),
+    error: null,
+  }),
 }));
 
 vi.mock("./PageCard", () => ({
@@ -94,8 +113,11 @@ function makePages(n: number): PageSummary[] {
 beforeEach(() => {
   personalQueryData.current = undefined;
   personalQueryData.isLoading = false;
-  noteQueryData.current = undefined;
-  noteQueryData.isLoading = false;
+  noteInfiniteData.current = undefined;
+  noteInfiniteData.isLoading = false;
+  noteInfiniteData.hasNextPage = false;
+  noteInfiniteData.isFetchingNextPage = false;
+  noteInfiniteData.fetchNextPage = vi.fn();
 });
 
 describe("PageGrid", () => {
@@ -114,7 +136,7 @@ describe("PageGrid", () => {
   });
 
   it("renders a small bounded number of PageCards for a 1000-page note", () => {
-    noteQueryData.current = makePages(1000);
+    noteInfiniteData.current = makePages(1000);
     render(<PageGrid noteId="note-1" />);
 
     const cards = screen.queryAllByTestId("page-card");
@@ -126,7 +148,7 @@ describe("PageGrid", () => {
 
   it("renders only the visible window of pages, not all of them", () => {
     const allPages = makePages(500);
-    noteQueryData.current = allPages;
+    noteInfiniteData.current = allPages;
     render(<PageGrid noteId="note-2" />);
 
     const cards = screen.queryAllByTestId("page-card");
@@ -138,12 +160,55 @@ describe("PageGrid", () => {
   });
 
   it("renders the first page first (sorted by updatedAt desc)", () => {
-    noteQueryData.current = makePages(20);
+    noteInfiniteData.current = makePages(20);
     render(<PageGrid noteId="note-3" />);
 
     const cards = screen.queryAllByTestId("page-card");
     // 先頭のカードは最新の updatedAt = page-0。
     // First rendered card is the most-recently-updated (page-0 in our mock).
     expect(cards[0]?.dataset.pageId).toBe("page-0");
+  });
+
+  it("calls fetchNextPage when virtual range nears the tail and more pages exist", () => {
+    // 仮想化モックは先頭から `VIRTUAL_VISIBLE + overscan` 行を返す（合計 14 行 ≒
+    // 14 行分のページ）。`hasNextPage` を true にすると、infinite query の末尾
+    // 検知が走り `fetchNextPage` を呼ぶ。columns=4 / 14 行 → 56 件以下の少量
+    // データで、虚像 range の末尾が `rowCount - threshold` を超える条件を作る。
+    //
+    // The virtualizer mock returns the first `VIRTUAL_VISIBLE + overscan`
+    // rows. With `hasNextPage: true` and a page count small enough that the
+    // tail of the virtual range crosses `rowCount - threshold`, PageGrid
+    // should request the next infinite window.
+    noteInfiniteData.current = makePages(20);
+    noteInfiniteData.hasNextPage = true;
+    const fetchNextPage = vi.fn();
+    noteInfiniteData.fetchNextPage = fetchNextPage;
+
+    render(<PageGrid noteId="note-tail" />);
+
+    expect(fetchNextPage).toHaveBeenCalled();
+  });
+
+  it("does not call fetchNextPage while a window is already being fetched", () => {
+    noteInfiniteData.current = makePages(20);
+    noteInfiniteData.hasNextPage = true;
+    noteInfiniteData.isFetchingNextPage = true;
+    const fetchNextPage = vi.fn();
+    noteInfiniteData.fetchNextPage = fetchNextPage;
+
+    render(<PageGrid noteId="note-tail-busy" />);
+
+    expect(fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it("does not call fetchNextPage when hasNextPage is false", () => {
+    noteInfiniteData.current = makePages(20);
+    noteInfiniteData.hasNextPage = false;
+    const fetchNextPage = vi.fn();
+    noteInfiniteData.fetchNextPage = fetchNextPage;
+
+    render(<PageGrid noteId="note-end" />);
+
+    expect(fetchNextPage).not.toHaveBeenCalled();
   });
 });

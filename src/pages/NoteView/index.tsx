@@ -8,7 +8,7 @@ import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge } from "@zedi/ui";
 import { NoteAddPageDialog } from "./NoteAddPageDialog";
-import { useNote, useNotePages } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
@@ -53,11 +53,13 @@ const NoteView: React.FC = () => {
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
 
-  // `NoteAddPageDialog` の重複検出に使う。グリッド自体は `PageGrid` 内部で
-  // 同じクエリキーを引くので二重フェッチにはならない。
-  // Used for `NoteAddPageDialog` dedup; the grid reuses the same React Query
-  // key, so this is a cache hit.
-  const { data: notePages = [] } = useNotePages(noteId ?? "", noteSource, Boolean(access?.canView));
+  // issue #860 Phase 3: `NoteAddPageDialog` は `notePages` 配列を受け取らなくなった
+  // （重複判定の no-op 化に伴い prop ごと除去）。ノートのページ一覧は `PageGrid`
+  // 配下の `useInfiniteNotePages` だけが取りに行く。
+  // Issue #860 Phase 3: `NoteAddPageDialog` no longer takes a `notePages`
+  // array — the duplicate filter was a no-op and the prop was removed. The
+  // note's page list is now fetched only by `useInfiniteNotePages` inside
+  // `PageGrid`.
 
   const [isAddPageOpen, setIsAddPageOpen] = useState(false);
 
@@ -170,7 +172,6 @@ const NoteView: React.FC = () => {
           open={isAddPageOpen}
           onOpenChange={setIsAddPageOpen}
           noteId={note.id}
-          notePages={notePages}
           canEdit={canEdit}
         />
       )}

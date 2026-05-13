@@ -32,6 +32,8 @@ import type {
   InviteLinkRow,
   DomainAccessRow,
   CreateDomainAccessBody,
+  NotePageWindowInclude,
+  NotePageWindowResponse,
 } from "./types";
 
 export type { NoteListItem };
@@ -401,6 +403,47 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
           offset: String(opts?.offset ?? 0),
         },
       });
+    },
+
+    /**
+     * `GET /api/notes/:noteId/pages` — keyset cursor pagination で一覧を取得する
+     * 軽量ノートページ window 経路（issue #860 Phase 1）。`include` で
+     * `content_preview` / `thumbnail_url` の同梱を要求する。`cursor` を
+     * 省略すると先頭から取得し、レスポンスの `next_cursor` を次回呼び出しに
+     * そのまま渡す。`next_cursor` が `null` なら末尾まで読み切った状態。
+     * `authOptional` なので、公開 / unlisted ノートは未ログインでも取得できる。
+     *
+     * Keyset-paginated window of a note's pages (issue #860 Phase 1). Echo the
+     * previous response's `next_cursor` back into `cursor` for the next page;
+     * a `null` `next_cursor` means the end has been reached. `include` opts
+     * the heavy `content_preview` / `thumbnail_url` columns back into the row.
+     * The endpoint is `authOptional`, so guests can browse public / unlisted
+     * notes without sign-in.
+     */
+    async getNotePages(
+      noteId: string,
+      params: {
+        cursor?: string | null;
+        limit?: number;
+        include?: ReadonlyArray<NotePageWindowInclude>;
+      } = {},
+    ): Promise<NotePageWindowResponse> {
+      const query: Record<string, string> = {};
+      if (params.cursor) query.cursor = params.cursor;
+      if (params.limit !== undefined) query.limit = String(params.limit);
+      if (params.include && params.include.length > 0) {
+        // 重複トークンは集合化して落とす。サーバ側は未知トークンを無視するが、
+        // URL を簡潔に保つためクライアントでも先に正規化する。
+        // De-duplicate include tokens; the server tolerates unknown values but
+        // keeping the query string tidy avoids confusing log entries.
+        const tokens = Array.from(new Set(params.include));
+        query.include = tokens.join(",");
+      }
+      return reqOptionalAuth<NotePageWindowResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/pages`,
+        { query },
+      );
     },
 
     /** GET /api/notes/:id/members — list members. */

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import NoteView from "./index";
-import { useNote, useNotePages } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/useNoteQueries";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -24,7 +24,6 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
-  useNotePages: vi.fn(() => ({ data: [], isLoading: false })),
   useAddPageToNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCopyPersonalPageToNote: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ created: true, page_id: "pg", sort_order: 1 }),
@@ -165,7 +164,6 @@ describe("NoteView", () => {
       source: "local",
       isLoading: false,
     } as never);
-    vi.mocked(useNotePages).mockReturnValue({ data: [], isLoading: false } as never);
   });
 
   it("shows loading message when note is loading", () => {
@@ -214,7 +212,6 @@ describe("NoteView", () => {
       source: "local",
       isLoading: false,
     } as never);
-    vi.mocked(useNotePages).mockReturnValue({ data: [], isLoading: false } as never);
     renderNoteView("note-1");
     expect(screen.getByRole("heading", { name: "My Note" })).toBeInTheDocument();
     expect(screen.getByTestId("note-view-header-actions")).toBeInTheDocument();

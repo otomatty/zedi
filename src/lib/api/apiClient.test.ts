@@ -856,4 +856,118 @@ describe("apiClient", () => {
       expect((init.headers as Record<string, string>)["If-None-Match"]).toBeUndefined();
     });
   });
+
+  // ── getNotePages (keyset cursor pagination, Issue #860 Phase 1/3) ──────────
+  describe("getNotePages", () => {
+    function emptyWindowBody() {
+      return JSON.stringify({ items: [], next_cursor: null });
+    }
+
+    it("omits cursor / limit / include query params when not supplied", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: emptyWindowBody(),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNotePages("note-1");
+
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const parsed = new URL(url);
+      expect(parsed.pathname).toBe("/api/notes/note-1/pages");
+      expect(parsed.searchParams.has("cursor")).toBe(false);
+      expect(parsed.searchParams.has("limit")).toBe(false);
+      expect(parsed.searchParams.has("include")).toBe(false);
+    });
+
+    it("encodes cursor, limit, and include as query params", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: emptyWindowBody(),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNotePages("note-1", {
+        cursor: "cursor-abc",
+        limit: 25,
+        include: ["preview", "thumbnail"],
+      });
+
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get("cursor")).toBe("cursor-abc");
+      expect(parsed.searchParams.get("limit")).toBe("25");
+      // 順序はクライアント側で `sort` していないため、`include` の出力順は入力順に従う。
+      // The client does not sort `include` tokens, so the value preserves call order.
+      expect(parsed.searchParams.get("include")).toBe("preview,thumbnail");
+    });
+
+    it("deduplicates repeated include tokens", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: emptyWindowBody(),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNotePages("note-1", {
+        include: ["preview", "preview", "thumbnail"],
+      });
+
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get("include")).toBe("preview,thumbnail");
+    });
+
+    it("returns the parsed { items, next_cursor } body", async () => {
+      const body = {
+        items: [
+          {
+            id: "p1",
+            owner_id: "u1",
+            note_id: "note-1",
+            source_page_id: null,
+            title: "Page 1",
+            content_preview: "preview",
+            thumbnail_url: null,
+            source_url: null,
+            created_at: "2026-05-13T00:00:00.000000Z",
+            updated_at: "2026-05-13T00:00:00.000000Z",
+            is_deleted: false,
+          },
+        ],
+        next_cursor: "next-cursor",
+      };
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify(body),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.getNotePages("note-1");
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]?.id).toBe("p1");
+      expect(result.next_cursor).toBe("next-cursor");
+    });
+  });
 });
