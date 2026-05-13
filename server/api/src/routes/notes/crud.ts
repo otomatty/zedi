@@ -83,6 +83,28 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
 }
 
 /**
+ * `Date | string | null` のいずれで来ても安全に epoch ms に正規化するヘルパー。
+ * drizzle の `sql<T>` テンプレートタグは型ヒントだけで runtime 変換しないため、
+ * `MAX(pages.updated_at)` のような raw SQL 集約は pg ドライバ次第で
+ * `Date` ではなく ISO 文字列で返ってくることがある (Issue #857 / PR #856 regression)。
+ * SQL 境界側でも `.mapWith()` で Date 化しているが、ここでも defensive に
+ * 受けておくことで将来同種の罠が再発しても 500 を避けられる。
+ *
+ * Normalizes `Date | string | null` to an epoch-ms number. drizzle's
+ * `sql<T>` template tag is a compile-time-only hint and does not coerce
+ * driver values, so raw aggregates like `MAX(pages.updated_at)` can arrive
+ * as ISO strings depending on the pg driver path (Issue #857 / PR #856
+ * regression). The query call site already normalizes via `.mapWith()`,
+ * but accepting strings here too keeps the ETag path resilient against
+ * similar bugs in the future.
+ */
+function toEpochMillis(value: Date | string | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  if (value instanceof Date) return value.getTime();
+  return new Date(value).getTime();
+}
+
+/**
  * Note 詳細レスポンス用の weak ETag を生成する。`note.updatedAt` と role に
  * 加えて、ページの最大 `updated_at` と件数も混ぜることで、`notes.updated_at`
  * を経由しないページ単体編集（`PUT /api/pages/:id/content`・タイトル変更・
@@ -101,14 +123,14 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
  */
 function makeNoteETag(
   noteId: string,
-  noteUpdatedAt: Date,
+  noteUpdatedAt: Date | string,
   role: string,
-  pagesMaxUpdatedAt: Date | null,
+  pagesMaxUpdatedAt: Date | string | null,
   pagesCount: number,
 ): string {
   const hash = createHash("sha1")
     .update(
-      `${noteId}:${noteUpdatedAt.getTime()}:${role}:${pagesMaxUpdatedAt?.getTime() ?? 0}:${pagesCount}`,
+      `${noteId}:${toEpochMillis(noteUpdatedAt)}:${role}:${toEpochMillis(pagesMaxUpdatedAt)}:${pagesCount}`,
     )
     .digest("base64url")
     .slice(0, 22);
@@ -373,7 +395,20 @@ app.get("/:noteId", authOptional, async (c) => {
   // resolve this from the index alone, keeping the cost negligible.
   const pagesSignalRows = await db
     .select({
-      maxUpdatedAt: sql<Date | null>`MAX(${pages.updatedAt})`,
+      // drizzle の `sql<Date | null>\`...\`` は型ヒントだけで、raw SQL 集約 (typed
+      // column ではない式) の戻り値に decoder を持たない。pg ドライバ経路次第で
+      // `timestamptz` の集約値が ISO 文字列のまま返ってくることがあり、その場合
+      // 下流の `makeNoteETag` で `.getTime()` が落ちて 500 になる (Issue #857)。
+      // `.mapWith()` で境界側で Date | null に強制正規化する。
+      //
+      // `sql<Date | null>` is a compile-time-only hint and drizzle has no decoder
+      // for raw aggregate expressions, so the pg driver can hand the result back
+      // as an ISO string (Issue #857 / PR #856 regression). `.mapWith()` coerces
+      // the driver value to `Date | null` at the query boundary.
+      maxUpdatedAt: sql<Date | null>`MAX(${pages.updatedAt})`.mapWith((value): Date | null => {
+        if (value === null || value === undefined) return null;
+        return value instanceof Date ? value : new Date(value as string);
+      }),
       count: sql<number>`COUNT(*)::int`,
     })
     .from(pages)

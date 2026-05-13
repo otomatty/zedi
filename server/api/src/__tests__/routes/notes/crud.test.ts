@@ -44,6 +44,22 @@ function mockPagesSignal(maxUpdatedAt: Date | null = null, count = 0) {
   return [{ maxUpdatedAt, count }];
 }
 
+/**
+ * `pg` ドライバが `timestamptz` を Date ではなく ISO 文字列のまま返してくる
+ * 本番挙動を再現するためのモック。Issue #857 (PR #856 regression) で観測された
+ * ケース: drizzle の `sql<Date | null>` テンプレートタグは型ヒントだけで、
+ * ランタイムでは string がそのまま素通しされうる。
+ *
+ * Mocks the pg driver path where `timestamptz` aggregates arrive as raw ISO
+ * strings instead of `Date` instances (Issue #857 / PR #856 regression).
+ * drizzle's `sql<Date | null>` template tag is compile-time only and does
+ * not decode the driver value, so the production runtime occasionally yields
+ * a string here.
+ */
+function mockPagesSignalRaw(maxUpdatedAt: string | null = null, count = 0) {
+  return [{ maxUpdatedAt, count }];
+}
+
 // ── ifNoneMatchMatches (Issue #853, PR #856 review) ─────────────────────────
 
 describe("ifNoneMatchMatches", () => {
@@ -742,6 +758,66 @@ describe("GET /api/notes/:noteId", () => {
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toHaveProperty("id", mockNote.id);
       expect(res.headers.get("ETag")).toBeTruthy();
+    });
+
+    // ── Issue #857 (PR #856 regression) ────────────────────────────────
+    // drizzle の `sql<Date | null>`MAX(...)`` は型ヒントだけで、本番の pg
+    // ドライバ経路では集約値が ISO 文字列のまま返ってくる場合がある。修正前は
+    // `makeNoteETag` 内の `.getTime()` が落ちて 500 になっていた。
+    // 修正は (A) query 側で `.mapWith()` により Date 化、(B) ETag ヘルパー側で
+    // `Date | string | null` を受けて defensive に正規化、の二段構え。
+    //
+    // drizzle's `sql<Date | null>`MAX(...)`` is compile-time only and the pg
+    // driver path can yield the aggregate as a raw ISO string. Pre-fix code
+    // threw `TypeError` inside `makeNoteETag` and returned 500. The fix has
+    // two layers: (A) the query coerces via `.mapWith()`, and (B) the ETag
+    // helper defensively accepts `Date | string | null`.
+    it("should compute ETag without throwing when MAX(pages.updated_at) is returned as a string (Issue #857)", async () => {
+      const mockNote = createMockNote();
+      const mockPage = createMockPageRow();
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignalRaw("2026-01-01T00:00:00.000Z", 1),
+        [mockPage],
+      ]);
+
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("ETag")).toMatch(/^W\/".+"$/);
+    });
+
+    it("should produce the same ETag whether MAX(pages.updated_at) is a Date or an ISO string (Issue #857)", async () => {
+      // 同一の瞬間を `Date` で渡したケースと `string` で渡したケースで
+      // ETag が一致することを確認する。境界正規化が effective であることの確認。
+      // Verifies that the boundary normalization renders driver representation
+      // irrelevant: the same instant must hash to the same ETag whether the
+      // mock yields a `Date` or an ISO string.
+      const mockNote = createMockNote();
+      const sameInstant = new Date("2026-01-01T00:00:00.000Z");
+      const { app } = createTestApp([
+        [mockNote],
+        mockPagesSignal(sameInstant, 1),
+        [],
+        [mockNote],
+        mockPagesSignalRaw("2026-01-01T00:00:00.000Z", 1),
+        [],
+      ]);
+
+      const resDate = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+      const resString = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: authHeaders(),
+      });
+
+      const etagDate = resDate.headers.get("ETag");
+      const etagString = resString.headers.get("ETag");
+      expect(etagDate).toBeTruthy();
+      expect(etagString).toBeTruthy();
+      expect(etagDate).toBe(etagString);
     });
   });
 });
