@@ -100,8 +100,21 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
  */
 function toEpochMillis(value: Date | string | null | undefined): number {
   if (value === null || value === undefined) return 0;
-  if (value instanceof Date) return value.getTime();
-  return new Date(value).getTime();
+  const parsed = value instanceof Date ? value : new Date(value);
+  const ms = parsed.getTime();
+  // 不正な文字列 (`new Date("not a date")`) や Invalid Date オブジェクトは
+  // `NaN` を返す。テンプレートリテラルでハッシュに混ぜると "NaN" がそのまま
+  // 文字列として入り、入力が壊れていても "同じ NaN" として ETag が安定して
+  // しまう (= 別の壊れ方を区別できない)。0 に正規化することで `null` と同じ
+  // 扱いになり、少なくとも安全側に倒れる (gemini-code-assist review on #859)。
+  //
+  // Invalid input (e.g. `new Date("bogus")` or an `Invalid Date`) yields
+  // `NaN` from `getTime()`. Embedding it into the template literal would
+  // splice the literal string `"NaN"` into the hash, which silently
+  // collapses *different* malformed inputs into the same digest. Normalize
+  // to 0 so the ETag at least falls back to the `null` branch behavior
+  // (gemini-code-assist review on PR #859).
+  return Number.isNaN(ms) ? 0 : ms;
 }
 
 /**
