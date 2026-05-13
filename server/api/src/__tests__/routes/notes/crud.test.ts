@@ -477,7 +477,11 @@ describe("GET /api/notes/:noteId", () => {
 
   it("should include page data in snake_case within pages array", async () => {
     const mockNote = createMockNote();
-    const mockPage = createMockPageRow({ id: "page-abc", title: "Page Title" });
+    const mockPage = createMockPageRow({
+      id: "page-abc",
+      title: "Page Title",
+      contentPreview: "Preview body...",
+    });
 
     const { app } = createTestApp([
       [mockNote], // getNoteRole
@@ -496,11 +500,39 @@ describe("GET /api/notes/:noteId", () => {
     expect(page).toHaveProperty("id", "page-abc");
     expect(page).toHaveProperty("owner_id");
     expect(page).toHaveProperty("source_page_id");
-    // Issue #849 移行措置: レスポンス軽量化のため `content_preview` は常に `null`。
-    // Migration step for #849: `content_preview` is always `null` on the wire.
-    expect(page).toHaveProperty("content_preview", null);
+    // Issue #860 Phase 0: `content_preview` を一覧レスポンスに復旧。保存時に
+    // 算出した先頭抜粋がそのまま返る。
+    // Issue #860 Phase 0: `content_preview` is restored on the list response;
+    // the stored head-of-body excerpt comes back verbatim.
+    expect(page).toHaveProperty("content_preview", "Preview body...");
     expect(page).toHaveProperty("thumbnail_url");
     expect(page).toHaveProperty("note_id", mockNote.id);
+  });
+
+  it("should return content_preview as null when the page has no stored preview", async () => {
+    // 保存時にプレビューが未生成 (`content_preview IS NULL`) のページでも
+    // ワイヤ上は `null` のまま素通しすることを保証する。Issue #860 Phase 0 の
+    // 復旧は「常に null」をやめるだけで、空ページのセマンティクスは維持する。
+    //
+    // Even when the stored preview is absent (`content_preview IS NULL`), the
+    // wire value must remain `null`. Issue #860 Phase 0 only stops the
+    // "always null" override; empty-page semantics are preserved.
+    const mockNote = createMockNote();
+    const mockPage = createMockPageRow({ id: "page-empty", contentPreview: null });
+
+    const { app } = createTestApp([
+      [mockNote],
+      mockPagesSignal(mockPage.updatedAt as Date, 1),
+      [mockPage],
+    ]);
+
+    const res = await app.request(`/api/notes/${mockNote.id}`, {
+      headers: authHeaders(),
+    });
+
+    const body = (await res.json()) as Record<string, unknown>;
+    const page = (body.pages as Record<string, unknown>[])[0];
+    expect(page).toHaveProperty("content_preview", null);
   });
 
   it("should return 404 for non-existent note", async () => {
