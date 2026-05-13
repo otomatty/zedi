@@ -23,6 +23,7 @@ import ExtensionAuth from "./pages/ExtensionAuth";
 import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
 import PageEditorPage from "./pages/PageEditor";
+import PdfReaderPage from "./pages/pdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
 import IndexPage from "./pages/IndexPage";
@@ -261,6 +262,11 @@ const App = () => (
                       {/* Legacy singular path — redirect to plural.
                           旧単数形パス — 複数形にリダイレクト。 */}
                       <Route path="/page/:id" element={<LegacyPageRedirect />} />
+                      {/* PDF 知識化ビューア (issue otomatty/zedi#389).
+                          Web から開いた場合は `PdfReaderUnsupported` を表示。
+                          PDF knowledge viewer; web falls back to the
+                          desktop-only placeholder. */}
+                      <Route path="/sources/:sourceId/pdf" element={<PdfReaderPage />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/wiki-schema" element={<WikiSchemaPage />} />
                       <Route path="/index" element={<IndexPage />} />

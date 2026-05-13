@@ -17,6 +17,7 @@ import { subscriptions } from "./subscriptions.js";
 import { aiUsageLogs, aiMonthlyUsage } from "./aiModels.js";
 import { sources } from "./sources.js";
 import { pageSources } from "./pageSources.js";
+import { pdfHighlights } from "./pdfHighlights.js";
 import { lintFindings } from "./lintFindings.js";
 import { activityLog } from "./activityLog.js";
 
@@ -286,6 +287,26 @@ export const sourcesRelations = relations(sources, ({ one, many }) => ({
     references: [users.id],
   }),
   citations: many(pageSources),
+  highlights: many(pdfHighlights),
+}));
+
+/**
+ * `pdf_highlights` のリレーション定義。所有者・ソース・派生ページに繋がる。
+ * Relations for `pdf_highlights`: owner, source, and (optional) derived page.
+ */
+export const pdfHighlightsRelations = relations(pdfHighlights, ({ one }) => ({
+  owner: one(users, {
+    fields: [pdfHighlights.ownerId],
+    references: [users.id],
+  }),
+  source: one(sources, {
+    fields: [pdfHighlights.sourceId],
+    references: [sources.id],
+  }),
+  derivedPage: one(pages, {
+    fields: [pdfHighlights.derivedPageId],
+    references: [pages.id],
+  }),
 }));
 
 /**

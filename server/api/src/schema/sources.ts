@@ -12,23 +12,59 @@
  *
  * @see https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
  */
-import { pgTable, uuid, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  bigint,
+  integer,
+  jsonb,
+  timestamp,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 
 /**
- * 外部から取り込んだ素材（URL / 会話 等）。不変・AI による書き換え対象外。
- * External material ingested from URL or conversation. Immutable.
+ * `kind="pdf_local"` のソースに付随するメタ情報。
+ * Optional metadata attached to a `pdf_local` source row.
+ *
+ * 元 PDF のファイルパスは決してこの構造には含めない。実体パスは Tauri 側の
+ * ローカルレジストリ (`pdf_sources.json`) にのみ保持する。
+ * The original PDF file path is NEVER stored here; only the Tauri-side local
+ * registry (`pdf_sources.json`) knows where the bytes actually live.
+ */
+export interface PdfSourceMetadata {
+  /** PDF メタデータの title（XMP / Info dictionary 由来）。PDF title from XMP / Info. */
+  pdfTitle?: string;
+  /** PDF メタデータの author。PDF author. */
+  pdfAuthor?: string;
+  /** PDF メタデータの作成日時 ISO 文字列。Creation date in ISO 8601. */
+  pdfCreatedAt?: string;
+  /** 任意の追加プロパティ。Free-form extension fields. */
+  [key: string]: unknown;
+}
+
+/**
+ * 外部から取り込んだ素材（URL / 会話 / ローカル PDF 等）。不変・AI による書き換え対象外。
+ * External material ingested from URL, conversation, or a local PDF file.
+ * Immutable; AI never rewrites a row in this table.
  *
  * @property id - ソースの一意 ID。Unique ID.
  * @property ownerId - 所有ユーザー ID。Owner user ID.
- * @property kind - ソース種別。"url" | "conversation"（将来拡張可能）。Source kind.
+ * @property kind - ソース種別。"url" | "conversation" | "pdf_local"。Source kind.
  * @property url - 取得元 URL（kind="url" のとき）。Source URL (when kind="url").
- * @property title - ソースのタイトル（OGP / Readability 抽出）。Source title.
+ * @property title - ソースのタイトル（OGP / Readability / PDF Info 抽出）。Source title.
  * @property contentHash - 本文の SHA-256 等。重複検出用。Content hash for dedup.
- * @property excerpt - 先頭の要約プレビュー（重い本文を別カラムに分けず軽量化）。Short excerpt.
+ * @property excerpt - 先頭の要約プレビュー。Short excerpt.
  * @property extractedAt - 抽出を行った時刻。When extraction happened.
  * @property createdAt - レコード作成時刻。Row created at.
+ * @property displayName - UI で表示するファイル名（kind="pdf_local" のとき設定）。
+ *   Filename shown in UI (set when kind="pdf_local").
+ * @property byteSize - PDF のバイトサイズ（kind="pdf_local" のみ）。PDF byte size.
+ * @property pageCount - PDF の総ページ数（kind="pdf_local" のみ）。PDF page count.
+ * @property metadata - フォーマット固有メタデータ。Format-specific metadata.
  */
 export const sources = pgTable(
   "sources",
@@ -44,6 +80,12 @@ export const sources = pgTable(
     excerpt: text("excerpt"),
     extractedAt: timestamp("extracted_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    // PDF / ローカルファイル系ソースで使うメタ情報。他 kind では NULL のまま。
+    // Metadata columns used by file-backed sources (e.g. "pdf_local"). NULL for others.
+    displayName: text("display_name"),
+    byteSize: bigint("byte_size", { mode: "number" }),
+    pageCount: integer("page_count"),
+    metadata: jsonb("metadata").$type<PdfSourceMetadata | null>(),
   },
   (table) => [
     index("idx_sources_owner_id").on(table.ownerId),

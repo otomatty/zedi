@@ -18,6 +18,7 @@ import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
 import ingestRoutes from "./routes/ingest.js";
+import pdfSourcesRoutes from "./routes/pdfSources.js";
 import wikiSchemaRoutes from "./routes/wikiSchema.js";
 import extRoutes from "./routes/ext.js";
 import mcpRoutes from "./routes/mcp.js";
@@ -153,6 +154,12 @@ export function createApp(): Hono<AppEnv> {
 
   // Ingest (LLM Wiki pattern, P1)
   app.route("/api/ingest", ingestRoutes);
+
+  // Local PDF sources + highlights (issue otomatty/zedi#389).
+  // PDF binaries never reach the server — only hashes / page counts / highlights.
+  // ローカル PDF のソース行とハイライト (issue otomatty/zedi#389)。
+  // PDF バイナリ自体はサーバに渡さず、ハッシュ・ページ数・ハイライトのみを扱う。
+  app.route("/api/sources", pdfSourcesRoutes);
 
   // Wiki Schema (P3 — user-defined wiki "constitution")
   app.route("/api/wiki-schema", wikiSchemaRoutes);
