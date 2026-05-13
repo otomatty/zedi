@@ -116,7 +116,11 @@ export function PdfReader() {
           <h2 className="mb-2 font-medium">ハイライト / Highlights</h2>
           {highlightsQuery.isLoading && <p className="text-muted-foreground">読み込み中…</p>}
           {highlightsQuery.error && (
-            <p className="text-destructive text-xs">{(highlightsQuery.error as Error).message}</p>
+            <p className="text-destructive text-xs">
+              {highlightsQuery.error instanceof Error
+                ? highlightsQuery.error.message
+                : String(highlightsQuery.error)}
+            </p>
           )}
           {highlightsQuery.data?.highlights.length === 0 && (
             <p className="text-muted-foreground">まだハイライトはありません。</p>
