@@ -78,14 +78,17 @@ export interface NotePageApiItem {
   source_page_id: string | null;
   title: string | null;
   /**
-   * Issue #849 移行措置: レスポンス軽量化のため、サーバは常に `null` を返す。
-   * 型は後段で削除される予定。プレビュー本文が必要な呼び出し元は個別ページ取得
-   * (`GET /api/pages/:id`) や検索結果 (`GET /api/search`) を使う。
+   * 一覧カード描画用の先頭プレビュー (`pages.content_preview`)。本文 fetch を
+   * 伴わずにカードへ表示するために、保存時に算出した短い抜粋を返す。Issue #849
+   * で一時的に常時 `null` 化していたが、Issue #860 Phase 0 で復旧した。
+   * Phase 1 以降でノートシェルとページ一覧の API が分離されたら、本フィールド
+   * は `GET /api/notes/:noteId/pages?include=preview` 側で提供される予定。
    *
-   * Migration step for #849: the server now always returns `null` to keep the
-   * response slim. The field is slated for removal in a follow-up. Callers
-   * that need the body preview should hit `GET /api/pages/:id` or the search
-   * endpoint instead.
+   * Short head-of-body preview (`pages.content_preview`) used to render list
+   * cards without fetching full page bodies. Temporarily forced to `null` by
+   * Issue #849 and restored by Issue #860 Phase 0. Once Phase 1 splits the
+   * note-shell and page-list APIs, this field will live on
+   * `GET /api/notes/:noteId/pages?include=preview` instead.
    */
   content_preview: string | null;
   thumbnail_url: string | null;

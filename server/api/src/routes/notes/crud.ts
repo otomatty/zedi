@@ -42,6 +42,19 @@ const ALLOWED_EDIT_PERMISSION = new Set<NoteEditPermission>([
   "any_logged_in",
 ]);
 
+/**
+ * `GET /api/notes/:noteId` のレスポンス形状バージョン。ETag に混ぜることで、
+ * サーバ側のレスポンス形状を変えた直後にクライアントが古い `If-None-Match`
+ * を送ってきても 304 で旧 body をキャッシュ再利用させない（Issue #860 Phase 0）。
+ * 形状を変更したら必ずこの値を bump する。
+ *
+ * Response-shape version for `GET /api/notes/:noteId`. Mixed into the ETag so
+ * that when the server's response shape changes, stale `If-None-Match`
+ * validators from clients cannot revive an outdated cached body via 304
+ * (Issue #860 Phase 0). Bump this whenever the wire shape changes.
+ */
+const NOTE_DETAIL_RESPONSE_VERSION = "v2";
+
 function validateVisibility(value: string | undefined): NoteVisibility {
   if (value === undefined) return "private";
   if (!ALLOWED_VISIBILITY.has(value as NoteVisibility)) {
@@ -143,7 +156,7 @@ function makeNoteETag(
 ): string {
   const hash = createHash("sha1")
     .update(
-      `${noteId}:${toEpochMillis(noteUpdatedAt)}:${role}:${toEpochMillis(pagesMaxUpdatedAt)}:${pagesCount}`,
+      `${NOTE_DETAIL_RESPONSE_VERSION}:${noteId}:${toEpochMillis(noteUpdatedAt)}:${role}:${toEpochMillis(pagesMaxUpdatedAt)}:${pagesCount}`,
     )
     .digest("base64url")
     .slice(0, 22);
@@ -478,6 +491,7 @@ app.get("/:noteId", authOptional, async (c) => {
       noteId: pages.noteId,
       sourcePageId: pages.sourcePageId,
       title: pages.title,
+      contentPreview: pages.contentPreview,
       thumbnailUrl: pages.thumbnailUrl,
       sourceUrl: pages.sourceUrl,
       createdAt: pages.createdAt,
@@ -499,12 +513,15 @@ app.get("/:noteId", authOptional, async (c) => {
         note_id: p.noteId,
         source_page_id: p.sourcePageId,
         title: p.title,
-        // Issue #849 移行措置: レスポンス軽量化のため常に `null`。プレビューが
-        // 必要な箇所は専用エンドポイント or 個別ページ取得を使う。
-        // Migration step for #849: always `null` to keep the response slim.
-        // Callers that need the preview should hit a dedicated endpoint or
-        // fetch the page individually.
-        content_preview: null,
+        // Issue #860 Phase 0: `pages.content_preview` を戻し、カード描画で
+        // 本文 fetch を伴わないプレビュー表示を復旧する。Phase 1 以降で
+        // ノートシェルとページ一覧の API を分割するまでの暫定経路。
+        //
+        // Issue #860 Phase 0: restore `pages.content_preview` so list cards
+        // can render the preview without fetching full page bodies. This is
+        // the interim path until Phase 1 splits the note-shell and page-list
+        // APIs.
+        content_preview: p.contentPreview ?? null,
         thumbnail_url: p.thumbnailUrl,
         source_url: p.sourceUrl,
         created_at: p.createdAt,
