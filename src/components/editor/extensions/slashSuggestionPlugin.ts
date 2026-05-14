@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import type { MarkType, ResolvedPos } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
@@ -29,12 +30,31 @@ export interface SlashSuggestionOptions {
 }
 
 /**
+ * Returns true when the caret sits inside an inline `code` mark (Markdown `` ` ``).
+ * Mirrors {@link TagSuggestionPlugin}'s helper so slash behaviour stays aligned.
+ *
+ * インライン `code` マーク（Markdown のバッククォート）内かどうか。
+ * `TagSuggestionPlugin` と同じ判定でスラッシュとタグの契約を揃える。
+ */
+function isInsideInlineCode($from: ResolvedPos, schemaMarks: Record<string, MarkType>): boolean {
+  const codeMark = schemaMarks.code;
+  if (!codeMark) return false;
+  return Boolean(codeMark.isInSet($from.marks()));
+}
+
+/**
  * Slash suggestion plugin for "/ command" menu.
  * Triggers on:
  *   1. "/" at the start of a line
  *   2. " /" (space followed by slash) in the middle of text
  *
  * The text after "/" is treated as a filter query.
+ *
+ * Does **not** activate inside an inline `code` mark or a `code_block` node, so
+ * literals such as `` `/analyze` `` stay plain text (same rationale as tag suggestions).
+ *
+ * インライン `code` マーク・`code_block` ノード内では起動しない。
+ * `` `/analyze` `` のようにスラッシュをテキストとして書くためのエスケープ口。
  */
 export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
   name: "slashSuggestion",
@@ -77,11 +97,28 @@ export const SlashSuggestionPlugin = Extension.create<SlashSuggestionOptions>({
               return nextState;
             }
 
-            const { selection } = newState;
+            const { selection, schema } = newState;
             const { $from } = selection;
 
             // Only activate on cursor (not range) selections
             if (!selection.empty) {
+              if (prev.active) {
+                const nextState: SlashSuggestionState = {
+                  active: false,
+                  query: "",
+                  range: null,
+                  decorations: DecorationSet.empty,
+                };
+                onStateChange?.(nextState);
+                return nextState;
+              }
+              return prev;
+            }
+
+            // Suppress inside code blocks / inline code so `/token` stays literal text.
+            // `textBetween` strips marks; without this check `/run` inside `` `…` `` would still match (^|\s)/.
+            // コードブロック・インラインコード内では抑止。マーク無視でマッチしてしまうのを防ぐ。
+            if ($from.parent.type.spec.code || isInsideInlineCode($from, schema.marks)) {
               if (prev.active) {
                 const nextState: SlashSuggestionState = {
                   active: false,
