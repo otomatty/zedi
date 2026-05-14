@@ -10,6 +10,7 @@ import memberRoutes from "./members.js";
 import inviteLinkRoutes from "./inviteLinks.js";
 import domainAccessRoutes from "./domainAccess.js";
 import searchRoutes from "./search.js";
+import eventsRoutes from "./events.js";
 
 const app = new Hono<AppEnv>();
 
@@ -22,5 +23,6 @@ app.route("/", memberRoutes);
 app.route("/", inviteLinkRoutes);
 app.route("/", domainAccessRoutes);
 app.route("/", searchRoutes);
+app.route("/", eventsRoutes);
 
 export default app;

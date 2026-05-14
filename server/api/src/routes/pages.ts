@@ -24,6 +24,8 @@ import { maybeCreateSnapshot } from "../services/snapshotService.js";
 import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
 import { deleteThumbnailObject } from "../services/thumbnailGcService.js";
+import { publishNoteEvent } from "../services/noteEventBroadcaster.js";
+import { pageRowToWindowItem } from "./notes/eventHelpers.js";
 
 /**
  * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
@@ -67,6 +69,35 @@ function tryPropagateTitleRename(
         `(${oldTitle} → ${newTitle}):`,
       error,
     );
+  });
+}
+
+/**
+ * Issue #860 Phase 4: PUT /content で title / content_preview が変わったときだけ
+ * `page.updated` をノート購読者へ配信する。ydoc 本体だけのセーブで毎回発火
+ * させると保存頻度に応じて SSE が暴発するため、メタデータ更新時のみ最新行を
+ * select して emit する。`pages.note_id` は変わらない前提なので、結果セットの
+ * `noteId` をそのままイベントの `note_id` として使う。
+ *
+ * Emit `page.updated` to note subscribers only when the title or
+ * content_preview really changed. Editor saves hit `PUT /content` on every
+ * keystroke flush; firing a broadcast on each one would spam every connected
+ * client. We re-select the row after the metadata update so the SSE payload
+ * is consistent with the DB state, and use the row's `note_id` as the
+ * event's note id (pages never move between notes).
+ */
+async function maybeEmitPageUpdated(
+  db: Database,
+  pageId: string,
+  body: { title?: string; content_preview?: string },
+): Promise<void> {
+  if (body.title === undefined && body.content_preview === undefined) return;
+  const [row] = await db.select().from(pages).where(eq(pages.id, pageId)).limit(1);
+  if (!row || row.isDeleted) return;
+  publishNoteEvent({
+    type: "page.updated",
+    note_id: row.noteId,
+    page: pageRowToWindowItem(row),
   });
 }
 
@@ -312,6 +343,9 @@ app.put("/:id/content", authRequired, async (c) => {
             firstSave.renamed.newTitle,
           );
         }
+        // Issue #860 Phase 4: メタデータが変わったときだけ note 購読者へ通知。
+        // Issue #860 Phase 4: notify note subscribers only when metadata changed.
+        await maybeEmitPageUpdated(db, pageId, body);
         return c.json({ version: firstSave.version });
       }
     }
@@ -359,6 +393,10 @@ app.put("/:id/content", authRequired, async (c) => {
       tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
     }
 
+    // Issue #860 Phase 4: optimistic-lock 経路のメタデータ変化を通知。
+    // Notify subscribers from the optimistic-lock path as well.
+    await maybeEmitPageUpdated(db, pageId, body);
+
     return c.json({ version: updatedRow.version ?? 0 });
   }
 
@@ -399,6 +437,10 @@ app.put("/:id/content", authRequired, async (c) => {
   if (renamed) {
     tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
   }
+
+  // Issue #860 Phase 4: UPSERT 経路（楽観的ロック未使用）でも emit。
+  // Issue #860 Phase 4: emit from the UPSERT path too (no optimistic lock).
+  await maybeEmitPageUpdated(db, pageId, body);
 
   return c.json({ version: resultRow.version });
 });
@@ -457,6 +499,21 @@ app.post("/", authRequired, async (c) => {
 
   const row = result[0];
   if (!row) throw new HTTPException(500, { message: "Insert failed" });
+
+  // Issue #860 Phase 4: 新規ページを所属ノート購読者に通知。本ルートは Web
+  // Clipper / `/notes/me` 系の創出経路でも使われるため、`/api/notes/:noteId/pages`
+  // の POST と同じ event を出してフロント側のキャッシュ更新を一本化する。
+  // Issue #860 Phase 4: emit `page.added` so subscribers (including the
+  // `/api/notes/:noteId/events` consumers) update their cached windows
+  // without a refetch. This route is shared by Web Clipper and `/notes/me`
+  // flows, so emitting here keeps the cache patch behavior identical to
+  // `POST /api/notes/:noteId/pages`.
+  publishNoteEvent({
+    type: "page.added",
+    note_id: row.noteId,
+    page: pageRowToWindowItem(row),
+  });
+
   return c.json(
     {
       id: row.id,
@@ -500,6 +557,7 @@ app.delete("/:id", authRequired, async (c) => {
     .select({
       thumbnailObjectId: pages.thumbnailObjectId,
       ownerId: pages.ownerId,
+      noteId: pages.noteId,
     })
     .from(pages)
     .where(eq(pages.id, pageId))
@@ -509,6 +567,14 @@ app.delete("/:id", authRequired, async (c) => {
     .update(pages)
     .set({ isDeleted: true, thumbnailObjectId: null, updatedAt: new Date() })
     .where(eq(pages.id, pageId));
+
+  // Issue #860 Phase 4: 削除を所属ノート購読者に通知。`noteId` は同じ
+  // SELECT で取得済みのため追加クエリは発生しない。
+  // Issue #860 Phase 4: notify subscribers of the owning note. The note id
+  // came from the earlier SELECT so no extra round trip is needed.
+  if (target?.noteId) {
+    publishNoteEvent({ type: "page.deleted", note_id: target.noteId, page_id: pageId });
+  }
 
   // GC は best-effort。サムネイル削除が S3 障害などで失敗しても、ページ削除
   // 自体は成功させる（ユーザーから見て「削除できなかった」状態を作らない）。

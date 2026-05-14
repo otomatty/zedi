@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useContainerColumns } from "@/hooks/useContainerColumns";
 import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
 import { useInfiniteNotePages } from "@/hooks/useNoteQueries";
+import { useNotePageEvents } from "@/hooks/useNotePageEvents";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
 import { cn, Skeleton } from "@zedi/ui";
@@ -178,6 +179,15 @@ const PageGrid: React.FC<PageGridProps> = ({
   // query (issue #860 Phase 3). The server's `updated_at DESC, id DESC` order
   // is preserved verbatim; no client-side resort.
   const noteInfinite = useInfiniteNotePages(noteId ?? "", { enabled: isNoteContext });
+  // Issue #860 Phase 4: ノート画面を開いている間だけ SSE を張り、ページ追加・
+  // 更新・削除・権限変更イベントを React Query infinite cache に差分適用する。
+  // 結果として `useAddPageToNote` / `useRemovePageFromNote` の onSuccess
+  // invalidate と二重になるが、SSE 未接続時の保険として双方残す。
+  // Issue #860 Phase 4: subscribe to the note-scoped SSE feed while the grid
+  // is visible so page mutations elsewhere patch the React Query cache
+  // without a full refetch. Existing mutation `onSuccess` invalidations stay
+  // in place as a fallback when the SSE connection hasn't established yet.
+  useNotePageEvents(noteId ?? "", { enabled: isNoteContext });
 
   const pages: PageSummary[] = isNoteContext ? noteInfinite.pages : (personalQuery.data ?? []);
   const isLoading = isNoteContext ? noteInfinite.isLoading : personalQuery.isLoading;

@@ -60,6 +60,16 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   }),
 }));
 
+// Issue #860 Phase 4: PageGrid は note 文脈で `useNotePageEvents` を呼んで
+// SSE を購読するが、本テストの責務は仮想化レンダリングのため、フックは
+// no-op にして QueryClientProvider 依存を避ける。
+// PageGrid wires `useNotePageEvents` to subscribe to the note SSE feed in
+// note context. This test focuses on virtualization, so stub the hook to a
+// no-op and skip the QueryClientProvider it would otherwise require.
+vi.mock("@/hooks/useNotePageEvents", () => ({
+  useNotePageEvents: vi.fn(),
+}));
+
 vi.mock("./PageCard", () => ({
   default: vi.fn(({ page }: { page: PageSummary }) => (
     <div data-testid="page-card" data-page-id={page.id}>

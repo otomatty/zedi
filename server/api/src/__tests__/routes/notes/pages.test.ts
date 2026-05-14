@@ -2,7 +2,7 @@
  * ノートページ管理ルートのテスト（Issue #823: pages.note_id 直接モデル）
  * Tests for note page routes after issue #823 (`pages.note_id` ownership).
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
@@ -32,6 +32,15 @@ import {
   createTestApp,
   authHeaders,
 } from "./setup.js";
+import {
+  clearNoteEventSubscribers,
+  subscribeNoteEvents,
+  type NoteEvent,
+} from "../../../services/noteEventBroadcaster.js";
+
+afterEach(() => {
+  clearNoteEventSubscribers();
+});
 
 const NOTE_ID = "note-test-001";
 
@@ -144,6 +153,59 @@ describe("POST /api/notes/:noteId/pages", () => {
     });
 
     expect(res.status).toBe(403);
+  });
+
+  it("publishes page.added to note subscribers (Issue #860 Phase 4)", async () => {
+    // POST 成功時にノート購読者へ `page.added` が配信される。SSE ルートを介さず
+    // ブロードキャスタ直接購読で検証することで、emit 経路だけを切り出してテスト
+    // する。本番経路ではこの listener が SSE writer に変わる。
+    //
+    // POST success must fan out a `page.added` event to note subscribers.
+    // Bypassing the SSE route and subscribing the broadcaster directly lets
+    // the test focus on the publish call-site without coupling to the SSE
+    // transport. In production the listener is the SSE writer.
+    const mockNote = createMockNote();
+    const newPageRow = {
+      id: "pg-created",
+      ownerId: TEST_USER_ID,
+      noteId: NOTE_ID,
+      sourcePageId: null,
+      title: "Emitted Page",
+      contentPreview: "preview body",
+      thumbnailUrl: "https://cdn.example/p.jpg",
+      sourceUrl: null,
+      createdAt: new Date("2026-05-13T00:00:00Z"),
+      updatedAt: new Date("2026-05-13T00:00:00Z"),
+      isDeleted: false,
+    };
+    const { app } = createTestApp([[mockNote], [newPageRow], []]);
+
+    const received: NoteEvent[] = [];
+    subscribeNoteEvents(NOTE_ID, (event) => {
+      received.push(event);
+    });
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Emitted Page" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(received).toHaveLength(1);
+    const event = received[0];
+    expect(event?.type).toBe("page.added");
+    if (event?.type === "page.added") {
+      expect(event.note_id).toBe(NOTE_ID);
+      expect(event.page.id).toBe("pg-created");
+      expect(event.page.title).toBe("Emitted Page");
+      // SSE 経路では preview / thumbnail を常に同梱する（フロントの
+      // useInfiniteNotePages デフォルト include と整合させるため）。
+      // The SSE channel always carries preview/thumbnail to stay consistent
+      // with the frontend's `useInfiniteNotePages` default include set.
+      expect(event.page.content_preview).toBe("preview body");
+      expect(event.page.thumbnail_url).toBe("https://cdn.example/p.jpg");
+    }
   });
 });
 
@@ -413,6 +475,55 @@ describe("DELETE /api/notes/:noteId/pages/:pageId", () => {
 
     const updates = chains.filter((c) => c.startMethod === "update");
     expect(updates.length).toBe(2);
+  });
+
+  it("publishes page.deleted to note subscribers (Issue #860 Phase 4)", async () => {
+    // DELETE 成功時にノート購読者へ `page.deleted` が配信され、client は
+    // 該当 id を window から落とすだけで済む。
+    // DELETE success fans out a `page.deleted` event so subscribers can drop
+    // the page id from their cached windows.
+    const mockNote = createMockNote();
+    const pageId = "pg-del-emit";
+    const { app } = createTestApp([[mockNote], [{ id: pageId, noteId: NOTE_ID }], [], []]);
+
+    const received: NoteEvent[] = [];
+    subscribeNoteEvents(NOTE_ID, (event) => {
+      received.push(event);
+    });
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages/${pageId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual({
+      type: "page.deleted",
+      note_id: NOTE_ID,
+      page_id: pageId,
+    });
+  });
+
+  it("does not publish when DELETE fails (page belongs to other note)", async () => {
+    // 400 で落ちる経路では SSE 購読者へイベントを流さない（DB は更新されていない
+    // ため）。整合性ずれの早期検出として明示的に検証する。
+    // The 400 path must not emit since no DB mutation happened. Verified
+    // explicitly so a future refactor cannot regress this invariant silently.
+    const mockNote = createMockNote();
+    const pageId = "pg-other-note";
+    const { app } = createTestApp([[mockNote], [{ id: pageId, noteId: "other-note-id" }]]);
+
+    const received: NoteEvent[] = [];
+    subscribeNoteEvents(NOTE_ID, (event) => received.push(event));
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/pages/${pageId}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(400);
+    expect(received).toHaveLength(0);
   });
 
   it("returns 400 when page belongs to another note", async () => {

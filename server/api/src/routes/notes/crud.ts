@@ -34,6 +34,7 @@ import {
   getActivePageCounts,
   getActiveMemberCounts,
 } from "./helpers.js";
+import { publishNoteEvent } from "../../services/noteEventBroadcaster.js";
 
 const ALLOWED_VISIBILITY = new Set<NoteVisibility>(["private", "public", "unlisted", "restricted"]);
 const ALLOWED_EDIT_PERMISSION = new Set<NoteEditPermission>([
@@ -294,6 +295,23 @@ app.put("/:noteId", authRequired, async (c) => {
 
   const updatedNote = updated[0];
   if (!updatedNote) throw new HTTPException(500, { message: "Failed to update note" });
+
+  // Issue #860 Phase 4: visibility / edit_permission の変化は `getNoteRole`
+  // の解釈に直結するため、ノート購読者へ sentinel を投げて details / window /
+  // members を invalidate させる。title だけの変更でも `noteRowToApi` の値が
+  // 変わるので一律で emit する。
+  // Issue #860 Phase 4: changes to visibility / edit_permission flip the
+  // result of `getNoteRole` for some callers, so notify subscribers to
+  // re-evaluate access. Always emit on a successful PUT (even title-only
+  // changes) so the cached note shell does not drift.
+  if (
+    visibility !== undefined ||
+    editPermission !== undefined ||
+    body.title !== undefined ||
+    isOfficial !== undefined
+  ) {
+    publishNoteEvent({ type: "note.permission_changed", note_id: noteId });
+  }
   return c.json(noteRowToApi(updatedNote));
 });
 
