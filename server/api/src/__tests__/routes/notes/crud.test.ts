@@ -27,7 +27,6 @@ import {
   TEST_USER_EMAIL,
   OTHER_USER_ID,
   createMockNote,
-  createMockPageRow,
   createTestApp,
   authHeaders,
 } from "./setup.js";
@@ -402,14 +401,20 @@ describe("DELETE /api/notes/:noteId", () => {
 // ── GET /api/notes/:noteId ──────────────────────────────────────────────────
 
 describe("GET /api/notes/:noteId", () => {
-  it("should return a flat response with current_user_role and pages (snake_case)", async () => {
+  it("should return a flat note shell without pages[] (Issue #860 Phase 6)", async () => {
+    // Issue #860 Phase 6: ノートシェルから `pages[]` を撤去した。一覧表示は
+    // `GET /api/notes/:noteId/pages` (cursor pagination) を、wiki link / AI
+    // chat scope のような全ページタイトルが必要な経路は
+    // `GET /api/notes/:noteId/page-titles` を使う。
+    //
+    // Issue #860 Phase 6: the note shell no longer carries `pages[]`. UI
+    // page lists fetch from the cursor-paginated `/pages` endpoint, and
+    // full-set title consumers fetch from `/page-titles`.
     const mockNote = createMockNote();
-    const mockPage = createMockPageRow();
 
     const { app } = createTestApp([
       [mockNote], // getNoteRole → findActiveNoteById (owner)
-      mockPagesSignal(mockPage.updatedAt as Date, 1), // ETag pages signal
-      [mockPage], // pages query
+      mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 1), // ETag pages signal
     ]);
 
     const res = await app.request(`/api/notes/${mockNote.id}`, {
@@ -422,8 +427,7 @@ describe("GET /api/notes/:noteId", () => {
     expect(body).toHaveProperty("id", mockNote.id);
     expect(body).not.toHaveProperty("note");
     expect(body).toHaveProperty("current_user_role", "owner");
-    expect(body).toHaveProperty("pages");
-    expect(Array.isArray(body.pages)).toBe(true);
+    expect(body).not.toHaveProperty("pages");
     expect(body).toHaveProperty("owner_id");
     expect(body).toHaveProperty("edit_permission");
     expect(body).toHaveProperty("is_official");
@@ -441,8 +445,7 @@ describe("GET /api/notes/:noteId", () => {
       [], // getNoteRole → member check (not a member)
       [], // getNoteRole → domain access check (no matching rule)
       mockPagesSignal(), // ETag pages signal
-      [], // viewCount update
-      [], // pages query
+      [], // viewCount update (fire-and-forget)
     ]);
 
     const res = await app.request("/api/notes/note-public", {
@@ -464,8 +467,7 @@ describe("GET /api/notes/:noteId", () => {
     const { app } = createTestApp([
       [publicNote], // getNoteRole (no userId, no email → guest)
       mockPagesSignal(), // ETag pages signal
-      [], // viewCount update
-      [], // pages query
+      [], // viewCount update (fire-and-forget)
     ]);
 
     const res = await app.request("/api/notes/note-public");
@@ -475,55 +477,17 @@ describe("GET /api/notes/:noteId", () => {
     expect(body.current_user_role).toBe("guest");
   });
 
-  it("should include page data in snake_case within pages array", async () => {
-    const mockNote = createMockNote();
-    const mockPage = createMockPageRow({
-      id: "page-abc",
-      title: "Page Title",
-      contentPreview: "Preview body...",
-    });
-
-    const { app } = createTestApp([
-      [mockNote], // getNoteRole
-      mockPagesSignal(mockPage.updatedAt as Date, 1), // ETag pages signal
-      [mockPage], // pages query
-    ]);
-
-    const res = await app.request(`/api/notes/${mockNote.id}`, {
-      headers: authHeaders(),
-    });
-
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.pages).toHaveLength(1);
-
-    const page = (body.pages as Record<string, unknown>[])[0];
-    expect(page).toHaveProperty("id", "page-abc");
-    expect(page).toHaveProperty("owner_id");
-    expect(page).toHaveProperty("source_page_id");
-    // Issue #860 Phase 0: `content_preview` を一覧レスポンスに復旧。保存時に
-    // 算出した先頭抜粋がそのまま返る。
-    // Issue #860 Phase 0: `content_preview` is restored on the list response;
-    // the stored head-of-body excerpt comes back verbatim.
-    expect(page).toHaveProperty("content_preview", "Preview body...");
-    expect(page).toHaveProperty("thumbnail_url");
-    expect(page).toHaveProperty("note_id", mockNote.id);
-  });
-
-  it("should return content_preview as null when the page has no stored preview", async () => {
-    // 保存時にプレビューが未生成 (`content_preview IS NULL`) のページでも
-    // ワイヤ上は `null` のまま素通しすることを保証する。Issue #860 Phase 0 の
-    // 復旧は「常に null」をやめるだけで、空ページのセマンティクスは維持する。
+  it("should not include pages[] on the note shell response", async () => {
+    // Phase 6 で `pages[]` を撤去した契約を明示的に固定する。consumer 側で
+    // 残存フィールド読み取りを誤って復活させないためのガードでもある。
     //
-    // Even when the stored preview is absent (`content_preview IS NULL`), the
-    // wire value must remain `null`. Issue #860 Phase 0 only stops the
-    // "always null" override; empty-page semantics are preserved.
+    // Lock down the Phase 6 contract: no `pages[]` field appears on the note
+    // shell. Also guards against a future regression that re-introduces the
+    // field for a single consumer.
     const mockNote = createMockNote();
-    const mockPage = createMockPageRow({ id: "page-empty", contentPreview: null });
-
     const { app } = createTestApp([
       [mockNote],
-      mockPagesSignal(mockPage.updatedAt as Date, 1),
-      [mockPage],
+      mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 3),
     ]);
 
     const res = await app.request(`/api/notes/${mockNote.id}`, {
@@ -531,8 +495,7 @@ describe("GET /api/notes/:noteId", () => {
     });
 
     const body = (await res.json()) as Record<string, unknown>;
-    const page = (body.pages as Record<string, unknown>[])[0];
-    expect(page).toHaveProperty("content_preview", null);
+    expect(body).not.toHaveProperty("pages");
   });
 
   it("should return 404 for non-existent note", async () => {
@@ -570,11 +533,9 @@ describe("GET /api/notes/:noteId", () => {
   describe("ETag / 304 conditional GET", () => {
     it("should include an ETag header on a 200 response", async () => {
       const mockNote = createMockNote();
-      const mockPage = createMockPageRow();
       const { app } = createTestApp([
         [mockNote],
-        mockPagesSignal(mockPage.updatedAt as Date, 1),
-        [mockPage],
+        mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 1),
       ]);
 
       const res = await app.request(`/api/notes/${mockNote.id}`, {
@@ -591,13 +552,12 @@ describe("GET /api/notes/:noteId", () => {
 
     it("should return 304 with an empty body when If-None-Match matches", async () => {
       const mockNote = createMockNote();
-      const mockPage = createMockPageRow();
+      const updatedAt = new Date("2026-01-01T00:00:00Z");
       const { app, chains } = createTestApp([
         [mockNote], // first request: getNoteRole
-        mockPagesSignal(mockPage.updatedAt as Date, 1), // first request: ETag pages signal
-        [mockPage], // first request: pages query
+        mockPagesSignal(updatedAt, 1), // first request: ETag pages signal
         [mockNote], // second request: getNoteRole
-        mockPagesSignal(mockPage.updatedAt as Date, 1), // second request: ETag pages signal
+        mockPagesSignal(updatedAt, 1), // second request: ETag pages signal
       ]);
 
       const res1 = await app.request(`/api/notes/${mockNote.id}`, {
@@ -615,9 +575,13 @@ describe("GET /api/notes/:noteId", () => {
       expect(res2.status).toBe(304);
       expect(await res2.text()).toBe("");
       // 304 経路で消費するのは getNoteRole + pages signal の 2 件のみ。
-      // pages 本体クエリと viewCount UPDATE はスキップされる。
+      // viewCount UPDATE はスキップされる（Phase 6 で pages 本体クエリは
+      // そもそも note shell から消えたため、200 経路でも走らない）。
+      //
       // Only role resolution + pages signal aggregate run on the 304 path;
-      // the full pages query and the viewCount update are both skipped.
+      // the viewCount update is skipped. The pages list query was removed
+      // from the note shell entirely in Phase 6, so it does not run on
+      // either path.
       expect(chains.length - chainsBefore).toBe(2);
     });
 
@@ -627,10 +591,8 @@ describe("GET /api/notes/:noteId", () => {
       const { app } = createTestApp([
         [firstNote],
         mockPagesSignal(), // ETag pages signal
-        [], // pages query
         [updatedNote],
         mockPagesSignal(), // ETag pages signal
-        [], // pages query
       ]);
 
       const res1 = await app.request(`/api/notes/${firstNote.id}`, {
@@ -646,6 +608,37 @@ describe("GET /api/notes/:noteId", () => {
       expect(etag1).toBeTruthy();
       expect(etag2).toBeTruthy();
       expect(etag1).not.toBe(etag2);
+    });
+
+    it("should bust client caches across the v2 → v3 response shape change (Issue #860 Phase 6)", async () => {
+      // Phase 6 で note shell から pages[] を撤去するのに合わせて
+      // RESPONSE_VERSION を v2 → v3 に bump した。古い v2 ETag を `If-None-Match`
+      // に乗せて来たクライアントが 304 で旧 body を再利用しないことを確認する。
+      // 同じ note row / pages signal でも、version が違えば ETag は別物になる。
+      //
+      // Phase 6 bumped RESPONSE_VERSION from v2 to v3 alongside dropping
+      // `pages[]`. A client cached on the v2 wire shape must not get a 304
+      // back for its stale `If-None-Match` validator, otherwise it would
+      // revive the obsolete body. The version salt makes the ETag diverge
+      // even when the note row and pages signal are identical.
+      const mockNote = createMockNote();
+      const updatedAt = new Date("2026-01-01T00:00:00Z");
+      const { app } = createTestApp([[mockNote], mockPagesSignal(updatedAt, 1)]);
+
+      // v2 era の ETag を完全な憶測としてではなく、現行 (v3) 経路から外れる
+      // ことだけを保証したいので、明らかに別 hash を `If-None-Match` に流す。
+      // The exact v2 hash is irrelevant — we only need to prove that a
+      // foreign validator does not match the v3 ETag, so any well-formed
+      // weak ETag works as a stand-in for "what an old client cached".
+      const res = await app.request(`/api/notes/${mockNote.id}`, {
+        headers: { ...authHeaders(), "If-None-Match": 'W/"v2-cached-hash"' },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toHaveProperty("id", mockNote.id);
+      expect(body).not.toHaveProperty("pages");
+      expect(res.headers.get("ETag")).toMatch(/^W\/".+"$/);
     });
 
     it("should produce a different ETag when the same note row is viewed under a different role", async () => {
@@ -672,13 +665,11 @@ describe("GET /api/notes/:noteId", () => {
         // First GET: authed user is the OWNER (single role-resolution query)
         [sharedPublicNote],
         pagesSignal,
-        [], // pages query
         // Second GET: anonymous viewer → guest role on the SAME note row.
         // No userEmail → getNoteRole skips member/domain checks for guests.
         [sharedPublicNote],
         pagesSignal,
-        [], // viewCount update
-        [], // pages query
+        [], // viewCount update (fire-and-forget, runs only for non-owner)
       ]);
 
       const resOwner = await app.request(`/api/notes/${sharedPublicNote.id}`, {
@@ -709,10 +700,8 @@ describe("GET /api/notes/:noteId", () => {
       const { app } = createTestApp([
         [mockNote],
         mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 1),
-        [], // pages query
         [mockNote],
         mockPagesSignal(new Date("2026-03-10T08:00:00Z"), 1),
-        [], // pages query
       ]);
 
       const res1 = await app.request(`/api/notes/${mockNote.id}`, {
@@ -737,13 +726,12 @@ describe("GET /api/notes/:noteId", () => {
       // RFC 7232 §3.2: clients may send a comma-separated list of validators
       // and the server must 304 if any one of them matches the current ETag.
       const mockNote = createMockNote();
-      const mockPage = createMockPageRow();
+      const updatedAt = new Date("2026-01-01T00:00:00Z");
       const { app } = createTestApp([
         [mockNote],
-        mockPagesSignal(mockPage.updatedAt as Date, 1),
-        [mockPage],
+        mockPagesSignal(updatedAt, 1),
         [mockNote],
-        mockPagesSignal(mockPage.updatedAt as Date, 1),
+        mockPagesSignal(updatedAt, 1),
       ]);
 
       const res1 = await app.request(`/api/notes/${mockNote.id}`, {
@@ -775,11 +763,9 @@ describe("GET /api/notes/:noteId", () => {
 
     it("should ignore a stale If-None-Match and return 200 with a fresh body", async () => {
       const mockNote = createMockNote();
-      const mockPage = createMockPageRow();
       const { app } = createTestApp([
         [mockNote],
-        mockPagesSignal(mockPage.updatedAt as Date, 1),
-        [mockPage],
+        mockPagesSignal(new Date("2026-01-01T00:00:00Z"), 1),
       ]);
 
       const res = await app.request(`/api/notes/${mockNote.id}`, {
@@ -806,11 +792,9 @@ describe("GET /api/notes/:noteId", () => {
     // helper defensively accepts `Date | string | null`.
     it("should compute ETag without throwing when MAX(pages.updated_at) is returned as a string (Issue #857)", async () => {
       const mockNote = createMockNote();
-      const mockPage = createMockPageRow();
       const { app } = createTestApp([
         [mockNote],
         mockPagesSignalRaw("2026-01-01T00:00:00.000Z", 1),
-        [mockPage],
       ]);
 
       const res = await app.request(`/api/notes/${mockNote.id}`, {
@@ -832,10 +816,8 @@ describe("GET /api/notes/:noteId", () => {
       const { app } = createTestApp([
         [mockNote],
         mockPagesSignal(sameInstant, 1),
-        [],
         [mockNote],
         mockPagesSignalRaw("2026-01-01T00:00:00.000Z", 1),
-        [],
       ]);
 
       const resDate = await app.request(`/api/notes/${mockNote.id}`, {

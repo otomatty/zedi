@@ -11,6 +11,7 @@ import inviteLinkRoutes from "./inviteLinks.js";
 import domainAccessRoutes from "./domainAccess.js";
 import searchRoutes from "./search.js";
 import eventsRoutes from "./events.js";
+import titleIndexRoutes from "./titleIndex.js";
 
 const app = new Hono<AppEnv>();
 
@@ -19,6 +20,7 @@ const app = new Hono<AppEnv>();
 app.route("/", meRoutes);
 app.route("/", crudRoutes);
 app.route("/", pageRoutes);
+app.route("/", titleIndexRoutes);
 app.route("/", memberRoutes);
 app.route("/", inviteLinkRoutes);
 app.route("/", domainAccessRoutes);

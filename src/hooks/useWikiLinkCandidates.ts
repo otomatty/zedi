@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { usePagesSummary } from "@/hooks/usePageQueries";
-import { useNotePages } from "@/hooks/useNoteQueries";
+import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
 import type { PageSummary } from "@/types/page";
 
 /**
@@ -36,14 +36,20 @@ export function useWikiLinkCandidates(
   // In note scope, skip the personal pages lookup to avoid unnecessary
   // IndexedDB access; `enabled` suppresses the react-query queryFn.
   const personal = usePagesSummary({ enabled: noteId === null });
-  const notePages = useNotePages(noteId ?? "", undefined, Boolean(noteId));
+  // issue #860 Phase 6: ノートスコープではタイトル文字列だけ使うため、
+  // `useNoteTitleIndex` の最小 payload で十分（preview / thumbnail を取らない）。
+  //
+  // Issue #860 Phase 6: in note scope only the titles are read, so the
+  // `useNoteTitleIndex` minimal payload is enough — no preview / thumbnail
+  // needs to be transferred for the suggestion UI.
+  const noteTitles = useNoteTitleIndex(noteId ?? "", { enabled: Boolean(noteId) });
 
   return useMemo<WikiLinkCandidatesResult>(() => {
     if (noteId) {
-      const data = notePages.data ?? [];
+      const data = noteTitles.data ?? [];
       return {
         pages: data.map((p) => ({ id: p.id, title: p.title, isDeleted: p.isDeleted })),
-        isLoading: notePages.isLoading,
+        isLoading: noteTitles.isLoading,
       };
     }
     const data = personal.data ?? [];
@@ -51,5 +57,5 @@ export function useWikiLinkCandidates(
       pages: data.map((p) => ({ id: p.id, title: p.title, isDeleted: p.isDeleted })),
       isLoading: personal.isLoading,
     };
-  }, [noteId, personal.data, personal.isLoading, notePages.data, notePages.isLoading]);
+  }, [noteId, personal.data, personal.isLoading, noteTitles.data, noteTitles.isLoading]);
 }

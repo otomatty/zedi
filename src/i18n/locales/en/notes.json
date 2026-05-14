@@ -80,6 +80,7 @@
   "addPage": "Add page",
   "addPageDialogTitle": "Add page",
   "searchByTitle": "Search by title",
+  "duplicateTitleWarning": "A page with this title already exists in this note.",
   "noPagesToAdd": "No pages available to add.",
   "untitledPage": "Untitled page",
   "close": "Close",
@@ -219,5 +220,18 @@
   "domainTabCreateFailedInvalid": "The domain format is invalid.",
   "domainTabCreateFailedEmpty": "Enter a domain.",
   "domainTabRemoved": "Domain rule removed",
-  "domainTabRemoveFailed": "Failed to remove domain rule"
+  "domainTabRemoveFailed": "Failed to remove domain rule",
+  "search": {
+    "placeholder": "Search pages in this note…",
+    "ariaLabel": "Search pages in this note",
+    "clear": "Clear search",
+    "resultsLabel": "Search results",
+    "loading": "Searching…",
+    "loadingMore": "Loading…",
+    "loadMore": "Show more results",
+    "refreshing": "Refreshing…",
+    "noResults": "No pages found for \"{{query}}\".",
+    "untitled": "(untitled)",
+    "error": "Failed to load search results."
+  }
 }

@@ -12,7 +12,7 @@ import type {
 } from "@/types/aiChat";
 import type { PageContext } from "@/types/aiChat";
 import { useCreatePage, useUpdatePage, useSyncWikiLinks } from "@/hooks/usePageQueries";
-import { useNotePages } from "@/hooks/useNoteQueries";
+import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
 import {
   appendMarkdownToTiptapContent,
   buildSuggestedWikiLinksMarkdown,
@@ -57,22 +57,25 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
    */
   const updatePageMutation = useUpdatePage();
   // 編集対象ページ自身の所属ノート（`pageContext.noteId`）に応じて WikiLink
-  // 同期のスコープを切り替える（Issue #713 Phase 4）。ノート内のページ一覧は
-  // `useNotePages` から取得し、`syncLinks` が同一ノート内のタイトルを正しく
-  // 解決できるようにする。linked personal page は `noteId` を持たないので、
-  // 個人スコープのまま処理する。`noteId` が空のときは fetch しない。
+  // 同期のスコープを切り替える（Issue #713 Phase 4 / 同 #860 Phase 6）。
+  // ノート内のページタイトル一覧は `useNoteTitleIndex` から取得し、
+  // `syncLinks` が同一ノート内のタイトルを正しく解決できるようにする。
+  // linked personal page は `noteId` を持たないので、個人スコープのまま処理する。
+  // `noteId` が空のときは fetch しない。
   //
   // Switch WikiLink sync scope based on the current page's owning note
-  // (`pageContext.noteId`, issue #713 Phase 4). Linked personal pages keep
-  // this unset even when rendered inside a note, so they continue to use the
-  // personal scope. The note's page list is fetched via `useNotePages` and
-  // fed into `useSyncWikiLinks` so same-note references resolve to real links
-  // instead of ghost entries.
+  // (`pageContext.noteId`; issues #713 Phase 4 / #860 Phase 6). Linked
+  // personal pages keep this unset even when rendered inside a note, so they
+  // continue to use the personal scope. The note's title set is fetched via
+  // `useNoteTitleIndex` and fed into `useSyncWikiLinks` so same-note
+  // references resolve to real links instead of ghost entries.
   const scopeNoteId = pageContext?.noteId ?? null;
-  const notePagesQuery = useNotePages(scopeNoteId ?? "", undefined, Boolean(scopeNoteId));
+  const noteTitleIndexQuery = useNoteTitleIndex(scopeNoteId ?? "", {
+    enabled: Boolean(scopeNoteId),
+  });
   const { syncLinks } = useSyncWikiLinks({
     pageNoteId: scopeNoteId,
-    notePages: scopeNoteId ? notePagesQuery.data : undefined,
+    notePages: scopeNoteId ? noteTitleIndexQuery.data : undefined,
   });
 
   /**

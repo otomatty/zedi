@@ -25,6 +25,18 @@ export interface NoteViewAddPageDialogContentProps {
    */
   onCopyByPageId: (pageId: string) => Promise<void>;
   isPending: boolean;
+  /**
+   * 入力中の `newPageTitle` がノート内の既存タイトルと完全一致しているか
+   * （issue #860 Phase 5）。`true` のときはインライン警告を表示する。
+   * 重複タイトル自体はサーバ側で拒否しないので、Add ボタンは押せるままにし、
+   * 「同名のページが既にあります」とユーザーに知らせるだけ。
+   *
+   * Whether the entered `newPageTitle` exactly matches an existing title in
+   * the note (issue #860 Phase 5). When `true` we surface an inline warning;
+   * the server does not reject duplicates, so the Add button stays enabled
+   * and we only inform the user a near-twin already exists.
+   */
+  duplicateTitleExists?: boolean;
   onClose: () => void;
 }
 
@@ -43,6 +55,7 @@ export function NoteViewAddPageDialogContent({
   onAddByPageId,
   onCopyByPageId,
   isPending,
+  duplicateTitleExists = false,
   onClose,
 }: NoteViewAddPageDialogContentProps) {
   const { t } = useTranslation();
@@ -65,6 +78,17 @@ export function NoteViewAddPageDialogContent({
               value={newPageTitle}
               onChange={(e) => setNewPageTitle(e.target.value)}
               placeholder={t("notes.newPageTitle")}
+              // coderabbitai review on PR #868: 重複タイトルは投稿が成功する
+              // 「警告」であり「入力エラー」ではないので `aria-invalid` は付け
+              // ない。`aria-describedby` で警告 element を読み上げ対象に紐付ける
+              // だけにする（assistive tech に「無効な入力」と告知させない）。
+              //
+              // PR #868 review (coderabbitai): a duplicate title is an
+              // advisory warning, not a blocking input error — submit still
+              // succeeds. Drop `aria-invalid` so screen readers do not
+              // announce the field as invalid, but keep `aria-describedby`
+              // so the warning text is associated with the input.
+              aria-describedby={duplicateTitleExists ? `${newPageTitleFieldId}-dup` : undefined}
             />
             <Button
               type="button"
@@ -75,6 +99,15 @@ export function NoteViewAddPageDialogContent({
               {t("notes.add")}
             </Button>
           </div>
+          {duplicateTitleExists && (
+            <p
+              id={`${newPageTitleFieldId}-dup`}
+              role="status"
+              className="text-xs text-amber-600 dark:text-amber-400"
+            >
+              {t("notes.duplicateTitleWarning")}
+            </p>
+          )}
         </div>
         {canEdit && (
           <>

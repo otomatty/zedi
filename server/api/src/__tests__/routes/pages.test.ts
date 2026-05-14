@@ -14,6 +14,14 @@ vi.mock("../../middleware/auth.js", () => ({
     c.set("userEmail", "tester@example.com");
     await next();
   },
+  authOptional: async (c: Context<AppEnv>, next: Next) => {
+    const userId = c.req.header("x-test-user-id");
+    if (userId) {
+      c.set("userId", userId);
+      c.set("userEmail", "tester@example.com");
+    }
+    await next();
+  },
 }));
 
 vi.mock("../../services/defaultNoteService.js", () => ({
@@ -147,6 +155,112 @@ describe("GET /api/pages/:id/content", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/pages/:id (single page metadata, Issue #860 Phase 6)", () => {
+  /**
+   * 単一ページ取得経路で返される metadata 行のテンプレート。実際の SELECT
+   * カラムと並びを揃えるため、`createMockPageMetaRow` の戻り値をそのまま
+   * `[row]` として createPagesApp に流す。
+   *
+   * Template for the single-page metadata row returned by the new GET route.
+   * Mirrors the SELECT column set so the mock can be passed straight through
+   * `createPagesApp` as `[row]`.
+   */
+  function createMockPageMetaRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: PAGE_ID,
+      ownerId: TEST_USER_ID,
+      noteId: NOTE_ID,
+      sourcePageId: null,
+      title: "Hello",
+      contentPreview: "preview body",
+      thumbnailUrl: "https://cdn.example/t.jpg",
+      sourceUrl: null,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      updatedAt: new Date("2026-01-01T00:00:00Z"),
+      isDeleted: false,
+      ...overrides,
+    };
+  }
+
+  it("returns the page metadata for the owner", async () => {
+    const app = createPagesApp([
+      [createMockPageMetaRow()], // page row
+      [mockNoteRow()], // getNoteRole → findActiveNoteById (owner)
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: PAGE_ID,
+      owner_id: TEST_USER_ID,
+      note_id: NOTE_ID,
+      title: "Hello",
+      content_preview: "preview body",
+      thumbnail_url: "https://cdn.example/t.jpg",
+      source_url: null,
+      is_deleted: false,
+    });
+  });
+
+  it("returns 404 when the page row is missing or already soft-deleted", async () => {
+    const app = createPagesApp([[]]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when caller has no role on the owning note", async () => {
+    const privateNote = {
+      ...mockNoteRow(),
+      ownerId: "other-user",
+      visibility: "private" as const,
+    };
+    const app = createPagesApp([
+      [createMockPageMetaRow({ ownerId: "other-user" })],
+      [privateNote], // getNoteRole → findActiveNoteById (not owner)
+      [], // member check
+      [], // domain access check
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("allows guest access for pages on a public note (authOptional)", async () => {
+    // 公開ノート配下のページは未ログインの guest からも取得できる。
+    // `getNoteRole` は visibility=public に対して role=guest を返す。
+    //
+    // Public-note pages are reachable by unauthenticated callers; `getNoteRole`
+    // resolves them as `guest` via the visibility branch.
+    const publicNote = { ...mockNoteRow(), ownerId: "other-user", visibility: "public" as const };
+    const app = createPagesApp([
+      [createMockPageMetaRow({ ownerId: "other-user" })],
+      [publicNote], // getNoteRole → findActiveNoteById (no userId/email → guest path)
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "GET",
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ id: PAGE_ID });
   });
 });
 

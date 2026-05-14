@@ -7,8 +7,13 @@ type MockNotePage = { id: string; title: string };
 
 let mockNotePagesData: MockNotePage[] | undefined;
 
+// issue #860 Phase 6: useNotePages → useNoteTitleIndex に置き換え。タグ存在
+// 判定は `id` / `title` だけ参照するため、最小 payload で十分。
+// Issue #860 Phase 6: replaced useNotePages mock with useNoteTitleIndex; tag
+// existence resolution only reads `id` / `title`, so the minimal title row
+// is sufficient.
 vi.mock("@/hooks/useNoteQueries", () => ({
-  useNotePages: vi.fn(() => ({
+  useNoteTitleIndex: vi.fn(() => ({
     data: mockNotePagesData,
   })),
 }));

@@ -271,7 +271,19 @@ export interface DiscoverNoteItem {
   page_count: number;
 }
 
-/** GET /api/notes/:id response. */
+/**
+ * `GET /api/notes/:id` のレスポンス（"note shell"）。Issue #860 Phase 6 で
+ * `pages[]` を撤去し、ノート属性と呼び出し元の解決ロールのみを返す形に
+ * なった。ページ一覧は cursor pagination の `GET /api/notes/:noteId/pages`、
+ * wiki link / AI chat scope のような全ページタイトルが必要な経路は
+ * `GET /api/notes/:noteId/page-titles` を使う。
+ *
+ * `GET /api/notes/:id` response — the "note shell". Issue #860 Phase 6
+ * removed the `pages[]` field entirely; the response now carries only note
+ * attributes plus the caller's resolved role. Visible page lists fetch via
+ * the cursor-paginated `/pages` endpoint, and full-set title consumers
+ * fetch via `/page-titles`.
+ */
 export interface GetNoteResponse {
   id: string;
   owner_id: string;
@@ -290,31 +302,69 @@ export interface GetNoteResponse {
   updated_at: string;
   is_deleted: boolean;
   current_user_role: "owner" | "editor" | "viewer" | "guest";
-  pages: Array<{
-    id: string;
-    owner_id: string;
-    /**
-     * ページが所属するノートの ID。Issue #823 以降、すべてのページはちょうど
-     * 1 つのノートに所属し、この値はレスポンスのノート ID と一致する。
-     * Issue #825 で型上も non-null に揃えた。
-     *
-     * Owning note id. After issue #823 every page belongs to exactly one note
-     * and this matches the enclosing note's `id`. Issue #825 also tightened
-     * the type to non-null.
-     */
-    note_id: string;
-    source_page_id: string | null;
-    title: string | null;
-    content_preview: string | null;
-    thumbnail_url: string | null;
-    source_url: string | null;
-    created_at: string;
-    updated_at: string;
-    is_deleted: boolean;
-    sort_order: number;
-    added_by_user_id: string;
-    added_at: string;
-  }>;
+}
+
+/**
+ * `GET /api/notes/:noteId/page-titles` のページ行（issue #860 Phase 6）。
+ * wiki link 解決・AI chat scope sync・追加 dialog の重複判定など、
+ * 「ノート全ページのタイトル」を完全集合として必要とする consumer 向けの
+ * 軽量ペイロード。
+ *
+ * Page row from `GET /api/notes/:noteId/page-titles` (issue #860 Phase 6).
+ * Lightweight payload for consumers that need the *complete* set of
+ * page titles in a note: wiki-link resolution, AI-chat scope sync,
+ * and add-dialog dedup.
+ */
+export interface NotePageTitleItem {
+  id: string;
+  title: string;
+  is_deleted: boolean;
+  updated_at: string;
+}
+
+/**
+ * `GET /api/notes/:noteId/page-titles` のレスポンス。サーバ順
+ * (`updated_at DESC, id DESC`) を維持したフラット配列を返す。
+ *
+ * `GET /api/notes/:noteId/page-titles` response. Returns a flat array
+ * preserving the server order (`updated_at DESC, id DESC`).
+ */
+export interface NotePageTitleIndexResponse {
+  items: NotePageTitleItem[];
+}
+
+/**
+ * `GET /api/notes/:noteId/search` の結果行（issue #860 Phase 5）。
+ * note-scoped 全文検索 (ILIKE) のヒット行。サーバ側 SQL が `p.note_id = :noteId`
+ * で hard-filter しているため、`note_id` は常に URL の `:noteId` と一致し
+ * 非 null。`content_text` 等の本文フィールドはペイロード肥大化を避けるため
+ * サーバ内部に留めており、公開レスポンスには含めない。
+ *
+ * Result row from `GET /api/notes/:noteId/search` (issue #860 Phase 5).
+ * Note-scoped ILIKE hit. The server hard-filters `p.note_id = :noteId` so
+ * `note_id` is always equal to the URL's `:noteId` and never null. Body
+ * fields like `content_text` stay server-side to keep the wire payload
+ * small.
+ */
+export interface NoteSearchResultItem {
+  id: string;
+  title: string | null;
+  content_preview: string | null;
+  updated_at: string;
+  note_id: string;
+}
+
+/**
+ * `GET /api/notes/:noteId/search` のレスポンス（issue #860 Phase 5 で
+ * `next_cursor` 付きの cursor pagination に変更）。`next_cursor` が `null` で
+ * 末尾を示す。
+ *
+ * Cursor-paginated response from `GET /api/notes/:noteId/search` (issue
+ * #860 Phase 5 added the cursor). A `null` `next_cursor` marks the end.
+ */
+export interface NoteSearchResponse {
+  results: NoteSearchResultItem[];
+  next_cursor: string | null;
 }
 
 /**

@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, useToast } from "@zedi/ui";
-import { useAddPageToNote, useCopyPersonalPageToNote } from "@/hooks/useNoteQueries";
+import {
+  useAddPageToNote,
+  useCopyPersonalPageToNote,
+  useNoteTitleIndex,
+} from "@/hooks/useNoteQueries";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import { NoteViewAddPageDialogContent } from "./NoteViewAddPageDialogContent";
 
@@ -44,6 +48,14 @@ export function NoteAddPageDialog({ open, onOpenChange, noteId, canEdit }: NoteA
   const addPageMutation = useAddPageToNote();
   const copyPersonalMutation = useCopyPersonalPageToNote();
   const { data: allPages = [] } = usePagesSummary();
+  // issue #860 Phase 5 (Phase 3 leftover): ノートスコープのタイトル重複判定は
+  // 全件配列依存をやめ、`useNoteTitleIndex` の最小 payload に寄せる。`enabled:
+  // open` で dialog が開いている間だけ fetch し、閉じている間は走らせない。
+  //
+  // Issue #860 Phase 5 (carrying over Phase 3's TODO): replace the dropped
+  // full-array dedup with a `useNoteTitleIndex` lookup. Gated on `open`
+  // so the title-index is fetched only while the dialog is visible.
+  const { data: noteTitles = [] } = useNoteTitleIndex(noteId, { enabled: open });
 
   const [pageFilter, setPageFilter] = useState("");
   const [newPageTitle, setNewPageTitle] = useState("");
@@ -53,6 +65,27 @@ export function NoteAddPageDialog({ open, onOpenChange, noteId, canEdit }: NoteA
     if (!query) return allPages;
     return allPages.filter((p) => (p.title || "").toLowerCase().includes(query));
   }, [allPages, pageFilter]);
+
+  // ノート内の既存タイトル集合を作っておき、入力中の `newPageTitle` と
+  // 大文字小文字無視で突合する。完全一致時のみ重複扱いとし、Add ボタンは
+  // 押せるが警告を表示する（タイトル重複は許容するが意図せぬ衝突を伝える）。
+  //
+  // Build a case-insensitive set of existing titles in the note and flag an
+  // exact match against the user's input. The Add button stays enabled
+  // (duplicate titles are not a hard error), but we surface a warning so
+  // the user can rename instead of accidentally adding a near-twin.
+  const noteTitleSet = useMemo(
+    () =>
+      new Set(
+        noteTitles
+          .filter((p) => !p.isDeleted)
+          .map((p) => p.title.trim().toLowerCase())
+          .filter((s) => s.length > 0),
+      ),
+    [noteTitles],
+  );
+  const trimmedNewTitle = newPageTitle.trim().toLowerCase();
+  const duplicateTitleExists = trimmedNewTitle.length > 0 && noteTitleSet.has(trimmedNewTitle);
 
   const runAddPage = async (params: { pageId: string } | { title: string }) => {
     try {
@@ -108,6 +141,7 @@ export function NoteAddPageDialog({ open, onOpenChange, noteId, canEdit }: NoteA
           onAddByPageId={handleAddByPageId}
           onCopyByPageId={handleCopyByPageId}
           isPending={isPending}
+          duplicateTitleExists={duplicateTitleExists}
           onClose={() => onOpenChange(false)}
         />
       </DialogContent>

@@ -34,6 +34,8 @@ import type {
   CreateDomainAccessBody,
   NotePageWindowInclude,
   NotePageWindowResponse,
+  NotePageTitleIndexResponse,
+  NoteSearchResponse,
 } from "./types";
 
 export type { NoteListItem };
@@ -288,6 +290,31 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<PostSyncPagesResponse>("POST", "/api/sync/pages", { body });
     },
 
+    /**
+     * `GET /api/pages/:pageId` — 単一ページのメタデータを返す（issue #860
+     * Phase 6 で追加）。Phase 6 で `GET /api/notes/:noteId` から `pages[]`
+     * を撤去したため、`useNotePage` のような単一ページ metadata の経路は
+     * このルートに切り替わる。`authOptional` なので、公開 / unlisted ノート
+     * 配下のページは未ログインの guest からも取得できる。
+     *
+     * Single-page metadata fetch (issue #860 Phase 6). Phase 6 dropped
+     * `pages[]` from the note shell, so consumers that previously read a
+     * page's owner / source url / etc. through that array now go through
+     * this route. The endpoint is `authOptional`, so guests can read pages
+     * of public / unlisted notes.
+     *
+     * Returns `null` when the page is missing or soft-deleted (404 from the
+     * server). Other errors propagate as `ApiError`.
+     */
+    async getPage(pageId: string): Promise<unknown> {
+      try {
+        return await reqOptionalAuth<unknown>("GET", `/api/pages/${encodeURIComponent(pageId)}`);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
+      }
+    },
+
     /** GET /api/pages/:id/content — ydoc_state (base64), version. 404 if no content. */
     async getPageContent(pageId: string): Promise<PageContentResponse> {
       return req<PageContentResponse>("GET", `/api/pages/${encodeURIComponent(pageId)}/content`);
@@ -442,6 +469,58 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return reqOptionalAuth<NotePageWindowResponse>(
         "GET",
         `/api/notes/${encodeURIComponent(noteId)}/pages`,
+        { query },
+      );
+    },
+
+    /**
+     * `GET /api/notes/:noteId/page-titles` — ノート配下の全ページの id /
+     * title / is_deleted / updated_at だけを返す軽量タイトルインデックス
+     * （issue #860 Phase 6）。`/pages` の cursor pagination とは異なり
+     * 「全タイトルが必要」な consumer 専用で、payload を最小限に抑えるため
+     * preview / thumbnail / source_url 等は含めない。`authOptional` なので、
+     * 公開 / unlisted ノートは未ログインでも取得できる。
+     *
+     * Lightweight title-index for a note (issue #860 Phase 6). Returns only
+     * `id / title / is_deleted / updated_at` for every active page, with no
+     * preview / thumbnail / source_url, so consumers that need the *complete*
+     * title set (wiki-link resolver, AI-chat scope sync, add-dialog dedup)
+     * can fetch the whole list cheaply even on huge notes. The endpoint is
+     * `authOptional`, so guests can browse public / unlisted notes without
+     * sign-in.
+     */
+    async getNotePageTitles(noteId: string): Promise<NotePageTitleIndexResponse> {
+      return reqOptionalAuth<NotePageTitleIndexResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/page-titles`,
+      );
+    },
+
+    /**
+     * `GET /api/notes/:noteId/search` — note-scoped 全文検索（issue #860
+     * Phase 5）。`q` を渡してタイトル / コンテンツに対して ILIKE マッチを実行
+     * する。`cursor` は前回レスポンスの `next_cursor` を echo するだけで、
+     * `null` 時は先頭から取得する。`limit` は 1..100 にクランプされ、サーバ
+     * 側で `limit + 1` 件取得して `next_cursor` の有無を判定する。
+     * `authOptional` なので、公開 / unlisted ノートは未ログインの guest からも
+     * 検索可能。
+     *
+     * Note-scoped full-text search (issue #860 Phase 5). Performs an ILIKE
+     * match against title + content. The `cursor` parameter echoes back the
+     * previous response's `next_cursor`; pass `null` for the first window.
+     * `limit` is clamped to 1..100 server-side. The endpoint is
+     * `authOptional`, so guests can search public / unlisted notes.
+     */
+    async searchNotePages(
+      noteId: string,
+      params: { q: string; cursor?: string | null; limit?: number } = { q: "" },
+    ): Promise<NoteSearchResponse> {
+      const query: Record<string, string> = { q: params.q };
+      if (params.cursor) query.cursor = params.cursor;
+      if (params.limit !== undefined) query.limit = String(params.limit);
+      return reqOptionalAuth<NoteSearchResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/search`,
         { query },
       );
     },

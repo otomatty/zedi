@@ -23,11 +23,16 @@ vi.mock("@/hooks/usePageQueries", () => ({
 }));
 
 vi.mock("@/hooks/useNoteQueries", () => ({
-  useNotePages: vi.fn(() => ({ data: [], isLoading: false, isFetched: true })),
+  // issue #860 Phase 6: useNotePages → useNoteTitleIndex への移行に合わせて
+  // mock 名を変更。返す shape は { id, title, isDeleted, updatedAt } 配列。
+  // Issue #860 Phase 6: switched mock to `useNoteTitleIndex`; data is an
+  // array of `{ id, title, isDeleted, updatedAt }` rather than full
+  // `NotePageSummary` rows.
+  useNoteTitleIndex: vi.fn(() => ({ data: [], isLoading: false, isFetched: true })),
 }));
 
 import { usePageByTitle } from "@/hooks/usePageQueries";
-import { useNotePages } from "@/hooks/useNoteQueries";
+import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
 
 describe("useWikiLinkNavigation", () => {
   beforeEach(() => {
@@ -219,25 +224,15 @@ describe("useWikiLinkNavigation", () => {
     const noteId = "note-42";
 
     it("同一ノート内のページにマッチしたら /notes/:noteId/:pageId に遷移する", async () => {
-      vi.mocked(useNotePages).mockReturnValue({
-        data: [
-          {
-            id: "note-page-1",
-            ownerUserId: "user-1",
-            noteId,
-            title: "Note Page A",
-            contentPreview: undefined,
-            thumbnailUrl: undefined,
-            sourceUrl: undefined,
-            createdAt: 0,
-            updatedAt: 0,
-            isDeleted: false,
-            addedByUserId: "user-1",
-          },
-        ],
+      // issue #860 Phase 6: useNoteTitleIndex は { id, title, isDeleted,
+      // updatedAt } のみ返す。wiki link 解決はこの 4 フィールドだけ参照する。
+      // Issue #860 Phase 6: useNoteTitleIndex returns the minimal title row;
+      // wiki-link resolution reads only id/title/isDeleted.
+      vi.mocked(useNoteTitleIndex).mockReturnValue({
+        data: [{ id: "note-page-1", title: "Note Page A", isDeleted: false, updatedAt: 0 }],
         isFetched: true,
         isLoading: false,
-      } as unknown as ReturnType<typeof useNotePages>);
+      } as unknown as ReturnType<typeof useNoteTitleIndex>);
 
       const { result } = renderHook(() => useWikiLinkNavigation({ pageNoteId: noteId }), {
         wrapper: createHookWrapper(),
@@ -260,11 +255,11 @@ describe("useWikiLinkNavigation", () => {
     });
 
     it("ノート内で一致しないタイトルをクリックするとダイアログを開き、handleConfirmCreate は新規作成 API を呼ばずに閉じる", async () => {
-      vi.mocked(useNotePages).mockReturnValue({
+      vi.mocked(useNoteTitleIndex).mockReturnValue({
         data: [],
         isFetched: true,
         isLoading: false,
-      } as unknown as ReturnType<typeof useNotePages>);
+      } as unknown as ReturnType<typeof useNoteTitleIndex>);
 
       const { result } = renderHook(() => useWikiLinkNavigation({ pageNoteId: noteId }), {
         wrapper: createHookWrapper(),
@@ -291,25 +286,11 @@ describe("useWikiLinkNavigation", () => {
     });
 
     it("削除済みノートページと同一タイトルのクリックでは、ダイアログを開いて新規作成フローに入る", async () => {
-      vi.mocked(useNotePages).mockReturnValue({
-        data: [
-          {
-            id: "tombstone",
-            ownerUserId: "user-1",
-            noteId,
-            title: "Archived",
-            contentPreview: undefined,
-            thumbnailUrl: undefined,
-            sourceUrl: undefined,
-            createdAt: 0,
-            updatedAt: 0,
-            isDeleted: true,
-            addedByUserId: "user-1",
-          },
-        ],
+      vi.mocked(useNoteTitleIndex).mockReturnValue({
+        data: [{ id: "tombstone", title: "Archived", isDeleted: true, updatedAt: 0 }],
         isFetched: true,
         isLoading: false,
-      } as unknown as ReturnType<typeof useNotePages>);
+      } as unknown as ReturnType<typeof useNoteTitleIndex>);
 
       const { result } = renderHook(() => useWikiLinkNavigation({ pageNoteId: noteId }), {
         wrapper: createHookWrapper(),
