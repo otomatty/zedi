@@ -185,34 +185,35 @@ describe("GET /api/notes/:noteId/search", () => {
     expect(res.status).toBe(200);
   });
 
-  it("response rows carry note_id so callers can verify scope", async () => {
-    // ノートスコープ検索でも `note_id` を露出させる (Phase 5 契約)。リンクされた
-    // 個人ページ（`note_id IS NULL`）と、このノートのネイティブページ（`note_id`
-    // = :noteId）を UI 側で見分けるための判定材料。
+  it("response rows always carry note_id equal to the path noteId", async () => {
+    // Issue #860 Phase 5 + Issue #823: SQL は `p.note_id = :noteId` で
+    // hard-filter しているため、結果行の `note_id` は常に URL の `:noteId` と
+    // 一致する。旧 "linked-personal (`note_id IS NULL`)" の経路は Phase 5 で
+    // 物理的に閉じた（coderabbitai review on PR #868）。
     //
-    // Expose `note_id` on every row even for the note-scoped endpoint, so UI and
-    // MCP callers can still tell a linked personal page (`note_id: null`) apart
-    // from a note-native page (`note_id: NOTE_ID`). This matches the Phase 5
-    // scope contract shared with `/api/search`.
+    // Issue #860 Phase 5 + Issue #823: the SQL hard-filters
+    // `p.note_id = :noteId`, so every result row's `note_id` matches the URL
+    // path. The legacy "linked-personal (`note_id IS NULL`)" branch is no
+    // longer reachable through this endpoint (PR #868 review).
     const mockNote = createMockNote();
     const { app } = createTestApp([
       [mockNote], // getNoteRole → owner
       {
         rows: [
           {
-            id: "page-native",
-            title: "Native Page",
+            id: "page-native-1",
+            title: "Native Page 1",
             content_preview: null,
             updated_at: new Date("2026-04-01T00:00:00Z").toISOString(),
             note_id: NOTE_ID,
             updated_at_iso: "2026-04-01T00:00:00.000000Z",
           },
           {
-            id: "page-linked-personal",
-            title: "Linked Personal",
-            content_preview: null,
+            id: "page-native-2",
+            title: "Native Page 2",
+            content_preview: "snippet…",
             updated_at: new Date("2026-04-01T00:00:00Z").toISOString(),
-            note_id: null,
+            note_id: NOTE_ID,
             updated_at_iso: "2026-04-01T00:00:00.000000Z",
           },
         ],
@@ -231,12 +232,19 @@ describe("GET /api/notes/:noteId/search", () => {
     };
     expect(body.results).toHaveLength(2);
     expect(body.results[0]).toHaveProperty("note_id", NOTE_ID);
-    expect(body.results[1]).toHaveProperty("note_id", null);
+    expect(body.results[1]).toHaveProperty("note_id", NOTE_ID);
     // Issue #860 Phase 5: cursor は内部 helper フィールドなので公開レスポンスに
     // 漏らさないことを確認する（payload を肥大化させないための契約）。
+    // coderabbitai review on PR #868: 同様に `content_text` も公開しないこと
+    // を契約として固定する（限界帯域防止）。
+    //
     // Issue #860 Phase 5: the cursor-helper `updated_at_iso` is internal and
-    // must not leak into the public response.
+    // must not leak into the public response. PR #868 review (coderabbitai)
+    // adds the same contract for `content_text` so search responses cannot
+    // balloon with full page bodies.
     expect(body.results[0]).not.toHaveProperty("updated_at_iso");
+    expect(body.results[0]).not.toHaveProperty("content_text");
+    expect(body.results[1]).not.toHaveProperty("content_text");
     expect(body.next_cursor).toBeNull();
   });
 
@@ -344,7 +352,6 @@ describe("GET /api/notes/:noteId/search", () => {
       content_preview: null,
       updated_at: new Date(microIso).toISOString(),
       note_id: NOTE_ID,
-      content_text: null,
       updated_at_iso: microIso,
     }));
     const { app } = createTestApp([
@@ -392,7 +399,6 @@ describe("GET /api/notes/:noteId/search", () => {
             content_preview: null,
             updated_at: new Date("2026-04-01T00:00:00Z").toISOString(),
             note_id: NOTE_ID,
-            content_text: null,
             updated_at_iso: "2026-04-01T00:00:00.000000Z",
           },
         ],

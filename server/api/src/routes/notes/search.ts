@@ -173,9 +173,19 @@ app.get("/:noteId/search", authOptional, async (c) => {
 
   const fetchLimit = limit + 1;
 
+  // coderabbitai review on PR #868: `pc.content_text` は ILIKE の対象として
+  // 必要だが、レスポンス body には載せない。`limit=100` で長文ページが並ぶと
+  // 1 リクエストあたり数 MB に肥大化し、検索のレイテンシ + 帯域コストを
+  // 悪化させる。SELECT からは外し、JOIN 側の ILIKE マッチだけ残す
+  // （snippet 生成等が必要になれば別 `include` トークンで opt-in する）。
+  //
+  // PR #868 review (coderabbitai): keep `pc.content_text` out of the SELECT.
+  // We still need the join for the ILIKE-on-body match, but returning the
+  // full body would balloon each search response (megabytes per request at
+  // limit=100 with long pages) for zero current benefit. If snippet
+  // generation lands later, gate it behind an explicit `?include=` token.
   const result = await db.execute(sql`
     SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id,
-           pc.content_text,
            to_char(p.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at_iso
     FROM pages p
     LEFT JOIN page_contents pc ON pc.page_id = p.id
@@ -195,8 +205,7 @@ app.get("/:noteId/search", authOptional, async (c) => {
     title: string | null;
     content_preview: string | null;
     updated_at: Date | string;
-    note_id: string | null;
-    content_text: string | null;
+    note_id: string;
     updated_at_iso: string;
   };
   const rawRows = result.rows as SearchRow[];

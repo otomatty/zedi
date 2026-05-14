@@ -335,23 +335,23 @@ export interface NotePageTitleIndexResponse {
 
 /**
  * `GET /api/notes/:noteId/search` の結果行（issue #860 Phase 5）。
- * note-scoped 全文検索 (ILIKE) のヒット行で、`note_id` は呼び出し元が「ノート
- * ネイティブ (`note_id === noteId`) か旧リンクパス (`note_id === null`) か」
- * を区別するために残す。`content_text` は将来の snippet 生成用に確保している
- * 内部フィールド。
+ * note-scoped 全文検索 (ILIKE) のヒット行。サーバ側 SQL が `p.note_id = :noteId`
+ * で hard-filter しているため、`note_id` は常に URL の `:noteId` と一致し
+ * 非 null。`content_text` 等の本文フィールドはペイロード肥大化を避けるため
+ * サーバ内部に留めており、公開レスポンスには含めない。
  *
  * Result row from `GET /api/notes/:noteId/search` (issue #860 Phase 5).
- * Note-scoped ILIKE hit. `note_id` is exposed so callers can distinguish
- * note-native pages from legacy linked-personal hits. `content_text` is
- * reserved for future server-side snippet generation.
+ * Note-scoped ILIKE hit. The server hard-filters `p.note_id = :noteId` so
+ * `note_id` is always equal to the URL's `:noteId` and never null. Body
+ * fields like `content_text` stay server-side to keep the wire payload
+ * small.
  */
 export interface NoteSearchResultItem {
   id: string;
   title: string | null;
   content_preview: string | null;
   updated_at: string;
-  note_id: string | null;
-  content_text: string | null;
+  note_id: string;
 }
 
 /**

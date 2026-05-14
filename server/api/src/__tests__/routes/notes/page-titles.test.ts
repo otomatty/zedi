@@ -153,7 +153,7 @@ describe("GET /api/notes/:noteId/page-titles", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 401 when private note is accessed unauthenticated", async () => {
+  it("returns 403 when private note is accessed unauthenticated", async () => {
     const privateNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "private" });
     const { app } = createTestApp([[privateNote]]);
 

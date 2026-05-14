@@ -78,7 +78,16 @@ export function NoteViewAddPageDialogContent({
               value={newPageTitle}
               onChange={(e) => setNewPageTitle(e.target.value)}
               placeholder={t("notes.newPageTitle")}
-              aria-invalid={duplicateTitleExists || undefined}
+              // coderabbitai review on PR #868: 重複タイトルは投稿が成功する
+              // 「警告」であり「入力エラー」ではないので `aria-invalid` は付け
+              // ない。`aria-describedby` で警告 element を読み上げ対象に紐付ける
+              // だけにする（assistive tech に「無効な入力」と告知させない）。
+              //
+              // PR #868 review (coderabbitai): a duplicate title is an
+              // advisory warning, not a blocking input error — submit still
+              // succeeds. Drop `aria-invalid` so screen readers do not
+              // announce the field as invalid, but keep `aria-describedby`
+              // so the warning text is associated with the input.
               aria-describedby={duplicateTitleExists ? `${newPageTitleFieldId}-dup` : undefined}
             />
             <Button

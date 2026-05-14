@@ -973,7 +973,19 @@ export function useNotePage(
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  const { api, isLoaded, isSignedIn } = useNoteApi();
+  // coderabbitai review on PR #868: `GET /api/pages/:pageId` は Phase 6 で
+  // `authOptional` + `getNoteRole` に切り替わっているため、未ログインの
+  // guest でも公開 / unlisted ノートのページを読める。hook 側で `isSignedIn`
+  // を `enabled` に混ぜると、せっかくサーバが許可した経路をクライアントが
+  // 自分で塞いでしまう。サインインゲートを外し、`getNoteRole` がサーバ側で
+  // 唯一の権限判定であるという契約に揃える。
+  //
+  // PR #868 review (coderabbitai): `GET /api/pages/:pageId` is `authOptional`
+  // + `getNoteRole` since Phase 6, so guests can read pages on public /
+  // unlisted notes. Gating the hook on `isSignedIn` would slam shut a route
+  // the server explicitly opens; drop it and let `getNoteRole` remain the
+  // single source of permission truth.
+  const { api, isLoaded } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.page(noteId, pageId),
@@ -995,7 +1007,7 @@ export function useNotePage(
       if (p.note_id !== noteId) return null;
       return apiPageToPage(p);
     },
-    enabled: enabled && isLoaded && isSignedIn && !!noteId && !!pageId,
+    enabled: enabled && isLoaded && !!noteId && !!pageId,
   });
 }
 
