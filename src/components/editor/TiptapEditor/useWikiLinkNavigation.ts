@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageByTitle, usePagesSummary, useCreatePage } from "@/hooks/usePageQueries";
-import { useNotePages } from "@/hooks/useNoteQueries";
+import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
 
 interface UseWikiLinkNavigationOptions {
   /**
@@ -91,14 +91,23 @@ export function useWikiLinkNavigation(
   // ノートスコープ: そのノートに所属するページ一覧に対する大小文字無視の検索。
   // Note scope: case-insensitive title lookup against the note's page list.
   const shouldQueryNote = pageNoteId !== null && !!linkTitleToFind;
-  const notePagesQuery = useNotePages(pageNoteId ?? "", undefined, Boolean(pageNoteId));
+  // issue #860 Phase 6: 全ページのタイトルが必要なため `useNoteTitleIndex`
+  // を使う（`useInfiniteNotePages` の window では完全集合が保証できない）。
+  // タイトル文字列だけが必要で preview / thumbnail は不要なため、`/page-titles`
+  // の最小 payload で十分。
+  //
+  // Issue #860 Phase 6: wiki-link resolution needs the *complete* title set
+  // (the windowed `useInfiniteNotePages` would silently miss matches outside
+  // the loaded window). Only titles are read, so the `/page-titles` payload
+  // is sufficient and avoids paying for preview / thumbnail.
+  const noteTitleIndexQuery = useNoteTitleIndex(pageNoteId ?? "", { enabled: Boolean(pageNoteId) });
 
   const noteLookup = useMemo(() => {
     if (!shouldQueryNote || !linkTitleToFind) {
       return { data: null as { id: string; title: string } | null, isFetched: true };
     }
     const normalized = linkTitleToFind.trim().toLowerCase();
-    const list = notePagesQuery.data ?? [];
+    const list = noteTitleIndexQuery.data ?? [];
     // 削除済みページは候補から外す（個人スコープのフォールバックが
     // `!p.isDeleted` を見ているので挙動を揃える。Issue #713 Phase 4）。
     // Exclude deleted pages to match the personal fallback and avoid
@@ -108,9 +117,9 @@ export function useWikiLinkNavigation(
     );
     return {
       data: found ? { id: found.id, title: found.title } : null,
-      isFetched: notePagesQuery.isFetched,
+      isFetched: noteTitleIndexQuery.isFetched,
     };
-  }, [shouldQueryNote, linkTitleToFind, notePagesQuery.data, notePagesQuery.isFetched]);
+  }, [shouldQueryNote, linkTitleToFind, noteTitleIndexQuery.data, noteTitleIndexQuery.isFetched]);
 
   const foundPage = pageNoteId === null ? personalResolved.data : noteLookup.data;
   const isFetched = pageNoteId === null ? personalResolved.isFetched : noteLookup.isFetched;

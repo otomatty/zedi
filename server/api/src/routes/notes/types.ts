@@ -65,51 +65,20 @@ export interface NoteListApiItem extends NoteApiFields {
 }
 
 /**
- * `GET /api/notes/:id` のページ行。Issue #823 以降、ページは常に 1 つのノートに所属し、
- * `note_id` はこのレスポンスのノート ID と一致する。
+ * `GET /api/notes/:id` のレスポンス。呼び出し元の解決ロールのみを含む
+ * 「note shell」。Issue #860 Phase 6 で `pages[]` を撤去し、ページ一覧は
+ * cursor pagination の `GET /api/notes/:noteId/pages`、wiki link / AI chat
+ * scope のような全ページタイトルが必要な経路は `GET /api/notes/:noteId/page-titles`
+ * を使うように分離した。
  *
- * Page row inside `GET /api/notes/:id`. After issue #823 every page belongs to
- * exactly one note; `note_id` matches the enclosing note id.
- */
-export interface NotePageApiItem {
-  id: string;
-  owner_id: string;
-  note_id: string;
-  source_page_id: string | null;
-  title: string | null;
-  /**
-   * 一覧カード描画用の先頭プレビュー (`pages.content_preview`)。本文 fetch を
-   * 伴わずにカードへ表示するために、保存時に算出した短い抜粋を返す。Issue #849
-   * で一時的に常時 `null` 化していたが、Issue #860 Phase 0 で復旧した。
-   * Phase 1 で導入した `GET /api/notes/:noteId/pages?include=preview` がノート
-   * シェルとページ一覧を分離した新経路だが、互換期間中は本フィールドも維持する
-   * （Phase 6 で `pages[]` ごと撤去する予定）。
-   *
-   * Short head-of-body preview (`pages.content_preview`) used to render list
-   * cards without fetching full page bodies. Temporarily forced to `null` by
-   * Issue #849 and restored by Issue #860 Phase 0. Phase 1 added
-   * `GET /api/notes/:noteId/pages?include=preview` as the new split route;
-   * this field is kept for the compatibility window until `pages[]` itself
-   * is removed in Phase 6.
-   */
-  content_preview: string | null;
-  thumbnail_url: string | null;
-  source_url: string | null;
-  created_at: Date;
-  updated_at: Date;
-  is_deleted: boolean;
-}
-
-/**
- * `GET /api/notes/:id` のレスポンス。呼び出し元の解決ロールと、`pages.note_id = id`
- * の全ページを含む。
- *
- * `GET /api/notes/:id` response: caller's resolved role plus every page with
- * `pages.note_id` equal to this note id.
+ * `GET /api/notes/:id` response — the "note shell". Returns only note
+ * attributes and the caller's resolved role. Issue #860 Phase 6 removed the
+ * `pages[]` field; visible page lists now come from the cursor-paginated
+ * `GET /api/notes/:noteId/pages` and full-set title lookups (wiki-link,
+ * AI-chat scope) come from `GET /api/notes/:noteId/page-titles`.
  */
 export interface NoteDetailApiResponse extends NoteApiFields {
   current_user_role: NonNullable<NoteRole>;
-  pages: NotePageApiItem[];
 }
 
 /**
@@ -156,6 +125,38 @@ export interface NotePageWindowItem {
 export interface NotePageWindowResponse {
   items: NotePageWindowItem[];
   next_cursor: string | null;
+}
+
+/**
+ * `GET /api/notes/:noteId/page-titles` のページ行。Issue #860 Phase 6 の
+ * 軽量タイトルインデックス。`pages.contentPreview` / `thumbnailUrl` /
+ * `sourceUrl` 等は含まず、wiki link の解決・AI chat scope の sync・
+ * `NoteAddPageDialog` の重複判定など「ノート全ページのタイトル文字列だけ」
+ * 必要な consumer 向けに最小フィールドだけ返す。
+ *
+ * Page row returned by `GET /api/notes/:noteId/page-titles` (Issue #860 Phase
+ * 6). Carries only the four fields needed by full-set consumers (wiki-link
+ * resolver, AI-chat scope sync, add-dialog dedup) — preview / thumbnail /
+ * source_url are intentionally absent so the payload stays small even on
+ * notes with thousands of pages.
+ */
+export interface NotePageTitleItem {
+  id: string;
+  title: string;
+  is_deleted: boolean;
+  updated_at: Date;
+}
+
+/**
+ * `GET /api/notes/:noteId/page-titles` のレスポンス。`updated_at DESC, id DESC`
+ * のサーバ順を維持してフラット配列で返す（Phase 1 の `/pages` と同じ並び）。
+ *
+ * Response for `GET /api/notes/:noteId/page-titles`. Returns a flat array
+ * preserving the server order (`updated_at DESC, id DESC`) to match the
+ * Phase 1 `/pages` window endpoint.
+ */
+export interface NotePageTitleIndexResponse {
+  items: NotePageTitleItem[];
 }
 
 /**

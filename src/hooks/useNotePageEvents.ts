@@ -20,7 +20,7 @@ import { useEffect } from "react";
 import { type InfiniteData, useQueryClient } from "@tanstack/react-query";
 import type { NotePageWindowItem, NotePageWindowResponse } from "@/lib/api/types";
 import type { NoteEvent } from "@/lib/api/noteEvents";
-import { noteKeys } from "@/hooks/useNoteQueries";
+import { noteKeys, type NotePageTitle } from "@/hooks/useNoteQueries";
 
 /**
  * `useNotePageEvents` の実行オプション。
@@ -82,6 +82,50 @@ function updateAllWindowsForNote(
 }
 
 /**
+ * `useNoteTitleIndex` 用の `setQueriesData` ヘルパ（issue #860 Phase 6）。
+ * window キャッシュと同じく、認証プリンシパルごとに分かれている title-index
+ * キャッシュ全部に対して transform を流す。
+ *
+ * `setQueriesData` helper for the title-index cache (issue #860 Phase 6).
+ * Walks every cached `titleIndex` query for the given note (one entry per
+ * auth principal) and applies the transform.
+ */
+function updateAllTitleIndexesForNote(
+  queryClient: ReturnType<typeof useQueryClient>,
+  noteId: string,
+  transform: (data: NotePageTitle[]) => NotePageTitle[],
+): void {
+  queryClient.setQueriesData<NotePageTitle[]>(
+    { queryKey: noteKeys.titleIndexByNoteId(noteId) },
+    (data) => {
+      if (!data) return data;
+      return transform(data);
+    },
+  );
+}
+
+/**
+ * `NotePageWindowItem` を `NotePageTitle` に縮約する。SSE で受け取る
+ * `page.added` / `page.updated` の payload から、title-index 用の最小行を
+ * 切り出すために使う。
+ *
+ * Project a `NotePageWindowItem` (full SSE payload) down to the
+ * `NotePageTitle` shape consumed by `useNoteTitleIndex`. Used to splice
+ * `page.added` / `page.updated` events into the title-index cache.
+ */
+function windowItemToTitle(item: NotePageWindowItem): NotePageTitle {
+  // updated_at は SSE 経路でも snake_case の ISO 文字列。`Date.parse` 互換。
+  // The SSE wire shape carries `updated_at` as an ISO string; parse to ms.
+  const ts = Date.parse(item.updated_at);
+  return {
+    id: item.id,
+    title: item.title ?? "",
+    isDeleted: item.is_deleted,
+    updatedAt: Number.isNaN(ts) ? 0 : ts,
+  };
+}
+
+/**
  * SSE で受け取った `NoteEvent` を `queryClient` のキャッシュへ適用する。
  *
  * Apply a received {@link NoteEvent} to the React Query cache. Pure dispatch
@@ -115,6 +159,17 @@ export function applyNoteEventToCache(
           ...data,
           pages: [nextFirst, ...data.pages.slice(1)],
         };
+      });
+      // issue #860 Phase 6: title-index キャッシュにも同じ append を反映する。
+      // wiki link / AI chat scope などが「今追加されたページ」を即座に解決
+      // できるようにするため、全ページ refetch を待たずに patch する。
+      //
+      // Issue #860 Phase 6: mirror the prepend in the title-index cache so
+      // wiki-link resolution and AI-chat scope sync see the new title
+      // immediately, without waiting for a full title-index refetch.
+      updateAllTitleIndexesForNote(queryClient, event.note_id, (data) => {
+        if (data.some((it) => it.id === event.page.id)) return data;
+        return [windowItemToTitle(event.page), ...data];
       });
       return;
     }
@@ -170,6 +225,18 @@ export function applyNoteEventToCache(
           pages: [nextFirst, ...stripped.slice(1)],
         };
       });
+      // issue #860 Phase 6: title-index も同じ remove + prepend で move-to-head。
+      // タイトル変更が含まれる場合（リネーム）にも反映されるため、wiki link
+      // 解決の即時性が保たれる。
+      //
+      // Issue #860 Phase 6: apply the same remove + prepend semantics to the
+      // title-index cache, so a rename surfaces in wiki-link resolution
+      // without waiting for the next refetch.
+      updateAllTitleIndexesForNote(queryClient, event.note_id, (data) => {
+        const next = windowItemToTitle(event.page);
+        const stripped = data.filter((it) => it.id !== next.id);
+        return [next, ...stripped];
+      });
       return;
     }
     case "page.deleted": {
@@ -184,18 +251,34 @@ export function applyNoteEventToCache(
         if (!anyChanged) return data;
         return { ...data, pages: nextPages };
       });
+      // issue #860 Phase 6: title-index からも該当 id を取り除く。wiki link
+      // が削除済みページに解決され続けないようにするためのキャッシュ整合。
+      //
+      // Issue #860 Phase 6: drop the deleted id from the title-index cache
+      // so wiki-link resolution stops matching the tombstoned page until a
+      // refetch happens.
+      updateAllTitleIndexesForNote(queryClient, event.note_id, (data) => {
+        const next = data.filter((it) => it.id !== event.page_id);
+        return next.length === data.length ? data : next;
+      });
       return;
     }
     case "note.permission_changed": {
       // 権限の変化は `getNoteRole` の結果を変えるため、details / window /
-      // members の 3 系列を invalidate して次レンダリングで再評価させる。
-      // Permission changes flip `getNoteRole`, so invalidate the three
-      // related caches and let the next render fetch fresh values.
+      // title-index / members の 4 系列を invalidate して次レンダリングで
+      // 再評価させる（Phase 6 で title-index 系列を追加）。
+      // Permission changes flip `getNoteRole`, so invalidate the four
+      // related caches and let the next render fetch fresh values. Phase 6
+      // added the title-index cache to this list since its ETag is
+      // role-aware too.
       queryClient.invalidateQueries({
         queryKey: noteKeys.detailsByNoteId(event.note_id),
       });
       queryClient.invalidateQueries({
         queryKey: noteKeys.pagesWindowByNoteId(event.note_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: noteKeys.titleIndexByNoteId(event.note_id),
       });
       queryClient.invalidateQueries({
         queryKey: noteKeys.memberList(event.note_id),
@@ -322,22 +405,26 @@ export function useNotePageEvents(noteId: string, options: UseNotePageEventsOpti
       currentDetach = attachNoteEventListeners(
         es,
         () => {
-          // 毎回の `ready` で window キャッシュを 1 度 invalidate する。
-          // 初回 ready は `useInfiniteNotePages` のクエリ完了から SSE
-          // subscribe が live になるまでの T0→subscribe ギャップを補修し、
-          // 再接続時の ready は切断中の取りこぼしを補修する
-          // (Codex P2 / coderabbitai PR #867)。サーバが ready 送信前に
+          // 毎回の `ready` で window と title-index キャッシュを 1 度ずつ
+          // invalidate する。初回 ready は `useInfiniteNotePages` /
+          // `useNoteTitleIndex` のクエリ完了から SSE subscribe が live に
+          // なるまでの T0→subscribe ギャップを補修し、再接続時の ready は
+          // 切断中の取りこぼしを補修する (Codex P2 / coderabbitai PR #867、
+          // Phase 6 で title-index も対象化)。サーバが ready 送信前に
           // subscribe するため、ready 後に来る event は失われない。
           //
-          // Invalidate the pages window on every `ready`, including the
-          // first one. The first ready covers the T0→subscribe race
-          // between `useInfiniteNotePages` finishing its initial fetch
-          // and the SSE subscription becoming live; subsequent readys
-          // (reconnects) cover the disconnect gap. The server registers
-          // its subscription before sending ready, so anything published
-          // after that point arrives via the SSE channel.
+          // Invalidate both the pages window and title-index caches on
+          // every `ready`. The first ready covers the T0→subscribe race
+          // between the initial REST fetches and the SSE subscription
+          // becoming live; subsequent readys (reconnects) cover the
+          // disconnect gap. Phase 6 extended this to include the
+          // title-index cache since wiki-link consumers can lose events
+          // during the same window.
           queryClient.invalidateQueries({
             queryKey: noteKeys.pagesWindowByNoteId(noteId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: noteKeys.titleIndexByNoteId(noteId),
           });
         },
         (event) => {

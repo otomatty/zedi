@@ -15,7 +15,7 @@ import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import type { NotePageWindowItem, NotePageWindowResponse } from "@/lib/api/types";
 import type { NoteEvent } from "@/lib/api/noteEvents";
 import { applyNoteEventToCache } from "./useNotePageEvents";
-import { noteKeys } from "./useNoteQueries";
+import { noteKeys, type NotePageTitle } from "./useNoteQueries";
 
 const NOTE_ID = "00000000-0000-4000-8000-00000000000a";
 const USER_ID = "user-1";
@@ -185,32 +185,37 @@ describe("applyNoteEventToCache", () => {
     expect(data.pages[0]?.items.map((i) => i.id)).toEqual(["pg-1", "pg-3"]);
   });
 
-  it("invalidates pages/details/members on note.permission_changed", () => {
-    // `note.permission_changed` は権限の再評価を促すセンチネルなので、3 系列
-    // を invalidate（fetchStatus が dirty 化）することを確認する。
-    // The sentinel triggers re-evaluation of 3 cache families; we assert
-    // that each one is marked stale (`invalidate`) after the dispatch.
+  it("invalidates pages/details/title-index/members on note.permission_changed", () => {
+    // `note.permission_changed` は権限の再評価を促すセンチネルなので、4 系列
+    // を invalidate（Phase 6 で title-index も対象）することを確認する。
+    // The sentinel triggers re-evaluation of 4 cache families (Phase 6 added
+    // title-index to the set since its ETag is role-aware too).
     const client = seedCache([makeItem("pg-1")]);
 
-    // 別途、members / detail 用のダミーキャッシュも種付けする。
-    // Seed dummy entries for the members and detail caches too.
+    // 別途、members / detail / title-index 用のダミーキャッシュも種付けする。
+    // Seed dummy entries for the members, detail, and title-index caches too.
     client.setQueryData(noteKeys.memberList(NOTE_ID), [{ noteId: NOTE_ID }]);
     client.setQueryData(noteKeys.detail(NOTE_ID, USER_ID, USER_EMAIL), { id: NOTE_ID });
+    client.setQueryData<NotePageTitle[]>(noteKeys.titleIndex(NOTE_ID, USER_ID, USER_EMAIL), [
+      { id: "pg-1", title: "Title pg-1", isDeleted: false, updatedAt: 0 },
+    ]);
 
     const event: NoteEvent = { type: "note.permission_changed", note_id: NOTE_ID };
     applyNoteEventToCache(client, event);
 
-    // `invalidateQueries` は該当キャッシュを stale にマークする。`isStale()`
+    // `invalidateQueries` は該当キャッシュを stale にマークする。`isInvalidated`
     // で検証する。
-    // `invalidateQueries` marks matching entries stale; check via `isStale()`.
+    // `invalidateQueries` marks matching entries stale; check via `isInvalidated`.
     const windowState = client.getQueryState(
       noteKeys.pagesWindow(NOTE_ID, USER_ID, USER_EMAIL, INCLUDE, PAGE_SIZE),
     );
     const memberState = client.getQueryState(noteKeys.memberList(NOTE_ID));
     const detailState = client.getQueryState(noteKeys.detail(NOTE_ID, USER_ID, USER_EMAIL));
+    const titleIndexState = client.getQueryState(noteKeys.titleIndex(NOTE_ID, USER_ID, USER_EMAIL));
     expect(windowState?.isInvalidated).toBe(true);
     expect(memberState?.isInvalidated).toBe(true);
     expect(detailState?.isInvalidated).toBe(true);
+    expect(titleIndexState?.isInvalidated).toBe(true);
   });
 
   it("patches every window variant for the same note (different include/pageSize)", () => {
@@ -277,5 +282,123 @@ describe("applyNoteEventToCache", () => {
       noteKeys.pagesWindow(otherNoteId, USER_ID, USER_EMAIL, INCLUDE, PAGE_SIZE),
     );
     expect(other?.pages[0]?.items.map((i) => i.id)).toEqual(["pg-other-1"]);
+  });
+});
+
+// ── title-index patching (Issue #860 Phase 6) ────────────────────────────────
+
+/**
+ * ノート配下の title-index キャッシュ（{@link noteKeys.titleIndex}) を
+ * 1 エントリだけ種付けし、SSE event がそのキャッシュへ適切に反映される
+ * ことを検証する補助。Phase 6 で `useNoteTitleIndex` が wiki link / AI chat
+ * scope の hot path になったため、SSE 経路も title-index cache を patch する
+ * 必要がある。
+ *
+ * Helper that seeds one title-index entry for the note and lets each SSE
+ * event verify the title-index cache is patched correctly. Phase 6 made
+ * `useNoteTitleIndex` the hot path for wiki-link resolution and AI-chat
+ * scope, so the SSE handler must mirror its mutations into that cache.
+ */
+function seedTitleIndex(client: QueryClient, items: NotePageTitle[]): void {
+  client.setQueryData<NotePageTitle[]>(noteKeys.titleIndex(NOTE_ID, USER_ID, USER_EMAIL), items);
+}
+
+function readTitleIndex(client: QueryClient): NotePageTitle[] {
+  const data = client.getQueryData<NotePageTitle[]>(
+    noteKeys.titleIndex(NOTE_ID, USER_ID, USER_EMAIL),
+  );
+  if (!data) throw new Error("expected cached title-index data");
+  return data;
+}
+
+describe("applyNoteEventToCache — title-index (Issue #860 Phase 6)", () => {
+  it("prepends a new title on page.added", () => {
+    const client = seedCache([makeItem("pg-1")]);
+    seedTitleIndex(client, [{ id: "pg-1", title: "Existing", isDeleted: false, updatedAt: 0 }]);
+
+    applyNoteEventToCache(client, {
+      type: "page.added",
+      note_id: NOTE_ID,
+      page: makeItem("pg-new", { title: "Fresh title" }),
+    });
+
+    const titles = readTitleIndex(client);
+    expect(titles.map((t) => t.id)).toEqual(["pg-new", "pg-1"]);
+    expect(titles[0]?.title).toBe("Fresh title");
+    expect(titles[0]?.isDeleted).toBe(false);
+  });
+
+  it("does not duplicate on page.added when the id already exists", () => {
+    const client = seedCache([makeItem("pg-dup")]);
+    seedTitleIndex(client, [{ id: "pg-dup", title: "Original", isDeleted: false, updatedAt: 0 }]);
+
+    applyNoteEventToCache(client, {
+      type: "page.added",
+      note_id: NOTE_ID,
+      page: makeItem("pg-dup", { title: "Echo" }),
+    });
+
+    const titles = readTitleIndex(client);
+    expect(titles.map((t) => t.id)).toEqual(["pg-dup"]);
+    expect(titles[0]?.title).toBe("Original");
+  });
+
+  it("moves an existing entry to the head with the new title on page.updated (rename)", () => {
+    // page.updated は move-to-head + title 上書きで、リネームが wiki link に
+    // 即時反映されることを担保する。
+    // page.updated must move-to-head and overwrite the title so a rename
+    // surfaces in wiki-link resolution without a refetch.
+    const client = seedCache([makeItem("pg-1"), makeItem("pg-2")]);
+    seedTitleIndex(client, [
+      { id: "pg-1", title: "Old A", isDeleted: false, updatedAt: 1 },
+      { id: "pg-2", title: "Old B", isDeleted: false, updatedAt: 2 },
+    ]);
+
+    applyNoteEventToCache(client, {
+      type: "page.updated",
+      note_id: NOTE_ID,
+      page: makeItem("pg-2", { title: "New B" }),
+    });
+
+    const titles = readTitleIndex(client);
+    expect(titles.map((t) => t.id)).toEqual(["pg-2", "pg-1"]);
+    expect(titles[0]?.title).toBe("New B");
+  });
+
+  it("removes the deleted id from the title-index on page.deleted", () => {
+    const client = seedCache([makeItem("pg-1"), makeItem("pg-2")]);
+    seedTitleIndex(client, [
+      { id: "pg-1", title: "Keep", isDeleted: false, updatedAt: 1 },
+      { id: "pg-2", title: "Drop", isDeleted: false, updatedAt: 2 },
+    ]);
+
+    applyNoteEventToCache(client, {
+      type: "page.deleted",
+      note_id: NOTE_ID,
+      page_id: "pg-2",
+    });
+
+    const titles = readTitleIndex(client);
+    expect(titles.map((t) => t.id)).toEqual(["pg-1"]);
+  });
+
+  it("does not touch other notes' title-index caches", () => {
+    const otherNoteId = "00000000-0000-4000-8000-00000000000b";
+    const client = seedCache([makeItem("pg-1")]);
+    seedTitleIndex(client, [{ id: "pg-1", title: "Mine", isDeleted: false, updatedAt: 0 }]);
+    client.setQueryData<NotePageTitle[]>(noteKeys.titleIndex(otherNoteId, USER_ID, USER_EMAIL), [
+      { id: "pg-other", title: "Other note", isDeleted: false, updatedAt: 0 },
+    ]);
+
+    applyNoteEventToCache(client, {
+      type: "page.added",
+      note_id: NOTE_ID,
+      page: makeItem("pg-new"),
+    });
+
+    const otherTitles = client.getQueryData<NotePageTitle[]>(
+      noteKeys.titleIndex(otherNoteId, USER_ID, USER_EMAIL),
+    );
+    expect(otherTitles?.map((t) => t.id)).toEqual(["pg-other"]);
   });
 });

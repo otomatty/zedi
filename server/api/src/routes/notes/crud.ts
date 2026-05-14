@@ -21,7 +21,6 @@ import type {
   NoteEditPermission,
   NoteMemberRole,
   NoteListApiItem,
-  NotePageApiItem,
   NoteDetailApiResponse,
   DiscoverApiItem,
   DiscoverApiResponse,
@@ -54,7 +53,7 @@ const ALLOWED_EDIT_PERMISSION = new Set<NoteEditPermission>([
  * validators from clients cannot revive an outdated cached body via 304
  * (Issue #860 Phase 0). Bump this whenever the wire shape changes.
  */
-const NOTE_DETAIL_RESPONSE_VERSION = "v2";
+const NOTE_DETAIL_RESPONSE_VERSION = "v3";
 
 function validateVisibility(value: string | undefined): NoteVisibility {
   if (value === undefined) return "private";
@@ -502,51 +501,22 @@ app.get("/:noteId", authOptional, async (c) => {
       });
   }
 
-  const pagesResult = await db
-    .select({
-      id: pages.id,
-      ownerId: pages.ownerId,
-      noteId: pages.noteId,
-      sourcePageId: pages.sourcePageId,
-      title: pages.title,
-      contentPreview: pages.contentPreview,
-      thumbnailUrl: pages.thumbnailUrl,
-      sourceUrl: pages.sourceUrl,
-      createdAt: pages.createdAt,
-      updatedAt: pages.updatedAt,
-      isDeleted: pages.isDeleted,
-    })
-    .from(pages)
-    .where(and(eq(pages.noteId, noteId), eq(pages.isDeleted, false)))
-    .orderBy(desc(pages.updatedAt));
-
+  // Issue #860 Phase 6: ノートシェルから `pages[]` を撤去した。一覧表示は
+  // Phase 1 で導入した `GET /api/notes/:noteId/pages` (cursor pagination)、
+  // wiki link / AI chat scope のような全ページタイトルが必要な経路は
+  // Phase 6 で追加した `GET /api/notes/:noteId/page-titles` を使う。
+  // ETag に混ぜる pages signal は引き続き上で集約しているため、ページ単体
+  // 編集でもノート ETag は変わる（304 経路の正しさを維持）。
+  //
+  // Issue #860 Phase 6: drops `pages[]` from the note-shell response. The
+  // visible list now uses the Phase 1 cursor-paginated `/pages` window
+  // endpoint, while full-set consumers (wiki-link resolver, AI-chat scope)
+  // use the Phase 6 `/page-titles` endpoint. The ETag still mixes in the
+  // pages signal aggregate above so single-page edits invalidate the note
+  // shell validator (preserving 304 correctness).
   const response: NoteDetailApiResponse = {
     ...noteRowToApi(note),
     current_user_role: role,
-    pages: pagesResult.map(
-      (p): NotePageApiItem => ({
-        id: p.id,
-        owner_id: p.ownerId,
-        /** 所属ノート ID（Issue #823 以降は常にこのノート ID）。 */
-        note_id: p.noteId,
-        source_page_id: p.sourcePageId,
-        title: p.title,
-        // Issue #860 Phase 0: `pages.content_preview` を戻し、カード描画で
-        // 本文 fetch を伴わないプレビュー表示を復旧する。Phase 1 以降で
-        // ノートシェルとページ一覧の API を分割するまでの暫定経路。
-        //
-        // Issue #860 Phase 0: restore `pages.content_preview` so list cards
-        // can render the preview without fetching full page bodies. This is
-        // the interim path until Phase 1 splits the note-shell and page-list
-        // APIs.
-        content_preview: p.contentPreview ?? null,
-        thumbnail_url: p.thumbnailUrl,
-        source_url: p.sourceUrl,
-        created_at: p.createdAt,
-        updated_at: p.updatedAt,
-        is_deleted: p.isDeleted,
-      }),
-    ),
   };
 
   return c.json(response);

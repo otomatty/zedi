@@ -15,7 +15,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
 import { pages, pageContents, type Page } from "../schema/index.js";
-import { authRequired } from "../middleware/auth.js";
+import { authRequired, authOptional } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
 import { getNoteRole, canEdit } from "./notes/helpers.js";
@@ -584,6 +584,84 @@ app.post("/", authRequired, async (c) => {
     },
     201,
   );
+});
+
+// ── GET /pages/:id (single page metadata) ───────────────────────────────────
+/**
+ * `GET /api/pages/:pageId` — 単一ページのメタデータを返す（Issue #860 Phase 6）。
+ *
+ * Phase 6 で `GET /api/notes/:noteId` から `pages[]` を撤去したため、
+ * NotePageView などが「単一ページの所有者・所属ノート・ソース URL 等」を
+ * 取得する経路が必要になった。この route はノートシェルとも cursor pagination
+ * の `/notes/:noteId/pages` window とも独立した、id 直アクセスの軽量経路。
+ *
+ * `authOptional` + `getNoteRole` を採用し、公開 / unlisted ノート配下の
+ * ページであれば未ログインの guest からも 200 で返す（`/notes/:noteId/pages`
+ * と整合）。private ノート配下のページは role が解決しない呼び出し元に対して
+ * 403 を返す。
+ *
+ * `GET /api/pages/:pageId` returns single-page metadata (Issue #860 Phase 6).
+ *
+ * Phase 6 dropped `pages[]` from `GET /api/notes/:noteId`, so consumers like
+ * `NotePageView` lost the existing "look up one page's owner / source url /
+ * note id" path. This route fills that gap with an id-direct lookup that is
+ * independent of the note shell and the cursor-paginated `/pages` window.
+ *
+ * Auth model is `authOptional` + `getNoteRole`: guests can read pages of
+ * public / unlisted notes without sign-in (consistent with `/pages`),
+ * while private-note pages still 403 for callers without a resolved role.
+ */
+app.get("/:id", authOptional, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+  const db = c.get("db");
+
+  const rows = await db
+    .select({
+      id: pages.id,
+      ownerId: pages.ownerId,
+      noteId: pages.noteId,
+      sourcePageId: pages.sourcePageId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      thumbnailUrl: pages.thumbnailUrl,
+      sourceUrl: pages.sourceUrl,
+      createdAt: pages.createdAt,
+      updatedAt: pages.updatedAt,
+      isDeleted: pages.isDeleted,
+    })
+    .from(pages)
+    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new HTTPException(404, { message: "Page not found" });
+
+  // 所属ノートに対する role が解決しない呼び出し元はアクセス不可。owner /
+  // editor / viewer / guest のいずれかが付けば 200 で返す（owner だけに絞ると
+  // 共有ノートの member や public ノートの guest が読めなくなる）。
+  //
+  // The caller must hold *some* role on the owning note. Restricting to
+  // owner-only would cut off note members and public-note guests; the
+  // visibility check inside `getNoteRole` already gates anonymous access to
+  // private notes correctly.
+  const { role } = await getNoteRole(row.noteId, userId, userEmail, db);
+  if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  return c.json({
+    id: row.id,
+    owner_id: row.ownerId,
+    note_id: row.noteId,
+    source_page_id: row.sourcePageId,
+    title: row.title,
+    content_preview: row.contentPreview ?? null,
+    thumbnail_url: row.thumbnailUrl,
+    source_url: row.sourceUrl,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+    is_deleted: row.isDeleted,
+  });
 });
 
 // ── DELETE /pages/:id ───────────────────────────────────────────────────────
