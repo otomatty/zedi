@@ -121,11 +121,21 @@ export function NoteSearchBar({ noteId, debounceMs = 250 }: NoteSearchBarProps):
       </div>
 
       {showResults && (
-        <div
-          role="listbox"
-          aria-label={t("notes.search.resultsLabel")}
-          className="border-border bg-card mt-3 max-h-[60vh] overflow-y-auto rounded-md border"
-        >
+        // gemini-code-assist review on PR #868: 検索結果は select 系の listbox
+        // ではなく、ナビゲーション用リンクの一覧。`role="listbox"` / `role="option"`
+        // を外し、`aria-label` を実際のリスト (`<ul>`) に載せ替えることで、
+        // スクリーンリーダーが「選択ウィジェット」ではなく「リンクのリスト」と
+        // して読み上げるようにする。空状態 / ローディング / 「もっと見る」など
+        // リスト要素を内包しない補助 UI も同じコンテナに置くため、外側の
+        // `<div>` は無 role のスタイリングコンテナのまま残す。
+        //
+        // PR #868 review (gemini-code-assist): search results are navigation
+        // links, not a `listbox` selection widget. Drop `role="listbox"` /
+        // `role="option"` and move `aria-label` onto the real `<ul>` so
+        // screen readers announce a list of links instead of a select-like
+        // widget. The outer `<div>` stays role-less because it also hosts
+        // the loading / empty / load-more affordances around the list.
+        <div className="border-border bg-card mt-3 max-h-[60vh] overflow-y-auto rounded-md border">
           {error && (
             <p className="text-destructive p-3 text-sm" role="alert">
               {t("notes.search.error")}
@@ -143,9 +153,9 @@ export function NoteSearchBar({ noteId, debounceMs = 250 }: NoteSearchBarProps):
             </p>
           )}
           {!error && results.length > 0 && (
-            <ul className="divide-border divide-y">
+            <ul aria-label={t("notes.search.resultsLabel")} className="divide-border divide-y">
               {results.map((row, idx) => (
-                <li key={ids[idx]} role="option">
+                <li key={ids[idx]}>
                   <Link
                     to={`/notes/${noteId}/${row.id}`}
                     className="hover:bg-muted block px-3 py-2 transition-colors"
