@@ -25,6 +25,18 @@ export interface NoteViewAddPageDialogContentProps {
    */
   onCopyByPageId: (pageId: string) => Promise<void>;
   isPending: boolean;
+  /**
+   * 入力中の `newPageTitle` がノート内の既存タイトルと完全一致しているか
+   * （issue #860 Phase 5）。`true` のときはインライン警告を表示する。
+   * 重複タイトル自体はサーバ側で拒否しないので、Add ボタンは押せるままにし、
+   * 「同名のページが既にあります」とユーザーに知らせるだけ。
+   *
+   * Whether the entered `newPageTitle` exactly matches an existing title in
+   * the note (issue #860 Phase 5). When `true` we surface an inline warning;
+   * the server does not reject duplicates, so the Add button stays enabled
+   * and we only inform the user a near-twin already exists.
+   */
+  duplicateTitleExists?: boolean;
   onClose: () => void;
 }
 
@@ -43,6 +55,7 @@ export function NoteViewAddPageDialogContent({
   onAddByPageId,
   onCopyByPageId,
   isPending,
+  duplicateTitleExists = false,
   onClose,
 }: NoteViewAddPageDialogContentProps) {
   const { t } = useTranslation();
@@ -65,6 +78,8 @@ export function NoteViewAddPageDialogContent({
               value={newPageTitle}
               onChange={(e) => setNewPageTitle(e.target.value)}
               placeholder={t("notes.newPageTitle")}
+              aria-invalid={duplicateTitleExists || undefined}
+              aria-describedby={duplicateTitleExists ? `${newPageTitleFieldId}-dup` : undefined}
             />
             <Button
               type="button"
@@ -75,6 +90,15 @@ export function NoteViewAddPageDialogContent({
               {t("notes.add")}
             </Button>
           </div>
+          {duplicateTitleExists && (
+            <p
+              id={`${newPageTitleFieldId}-dup`}
+              role="status"
+              className="text-xs text-amber-600 dark:text-amber-400"
+            >
+              {t("notes.duplicateTitleWarning")}
+            </p>
+          )}
         </div>
         {canEdit && (
           <>

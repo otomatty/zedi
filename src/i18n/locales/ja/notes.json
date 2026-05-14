@@ -80,6 +80,7 @@
   "addPage": "ページを追加",
   "addPageDialogTitle": "ページを追加",
   "searchByTitle": "タイトルで検索",
+  "duplicateTitleWarning": "このノートには同名のページが既に存在します。",
   "noPagesToAdd": "追加できるページがありません。",
   "untitledPage": "無題のページ",
   "close": "閉じる",
@@ -219,5 +220,18 @@
   "domainTabCreateFailedInvalid": "ドメインの形式が正しくありません。",
   "domainTabCreateFailedEmpty": "ドメインを入力してください。",
   "domainTabRemoved": "ドメインルールを削除しました",
-  "domainTabRemoveFailed": "ドメインルールの削除に失敗しました"
+  "domainTabRemoveFailed": "ドメインルールの削除に失敗しました",
+  "search": {
+    "placeholder": "このノート内のページを検索…",
+    "ariaLabel": "このノート内のページを検索",
+    "clear": "検索をクリア",
+    "resultsLabel": "検索結果",
+    "loading": "検索中…",
+    "loadingMore": "読み込み中…",
+    "loadMore": "さらに表示",
+    "refreshing": "更新中…",
+    "noResults": "「{{query}}」に一致するページはありません。",
+    "untitled": "（無題）",
+    "error": "検索結果を取得できませんでした。"
+  }
 }

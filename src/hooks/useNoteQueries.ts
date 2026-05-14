@@ -18,6 +18,8 @@ import type {
   NotePageWindowInclude,
   NotePageWindowItem,
   NotePageWindowResponse,
+  NoteSearchResponse,
+  NoteSearchResultItem,
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
@@ -150,6 +152,22 @@ export const noteKeys = {
    * `setQueriesData` ターゲットに使う。
    */
   titleIndexByNoteId: (noteId: string) => [...noteKeys.all, "title-index", noteId] as const,
+  /**
+   * `useInfiniteNoteSearch` の queryKey ファクトリ（issue #860 Phase 5）。
+   * クエリ文字列 / pageSize / 認証プリンシパルでキーを分け、同一ノートでも
+   * 別クエリ・別ページサイズ・別ロールで co-existence できるようにする。
+   *
+   * Query-key factory for `useInfiniteNoteSearch` (issue #860 Phase 5).
+   * Includes the search text, page size, and auth principal so distinct
+   * queries do not collide and role changes do not surface stale results.
+   */
+  search: (
+    noteId: string,
+    q: string,
+    pageSize: number,
+    userId: string,
+    userEmail: string | undefined,
+  ) => [...noteKeys.all, "search", noteId, q, pageSize, userId, userEmail ?? ""] as const,
   members: () => [...noteKeys.all, "members"] as const,
   memberList: (noteId: string) => [...noteKeys.members(), noteId] as const,
 };
@@ -817,6 +835,109 @@ export function useInfiniteNotePages(noteId: string, options: UseInfiniteNotePag
     /** Flattened, server-ordered page summaries across all fetched windows. */
     pages: flattened,
     /** Raw infinite-query pages, exposed for advanced callers that need cursor state. */
+    rawPages: query.data?.pages ?? [],
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isFetchingNextPage: query.isFetchingNextPage,
+    hasNextPage: query.hasNextPage,
+    fetchNextPage: query.fetchNextPage,
+    refetch: query.refetch,
+    error: query.error,
+  };
+}
+
+/**
+ * `useInfiniteNoteSearch` の 1 ページあたり既定取得件数（issue #860 Phase 5）。
+ * サーバ側上限 (100) と整合させる。
+ *
+ * Default page size for {@link useInfiniteNoteSearch} (issue #860 Phase 5).
+ * Aligned with the server-side cap of 100.
+ */
+export const DEFAULT_INFINITE_NOTE_SEARCH_SIZE = 20;
+
+/**
+ * `useInfiniteNoteSearch` のオプション。
+ *
+ * Options for {@link useInfiniteNoteSearch}.
+ */
+export interface UseInfiniteNoteSearchOptions {
+  /**
+   * 1 リクエストあたりの取得件数（1..100）。省略時は
+   * {@link DEFAULT_INFINITE_NOTE_SEARCH_SIZE}。
+   *
+   * Items per request (1..100). Defaults to
+   * {@link DEFAULT_INFINITE_NOTE_SEARCH_SIZE}.
+   */
+  pageSize?: number;
+  /**
+   * フェッチ抑止ゲート。`q` が空文字 / `noteId` が未確定のときに `false` を
+   * 渡してネットワークアクセスを止める。
+   *
+   * Suppress the fetch when `q` is empty or `noteId` is not resolved yet.
+   */
+  enabled?: boolean;
+}
+
+/**
+ * ノートスコープ全文検索 (`GET /api/notes/:noteId/search`) を keyset cursor
+ * pagination で段階取得するフック（issue #860 Phase 5）。サーバ順
+ * (`updated_at DESC, id DESC`) を維持したまま、`fetchNextPage()` で
+ * `next_cursor` を辿る。空クエリ時は `enabled: false` を渡してフックを
+ * 無効化することで、無駄な fetch を抑止する。
+ *
+ * Step-paginated infinite query for the note-scoped search endpoint
+ * (issue #860 Phase 5). Wraps `GET /api/notes/:noteId/search` and threads
+ * the opaque `next_cursor` back into the next request via
+ * `useInfiniteQuery`. Returned `results` is the flattened, server-ordered
+ * (`updated_at DESC, id DESC`) array of {@link NoteSearchResultItem}.
+ * `hasNextPage` / `isFetchingNextPage` are surfaced so the caller can
+ * debounce repeated tail-trigger fetches.
+ */
+export function useInfiniteNoteSearch(
+  noteId: string,
+  q: string,
+  options: UseInfiniteNoteSearchOptions = {},
+) {
+  const { api, userId, userEmail, isLoaded } = useNoteApi();
+  const pageSize = options.pageSize ?? DEFAULT_INFINITE_NOTE_SEARCH_SIZE;
+  const enabled = (options.enabled ?? true) && isLoaded && !!noteId && q.trim().length > 0;
+
+  const query = useInfiniteQuery<
+    NoteSearchResponse,
+    Error,
+    InfiniteData<NoteSearchResponse, string | null>,
+    readonly unknown[],
+    string | null
+  >({
+    queryKey: noteKeys.search(noteId, q, pageSize, userId, userEmail),
+    queryFn: async (ctx): Promise<NoteSearchResponse> => {
+      const cursor = ctx.pageParam ?? null;
+      return api.searchNotePages(noteId, { q, cursor, limit: pageSize });
+    },
+    enabled,
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+  });
+
+  // window と同様に `select` ではなく `useMemo` で flatten する（generic 型の
+  // 取り回しが軽い）。
+  // Flatten outside `select` for the same generic-typing reason as
+  // `useInfiniteNotePages`.
+  const flattened = useMemo<NoteSearchResultItem[]>(() => {
+    if (!query.data) return [];
+    const out: NoteSearchResultItem[] = [];
+    for (const window of query.data.pages) {
+      for (const item of window.results) {
+        out.push(item);
+      }
+    }
+    return out;
+  }, [query.data]);
+
+  return {
+    /** Flattened, server-ordered search results across all fetched windows. */
+    results: flattened,
+    /** Raw infinite-query pages (for advanced cursor-state inspection). */
     rawPages: query.data?.pages ?? [],
     isLoading: query.isLoading,
     isFetching: query.isFetching,

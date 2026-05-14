@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
+import { NoteSearchBar } from "@/components/note/NoteSearchBar";
 import PageGrid from "@/components/page/PageGrid";
 import type { PageSummary } from "@/types/page";
 import { isClipUrlAllowed } from "@/lib/webClipper";
@@ -161,6 +162,16 @@ const NoteView: React.FC = () => {
               canManageMembers={canManageMembers}
               userRole={access?.role ?? "none"}
             />
+          </div>
+          {/* issue #860 Phase 5: ノート画面に常設の note-scoped 検索バーを
+              一級導線として配置する。クエリが空のときは検索結果パネルを描画
+              しないため、通常の `PageGrid` のレイアウトは下にずれない。
+              Issue #860 Phase 5: surfaces a note-scoped search bar above the
+              page grid as a first-class entry point. The results panel is
+              hidden when the query is empty, so the regular `PageGrid`
+              layout below is unaffected. */}
+          <div className="mt-4">
+            <NoteSearchBar noteId={note.id} />
           </div>
           <div className="mt-4">
             <PageGrid noteId={note.id} canEdit={canEdit} canDeletePage={canDeletePageInGrid} />

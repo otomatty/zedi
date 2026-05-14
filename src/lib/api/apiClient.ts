@@ -35,6 +35,7 @@ import type {
   NotePageWindowInclude,
   NotePageWindowResponse,
   NotePageTitleIndexResponse,
+  NoteSearchResponse,
 } from "./types";
 
 export type { NoteListItem };
@@ -492,6 +493,35 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return reqOptionalAuth<NotePageTitleIndexResponse>(
         "GET",
         `/api/notes/${encodeURIComponent(noteId)}/page-titles`,
+      );
+    },
+
+    /**
+     * `GET /api/notes/:noteId/search` — note-scoped 全文検索（issue #860
+     * Phase 5）。`q` を渡してタイトル / コンテンツに対して ILIKE マッチを実行
+     * する。`cursor` は前回レスポンスの `next_cursor` を echo するだけで、
+     * `null` 時は先頭から取得する。`limit` は 1..100 にクランプされ、サーバ
+     * 側で `limit + 1` 件取得して `next_cursor` の有無を判定する。
+     * `authOptional` なので、公開 / unlisted ノートは未ログインの guest からも
+     * 検索可能。
+     *
+     * Note-scoped full-text search (issue #860 Phase 5). Performs an ILIKE
+     * match against title + content. The `cursor` parameter echoes back the
+     * previous response's `next_cursor`; pass `null` for the first window.
+     * `limit` is clamped to 1..100 server-side. The endpoint is
+     * `authOptional`, so guests can search public / unlisted notes.
+     */
+    async searchNotePages(
+      noteId: string,
+      params: { q: string; cursor?: string | null; limit?: number } = { q: "" },
+    ): Promise<NoteSearchResponse> {
+      const query: Record<string, string> = { q: params.q };
+      if (params.cursor) query.cursor = params.cursor;
+      if (params.limit !== undefined) query.limit = String(params.limit);
+      return reqOptionalAuth<NoteSearchResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/search`,
+        { query },
       );
     },
 

@@ -334,6 +334,40 @@ export interface NotePageTitleIndexResponse {
 }
 
 /**
+ * `GET /api/notes/:noteId/search` の結果行（issue #860 Phase 5）。
+ * note-scoped 全文検索 (ILIKE) のヒット行で、`note_id` は呼び出し元が「ノート
+ * ネイティブ (`note_id === noteId`) か旧リンクパス (`note_id === null`) か」
+ * を区別するために残す。`content_text` は将来の snippet 生成用に確保している
+ * 内部フィールド。
+ *
+ * Result row from `GET /api/notes/:noteId/search` (issue #860 Phase 5).
+ * Note-scoped ILIKE hit. `note_id` is exposed so callers can distinguish
+ * note-native pages from legacy linked-personal hits. `content_text` is
+ * reserved for future server-side snippet generation.
+ */
+export interface NoteSearchResultItem {
+  id: string;
+  title: string | null;
+  content_preview: string | null;
+  updated_at: string;
+  note_id: string | null;
+  content_text: string | null;
+}
+
+/**
+ * `GET /api/notes/:noteId/search` のレスポンス（issue #860 Phase 5 で
+ * `next_cursor` 付きの cursor pagination に変更）。`next_cursor` が `null` で
+ * 末尾を示す。
+ *
+ * Cursor-paginated response from `GET /api/notes/:noteId/search` (issue
+ * #860 Phase 5 added the cursor). A `null` `next_cursor` marks the end.
+ */
+export interface NoteSearchResponse {
+  results: NoteSearchResultItem[];
+  next_cursor: string | null;
+}
+
+/**
  * `?include=` トークンで追加できるオプションフィールド（issue #860 Phase 1）。
  * `preview` は `content_preview`、`thumbnail` は `thumbnail_url` の同梱を要求する。
  *
