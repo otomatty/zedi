@@ -21,6 +21,7 @@ import {
   sendInvitation,
   upsertInvitationTokenInDbThrowing,
 } from "../../services/invitationService.js";
+import { publishNoteEvent } from "../../services/noteEventBroadcaster.js";
 
 const app = new Hono<AppEnv>();
 
@@ -114,6 +115,12 @@ app.post("/:noteId/members", authRequired, async (c) => {
       });
     invitationSent = true;
   }
+
+  // Issue #860 Phase 4: メンバー追加で `getNoteRole` の解釈が変わるので、購読者
+  // に通知して details / window / members を再評価させる。
+  // Issue #860 Phase 4: adding a member changes how `getNoteRole` resolves
+  // for that email, so notify subscribers to re-evaluate access.
+  publishNoteEvent({ type: "note.permission_changed", note_id: noteId });
 
   return c.json({
     note_id: member.noteId,
@@ -230,6 +237,13 @@ app.put("/:noteId/members/:memberEmail", authRequired, async (c) => {
   if (!updated) {
     throw new HTTPException(404, { message: "Member not found" });
   }
+
+  // Issue #860 Phase 4: ロール変更（viewer ↔ editor）でメンバーの編集権が
+  // 変わるため購読者に通知する。
+  // Issue #860 Phase 4: role transitions flip `canEdit` for the affected
+  // member, so notify subscribers.
+  publishNoteEvent({ type: "note.permission_changed", note_id: noteId });
+
   return c.json({
     note_id: updated.noteId,
     member_email: updated.memberEmail,
@@ -254,6 +268,10 @@ app.delete("/:noteId/members/:memberEmail", authRequired, async (c) => {
     .update(noteMembers)
     .set({ isDeleted: true, updatedAt: new Date() })
     .where(and(eq(noteMembers.noteId, noteId), eq(noteMembers.memberEmail, memberEmail)));
+
+  // Issue #860 Phase 4: メンバー削除も `getNoteRole` の挙動を変えるため通知。
+  // Issue #860 Phase 4: removing a member affects `getNoteRole`; notify too.
+  publishNoteEvent({ type: "note.permission_changed", note_id: noteId });
 
   return c.json({ removed: true });
 });

@@ -16,6 +16,8 @@ import { authRequired, authOptional } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
 import type { NotePageWindowItem, NotePageWindowResponse } from "./types.js";
 import { getNoteRole, canEdit } from "./helpers.js";
+import { publishNoteEvent } from "../../services/noteEventBroadcaster.js";
+import { pageRowToWindowItem } from "./eventHelpers.js";
 
 /**
  * `GET /api/notes/:noteId/pages` の最大ページサイズ。issue #860 Phase 1 で 100 件
@@ -225,6 +227,24 @@ app.post("/:noteId/pages", authRequired, async (c) => {
     return newPage;
   });
 
+  // Issue #860 Phase 4: ノートを購読中のクライアント全員に `page.added` を配信
+  // し、各 client の `useInfiniteNotePages` キャッシュへ直接 prepend させる
+  // ことで、window 全体の refetch を避ける。emit は DB tx 完了後に限り、
+  // 失敗時の整合性ずれを防ぐ。`publishNoteEvent` 自身は throw しないので
+  // try/catch は不要。
+  //
+  // Issue #860 Phase 4: notify every SSE subscriber for this note so the
+  // client can prepend the new page into its `useInfiniteNotePages` cache
+  // without refetching the whole window. The publish happens strictly after
+  // the transaction commits — emitting inside the tx could leak an event
+  // for a page that never lands. `publishNoteEvent` swallows listener
+  // failures internally, so no try/catch is needed here.
+  publishNoteEvent({
+    type: "page.added",
+    note_id: noteId,
+    page: pageRowToWindowItem(created),
+  });
+
   return c.json({
     created: true,
     page_id: created.id,
@@ -266,6 +286,14 @@ app.delete("/:noteId/pages/:pageId", authRequired, async (c) => {
 
     await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
   });
+
+  // Issue #860 Phase 4: 削除をノート購読者へ通知。client は cache から
+  // 該当 id を取り除くだけで済む（全 window refetch は不要）。tx 完了後に
+  // emit する。
+  // Issue #860 Phase 4: notify SSE subscribers so they can drop the page id
+  // from their cached windows without refetching. Emitted after the
+  // transaction commits to avoid announcing a delete that gets rolled back.
+  publishNoteEvent({ type: "page.deleted", note_id: noteId, page_id: pageId });
 
   return c.json({ removed: true });
 });

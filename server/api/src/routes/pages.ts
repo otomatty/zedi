@@ -14,7 +14,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
-import { pages, pageContents } from "../schema/index.js";
+import { pages, pageContents, type Page } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
@@ -24,6 +24,8 @@ import { maybeCreateSnapshot } from "../services/snapshotService.js";
 import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
 import { deleteThumbnailObject } from "../services/thumbnailGcService.js";
+import { publishNoteEvent } from "../services/noteEventBroadcaster.js";
+import { pageRowToWindowItem } from "./notes/eventHelpers.js";
 
 /**
  * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
@@ -71,30 +73,84 @@ function tryPropagateTitleRename(
 }
 
 /**
+ * Issue #860 Phase 4: PUT /content で title / content_preview が「実際に」変わった
+ * ときだけ `page.updated` をノート購読者へ配信する。クライアントが現在値を
+ * 毎回ラウンドトリップする実装でも spam しないよう、`applyPagesMetadataUpdate`
+ * の戻り値 `metadataChanged` で判定する。`updatedRow` も同じ helper の
+ * `.returning()` から渡るため、ここでは追加 SELECT を発生させない
+ * （gemini-code-assist + coderabbitai review on PR #867）。
+ *
+ * Emit `page.updated` only when the metadata actually changed compared to the
+ * current row. A client that round-trips the unchanged values on every save
+ * must not trigger a broadcast — the helper's `metadataChanged` flag gates
+ * that. The `updatedRow` comes from `applyPagesMetadataUpdate`'s
+ * `.returning()`, so this path stays SELECT-free (gemini-code-assist and
+ * coderabbitai reviews on PR #867).
+ */
+function emitPageUpdatedIfChanged(metadataChanged: boolean, updatedRow: Page | null): void {
+  if (!metadataChanged || !updatedRow || updatedRow.isDeleted) return;
+  publishNoteEvent({
+    type: "page.updated",
+    note_id: updatedRow.noteId,
+    page: pageRowToWindowItem(updatedRow),
+  });
+}
+
+/**
  * PUT /content リクエストから pages テーブルの更新セットを構築し、変更があれば適用する。
  * タイトル更新を検出した場合は旧タイトルを返して呼び出し側から伝播処理を
  * 起動できるようにする（issue #726）。
  *
+ * Issue #860 Phase 4 で 2 つの戻り値を追加した:
+ * - `metadataChanged`: 現在値と比較して title または content_preview が
+ *   実際に変わったかどうか。クライアントが現在値をエコーバックするセーブ
+ *   フローで SSE がスパムしないように、emit 側でこのフラグを参照する
+ *   （coderabbitai major on PR #867）。
+ * - `updatedRow`: `.returning()` の結果。emit 側で追加 SELECT せずに
+ *   そのまま payload に流せる（gemini-code-assist medium on PR #867）。
+ *
  * Build and apply pages-table updates (title, content_preview, updated_at)
- * from the PUT body. When the title is being changed, return the old / new
- * title pair so the caller can kick off rename propagation once the row
- * update is durable (issue #726).
+ * from the PUT body. Returns:
+ * - `renamed` — old/new title pair when the title meaningfully changed
+ *   (issue #726).
+ * - `metadataChanged` — whether title or content_preview actually differs
+ *   from the current row. Used by the Issue #860 Phase 4 SSE emit to avoid
+ *   broadcasting `page.updated` on round-tripped values
+ *   (coderabbitai review on PR #867).
+ * - `updatedRow` — the post-update row returned by `.returning()` so the
+ *   emit path does not need a follow-up SELECT
+ *   (gemini-code-assist review on PR #867).
  */
 async function applyPagesMetadataUpdate(
   db: { select: Database["select"]; update: Database["update"] },
   pageId: string,
   body: { title?: string; content_preview?: string },
-): Promise<{ renamed: { oldTitle: string; newTitle: string } | null }> {
+): Promise<{
+  renamed: { oldTitle: string; newTitle: string } | null;
+  metadataChanged: boolean;
+  updatedRow: Page | null;
+}> {
   let renamed: { oldTitle: string; newTitle: string } | null = null;
 
-  if (body.title !== undefined) {
+  // タイトル変化検知に加えて Phase 4 で content_preview の変化検知も必要
+  // なので、両方をまとめて 1 回の SELECT で取り出す。
+  // Title (for rename propagation) and content_preview (for SSE emit
+  // gating) are both compared against the current row, so fetch them in a
+  // single SELECT instead of two.
+  let currentTitle: string | null = null;
+  let currentPreview: string | null = null;
+  if (body.title !== undefined || body.content_preview !== undefined) {
     const current = await db
-      .select({ title: pages.title })
+      .select({ title: pages.title, contentPreview: pages.contentPreview })
       .from(pages)
       .where(eq(pages.id, pageId))
       .limit(1);
-    const previousRaw = current[0]?.title ?? null;
-    const previousTrimmed = typeof previousRaw === "string" ? previousRaw.trim() : "";
+    currentTitle = current[0]?.title ?? null;
+    currentPreview = current[0]?.contentPreview ?? null;
+  }
+
+  if (body.title !== undefined) {
+    const previousTrimmed = typeof currentTitle === "string" ? currentTitle.trim() : "";
     const nextTrimmed = body.title.trim();
     // 正規化（小文字化）して比較することで "Foo" → "foo" のような表記揺れだけの
     // 変更は伝播をスキップする。`wikiLinkUtils` / `tagUtils` の照合も同一正規化。
@@ -110,13 +166,25 @@ async function applyPagesMetadataUpdate(
     }
   }
 
+  // 実際に値が異なるカラムだけを set に積む。これにより:
+  // 1. クライアントがエコーバックしただけのセーブで UPDATE が走らない。
+  // 2. UPDATE が走らなければ updatedRow も null になり、emit もスキップされる。
+  // Only stage columns whose new value really differs from the current row.
+  // Skipping no-op UPDATEs avoids spurious `updated_at` churn and ensures
+  // the SSE emit path is gated on real changes (coderabbitai PR #867).
   const set: Record<string, unknown> = {};
-  if (body.title !== undefined) set.title = body.title;
-  if (body.content_preview !== undefined) set.contentPreview = body.content_preview;
-  if (Object.keys(set).length === 0) return { renamed };
+  if (body.title !== undefined && body.title !== currentTitle) {
+    set.title = body.title;
+  }
+  if (body.content_preview !== undefined && body.content_preview !== currentPreview) {
+    set.contentPreview = body.content_preview;
+  }
+  if (Object.keys(set).length === 0) {
+    return { renamed, metadataChanged: false, updatedRow: null };
+  }
   set.updatedAt = new Date();
-  await db.update(pages).set(set).where(eq(pages.id, pageId));
-  return { renamed };
+  const updated = await db.update(pages).set(set).where(eq(pages.id, pageId)).returning();
+  return { renamed, metadataChanged: true, updatedRow: updated[0] ?? null };
 }
 
 // ── GET /pages ──────────────────────────────────────────────────────────────
@@ -290,9 +358,19 @@ app.put("/:id/content", authRequired, async (c) => {
         const insertedRow = inserted[0];
         if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
 
-        const { renamed } = await applyPagesMetadataUpdate(tx, pageId, body);
+        const { renamed, metadataChanged, updatedRow } = await applyPagesMetadataUpdate(
+          tx,
+          pageId,
+          body,
+        );
 
-        return { done: true as const, version: insertedRow.version ?? 1, renamed };
+        return {
+          done: true as const,
+          version: insertedRow.version ?? 1,
+          renamed,
+          metadataChanged,
+          updatedRow,
+        };
       });
 
       if (firstSave.done) {
@@ -312,6 +390,9 @@ app.put("/:id/content", authRequired, async (c) => {
             firstSave.renamed.newTitle,
           );
         }
+        // Issue #860 Phase 4: メタデータが実際に変化したときだけ通知。
+        // Issue #860 Phase 4: emit only when metadata really changed.
+        emitPageUpdatedIfChanged(firstSave.metadataChanged, firstSave.updatedRow);
         return c.json({ version: firstSave.version });
       }
     }
@@ -344,7 +425,11 @@ app.put("/:id/content", authRequired, async (c) => {
     const updatedRow = updated[0];
     if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
 
-    const { renamed } = await applyPagesMetadataUpdate(db, pageId, body);
+    const {
+      renamed,
+      metadataChanged,
+      updatedRow: metadataRow,
+    } = await applyPagesMetadataUpdate(db, pageId, body);
 
     void tryAutoSnapshot(
       db,
@@ -358,6 +443,10 @@ app.put("/:id/content", authRequired, async (c) => {
     if (renamed) {
       tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
     }
+
+    // Issue #860 Phase 4: optimistic-lock 経路のメタデータ変化を通知。
+    // Notify subscribers from the optimistic-lock path as well.
+    emitPageUpdatedIfChanged(metadataChanged, metadataRow);
 
     return c.json({ version: updatedRow.version ?? 0 });
   }
@@ -382,7 +471,11 @@ app.put("/:id/content", authRequired, async (c) => {
     })
     .returning();
 
-  const { renamed } = await applyPagesMetadataUpdate(db, pageId, body);
+  const {
+    renamed,
+    metadataChanged,
+    updatedRow: metadataRow,
+  } = await applyPagesMetadataUpdate(db, pageId, body);
 
   const resultRow = result[0];
   if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
@@ -399,6 +492,10 @@ app.put("/:id/content", authRequired, async (c) => {
   if (renamed) {
     tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
   }
+
+  // Issue #860 Phase 4: UPSERT 経路（楽観的ロック未使用）でも emit。
+  // Issue #860 Phase 4: emit from the UPSERT path too (no optimistic lock).
+  emitPageUpdatedIfChanged(metadataChanged, metadataRow);
 
   return c.json({ version: resultRow.version });
 });
@@ -457,6 +554,21 @@ app.post("/", authRequired, async (c) => {
 
   const row = result[0];
   if (!row) throw new HTTPException(500, { message: "Insert failed" });
+
+  // Issue #860 Phase 4: 新規ページを所属ノート購読者に通知。本ルートは Web
+  // Clipper / `/notes/me` 系の創出経路でも使われるため、`/api/notes/:noteId/pages`
+  // の POST と同じ event を出してフロント側のキャッシュ更新を一本化する。
+  // Issue #860 Phase 4: emit `page.added` so subscribers (including the
+  // `/api/notes/:noteId/events` consumers) update their cached windows
+  // without a refetch. This route is shared by Web Clipper and `/notes/me`
+  // flows, so emitting here keeps the cache patch behavior identical to
+  // `POST /api/notes/:noteId/pages`.
+  publishNoteEvent({
+    type: "page.added",
+    note_id: row.noteId,
+    page: pageRowToWindowItem(row),
+  });
+
   return c.json(
     {
       id: row.id,
@@ -500,6 +612,7 @@ app.delete("/:id", authRequired, async (c) => {
     .select({
       thumbnailObjectId: pages.thumbnailObjectId,
       ownerId: pages.ownerId,
+      noteId: pages.noteId,
     })
     .from(pages)
     .where(eq(pages.id, pageId))
@@ -509,6 +622,14 @@ app.delete("/:id", authRequired, async (c) => {
     .update(pages)
     .set({ isDeleted: true, thumbnailObjectId: null, updatedAt: new Date() })
     .where(eq(pages.id, pageId));
+
+  // Issue #860 Phase 4: 削除を所属ノート購読者に通知。`noteId` は同じ
+  // SELECT で取得済みのため追加クエリは発生しない。
+  // Issue #860 Phase 4: notify subscribers of the owning note. The note id
+  // came from the earlier SELECT so no extra round trip is needed.
+  if (target?.noteId) {
+    publishNoteEvent({ type: "page.deleted", note_id: target.noteId, page_id: pageId });
+  }
 
   // GC は best-effort。サムネイル削除が S3 障害などで失敗しても、ページ削除
   // 自体は成功させる（ユーザーから見て「削除できなかった」状態を作らない）。
