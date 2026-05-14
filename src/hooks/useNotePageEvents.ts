@@ -247,11 +247,15 @@ function attachNoteEventListeners(
     wrap(name, (msg) => {
       const parsed = tryParseJson(msg.data) as Record<string, unknown> | null;
       if (!parsed || typeof parsed !== "object") return;
-      // ペイロードに `type` が無くてもイベント名から復元する（サーバ側で
-      // 落ちている / 未来のリプレイ機構との互換のため）。
-      // Some senders may omit `type` in the body since it duplicates the
-      // SSE event name; restore it so the union narrows correctly.
-      const event = { type: name, ...parsed } as NoteEvent;
+      // SSE のイベント名 `name` を信頼の単一源とする。サーバ payload の
+      // `type` を後から上書きされないよう、`...parsed` を先に展開して `type`
+      // を後置きで固定する (coderabbitai minor on PR #867)。
+      // Make the wire SSE event name authoritative. Spreading `parsed`
+      // first and clamping `type: name` afterwards prevents a malformed
+      // payload from overriding the discriminator that the
+      // `addEventListener` wiring already validated (coderabbitai minor
+      // on PR #867).
+      const event = { ...parsed, type: name } as NoteEvent;
       onEvent(event);
     });
   }

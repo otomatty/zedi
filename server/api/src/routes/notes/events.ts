@@ -162,31 +162,47 @@ app.get("/:noteId/events", authOptional, async (c) => {
         return;
       }
 
-      // Subscription is live — now emit `ready`. From this point on the
-      // client can rely on receiving every event the server publishes.
-      await stream.writeSSE({
-        event: "ready",
-        data: JSON.stringify({ note_id: noteId }),
-        retry: 30_000,
-      });
-
+      // 購読登録より後のすべて（ready 書き込み + keep-alive ループ）を
+      // try/finally で囲む。`stream.writeSSE("ready")` がクライアント切断中
+      // などで throw した場合でも、finally で必ず購読を解放する。これを
+      // しないと subscriber slot がリークし、最終的に capacity cap (256) を
+      // 食い潰して 503 を出すようになる (coderabbitai major on PR #867)。
+      //
+      // Wrap everything after subscribe registration in try/finally. If the
+      // initial `writeSSE("ready")` throws (e.g. client disconnected mid
+      // handshake), the finally guarantees the subscriber slot is freed.
+      // Without this guard a sequence of failed handshakes can exhaust the
+      // 256-subscriber cap and start rejecting healthy clients with 503
+      // (coderabbitai major on PR #867).
       stream.onAbort(() => {
         unsubscribe?.();
+        unsubscribe = null;
       });
 
-      // クライアントが切断するまでキープアライブを送り続ける。生の SSE コメント
-      // 行（`:` 始まり）を書く: `writeSSE` だと `event:` フィールドが必ず付与され、
-      // クライアントは「無名イベント」を受信してしまうため (PR #816 review)。
-      // Heartbeat loop: emit a raw SSE comment line every SSE_KEEPALIVE_MS so
-      // idle proxies don't tear down the TCP connection. Using `write` (not
-      // `writeSSE`) keeps the line as a comment instead of a named event.
-      while (!stream.aborted && !stream.closed) {
-        await stream.sleep(SSE_KEEPALIVE_MS);
-        if (stream.aborted || stream.closed) break;
-        await stream.write(": ping\n\n");
-      }
+      try {
+        // Subscription is live — now emit `ready`. From this point on the
+        // client can rely on receiving every event the server publishes.
+        await stream.writeSSE({
+          event: "ready",
+          data: JSON.stringify({ note_id: noteId }),
+          retry: 30_000,
+        });
 
-      unsubscribe?.();
+        // クライアントが切断するまでキープアライブを送り続ける。生の SSE コメント
+        // 行（`:` 始まり）を書く: `writeSSE` だと `event:` フィールドが必ず付与され、
+        // クライアントは「無名イベント」を受信してしまうため (PR #816 review)。
+        // Heartbeat loop: emit a raw SSE comment line every SSE_KEEPALIVE_MS so
+        // idle proxies don't tear down the TCP connection. Using `write` (not
+        // `writeSSE`) keeps the line as a comment instead of a named event.
+        while (!stream.aborted && !stream.closed) {
+          await stream.sleep(SSE_KEEPALIVE_MS);
+          if (stream.aborted || stream.closed) break;
+          await stream.write(": ping\n\n");
+        }
+      } finally {
+        unsubscribe?.();
+        unsubscribe = null;
+      }
     },
     async (err, stream) => {
       const message = err instanceof Error ? err.message : String(err);
