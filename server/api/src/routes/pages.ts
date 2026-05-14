@@ -14,7 +14,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
-import { pages, pageContents } from "../schema/index.js";
+import { pages, pageContents, type Page } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
