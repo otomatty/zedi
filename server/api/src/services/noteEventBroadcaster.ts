@@ -114,13 +114,24 @@ export function subscribeNoteEvents(noteId: string, listener: NoteEventListener)
     bucket = new Set();
     listenersByNote.set(noteId, bucket);
   }
+  // `Set.add` は冪等なので、同じ listener が二重 subscribe された場合に
+  // bucket.size は増えない。`totalSubscribers` の増減を `bucket.size` の差で
+  // 駆動することで、unsubscribe との計数が必ず対称になる
+  // (coderabbitai review on PR #867 major)。
+  // `Set.add` is idempotent — a double-subscribe of the same function reference
+  // does not enlarge the set. Drive the accounting off the size delta so the
+  // add/remove sides stay symmetric and bogus capacity rejections cannot drift
+  // in (coderabbitai review on PR #867 major).
+  const beforeSize = bucket.size;
   bucket.add(listener);
-  totalSubscribers += 1;
+  const added = bucket.size > beforeSize;
+  if (added) totalSubscribers += 1;
 
   let active = true;
   return () => {
     if (!active) return;
     active = false;
+    if (!added) return;
     const current = listenersByNote.get(noteId);
     if (!current) return;
     if (!current.delete(listener)) return;

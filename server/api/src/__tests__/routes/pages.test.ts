@@ -350,16 +350,26 @@ describe("PUT /api/pages/:id/content", () => {
 
   // Issue #726: タイトル変更検出のため、PUT に title が含まれるとき pages.title
   // を SELECT してから UPDATE を行う。これにより伝播処理の起点になる。
+  // Issue #860 Phase 4 (PR #867 review fix) で、メタデータが実際に変化したとき
+  // だけ pages テーブルを UPDATE する最適化が入った。タイトルが変わるケースは
+  // 引き続き SELECT + UPDATE の 2 段ステップを踏む。
+  //
   // Issue #726: when PUT carries `title`, the route SELECTs the current
   // `pages.title` before UPDATE so the handler can detect a rename and
-  // trigger background propagation.
-  it("issues an extra SELECT for rename detection when body.title is provided", async () => {
+  // trigger background propagation. Issue #860 Phase 4 (PR #867 review)
+  // additionally gates the metadata UPDATE on a real value diff; when the
+  // title genuinely changes the SELECT + UPDATE pair is still issued.
+  it("issues an extra SELECT and pages UPDATE for rename detection when body.title differs", async () => {
     const ydocB64 = Buffer.from("hello").toString("base64");
     const { app, chains } = createPagesAppWithChains([
       ...pageAccessPrefix(),
       [{ version: 2, pageId: PAGE_ID }],
-      [{ title: "Same Title" }],
-      [],
+      // 現在のタイトルが "Old Title"、新タイトルが "New Title" なので
+      // SELECT + UPDATE が実際に走る。
+      // Current title "Old Title" ≠ new title "New Title", so the SELECT
+      // detects a rename and the metadata UPDATE actually fires.
+      [{ title: "Old Title", contentPreview: null }],
+      [{ id: PAGE_ID, title: "New Title" }],
       [],
       [],
     ]);
@@ -370,7 +380,7 @@ describe("PUT /api/pages/:id/content", () => {
       body: JSON.stringify({
         ydoc_state: ydocB64,
         expected_version: 1,
-        title: "Same Title",
+        title: "New Title",
       }),
     });
 
@@ -382,5 +392,45 @@ describe("PUT /api/pages/:id/content", () => {
     expect(selectChains.length).toBeGreaterThanOrEqual(2);
     const updateChains = chains.filter((c) => c.startMethod === "update");
     expect(updateChains.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // Issue #860 Phase 4 (PR #867 review): クライアントが現在値を round-trip した
+  // だけの保存では、SSE が暴発しないように pages テーブルの UPDATE を skip する。
+  // SELECT 1 回（現在値の取得）は走るが、metadata UPDATE は走らない。
+  //
+  // When the client round-trips unchanged title / content_preview values,
+  // the route now skips the metadata UPDATE entirely so `page.updated` is
+  // not broadcast on a no-op save.
+  it("skips the pages metadata UPDATE when title/content_preview match current (PR #867)", async () => {
+    const ydocB64 = Buffer.from("hello").toString("base64");
+    const { app, chains } = createPagesAppWithChains([
+      ...pageAccessPrefix(),
+      [{ version: 2, pageId: PAGE_ID }],
+      [{ title: "Same Title", contentPreview: "Same Preview" }],
+      [],
+      [],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ydoc_state: ydocB64,
+        expected_version: 1,
+        title: "Same Title",
+        content_preview: "Same Preview",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    // SELECT は現在値取得のため 1 回走るが、pages の UPDATE は走らない。
+    // page_contents の UPDATE は走る (version bump)。
+    // SELECT for current values still happens; the pages UPDATE is
+    // skipped, while page_contents still updates (version bump).
+    const updateChains = chains.filter((c) => c.startMethod === "update");
+    // ノートアクセス可否を見るための SELECT が起点となる UPDATE も無いため、
+    // 残るのは page_contents の version bump 1 件のみ。
+    // The only UPDATE left is the page_contents version bump.
+    expect(updateChains.length).toBe(1);
   });
 });

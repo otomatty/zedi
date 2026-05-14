@@ -241,6 +241,101 @@ describe("GET /api/notes/:noteId/events", () => {
     expect(noteEventSubscriberCount(NOTE_ID)).toBe(0);
   });
 
+  it("subscribes before sending ready so events published during the handshake are delivered (Codex P2 / coderabbitai)", async () => {
+    // Issue #860 Phase 4 リグレッションテスト: 以前は ready の前に subscribe
+    // していなかったため、ready 直前に publish されたイベントが取りこぼれて
+    // いた。修正後は subscribe → ready の順なので、handler 起動直後に
+    // publish しても ready の後にちゃんと届く。
+    //
+    // Regression test for the subscribe-before-ready fix. We can't observe
+    // the exact instant between subscribe and ready from outside Hono, but
+    // we can prove the invariant by publishing AFTER the subscribe count
+    // becomes 1 (i.e. handler entered) but BEFORE reading any frame. If
+    // ready were emitted first, the publish would race the subscribe and
+    // be lost on slow scheduling; with the fix the event is buffered into
+    // the SSE writer and arrives right after `ready`.
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/events`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    // Poll until the subscriber is registered (handler entered, subscribe
+    // succeeded). At this point ready has not been read yet from our side,
+    // but on the server it was written AFTER subscribe.
+    for (let i = 0; i < 50; i++) {
+      if (noteEventSubscriberCount(NOTE_ID) === 1) break;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(noteEventSubscriberCount(NOTE_ID)).toBe(1);
+
+    publishNoteEvent({
+      type: "page.deleted",
+      note_id: NOTE_ID,
+      page_id: "pg-during-handshake",
+    });
+
+    const sse = openSseReader(res);
+    try {
+      const frames = await sse.readFrames(2);
+      expect(frames).toHaveLength(2);
+      const ready = parseSseFrame(frames[0] ?? "");
+      const deleted = parseSseFrame(frames[1] ?? "");
+      expect(ready.event).toBe("ready");
+      expect(deleted.event).toBe("page.deleted");
+      expect(JSON.parse(deleted.data)).toMatchObject({
+        type: "page.deleted",
+        note_id: NOTE_ID,
+        page_id: "pg-during-handshake",
+      });
+    } finally {
+      await sse.close();
+    }
+  });
+
+  it("closes the stream after delivering note.permission_changed (Codex P1 / coderabbitai)", async () => {
+    // Issue #860 Phase 4: 権限変化を受け取ったクライアントは EventSource
+    // 経由で再接続して `getNoteRole` を再評価する必要がある。サーバ側で
+    // ストリームを閉じることで、剥奪済みユーザーには後続の page.* イベントが
+    // 届かない。
+    //
+    // After delivering `note.permission_changed`, the server proactively
+    // closes the stream so a revoked caller stops receiving subsequent
+    // events. Verified by checking the subscriber count drops to zero and
+    // the read loop hits EOF.
+    const mockNote = createMockNote();
+    const { app } = createTestApp([[mockNote]]);
+
+    const res = await app.request(`/api/notes/${NOTE_ID}/events`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    const sse = openSseReader(res);
+    try {
+      // Wait for ready, then publish a permission change.
+      const ready = await sse.readFrames(1);
+      expect(parseSseFrame(ready[0] ?? "").event).toBe("ready");
+
+      publishNoteEvent({ type: "note.permission_changed", note_id: NOTE_ID });
+
+      const permission = await sse.readFrames(1);
+      expect(parseSseFrame(permission[0] ?? "").event).toBe("note.permission_changed");
+
+      // Stream is closing on the server side; give it a moment then assert
+      // the subscriber slot was released.
+      for (let i = 0; i < 50; i++) {
+        if (noteEventSubscriberCount(NOTE_ID) === 0) break;
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      expect(noteEventSubscriberCount(NOTE_ID)).toBe(0);
+    } finally {
+      await sse.close();
+    }
+  });
+
   it("allows guest access on public notes (authOptional)", async () => {
     const mockNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "public" });
     const { app } = createTestApp([[mockNote]]);

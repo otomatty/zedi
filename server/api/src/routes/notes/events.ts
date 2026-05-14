@@ -98,22 +98,31 @@ app.get("/:noteId/events", authOptional, async (c) => {
   return streamSSE(
     c,
     async (stream) => {
-      // EventSource は接続成功直後の最初のイベントを待つので、空っぽの応答を
-      // 返さないよう必ず `ready` と `retry` ヒントを送る。
-      // EventSource holds the request "pending" until the first event lands;
-      // emit a `ready` event with a 30 s `retry` so the browser commits to
-      // the connection and uses our preferred reconnect delay.
-      await stream.writeSSE({
-        event: "ready",
-        data: JSON.stringify({ note_id: noteId }),
-        retry: 30_000,
-      });
-
+      // Issue #860 Phase 4: subscribe BEFORE emitting `ready` so any event
+      // published in the gap between handshake and subscription is not lost.
+      // Codex P2 + coderabbitai PR #867 review.
+      //
+      // 購読登録を `ready` 送信の前に行い、両者の間に publish された
+      // イベントが取りこぼされないようにする。`ready` の前に subscribe する
+      // ことで、クライアントが `ready` を受け取った瞬間からはすべての
+      // イベントが届く契約を成立させる。
+      //
       // 上限はルート冒頭で確認済みのため通常 throw しないが、競合で同時に
       // 限界を超えた場合に備えて catch して接続を畳む。
       // Capacity is verified above, but a concurrent subscribe could still
-      // exceed the cap; close cleanly if that race fires instead of leaking
-      // an unhandled rejection.
+      // exceed the cap; close cleanly if that race fires.
+      // Issue #860 Phase 4: `note.permission_changed` を受信したら、それを
+      // クライアントへ書き出した直後にストリームを閉じる。クライアントは
+      // EventSource の自動再接続経由で `getNoteRole` を再評価するので、
+      // 既にアクセス権を失ったユーザーには次の page.* イベントが届かない
+      // (Codex P1 / coderabbitai critical on PR #867)。
+      //
+      // After delivering `note.permission_changed`, proactively close the
+      // stream so the client reconnects through `getNoteRole` and a revoked
+      // caller stops receiving subsequent `page.*` events. Combined with the
+      // client-side rotation in `useNotePageEvents`, this gives instant
+      // revocation without a per-event re-auth (Codex P1 / coderabbitai
+      // critical on PR #867).
       let unsubscribe: (() => void) | null = null;
       try {
         let writeChain: Promise<void> = Promise.resolve();
@@ -122,6 +131,20 @@ app.get("/:noteId/events", authOptional, async (c) => {
             .then(async () => {
               if (stream.aborted || stream.closed) return;
               await stream.writeSSE(serializeNoteEvent(event));
+              if (event.type === "note.permission_changed") {
+                // 配信直後に購読を解放しつつストリームを閉じる。`stream.close()`
+                // だけだと keep-alive ループの `await stream.sleep(...)` が
+                // 25 秒沈黙したままなので、明示的に unsubscribe しないと購読者
+                // スロットが解放されない。
+                // Release the subscriber slot eagerly: `stream.close()` alone
+                // doesn't wake the keep-alive `await stream.sleep(...)` loop,
+                // so the listener would linger until the sleep returns 25 s
+                // later. Explicit unsubscribe here matches the revocation
+                // requirement immediately.
+                unsubscribe?.();
+                unsubscribe = null;
+                await stream.close();
+              }
             })
             .catch((err) => {
               const message = err instanceof Error ? err.message : String(err);
@@ -138,6 +161,14 @@ app.get("/:noteId/events", authOptional, async (c) => {
         await stream.close();
         return;
       }
+
+      // Subscription is live — now emit `ready`. From this point on the
+      // client can rely on receiving every event the server publishes.
+      await stream.writeSSE({
+        event: "ready",
+        data: JSON.stringify({ note_id: noteId }),
+        retry: 30_000,
+      });
 
       stream.onAbort(() => {
         unsubscribe?.();

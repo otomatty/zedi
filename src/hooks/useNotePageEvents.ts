@@ -40,28 +40,20 @@ export interface UseNotePageEventsOptions {
 }
 
 /**
- * 同一 noteId かつ wire shape 同一の `NotePageWindowItem` 配列内で id が
- * 一致する行を最新ペイロードで置換する。順序は維持する（Phase 3 の「サーバ順
- * を信頼する」要件に従う）。
+ * 指定 id を `NotePageWindowItem` 配列から取り除く。`removed` フラグで
+ * 実際に該当行があったかを呼び出し側へ伝える（無変更時はキャッシュエントリ
+ * 自体を再構築しないための判定に使う）。
  *
- * Replace the page row with matching id, keeping the array order intact.
- * Phase 3 requires the client trust the server's `updated_at DESC, id DESC`
- * ordering, so we do not re-sort here even if `updated_at` changes — the
- * next natural refetch reconciles drift.
+ * Strip the entry with `id` from the items array. `removed` lets the caller
+ * skip recreating the cache entry when nothing changed (avoids spurious
+ * React Query notifications).
  */
-function replacePageInItems(
+function removeIdFromItems(
   items: NotePageWindowItem[],
-  next: NotePageWindowItem,
-): { items: NotePageWindowItem[]; changed: boolean } {
-  let changed = false;
-  const updated = items.map((item) => {
-    if (item.id === next.id) {
-      changed = true;
-      return next;
-    }
-    return item;
-  });
-  return { items: updated, changed };
+  id: string,
+): { items: NotePageWindowItem[]; removed: boolean } {
+  const next = items.filter((item) => item.id !== id);
+  return { items: next, removed: next.length !== items.length };
 }
 
 /**
@@ -127,20 +119,56 @@ export function applyNoteEventToCache(
       return;
     }
     case "page.updated": {
-      // どの window に該当行が居るか分からないので全 window を走査して
-      // 一致 id を置換する。Phase 3 のサーバ順を尊重するため再 sort はしない。
-      // The updated page can live in any window, so scan all of them and
-      // replace by id. We honour Phase 3's "trust server order" invariant
-      // and do not re-sort even if `updated_at` shifts.
+      // PUT /content の metadata 更新は `updated_at` を bump するので、
+      // サーバ順 (`updated_at DESC, id DESC`) では更新ページが必ず先頭に来る。
+      // クライアントキャッシュも同様に「現在いる window から取り除いて先頭
+      // window に prepend」する remove+prepend セマンティクスで合わせる。
+      // 再ソートはしない (Phase 3 の「サーバ順を信頼する」要件)。
+      // coderabbitai review on PR #867 major: in-place 置換だと旧 window に
+      // 取り残されてしまうため移動が必要。
+      //
+      // `page.updated` bumps `updated_at`, which puts the row at the head
+      // of the server's `updated_at DESC, id DESC` ordering. Apply the same
+      // shift to the cached windows by removing the row wherever it lives
+      // and prepending the fresh copy to the first window. We do not
+      // re-sort anything else (Phase 3 invariant); the next natural
+      // refetch reconciles any cross-window drift. Fixes coderabbitai
+      // major on PR #867 — replace-in-place left the row stranded in its
+      // old window.
       updateAllWindowsForNote(queryClient, event.note_id, (data) => {
+        const first = data.pages[0];
+        if (!first) return data;
+
         let anyChanged = false;
-        const nextPages = data.pages.map((page) => {
-          const { items, changed } = replacePageInItems(page.items, event.page);
-          if (changed) anyChanged = true;
-          return changed ? { items, next_cursor: page.next_cursor } : page;
+        const stripped = data.pages.map((page) => {
+          const { items, removed } = removeIdFromItems(page.items, event.page.id);
+          if (!removed) return page;
+          anyChanged = true;
+          return { items, next_cursor: page.next_cursor };
         });
-        if (!anyChanged) return data;
-        return { ...data, pages: nextPages };
+
+        const head = stripped[0];
+        if (!head) return data;
+
+        // 重複防止: 既に先頭 window に新しい event.page と同じ id があれば
+        // 何もしない（同一フレーム内で page.added → page.updated が連続する
+        // ような並びでの重複防止）。`stripped` で既に取り除いているので、
+        // 通常はこの分岐に入らないが、データ不整合への防御として残す。
+        // Defensive dedupe: even after stripping, if the first window
+        // already contains the id (e.g. another concurrent event), skip
+        // the prepend to avoid duplicates.
+        if (head.items.some((it) => it.id === event.page.id)) {
+          return anyChanged ? { ...data, pages: stripped } : data;
+        }
+
+        const nextFirst: NotePageWindowResponse = {
+          items: [event.page, ...head.items],
+          next_cursor: head.next_cursor,
+        };
+        return {
+          ...data,
+          pages: [nextFirst, ...stripped.slice(1)],
+        };
       });
       return;
     }
@@ -148,10 +176,10 @@ export function applyNoteEventToCache(
       updateAllWindowsForNote(queryClient, event.note_id, (data) => {
         let anyChanged = false;
         const nextPages = data.pages.map((page) => {
-          const filtered = page.items.filter((it) => it.id !== event.page_id);
-          if (filtered.length === page.items.length) return page;
+          const { items, removed } = removeIdFromItems(page.items, event.page_id);
+          if (!removed) return page;
           anyChanged = true;
-          return { items: filtered, next_cursor: page.next_cursor };
+          return { items, next_cursor: page.next_cursor };
         });
         if (!anyChanged) return data;
         return { ...data, pages: nextPages };
@@ -270,44 +298,85 @@ export function useNotePageEvents(noteId: string, options: UseNotePageEventsOpti
     const base = resolveApiBaseUrl();
     const url = `${base}/api/notes/${encodeURIComponent(noteId)}/events`;
 
-    // EventSource は cookie ベース認証で動くため `withCredentials: true` を
-    // 渡す。same-origin 構成（VITE_API_BASE_URL が空）でも明示しておく。
-    // EventSource needs `withCredentials: true` so the cookie-based auth
-    // travels with the request. Explicit even on same-origin builds.
-    const es = new EventSource(url, { withCredentials: true });
+    // 接続を作るたびに detach / close を覚えておくセル。`note.permission_changed`
+    // で即時 rotate するため、useEffect cleanup と中身の reconnect の両方から
+    // 同じハンドルを操作する。
+    // Cell holding the current connection so both the useEffect cleanup
+    // and the in-callback rotation on `note.permission_changed` can close
+    // and replace the active EventSource via a single owner.
+    let currentEs: EventSource | null = null;
+    let currentDetach: (() => void) | null = null;
 
-    let isFirstReady = true;
-    const detach = attachNoteEventListeners(
-      es,
-      () => {
-        // 初回 `ready` ではキャッシュをそのまま使う。2 回目以降（再接続）は
-        // 切断中の取りこぼし補修として 1 度だけ invalidate する。
-        // First `ready` is just the hello; subsequent ones mean we reconnected
-        // and should invalidate once to pick up anything missed during the gap.
-        if (isFirstReady) {
-          isFirstReady = false;
-          return;
-        }
-        queryClient.invalidateQueries({
-          queryKey: noteKeys.pagesWindowByNoteId(noteId),
-        });
-      },
-      (event) => {
-        applyNoteEventToCache(queryClient, event);
-      },
-    );
+    const open = () => {
+      // EventSource は cookie ベース認証で動くため `withCredentials: true` を
+      // 渡す。same-origin 構成（VITE_API_BASE_URL が空）でも明示しておく。
+      // EventSource needs `withCredentials: true` so the cookie-based auth
+      // travels with the request. Explicit even on same-origin builds.
+      const es = new EventSource(url, { withCredentials: true });
+      currentEs = es;
 
-    // `onerror` は EventSource の自動再接続が走る前にも呼ばれる。ログするだけ
-    // にして接続維持はブラウザに任せ、ユーザー操作で recover させる。
-    // `onerror` fires before EventSource's built-in reconnect; just log so
-    // we don't double-handle the recovery the browser will do for us.
-    es.onerror = (ev) => {
-      console.warn("[useNotePageEvents] EventSource error", ev);
+      currentDetach = attachNoteEventListeners(
+        es,
+        () => {
+          // 毎回の `ready` で window キャッシュを 1 度 invalidate する。
+          // 初回 ready は `useInfiniteNotePages` のクエリ完了から SSE
+          // subscribe が live になるまでの T0→subscribe ギャップを補修し、
+          // 再接続時の ready は切断中の取りこぼしを補修する
+          // (Codex P2 / coderabbitai PR #867)。サーバが ready 送信前に
+          // subscribe するため、ready 後に来る event は失われない。
+          //
+          // Invalidate the pages window on every `ready`, including the
+          // first one. The first ready covers the T0→subscribe race
+          // between `useInfiniteNotePages` finishing its initial fetch
+          // and the SSE subscription becoming live; subsequent readys
+          // (reconnects) cover the disconnect gap. The server registers
+          // its subscription before sending ready, so anything published
+          // after that point arrives via the SSE channel.
+          queryClient.invalidateQueries({
+            queryKey: noteKeys.pagesWindowByNoteId(noteId),
+          });
+        },
+        (event) => {
+          applyNoteEventToCache(queryClient, event);
+          // Issue #860 Phase 4: 権限変化を検知したら EventSource をその場で
+          // 閉じて張り直す。サーバ側も `note.permission_changed` を書き出した
+          // 後にストリームを閉じるが、`retry: 30000` の auto-reconnect 待ち
+          // が走る前にクライアント側で即時再接続することで、新権限の
+          // 再評価とフィード回復のレイテンシを最小化する
+          // (Codex P1 / coderabbitai critical on PR #867)。
+          //
+          // Client-side rotation on permission change: the server closes
+          // the stream after delivering this event, but EventSource would
+          // otherwise wait `retry: 30000` ms before reconnecting. Closing
+          // and re-opening here makes the re-auth round trip happen
+          // immediately.
+          if (event.type === "note.permission_changed") {
+            currentDetach?.();
+            es.close();
+            currentEs = null;
+            currentDetach = null;
+            open();
+          }
+        },
+      );
+
+      // `onerror` は EventSource の自動再接続が走る前にも呼ばれる。ログするだけ
+      // にして接続維持はブラウザに任せる（自動再接続が走らないようにしたい場合
+      // は close を呼ぶが、ここでは保守的に何もしない）。
+      // `onerror` fires before EventSource's built-in reconnect; just log so
+      // the browser's reconnect path runs unimpeded.
+      es.onerror = (ev) => {
+        console.warn("[useNotePageEvents] EventSource error", ev);
+      };
     };
 
+    open();
+
     return () => {
-      detach();
-      es.close();
+      currentDetach?.();
+      currentEs?.close();
+      currentEs = null;
+      currentDetach = null;
     };
   }, [noteId, enabled, queryClient]);
 }

@@ -142,6 +142,33 @@ describe("noteEventBroadcaster", () => {
     expect(noteEventSubscriberCount()).toBe(0);
   });
 
+  it("treats a double-subscribe of the same listener as one slot (coderabbitai PR #867)", () => {
+    // `Set.add` は冪等なので、同じ listener を 2 回 subscribe しても bucket には
+    // 1 つしか入らない。totalSubscribers がそれに同期していないと、unsubscribe
+    // 1 回で計数だけが 1 残ってしまい capacity を誤って 503 にする恐れがある。
+    // Subscribing the same listener twice must not inflate the counter — the
+    // Set holds at most one reference, so unsubscribe accounting has to match.
+    const listener = vi.fn();
+    const unsubscribeA = subscribeNoteEvents(NOTE_A, listener);
+    const unsubscribeB = subscribeNoteEvents(NOTE_A, listener);
+
+    expect(noteEventSubscriberCount()).toBe(1);
+    expect(noteEventSubscriberCount(NOTE_A)).toBe(1);
+
+    // どちらの unsubscribe を呼んでも最終的に 0 に戻る。
+    // Either unsubscribe collapses to 0 in the end.
+    unsubscribeA();
+    expect(noteEventSubscriberCount()).toBe(0);
+    unsubscribeB();
+    expect(noteEventSubscriberCount()).toBe(0);
+
+    // 配信もたかが 1 回。
+    // Dispatch only fires once.
+    subscribeNoteEvents(NOTE_A, listener);
+    publishNoteEvent(makeAddedEvent(NOTE_A));
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it("delivers different event types (deleted, permission_changed)", () => {
     // 別バリアントの discriminated union が無加工で listener に渡ること。
     // Other event variants flow through the same channel unchanged.
