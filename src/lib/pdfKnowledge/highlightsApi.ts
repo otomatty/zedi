@@ -224,6 +224,11 @@ export function derivePageFromHighlightApi(
 export const pdfKnowledgeKeys = {
   all: ["pdfKnowledge"] as const,
   highlights: (sourceId: string) => [...pdfKnowledgeKeys.all, "highlights", sourceId] as const,
+  /**
+   * verify_pdf_source の結果をキャッシュするためのキー。
+   * Key for caching the local `verify_pdf_source` probe result.
+   */
+  verify: (sourceId: string) => [...pdfKnowledgeKeys.all, "verify", sourceId] as const,
 };
 
 /** ハイライト一覧を購読する。Subscribe to a source's highlights. */
