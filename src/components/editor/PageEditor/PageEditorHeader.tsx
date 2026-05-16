@@ -87,17 +87,40 @@ function getScrollTop(target: HTMLElement | Window): number {
  * caller decide which actions are exposed in the more-actions menu.
  */
 export interface PageDetailToolbarAction {
-  /** Stable identifier used as the React key and for testing hooks. */
+  /**
+   * 安定した識別子。React の key とテストのフックに使う。
+   * Stable identifier used as the React key and for testing hooks.
+   */
   id: string;
-  /** Visible label / aria label. */
+  /**
+   * 表示ラベル兼アクセシブルネーム。
+   * Visible label / aria label.
+   */
   label: string;
-  /** Optional leading icon component (e.g. `Trash2`, `Download`). */
+  /**
+   * メニュー項目左側に表示するアイコンコンポーネント（例: `Trash2`, `Download`）。
+   * Optional leading icon component (e.g. `Trash2`, `Download`).
+   */
   icon?: React.ComponentType<{ className?: string }>;
+  /**
+   * メニュー項目クリック時のハンドラ。
+   * Handler invoked when the menu item is clicked.
+   */
   onClick: () => void;
+  /**
+   * 真のとき項目を無効化する（mutation pending 中など）。
+   * Disable the item (e.g. while a mutation is pending).
+   */
   disabled?: boolean;
-  /** Apply destructive styling (red text). */
+  /**
+   * 破壊的アクション用のスタイル（赤文字）を適用する。
+   * Apply destructive styling (red text).
+   */
   destructive?: boolean;
-  /** Render a visual separator immediately before this item. */
+  /**
+   * この項目の直前に視覚的な区切り線を入れる。
+   * Render a visual separator immediately before this item.
+   */
   separatorBefore?: boolean;
 }
 

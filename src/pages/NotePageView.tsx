@@ -418,7 +418,9 @@ const NotePageView: React.FC = () => {
       onBack={handleBack}
       menuItems={menuItems}
       supplementalRightContent={
-        !canEdit ? <span className="text-muted-foreground text-xs">閲覧専用</span> : undefined
+        !canEdit ? (
+          <span className="text-muted-foreground text-xs">{t("common.readOnly", "閲覧専用")}</span>
+        ) : undefined
       }
     />
   );
