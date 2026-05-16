@@ -166,11 +166,21 @@ export function useEditorLifecycle({
   // The `collaborationConfig` object is rebuilt on every parent render; key
   // the effect on the boolean `isSynced` flag so the effect doesn't tear down
   // and re-arm the timer needlessly.
+  // editor インスタンスまたは pageId が切り替わったら、normalization 履歴を
+  // リセットして新しい文書でも一度だけ走るようにする。useRef はマウント中
+  // 値を保持するため、ページ遷移しても明示的に false に戻す必要がある。
+  // Reset the one-shot guard when the editor instance or page changes so a
+  // navigated-to page also runs the normalization once. `useRef` persists
+  // across renders, so without this reset a stale `true` would block the
+  // post-sync pass on the next page.
+  useEffect(() => {
+    wikiLinkNormalizationAppliedRef.current = false;
+  }, [editor, pageId]);
+
   const isCollabSynced = Boolean(collaborationConfig?.isSynced);
   useEffect(() => {
     if (!editor || !isCollabSynced) return;
     if (wikiLinkNormalizationAppliedRef.current) return;
-    wikiLinkNormalizationAppliedRef.current = true;
 
     // editor mount 直後だと PM doc がまだ最終形に落ちていないことがあるため、
     // 1 tick 待ってから走査する。`useContentSanitizer` の初期化フローや、
@@ -178,21 +188,35 @@ export function useEditorLifecycle({
     // Defer one microtask so the editor finishes binding to the synced Y.Doc
     // before we scan it. Matches the deferral pattern used for `initialContent`.
     const timer = setTimeout(() => {
+      // ガードはタイマ起動時ではなく実際に走った時点で flip する。effect
+      // クリーンアップで timer が解除された場合に「未実行なのに guard=true」
+      // 状態を残さないため。
+      // Flip the guard inside the timer (not when scheduling it) so a cleanup
+      // that cancels the timer does not leave the guard armed and silently
+      // skip the real run forever.
+      if (wikiLinkNormalizationAppliedRef.current) return;
+      wikiLinkNormalizationAppliedRef.current = true;
       try {
-        const applied = applyWikiLinkMarksToEditor(editor);
-        if (applied) {
-          // 変更を永続化経路へ流す（collab mode では Y.Doc に伝わるが、
-          // onChange 経由でフロント状態も一致させる）。
-          // Push the JSON downstream so the React-side `content` state matches
-          // the mark transaction's result (Y.Doc already sees it directly).
-          onChange(JSON.stringify(editor.getJSON()));
-        }
+        // `applyWikiLinkMarksToEditor` 内の `editor.view.dispatch(tr)` が
+        // Tiptap の `onUpdate` を発火し、上位 (`useEditorSetup`) で
+        // `onChange(JSON.stringify(editor.getJSON()))` が呼ばれる。
+        // ここで明示的に呼ぶと二重呼び出しになるため呼ばない。
+        // The dispatch inside `applyWikiLinkMarksToEditor` triggers Tiptap's
+        // `onUpdate`, which already invokes `onChange` upstream. Calling it
+        // again here would double-fire the downstream state update.
+        applyWikiLinkMarksToEditor(editor);
       } catch (e) {
         console.error("[WikiLinkNormalize] Failed to normalize post-sync marks", e);
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [editor, isCollabSynced, onChange]);
+    // `pageId` を deps に含めることで、エディタインスタンスが使い回されたまま
+    // ページ遷移したケース (上の reset effect が ref を false に戻すケース) でも
+    // この effect が再実行されて正規化が走るようにする。
+    // `pageId` is in deps so that when the editor instance is reused across
+    // page navigation, the reset effect above flips the guard back to false
+    // AND this effect re-runs to perform the normalization on the new page.
+  }, [editor, isCollabSynced, pageId]);
 
   usePasteImageHandler({ editor, handleImageUpload });
 
