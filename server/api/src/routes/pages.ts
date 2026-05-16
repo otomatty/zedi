@@ -38,12 +38,21 @@ import { pageRowToWindowItem } from "./notes/eventHelpers.js";
  * ロックで page_contents を更新し、競合した場合は in-memory バッファだけ
  * 正規化したまま返す（次回保存で自然に追従する）。
  *
+ * 楽観ロックでの永続化に成功した場合は、新しい `wikiLink` mark に対応する
+ * `links` / `ghost_links` を再構築するため `tryGraphSync` を fire-and-forget
+ * で呼ぶ。PR #887 のレビュー（CodeRabbit）で指摘された、GET 経路の lazy
+ * migration ではグラフ同期が走らずバックリンクが古いまま残る問題への対応。
+ *
  * Lazy migration helper for the GET path: ensures the bytes returned by
  * `/api/pages/:id/content` never contain unmarked `[[Title]]` plain text,
  * eliminating the y-prosemirror `unexpectedCase` boundary case from Issue
  * #880 Phase B. When marks are applied, persist with optimistic locking;
  * on lock conflict, return the normalized buffer in-memory only and let
  * the next save reconcile.
+ *
+ * When persistence succeeds, fire `tryGraphSync` so `links` / `ghost_links`
+ * are rebuilt to reflect the newly added `wikiLink` marks (PR #887 review
+ * by CodeRabbit: GET-side migration must not leave the graph stale).
  */
 async function normalizeWikiLinksOnRead(
   db: Database,
@@ -80,6 +89,13 @@ async function normalizeWikiLinksOnRead(
       .returning({ version: pageContents.version, updatedAt: pageContents.updatedAt });
     const row = updated[0];
     if (row) {
+      // 永続化に成功した場合のみ `links` / `ghost_links` を再構築する。楽観
+      // ロックが競合した場合は別経路の保存が同時に走っており、そちらが自分の
+      // タイミングでグラフ同期を発火するためここからは呼ばない。
+      // Trigger graph sync only when our optimistic-lock update actually wrote
+      // the new bytes. On lock conflict, a concurrent writer owns the next
+      // graph-sync invocation, so we stay silent here.
+      tryGraphSync(db, pageId);
       return {
         buffer: normalized,
         version: row.version ?? version + 1,

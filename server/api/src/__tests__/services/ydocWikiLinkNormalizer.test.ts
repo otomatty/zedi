@@ -176,6 +176,30 @@ describe("applyWikiLinkMarksToYDoc", () => {
     expect(text.toDelta()).toEqual([{ insert: "[[Foo]]" }]);
   });
 
+  it("skips text nested under a code-container via an intermediate element", () => {
+    // 将来 `codeBlock > customNode > text` のようなスキーマ拡張が行われても、
+    // 祖先のいずれかが code-container ならテキストはリテラル扱いになることを
+    // 検証する（Gemini レビュー指摘 #887: 直近親だけのチェックでは取りこぼし）。
+    // Verify that nested text deeper than one level under a code-container
+    // is still skipped — the `inCodeContainer` flag must propagate through
+    // intermediate elements (Gemini review #887: checking only the immediate
+    // parent would let nested text slip through).
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("default");
+    const codeBlock = new Y.XmlElement("codeBlock");
+    fragment.insert(0, [codeBlock]);
+    const customNode = new Y.XmlElement("customNode");
+    codeBlock.insert(0, [customNode]);
+    const text = new Y.XmlText();
+    customNode.insert(0, [text]);
+    text.insert(0, "see [[Foo]] should stay literal");
+
+    const result = applyWikiLinkMarksToYDoc(doc);
+
+    expect(result.marksApplied).toBe(0);
+    expect(text.toDelta()).toEqual([{ insert: "see [[Foo]] should stay literal" }]);
+  });
+
   it("skips empty title `[[   ]]`", () => {
     const { doc, text } = buildParagraphDoc([{ insert: "garbage [[   ]] here" }]);
 

@@ -106,15 +106,25 @@ interface PendingFormat {
  * Walk a single Y.XmlText, collect format candidates for unmarked
  * `[[Title]]` runs, then apply them all in one pass. Position math uses the
  * segment offsets from `toDelta()`; embeds occupy one position each.
+ *
+ * `inCodeContainer` は祖先のいずれかが code-container ノードであるかを示す
+ * 伝播フラグ。直近の親だけを見ると、将来 codeBlock → customNode → text の
+ * ようなネストが追加されたときにスキップを取りこぼすため、`walk` 側で OR
+ * 伝播した結果を受け取って判定する。
+ *
+ * `inCodeContainer` is propagated from `walk` and is `true` when any
+ * ancestor — not just the immediate parent — is a code-container node.
+ * Checking only the direct parent would miss cases like codeBlock →
+ * customNode → text if the schema ever nests an intermediate element.
  */
 function normalizeText(
   text: Y.XmlText,
-  parentTypeName: string,
+  inCodeContainer: boolean,
   result: NormalizeWikiLinkResult,
 ): void {
-  // 親が code-block ノードなら、内側のテキストはリテラル扱いで全スキップ。
-  // If the parent is a code-container node, leave all text alone.
-  if (CODE_CONTAINER_TYPES.has(parentTypeName)) return;
+  // 祖先のいずれかが code-container ならテキストはリテラル扱いで全スキップ。
+  // Skip if any ancestor is a code-container node.
+  if (inCodeContainer) return;
 
   const delta = text.toDelta() as Array<{ insert: unknown; attributes?: Record<string, unknown> }>;
   if (delta.length === 0) return;
@@ -181,15 +191,17 @@ function normalizeText(
 type XmlChild = Y.XmlFragment | Y.XmlElement | Y.XmlText | Y.XmlHook;
 
 /**
- * XmlFragment / XmlElement を再帰的に走査し、各 Y.XmlText の親要素名を
- * `normalizeText` に渡して code-container 判定を行わせる。
+ * XmlFragment / XmlElement を再帰的に走査する。`inCodeContainer` を
+ * OR 伝播することで、深さに関わらず祖先のどこかが code-container ノード
+ * であればテキストをリテラル扱いにできる。
  *
- * Recursively walk `node`; carry the parent's `nodeName` into `normalizeText`
- * so it can short-circuit code-container subtrees without re-traversing them.
+ * Recursively walk `node`. The `inCodeContainer` flag is OR-propagated, so
+ * any text whose ancestor chain contains a code-container node is preserved
+ * verbatim regardless of nesting depth (e.g. `codeBlock > customNode > text`).
  */
 function walk(
   node: Y.XmlFragment | Y.XmlElement,
-  parentTypeName: string,
+  inCodeContainer: boolean,
   result: NormalizeWikiLinkResult,
 ): void {
   // `node.get(i)` は Yjs の連結リストを毎回頭から辿るため、インデックス
@@ -202,9 +214,10 @@ function walk(
   const children = node.toArray() as XmlChild[];
   for (const child of children) {
     if (child instanceof Y.XmlText) {
-      normalizeText(child, parentTypeName, result);
+      normalizeText(child, inCodeContainer, result);
     } else if (child instanceof Y.XmlElement) {
-      walk(child, child.nodeName, result);
+      const nextInCodeContainer = inCodeContainer || CODE_CONTAINER_TYPES.has(child.nodeName);
+      walk(child, nextInCodeContainer, result);
     }
     // Y.XmlHook は Tiptap の既定スキーマでは現れないためスキップ。
     // Y.XmlHook is not part of the default Tiptap schema; skip it.
@@ -237,7 +250,7 @@ export function applyWikiLinkMarksToYDoc(
   // Wrap in a single `transact` so observers fire once and the origin label
   // makes the source traceable in Hocuspocus / graph-sync logs.
   doc.transact(() => {
-    walk(fragment, "", result);
+    walk(fragment, false, result);
   }, "wikilink-normalize");
 
   return result;
