@@ -160,6 +160,52 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Total: $TOTAL**" >> $GITHUB_STEP_SUMMARY
 
+  e2e-web:
+    name: E2E (web)
+    # PDF 知識化フローの Web (非 Tauri) 側を Playwright で守るための job。
+    # 現状は issue #863 で追加した `pdf-knowledge.spec.ts` のみを実行する。
+    # 既存の他 spec (web-clipper, page-editor, ...) は CI 未通過のものが
+    # 混ざっている可能性が高いため、別 PR で順次取り込む。
+    #
+    # Phase 2 (issue #863 follow-up): Tauri デスクトップ E2E は `tauri-driver`
+    # を要するため、本 job ではなく専用の job (`e2e-tauri`) として追加予定。
+    #
+    # Playwright job guarding the web-side (non-Tauri) of the PDF knowledge
+    # ingestion flow added by #863. Limited to the new `pdf-knowledge.spec.ts`
+    # for now; the existing e2e specs (web-clipper, page-editor, …) have not
+    # been wired into CI before and may regress separately — they are queued
+    # for a follow-up PR rather than risking a noisy first integration.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+
+      - run: bun install --frozen-lockfile
+
+      # Playwright のブラウザバイナリ + 必要な OS 依存を入れる。
+      # Install Playwright's browser binaries plus the matching OS deps.
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run PDF knowledge E2E
+        run: bunx playwright test e2e/pdf-knowledge.spec.ts
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-pdf-knowledge
+          path: playwright-report/
+          retention-days: 7
+
   api-typecheck:
     name: API Type Check
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
