@@ -49,7 +49,10 @@ const NoteView: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const noteSource = source === "remote" ? "remote" : "local";
-  const { canEdit, canShowAddPage, canManageMembers } = getNoteViewPermissions(access, noteSource);
+  const { canView, canEdit, canShowAddPage, canManageMembers } = getNoteViewPermissions(
+    access,
+    noteSource,
+  );
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
 
@@ -159,6 +162,7 @@ const NoteView: React.FC = () => {
             <NoteViewHeaderActions
               note={note}
               canManageMembers={canManageMembers}
+              canView={canView}
               userRole={access?.role ?? "none"}
             />
           </div>

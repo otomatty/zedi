@@ -39,6 +39,7 @@
   "untitledNote": "無題のノート",
   "noPermissionToEdit": "設定を変更する権限がありません。",
   "openSettings": "設定を開く",
+  "openShareSettingsReadOnly": "共有設定を確認",
   "copyShareUrlAria": "共有 URL をコピー",
   "settingsNav": {
     "ariaLabel": "ノート設定セクション",
