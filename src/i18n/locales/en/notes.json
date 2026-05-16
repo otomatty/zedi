@@ -220,18 +220,5 @@
   "domainTabCreateFailedInvalid": "The domain format is invalid.",
   "domainTabCreateFailedEmpty": "Enter a domain.",
   "domainTabRemoved": "Domain rule removed",
-  "domainTabRemoveFailed": "Failed to remove domain rule",
-  "search": {
-    "placeholder": "Search pages in this note…",
-    "ariaLabel": "Search pages in this note",
-    "clear": "Clear search",
-    "resultsLabel": "Search results",
-    "loading": "Searching…",
-    "loadingMore": "Loading…",
-    "loadMore": "Show more results",
-    "refreshing": "Refreshing…",
-    "noResults": "No pages found for \"{{query}}\".",
-    "untitled": "(untitled)",
-    "error": "Failed to load search results."
-  }
+  "domainTabRemoveFailed": "Failed to remove domain rule"
 }
