@@ -263,6 +263,33 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: node scripts/check-drizzle-migrations.mjs
 
+  drizzle-schema-drift-check:
+    name: Drizzle Schema Drift Check
+    # `pgTable("name", ...)` で宣言された全テーブルが、checked-in な
+    # `server/api/drizzle/*.sql` の `CREATE TABLE` に対応しているかをリポジトリ
+    # 全体で検査する。`drizzle-migration-check` は同一 PR 内のペア漏れしか
+    # 拾えなかったため、本ジョブは push / PR 双方で実行し、過去から放置されて
+    # いた drift（例: Issue #878 の `page_snapshots`）も検出する。
+    #
+    # Repo-wide audit ensuring every `pgTable("name", ...)` is actually created
+    # by a checked-in migration. `drizzle-migration-check` only covers
+    # within-PR pair omissions, so this job runs on push + PR to also catch
+    # historical drift like the `page_snapshots` regression in Issue #878.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Unit-test drift extractors (regex + allowlist logic)
+        run: node --test scripts/check-drizzle-schema-drift.test.mjs
+
+      - name: Audit repository schema ↔ migration drift
+        run: node scripts/check-drizzle-schema-drift.mjs
+
   mcp-test:
     name: MCP Server Tests
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
