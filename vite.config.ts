@@ -72,6 +72,11 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
     },
     optimizeDeps: {
+      // `pdfjs-dist` を事前バンドルに含めておかないと、毎回のコールドスタートで
+      // Vite が再評価し、初期化コストが累積する。
+      // Force `pdfjs-dist` to be pre-bundled so Vite doesn't re-evaluate it on
+      // every cold start.
+      include: ["pdfjs-dist"],
       esbuildOptions: {
         target: "esnext",
       },

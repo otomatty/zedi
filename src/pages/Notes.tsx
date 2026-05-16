@@ -9,6 +9,7 @@ import { NoteCard } from "@/components/note/NoteCard";
 import { NoteEditPermissionControls } from "@/components/note/NoteEditPermissionControls";
 import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
 import { shouldConfirmPublicAnyLoggedInSave } from "@/lib/noteSharingRisk";
+import { OpenPdfButton } from "@/components/pdf-reader/OpenPdfButton";
 import { Button } from "@zedi/ui";
 import {
   AlertDialog,
@@ -242,26 +243,31 @@ const Notes: React.FC = () => {
     <NotesLayout>
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{t("notes.title")}</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              {t("notes.newNote")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <CreateNoteDialogContent
-              title={title}
-              setTitle={setTitle}
-              visibility={visibility}
-              setVisibility={setVisibility}
-              editPermission={editPermission}
-              setEditPermission={setEditPermission}
-              onCreate={handleCreate}
-              isPending={createNoteMutation.isPending}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          {/* デスクトップ専用の PDF 取り込みエントリ。Web ビルドでは非表示。 */}
+          {/* Desktop-only "Open PDF" entry. Hidden on the web build. */}
+          <OpenPdfButton />
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                {t("notes.newNote")}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <CreateNoteDialogContent
+                title={title}
+                setTitle={setTitle}
+                visibility={visibility}
+                setVisibility={setVisibility}
+                editPermission={editPermission}
+                setEditPermission={setEditPermission}
+                onCreate={handleCreate}
+                isPending={createNoteMutation.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <AlertDialog
