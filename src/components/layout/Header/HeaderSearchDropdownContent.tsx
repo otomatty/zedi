@@ -1,6 +1,7 @@
-import { FileText, Link as LinkIcon, ArrowRight } from "lucide-react";
+import { FileText, Link as LinkIcon, ArrowRight, BookOpen } from "lucide-react";
 import { PopoverContent } from "@zedi/ui";
 import { cn } from "@zedi/ui";
+import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
 
 const EMPTY_MESSAGE = "ページが見つかりません";
 
@@ -11,7 +12,7 @@ export interface HeaderSearchDropdownContentProps {
   hasContent: boolean;
   showEmpty: boolean;
   showResults: boolean;
-  searchResults: Array<{ pageId: string; noteId?: string; title: string; sourceUrl?: string }>;
+  searchResults: GlobalSearchResultItem[];
   itemCount: number;
   activeIndex: number;
   query: string;
@@ -19,10 +20,26 @@ export interface HeaderSearchDropdownContentProps {
   listRef: React.RefObject<HTMLUListElement | null>;
   footerRef: React.RefObject<HTMLButtonElement | null>;
   getOptionId: (index: number) => string;
-  onSelectItem: (pageId: string, noteId?: string) => void;
+  onSelectItem: (item: GlobalSearchResultItem) => void;
   setActiveIndex: (value: number | ((prev: number) => number)) => void;
   closeDropdown: () => void;
   handleSearchSubmit: () => void;
+}
+
+/**
+ * Issue #864 でグローバル検索結果に PDF ハイライト型 (`kind="pdf_highlight"`) が
+ * 加わったので、`key` と `aria-label` をアイテム種別ごとに分岐して安定化させる。
+ * 既存ノートページ / 個人ページの key 形式は維持し、追加分だけ別 prefix にする。
+ *
+ * Issue #864 introduced `kind="pdf_highlight"` rows; the React `key` and the
+ * accessible label branch on `kind` so the existing page-row keys stay stable
+ * and the new highlight rows get a distinct, collision-free namespace.
+ */
+function getResultKey(item: GlobalSearchResultItem): string {
+  if (item.kind === "pdf_highlight") {
+    return `pdf-${item.sourceId}-${item.highlightId}`;
+  }
+  return item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
 }
 
 /**
@@ -73,29 +90,37 @@ export function HeaderSearchDropdownContent({
             候補 ({searchResults.length}件)
           </p>
           <ul ref={listRef} className="list-none" role="group" aria-label="検索候補">
-            {searchResults.map(({ pageId, noteId, title, sourceUrl }, index) => (
-              <li key={noteId ? `shared-${noteId}-${pageId}` : `personal-${pageId}`} role="none">
-                <button
-                  id={getOptionId(index)}
-                  type="button"
-                  role="option"
-                  aria-selected={activeIndex === index}
-                  className={cn(
-                    "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none",
-                    activeIndex === index ? "bg-accent text-accent-foreground" : "hover:bg-muted",
-                  )}
-                  onClick={() => onSelectItem(pageId, noteId)}
-                  onMouseEnter={() => setActiveIndex(index)}
-                >
-                  {sourceUrl ? (
-                    <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-                  ) : (
-                    <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
-                  )}
-                  <span className="flex-1 truncate font-medium">{title}</span>
-                </button>
-              </li>
-            ))}
+            {searchResults.map((item, index) => {
+              const isPdf = item.kind === "pdf_highlight";
+              return (
+                <li key={getResultKey(item)} role="none">
+                  <button
+                    id={getOptionId(index)}
+                    type="button"
+                    role="option"
+                    aria-selected={activeIndex === index}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none",
+                      activeIndex === index ? "bg-accent text-accent-foreground" : "hover:bg-muted",
+                    )}
+                    onClick={() => onSelectItem(item)}
+                    onMouseEnter={() => setActiveIndex(index)}
+                  >
+                    {isPdf ? (
+                      <BookOpen className="text-muted-foreground h-4 w-4 shrink-0" />
+                    ) : item.kind === "page" && item.sourceUrl ? (
+                      <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+                    ) : (
+                      <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+                    )}
+                    <span className="flex-1 truncate font-medium">{item.title}</span>
+                    {isPdf && (
+                      <span className="text-muted-foreground shrink-0 text-[10px]">PDF</span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

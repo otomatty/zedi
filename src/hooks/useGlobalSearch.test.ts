@@ -2,10 +2,17 @@ import { describe, it, expect } from "vitest";
 import {
   searchPages,
   buildGlobalSearchResults,
+  buildPdfHighlightItem,
   dedupSharedRowsAgainstPersonal,
+  PDF_HIGHLIGHT_BASE_SCORE,
+  type GlobalSearchResultItem,
 } from "./useGlobalSearch";
 import type { Page } from "@/types/page";
-import type { SearchSharedResponse } from "@/lib/api/types";
+import type {
+  SearchPageResultRow,
+  SearchPdfHighlightResultRow,
+  SearchResultRow,
+} from "@/lib/api/types";
 import { createPlainTextContent } from "@/test/testDatabase";
 import { parseSearchQuery } from "@/lib/searchUtils";
 
@@ -271,26 +278,46 @@ describe("searchPages", () => {
 });
 
 /**
- * 共有検索の row 雛形を作るテストヘルパー。サーバーは個人ページも `note_id IS NULL`
- * で返してくる仕様 (Issue #718 Phase 5-1) なので、両方のケースを並べて検証できる
- * よう `note_id` を任意で受け取る。
+ * 共有検索のページ行を作るテストヘルパー。`kind="page"` を default で埋める。
  *
- * Test helper that builds a `SearchSharedResponse` row. The server still
- * returns personal pages with `note_id: null` under `scope=shared`, so the
- * tests below need to construct both shapes side-by-side.
+ * Test helper that builds a `kind="page"` row for the shared-search response.
  */
 function createSharedRow(
-  overrides: Partial<SearchSharedResponse["results"][number]> &
-    Pick<SearchSharedResponse["results"][number], "id">,
-): SearchSharedResponse["results"][number] {
+  overrides: Partial<SearchPageResultRow> & Pick<SearchPageResultRow, "id">,
+): SearchPageResultRow {
   return {
+    kind: "page",
     id: overrides.id,
-    note_id: null,
+    note_id: "note-default" as string,
     owner_id: "u1",
     title: "shared",
     content_preview: "preview",
     thumbnail_url: null,
     source_url: null,
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  } as SearchPageResultRow;
+}
+
+/**
+ * Issue #864: PDF ハイライト行を作るテストヘルパー。
+ *
+ * Issue #864: builds a `kind="pdf_highlight"` row for the shared-search response.
+ */
+function createHighlightRow(
+  overrides: Partial<SearchPdfHighlightResultRow> &
+    Pick<SearchPdfHighlightResultRow, "highlight_id">,
+): SearchPdfHighlightResultRow {
+  return {
+    kind: "pdf_highlight",
+    highlight_id: overrides.highlight_id,
+    source_id: "src-1",
+    owner_id: "u1",
+    pdf_page: 1,
+    text: "highlighted body",
+    derived_page_id: null,
+    source_display_name: "paper.pdf",
+    source_title: null,
     updated_at: new Date().toISOString(),
     ...overrides,
   };
@@ -327,14 +354,17 @@ describe("buildGlobalSearchResults", () => {
       const query = "alpha";
       const keywords = parseSearchQuery(query);
       const personal: Page[] = [createPersonalPage("p1", "alpha")];
-      const shared = [
-        createSharedRow({ id: "p1", note_id: null, title: "alpha" }),
+      const shared: SearchResultRow[] = [
+        createSharedRow({ id: "p1", note_id: "note-1", title: "alpha" }),
         createSharedRow({ id: "p2", note_id: "note-1", title: "alpha note" }),
       ];
 
       const results = buildGlobalSearchResults(personal, shared, query, keywords);
 
-      const ids = results.map((r) => r.pageId).sort();
+      const ids = results
+        .filter((r): r is Extract<GlobalSearchResultItem, { kind: "page" }> => r.kind === "page")
+        .map((r) => r.pageId)
+        .sort();
       // `p1` だけが personal 由来で 1 回、`p2` がノート由来で 1 回。
       // `p1` only appears once (personal), `p2` once (shared note-native).
       expect(ids).toEqual(["p1", "p2"]);
@@ -343,93 +373,186 @@ describe("buildGlobalSearchResults", () => {
     it("keeps note-native shared rows with noteId for canonical /notes/:noteId/:pageId routing", () => {
       const query = "alpha";
       const keywords = parseSearchQuery(query);
-      const shared = [createSharedRow({ id: "p3", note_id: "note-9", title: "alpha shared" })];
+      const shared: SearchResultRow[] = [
+        createSharedRow({ id: "p3", note_id: "note-9", title: "alpha shared" }),
+      ];
 
       const results = buildGlobalSearchResults([], shared, query, keywords);
 
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
+        kind: "page",
         pageId: "p3",
         noteId: "note-9",
       });
     });
 
-    it("preserves linked personal pages (note_id IS NULL) not present in IDB", () => {
-      // 他ユーザー所有のリンク済み個人ページや、IDB がまだ hydrate されて
-      // いない時点での自分の個人ページ。`note_id IS NULL` だが personal 結果に
-      // 居ないので shared 側に残す必要がある (Codex / CodeRabbit 指摘)。
-      //
-      // Linked personal pages owned by other note members — or the caller's
-      // own personal pages before IDB has hydrated — have `note_id IS NULL`
-      // but are not yet in the personal results, so they must survive the
-      // dedup (Codex / CodeRabbit review).
+    it("does not over-drop when IDB has not loaded yet", () => {
       const query = "alpha";
       const keywords = parseSearchQuery(query);
-      const shared = [
-        createSharedRow({
-          id: "linked-personal",
-          note_id: null,
-          title: "alpha linked personal",
-          owner_id: "other-user",
+      const shared: SearchResultRow[] = [
+        createSharedRow({ id: "a", note_id: "n2", title: "alpha" }),
+        createSharedRow({ id: "b", note_id: "n1", title: "alpha b" }),
+      ];
+
+      const results = buildGlobalSearchResults([], shared, query, keywords);
+
+      const ids = results
+        .filter((r): r is Extract<GlobalSearchResultItem, { kind: "page" }> => r.kind === "page")
+        .map((r) => r.pageId)
+        .sort();
+      expect(ids).toEqual(["a", "b"]);
+    });
+
+    it("returns empty when query is shorter than 3 chars", () => {
+      const query = "ab";
+      const shared: SearchResultRow[] = [createSharedRow({ id: "p1", note_id: "n1" })];
+      const results = buildGlobalSearchResults([], shared, query, parseSearchQuery(query));
+      expect(results).toEqual([]);
+    });
+  });
+
+  // ── Issue #864: PDF ハイライト統合 ─────────────────────────────────────────
+  describe("Issue #864: PDF highlight integration", () => {
+    it("includes pdf_highlight rows as kind='pdf_highlight' items with deep-link fields", () => {
+      const query = "alpha";
+      const keywords = parseSearchQuery(query);
+      const shared: SearchResultRow[] = [
+        createHighlightRow({
+          highlight_id: "h-1",
+          source_id: "src-100",
+          pdf_page: 12,
+          text: "alpha appears in this passage",
+          derived_page_id: "derived-1",
         }),
       ];
 
       const results = buildGlobalSearchResults([], shared, query, keywords);
 
       expect(results).toHaveLength(1);
-      expect(results[0].pageId).toBe("linked-personal");
-      // `noteId` は undefined のままなので、UI 側は /pages/:id にルーティングする。
-      // `noteId` stays undefined so the UI routes to /pages/:id.
-      expect(results[0].noteId).toBeUndefined();
+      const item = results[0];
+      expect(item.kind).toBe("pdf_highlight");
+      if (item.kind !== "pdf_highlight") throw new Error("type narrowing");
+      expect(item).toMatchObject({
+        highlightId: "h-1",
+        sourceId: "src-100",
+        pdfPage: 12,
+        derivedPageId: "derived-1",
+      });
+      expect(item.highlightedText).toContain("【alpha】");
     });
 
-    it("does not over-drop when IDB has not loaded yet", () => {
-      // 初回ロード等で `useSearchPages` が空配列を返す場合、shared 結果は
-      // 何も落とされず全件残るはず。
-      // When IDB has not hydrated and `useSearchPages` returns [], every
-      // shared row must survive — otherwise the user sees no hits at all.
+    it("keeps the priority order: title > content > pdf_highlight body", () => {
       const query = "alpha";
       const keywords = parseSearchQuery(query);
-      const shared = [
-        createSharedRow({ id: "a", note_id: null, title: "alpha" }),
-        createSharedRow({ id: "b", note_id: "n1", title: "alpha b" }),
+      // title 一致のページ / content 一致のページ / pdf_highlight 行
+      // Title match page / content match page / pdf highlight row.
+      const personal: Page[] = [createPersonalPage("page-title", "alpha header")];
+      const shared: SearchResultRow[] = [
+        createSharedRow({
+          id: "page-content",
+          note_id: "n1",
+          title: "shared note",
+          content_preview: "this mentions alpha somewhere",
+        }),
+        createHighlightRow({
+          highlight_id: "h-9",
+          text: "alpha in PDF body",
+        }),
       ];
 
-      const results = buildGlobalSearchResults([], shared, query, keywords);
+      const results = buildGlobalSearchResults(personal, shared, query, keywords);
 
-      expect(results.map((r) => r.pageId).sort()).toEqual(["a", "b"]);
+      expect(results).toHaveLength(3);
+      expect(results[0]).toMatchObject({ kind: "page", pageId: "page-title" });
+      // The shared content-match page should outrank the pdf_highlight row.
+      // 共有のコンテンツ一致ページが PDF ハイライト行より上位に来る。
+      expect(results[1]).toMatchObject({ kind: "page", pageId: "page-content" });
+      expect(results[2]).toMatchObject({ kind: "pdf_highlight", highlightId: "h-9" });
     });
 
-    it("returns empty when query is shorter than 3 chars", () => {
-      const query = "ab";
-      const shared = [createSharedRow({ id: "p1", note_id: "n1" })];
-      const results = buildGlobalSearchResults([], shared, query, parseSearchQuery(query));
-      expect(results).toEqual([]);
+    it("does not dedup pdf_highlight rows against personal page ids (separate entity)", () => {
+      const query = "alpha";
+      const keywords = parseSearchQuery(query);
+      // page id と highlight id が偶然同じ値でも、別エンティティなので両方残る。
+      // Even when a personal page id collides with a highlight id, both
+      // survive — highlights live in their own table.
+      const personal: Page[] = [createPersonalPage("collision-id", "alpha title")];
+      const shared: SearchResultRow[] = [
+        createHighlightRow({ highlight_id: "collision-id", text: "alpha body" }),
+      ];
+
+      const results = buildGlobalSearchResults(personal, shared, query, keywords);
+
+      expect(results).toHaveLength(2);
+      expect(results.some((r) => r.kind === "page" && r.pageId === "collision-id")).toBe(true);
+      expect(
+        results.some((r) => r.kind === "pdf_highlight" && r.highlightId === "collision-id"),
+      ).toBe(true);
     });
+  });
+});
+
+describe("buildPdfHighlightItem", () => {
+  it("builds a UI item with display name, page number, and highlighted text", () => {
+    const row = createHighlightRow({
+      highlight_id: "h-42",
+      source_id: "src-42",
+      pdf_page: 7,
+      text: "the quick brown alpha jumps",
+      source_display_name: "spec.pdf",
+    });
+    const item = buildPdfHighlightItem(row, ["alpha"]);
+
+    expect(item).toMatchObject({
+      kind: "pdf_highlight",
+      highlightId: "h-42",
+      sourceId: "src-42",
+      pdfPage: 7,
+      sourceDisplayName: "spec.pdf",
+      score: PDF_HIGHLIGHT_BASE_SCORE,
+    });
+    expect(item.highlightedText).toContain("【alpha】");
+    // タイトルにファイル名とページ番号が含まれる。
+    // Title includes both the file name and the page number.
+    expect(item.title).toContain("spec.pdf");
+    expect(item.title).toContain("7");
+  });
+
+  it("falls back to PDF title when display name is missing", () => {
+    const row = createHighlightRow({
+      highlight_id: "h-43",
+      source_display_name: null,
+      source_title: "From PDF Metadata",
+    });
+    const item = buildPdfHighlightItem(row, ["body"]);
+    expect(item.sourceDisplayName).toBe("From PDF Metadata");
   });
 });
 
 describe("dedupSharedRowsAgainstPersonal (Issue #718 Phase 5-4)", () => {
   it("drops rows whose id is in the personal id set", () => {
-    const rows = [
-      createSharedRow({ id: "p1", note_id: null }),
+    const rows: SearchResultRow[] = [
+      createSharedRow({ id: "p1", note_id: "n2" }),
       createSharedRow({ id: "p2", note_id: "n1" }),
-      createSharedRow({ id: "p3", note_id: null }),
+      createSharedRow({ id: "p3", note_id: "n3" }),
     ];
     const personalIds = new Set(["p1"]);
 
     const filtered = dedupSharedRowsAgainstPersonal(rows, personalIds);
 
-    // `p1` だけが personal 由来で重複、`p2`/`p3` は残る (リンク済み個人 / ノート)。
-    // Only `p1` overlaps with the personal result set; `p2` (note-native) and
-    // `p3` (linked personal not in IDB) survive.
-    expect(filtered.map((r) => r.id).sort()).toEqual(["p2", "p3"]);
+    expect(
+      filtered
+        .filter((r): r is SearchPageResultRow => r.kind === "page")
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(["p2", "p3"]);
   });
 
   it("keeps every row when the personal id set is empty (IDB not hydrated)", () => {
-    const rows = [
-      createSharedRow({ id: "p1", note_id: null }),
-      createSharedRow({ id: "p2", note_id: "n1" }),
+    const rows: SearchResultRow[] = [
+      createSharedRow({ id: "p1", note_id: "n1" }),
+      createSharedRow({ id: "p2", note_id: "n2" }),
     ];
     const filtered = dedupSharedRowsAgainstPersonal(rows, new Set());
     expect(filtered).toHaveLength(2);
@@ -437,5 +560,20 @@ describe("dedupSharedRowsAgainstPersonal (Issue #718 Phase 5-4)", () => {
 
   it("handles empty input", () => {
     expect(dedupSharedRowsAgainstPersonal([], new Set(["p1"]))).toEqual([]);
+  });
+
+  // Issue #864: pdf_highlight 行は別エンティティなので、page id とぶつかっても落とさない。
+  // Issue #864: highlight rows live in a separate table; never dropped by page-id dedup.
+  it("never drops pdf_highlight rows by id collision with personal pages", () => {
+    const rows: SearchResultRow[] = [
+      createSharedRow({ id: "shared-page", note_id: "n1" }),
+      createHighlightRow({ highlight_id: "shared-page", text: "body" }),
+    ];
+    const personalIds = new Set(["shared-page"]);
+
+    const filtered = dedupSharedRowsAgainstPersonal(rows, personalIds);
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].kind).toBe("pdf_highlight");
   });
 });
