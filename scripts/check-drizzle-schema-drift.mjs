@@ -72,11 +72,14 @@ export const SCHEMA_DIR = "server/api/src/schema";
 export const MIGRATION_DIR = "server/api/drizzle";
 
 /**
- * `pgTable("name", ...)` の抽出パターン。改行や空白を許容する。
+ * `pgTable("name", ...)` の抽出パターン。改行や空白を許容し、Drizzle が許す
+ * 任意のテーブル名文字列（ハイフン・先頭数字なども含む）を捕捉する。
  * Match `pgTable("name", ...)` allowing whitespace and newlines before the
- * first string argument.
+ * first string argument. The capture group accepts any character that is not
+ * a quote or newline so legal-but-non-identifier names (hyphenated, leading
+ * digit) are not silently skipped.
  */
-const PG_TABLE_PATTERN = /\bpgTable\s*\(\s*["']([a-zA-Z_][a-zA-Z0-9_]*)["']/g;
+const PG_TABLE_PATTERN = /\bpgTable\s*\(\s*["']([^"'\n]+)["']/g;
 
 /**
  * `CREATE TABLE [IF NOT EXISTS] "name"` の抽出パターン。
@@ -154,31 +157,63 @@ export function extractMigrationDroppedTables(content) {
 }
 
 /**
- * Schema にあるが migration に対応する CREATE TABLE が無い（または後で
- * DROP されている）テーブルを列挙する。allowlist に含まれるテーブルは除外する。
+ * Migration を chronological 順に再生して、最終的に存在するテーブル集合を返す。
  *
- * Compute the set of schema tables that have no live `CREATE TABLE` in the
- * migration history (never created, or created and later dropped). Entries
- * in `allowlist` are excluded so pre-existing drift does not break CI.
+ * `CREATE TABLE` と `DROP TABLE` をファイル名順 → ファイル内位置順で再生し、
+ * 各テーブルの最後の操作が CREATE のものだけを「live」として返す。これに
+ * より、`CREATE → DROP → CREATE` のような正規のテーブルリサイクルを drift
+ * と誤検出しない。呼び出し側は `migrations` をファイル名昇順で渡す責務を持つ。
+ *
+ * Replay every `CREATE TABLE` / `DROP TABLE` in chronological order (by file,
+ * then by in-file position) and return the set of tables whose last operation
+ * is a CREATE. Lets the checker accept a legitimate
+ * `create → drop → recreate` sequence as live. The caller must pass
+ * `migrations` already sorted by filename.
+ *
+ * @param {ReadonlyArray<{ file: string, content: string }>} migrations
+ * @returns {Set<string>} 最終的に存在するテーブル名 / live table names.
+ */
+export function computeLiveTables(migrations) {
+  /** @type {Map<string, "created" | "dropped">} */
+  const state = new Map();
+  for (const { content } of migrations) {
+    /** @type {Array<{ pos: number, table: string, op: "created" | "dropped" }>} */
+    const transitions = [];
+    for (const m of content.matchAll(CREATE_TABLE_PATTERN)) {
+      transitions.push({ pos: m.index ?? 0, table: m[1], op: "created" });
+    }
+    for (const m of content.matchAll(DROP_TABLE_PATTERN)) {
+      transitions.push({ pos: m.index ?? 0, table: m[1], op: "dropped" });
+    }
+    transitions.sort((a, b) => a.pos - b.pos);
+    for (const t of transitions) state.set(t.table, t.op);
+  }
+  const live = new Set();
+  for (const [table, op] of state) {
+    if (op === "created") live.add(table);
+  }
+  return live;
+}
+
+/**
+ * Schema にあるが migration の最終状態で存在しないテーブルを列挙する。
+ * allowlist に含まれるテーブルは既存ドリフトとして除外する。
+ *
+ * Compute the set of schema tables that are not live after replaying every
+ * migration. Entries in `allowlist` are excluded so pre-existing drift does
+ * not break CI.
  *
  * @param {object} args
  * @param {Set<string>} args.schemaTables - schema 由来のテーブル名集合.
- * @param {Set<string>} args.createdTables - migration の CREATE TABLE 集合.
- * @param {Set<string>} args.droppedTables - migration の DROP TABLE 集合.
+ * @param {Set<string>} args.liveTables - migration 再生後の live テーブル集合.
  * @param {Set<string>} args.allowlist - 既存ドリフトの許容リスト.
  * @returns {string[]} 修正が必要なテーブル名の昇順配列.
  */
-export function findMissingTables({ schemaTables, createdTables, droppedTables, allowlist }) {
+export function findMissingTables({ schemaTables, liveTables, allowlist }) {
   const missing = [];
   for (const name of schemaTables) {
     if (allowlist.has(name)) continue;
-    if (!createdTables.has(name)) {
-      missing.push(name);
-      continue;
-    }
-    if (droppedTables.has(name)) {
-      missing.push(name);
-    }
+    if (!liveTables.has(name)) missing.push(name);
   }
   return missing.sort();
 }
@@ -238,7 +273,11 @@ function isMigrationSqlFile(relativePath) {
  */
 function main() {
   const schemaFiles = listFiles(SCHEMA_DIR, [".ts"]).filter(isSchemaSourceFile);
-  const migrationFiles = listFiles(MIGRATION_DIR, [".sql"]).filter(isMigrationSqlFile);
+  // Migration ファイルは chronological 順（`0000_`, `0001_`, ...）に処理する
+  // 必要があるため、`readdirSync` の順序に頼らず明示的にソートする。
+  // Explicitly sort migration files so `computeLiveTables` sees them in the
+  // chronological order encoded by the `NNNN_` prefix.
+  const migrationFiles = listFiles(MIGRATION_DIR, [".sql"]).filter(isMigrationSqlFile).sort();
 
   /** @type {Map<string, string[]>} */
   const tableToSchemaFiles = new Map();
@@ -251,25 +290,22 @@ function main() {
     }
   }
 
-  const createdTables = new Set();
-  const droppedTables = new Set();
-  for (const file of migrationFiles) {
-    const content = readFileSync(join(REPO_ROOT, file), "utf8");
-    for (const t of extractMigrationCreatedTables(content)) createdTables.add(t);
-    for (const t of extractMigrationDroppedTables(content)) droppedTables.add(t);
-  }
+  const migrations = migrationFiles.map((file) => ({
+    file,
+    content: readFileSync(join(REPO_ROOT, file), "utf8"),
+  }));
+  const liveTables = computeLiveTables(migrations);
 
   const schemaTables = new Set(tableToSchemaFiles.keys());
   const missing = findMissingTables({
     schemaTables,
-    createdTables,
-    droppedTables,
+    liveTables,
     allowlist: ALLOWLIST,
   });
 
   if (missing.length === 0) {
     console.log(
-      `[check-drizzle-schema-drift] OK — ${schemaTables.size} schema tables are covered by ${createdTables.size} CREATE TABLE statements across ${migrationFiles.length} migration(s).`,
+      `[check-drizzle-schema-drift] OK — ${schemaTables.size} schema tables are covered by ${liveTables.size} live table(s) across ${migrationFiles.length} migration(s).`,
     );
     if (ALLOWLIST.size > 0) {
       console.log(
@@ -277,6 +313,17 @@ function main() {
       );
     }
     return;
+  }
+
+  // Drift と判定された各テーブルが「過去に存在したことがあるか」を表示するために、
+  // 「CREATE TABLE が一度でも出現したか」を別途集計する（live 集合だけでは
+  //  create→drop の区別がつかないため）。
+  // Build an "ever created" set separately so the FAIL output can flag the
+  // create-then-drop subcase (live alone cannot distinguish "never created"
+  // from "created then dropped").
+  const everCreated = new Set();
+  for (const m of migrations) {
+    for (const t of extractMigrationCreatedTables(m.content)) everCreated.add(t);
   }
 
   console.error("[check-drizzle-schema-drift] FAIL");
@@ -289,7 +336,7 @@ function main() {
   for (const table of missing) {
     const files = tableToSchemaFiles.get(table) ?? [];
     console.error(`  - ${table}  (declared in: ${files.join(", ") || "?"})`);
-    if (droppedTables.has(table)) {
+    if (everCreated.has(table)) {
       console.error(
         `      note: this table was CREATEd then later DROPped in a migration. Either re-add the CREATE or remove it from the TS schema.`,
       );

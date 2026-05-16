@@ -9,10 +9,14 @@
  *     を網羅できているかを保証する。
  *   - `pageSnapshots` のように schema にはあるが migration が無いケースが
  *     drift として検出できることをユニットテストで再現する。
+ *   - `CREATE → DROP → CREATE` のような正規のライフサイクルを drift と
+ *     誤検出しない（migration を chronological 順で評価する）。
  *
  *   Guarantee that the extraction regexes cover the patterns Zedi actually
- *   writes in this repo and that the missing-table detection reproduces the
- *   `page_snapshots` regression we hit on the develop Railway environment.
+ *   writes in this repo, that the missing-table detection reproduces the
+ *   `page_snapshots` regression we hit on the develop Railway environment,
+ *   and that legitimate `create → drop → recreate` sequences are not
+ *   misclassified as drift.
  *
  * 実行 / Run:
  *   node --test scripts/check-drizzle-schema-drift.test.mjs
@@ -25,6 +29,7 @@ import {
   extractSchemaTables,
   extractMigrationCreatedTables,
   extractMigrationDroppedTables,
+  computeLiveTables,
   findMissingTables,
 } from "./check-drizzle-schema-drift.mjs";
 
@@ -71,6 +76,18 @@ describe("extractSchemaTables", () => {
       'export const b = pgTable("dup", {});',
     ].join("\n");
     assert.deepEqual(extractSchemaTables(src), ["dup"]);
+  });
+
+  it("accepts non-identifier characters that are legal Postgres identifiers (hyphen, leading digit)", () => {
+    // Drizzle の pgTable は文字列であって JS 識別子ではないため、
+    // ハイフンや先頭数字を含む名前を抽出できる必要がある。
+    // pgTable accepts arbitrary strings, so the extractor must tolerate
+    // non-identifier characters like hyphens or leading digits.
+    const src = [
+      'export const a = pgTable("kebab-case", {});',
+      'export const b = pgTable("2024_archive", {});',
+    ].join("\n");
+    assert.deepEqual(extractSchemaTables(src).sort(), ["2024_archive", "kebab-case"]);
   });
 });
 
@@ -121,12 +138,70 @@ describe("extractMigrationDroppedTables", () => {
   });
 });
 
+describe("computeLiveTables", () => {
+  // computeLiveTables walks migrations in chronological order and returns the
+  // set of tables that exist after replaying every CREATE/DROP. The caller is
+  // responsible for passing migrations sorted by filename.
+  //
+  // chronological 順に CREATE/DROP を再生し、最終的に存在するテーブル集合を
+  // 返す。呼び出し側はファイル名順にソート済みの配列を渡す責務を持つ。
+
+  it("treats a single CREATE TABLE as live", () => {
+    const live = computeLiveTables([
+      { file: "0000_init.sql", content: 'CREATE TABLE "pages" ();' },
+    ]);
+    assert.deepEqual([...live].sort(), ["pages"]);
+  });
+
+  it("treats CREATE then DROP across files as not-live", () => {
+    const live = computeLiveTables([
+      { file: "0000_init.sql", content: 'CREATE TABLE "note_pages" ();' },
+      { file: "0023_drop.sql", content: 'DROP TABLE IF EXISTS "note_pages";' },
+    ]);
+    assert.deepEqual([...live], []);
+  });
+
+  it("treats CREATE → DROP → CREATE across files as live (recreated)", () => {
+    // Codex / Gemini レビューで指摘された誤検出の再発防止。
+    // Regression guard for the recreate case flagged by Codex / Gemini.
+    const live = computeLiveTables([
+      { file: "0000_init.sql", content: 'CREATE TABLE "audit_logs" ();' },
+      { file: "0010_drop.sql", content: 'DROP TABLE "audit_logs";' },
+      { file: "0020_recreate.sql", content: 'CREATE TABLE IF NOT EXISTS "audit_logs" ();' },
+    ]);
+    assert.deepEqual([...live].sort(), ["audit_logs"]);
+  });
+
+  it("uses the order of statements inside one file (DROP then CREATE → live)", () => {
+    // 同一ファイル内で DROP の後に CREATE がある場合、最終的にはテーブルが
+    // 存在する。statement の位置順で評価する。
+    // When a single migration drops then recreates a table, the final state
+    // is "exists"; honour the in-file statement order.
+    const live = computeLiveTables([
+      {
+        file: "0007_swap.sql",
+        content: 'DROP TABLE IF EXISTS "tmp";\nCREATE TABLE "tmp" ();',
+      },
+    ]);
+    assert.deepEqual([...live].sort(), ["tmp"]);
+  });
+
+  it("uses the order of statements inside one file (CREATE then DROP → not live)", () => {
+    const live = computeLiveTables([
+      {
+        file: "0007_swap.sql",
+        content: 'CREATE TABLE "tmp" ();\nDROP TABLE "tmp";',
+      },
+    ]);
+    assert.deepEqual([...live], []);
+  });
+});
+
 describe("findMissingTables", () => {
-  it("returns nothing when every schema table has a CREATE TABLE", () => {
+  it("returns nothing when every schema table is live", () => {
     const result = findMissingTables({
       schemaTables: new Set(["pages", "notes"]),
-      createdTables: new Set(["pages", "notes", "user"]),
-      droppedTables: new Set(),
+      liveTables: new Set(["pages", "notes", "user"]),
       allowlist: new Set(),
     });
     assert.deepEqual(result, []);
@@ -138,8 +213,7 @@ describe("findMissingTables", () => {
     // The schema referenced `page_snapshots` but no migration CREATEd it.
     const result = findMissingTables({
       schemaTables: new Set(["pages", "page_snapshots"]),
-      createdTables: new Set(["pages"]),
-      droppedTables: new Set(),
+      liveTables: new Set(["pages"]),
       allowlist: new Set(),
     });
     assert.deepEqual(result, ["page_snapshots"]);
@@ -150,8 +224,7 @@ describe("findMissingTables", () => {
     // would be a drift even though a historical CREATE TABLE exists.
     const result = findMissingTables({
       schemaTables: new Set(["note_pages"]),
-      createdTables: new Set(["note_pages"]),
-      droppedTables: new Set(["note_pages"]),
+      liveTables: new Set(), // create-then-drop ⇒ not live
       allowlist: new Set(),
     });
     assert.deepEqual(result, ["note_pages"]);
@@ -160,8 +233,7 @@ describe("findMissingTables", () => {
   it("does not flag a table that was DROPped and is no longer in the schema", () => {
     const result = findMissingTables({
       schemaTables: new Set(["pages"]),
-      createdTables: new Set(["pages", "note_pages"]),
-      droppedTables: new Set(["note_pages"]),
+      liveTables: new Set(["pages"]), // note_pages was created then dropped ⇒ not live, and not in schema
       allowlist: new Set(),
     });
     assert.deepEqual(result, []);
@@ -170,8 +242,7 @@ describe("findMissingTables", () => {
   it("respects the allowlist for pre-existing drift", () => {
     const result = findMissingTables({
       schemaTables: new Set(["note_invitations"]),
-      createdTables: new Set(),
-      droppedTables: new Set(),
+      liveTables: new Set(),
       allowlist: new Set(["note_invitations"]),
     });
     assert.deepEqual(result, []);
@@ -180,8 +251,7 @@ describe("findMissingTables", () => {
   it("returns missing tables in deterministic sorted order", () => {
     const result = findMissingTables({
       schemaTables: new Set(["z_table", "a_table", "m_table"]),
-      createdTables: new Set(),
-      droppedTables: new Set(),
+      liveTables: new Set(),
       allowlist: new Set(),
     });
     assert.deepEqual(result, ["a_table", "m_table", "z_table"]);
