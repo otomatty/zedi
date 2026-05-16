@@ -134,15 +134,19 @@ export interface UpdatePageMetadataBody {
 }
 
 /**
- * `PUT /api/pages/:id` レスポンス。
+ * `PUT /api/pages/:id` レスポンス。`title` / `content_preview` はスキーマ上 nullable
+ * のままだが、`updated_at` は `pages.updated_at` (`notNull`) を反映するため必ず
+ * 文字列。
  *
- * `PUT /api/pages/:id` response.
+ * `PUT /api/pages/:id` response. `title` / `content_preview` stay nullable to
+ * mirror the schema, while `updated_at` is always present because
+ * `pages.updated_at` is `notNull` in the DB.
  */
 export interface UpdatePageMetadataResponse {
   id: string;
   title: string | null;
   content_preview: string | null;
-  updated_at: string | null;
+  updated_at: string;
 }
 
 /**

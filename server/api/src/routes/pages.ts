@@ -913,6 +913,18 @@ app.put("/:id", authRequired, async (c) => {
     content_preview?: string;
   }>();
 
+  // 型バリデーション: ヘルパー (`applyPagesMetadataUpdate`) は `body.title.trim()`
+  // を呼ぶので、文字列以外が混ざると runtime 500 になる。境界で 400 に倒す。
+  // Validate field types so malformed payloads (e.g. `{ "title": 123 }`)
+  // are surfaced as 400 instead of crashing inside `applyPagesMetadataUpdate`'s
+  // `.trim()` call.
+  if (body.title !== undefined && typeof body.title !== "string") {
+    throw new HTTPException(400, { message: "`title` must be a string" });
+  }
+  if (body.content_preview !== undefined && typeof body.content_preview !== "string") {
+    throw new HTTPException(400, { message: "`content_preview` must be a string" });
+  }
+
   if (body.title === undefined && body.content_preview === undefined) {
     throw new HTTPException(400, {
       message: "At least one of `title` or `content_preview` is required",
@@ -928,11 +940,49 @@ app.put("/:id", authRequired, async (c) => {
   }
   emitPageUpdatedIfChanged(metadataChanged, updatedRow);
 
+  // no-op (現在値と同値を送信) のときは UPDATE がスキップされて `updatedRow` が
+  // null になる。クライアントのキャッシュを null で上書きしないよう、現在値を
+  // SELECT して返す。追加 SELECT は no-op パスのみ発生する。
+  // No-op saves (request body echoes the current values) skip the UPDATE and
+  // leave `updatedRow` null. To avoid responding with null fields that would
+  // clobber a client cache, fall back to fetching the current row. The extra
+  // SELECT only fires on the no-op path.
+  let title: string | null;
+  let contentPreview: string | null;
+  let updatedAt: Date;
+  if (updatedRow) {
+    title = updatedRow.title;
+    contentPreview = updatedRow.contentPreview;
+    updatedAt = updatedRow.updatedAt;
+  } else {
+    const current = await db
+      .select({
+        title: pages.title,
+        contentPreview: pages.contentPreview,
+        updatedAt: pages.updatedAt,
+      })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+      .limit(1);
+    const row = current[0];
+    if (!row) {
+      // `assertPageEditAccess` の直後に同じ id が論理削除される競合は通常
+      // 起きないが、起きた場合はクライアントが再同期できるよう 404 を返す。
+      // `assertPageEditAccess` already proved the row exists; reaching here
+      // means a concurrent delete raced us. Surface 404 so the client
+      // resyncs cleanly instead of seeing a half-formed response.
+      throw new HTTPException(404, { message: "Page not found" });
+    }
+    title = row.title;
+    contentPreview = row.contentPreview;
+    updatedAt = row.updatedAt;
+  }
+
   return c.json({
     id: pageId,
-    title: updatedRow?.title ?? null,
-    content_preview: updatedRow?.contentPreview ?? null,
-    updated_at: updatedRow?.updatedAt?.toISOString() ?? null,
+    title,
+    content_preview: contentPreview,
+    updated_at: updatedAt.toISOString(),
   });
 });
 

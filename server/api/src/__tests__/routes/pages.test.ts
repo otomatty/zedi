@@ -763,14 +763,29 @@ describe("PUT /api/pages/:id (metadata only)", () => {
   });
 
   // 同じ値を round-trip した場合は `applyPagesMetadataUpdate` が UPDATE を skip し、
-  // `metadataChanged: false` で返す。SSE 通知も走らない。
+  // `metadataChanged: false` で返す。SSE 通知も走らない。さらに、レスポンスは
+  // 現在値 (DB に保存された値) を必ず含み、`null` で返してクライアントの
+  // キャッシュを壊さないこと (PR #888 レビューフィードバック)。
   //
   // Round-tripping the current values must be a no-op: the helper skips the
   // UPDATE and returns `metadataChanged: false`, so no SSE broadcast fires.
-  it("skips the UPDATE when title matches current value (PR #867 invariant)", async () => {
+  // The response must echo the current persisted values rather than nulls so
+  // clients trusting the response do not clobber valid cache entries
+  // (PR #888 review feedback from gemini-code-assist, codex, coderabbitai).
+  it("skips the UPDATE but echoes current metadata when title matches (PR #888 review)", async () => {
+    const sameUpdatedAt = new Date("2026-05-16T11:00:00Z");
     const { app, chains } = createPagesAppWithChains([
       ...pageAccessPrefix(),
+      // applyPagesMetadataUpdate の現在値取得 SELECT
       [{ title: "Same Title", contentPreview: "Same Preview" }],
+      // no-op 経路の現在値再取得 SELECT (`updated_at` を含む)
+      [
+        {
+          title: "Same Title",
+          contentPreview: "Same Preview",
+          updatedAt: sameUpdatedAt,
+        },
+      ],
     ]);
 
     const res = await app.request(`/api/pages/${PAGE_ID}`, {
@@ -780,6 +795,13 @@ describe("PUT /api/pages/:id (metadata only)", () => {
     });
 
     expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: PAGE_ID,
+      title: "Same Title",
+      content_preview: "Same Preview",
+      updated_at: sameUpdatedAt.toISOString(),
+    });
     const updateChains = chains.filter((c) => c.startMethod === "update");
     expect(updateChains.length).toBe(0);
   });
@@ -791,6 +813,36 @@ describe("PUT /api/pages/:id (metadata only)", () => {
       method: "PUT",
       headers: authHeaders(),
       body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  // 非文字列が混ざった場合に `applyPagesMetadataUpdate` の `.trim()` で 500 に
+  // 落ちないこと (PR #888 review by coderabbitai)。境界で 400 に倒す。
+  //
+  // Malformed payloads with non-string fields must be rejected at the route
+  // boundary (400) instead of crashing inside the metadata helper's
+  // `.trim()` call (PR #888 review by coderabbitai).
+  it("returns 400 when title is not a string", async () => {
+    const app = createPagesApp([]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: 123 }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when content_preview is not a string", async () => {
+    const app = createPagesApp([]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ content_preview: 42 }),
     });
 
     expect(res.status).toBe(400);
