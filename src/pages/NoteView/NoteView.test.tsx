@@ -30,22 +30,10 @@ vi.mock("@/hooks/useNoteQueries", () => ({
     isPending: false,
   }),
   useRemovePageFromNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  // issue #860 Phase 5/6: NoteAddPageDialog uses useNoteTitleIndex for the
-  // title-dedup warning, and NoteSearchBar (rendered above PageGrid) uses
-  // useInfiniteNoteSearch. Stub both so the test does not error on
+  // issue #860 Phase 6: NoteAddPageDialog uses useNoteTitleIndex for the
+  // title-dedup warning. Stub it so the test does not error on
   // undefined-as-function.
   useNoteTitleIndex: () => ({ data: [], isLoading: false }),
-  useInfiniteNoteSearch: () => ({
-    results: [],
-    rawPages: [],
-    isLoading: false,
-    isFetching: false,
-    isFetchingNextPage: false,
-    hasNextPage: false,
-    fetchNextPage: vi.fn(),
-    refetch: vi.fn(),
-    error: null,
-  }),
 }));
 
 vi.mock("@/hooks/usePageQueries", () => ({

@@ -379,40 +379,6 @@ export interface NotePageTitleIndexResponse {
 }
 
 /**
- * `GET /api/notes/:noteId/search` の結果行（issue #860 Phase 5）。
- * note-scoped 全文検索 (ILIKE) のヒット行。サーバ側 SQL が `p.note_id = :noteId`
- * で hard-filter しているため、`note_id` は常に URL の `:noteId` と一致し
- * 非 null。`content_text` 等の本文フィールドはペイロード肥大化を避けるため
- * サーバ内部に留めており、公開レスポンスには含めない。
- *
- * Result row from `GET /api/notes/:noteId/search` (issue #860 Phase 5).
- * Note-scoped ILIKE hit. The server hard-filters `p.note_id = :noteId` so
- * `note_id` is always equal to the URL's `:noteId` and never null. Body
- * fields like `content_text` stay server-side to keep the wire payload
- * small.
- */
-export interface NoteSearchResultItem {
-  id: string;
-  title: string | null;
-  content_preview: string | null;
-  updated_at: string;
-  note_id: string;
-}
-
-/**
- * `GET /api/notes/:noteId/search` のレスポンス（issue #860 Phase 5 で
- * `next_cursor` 付きの cursor pagination に変更）。`next_cursor` が `null` で
- * 末尾を示す。
- *
- * Cursor-paginated response from `GET /api/notes/:noteId/search` (issue
- * #860 Phase 5 added the cursor). A `null` `next_cursor` marks the end.
- */
-export interface NoteSearchResponse {
-  results: NoteSearchResultItem[];
-  next_cursor: string | null;
-}
-
-/**
  * `?include=` トークンで追加できるオプションフィールド（issue #860 Phase 1）。
  * `preview` は `content_preview`、`thumbnail` は `thumbnail_url` の同梱を要求する。
  *
