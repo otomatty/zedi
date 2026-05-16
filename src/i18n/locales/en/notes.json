@@ -39,6 +39,7 @@
   "untitledNote": "Untitled note",
   "noPermissionToEdit": "You don't have permission to change settings.",
   "openSettings": "Open settings",
+  "openShareSettingsReadOnly": "View share settings",
   "copyShareUrlAria": "Copy share URL",
   "settingsNav": {
     "ariaLabel": "Note settings sections",

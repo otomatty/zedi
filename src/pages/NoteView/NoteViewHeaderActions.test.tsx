@@ -1,10 +1,20 @@
 /**
  * NoteViewHeaderActions: ノート画面のヘッダー右上アクション。
  *
- * 旧仕様（共有モーダル + 設定リンクの 2 系統）から「歯車アイコン 1 個」に
- * 簡素化済み。テストの観点 / Coverage:
- *   - Owner: 設定ページ (`/notes/:id/settings`) へ遷移する歯車リンクを表示
- *   - Editor / Viewer / Guest: 何もレンダリングしない（共有モーダル廃止）
+ * 共有モーダル廃止後は `/notes/:id/settings/*` へのエントリポイントとして
+ * 機能する。Issue #675 の精神 (editor / viewer にもアクセス透明性を) を
+ * 満たすため、ロール別に異なるアイコン / リンク先を提示する。
+ *
+ * テストの観点 / Coverage:
+ *   - Owner: 歯車アイコン → `/notes/:id/settings`
+ *   - Editor: 共有閲覧アイコン → `/notes/:id/settings/members` (read-only)
+ *   - Viewer (canView=true): 共有閲覧アイコン → `/notes/:id/settings/visibility`
+ *   - Guest / canView=false: 何もレンダリングしない
+ *
+ * Header-right actions on the note page. Renders a role-aware entry point
+ * into `/notes/:id/settings/*`. Owners get a gear icon to general settings,
+ * editors and viewers get a read-only "view share settings" icon landing on
+ * the most relevant section for their role.
  */
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
@@ -38,6 +48,7 @@ function renderActions(props: Partial<React.ComponentProps<typeof NoteViewHeader
   const merged = {
     note: baseNote,
     canManageMembers: false,
+    canView: false,
     userRole: "none" as NoteAccessRole,
     ...props,
   };
@@ -50,23 +61,40 @@ function renderActions(props: Partial<React.ComponentProps<typeof NoteViewHeader
 
 describe("NoteViewHeaderActions", () => {
   it("owner には設定ページへ遷移する歯車アイコンを表示する", () => {
-    renderActions({ canManageMembers: true, userRole: "owner" });
+    renderActions({ canManageMembers: true, canView: true, userRole: "owner" });
     const link = screen.getByRole("link", { name: "notes.openSettings" });
     expect(link).toHaveAttribute("href", "/notes/note-1/settings");
   });
 
-  it("editor には何もレンダリングしない（設定画面の編集権限を持たないため）", () => {
-    const { container } = renderActions({ canManageMembers: false, userRole: "editor" });
+  it("editor には共有閲覧アイコンを表示し、members セクションへリンクする", () => {
+    renderActions({ canManageMembers: false, canView: true, userRole: "editor" });
+    const link = screen.getByRole("link", { name: "notes.openShareSettingsReadOnly" });
+    expect(link).toHaveAttribute("href", "/notes/note-1/settings/members");
+    // owner 向けの歯車アイコンは出ない
+    expect(screen.queryByRole("link", { name: "notes.openSettings" })).not.toBeInTheDocument();
+  });
+
+  it("viewer には共有閲覧アイコンを表示し、visibility セクションへリンクする", () => {
+    renderActions({ canManageMembers: false, canView: true, userRole: "viewer" });
+    const link = screen.getByRole("link", { name: "notes.openShareSettingsReadOnly" });
+    expect(link).toHaveAttribute("href", "/notes/note-1/settings/visibility");
+  });
+
+  it("canView=false の guest には何もレンダリングしない", () => {
+    const { container } = renderActions({
+      canManageMembers: false,
+      canView: false,
+      userRole: "guest",
+    });
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("viewer には何もレンダリングしない", () => {
-    const { container } = renderActions({ canManageMembers: false, userRole: "viewer" });
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("guest (canManageMembers=false) でも何もレンダリングしない", () => {
-    const { container } = renderActions({ canManageMembers: false, userRole: "guest" });
+  it("canView=false の none (未ログイン) には何もレンダリングしない", () => {
+    const { container } = renderActions({
+      canManageMembers: false,
+      canView: false,
+      userRole: "none",
+    });
     expect(container).toBeEmptyDOMElement();
   });
 });

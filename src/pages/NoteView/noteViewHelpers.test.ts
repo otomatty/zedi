@@ -42,6 +42,15 @@ describe("getNoteViewPermissions", () => {
     });
   });
 
+  describe("canView", () => {
+    it("returns true when access.canView is true regardless of noteSource", () => {
+      expect(getNoteViewPermissions({ canView: true }, "local").canView).toBe(true);
+      expect(getNoteViewPermissions({ canView: true }, "remote").canView).toBe(true);
+      expect(getNoteViewPermissions({ canView: false }, "local").canView).toBe(false);
+      expect(getNoteViewPermissions(undefined, "local").canView).toBe(false);
+    });
+  });
+
   describe("canManageMembers", () => {
     it("returns true only when access.canManageMembers and noteSource is local", () => {
       expect(getNoteViewPermissions({ canManageMembers: true }, "local").canManageMembers).toBe(
