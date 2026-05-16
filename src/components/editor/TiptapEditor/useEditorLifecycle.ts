@@ -5,6 +5,7 @@ import { useContentSanitizer } from "./useContentSanitizer";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
 import { useTagStatusSync } from "./useTagStatusSync";
 import { usePasteImageHandler } from "./usePasteImageHandler";
+import { applyWikiLinkMarksToEditor } from "../extensions/applyWikiLinkMarksToEditor";
 
 import { rememberSlashAgentSelection } from "@/lib/agentSlashCommands/slashAgentSelectionCache";
 import type { TiptapEditorProps } from "./types";
@@ -61,6 +62,15 @@ export function useEditorLifecycle({
   pageNoteId,
 }: UseEditorLifecycleOptions) {
   const initialContentAppliedRef = useRef(false);
+  /**
+   * Issue #880 Phase B: 初期同期完了後に `[[Title]]` プレーンテキストを一度だけ
+   * `wikiLink` mark 化したかを記録する。エディタ／ページが変わった場合は
+   * 別効果で false にリセットされる。
+   *
+   * Issue #880 Phase B: tracks whether the post-sync `[[Title]]` → wikiLink
+   * mark normalization already ran on the current editor/page combination.
+   */
+  const wikiLinkNormalizationAppliedRef = useRef(false);
 
   useEffect(() => {
     if (!editor) return;
@@ -137,6 +147,76 @@ export function useEditorLifecycle({
     onWikiContentApplied,
     isEditorInitializedRef,
   ]);
+
+  // Issue #880 Phase B: Hocuspocus からロードされた既存 Y.Doc に含まれる plain
+  // text `[[Title]]` を、初期同期完了直後に一度だけ `wikiLink` mark へ昇格する。
+  // - collaborative mode の場合のみ実行（local mode は paste 時に既に mark 化される）。
+  // - `setContent` を使わず ProseMirror transaction で `addMark` のみ呼ぶことで
+  //   Y.Doc 構造を壊さない。
+  // - `useWikiLinkStatusSync` は mark 後の `exists/referenced/targetId` を更新する。
+  //
+  // Issue #880 Phase B: promote plain `[[Title]]` text inside the
+  // Hocuspocus-loaded Y.Doc to `wikiLink` marks once, immediately after the
+  // initial sync completes. Collaborative mode only — local mode marks links
+  // at paste time via `WikiLinkExtension`. The downstream `useWikiLinkStatusSync`
+  // hook then fills in `exists/referenced/targetId`.
+  // `collaborationConfig` は親側で毎回 new されるが、判定に必要なのは isSynced
+  // フラグだけなのでプリミティブで dep に積む。これで effect の再実行が必要
+  // 以上に走らない。
+  // The `collaborationConfig` object is rebuilt on every parent render; key
+  // the effect on the boolean `isSynced` flag so the effect doesn't tear down
+  // and re-arm the timer needlessly.
+  // editor インスタンスまたは pageId が切り替わったら、normalization 履歴を
+  // リセットして新しい文書でも一度だけ走るようにする。useRef はマウント中
+  // 値を保持するため、ページ遷移しても明示的に false に戻す必要がある。
+  // Reset the one-shot guard when the editor instance or page changes so a
+  // navigated-to page also runs the normalization once. `useRef` persists
+  // across renders, so without this reset a stale `true` would block the
+  // post-sync pass on the next page.
+  useEffect(() => {
+    wikiLinkNormalizationAppliedRef.current = false;
+  }, [editor, pageId]);
+
+  const isCollabSynced = Boolean(collaborationConfig?.isSynced);
+  useEffect(() => {
+    if (!editor || !isCollabSynced) return;
+    if (wikiLinkNormalizationAppliedRef.current) return;
+
+    // editor mount 直後だと PM doc がまだ最終形に落ちていないことがあるため、
+    // 1 tick 待ってから走査する。`useContentSanitizer` の初期化フローや、
+    // Hocuspocus からの Y.Doc 反映の最終ステップが完了してから実行したい。
+    // Defer one microtask so the editor finishes binding to the synced Y.Doc
+    // before we scan it. Matches the deferral pattern used for `initialContent`.
+    const timer = setTimeout(() => {
+      // ガードはタイマ起動時ではなく実際に走った時点で flip する。effect
+      // クリーンアップで timer が解除された場合に「未実行なのに guard=true」
+      // 状態を残さないため。
+      // Flip the guard inside the timer (not when scheduling it) so a cleanup
+      // that cancels the timer does not leave the guard armed and silently
+      // skip the real run forever.
+      if (wikiLinkNormalizationAppliedRef.current) return;
+      wikiLinkNormalizationAppliedRef.current = true;
+      try {
+        // `applyWikiLinkMarksToEditor` 内の `editor.view.dispatch(tr)` が
+        // Tiptap の `onUpdate` を発火し、上位 (`useEditorSetup`) で
+        // `onChange(JSON.stringify(editor.getJSON()))` が呼ばれる。
+        // ここで明示的に呼ぶと二重呼び出しになるため呼ばない。
+        // The dispatch inside `applyWikiLinkMarksToEditor` triggers Tiptap's
+        // `onUpdate`, which already invokes `onChange` upstream. Calling it
+        // again here would double-fire the downstream state update.
+        applyWikiLinkMarksToEditor(editor);
+      } catch (e) {
+        console.error("[WikiLinkNormalize] Failed to normalize post-sync marks", e);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+    // `pageId` を deps に含めることで、エディタインスタンスが使い回されたまま
+    // ページ遷移したケース (上の reset effect が ref を false に戻すケース) でも
+    // この effect が再実行されて正規化が走るようにする。
+    // `pageId` is in deps so that when the editor instance is reused across
+    // page navigation, the reset effect above flips the guard back to false
+    // AND this effect re-runs to perform the normalization on the new page.
+  }, [editor, isCollabSynced, pageId]);
 
   usePasteImageHandler({ editor, handleImageUpload });
 

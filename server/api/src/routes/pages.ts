@@ -25,6 +25,7 @@ import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAcce
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
 import { deleteThumbnailObject } from "../services/thumbnailGcService.js";
 import { publishNoteEvent } from "../services/noteEventBroadcaster.js";
+import { syncPageGraphFromStoredYDoc } from "../services/pageGraphSyncService.js";
 import { pageRowToWindowItem } from "./notes/eventHelpers.js";
 
 /**
@@ -69,6 +70,21 @@ function tryPropagateTitleRename(
         `(${oldTitle} → ${newTitle}):`,
       error,
     );
+  });
+}
+
+/**
+ * 本文保存後に、現在の Y.Doc から `links` / `ghost_links` を再構築する
+ * (issue #880 Phase C)。本文保存のレスポンスはブロックしないよう
+ * fire-and-forget。失敗は本文保存とは独立にログに残す。
+ *
+ * Fire-and-forget rebuild of `links` / `ghost_links` from the just-saved
+ * Y.Doc (issue #880 Phase C). Failures are logged but do not block the
+ * content save response.
+ */
+function tryGraphSync(db: Database, pageId: string): void {
+  void syncPageGraphFromStoredYDoc(db, pageId).catch((error) => {
+    console.error(`[PageGraphSync] Background graph sync crashed for page ${pageId}:`, error);
   });
 }
 
@@ -390,6 +406,9 @@ app.put("/:id/content", authRequired, async (c) => {
             firstSave.renamed.newTitle,
           );
         }
+        // Issue #880 Phase C: 本文保存と同じトリガーでリンクグラフを再構築する。
+        // Issue #880 Phase C: rebuild outgoing edges from the saved Y.Doc.
+        tryGraphSync(db, pageId);
         // Issue #860 Phase 4: メタデータが実際に変化したときだけ通知。
         // Issue #860 Phase 4: emit only when metadata really changed.
         emitPageUpdatedIfChanged(firstSave.metadataChanged, firstSave.updatedRow);
@@ -444,6 +463,10 @@ app.put("/:id/content", authRequired, async (c) => {
       tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
     }
 
+    // Issue #880 Phase C: 楽観的ロック成功経路でもグラフ再構築を発火する。
+    // Issue #880 Phase C: trigger graph rebuild on the optimistic-lock path.
+    tryGraphSync(db, pageId);
+
     // Issue #860 Phase 4: optimistic-lock 経路のメタデータ変化を通知。
     // Notify subscribers from the optimistic-lock path as well.
     emitPageUpdatedIfChanged(metadataChanged, metadataRow);
@@ -492,6 +515,10 @@ app.put("/:id/content", authRequired, async (c) => {
   if (renamed) {
     tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
   }
+
+  // Issue #880 Phase C: UPSERT 経路（楽観的ロック未使用）でも graph 再構築する。
+  // Issue #880 Phase C: trigger graph rebuild on the UPSERT path too.
+  tryGraphSync(db, pageId);
 
   // Issue #860 Phase 4: UPSERT 経路（楽観的ロック未使用）でも emit。
   // Issue #860 Phase 4: emit from the UPSERT path too (no optimistic lock).

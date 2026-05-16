@@ -361,6 +361,78 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
   } finally {
     snapshotClient.release();
   }
+
+  // Issue #880 Phase C: 本文保存後に API 経由でリンクグラフ (links / ghost_links)
+  // を再構築する。本処理は内部 HTTP 呼び出しのベストエフォートで、失敗しても
+  // 本文保存の成功には影響させない。
+  // Issue #880 Phase C: rebuild outgoing edges (links / ghost_links) via the
+  // API's internal endpoint after persisting the document. Best-effort — a
+  // failure does not roll back the content save.
+  void triggerGraphSync(pageId).catch((error) => {
+    console.error(`[GraphSync] Failed to trigger graph sync for page ${pageId}:`, error);
+  });
+}
+
+/**
+ * `API_INTERNAL_URL` の末尾スラッシュを取り除いた origin を返す。
+ * Resolves the API origin used for internal calls. Returns `null` when the
+ * variable is unset so the caller can skip silently in dev.
+ */
+function getApiInternalOrigin(): string | null {
+  const raw = process.env.API_INTERNAL_URL?.trim();
+  if (!raw) return null;
+  return raw.replace(/\/+$/, "");
+}
+
+/** HTTP timeout for the API graph-sync call (ms). / API グラフ同期 HTTP のタイムアウト (ms) */
+const API_GRAPH_SYNC_TIMEOUT_MS = 2500;
+
+/**
+ * `POST /api/internal/pages/:id/graph-sync` を呼び出して、保存済み Y.Doc から
+ * リンクグラフを再構築させる。ネットワーク失敗・タイムアウトは握りつぶす
+ * （呼び出し元はベストエフォートで呼ぶ）。
+ *
+ * Call the API's internal graph-sync endpoint so it rebuilds outgoing edges
+ * from the just-persisted Y.Doc. Network failures / timeouts are swallowed
+ * because the caller treats this as best-effort.
+ */
+async function triggerGraphSync(pageId: string): Promise<void> {
+  const baseUrl = getApiInternalOrigin();
+  const secret = INTERNAL_SECRET;
+  if (!baseUrl || !secret) {
+    // dev: ログだけ残してスキップ。production では起動時に API_INTERNAL_URL
+    // が未設定だと起動拒否しているため、ここに来るのは dev か設定ミス。
+    // Dev: log + skip. In production the server already refuses to start
+    // without `API_INTERNAL_URL`, so this branch is dev-only or misconfig.
+    const missing = [baseUrl ? null : "API_INTERNAL_URL", secret ? null : "BETTER_AUTH_SECRET"]
+      .filter((v): v is string => v !== null)
+      .join(", ");
+    console.warn(`[GraphSync] Skipped for page ${pageId}: missing env var(s): ${missing}`);
+    return;
+  }
+
+  const url = `${baseUrl}/api/internal/pages/${encodeURIComponent(pageId)}/graph-sync`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_GRAPH_SYNC_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "x-internal-secret": secret },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      console.warn(`[GraphSync] HTTP ${response.status} for page ${pageId}`);
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const name = error instanceof Error ? error.name : "";
+    if (name === "AbortError") {
+      console.warn(`[GraphSync] Timed out for page ${pageId}`);
+      return;
+    }
+    console.warn(`[GraphSync] Request failed for page ${pageId}:`, error);
+  }
 }
 
 function parseRedisOptions(redisUrl: string): Record<string, unknown> {

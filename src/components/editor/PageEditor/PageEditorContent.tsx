@@ -14,15 +14,31 @@ import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { WikiGeneratorStatus } from "./types";
 import { PageTitleBlock } from "./PageTitleBlock";
 
+/**
+ * `useCollaboration` の戻り値から、Tiptap に渡す collaborationConfig と
+ * 編集可否ゲートに使うフラグを導出する。Issue #880 で初期同期完了
+ * (`isSynced`) を編集可否条件に取り込んだ。
+ *
+ * Derive both the `CollaborationConfig` for Tiptap and the gating flags used
+ * to lock editing during the initial Hocuspocus/IDB merge. Issue #880 added
+ * `isInitialSyncPending` so the body editor stays unmounted while a remote
+ * Y.Doc is still being merged, preventing the user from typing into an empty
+ * doc that will be overwritten by the upcoming sync.
+ */
 function getCollaborationState(collaboration: UseCollaborationReturn | undefined): {
   useCollaborationMode: boolean;
+  isInitialSyncPending: boolean;
   collaborationConfig: CollaborationConfig | undefined;
 } {
   const ready = Boolean(
     collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.collaborationUser,
   );
   if (!ready || !collaboration) {
-    return { useCollaborationMode: false, collaborationConfig: undefined };
+    return {
+      useCollaborationMode: false,
+      isInitialSyncPending: false,
+      collaborationConfig: undefined,
+    };
   }
   const config: CollaborationConfig = {
     ydoc: collaboration.ydoc,
@@ -31,8 +47,13 @@ function getCollaborationState(collaboration: UseCollaborationReturn | undefined
     user: collaboration.collaborationUser,
     updateCursor: collaboration.updateCursor,
     updateSelection: collaboration.updateSelection,
+    isSynced: collaboration.isSynced,
   };
-  return { useCollaborationMode: true, collaborationConfig: config };
+  return {
+    useCollaborationMode: true,
+    isInitialSyncPending: !collaboration.isSynced,
+    collaborationConfig: config,
+  };
 }
 
 interface PageEditorContentProps {
@@ -121,9 +142,23 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
     contentFocusRef.current?.();
   }, []);
 
-  const { useCollaborationMode, collaborationConfig } = getCollaborationState(collaboration);
-  const showCollaborationLoading = Boolean(collaboration && !useCollaborationMode);
-  const showEditor = useCollaborationMode || !collaboration;
+  const { useCollaborationMode, isInitialSyncPending, collaborationConfig } =
+    getCollaborationState(collaboration);
+  // Issue #880: `isSynced` を満たすまで本文 editor を表示しない。`ydoc/xmlFragment`
+  // は HocuspocusProvider の初期同期完了より前に作られるため、ここを編集可能条件に
+  // すると空 Y.Doc に入力できてしまい、その直後に届く remote update と競合する。
+  // タイトル input は `pages.title` 列に独立して保存され Y.Doc とは無関係なため、
+  // 初期同期中も編集可能にしておく（保存レースは発生しない）。
+  //
+  // Issue #880: keep the body editor unmounted until the initial Y.Doc sync
+  // completes. Using `ydoc/xmlFragment` presence alone would let users type
+  // into an empty Y.Doc that is about to be overwritten by the remote sync.
+  // Title input persists into `pages.title` (separate from Y.Doc) so there is
+  // no race and it can remain editable during sync.
+  const showCollaborationLoading = Boolean(
+    collaboration && (!useCollaborationMode || isInitialSyncPending),
+  );
+  const showEditor = (useCollaborationMode && !isInitialSyncPending) || !collaboration;
 
   return (
     <div className="flex-1 pt-6 pb-32">
