@@ -47,7 +47,7 @@
  */
 
 import * as Y from "yjs";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { links, ghostLinks, pages, pageContents } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 import type { LinkType } from "../schema/links.js";
@@ -233,10 +233,18 @@ async function buildResolvedScope(
   sourcePageId: string,
   markedTargetIds: Set<string>,
 ): Promise<ResolvedScope> {
+  // `createdAt` 昇順 + `id` 昇順で読み出し、同一ノート内で同名ページが複数ある
+  // 場合の解決を「作成順（最初勝ち）」で決定的にする。下の `titleToId` 構築は
+  // `if (!titleToId.has(key))` で最初に出てきた行を採用するため、ここで安定した
+  // 順序を与えないと実行ごとに解決先がブレうる。
+  // Order by creation time (with id as deterministic tie-breaker) so duplicate
+  // titles within a note resolve to the same page across runs — `titleToId`
+  // below uses first-write-wins semantics and depends on a stable scan order.
   const scopeRows = await tx
     .select({ id: pages.id, title: pages.title, isDeleted: pages.isDeleted })
     .from(pages)
-    .where(eq(pages.noteId, sourcePageNoteId));
+    .where(eq(pages.noteId, sourcePageNoteId))
+    .orderBy(asc(pages.createdAt), asc(pages.id));
 
   const titleToId = new Map<string, string>();
   const validIds = new Set<string>();
@@ -387,6 +395,102 @@ async function replaceBucket(
 }
 
 /**
+ * 与えられた `tx` 内でリンクグラフ再構築を実行する共通本体。
+ * `sourceNoteId` は呼び出し側がロック取得後に読み出した値を渡すこと。
+ *
+ * Shared core that performs the (source_id, link_type) bucket rewrite inside
+ * an existing transaction. Callers are responsible for first acquiring a
+ * write lock on the source `pages` row and supplying its `noteId`.
+ */
+type TxHandle = ReadHandle & WriteHandle;
+async function rewriteGraphInTx(
+  tx: TxHandle,
+  sourcePageId: string,
+  sourceNoteId: string,
+  doc: Y.Doc,
+): Promise<PageGraphSyncResult> {
+  const refs = extractRefsFromYDoc(doc);
+  const allTargetIds = new Set<string>();
+  for (const ref of refs.wikiRefs) {
+    if (ref.targetId) allTargetIds.add(ref.targetId);
+  }
+  for (const ref of refs.tagRefs) {
+    if (ref.targetId) allTargetIds.add(ref.targetId);
+  }
+  const scope = await buildResolvedScope(tx, sourceNoteId, sourcePageId, allTargetIds);
+
+  const wikiPlan = planBucket(sourcePageId, refs.wikiRefs, scope);
+  const tagPlan = planBucket(sourcePageId, refs.tagRefs, scope);
+
+  const wikiResult = await replaceBucket(
+    tx,
+    sourcePageId,
+    "wiki",
+    wikiPlan.linkTargetIds,
+    wikiPlan.ghostTexts,
+  );
+  const tagResult = await replaceBucket(
+    tx,
+    sourcePageId,
+    "tag",
+    tagPlan.linkTargetIds,
+    tagPlan.ghostTexts,
+  );
+
+  return {
+    wikiLinksInserted: wikiResult.insertedLinks,
+    wikiGhostsInserted: wikiResult.insertedGhosts,
+    tagLinksInserted: tagResult.insertedLinks,
+    tagGhostsInserted: tagResult.insertedGhosts,
+    skippedSourceNotFound: false,
+  };
+}
+
+/**
+ * ソースページ行を `SELECT ... FOR UPDATE` でロックする。
+ * 同一ページに対する並列同期を直列化し、後勝ちで一貫した結果を保証する。
+ *
+ * Acquire a row-level write lock on the source page so that concurrent graph
+ * syncs for the same page serialize. Combined with reading the latest Y.Doc
+ * inside the same transaction, this prevents an older sync from overwriting
+ * a newer one's edges.
+ */
+async function lockSourcePage(
+  tx: TxHandle,
+  sourcePageId: string,
+): Promise<{ noteId: string; isDeleted: boolean } | null> {
+  // drizzle-orm の `select(...).for("update")` で `SELECT ... FOR UPDATE` を発行する。
+  // Issues `SELECT ... FOR UPDATE` so parallel syncs on the same page queue up
+  // instead of racing on `links` / `ghost_links`.
+  const rows = await tx
+    .select({ noteId: pages.noteId, isDeleted: pages.isDeleted })
+    .from(pages)
+    .where(eq(pages.id, sourcePageId))
+    .for("update")
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * `ydocState` カラムの値を `Buffer` に正規化する。
+ * Drizzle / pg ドライバの組み合わせによっては Buffer / Uint8Array / base64 文字列
+ * のいずれかが返るため、`titleRenamePropagationService` と同じ防御策を取る。
+ *
+ * Normalize a `ydoc_state` column value to a `Buffer`. Some driver
+ * configurations hand the bytes back as a base64 string, so handle that
+ * branch explicitly — `Buffer.from(string)` without an encoding would treat
+ * each character as a raw byte and corrupt the payload. Mirrors the helper
+ * in `titleRenamePropagationService.ts`.
+ */
+function toYdocBuffer(ydocState: unknown): Buffer | null {
+  if (ydocState instanceof Buffer) return ydocState;
+  if (ydocState instanceof Uint8Array) return Buffer.from(ydocState);
+  if (typeof ydocState === "string") return Buffer.from(ydocState, "base64");
+  if (ydocState == null) return null;
+  return Buffer.from(ydocState as ArrayBufferLike);
+}
+
+/**
  * `pageId` のソースページについて、Y.Doc の現在内容から
  * `links` / `ghost_links` を `(source_id, link_type)` バケット単位で
  * 再構築する。
@@ -413,56 +517,17 @@ export async function syncPageGraphFromYDoc(
   };
 
   return db.transaction(async (tx) => {
-    // ソースページの note スコープを解決する。削除済み・行欠落は best-effort
-    // としてサイレント no-op（呼び出し側のメイン保存パスは既に終わっている）。
-    // Resolve the source page's note scope. Missing / soft-deleted rows are
-    // treated as a no-op since this service runs in a best-effort context
-    // after the main content save has already succeeded.
-    const sourceRows = await tx
-      .select({ noteId: pages.noteId, isDeleted: pages.isDeleted })
-      .from(pages)
-      .where(eq(pages.id, sourcePageId))
-      .limit(1);
-    const source = sourceRows[0];
+    // ソースページ行を FOR UPDATE でロックし、note スコープを取得する。
+    // 削除済み・行欠落は best-effort としてサイレント no-op
+    // （呼び出し側のメイン保存パスは既に終わっている）。
+    // Lock the source page (FOR UPDATE) and read its note scope. Missing /
+    // soft-deleted rows are treated as a no-op since this service runs in a
+    // best-effort context after the main content save has already succeeded.
+    const source = await lockSourcePage(tx, sourcePageId);
     if (!source || source.isDeleted) {
       return { ...empty, skippedSourceNotFound: true };
     }
-
-    const refs = extractRefsFromYDoc(doc);
-    const allTargetIds = new Set<string>();
-    for (const ref of refs.wikiRefs) {
-      if (ref.targetId) allTargetIds.add(ref.targetId);
-    }
-    for (const ref of refs.tagRefs) {
-      if (ref.targetId) allTargetIds.add(ref.targetId);
-    }
-    const scope = await buildResolvedScope(tx, source.noteId, sourcePageId, allTargetIds);
-
-    const wikiPlan = planBucket(sourcePageId, refs.wikiRefs, scope);
-    const tagPlan = planBucket(sourcePageId, refs.tagRefs, scope);
-
-    const wikiResult = await replaceBucket(
-      tx,
-      sourcePageId,
-      "wiki",
-      wikiPlan.linkTargetIds,
-      wikiPlan.ghostTexts,
-    );
-    const tagResult = await replaceBucket(
-      tx,
-      sourcePageId,
-      "tag",
-      tagPlan.linkTargetIds,
-      tagPlan.ghostTexts,
-    );
-
-    return {
-      wikiLinksInserted: wikiResult.insertedLinks,
-      wikiGhostsInserted: wikiResult.insertedGhosts,
-      tagLinksInserted: tagResult.insertedLinks,
-      tagGhostsInserted: tagResult.insertedGhosts,
-      skippedSourceNotFound: false,
-    };
+    return rewriteGraphInTx(tx, sourcePageId, source.noteId, doc);
   });
 }
 
@@ -471,10 +536,19 @@ export async function syncPageGraphFromYDoc(
  * グラフ同期を実行するラッパー。Hocuspocus 保存後の internal 経路や、API 内
  * の fire-and-forget 呼び出しから使う。
  *
- * Convenience wrapper: read `page_contents.ydoc_state` for `pageId`, hydrate
- * the Y.Doc, and run `syncPageGraphFromYDoc`. Used by the Hocuspocus
- * post-save trigger (via internal HTTP) and by the REST PUT /content path
- * (fire-and-forget).
+ * Convenience wrapper: lock the source page, read the latest
+ * `page_contents.ydoc_state` under that lock, hydrate the Y.Doc, then rewrite
+ * the graph. Used by the Hocuspocus post-save trigger (via internal HTTP)
+ * and by the REST PUT /content path (fire-and-forget).
+ *
+ * 並列保存が連続して走るケース（fire-and-forget で 2 つの同期が ほぼ同時に
+ * 起動する）に備えて、`pages` 行のロック取得後に `page_contents` を読み直す。
+ * これにより「古い Y.Doc を読んでいた古い同期がロック解放後に新しいグラフを
+ * 上書きする」レースを防ぐ。
+ *
+ * Reading `page_contents` inside the transaction (after the `pages` lock) is
+ * what makes the lock useful: it ensures the older of two queued syncs sees
+ * the newer Y.Doc state and never regresses the graph back to an older one.
  *
  * Returns `null` when there is no stored content yet — the caller should
  * treat that as a no-op (graph stays empty).
@@ -483,22 +557,32 @@ export async function syncPageGraphFromStoredYDoc(
   db: Database,
   sourcePageId: string,
 ): Promise<PageGraphSyncResult | null> {
-  const rows = await db
-    .select({ ydocState: pageContents.ydocState })
-    .from(pageContents)
-    .where(eq(pageContents.pageId, sourcePageId))
-    .limit(1);
-  const row = rows[0];
-  if (!row?.ydocState) return null;
+  const empty: PageGraphSyncResult = {
+    wikiLinksInserted: 0,
+    wikiGhostsInserted: 0,
+    tagLinksInserted: 0,
+    tagGhostsInserted: 0,
+    skippedSourceNotFound: false,
+  };
 
-  const buffer =
-    row.ydocState instanceof Buffer
-      ? row.ydocState
-      : Buffer.from(row.ydocState as unknown as ArrayBufferLike);
+  return db.transaction(async (tx) => {
+    const source = await lockSourcePage(tx, sourcePageId);
+    if (!source || source.isDeleted) {
+      return source ? { ...empty, skippedSourceNotFound: true } : null;
+    }
 
-  const doc = new Y.Doc();
-  Y.applyUpdate(doc, new Uint8Array(buffer));
-  return syncPageGraphFromYDoc(db, sourcePageId, doc);
+    const rows = await tx
+      .select({ ydocState: pageContents.ydocState })
+      .from(pageContents)
+      .where(eq(pageContents.pageId, sourcePageId))
+      .limit(1);
+    const buffer = toYdocBuffer(rows[0]?.ydocState);
+    if (!buffer) return null;
+
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, new Uint8Array(buffer));
+    return rewriteGraphInTx(tx, sourcePageId, source.noteId, doc);
+  });
 }
 
 /**

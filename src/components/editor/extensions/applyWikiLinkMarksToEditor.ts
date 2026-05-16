@@ -103,7 +103,14 @@ export function applyWikiLinkMarksToEditor(editor: Editor): boolean {
 
   if (edits.length === 0) return false;
 
-  let tr = editor.state.tr;
+  // この正規化はユーザー操作ではなく初期同期後の機械的処理なので、Undo スタック
+  // に積まない (`addToHistory=false`)。これがないと、最初の Cmd+Z で plain
+  // text `[[Title]]` に戻ってしまい、ユーザーの直前操作 (タイトル入力等) が
+  // 取り消せなくなる。
+  // The normalization is a post-sync, machine-driven cleanup — not a user
+  // edit — so keep it out of the undo stack. Otherwise the first Cmd+Z would
+  // undo the mark promotion instead of the user's most recent change.
+  let tr = editor.state.tr.setMeta("addToHistory", false);
   // `addMark` は文書位置を変えないため、順序に関わらず安全に複数適用できる。
   // `addMark` does not change positions, so the order is irrelevant; iterate
   // in document order for clarity.
@@ -117,11 +124,6 @@ export function applyWikiLinkMarksToEditor(editor: Editor): boolean {
     tr = tr.addMark(edit.from, edit.to, mark);
   }
 
-  // 履歴に残さないことで、ユーザーが「元に戻す」で同期前状態に戻れないようにする
-  // のが望ましいが、Tiptap の history は ProseMirror transaction metadata で扱う。
-  // ここでは標準 dispatch のままにし、必要なら呼び出し側で history を分離する。
-  // We dispatch with default metadata; callers may wrap with `history` meta if
-  // they want to keep the normalization out of the undo stack.
   editor.view.dispatch(tr);
   return true;
 }
