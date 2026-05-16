@@ -107,17 +107,33 @@ export function PdfReader() {
     });
   }, []);
 
-  // ----- Backfill page_count once per loaded doc ----------------------------
-  const reportedPageCount = useRef<number | null>(null);
+  // ----- Backfill page_count once per loaded (sourceId, numPages) pair -----
+  // ガードは {sourceId → numPages} で記録する。「前回 PATCH した numPages」だけ
+  // で判定すると、同じページ数の別ソースに切り替えたときに新しいソースの
+  // PATCH を取りこぼす（chatgpt-codex-connector PR #870 review 指摘）。
+  // Track the backfill keyed by `(sourceId → numPages)`. If we keyed only on
+  // numPages, switching between two sources that happen to share a page count
+  // would silently skip the second PATCH and leave the server with stale
+  // metadata for the new source.
+  const reportedPageCount = useRef<Map<string, number>>(new Map());
   useEffect(() => {
     const doc = pdfState.pdfDoc;
     if (!doc || !sourceId) return;
-    if (reportedPageCount.current === doc.numPages) return;
-    reportedPageCount.current = doc.numPages;
-    patchPdfSourcePageCount(sourceId, doc.numPages).catch(() => {
-      // Server is idempotent; ignore failures so the viewer stays usable.
-      // サーバ側はべき等。失敗してもビューア利用は継続する。
-    });
+    if (reportedPageCount.current.get(sourceId) === doc.numPages) return;
+    const targetSourceId = sourceId;
+    const targetNumPages = doc.numPages;
+    patchPdfSourcePageCount(targetSourceId, targetNumPages)
+      .then(() => {
+        // Only mark on success so a transient failure doesn't permanently
+        // suppress retries while the viewer is open.
+        // 失敗中はガードを更新せず、次レンダーで再試行できるようにする。
+        reportedPageCount.current.set(targetSourceId, targetNumPages);
+      })
+      .catch(() => {
+        // Server is idempotent and the viewer stays usable; ignore the error
+        // beyond skipping the success-side mark.
+        // サーバ側はべき等。失敗してもビューア利用は継続する。
+      });
   }, [pdfState.pdfDoc, sourceId]);
 
   // ----- Reset scale + selection when source changes ------------------------
@@ -170,7 +186,10 @@ export function PdfReader() {
         }
         if (mostVisible && mostVisible.ratio > 0) setVisiblePage(mostVisible.page);
       },
-      { root, threshold: [0, 0.25, 0.5, 0.75, 1] },
+      // Coarse thresholds keep the callback rate low during fast scrolling
+      // while still letting us pick the "most visible" page reliably.
+      // スクロール中のコールバック頻度を抑えるため閾値は粗めにする。
+      { root, threshold: [0, 0.5, 1] },
     );
     for (const el of pageRefs.current.values()) observer.observe(el);
     return () => observer.disconnect();
@@ -242,8 +261,18 @@ export function PdfReader() {
   }, [viewports]);
 
   // ----- Save / derive handlers ---------------------------------------------
-  const handleSave = useCallback(async () => {
-    if (!selection || !sourceId) return;
+  /**
+   * 共有ヘルパ: 現在の selection から rects / text を取り出し、空なら toast して null を返す。
+   * Shared helper that converts the active selection into pdf-space rects +
+   * text. Returns `null` (and toasts) when the selection is empty so the
+   * caller can early-return.
+   */
+  const extractSavePayload = useCallback((): {
+    pdfPage: number;
+    rects: ReturnType<typeof selectionToPdfRects>["rects"];
+    text: string;
+  } | null => {
+    if (!selection) return null;
     const { rects, text } = selectionToPdfRects({
       selection: selection.selection,
       pageEl: selection.pageEl,
@@ -254,15 +283,17 @@ export function PdfReader() {
         title: "選択範囲が空です / Selection is empty",
         variant: "destructive",
       });
-      return;
+      return null;
     }
+    return { pdfPage: selection.pageNumber, rects, text };
+  }, [selection, toast]);
+
+  const handleSave = useCallback(async () => {
+    if (!sourceId) return;
+    const payload = extractSavePayload();
+    if (!payload) return;
     try {
-      await createMutation.mutateAsync({
-        pdfPage: selection.pageNumber,
-        rects,
-        text,
-        color: "yellow",
-      });
+      await createMutation.mutateAsync({ ...payload, color: "yellow" });
       setSelection(null);
       document.getSelection()?.removeAllRanges();
     } catch (err) {
@@ -272,25 +303,15 @@ export function PdfReader() {
         variant: "destructive",
       });
     }
-  }, [selection, sourceId, createMutation, toast]);
+  }, [sourceId, extractSavePayload, createMutation, toast]);
 
   const handleSaveAndDerive = useCallback(async () => {
-    if (!selection || !sourceId) return;
-    const { rects, text } = selectionToPdfRects({
-      selection: selection.selection,
-      pageEl: selection.pageEl,
-      viewport: selection.viewport,
-    });
-    if (rects.length === 0 || !text.trim()) {
-      toast({
-        title: "選択範囲が空です / Selection is empty",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!sourceId) return;
+    const payload = extractSavePayload();
+    if (!payload) return;
     const result = await runSaveAndDeriveFlow({
       sourceId,
-      createBody: { pdfPage: selection.pageNumber, rects, text, color: "yellow" },
+      createBody: { ...payload, color: "yellow" },
       createHighlight: (body) => createMutation.mutateAsync(body),
       derivePage: (p) => deriveMutation.mutateAsync(p),
       navigate,
@@ -304,7 +325,7 @@ export function PdfReader() {
         variant: "destructive",
       });
     }
-  }, [selection, sourceId, createMutation, deriveMutation, navigate, toast]);
+  }, [sourceId, extractSavePayload, createMutation, deriveMutation, navigate, toast]);
 
   // ----- Sidebar callbacks ---------------------------------------------------
   const handleSelectHighlight = useCallback((h: PdfHighlight) => {
@@ -327,6 +348,18 @@ export function PdfReader() {
     if (!pdfState.pdfDoc) return [];
     return Array.from({ length: pdfState.pdfDoc.numPages }, (_, i) => i + 1);
   }, [pdfState.pdfDoc]);
+
+  // 既に viewport が分かっているページ (通常は 1 ページ目) のサイズを placeholder
+  // のフォールバックに使う。多くの PDF はページサイズが揃っているので、A4 想定の
+  // ハードコード 800px より大幅にレイアウトシフトを抑えられる。
+  // Use the first known page viewport as the placeholder size for not-yet-
+  // rendered pages. Most PDFs have uniform page dimensions, so this minimises
+  // layout shift compared to a hardcoded 800px fallback.
+  const fallbackPageSize = useMemo<{ width: number; height: number } | null>(() => {
+    const first = viewports.values().next().value as PdfPageViewport | undefined;
+    if (!first) return null;
+    return { width: first.width, height: first.height };
+  }, [viewports]);
 
   // ----- Platform / route guards --------------------------------------------
   if (!isTauriDesktop()) return <PdfReaderUnsupported />;
@@ -408,10 +441,21 @@ export function PdfReader() {
                     }}
                     className="mx-auto mb-4 bg-white shadow-sm"
                     style={{
-                      width: viewport ? `${viewport.width}px` : undefined,
-                      // Reserve vertical space for non-rendered pages.
-                      // 未描画ページにも縦方向のスペースを確保する。
-                      minHeight: viewport ? `${viewport.height}px` : "800px",
+                      width: viewport
+                        ? `${viewport.width}px`
+                        : fallbackPageSize
+                          ? `${fallbackPageSize.width}px`
+                          : undefined,
+                      // Reserve vertical space for non-rendered pages — prefer the
+                      // first known viewport, fall back to a sensible A4 default.
+                      // 未描画ページにも縦方向のスペースを確保。最初に判明した
+                      // viewport を再利用して、ハードコード値由来のレイアウト
+                      // シフトを抑える。
+                      minHeight: viewport
+                        ? `${viewport.height}px`
+                        : fallbackPageSize
+                          ? `${fallbackPageSize.height}px`
+                          : "800px",
                     }}
                   >
                     {isVisible && pdfState.pdfDoc && (

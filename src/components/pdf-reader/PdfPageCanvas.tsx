@@ -67,11 +67,15 @@ function PdfPageCanvasImpl({ pdfDoc, pageNumber, scale, onViewportReady }: PdfPa
         if (cancelled) return;
 
         const viewport = page.getViewport({ scale });
-        // Resize the canvas. We do NOT account for devicePixelRatio here to
-        // keep the implementation simple; pdf.js + browser handle Hi-DPI
-        // acceptably with CSS-px sizing for our use case.
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
+        // High-DPI 対応: 内部バッファを devicePixelRatio 倍にし、CSS サイズは
+        // viewport のままに保つ。pdf.js には transform マトリクスで同じ倍率を
+        // かけ、ベクター描画も鮮明にする。
+        // High-DPI support: allocate a backing-store of `viewport × dpr` while
+        // keeping the CSS box at viewport size, and feed pdf.js a matching
+        // transform so vectors stay crisp on Retina-class displays.
+        const outputScale = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
 
@@ -87,7 +91,13 @@ function PdfPageCanvasImpl({ pdfDoc, pageNumber, scale, onViewportReady }: PdfPa
           throw new Error("PdfPageCanvas: 2d canvas context unavailable");
         }
 
-        renderTask = page.render({ canvasContext: ctx, viewport });
+        renderTask = page.render({
+          canvasContext: ctx,
+          viewport,
+          // dpr=1 のときは undefined を渡してデフォルトパスを温存する。
+          // Pass `transform` only when scaling is required.
+          transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined,
+        });
         await renderTask.promise;
         if (cancelled) return;
 

@@ -21,7 +21,10 @@ import { fileURLToPath } from "node:url";
 
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
-/** Mirror one pdfjs-dist asset directory into public/pdfjs/. */
+/**
+ * pdfjs-dist の 1 つのアセットディレクトリを `public/pdfjs/` にミラーする。
+ * Mirror one pdfjs-dist asset directory into `public/pdfjs/`.
+ */
 async function mirror(srcRel, destRel) {
   const src = join(root, "node_modules", "pdfjs-dist", srcRel);
   const dest = join(root, "public", "pdfjs", destRel);

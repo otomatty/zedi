@@ -8,7 +8,7 @@
  * a derived page (`derivedPageId`), an extra "派生ページを開く / Open derived
  * page" link is shown.
  */
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Trash2, FileText } from "lucide-react";
 import {
   usePdfHighlights,
@@ -65,6 +65,12 @@ export function HighlightSidebar({
   const deleteMutation = useDeletePdfHighlight(sourceId);
   const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
 
+  const highlights = highlightsQuery.data?.highlights ?? [];
+  // Hooks must run on every render (rules-of-hooks), so memoise before the
+  // loading / error / empty early-returns below.
+  // フック呼び出し順を一定に保つため、早期 return より前で memo を取る。
+  const grouped = useMemo(() => groupByPage(highlights), [highlights]);
+
   if (highlightsQuery.isLoading) {
     return <aside className="text-muted-foreground p-4 text-sm">読み込み中… / Loading…</aside>;
   }
@@ -78,7 +84,6 @@ export function HighlightSidebar({
     );
   }
 
-  const highlights = highlightsQuery.data?.highlights ?? [];
   if (highlights.length === 0) {
     return (
       <aside className="text-muted-foreground p-4 text-sm">
@@ -88,8 +93,6 @@ export function HighlightSidebar({
       </aside>
     );
   }
-
-  const grouped = groupByPage(highlights);
 
   function handleDelete(id: string) {
     if (

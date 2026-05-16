@@ -21,11 +21,11 @@
 import * as pdfjsLib from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 
-/** `pdfjs-dist` の `getDocument` 戻り値の型エイリアス。 */
+/** `pdfjs-dist` の `getDocument` 戻り値の型エイリアス。Type alias for the `pdfjs-dist` `getDocument` return type. */
 export type PdfDocumentProxy = pdfjsLib.PDFDocumentProxy;
-/** `pdfjs-dist` の `PDFPageProxy` の型エイリアス。 */
+/** `pdfjs-dist` の `PDFPageProxy` の型エイリアス。Type alias for the `pdfjs-dist` `PDFPageProxy` type. */
 export type PdfPageProxy = pdfjsLib.PDFPageProxy;
-/** `pdfjs-dist` の `PageViewport` の型エイリアス。 */
+/** `pdfjs-dist` の `PageViewport` の型エイリアス。Type alias for the `pdfjs-dist` `PageViewport` type. */
 export type PdfPageViewport = pdfjsLib.PageViewport;
 
 /**
